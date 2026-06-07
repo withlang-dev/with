@@ -43,6 +43,7 @@ enum TypeKind: i32:
     TY_TRAIT_OBJ = 17
     TY_NEVER = 18
     TY_GENERIC_INST = 19
+    TY_EXTERN_FN = 20
 
 type TypeId = distinct i32
 impl Copy for TypeId
@@ -1828,10 +1829,10 @@ fn Sema.ensure_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> TypeI
         self.type_extra.push(elems.get(ei as i64))
     self.add_type(TypeKind.TY_TUPLE, te_start, elem_count, 0)
 
-fn Sema.find_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+fn Sema.find_fn_type_of_kind(self: Sema, kind: i32, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
-        if self.type_kinds.get(ti as i64) != TypeKind.TY_FN:
+        if self.type_kinds.get(ti as i64) != kind:
             continue
         if self.type_d1.get(ti as i64) != param_count:
             continue
@@ -1841,6 +1842,12 @@ fn Sema.find_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId
         if self.type_extra_matches(te_start, params, param_count) != 0:
             return ti as TypeId
     0 as TypeId
+
+fn Sema.find_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+    self.find_fn_type_of_kind(TypeKind.TY_FN, params, param_count, ret)
+
+fn Sema.find_extern_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+    self.find_fn_type_of_kind(TypeKind.TY_EXTERN_FN, params, param_count, ret)
 
 fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
     let existing = self.find_fn_type(params, param_count, ret)
@@ -1852,6 +1859,17 @@ fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: Type
     for pi in 0..param_count:
         self.type_extra.push(params.get(pi as i64))
     self.add_type(TypeKind.TY_FN, te_start, param_count, ret as i32)
+
+fn Sema.ensure_extern_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+    let existing = self.find_extern_fn_type(params, param_count, ret)
+    if existing != 0:
+        return existing
+    if self.types_frozen != 0:
+        return 0 as TypeId
+    let te_start = self.type_extra.len() as i32
+    for pi in 0..param_count:
+        self.type_extra.push(params.get(pi as i64))
+    self.add_type(TypeKind.TY_EXTERN_FN, te_start, param_count, ret as i32)
 
 fn Sema.callable_fn_type(self: Sema, tid: TypeId) -> i32:
     var current = tid as i32
@@ -1865,8 +1883,19 @@ fn Sema.callable_fn_type(self: Sema, tid: TypeId) -> i32:
         current = self.get_type_d0(resolved)
     0
 
-fn Sema.callable_fn_param_type(self: Sema, tid: TypeId, param_i: i32) -> i32:
-    let fn_tid = self.callable_fn_type(tid)
+fn Sema.callable_any_fn_type(self: Sema, tid: TypeId) -> i32:
+    var current = tid as i32
+    while current != 0:
+        let resolved = self.resolve_alias(current as TypeId) as i32
+        let tk = self.get_type_kind(resolved)
+        if tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN:
+            return resolved
+        if tk != TypeKind.TY_PTR and tk != TypeKind.TY_REF:
+            return 0
+        current = self.get_type_d0(resolved)
+    0
+
+fn Sema.fn_type_param_type(self: Sema, fn_tid: i32, param_i: i32) -> i32:
     if fn_tid == 0 or param_i < 0:
         return 0
     let param_count = self.get_type_d1(fn_tid)
@@ -1874,6 +1903,25 @@ fn Sema.callable_fn_param_type(self: Sema, tid: TypeId, param_i: i32) -> i32:
         return 0
     let te_start = self.get_type_d0(fn_tid)
     self.type_extra.get((te_start + param_i) as i64)
+
+fn Sema.callable_fn_param_type(self: Sema, tid: TypeId, param_i: i32) -> i32:
+    self.fn_type_param_type(self.callable_fn_type(tid), param_i)
+
+fn Sema.callable_any_fn_param_type(self: Sema, tid: TypeId, param_i: i32) -> i32:
+    self.fn_type_param_type(self.callable_any_fn_type(tid), param_i)
+
+fn Sema.fn_types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
+    if self.get_type_d1(expected) != self.get_type_d1(actual):
+        return 0
+    let param_count = self.get_type_d1(expected)
+    let exp_start = self.get_type_d0(expected)
+    let act_start = self.get_type_d0(actual)
+    for pi in 0..param_count:
+        let exp_param = self.type_extra.get((exp_start + pi) as i64)
+        let act_param = self.type_extra.get((act_start + pi) as i64)
+        if self.types_compatible(exp_param, act_param) == 0:
+            return 0
+    self.types_compatible(self.get_type_d2(expected), self.get_type_d2(actual))
 
 fn sema_generic_inst_hash(base_sym: i32, args: Vec[i32], arg_count: i32) -> i64:
     var h: i64 = base_sym as i64
@@ -2196,7 +2244,8 @@ fn Sema.is_option_pointer_type(self: Sema, tid: i32) -> i32:
         return 0
     let payload = self.get_generic_inst_arg(resolved, 0)
     let payload_resolved = self.resolve_alias(payload)
-    if self.get_type_kind(payload_resolved) == TypeKind.TY_PTR:
+    let payload_kind = self.get_type_kind(payload_resolved)
+    if payload_kind == TypeKind.TY_PTR or payload_kind == TypeKind.TY_EXTERN_FN:
         return 1
     0
 
@@ -3056,11 +3105,13 @@ fn Sema.types_compatible_fast(self: Sema, expected: TypeId, actual: TypeId) -> i
         return 1
     if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
         return 1
+    if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
+        return self.fn_types_compatible(exp_r, act_r)
     if (exp_k == TypeKind.TY_PTR or exp_k == TypeKind.TY_REF) and act_k == TypeKind.TY_FN:
         return 1
     if exp_k == TypeKind.TY_FN and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF):
         return 1
-    if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN):
+    if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
         let opt_payload = self.option_pointer_payload_type(exp_r)
         if opt_payload != 0:
             return self.types_compatible_fast(opt_payload, actual)
@@ -3106,7 +3157,7 @@ fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
     let exp_k = self.get_type_kind(exp_r)
     let act_k = self.get_type_kind(act_r)
 
-    if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN):
+    if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
         let opt_payload = self.option_pointer_payload_type(exp_r)
         if opt_payload != 0:
             return self.types_compatible(opt_payload, actual)
@@ -3144,6 +3195,8 @@ fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
         if self.is_c_void_like_type(self.get_type_d0(exp_r)) != 0 or self.is_c_void_like_type(self.get_type_d0(act_r)) != 0:
             return 1
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
+    if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
+        return self.fn_types_compatible(exp_r, act_r)
     if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
     if exp_k == TypeKind.TY_ARRAY and act_k == TypeKind.TY_ARRAY:
@@ -3236,7 +3289,7 @@ fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_ERR or tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER or tk == TypeKind.TY_STR:
         return 1
-    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_GENERIC_FN:
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN:
         return 1
     if tk == TypeKind.TY_STRUCT:
         let name = self.get_type_d0(resolved)

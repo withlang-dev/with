@@ -3,13 +3,26 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-06-04.
+Last updated: 2026-06-05.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
 conversation context after compaction.
 
 ## Current Focus
+
+#299 is implemented. With now has a distinct `extern "C" fn(...) -> T` type
+node and `TY_EXTERN_FN` sema type for raw C ABI function pointers, while
+ordinary `fn(...) -> T` remains With's context-carrying callable value. The
+slice parses optional parameter names in function pointer types, makes the raw
+type pointer-sized and Copy, accepts matching named functions and
+non-capturing closures, rejects capturing/suspending/ephemeral-task callbacks,
+lowers raw callbacks as LLVM pointers, and teaches c_import to emit C function
+pointer typedefs as `extern "C" fn` instead of `*const fn`. The migrator now
+preserves C `(void)expr` discard statements without turning pure discards into
+With tail expressions, and emits a bare `return` for translated void functions
+whose body lowers to no statements. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-05.
 
 #335 is implemented. The policy baseline is encoded in AGENTS.md/CLAUDE.md:
 `@[c_export]` is foreign ABI only, not compiler-internal linkage. The first
@@ -67,10 +80,12 @@ compile-error coverage exists for scoped task await/drop, scoped thread
 spawn/join, block forms, method misuse, and escape/storage rejection. Full
 build, fixpoint, and test passed on 2026-06-04 for this checkpoint.
 
-#334 is implemented. Final `else expr` is now accepted in mixed-form `if`
-chains after colon or braced arms while `else if` remains a chain
-continuation. The spec, parser fixture, and behavior coverage were updated;
-full build, fixpoint, and test passed on 2026-06-04.
+#334 is implemented, then tightened: non-`then` `if` chains now require a
+normal body introducer after every arm, including final `else` (`else: expr`
+or `else { ... }`, not bare `else expr`). `else if` remains a chain
+continuation. The spec, parser fixture, behavior coverage, and compile-error
+coverage were updated; full build, fixpoint, and test passed on 2026-06-04
+for the original #334 checkpoint.
 
 #252 and #253 are implemented as the first generator vertical slice.
 `gen fn f(...) -> T` now semantically returns a compiler-generated state
@@ -121,8 +136,10 @@ and `with build :install-user` installs the same verified final compiler to
 `~/.local/bin/with`. `with build :prune` is a dry-run report for stale build
 artifacts; `with build :prune-apply` removes stale temporary dSYM bundles,
 runtime archive wrappers, stale build state, stale retained test-graph compiler
-copies, stale issue61 regression fixture directories, and old seed archives
-without touching `.deps/` or `out/release/`.
+copies, stale issue61 regression fixture directories, old seed archives, and
+versioned `out/release/` byproducts beyond the five most recent release
+versions, without touching `.deps/`, current unversioned release binaries,
+`install.sh`, or platform SDK archives.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D

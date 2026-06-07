@@ -1,0 +1,11040 @@
+# With Language Requirements
+
+This document is a requirements traceability matrix derived from `docs/with-specification.md` (Specification v6.9).
+
+## Traceability Model
+
+- Requirement IDs use four numeric components: `category.topic.subtopic.ordinal`. The first three components follow the spec chapter/topic grouping; the final component is stable within that group.
+- Lettered spec sections are normalized into numeric subtopics while preserving the exact source label in the `Source` field. For example, `§4.3a` is grouped under `4.3.2.x`, after base `§4.3` under `4.3.1.x`.
+- The spec currently contains a repeated `§18.7` heading. Requirement IDs remain unique by continuing the same `18.7.1.x` sequence across both source sections; the exact source line range distinguishes them.
+- Each requirement records the exact spec section and line range that produced it. This is the sentence-to-requirement relationship. If a source sentence supports more than one requirement, repeat that source under each requirement when editing this file.
+- `Related spec refs` records explicit cross-references (`§...`) found in the source sentence. These are not exhaustive semantic dependencies; they are traceability hints.
+- Filler/meta sentences such as moved-document notices, appendix framing, and pure changelog prose are intentionally excluded. Examples and code blocks are usually represented through the surrounding normative prose, not as independent requirements.
+
+Generated coverage: 2567 requirements from 268 numbered spec sections.
+
+## 1. Design Goals
+
+### §1 Design Goals
+
+- `1.1.1.1` **With is a systems programming language that wants you to have a good time.**
+  - Requirement: With is a systems programming language that wants you to have a good time.
+  - Source: `§1 L31-L33`
+  - Related spec refs: none
+- `1.1.1.2` **No garbage collector.**
+  - Requirement: No garbage collector.
+  - Source: `§1 L31-L33`
+  - Related spec refs: none
+- `1.1.1.3` **No lifetime annotations.**
+  - Requirement: No lifetime annotations.
+  - Source: `§1 L31-L33`
+  - Related spec refs: none
+- `1.1.1.4` **No fighting the compiler for an hour to do something obvious.**
+  - Requirement: No fighting the compiler for an hour to do something obvious.
+  - Source: `§1 L31-L33`
+  - Related spec refs: none
+- `1.1.1.5` **You get memory safety, native performance, and code that reads like you'd explain i...**
+  - Requirement: You get memory safety, native performance, and code that reads like you'd explain it to a colleague.
+  - Source: `§1 L35-L37`
+  - Related spec refs: none
+- `1.1.1.6` **The compiler is smart, catches real bugs, and stays out of your way for everything...**
+  - Requirement: The compiler is smart, catches real bugs, and stays out of your way for everything else.
+  - Source: `§1 L35-L37`
+  - Related spec refs: none
+
+### §1.1 Identity
+
+- `1.1.1.7` **With is systems programming that feels like a modern language.**
+  - Requirement: With is **systems programming that feels like a modern language.**
+  - Source: `§1.1 L41`
+  - Related spec refs: none
+- `1.1.1.8` **Most lifetime complexity comes from storing references in structs.**
+  - Requirement: Most lifetime complexity comes from storing references in structs.
+  - Source: `§1.1 L43-L47`
+  - Related spec refs: none
+- `1.1.1.9` **Ban that, and 90% of the borrow checker pain disappears.**
+  - Requirement: Ban that, and 90% of the borrow checker pain disappears.
+  - Source: `§1.1 L43-L47`
+  - Related spec refs: none
+- `1.1.1.10` **The compiler is smart about it, the stdlib handles the tricky parts internally, and...**
+  - Requirement: The compiler is smart about it, the stdlib handles the tricky parts internally, and if you hit a genuine edge case, `unsafe` is right there — no shame, no ceremony.
+  - Source: `§1.1 L43-L47`
+  - Related spec refs: none
+- `1.1.1.11` **Common case first. If 95% of code does the obvious thing, make the obvious thing wo...**
+  - Requirement: **Common case first.** If 95% of code does the obvious thing, make the obvious thing work. Don't penalize everyone for edge cases.
+  - Source: `§1.1 L51-L52`
+  - Related spec refs: none
+- `1.1.1.12` **Safe where it matters. Use-after-free, double-free, data races — these are caught a...**
+  - Requirement: **Safe where it matters.** Use-after-free, double-free, data races — these are caught at compile time. Always.
+  - Source: `§1.1 L53-L54`
+  - Related spec refs: none
+- `1.1.1.13` **Pragmatic at the edges. HashMap::get just works. Iterators just work. The compiler...**
+  - Requirement: **Pragmatic at the edges.** HashMap::get just works. Iterators just work. The compiler is smart about common patterns even when it can't formally prove safety. If it's wrong, the stdlib uses `unsafe` internally. You never see it.
+  - Source: `§1.1 L55-L58`
+  - Related spec refs: none
+- `1.1.1.14` **Trust the programmer. If you write something weird, the compiler warns you. It does...**
+  - Requirement: **Trust the programmer.** If you write something weird, the compiler warns you. It doesn't block you. You're an adult.
+  - Source: `§1.1 L59-L60`
+  - Related spec refs: none
+- `1.1.1.15` **Service architecture (async, DI, error handling)**
+  - Requirement: Service architecture (async, DI, error handling)
+  - Source: `§1.1 L64`
+  - Related spec refs: none
+- `1.1.1.16` **Game engines and ECS (dense storage, handle-based entities)**
+  - Requirement: Game engines and ECS (dense storage, handle-based entities)
+  - Source: `§1.1 L65`
+  - Related spec refs: none
+- `1.1.1.17` **Database wrappers and infrastructure (FFI, resource guards)**
+  - Requirement: Database wrappers and infrastructure (FFI, resource guards)
+  - Source: `§1.1 L66`
+  - Related spec refs: none
+- `1.1.1.18` **Anything where you'd use Rust but don't want to fight the compiler**
+  - Requirement: Anything where you'd use Rust but don't want to fight the compiler
+  - Source: `§1.1 L67`
+  - Related spec refs: none
+- `1.1.1.19` **No garbage collector.**
+  - Requirement: No garbage collector.
+  - Source: `§1.1 L88-L91`
+  - Related spec refs: none
+- `1.1.1.20` **No lifetime annotations.**
+  - Requirement: No lifetime annotations.
+  - Source: `§1.1 L88-L91`
+  - Related spec refs: none
+- `1.1.1.21` **No Ok(()).**
+  - Requirement: No `Ok(())`.
+  - Source: `§1.1 L88-L91`
+  - Related spec refs: none
+- `1.1.1.22` **No .to_owned().**
+  - Requirement: No `.to_owned()`.
+  - Source: `§1.1 L88-L91`
+  - Related spec refs: none
+- `1.1.1.23` **No unsafe.**
+  - Requirement: No `unsafe`.
+  - Source: `§1.1 L88-L91`
+  - Related spec refs: none
+- `1.1.1.24` **Zero explicit memory management, fully statically typed, native-compiled, memory-safe.**
+  - Requirement: Zero explicit memory management, fully statically typed, native-compiled, memory-safe.
+  - Source: `§1.1 L88-L91`
+  - Related spec refs: none
+- `1.1.1.25` **It reads like Python, runs like C.**
+  - Requirement: It reads like Python, runs like C.
+  - Source: `§1.1 L88-L91`
+  - Related spec refs: none
+
+### §1.2 Positioning
+
+- `1.2.1.1` **Safety without the ceremony. Compile-time memory safety works. With takes that proo...**
+  - Requirement: **Safety without the ceremony.** Compile-time memory safety works. With takes that proof and asks: "what if it was fun?" No lifetime annotations, no `Pin`, no `PhantomData`, no `where` clauses that scroll off the screen.
+  - Source: `§1.2 L95-L98`
+  - Related spec refs: none
+- `1.2.1.2` **Explicit control, compile-time safety. Explicit allocation, C interop on day one, n...**
+  - Requirement: **Explicit control, compile-time safety.** Explicit allocation, C interop on day one, no hidden runtime costs — with compile-time safety that Zig deliberately omits.
+  - Source: `§1.2 L100-L102`
+  - Related spec refs: none
+- `1.2.1.3` **Data-oriented by default. The language naturally pushes you toward good architectur...**
+  - Requirement: **Data-oriented by default.** The language naturally pushes you toward good architecture: data in pools, handles over pointers, clear ownership. Not because of restrictions, but because the ergonomics make it the path of least resistance.
+  - Source: `§1.2 L104-L107`
+  - Related spec refs: none
+
+### §1.3 Target Domains
+
+- `1.3.1.1` **With is built for game engines, databases, and servers — domains where:**
+  - Requirement: With is built for **game engines, databases, and servers** — domains where:
+  - Source: `§1.3 L111-L112`
+  - Related spec refs: none
+- `1.3.1.2` **Data lives in large, contiguous pools (arenas, SlotMaps, ECS stores)**
+  - Requirement: Data lives in large, contiguous pools (arenas, SlotMaps, ECS stores)
+  - Source: `§1.3 L114`
+  - Related spec refs: none
+- `1.3.1.3` **Entities reference each other by ID, not by pointer**
+  - Requirement: Entities reference each other by ID, not by pointer
+  - Source: `§1.3 L115`
+  - Related spec refs: none
+- `1.3.1.4` **Ownership is clear — the pool owns the data**
+  - Requirement: Ownership is clear — the pool owns the data
+  - Source: `§1.3 L116`
+  - Related spec refs: none
+- `1.3.1.5` **Concurrent access must be high-performance and easy to read**
+  - Requirement: Concurrent access must be high-performance and easy to read
+  - Source: `§1.3 L117`
+  - Related spec refs: none
+- `1.3.1.6` **C interoperability is non-negotiable**
+  - Requirement: C interoperability is non-negotiable
+  - Source: `§1.3 L118`
+  - Related spec refs: none
+- `1.3.1.7` **The name reflects the core abstraction: working *with* data through scoped access.**
+  - Requirement: The name reflects the core abstraction: working *with* data through scoped access.
+  - Source: `§1.3 L120-L128`
+  - Related spec refs: none
+- `1.3.1.8` **The with keyword is the language's signature construct — it appears in guarded reso...**
+  - Requirement: The `with` keyword is the language's signature construct — it appears in guarded resource access (`with lock.read() as data:`), object initialization (`with Config.default() as mut c:`), intermediate computation (`with expr as name:`), and record update (`{ entity with position: new_pos }`).
+  - Source: `§1.3 L120-L128`
+  - Related spec refs: none
+- `1.3.1.9` **Most With files contain with.**
+  - Requirement: Most With files contain `with`.
+  - Source: `§1.3 L120-L128`
+  - Related spec refs: none
+- `1.3.1.10` **It is the language's answer to lifetimes: instead of annotating how long a referenc...**
+  - Requirement: It is the language's answer to lifetimes: instead of annotating how long a reference lives, you state what you're working with and let the scope handle the rest.
+  - Source: `§1.3 L120-L128`
+  - Related spec refs: none
+
+### §1.4 Ownership Philosophy
+
+- `1.4.1.1` **This is the fundamental invariant.**
+  - Requirement: This is the fundamental invariant.
+  - Source: `§1.4 L138-L141`
+  - Related spec refs: none
+- `1.4.1.2` **It removes 90% of Rust's cognitive load (no 'a, no where clauses full of lifetime b...**
+  - Requirement: It removes 90% of Rust's cognitive load (no `'a`, no `where` clauses full of lifetime bounds, no `PhantomData<&'a T>`) while preserving compile-time guarantees against use-after-free, double-free, and data races.
+  - Source: `§1.4 L138-L141`
+  - Related spec refs: none
+- `1.4.1.3` **The trade-off is explicit: you cannot store references in structs.**
+  - Requirement: The trade-off is explicit: you cannot store references in structs.
+  - Source: `§1.4 L143-L149`
+  - Related spec refs: none
+- `1.4.1.4` **You cannot write struct Lexer { source: &str }.**
+  - Requirement: You cannot write `struct Lexer { source: &str }`.
+  - Source: `§1.4 L143-L149`
+  - Related spec refs: none
+- `1.4.1.5` **You cannot return a lazy iterator that borrows from its input.**
+  - Requirement: You cannot return a lazy iterator that borrows from its input.
+  - Source: `§1.4 L143-L149`
+  - Related spec refs: none
+- `1.4.1.6` **Instead, you pass (&Tree, NodeId) pairs, you collect() into owned containers, and y...**
+  - Requirement: Instead, you pass `(&Tree, NodeId)` pairs, you `collect()` into owned containers, and you use `with` blocks for scoped access to locked or guarded data.
+  - Source: `§1.4 L143-L149`
+  - Related spec refs: none
+- `1.4.1.7` **This forces Data-Oriented Design patterns that are healthier for cache locality, se...**
+  - Requirement: This forces Data-Oriented Design patterns that are healthier for cache locality, serialization, and concurrent access.
+  - Source: `§1.4 L143-L149`
+  - Related spec refs: none
+
+### §1.5 Explicit Non-Goals
+
+- `1.5.1.1` **The following are deliberately unsupported in safe code:**
+  - Requirement: The following are deliberately unsupported in safe code:
+  - Source: `§1.5 L153`
+  - Related spec refs: none
+- `1.5.1.2` **Self-referential structs**
+  - Requirement: Self-referential structs
+  - Source: `§1.5 L155`
+  - Related spec refs: none
+- `1.5.1.3` **Stored references in data structures**
+  - Requirement: Stored references in data structures
+  - Source: `§1.5 L156`
+  - Related spec refs: none
+- `1.5.1.4` **Borrow-based lazy iterators that escape their scope**
+  - Requirement: Borrow-based lazy iterators that escape their scope
+  - Source: `§1.5 L157`
+  - Related spec refs: none
+- `1.5.1.5` **Safe intrusive linked lists**
+  - Requirement: Safe intrusive linked lists
+  - Source: `§1.5 L158`
+  - Related spec refs: none
+- `1.5.1.6` **Higher-kinded types**
+  - Requirement: Higher-kinded types
+  - Source: `§1.5 L159`
+  - Related spec refs: none
+- `1.5.1.7` **Lifetime annotations**
+  - Requirement: Lifetime annotations
+  - Source: `§1.5 L160`
+  - Related spec refs: none
+- `1.5.1.8` **State-machine-based async (no Futures, no Pin, no Unpin, no Poll)**
+  - Requirement: State-machine-based async (no Futures, no Pin, no Unpin, no Poll)
+  - Source: `§1.5 L161`
+  - Related spec refs: none
+- `1.5.1.9` **Garbage collection**
+  - Requirement: Garbage collection
+  - Source: `§1.5 L162`
+  - Related spec refs: none
+- `1.5.1.10` **Transparent reference counting**
+  - Requirement: Transparent reference counting
+  - Source: `§1.5 L163`
+  - Related spec refs: none
+- `1.5.1.11` **Pluggable async runtimes / executors**
+  - Requirement: Pluggable async runtimes / executors
+  - Source: `§1.5 L164`
+  - Related spec refs: none
+- `1.5.1.12` **Each has a documented workaround.**
+  - Requirement: Each has a documented workaround.
+  - Source: `§1.5 L166-L167`
+  - Related spec refs: none
+- `1.5.1.13` **None require reintroducing the features listed above.**
+  - Requirement: None require reintroducing the features listed above.
+  - Source: `§1.5 L166-L167`
+  - Related spec refs: none
+- `1.5.1.14` **This is the core design invariant.**
+  - Requirement: This is the core design invariant.
+  - Source: `§1.5 L166-L167`
+  - Related spec refs: none
+
+### §1.7 Ergonomics
+
+- `1.7.1.1` **With prioritizes joy.**
+  - Requirement: With prioritizes joy.
+  - Source: `§1.7 L177`
+  - Related spec refs: none
+- `1.7.1.2` **The common case should be effortless:**
+  - Requirement: The common case should be effortless:
+  - Source: `§1.7 L177`
+  - Related spec refs: none
+- `1.7.1.3` **Clean function syntax — fn greet: for no-arg void functions. Parentheses optional w...**
+  - Requirement: **Clean function syntax** — `fn greet:` for no-arg void functions. Parentheses optional when you have no parameters. `:` introduces the body. Return type only when you return something. (§9.1)
+  - Source: `§1.7 L179-L181`
+  - Related spec refs: §9.1
+- `1.7.1.4` **Implicit Ok wrapping — functions returning Result don't need Ok(value) at the end...**
+  - Requirement: **Implicit `Ok` wrapping** — functions returning `Result` don't need `Ok(value)` at the end. Just return the value. (§4.9)
+  - Source: `§1.7 L182-L183`
+  - Related spec refs: §4.9
+- `1.7.1.5` **No Ok(()) — functions returning Result[Unit, E] don't need a trailing Ok(). Just en...**
+  - Requirement: **No `Ok(())`** — functions returning `Result[Unit, E]` don't need a trailing `Ok()`. Just end the function. (§4.9)
+  - Source: `§1.7 L184-L185`
+  - Related spec refs: §4.9
+- `1.7.1.6` **String literals just work — "hello" is str by default. No type annotations, no .to_...**
+  - Requirement: **String literals just work** — `"hello"` is `str` by default. No type annotations, no `.to_owned()`. (§15.3)
+  - Source: `§1.7 L186-L187`
+  - Related spec refs: §15.3
+- `1.7.1.7` **Auto-ref — pass alice where &User is expected. The compiler borrows for you. (§3.8)**
+  - Requirement: **Auto-ref** — pass `alice` where `&User` is expected. The compiler borrows for you. (§3.8)
+  - Source: `§1.7 L188-L189`
+  - Related spec refs: §3.8
+- `1.7.1.8` **Auto-deref — box_user.name works through any number of pointers. No (*x).field. (§3.7)**
+  - Requirement: **Auto-deref** — `box_user.name` works through any number of pointers. No `(*x).field`. (§3.7)
+  - Source: `§1.7 L190-L191`
+  - Related spec refs: §3.7
+- `1.7.1.9` **Implicit trait coercion — pass &my_log where &dyn Logger is expected. If it impleme...**
+  - Requirement: **Implicit trait coercion** — pass `&my_log` where `&dyn Logger` is expected. If it implements the trait, just pass it. (§3.9)
+  - Source: `§1.7 L192-L193`
+  - Related spec refs: §3.9
+- `1.7.1.10` **Comprehensions — [x * x for x in 0..10] builds a list. Obviously it allocates. That...**
+  - Requirement: **Comprehensions** — `[x * x for x in 0..10]` builds a list. Obviously it allocates. That's fine. (§13.6)
+  - Source: `§1.7 L194-L195`
+  - Related spec refs: §13.6
+- `1.7.1.11` **Short-circuit for comprehensions — for user in get_user(id); profile in get_profile...**
+  - Requirement: **Short-circuit `for` comprehensions** — `for user in get_user(id); profile in get_profile(user): yield profile.name` chains `Option` and `Result` without pyramid-shaped `match` nests. (§13.6a)
+  - Source: `§1.7 L196-L198`
+  - Related spec refs: §13.6a
+- `1.7.1.12` **Pattern for loops — for (key, value) in map: and for Some(item) in optional_items...**
+  - Requirement: **Pattern `for` loops** — `for (key, value) in map:` and `for Some(item) in optional_items:` destructure directly in the loop header. (§13.5)
+  - Source: `§1.7 L199-L201`
+  - Related spec refs: §13.5
+- `1.7.1.13` **Labeled break and continue — 'outer for ... plus break 'outer or continue 'outer ta...**
+  - Requirement: **Labeled break and continue** — `'outer for ...` plus `break 'outer` or `continue 'outer` targets outer loops and labeled blocks without flag-variable cascades. (§13.5a)
+  - Source: `§1.7 L202-L204`
+  - Related spec refs: §13.5a
+- `1.7.1.14` **Iterators just work — hold two items, zip, peek. The compiler is smart about stdlib...**
+  - Requirement: **Iterators just work** — hold two items, zip, peek. The compiler is smart about stdlib iterators. (§13.2)
+  - Source: `§1.7 L205-L206`
+  - Related spec refs: §13.2
+- `1.7.1.15` **with infers guards — with lock.read() as data: — the compiler knows it's a guard fr...**
+  - Requirement: **`with` infers guards** — `with lock.read() as data:` — the compiler knows it's a guard from the type. No keyword. (§7.1)
+  - Source: `§1.7 L207-L208`
+  - Related spec refs: §7.1
+- `1.7.1.16` **Implicit contexts — with context(default_device()): sin(x) wires implicit parameter...**
+  - Requirement: **Implicit contexts** — `with context(default_device()): sin(x)` wires `implicit` parameters from lexical scope. (§7.3a)
+  - Source: `§1.7 L209-L210`
+  - Related spec refs: §7.3a
+- `1.7.1.17` **C functions just call — c_import functions are callable directly. No unsafe {} wrap...**
+  - Requirement: **C functions just call** — `c_import` functions are callable directly. No `unsafe {}` wrapper on every FFI call. (§16.1)
+  - Source: `§1.7 L211-L212`
+  - Related spec refs: §16.1
+- `1.7.1.18` **Postfix .await — chains naturally with ? and |> (§14.5)**
+  - Requirement: **Postfix `.await`** — chains naturally with `?` and `|>` (§14.5)
+  - Source: `§1.7 L213`
+  - Related spec refs: §14.5
+- `1.7.1.19` **Pipeline operator — data |> filter(it.active) |> map(it.name) (§12)**
+  - Requirement: **Pipeline operator** — `data |> filter(it.active) |> map(it.name)` (§12)
+  - Source: `§1.7 L214`
+  - Related spec refs: §12
+- `1.7.1.20` **Named arguments — connect("localhost", port: 8080) can mix positional and named arg...**
+  - Requirement: **Named arguments** — `connect("localhost", port: 8080)` can mix positional and named arguments, and defaults can be skipped by name. (§9.1a)
+  - Source: `§1.7 L215-L216`
+  - Related spec refs: §9.1a
+- `1.7.1.21` **Chained comparisons — 0 < x < 1 evaluates interior terms once and reads like the ma...**
+  - Requirement: **Chained comparisons** — `0 < x < 1` evaluates interior terms once and reads like the math you meant. (§4.2.7)
+  - Source: `§1.7 L217-L218`
+  - Related spec refs: §4.2.7
+- `1.7.1.22` **Membership test — if x in [1, 2, 3]: and if x not in banned: — reads like English...**
+  - Requirement: **Membership test** — `if x in [1, 2, 3]:` and `if x not in banned:` — reads like English, works on any collection, optimized for literals (§9.9)
+  - Source: `§1.7 L219-L221`
+  - Related spec refs: §9.9
+- `1.7.1.23` **Multi-dimensional indexing — tensor[2:5, :, newaxis] is trait-driven syntax, not a...**
+  - Requirement: **Multi-dimensional indexing** — `tensor[2:5, :, newaxis]` is trait-driven syntax, not a special built-in container. (§11.7)
+  - Source: `§1.7 L222-L223`
+  - Related spec refs: §11.7
+- `1.7.1.24` **@ operator — a @ b reads as matrix multiplication and lowers through trait dispatch...**
+  - Requirement: **`@` operator** — `a @ b` reads as matrix multiplication and lowers through trait dispatch like other operators. (§4.2.2, §11.7)
+  - Source: `§1.7 L224-L225`
+  - Related spec refs: §11.7, §4.2.2
+- `1.7.1.25` **Field shorthand — User { name, email } when variable names match field names (§4.3)**
+  - Requirement: **Field shorthand** — `User { name, email }` when variable names match field names (§4.3)
+  - Source: `§1.7 L226-L227`
+  - Related spec refs: §4.3
+- `1.7.1.26` **Default field values — ServerConfig { port: 9090 } omits fields that have defaults...**
+  - Requirement: **Default field values** — `ServerConfig { port: 9090 }` omits fields that have defaults (§4.3)
+  - Source: `§1.7 L228-L229`
+  - Related spec refs: §4.3
+- `1.7.1.27` **Enum variant shorthand — .Member when the type is known from context (§4.4)**
+  - Requirement: **Enum variant shorthand** — `.Member` when the type is known from context (§4.4)
+  - Source: `§1.7 L230-L231`
+  - Related spec refs: §4.4
+- `1.7.1.28` **Optional chaining — user.address?.city for nested Option access (§10.3)**
+  - Requirement: **Optional chaining** — `user.address?.city` for nested Option access (§10.3)
+  - Source: `§1.7 L232-L233`
+  - Related spec refs: §10.3
+- `1.7.1.29` **Default operator — x ?? default for unwrap-or (§10.4)**
+  - Requirement: **Default operator** — `x ?? default` for unwrap-or (§10.4)
+  - Source: `§1.7 L234`
+  - Related spec refs: §10.4
+- `1.7.1.30` **Error context — fs.open(path).context("loading config")? wraps errors with human-re...**
+  - Requirement: **Error context** — `fs.open(path).context("loading config")?` wraps errors with human-readable messages (§10.6)
+  - Source: `§1.7 L235-L236`
+  - Related spec refs: §10.6
+- `1.7.1.31` **Builder blocks — with Config.default() as mut c: with flexible return values (§7.2)**
+  - Requirement: **Builder blocks** — `with Config.default() as mut c:` with flexible return values (§7.2)
+  - Source: `§1.7 L237-L238`
+  - Related spec refs: §7.2
+- `1.7.1.32` **Cancellation just works — no From[TaskCancelled] on every error type. Cancellation...**
+  - Requirement: **Cancellation just works** — no `From[TaskCancelled]` on every error type. Cancellation unwinds cleanly. (§14.7)
+  - Source: `§1.7 L239-L240`
+  - Related spec refs: §14.7
+- `1.7.1.33` **Chained if let — if let Some(a) = x, let Some(b) = y: kills the pyramid of doom (§9.7)**
+  - Requirement: **Chained `if let`** — `if let Some(a) = x, let Some(b) = y:` kills the pyramid of doom (§9.7)
+  - Source: `§1.7 L241-L242`
+  - Related spec refs: §9.7
+- `1.7.1.34` **Enum _ref accessors — .as_str_ref(), .as_num_mut() auto-generated. Navigate ASTs an...**
+  - Requirement: **Enum `_ref` accessors** — `.as_str_ref()`, `.as_num_mut()` auto-generated. Navigate ASTs and JSON without cloning. (§4.4)
+  - Source: `§1.7 L243-L244`
+  - Related spec refs: §4.4
+- `1.7.1.35` **@[derive(Builder)] — one annotation generates the entire builder pattern (§11.8)**
+  - Requirement: **`@[derive(Builder)]`** — one annotation generates the entire builder pattern (§11.8)
+  - Source: `§1.7 L245-L246`
+  - Related spec refs: §11.8
+- `1.7.1.36` **Comptime cascade — inside comptime fn, everything is comptime. No redundant prefixe...**
+  - Requirement: **Comptime cascade** — inside `comptime fn`, everything is comptime. No redundant prefixes. (§17.4)
+  - Source: `§1.7 L247-L248`
+  - Related spec refs: §17.4
+- `1.7.1.37` **T.fields() — types are objects at compile time. Natural reflection-style metaprogra...**
+  - Requirement: **`T.fields()`** — types are objects at compile time. Natural reflection-style metaprogramming. (§17.2)
+  - Source: `§1.7 L249-L250`
+  - Related spec refs: §17.2
+
+## 2. Values and Ownership
+
+### §2.1 Values
+
+- `2.1.1.1` **All values have a single owner.**
+  - Requirement: All values have a single owner.
+  - Source: `§2.1 L263-L264`
+  - Related spec refs: none
+- `2.1.1.2` **When a variable binding goes out of scope, its value is destroyed.**
+  - Requirement: When a variable binding goes out of scope, its value is destroyed.
+  - Source: `§2.1 L263-L264`
+  - Related spec refs: none
+- `2.1.1.3` **Destruction is deterministic.**
+  - Requirement: Destruction is deterministic.
+  - Source: `§2.1 L263-L264`
+  - Related spec refs: none
+
+### §2.2 Move Semantics
+
+- `2.2.1.1` **Assignment moves by default.**
+  - Requirement: Assignment moves by default.
+  - Source: `§2.2 L268-L269`
+  - Related spec refs: none
+- `2.2.1.2` **After a move, the source binding is invalid.**
+  - Requirement: After a move, the source binding is invalid.
+  - Source: `§2.2 L268-L269`
+  - Related spec refs: none
+
+### §2.3 Copy Types
+
+- `2.3.1.1` **Types that implement the Copy trait are implicitly copied on assignment, parameter...**
+  - Requirement: Types that implement the `Copy` trait are implicitly copied on assignment, parameter passing, and other value uses.
+  - Source: `§2.3 L279-L281`
+  - Related spec refs: none
+- `2.3.1.2` **The original binding remains valid.**
+  - Requirement: The original binding remains valid.
+  - Source: `§2.3 L279-L281`
+  - Related spec refs: none
+- `2.3.1.3` **All fields must be Copy. A type can only implement Copy if every field is itself Co...**
+  - Requirement: **All fields must be `Copy`.** A type can only implement `Copy` if every field is itself `Copy`. This is checked recursively by the compiler.
+  - Source: `§2.3 L290-L292`
+  - Related spec refs: none
+- `2.3.1.4` **Copy and Drop are mutually exclusive. A type that implements Drop cannot implement...**
+  - Requirement: **`Copy` and `Drop` are mutually exclusive.** A type that implements `Drop` cannot implement `Copy`. Bitwise duplication of a value with a destructor would cause double-free — the two copies would both run `Drop`.
+  - Source: `§2.3 L294-L297`
+  - Related spec refs: none
+- `2.3.1.5` **Types containing owning pointers (Box[T], String, Vec[T], Rc[T], Arc[T]) are not Co...**
+  - Requirement: **Types containing owning pointers** (`Box[T]`, `String`, `Vec[T]`, `Rc[T]`, `Arc[T]`) are not `Copy` because those types implement `Drop`. This is enforced by rule 1 (their fields are not `Copy`).
+  - Source: `§2.3 L299-L301`
+  - Related spec refs: none
+- `2.3.1.6` **These rules guarantee that Copy is always safe in safe code — it cannot cause doubl...**
+  - Requirement: These rules guarantee that `Copy` is always safe in safe code — it cannot cause double-free, use-after-free, or resource leaks.
+  - Source: `§2.3 L319-L320`
+  - Related spec refs: none
+- `2.3.1.7` **Size warning: The compiler emits a warning (not an error) when Copy is implemented...**
+  - Requirement: **Size warning:** The compiler emits a **warning** (not an error) when `Copy` is implemented for types exceeding a size threshold.
+  - Source: `§2.3 L322-L326`
+  - Related spec refs: none
+- `2.3.1.8` **The default threshold is 128 bytes.**
+  - Requirement: The default threshold is 128 bytes.
+  - Source: `§2.3 L322-L326`
+  - Related spec refs: none
+- `2.3.1.9` **It is configurable via with.toml (copy_warn_threshold).**
+  - Requirement: It is configurable via `with.toml` (`copy_warn_threshold`).
+  - Source: `§2.3 L322-L326`
+  - Related spec refs: none
+- `2.3.1.10` **The warning does not affect semantics — the type is still Copy.**
+  - Requirement: The warning does not affect semantics — the type is still `Copy`.
+  - Source: `§2.3 L322-L326`
+  - Related spec refs: none
+
+### §2.4 Destructors and `defer`
+
+- `2.4.1.1` **Types may implement a Drop trait whose drop method is called when the value goes ou...**
+  - Requirement: Types may implement a `Drop` trait whose `drop` method is called when the value goes out of scope.
+  - Source: `§2.4 L330-L332`
+  - Related spec refs: none
+- `2.4.1.2` **The drop method takes self by value — the value is consumed:**
+  - Requirement: The `drop` method takes `self` **by value** — the value is consumed:
+  - Source: `§2.4 L330-L332`
+  - Related spec refs: none
+- `2.4.1.3` **Because drop consumes self, there is no need to defensively null out fields to prev...**
+  - Requirement: Because `drop` consumes `self`, there is no need to defensively null out fields to prevent double-free — the value ceases to exist after `drop` returns.
+  - Source: `§2.4 L340-L344`
+  - Related spec refs: none
+- `2.4.1.4` **The compiler handles the details: fields you use in your drop body are consumed, re...**
+  - Requirement: The compiler handles the details: fields you use in your drop body are consumed, remaining fields are dropped automatically.
+  - Source: `§2.4 L340-L344`
+  - Related spec refs: none
+- `2.4.1.5` **No recursion, no leaks, no ceremony:**
+  - Requirement: No recursion, no leaks, no ceremony:
+  - Source: `§2.4 L340-L344`
+  - Related spec refs: none
+- `2.4.1.6` **Drop order within a scope is reverse declaration order.**
+  - Requirement: Drop order within a scope is reverse declaration order.
+  - Source: `§2.4 L354`
+  - Related spec refs: none
+- `2.4.1.7` **Drop on reassignment: When a var binding of a Drop type is reassigned, the compiler...**
+  - Requirement: **Drop on reassignment:** When a `var` binding of a Drop type is reassigned, the compiler drops the old value before storing the new one.
+  - Source: `§2.4 L356-L358`
+  - Related spec refs: none
+- `2.4.1.8` **This prevents resource leaks in loops:**
+  - Requirement: This prevents resource leaks in loops:
+  - Source: `§2.4 L356-L358`
+  - Related spec refs: none
+- `2.4.1.9` **Drop on expression temporaries: Temporaries created within an expression are droppe...**
+  - Requirement: **Drop on expression temporaries:** Temporaries created within an expression are dropped at the end of the enclosing statement.
+  - Source: `§2.4 L367-L369`
+  - Related spec refs: none
+- `2.4.1.10` **This frees intermediate resources automatically:**
+  - Requirement: This frees intermediate resources automatically:
+  - Source: `§2.4 L367-L369`
+  - Related spec refs: none
+- `2.4.1.11` **Partial moves from Drop types are forbidden in normal code.**
+  - Requirement: **Partial moves from Drop types are forbidden** in normal code.
+  - Source: `§2.4 L377-L380`
+  - Related spec refs: none
+- `2.4.1.12` **Inside drop itself, you can access and consume fields freely.**
+  - Requirement: Inside `drop` itself, you can access and consume fields freely.
+  - Source: `§2.4 L377-L380`
+  - Related spec refs: none
+- `2.4.1.13` **Outside of drop, moving a field out of a Drop type is a compile error:**
+  - Requirement: Outside of `drop`, moving a field out of a Drop type is a compile error:
+  - Source: `§2.4 L377-L380`
+  - Related spec refs: none
+- `2.4.1.14` **For non-Drop types, partial moves and record update syntax work as described in §4.3.**
+  - Requirement: For non-`Drop` types, partial moves and record update syntax work as described in §4.3.
+  - Source: `§2.4 L396-L397`
+  - Related spec refs: §4.3
+- `2.4.1.15` **For explicit cleanup of resources not tied to a value's lifetime, defer executes a...**
+  - Requirement: For explicit cleanup of resources not tied to a value's lifetime, `defer` executes a statement when the enclosing scope exits:
+  - Source: `§2.4 L399-L400`
+  - Related spec refs: none
+- `2.4.1.16` **defer statements execute in LIFO order.**
+  - Requirement: `defer` statements execute in LIFO order.
+  - Source: `§2.4 L411`
+  - Related spec refs: none
+- `2.4.1.17` **Control flow restriction: return, labeled or unlabeled break, labeled or unlabeled...**
+  - Requirement: **Control flow restriction:** `return`, labeled or unlabeled `break`, labeled or unlabeled `continue`, `goto`, and `?` are **compile errors** inside `defer` or `errdefer` blocks.
+  - Source: `§2.4 L413-L417`
+  - Related spec refs: none
+- `2.4.1.18` **Defer runs during scope cleanup — non-local control flow would silently swallow the...**
+  - Requirement: Defer runs during scope cleanup — non-local control flow would silently swallow the function's actual return value or jump to unexpected locations:
+  - Source: `§2.4 L413-L417`
+  - Related spec refs: none
+- `2.4.1.19` **errdefer: Like defer but only executes when the function returns an error (via ? pr...**
+  - Requirement: **`errdefer`:** Like `defer` but only executes when the function returns an error (via `?` propagation).
+  - Source: `§2.4 L434-L435`
+  - Related spec refs: none
+- `2.4.1.20` **On normal return paths, errdefer is skipped:**
+  - Requirement: On normal return paths, `errdefer` is skipped:
+  - Source: `§2.4 L434-L435`
+  - Related spec refs: none
+- `2.4.1.21` **errdefer and defer execute in LIFO order relative to each other.**
+  - Requirement: `errdefer` and `defer` execute in LIFO order relative to each other.
+  - Source: `§2.4 L445-L447`
+  - Related spec refs: none
+- `2.4.1.22` **On error return, both errdefer and defer blocks run.**
+  - Requirement: On error return, both `errdefer` and `defer` blocks run.
+  - Source: `§2.4 L445-L447`
+  - Related spec refs: none
+- `2.4.1.23` **On success return, only defer blocks run.**
+  - Requirement: On success return, only `defer` blocks run.
+  - Source: `§2.4 L445-L447`
+  - Related spec refs: none
+
+## 3. References and Borrowing
+
+### §3.1 Reference Types
+
+- `3.1.1.1` **With has a single reference type: &T.**
+  - Requirement: With has a single reference type: `&T`.
+  - Source: `§3.1 L459-L461`
+  - Related spec refs: none
+- `3.1.1.2` **There is no &mut T in safe code.**
+  - Requirement: There is no `&mut T` in safe code.
+  - Source: `§3.1 L459-L461`
+  - Related spec refs: none
+- `3.1.1.3` **Mutation is expressed through owned values (mut self: Self receivers), with scoped...**
+  - Requirement: Mutation is expressed through owned values (`mut self: Self` receivers), `with` scoped access, and `IndexPlace` projections.
+  - Source: `§3.1 L459-L461`
+  - Related spec refs: none
+- `3.1.1.4` **For unsafe FFI, raw pointers (*const T, *mut T) and address-of (&raw mut x) provide...**
+  - Requirement: For unsafe FFI, raw pointers (`*const T`, `*mut T`) and address-of (`&raw mut x`) provide mutable pointer semantics (§19).
+  - Source: `§3.1 L463-L464`
+  - Related spec refs: §19
+
+### §3.2 Aliasing Rule
+
+- `3.2.1.1` **Active shared borrows (&T) of a place are invalidated when that place is mutated.**
+  - Requirement: Active shared borrows (`&T`) of a place are invalidated when that place is mutated.
+  - Source: `§3.2 L468-L469`
+  - Related spec refs: none
+- `3.2.1.2` **Mutation occurs through:**
+  - Requirement: Mutation occurs through:
+  - Source: `§3.2 L468-L469`
+  - Related spec refs: none
+- `3.2.1.3` **Assignment to the place (x = value)**
+  - Requirement: Assignment to the place (`x = value`)
+  - Source: `§3.2 L471`
+  - Related spec refs: none
+- `3.2.1.4` **Calling a mut self method on the place (x.push(v))**
+  - Requirement: Calling a `mut self` method on the place (`x.push(v)`)
+  - Source: `§3.2 L472`
+  - Related spec refs: none
+- `3.2.1.5` **Mutation through with scoped access or IndexPlace projection**
+  - Requirement: Mutation through `with` scoped access or `IndexPlace` projection
+  - Source: `§3.2 L473`
+  - Related spec refs: none
+- `3.2.1.6` **Enforced at compile time via view-liveness analysis.**
+  - Requirement: Enforced at compile time via view-liveness analysis.
+  - Source: `§3.2 L475`
+  - Related spec refs: none
+
+### §3.3 Second-Class Restriction
+
+- `3.3.1.1` **References are ephemeral (Section 5).**
+  - Requirement: References are **ephemeral** (Section 5).
+  - Source: `§3.3 L479`
+  - Related spec refs: none
+- `3.3.1.2` **They may appear as:**
+  - Requirement: They may appear as:
+  - Source: `§3.3 L479`
+  - Related spec refs: none
+- `3.3.1.3` **Function parameters**
+  - Requirement: Function parameters
+  - Source: `§3.3 L481`
+  - Related spec refs: none
+- `3.3.1.4` **Local variable bindings**
+  - Requirement: Local variable bindings
+  - Source: `§3.3 L482`
+  - Related spec refs: none
+- `3.3.1.5` **Arguments to non-escaping closures**
+  - Requirement: Arguments to non-escaping closures
+  - Source: `§3.3 L483`
+  - Related spec refs: none
+- `3.3.1.6` **Return values from functions (with ephemeral propagation; see 3.4)**
+  - Requirement: Return values from functions (with ephemeral propagation; see 3.4)
+  - Source: `§3.3 L484`
+  - Related spec refs: none
+- `3.3.1.7` **References may NOT appear as:**
+  - Requirement: References may NOT appear as:
+  - Source: `§3.3 L486`
+  - Related spec refs: none
+- `3.3.1.8` **Struct or enum fields**
+  - Requirement: Struct or enum fields
+  - Source: `§3.3 L488`
+  - Related spec refs: none
+- `3.3.1.9` **Elements of heap containers**
+  - Requirement: Elements of heap containers
+  - Source: `§3.3 L489`
+  - Related spec refs: none
+- `3.3.1.10` **Captures of escaping closures**
+  - Requirement: Captures of escaping closures
+  - Source: `§3.3 L490`
+  - Related spec refs: none
+- `3.3.1.11` **Global or static storage**
+  - Requirement: Global or static storage
+  - Source: `§3.3 L491`
+  - Related spec refs: none
+- `3.3.1.12` **This restriction eliminates lifetime annotations entirely.**
+  - Requirement: This restriction eliminates lifetime annotations entirely.
+  - Source: `§3.3 L493`
+  - Related spec refs: none
+
+### §3.4 Returning References
+
+- `3.4.1.1` **A function may return a reference or a type containing a reference (e.g., Option[&T]).**
+  - Requirement: A function may return a reference or a type containing a reference (e.g., `Option[&T]`).
+  - Source: `§3.4 L497-L501`
+  - Related spec refs: none
+- `3.4.1.2` **The returned value is ephemeral: the caller may bind it to a local and use it, but...**
+  - Requirement: The returned value is ephemeral: the caller may bind it to a local and use it, but may not store it in a struct, place it in a container, capture it in an escaping closure, or return it from a function whose return type is not itself ephemeral.
+  - Source: `§3.4 L497-L501`
+  - Related spec refs: none
+- `3.4.1.3` **A function whose declared return type is or contains an ephemeral type is permitted.**
+  - Requirement: A function whose declared return type is or contains an ephemeral type is permitted.
+  - Source: `§3.4 L503-L509`
+  - Related spec refs: none
+- `3.4.1.4` **Both fn foo -> StrView and fn bar -> Option[StrView] are legal.**
+  - Requirement: Both `fn foo -> StrView` and `fn bar -> Option[StrView]` are legal.
+  - Source: `§3.4 L503-L509`
+  - Related spec refs: none
+- `3.4.1.5` **Any function that calls such a function and returns its result must also have an ep...**
+  - Requirement: Any function that calls such a function and returns its result must also have an ephemeral return type.
+  - Source: `§3.4 L503-L509`
+  - Related spec refs: none
+- `3.4.1.6` **This forms a chain: ephemerality propagates upward through callers until a function...**
+  - Requirement: This forms a chain: ephemerality propagates upward through callers until a function consumes the ephemeral value (by copying data out, converting to owned, etc.) rather than returning it.
+  - Source: `§3.4 L503-L509`
+  - Related spec refs: none
+- `3.4.1.7` **When a function returns an ephemeral value and accepts multiple potential origin pa...**
+  - Requirement: When a function returns an ephemeral value and accepts multiple potential origin parameters, the returned value is tracked as borrowing from the set of parameters the body may actually derive it from.
+  - Source: `§3.4 L533-L537`
+  - Related spec refs: none
+- `3.4.1.8` **This origin set is inferred from the function body and enforced at the call site.**
+  - Requirement: This origin set is inferred from the function body and enforced at the call site.
+  - Source: `§3.4 L533-L537`
+  - Related spec refs: none
+
+### §3.5 Borrow Scope: Non-Lexical Lifetimes
+
+- `3.5.1.1` **A borrow is active from the point it is created until its last use, not until the e...**
+  - Requirement: A borrow is active from the point it is created until its **last use**, not until the end of the enclosing block.
+  - Source: `§3.5 L541-L542`
+  - Related spec refs: none
+
+### §3.6 Disjoint Field Access
+
+- `3.6.1.1` **The compiler guarantees that simultaneous access to structurally disjoint fields is...**
+  - Requirement: The compiler guarantees that simultaneous access to structurally disjoint fields is permitted, at any nesting depth.
+  - Source: `§3.6 L553-L554`
+  - Related spec refs: none
+- `3.6.1.2` **Disjointness is defined over static field paths.**
+  - Requirement: Disjointness is defined over **static field paths**.
+  - Source: `§3.6 L561-L562`
+  - Related spec refs: none
+- `3.6.1.3` **Two paths are disjoint if they diverge at any field access.**
+  - Requirement: Two paths are disjoint if they diverge at any field access.
+  - Source: `§3.6 L561-L562`
+  - Related spec refs: none
+- `3.6.1.4` **Array/slice index disjointness is NOT guaranteed at compile time.**
+  - Requirement: **Array/slice index disjointness is NOT guaranteed at compile time.**
+  - Source: `§3.6 L564-L565`
+  - Related spec refs: none
+- `3.6.1.5` **Use get_disjoint(i, j) for safe simultaneous element access.**
+  - Requirement: Use `get_disjoint(i, j)` for safe simultaneous element access.
+  - Source: `§3.6 L564-L565`
+  - Related spec refs: none
+- `3.6.1.6` **Disjoint capture in closures: Closures capture only the specific fields they access...**
+  - Requirement: **Disjoint capture in closures:** Closures capture only the specific fields they access, not the enclosing struct as a whole.
+  - Source: `§3.6 L567-L569`
+  - Related spec refs: none
+- `3.6.1.7` **This is critical for parallel data-oriented code:**
+  - Requirement: This is critical for parallel data-oriented code:
+  - Source: `§3.6 L567-L569`
+  - Related spec refs: none
+- `3.6.1.8` **Without disjoint closure capture, the above code would fail because both closures w...**
+  - Requirement: Without disjoint closure capture, the above code would fail because both closures would capture `world` as a whole, creating conflicting borrows.
+  - Source: `§3.6 L580-L583`
+  - Related spec refs: none
+- `3.6.1.9` **With disjoint capture, the compiler sees that the two closures access non-overlappi...**
+  - Requirement: With disjoint capture, the compiler sees that the two closures access non-overlapping field paths and permits the code.
+  - Source: `§3.6 L580-L583`
+  - Related spec refs: none
+
+### §3.7 Auto-Dereferencing
+
+- `3.7.1.1` **The compiler automatically follows references, boxes, and smart pointers to find fi...**
+  - Requirement: The compiler automatically follows references, boxes, and smart pointers to find fields and methods.
+  - Source: `§3.7 L587-L588`
+  - Related spec refs: none
+- `3.7.1.2` **You never write (*x).field:**
+  - Requirement: You never write `(*x).field`:
+  - Source: `§3.7 L587-L588`
+  - Related spec refs: none
+- `3.7.1.3` **Auto-deref applies to &T, Box[T], Arc[T], Rc[T], and any type implementing the Dere...**
+  - Requirement: Auto-deref applies to `&T`, `Box[T]`, `Arc[T]`, `Rc[T]`, and any type implementing the `Deref` trait.
+  - Source: `§3.7 L601-L603`
+  - Related spec refs: none
+- `3.7.1.4` **The compiler inserts as many dereferences as needed to reach the target field or me...**
+  - Requirement: The compiler inserts as many dereferences as needed to reach the target field or method.
+  - Source: `§3.7 L601-L603`
+  - Related spec refs: none
+- `3.7.1.5` **Raw pointers: Auto-deref also applies to *const T and *mut T.**
+  - Requirement: **Raw pointers:** Auto-deref also applies to `*const T` and `*mut T`.
+  - Source: `§3.7 L605-L608`
+  - Related spec refs: none
+- `3.7.1.6` **When p has type *mut Sha256, p.state[0] is equivalent to (*p).state[0].**
+  - Requirement: When `p` has type `*mut Sha256`, `p.state[0]` is equivalent to `(*p).state[0]`.
+  - Source: `§3.7 L605-L608`
+  - Related spec refs: none
+- `3.7.1.7` **The dereference is still unsafe — the access must be inside an unsafe block or unsa...**
+  - Requirement: The dereference is still unsafe — the access must be inside an `unsafe` block or `unsafe fn`.
+  - Source: `§3.7 L605-L608`
+  - Related spec refs: none
+- `3.7.1.8` **The vibe: "I don't care how many layers of indirection there are, just give me the...**
+  - Requirement: **The vibe:** "I don't care how many layers of indirection there are, just give me the `.name` field."
+  - Source: `§3.7 L616-L617`
+  - Related spec refs: none
+
+### §3.8 Auto-Referencing
+
+- `3.8.1.1` **When a function takes &T and you pass an owned T, the compiler automatically borrow...**
+  - Requirement: When a function takes `&T` and you pass an owned `T`, the compiler automatically borrows it:
+  - Source: `§3.8 L621-L622`
+  - Related spec refs: none
+- `3.8.1.2` **This also works for method calls: alice.greet() works when greet takes self: &Self.**
+  - Requirement: This also works for method calls: `alice.greet()` works when `greet` takes `self: &Self`.
+  - Source: `§3.8 L631-L632`
+  - Related spec refs: none
+- `3.8.1.3` **Restriction: Auto-referencing only creates shared borrows (&T).**
+  - Requirement: **Restriction:** Auto-referencing only creates shared borrows (`&T`).
+  - Source: `§3.8 L634-L635`
+  - Related spec refs: none
+- `3.8.1.4` **Mutation uses mut self receivers on owned values:**
+  - Requirement: Mutation uses `mut self` receivers on owned values:
+  - Source: `§3.8 L634-L635`
+  - Related spec refs: none
+- `3.8.1.5` **When a call must use non-default ownership semantics, the caller writes them explic...**
+  - Requirement: When a call must use non-default ownership semantics, the caller writes them explicitly:
+  - Source: `§3.8 L646-L647`
+  - Related spec refs: none
+- `3.8.1.6` **For non-Copy parameters, the default plain call f(x) is share-place: the callee ope...**
+  - Requirement: For non-`Copy` parameters, the default plain call `f(x)` is share-place: the callee operates on the caller's place unless the caller overrides that behavior with `move x`, `copy x`, or `&x`.
+  - Source: `§3.8 L655-L657`
+  - Related spec refs: none
+- `3.8.1.7` **The vibe: "The function just wants to look at the data.**
+  - Requirement: **The vibe:** "The function just wants to look at the data.
+  - Source: `§3.8 L659-L660`
+  - Related spec refs: none
+- `3.8.1.8` **I shouldn't have to manually type &."**
+  - Requirement: I shouldn't have to manually type `&`."
+  - Source: `§3.8 L659-L660`
+  - Related spec refs: none
+
+### §3.9 Implicit Trait Object Coercion
+
+- `3.9.1.1` **When a function takes &dyn Trait and you pass &T where T implements the trait, the...**
+  - Requirement: When a function takes `&dyn Trait` and you pass `&T` where `T` implements the trait, the compiler coerces automatically.
+  - Source: `§3.9 L664-L666`
+  - Related spec refs: none
+- `3.9.1.2` **No cast needed — if it implements the trait, just pass it:**
+  - Requirement: No cast needed — if it implements the trait, just pass it:
+  - Source: `§3.9 L664-L666`
+  - Related spec refs: none
+- `3.9.1.3` **This is the Go interface feel — structural satisfaction, implicit coercion.**
+  - Requirement: This is the Go interface feel — structural satisfaction, implicit coercion.
+  - Source: `§3.9 L681-L682`
+  - Related spec refs: none
+- `3.9.1.4` **The same applies to Box[T] → Box[dyn Trait]:**
+  - Requirement: The same applies to `Box[T]` → `Box[dyn Trait]`:
+  - Source: `§3.9 L681-L682`
+  - Related spec refs: none
+- `3.9.1.5` **The vibe: "It implements the trait.**
+  - Requirement: **The vibe:** "It implements the trait.
+  - Source: `§3.9 L688`
+  - Related spec refs: none
+- `3.9.1.6` **Just take it."**
+  - Requirement: Just take it."
+  - Source: `§3.9 L688`
+  - Related spec refs: none
+
+## 4. Types
+
+### §4.1 Primitive Types
+
+- `4.1.1.1` **Signed integers: i8, i16, i32, i64 Unsigned integers: u8, u16, u32, u64 Floating po...**
+  - Requirement: Signed integers: `i8`, `i16`, `i32`, `i64` Unsigned integers: `u8`, `u16`, `u32`, `u64` Floating point: `f32`, `f64` Boolean: `bool` Unit: `Unit` (zero-sized)
+  - Source: `§4.1 L696-L700`
+  - Related spec refs: none
+- `4.1.1.2` **Int is an alias for i64.**
+  - Requirement: `Int` is an alias for `i64`.
+  - Source: `§4.1 L702-L703`
+  - Related spec refs: none
+- `4.1.1.3` **UInt is an alias for u64.**
+  - Requirement: `UInt` is an alias for `u64`.
+  - Source: `§4.1 L702-L703`
+  - Related spec refs: none
+- `4.1.1.4` **Always 64-bit, never platform-dependent.**
+  - Requirement: Always 64-bit, never platform-dependent.
+  - Source: `§4.1 L702-L703`
+  - Related spec refs: none
+- `4.1.1.5` **Compile-time types: At compile time, type is a first-class value (see §17.3).**
+  - Requirement: **Compile-time types:** At compile time, `type` is a first-class value (see §17.3).
+  - Source: `§4.1 L705-L709`
+  - Related spec refs: §17.3
+- `4.1.1.6` **comptime functions can accept T: type as a parameter, enabling type-generic metapro...**
+  - Requirement: `comptime` functions can accept `T: type` as a parameter, enabling type-generic metaprogramming.
+  - Source: `§4.1 L705-L709`
+  - Related spec refs: none
+- `4.1.1.7` **type is not a runtime value — it exists only during compilation and is erased befor...**
+  - Requirement: `type` is not a runtime value — it exists only during compilation and is erased before code generation.
+  - Source: `§4.1 L705-L709`
+  - Related spec refs: none
+
+### §4.2.1 Numeric Literals
+
+- `4.2.1.1` **Underscores may appear between digits in any literal for readability: 1_000_000, 0x...**
+  - Requirement: Underscores may appear between digits in any literal for readability: `1_000_000`, `0xFF_FF`, `0b1111_0000`.
+  - Source: `§4.2.1 L729-L730`
+  - Related spec refs: none
+- `4.2.1.2` **Integer and float literals may carry a type suffix directly on the literal token:**
+  - Requirement: Integer and float literals may carry a type suffix directly on the literal token:
+  - Source: `§4.2.1 L732-L733`
+  - Related spec refs: none
+- `4.2.1.3` **Integer suffixes: u8, u16, u32, u64, i8, i16, i32, i64**
+  - Requirement: Integer suffixes: `u8`, `u16`, `u32`, `u64`, `i8`, `i16`, `i32`, `i64`
+  - Source: `§4.2.1 L735`
+  - Related spec refs: none
+- `4.2.1.4` **Float suffixes: f32, f64**
+  - Requirement: Float suffixes: `f32`, `f64`
+  - Source: `§4.2.1 L736`
+  - Related spec refs: none
+- `4.2.1.5` **Examples:**
+  - Requirement: Examples:
+  - Source: `§4.2.1 L738`
+  - Related spec refs: none
+- `4.2.1.6` **The suffix is part of the literal.**
+  - Requirement: The suffix is part of the literal.
+  - Source: `§4.2.1 L747-L749`
+  - Related spec refs: none
+- `4.2.1.7` **It is written without whitespace and without a separator underscore.**
+  - Requirement: It is written without whitespace and without a separator underscore.
+  - Source: `§4.2.1 L747-L749`
+  - Related spec refs: none
+- `4.2.1.8` **0u64 is valid; 0_u64 is not part of the language surface syntax.**
+  - Requirement: `0u64` is valid; `0_u64` is not part of the language surface syntax.
+  - Source: `§4.2.1 L747-L749`
+  - Related spec refs: none
+- `4.2.1.9` **Default literal types: if no suffix and no surrounding context forces another numer...**
+  - Requirement: **Default literal types:** if no suffix and no surrounding context forces another numeric type:
+  - Source: `§4.2.1 L751-L752`
+  - Related spec refs: none
+- `4.2.1.10` **Unsuffixed integer literals default to i32**
+  - Requirement: Unsuffixed integer literals default to `i32`
+  - Source: `§4.2.1 L754`
+  - Related spec refs: none
+- `4.2.1.11` **Unsuffixed float literals default to f64**
+  - Requirement: Unsuffixed float literals default to `f64`
+  - Source: `§4.2.1 L755`
+  - Related spec refs: none
+- `4.2.1.12` **Contextual numeric inference: unsuffixed numeric literals are resolved from surroun...**
+  - Requirement: **Contextual numeric inference:** unsuffixed numeric literals are resolved from surrounding type context before falling back to the defaults above.
+  - Source: `§4.2.1 L757-L759`
+  - Related spec refs: none
+- `4.2.1.13` **The compiler may infer an unsuffixed literal's type from:**
+  - Requirement: The compiler may infer an unsuffixed literal's type from:
+  - Source: `§4.2.1 L757-L759`
+  - Related spec refs: none
+- `4.2.1.14` **The target type of a typed binding or assignment**
+  - Requirement: The target type of a typed binding or assignment
+  - Source: `§4.2.1 L761`
+  - Related spec refs: none
+- `4.2.1.15` **A function parameter type at the call site**
+  - Requirement: A function parameter type at the call site
+  - Source: `§4.2.1 L762`
+  - Related spec refs: none
+- `4.2.1.16` **The peer operand in a numeric binary operator**
+  - Requirement: The peer operand in a numeric binary operator
+  - Source: `§4.2.1 L763`
+  - Related spec refs: none
+- `4.2.1.17` **The enclosing function's declared return type for tail expressions**
+  - Requirement: The enclosing function's declared return type for tail expressions
+  - Source: `§4.2.1 L764`
+  - Related spec refs: none
+- `4.2.1.18` **A known array element type**
+  - Requirement: A known array element type
+  - Source: `§4.2.1 L765`
+  - Related spec refs: none
+- `4.2.1.19` **A known struct field type**
+  - Requirement: A known struct field type
+  - Source: `§4.2.1 L766`
+  - Related spec refs: none
+- `4.2.1.20` **Examples:**
+  - Requirement: Examples:
+  - Source: `§4.2.1 L768`
+  - Related spec refs: none
+- `4.2.1.21` **Suffixed literals are explicit and do not participate in contextual retyping.**
+  - Requirement: Suffixed literals are explicit and do not participate in contextual retyping.
+  - Source: `§4.2.1 L779-L781`
+  - Related spec refs: none
+- `4.2.1.22` **If a context expects u32 and the literal is 42u8, the program is ill-typed unless a...**
+  - Requirement: If a context expects `u32` and the literal is `42u8`, the program is ill-typed unless an explicit conversion is written.
+  - Source: `§4.2.1 L779-L781`
+  - Related spec refs: none
+- `4.2.1.23` **Range checking: a suffixed literal must fit in its declared type.**
+  - Requirement: **Range checking:** a suffixed literal must fit in its declared type.
+  - Source: `§4.2.1 L783-L784`
+  - Related spec refs: none
+- `4.2.1.24` **For example, 256u8 is invalid.**
+  - Requirement: For example, `256u8` is invalid.
+  - Source: `§4.2.1 L783-L784`
+  - Related spec refs: none
+
+### §4.2.2 Arithmetic Operators
+
+- `4.2.2.1` **All arithmetic operators work on all integer types (i8–i64, u8–u64) and floating po...**
+  - Requirement: All arithmetic operators work on all integer types (`i8`–`i64`, `u8`–`u64`) and floating point types (`f32`, `f64`).
+  - Source: `§4.2.2 L798-L799`
+  - Related spec refs: none
+- `4.2.2.2` **@ is a distinct infix operator at the same precedence level as *, /, and %.**
+  - Requirement: `@` is a distinct infix operator at the same precedence level as `*`, `/`, and `%`.
+  - Source: `§4.2.2 L801-L805`
+  - Related spec refs: none
+- `4.2.2.3` **It is intended for matrix multiplication and generalized tensor products.**
+  - Requirement: It is intended for matrix multiplication and generalized tensor products.
+  - Source: `§4.2.2 L801-L805`
+  - Related spec refs: none
+- `4.2.2.4` **Primitive numeric types do not provide built-in @; user-defined types participate t...**
+  - Requirement: Primitive numeric types do not provide built-in `@`; user-defined types participate through the `MatMul` operator trait (§11.7).
+  - Source: `§4.2.2 L801-L805`
+  - Related spec refs: §11.7
+
+### §4.2.3 Integer Overflow
+
+- `4.2.3.1` **Arithmetic is checked in safe code by default.**
+  - Requirement: Arithmetic is checked in safe code by default.
+  - Source: `§4.2.3 L809-L811`
+  - Related spec refs: none
+- `4.2.3.2` **Integer overflow causes a panic in debug builds.**
+  - Requirement: Integer overflow causes a panic in debug builds.
+  - Source: `§4.2.3 L809-L811`
+  - Related spec refs: none
+- `4.2.3.3` **Release builds may be configured for panic, wrap, or saturation; the default is panic.**
+  - Requirement: Release builds may be configured for panic, wrap, or saturation; the default is panic.
+  - Source: `§4.2.3 L809-L811`
+  - Related spec refs: none
+- `4.2.3.4` **Explicit wrapping operators bypass the overflow check:**
+  - Requirement: **Explicit wrapping operators** bypass the overflow check:
+  - Source: `§4.2.3 L821`
+  - Related spec refs: none
+- `4.2.3.5` **These always produce the two's complement result, regardless of build mode.**
+  - Requirement: These always produce the two's complement result, regardless of build mode.
+  - Source: `§4.2.3 L829-L831`
+  - Related spec refs: none
+- `4.2.3.6` **Use them for hash functions, checksums, and cryptographic code.**
+  - Requirement: Use them for hash functions, checksums, and cryptographic code.
+  - Source: `§4.2.3 L829-L831`
+  - Related spec refs: none
+- `4.2.3.7` **Explicit saturating operators clamp to the type's representable range:**
+  - Requirement: **Explicit saturating operators** clamp to the type's representable range:
+  - Source: `§4.2.3 L833`
+  - Related spec refs: none
+- `4.2.3.8` **When the mathematical result exceeds the type's maximum, the result is the maximum.**
+  - Requirement: When the mathematical result exceeds the type's maximum, the result is the maximum.
+  - Source: `§4.2.3 L841-L844`
+  - Related spec refs: none
+- `4.2.3.9` **When it falls below the minimum, the result is the minimum.**
+  - Requirement: When it falls below the minimum, the result is the minimum.
+  - Source: `§4.2.3 L841-L844`
+  - Related spec refs: none
+- `4.2.3.10` **This is useful for audio processing, color blending, health bars, and any domain wh...**
+  - Requirement: This is useful for audio processing, color blending, health bars, and any domain where clamping is the correct overflow behavior.
+  - Source: `§4.2.3 L841-L844`
+  - Related spec refs: none
+- `4.2.3.11` **Saturating operators are defined for all integer types.**
+  - Requirement: Saturating operators are defined for all integer types.
+  - Source: `§4.2.3 L857-L859`
+  - Related spec refs: none
+- `4.2.3.12` **They are not defined for floating-point types (floats already saturate to ±infinity...**
+  - Requirement: They are not defined for floating-point types (floats already saturate to ±infinity per IEEE 754).
+  - Source: `§4.2.3 L857-L859`
+  - Related spec refs: none
+- `4.2.3.13` **Using them with floats is a compile error.**
+  - Requirement: Using them with floats is a compile error.
+  - Source: `§4.2.3 L857-L859`
+  - Related spec refs: none
+
+### §4.2.4 Bitwise Operators
+
+- `4.2.4.1` **All bitwise operators work on all integer types (i8–i64, u8–u64).**
+  - Requirement: All bitwise operators work on all integer types (`i8`–`i64`, `u8`–`u64`).
+  - Source: `§4.2.4 L880-L881`
+  - Related spec refs: none
+- `4.2.4.2` **Mixed-width operands are promoted to the wider type.**
+  - Requirement: Mixed-width operands are promoted to the wider type.
+  - Source: `§4.2.4 L880-L881`
+  - Related spec refs: none
+- `4.2.4.3` **Signed types (i8–i64): arithmetic right shift (sign-extending — the sign bit is rep...**
+  - Requirement: **Signed types** (`i8`–`i64`): arithmetic right shift (sign-extending — the sign bit is replicated into vacated bits).
+  - Source: `§4.2.4 L885-L886`
+  - Related spec refs: none
+- `4.2.4.4` **Unsigned types (u8–u64): logical right shift (zero-filling — vacated bits are fille...**
+  - Requirement: **Unsigned types** (`u8`–`u64`): logical right shift (zero-filling — vacated bits are filled with zeros).
+  - Source: `§4.2.4 L887-L888`
+  - Related spec refs: none
+- `4.2.4.5` **Shift operations: The shift operators << (left shift) and >> (right shift) take a l...**
+  - Requirement: **Shift operations:** The shift operators `<<` (left shift) and `>>` (right shift) take a left operand of any integer type and a right operand of any unsigned integer type.
+  - Source: `§4.2.4 L898-L901`
+  - Related spec refs: none
+- `4.2.4.6` **A signed right operand is a type error; callers must cast explicitly.**
+  - Requirement: A signed right operand is a type error; callers must cast explicitly.
+  - Source: `§4.2.4 L898-L901`
+  - Related spec refs: none
+- `4.2.4.7` **When the right operand is less than the bit width of the left operand, the shift ha...**
+  - Requirement: When the right operand is less than the bit width of the left operand, the shift has its usual arithmetic meaning.
+  - Source: `§4.2.4 L903-L904`
+  - Related spec refs: none
+- `4.2.4.8` **When the right operand is greater than or equal to the bit width of the left operan...**
+  - Requirement: When the right operand is greater than or equal to the bit width of the left operand, the result is defined as follows:
+  - Source: `§4.2.4 L906-L907`
+  - Related spec refs: none
+- `4.2.4.9` **Left shift (<<) produces 0.**
+  - Requirement: Left shift (`<<`) produces `0`.
+  - Source: `§4.2.4 L909`
+  - Related spec refs: none
+- `4.2.4.10` **Logical right shift (>> on an unsigned value) produces 0.**
+  - Requirement: Logical right shift (`>>` on an unsigned value) produces `0`.
+  - Source: `§4.2.4 L910`
+  - Related spec refs: none
+- `4.2.4.11` **Arithmetic right shift (>> on a signed value) produces 0 for non-negative values an...**
+  - Requirement: Arithmetic right shift (`>>` on a signed value) produces `0` for non-negative values and `-1` for negative values (the sign bit repeated).
+  - Source: `§4.2.4 L911-L913`
+  - Related spec refs: none
+- `4.2.4.12` **Shift operations are defined for all well-typed inputs and cannot cause undefined b...**
+  - Requirement: Shift operations are defined for all well-typed inputs and cannot cause undefined behavior.
+  - Source: `§4.2.4 L915-L916`
+  - Related spec refs: none
+- `4.2.4.13` **Rotation is available as a method on all integer types.**
+  - Requirement: Rotation is available as a method on all integer types.
+  - Source: `§4.2.4 L925-L928`
+  - Related spec refs: none
+- `4.2.4.14` **It wraps bits that shift off one end back onto the other end.**
+  - Requirement: It wraps bits that shift off one end back onto the other end.
+  - Source: `§4.2.4 L925-L928`
+  - Related spec refs: none
+- `4.2.4.15` **Compiles to a single ror/rol instruction on all modern architectures (via LLVM's fs...**
+  - Requirement: Compiles to a single `ror`/`rol` instruction on all modern architectures (via LLVM's `fshl`/`fshr` intrinsics).
+  - Source: `§4.2.4 L925-L928`
+  - Related spec refs: none
+- `4.2.4.16` **Available on all integer types ≥16 bits.**
+  - Requirement: Available on all integer types ≥16 bits.
+  - Source: `§4.2.4 L942-L944`
+  - Related spec refs: none
+- `4.2.4.17` **Identity for i8/u8.**
+  - Requirement: Identity for `i8`/`u8`.
+  - Source: `§4.2.4 L942-L944`
+  - Related spec refs: none
+- `4.2.4.18` **Compiles to LLVM's @llvm.bswap intrinsic (single bswap instruction on x86/ARM).**
+  - Requirement: Compiles to LLVM's `@llvm.bswap` intrinsic (single `bswap` instruction on x86/ARM).
+  - Source: `§4.2.4 L942-L944`
+  - Related spec refs: none
+- `4.2.4.19` **The std.crypto.endian module provides functions for big-endian and little-endian en...**
+  - Requirement: The `std.crypto.endian` module provides functions for big-endian and little-endian encoding/decoding from byte buffers:
+  - Source: `§4.2.4 L954-L955`
+  - Related spec refs: none
+- `4.2.4.20` **Available on all integer types.**
+  - Requirement: Available on all integer types.
+  - Source: `§4.2.4 L992-L994`
+  - Related spec refs: none
+- `4.2.4.21` **Return type is i32 regardless of input width.**
+  - Requirement: Return type is `i32` regardless of input width.
+  - Source: `§4.2.4 L992-L994`
+  - Related spec refs: none
+- `4.2.4.22` **Returns the type's bit width when the value is zero (for clz and ctz).**
+  - Requirement: Returns the type's bit width when the value is zero (for `clz` and `ctz`).
+  - Source: `§4.2.4 L992-L994`
+  - Related spec refs: none
+- `4.2.4.23` **Compiles to single hardware instructions on all modern architectures (via LLVM's ct...**
+  - Requirement: Compiles to single hardware instructions on all modern architectures (via LLVM's `ctpop`, `ctlz`, `cttz` intrinsics).
+  - Source: `§4.2.4 L1009-L1010`
+  - Related spec refs: none
+- `4.2.4.24` **Available on all integer types.**
+  - Requirement: Available on all integer types.
+  - Source: `§4.2.4 L1018-L1019`
+  - Related spec refs: none
+- `4.2.4.25` **Return type matches the input type.**
+  - Requirement: Return type matches the input type.
+  - Source: `§4.2.4 L1018-L1019`
+  - Related spec refs: none
+- `4.2.4.26` **Bit 0 becomes the MSB, bit 1 becomes MSB-1, etc.**
+  - Requirement: Bit 0 becomes the MSB, bit 1 becomes MSB-1, etc.
+  - Source: `§4.2.4 L1018-L1019`
+  - Related spec refs: none
+- `4.2.4.27` **Compiles to LLVM's llvm.bitreverse intrinsic.**
+  - Requirement: Compiles to LLVM's `llvm.bitreverse` intrinsic.
+  - Source: `§4.2.4 L1029`
+  - Related spec refs: none
+- `4.2.4.28` **Compile-time evaluation: All bit manipulation methods can be evaluated at compile t...**
+  - Requirement: **Compile-time evaluation:** All bit manipulation methods can be evaluated at compile time when the receiver is a constant.
+  - Source: `§4.2.4 L1031-L1032`
+  - Related spec refs: none
+
+### §4.2.5 Compound Assignment Operators
+
+- `4.2.5.1` **Compound assignment requires a to be a mutable binding (var) or a mutable reference.**
+  - Requirement: Compound assignment requires `a` to be a mutable binding (`var`) or a mutable reference.
+  - Source: `§4.2.5 L1055-L1057`
+  - Related spec refs: none
+- `4.2.5.2` **The operation and assignment are atomic from the language's perspective (no interme...**
+  - Requirement: The operation and assignment are atomic from the language's perspective (no intermediate observable state).
+  - Source: `§4.2.5 L1055-L1057`
+  - Related spec refs: none
+- `4.2.5.3` **For Drop types, compound assignment is equivalent to: evaluate a op b, drop the old...**
+  - Requirement: For Drop types, compound assignment is equivalent to: evaluate `a op b`, drop the old value of `a`, store the result.
+  - Source: `§4.2.5 L1059-L1061`
+  - Related spec refs: none
+- `4.2.5.4` **This ensures resources are properly released.**
+  - Requirement: This ensures resources are properly released.
+  - Source: `§4.2.5 L1059-L1061`
+  - Related spec refs: none
+
+### §4.2.6 Implicit Widening
+
+- `4.2.6.1` **Implicit widening is only allowed for lossless numeric conversions:**
+  - Requirement: Implicit widening is only allowed for lossless numeric conversions:
+  - Source: `§4.2.6 L1065`
+  - Related spec refs: none
+- `4.2.6.2` **Signed integers: i8 -> i16 -> i32 -> i64**
+  - Requirement: Signed integers: `i8 -> i16 -> i32 -> i64`
+  - Source: `§4.2.6 L1066`
+  - Related spec refs: none
+- `4.2.6.3` **Unsigned integers: u8 -> u16 -> u32 -> u64**
+  - Requirement: Unsigned integers: `u8 -> u16 -> u32 -> u64`
+  - Source: `§4.2.6 L1067`
+  - Related spec refs: none
+- `4.2.6.4` **Floats: f32 -> f64**
+  - Requirement: Floats: `f32 -> f64`
+  - Source: `§4.2.6 L1068`
+  - Related spec refs: none
+- `4.2.6.5` **Unsigned to signed only when destination is strictly wider (u8 -> i16, u16 -> i32...**
+  - Requirement: Unsigned to signed only when destination is strictly wider (`u8 -> i16`, `u16 -> i32`, `u32 -> i64`)
+  - Source: `§4.2.6 L1069-L1070`
+  - Related spec refs: none
+- `4.2.6.6` **No other implicit numeric conversion is allowed.**
+  - Requirement: No other implicit numeric conversion is allowed.
+  - Source: `§4.2.6 L1072`
+  - Related spec refs: none
+- `4.2.6.7` **This catches a class of silent data corruption bugs inherited from C.**
+  - Requirement: This catches a class of silent data corruption bugs inherited from C.
+  - Source: `§4.2.6 L1090-L1093`
+  - Related spec refs: none
+- `4.2.6.8` **The as keyword signals that the programmer understands the conversion may lose data.**
+  - Requirement: The `as` keyword signals that the programmer understands the conversion may lose data.
+  - Source: `§4.2.6 L1090-L1093`
+  - Related spec refs: none
+- `4.2.6.9` **Signed-to-unsigned and unsigned-to-signed conversions also require as, even at the...**
+  - Requirement: Signed-to-unsigned and unsigned-to-signed conversions also require `as`, even at the same width.
+  - Source: `§4.2.6 L1090-L1093`
+  - Related spec refs: none
+
+### §4.2.7 Comparison Operators and Chaining
+
+- `4.2.7.1` **Ordered comparisons (<, <=, >, >=) may be chained:**
+  - Requirement: Ordered comparisons (`<`, `<=`, `>`, `>=`) may be chained:
+  - Source: `§4.2.7 L1106`
+  - Related spec refs: none
+- `4.2.7.2` **a < b < c is equivalent to (a < b) and (b < c), except each interior operand is eva...**
+  - Requirement: `a < b < c` is equivalent to `(a < b) and (b < c)`, except each interior operand is evaluated exactly once.
+  - Source: `§4.2.7 L1114-L1116`
+  - Related spec refs: none
+- `4.2.7.3` **When an interior operand is non-trivial, the compiler introduces a hidden temporary:**
+  - Requirement: When an interior operand is non-trivial, the compiler introduces a hidden temporary:
+  - Source: `§4.2.7 L1114-L1116`
+  - Related spec refs: none
+- `4.2.7.4` **Only ordered comparisons chain.**
+  - Requirement: Only ordered comparisons chain.
+  - Source: `§4.2.7 L1125-L1129`
+  - Related spec refs: none
+- `4.2.7.5` **Equality and membership operators do not: a == b == c and x in y in z are compile e...**
+  - Requirement: Equality and membership operators do not: `a == b == c` and `x in y in z` are compile errors.
+  - Source: `§4.2.7 L1125-L1129`
+  - Related spec refs: none
+- `4.2.7.6` **Chained comparisons require each pairwise comparison to produce bool.**
+  - Requirement: Chained comparisons require each pairwise comparison to produce `bool`.
+  - Source: `§4.2.7 L1125-L1129`
+  - Related spec refs: none
+- `4.2.7.7` **If a type wants elementwise or non-boolean comparison results, write the pairwise c...**
+  - Requirement: If a type wants elementwise or non-boolean comparison results, write the pairwise comparisons explicitly and combine them yourself.
+  - Source: `§4.2.7 L1125-L1129`
+  - Related spec refs: none
+
+### §4.3 Structs
+
+- `4.3.1.1` **Structs are declared with type using either inline braces or an indented block:**
+  - Requirement: Structs are declared with `type` using either inline braces or an indented block:
+  - Source: `§4.3 L1133-L1134`
+  - Related spec refs: none
+- `4.3.1.2` **No methods, no constructors, no inheritance.**
+  - Requirement: No methods, no constructors, no inheritance.
+  - Source: `§4.3 L1144-L1145`
+  - Related spec refs: none
+- `4.3.1.3` **Functions are associated with types via extension blocks (Section 9.5).**
+  - Requirement: Functions are associated with types via extension blocks (Section 9.5).
+  - Source: `§4.3 L1144-L1145`
+  - Related spec refs: none
+- `4.3.1.4` **Named literals require all non-defaulted fields; fields may appear in any order.**
+  - Requirement: Named literals require all non-defaulted fields; fields may appear in any order.
+  - Source: `§4.3 L1157-L1162`
+  - Related spec refs: none
+- `4.3.1.5` **Positional literals require all fields in declaration order.**
+  - Requirement: Positional literals require all fields in declaration order.
+  - Source: `§4.3 L1157-L1162`
+  - Related spec refs: none
+- `4.3.1.6` **Mixing named and positional fields in one literal is a compile error.**
+  - Requirement: Mixing named and positional fields in one literal is a compile error.
+  - Source: `§4.3 L1157-L1162`
+  - Related spec refs: none
+- `4.3.1.7` **Positional form is inline only.**
+  - Requirement: Positional form is inline only.
+  - Source: `§4.3 L1157-L1162`
+  - Related spec refs: none
+- `4.3.1.8` **Block form is named only.**
+  - Requirement: Block form is named only.
+  - Source: `§4.3 L1157-L1162`
+  - Related spec refs: none
+- `4.3.1.9` **Field access is always by name, regardless of construction form.**
+  - Requirement: Field access is always by name, regardless of construction form.
+  - Source: `§4.3 L1157-L1162`
+  - Related spec refs: none
+- `4.3.1.10` **Inline forms use commas between fields; block form uses newlines.**
+  - Requirement: Inline forms use commas between fields; block form uses newlines.
+  - Source: `§4.3 L1157-L1162`
+  - Related spec refs: none
+- `4.3.1.11` **{ base with field: value } copies (or moves) all fields from base, then overwrites...**
+  - Requirement: `{ base with field: value }` copies (or moves) all fields from `base`, then overwrites the named fields.
+  - Source: `§4.3 L1171-L1176`
+  - Related spec refs: none
+- `4.3.1.12` **If the type is Copy, the base is copied and remains valid.**
+  - Requirement: If the type is `Copy`, the base is copied and remains valid.
+  - Source: `§4.3 L1171-L1176`
+  - Related spec refs: none
+- `4.3.1.13` **If not, the base is moved — non-overwritten fields are moved into the new record, a...**
+  - Requirement: If not, the base is moved — non-overwritten fields are moved into the new record, and **overwritten fields are dropped** (the compiler emits `drop` calls for them).
+  - Source: `§4.3 L1171-L1176`
+  - Related spec refs: none
+- `4.3.1.14` **The base is fully consumed.**
+  - Requirement: The base is fully consumed.
+  - Source: `§4.3 L1171-L1176`
+  - Related spec refs: none
+- `4.3.1.15` **Multiple fields may be updated:**
+  - Requirement: Multiple fields may be updated:
+  - Source: `§4.3 L1178`
+  - Related spec refs: none
+- `4.3.1.16` **This is the primary mechanism for functional-style immutable updates.**
+  - Requirement: This is the primary mechanism for functional-style immutable updates.
+  - Source: `§4.3 L1188-L1191`
+  - Related spec refs: none
+- `4.3.1.17` **It replaces the need for lenses or builder patterns.**
+  - Requirement: It replaces the need for lenses or builder patterns.
+  - Source: `§4.3 L1188-L1191`
+  - Related spec refs: none
+- `4.3.1.18` **This is Form 4 of the with construct — see §7.4.**
+  - Requirement: This is Form 4 of the `with` construct — see §7.4.
+  - Source: `§4.3 L1188-L1191`
+  - Related spec refs: §7.4
+- `4.3.1.19` **Record update supports named inline and named block fields only; positional record...**
+  - Requirement: Record update supports named inline and named block fields only; positional record update is invalid.
+  - Source: `§4.3 L1188-L1191`
+  - Related spec refs: none
+- `4.3.1.20` **When a variable has the same name as a struct field, the : value part may be omitted:**
+  - Requirement: When a variable has the same name as a struct field, the `: value` part may be omitted:
+  - Source: `§4.3 L1195-L1196`
+  - Related spec refs: none
+- `4.3.1.21` **This applies in all struct construction contexts including record update syntax:**
+  - Requirement: This applies in all struct construction contexts including record update syntax:
+  - Source: `§4.3 L1210-L1211`
+  - Related spec refs: none
+- `4.3.1.22` **Struct fields may declare default values.**
+  - Requirement: Struct fields may declare default values.
+  - Source: `§4.3 L1224-L1225`
+  - Related spec refs: none
+- `4.3.1.23` **Fields with defaults may be omitted at construction sites:**
+  - Requirement: Fields with defaults may be omitted at construction sites:
+  - Source: `§4.3 L1224-L1225`
+  - Related spec refs: none
+- `4.3.1.24` **The block form also supports defaults:**
+  - Requirement: The block form also supports defaults:
+  - Source: `§4.3 L1249`
+  - Related spec refs: none
+- `4.3.1.25` **Default expressions are evaluated at the construction site, not at type definition...**
+  - Requirement: Default expressions are evaluated at the construction site, not at type definition time.
+  - Source: `§4.3 L1259-L1260`
+  - Related spec refs: none
+- `4.3.1.26` **Each construction gets a fresh evaluation:**
+  - Requirement: Each construction gets a fresh evaluation:
+  - Source: `§4.3 L1259-L1260`
+  - Related spec refs: none
+- `4.3.1.27` **Default expressions must be valid at any construction site (no capturing locals fro...**
+  - Requirement: Default expressions must be valid at any construction site (no capturing locals from the definition scope).
+  - Source: `§4.3 L1272-L1273`
+  - Related spec refs: none
+- `4.3.1.28` **Fields without defaults must always be provided at construction.**
+  - Requirement: Fields without defaults must always be provided at construction.
+  - Source: `§4.3 L1274`
+  - Related spec refs: none
+- `4.3.1.29` **Fields with defaults may be explicitly provided to override.**
+  - Requirement: Fields with defaults may be explicitly provided to override.
+  - Source: `§4.3 L1275`
+  - Related spec refs: none
+- `4.3.1.30` **Default field values compose with field shorthand and record update syntax.**
+  - Requirement: Default field values compose with field shorthand and record update syntax.
+  - Source: `§4.3 L1276-L1277`
+  - Related spec refs: none
+- `4.3.1.31` **Defaults are a comptime transformation — the compiler inserts the default expressio...**
+  - Requirement: Defaults are a comptime transformation — the compiler inserts the default expressions for missing fields at the call site.
+  - Source: `§4.3 L1278-L1279`
+  - Related spec refs: none
+
+### §4.3a Fixed-Size Arrays
+
+- `4.3.2.1` **Fixed-size arrays have a compile-time-known length and are stack-allocated value ty...**
+  - Requirement: Fixed-size arrays have a compile-time-known length and are stack-allocated value types:
+  - Source: `§4.3a L1305-L1306`
+  - Related spec refs: none
+- `4.3.2.2` **Length N must be a compile-time constant (integer literal or const).**
+  - Requirement: Length `N` must be a compile-time constant (integer literal or `const`).
+  - Source: `§4.3a L1329`
+  - Related spec refs: none
+- `4.3.2.3` **[T; N] has size N * sizeof(T) and alignment alignof(T).**
+  - Requirement: `[T; N]` has size `N * sizeof(T)` and alignment `alignof(T)`.
+  - Source: `§4.3a L1330`
+  - Related spec refs: none
+- `4.3.2.4` **Passed by value (copied on assignment). For large arrays, pass by reference.**
+  - Requirement: Passed by value (copied on assignment). For large arrays, pass by reference.
+  - Source: `§4.3a L1331-L1332`
+  - Related spec refs: none
+- `4.3.2.5` **Bounds checking in debug mode, unchecked in release.**
+  - Requirement: Bounds checking in debug mode, unchecked in release.
+  - Source: `§4.3a L1333`
+  - Related spec refs: none
+- `4.3.2.6` **Copy if the element type is Copy.**
+  - Requirement: `Copy` if the element type is `Copy`.
+  - Source: `§4.3a L1334`
+  - Related spec refs: none
+
+### §4.3a.1 Array-to-Pointer Decay
+
+- `4.3.2.7` **With has no implicit array-to-pointer decay.**
+  - Requirement: With has no implicit array-to-pointer decay.
+  - Source: `§4.3a.1 L1337-L1339`
+  - Related spec refs: none
+- `4.3.2.8` **Use explicit decay: &arr[0] as *const T (or *mut T).**
+  - Requirement: Use explicit decay: `&arr[0] as *const T` (or `*mut T`).
+  - Source: `§4.3a.1 L1337-L1339`
+  - Related spec refs: none
+- `4.3.2.9` **This applies in all contexts: assignment, function arguments, and comparisons.**
+  - Requirement: This applies in all contexts: assignment, function arguments, and comparisons.
+  - Source: `§4.3a.1 L1337-L1339`
+  - Related spec refs: none
+
+### §4.3b Bitpacked Structs
+
+- `4.3.3.1` **The @[bitpacked] attribute provides bit-level field packing where fields occupy exa...**
+  - Requirement: The `@[bitpacked]` attribute provides bit-level field packing where fields occupy exactly their declared bit width with no padding.
+  - Source: `§4.3b L1363-L1364`
+  - Related spec refs: none
+- `4.3.3.2` **Fields are laid out MSB-first (network byte order) from first field to last, with n...**
+  - Requirement: Fields are laid out MSB-first (network byte order) from first field to last, with no gaps.
+  - Source: `§4.3b L1397-L1398`
+  - Related spec refs: none
+- `4.3.3.3` **Total size is ceil(sum_of_field_bits / 8) bytes.**
+  - Requirement: Total size is `ceil(sum_of_field_bits / 8)` bytes.
+  - Source: `§4.3b L1399`
+  - Related spec refs: none
+- `4.3.3.4` **All field types must have a known bit width. Pointers, slices, strings, structs (ex...**
+  - Requirement: All field types must have a known bit width. Pointers, slices, strings, structs (except nested bitpacked), and Vecs are not allowed. Compile error: "bitpacked fields must be integer, bool, or bitpacked struct type."
+  - Source: `§4.3b L1400-L1403`
+  - Related spec refs: none
+- `4.3.3.5` **bool occupies 1 bit. true is 1, false is 0.**
+  - Requirement: `bool` occupies 1 bit. `true` is `1`, `false` is `0`.
+  - Source: `§4.3b L1404`
+  - Related spec refs: none
+- `4.3.3.6` **Non-byte-sized integer types are valid field types (see below).**
+  - Requirement: Non-byte-sized integer types are valid field types (see below).
+  - Source: `§4.3b L1405`
+  - Related spec refs: none
+- `4.3.3.7` **Nested @[bitpacked] structs are allowed; their bits are inlined.**
+  - Requirement: Nested `@[bitpacked]` structs are allowed; their bits are inlined.
+  - Source: `§4.3b L1406`
+  - Related spec refs: none
+- `4.3.3.8` **Field access uses the same dot syntax as regular structs.**
+  - Requirement: **Field access** uses the same dot syntax as regular structs.
+  - Source: `§4.3b L1408-L1409`
+  - Related spec refs: none
+- `4.3.3.9` **The compiler generates shift-and-mask operations:**
+  - Requirement: The compiler generates shift-and-mask operations:
+  - Source: `§4.3b L1408-L1409`
+  - Related spec refs: none
+- `4.3.3.10` **Pointers to bitpacked fields are a compile error.**
+  - Requirement: **Pointers to bitpacked fields** are a compile error.
+  - Source: `§4.3b L1417-L1418`
+  - Related spec refs: none
+- `4.3.3.11` **The field may not be byte-aligned:**
+  - Requirement: The field may not be byte-aligned:
+  - Source: `§4.3b L1417-L1418`
+  - Related spec refs: none
+- `4.3.3.12` **Casting to and from the backing integer type:**
+  - Requirement: **Casting** to and from the backing integer type:
+  - Source: `§4.3b L1425`
+  - Related spec refs: none
+- `4.3.3.13` **The backing integer type is the smallest unsigned integer that holds all bits: u8 f...**
+  - Requirement: The backing integer type is the smallest unsigned integer that holds all bits: `u8` for 1-8 bits, `u16` for 9-16, `u32` for 17-32, `u64` for 33-64.
+  - Source: `§4.3b L1435-L1437`
+  - Related spec refs: none
+- `4.3.3.14` **To support bitpacked structs, With provides integer types with non-standard widths:**
+  - Requirement: To support bitpacked structs, With provides integer types with non-standard widths:
+  - Source: `§4.3b L1441-L1442`
+  - Related spec refs: none
+- `4.3.3.15` **When used as local variables, non-byte-sized integers are stored in the next larger...**
+  - Requirement: When used as local variables, non-byte-sized integers are stored in the next larger standard-width register (e.g., `u3` occupies an `i32` register with the upper bits zeroed).
+  - Source: `§4.3b L1450-L1453`
+  - Related spec refs: none
+- `4.3.3.16` **Arithmetic works normally; the result is masked to the type's range.**
+  - Requirement: Arithmetic works normally; the result is masked to the type's range.
+  - Source: `§4.3b L1450-L1453`
+  - Related spec refs: none
+
+### §4.4 Enums (Algebraic Data Types)
+
+- `4.4.1.1` **Enums are declared with the enum keyword using either an indented block or inline b...**
+  - Requirement: Enums are declared with the `enum` keyword using either an indented block or inline braces:
+  - Source: `§4.4 L1457-L1458`
+  - Related spec refs: none
+- `4.4.1.2` **An optional leading | is allowed in block form:**
+  - Requirement: An optional leading `|` is allowed in block form:
+  - Source: `§4.4 L1469`
+  - Related spec refs: none
+- `4.4.1.3` **The standard library prelude automatically imports:**
+  - Requirement: The standard library prelude automatically imports:
+  - Source: `§4.4 L1487`
+  - Related spec refs: none
+- `4.4.1.4` **Option.{Some, None}**
+  - Requirement: `Option.{Some, None}`
+  - Source: `§4.4 L1488`
+  - Related spec refs: none
+- `4.4.1.5` **Result.{Ok, Err}**
+  - Requirement: `Result.{Ok, Err}`
+  - Source: `§4.4 L1489`
+  - Related spec refs: none
+- `4.4.1.6` **These never require qualification in normal code.**
+  - Requirement: These never require qualification in normal code.
+  - Source: `§4.4 L1491`
+  - Related spec refs: none
+- `4.4.1.7` **When the expected type is statically known from context, variant names may be prefi...**
+  - Requirement: When the expected type is statically known from context, variant names may be prefixed with `.` instead of the full type path:
+  - Source: `§4.4 L1495-L1496`
+  - Related spec refs: none
+- `4.4.1.8` **The compiler infers the type from: return type annotations, match subject type, fun...**
+  - Requirement: The compiler infers the type from: return type annotations, match subject type, function parameter types, struct field types, variable type annotations, and generic type arguments.
+  - Source: `§4.4 L1519-L1522`
+  - Related spec refs: none
+- `4.4.1.9` **If the type cannot be inferred, the compiler requires the full path and suggests it:**
+  - Requirement: If the type cannot be inferred, the compiler requires the full path and suggests it:
+  - Source: `§4.4 L1519-L1522`
+  - Related spec refs: none
+- `4.4.1.10` **Match patterns may use qualified Type.Variant syntax:**
+  - Requirement: Match patterns may use qualified `Type.Variant` syntax:
+  - Source: `§4.4 L1532`
+  - Related spec refs: none
+- `4.4.1.11` **Qualified patterns also work with payloads:**
+  - Requirement: Qualified patterns also work with payloads:
+  - Source: `§4.4 L1542`
+  - Related spec refs: none
+- `4.4.1.12` **The compiler validates that the qualifying type matches the match subject type, pro...**
+  - Requirement: The compiler validates that the qualifying type matches the match subject type, producing a compile error for mismatches.
+  - Source: `§4.4 L1552-L1553`
+  - Related spec refs: none
+- `4.4.1.13` **Every enum variant with data automatically generates accessor methods.**
+  - Requirement: Every enum variant with data automatically generates accessor methods.
+  - Source: `§4.4 L1557-L1558`
+  - Related spec refs: none
+- `4.4.1.14` **For a variant Foo(T), the compiler generates:**
+  - Requirement: For a variant `Foo(T)`, the compiler generates:
+  - Source: `§4.4 L1557-L1558`
+  - Related spec refs: none
+- `4.4.1.15` **Method names are the variant name converted to snake_case.**
+  - Requirement: Method names are the variant name converted to `snake_case`.
+  - Source: `§4.4 L1566`
+  - Related spec refs: none
+- `4.4.1.16` **The _ref variants are essential for navigating tree structures without cloning:**
+  - Requirement: The `_ref` variants are essential for navigating tree structures without cloning:
+  - Source: `§4.4 L1583-L1584`
+  - Related spec refs: none
+- `4.4.1.17` **These compose with optional chaining and ??:**
+  - Requirement: These compose with optional chaining and `??`:
+  - Source: `§4.4 L1601`
+  - Related spec refs: none
+- `4.4.1.18` **For variants with multiple fields, .as_variant() returns Option[(A, B)] (a tuple):**
+  - Requirement: For variants with multiple fields, `.as_variant()` returns `Option[(A, B)]` (a tuple):
+  - Source: `§4.4 L1617-L1618`
+  - Related spec refs: none
+- `4.4.1.19` **Unit variants (no data) generate only .is_variant().**
+  - Requirement: Unit variants (no data) generate only `.is_variant()`.
+  - Source: `§4.4 L1629`
+  - Related spec refs: none
+- `4.4.1.20` **These methods are generated unconditionally for all enums — no @[derive] needed.**
+  - Requirement: These methods are generated unconditionally for all enums — no `@[derive]` needed.
+  - Source: `§4.4 L1631-L1632`
+  - Related spec refs: none
+- `4.4.1.21` **They are always available.**
+  - Requirement: They are always available.
+  - Source: `§4.4 L1631-L1632`
+  - Related spec refs: none
+
+### §4.4a Discriminant Enums
+
+- `4.4.2.1` **Enums can specify an integer representation type and explicit discriminant values f...**
+  - Requirement: Enums can specify an integer representation type and explicit discriminant values for each variant.
+  - Source: `§4.4a L1636-L1638`
+  - Related spec refs: none
+- `4.4.2.2` **Discriminant enums use the enum keyword with a representation type:**
+  - Requirement: Discriminant enums use the `enum` keyword with a representation type:
+  - Source: `§4.4a L1636-L1638`
+  - Related spec refs: none
+- `4.4.2.3` **Inline form is also supported:**
+  - Requirement: Inline form is also supported:
+  - Source: `§4.4a L1647`
+  - Related spec refs: none
+- `4.4.2.4` **The type after the first colon is the representation type — an integer type (i8, i1...**
+  - Requirement: The type after the first colon is the **representation type** — an integer type (`i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`) that determines the underlying storage.
+  - Source: `§4.4a L1653-L1656`
+  - Related spec refs: none
+- `4.4.2.5` **Each variant is assigned an explicit integer value with = N.**
+  - Requirement: Each variant is assigned an explicit integer value with `= N`.
+  - Source: `§4.4a L1653-L1656`
+  - Related spec refs: none
+- `4.4.2.6` **Auto-incrementing: If a variant omits the = N, it defaults to the previous variant'...**
+  - Requirement: **Auto-incrementing:** If a variant omits the `= N`, it defaults to the previous variant's value plus one (or zero for the first variant):
+  - Source: `§4.4a L1658-L1659`
+  - Related spec refs: none
+- `4.4.2.7` **Discriminant enums with payloads: Variants can carry associated data just like regu...**
+  - Requirement: **Discriminant enums with payloads:** Variants can carry associated data just like regular enums, combined with explicit discriminant values:
+  - Source: `§4.4a L1669-L1670`
+  - Related spec refs: none
+- `4.4.2.8` **When any variant has a payload, the LLVM representation is a tagged union { repr_ty...**
+  - Requirement: When any variant has a payload, the LLVM representation is a tagged union `{ repr_ty, [max_payload_size x i8] }` — the same layout as regular enums but with the tag being the discriminant value.
+  - Source: `§4.4a L1679-L1682`
+  - Related spec refs: none
+- `4.4.2.9` **Pattern matching extracts payloads the same way as regular enums.**
+  - Requirement: Pattern matching extracts payloads the same way as regular enums.
+  - Source: `§4.4a L1679-L1682`
+  - Related spec refs: none
+- `4.4.2.10` **@[flags] attribute: For bitflag enums, @[flags] changes auto-increment to power-of-...**
+  - Requirement: **`@[flags]` attribute:** For bitflag enums, `@[flags]` changes auto-increment to power-of-two doubling:
+  - Source: `§4.4a L1684-L1685`
+  - Related spec refs: none
+- `4.4.2.11` **Bitwise operations work naturally since the enum is its integer value.**
+  - Requirement: Bitwise operations work naturally since the enum **is** its integer value.
+  - Source: `§4.4a L1695`
+  - Related spec refs: none
+- `4.4.2.12` **@[specified] attribute: For boundary-facing discriminant enums, @[specified] requir...**
+  - Requirement: **`@[specified]` attribute:** For boundary-facing discriminant enums, `@[specified]` requires every variant to provide an explicit value.
+  - Source: `§4.4a L1697-L1701`
+  - Related spec refs: none
+- `4.4.2.13` **It is intended for wire formats, file formats, FFI constants, protocol messages, an...**
+  - Requirement: It is intended for wire formats, file formats, FFI constants, protocol messages, and other values where auto-increment would make source ordering part of the external ABI.
+  - Source: `§4.4a L1697-L1701`
+  - Related spec refs: none
+- `4.4.2.14` **@[specified] requires an explicit integer representation type and rejects any varia...**
+  - Requirement: `@[specified]` requires an explicit integer representation type and rejects any variant without `= value`:
+  - Source: `§4.4a L1711-L1712`
+  - Related spec refs: none
+- `4.4.2.15` **Conversion: Type.from_int(n) converts an integer to Option[Type], returning .None f...**
+  - Requirement: **Conversion:** `Type.from_int(n)` converts an integer to `Option[Type]`, returning `.None` for values that don't match any defined discriminant:
+  - Source: `§4.4a L1721-L1722`
+  - Related spec refs: none
+- `4.4.2.16` **Casting: value as i32 extracts the underlying integer (identity cast).**
+  - Requirement: **Casting:** `value as i32` extracts the underlying integer (identity cast).
+  - Source: `§4.4a L1729`
+  - Related spec refs: none
+
+### §4.5 Distinct Types
+
+- `4.5.1.1` **Zero-cost wrappers that prevent accidental mixing of semantically different values.**
+  - Requirement: Zero-cost wrappers that prevent accidental mixing of semantically different values.
+  - Source: `§4.5 L1738-L1739`
+  - Related spec refs: none
+
+### §4.6 Type Inference
+
+- `4.6.1.1` **Bidirectional, local inference.**
+  - Requirement: Bidirectional, local inference.
+  - Source: `§4.6 L1743-L1745`
+  - Related spec refs: none
+- `4.6.1.2` **Inside function bodies, types are inferred.**
+  - Requirement: Inside function bodies, types are inferred.
+  - Source: `§4.6 L1743-L1745`
+  - Related spec refs: none
+- `4.6.1.3` **At module boundaries, types must be explicit.**
+  - Requirement: At module boundaries, types must be explicit.
+  - Source: `§4.6 L1743-L1745`
+  - Related spec refs: none
+- `4.6.1.4` **Inference does not cross compilation unit boundaries.**
+  - Requirement: Inference does not cross compilation unit boundaries.
+  - Source: `§4.6 L1743-L1745`
+  - Related spec refs: none
+
+### §4.7 Ranges
+
+- `4.7.1.1` **Ranges are values of type Range[T] or RangeInclusive[T].**
+  - Requirement: Ranges are values of type `Range[T]` or `RangeInclusive[T]`.
+  - Source: `§4.7 L1754-L1757`
+  - Related spec refs: none
+- `4.7.1.2` **They implement Iter[T] for integer types and Contains[T] for ordered types, making...**
+  - Requirement: They implement `Iter[T]` for integer types and `Contains[T]` for ordered types, making them usable in `for` loops, slicing, pattern matching, and membership tests.
+  - Source: `§4.7 L1754-L1757`
+  - Related spec refs: none
+- `4.7.1.3` **Ranges are ordinary first-class values: they can be stored in variables, passed to...**
+  - Requirement: Ranges are ordinary first-class values: they can be stored in variables, passed to functions, and returned like any other value.
+  - Source: `§4.7 L1759-L1760`
+  - Related spec refs: none
+
+### §4.8 Tuples
+
+- `4.8.1.1` **Tuples are anonymous product types for quick groupings of values:**
+  - Requirement: Tuples are anonymous product types for quick groupings of values:
+  - Source: `§4.8 L1784`
+  - Related spec refs: none
+- `4.8.1.2` **Ownership: Tuples follow normal ownership rules.**
+  - Requirement: **Ownership:** Tuples follow normal ownership rules.
+  - Source: `§4.8 L1821-L1823`
+  - Related spec refs: none
+- `4.8.1.3` **A tuple is Copy if all elements are Copy.**
+  - Requirement: A tuple is `Copy` if all elements are `Copy`.
+  - Source: `§4.8 L1821-L1823`
+  - Related spec refs: none
+- `4.8.1.4` **A tuple is Send if all elements are Send.**
+  - Requirement: A tuple is `Send` if all elements are `Send`.
+  - Source: `§4.8 L1821-L1823`
+  - Related spec refs: none
+- `4.8.1.5` **Ephemeral elements make the tuple ephemeral.**
+  - Requirement: Ephemeral elements make the tuple ephemeral.
+  - Source: `§4.8 L1821-L1823`
+  - Related spec refs: none
+- `4.8.1.6` **Unit: The unit type Unit is equivalent to the empty tuple ().**
+  - Requirement: **Unit:** The unit type `Unit` is equivalent to the empty tuple `()`.
+  - Source: `§4.8 L1825`
+  - Related spec refs: none
+- `4.8.1.7` **Unit elision: When a function, method, or variant constructor expects a single argu...**
+  - Requirement: **Unit elision:** When a function, method, or variant constructor expects a single argument of type `Unit`, the argument may be omitted.
+  - Source: `§4.8 L1827-L1829`
+  - Related spec refs: none
+- `4.8.1.8` **The compiler inserts () automatically:**
+  - Requirement: The compiler inserts `()` automatically:
+  - Source: `§4.8 L1827-L1829`
+  - Related spec refs: none
+- `4.8.1.9` **In practice, Ok() is rarely needed because of implicit Ok wrapping (§4.9).**
+  - Requirement: In practice, `Ok()` is rarely needed because of implicit `Ok` wrapping (§4.9).
+  - Source: `§4.8 L1836-L1837`
+  - Related spec refs: §4.9
+- `4.8.1.10` **But Unit elision still helps with other types.**
+  - Requirement: But Unit elision still helps with other types.
+  - Source: `§4.8 L1836-L1837`
+  - Related spec refs: none
+- `4.8.1.11` **Applicability: Unit elision applies only when the expected parameter type is static...**
+  - Requirement: **Applicability:** Unit elision applies **only when the expected parameter type is statically known to be `Unit`** at the call site via bidirectional type inference.
+  - Source: `§4.8 L1839-L1842`
+  - Related spec refs: none
+- `4.8.1.12` **It does NOT apply to unconstrained generics:**
+  - Requirement: It does NOT apply to unconstrained generics:
+  - Source: `§4.8 L1839-L1842`
+  - Related spec refs: none
+- `4.8.1.13` **More examples:**
+  - Requirement: More examples:
+  - Source: `§4.8 L1852`
+  - Related spec refs: none
+
+### §4.8a Slices
+
+- `4.8.2.1` **Slices are borrowed views into contiguous memory (arrays, Vecs):**
+  - Requirement: Slices are borrowed views into contiguous memory (arrays, Vecs):
+  - Source: `§4.8a L1871`
+  - Related spec refs: none
+- `4.8.2.2` **A slice is a fat pointer: (ptr: *const T, len: usize).**
+  - Requirement: A slice is a fat pointer: `(ptr: *const T, len: usize)`.
+  - Source: `§4.8a L1878-L1880`
+  - Related spec refs: none
+- `4.8.2.3` **It does not own the data — it borrows from an array, Vec, or other contiguous storage.**
+  - Requirement: It does not own the data — it borrows from an array, Vec, or other contiguous storage.
+  - Source: `§4.8a L1878-L1880`
+  - Related spec refs: none
+- `4.8.2.4` **Slices are ephemeral (§5) — they cannot be stored in structs or returned from funct...**
+  - Requirement: Slices are ephemeral (§5) — they cannot be stored in structs or returned from functions (they borrow the underlying storage).
+  - Source: `§4.8a L1894-L1896`
+  - Related spec refs: §5
+- `4.8.2.5` **Bounds-checked in debug mode.**
+  - Requirement: Bounds-checked in debug mode.
+  - Source: `§4.8a L1894-L1896`
+  - Related spec refs: none
+
+### §4.9 Implicit `Ok` Wrapping
+
+- `4.9.1.1` **When a function's return type is Result[T, E], the compiler automatically wraps the...**
+  - Requirement: When a function's return type is `Result[T, E]`, the compiler automatically wraps the final expression:
+  - Source: `§4.9 L1900-L1901`
+  - Related spec refs: none
+- `4.9.1.2` **If the last expression has type T (not Result), it's wrapped in Ok(...).**
+  - Requirement: If the last expression has type `T` (not `Result`), it's wrapped in `Ok(...)`.
+  - Source: `§4.9 L1903-L1904`
+  - Related spec refs: none
+- `4.9.1.3` **If the function returns Result[Unit, E] and the block ends with a statement (no tra...**
+  - Requirement: If the function returns `Result[Unit, E]` and the block ends with a statement (no trailing expression), `Ok(())` is returned.
+  - Source: `§4.9 L1905-L1906`
+  - Related spec refs: none
+- `4.9.1.4` **? still early-returns Err as normal.**
+  - Requirement: `?` still early-returns `Err` as normal.
+  - Source: `§4.9 L1907`
+  - Related spec refs: none
+- `4.9.1.5` **The rule is simple: ? handles the sad path.**
+  - Requirement: **The rule is simple:** `?` handles the sad path.
+  - Source: `§4.9 L1934-L1935`
+  - Related spec refs: none
+- `4.9.1.6` **The happy path just returns the value.**
+  - Requirement: The happy path just returns the value.
+  - Source: `§4.9 L1934-L1935`
+  - Related spec refs: none
+- `4.9.1.7` **No wrapping needed.**
+  - Requirement: No wrapping needed.
+  - Source: `§4.9 L1934-L1935`
+  - Related spec refs: none
+- `4.9.1.8` **If the last expression already has type Result[T, E], no wrapping occurs (would pro...**
+  - Requirement: If the last expression already has type `Result[T, E]`, no wrapping occurs (would produce `Result[Result[T, E], E]`).
+  - Source: `§4.9 L1939-L1940`
+  - Related spec refs: none
+- `4.9.1.9` **If the return type is not Result, implicit Ok wrapping doesn't apply (but see §4.10...**
+  - Requirement: If the return type is not `Result`, implicit Ok wrapping doesn't apply (but see §4.10 for implicit default return).
+  - Source: `§4.9 L1941-L1942`
+  - Related spec refs: §4.10
+- `4.9.1.10` **Explicit Ok(...) and Err(...) still work everywhere.**
+  - Requirement: Explicit `Ok(...)` and `Err(...)` still work everywhere.
+  - Source: `§4.9 L1943`
+  - Related spec refs: none
+- `4.9.1.11` **Guideline: Tuples above 3 elements should usually be replaced with a named struct f...**
+  - Requirement: **Guideline:** Tuples above 3 elements should usually be replaced with a named struct for readability.
+  - Source: `§4.9 L1945-L1947`
+  - Related spec refs: none
+- `4.9.1.12` **The compiler does not enforce this, but with fmt may suggest it.**
+  - Requirement: The compiler does not enforce this, but `with fmt` may suggest it.
+  - Source: `§4.9 L1945-L1947`
+  - Related spec refs: none
+
+### §4.10 Implicit Default Return
+
+- `4.10.1.1` **When a function's return type implements the Default trait and the body's last expr...**
+  - Requirement: When a function's return type implements the `Default` trait and the body's last expression is `Unit` (a statement like `print`), the compiler implicitly returns `T.default()`.
+  - Source: `§4.10 L1951-L1953`
+  - Related spec refs: none
+- `4.10.1.2` **Built-in implementations:**
+  - Requirement: Built-in implementations:
+  - Source: `§4.10 L1978`
+  - Related spec refs: none
+- `4.10.1.3` **i8, i16, i32, i64; 0**
+  - Requirement: `i8`, `i16`, `i32`, `i64`; `0`
+  - Source: `§4.10 L1982`
+  - Related spec refs: none
+- `4.10.1.4` **u8, u16, u32, u64; 0**
+  - Requirement: `u8`, `u16`, `u32`, `u64`; `0`
+  - Source: `§4.10 L1983`
+  - Related spec refs: none
+- `4.10.1.5` **usize; 0**
+  - Requirement: `usize`; `0`
+  - Source: `§4.10 L1984`
+  - Related spec refs: none
+- `4.10.1.6` **f32, f64; 0.0**
+  - Requirement: `f32`, `f64`; `0.0`
+  - Source: `§4.10 L1985`
+  - Related spec refs: none
+- `4.10.1.7` **bool; false**
+  - Requirement: `bool`; `false`
+  - Source: `§4.10 L1986`
+  - Related spec refs: none
+- `4.10.1.8` **str; ""**
+  - Requirement: `str`; `""`
+  - Source: `§4.10 L1987`
+  - Related spec refs: none
+- `4.10.1.9` **Option[T]; None**
+  - Requirement: `Option[T]`; `None`
+  - Source: `§4.10 L1988`
+  - Related spec refs: none
+- `4.10.1.10` **Vec[T]; empty vec**
+  - Requirement: `Vec[T]`; empty vec
+  - Source: `§4.10 L1989`
+  - Related spec refs: none
+- `4.10.1.11` **HashMap[K, V]; empty map**
+  - Requirement: `HashMap[K, V]`; empty map
+  - Source: `§4.10 L1990`
+  - Related spec refs: none
+- `4.10.1.12` **HashSet[T]; empty set**
+  - Requirement: `HashSet[T]`; empty set
+  - Source: `§4.10 L1991`
+  - Related spec refs: none
+- `4.10.1.13` **User types can implement Default manually or via @[derive(Default)] (requires all f...**
+  - Requirement: User types can implement `Default` manually or via `@[derive(Default)]` (requires all fields to implement `Default`):
+  - Source: `§4.10 L1993-L1994`
+  - Related spec refs: none
+- `4.10.1.14` **Both features compose.**
+  - Requirement: Both features compose.
+  - Source: `§4.10 L2011-L2014`
+  - Related spec refs: none
+- `4.10.1.15` **If the return type is Result[T, E] and the body ends with a Unit statement, implici...**
+  - Requirement: If the return type is `Result[T, E]` and the body ends with a `Unit` statement, implicit Ok wrapping takes priority (returns `Ok(T.default())` if `T` implements `Default`, or `Ok(())` if `T` is `Unit`).
+  - Source: `§4.10 L2011-L2014`
+  - Related spec refs: none
+- `4.10.1.16` **If the last expression has a non-Unit type, no default insertion occurs (the expres...**
+  - Requirement: If the last expression has a non-Unit type, no default insertion occurs (the expression is the return value as usual).
+  - Source: `§4.10 L2018-L2019`
+  - Related spec refs: none
+- `4.10.1.17` **If the return type does not implement Default, the compiler reports a type mismatch...**
+  - Requirement: If the return type does not implement `Default`, the compiler reports a type mismatch as usual.
+  - Source: `§4.10 L2020-L2021`
+  - Related spec refs: none
+- `4.10.1.18` **If the return type is Unit, no return value is needed (already handled).**
+  - Requirement: If the return type is `Unit`, no return value is needed (already handled).
+  - Source: `§4.10 L2022-L2023`
+  - Related spec refs: none
+- `4.10.1.19` **Explicit return values always work and are never overridden.**
+  - Requirement: Explicit return values always work and are never overridden.
+  - Source: `§4.10 L2024`
+  - Related spec refs: none
+- `4.10.1.20` **Implicit unreachable on unproven paths: If the compiler cannot statically prove tha...**
+  - Requirement: **Implicit unreachable on unproven paths:** If the compiler cannot statically prove that all code paths return a value of the declared return type, it silently inserts `unreachable` at the function exit.
+  - Source: `§4.10 L2026-L2031`
+  - Related spec refs: none
+- `4.10.1.21` **If this path is reached at runtime, the program panics with a diagnostic that inclu...**
+  - Requirement: If this path is reached at runtime, the program panics with a diagnostic that includes file and line.
+  - Source: `§4.10 L2026-L2031`
+  - Related spec refs: none
+- `4.10.1.22` **You may add an explicit unreachable for clarity, but it is never required.**
+  - Requirement: You may add an explicit `unreachable` for clarity, but it is never required.
+  - Source: `§4.10 L2026-L2031`
+  - Related spec refs: none
+
+## 5. Ephemeral Types
+
+### §5.1 Definition
+
+- `5.1.1.1` **ephemeral is a type qualifier that marks a type as second-class.**
+  - Requirement: `ephemeral` is a type qualifier that marks a type as second-class.
+  - Source: `§5.1 L2039`
+  - Related spec refs: none
+- `5.1.1.2` **Ephemeral values may exist as local bindings and function parameters.**
+  - Requirement: Ephemeral values may exist as local bindings and function parameters.
+  - Source: `§5.1 L2045-L2047`
+  - Related spec refs: none
+- `5.1.1.3` **They may be returned from functions (with propagation).**
+  - Requirement: They may be returned from functions (with propagation).
+  - Source: `§5.1 L2045-L2047`
+  - Related spec refs: none
+- `5.1.1.4` **They may be captured by non-escaping closures.**
+  - Requirement: They may be captured by non-escaping closures.
+  - Source: `§5.1 L2045-L2047`
+  - Related spec refs: none
+- `5.1.1.5` **Ephemeral values may NOT be stored in struct fields, enum variants, heap containers...**
+  - Requirement: Ephemeral values may NOT be stored in struct fields, enum variants, heap containers, global storage, or escaping closures.
+  - Source: `§5.1 L2049-L2050`
+  - Related spec refs: none
+
+### §5.2 Propagation
+
+- `5.2.1.1` **Ephemerality propagates through type constructors:**
+  - Requirement: Ephemerality propagates through type constructors:
+  - Source: `§5.2 L2054`
+  - Related spec refs: none
+- `5.2.1.2` **If T is ephemeral, then Option[T], Result[T, E], (T, U), and any generic F[T] are e...**
+  - Requirement: If `T` is ephemeral, then `Option[T]`, `Result[T, E]`, `(T, U)`, and any generic `F[T]` are ephemeral.
+  - Source: `§5.2 L2056-L2057`
+  - Related spec refs: none
+- `5.2.1.3` **If any field of a struct is ephemeral, the struct is ephemeral. A struct definition...**
+  - Requirement: If any field of a struct is ephemeral, the struct is ephemeral. A struct definition with ephemeral fields is rejected unless the struct itself is marked `ephemeral`.
+  - Source: `§5.2 L2058-L2060`
+  - Related spec refs: none
+
+### §5.3 Canonical Ephemeral Types
+
+- `5.3.1.1` **References: &T**
+  - Requirement: References: `&T`
+  - Source: `§5.3 L2064`
+  - Related spec refs: none
+- `5.3.1.2` **Views: StrView / &str, &[T]**
+  - Requirement: Views: `StrView` / `&str`, `&[T]`
+  - Source: `§5.3 L2065`
+  - Related spec refs: none
+- `5.3.1.3` **Lock guards: MutexGuard[T], RwLockReadGuard[T], RwLockWriteGuard[T]**
+  - Requirement: Lock guards: `MutexGuard[T]`, `RwLockReadGuard[T]`, `RwLockWriteGuard[T]`
+  - Source: `§5.3 L2066`
+  - Related spec refs: none
+- `5.3.1.4` **Iterators over borrowed data**
+  - Requirement: Iterators over borrowed data
+  - Source: `§5.3 L2067`
+  - Related spec refs: none
+
+### §5.4 Views: Ephemeral vs Storable
+
+- `5.4.1.1` **View types are pointer-and-length values that reference memory they do not own.**
+  - Requirement: View types are pointer-and-length values that reference memory they do not own.
+  - Source: `§5.4 L2071-L2072`
+  - Related spec refs: none
+- `5.4.1.2` **They are ephemeral to prevent dangling.**
+  - Requirement: They are ephemeral to prevent dangling.
+  - Source: `§5.4 L2071-L2072`
+  - Related spec refs: none
+- `5.4.1.3` **For long-lived references into owned buffers, use offset-based types:**
+  - Requirement: For long-lived references into owned buffers, use offset-based types:
+  - Source: `§5.4 L2074`
+  - Related spec refs: none
+- `5.4.1.4` **Pattern: structs store BufSlice (storable offsets); accessor methods compute epheme...**
+  - Requirement: Pattern: structs store `BufSlice` (storable offsets); accessor methods compute ephemeral `&str`/`&[u8]` on demand from an owned buffer.
+  - Source: `§5.4 L2080-L2081`
+  - Related spec refs: none
+
+### §5.5 Ephemeral Structs
+
+- `5.5.1.1` **Structs may be marked ephemeral to hold references and views.**
+  - Requirement: Structs may be marked `ephemeral` to hold references and views.
+  - Source: `§5.5 L2099-L2101`
+  - Related spec refs: none
+- `5.5.1.2` **This is the idiomatic pattern for parsers, tokenizers, iterators, and any "processi...**
+  - Requirement: This is the idiomatic pattern for parsers, tokenizers, iterators, and any "processing context" that borrows from input data:
+  - Source: `§5.5 L2099-L2101`
+  - Related spec refs: none
+- `5.5.1.3` **Ephemeral structs follow all the same rules as ephemeral values (§5.1): they can be...**
+  - Requirement: Ephemeral structs follow all the same rules as ephemeral values (§5.1): they can be local bindings, parameters, and return values, but cannot be stored in long-lived containers or non-ephemeral structs.
+  - Source: `§5.5 L2120-L2123`
+  - Related spec refs: §5.1
+- `5.5.1.4` **2 unnamed values; Tuple: (StrView, TokenKind)**
+  - Requirement: 2 unnamed values; Tuple: `(StrView, TokenKind)`
+  - Source: `§5.5 L2162`
+  - Related spec refs: none
+- `5.5.1.5` **3+ values, or named fields matter; Ephemeral struct: Token { text, kind, span }**
+  - Requirement: 3+ values, or named fields matter; Ephemeral struct: `Token { text, kind, span }`
+  - Source: `§5.5 L2163`
+  - Related spec refs: none
+- `5.5.1.6` **Value must outlive its borrow; Storable struct with offsets (§5.4)**
+  - Requirement: Value must outlive its borrow; Storable struct with offsets (§5.4)
+  - Source: `§5.5 L2164`
+  - Related spec refs: §5.4
+- `5.5.1.7` **Ephemeral structs are cheap — they're stack values with no heap allocation, just li...**
+  - Requirement: Ephemeral structs are cheap — they're stack values with no heap allocation, just like the references they contain.
+  - Source: `§5.5 L2166-L2167`
+  - Related spec refs: none
+
+## 6. Handles and Generational Arenas
+
+### §6.1 Handles
+
+- `6.1.1.1` **A handle is a typed index with a generation counter.**
+  - Requirement: A handle is a typed index with a generation counter.
+  - Source: `§6.1 L2175`
+  - Related spec refs: none
+- `6.1.1.2` **Handles are Copy, type-parameterized (Handle[Texture] incompatible with Handle[Mesh...**
+  - Requirement: Handles are `Copy`, type-parameterized (`Handle[Texture]` incompatible with `Handle[Mesh]`), not an ownership relationship, and safe against use-after-remove (generation mismatch returns `None`).
+  - Source: `§6.1 L2182-L2184`
+  - Related spec refs: none
+
+### §6.2 SlotMap (Standard Library Requirement)
+
+- `6.2.1.1` **The standard library must provide:**
+  - Requirement: The standard library must provide:
+  - Source: `§6.2 L2188`
+  - Related spec refs: none
+- `6.2.1.2` **insert; (mut self: Self, T) -> Handle[T];**
+  - Requirement: `insert`; `(mut self: Self, T) -> Handle[T]`;
+  - Source: `§6.2 L2196`
+  - Related spec refs: none
+- `6.2.1.3` **get; (self: &Self, Handle[T]) -> Option[&T]; Ephemeral return**
+  - Requirement: `get`; `(self: &Self, Handle[T]) -> Option[&T]`; Ephemeral return
+  - Source: `§6.2 L2197`
+  - Related spec refs: none
+- `6.2.1.4` **slot; Scoped via with sm.slot(h) as mut s:; Place-based mutation**
+  - Requirement: `slot`; Scoped via `with sm.slot(h) as mut s:`; Place-based mutation
+  - Source: `§6.2 L2198`
+  - Related spec refs: none
+- `6.2.1.5` **remove; (mut self: Self, Handle[T]) -> Option[T];**
+  - Requirement: `remove`; `(mut self: Self, Handle[T]) -> Option[T]`;
+  - Source: `§6.2 L2199`
+  - Related spec refs: none
+- `6.2.1.6` **replace; (mut self: Self, Handle[T], T) -> Option[T];**
+  - Requirement: `replace`; `(mut self: Self, Handle[T], T) -> Option[T]`;
+  - Source: `§6.2 L2200`
+  - Related spec refs: none
+- `6.2.1.7` **for_each; (self: &Self, fn(Handle[T], &T));**
+  - Requirement: `for_each`; `(self: &Self, fn(Handle[T], &T))`;
+  - Source: `§6.2 L2201`
+  - Related spec refs: none
+- `6.2.1.8` **get_disjoint; with sm.get_disjoint(h1, h2) as mut (a, b):; Panics if equal**
+  - Requirement: `get_disjoint`; `with sm.get_disjoint(h1, h2) as mut (a, b):`; Panics if equal
+  - Source: `§6.2 L2202`
+  - Related spec refs: none
+- `6.2.1.9` **contains; (&Self, Handle[T]) -> bool;**
+  - Requirement: `contains`; `(&Self, Handle[T]) -> bool`;
+  - Source: `§6.2 L2203`
+  - Related spec refs: none
+- `6.2.1.10` **len; (&Self) -> usize;**
+  - Requirement: `len`; `(&Self) -> usize`;
+  - Source: `§6.2 L2204`
+  - Related spec refs: none
+
+### §6.3 Performance Characteristics
+
+- `6.3.1.1` **A handle dereference involves: one array index lookup, one bounds check (branch, us...**
+  - Requirement: A handle dereference involves: one array index lookup, one bounds check (branch, usually predicted), and one generation comparison (branch, usually predicted).
+  - Source: `§6.3 L2208-L2211`
+  - Related spec refs: none
+- `6.3.1.2` **This is roughly 2-3ns per access versus ~0.3ns for a raw pointer dereference.**
+  - Requirement: This is roughly 2-3ns per access versus ~0.3ns for a raw pointer dereference.
+  - Source: `§6.3 L2208-L2211`
+  - Related spec refs: none
+- `6.3.1.3` **For bulk operations, use for_each / iter which amortize the per-element overhead.**
+  - Requirement: For bulk operations, use `for_each` / `iter` which amortize the per-element overhead.
+  - Source: `§6.3 L2213-L2215`
+  - Related spec refs: none
+- `6.3.1.4` **In rare hot paths where handle indirection is measurably costly, unsafe raw pointer...**
+  - Requirement: In rare hot paths where handle indirection is measurably costly, `unsafe` raw pointer access is available.
+  - Source: `§6.3 L2213-L2215`
+  - Related spec refs: none
+- `6.3.1.5` **The trade-off is explicit: safety over raw pointer speed for individual accesses, w...**
+  - Requirement: The trade-off is explicit: **safety over raw pointer speed** for individual accesses, with batch iteration as the escape hatch for performance-critical loops.
+  - Source: `§6.3 L2217-L2219`
+  - Related spec refs: none
+
+## 7. `with` — Scoped Access
+
+### §7 `with` — Scoped Access
+
+- `7.1.1.1` **with is the language's central construct.**
+  - Requirement: `with` is the language's central construct.
+  - Source: `§7 L2225-L2227`
+  - Related spec refs: none
+- `7.1.1.2` **It means: access this value within this scope.**
+  - Requirement: It means: **access this value within this scope.**
+  - Source: `§7 L2225-L2227`
+  - Related spec refs: none
+- `7.1.1.3` **It appears in five forms, all expressing the same idea — bounded, explicit interact...**
+  - Requirement: It appears in five forms, all expressing the same idea — bounded, explicit interaction with data.
+  - Source: `§7 L2225-L2227`
+  - Related spec refs: none
+- `7.1.1.4` **with as name:; Guarded access (lock, arena, file); Concurrent/resource code**
+  - Requirement: `with as name:`; Guarded access (lock, arena, file); Concurrent/resource code
+  - Source: `§7 L2231`
+  - Related spec refs: none
+- `7.1.1.5` **with value as mut name:; Scoped mutation (builder pattern); Initialization, configu...**
+  - Requirement: `with value as mut name:`; Scoped mutation (builder pattern); Initialization, configuration
+  - Source: `§7 L2232`
+  - Related spec refs: none
+- `7.1.1.6` **with expr as name:; Scoped binding (named temporary); Pipelines, intermediate values**
+  - Requirement: `with expr as name:`; Scoped binding (named temporary); Pipelines, intermediate values
+  - Source: `§7 L2233`
+  - Related spec refs: none
+- `7.1.1.7` **with name(expr):; Scoped implicit context; Allocators, devices, loggers, ambient co...**
+  - Requirement: `with name(expr):`; Scoped implicit context; Allocators, devices, loggers, ambient config
+  - Source: `§7 L2234`
+  - Related spec refs: none
+- `7.1.1.8` **{ expr with field: val }; Record update (functional copy); Data transformation**
+  - Requirement: `{ expr with field: val }`; Record update (functional copy); Data transformation
+  - Source: `§7 L2235`
+  - Related spec refs: none
+
+### §7.1 Form 1: Guarded Access
+
+- `7.1.1.9` **When data lives behind a lock, arena, or resource guard, with provides scoped access.**
+  - Requirement: When data lives behind a lock, arena, or resource guard, `with` provides scoped access.
+  - Source: `§7.1 L2239-L2241`
+  - Related spec refs: none
+- `7.1.1.10` **The compiler ensures the binding cannot escape the block — the guard is released wh...**
+  - Requirement: The compiler ensures the binding cannot escape the block — the guard is released when the block exits.
+  - Source: `§7.1 L2239-L2241`
+  - Related spec refs: none
+- `7.1.1.11` **with is built-in compiler semantics.**
+  - Requirement: `with` is built-in compiler semantics.
+  - Source: `§7.1 L2255-L2257`
+  - Related spec refs: none
+- `7.1.1.12` **The binding is scoped to the block — it cannot escape.**
+  - Requirement: The binding is scoped to the block — it cannot escape.
+  - Source: `§7.1 L2255-L2257`
+  - Related spec refs: none
+- `7.1.1.13` **The as mut variant creates a mutable binding; without mut, the binding is read-only.**
+  - Requirement: The `as mut` variant creates a mutable binding; without `mut`, the binding is read-only.
+  - Source: `§7.1 L2255-L2257`
+  - Related spec refs: none
+- `7.1.1.14` **Multiple bindings are flat, nesting left-to-right:**
+  - Requirement: Multiple bindings are flat, nesting left-to-right:
+  - Source: `§7.1 L2267`
+  - Related spec refs: none
+
+### §7.2 Form 2: Scoped Mutation (Builder Pattern)
+
+- `7.2.1.1` **When constructing a complex value, with provides a mutable scope for staged initial...**
+  - Requirement: When constructing a complex value, `with` provides a mutable scope for staged initialization.
+  - Source: `§7.2 L2277-L2279`
+  - Related spec refs: none
+- `7.2.1.2` **The value is owned and mutable inside the block, then returned as the block's result.**
+  - Requirement: The value is owned and mutable inside the block, then returned as the block's result.
+  - Source: `§7.2 L2277-L2279`
+  - Related spec refs: none
+- `7.2.1.3` **Implicit return rule: In with expr as mut x:, if the block's last statement evaluat...**
+  - Requirement: **Implicit return rule:** In `with expr as mut x:`, if the block's last statement evaluates to `Unit` (assignment, void method call), the block returns `x` (the builder).
+  - Source: `§7.2 L2299-L2302`
+  - Related spec refs: none
+- `7.2.1.4` **If the last expression is non-Unit, the block returns that expression's value.**
+  - Requirement: If the last expression is non-Unit, the block returns that expression's value.
+  - Source: `§7.2 L2299-L2302`
+  - Related spec refs: none
+- `7.2.1.5` **This gives you both builder and extraction patterns from the same construct.**
+  - Requirement: This gives you both builder and extraction patterns from the same construct.
+  - Source: `§7.2 L2323-L2324`
+  - Related spec refs: none
+- `7.2.1.6` **The type system tells you what you're getting.**
+  - Requirement: The type system tells you what you're getting.
+  - Source: `§7.2 L2323-L2324`
+  - Related spec refs: none
+- `7.2.1.7` **The value is bound as a mutable local inside the block.**
+  - Requirement: The value is bound as a mutable local inside the block.
+  - Source: `§7.2 L2326`
+  - Related spec refs: none
+- `7.2.1.8` **This replaces the need for builder types, method chaining, or mutable-then-freeze p...**
+  - Requirement: This replaces the need for builder types, method chaining, or mutable-then-freeze patterns.
+  - Source: `§7.2 L2335-L2338`
+  - Related spec refs: none
+- `7.2.1.9` **The mutation is visually contained within the with block — nothing outside it can o...**
+  - Requirement: The mutation is visually contained within the `with` block — nothing outside it can observe the intermediate mutable state.
+  - Source: `§7.2 L2335-L2338`
+  - Related spec refs: none
+
+### §7.3 Form 3: Scoped Binding
+
+- `7.3.1.1` **When an intermediate computation needs a name for a small scope without polluting t...**
+  - Requirement: When an intermediate computation needs a name for a small scope without polluting the enclosing namespace, `with` provides a scoped binding.
+  - Source: `§7.3 L2342-L2344`
+  - Related spec refs: none
+- `7.3.1.2` **When mut is absent, the value is bound as an immutable local.**
+  - Requirement: When `mut` is absent, the value is bound as an immutable local.
+  - Source: `§7.3 L2357`
+  - Related spec refs: none
+- `7.3.1.3` **This is lightweight.**
+  - Requirement: This is lightweight.
+  - Source: `§7.3 L2365-L2367`
+  - Related spec refs: none
+- `7.3.1.4` **It is equivalent to a let binding inside an anonymous block, but reads more natural...**
+  - Requirement: It is equivalent to a `let` binding inside an anonymous block, but reads more naturally in expression chains and avoids name leakage.
+  - Source: `§7.3 L2365-L2367`
+  - Related spec refs: none
+
+### §7.3a Form 3a: Implicit Context
+
+- `7.3.2.1` **with name(expr): introduces an implicit context binding.**
+  - Requirement: `with name(expr):` introduces an **implicit context binding**.
+  - Source: `§7.3a L2371-L2373`
+  - Related spec refs: none
+- `7.3.2.2` **Any function parameter declared with the implicit modifier may be filled from the i...**
+  - Requirement: Any function parameter declared with the `implicit` modifier may be filled from the innermost matching implicit context in scope.
+  - Source: `§7.3a L2371-L2373`
+  - Related spec refs: none
+- `7.3.2.3` **Implicit resolution is lexical and type-based:**
+  - Requirement: Implicit resolution is **lexical and type-based**:
+  - Source: `§7.3a L2384`
+  - Related spec refs: none
+- `7.3.2.4` **Positional arguments are matched first.**
+  - Requirement: Positional arguments are matched first.
+  - Source: `§7.3a L2386`
+  - Related spec refs: none
+- `7.3.2.5` **Named arguments are matched second.**
+  - Requirement: Named arguments are matched second.
+  - Source: `§7.3a L2387`
+  - Related spec refs: none
+- `7.3.2.6` **Unfilled implicit parameters are searched from the innermost enclosing with name(ex...**
+  - Requirement: Unfilled `implicit` parameters are searched from the innermost enclosing `with name(expr):` block outward.
+  - Source: `§7.3a L2388-L2389`
+  - Related spec refs: none
+- `7.3.2.7` **Remaining omitted parameters may then be filled from defaults.**
+  - Requirement: Remaining omitted parameters may then be filled from defaults.
+  - Source: `§7.3a L2390`
+  - Related spec refs: none
+- `7.3.2.8` **Additional rules:**
+  - Requirement: Additional rules:
+  - Source: `§7.3a L2392`
+  - Related spec refs: none
+- `7.3.2.9` **Auto-ref applies during implicit lookup, so Context and &Context compose naturally...**
+  - Requirement: Auto-ref applies during implicit lookup, so `Context` and `&Context` compose naturally with existing call ergonomics.
+  - Source: `§7.3a L2394-L2395`
+  - Related spec refs: none
+- `7.3.2.10` **A function may not declare two implicit parameters of the same type.**
+  - Requirement: A function may not declare two `implicit` parameters of the same type.
+  - Source: `§7.3a L2396-L2397`
+  - Related spec refs: none
+- `7.3.2.11` **An implicit parameter may not also have a default value.**
+  - Requirement: An `implicit` parameter may not also have a default value.
+  - Source: `§7.3a L2398`
+  - Related spec refs: none
+- `7.3.2.12` **Inner implicit contexts shadow outer contexts of the same type.**
+  - Requirement: Inner implicit contexts shadow outer contexts of the same type.
+  - Source: `§7.3a L2399`
+  - Related spec refs: none
+- `7.3.2.13` **Closures capture the implicit contexts visible at their definition site, just like...**
+  - Requirement: Closures capture the implicit contexts visible at their definition site, just like ordinary lexical bindings.
+  - Source: `§7.3a L2400-L2401`
+  - Related spec refs: none
+- `7.3.2.14` **The identifier in with name(expr): is descriptive.**
+  - Requirement: The identifier in `with name(expr):` is descriptive.
+  - Source: `§7.3a L2403-L2404`
+  - Related spec refs: none
+- `7.3.2.15` **Resolution is driven by type, not by the identifier text.**
+  - Requirement: Resolution is driven by type, not by the identifier text.
+  - Source: `§7.3a L2403-L2404`
+  - Related spec refs: none
+- `7.3.2.16` **std.context defines the standard context shape for common execution services.**
+  - Requirement: `std.context` defines the standard context shape for common execution services.
+  - Source: `§7.3a L2406-L2410`
+  - Related spec refs: none
+- `7.3.2.17` **Context is ephemeral and currently carries a temporary arena, logger, cancellation...**
+  - Requirement: `Context` is ephemeral and currently carries a temporary arena, logger, cancellation token, and trace id.
+  - Source: `§7.3a L2406-L2410`
+  - Related spec refs: none
+- `7.3.2.18` **Library APIs that need these cross-cutting services should accept an implicit Conte...**
+  - Requirement: Library APIs that need these cross-cutting services should accept an `implicit Context` parameter instead of adding unrelated positional parameters.
+  - Source: `§7.3a L2406-L2410`
+  - Related spec refs: none
+
+### §7.4 Form 4: Record Update
+
+- `7.4.1.1` **Functional immutable update of struct fields.**
+  - Requirement: Functional immutable update of struct fields.
+  - Source: `§7.4 L2424-L2425`
+  - Related spec refs: none
+- `7.4.1.2` **Defined in §4.3 and included here for completeness.**
+  - Requirement: Defined in §4.3 and included here for completeness.
+  - Source: `§7.4 L2424-L2425`
+  - Related spec refs: §4.3
+- `7.4.1.3` **For Copy types, all fields are copied.**
+  - Requirement: For `Copy` types, all fields are copied.
+  - Source: `§7.4 L2433-L2435`
+  - Related spec refs: none
+- `7.4.1.4` **For non-Copy types, non-overridden fields are moved from the source (the source is...**
+  - Requirement: For non-`Copy` types, non-overridden fields are moved from the source (the source is consumed).
+  - Source: `§7.4 L2433-L2435`
+  - Related spec refs: none
+
+### §7.5 Dispatch Rule
+
+- `7.5.1.1` **The with block form is determined by the type of the expression:**
+  - Requirement: The `with` block form is determined by the **type** of the expression:
+  - Source: `§7.5 L2439-L2440`
+  - Related spec refs: none
+
+### §7.6 `with` as Expression
+
+- `7.6.1.1` **All forms of with are expressions.**
+  - Requirement: All forms of `with` are expressions.
+  - Source: `§7.6 L2466-L2467`
+  - Related spec refs: none
+- `7.6.1.2` **Their value is the value of the body.**
+  - Requirement: Their value is the value of the body.
+  - Source: `§7.6 L2466-L2467`
+  - Related spec refs: none
+- `7.6.1.3` **For guarded access (Form 1), the result must be non-ephemeral (it cannot be a refer...**
+  - Requirement: For guarded access (Form 1), the result must be non-ephemeral (it cannot be a reference into the guarded data, since the guard releases at block exit).
+  - Source: `§7.6 L2483-L2485`
+  - Related spec refs: none
+
+### §7.7 Control Flow Inside `with` Blocks
+
+- `7.7.1.1` **All with forms are transparent for control flow (analogous to inline lambdas or non...**
+  - Requirement: All `with` forms are **transparent for control flow** (analogous to inline lambdas or non-escaping closures):
+  - Source: `§7.7 L2489-L2490`
+  - Related spec refs: none
+- `7.7.1.2` **return inside a with block returns from the enclosing function, not from the desuga...**
+  - Requirement: **`return`** inside a `with` block returns from the **enclosing function**, not from the desugared closure.
+  - Source: `§7.7 L2492-L2493`
+  - Related spec refs: none
+- `7.7.1.3` **break and continue inside a with block within a loop affect the enclosing loop.**
+  - Requirement: **`break`** and **`continue`** inside a `with` block within a loop affect the **enclosing loop**.
+  - Source: `§7.7 L2494-L2495`
+  - Related spec refs: none
+- `7.7.1.4` **Labeled break 'label and continue 'label inside a with block may target any visible...**
+  - Requirement: Labeled `break 'label` and `continue 'label` inside a `with` block may target any visible label in the enclosing function; `with` does not create a label-scope boundary.
+  - Source: `§7.7 L2496-L2498`
+  - Related spec refs: none
+- `7.7.1.5` **goto 'label inside a with block may target a visible label in the enclosing functio...**
+  - Requirement: **`goto 'label`** inside a `with` block may target a visible label in the enclosing function, subject to the normal goto restrictions (§13.5b).
+  - Source: `§7.7 L2499-L2501`
+  - Related spec refs: §13.5b
+- `7.7.1.6` **? propagates errors to the enclosing function.**
+  - Requirement: **`?`** propagates errors to the **enclosing function**.
+  - Source: `§7.7 L2502`
+  - Related spec refs: none
+- `7.7.1.7` **This is possible because with blocks are always non-escaping and synchronous — the...**
+  - Requirement: This is possible because `with` blocks are always non-escaping and synchronous — the compiler can inline the control flow transformation.
+  - Source: `§7.7 L2527-L2530`
+  - Related spec refs: none
+- `7.7.1.8` **This is NOT a general property of closures; it applies only to with blocks and othe...**
+  - Requirement: This is NOT a general property of closures; it applies only to `with` blocks and other compiler-known non-escaping constructs.
+  - Source: `§7.7 L2527-L2530`
+  - Related spec refs: none
+
+### §7.8 `with` Frequency
+
+- `7.8.1.1` **In a typical codebase, with appears pervasively:**
+  - Requirement: In a typical codebase, `with` appears pervasively:
+  - Source: `§7.8 L2534`
+  - Related spec refs: none
+
+### §7.9 `with` Idioms and Rules
+
+- `7.9.1.1` **Some synchronization guard types must not be held across suspension points — holdin...**
+  - Requirement: Some synchronization guard types must not be held across suspension points — holding a mutex lock while a fiber suspends blocks all other fibers waiting for that lock.
+  - Source: `§7.9 L2569-L2572`
+  - Related spec refs: none
+- `7.9.1.2` **These types are annotated @[no_await_guard]:**
+  - Requirement: These types are annotated `@[no_await_guard]`:
+  - Source: `§7.9 L2569-L2572`
+  - Related spec refs: none
+- `7.9.1.3` **The compiler rejects .await or any may_suspend function call while a @[no_await_gua...**
+  - Requirement: The compiler rejects `.await` **or any `may_suspend` function call** while a `@[no_await_guard]` value is **live in the NLL sense** — regardless of whether it was created via `with` or a plain `let` binding (see Invariant 5, §14.3):
+  - Source: `§7.9 L2585-L2588`
+  - Related spec refs: §14.3
+- `7.9.1.4` **Other guarded types — connection pools, transactions, file handles — are not annota...**
+  - Requirement: Other guarded types — connection pools, transactions, file handles — are not annotated and work naturally with `await`:
+  - Source: `§7.9 L2614-L2615`
+  - Related spec refs: none
+- `7.9.1.5` **This is the correct distinction.**
+  - Requirement: This is the correct distinction.
+  - Source: `§7.9 L2630-L2633`
+  - Related spec refs: none
+- `7.9.1.6` **A connection pool lease does not block other fibers from acquiring their own connec...**
+  - Requirement: A connection pool lease does not block other fibers from acquiring their own connections — holding it across `await` is the entire point.
+  - Source: `§7.9 L2630-L2633`
+  - Related spec refs: none
+- `7.9.1.7` **A mutex lock does block other fibers — holding it across await is almost always a bug.**
+  - Requirement: A mutex lock does block other fibers — holding it across `await` is almost always a bug.
+  - Source: `§7.9 L2630-L2633`
+  - Related spec refs: none
+- `7.9.1.8` **Mutex[T] guard; Yes; Error**
+  - Requirement: `Mutex[T]` guard; Yes; **Error**
+  - Source: `§7.9 L2637`
+  - Related spec refs: none
+- `7.9.1.9` **RwLock[T] guard; Yes; Error**
+  - Requirement: `RwLock[T]` guard; Yes; **Error**
+  - Source: `§7.9 L2638`
+  - Related spec refs: none
+- `7.9.1.10` **Arena scope; Yes; Error**
+  - Requirement: `Arena` scope; Yes; **Error**
+  - Source: `§7.9 L2639`
+  - Related spec refs: none
+- `7.9.1.11` **ConnectionPool lease; No; Fine**
+  - Requirement: `ConnectionPool` lease; No; Fine
+  - Source: `§7.9 L2640`
+  - Related spec refs: none
+- `7.9.1.12` **Transaction; No; Fine**
+  - Requirement: `Transaction`; No; Fine
+  - Source: `§7.9 L2641`
+  - Related spec refs: none
+- `7.9.1.13` **File; No; Fine**
+  - Requirement: `File`; No; Fine
+  - Source: `§7.9 L2642`
+  - Related spec refs: none
+- `7.9.1.14` **Standard library types that carry @[no_await_guard]: MutexGuard, ReadGuard, WriteGu...**
+  - Requirement: Standard library types that carry `@[no_await_guard]`: `MutexGuard`, `ReadGuard`, `WriteGuard`, and `ArenaScope`.
+  - Source: `§7.9 L2644-L2647`
+  - Related spec refs: none
+- `7.9.1.15` **Library authors should apply this annotation to any guard type that blocks shared a...**
+  - Requirement: Library authors should apply this annotation to any guard type that blocks shared access while held.
+  - Source: `§7.9 L2644-L2647`
+  - Related spec refs: none
+- `7.9.1.16` **Forms 2, 3, and 3a (with expr as mut name:, with expr as name:, and with name(expr)...**
+  - Requirement: Forms 2, 3, and 3a (`with expr as mut name:`, `with expr as name:`, and `with name(expr):`) are unaffected — they do not create a guard value and therefore introduce no `@[no_await_guard]` obligation by themselves.
+  - Source: `§7.9 L2649-L2652`
+  - Related spec refs: none
+- `7.9.1.17` **Escaping data from a guarded with block requires the data to be owned, not borrowed.**
+  - Requirement: Escaping data from a guarded `with` block requires the data to be owned, not borrowed.
+  - Source: `§7.9 L2656-L2658`
+  - Related spec refs: none
+- `7.9.1.18` **This means cloning is the standard pattern for extracting values from behind a guard:**
+  - Requirement: This means cloning is the standard pattern for extracting values from behind a guard:
+  - Source: `§7.9 L2656-L2658`
+  - Related spec refs: none
+- `7.9.1.19` **This is by design — the clone marks the exact point where borrowed data becomes own...**
+  - Requirement: This is by design — the clone marks the exact point where borrowed data becomes owned data.
+  - Source: `§7.9 L2671-L2674`
+  - Related spec refs: none
+- `7.9.1.20` **Library authors should provide .cloned() and .copied() convenience methods on itera...**
+  - Requirement: Library authors should provide `.cloned()` and `.copied()` convenience methods on iterators and Option/Result to make this ergonomic.
+  - Source: `§7.9 L2671-L2674`
+  - Related spec refs: none
+
+## 8. Memory Management
+
+### §8.1 No Garbage Collector
+
+- `8.1.1.1` **Memory is freed deterministically when owners go out of scope.**
+  - Requirement: Memory is freed deterministically when owners go out of scope.
+  - Source: `§8.1 L2682`
+  - Related spec refs: none
+
+### §8.2 No Transparent Reference Counting
+
+- `8.2.1.1` **Reference counting exists only when explicitly used:**
+  - Requirement: Reference counting exists only when explicitly used:
+  - Source: `§8.2 L2686`
+  - Related spec refs: none
+- `8.2.1.2` **Rc[T] — single-threaded**
+  - Requirement: `Rc[T]` — single-threaded
+  - Source: `§8.2 L2687`
+  - Related spec refs: none
+- `8.2.1.3` **Arc[T] — thread-safe**
+  - Requirement: `Arc[T]` — thread-safe
+  - Source: `§8.2 L2688`
+  - Related spec refs: none
+- `8.2.1.4` **No hidden refcount operations.**
+  - Requirement: No hidden refcount operations.
+  - Source: `§8.2 L2690`
+  - Related spec refs: none
+
+### §8.3 Allocators
+
+- `8.3.1.1` **First-class.**
+  - Requirement: First-class.
+  - Source: `§8.3 L2694`
+  - Related spec refs: none
+- `8.3.1.2` **Standard library provides:**
+  - Requirement: Standard library provides:
+  - Source: `§8.3 L2694`
+  - Related spec refs: none
+- `8.3.1.3` **Arena — region-based; all allocations freed at once**
+  - Requirement: `Arena` — region-based; all allocations freed at once
+  - Source: `§8.3 L2695`
+  - Related spec refs: none
+- `8.3.1.4` **FrameArena — resets each frame**
+  - Requirement: `FrameArena` — resets each frame
+  - Source: `§8.3 L2696`
+  - Related spec refs: none
+- `8.3.1.5` **PoolAllocator — fixed-size blocks**
+  - Requirement: `PoolAllocator` — fixed-size blocks
+  - Source: `§8.3 L2697`
+  - Related spec refs: none
+- `8.3.1.6` **Standard containers accept an optional allocator parameter.**
+  - Requirement: Standard containers accept an optional allocator parameter.
+  - Source: `§8.3 L2699`
+  - Related spec refs: none
+- `8.3.1.7` **Ephemeral virality with allocators: If a container is initialized with a borrowed a...**
+  - Requirement: **Ephemeral virality with allocators:** If a container is initialized with a borrowed allocator (`&Arena`), the container stores the reference internally and becomes **ephemeral** (§5.2).
+  - Source: `§8.3 L2701-L2705`
+  - Related spec refs: §5.2
+- `8.3.1.8` **This means it can only be used as a local variable — it cannot be stored in structs...**
+  - Requirement: This means it can only be used as a local variable — it cannot be stored in structs or returned from functions:
+  - Source: `§8.3 L2701-L2705`
+  - Related spec refs: none
+- `8.3.1.9` **This is a deliberate consequence of the ephemeral system: borrowed resources create...**
+  - Requirement: This is a deliberate consequence of the ephemeral system: borrowed resources create ephemeral containers, owned resources create storable ones.
+  - Source: `§8.3 L2719-L2721`
+  - Related spec refs: none
+- `8.3.1.10` **The compiler enforces this automatically.**
+  - Requirement: The compiler enforces this automatically.
+  - Source: `§8.3 L2719-L2721`
+  - Related spec refs: none
+
+### §8.3a Temporary Arenas
+
+- `8.3.2.1` **std.alloc provides TempArena for short-lived scratch allocation:**
+  - Requirement: `std.alloc` provides `TempArena` for short-lived scratch allocation:
+  - Source: `§8.3a L2725`
+  - Related spec refs: none
+- `8.3.2.2` **scratch_arena() returns a fresh TempArena.**
+  - Requirement: `scratch_arena()` returns a fresh `TempArena`.
+  - Source: `§8.3a L2736-L2741`
+  - Related spec refs: none
+- `8.3.2.3` **TempArena.alloc(size) and TempArena.alloc_zeroed(count, size) allocate raw memory a...**
+  - Requirement: `TempArena.alloc(size)` and `TempArena.alloc_zeroed(count, size)` allocate raw memory and record it in the arena.
+  - Source: `§8.3a L2736-L2741`
+  - Related spec refs: none
+- `8.3.2.4` **TempArena.reset() frees all allocations made through that arena and clears the allo...**
+  - Requirement: `TempArena.reset()` frees all allocations made through that arena and clears the allocation list.
+  - Source: `§8.3a L2736-L2741`
+  - Related spec refs: none
+- `8.3.2.5` **TempArena also has a destructor that calls reset(), so a scoped arena created for a...**
+  - Requirement: `TempArena` also has a destructor that calls `reset()`, so a scoped arena created for a block releases its allocations when the arena value goes out of scope.
+  - Source: `§8.3a L2736-L2741`
+  - Related spec refs: none
+- `8.3.2.6` **TempArena is distinct from the longer-lived arena types:**
+  - Requirement: `TempArena` is distinct from the longer-lived arena types:
+  - Source: `§8.3a L2743`
+  - Related spec refs: none
+- `8.3.2.7` **Arena; User-controlled reset/drop; Long-lived region allocation**
+  - Requirement: `Arena`; User-controlled reset/drop; Long-lived region allocation
+  - Source: `§8.3a L2747`
+  - Related spec refs: none
+- `8.3.2.8` **FrameArena; External reset per frame/tick; Game loops, render passes**
+  - Requirement: `FrameArena`; External reset per frame/tick; Game loops, render passes
+  - Source: `§8.3a L2748`
+  - Related spec refs: none
+- `8.3.2.9` **TempArena; Lexical owner scope or explicit reset(); Scratch computation**
+  - Requirement: `TempArena`; Lexical owner scope or explicit `reset()`; Scratch computation
+  - Source: `§8.3a L2749`
+  - Related spec refs: none
+- `8.3.2.10` **References or containers that borrow arena-backed storage follow the normal ephemer...**
+  - Requirement: References or containers that borrow arena-backed storage follow the normal ephemeral rules: they cannot be stored somewhere that outlives the arena scope.
+  - Source: `§8.3a L2751-L2753`
+  - Related spec refs: none
+
+### §8.4 Convenience Type
+
+- `8.4.1.1` **Usable with with blocks for scoped access.**
+  - Requirement: Usable with `with` blocks for scoped access.
+  - Source: `§8.4 L2761`
+  - Related spec refs: none
+
+## 9. Functions and Expressions
+
+### §9.1 Functions
+
+- `9.1.1.1` **Function bodies support three interchangeable forms (§29.13):**
+  - Requirement: Function bodies support three interchangeable forms (§29.13):
+  - Source: `§9.1 L2787`
+  - Related spec refs: §29.13
+- `9.1.1.2` **Parentheses are required when a function takes parameters.**
+  - Requirement: Parentheses are required when a function takes parameters.
+  - Source: `§9.1 L2794-L2800`
+  - Related spec refs: none
+- `9.1.1.3` **When a function takes no parameters, parentheses may be included or omitted — fn gr...**
+  - Requirement: When a function takes no parameters, parentheses may be included or omitted — `fn greet:` and `fn greet():` are both legal.
+  - Source: `§9.1 L2794-L2800`
+  - Related spec refs: none
+- `9.1.1.4` **The idiomatic style omits them.**
+  - Requirement: The idiomatic style omits them.
+  - Source: `§9.1 L2794-L2800`
+  - Related spec refs: none
+- `9.1.1.5` **The return type -> TYPE is omitted when the function returns Unit (void).**
+  - Requirement: The return type `-> TYPE` is omitted when the function returns `Unit` (void).
+  - Source: `§9.1 L2794-L2800`
+  - Related spec refs: none
+- `9.1.1.6` **The body is introduced by : (colon form) or { } (brace form) — see §29.13 for the f...**
+  - Requirement: The body is introduced by `:` (colon form) or `{ }` (brace form) — see §29.13 for the full rules.
+  - Source: `§9.1 L2794-L2800`
+  - Related spec refs: §29.13
+- `9.1.1.7` **if supports four body forms.**
+  - Requirement: `if` supports four body forms.
+  - Source: `§9.1 L2814-L2815`
+  - Related spec refs: none
+- `9.1.1.8` **else if is a two-token keyword pair that continues the chain; else without if ends it:**
+  - Requirement: `else if` is a two-token keyword pair that continues the chain; `else` without `if` ends it:
+  - Source: `§9.1 L2814-L2815`
+  - Related spec refs: none
+- `9.1.1.9` **The then form is strictly an expression form: if cond then expr.**
+  - Requirement: The `then` form is strictly an expression form: `if cond then expr`.
+  - Source: `§9.1 L2839-L2843`
+  - Related spec refs: none
+- `9.1.1.10` **The body after then is a single expression (not a block), and the else clause is el...**
+  - Requirement: The body after `then` is a single expression (not a block), and the `else` clause is `else expr` with no body introducer.
+  - Source: `§9.1 L2839-L2843`
+  - Related spec refs: none
+- `9.1.1.11` **Colon and braced if chains use normal body introducers for every arm, including the...**
+  - Requirement: Colon and braced `if` chains use normal body introducers for every arm, including the final `else`:
+  - Source: `§9.1 L2839-L2843`
+  - Related spec refs: none
+- `9.1.1.12` **else if is always parsed as a chain continuation — the parser consumes else, sees i...**
+  - Requirement: `else if` is always parsed as a chain continuation — the parser consumes `else`, sees `if`, and continues the same chain rather than nesting an `if` inside the else body.
+  - Source: `§9.1 L2854-L2858`
+  - Related spec refs: none
+- `9.1.1.13` **The forms may be mixed freely within a single chain.**
+  - Requirement: The forms may be mixed freely within a single chain.
+  - Source: `§9.1 L2854-L2858`
+  - Related spec refs: none
+- `9.1.1.14` **else is required in expression position unless the if-branch is Never-typed.**
+  - Requirement: `else` is required in expression position unless the if-branch is `Never`-typed.
+  - Source: `§9.1 L2854-L2858`
+  - Related spec refs: none
+
+### §9.1a Named Arguments, Default Parameters, and Implicit Parameters
+
+- `9.1.2.1` **Function parameters may be passed positionally or by name.**
+  - Requirement: Function parameters may be passed positionally or by name.
+  - Source: `§9.1a L2862-L2865`
+  - Related spec refs: none
+- `9.1.2.2` **Parameters may declare a default value with = expr, and may declare an implicit mod...**
+  - Requirement: Parameters may declare a default value with `= expr`, and may declare an `implicit` modifier to request resolution from an enclosing `with name(expr):` scope (§7.3a).
+  - Source: `§9.1a L2862-L2865`
+  - Related spec refs: §7.3a
+- `9.1.2.3` **Positional arguments must come before named arguments.**
+  - Requirement: Positional arguments must come before named arguments.
+  - Source: `§9.1a L2882`
+  - Related spec refs: none
+- `9.1.2.4` **A parameter may not be specified more than once.**
+  - Requirement: A parameter may not be specified more than once.
+  - Source: `§9.1a L2883`
+  - Related spec refs: none
+- `9.1.2.5` **Named arguments must match parameter names exactly.**
+  - Requirement: Named arguments must match parameter names exactly.
+  - Source: `§9.1a L2884`
+  - Related spec refs: none
+- `9.1.2.6` **Named arguments may appear in any order relative to one another.**
+  - Requirement: Named arguments may appear in any order relative to one another.
+  - Source: `§9.1a L2885`
+  - Related spec refs: none
+- `9.1.2.7` **Default parameters may be omitted positionally only from the end of the parameter l...**
+  - Requirement: Default parameters may be omitted positionally only from the end of the parameter list, or skipped arbitrarily when the caller uses named arguments.
+  - Source: `§9.1a L2886-L2888`
+  - Related spec refs: none
+- `9.1.2.8` **Default expressions are evaluated at the call site on every call where the argument...**
+  - Requirement: Default expressions are evaluated at the call site on every call where the argument is omitted.
+  - Source: `§9.1a L2889-L2890`
+  - Related spec refs: none
+- `9.1.2.9` **Call resolution order is: positional arguments, named arguments, implicit parameter...**
+  - Requirement: Call resolution order is: positional arguments, named arguments, implicit parameters, then defaults.
+  - Source: `§9.1a L2891-L2892`
+  - Related spec refs: none
+- `9.1.2.10` **extern fn values, closure values, and placeholder-based partial application calls d...**
+  - Requirement: `extern fn` values, closure values, and placeholder-based partial application calls do not support named arguments.
+  - Source: `§9.1a L2893-L2894`
+  - Related spec refs: none
+- `9.1.2.11` **A function may not declare two implicit parameters of the same type, and an implici...**
+  - Requirement: A function may not declare two `implicit` parameters of the same type, and an `implicit` parameter may not also have a default.
+  - Source: `§9.1a L2895-L2896`
+  - Related spec refs: none
+
+### §9.1b `const` Declarations
+
+- `9.1.3.1` **Compile-time constants are declared with const:**
+  - Requirement: Compile-time constants are declared with `const`:
+  - Source: `§9.1b L2910`
+  - Related spec refs: none
+- `9.1.3.2` **Syntax: const NAME: TYPE = EXPR**
+  - Requirement: **Syntax:** `const NAME: TYPE = EXPR`
+  - Source: `§9.1b L2918`
+  - Related spec refs: none
+- `9.1.3.3` **The type annotation is required.**
+  - Requirement: The type annotation is required.
+  - Source: `§9.1b L2920-L2922`
+  - Related spec refs: none
+- `9.1.3.4` **The expression must be evaluable at compile time — integer literals, arithmetic (+...**
+  - Requirement: The expression must be evaluable at compile time — integer literals, arithmetic (`+`, `-`, `*`, `/`, `%`), unary negate, logical `not`, and references to other `const` values.
+  - Source: `§9.1b L2920-L2922`
+  - Related spec refs: none
+- `9.1.3.5` **const values are inlined at every use site.**
+  - Requirement: `const` values are inlined at every use site.
+  - Source: `§9.1b L2930-L2931`
+  - Related spec refs: none
+- `9.1.3.6` **They have no runtime address and cannot be mutated.**
+  - Requirement: They have no runtime address and cannot be mutated.
+  - Source: `§9.1b L2930-L2931`
+  - Related spec refs: none
+- `9.1.3.7` **They may appear at module scope or inside function bodies.**
+  - Requirement: They may appear at module scope or inside function bodies.
+  - Source: `§9.1b L2930-L2931`
+  - Related spec refs: none
+- `9.1.3.8` **Difference from let: let bindings are runtime values (even if initialized from a co...**
+  - Requirement: **Difference from `let`:** `let` bindings are runtime values (even if initialized from a constant).
+  - Source: `§9.1b L2933-L2935`
+  - Related spec refs: none
+- `9.1.3.9` **const values are guaranteed to be compile-time constants and are always inlined.**
+  - Requirement: `const` values are guaranteed to be compile-time constants and are always inlined.
+  - Source: `§9.1b L2933-L2935`
+  - Related spec refs: none
+
+### §9.2 Tail Call Optimization
+
+- `9.2.1.1` **Tail calls may be optimized even without annotations.**
+  - Requirement: Tail calls may be optimized even without annotations.
+  - Source: `§9.2 L2939-L2942`
+  - Related spec refs: none
+- `9.2.1.2` **@[tailrec] turns that optimization into a guarantee: if the compiler cannot elimina...**
+  - Requirement: `@[tailrec]` turns that optimization into a guarantee: if the compiler cannot eliminate stack growth for the annotated recursive calls, it rejects the program.
+  - Source: `§9.2 L2939-L2942`
+  - Related spec refs: none
+- `9.2.1.3` **Tail position means:**
+  - Requirement: Tail position means:
+  - Source: `§9.2 L2950`
+  - Related spec refs: none
+- `9.2.1.4` **The final expression of a function body**
+  - Requirement: The final expression of a function body
+  - Source: `§9.2 L2952`
+  - Related spec refs: none
+- `9.2.1.5` **The final expression of a block already in tail position**
+  - Requirement: The final expression of a block already in tail position
+  - Source: `§9.2 L2953`
+  - Related spec refs: none
+- `9.2.1.6` **Both branches of an if/else already in tail position**
+  - Requirement: Both branches of an `if`/`else` already in tail position
+  - Source: `§9.2 L2954`
+  - Related spec refs: none
+- `9.2.1.7` **Every arm of a match already in tail position**
+  - Requirement: Every arm of a `match` already in tail position
+  - Source: `§9.2 L2955`
+  - Related spec refs: none
+- `9.2.1.8` **return f(...) only when the call result can be returned directly with no post-call...**
+  - Requirement: `return f(...)` only when the call result can be returned directly with no post-call coercion, wrapping, storage, cleanup, or ABI reshaping
+  - Source: `§9.2 L2956-L2958`
+  - Related spec refs: none
+- `9.2.1.9` **The following are not tail position:**
+  - Requirement: The following are **not** tail position:
+  - Source: `§9.2 L2960`
+  - Related spec refs: none
+- `9.2.1.10` **Any call followed by additional work (1 + recur(...), field access, method call, etc.)**
+  - Requirement: Any call followed by additional work (`1 + recur(...)`, field access, method call, etc.)
+  - Source: `§9.2 L2962-L2963`
+  - Related spec refs: none
+- `9.2.1.11` **Loop bodies**
+  - Requirement: Loop bodies
+  - Source: `§9.2 L2964`
+  - Related spec refs: none
+- `9.2.1.12` **Calls with an active defer or errdefer**
+  - Requirement: Calls with an active `defer` or `errdefer`
+  - Source: `§9.2 L2965`
+  - Related spec refs: none
+- `9.2.1.13` **Calls that leave a Drop-implementing local live across the call**
+  - Requirement: Calls that leave a `Drop`-implementing local live across the call
+  - Source: `§9.2 L2966`
+  - Related spec refs: none
+- `9.2.1.14` **Self-recursive @[tailrec] functions must compile to a loop or equivalent frame-reus...**
+  - Requirement: Self-recursive `@[tailrec]` functions must compile to a loop or equivalent frame-reusing form.
+  - Source: `§9.2 L2975-L2979`
+  - Related spec refs: none
+- `9.2.1.15` **Mutual tail recursion is permitted only when every function in the cycle is annotat...**
+  - Requirement: Mutual tail recursion is permitted only when every function in the cycle is annotated `@[tailrec]` and the compiler can verify the cycle without stack growth; otherwise the program is ill-formed.
+  - Source: `§9.2 L2975-L2979`
+  - Related spec refs: none
+- `9.2.1.16` **In the currently guaranteed mutual-recursion subset, every recursive edge in the SC...**
+  - Requirement: In the currently guaranteed mutual-recursion subset, every recursive edge in the SCC must be in verified tail position, every member of the SCC must have a compatible signature and calling convention, and no active `defer` or `errdefer` cleanup may remain across the recursive edge.
+  - Source: `§9.2 L2981-L2986`
+  - Related spec refs: none
+- `9.2.1.17` **When those conditions are not met, the compiler must reject the program rather than...**
+  - Requirement: When those conditions are not met, the compiler must reject the program rather than falling back to ordinary stack-growing calls.
+  - Source: `§9.2 L2981-L2986`
+  - Related spec refs: none
+- `9.2.1.18` **The full @[tailrec] contract, diagnostics, ABI constraints, and current guaranteed...**
+  - Requirement: The full `@[tailrec]` contract, diagnostics, ABI constraints, and current guaranteed lowering subset are specified in `docs/tco-spec.md`.
+  - Source: `§9.2 L2988-L2990`
+  - Related spec refs: none
+
+### §9.3 Closures
+
+- `9.3.1.1` **The => token means "produces this value" and is used in both closures and match arms.**
+  - Requirement: The `=>` token means "produces this value" and is used in both closures and match arms.
+  - Source: `§9.3 L3000-L3002`
+  - Related spec refs: none
+- `9.3.1.2` **The -> token is reserved exclusively for return type annotations (e.g., fn foo() ->...**
+  - Requirement: The `->` token is reserved exclusively for return type annotations (e.g., `fn foo() -> i32`).
+  - Source: `§9.3 L3000-L3002`
+  - Related spec refs: none
+- `9.3.1.3` **Implicit it parameter (see §9.3.1):**
+  - Requirement: Implicit `it` parameter (see §9.3.1):
+  - Source: `§9.3 L3004`
+  - Related spec refs: §9.3.1
+
+### §9.3.1 Implicit `it` Parameter
+
+- `9.3.1.4` **When a function expects a single-parameter closure, the expression can use it to re...**
+  - Requirement: When a function expects a single-parameter closure, the expression can use `it` to refer to the implicit parameter instead of declaring an explicit closure with `x => expr` syntax:
+  - Source: `§9.3.1 L3011-L3013`
+  - Related spec refs: none
+- `9.3.1.5` **it is a reserved keyword.**
+  - Requirement: `it` is a reserved keyword.
+  - Source: `§9.3.1 L3022-L3024`
+  - Related spec refs: none
+- `9.3.1.6` **It may only appear in expression positions where the surrounding call site expects...**
+  - Requirement: It may only appear in expression positions where the surrounding call site expects a single-parameter function type.
+  - Source: `§9.3.1 L3022-L3024`
+  - Related spec refs: none
+- `9.3.1.7` **The compiler infers it's type from the expected function parameter type.**
+  - Requirement: The compiler infers `it`'s type from the expected function parameter type.
+  - Source: `§9.3.1 L3022-L3024`
+  - Related spec refs: none
+- `9.3.1.8` **Nested it is forbidden: If an it-expression appears inside another it-expression, t...**
+  - Requirement: **Nested `it` is forbidden:** If an `it`-expression appears inside another `it`-expression, the inner closure must use explicit `param => expr` syntax.
+  - Source: `§9.3.1 L3026-L3028`
+  - Related spec refs: none
+- `9.3.1.9` **This prevents ambiguity about which closure level it refers to.**
+  - Requirement: This prevents ambiguity about which closure level `it` refers to.
+  - Source: `§9.3.1 L3026-L3028`
+  - Related spec refs: none
+- `9.3.1.10` **_ is not a closure placeholder.**
+  - Requirement: **`_` is not a closure placeholder.**
+  - Source: `§9.3.1 L3038-L3040`
+  - Related spec refs: none
+- `9.3.1.11` **_ means discard (in patterns) or placeholder (in partial application).**
+  - Requirement: `_` means discard (in patterns) or placeholder (in partial application).
+  - Source: `§9.3.1 L3038-L3040`
+  - Related spec refs: none
+- `9.3.1.12` **For closure shorthand, it is the one way.**
+  - Requirement: For closure shorthand, `it` is the one way.
+  - Source: `§9.3.1 L3038-L3040`
+  - Related spec refs: none
+- `9.3.1.13` **E0951: nested implicit it is ambiguous — use explicit param => expr for inner closure**
+  - Requirement: E0951: nested implicit `it` is ambiguous — use explicit `param => expr` for inner closure
+  - Source: `§9.3.1 L3043`
+  - Related spec refs: none
+- `9.3.1.14` **E0952: it used in context expecting N != 1 parameters**
+  - Requirement: E0952: `it` used in context expecting N != 1 parameters
+  - Source: `§9.3.1 L3044`
+  - Related spec refs: none
+- `9.3.1.15` **E0953: it is a reserved keyword and cannot be used as an identifier**
+  - Requirement: E0953: `it` is a reserved keyword and cannot be used as an identifier
+  - Source: `§9.3.1 L3045`
+  - Related spec refs: none
+
+### §9.4 Partial Application
+
+- `9.4.1.1` **Functions can be partially applied with _ placeholders inside a call argument list:**
+  - Requirement: Functions can be partially applied with `_` placeholders inside a call argument list:
+  - Source: `§9.4 L3049-L3050`
+  - Related spec refs: none
+- `9.4.1.2` **Currying is not automatic.**
+  - Requirement: Currying is not automatic.
+  - Source: `§9.4 L3063-L3064`
+  - Related spec refs: none
+- `9.4.1.3` **Partial application via _ is the explicit, controlled equivalent.**
+  - Requirement: Partial application via `_` is the explicit, controlled equivalent.
+  - Source: `§9.4 L3063-L3064`
+  - Related spec refs: none
+- `9.4.1.4` **_ is a placeholder only inside a call argument list.**
+  - Requirement: `_` is a placeholder only inside a call argument list.
+  - Source: `§9.4 L3068`
+  - Related spec refs: none
+- `9.4.1.5` **A placeholder call with N placeholders produces a closure taking N arguments in lef...**
+  - Requirement: A placeholder call with `N` placeholders produces a closure taking `N` arguments in left-to-right placeholder order.
+  - Source: `§9.4 L3069-L3070`
+  - Related spec refs: none
+- `9.4.1.6` **Non-placeholder arguments are captured into the generated closure.**
+  - Requirement: Non-placeholder arguments are captured into the generated closure.
+  - Source: `§9.4 L3071`
+  - Related spec refs: none
+- `9.4.1.7` **_ in callee position is an error.**
+  - Requirement: `_` in callee position is an error.
+  - Source: `§9.4 L3072`
+  - Related spec refs: none
+- `9.4.1.8` **add(5) is an ordinary wrong-argument-count error, not partial application.**
+  - Requirement: `add(5)` is an ordinary wrong-argument-count error, not partial application.
+  - Source: `§9.4 L3073-L3074`
+  - Related spec refs: none
+- `9.4.1.9` **Placeholder calls use positional arguments only; named arguments are not permitted...**
+  - Requirement: Placeholder calls use positional arguments only; named arguments are not permitted in the same call.
+  - Source: `§9.4 L3075-L3076`
+  - Related spec refs: none
+
+### §9.5 Extension Blocks
+
+- `9.5.1.1` **Method call syntax applies to all self parameter forms:**
+  - Requirement: **Method call syntax** applies to all `self` parameter forms:
+  - Source: `§9.5 L3085`
+  - Related spec refs: none
+- `9.5.1.2` **self: &T; x.method(); Borrows x immutably**
+  - Requirement: `self: &T`; `x.method()`; Borrows `x` immutably
+  - Source: `§9.5 L3089`
+  - Related spec refs: none
+- `9.5.1.3` **mut self: Self; x.method(); Mutates x in place**
+  - Requirement: `mut self: Self`; `x.method()`; Mutates `x` in place
+  - Source: `§9.5 L3090`
+  - Related spec refs: none
+- `9.5.1.4` **move self: Self; x.method(); Moves (consumes) x**
+  - Requirement: `move self: Self`; `x.method()`; Moves (consumes) `x`
+  - Source: `§9.5 L3091`
+  - Related spec refs: none
+- `9.5.1.5` **This eliminates the need for pipeline placeholder syntax in builder patterns.**
+  - Requirement: This eliminates the need for pipeline placeholder syntax in builder patterns.
+  - Source: `§9.5 L3110-L3112`
+  - Related spec refs: none
+- `9.5.1.6` **The pipeline operator |> remains available for free functions and partial application.**
+  - Requirement: The pipeline operator `|>` remains available for free functions and partial application.
+  - Source: `§9.5 L3110-L3112`
+  - Related spec refs: none
+- `9.5.1.7` **with ... as mut (§7.2); Configuring fields on an existing struct with defaults; wit...**
+  - Requirement: `with ... as mut` (§7.2); Configuring fields on an existing struct with defaults; `with Config.default() as mut c: c.timeout = 30`
+  - Source: `§9.5 L3118`
+  - Related spec refs: §7.2
+- `9.5.1.8` **Method chains (§9.5); Progressive construction with type-state, validation, or mult...**
+  - Requirement: Method chains (§9.5); Progressive construction with type-state, validation, or multiple steps; `Builder.new().host("x").build()?`
+  - Source: `§9.5 L3119`
+  - Related spec refs: §9.5
+- `9.5.1.9` **Use with ... as mut when you have a struct with default values and just need to set...**
+  - Requirement: Use `with ... as mut` when you have a struct with default values and just need to set some fields.
+  - Source: `§9.5 L3121-L3124`
+  - Related spec refs: none
+- `9.5.1.10` **Use method chains when each step transforms or validates the builder, especially wh...**
+  - Requirement: Use method chains when each step transforms or validates the builder, especially when `.build()` can fail.
+  - Source: `§9.5 L3121-L3124`
+  - Related spec refs: none
+- `9.5.1.11` **Both are idiomatic — they solve different problems.**
+  - Requirement: Both are idiomatic — they solve different problems.
+  - Source: `§9.5 L3121-L3124`
+  - Related spec refs: none
+
+### §9.6 Pipeline and Composition Operators
+
+- `9.6.1.1` **x |> f(a) desugars to f(x, a).**
+  - Requirement: `x |> f(a)` desugars to `f(x, a)`.
+  - Source: `§9.6 L3133`
+  - Related spec refs: none
+- `9.6.1.2` **Left-associative.**
+  - Requirement: Left-associative.
+  - Source: `§9.6 L3133`
+  - Related spec refs: none
+- `9.6.1.3` **f <| x desugars to f(x).**
+  - Requirement: `f <| x` desugars to `f(x)`.
+  - Source: `§9.6 L3140-L3141`
+  - Related spec refs: none
+- `9.6.1.4` **Right-associative.**
+  - Requirement: Right-associative.
+  - Source: `§9.6 L3140-L3141`
+  - Related spec refs: none
+- `9.6.1.5` **Useful for avoiding parentheses in nested calls:**
+  - Requirement: Useful for avoiding parentheses in nested calls:
+  - Source: `§9.6 L3140-L3141`
+  - Related spec refs: none
+- `9.6.1.6` **<< (left shift) and >> (right shift) are binary operators at precedence level 9, be...**
+  - Requirement: `<<` (left shift) and `>>` (right shift) are binary operators at precedence level 9, between bitwise operators and additive operators.
+  - Source: `§9.6 L3151-L3152`
+  - Related spec refs: none
+- `9.6.1.7` **Right shift is arithmetic (sign-extending) for signed types and logical (zero-filli...**
+  - Requirement: Right shift is arithmetic (sign-extending) for signed types and logical (zero-filling) for unsigned types.
+  - Source: `§9.6 L3160-L3161`
+  - Related spec refs: none
+- `9.6.1.8` **Function composition uses the pipeline operator or explicit closures:**
+  - Requirement: **Function composition** uses the pipeline operator or explicit closures:
+  - Source: `§9.6 L3163-L3164`
+  - Related spec refs: none
+
+### §9.7 Pattern Matching
+
+- `9.7.1.1` **Pattern matching is the primary control flow for algebraic data types.**
+  - Requirement: Pattern matching is the primary control flow for algebraic data types.
+  - Source: `§9.7 L3173-L3175`
+  - Related spec refs: none
+- `9.7.1.2` **It is expression-oriented, exhaustive, and supports deep structural matching.**
+  - Requirement: It is expression-oriented, exhaustive, and supports deep structural matching.
+  - Source: `§9.7 L3173-L3175`
+  - Related spec refs: none
+- `9.7.1.3` **match has two forms:**
+  - Requirement: `match` has two forms:
+  - Source: `§9.7 L3173-L3175`
+  - Related spec refs: none
+- `9.7.1.4` **Block match uses : after the subject and separates arms with newlines.**
+  - Requirement: **Block match** uses `:` after the subject and separates arms with newlines.
+  - Source: `§9.7 L3177-L3178`
+  - Related spec refs: none
+- `9.7.1.5` **Inline match uses {} around arms and separates arms with commas.**
+  - Requirement: **Inline match** uses `{}` around arms and separates arms with commas.
+  - Source: `§9.7 L3179-L3180`
+  - Related spec refs: none
+- `9.7.1.6` **Semicolons are not valid match arm separators.**
+  - Requirement: Semicolons are not valid match arm separators.
+  - Source: `§9.7 L3182`
+  - Related spec refs: none
+- `9.7.1.7` **The colon is required in block form.**
+  - Requirement: The colon is required in block form.
+  - Source: `§9.7 L3192-L3194`
+  - Related spec refs: none
+- `9.7.1.8` **Omitting it is a syntax error.**
+  - Requirement: Omitting it is a syntax error.
+  - Source: `§9.7 L3192-L3194`
+  - Related spec refs: none
+- `9.7.1.9` **Block arms are separated by newlines; commas and leading | arm separators are not u...**
+  - Requirement: Block arms are separated by newlines; commas and leading `|` arm separators are not used.
+  - Source: `§9.7 L3192-L3194`
+  - Related spec refs: none
+- `9.7.1.10` **Inline match is an expression form.**
+  - Requirement: Inline match is an expression form.
+  - Source: `§9.7 L3202-L3205`
+  - Related spec refs: none
+- `9.7.1.11` **Arms are written as pattern => expr; guards use pattern if cond => expr.**
+  - Requirement: Arms are written as `pattern => expr`; guards use `pattern if cond => expr`.
+  - Source: `§9.7 L3202-L3205`
+  - Related spec refs: none
+- `9.7.1.12` **Arms are comma-separated, and a trailing comma is allowed under §29.2.**
+  - Requirement: Arms are comma-separated, and a trailing comma is allowed under §29.2.
+  - Source: `§9.7 L3202-L3205`
+  - Related spec refs: §29.2
+- `9.7.1.13` **The semicolon-separated form used in earlier examples is invalid.**
+  - Requirement: The semicolon-separated form used in earlier examples is invalid.
+  - Source: `§9.7 L3202-L3205`
+  - Related spec refs: none
+- `9.7.1.14` **Or-patterns share a body:**
+  - Requirement: **Or-patterns** share a body:
+  - Source: `§9.7 L3224`
+  - Related spec refs: none
+- `9.7.1.15` **An in pattern matches when the scrutinee is contained in the given expression.**
+  - Requirement: An `in` pattern matches when the scrutinee is contained in the given expression.
+  - Source: `§9.7 L3250-L3252`
+  - Related spec refs: none
+- `9.7.1.16` **It works with any Contains type — arrays, ranges, sets, or user types:**
+  - Requirement: It works with any `Contains` type — arrays, ranges, sets, or user types:
+  - Source: `§9.7 L3250-L3252`
+  - Related spec refs: none
+- `9.7.1.17` **This is syntactic sugar for a guard:**
+  - Requirement: This is syntactic sugar for a guard:
+  - Source: `§9.7 L3261`
+  - Related spec refs: none
+- `9.7.1.18` **The in pattern does not introduce a binding.**
+  - Requirement: The `in` pattern does not introduce a binding.
+  - Source: `§9.7 L3270-L3271`
+  - Related spec refs: none
+- `9.7.1.19` **Use @ if you need one:**
+  - Requirement: Use `@` if you need one:
+  - Source: `§9.7 L3270-L3271`
+  - Related spec refs: none
+- `9.7.1.20` **in patterns compose naturally with other match features:**
+  - Requirement: `in` patterns compose naturally with other match features:
+  - Source: `§9.7 L3281`
+  - Related spec refs: none
+- `9.7.1.21` **Positional struct patterns match fields in declaration order:**
+  - Requirement: Positional struct patterns match fields in declaration order:
+  - Source: `§9.7 L3301`
+  - Related spec refs: none
+- `9.7.1.22` **Parentheses around a single pattern are grouping: (p) is the same pattern as p.**
+  - Requirement: Parentheses around a single pattern are grouping: `(p)` is the same pattern as `p`.
+  - Source: `§9.7 L3316-L3318`
+  - Related spec refs: none
+- `9.7.1.23` **A one-element tuple pattern requires a comma: (p,).**
+  - Requirement: A one-element tuple pattern requires a comma: `(p,)`.
+  - Source: `§9.7 L3316-L3318`
+  - Related spec refs: none
+- `9.7.1.24` **() matches the empty tuple.**
+  - Requirement: `()` matches the empty tuple.
+  - Source: `§9.7 L3316-L3318`
+  - Related spec refs: none
+- `9.7.1.25` **For fixed-size arrays, the compiler performs compile-time length matching:**
+  - Requirement: For fixed-size arrays, the compiler performs compile-time length matching:
+  - Source: `§9.7 L3328`
+  - Related spec refs: none
+- `9.7.1.26` **[a, b, c] matches exactly 3 elements**
+  - Requirement: `[a, b, c]` matches exactly 3 elements
+  - Source: `§9.7 L3329`
+  - Related spec refs: none
+- `9.7.1.27` **[first, ..rest] matches any array with 1+ elements, rest is bound to the remaining...**
+  - Requirement: `[first, ..rest]` matches any array with 1+ elements, `rest` is bound to the remaining count
+  - Source: `§9.7 L3330`
+  - Related spec refs: none
+- `9.7.1.28` **[first, ..mid, last] matches 2+ elements, extracting both ends**
+  - Requirement: `[first, ..mid, last]` matches 2+ elements, extracting both ends
+  - Source: `§9.7 L3331`
+  - Related spec refs: none
+- `9.7.1.29` **[] matches empty arrays ([0]T)**
+  - Requirement: `[]` matches empty arrays (`[0]T`)
+  - Source: `§9.7 L3332`
+  - Related spec refs: none
+- `9.7.1.30` **All pattern forms are available in let/var bindings:**
+  - Requirement: All pattern forms are available in `let`/`var` bindings:
+  - Source: `§9.7 L3336`
+  - Related spec refs: none
+- `9.7.1.31` **When a pattern might not match, let ... else provides the fallback.**
+  - Requirement: When a pattern might not match, `let ... else` provides the fallback.
+  - Source: `§9.7 L3357-L3359`
+  - Related spec refs: none
+- `9.7.1.32` **The else branch must diverge (return, break, continue, panic):**
+  - Requirement: The `else` branch must diverge (`return`, `break`, `continue`, `panic`):
+  - Source: `§9.7 L3357-L3359`
+  - Related spec refs: none
+- `9.7.1.33` **Chained if let: Multiple conditional bindings in a single if, separated by commas.**
+  - Requirement: **Chained `if let`:** Multiple conditional bindings in a single `if`, separated by commas.
+  - Source: `§9.7 L3373-L3375`
+  - Related spec refs: none
+- `9.7.1.34` **All bindings must succeed for the body to execute.**
+  - Requirement: All bindings must succeed for the body to execute.
+  - Source: `§9.7 L3373-L3375`
+  - Related spec refs: none
+- `9.7.1.35` **This eliminates the pyramid of doom:**
+  - Requirement: This eliminates the pyramid of doom:
+  - Source: `§9.7 L3373-L3375`
+  - Related spec refs: none
+- `9.7.1.36` **Chains can mix let bindings with boolean conditions:**
+  - Requirement: Chains can mix `let` bindings with boolean conditions:
+  - Source: `§9.7 L3389`
+  - Related spec refs: none
+- `9.7.1.37` **Each binding in the chain is in scope for subsequent bindings and the body.**
+  - Requirement: Each binding in the chain is in scope for subsequent bindings and the body.
+  - Source: `§9.7 L3398-L3400`
+  - Related spec refs: none
+- `9.7.1.38` **If any binding fails, the entire if is skipped (or the else branch runs).**
+  - Requirement: If any binding fails, the entire `if` is skipped (or the `else` branch runs).
+  - Source: `§9.7 L3398-L3400`
+  - Related spec refs: none
+- `9.7.1.39` **let ... else works especially well with enum variant shorthand for asserting expect...**
+  - Requirement: `let ... else` works especially well with enum variant shorthand for asserting expectations:
+  - Source: `§9.7 L3404-L3405`
+  - Related spec refs: none
+- `9.7.1.40` **Parameter patterns desugar to a match on the parameter at the function entry.**
+  - Requirement: Parameter patterns desugar to a match on the parameter at the function entry.
+  - Source: `§9.7 L3430-L3434`
+  - Related spec refs: none
+- `9.7.1.41` **They are sugar, not a separate mechanism.**
+  - Requirement: They are sugar, not a separate mechanism.
+  - Source: `§9.7 L3430-L3434`
+  - Related spec refs: none
+- `9.7.1.42` **Irrefutable patterns (structs, tuples) need no special handling.**
+  - Requirement: Irrefutable patterns (structs, tuples) need no special handling.
+  - Source: `§9.7 L3430-L3434`
+  - Related spec refs: none
+- `9.7.1.43` **Refutable patterns (like slice patterns) require multiple function clauses or an else.**
+  - Requirement: Refutable patterns (like slice patterns) require multiple function clauses or an `else`.
+  - Source: `§9.7 L3430-L3434`
+  - Related spec refs: none
+- `9.7.1.44` **Exhaustiveness depends on position:**
+  - Requirement: Exhaustiveness depends on position:
+  - Source: `§9.7 L3452`
+  - Related spec refs: none
+- `9.7.1.45` **Expression-position match (value is used/returned): must be exhaustive.**
+  - Requirement: **Expression-position match** (value is used/returned): must be exhaustive.
+  - Source: `§9.7 L3454`
+  - Related spec refs: none
+- `9.7.1.46` **Statement-position match (value ignored): may be partial; unmatched variants are a...**
+  - Requirement: **Statement-position match** (value ignored): may be partial; unmatched variants are a no-op.
+  - Source: `§9.7 L3455-L3456`
+  - Related spec refs: none
+- `9.7.1.47` **@[must_use] types (e.g. Result, Task): match must always be exhaustive or include a...**
+  - Requirement: **`@[must_use]` types** (e.g. `Result`, `Task`): match must always be exhaustive or include an explicit `_ => ...` catch-all arm, regardless of position. Partial match on `@[must_use]` types is a compile error. This prevents silently ignoring `Err` arms, which would contradict `@[must_use]` semantics.
+  - Source: `§9.7 L3457-L3461`
+  - Related spec refs: none
+- `9.7.1.48` **Examples:**
+  - Requirement: Examples:
+  - Source: `§9.7 L3463`
+  - Related spec refs: none
+- `9.7.1.49` **Reference pattern ergonomics: When a pattern is matched against a reference type &T...**
+  - Requirement: **Reference pattern ergonomics:** When a pattern is matched against a reference type `&T`, the pattern automatically binds variables as references to the inner fields.
+  - Source: `§9.7 L3484-L3487`
+  - Related spec refs: none
+- `9.7.1.50` **No explicit & is needed in the pattern:**
+  - Requirement: No explicit `&` is needed in the pattern:
+  - Source: `§9.7 L3484-L3487`
+  - Related spec refs: none
+- `9.7.1.51` **This rule applies transitively: matching &(A, &B) against a pattern (a, b) gives a...**
+  - Requirement: This rule applies transitively: matching `&(A, &B)` against a pattern `(a, b)` gives `a: &A` and `b: &&B`.
+  - Source: `§9.7 L3508-L3512`
+  - Related spec refs: none
+- `9.7.1.52` **The compiler inserts reference bindings to match the actual type.**
+  - Requirement: The compiler inserts reference bindings to match the actual type.
+  - Source: `§9.7 L3508-L3512`
+  - Related spec refs: none
+- `9.7.1.53` **This is critical for ergonomic iteration, since for loops with implicit .iter() alw...**
+  - Requirement: This is critical for ergonomic iteration, since `for` loops with implicit `.iter()` always yield references.
+  - Source: `§9.7 L3508-L3512`
+  - Related spec refs: none
+
+### §9.8 Pipeline DSL Patterns
+
+- `9.8.1.1` **The |> operator plus extension blocks plus closures is sufficient to build fluent d...**
+  - Requirement: The `|>` operator plus extension blocks plus closures is sufficient to build fluent domain-specific APIs that read like language features.
+  - Source: `§9.8 L3516-L3518`
+  - Related spec refs: none
+- `9.8.1.2` **No macros or special syntax required.**
+  - Requirement: No macros or special syntax required.
+  - Source: `§9.8 L3516-L3518`
+  - Related spec refs: none
+- `9.8.1.3` **These patterns require no language support beyond |>, extension blocks, and closures.**
+  - Requirement: These patterns require no language support beyond `|>`, extension blocks, and closures.
+  - Source: `§9.8 L3551-L3554`
+  - Related spec refs: none
+- `9.8.1.4` **The gap between "library code" and "language feature" is intentionally small in Wit...**
+  - Requirement: The gap between "library code" and "language feature" is intentionally small in With — the pipeline operator makes well-designed libraries feel like built-in syntax.
+  - Source: `§9.8 L3551-L3554`
+  - Related spec refs: none
+
+### §9.9 The `in` Operator
+
+- `9.9.1.1` **in is a boolean operator that tests membership.**
+  - Requirement: `in` is a boolean operator that tests membership.
+  - Source: `§9.9 L3558-L3560`
+  - Related spec refs: none
+- `9.9.1.2` **It works on any type that implements the Contains trait.**
+  - Requirement: It works on any type that implements the `Contains` trait.
+  - Source: `§9.9 L3558-L3560`
+  - Related spec refs: none
+- `9.9.1.3` **The compiler optimizes literal cases to zero-allocation comparisons.**
+  - Requirement: The compiler optimizes literal cases to zero-allocation comparisons.
+  - Source: `§9.9 L3558-L3560`
+  - Related spec refs: none
+- `9.9.1.4` **in is a binary operator at the same precedence level as equality operators (==, !=).**
+  - Requirement: `in` is a binary operator at the same precedence level as equality operators (`==`, `!=`).
+  - Source: `§9.9 L3574-L3577`
+  - Related spec refs: none
+- `9.9.1.5` **It is non-associative — a in b in c is a compile error.**
+  - Requirement: It is non-associative — `a in b in c` is a compile error.
+  - Source: `§9.9 L3574-L3577`
+  - Related spec refs: none
+- `9.9.1.6` **Ordered comparisons (<, <=, >, >=) may chain; see §4.2.7.**
+  - Requirement: Ordered comparisons (`<`, `<=`, `>`, `>=`) may chain; see §4.2.7.
+  - Source: `§9.9 L3574-L3577`
+  - Related spec refs: §4.2.7
+- `9.9.1.7` **Operator precedence (low to high):**
+  - Requirement: **Operator precedence** (low to high):
+  - Source: `§9.9 L3579`
+  - Related spec refs: none
+- `9.9.1.8` **1; or; Left**
+  - Requirement: 1; `or`; Left
+  - Source: `§9.9 L3583`
+  - Related spec refs: none
+- `9.9.1.9` **2; and; Left**
+  - Requirement: 2; `and`; Left
+  - Source: `§9.9 L3584`
+  - Related spec refs: none
+- `9.9.1.10` **3; ==, !=, in, not in; Non-associative**
+  - Requirement: 3; `==`, `!=`, `in`, `not in`; Non-associative
+  - Source: `§9.9 L3585`
+  - Related spec refs: none
+- `9.9.1.11` **4; <, >, <=, >=; Chained**
+  - Requirement: 4; `<`, `>`, `<=`, `>=`; Chained
+  - Source: `§9.9 L3586`
+  - Related spec refs: none
+- `9.9.1.12` **5; \|> (pipeline); Left**
+  - Requirement: 5; `\|>` (pipeline); Left
+  - Source: `§9.9 L3587`
+  - Related spec refs: none
+- `9.9.1.13` **6; \|; Left**
+  - Requirement: 6; `\|`; Left
+  - Source: `§9.9 L3588`
+  - Related spec refs: none
+- `9.9.1.14` **7; ^; Left**
+  - Requirement: 7; `^`; Left
+  - Source: `§9.9 L3589`
+  - Related spec refs: none
+- `9.9.1.15` **8; &; Left**
+  - Requirement: 8; `&`; Left
+  - Source: `§9.9 L3590`
+  - Related spec refs: none
+- `9.9.1.16` **9; <<, >>; Left**
+  - Requirement: 9; `<<`, `>>`; Left
+  - Source: `§9.9 L3591`
+  - Related spec refs: none
+- `9.9.1.17` **10; +, -, ++, ??; Left**
+  - Requirement: 10; `+`, `-`, `++`, `??`; Left
+  - Source: `§9.9 L3592`
+  - Related spec refs: none
+- `9.9.1.18` **11; *, /, %, @; Left**
+  - Requirement: 11; `*`, `/`, `%`, `@`; Left
+  - Source: `§9.9 L3593`
+  - Related spec refs: none
+- `9.9.1.19` **12; Unary prefix (not, -, ~, &, &raw mut); —**
+  - Requirement: 12; Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`); —
+  - Source: `§9.9 L3594`
+  - Related spec refs: none
+- `9.9.1.20` **13; Postfix (.await, ?, .field, [i], ()); Left**
+  - Requirement: 13; Postfix (`.await`, `?`, `.field`, `[i]`, `()`); Left
+  - Source: `§9.9 L3595`
+  - Related spec refs: none
+- `9.9.1.21` **This means:**
+  - Requirement: This means:
+  - Source: `§9.9 L3597`
+  - Related spec refs: none
+- `9.9.1.22` **not in is a single two-keyword operator, not not (x in y).**
+  - Requirement: `not in` is a single two-keyword operator, not `not (x in y)`.
+  - Source: `§9.9 L3605-L3606`
+  - Related spec refs: none
+- `9.9.1.23` **This matches Python's not in and reads naturally:**
+  - Requirement: This matches Python's `not in` and reads naturally:
+  - Source: `§9.9 L3605-L3606`
+  - Related spec refs: none
+- `9.9.1.24` **Desugaring: x in collection desugars to collection.contains(&x).**
+  - Requirement: **Desugaring:** `x in collection` desugars to `collection.contains(&x)`.
+  - Source: `§9.9 L3617-L3620`
+  - Related spec refs: none
+- `9.9.1.25` **x not in collection desugars to not collection.contains(&x).**
+  - Requirement: `x not in collection` desugars to `not collection.contains(&x)`.
+  - Source: `§9.9 L3617-L3620`
+  - Related spec refs: none
+- `9.9.1.26` **The Contains trait is defined in §11.7.**
+  - Requirement: The `Contains` trait is defined in §11.7.
+  - Source: `§9.9 L3617-L3620`
+  - Related spec refs: §11.7
+- `9.9.1.27` **not in is parsed as a single operator, not as not (expr in expr).**
+  - Requirement: `not in` is parsed as a single operator, not as `not (expr in expr)`.
+  - Source: `§9.9 L3624-L3627`
+  - Related spec refs: none
+- `9.9.1.28` **Both x not in list and not x in list produce the same result.**
+  - Requirement: Both `x not in list` and `not x in list` produce the same result.
+  - Source: `§9.9 L3624-L3627`
+  - Related spec refs: none
+- `9.9.1.29` **The not in form is idiomatic.**
+  - Requirement: The `not in` form is idiomatic.
+  - Source: `§9.9 L3624-L3627`
+  - Related spec refs: none
+- `9.9.1.30` **The linter suggests x not in y when it sees not (x in y).**
+  - Requirement: The linter suggests `x not in y` when it sees `not (x in y)`.
+  - Source: `§9.9 L3624-L3627`
+  - Related spec refs: none
+- `9.9.1.31` **Left operand type T**
+  - Requirement: Left operand type `T`
+  - Source: `§9.9 L3631`
+  - Related spec refs: none
+- `9.9.1.32` **Right operand type C where C: Contains[T]**
+  - Requirement: Right operand type `C` where `C: Contains[T]`
+  - Source: `§9.9 L3632`
+  - Related spec refs: none
+- `9.9.1.33` **Result type is bool**
+  - Requirement: Result type is `bool`
+  - Source: `§9.9 L3633`
+  - Related spec refs: none
+- `9.9.1.34` **If C does not implement Contains[T], the compiler emits:**
+  - Requirement: If `C` does not implement `Contains[T]`, the compiler emits:
+  - Source: `§9.9 L3635`
+  - Related spec refs: none
+- `9.9.1.35` **Type inference: The right-hand side provides type context for the left-hand side, j...**
+  - Requirement: **Type inference:** The right-hand side provides type context for the left-hand side, just as with `==`:
+  - Source: `§9.9 L3647-L3648`
+  - Related spec refs: none
+- `9.9.1.36` **Literal arrays on the right infer element type from the left:**
+  - Requirement: Literal arrays on the right infer element type from the left:
+  - Source: `§9.9 L3655`
+  - Related spec refs: none
+- `9.9.1.37` ***Literal array elimination.***
+  - Requirement: *Literal array elimination.*
+  - Source: `§9.9 L3664-L3667`
+  - Related spec refs: none
+- `9.9.1.38` **When the right-hand side of in is an array literal where all elements are compile-t...**
+  - Requirement: When the right-hand side of `in` is an array literal where all elements are compile-time constants, the compiler eliminates the array entirely and emits a chain of comparisons:
+  - Source: `§9.9 L3664-L3667`
+  - Related spec refs: none
+- `9.9.1.39` **This applies to any array literal of constants: integers, floats, strings, enum var...**
+  - Requirement: This applies to any array literal of constants: integers, floats, strings, enum variants, bool.
+  - Source: `§9.9 L3677-L3681`
+  - Related spec refs: none
+- `9.9.1.40` **For small arrays (≤8 elements), this is always done.**
+  - Requirement: For small arrays (≤8 elements), this is always done.
+  - Source: `§9.9 L3677-L3681`
+  - Related spec refs: none
+- `9.9.1.41` **For larger literal arrays, the compiler may emit a switch/jump table or sorted bina...**
+  - Requirement: For larger literal arrays, the compiler may emit a switch/jump table or sorted binary search.
+  - Source: `§9.9 L3677-L3681`
+  - Related spec refs: none
+- `9.9.1.42` **The threshold is implementation-defined.**
+  - Requirement: The threshold is implementation-defined.
+  - Source: `§9.9 L3677-L3681`
+  - Related spec refs: none
+- `9.9.1.43` ***Range optimization.***
+  - Requirement: *Range optimization.*
+  - Source: `§9.9 L3683`
+  - Related spec refs: none
+- `9.9.1.44` **Ranges are always optimized to two comparisons:**
+  - Requirement: Ranges are always optimized to two comparisons:
+  - Source: `§9.9 L3683`
+  - Related spec refs: none
+- `9.9.1.45` **No Contains trait call, no range object allocation.**
+  - Requirement: No `Contains` trait call, no range object allocation.
+  - Source: `§9.9 L3693`
+  - Related spec refs: none
+- `9.9.1.46` ***HashSet / HashMap.***
+  - Requirement: *HashSet / HashMap.*
+  - Source: `§9.9 L3695-L3696`
+  - Related spec refs: none
+- `9.9.1.47` **These go through the actual .contains() method, which is O(1).**
+  - Requirement: These go through the actual `.contains()` method, which is O(1).
+  - Source: `§9.9 L3695-L3696`
+  - Related spec refs: none
+- `9.9.1.48` **No special compiler treatment needed.**
+  - Requirement: No special compiler treatment needed.
+  - Source: `§9.9 L3695-L3696`
+  - Related spec refs: none
+- `9.9.1.49` **in already appears in for loops (for x in collection:).**
+  - Requirement: `in` already appears in `for` loops (`for x in collection:`).
+  - Source: `§9.9 L3700-L3704`
+  - Related spec refs: none
+- `9.9.1.50` **The for loop uses the Iter trait.**
+  - Requirement: The `for` loop uses the `Iter` trait.
+  - Source: `§9.9 L3700-L3704`
+  - Related spec refs: none
+- `9.9.1.51` **The in operator uses the Contains trait.**
+  - Requirement: The `in` operator uses the `Contains` trait.
+  - Source: `§9.9 L3700-L3704`
+  - Related spec refs: none
+- `9.9.1.52` **The parser distinguishes them structurally: for PATTERN in EXPR: is a loop, EXPR in...**
+  - Requirement: The parser distinguishes them structurally: `for PATTERN in EXPR:` is a loop, `EXPR in EXPR` is a membership test.
+  - Source: `§9.9 L3700-L3704`
+  - Related spec refs: none
+- `9.9.1.53` **No ambiguity.**
+  - Requirement: No ambiguity.
+  - Source: `§9.9 L3700-L3704`
+  - Related spec refs: none
+- `9.9.1.54` **in in comprehensions is the for loop form, not the membership test.**
+  - Requirement: `in` in comprehensions is the `for` loop form, not the membership test.
+  - Source: `§9.9 L3708-L3709`
+  - Related spec refs: none
+- `9.9.1.55` **The membership test appears in filter expressions:**
+  - Requirement: The membership test appears in filter expressions:
+  - Source: `§9.9 L3708-L3709`
+  - Related spec refs: none
+- `9.9.1.56` **in works naturally inside pipeline closures:**
+  - Requirement: `in` works naturally inside pipeline closures:
+  - Source: `§9.9 L3718`
+  - Related spec refs: none
+- `9.9.1.57` **in patterns are described in §9.7.**
+  - Requirement: `in` patterns are described in §9.7.
+  - Source: `§9.9 L3728-L3730`
+  - Related spec refs: §9.7
+- `9.9.1.58` **Range patterns (400..=499) remain valid in match.**
+  - Requirement: Range patterns (`400..=499`) remain valid in match.
+  - Source: `§9.9 L3728-L3730`
+  - Related spec refs: none
+- `9.9.1.59` **There is no ambiguity because in patterns always start with the in keyword.**
+  - Requirement: There is no ambiguity because `in` patterns always start with the `in` keyword.
+  - Source: `§9.9 L3728-L3730`
+  - Related spec refs: none
+- `9.9.1.60` **The in keyword is already reserved (used by for).**
+  - Requirement: The `in` keyword is already reserved (used by `for`).
+  - Source: `§9.9 L3793-L3794`
+  - Related spec refs: none
+- `9.9.1.61` **not is already a keyword.**
+  - Requirement: `not` is already a keyword.
+  - Source: `§9.9 L3793-L3794`
+  - Related spec refs: none
+- `9.9.1.62` **No new keywords needed.**
+  - Requirement: No new keywords needed.
+  - Source: `§9.9 L3793-L3794`
+  - Related spec refs: none
+
+## 10. Error Handling
+
+### §10.1 Result and Option
+
+- `10.1.1.1` **No exceptions.**
+  - Requirement: No exceptions.
+  - Source: `§10.1 L3807`
+  - Related spec refs: none
+- `10.1.1.2` **Errors are values.**
+  - Requirement: Errors are values.
+  - Source: `§10.1 L3807`
+  - Related spec refs: none
+- `10.1.1.3` **Discarding a Result or Option has no side effect.**
+  - Requirement: Discarding a `Result` or `Option` has no side effect.
+  - Source: `§10.1 L3809-L3813`
+  - Related spec refs: none
+- `10.1.1.4` **The compiler does not require ceremony such as let _ = expr merely to acknowledge t...**
+  - Requirement: The compiler does not require ceremony such as `let _ = expr` merely to acknowledge that discard.
+  - Source: `§10.1 L3809-L3813`
+  - Related spec refs: none
+- `10.1.1.5` **Propagate, match, or bind the value when handling it matters; otherwise an expressi...**
+  - Requirement: Propagate, match, or bind the value when handling it matters; otherwise an expression statement is already an explicit choice to ignore the value:
+  - Source: `§10.1 L3809-L3813`
+  - Related spec refs: none
+- `10.1.1.6` **This keeps discard semantics honest: Result and Option do not start background work...**
+  - Requirement: This keeps discard semantics honest: `Result` and `Option` do not start background work or acquire resources merely by existing.
+  - Source: `§10.1 L3824-L3826`
+  - Related spec refs: none
+- `10.1.1.7` **Use let _ = expr when that local style is useful, but it is not required.**
+  - Requirement: Use `let _ = expr` when that local style is useful, but it is not required.
+  - Source: `§10.1 L3824-L3826`
+  - Related spec refs: none
+
+### §10.2 The `?` Operator
+
+- `10.2.1.1` **? on Result propagates Err by early return.**
+  - Requirement: `?` on `Result` propagates `Err` by early return.
+  - Source: `§10.2 L3830-L3831`
+  - Related spec refs: none
+- `10.2.1.2` **On Option, propagates None.**
+  - Requirement: On `Option`, propagates `None`.
+  - Source: `§10.2 L3830-L3831`
+  - Related spec refs: none
+- `10.2.1.3` **The ? operator is controlled by the Try syntax trait (§11.7).**
+  - Requirement: The `?` operator is controlled by the `Try` syntax trait (§11.7).
+  - Source: `§10.2 L3840-L3843`
+  - Related spec refs: §11.7
+- `10.2.1.4` **Result and Option implement Try in the standard library.**
+  - Requirement: `Result` and `Option` implement `Try` in the standard library.
+  - Source: `§10.2 L3840-L3843`
+  - Related spec refs: none
+- `10.2.1.5` **User types can also implement Try to participate in ? propagation — for example, pa...**
+  - Requirement: User types can also implement `Try` to participate in `?` propagation — for example, parser result types or validation types.
+  - Source: `§10.2 L3840-L3843`
+  - Related spec refs: none
+
+### §10.3 Optional Chaining (`?.`)
+
+- `10.3.1.1` **The ?. operator accesses a field or method on an Option or Result, returning None/E...**
+  - Requirement: The `?.` operator accesses a field or method on an `Option` or `Result`, returning `None`/`Err` if the value is absent:
+  - Source: `§10.3 L3847-L3848`
+  - Related spec refs: none
+- `10.3.1.2` **Desugaring: The desugaring is type-aware to avoid producing Option[Option[T]]:**
+  - Requirement: **Desugaring:** The desugaring is **type-aware** to avoid producing `Option[Option[T]]`:
+  - Source: `§10.3 L3861-L3862`
+  - Related spec refs: none
+- `10.3.1.3` **If field has type U (non-Optional): expr?.field → expr.map(v => v.field) — result i...**
+  - Requirement: If `field` has type `U` (non-Optional): `expr?.field` → `expr.map(v => v.field)` — result is `Option[U]`.
+  - Source: `§10.3 L3864`
+  - Related spec refs: none
+- `10.3.1.4` **If field has type Option[U]: expr?.field → expr.and_then(v => v.field) — result is...**
+  - Requirement: If `field` has type `Option[U]`: `expr?.field` → `expr.and_then(v => v.field)` — result is `Option[U]` (flattened).
+  - Source: `§10.3 L3865`
+  - Related spec refs: none
+- `10.3.1.5` **expr?.method(args) → expr.and_then(v => v.method(args)) when the method returns Opt...**
+  - Requirement: `expr?.method(args)` → `expr.and_then(v => v.method(args))` when the method returns `Option`/`Result`.
+  - Source: `§10.3 L3866`
+  - Related spec refs: none
+- `10.3.1.6` **Optional chaining works on both Option[T] and Result[T, E]:**
+  - Requirement: Optional chaining works on both `Option[T]` and `Result[T, E]`:
+  - Source: `§10.3 L3877`
+  - Related spec refs: none
+
+### §10.4 Default Operator (`??`)
+
+- `10.4.1.1` **The ?? operator provides a default value when an Option is None:**
+  - Requirement: The `??` operator provides a default value when an `Option` is `None`:
+  - Source: `§10.4 L3889-L3890`
+  - Related spec refs: none
+- `10.4.1.2` **Desugaring: expr ?? default desugars to expr.unwrap_or(default).**
+  - Requirement: **Desugaring:** `expr ?? default` desugars to `expr.unwrap_or(default)`.
+  - Source: `§10.4 L3897-L3899`
+  - Related spec refs: none
+- `10.4.1.3` **The right-hand side is lazily evaluated (only computed if left is None).**
+  - Requirement: The right-hand side is lazily evaluated (only computed if left is `None`).
+  - Source: `§10.4 L3897-L3899`
+  - Related spec refs: none
+- `10.4.1.4` **Early exit form: ?? can be followed by return, break, or continue for early exit on...**
+  - Requirement: **Early exit form:** `??` can be followed by `return`, `break`, or `continue` for early exit on `None`.
+  - Source: `§10.4 L3901-L3903`
+  - Related spec refs: none
+- `10.4.1.5` **The break and continue forms may include labels (§13.5a):**
+  - Requirement: The `break` and `continue` forms may include labels (§13.5a):
+  - Source: `§10.4 L3901-L3903`
+  - Related spec refs: §13.5a
+- `10.4.1.6` **This replaces the need for if let / let-else in the most common cases.**
+  - Requirement: This replaces the need for `if let` / `let-else` in the most common cases.
+  - Source: `§10.4 L3912-L3913`
+  - Related spec refs: none
+- `10.4.1.7` **The desugaring is:**
+  - Requirement: The desugaring is:
+  - Source: `§10.4 L3912-L3913`
+  - Related spec refs: none
+
+### §10.5 Option Combinators (Standard Library Requirement)
+
+- `10.5.1.1` **The standard library must provide these methods on Option[T]:**
+  - Requirement: The standard library must provide these methods on `Option[T]`:
+  - Source: `§10.5 L3925`
+  - Related spec refs: none
+- `10.5.1.2` **map; (fn(T) -> U) -> Option[U]; Transform the inner value**
+  - Requirement: `map`; `(fn(T) -> U) -> Option[U]`; Transform the inner value
+  - Source: `§10.5 L3929`
+  - Related spec refs: none
+- `10.5.1.3` **and_then; (fn(T) -> Option[U]) -> Option[U]; Chain fallible operations**
+  - Requirement: `and_then`; `(fn(T) -> Option[U]) -> Option[U]`; Chain fallible operations
+  - Source: `§10.5 L3930`
+  - Related spec refs: none
+- `10.5.1.4` **or_else; (fn() -> Option[T]) -> Option[T]; Fallback provider**
+  - Requirement: `or_else`; `(fn() -> Option[T]) -> Option[T]`; Fallback provider
+  - Source: `§10.5 L3931`
+  - Related spec refs: none
+- `10.5.1.5` **unwrap_or; (T) -> T; Default value**
+  - Requirement: `unwrap_or`; `(T) -> T`; Default value
+  - Source: `§10.5 L3932`
+  - Related spec refs: none
+- `10.5.1.6` **unwrap_or_else; (fn() -> T) -> T; Lazy default**
+  - Requirement: `unwrap_or_else`; `(fn() -> T) -> T`; Lazy default
+  - Source: `§10.5 L3933`
+  - Related spec refs: none
+- `10.5.1.7` **unwrap; () -> T; Extract value; panics if None**
+  - Requirement: `unwrap`; `() -> T`; Extract value; **panics** if `None`
+  - Source: `§10.5 L3934`
+  - Related spec refs: none
+- `10.5.1.8` **expect; (msg: &str) -> T; Extract value; panics with message if None**
+  - Requirement: `expect`; `(msg: &str) -> T`; Extract value; **panics** with message if `None`
+  - Source: `§10.5 L3935`
+  - Related spec refs: none
+- `10.5.1.9` **filter; (fn(&T) -> bool) -> Option[T]; Keep if predicate holds**
+  - Requirement: `filter`; `(fn(&T) -> bool) -> Option[T]`; Keep if predicate holds
+  - Source: `§10.5 L3936`
+  - Related spec refs: none
+- `10.5.1.10` **is_some; () -> bool; Check presence**
+  - Requirement: `is_some`; `() -> bool`; Check presence
+  - Source: `§10.5 L3937`
+  - Related spec refs: none
+- `10.5.1.11` **is_none; () -> bool; Check absence**
+  - Requirement: `is_none`; `() -> bool`; Check absence
+  - Source: `§10.5 L3938`
+  - Related spec refs: none
+- `10.5.1.12` **zip; (Option[U]) -> Option[(T, U)]; Combine two options**
+  - Requirement: `zip`; `(Option[U]) -> Option[(T, U)]`; Combine two options
+  - Source: `§10.5 L3939`
+  - Related spec refs: none
+- `10.5.1.13` **unzip; () -> (Option[A], Option[B]); Split paired option**
+  - Requirement: `unzip`; `() -> (Option[A], Option[B])`; Split paired option
+  - Source: `§10.5 L3940`
+  - Related spec refs: none
+- `10.5.1.14` **flatten; () -> Option[T] where Self = Option[Option[T]]; Remove nesting**
+  - Requirement: `flatten`; `() -> Option[T]` where Self = `Option[Option[T]]`; Remove nesting
+  - Source: `§10.5 L3941`
+  - Related spec refs: none
+- `10.5.1.15` **cloned; () -> Option[T] where T: Clone; Clone inner value**
+  - Requirement: `cloned`; `() -> Option[T]` where T: Clone; Clone inner value
+  - Source: `§10.5 L3942`
+  - Related spec refs: none
+- `10.5.1.16` **inspect; (fn(&T)) -> Option[T]; Side effect without consuming**
+  - Requirement: `inspect`; `(fn(&T)) -> Option[T]`; Side effect without consuming
+  - Source: `§10.5 L3943`
+  - Related spec refs: none
+- `10.5.1.17` **transpose; () -> Result[Option[T], E] where Self = Option[Result[T, E]]; Swap Optio...**
+  - Requirement: `transpose`; `() -> Result[Option[T], E]` where Self = `Option[Result[T, E]]`; Swap Option/Result nesting
+  - Source: `§10.5 L3944`
+  - Related spec refs: none
+
+### §10.6 Result Combinators (Standard Library Requirement)
+
+- `10.6.1.1` **map; (fn(T) -> U) -> Result[U, E]; Transform Ok value**
+  - Requirement: `map`; `(fn(T) -> U) -> Result[U, E]`; Transform Ok value
+  - Source: `§10.6 L3965`
+  - Related spec refs: none
+- `10.6.1.2` **map_err; (fn(E) -> F) -> Result[T, F]; Transform Err value**
+  - Requirement: `map_err`; `(fn(E) -> F) -> Result[T, F]`; Transform Err value
+  - Source: `§10.6 L3966`
+  - Related spec refs: none
+- `10.6.1.3` **and_then; (fn(T) -> Result[U, E]) -> Result[U, E]; Chain operations**
+  - Requirement: `and_then`; `(fn(T) -> Result[U, E]) -> Result[U, E]`; Chain operations
+  - Source: `§10.6 L3967`
+  - Related spec refs: none
+- `10.6.1.4` **or_else; (fn(E) -> Result[T, F]) -> Result[T, F]; Recover from error**
+  - Requirement: `or_else`; `(fn(E) -> Result[T, F]) -> Result[T, F]`; Recover from error
+  - Source: `§10.6 L3968`
+  - Related spec refs: none
+- `10.6.1.5` **unwrap_or; (T) -> T; Default on error**
+  - Requirement: `unwrap_or`; `(T) -> T`; Default on error
+  - Source: `§10.6 L3969`
+  - Related spec refs: none
+- `10.6.1.6` **unwrap_or_else; (fn(E) -> T) -> T; Lazy default**
+  - Requirement: `unwrap_or_else`; `(fn(E) -> T) -> T`; Lazy default
+  - Source: `§10.6 L3970`
+  - Related spec refs: none
+- `10.6.1.7` **unwrap; () -> T; Extract value; panics if Err**
+  - Requirement: `unwrap`; `() -> T`; Extract value; **panics** if `Err`
+  - Source: `§10.6 L3971`
+  - Related spec refs: none
+- `10.6.1.8` **expect; (msg: &str) -> T; Extract value; panics with message if Err**
+  - Requirement: `expect`; `(msg: &str) -> T`; Extract value; **panics** with message if `Err`
+  - Source: `§10.6 L3972`
+  - Related spec refs: none
+- `10.6.1.9` **is_ok; () -> bool; Check success**
+  - Requirement: `is_ok`; `() -> bool`; Check success
+  - Source: `§10.6 L3973`
+  - Related spec refs: none
+- `10.6.1.10` **is_err; () -> bool; Check failure**
+  - Requirement: `is_err`; `() -> bool`; Check failure
+  - Source: `§10.6 L3974`
+  - Related spec refs: none
+- `10.6.1.11` **ok; () -> Option[T]; Convert to Option**
+  - Requirement: `ok`; `() -> Option[T]`; Convert to Option
+  - Source: `§10.6 L3975`
+  - Related spec refs: none
+- `10.6.1.12` **err; () -> Option[E]; Extract error**
+  - Requirement: `err`; `() -> Option[E]`; Extract error
+  - Source: `§10.6 L3976`
+  - Related spec refs: none
+- `10.6.1.13` **inspect; (fn(&T)) -> Result[T, E]; Side effect on Ok**
+  - Requirement: `inspect`; `(fn(&T)) -> Result[T, E]`; Side effect on Ok
+  - Source: `§10.6 L3977`
+  - Related spec refs: none
+- `10.6.1.14` **inspect_err; (fn(&E)) -> Result[T, E]; Side effect on Err**
+  - Requirement: `inspect_err`; `(fn(&E)) -> Result[T, E]`; Side effect on Err
+  - Source: `§10.6 L3978`
+  - Related spec refs: none
+- `10.6.1.15` **transpose; () -> Option[Result[T, E]] where Self = Result[Option[T], E]; Swap Resul...**
+  - Requirement: `transpose`; `() -> Option[Result[T, E]]` where Self = `Result[Option[T], E]`; Swap Result/Option nesting
+  - Source: `§10.6 L3979`
+  - Related spec refs: none
+- `10.6.1.16` **context; (msg: &str) -> Result[T, ContextError[E]]; Wrap error with message**
+  - Requirement: `context`; `(msg: &str) -> Result[T, ContextError[E]]`; Wrap error with message
+  - Source: `§10.6 L3980`
+  - Related spec refs: none
+- `10.6.1.17` **with_context; (fn() -> str) -> Result[T, ContextError[E]]; Wrap error lazily**
+  - Requirement: `with_context`; `(fn() -> str) -> Result[T, ContextError[E]]`; Wrap error lazily
+  - Source: `§10.6 L3981`
+  - Related spec refs: none
+- `10.6.1.18` **Both Option and Result provide .unwrap() and .expect() for extracting the inner val...**
+  - Requirement: Both `Option` and `Result` provide `.unwrap()` and `.expect()` for extracting the inner value with a panic on failure:
+  - Source: `§10.6 L3985-L3986`
+  - Related spec refs: none
+- `10.6.1.19` **.unwrap() panics with a message that includes the source location and the Debug rep...**
+  - Requirement: `.unwrap()` panics with a message that includes the source location and the `Debug` representation of the `None`/`Err` value.
+  - Source: `§10.6 L3998-L4000`
+  - Related spec refs: none
+- `10.6.1.20` **.expect() panics with the provided message plus the same debug info.**
+  - Requirement: `.expect()` panics with the provided message plus the same debug info.
+  - Source: `§10.6 L3998-L4000`
+  - Related spec refs: none
+- `10.6.1.21` **These are intended for tests, prototyping, and cases where failure is a genuine bug...**
+  - Requirement: These are intended for tests, prototyping, and cases where failure is a genuine bug (not a recoverable error).
+  - Source: `§10.6 L4002-L4004`
+  - Related spec refs: none
+- `10.6.1.22` **Production code should prefer ?, match, unwrap_or, or ??.**
+  - Requirement: Production code should prefer `?`, `match`, `unwrap_or`, or `??`.
+  - Source: `§10.6 L4002-L4004`
+  - Related spec refs: none
+- `10.6.1.23` **.context() wraps an error with a human-readable message, producing a ContextError[E...**
+  - Requirement: `.context()` wraps an error with a human-readable message, producing a `ContextError[E]` that preserves the original error as a `source` field.
+  - Source: `§10.6 L4008-L4010`
+  - Related spec refs: none
+- `10.6.1.24` **This chains naturally with ?:**
+  - Requirement: This chains naturally with `?`:
+  - Source: `§10.6 L4008-L4010`
+  - Related spec refs: none
+- `10.6.1.25` **.with_context() evaluates the message lazily (only on error), useful when building...**
+  - Requirement: `.with_context()` evaluates the message lazily (only on error), useful when building the message is expensive:
+  - Source: `§10.6 L4025-L4026`
+  - Related spec refs: none
+- `10.6.1.26` **ContextError[E] implements Error when E: Error, and the error chain is traversable...**
+  - Requirement: `ContextError[E]` implements `Error` when `E: Error`, and the error chain is traversable via the `source` field:
+  - Source: `§10.6 L4033-L4034`
+  - Related spec refs: none
+
+### §10.7 Collection Combinators: `sequence` and `traverse`
+
+- `10.7.1.1` **These bridge collections and Option/Result.**
+  - Requirement: These bridge collections and Option/Result.
+  - Source: `§10.7 L4057-L4059`
+  - Related spec refs: none
+- `10.7.1.2` **They are among the most frequently used combinators in functional programming and a...**
+  - Requirement: They are among the most frequently used combinators in functional programming and are required in the standard library.
+  - Source: `§10.7 L4057-L4059`
+  - Related spec refs: none
+- `10.7.1.3` **sequence converts a collection of wrappers into a wrapper of a collection.**
+  - Requirement: **`sequence`** converts a collection of wrappers into a wrapper of a collection.
+  - Source: `§10.7 L4061-L4062`
+  - Related spec refs: none
+- `10.7.1.4` **If any element is None or Err, the whole result is:**
+  - Requirement: If any element is `None` or `Err`, the whole result is:
+  - Source: `§10.7 L4061-L4062`
+  - Related spec refs: none
+- `10.7.1.5` **traverse maps a function over a collection, then sequences.**
+  - Requirement: **`traverse`** maps a function over a collection, then sequences.
+  - Source: `§10.7 L4080-L4081`
+  - Related spec refs: none
+- `10.7.1.6` **It is map + sequence fused into one pass:**
+  - Requirement: It is `map` + `sequence` fused into one pass:
+  - Source: `§10.7 L4080-L4081`
+  - Related spec refs: none
+- `10.7.1.7` **traverse is the workhorse of "apply a fallible operation to every element and bail...**
+  - Requirement: `traverse` is the workhorse of "apply a fallible operation to every element and bail on first failure" — extremely common in validation, parsing, and batch processing.
+  - Source: `§10.7 L4095-L4097`
+  - Related spec refs: none
+
+### §10.8 Error Declarations
+
+- `10.8.1.1` **Automatically implements Error, Debug, Display.**
+  - Requirement: Automatically implements `Error`, `Debug`, `Display`.
+  - Source: `§10.8 L4108`
+  - Related spec refs: none
+
+### §10.9 Error Conversion with `from`
+
+- `10.9.1.1` **Generates wrapper variants (AppError.Io(IoError), etc.) and From implementations.**
+  - Requirement: Generates wrapper variants (`AppError.Io(IoError)`, etc.) and `From` implementations.
+  - Source: `§10.9 L4116-L4118`
+  - Related spec refs: none
+- `10.9.1.2` **? uses From for automatic conversion.**
+  - Requirement: `?` uses `From` for automatic conversion.
+  - Source: `§10.9 L4116-L4118`
+  - Related spec refs: none
+- `10.9.1.3` **Chained conversion works via transitivity.**
+  - Requirement: Chained conversion works via transitivity.
+  - Source: `§10.9 L4116-L4118`
+  - Related spec refs: none
+
+## 11. Traits
+
+### §11.2 Generic Bounds
+
+- `11.2.1.1` **Generic type parameters may omit bounds entirely.**
+  - Requirement: Generic type parameters may omit bounds entirely.
+  - Source: `§11.2 L4136-L4137`
+  - Related spec refs: none
+- `11.2.1.2` **Unbounded generics are checked when they are instantiated with concrete types:**
+  - Requirement: Unbounded generics are checked when they are instantiated with concrete types:
+  - Source: `§11.2 L4136-L4137`
+  - Related spec refs: none
+- `11.2.1.3` **If double(5) is instantiated, the compiler checks that i32 supports +.**
+  - Requirement: If `double(5)` is instantiated, the compiler checks that `i32` supports `+`.
+  - Source: `§11.2 L4143-L4147`
+  - Related spec refs: none
+- `11.2.1.4` **If double("hi") is instantiated and the concrete type does not support the required...**
+  - Requirement: If `double("hi")` is instantiated and the concrete type does not support the required operator or method, the compiler emits an error naming the concrete type, the unsupported operation, and the instantiation:
+  - Source: `§11.2 L4143-L4147`
+  - Related spec refs: none
+- `11.2.1.5` **If a generic function is never called, its body is never compiled and no errors are...**
+  - Requirement: If a generic function is never called, its body is never compiled and no errors are reported — even if the body contains invalid operations.
+  - Source: `§11.2 L4153-L4154`
+  - Related spec refs: none
+- `11.2.1.6` **Explicit bounds remain available as optional contracts:**
+  - Requirement: Explicit bounds remain available as optional contracts:
+  - Source: `§11.2 L4156`
+  - Related spec refs: none
+- `11.2.1.7` **Use bounds when they improve the public API contract or produce clearer caller-faci...**
+  - Requirement: Use bounds when they improve the public API contract or produce clearer caller-facing errors.
+  - Source: `§11.2 L4163-L4165`
+  - Related spec refs: none
+- `11.2.1.8` **Omit them when the body already makes the requirement obvious.**
+  - Requirement: Omit them when the body already makes the requirement obvious.
+  - Source: `§11.2 L4163-L4165`
+  - Related spec refs: none
+
+### §11.2a `where` Clauses
+
+- `11.2.2.1` **Trait bounds may also be specified with where clauses, placed after the function si...**
+  - Requirement: Trait bounds may also be specified with `where` clauses, placed after the function signature, type definition, or impl header:
+  - Source: `§11.2a L4169-L4170`
+  - Related spec refs: none
+- `11.2.2.2` **where clauses are equivalent to inline bounds (T: Trait in the generic parameter li...**
+  - Requirement: `where` clauses are equivalent to inline bounds (`T: Trait` in the generic parameter list) when present, but neither form is required.
+  - Source: `§11.2a L4180-L4184`
+  - Related spec refs: none
+- `11.2.2.3` **Generic functions and types may omit both inline bounds and where clauses and rely...**
+  - Requirement: Generic functions and types may omit both inline bounds and `where` clauses and rely on instantiation-time checking instead.
+  - Source: `§11.2a L4180-L4184`
+  - Related spec refs: none
+- `11.2.2.4` **When bounds are written, where clauses scale better when there are many constraints:**
+  - Requirement: When bounds are written, `where` clauses scale better when there are many constraints:
+  - Source: `§11.2a L4180-L4184`
+  - Related spec refs: none
+- `11.2.2.5` **where clauses may appear on functions, type declarations, and impl blocks:**
+  - Requirement: `where` clauses may appear on functions, type declarations, and impl blocks:
+  - Source: `§11.2a L4192`
+  - Related spec refs: none
+- `11.2.2.6` **The compiler validates that each constraint references a known type parameter and a...**
+  - Requirement: The compiler validates that each constraint references a known type parameter and a known trait.
+  - Source: `§11.2a L4201-L4202`
+  - Related spec refs: none
+- `11.2.2.7` **Unknown type parameters or traits produce compile errors.**
+  - Requirement: Unknown type parameters or traits produce compile errors.
+  - Source: `§11.2a L4201-L4202`
+  - Related spec refs: none
+
+### §11.3 Static Dispatch by Default
+
+- `11.3.1.1` **Trait calls are monomorphized.**
+  - Requirement: Trait calls are monomorphized.
+  - Source: `§11.3 L4206`
+  - Related spec refs: none
+- `11.3.1.2` **Dynamic dispatch via explicit dyn Trait.**
+  - Requirement: Dynamic dispatch via explicit `dyn Trait`.
+  - Source: `§11.3 L4206`
+  - Related spec refs: none
+- `11.3.1.3` **Object safety: A trait can be used as dyn Trait only if all its methods are object-...**
+  - Requirement: **Object safety:** A trait can be used as `dyn Trait` only if all its methods are **object-safe**.
+  - Source: `§11.3 L4208-L4209`
+  - Related spec refs: none
+- `11.3.1.4` **A method is object-safe if:**
+  - Requirement: A method is object-safe if:
+  - Source: `§11.3 L4208-L4209`
+  - Related spec refs: none
+- `11.3.1.5` **It uses an explicit object-safe receiver mode: self: &Self or mut self: Self, OR**
+  - Requirement: It uses an explicit object-safe receiver mode: `self: &Self` or `mut self: Self`, OR
+  - Source: `§11.3 L4211-L4212`
+  - Related spec refs: none
+- `11.3.1.6` **It uses move self: Self and the trait specifies Self: Sized — but dyn Trait is unsi...**
+  - Requirement: It uses `move self: Self` and the trait specifies `Self: Sized` — but `dyn Trait` is unsized, so consuming receiver methods are excluded from the vtable.
+  - Source: `§11.3 L4213-L4215`
+  - Related spec refs: none
+- `11.3.1.7` **Consuming self behind Box: To call a consuming method through a trait object, wrap...**
+  - Requirement: **Consuming `self` behind `Box`:** To call a consuming method through a trait object, wrap it in `Box[dyn Trait]`.
+  - Source: `§11.3 L4229-L4232`
+  - Related spec refs: none
+- `11.3.1.8` **The compiler generates a shim that moves the value out of the box (which has a know...**
+  - Requirement: The compiler generates a shim that moves the value out of the box (which has a known pointer size):
+  - Source: `§11.3 L4229-L4232`
+  - Related spec refs: none
+- `11.3.1.9` **Traits with generic methods (where the generic is not Self) are not object-safe, be...**
+  - Requirement: Traits with generic methods (where the generic is not `Self`) are not object-safe, because the vtable cannot contain entries for all possible monomorphizations.
+  - Source: `§11.3 L4244-L4246`
+  - Related spec refs: none
+
+### §11.4 Coherence (Orphan Rules)
+
+- `11.4.1.1` **A trait implementation is permitted only if the trait or the type is defined in the...**
+  - Requirement: A trait implementation is permitted only if the trait or the type is defined in the current package.
+  - Source: `§11.4 L4250-L4251`
+  - Related spec refs: none
+- `11.4.1.2` **This ensures global coherence.**
+  - Requirement: This ensures global coherence.
+  - Source: `§11.4 L4250-L4251`
+  - Related spec refs: none
+- `11.4.1.3` **Extension block coherence: extend blocks (§9.5) follow similar rules to prevent met...**
+  - Requirement: **Extension block coherence:** `extend` blocks (§9.5) follow similar rules to prevent method conflicts across packages:
+  - Source: `§11.4 L4253-L4254`
+  - Related spec refs: §9.5
+- `11.4.1.4` **You may extend any type with new methods.**
+  - Requirement: You may `extend` any type with new methods.
+  - Source: `§11.4 L4256`
+  - Related spec refs: none
+- `11.4.1.5` **If two packages in scope extend the same type with the same method name, calling th...**
+  - Requirement: If two packages in scope extend the same type with the same method name, calling that method is a **compile error** (ambiguous). The caller must disambiguate using the fully-qualified syntax: `pkg_a.method_name(value)`.
+  - Source: `§11.4 L4257-L4260`
+  - Related spec refs: none
+- `11.4.1.6` **Extension methods never shadow inherent methods (defined in the same module as the...**
+  - Requirement: Extension methods **never shadow** inherent methods (defined in the same module as the type). Inherent methods always win.
+  - Source: `§11.4 L4261-L4262`
+  - Related spec refs: none
+- `11.4.1.7` **Extension methods are resolved by import: only methods from packages in the current...**
+  - Requirement: Extension methods are resolved by import: only methods from packages in the current `use` scope are candidates.
+  - Source: `§11.4 L4263-L4264`
+  - Related spec refs: none
+
+### §11.5 Async Methods in Traits
+
+- `11.5.1.1` **Async methods in traits are permitted and require no special rules.**
+  - Requirement: Async methods in traits are permitted and require no special rules.
+  - Source: `§11.5 L4285`
+  - Related spec refs: none
+- `11.5.1.2` **Because async fn fetch(...) -> T is equivalent to fn fetch(...) -> Task[T], the tra...**
+  - Requirement: Because `async fn fetch(...) -> T` is equivalent to `fn fetch(...) -> Task[T]`, the trait signature is simply a method returning `Task[T]`.
+  - Source: `§11.5 L4292-L4295`
+  - Related spec refs: none
+- `11.5.1.3` **No boxing, no GATs, no special async trait machinery.**
+  - Requirement: No boxing, no GATs, no special async trait machinery.
+  - Source: `§11.5 L4292-L4295`
+  - Related spec refs: none
+- `11.5.1.4` **This works because:**
+  - Requirement: This works because:
+  - Source: `§11.5 L4305`
+  - Related spec refs: none
+- `11.5.1.5` **Task[T] is a concrete, fixed-size type (an opaque handle).**
+  - Requirement: `Task[T]` is a concrete, fixed-size type (an opaque handle).
+  - Source: `§11.5 L4307`
+  - Related spec refs: none
+- `11.5.1.6` **The vtable entry for fetch returns Task[T] like any other return value.**
+  - Requirement: The vtable entry for `fetch` returns `Task[T]` like any other return value.
+  - Source: `§11.5 L4308-L4309`
+  - Related spec refs: none
+- `11.5.1.7` **No boxing of the return value is needed — Task[T] is already a handle to a heap-all...**
+  - Requirement: No boxing of the return value is needed — `Task[T]` is already a handle to a heap-allocated fiber.
+  - Source: `§11.5 L4310-L4311`
+  - Related spec refs: none
+- `11.5.1.8` **Formal rule: Async methods are methods returning Task[T].**
+  - Requirement: **Formal rule:** Async methods are methods returning `Task[T]`.
+  - Source: `§11.5 L4313-L4316`
+  - Related spec refs: none
+- `11.5.1.9` **No special trait rules, object safety constraints, or dynamic dispatch restrictions...**
+  - Requirement: No special trait rules, object safety constraints, or dynamic dispatch restrictions apply beyond those that apply to any method returning a concrete type.
+  - Source: `§11.5 L4313-L4316`
+  - Related spec refs: none
+
+### §11.6 Feature Scope (v1.0)
+
+- `11.6.1.1` **Supported: generic type parameters, optional bounds, multiple bounds, default metho...**
+  - Requirement: Supported: generic type parameters, optional bounds, multiple bounds, default methods, async methods in traits, `where` clauses, blanket impls, associated types (basic), sealed traits.
+  - Source: `§11.6 L4320-L4322`
+  - Related spec refs: none
+- `11.6.1.2` **Not supported in v1.0: Self type in associated type references, associated type bou...**
+  - Requirement: Not supported in v1.0: `Self` type in associated type references, associated type bound checking, higher-kinded types, lifetime parameters on traits.
+  - Source: `§11.6 L4324-L4326`
+  - Related spec refs: none
+- `11.6.1.3` **Associated types (basic): Traits can declare associated types and impls can provide...**
+  - Requirement: **Associated types (basic):** Traits can declare associated types and impls can provide concrete bindings:
+  - Source: `§11.6 L4328-L4329`
+  - Related spec refs: none
+- `11.6.1.4` **Default associated types are supported (type Item = i32 in the trait).**
+  - Requirement: Default associated types are supported (`type Item = i32` in the trait).
+  - Source: `§11.6 L4339-L4342`
+  - Related spec refs: none
+- `11.6.1.5` **Missing required associated types produce a compile error.**
+  - Requirement: Missing required associated types produce a compile error.
+  - Source: `§11.6 L4339-L4342`
+  - Related spec refs: none
+- `11.6.1.6` **Self.Item references in type expressions and associated type bound checking (type I...**
+  - Requirement: `Self.Item` references in type expressions and associated type bound checking (`type Item: Eq`) are deferred.
+  - Source: `§11.6 L4339-L4342`
+  - Related spec refs: none
+- `11.6.1.7` **Sealed traits: The @[sealed] attribute restricts a trait so that only the defining...**
+  - Requirement: **Sealed traits:** The `@[sealed]` attribute restricts a trait so that only the defining module can implement it:
+  - Source: `§11.6 L4344-L4345`
+  - Related spec refs: none
+- `11.6.1.8` **Sealed traits guarantee a closed set of implementors, enabling optimizations and ex...**
+  - Requirement: Sealed traits guarantee a closed set of implementors, enabling optimizations and exhaustive reasoning.
+  - Source: `§11.6 L4357-L4359`
+  - Related spec refs: none
+- `11.6.1.9` **Implementors outside the defining module produce a compile error.**
+  - Requirement: Implementors outside the defining module produce a compile error.
+  - Source: `§11.6 L4357-L4359`
+  - Related spec refs: none
+- `11.6.1.10` **Blanket impls: A blanket impl provides a trait implementation for all types satisfy...**
+  - Requirement: **Blanket impls:** A blanket impl provides a trait implementation for all types satisfying a bound:
+  - Source: `§11.6 L4361-L4362`
+  - Related spec refs: none
+- `11.6.1.11` **The compiler checks for overlaps between blanket and direct impls to prevent ambigu...**
+  - Requirement: The compiler checks for overlaps between blanket and direct impls to prevent ambiguity.
+  - Source: `§11.6 L4369-L4370`
+  - Related spec refs: none
+
+### §11.7 Syntax Traits
+
+- `11.7.1.1` **Certain traits, when implemented, unlock participation in language syntax.**
+  - Requirement: Certain traits, when implemented, unlock participation in language syntax.
+  - Source: `§11.7 L4374-L4383`
+  - Related spec refs: none
+- `11.7.1.2` **This is a deliberate design pattern: library types opt into language constructs by...**
+  - Requirement: This is a deliberate design pattern: library types opt into language constructs by implementing a known trait.
+  - Source: `§11.7 L4374-L4383`
+  - Related spec refs: none
+- `11.7.1.3` **The set of syntax traits is fixed and closed — users cannot define new syntax hooks.**
+  - Requirement: The set of syntax traits is **fixed and closed** — users cannot define new syntax hooks.
+  - Source: `§11.7 L4374-L4383`
+  - Related spec refs: none
+- `11.7.1.4` **Arithmetic and comparison operators are the main exception: they use fixed method n...**
+  - Requirement: Arithmetic and comparison operators are the main exception: they use fixed method names on the concrete type (`add`, `sub`, `mul`, `div`, `matmul`, `eq`, `lt`, and so on).
+  - Source: `§11.7 L4374-L4383`
+  - Related spec refs: none
+- `11.7.1.5` **The prelude traits Add, Sub, Mul, Div, MatMul, Neg, Eq, and Ord remain available fo...**
+  - Requirement: The prelude traits `Add`, `Sub`, `Mul`, `Div`, `MatMul`, `Neg`, `Eq`, and `Ord` remain available for explicit bounds and documentation, but an unbounded generic does not need to name them.
+  - Source: `§11.7 L4374-L4383`
+  - Related spec refs: none
+- `11.7.1.6` **Iter[T]; for loops; for x in expr:**
+  - Requirement: `Iter[T]`; `for` loops; `for x in expr:`
+  - Source: `§11.7 L4387`
+  - Related spec refs: none
+- `11.7.1.7` **Contains[T]; Membership test; x in collection, x not in collection**
+  - Requirement: `Contains[T]`; Membership test; `x in collection`, `x not in collection`
+  - Source: `§11.7 L4388`
+  - Related spec refs: none
+- `11.7.1.8` **IndexGet[I, O]; Subscript read; expr[index]**
+  - Requirement: `IndexGet[I, O]`; Subscript read; `expr[index]`
+  - Source: `§11.7 L4389`
+  - Related spec refs: none
+- `11.7.1.9` **IndexPlace[I, O]; Subscript read/write (place); expr[index] = val**
+  - Requirement: `IndexPlace[I, O]`; Subscript read/write (place); `expr[index] = val`
+  - Source: `§11.7 L4390`
+  - Related spec refs: none
+- `11.7.1.10` **MultiIndex[O]; Generalized subscript read; expr[i, j], expr[1:4, :, ...]**
+  - Requirement: `MultiIndex[O]`; Generalized subscript read; `expr[i, j]`, `expr[1:4, :, ...]`
+  - Source: `§11.7 L4391`
+  - Related spec refs: none
+- `11.7.1.11` **MultiIndexMut[V]; Generalized subscript write; expr[i, j] = val, expr[:, 0] = val**
+  - Requirement: `MultiIndexMut[V]`; Generalized subscript write; `expr[i, j] = val`, `expr[:, 0] = val`
+  - Source: `§11.7 L4392`
+  - Related spec refs: none
+- `11.7.1.12` **Try[T, E]; ? operator; expr?**
+  - Requirement: `Try[T, E]`; `?` operator; `expr?`
+  - Source: `§11.7 L4393`
+  - Related spec refs: none
+- `11.7.1.13` **Drop; Destructor; automatic at scope exit**
+  - Requirement: `Drop`; Destructor; automatic at scope exit
+  - Source: `§11.7 L4394`
+  - Related spec refs: none
+- `11.7.1.14` **The [] syntax also supports comma-separated multi-dimensional indices, slice notati...**
+  - Requirement: The `[]` syntax also supports comma-separated multi-dimensional indices, slice notation, ellipsis, and `newaxis`:
+  - Source: `§11.7 L4412-L4413`
+  - Related spec refs: none
+- `11.7.1.15` **The compiler evaluates each component left-to-right and lowers the list into a stan...**
+  - Requirement: The compiler evaluates each component left-to-right and lowers the list into a standard sequence of `IndexSpec` values with four forms: scalar, slice, ellipsis, and new-axis insertion.
+  - Source: `§11.7 L4424-L4431`
+  - Related spec refs: none
+- `11.7.1.16` **... may appear at most once in a single index list.**
+  - Requirement: `...` may appear at most once in a single index list.
+  - Source: `§11.7 L4424-L4431`
+  - Related spec refs: none
+- `11.7.1.17` **The meaning of those specs is owned by the receiving type's MultiIndex / MultiIndex...**
+  - Requirement: The meaning of those specs is owned by the receiving type's `MultiIndex` / `MultiIndexMut` implementation.
+  - Source: `§11.7 L4424-L4431`
+  - Related spec refs: none
+- `11.7.1.18` **Standard library tensor and array-view types interpret negative scalar indices and...**
+  - Requirement: Standard library tensor and array-view types interpret negative scalar indices and slice bounds relative to the end of the indexed dimension.
+  - Source: `§11.7 L4424-L4431`
+  - Related spec refs: none
+- `11.7.1.19` **The standard library exposes IndexSpec as the carrier for those components:**
+  - Requirement: The standard library exposes `IndexSpec` as the carrier for those components:
+  - Source: `§11.7 L4433-L4434`
+  - Related spec refs: none
+- `11.7.1.20` **The set of syntax traits is defined by the language. Users cannot add new syntax ho...**
+  - Requirement: The set of syntax traits is defined by the language. Users cannot add new syntax hooks.
+  - Source: `§11.7 L4463-L4464`
+  - Related spec refs: none
+- `11.7.1.21` **Resolution is always static. No implicit conversions, no fallback chains, no dynami...**
+  - Requirement: Resolution is always static. No implicit conversions, no fallback chains, no dynamic dispatch (unless the user explicitly writes `dyn Trait`).
+  - Source: `§11.7 L4465-L4467`
+  - Related spec refs: none
+- `11.7.1.22` **The compiler knows at compile time exactly which trait implementation or concrete m...**
+  - Requirement: The compiler knows at compile time exactly which trait implementation or concrete method resolution controls each syntactic form.
+  - Source: `§11.7 L4468-L4470`
+  - Related spec refs: none
+- `11.7.1.23` **Pattern matching extensibility (Scala-style unapply) is not included in v1.0. It in...**
+  - Requirement: Pattern matching extensibility (Scala-style `unapply`) is **not included** in v1.0. It introduces hidden runtime behavior into match resolution and conflicts with exhaustiveness checking. This may be revisited in a future version.
+  - Source: `§11.7 L4471-L4474`
+  - Related spec refs: none
+- `11.7.1.24` **Arithmetic and comparison operators use fixed method names on the concrete type:**
+  - Requirement: Arithmetic and comparison operators use fixed method names on the concrete type:
+  - Source: `§11.7 L4478-L4479`
+  - Related spec refs: none
+- `11.7.1.25` **+; add**
+  - Requirement: `+`; `add`
+  - Source: `§11.7 L4483`
+  - Related spec refs: none
+- `11.7.1.26` **-; sub**
+  - Requirement: `-`; `sub`
+  - Source: `§11.7 L4484`
+  - Related spec refs: none
+- `11.7.1.27` ***; mul**
+  - Requirement: `*`; `mul`
+  - Source: `§11.7 L4485`
+  - Related spec refs: none
+- `11.7.1.28` **/; div**
+  - Requirement: `/`; `div`
+  - Source: `§11.7 L4486`
+  - Related spec refs: none
+- `11.7.1.29` **@; matmul**
+  - Requirement: `@`; `matmul`
+  - Source: `§11.7 L4487`
+  - Related spec refs: none
+- `11.7.1.30` **unary -; neg**
+  - Requirement: unary `-`; `neg`
+  - Source: `§11.7 L4488`
+  - Related spec refs: none
+- `11.7.1.31` **==; eq**
+  - Requirement: `==`; `eq`
+  - Source: `§11.7 L4489`
+  - Related spec refs: none
+- `11.7.1.32` **!=; ne**
+  - Requirement: `!=`; `ne`
+  - Source: `§11.7 L4490`
+  - Related spec refs: none
+- `11.7.1.33` **<; lt**
+  - Requirement: `<`; `lt`
+  - Source: `§11.7 L4491`
+  - Related spec refs: none
+- `11.7.1.34` **<=; le**
+  - Requirement: `<=`; `le`
+  - Source: `§11.7 L4492`
+  - Related spec refs: none
+- `11.7.1.35` **>; gt**
+  - Requirement: `>`; `gt`
+  - Source: `§11.7 L4493`
+  - Related spec refs: none
+- `11.7.1.36` **>=; ge**
+  - Requirement: `>=`; `ge`
+  - Source: `§11.7 L4494`
+  - Related spec refs: none
+- `11.7.1.37` **The prelude also defines optional traits with matching names and signatures for exp...**
+  - Requirement: The prelude also defines optional traits with matching names and signatures for explicit bounds and documentation:
+  - Source: `§11.7 L4496-L4497`
+  - Related spec refs: none
+- `11.7.1.38` **x in collection desugars to collection.contains(&x).**
+  - Requirement: `x in collection` desugars to `collection.contains(&x)`.
+  - Source: `§11.7 L4522-L4523`
+  - Related spec refs: none
+- `11.7.1.39` **x not in collection desugars to not collection.contains(&x).**
+  - Requirement: `x not in collection` desugars to `not collection.contains(&x)`.
+  - Source: `§11.7 L4522-L4523`
+  - Related spec refs: none
+- `11.7.1.40` **Standard library implementations:**
+  - Requirement: Standard library implementations:
+  - Source: `§11.7 L4525`
+  - Related spec refs: none
+- `11.7.1.41` **[T; N] (array); T where T: Eq; Linear scan**
+  - Requirement: `[T; N]` (array); `T` where `T: Eq`; Linear scan
+  - Source: `§11.7 L4529`
+  - Related spec refs: none
+- `11.7.1.42` **[]T (slice); T where T: Eq; Linear scan**
+  - Requirement: `[]T` (slice); `T` where `T: Eq`; Linear scan
+  - Source: `§11.7 L4530`
+  - Related spec refs: none
+- `11.7.1.43` **Vec[T]; T where T: Eq; Linear scan**
+  - Requirement: `Vec[T]`; `T` where `T: Eq`; Linear scan
+  - Source: `§11.7 L4531`
+  - Related spec refs: none
+- `11.7.1.44` **HashSet[T]; T where T: Hash + Eq; O(1) lookup**
+  - Requirement: `HashSet[T]`; `T` where `T: Hash + Eq`; O(1) lookup
+  - Source: `§11.7 L4532`
+  - Related spec refs: none
+- `11.7.1.45` **HashMap[K, V]; K where K: Hash + Eq; Key existence**
+  - Requirement: `HashMap[K, V]`; `K` where `K: Hash + Eq`; Key existence
+  - Source: `§11.7 L4533`
+  - Related spec refs: none
+- `11.7.1.46` **BTreeSet[T]; T where T: Ord; O(log n) lookup**
+  - Requirement: `BTreeSet[T]`; `T` where `T: Ord`; O(log n) lookup
+  - Source: `§11.7 L4534`
+  - Related spec refs: none
+- `11.7.1.47` **BTreeMap[K, V]; K where K: Ord; Key existence**
+  - Requirement: `BTreeMap[K, V]`; `K` where `K: Ord`; Key existence
+  - Source: `§11.7 L4535`
+  - Related spec refs: none
+- `11.7.1.48` **Range[T] (a..b); T where T: Ord; a <= x and x < b**
+  - Requirement: `Range[T]` (`a..b`); `T` where `T: Ord`; `a <= x and x < b`
+  - Source: `§11.7 L4536`
+  - Related spec refs: none
+- `11.7.1.49` **RangeInclusive[T] (a..=b); T where T: Ord; a <= x and x <= b**
+  - Requirement: `RangeInclusive[T]` (`a..=b`); `T` where `T: Ord`; `a <= x and x <= b`
+  - Source: `§11.7 L4537`
+  - Related spec refs: none
+- `11.7.1.50` **str; str; Substring search**
+  - Requirement: `str`; `str`; Substring search
+  - Source: `§11.7 L4538`
+  - Related spec refs: none
+- `11.7.1.51` **str; char; Character search**
+  - Requirement: `str`; `char`; Character search
+  - Source: `§11.7 L4539`
+  - Related spec refs: none
+- `11.7.1.52` **String; str; Substring search**
+  - Requirement: `String`; `str`; Substring search
+  - Source: `§11.7 L4540`
+  - Related spec refs: none
+- `11.7.1.53` **String; char; Character search**
+  - Requirement: `String`; `char`; Character search
+  - Source: `§11.7 L4541`
+  - Related spec refs: none
+- `11.7.1.54` **Maps test key containment, not value.**
+  - Requirement: Maps test **key** containment, not value.
+  - Source: `§11.7 L4543-L4545`
+  - Related spec refs: none
+- `11.7.1.55` **This is consistent with for (k, v) in map iterating keys.**
+  - Requirement: This is consistent with `for (k, v) in map` iterating keys.
+  - Source: `§11.7 L4543-L4545`
+  - Related spec refs: none
+- `11.7.1.56` **To test value containment: value in map.values().**
+  - Requirement: To test value containment: `value in map.values()`.
+  - Source: `§11.7 L4543-L4545`
+  - Related spec refs: none
+- `11.7.1.57` **User types can implement Contains:**
+  - Requirement: User types can implement `Contains`:
+  - Source: `§11.7 L4547`
+  - Related spec refs: none
+- `11.7.1.58` **Operator desugaring: For user-defined types, operator resolution searches the full...**
+  - Requirement: **Operator desugaring:** For user-defined types, operator resolution searches the full `(lhs_type, rhs_type)` pair:
+  - Source: `§11.7 L4560-L4561`
+  - Related spec refs: none
+- `11.7.1.59` **Try an implementation whose Self is the left operand type and whose right-hand-side...**
+  - Requirement: Try an implementation whose `Self` is the left operand type and whose right-hand-side parameter matches the right operand type.
+  - Source: `§11.7 L4563-L4564`
+  - Related spec refs: none
+- `11.7.1.60` **If none exists, try an implementation whose Self is the right operand type and whos...**
+  - Requirement: If none exists, try an implementation whose `Self` is the right operand type and whose right-hand-side parameter matches the left operand type.
+  - Source: `§11.7 L4565-L4567`
+  - Related spec refs: none
+- `11.7.1.61` **Exactly one implementation must match. If both sides provide distinct applicable im...**
+  - Requirement: Exactly one implementation must match. If both sides provide distinct applicable implementations, the expression is ambiguous and rejected.
+  - Source: `§11.7 L4568-L4570`
+  - Related spec refs: none
+- `11.7.1.62` **The selected operation then desugars to a method call with auto-referencing:**
+  - Requirement: The selected operation then desugars to a method call with auto-referencing:
+  - Source: `§11.7 L4572-L4573`
+  - Related spec refs: none
+- `11.7.1.63` **When right-side dispatch is selected, the implementation still represents the origi...**
+  - Requirement: When right-side dispatch is selected, the implementation still represents the original source expression order.
+  - Source: `§11.7 L4583-L4586`
+  - Related spec refs: none
+- `11.7.1.64` **An implementation of Sub[f64, Array] for Array therefore defines f64 - Array, not A...**
+  - Requirement: An implementation of `Sub[f64, Array] for Array` therefore defines `f64 - Array`, not `Array - f64`.
+  - Source: `§11.7 L4583-L4586`
+  - Related spec refs: none
+- `11.7.1.65` **Operator traits should take &Self, not Self.**
+  - Requirement: **Operator traits should take `&Self`, not `Self`.**
+  - Source: `§11.7 L4588-L4591`
+  - Related spec refs: none
+- `11.7.1.66` **If add takes Self by value, then a + b moves both operands and a + b + c fails beca...**
+  - Requirement: If `add` takes `Self` by value, then `a + b` moves both operands and `a + b + c` fails because `a` was consumed.
+  - Source: `§11.7 L4588-L4591`
+  - Related spec refs: none
+- `11.7.1.67` **With auto-referencing, the pattern is:**
+  - Requirement: With auto-referencing, the pattern is:
+  - Source: `§11.7 L4588-L4591`
+  - Related spec refs: none
+- `11.7.1.68` **For primitive types (i32, f64, etc.), operators are built-in and do not go through...**
+  - Requirement: For primitive types (`i32`, `f64`, etc.), operators are built-in and do not go through trait dispatch.
+  - Source: `§11.7 L4601-L4602`
+  - Related spec refs: none
+
+### §11.8 Derive
+
+- `11.8.1.1` **@[derive(...)] generates trait implementations based on a type's structure.**
+  - Requirement: `@[derive(...)]` generates trait implementations based on a type's structure.
+  - Source: `§11.8 L4606-L4607`
+  - Related spec refs: none
+- `11.8.1.2` **The following traits may be derived:**
+  - Requirement: The following traits may be derived:
+  - Source: `§11.8 L4606-L4607`
+  - Related spec refs: none
+- `11.8.1.3` **Copy; Explicit opt-in only; all fields are Copy, no Drop; Bitwise copy**
+  - Requirement: `Copy`; Explicit opt-in only; all fields are `Copy`, no `Drop`; Bitwise copy
+  - Source: `§11.8 L4611`
+  - Related spec refs: none
+- `11.8.1.4` **Clone; All fields are Clone; Field-by-field clone**
+  - Requirement: `Clone`; All fields are `Clone`; Field-by-field clone
+  - Source: `§11.8 L4612`
+  - Related spec refs: none
+- `11.8.1.5` **Default; All fields are Default; Field-by-field default**
+  - Requirement: `Default`; All fields are `Default`; Field-by-field default
+  - Source: `§11.8 L4613`
+  - Related spec refs: none
+- `11.8.1.6` **Eq; All fields are Eq; Field-by-field equality**
+  - Requirement: `Eq`; All fields are `Eq`; Field-by-field equality
+  - Source: `§11.8 L4614`
+  - Related spec refs: none
+- `11.8.1.7` **Hash; All fields are Hash; Hash all fields in order**
+  - Requirement: `Hash`; All fields are `Hash`; Hash all fields in order
+  - Source: `§11.8 L4615`
+  - Related spec refs: none
+- `11.8.1.8` **Ord; All fields are Ord; Lexicographic comparison**
+  - Requirement: `Ord`; All fields are `Ord`; Lexicographic comparison
+  - Source: `§11.8 L4616`
+  - Related spec refs: none
+- `11.8.1.9` **Debug; Always; "{TypeName} { field: value, ... }"**
+  - Requirement: `Debug`; Always; "{TypeName} { field: value, ... }"
+  - Source: `§11.8 L4617`
+  - Related spec refs: none
+- `11.8.1.10` **Display; Always (enums); Variant name as string**
+  - Requirement: `Display`; Always (enums); Variant name as string
+  - Source: `§11.8 L4618`
+  - Related spec refs: none
+- `11.8.1.11` **@[derive(all)] derives every eligible trait the type qualifies for:**
+  - Requirement: **`@[derive(all)]`** derives every eligible trait the type qualifies for:
+  - Source: `§11.8 L4628-L4629`
+  - Related spec refs: none
+- `11.8.1.12` **Aggregate types (type, anonymous records, and enum) are non-Copy by default, even w...**
+  - Requirement: Aggregate types (`type`, anonymous records, and `enum`) are **non-`Copy` by default**, even when all fields are `Copy`.
+  - Source: `§11.8 L4644-L4648`
+  - Related spec refs: none
+- `11.8.1.13` **Copy is part of the type's API surface and must be opted into explicitly with impl...**
+  - Requirement: `Copy` is part of the type's API surface and must be opted into explicitly with `impl Copy for T` or equivalent declaration syntax such as `type Pair: Copy { ... }`.
+  - Source: `§11.8 L4644-L4648`
+  - Related spec refs: none
+- `11.8.1.14` **@[derive(all)] is conservative — it only derives traits where all fields satisfy th...**
+  - Requirement: `@[derive(all)]` is conservative — it only derives traits where all fields satisfy the trait's requirements, and it never implicitly opts an aggregate type into `Copy`.
+  - Source: `§11.8 L4650-L4655`
+  - Related spec refs: none
+- `11.8.1.15` **If a field is added that doesn't implement Eq, the type silently loses its derived Eq.**
+  - Requirement: If a field is added that doesn't implement `Eq`, the type silently loses its derived `Eq`.
+  - Source: `§11.8 L4650-L4655`
+  - Related spec refs: none
+- `11.8.1.16` **This is by design — no compile error, because @[derive(all)] means "whatever you can."**
+  - Requirement: This is by design — no compile error, because `@[derive(all)]` means "whatever you can."
+  - Source: `§11.8 L4650-L4655`
+  - Related spec refs: none
+- `11.8.1.17` **For explicit control, list traits individually.**
+  - Requirement: For explicit control, list traits individually.
+  - Source: `§11.8 L4657-L4659`
+  - Related spec refs: none
+- `11.8.1.18` **@[derive(Eq, Hash)] will produce a compile error if a field doesn't implement Eq or...**
+  - Requirement: `@[derive(Eq, Hash)]` will produce a compile error if a field doesn't implement `Eq` or `Hash`.
+  - Source: `§11.8 L4657-L4659`
+  - Related spec refs: none
+- `11.8.1.19` **@[derive(...)] is implemented via comptime (§17.3).**
+  - Requirement: `@[derive(...)]` is implemented via comptime (§17.3).
+  - Source: `§11.8 L4661-L4663`
+  - Related spec refs: §17.3
+- `11.8.1.20` **User-defined derive targets (e.g., @[derive(Serialize)]) are supported through comp...**
+  - Requirement: User-defined derive targets (e.g., `@[derive(Serialize)]`) are supported through comptime functions.
+  - Source: `§11.8 L4661-L4663`
+  - Related spec refs: none
+- `11.8.1.21` **@[derive(Builder)] generates a builder struct with chaining methods for every field.**
+  - Requirement: **`@[derive(Builder)]`** generates a builder struct with chaining methods for every field.
+  - Source: `§11.8 L4665-L4667`
+  - Related spec refs: none
+- `11.8.1.22` **This eliminates the most common source of builder boilerplate:**
+  - Requirement: This eliminates the most common source of builder boilerplate:
+  - Source: `§11.8 L4665-L4667`
+  - Related spec refs: none
+- `11.8.1.23` **Fields with default values are optional in the builder.**
+  - Requirement: Fields with default values are optional in the builder.
+  - Source: `§11.8 L4698-L4701`
+  - Related spec refs: none
+- `11.8.1.24` **Fields without defaults are required — .build() returns an error if they aren't set.**
+  - Requirement: Fields without defaults are required — `.build()` returns an error if they aren't set.
+  - Source: `§11.8 L4698-L4701`
+  - Related spec refs: none
+- `11.8.1.25` **This is checked at compile time when all .field() calls are visible.**
+  - Requirement: This is checked at compile time when all `.field()` calls are visible.
+  - Source: `§11.8 L4698-L4701`
+  - Related spec refs: none
+
+### §11.9 Debug Formatting (`:?`)
+
+- `11.9.1.1` **The :? format specifier in f-strings produces a programmer-facing structural repres...**
+  - Requirement: The `:?` format specifier in f-strings produces a programmer-facing structural representation of a value.
+  - Source: `§11.9 L4705-L4706`
+  - Related spec refs: none
+- `11.9.1.2` **See §15.4.7 for full details.**
+  - Requirement: See §15.4.7 for full details.
+  - Source: `§11.9 L4705-L4706`
+  - Related spec refs: §15.4.7
+- `11.9.1.3` **Debug formatting is generated inline by the compiler at compile time — each struct...**
+  - Requirement: Debug formatting is generated inline by the compiler at compile time — each struct field is extracted and formatted without trait dispatch or runtime reflection.
+  - Source: `§11.9 L4715-L4719`
+  - Related spec refs: none
+- `11.9.1.4` **For primitives, :? produces the same output as default display, except strings are...**
+  - Requirement: For primitives, `:?` produces the same output as default display, except strings are quoted (`"hello"` instead of `hello`).
+  - Source: `§11.9 L4715-L4719`
+  - Related spec refs: none
+- `11.9.1.5` **A Debug trait exists in the standard library for manual implementations, but the :?...**
+  - Requirement: A `Debug` trait exists in the standard library for manual implementations, but the `:?` f-string specifier does not dispatch through it.
+  - Source: `§11.9 L4721-L4723`
+  - Related spec refs: none
+- `11.9.1.6` **The compiler generates the formatting directly.**
+  - Requirement: The compiler generates the formatting directly.
+  - Source: `§11.9 L4721-L4723`
+  - Related spec refs: none
+
+## 12. Closures and Escaping
+
+### §12.1 Non-Escaping Closures
+
+- `12.1.1.1` **A closure is non-escaping if passed directly as an argument to a function that cons...**
+  - Requirement: A closure is **non-escaping** if passed directly as an argument to a function that consumes it synchronously.
+  - Source: `§12.1 L4731-L4733`
+  - Related spec refs: none
+- `12.1.1.2` **Non-escaping closures may capture ephemeral values.**
+  - Requirement: Non-escaping closures may capture ephemeral values.
+  - Source: `§12.1 L4731-L4733`
+  - Related spec refs: none
+
+### §12.2 Escaping Closures
+
+- `12.2.1.1` **A closure is escaping if stored, returned, or sent to another thread.**
+  - Requirement: A closure is **escaping** if stored, returned, or sent to another thread.
+  - Source: `§12.2 L4737-L4738`
+  - Related spec refs: none
+- `12.2.1.2` **Escaping closures may NOT capture ephemeral values.**
+  - Requirement: Escaping closures may NOT capture ephemeral values.
+  - Source: `§12.2 L4737-L4738`
+  - Related spec refs: none
+
+### §12.3 Precise Rules (v1.0)
+
+- `12.3.1.1` **A closure is non-escaping if and only if it appears as a direct argument to a funct...**
+  - Requirement: A closure is non-escaping if and only if it appears as a **direct argument to a function call**.
+  - Source: `§12.3 L4742-L4743`
+  - Related spec refs: none
+- `12.3.1.2` **All other closures are escaping.**
+  - Requirement: All other closures are escaping.
+  - Source: `§12.3 L4742-L4743`
+  - Related spec refs: none
+- `12.3.1.3` **Specifically, the following are all escaping in v1.0:**
+  - Requirement: Specifically, the following are all **escaping** in v1.0:
+  - Source: `§12.3 L4745`
+  - Related spec refs: none
+- `12.3.1.4` **The following are non-escaping:**
+  - Requirement: The following are **non-escaping**:
+  - Source: `§12.3 L4754`
+  - Related spec refs: none
+- `12.3.1.5` **This is deliberately conservative.**
+  - Requirement: This is deliberately conservative.
+  - Source: `§12.3 L4763-L4766`
+  - Related spec refs: none
+- `12.3.1.6` **A closure bound to a named local variable is treated as escaping even if analysis c...**
+  - Requirement: A closure bound to a named local variable is treated as escaping even if analysis could prove it never escapes the scope.
+  - Source: `§12.3 L4763-L4766`
+  - Related spec refs: none
+- `12.3.1.7` **This avoids complex escape analysis in v1.0 and can be relaxed in future versions.**
+  - Requirement: This avoids complex escape analysis in v1.0 and can be relaxed in future versions.
+  - Source: `§12.3 L4763-L4766`
+  - Related spec refs: none
+
+### §12.4 Capture Semantics and Effects
+
+- `12.4.1.1` **Closure captures follow the same calling-convention model as ordinary function para...**
+  - Requirement: Closure captures follow the same calling-convention model as ordinary function parameters:
+  - Source: `§12.4 L4770-L4771`
+  - Related spec refs: none
+- `12.4.1.2` **For Copy values, default capture copies the value.**
+  - Requirement: For `Copy` values, default capture copies the value.
+  - Source: `§12.4 L4773`
+  - Related spec refs: none
+- `12.4.1.3` **For non-Copy values, default capture is share-place: the closure observes or mutate...**
+  - Requirement: For non-`Copy` values, default capture is share-place: the closure observes or mutates the original place according to its body.
+  - Source: `§12.4 L4774-L4775`
+  - Related spec refs: none
+- `12.4.1.4` **move || captures transfer ownership into the closure.**
+  - Requirement: `move ||` captures transfer ownership into the closure.
+  - Source: `§12.4 L4776`
+  - Related spec refs: none
+- `12.4.1.5` **Closure bodies receive inferred effect summaries over their captures.**
+  - Requirement: Closure bodies receive inferred effect summaries over their captures.
+  - Source: `§12.4 L4778-L4781`
+  - Related spec refs: none
+- `12.4.1.6` **Invoking a closure is checked exactly like invoking a function: if a closure consum...**
+  - Requirement: Invoking a closure is checked exactly like invoking a function: if a closure consumes, mutates, returns, or returns a view derived from a capture, those effects apply to the originating captured place.
+  - Source: `§12.4 L4778-L4781`
+  - Related spec refs: none
+
+## 13. Iteration and Collection Operations
+
+### §13.1 Iterators Over Borrowed Data Are Ephemeral
+
+- `13.1.1.1` **Iterators holding references to collections are ephemeral.**
+  - Requirement: Iterators holding references to collections are ephemeral.
+  - Source: `§13.1 L4803-L4805`
+  - Related spec refs: none
+- `13.1.1.2` **They can be used in pipelines within scope but not stored, returned, or captured by...**
+  - Requirement: They can be used in pipelines within scope but not stored, returned, or captured by escaping closures.
+  - Source: `§13.1 L4803-L4805`
+  - Related spec refs: none
+- `13.1.1.3` **What this means in practice: You cannot return an *opaque* lazy iterator that borro...**
+  - Requirement: **What this means in practice:** You cannot return an *opaque* lazy iterator that borrows from its inputs (e.g., `-> impl Iter[StrView]` or `-> dyn Iter[StrView]`).
+  - Source: `§13.1 L4807-L4810`
+  - Related spec refs: none
+- `13.1.1.4` **However, you CAN return a *concrete ephemeral struct* that implements Iter:**
+  - Requirement: However, you CAN return a *concrete ephemeral struct* that implements `Iter`:
+  - Source: `§13.1 L4807-L4810`
+  - Related spec refs: none
+- `13.1.1.5` **The concrete ephemeral struct approach works because the caller can see the type is...**
+  - Requirement: The concrete ephemeral struct approach works because the caller can see the type is ephemeral and inherits the restriction (Rule 8, §22.1).
+  - Source: `§13.1 L4825-L4828`
+  - Related spec refs: §22.1
+- `13.1.1.6` **The opaque approach fails because trait objects erase the ephemerality, preventing...**
+  - Requirement: The opaque approach fails because trait objects erase the ephemerality, preventing the caller from knowing the restriction.
+  - Source: `§13.1 L4825-L4828`
+  - Related spec refs: none
+- `13.1.1.7` **This trade-off is fundamental to With's design.**
+  - Requirement: This trade-off is fundamental to With's design.
+  - Source: `§13.1 L4854-L4859`
+  - Related spec refs: none
+- `13.1.1.8` **Rust allows returning borrowing iterators at the cost of lifetime annotations on ev...**
+  - Requirement: Rust allows returning borrowing iterators at the cost of lifetime annotations on every struct and function in the chain.
+  - Source: `§13.1 L4854-L4859`
+  - Related spec refs: none
+- `13.1.1.9` **With eliminates those annotations at the cost of occasional allocation or ownership...**
+  - Requirement: With eliminates those annotations at the cost of occasional allocation or ownership transfer at function boundaries.
+  - Source: `§13.1 L4854-L4859`
+  - Related spec refs: none
+- `13.1.1.10` **For most code, the ergonomic difference is small.**
+  - Requirement: For most code, the ergonomic difference is small.
+  - Source: `§13.1 L4854-L4859`
+  - Related spec refs: none
+- `13.1.1.11` **For zero-copy parsing pipelines, it is real.**
+  - Requirement: For zero-copy parsing pipelines, it is real.
+  - Source: `§13.1 L4854-L4859`
+  - Related spec refs: none
+
+### §13.2 The Iterator Trait
+
+- `13.2.1.1` **One-implementation rule: A type may implement Iter[T] for at most one T.**
+  - Requirement: **One-implementation rule:** A type may implement `Iter[T]` for **at most one `T`**.
+  - Source: `§13.2 L4868-L4871`
+  - Related spec refs: none
+- `13.2.1.2` **This ensures that for x in expr: always has unambiguous type inference — the compil...**
+  - Requirement: This ensures that `for x in expr:` always has unambiguous type inference — the compiler knows exactly what type `x` is without annotation:
+  - Source: `§13.2 L4868-L4871`
+  - Related spec refs: none
+- `13.2.1.3` **This restriction replaces the need for associated types on Iter in v1.0.**
+  - Requirement: This restriction replaces the need for associated types on `Iter` in v1.0.
+  - Source: `§13.2 L4883-L4886`
+  - Related spec refs: none
+- `13.2.1.4` **A type that genuinely needs to yield different element types should provide named m...**
+  - Requirement: A type that genuinely needs to yield different element types should provide named methods returning different iterator types (e.g., `.bytes() -> ByteIter`, `.lines() -> LineIter`).
+  - Source: `§13.2 L4883-L4886`
+  - Related spec refs: none
+- `13.2.1.5` **Iterators just work.**
+  - Requirement: **Iterators just work.**
+  - Source: `§13.2 L4888-L4892`
+  - Related spec refs: none
+- `13.2.1.6` **The compiler has built-in knowledge of stdlib collection iterators (Vec, HashMap, S...**
+  - Requirement: The compiler has built-in knowledge of stdlib collection iterators (Vec, HashMap, Slice, etc.).
+  - Source: `§13.2 L4888-L4892`
+  - Related spec refs: none
+- `13.2.1.7` **When next() returns a reference, the compiler knows the reference borrows the *unde...**
+  - Requirement: When `next()` returns a reference, the compiler knows the reference borrows the *underlying collection*, not the iterator struct itself.
+  - Source: `§13.2 L4888-L4892`
+  - Related spec refs: none
+- `13.2.1.8` **This means normal iteration patterns work naturally:**
+  - Requirement: This means normal iteration patterns work naturally:
+  - Source: `§13.2 L4888-L4892`
+  - Related spec refs: none
+- `13.2.1.9` **for loops, .zip(), .peekable(), .windows() — all work as you'd expect.**
+  - Requirement: `for` loops, `.zip()`, `.peekable()`, `.windows()` — all work as you'd expect.
+  - Source: `§13.2 L4901-L4904`
+  - Related spec refs: none
+- `13.2.1.10` **The compiler is smart.**
+  - Requirement: The compiler is smart.
+  - Source: `§13.2 L4901-L4904`
+  - Related spec refs: none
+- `13.2.1.11` **If you hit an edge case with a custom iterator, the worst that happens is a conserv...**
+  - Requirement: If you hit an edge case with a custom iterator, the worst that happens is a conservative borrow error with a clear message.
+  - Source: `§13.2 L4901-L4904`
+  - Related spec refs: none
+
+### §13.3 Collection Operations (Standard Library)
+
+- `13.3.1.1` **Transformations (lazy, produce iterators):**
+  - Requirement: **Transformations** (lazy, produce iterators):
+  - Source: `§13.3 L4908`
+  - Related spec refs: none
+- `13.3.1.2` **map(fn(T) -> U); Transform each element**
+  - Requirement: `map(fn(T) -> U)`; Transform each element
+  - Source: `§13.3 L4912`
+  - Related spec refs: none
+- `13.3.1.3` **filter(fn(&T) -> bool); Keep matching elements**
+  - Requirement: `filter(fn(&T) -> bool)`; Keep matching elements
+  - Source: `§13.3 L4913`
+  - Related spec refs: none
+- `13.3.1.4` **filter_map(fn(T) -> Option[U]); Transform + filter**
+  - Requirement: `filter_map(fn(T) -> Option[U])`; Transform + filter
+  - Source: `§13.3 L4914`
+  - Related spec refs: none
+- `13.3.1.5` **flat_map(fn(T) -> Iter[U]); Map then flatten**
+  - Requirement: `flat_map(fn(T) -> Iter[U])`; Map then flatten
+  - Source: `§13.3 L4915`
+  - Related spec refs: none
+- `13.3.1.6` **flatten(); Flatten nested iterators**
+  - Requirement: `flatten()`; Flatten nested iterators
+  - Source: `§13.3 L4916`
+  - Related spec refs: none
+- `13.3.1.7` **take(n); First n elements**
+  - Requirement: `take(n)`; First n elements
+  - Source: `§13.3 L4917`
+  - Related spec refs: none
+- `13.3.1.8` **drop(n); Skip first n**
+  - Requirement: `drop(n)`; Skip first n
+  - Source: `§13.3 L4918`
+  - Related spec refs: none
+- `13.3.1.9` **take_while(fn(&T) -> bool); Take while predicate holds**
+  - Requirement: `take_while(fn(&T) -> bool)`; Take while predicate holds
+  - Source: `§13.3 L4919`
+  - Related spec refs: none
+- `13.3.1.10` **drop_while(fn(&T) -> bool); Skip while predicate holds**
+  - Requirement: `drop_while(fn(&T) -> bool)`; Skip while predicate holds
+  - Source: `§13.3 L4920`
+  - Related spec refs: none
+- `13.3.1.11` **zip(Iter[U]); Pair from two iterators**
+  - Requirement: `zip(Iter[U])`; Pair from two iterators
+  - Source: `§13.3 L4921`
+  - Related spec refs: none
+- `13.3.1.12` **enumerate(); Attach index**
+  - Requirement: `enumerate()`; Attach index
+  - Source: `§13.3 L4922`
+  - Related spec refs: none
+- `13.3.1.13` **chain(Iter[T]); Concatenate**
+  - Requirement: `chain(Iter[T])`; Concatenate
+  - Source: `§13.3 L4923`
+  - Related spec refs: none
+- `13.3.1.14` **peekable(); Allow lookahead**
+  - Requirement: `peekable()`; Allow lookahead
+  - Source: `§13.3 L4924`
+  - Related spec refs: none
+- `13.3.1.15` **chunks(n); Fixed-size groups**
+  - Requirement: `chunks(n)`; Fixed-size groups
+  - Source: `§13.3 L4925`
+  - Related spec refs: none
+- `13.3.1.16` **windows(n); Sliding window**
+  - Requirement: `windows(n)`; Sliding window
+  - Source: `§13.3 L4926`
+  - Related spec refs: none
+- `13.3.1.17` **dedup(); Remove consecutive duplicates**
+  - Requirement: `dedup()`; Remove consecutive duplicates
+  - Source: `§13.3 L4927`
+  - Related spec refs: none
+- `13.3.1.18` **unique(); Remove all duplicates**
+  - Requirement: `unique()`; Remove all duplicates
+  - Source: `§13.3 L4928`
+  - Related spec refs: none
+- `13.3.1.19` **intersperse(sep); Insert separator**
+  - Requirement: `intersperse(sep)`; Insert separator
+  - Source: `§13.3 L4929`
+  - Related spec refs: none
+- `13.3.1.20` **scan(init, fn(S, T) -> (S, U)); Stateful map**
+  - Requirement: `scan(init, fn(S, T) -> (S, U))`; Stateful map
+  - Source: `§13.3 L4930`
+  - Related spec refs: none
+- `13.3.1.21` **step_by(n); Every nth element**
+  - Requirement: `step_by(n)`; Every nth element
+  - Source: `§13.3 L4931`
+  - Related spec refs: none
+- `13.3.1.22` **zip_with(Iter[U], fn(T, U) -> V); Zip and transform in one step**
+  - Requirement: `zip_with(Iter[U], fn(T, U) -> V)`; Zip and transform in one step
+  - Source: `§13.3 L4932`
+  - Related spec refs: none
+- `13.3.1.23` **Consumers (eager, produce final value):**
+  - Requirement: **Consumers** (eager, produce final value):
+  - Source: `§13.3 L4934`
+  - Related spec refs: none
+- `13.3.1.24` **collect[C](); Build a collection**
+  - Requirement: `collect[C]()`; Build a collection
+  - Source: `§13.3 L4938`
+  - Related spec refs: none
+- `13.3.1.25` **reduce(fn(T, T) -> T); Reduce with first element as initial**
+  - Requirement: `reduce(fn(T, T) -> T)`; Reduce with first element as initial
+  - Source: `§13.3 L4939`
+  - Related spec refs: none
+- `13.3.1.26` **fold(init, fn(U, T) -> U); Fold with explicit initial**
+  - Requirement: `fold(init, fn(U, T) -> U)`; Fold with explicit initial
+  - Source: `§13.3 L4940`
+  - Related spec refs: none
+- `13.3.1.27` **sum() / product(); Arithmetic aggregation**
+  - Requirement: `sum()` / `product()`; Arithmetic aggregation
+  - Source: `§13.3 L4941`
+  - Related spec refs: none
+- `13.3.1.28` **count(); Count elements**
+  - Requirement: `count()`; Count elements
+  - Source: `§13.3 L4942`
+  - Related spec refs: none
+- `13.3.1.29` **min() / max(); Extremes**
+  - Requirement: `min()` / `max()`; Extremes
+  - Source: `§13.3 L4943`
+  - Related spec refs: none
+- `13.3.1.30` **min_by(cmp) / max_by(cmp); By custom comparison**
+  - Requirement: `min_by(cmp)` / `max_by(cmp)`; By custom comparison
+  - Source: `§13.3 L4944`
+  - Related spec refs: none
+- `13.3.1.31` **find(fn(&T) -> bool); First match**
+  - Requirement: `find(fn(&T) -> bool)`; First match
+  - Source: `§13.3 L4945`
+  - Related spec refs: none
+- `13.3.1.32` **position(fn(&T) -> bool); Index of first match**
+  - Requirement: `position(fn(&T) -> bool)`; Index of first match
+  - Source: `§13.3 L4946`
+  - Related spec refs: none
+- `13.3.1.33` **any(pred) / all(pred) / none(pred); Boolean tests**
+  - Requirement: `any(pred)` / `all(pred)` / `none(pred)`; Boolean tests
+  - Source: `§13.3 L4947`
+  - Related spec refs: none
+- `13.3.1.34` **for_each(fn(T)); Side effect per element**
+  - Requirement: `for_each(fn(T))`; Side effect per element
+  - Source: `§13.3 L4948`
+  - Related spec refs: none
+- `13.3.1.35` **join(sep); Join as string**
+  - Requirement: `join(sep)`; Join as string
+  - Source: `§13.3 L4949`
+  - Related spec refs: none
+- `13.3.1.36` **sorted() / sorted_by(cmp); Collect and sort**
+  - Requirement: `sorted()` / `sorted_by(cmp)`; Collect and sort
+  - Source: `§13.3 L4950`
+  - Related spec refs: none
+- `13.3.1.37` **group_by(fn(&T) -> K); Group into buckets**
+  - Requirement: `group_by(fn(&T) -> K)`; Group into buckets
+  - Source: `§13.3 L4951`
+  - Related spec refs: none
+- `13.3.1.38` **partition(fn(&T) -> bool); Split by predicate**
+  - Requirement: `partition(fn(&T) -> bool)`; Split by predicate
+  - Source: `§13.3 L4952`
+  - Related spec refs: none
+- `13.3.1.39` **unzip(); Separate pairs**
+  - Requirement: `unzip()`; Separate pairs
+  - Source: `§13.3 L4953`
+  - Related spec refs: none
+- `13.3.1.40` **Standalone iterator constructors (not methods on existing iterators):**
+  - Requirement: **Standalone iterator constructors** (not methods on existing iterators):
+  - Source: `§13.3 L4955`
+  - Related spec refs: none
+- `13.3.1.41` **Iter.empty(); Empty iterator**
+  - Requirement: `Iter.empty()`; Empty iterator
+  - Source: `§13.3 L4959`
+  - Related spec refs: none
+- `13.3.1.42` **Iter.once(value); Single element**
+  - Requirement: `Iter.once(value)`; Single element
+  - Source: `§13.3 L4960`
+  - Related spec refs: none
+- `13.3.1.43` **Iter.repeat(value); Infinite repetition**
+  - Requirement: `Iter.repeat(value)`; Infinite repetition
+  - Source: `§13.3 L4961`
+  - Related spec refs: none
+- `13.3.1.44` **Iter.unfold(init, fn(S) -> Option[(T, S)]); Generate from state**
+  - Requirement: `Iter.unfold(init, fn(S) -> Option[(T, S)])`; Generate from state
+  - Source: `§13.3 L4962`
+  - Related spec refs: none
+- `13.3.1.45` **Iter.from_fn(fn() -> Option[T]); Generate from closure**
+  - Requirement: `Iter.from_fn(fn() -> Option[T])`; Generate from closure
+  - Source: `§13.3 L4963`
+  - Related spec refs: none
+- `13.3.1.46` **Beyond the standard iterator operations, HashMap provides ergonomic mutation methods:**
+  - Requirement: Beyond the standard iterator operations, `HashMap` provides ergonomic mutation methods:
+  - Source: `§13.3 L4996-L4997`
+  - Related spec refs: none
+- `13.3.1.47` **These methods cover the most common HashMap mutation patterns without requiring the...**
+  - Requirement: These methods cover the most common HashMap mutation patterns without requiring the entry API's verbose ceremony.
+  - Source: `§13.3 L5015-L5016`
+  - Related spec refs: none
+
+### §13.4 Generators (`yield`)
+
+- `13.4.1.1` **Generators produce sequences lazily, suspending between each yield.**
+  - Requirement: Generators produce sequences lazily, suspending between each `yield`.
+  - Source: `§13.4 L5020`
+  - Related spec refs: none
+- `13.4.1.2` **Generators are declared with gen fn, use yield, and return iterators implementing I...**
+  - Requirement: Generators are declared with `gen fn`, use `yield`, and return iterators implementing `Iter[T]`.
+  - Source: `§13.4 L5035-L5036`
+  - Related spec refs: none
+- `13.4.1.3` **Return type convention: In gen fn f -> T, the -> T specifies the yielded element ty...**
+  - Requirement: **Return type convention:** In `gen fn f -> T`, the `-> T` specifies the **yielded element type**, not the function's actual return type.
+  - Source: `§13.4 L5038-L5043`
+  - Related spec refs: none
+- `13.4.1.4` **The function actually returns an opaque iterator (impl Iter[T]).**
+  - Requirement: The function actually returns an opaque iterator (`impl Iter[T]`).
+  - Source: `§13.4 L5038-L5043`
+  - Related spec refs: none
+- `13.4.1.5` **This is analogous to async fn f -> T meaning "returns Task[T]" — the keyword modifi...**
+  - Requirement: This is analogous to `async fn f -> T` meaning "returns `Task[T]`" — the keyword modifies the return type's meaning:
+  - Source: `§13.4 L5038-L5043`
+  - Related spec refs: none
+- `13.4.1.6` **Compilation model: Generators compile to state machines, not fibers.**
+  - Requirement: **Compilation model:** Generators compile to **state machines**, not fibers.
+  - Source: `§13.4 L5054-L5060`
+  - Related spec refs: none
+- `13.4.1.7` **They do not use the fiber scheduler.**
+  - Requirement: They do not use the fiber scheduler.
+  - Source: `§13.4 L5054-L5060`
+  - Related spec refs: none
+- `13.4.1.8` **They do not imply async.**
+  - Requirement: They do not imply async.
+  - Source: `§13.4 L5054-L5060`
+  - Related spec refs: none
+- `13.4.1.9` **They are pure, synchronous iteration constructs.**
+  - Requirement: They are pure, synchronous iteration constructs.
+  - Source: `§13.4 L5054-L5060`
+  - Related spec refs: none
+- `13.4.1.10` **The compiler transforms each yield point into a state transition, and the generator...**
+  - Requirement: The compiler transforms each `yield` point into a state transition, and the generator's local variables become fields of the state machine struct.
+  - Source: `§13.4 L5054-L5060`
+  - Related spec refs: none
+- `13.4.1.11` **This is a compile-time transformation with zero runtime overhead beyond the state s...**
+  - Requirement: This is a compile-time transformation with zero runtime overhead beyond the state struct itself.
+  - Source: `§13.4 L5054-L5060`
+  - Related spec refs: none
+- `13.4.1.12` **No references across yield points.**
+  - Requirement: **No references across `yield` points.**
+  - Source: `§13.4 L5062-L5066`
+  - Related spec refs: none
+- `13.4.1.13` **Because generator locals become fields of the state machine struct, a reference to...**
+  - Requirement: Because generator locals become fields of the state machine struct, a reference to a local variable that is live across a `yield` would create a self-referential struct (the struct contains both the field and a pointer to it).
+  - Source: `§13.4 L5062-L5066`
+  - Related spec refs: none
+- `13.4.1.14` **Since With has no Pin, this is forbidden:**
+  - Requirement: Since With has no `Pin`, this is forbidden:
+  - Source: `§13.4 L5062-L5066`
+  - Related spec refs: none
+- `13.4.1.15` **This restriction does NOT apply to async fn — fibers have real stacks that don't mo...**
+  - Requirement: This restriction does NOT apply to `async fn` — fibers have real stacks that don't move, so references across `.await` are safe (§14.13).
+  - Source: `§13.4 L5081-L5084`
+  - Related spec refs: §14.13
+- `13.4.1.16` **Generators are the exception because they compile to movable structs.**
+  - Requirement: Generators are the exception because they compile to movable structs.
+  - Source: `§13.4 L5081-L5084`
+  - Related spec refs: none
+- `13.4.1.17` **Zero-copy iteration: Generators cannot yield references to their own locals, which...**
+  - Requirement: **Zero-copy iteration:** Generators cannot yield references to their own locals, which means `gen fn tokenize(src: &str) -> &str` that yields slices of `src` is impossible (src is stored in the state machine, yielding a slice creates a self-referential struct).
+  - Source: `§13.4 L5086-L5093`
+  - Related spec refs: none
+- `13.4.1.18` **For zero-copy iteration that yields references, use concrete ephemeral iterator str...**
+  - Requirement: For zero-copy iteration that yields references, use **concrete ephemeral iterator structs** (§5.5, §13.1) or the **callback/visitor pattern**.
+  - Source: `§13.4 L5086-L5093`
+  - Related spec refs: §13.1, §5.5
+- `13.4.1.19` **Generators are best for owned-value sequences (Fibonacci, generated data, transform...**
+  - Requirement: Generators are best for owned-value sequences (Fibonacci, generated data, transformations).
+  - Source: `§13.4 L5086-L5093`
+  - Related spec refs: none
+- `13.4.1.20` **Generators are not coroutines.**
+  - Requirement: **Generators are not coroutines.**
+  - Source: `§13.4 L5104-L5107`
+  - Related spec refs: none
+- `13.4.1.21` **They are pull-based (the caller drives iteration by calling next()), not push-based...**
+  - Requirement: They are pull-based (the caller drives iteration by calling `next()`), not push-based (no scheduler involved).
+  - Source: `§13.4 L5104-L5107`
+  - Related spec refs: none
+- `13.4.1.22` **They cannot use .await.**
+  - Requirement: They cannot use `.await`.
+  - Source: `§13.4 L5104-L5107`
+  - Related spec refs: none
+- `13.4.1.23` **They cannot be suspended by the runtime.**
+  - Requirement: They cannot be suspended by the runtime.
+  - Source: `§13.4 L5104-L5107`
+  - Related spec refs: none
+- `13.4.1.24` **A gen fn that captures no references produces a storable iterator. It can be stored...**
+  - Requirement: A `gen fn` that captures **no references** produces a storable iterator. It can be stored in structs, returned from functions, and passed to other threads (if `Send`).
+  - Source: `§13.4 L5111-L5113`
+  - Related spec refs: none
+- `13.4.1.25` **A gen fn that captures references is ephemeral. It follows the same rules as any ot...**
+  - Requirement: A `gen fn` that captures **references** is ephemeral. It follows the same rules as any other ephemeral value.
+  - Source: `§13.4 L5114-L5115`
+  - Related spec refs: none
+- `13.4.1.26` **A gen fn with no captures at all (including the common case of generators that only...**
+  - Requirement: A `gen fn` with **no captures at all** (including the common case of generators that only use their parameters) is always storable.
+  - Source: `§13.4 L5116-L5117`
+  - Related spec refs: none
+- `13.4.1.27` **State allocation: Generator state is stack-allocated at the call site.**
+  - Requirement: **State allocation:** Generator state is stack-allocated at the call site.
+  - Source: `§13.4 L5119-L5120`
+  - Related spec refs: none
+- `13.4.1.28` **It is moved to the heap only if explicitly boxed by the user.**
+  - Requirement: It is moved to the heap only if explicitly boxed by the user.
+  - Source: `§13.4 L5119-L5120`
+  - Related spec refs: none
+
+### §13.5 For-In Loops
+
+- `13.5.1.1` **The binding position is a full pattern, not just an identifier:**
+  - Requirement: The binding position is a full pattern, not just an identifier:
+  - Source: `§13.5 L5132`
+  - Related spec refs: none
+- `13.5.1.2` **Implicit iteration: When the expression after in implements Iter[T] directly (e.g...**
+  - Requirement: **Implicit iteration:** When the expression after `in` implements `Iter[T]` directly (e.g., ranges, iterators), it is used as-is.
+  - Source: `§13.5 L5145-L5149`
+  - Related spec refs: none
+- `13.5.1.3` **When it does not implement Iter[T] but has an .iter() method that returns an Iter[T...**
+  - Requirement: When it does not implement `Iter[T]` but has an `.iter()` method that returns an `Iter[T]`, the compiler inserts `.iter()` automatically:
+  - Source: `§13.5 L5145-L5149`
+  - Related spec refs: none
+- `13.5.1.4` **for pattern in expr: body desugars to calling next() in a loop.**
+  - Requirement: `for pattern in expr: body` desugars to calling `next()` in a loop.
+  - Source: `§13.5 L5162-L5165`
+  - Related spec refs: none
+- `13.5.1.5` **The implicit .iter() insertion means for x in collection: borrows the collection im...**
+  - Requirement: The implicit `.iter()` insertion means `for x in collection:` borrows the collection immutably — the collection remains valid after the loop.
+  - Source: `§13.5 L5162-L5165`
+  - Related spec refs: none
+- `13.5.1.6` **Pattern matching uses the same pattern language as let and match.**
+  - Requirement: Pattern matching uses the same pattern language as `let` and `match`.
+  - Source: `§13.5 L5167-L5172`
+  - Related spec refs: none
+- `13.5.1.7` **Irrefutable patterns bind every element.**
+  - Requirement: Irrefutable patterns bind every element.
+  - Source: `§13.5 L5167-L5172`
+  - Related spec refs: none
+- `13.5.1.8` **Refutable patterns are allowed; elements that do not match are skipped and iteratio...**
+  - Requirement: Refutable patterns are allowed; elements that do not match are skipped and iteration continues.
+  - Source: `§13.5 L5167-L5172`
+  - Related spec refs: none
+- `13.5.1.9` **Reference-pattern ergonomics (§9.7) apply here too, so patterns over .iter() output...**
+  - Requirement: Reference-pattern ergonomics (§9.7) apply here too, so patterns over `.iter()` output usually bind references without explicit `&`.
+  - Source: `§13.5 L5167-L5172`
+  - Related spec refs: §9.7
+
+### §13.5a Labels, Labeled Break, and Continue
+
+- `13.5.2.1` **Labels provide named control-flow targets within a function.**
+  - Requirement: Labels provide named control-flow targets within a function.
+  - Source: `§13.5a L5176-L5177`
+  - Related spec refs: none
+- `13.5.2.2` **A label declaration is an identifier prefixed with a single quote:**
+  - Requirement: A label declaration is an identifier prefixed with a single quote:
+  - Source: `§13.5a L5176-L5177`
+  - Related spec refs: none
+- `13.5.2.3` **A label appears as the first token of a statement.**
+  - Requirement: A label appears as the first token of a statement.
+  - Source: `§13.5a L5185-L5190`
+  - Related spec refs: none
+- `13.5.2.4` **It may precede any statement: a block, a loop, a let or var binding, a return, an e...**
+  - Requirement: It may precede any statement: a block, a loop, a `let` or `var` binding, a `return`, an expression statement, or another label.
+  - Source: `§13.5a L5185-L5190`
+  - Related spec refs: none
+- `13.5.2.5` **The label and the statement it precedes are syntactically a single statement; the l...**
+  - Requirement: The label and the statement it precedes are syntactically a single statement; the label does not declare a new scope.
+  - Source: `§13.5a L5185-L5190`
+  - Related spec refs: none
+- `13.5.2.6` **A label may appear alone on a line and label the next statement:**
+  - Requirement: A label may appear alone on a line and label the next statement:
+  - Source: `§13.5a L5185-L5190`
+  - Related spec refs: none
+- `13.5.2.7` **A label has no trailing colon of its own.**
+  - Requirement: A label has no trailing colon of its own.
+  - Source: `§13.5a L5206-L5210`
+  - Related spec refs: none
+- `13.5.2.8` **Labeled while and for loops may use either colon-form or brace-form bodies; the bod...**
+  - Requirement: Labeled `while` and `for` loops may use either colon-form or brace-form bodies; the body introducer is the same `:` or `{ }` the loop would use without a label.
+  - Source: `§13.5a L5206-L5210`
+  - Related spec refs: none
+- `13.5.2.9` **A labeled block uses a body directly after the label: : for colon form or { for bra...**
+  - Requirement: A labeled block uses a body directly after the label: `:` for colon form or `{` for brace form.
+  - Source: `§13.5a L5206-L5210`
+  - Related spec refs: none
+- `13.5.2.10` **Every label name must be unique within its function.**
+  - Requirement: Every label name must be unique within its function.
+  - Source: `§13.5a L5212-L5215`
+  - Related spec refs: none
+- `13.5.2.11` **The label namespace is shared by goto, break, and continue, but is separate from or...**
+  - Requirement: The label namespace is shared by `goto`, `break`, and `continue`, but is separate from ordinary identifiers, types, and keywords.
+  - Source: `§13.5a L5212-L5215`
+  - Related spec refs: none
+- `13.5.2.12` **A variable named outer and a label named 'outer do not collide.**
+  - Requirement: A variable named `outer` and a label named `'outer` do not collide.
+  - Source: `§13.5a L5212-L5215`
+  - Related spec refs: none
+- `13.5.2.13` **Labels are function-local control-flow targets.**
+  - Requirement: Labels are function-local control-flow targets.
+  - Source: `§13.5a L5217-L5220`
+  - Related spec refs: none
+- `13.5.2.14` **They are not visible inside a nested fn, closure, async: block, or gen fn body.**
+  - Requirement: They are not visible inside a nested `fn`, closure, `async:` block, or `gen fn` body.
+  - Source: `§13.5a L5217-L5220`
+  - Related spec refs: none
+- `13.5.2.15` **with blocks are transparent for label scoping: a label declared outside a with bloc...**
+  - Requirement: `with` blocks are transparent for label scoping: a label declared outside a `with` block remains visible inside the `with` body.
+  - Source: `§13.5a L5217-L5220`
+  - Related spec refs: none
+- `13.5.2.16` **The existing unlabeled forms are unchanged:**
+  - Requirement: The existing unlabeled forms are unchanged:
+  - Source: `§13.5a L5229`
+  - Related spec refs: none
+- `13.5.2.17` **break and continue also accept an optional label operand:**
+  - Requirement: `break` and `continue` also accept an optional label operand:
+  - Source: `§13.5a L5236`
+  - Related spec refs: none
+- `13.5.2.18` **Labeled break and continue are statements and have no value.**
+  - Requirement: Labeled `break` and `continue` are statements and have no value.
+  - Source: `§13.5a L5243-L5245`
+  - Related spec refs: none
+- `13.5.2.19` **break 'label value is reserved for a future value-carrying labeled-block design and...**
+  - Requirement: `break 'label value` is reserved for a future value-carrying labeled-block design and is invalid in this version.
+  - Source: `§13.5a L5243-L5245`
+  - Related spec refs: none
+- `13.5.2.20` **break 'label transfers control to the statement immediately after the construct lab...**
+  - Requirement: `break 'label` transfers control to the statement immediately after the construct labeled `'label`.
+  - Source: `§13.5a L5247-L5250`
+  - Related spec refs: none
+- `13.5.2.21` **The target label must be declared on a labeled while, labeled for, or labeled block...**
+  - Requirement: The target label must be declared on a labeled `while`, labeled `for`, or labeled block that lexically encloses the `break`.
+  - Source: `§13.5a L5247-L5250`
+  - Related spec refs: none
+- `13.5.2.22` **continue 'label transfers control to the next iteration of the loop labeled 'label.**
+  - Requirement: `continue 'label` transfers control to the next iteration of the loop labeled `'label`.
+  - Source: `§13.5a L5252-L5258`
+  - Related spec refs: none
+- `13.5.2.23` **For a while loop, this means the condition check.**
+  - Requirement: For a `while` loop, this means the condition check.
+  - Source: `§13.5a L5252-L5258`
+  - Related spec refs: none
+- `13.5.2.24` **For a for loop, this means the iterator-advance or next-element step.**
+  - Requirement: For a `for` loop, this means the iterator-advance or next-element step.
+  - Source: `§13.5a L5252-L5258`
+  - Related spec refs: none
+- `13.5.2.25` **For a do-while loop, this means the trailing condition check (§13.5c).**
+  - Requirement: For a `do`-`while` loop, this means the trailing condition check (§13.5c).
+  - Source: `§13.5a L5252-L5258`
+  - Related spec refs: §13.5c
+- `13.5.2.26` **The target label must be declared on a labeled while, for, or do that lexically enc...**
+  - Requirement: The target label must be declared on a labeled `while`, `for`, or `do` that lexically encloses the `continue`.
+  - Source: `§13.5a L5252-L5258`
+  - Related spec refs: none
+- `13.5.2.27` **Labels on other statement forms are valid goto targets (§13.5b), but they are not v...**
+  - Requirement: Labels on other statement forms are valid `goto` targets (§13.5b), but they are not valid targets for `break` or `continue`.
+  - Source: `§13.5a L5260-L5261`
+  - Related spec refs: §13.5b
+- `13.5.2.28` **Labeled blocks are statement-position only.**
+  - Requirement: Labeled blocks are statement-position only.
+  - Source: `§13.5a L5263-L5264`
+  - Related spec refs: none
+- `13.5.2.29` **They are not expressions, and they do not produce a value.**
+  - Requirement: They are not expressions, and they do not produce a value.
+  - Source: `§13.5a L5263-L5264`
+  - Related spec refs: none
+- `13.5.2.30` **This is valid:**
+  - Requirement: This is valid:
+  - Source: `§13.5a L5263-L5264`
+  - Related spec refs: none
+- `13.5.2.31` **This is not valid:**
+  - Requirement: This is not valid:
+  - Source: `§13.5a L5276`
+  - Related spec refs: none
+- `13.5.2.32` **A label token that is not the first token of a statement is a syntax error:**
+  - Requirement: A label token that is not the first token of a statement is a syntax error:
+  - Source: `§13.5a L5283-L5284`
+  - Related spec refs: none
+- `13.5.2.33` **A labeled break or continue exits every intervening scope between the statement and...**
+  - Requirement: A labeled `break` or `continue` exits every intervening scope between the statement and the target.
+  - Source: `§13.5a L5291-L5294`
+  - Related spec refs: none
+- `13.5.2.34` **Cleanup is the same as for ordinary structured control flow, repeated across each e...**
+  - Requirement: Cleanup is the same as for ordinary structured control flow, repeated across each exited scope in reverse entry order:
+  - Source: `§13.5a L5291-L5294`
+  - Related spec refs: none
+- `13.5.2.35` **defer blocks run.**
+  - Requirement: `defer` blocks run.
+  - Source: `§13.5a L5296`
+  - Related spec refs: none
+- `13.5.2.36` **Drop destructors for owned values run.**
+  - Requirement: `Drop` destructors for owned values run.
+  - Source: `§13.5a L5297`
+  - Related spec refs: none
+- `13.5.2.37` **with guards are released.**
+  - Requirement: `with` guards are released.
+  - Source: `§13.5a L5298`
+  - Related spec refs: none
+- `13.5.2.38` **errdefer blocks do not run for labeled break or continue, because these are normal...**
+  - Requirement: `errdefer` blocks do not run for labeled `break` or `continue`, because these are normal control transfers, not error returns.
+  - Source: `§13.5a L5300-L5301`
+  - Related spec refs: none
+- `13.5.2.39` **The compiler must diagnose at least these errors:**
+  - Requirement: The compiler must diagnose at least these errors:
+  - Source: `§13.5a L5303`
+  - Related spec refs: none
+- `13.5.2.40` **Duplicate label name in the same function.**
+  - Requirement: Duplicate label name in the same function.
+  - Source: `§13.5a L5305`
+  - Related spec refs: none
+- `13.5.2.41` **Undefined label.**
+  - Requirement: Undefined label.
+  - Source: `§13.5a L5306`
+  - Related spec refs: none
+- `13.5.2.42` **break targeting a label that is not on an enclosing loop or block.**
+  - Requirement: `break` targeting a label that is not on an enclosing loop or block.
+  - Source: `§13.5a L5307`
+  - Related spec refs: none
+- `13.5.2.43` **continue targeting a label that is not on an enclosing loop.**
+  - Requirement: `continue` targeting a label that is not on an enclosing loop.
+  - Source: `§13.5a L5308`
+  - Related spec refs: none
+- `13.5.2.44` **Label token not at the start of a statement.**
+  - Requirement: Label token not at the start of a statement.
+  - Source: `§13.5a L5309`
+  - Related spec refs: none
+- `13.5.2.45` **Label use across a nested function, closure, async:, or gen fn boundary.**
+  - Requirement: Label use across a nested function, closure, `async:`, or `gen fn` boundary.
+  - Source: `§13.5a L5310-L5311`
+  - Related spec refs: none
+- `13.5.2.46` **A label that is not targeted by goto, break, or continue produces an unused-label w...**
+  - Requirement: A label that is not targeted by `goto`, `break`, or `continue` produces an `unused-label` warning.
+  - Source: `§13.5a L5313-L5316`
+  - Related spec refs: none
+- `13.5.2.47` **Labels exist to name control-flow targets; code that wants to name a construct pure...**
+  - Requirement: Labels exist to name control-flow targets; code that wants to name a construct purely for readability should use a comment.
+  - Source: `§13.5a L5313-L5316`
+  - Related spec refs: none
+
+### §13.5b Goto Statement
+
+- `13.5.3.1` **goto transfers control unconditionally to a labeled statement within the same funct...**
+  - Requirement: `goto` transfers control unconditionally to a labeled statement within the same function:
+  - Source: `§13.5b L5320-L5321`
+  - Related spec refs: none
+- `13.5.3.2` **Conditional gotos are written by composition with if:**
+  - Requirement: Conditional gotos are written by composition with `if`:
+  - Source: `§13.5b L5327`
+  - Related spec refs: none
+- `13.5.3.3` **Example:**
+  - Requirement: Example:
+  - Source: `§13.5b L5333`
+  - Related spec refs: none
+- `13.5.3.4` **The compiler rejects any goto that violates these static restrictions:**
+  - Requirement: The compiler rejects any `goto` that violates these static restrictions:
+  - Source: `§13.5b L5348-L5349`
+  - Related spec refs: none
+- `13.5.3.5` **Function-local.**
+  - Requirement: **Function-local.**
+  - Source: `§13.5b L5351-L5353`
+  - Related spec refs: none
+- `13.5.3.6` **The target label must be declared in the same function as the goto statement.**
+  - Requirement: The target label must be declared in the same function as the `goto` statement.
+  - Source: `§13.5b L5351-L5353`
+  - Related spec refs: none
+- `13.5.3.7` **goto cannot cross function, closure, async:, or gen fn boundaries.**
+  - Requirement: `goto` cannot cross function, closure, `async:`, or `gen fn` boundaries.
+  - Source: `§13.5b L5351-L5353`
+  - Related spec refs: none
+- `13.5.3.8` **No entry into a block from outside.**
+  - Requirement: **No entry into a block from outside.**
+  - Source: `§13.5b L5355-L5358`
+  - Related spec refs: none
+- `13.5.3.9` **The target label's enclosing scope chain must be a prefix of the goto site's enclos...**
+  - Requirement: The target label's enclosing scope chain must be a prefix of the goto site's enclosing scope chain.
+  - Source: `§13.5b L5355-L5358`
+  - Related spec refs: none
+- `13.5.3.10` **Equivalently, a goto may exit scopes, but it may not enter a scope that is not alre...**
+  - Requirement: Equivalently, a `goto` may exit scopes, but it may not enter a scope that is not already active at the goto site.
+  - Source: `§13.5b L5355-L5358`
+  - Related spec refs: none
+- `13.5.3.11` **This forbids jumping from outside a loop into the loop body, jumping from one branc...**
+  - Requirement: This forbids jumping from outside a loop into the loop body, jumping from one branch of an `if` into the other branch, and jumping from outside a `match` into one of its arms.
+  - Source: `§13.5b L5360-L5362`
+  - Related spec refs: none
+- `13.5.3.12` **No skipping of variable initialization.**
+  - Requirement: **No skipping of variable initialization.**
+  - Source: `§13.5b L5364-L5367`
+  - Related spec refs: none
+- `13.5.3.13` **A goto must not jump over a binding declaration when that binding would be in scope...**
+  - Requirement: A `goto` must not jump over a binding declaration when that binding would be in scope at the target.
+  - Source: `§13.5b L5364-L5367`
+  - Related spec refs: none
+- `13.5.3.14` **Otherwise the target scope could observe, drop, or assign over a value that was nev...**
+  - Requirement: Otherwise the target scope could observe, drop, or assign over a value that was never initialized.
+  - Source: `§13.5b L5364-L5367`
+  - Related spec refs: none
+- `13.5.3.15` **When a goto exits one or more scopes, cleanup is identical to falling out of those...**
+  - Requirement: When a `goto` exits one or more scopes, cleanup is identical to falling out of those scopes normally or to an equivalent labeled `break`:
+  - Source: `§13.5b L5369-L5371`
+  - Related spec refs: none
+- `13.5.3.16` **defer blocks run.**
+  - Requirement: `defer` blocks run.
+  - Source: `§13.5b L5373`
+  - Related spec refs: none
+- `13.5.3.17` **Drop destructors for owned values run.**
+  - Requirement: `Drop` destructors for owned values run.
+  - Source: `§13.5b L5374`
+  - Related spec refs: none
+- `13.5.3.18` **with guards are released.**
+  - Requirement: `with` guards are released.
+  - Source: `§13.5b L5375`
+  - Related spec refs: none
+- `13.5.3.19` **errdefer blocks do not run for goto, because goto is a normal control transfer, not...**
+  - Requirement: `errdefer` blocks do not run for `goto`, because `goto` is a normal control transfer, not an error return.
+  - Source: `§13.5b L5377-L5378`
+  - Related spec refs: none
+- `13.5.3.20` **A backward goto to a point before a local binding's declaration ends that binding's...**
+  - Requirement: A backward `goto` to a point before a local binding's declaration ends that binding's current lifetime before the jump.
+  - Source: `§13.5b L5380-L5383`
+  - Related spec refs: none
+- `13.5.3.21` **Its cleanup runs before control transfers, and the binding is initialized again if...**
+  - Requirement: Its cleanup runs before control transfers, and the binding is initialized again if execution later reaches its declaration.
+  - Source: `§13.5b L5380-L5383`
+  - Related spec refs: none
+- `13.5.3.22` **The compiler must diagnose at least these errors:**
+  - Requirement: The compiler must diagnose at least these errors:
+  - Source: `§13.5b L5385`
+  - Related spec refs: none
+- `13.5.3.23` **Undefined target label.**
+  - Requirement: Undefined target label.
+  - Source: `§13.5b L5387`
+  - Related spec refs: none
+- `13.5.3.24` **Target label declared outside the current function.**
+  - Requirement: Target label declared outside the current function.
+  - Source: `§13.5b L5388`
+  - Related spec refs: none
+- `13.5.3.25` **goto across a nested function, closure, async:, or gen fn boundary.**
+  - Requirement: `goto` across a nested function, closure, `async:`, or `gen fn` boundary.
+  - Source: `§13.5b L5389-L5390`
+  - Related spec refs: none
+- `13.5.3.26` **goto that would enter a block from outside.**
+  - Requirement: `goto` that would enter a block from outside.
+  - Source: `§13.5b L5391`
+  - Related spec refs: none
+- `13.5.3.27` **goto that would skip variable initialization.**
+  - Requirement: `goto` that would skip variable initialization.
+  - Source: `§13.5b L5392`
+  - Related spec refs: none
+- `13.5.3.28` **with migrate may emit goto when C source contains control flow that cannot be expre...**
+  - Requirement: `with migrate` may emit `goto` when C source contains control flow that cannot be expressed with structured constructs, such as an irreducible control-flow graph.
+  - Source: `§13.5b L5394-L5403`
+  - Related spec refs: none
+- `13.5.3.29` **For reducible C, the migrator should prefer structured With using while, do-while (...**
+  - Requirement: For reducible C, the migrator should prefer structured With using `while`, `do`-`while` (§13.5c), `if`, labeled `break`, and labeled `continue`.
+  - Source: `§13.5b L5394-L5403`
+  - Related spec refs: §13.5c
+- `13.5.3.30` **In particular, C do { ... } while (cond) loops should be translated directly to Wit...**
+  - Requirement: In particular, C `do { ... } while (cond)` loops should be translated directly to With `do: ... while cond`, preserving `continue`-to-condition semantics.
+  - Source: `§13.5b L5394-L5403`
+  - Related spec refs: none
+- `13.5.3.31` **For irreducible C, each basic block may become a labeled statement at function scop...**
+  - Requirement: For irreducible C, each basic block may become a labeled statement at function scope, and each control-flow edge may become a `goto` or conditional `goto`.
+  - Source: `§13.5b L5394-L5403`
+  - Related spec refs: none
+- `13.5.3.32` **Computed goto (goto *ptr) and non-local jumps such as setjmp/longjmp are not suppor...**
+  - Requirement: Computed goto (`goto *ptr`) and non-local jumps such as `setjmp`/`longjmp` are not supported.
+  - Source: `§13.5b L5405-L5409`
+  - Related spec refs: none
+- `13.5.3.33` **If with migrate encounters a function that requires one of those patterns, it must...**
+  - Requirement: If `with migrate` encounters a function that requires one of those patterns, it must emit a diagnostic naming the function and source location, produce no misleading placeholder translation, and exit non-zero.
+  - Source: `§13.5b L5405-L5409`
+  - Related spec refs: none
+
+### §13.5c `do`-`while` Loop
+
+- `13.5.4.1` **A do-while loop executes its body at least once, then repeats while the trailing co...**
+  - Requirement: A `do`-`while` loop executes its body at least once, then repeats while the trailing condition is true.
+  - Source: `§13.5c L5413-L5414`
+  - Related spec refs: none
+- `13.5.4.2` **The body uses the standard three forms:**
+  - Requirement: The body uses the standard three forms:
+  - Source: `§13.5c L5420`
+  - Related spec refs: none
+- `13.5.4.3` **The while keyword following the body introduces the loop condition.**
+  - Requirement: The `while` keyword following the body introduces the loop condition.
+  - Source: `§13.5c L5440-L5443`
+  - Related spec refs: none
+- `13.5.4.4` **It is not a separate while loop — the parser recognizes while at the same nesting l...**
+  - Requirement: It is not a separate `while` loop — the parser recognizes `while` at the same nesting level as `do` as the loop's trailing condition, not as a new statement.
+  - Source: `§13.5c L5440-L5443`
+  - Related spec refs: none
+- `13.5.4.5` **No colon or brace follows the trailing while — the condition is a single expression...**
+  - Requirement: No colon or brace follows the trailing `while` — the condition is a single expression terminated by a newline or the end of the enclosing block.
+  - Source: `§13.5c L5445-L5447`
+  - Related spec refs: none
+- `13.5.4.6` **The body executes unconditionally on the first iteration.**
+  - Requirement: The body executes unconditionally on the first iteration.
+  - Source: `§13.5c L5451`
+  - Related spec refs: none
+- `13.5.4.7` **After each iteration, the condition is evaluated.**
+  - Requirement: After each iteration, the condition is evaluated.
+  - Source: `§13.5c L5452`
+  - Related spec refs: none
+- `13.5.4.8` **If the condition is true, the body executes again.**
+  - Requirement: If the condition is true, the body executes again.
+  - Source: `§13.5c L5453`
+  - Related spec refs: none
+- `13.5.4.9` **If the condition is false, the loop exits.**
+  - Requirement: If the condition is false, the loop exits.
+  - Source: `§13.5c L5454`
+  - Related spec refs: none
+- `13.5.4.10` **break exits the loop immediately.**
+  - Requirement: `break` exits the loop immediately.
+  - Source: `§13.5c L5456`
+  - Related spec refs: none
+- `13.5.4.11` **continue jumps to the condition check, not to the top of the body.**
+  - Requirement: `continue` jumps to the **condition check**, not to the top of the body.
+  - Source: `§13.5c L5458-L5460`
+  - Related spec refs: none
+- `13.5.4.12` **This matches C semantics: any side-effects in the condition expression are executed...**
+  - Requirement: This matches C semantics: any side-effects in the condition expression are executed on every `continue`.
+  - Source: `§13.5c L5458-L5460`
+  - Related spec refs: none
+- `13.5.4.13` **do loops may be labeled for use with break and continue:**
+  - Requirement: `do` loops may be labeled for use with `break` and `continue`:
+  - Source: `§13.5c L5474`
+  - Related spec refs: none
+- `13.5.4.14` **A do-while loop is a statement.**
+  - Requirement: A `do`-`while` loop is a statement.
+  - Source: `§13.5c L5488-L5490`
+  - Related spec refs: none
+- `13.5.4.15` **It does not produce a value.**
+  - Requirement: It does not produce a value.
+  - Source: `§13.5c L5488-L5490`
+  - Related spec refs: none
+- `13.5.4.16` **Unlike loop (which can produce a value via break expr), a do-while loop always eval...**
+  - Requirement: Unlike `loop` (which can produce a value via `break expr`), a `do`-`while` loop always evaluates to `Unit`.
+  - Source: `§13.5c L5488-L5490`
+  - Related spec refs: none
+- `13.5.4.17` **The trailing condition may contain side-effects.**
+  - Requirement: The trailing condition may contain side-effects.
+  - Source: `§13.5c L5494-L5497`
+  - Related spec refs: none
+- `13.5.4.18` **When the condition is a block expression (braced), all statements in the block exec...**
+  - Requirement: When the condition is a block expression (braced), all statements in the block execute before the truthiness of the final expression determines whether to continue looping:
+  - Source: `§13.5c L5494-L5497`
+  - Related spec refs: none
+- `13.5.4.19` **This is the direct translation of C's:**
+  - Requirement: This is the direct translation of C's:
+  - Source: `§13.5c L5505`
+  - Related spec refs: none
+- `13.5.4.20` **When the condition is a simple expression, it is evaluated normally:**
+  - Requirement: When the condition is a simple expression, it is evaluated normally:
+  - Source: `§13.5c L5513-L5514`
+  - Related spec refs: none
+- `13.5.4.21` **The compiler treats do-while as a primitive loop form, not as syntactic sugar over...**
+  - Requirement: The compiler treats `do`-`while` as a primitive loop form, not as syntactic sugar over `loop`.
+  - Source: `§13.5c L5524-L5526`
+  - Related spec refs: none
+- `13.5.4.22` **This ensures continue has the correct target (the condition check, not the body top).**
+  - Requirement: This ensures `continue` has the correct target (the condition check, not the body top).
+  - Source: `§13.5c L5524-L5526`
+  - Related spec refs: none
+- `13.5.4.23` **Conceptually, the semantics are equivalent to:**
+  - Requirement: Conceptually, the semantics are equivalent to:
+  - Source: `§13.5c L5528`
+  - Related spec refs: none
+- `13.5.4.24` **except that continue anywhere in body jumps to the condition evaluation, not to the...**
+  - Requirement: except that `continue` anywhere in `body` jumps to the condition evaluation, not to the top of `loop`.
+  - Source: `§13.5c L5536-L5538`
+  - Related spec refs: none
+- `13.5.4.25` **This distinction only matters when the body contains continue statements.**
+  - Requirement: This distinction only matters when the body contains `continue` statements.
+  - Source: `§13.5c L5536-L5538`
+  - Related spec refs: none
+- `13.5.4.26` **defer statements inside the body execute at scope exit as usual — either when the l...**
+  - Requirement: `defer` statements inside the body execute at scope exit as usual — either when the loop exits via `break`, when the enclosing function returns, or at the end of a braced body on each iteration.
+  - Source: `§13.5c L5542-L5545`
+  - Related spec refs: none
+- `13.5.4.27` **errdefer follows the same scoping rules as in other loop bodies.**
+  - Requirement: `errdefer` follows the same scoping rules as in other loop bodies.
+  - Source: `§13.5c L5547-L5548`
+  - Related spec refs: none
+- `13.5.4.28` **Retry loop:**
+  - Requirement: Retry loop:
+  - Source: `§13.5c L5552`
+  - Related spec refs: none
+- `13.5.4.29` **Processing a non-empty list:**
+  - Requirement: Processing a non-empty list:
+  - Source: `§13.5c L5565`
+  - Related spec refs: none
+- `13.5.4.30` **Iterator with lookahead:**
+  - Requirement: Iterator with lookahead:
+  - Source: `§13.5c L5575`
+  - Related spec refs: none
+- `13.5.4.31` **C migration — PCRE2 list iteration:**
+  - Requirement: C migration — PCRE2 list iteration:
+  - Source: `§13.5c L5586`
+  - Related spec refs: none
+- `13.5.4.32` **C source:**
+  - Requirement: C source:
+  - Source: `§13.5c L5588`
+  - Related spec refs: none
+- `13.5.4.33` **With translation:**
+  - Requirement: With translation:
+  - Source: `§13.5c L5607`
+  - Related spec refs: none
+- `13.5.4.34` **No goto required.**
+  - Requirement: No `goto` required.
+  - Source: `§13.5c L5628-L5629`
+  - Related spec refs: none
+- `13.5.4.35` **continue correctly jumps to the while condition, which increments list and checks t...**
+  - Requirement: `continue` correctly jumps to the `while` condition, which increments `list` and checks the terminator.
+  - Source: `§13.5c L5628-L5629`
+  - Related spec refs: none
+
+### §13.6 Collection Comprehensions
+
+- `13.6.1.1` **Comprehensions build collections from iteration with filtering:**
+  - Requirement: Comprehensions build collections from iteration with filtering:
+  - Source: `§13.6 L5633`
+  - Related spec refs: none
+- `13.6.1.2` **Yes, this allocates a Vec.**
+  - Requirement: Yes, this allocates a `Vec`.
+  - Source: `§13.6 L5654-L5657`
+  - Related spec refs: none
+- `13.6.1.3` **It's obvious from the syntax — you're building a list.**
+  - Requirement: It's obvious from the syntax — you're building a list.
+  - Source: `§13.6 L5654-L5657`
+  - Related spec refs: none
+- `13.6.1.4` **This is the same philosophy as string interpolation: the allocation is inherent to...**
+  - Requirement: This is the same philosophy as string interpolation: the allocation is inherent to what you're asking for, and the syntax makes it clear.
+  - Source: `§13.6 L5654-L5657`
+  - Related spec refs: none
+- `13.6.1.5` **Comprehensions are pure sugar.**
+  - Requirement: Comprehensions are pure sugar.
+  - Source: `§13.6 L5659-L5660`
+  - Related spec refs: none
+- `13.6.1.6` **For lazy evaluation, use pipeline syntax with iterators directly.**
+  - Requirement: For lazy evaluation, use pipeline syntax with iterators directly.
+  - Source: `§13.6 L5659-L5660`
+  - Related spec refs: none
+- `13.6.1.7` **Disambiguation with in operator: In comprehensions, for x in is always the iteratio...**
+  - Requirement: **Disambiguation with `in` operator:** In comprehensions, `for x in` is always the iteration form (`Iter` trait).
+  - Source: `§13.6 L5662-L5664`
+  - Related spec refs: none
+- `13.6.1.8` **The in membership operator (§9.9) may appear in the if filter clause:**
+  - Requirement: The `in` membership operator (§9.9) may appear in the `if` filter clause:
+  - Source: `§13.6 L5662-L5664`
+  - Related spec refs: §9.9
+- `13.6.1.9` **The parser resolves this structurally — for PATTERN in EXPR is always iteration, EX...**
+  - Requirement: The parser resolves this structurally — `for PATTERN in EXPR` is always iteration, `EXPR in EXPR` in the filter is always membership.
+  - Source: `§13.6 L5670-L5671`
+  - Related spec refs: none
+
+### §13.6a Option and Result For-Comprehensions
+
+- `13.6.2.1` **for can also express short-circuiting chains over Option and Result.**
+  - Requirement: `for` can also express short-circuiting chains over `Option` and `Result`.
+  - Source: `§13.6a L5675-L5677`
+  - Related spec refs: none
+- `13.6.2.2` **Clauses are separated by ;.**
+  - Requirement: Clauses are separated by `;`.
+  - Source: `§13.6a L5675-L5677`
+  - Related spec refs: none
+- `13.6.2.3` **Each binding clause unwraps one successful value and binds it for the following cla...**
+  - Requirement: Each binding clause unwraps one successful value and binds it for the following clauses.
+  - Source: `§13.6a L5675-L5677`
+  - Related spec refs: none
+- `13.6.2.4` **The first clause determines the carrier family:**
+  - Requirement: The first clause determines the carrier family:
+  - Source: `§13.6a L5692`
+  - Related spec refs: none
+- `13.6.2.5` **Option[T] comprehensions unwrap Some(...) and short-circuit on None.**
+  - Requirement: `Option[T]` comprehensions unwrap `Some(...)` and short-circuit on `None`.
+  - Source: `§13.6a L5694-L5695`
+  - Related spec refs: none
+- `13.6.2.6` **Result[T, E] comprehensions unwrap Ok(...) and short-circuit on Err(...).**
+  - Requirement: `Result[T, E]` comprehensions unwrap `Ok(...)` and short-circuit on `Err(...)`.
+  - Source: `§13.6a L5696-L5697`
+  - Related spec refs: none
+- `13.6.2.7` **The expression form ends with yield expr, which re-wraps the final value in Some(...**
+  - Requirement: The expression form ends with `yield expr`, which re-wraps the final value in `Some(...)` or `Ok(...)`.
+  - Source: `§13.6a L5699-L5701`
+  - Related spec refs: none
+- `13.6.2.8` **The statement form omits yield and runs its body only when every clause succeeds:**
+  - Requirement: The statement form omits `yield` and runs its body only when every clause succeeds:
+  - Source: `§13.6a L5699-L5701`
+  - Related spec refs: none
+- `13.6.2.9` **This is equivalent to nested match expressions over the relevant success and failur...**
+  - Requirement: This is equivalent to nested `match` expressions over the relevant success and failure constructors.
+  - Source: `§13.6a L5708-L5709`
+  - Related spec refs: none
+- `13.6.2.10` **Option comprehensions also support boolean guard clauses:**
+  - Requirement: Option comprehensions also support boolean guard clauses:
+  - Source: `§13.6a L5711`
+  - Related spec refs: none
+- `13.6.2.11` **If the guard is false, the comprehension produces None.**
+  - Requirement: If the guard is false, the comprehension produces `None`.
+  - Source: `§13.6a L5721-L5724`
+  - Related spec refs: none
+- `13.6.2.12` **Result comprehensions do not have an implicit guard-failure error value; use an exp...**
+  - Requirement: `Result` comprehensions do not have an implicit guard-failure error value; use an explicit `if`/`match` inside the comprehension body when guard failure must choose an `Err`.
+  - Source: `§13.6a L5721-L5724`
+  - Related spec refs: none
+
+## 14. Concurrency
+
+### §14.1 Design Principles
+
+- `14.1.1.1` **Three hard constraints govern the concurrency model:**
+  - Requirement: Three hard constraints govern the concurrency model:
+  - Source: `§14.1 L5732`
+  - Related spec refs: none
+- `14.1.1.2` **Suspension must be visible. A systems programmer must see where a function can yiel...**
+  - Requirement: **Suspension must be visible.** A systems programmer must see where a function can yield. Hidden suspension violates "predictable from source." This rules out Go-style implicit yielding.
+  - Source: `§14.1 L5734-L5736`
+  - Related spec refs: none
+- `14.1.1.3` **Controlled exception: Dropping an ephemeral Task without explicit .await or cancel...**
+  - Requirement: **Controlled exception:** Dropping an ephemeral `Task` without explicit `.await` or `cancel` may yield the current fiber (§14.7) to ensure memory safety.
+  - Source: `§14.1 L5738-L5745`
+  - Related spec refs: §14.7
+- `14.1.1.4` **This is the only implicit suspension point in the language.**
+  - Requirement: This is the only implicit suspension point in the language.
+  - Source: `§14.1 L5738-L5745`
+  - Related spec refs: none
+- `14.1.1.5` **The compiler emits a warning at any scope exit where an ephemeral Task is implicitl...**
+  - Requirement: The compiler emits a **warning** at any scope exit where an ephemeral Task is implicitly dropped without being awaited or cancelled, recommending explicit handling.
+  - Source: `§14.1 L5738-L5745`
+  - Related spec refs: none
+- `14.1.1.6` **Ephemeral Tasks cannot be created on OS threads or in FFI callbacks, because these...**
+  - Requirement: Ephemeral Tasks cannot be created on OS threads or in FFI callbacks, because these contexts cannot suspend.
+  - Source: `§14.1 L5738-L5745`
+  - Related spec refs: none
+- `14.1.1.7` **No colored functions. A function's callability must not depend on whether the calle...**
+  - Requirement: **No colored functions.** A function's callability must not depend on whether the caller is "async." This rules out Rust-style async.
+  - Source: `§14.1 L5747-L5748`
+  - Related spec refs: none
+- `14.1.1.8` **No type-system infection. Concurrency must not introduce new trait bounds, wrapper...**
+  - Requirement: **No type-system infection.** Concurrency must not introduce new trait bounds, wrapper types, or lifetime complications into code that doesn't need them.
+  - Source: `§14.1 L5750-L5752`
+  - Related spec refs: none
+- `14.1.1.9` **The solution: async/await keywords that compile to lightweight thread (fiber) opera...**
+  - Requirement: The solution: `async`/`await` keywords that compile to **lightweight thread (fiber) operations**, not state machine transformations.
+  - Source: `§14.1 L5754-L5755`
+  - Related spec refs: none
+
+### §14.2 What `async`/`.await` Mean in With
+
+- `14.2.1.1` **async fn declares a function that may suspend.**
+  - Requirement: `async fn` declares a function that may suspend.
+  - Source: `§14.2 L5759-L5761`
+  - Related spec refs: none
+- `14.2.1.2` **Calling it spawns a lightweight thread and returns a Task[T] handle immediately.**
+  - Requirement: Calling it spawns a lightweight thread and returns a `Task[T]` handle immediately.
+  - Source: `§14.2 L5759-L5761`
+  - Related spec refs: none
+- `14.2.1.3` **.await suspends the current fiber until a task completes.**
+  - Requirement: `.await` suspends the current fiber until a task completes.
+  - Source: `§14.2 L5759-L5761`
+  - Related spec refs: none
+- `14.2.1.4` **.await is postfix, chaining naturally with ? and |>:**
+  - Requirement: `.await` is postfix, chaining naturally with `?` and `|>`:
+  - Source: `§14.2 L5770`
+  - Related spec refs: none
+- `14.2.1.5` **Each fiber has a real stack.**
+  - Requirement: Each fiber has a **real stack**.
+  - Source: `§14.2 L5780-L5783`
+  - Related spec refs: none
+- `14.2.1.6` **References across .await points work normally — they live on the stack, not in a co...**
+  - Requirement: References across `.await` points work normally — they live on the stack, not in a compiler-generated struct.
+  - Source: `§14.2 L5780-L5783`
+  - Related spec refs: none
+- `14.2.1.7` **No Pin, no Unpin, no Future, no Poll.**
+  - Requirement: No Pin, no Unpin, no Future, no Poll.
+  - Source: `§14.2 L5780-L5783`
+  - Related spec refs: none
+- `14.2.1.8` **These concepts do not exist in With.**
+  - Requirement: These concepts do not exist in With.
+  - Source: `§14.2 L5780-L5783`
+  - Related spec refs: none
+
+### §14.3 Formal Invariants
+
+- `14.3.1.1` **The following are hard guarantees that may never be violated:**
+  - Requirement: The following are **hard guarantees** that may never be violated:
+  - Source: `§14.3 L5787`
+  - Related spec refs: none
+- `14.3.1.2` **INVARIANT 1: No async function type exists.**
+  - Requirement: **INVARIANT 1: No async function type exists.**
+  - Source: `§14.3 L5789-L5795`
+  - Related spec refs: none
+- `14.3.1.3` **A function containing await does not change its type signature.**
+  - Requirement: A function containing `await` does not change its type signature.
+  - Source: `§14.3 L5789-L5795`
+  - Related spec refs: none
+- `14.3.1.4` **There is no async fn type distinct from fn.**
+  - Requirement: There is no `async fn` type distinct from `fn`.
+  - Source: `§14.3 L5789-L5795`
+  - Related spec refs: none
+- `14.3.1.5` **There is no trait bound, wrapper type, or lifetime complication introduced by using...**
+  - Requirement: There is no trait bound, wrapper type, or lifetime complication introduced by using `.await`.
+  - Source: `§14.3 L5789-L5795`
+  - Related spec refs: none
+- `14.3.1.6` **Calling an async fn from a non-async fn is permitted — the call spawns a fiber and...**
+  - Requirement: Calling an `async fn` from a non-async `fn` is permitted — the call spawns a fiber and returns a `Task[T]`, which the caller may store, pass, or later `.await`.
+  - Source: `§14.3 L5789-L5795`
+  - Related spec refs: none
+- `14.3.1.7` **What "no colored functions" means here: In Rust, an async fn cannot be called from...**
+  - Requirement: **What "no colored functions" means here:** In Rust, an `async fn` cannot be called from a non-async context without an executor and explicit block-on machinery.
+  - Source: `§14.3 L5797-L5801`
+  - Related spec refs: none
+- `14.3.1.8` **In With, any function can call any async fn — the call returns a Task[T] and execut...**
+  - Requirement: In With, any function can call any `async fn` — the call returns a `Task[T]` and execution continues.
+  - Source: `§14.3 L5797-L5801`
+  - Related spec refs: none
+- `14.3.1.9` **The function is not "infected" by the call.**
+  - Requirement: The function is not "infected" by the call.
+  - Source: `§14.3 L5797-L5801`
+  - Related spec refs: none
+- `14.3.1.10` **What it does not mean: await itself requires a fiber runtime.**
+  - Requirement: **What it does not mean:** `await` itself requires a fiber runtime.
+  - Source: `§14.3 L5803-L5808`
+  - Related spec refs: none
+- `14.3.1.11` **Using .await in a no_runtime build is a compile error (Invariant 4).**
+  - Requirement: Using `.await` in a `no_runtime` build is a compile error (Invariant 4).
+  - Source: `§14.3 L5803-L5808`
+  - Related spec refs: none
+- `14.3.1.12` **This is narrower than Rust's coloring: the restriction is on *suspending*, not on *...**
+  - Requirement: This is narrower than Rust's coloring: the restriction is on *suspending*, not on *calling* async functions.
+  - Source: `§14.3 L5803-L5808`
+  - Related spec refs: none
+- `14.3.1.13` **A function that calls fetch_user(id) but never awaits the result works in any build.**
+  - Requirement: A function that calls `fetch_user(id)` but never awaits the result works in any build.
+  - Source: `§14.3 L5803-L5808`
+  - Related spec refs: none
+- `14.3.1.14` **Only the .await operator is gated.**
+  - Requirement: Only the `.await` operator is gated.
+  - Source: `§14.3 L5803-L5808`
+  - Related spec refs: none
+- `14.3.1.15` **INVARIANT 2: No Future trait exists.**
+  - Requirement: **INVARIANT 2: No Future trait exists.**
+  - Source: `§14.3 L5810-L5812`
+  - Related spec refs: none
+- `14.3.1.16` **Task[T] is an opaque handle.**
+  - Requirement: `Task[T]` is an opaque handle.
+  - Source: `§14.3 L5810-L5812`
+  - Related spec refs: none
+- `14.3.1.17` **It has no poll method, no Waker, no Pin<&mut Self>.**
+  - Requirement: It has no `poll` method, no `Waker`, no `Pin<&mut Self>`.
+  - Source: `§14.3 L5810-L5812`
+  - Related spec refs: none
+- `14.3.1.18` **It is not a trait.**
+  - Requirement: It is not a trait.
+  - Source: `§14.3 L5810-L5812`
+  - Related spec refs: none
+- `14.3.1.19` **It cannot be implemented.**
+  - Requirement: It cannot be implemented.
+  - Source: `§14.3 L5810-L5812`
+  - Related spec refs: none
+- `14.3.1.20` **INVARIANT 3: No pluggable executors.**
+  - Requirement: **INVARIANT 3: No pluggable executors.**
+  - Source: `§14.3 L5814-L5817`
+  - Related spec refs: none
+- `14.3.1.21` **There is exactly one fiber scheduler.**
+  - Requirement: There is exactly one fiber scheduler.
+  - Source: `§14.3 L5814-L5817`
+  - Related spec refs: none
+- `14.3.1.22` **It is part of the standard library.**
+  - Requirement: It is part of the standard library.
+  - Source: `§14.3 L5814-L5817`
+  - Related spec refs: none
+- `14.3.1.23` **It is not a trait.**
+  - Requirement: It is not a trait.
+  - Source: `§14.3 L5814-L5817`
+  - Related spec refs: none
+- `14.3.1.24` **It cannot be replaced.**
+  - Requirement: It cannot be replaced.
+  - Source: `§14.3 L5814-L5817`
+  - Related spec refs: none
+- `14.3.1.25` **This prevents ecosystem fragmentation.**
+  - Requirement: This prevents ecosystem fragmentation.
+  - Source: `§14.3 L5814-L5817`
+  - Related spec refs: none
+- `14.3.1.26` **INVARIANT 4: async requires the fiber runtime.**
+  - Requirement: **INVARIANT 4: `async` requires the fiber runtime.**
+  - Source: `§14.3 L5819-L5824`
+  - Related spec refs: none
+- `14.3.1.27` **On no_runtime targets (embedded, bare-metal), async fn is a compile error.**
+  - Requirement: On `no_runtime` targets (embedded, bare-metal), `async fn` is a **compile error**.
+  - Source: `§14.3 L5819-L5824`
+  - Related spec refs: none
+- `14.3.1.28` **This is not a fallback — it is a hard gate.**
+  - Requirement: This is not a fallback — it is a hard gate.
+  - Source: `§14.3 L5819-L5824`
+  - Related spec refs: none
+- `14.3.1.29` **If you see async in the source, a fiber scheduler exists.**
+  - Requirement: If you see `async` in the source, a fiber scheduler exists.
+  - Source: `§14.3 L5819-L5824`
+  - Related spec refs: none
+- `14.3.1.30` **If no scheduler exists, async does not compile.**
+  - Requirement: If no scheduler exists, `async` does not compile.
+  - Source: `§14.3 L5819-L5824`
+  - Related spec refs: none
+- `14.3.1.31` **The cost model is always honest.**
+  - Requirement: The cost model is always honest.
+  - Source: `§14.3 L5819-L5824`
+  - Related spec refs: none
+- `14.3.1.32` **INVARIANT 5: Suspension is trackable.**
+  - Requirement: **INVARIANT 5: Suspension is trackable.**
+  - Source: `§14.3 L5826-L5831`
+  - Related spec refs: none
+- `14.3.1.33` **The compiler statically computes a may_suspend property for every function.**
+  - Requirement: The compiler statically computes a **`may_suspend`** property for every function.
+  - Source: `§14.3 L5826-L5831`
+  - Related spec refs: none
+- `14.3.1.34` **A function is may_suspend if it directly contains .await, or if it calls any functi...**
+  - Requirement: A function is `may_suspend` if it directly contains `.await`, or if it calls any function that is `may_suspend`.
+  - Source: `§14.3 L5826-L5831`
+  - Related spec refs: none
+- `14.3.1.35` **This is a whole-program boolean propagation, not lifetime inference — it is cheap t...**
+  - Requirement: This is a whole-program boolean propagation, not lifetime inference — it is cheap to compute.
+  - Source: `§14.3 L5826-L5831`
+  - Related spec refs: none
+- `14.3.1.36` **This is restricted coloring.**
+  - Requirement: This is **restricted coloring**.
+  - Source: `§14.3 L5833-L5836`
+  - Related spec refs: none
+- `14.3.1.37` **Callers are not generally restricted by callee color: any function can call an asyn...**
+  - Requirement: Callers are not generally restricted by callee color: any function can call an async function and receive a `Task[T]`.
+  - Source: `§14.3 L5833-L5836`
+  - Related spec refs: none
+- `14.3.1.38` **However, specific safety contexts enforce constraints based on callee color:**
+  - Requirement: However, specific safety contexts enforce constraints based on callee color:
+  - Source: `§14.3 L5833-L5836`
+  - Related spec refs: none
+- `14.3.1.39` **@[no_await_guard] enforcement: Calling any may_suspend function while a @[no_await_...**
+  - Requirement: **`@[no_await_guard]` enforcement:** Calling any `may_suspend` function while a `@[no_await_guard]` guard is live is a compile error — even if the `.await` is buried three calls deep.
+  - Source: `§14.3 L5838-L5840`
+  - Related spec refs: none
+- `14.3.1.40` **FFI callback safety: Functions passed as extern "C" callbacks must not be may_suspe...**
+  - Requirement: **FFI callback safety:** Functions passed as `extern "C"` callbacks must not be `may_suspend` (see §14.19).
+  - Source: `§14.3 L5841-L5842`
+  - Related spec refs: §14.19
+- `14.3.1.41` **no_suspend blocks: Expert code may assert that a region contains no operation that...**
+  - Requirement: **`no_suspend` blocks:** Expert code may assert that a region contains no operation that yields to the scheduler. The compiler rejects direct `.await`/`select await`, transitive `may_suspend` calls, async-scope await-all, and implicit cleanup awaits in that region.
+  - Source: `§14.3 L5843-L5847`
+  - Related spec refs: none
+- `14.3.1.42` **Programmers do not declare or annotate may_suspend.**
+  - Requirement: Programmers do not declare or annotate `may_suspend`.
+  - Source: `§14.3 L5849-L5852`
+  - Related spec refs: none
+- `14.3.1.43` **The compiler computes it internally; it may appear in diagnostics when a safety vio...**
+  - Requirement: The compiler computes it internally; it may appear in diagnostics when a safety violation occurs.
+  - Source: `§14.3 L5849-L5852`
+  - Related spec refs: none
+- `14.3.1.44` **There are no separate async and sync function types, no trait split, and no closure...**
+  - Requirement: There are no separate `async` and `sync` function types, no trait split, and no closure type changes.
+  - Source: `§14.3 L5849-L5852`
+  - Related spec refs: none
+
+### §14.3.1 `no_suspend` Blocks
+
+- `14.3.1.45` **no_suspend is an expert assertion for code that must not yield to the fiber scheduler:**
+  - Requirement: `no_suspend` is an expert assertion for code that must not yield to the fiber scheduler:
+  - Source: `§14.3.1 L5866-L5867`
+  - Related spec refs: none
+- `14.3.1.46` **The body is otherwise an ordinary expression block: it has the type of its tail exp...**
+  - Requirement: The body is otherwise an ordinary expression block: it has the type of its tail expression and participates in inference normally.
+  - Source: `§14.3.1 L5881-L5885`
+  - Related spec refs: none
+- `14.3.1.47` **Creating an async task handle is allowed because calling an async fn returns a Task...**
+  - Requirement: Creating an async task handle is allowed because calling an `async fn` returns a `Task[T]` immediately; actually awaiting that task inside the block is not allowed.
+  - Source: `§14.3.1 L5881-L5885`
+  - Related spec refs: none
+- `14.3.1.48` **The compiler rejects any scheduler-yielding operation inside the block, including:**
+  - Requirement: The compiler rejects any scheduler-yielding operation inside the block, including:
+  - Source: `§14.3.1 L5887-L5888`
+  - Related spec refs: none
+- `14.3.1.49` **direct .await or select await**
+  - Requirement: direct `.await` or `select await`
+  - Source: `§14.3.1 L5890`
+  - Related spec refs: none
+- `14.3.1.50` **calls to functions whose body is may_suspend**
+  - Requirement: calls to functions whose body is `may_suspend`
+  - Source: `§14.3.1 L5891`
+  - Related spec refs: none
+- `14.3.1.51` **async-scope await-all**
+  - Requirement: async-scope await-all
+  - Source: `§14.3.1 L5892`
+  - Related spec refs: none
+- `14.3.1.52` **implicit cleanup await for an ephemeral Task**
+  - Requirement: implicit cleanup await for an ephemeral `Task`
+  - Source: `§14.3.1 L5893`
+  - Related spec refs: none
+- `14.3.1.53` **This check exists because suspending inside such a region can deadlock or expose pa...**
+  - Requirement: This check exists because suspending inside such a region can deadlock or expose partially-updated state to other fibers.
+  - Source: `§14.3.1 L5895-L5898`
+  - Related spec refs: none
+- `14.3.1.54` **It is independent of whether the compiler implements fibers with real stacks or sta...**
+  - Requirement: It is independent of whether the compiler implements fibers with real stacks or state machines.
+  - Source: `§14.3.1 L5895-L5898`
+  - Related spec refs: none
+
+### §14.4 `async fn` Semantics
+
+- `14.4.1.1` **Calling fetch(url) does the following:**
+  - Requirement: Calling `fetch(url)` does the following:
+  - Source: `§14.4 L5906`
+  - Related spec refs: none
+- `14.4.1.2` **Allocates a lightweight thread (fiber) with its own stack.**
+  - Requirement: Allocates a lightweight thread (fiber) with its own stack.
+  - Source: `§14.4 L5908`
+  - Related spec refs: none
+- `14.4.1.3` **Begins executing the function body on that fiber.**
+  - Requirement: Begins executing the function body on that fiber.
+  - Source: `§14.4 L5909`
+  - Related spec refs: none
+- `14.4.1.4` **Returns a Task[Result[String, IoError]] handle immediately to the caller.**
+  - Requirement: Returns a `Task[Result[String, IoError]]` handle immediately to the caller.
+  - Source: `§14.4 L5910-L5911`
+  - Related spec refs: none
+- `14.4.1.5` **The fiber runs concurrently.**
+  - Requirement: The fiber runs concurrently.
+  - Source: `§14.4 L5913-L5914`
+  - Related spec refs: none
+- `14.4.1.6` **It suspends at await points and is resumed by the scheduler when the awaited operat...**
+  - Requirement: It suspends at `await` points and is resumed by the scheduler when the awaited operation completes.
+  - Source: `§14.4 L5913-L5914`
+  - Related spec refs: none
+
+### §14.5 `.await` Semantics
+
+- `14.5.1.1` **.await does the following:**
+  - Requirement: `.await` does the following:
+  - Source: `§14.5 L5922`
+  - Related spec refs: none
+- `14.5.1.2` **If the task is already complete, returns the result immediately.**
+  - Requirement: If the task is already complete, returns the result immediately.
+  - Source: `§14.5 L5924`
+  - Related spec refs: none
+- `14.5.1.3` **If the task is still running, suspends the current fiber and yields to the schedule...**
+  - Requirement: If the task is still running, **suspends the current fiber** and yields to the scheduler. When the task completes, the current fiber is resumed.
+  - Source: `§14.5 L5925-L5927`
+  - Related spec refs: none
+- `14.5.1.4` **If called from an OS thread with no fiber runtime, this is a compile error (see Inv...**
+  - Requirement: If called from an OS thread with no fiber runtime, this is a **compile error** (see Invariant 4).
+  - Source: `§14.5 L5928-L5929`
+  - Related spec refs: none
+- `14.5.1.5` **.await is the only way to extract a value from a Task[T].**
+  - Requirement: `.await` is the only way to extract a value from a `Task[T]`.
+  - Source: `§14.5 L5931-L5933`
+  - Related spec refs: none
+- `14.5.1.6` **It is the only point where a fiber can suspend.**
+  - Requirement: It is the only point where a fiber can suspend.
+  - Source: `§14.5 L5931-L5933`
+  - Related spec refs: none
+- `14.5.1.7` **Suspension is always visible in the source code.**
+  - Requirement: Suspension is always visible in the source code.
+  - Source: `§14.5 L5931-L5933`
+  - Related spec refs: none
+- `14.5.1.8` **.await is postfix — it appears after the expression it operates on.**
+  - Requirement: `.await` is postfix — it appears after the expression it operates on.
+  - Source: `§14.5 L5935-L5936`
+  - Related spec refs: none
+- `14.5.1.9` **This allows natural chaining:**
+  - Requirement: This allows natural chaining:
+  - Source: `§14.5 L5935-L5936`
+  - Related spec refs: none
+
+### §14.6 `async:` Blocks
+
+- `14.6.1.1` **An async: block creates and immediately starts a fiber inline, returning a Task[T]:**
+  - Requirement: An `async:` block creates and immediately starts a fiber inline, returning a `Task[T]`:
+  - Source: `§14.6 L5950-L5951`
+  - Related spec refs: none
+- `14.6.1.2` **Semantics: async: body allocates a fiber, begins execution of body, and returns a T...**
+  - Requirement: **Semantics:** `async: body` allocates a fiber, begins execution of `body`, and returns a `Task[T]` where `T` is the type of `body`.
+  - Source: `§14.6 L5961-L5963`
+  - Related spec refs: none
+- `14.6.1.3` **The fiber runs concurrently with the caller.**
+  - Requirement: The fiber runs concurrently with the caller.
+  - Source: `§14.6 L5961-L5963`
+  - Related spec refs: none
+- `14.6.1.4` **This is the async analog of a regular block expression and is essential for inline...**
+  - Requirement: This is the async analog of a regular block expression and is essential for inline structured concurrency:
+  - Source: `§14.6 L5965-L5966`
+  - Related spec refs: none
+- `14.6.1.5` **Without async: blocks, users would need to define a separate async fn for every inl...**
+  - Requirement: Without `async:` blocks, users would need to define a separate `async fn` for every inline concurrent task — significant boilerplate when the logic is small and context-specific.
+  - Source: `§14.6 L5981-L5983`
+  - Related spec refs: none
+- `14.6.1.6` **Capture rules: async: blocks follow the same capture rules as closures.**
+  - Requirement: **Capture rules:** `async:` blocks follow the same capture rules as closures.
+  - Source: `§14.6 L5985-L5987`
+  - Related spec refs: none
+- `14.6.1.7` **They may capture references (making the resulting Task ephemeral) or owned values (...**
+  - Requirement: They may capture references (making the resulting `Task` ephemeral) or owned values (storable `Task`).
+  - Source: `§14.6 L5985-L5987`
+  - Related spec refs: none
+- `14.6.1.8` **See §14.22.**
+  - Requirement: See §14.22.
+  - Source: `§14.6 L5985-L5987`
+  - Related spec refs: §14.22
+
+### §14.7 `Task[T]`
+
+- `14.7.1.1` **.await; postfix keyword; Suspend fiber until complete**
+  - Requirement: `.await`; postfix keyword; Suspend fiber until complete
+  - Source: `§14.7 L5997`
+  - Related spec refs: none
+- `14.7.1.2` **cancel; (Task[T]) -> Unit; Cooperative cancellation**
+  - Requirement: `cancel`; `(Task[T]) -> Unit`; Cooperative cancellation
+  - Source: `§14.7 L5998`
+  - Related spec refs: none
+- `14.7.1.3` **is_done; (&Task[T]) -> bool; Check without blocking**
+  - Requirement: `is_done`; `(&Task[T]) -> bool`; Check without blocking
+  - Source: `§14.7 L5999`
+  - Related spec refs: none
+- `14.7.1.4` **Task[T] is Send when T: Send and T is not ephemeral.**
+  - Requirement: `Task[T]` is `Send` when `T: Send` and `T` is not ephemeral.
+  - Source: `§14.7 L6001-L6002`
+  - Related spec refs: none
+- `14.7.1.5` **It is an owned value.**
+  - Requirement: It is an owned value.
+  - Source: `§14.7 L6001-L6002`
+  - Related spec refs: none
+- `14.7.1.6` **It can be stored in data structures when non-ephemeral.**
+  - Requirement: It can be stored in data structures when non-ephemeral.
+  - Source: `§14.7 L6001-L6002`
+  - Related spec refs: none
+- `14.7.1.7` **A Task[T] that captures references is ephemeral (see §14.22).**
+  - Requirement: A `Task[T]` that captures references is **ephemeral** (see §14.22).
+  - Source: `§14.7 L6004-L6007`
+  - Related spec refs: §14.22
+- `14.7.1.8` **Ephemeral tasks cannot be stored, returned, or sent to other threads.**
+  - Requirement: Ephemeral tasks cannot be stored, returned, or sent to other threads.
+  - Source: `§14.7 L6004-L6007`
+  - Related spec refs: none
+- `14.7.1.9` **They must be awaited or tracked in a scope before the borrowed data goes out of scope.**
+  - Requirement: They must be awaited or tracked in a scope before the borrowed data goes out of scope.
+  - Source: `§14.7 L6004-L6007`
+  - Related spec refs: none
+- `14.7.1.10` **@[must_use]: Task[T] is annotated @[must_use].**
+  - Requirement: **`@[must_use]`:** `Task[T]` is annotated `@[must_use]`.
+  - Source: `§14.7 L6009-L6011`
+  - Related spec refs: none
+- `14.7.1.11` **Dropping a Task without awaiting or explicitly canceling it is a compile error:**
+  - Requirement: Dropping a `Task` without `await`ing or explicitly `cancel`ing it is a compile error:
+  - Source: `§14.7 L6009-L6011`
+  - Related spec refs: none
+- `14.7.1.12` **This catches accidental task drops — a common source of "why isn't this code runnin...**
+  - Requirement: This catches accidental task drops — a common source of "why isn't this code running?" bugs in concurrent systems.
+  - Source: `§14.7 L6026-L6027`
+  - Related spec refs: none
+- `14.7.1.13` **spawn for fire-and-forget: The spawn keyword creates a detached task that runs to c...**
+  - Requirement: **`spawn` for fire-and-forget:** The `spawn` keyword creates a **detached task** that runs to completion independently.
+  - Source: `§14.7 L6029-L6031`
+  - Related spec refs: none
+- `14.7.1.14` **It is not owned by any scope or variable — the runtime keeps it alive:**
+  - Requirement: It is not owned by any scope or variable — the runtime keeps it alive:
+  - Source: `§14.7 L6029-L6031`
+  - Related spec refs: none
+- `14.7.1.15` **spawn returns Unit, not Task[T].**
+  - Requirement: `spawn` returns `Unit`, not `Task[T]`.
+  - Source: `§14.7 L6037-L6039`
+  - Related spec refs: none
+- `14.7.1.16` **The spawned fiber is unowned — it runs until it completes, panics, or the program e...**
+  - Requirement: The spawned fiber is unowned — it runs until it completes, panics, or the program exits.
+  - Source: `§14.7 L6037-L6039`
+  - Related spec refs: none
+- `14.7.1.17` **This is the only correct way to do fire-and-forget.**
+  - Requirement: This is the only correct way to do fire-and-forget.
+  - Source: `§14.7 L6037-L6039`
+  - Related spec refs: none
+- `14.7.1.18` **WARNING: let _ = task is NOT fire-and-forget.**
+  - Requirement: **WARNING: `let _ = task` is NOT fire-and-forget.**
+  - Source: `§14.7 L6041-L6045`
+  - Related spec refs: none
+- `14.7.1.19` **Writing let _ = send_analytics(...) immediately drops the task, which cancels the f...**
+  - Requirement: Writing `let _ = send_analytics(...)` immediately drops the task, which cancels the fiber.
+  - Source: `§14.7 L6041-L6045`
+  - Related spec refs: none
+- `14.7.1.20` **The analytics request will abort at its first .await point — almost certainly befor...**
+  - Requirement: The analytics request will abort at its first `.await` point — almost certainly before it completes.
+  - Source: `§14.7 L6041-L6045`
+  - Related spec refs: none
+- `14.7.1.21` **The compiler emits a warning for let _ = <Task expression>:**
+  - Requirement: The compiler emits a warning for `let _ = <Task expression>`:
+  - Source: `§14.7 L6041-L6045`
+  - Related spec refs: none
+- `14.7.1.22` **See §20b.2.**
+  - Requirement: See §20b.2.
+  - Source: `§14.7 L6055`
+  - Related spec refs: §20b.2
+- `14.7.1.23` **Cancellation is cooperative, not preemptive for non-ephemeral tasks.**
+  - Requirement: Cancellation is **cooperative, not preemptive** for non-ephemeral tasks.
+  - Source: `§14.7 L6059-L6060`
+  - Related spec refs: none
+- `14.7.1.24` **When cancel() is called or a non-ephemeral Task is dropped:**
+  - Requirement: When `cancel()` is called or a non-ephemeral `Task` is dropped:
+  - Source: `§14.7 L6059-L6060`
+  - Related spec refs: none
+- `14.7.1.25` **A cancellation flag is set on the fiber.**
+  - Requirement: A cancellation flag is set on the fiber.
+  - Source: `§14.7 L6062`
+  - Related spec refs: none
+- `14.7.1.26` **The fiber continues executing until it reaches its next await point.**
+  - Requirement: The fiber continues executing until it reaches its next `await` point.
+  - Source: `§14.7 L6063-L6064`
+  - Related spec refs: none
+- `14.7.1.27` **At that await point, instead of suspending, the fiber begins unwinding.**
+  - Requirement: At that `await` point, instead of suspending, the fiber begins unwinding.
+  - Source: `§14.7 L6065-L6066`
+  - Related spec refs: none
+- `14.7.1.28` **Destructors are guaranteed to run during unwinding, in reverse declaration order, j...**
+  - Requirement: **Destructors are guaranteed to run** during unwinding, in reverse declaration order, just as with normal scope exit.
+  - Source: `§14.7 L6067-L6068`
+  - Related spec refs: none
+- `14.7.1.29` **Cancellation propagates to child tasks: if a fiber is cancelled, any tasks it spawn...**
+  - Requirement: Cancellation **propagates to child tasks**: if a fiber is cancelled, any tasks it spawned via `async scope` are also cancelled.
+  - Source: `§14.7 L6069-L6070`
+  - Related spec refs: none
+- `14.7.1.30` **Awaiting a cancelled task: Awaiting a cancelled task triggers cancellation unwindin...**
+  - Requirement: **Awaiting a cancelled task:** Awaiting a cancelled task triggers **cancellation unwinding** — similar to a panic, but structured and catchable at `async scope` boundaries.
+  - Source: `§14.7 L6071-L6073`
+  - Related spec refs: none
+- `14.7.1.31` **async scope automatically catches cancellation unwinding from its child tasks.**
+  - Requirement: `async scope` automatically catches cancellation unwinding from its child tasks.
+  - Source: `§14.7 L6084-L6087`
+  - Related spec refs: none
+- `14.7.1.32` **No error types need to change.**
+  - Requirement: No error types need to change.
+  - Source: `§14.7 L6084-L6087`
+  - Related spec refs: none
+- `14.7.1.33` **No From impls needed.**
+  - Requirement: No `From` impls needed.
+  - Source: `§14.7 L6084-L6087`
+  - Related spec refs: none
+- `14.7.1.34` **IoError, DbError, ApiError — they all work unchanged.**
+  - Requirement: `IoError`, `DbError`, `ApiError` — they all work unchanged.
+  - Source: `§14.7 L6084-L6087`
+  - Related spec refs: none
+- `14.7.1.35` **If you need to distinguish cancellation from real errors, match on the scope's result:**
+  - Requirement: If you need to distinguish cancellation from real errors, match on the scope's result:
+  - Source: `§14.7 L6089-L6090`
+  - Related spec refs: none
+- `14.7.1.36` **TaskCancelled is a standard library error type that all error types can be checked...**
+  - Requirement: `TaskCancelled` is a standard library error type that all error types can be checked against via `.is_cancelled()`.
+  - Source: `§14.7 L6099-L6101`
+  - Related spec refs: none
+- `14.7.1.37` **But you never need to add a Cancelled variant to your own types.**
+  - Requirement: But you never need to add a `Cancelled` variant to your own types.
+  - Source: `§14.7 L6099-L6101`
+  - Related spec refs: none
+- `14.7.1.38` **Cancellation of ephemeral tasks: If a Task is ephemeral (captures references), drop...**
+  - Requirement: **Cancellation of ephemeral tasks:** If a `Task` is ephemeral (captures references), dropping or cancelling it must ensure the fiber has stopped before the caller proceeds.
+  - Source: `§14.7 L6103-L6106`
+  - Related spec refs: none
+- `14.7.1.39` **This is mandatory for memory safety: the fiber holds references to the caller's stack.**
+  - Requirement: This is mandatory for memory safety: the fiber holds references to the caller's stack.
+  - Source: `§14.7 L6103-L6106`
+  - Related spec refs: none
+- `14.7.1.40` **The cancellation flag is set on the child fiber.**
+  - Requirement: The cancellation flag is set on the child fiber.
+  - Source: `§14.7 L6110`
+  - Related spec refs: none
+- `14.7.1.41` **If the child fiber is idle (suspended at an .await), it is immediately unwound. The...**
+  - Requirement: If the child fiber is idle (suspended at an `.await`), it is immediately unwound. The parent continues.
+  - Source: `§14.7 L6111-L6112`
+  - Related spec refs: none
+- `14.7.1.42` **If the child fiber is scheduled on the same OS thread (i.e., it is in the thread's...**
+  - Requirement: If the child fiber is scheduled on the **same** OS thread (i.e., it is in the thread's run queue, not currently executing — the parent is currently running), the runtime immediately switches to the child fiber and runs it until its next `.await` point, then unwinds it and resumes the parent. No scheduler involvement.
+  - Source: `§14.7 L6113-L6117`
+  - Related spec refs: none
+- `14.7.1.43` **If the child fiber is actively running on a different OS thread, the parent fiber y...**
+  - Requirement: If the child fiber is actively running on a **different** OS thread, the parent fiber **yields** (not blocks the OS thread) and the scheduler prioritizes the child for cancellation. When the child reaches `.await` and unwinds, the parent is resumed.
+  - Source: `§14.7 L6118-L6121`
+  - Related spec refs: none
+- `14.7.1.44` **This avoids the deadlock scenario where N OS threads all block waiting for fibers t...**
+  - Requirement: This avoids the deadlock scenario where N OS threads all block waiting for fibers that can never be scheduled.
+  - Source: `§14.7 L6123-L6126`
+  - Related spec refs: none
+- `14.7.1.45` **The key insight is that fiber drops happen inside fibers (which can yield), not ins...**
+  - Requirement: The key insight is that fiber drops happen inside fibers (which can yield), not inside raw OS thread code.
+  - Source: `§14.7 L6123-L6126`
+  - Related spec refs: none
+- `14.7.1.46` **Non-ephemeral tasks (capturing only owned values) use cooperative cancellation — th...**
+  - Requirement: Non-ephemeral tasks (capturing only owned values) use cooperative cancellation — the fiber continues until it hits `.await` on its own schedule, with no urgency.
+  - Source: `§14.7 L6135-L6137`
+  - Related spec refs: none
+- `14.7.1.47` **A fiber that is blocked in a long synchronous computation (no await points) cannot...**
+  - Requirement: A fiber that is blocked in a long synchronous computation (no `await` points) cannot be cancelled until it reaches an `await`.
+  - Source: `§14.7 L6139-L6144`
+  - Related spec refs: none
+- `14.7.1.48` **For ephemeral tasks, this means the parent fiber waits (yielding to the scheduler)...**
+  - Requirement: For ephemeral tasks, this means the parent fiber waits (yielding to the scheduler) for the duration of that computation.
+  - Source: `§14.7 L6139-L6144`
+  - Related spec refs: none
+- `14.7.1.49` **If both fibers are on the same OS thread, the computation runs inline.**
+  - Requirement: If both fibers are on the same OS thread, the computation runs inline.
+  - Source: `§14.7 L6139-L6144`
+  - Related spec refs: none
+- `14.7.1.50` **This is the trade-off of memory safety without Pin.**
+  - Requirement: This is the trade-off of memory safety without `Pin`.
+  - Source: `§14.7 L6139-L6144`
+  - Related spec refs: none
+- `14.7.1.51` **Restriction: Ephemeral tasks can only be created inside fibers (async contexts).**
+  - Requirement: **Restriction:** Ephemeral tasks can only be created inside fibers (async contexts).
+  - Source: `§14.7 L6146-L6151`
+  - Related spec refs: none
+- `14.7.1.52` **Creating an ephemeral task on a bare OS thread (e.g., inside thread.spawn_os) or in...**
+  - Requirement: Creating an ephemeral task on a bare OS thread (e.g., inside `thread.spawn_os`) or in an FFI callback is a **compile error**, because these contexts cannot yield to the scheduler and dropping the task would deadlock.
+  - Source: `§14.7 L6146-L6151`
+  - Related spec refs: none
+- `14.7.1.53` **Non-ephemeral tasks (capturing only owned values) can be created anywhere.**
+  - Requirement: Non-ephemeral tasks (capturing only owned values) can be created anywhere.
+  - Source: `§14.7 L6146-L6151`
+  - Related spec refs: none
+
+### §14.9 Structured Concurrency
+
+- `14.9.1.1` **async scope creates a scope in which tasks are tracked with the guarantee that all...**
+  - Requirement: `async scope` creates a scope in which tasks are tracked with the guarantee that **all tasks complete before the scope exits**.
+  - Source: `§14.9 L6167-L6168`
+  - Related spec refs: none
+- `14.9.1.2` **As with other block-introducing constructs, the body may use an inline expression...**
+  - Requirement: As with other block-introducing constructs, the body may use an inline expression, an indented colon block, or a braced block:
+  - Source: `§14.9 L6177-L6178`
+  - Related spec refs: none
+- `14.9.1.3` **desugars to:**
+  - Requirement: desugars to:
+  - Source: `§14.9 L6187`
+  - Related spec refs: none
+- `14.9.1.4` **The scope object s provides:**
+  - Requirement: The scope object `s` provides:
+  - Source: `§14.9 L6193`
+  - Related spec refs: none
+- `14.9.1.5` **track; (Task[T]) -> ScopedTask[T]; Register an existing task with this scope**
+  - Requirement: `track`; `(Task[T]) -> ScopedTask[T]`; Register an existing task with this scope
+  - Source: `§14.9 L6197`
+  - Related spec refs: none
+- `14.9.1.6` **Why track, not spawn: In With, calling an async fn eagerly allocates a fiber and re...**
+  - Requirement: **Why `track`, not `spawn`:** In With, calling an `async fn` eagerly allocates a fiber and returns a `Task[T]` (§14.4).
+  - Source: `§14.9 L6199-L6204`
+  - Related spec refs: §14.4
+- `14.9.1.7` **If a scope took a closure like s.spawn(() => async_fn()), the closure would run on...**
+  - Requirement: If a scope took a closure like `s.spawn(() => async_fn())`, the closure would run on one fiber and `async_fn()` would spawn a second — creating a detached task that escapes structured concurrency.
+  - Source: `§14.9 L6199-L6204`
+  - Related spec refs: none
+- `14.9.1.8` **Instead, s.track() accepts the Task[T] directly:**
+  - Requirement: Instead, `s.track()` accepts the `Task[T]` directly:
+  - Source: `§14.9 L6199-L6204`
+  - Related spec refs: none
+- `14.9.1.9` **ScopedTask[T]: The value returned by s.track().**
+  - Requirement: **`ScopedTask[T]`:** The value returned by `s.track()`.
+  - Source: `§14.9 L6214-L6220`
+  - Related spec refs: none
+- `14.9.1.10` **It behaves like Task[T] (supports .await, cancel, is_done) but is exempt from @[mus...**
+  - Requirement: It behaves like `Task[T]` (supports `.await`, `cancel`, `is_done`) but is **exempt from `@[must_use]`**.
+  - Source: `§14.9 L6214-L6220`
+  - Related spec refs: none
+- `14.9.1.11` **The scope guarantees cleanup: when the scope exits (normally or via early ? return)...**
+  - Requirement: The scope guarantees cleanup: when the scope exits (normally or via early `?` return), all tracked tasks that haven't been awaited are cancelled and joined.
+  - Source: `§14.9 L6214-L6220`
+  - Related spec refs: none
+- `14.9.1.12` **ScopedTask[T] is ephemeral: it may be used inside the scope, but the scope body may...**
+  - Requirement: `ScopedTask[T]` is ephemeral: it may be used inside the scope, but the scope body may not return it or store it in non-ephemeral data.
+  - Source: `§14.9 L6214-L6220`
+  - Related spec refs: none
+- `14.9.1.13` **This solves the ? interaction problem:**
+  - Requirement: This solves the `?` interaction problem:
+  - Source: `§14.9 L6222`
+  - Related spec refs: none
+- `14.9.1.14` **All tasks tracked via s.track will complete (or be cancelled) before async scope re...**
+  - Requirement: All tasks tracked via `s.track` will complete (or be cancelled) before `async scope` returns.
+  - Source: `§14.9 L6239-L6240`
+  - Related spec refs: none
+- `14.9.1.15` **If any tracked task panics, all sibling tasks are cancelled and the panic propagate...**
+  - Requirement: If any tracked task panics, all sibling tasks are cancelled and the panic propagates to the scope.
+  - Source: `§14.9 L6241-L6242`
+  - Related spec refs: none
+- `14.9.1.16` **The scope is an expression — it returns the value of body.**
+  - Requirement: The scope is an expression — it returns the value of `body`.
+  - Source: `§14.9 L6243`
+  - Related spec refs: none
+- `14.9.1.17` **s cannot escape the scope. It is ephemeral.**
+  - Requirement: `s` cannot escape the scope. It is ephemeral.
+  - Source: `§14.9 L6244`
+  - Related spec refs: none
+- `14.9.1.18` **The scope result cannot be ephemeral. Await or copy the value before it leaves the...**
+  - Requirement: The scope result cannot be ephemeral. Await or copy the value before it leaves the scope.
+  - Source: `§14.9 L6245-L6246`
+  - Related spec refs: none
+- `14.9.1.19` **For CPU-bound parallelism on OS threads (no fiber runtime required):**
+  - Requirement: For CPU-bound parallelism on OS threads (no fiber runtime required):
+  - Source: `§14.9 L6258`
+  - Related spec refs: none
+- `14.9.1.20` **The non-async scope uses s.spawn(() => closure) because OS-thread work items are sy...**
+  - Requirement: The non-async `scope` uses `s.spawn(() => closure)` because OS-thread work items are sync closures — no eager fiber spawning occurs.
+  - Source: `§14.9 L6267-L6274`
+  - Related spec refs: none
+- `14.9.1.21` **s.spawn(worker) returns a ScopedJoinHandle, which supports .join() -> i32 and is jo...**
+  - Requirement: `s.spawn(worker)` returns a `ScopedJoinHandle`, which supports `.join() -> i32` and is joined automatically at scope exit if it has not already been joined.
+  - Source: `§14.9 L6267-L6274`
+  - Related spec refs: none
+- `14.9.1.22` **ScopedJoinHandle is ephemeral: it may not leave the scope result or be stored in no...**
+  - Requirement: `ScopedJoinHandle` is ephemeral: it may not leave the `scope` result or be stored in non-ephemeral data.
+  - Source: `§14.9 L6267-L6274`
+  - Related spec refs: none
+- `14.9.1.23` **scope supports the same inline, colon, and braced body forms and is available in no...**
+  - Requirement: `scope` supports the same inline, colon, and braced body forms and is available in `no_runtime` builds.
+  - Source: `§14.9 L6267-L6274`
+  - Related spec refs: none
+
+### §14.10 Select Await
+
+- `14.10.1.1` **select await races multiple async expressions and executes the branch of the first...**
+  - Requirement: `select await` races multiple async expressions and executes the branch of the first to complete.
+  - Source: `§14.10 L6278-L6279`
+  - Related spec refs: none
+- `14.10.1.2` **Remaining expressions are cancelled.**
+  - Requirement: Remaining expressions are cancelled.
+  - Source: `§14.10 L6278-L6279`
+  - Related spec refs: none
+- `14.10.1.3` **Each branch has the form pattern = async_expr => body.**
+  - Requirement: Each branch has the form `pattern = async_expr => body`.
+  - Source: `§14.10 L6288-L6290`
+  - Related spec refs: none
+- `14.10.1.4` **The runtime starts all expressions concurrently, the first to resolve fires its bra...**
+  - Requirement: The runtime starts all expressions concurrently, the first to resolve fires its branch, and all siblings are cancelled (structured cancellation).
+  - Source: `§14.10 L6288-L6290`
+  - Related spec refs: none
+- `14.10.1.5` **Type safety: Each branch handles its own return type independently — no shared enum...**
+  - Requirement: **Type safety:** Each branch handles its own return type independently — no shared enum wrapper needed.
+  - Source: `§14.10 L6292-L6294`
+  - Related spec refs: none
+- `14.10.1.6` **This scales to any number of branches without First/Second/Third boilerplate.**
+  - Requirement: This scales to any number of branches without `First`/`Second`/`Third` boilerplate.
+  - Source: `§14.10 L6292-L6294`
+  - Related spec refs: none
+- `14.10.1.7` **Fair selection (default): If multiple expressions complete simultaneously, the runt...**
+  - Requirement: **Fair selection (default):** If multiple expressions complete simultaneously, the runtime selects a **ready branch at random** (pseudo-random, not cryptographic).
+  - Source: `§14.10 L6315-L6319`
+  - Related spec refs: none
+- `14.10.1.8` **This prevents starvation: a high-throughput data channel cannot indefinitely starve...**
+  - Requirement: This prevents starvation: a high-throughput data channel cannot indefinitely starve a shutdown signal or heartbeat timer.
+  - Source: `§14.10 L6315-L6319`
+  - Related spec refs: none
+- `14.10.1.9` **Biased selection: For cases where deterministic priority is needed, use select awai...**
+  - Requirement: **Biased selection:** For cases where deterministic priority is needed, use `select await biased`.
+  - Source: `§14.10 L6328-L6330`
+  - Related spec refs: none
+- `14.10.1.10` **This selects the first textual branch that is ready (top-to-bottom priority):**
+  - Requirement: This selects the first textual branch that is ready (top-to-bottom priority):
+  - Source: `§14.10 L6328-L6330`
+  - Related spec refs: none
+- `14.10.1.11` **Use biased when you need guaranteed priority ordering and understand the starvation...**
+  - Requirement: Use `biased` when you need guaranteed priority ordering and understand the starvation risk.
+  - Source: `§14.10 L6339-L6340`
+  - Related spec refs: none
+- `14.10.1.12` **Handling Option/Result in branches: Use let ... else inside the branch body to dest...**
+  - Requirement: **Handling `Option`/`Result` in branches:** Use `let ... else` inside the branch body to destructure the completed value.
+  - Source: `§14.10 L6342-L6344`
+  - Related spec refs: none
+- `14.10.1.13` **This reuses existing syntax and keeps the grammar simple:**
+  - Requirement: This reuses existing syntax and keeps the grammar simple:
+  - Source: `§14.10 L6342-L6344`
+  - Related spec refs: none
+- `14.10.1.14` **Exhaustiveness: select await does not require a default branch.**
+  - Requirement: **Exhaustiveness:** `select await` does not require a default branch.
+  - Source: `§14.10 L6359-L6362`
+  - Related spec refs: none
+- `14.10.1.15` **At least one branch must be present.**
+  - Requirement: At least one branch must be present.
+  - Source: `§14.10 L6359-L6362`
+  - Related spec refs: none
+- `14.10.1.16` **If all expressions complete with values that don't match their patterns, the select...**
+  - Requirement: If all expressions complete with values that don't match their patterns, the select panics (same as a non-exhaustive match).
+  - Source: `§14.10 L6359-L6362`
+  - Related spec refs: none
+
+### §14.11 Concurrent Await
+
+- `14.11.1.1` **When .await is applied to a tuple of tasks, all elements execute concurrently and t...**
+  - Requirement: When `.await` is applied to a tuple of tasks, all elements execute concurrently and the result is a tuple of their results.
+  - Source: `§14.11 L6366-L6367`
+  - Related spec refs: none
+- `14.11.1.2` **Given (Task[A], Task[B], ..., Task[N]), tuple .await returns (A, B, ..., N).**
+  - Requirement: Given `(Task[A], Task[B], ..., Task[N])`, tuple `.await` returns `(A, B, ..., N)`.
+  - Source: `§14.11 L6375-L6376`
+  - Related spec refs: none
+- `14.11.1.3` **Calling an async fn eagerly spawns a fiber (§14.4), so tuple .await is a join opera...**
+  - Requirement: Calling an `async fn` eagerly spawns a fiber (§14.4), so tuple `.await` is a join operation over already-running tasks.
+  - Source: `§14.11 L6378-L6379`
+  - Related spec refs: §14.4
+- `14.11.1.4` **Error handling with ? composes in tuple order:**
+  - Requirement: Error handling with `?` composes in tuple order:
+  - Source: `§14.11 L6381`
+  - Related spec refs: none
+- `14.11.1.5` **(Task[Result[A, E]], Task[Result[B, E]]).await? has type (A, B).**
+  - Requirement: `(Task[Result[A, E]], Task[Result[B, E]]).await?` has type `(A, B)`.
+  - Source: `§14.11 L6383`
+  - Related spec refs: none
+- `14.11.1.6` **If ? triggers early return from an async scope, tracked siblings are cancelled by n...**
+  - Requirement: If `?` triggers early return from an `async scope`, tracked siblings are cancelled by normal scope unwinding rules.
+  - Source: `§14.11 L6385-L6387`
+  - Related spec refs: none
+- `14.11.1.7` **Outside async scope, normal Task drop semantics apply (§14.7).**
+  - Requirement: Outside `async scope`, normal `Task` drop semantics apply (§14.7).
+  - Source: `§14.11 L6385-L6387`
+  - Related spec refs: §14.7
+- `14.11.1.8` **Tuple .await supports tuple sizes 2..12 (same as tuple arity limits in §4.6).**
+  - Requirement: Tuple `.await` supports tuple sizes 2..12 (same as tuple arity limits in §4.6).
+  - Source: `§14.11 L6398-L6399`
+  - Related spec refs: §4.6
+- `14.11.1.9` **For dynamic or larger sets, use collection combinators.**
+  - Requirement: For dynamic or larger sets, use collection combinators.
+  - Source: `§14.11 L6398-L6399`
+  - Related spec refs: none
+- `14.11.1.10` **Desugaring (2-tuple):**
+  - Requirement: Desugaring (2-tuple):
+  - Source: `§14.11 L6401`
+  - Related spec refs: none
+- `14.11.1.11` **Runtime implementations may use a multi-wait join internally; observable semantics...**
+  - Requirement: Runtime implementations may use a multi-wait join internally; observable semantics are completion of all tasks with results in tuple order.
+  - Source: `§14.11 L6413-L6414`
+  - Related spec refs: none
+- `14.11.1.12` **Await 2–12 heterogeneous tasks; (task_a, task_b).await**
+  - Requirement: Await 2–12 heterogeneous tasks; `(task_a, task_b).await`
+  - Source: `§14.11 L6418`
+  - Related spec refs: none
+- `14.11.1.13` **Await N homogeneous tasks; tasks; > await_all**
+  - Requirement: Await N homogeneous tasks; `tasks; > await_all`
+  - Source: `§14.11 L6419`
+  - Related spec refs: none
+- `14.11.1.14` **First task to complete; tasks; > await_first**
+  - Requirement: First task to complete; `tasks; > await_first`
+  - Source: `§14.11 L6420`
+  - Related spec refs: none
+- `14.11.1.15` **First successful task; tasks; > await_any**
+  - Requirement: First successful task; `tasks; > await_any`
+  - Source: `§14.11 L6421`
+  - Related spec refs: none
+- `14.11.1.16` **All results including errors; tasks; > await_settled**
+  - Requirement: All results including errors; `tasks; > await_settled`
+  - Source: `§14.11 L6422`
+  - Related spec refs: none
+- `14.11.1.17` **First of N with pattern dispatch; select await (§14.10)**
+  - Requirement: First of N with pattern dispatch; `select await` (§14.10)
+  - Source: `§14.11 L6423`
+  - Related spec refs: §14.10
+- `14.11.1.18` **Dynamic spawn + cancellation scope; async scope (§14.9)**
+  - Requirement: Dynamic spawn + cancellation scope; `async scope` (§14.9)
+  - Source: `§14.11 L6424`
+  - Related spec refs: §14.9
+- `14.11.1.19` **Fire-and-forget; spawn expr (§14.7)**
+  - Requirement: Fire-and-forget; `spawn expr` (§14.7)
+  - Source: `§14.11 L6425`
+  - Related spec refs: §14.7
+
+### §14.11.1 Collection Await (Standard Library)
+
+- `14.11.1.20` **Collection await is a standard-library surface, not special syntax:**
+  - Requirement: Collection await is a standard-library surface, not special syntax:
+  - Source: `§14.11.1 L6429`
+  - Related spec refs: none
+- `14.11.1.21` **Collection combinators follow deterministic semantics:**
+  - Requirement: Collection combinators follow deterministic semantics:
+  - Source: `§14.11.1 L6438`
+  - Related spec refs: none
+- `14.11.1.22` **await_all(Task[T]) -> Vec[T] waits for all tasks and returns results in input order.**
+  - Requirement: `await_all(Task[T]) -> Vec[T]` waits for all tasks and returns results in input order.
+  - Source: `§14.11.1 L6440`
+  - Related spec refs: none
+- `14.11.1.23` **await_all(Task[Result[T, E]]) -> Result[Vec[T], E] is fail-fast: on first Err, it c...**
+  - Requirement: `await_all(Task[Result[T, E]]) -> Result[Vec[T], E]` is fail-fast: on first `Err`, it cancels and joins remaining tasks, then returns that `Err`.
+  - Source: `§14.11.1 L6441`
+  - Related spec refs: none
+- `14.11.1.24` **await_first(Task[T]) -> T returns the first completed result, then cancels and join...**
+  - Requirement: `await_first(Task[T]) -> T` returns the first completed result, then cancels and joins losers before returning.
+  - Source: `§14.11.1 L6442`
+  - Related spec refs: none
+- `14.11.1.25` **await_any(Task[Result[T, E]]) -> Result[T, Vec[E]] returns first Ok(T) (then cancel...**
+  - Requirement: `await_any(Task[Result[T, E]]) -> Result[T, Vec[E]]` returns first `Ok(T)` (then cancels + joins losers); if all fail, returns `Err(Vec[E])` in input order.
+  - Source: `§14.11.1 L6443`
+  - Related spec refs: none
+- `14.11.1.26` **await_settled(Task[Result[T, E]]) -> Vec[Result[T, E]] never cancels, waits for all...**
+  - Requirement: `await_settled(Task[Result[T, E]]) -> Vec[Result[T, E]]` never cancels, waits for all, and returns in input order.
+  - Source: `§14.11.1 L6444`
+  - Related spec refs: none
+- `14.11.1.27` **Empty-input behavior:**
+  - Requirement: Empty-input behavior:
+  - Source: `§14.11.1 L6446`
+  - Related spec refs: none
+- `14.11.1.28` **await_first([]) panics with stable message: "await_first: empty input".**
+  - Requirement: `await_first([])` panics with stable message: `"await_first: empty input"`.
+  - Source: `§14.11.1 L6448-L6449`
+  - Related spec refs: none
+- `14.11.1.29` **await_any([]) returns Err(Vec.new()).**
+  - Requirement: `await_any([])` returns `Err(Vec.new())`.
+  - Source: `§14.11.1 L6450`
+  - Related spec refs: none
+- `14.11.1.30` **For non-empty input, await_any all-fail result is guaranteed non-empty (Err(errors)...**
+  - Requirement: For non-empty input, `await_any` all-fail result is guaranteed non-empty (`Err(errors)` where `errors.len() > 0`).
+  - Source: `§14.11.1 L6451-L6452`
+  - Related spec refs: none
+- `14.11.1.31` **Ordering guarantee for await_any all-fail:**
+  - Requirement: Ordering guarantee for `await_any` all-fail:
+  - Source: `§14.11.1 L6454`
+  - Related spec refs: none
+- `14.11.1.32` **Errors are aggregated in input order, not completion order.**
+  - Requirement: Errors are aggregated in **input order**, not completion order.
+  - Source: `§14.11.1 L6456`
+  - Related spec refs: none
+- `14.11.1.33` **Cancellation/drop contract for collection combinators:**
+  - Requirement: Cancellation/drop contract for collection combinators:
+  - Source: `§14.11.1 L6458`
+  - Related spec refs: none
+- `14.11.1.34` **If a combinator returns early (winner found or fail-fast trigger), it cancels all r...**
+  - Requirement: If a combinator returns early (winner found or fail-fast trigger), it cancels all remaining owned tasks and joins them before return.
+  - Source: `§14.11.1 L6460-L6461`
+  - Related spec refs: none
+- `14.11.1.35` **If the combinator itself is cancelled/dropped mid-flight, it cancels remaining owne...**
+  - Requirement: If the combinator itself is cancelled/dropped mid-flight, it cancels remaining owned tasks and joins them before unwinding.
+  - Source: `§14.11.1 L6462-L6463`
+  - Related spec refs: none
+- `14.11.1.36` **See lib/std/async.w and lib/std/async/ docs for API details.**
+  - Requirement: See `lib/std/async.w` and `lib/std/async/` docs for API details.
+  - Source: `§14.11.1 L6465`
+  - Related spec refs: none
+
+### §14.12 Why Fibers, Not State Machines?
+
+- `14.12.1.1` ***For design rationale on fibers vs state machines, see docs/design-rationale.md.***
+  - Requirement: *For design rationale on fibers vs state machines, see `docs/design-rationale.md`.*
+  - Source: `§14.12 L6469-L6470`
+  - Related spec refs: none
+
+### §14.13 Interaction with Ownership
+
+- `14.13.1.1` **Because fibers have real stacks, references across await are safe:**
+  - Requirement: Because fibers have real stacks, references across `await` are safe:
+  - Source: `§14.13 L6474`
+  - Related spec refs: none
+- `14.13.1.2` **In Rust, this requires Pin<&mut Self> because the Future is a struct and references...**
+  - Requirement: In Rust, this requires `Pin<&mut Self>` because the Future is a struct and references into it invalidate on move.
+  - Source: `§14.13 L6485-L6487`
+  - Related spec refs: none
+- `14.13.1.3` **Here, the fiber stack doesn't move.**
+  - Requirement: Here, the fiber stack doesn't move.
+  - Source: `§14.13 L6485-L6487`
+  - Related spec refs: none
+- `14.13.1.4` **.await works inside standard higher-order functions.**
+  - Requirement: **`.await` works inside standard higher-order functions.**
+  - Source: `§14.13 L6489-L6492`
+  - Related spec refs: none
+- `14.13.1.5` **Because fibers have real stacks, .await is valid anywhere — including inside closur...**
+  - Requirement: Because fibers have real stacks, `.await` is valid anywhere — including inside closures passed to `map`, `filter`, `fold`, and `for_each`.
+  - Source: `§14.13 L6489-L6492`
+  - Related spec refs: none
+- `14.13.1.6` **No specialized AsyncIterator or Stream traits are needed:**
+  - Requirement: No specialized `AsyncIterator` or `Stream` traits are needed:
+  - Source: `§14.13 L6489-L6492`
+  - Related spec refs: none
+- `14.13.1.7` **This is one of the most significant ergonomic advantages of the fiber model.**
+  - Requirement: This is one of the most significant ergonomic advantages of the fiber model.
+  - Source: `§14.13 L6506-L6510`
+  - Related spec refs: none
+- `14.13.1.8` **In Rust, any use of .await inside an iterator closure requires rewriting to use Str...**
+  - Requirement: In Rust, any use of `.await` inside an iterator closure requires rewriting to use `Stream`, `futures::join_all`, or manual loops.
+  - Source: `§14.13 L6506-L6510`
+  - Related spec refs: none
+- `14.13.1.9` **In With, standard synchronous iteration and standard async functions compose freely.**
+  - Requirement: In With, standard synchronous iteration and standard async functions compose freely.
+  - Source: `§14.13 L6506-L6510`
+  - Related spec refs: none
+- `14.13.1.10` **Implementation note: The language guarantees semantic stack preservation — safe ref...**
+  - Requirement: **Implementation note:** The language guarantees **semantic stack preservation** — safe references remain valid across `await` points.
+  - Source: `§14.13 L6512-L6519`
+  - Related spec refs: none
+- `14.13.1.11` **Implementations may relocate or segment physical stacks, but the compiler ensures s...**
+  - Requirement: Implementations may relocate or segment physical stacks, but the compiler ensures safe references are updated or indirected transparently.
+  - Source: `§14.13 L6512-L6519`
+  - Related spec refs: none
+- `14.13.1.12` **Raw pointers (*const T, *mut T) obtained via unsafe are not updated — they are bare...**
+  - Requirement: Raw pointers (`*const T`, `*mut T`) obtained via `unsafe` are **not** updated — they are bare addresses.
+  - Source: `§14.13 L6512-L6519`
+  - Related spec refs: none
+- `14.13.1.13` **This is why §19.3 forbids raw pointers to stack locals across await.**
+  - Requirement: This is why §19.3 forbids raw pointers to stack locals across `await`.
+  - Source: `§14.13 L6512-L6519`
+  - Related spec refs: §19.3
+- `14.13.1.14` **Safe code is never affected.**
+  - Requirement: Safe code is never affected.
+  - Source: `§14.13 L6512-L6519`
+  - Related spec refs: none
+
+### §14.14 OS Threads (Always Available)
+
+- `14.14.1.1` **OS threads exist independently of the fiber runtime and are available in all builds...**
+  - Requirement: OS threads exist independently of the fiber runtime and are available in all builds, including `no_runtime`:
+  - Source: `§14.14 L6523-L6524`
+  - Related spec refs: none
+- `14.14.1.2` **For structured CPU-bound parallelism:**
+  - Requirement: For structured CPU-bound parallelism:
+  - Source: `§14.14 L6531`
+  - Related spec refs: none
+
+### §14.15 Channels
+
+- `14.15.1.1` **Channels transfer ownership: sending moves the value.**
+  - Requirement: Channels transfer ownership: sending moves the value.
+  - Source: `§14.15 L6554-L6560`
+  - Related spec refs: none
+- `14.15.1.2` **Channel element types must be Send, not merely ScopedSend.**
+  - Requirement: **Channel element types must be `Send`, not merely `ScopedSend`.**
+  - Source: `§14.15 L6554-L6560`
+  - Related spec refs: none
+- `14.15.1.3` **This is critical: a channel decouples the lifetime of data from the sender's stack...**
+  - Requirement: This is critical: a channel decouples the lifetime of data from the sender's stack frame.
+  - Source: `§14.15 L6554-L6560`
+  - Related spec refs: none
+- `14.15.1.4` **Even inside an async scope, Fiber 1 can send a reference to its own local and then...**
+  - Requirement: Even inside an `async scope`, Fiber 1 can send a reference to its own local and then drop that local before Fiber 2 reads the message.
+  - Source: `§14.15 L6554-L6560`
+  - Related spec refs: none
+- `14.15.1.5` **ScopedSend guarantees the *scope* outlives the fibers, but not that Fiber 1's local...**
+  - Requirement: `ScopedSend` guarantees the *scope* outlives the fibers, but not that Fiber 1's locals outlive Fiber 2's reads.
+  - Source: `§14.15 L6554-L6560`
+  - Related spec refs: none
+
+### §14.16 Send, Sync, and ScopedSend
+
+- `14.16.1.1` **Send: safe to transfer across thread boundaries (value may outlive the sender). Eph...**
+  - Requirement: `Send`: safe to transfer across thread boundaries (value may outlive the sender). Ephemeral types are **not** `Send`.
+  - Source: `§14.16 L6581-L6582`
+  - Related spec refs: none
+- `14.16.1.2` **Sync: safe to share via &T across threads**
+  - Requirement: `Sync`: safe to share via `&T` across threads
+  - Source: `§14.16 L6583`
+  - Related spec refs: none
+- `14.16.1.3` **ScopedSend: safe to capture in a closure sent to a scoped thread or fiber that is g...**
+  - Requirement: `ScopedSend`: safe to **capture in a closure** sent to a scoped thread or fiber that is guaranteed to join before the current scope exits. All `Send` types implement `ScopedSend`. **Ephemeral types also implement `ScopedSend`** — they can be captured by scoped fibers because the scope guarantees the fiber joins before the borrowed data goes out of scope.
+  - Source: `§14.16 L6584-L6590`
+  - Related spec refs: none
+- `14.16.1.4` **Important: ScopedSend does NOT mean "safe to send over a channel."**
+  - Requirement: **Important:** `ScopedSend` does NOT mean "safe to send over a channel."
+  - Source: `§14.16 L6592-L6596`
+  - Related spec refs: none
+- `14.16.1.5` **Channels decouple sender and receiver lifetimes.**
+  - Requirement: Channels decouple sender and receiver lifetimes.
+  - Source: `§14.16 L6592-L6596`
+  - Related spec refs: none
+- `14.16.1.6` **ScopedSend only covers direct capture in the spawned closure — the reference's life...**
+  - Requirement: `ScopedSend` only covers direct capture in the spawned closure — the reference's lifetime is guaranteed by the scope's join.
+  - Source: `§14.16 L6592-L6596`
+  - Related spec refs: none
+- `14.16.1.7` **Channel element types require full Send (see §14.15).**
+  - Requirement: Channel element types require full `Send` (see §14.15).
+  - Source: `§14.16 L6592-L6596`
+  - Related spec refs: §14.15
+- `14.16.1.8` **i32, String, owned types; Yes; Yes**
+  - Requirement: `i32`, `String`, owned types; Yes; Yes
+  - Source: `§14.16 L6613`
+  - Related spec refs: none
+- `14.16.1.9` **Arc[T] where T: Send + Sync; Yes; Yes**
+  - Requirement: `Arc[T]` where `T: Send + Sync`; Yes; Yes
+  - Source: `§14.16 L6614`
+  - Related spec refs: none
+- `14.16.1.10` **Rc[T]; No; No**
+  - Requirement: `Rc[T]`; No; No
+  - Source: `§14.16 L6615`
+  - Related spec refs: none
+- `14.16.1.11` **&T; No; Yes**
+  - Requirement: `&T`; No; Yes
+  - Source: `§14.16 L6616`
+  - Related spec refs: none
+- `14.16.1.12` **Ephemeral structs; No; Yes**
+  - Requirement: Ephemeral structs; No; Yes
+  - Source: `§14.16 L6617`
+  - Related spec refs: none
+- `14.16.1.13` **Task[T] (non-ephemeral); Yes (if T: Send); Yes**
+  - Requirement: `Task[T]` (non-ephemeral); Yes (if `T: Send`); Yes
+  - Source: `§14.16 L6618`
+  - Related spec refs: none
+- `14.16.1.14` **Task[T] (ephemeral); No; Yes**
+  - Requirement: `Task[T]` (ephemeral); No; Yes
+  - Source: `§14.16 L6619`
+  - Related spec refs: none
+
+### §14.17 Synchronization Primitives
+
+- `14.17.1.1` **Mutex[T] — mutual exclusion with scoped access**
+  - Requirement: `Mutex[T]` — mutual exclusion with scoped access
+  - Source: `§14.17 L6623`
+  - Related spec refs: none
+- `14.17.1.2` **RwLock[T] — reader-writer lock with scoped access**
+  - Requirement: `RwLock[T]` — reader-writer lock with scoped access
+  - Source: `§14.17 L6624`
+  - Related spec refs: none
+- `14.17.1.3` **Atomic[T] — lock-free atomic operations**
+  - Requirement: `Atomic[T]` — lock-free atomic operations
+  - Source: `§14.17 L6625`
+  - Related spec refs: none
+- `14.17.1.4` **Condvar — condition variable**
+  - Requirement: `Condvar` — condition variable
+  - Source: `§14.17 L6626`
+  - Related spec refs: none
+- `14.17.1.5` **All are usable with with blocks for scoped access.**
+  - Requirement: All are usable with `with` blocks for scoped access.
+  - Source: `§14.17 L6628-L6629`
+  - Related spec refs: none
+- `14.17.1.6` **Lock operations are fiber-aware: contended locks yield the fiber, not the OS thread.**
+  - Requirement: Lock operations are fiber-aware: contended locks yield the fiber, not the OS thread.
+  - Source: `§14.17 L6628-L6629`
+  - Related spec refs: none
+
+### §14.17.1 Atomic[T]
+
+- `14.17.1.7` **Atomic[T] provides lock-free atomic operations on integer and pointer types.**
+  - Requirement: `Atomic[T]` provides lock-free atomic operations on integer and pointer types.
+  - Source: `§14.17.1 L6633-L6635`
+  - Related spec refs: none
+- `14.17.1.8` **T must be an integer type (i32, i64, u32, u64, etc.) or a pointer type.**
+  - Requirement: `T` must be an integer type (`i32`, `i64`, `u32`, `u64`, etc.) or a pointer type.
+  - Source: `§14.17.1 L6633-L6635`
+  - Related spec refs: none
+- `14.17.1.9` **Atomic.new(val); fn(T) -> Atomic[T]; Create with initial value**
+  - Requirement: `Atomic.new(val)`; `fn(T) -> Atomic[T]`; Create with initial value
+  - Source: `§14.17.1 L6662`
+  - Related spec refs: none
+- `14.17.1.10` **.load(order); fn(Order) -> T; Atomic read**
+  - Requirement: `.load(order)`; `fn(Order) -> T`; Atomic read
+  - Source: `§14.17.1 L6663`
+  - Related spec refs: none
+- `14.17.1.11` **.store(val, order); fn(T, Order) -> void; Atomic write**
+  - Requirement: `.store(val, order)`; `fn(T, Order) -> void`; Atomic write
+  - Source: `§14.17.1 L6664`
+  - Related spec refs: none
+- `14.17.1.12` **.swap(val, order); fn(T, Order) -> T; Exchange, return old**
+  - Requirement: `.swap(val, order)`; `fn(T, Order) -> T`; Exchange, return old
+  - Source: `§14.17.1 L6665`
+  - Related spec refs: none
+- `14.17.1.13` **.fetch_add(val, order); fn(T, Order) -> T; Add, return old**
+  - Requirement: `.fetch_add(val, order)`; `fn(T, Order) -> T`; Add, return old
+  - Source: `§14.17.1 L6666`
+  - Related spec refs: none
+- `14.17.1.14` **.fetch_sub(val, order); fn(T, Order) -> T; Subtract, return old**
+  - Requirement: `.fetch_sub(val, order)`; `fn(T, Order) -> T`; Subtract, return old
+  - Source: `§14.17.1 L6667`
+  - Related spec refs: none
+- `14.17.1.15` **.fetch_and(val, order); fn(T, Order) -> T; Bitwise AND, return old**
+  - Requirement: `.fetch_and(val, order)`; `fn(T, Order) -> T`; Bitwise AND, return old
+  - Source: `§14.17.1 L6668`
+  - Related spec refs: none
+- `14.17.1.16` **.fetch_or(val, order); fn(T, Order) -> T; Bitwise OR, return old**
+  - Requirement: `.fetch_or(val, order)`; `fn(T, Order) -> T`; Bitwise OR, return old
+  - Source: `§14.17.1 L6669`
+  - Related spec refs: none
+- `14.17.1.17` **.fetch_xor(val, order); fn(T, Order) -> T; Bitwise XOR, return old**
+  - Requirement: `.fetch_xor(val, order)`; `fn(T, Order) -> T`; Bitwise XOR, return old
+  - Source: `§14.17.1 L6670`
+  - Related spec refs: none
+- `14.17.1.18` **.fetch_min(val, order); fn(T, Order) -> T; Min, return old**
+  - Requirement: `.fetch_min(val, order)`; `fn(T, Order) -> T`; Min, return old
+  - Source: `§14.17.1 L6671`
+  - Related spec refs: none
+- `14.17.1.19` **.fetch_max(val, order); fn(T, Order) -> T; Max, return old**
+  - Requirement: `.fetch_max(val, order)`; `fn(T, Order) -> T`; Max, return old
+  - Source: `§14.17.1 L6672`
+  - Related spec refs: none
+- `14.17.1.20` **.compare_exchange(expected, desired, success, failure); fn(T, T, Order, Order) -> R...**
+  - Requirement: `.compare_exchange(expected, desired, success, failure)`; `fn(T, T, Order, Order) -> Result[T, T]`; CAS, strong
+  - Source: `§14.17.1 L6673`
+  - Related spec refs: none
+- `14.17.1.21` **.compare_exchange_weak(expected, desired, success, failure); fn(T, T, Order, Order)...**
+  - Requirement: `.compare_exchange_weak(expected, desired, success, failure)`; `fn(T, T, Order, Order) -> Result[T, T]`; CAS, weak
+  - Source: `§14.17.1 L6674`
+  - Related spec refs: none
+- `14.17.1.22` **compare_exchange returns Ok(old_value) on success or Err(actual_value) on failure.**
+  - Requirement: `compare_exchange` returns `Ok(old_value)` on success or `Err(actual_value)` on failure.
+  - Source: `§14.17.1 L6676-L6677`
+  - Related spec refs: none
+- `14.17.1.23` **.store cannot use .Acquire or .AcqRel**
+  - Requirement: `.store` cannot use `.Acquire` or `.AcqRel`
+  - Source: `§14.17.1 L6691`
+  - Related spec refs: none
+- `14.17.1.24` **.load cannot use .Release or .AcqRel**
+  - Requirement: `.load` cannot use `.Release` or `.AcqRel`
+  - Source: `§14.17.1 L6692`
+  - Related spec refs: none
+- `14.17.1.25` **compare_exchange failure ordering cannot be stronger than success ordering, and can...**
+  - Requirement: `compare_exchange` failure ordering cannot be stronger than success ordering, and cannot be `.Release` or `.AcqRel`
+  - Source: `§14.17.1 L6693-L6694`
+  - Related spec refs: none
+
+### §14.18 The Fiber Runtime
+
+- `14.18.1.1` **The fiber scheduler is part of the standard library.**
+  - Requirement: The fiber scheduler is part of the standard library.
+  - Source: `§14.18 L6698`
+  - Related spec refs: none
+- `14.18.1.2` **Initialized automatically on program start for hosted targets**
+  - Requirement: Initialized automatically on program start for hosted targets
+  - Source: `§14.18 L6700`
+  - Related spec refs: none
+- `14.18.1.3` **Work-stealing across OS threads**
+  - Requirement: Work-stealing across OS threads
+  - Source: `§14.18 L6701`
+  - Related spec refs: none
+- `14.18.1.4` **Not a trait, not pluggable, not replaceable**
+  - Requirement: Not a trait, not pluggable, not replaceable
+  - Source: `§14.18 L6702`
+  - Related spec refs: none
+- `14.18.1.5` **Absent in no_runtime builds (and async is then a compile error)**
+  - Requirement: Absent in `no_runtime` builds (and `async` is then a compile error)
+  - Source: `§14.18 L6703`
+  - Related spec refs: none
+- `14.18.1.6` **The runtime is the one component with hidden scheduling cost.**
+  - Requirement: The runtime is the one component with hidden scheduling cost.
+  - Source: `§14.18 L6705-L6708`
+  - Related spec refs: none
+- `14.18.1.7` **This is acceptable because: (a) it is opt-in via async, (b) suspension points are a...**
+  - Requirement: This is acceptable because: (a) it is opt-in via `async`, (b) suspension points are always marked with `await`, and (c) `no_runtime` builds can disable it entirely.
+  - Source: `§14.18 L6705-L6708`
+  - Related spec refs: none
+
+### §14.19 Fiber Stack Management
+
+- `14.19.1.1` **Each fiber has a dedicated stack.**
+  - Requirement: Each fiber has a dedicated stack.
+  - Source: `§14.19 L6712-L6714`
+  - Related spec refs: none
+- `14.19.1.2` **Stack memory is the primary resource cost of the fiber model and must be understood...**
+  - Requirement: Stack memory is the primary resource cost of the fiber model and must be understood to use `async` effectively.
+  - Source: `§14.19 L6712-L6714`
+  - Related spec refs: none
+- `14.19.1.3` **Default stack size: 64 KB per fiber.**
+  - Requirement: **Default stack size:** 64 KB per fiber.
+  - Source: `§14.19 L6716-L6717`
+  - Related spec refs: none
+- `14.19.1.4` **Sufficient for typical I/O-bound code.**
+  - Requirement: Sufficient for typical I/O-bound code.
+  - Source: `§14.19 L6716-L6717`
+  - Related spec refs: none
+- `14.19.1.5` **Configurable per-application in with.toml:**
+  - Requirement: Configurable per-application in `with.toml`:
+  - Source: `§14.19 L6716-L6717`
+  - Related spec refs: none
+- `14.19.1.6` **Growable stacks: The reference implementation uses growable stacks.**
+  - Requirement: **Growable stacks:** The reference implementation uses growable stacks.
+  - Source: `§14.19 L6726-L6732`
+  - Related spec refs: none
+- `14.19.1.7` **A fiber starts with a small initial allocation (default 8 KB) and grows on demand.**
+  - Requirement: A fiber starts with a small initial allocation (default 8 KB) and grows on demand.
+  - Source: `§14.19 L6726-L6732`
+  - Related spec refs: none
+- `14.19.1.8` **Stack overflow does not silently corrupt memory — growth is detected at each functi...**
+  - Requirement: Stack overflow does not silently corrupt memory — growth is detected at each function call's stack probe and handled by allocating a new segment (implementation-defined).
+  - Source: `§14.19 L6726-L6732`
+  - Related spec refs: none
+- `14.19.1.9` **This allows most fibers to use far less than 64 KB in practice while supporting dee...**
+  - Requirement: This allows most fibers to use far less than 64 KB in practice while supporting deep call stacks when needed.
+  - Source: `§14.19 L6726-L6732`
+  - Related spec refs: none
+- `14.19.1.10` **FFI stack switching: C code called via c_import has no knowledge of With's segmente...**
+  - Requirement: **FFI stack switching:** C code called via `c_import` has no knowledge of With's segmented stacks and may exceed remaining stack space.
+  - Source: `§14.19 L6734-L6739`
+  - Related spec refs: none
+- `14.19.1.11` **The compiler statically determines which call paths transitively invoke C functions.**
+  - Requirement: The compiler statically determines which call paths transitively invoke C functions.
+  - Source: `§14.19 L6734-L6739`
+  - Related spec refs: none
+- `14.19.1.12` **Fibers that call FFI functions automatically switch to an OS-thread-sized stack at...**
+  - Requirement: Fibers that call FFI functions **automatically switch to an OS-thread-sized stack** at the FFI boundary:
+  - Source: `§14.19 L6734-L6739`
+  - Related spec refs: none
+- `14.19.1.13` **The compiler marks functions as ffi_reachable if they (directly or transitively) ca...**
+  - Requirement: The compiler marks functions as `ffi_reachable` if they (directly or transitively) call any `c_import` function.
+  - Source: `§14.19 L6741-L6742`
+  - Related spec refs: none
+- `14.19.1.14` **At the FFI call site, the runtime saves the fiber stack pointer and switches to a p...**
+  - Requirement: At the FFI call site, the runtime saves the fiber stack pointer and switches to a pre-allocated OS-thread stack (typically 2–8 MB) from a per-thread pool.
+  - Source: `§14.19 L6743-L6745`
+  - Related spec refs: none
+- `14.19.1.15` **The C function executes on the full-size stack.**
+  - Requirement: The C function executes on the full-size stack.
+  - Source: `§14.19 L6746`
+  - Related spec refs: none
+- `14.19.1.16` **On return, the runtime restores the fiber stack pointer.**
+  - Requirement: On return, the runtime restores the fiber stack pointer.
+  - Source: `§14.19 L6747`
+  - Related spec refs: none
+- `14.19.1.17` **The stack switch costs approximately 10–50 ns (save/restore a few registers).**
+  - Requirement: The stack switch costs approximately 10–50 ns (save/restore a few registers).
+  - Source: `§14.19 L6749-L6752`
+  - Related spec refs: none
+- `14.19.1.18` **This is honest overhead — not zero-cost, but predictable and safe.**
+  - Requirement: This is honest overhead — not zero-cost, but predictable and safe.
+  - Source: `§14.19 L6749-L6752`
+  - Related spec refs: none
+- `14.19.1.19` **Pure-With fibers that never call C code pay nothing.**
+  - Requirement: Pure-With fibers that never call C code pay nothing.
+  - Source: `§14.19 L6749-L6752`
+  - Related spec refs: none
+- `14.19.1.20` **For performance-critical paths that call C frequently, the @[ffi_stack] attribute f...**
+  - Requirement: For performance-critical paths that call C frequently, the `@[ffi_stack]` attribute forces an entire function to run on an OS-thread stack, avoiding per-call switching:
+  - Source: `§14.19 L6763-L6765`
+  - Related spec refs: none
+- `14.19.1.21` **No suspension while C frames are on the stack.**
+  - Requirement: **No suspension while C frames are on the stack.**
+  - Source: `§14.19 L6775-L6780`
+  - Related spec refs: none
+- `14.19.1.22` **If C code calls back into With (e.g., via a function pointer passed to qsort), the...**
+  - Requirement: If C code calls back into With (e.g., via a function pointer passed to `qsort`), the With callback **must not suspend**.
+  - Source: `§14.19 L6775-L6780`
+  - Related spec refs: none
+- `14.19.1.23` **Suspending a fiber while C frames are active on the OS stack would corrupt the stac...**
+  - Requirement: Suspending a fiber while C frames are active on the OS stack would corrupt the stack — another fiber resuming on the same OS thread would overwrite the paused C frames.
+  - Source: `§14.19 L6775-L6780`
+  - Related spec refs: none
+- `14.19.1.24` **The compiler enforces this via may_suspend analysis (Invariant 5, §14.3): any funct...**
+  - Requirement: The compiler enforces this via `may_suspend` analysis (Invariant 5, §14.3): any function used as an `extern "C"` callback, or transitively called while C frames are on the stack, must not be `may_suspend`:
+  - Source: `§14.19 L6782-L6785`
+  - Related spec refs: §14.3
+- `14.19.1.25` **Rust stackless futures; ~state machine size; ~state machine sizes**
+  - Requirement: Rust stackless futures; ~state machine size; ~state machine sizes
+  - Source: `§14.19 L6809`
+  - Related spec refs: none
+- `14.19.1.26` **With fibers (8 KB initial); 8–64 KB (grows on demand); ~800 MB worst case**
+  - Requirement: With fibers (8 KB initial); 8–64 KB (grows on demand); ~800 MB worst case
+  - Source: `§14.19 L6810`
+  - Related spec refs: none
+- `14.19.1.27` **OS threads (8 MB typical); ~8 MB; Not viable**
+  - Requirement: OS threads (8 MB typical); ~8 MB; Not viable
+  - Source: `§14.19 L6811`
+  - Related spec refs: none
+- `14.19.1.28` **The 800 MB worst case is pathological — it requires all 100K fibers to grow to the...**
+  - Requirement: The 800 MB worst case is pathological — it requires all 100K fibers to grow to the full 64 KB limit and remain active simultaneously.
+  - Source: `§14.19 L6813-L6816`
+  - Related spec refs: none
+- `14.19.1.29` **Realistic suspended fibers doing typical I/O work often use less than 2 KB of actua...**
+  - Requirement: Realistic suspended fibers doing typical I/O work often use less than 2 KB of actual stack.
+  - Source: `§14.19 L6813-L6816`
+  - Related spec refs: none
+- `14.19.1.30` **Fiber stack pooling: The runtime maintains a pool of pre-allocated fiber stacks.**
+  - Requirement: **Fiber stack pooling:** The runtime maintains a pool of pre-allocated fiber stacks.
+  - Source: `§14.19 L6818-L6823`
+  - Related spec refs: none
+- `14.19.1.31` **Creating a fiber grabs a stack from the pool (one atomic operation, not malloc).**
+  - Requirement: Creating a fiber grabs a stack from the pool (one atomic operation, not `malloc`).
+  - Source: `§14.19 L6818-L6823`
+  - Related spec refs: none
+- `14.19.1.32` **When a fiber exits, its stack is returned to the pool for reuse.**
+  - Requirement: When a fiber exits, its stack is returned to the pool for reuse.
+  - Source: `§14.19 L6818-L6823`
+  - Related spec refs: none
+- `14.19.1.33` **This makes fiber creation/destruction extremely cheap — comparable to grabbing an o...**
+  - Requirement: This makes fiber creation/destruction extremely cheap — comparable to grabbing an object from a free list.
+  - Source: `§14.19 L6818-L6823`
+  - Related spec refs: none
+- `14.19.1.34` **This is critical for async trait dispatch: calling repo.find_by_id(id).await throug...**
+  - Requirement: This is critical for async trait dispatch: calling `repo.find_by_id(id).await` through a `Box[dyn UserRepository]` creates and destroys a fiber, but the stack is recycled from the pool.
+  - Source: `§14.19 L6825-L6829`
+  - Related spec refs: none
+- `14.19.1.35` **The cost is a pool grab + context switch, not a heap allocation.**
+  - Requirement: The cost is a pool grab + context switch, not a heap allocation.
+  - Source: `§14.19 L6825-L6829`
+  - Related spec refs: none
+- `14.19.1.36` **Pool size is configurable.**
+  - Requirement: Pool size is configurable.
+  - Source: `§14.19 L6831-L6832`
+  - Related spec refs: none
+- `14.19.1.37` **The runtime lazily grows the pool as needed and may shrink it under memory pressure.**
+  - Requirement: The runtime lazily grows the pool as needed and may shrink it under memory pressure.
+  - Source: `§14.19 L6831-L6832`
+  - Related spec refs: none
+- `14.19.1.38` **Scale guidance: Fibers are appropriate for web servers and database backends target...**
+  - Requirement: **Scale guidance:** Fibers are appropriate for web servers and database backends targeting 10K–100K concurrent connections.
+  - Source: `§14.19 L6834-L6839`
+  - Related spec refs: none
+- `14.19.1.39` **For systems requiring millions of simultaneous in-flight tasks, collect into owned...**
+  - Requirement: For systems requiring millions of simultaneous in-flight tasks, collect into owned data structures and process with a smaller fixed pool of worker fibers.
+  - Source: `§14.19 L6834-L6839`
+  - Related spec refs: none
+- `14.19.1.40` **For >100K suspended tasks, prefer channel-driven worker pool architectures.**
+  - Requirement: For >100K suspended tasks, prefer channel-driven worker pool architectures.
+  - Source: `§14.19 L6834-L6839`
+  - Related spec refs: none
+
+### §14.20 Generators vs. Async: A Clarification
+
+- `14.20.1.1` **Generators (gen fn) and async functions (async fn) look syntactically similar but c...**
+  - Requirement: Generators (`gen fn`) and async functions (`async fn`) look syntactically similar but compile to fundamentally different mechanisms:
+  - Source: `§14.20 L6843-L6845`
+  - Related spec refs: none
+- `14.20.1.2` **; gen fn; async fn**
+  - Requirement: ; `gen fn`; `async fn`
+  - Source: `§14.20 L6847`
+  - Related spec refs: none
+- `14.20.1.3` **--; ---------; -----------**
+  - Requirement: --; ---------; -----------
+  - Source: `§14.20 L6848`
+  - Related spec refs: none
+- `14.20.1.4` **Mechanism; State machine (compile-time); Fiber (runtime)**
+  - Requirement: **Mechanism**; State machine (compile-time); Fiber (runtime)
+  - Source: `§14.20 L6849`
+  - Related spec refs: none
+- `14.20.1.5` **Runtime required; No; Yes**
+  - Requirement: **Runtime required**; No; Yes
+  - Source: `§14.20 L6850`
+  - Related spec refs: none
+- `14.20.1.6` **Suspends; At yield; At await**
+  - Requirement: **Suspends**; At `yield`; At `await`
+  - Source: `§14.20 L6851`
+  - Related spec refs: none
+- `14.20.1.7` **Driver; Caller calls next(); Fiber scheduler**
+  - Requirement: **Driver**; Caller calls `next()`; Fiber scheduler
+  - Source: `§14.20 L6852`
+  - Related spec refs: none
+- `14.20.1.8` **Allocation; Stack at call site; Heap stack per fiber**
+  - Requirement: **Allocation**; Stack at call site; Heap stack per fiber
+  - Source: `§14.20 L6853`
+  - Related spec refs: none
+- `14.20.1.9` **Storable; Yes (if no captured refs); Task[T] is always storable**
+  - Requirement: **Storable**; Yes (if no captured refs); `Task[T]` is always storable
+  - Source: `§14.20 L6854`
+  - Related spec refs: none
+- `14.20.1.10` **no_runtime builds; Works; Compile error**
+  - Requirement: **`no_runtime` builds**; Works; Compile error
+  - Source: `§14.20 L6855`
+  - Related spec refs: none
+- `14.20.1.11` **gen fn compiles entirely away — the compiler rewrites it into a struct and a next()...**
+  - Requirement: `gen fn` compiles entirely away — the compiler rewrites it into a struct and a `next()` method.
+  - Source: `§14.20 L6857-L6859`
+  - Related spec refs: none
+- `14.20.1.12` **It has no scheduler dependency and works in no_runtime builds.**
+  - Requirement: It has no scheduler dependency and works in `no_runtime` builds.
+  - Source: `§14.20 L6857-L6859`
+  - Related spec refs: none
+- `14.20.1.13` **It cannot use .await.**
+  - Requirement: It cannot use `.await`.
+  - Source: `§14.20 L6857-L6859`
+  - Related spec refs: none
+- `14.20.1.14` **async fn allocates a fiber with a real stack and requires the fiber runtime.**
+  - Requirement: `async fn` allocates a fiber with a real stack and requires the fiber runtime.
+  - Source: `§14.20 L6861-L6863`
+  - Related spec refs: none
+- `14.20.1.15` **It can suspend at any await point and be driven by the scheduler.**
+  - Requirement: It can suspend at any `await` point and be driven by the scheduler.
+  - Source: `§14.20 L6861-L6863`
+  - Related spec refs: none
+- `14.20.1.16` **If you want a lazy sequence that works everywhere, use gen fn.**
+  - Requirement: If you want a lazy sequence that works everywhere, use `gen fn`.
+  - Source: `§14.20 L6865-L6867`
+  - Related spec refs: none
+- `14.20.1.17` **If you want concurrent I/O, use async fn.**
+  - Requirement: If you want concurrent I/O, use `async fn`.
+  - Source: `§14.20 L6865-L6867`
+  - Related spec refs: none
+- `14.20.1.18` **They are complementary tools, not alternatives.**
+  - Requirement: They are complementary tools, not alternatives.
+  - Source: `§14.20 L6865-L6867`
+  - Related spec refs: none
+
+### §14.21 Real-World Example
+
+- `14.21.1.1` **Reads like synchronous code.**
+  - Requirement: Reads like synchronous code.
+  - Source: `§14.21 L6895-L6896`
+  - Related spec refs: none
+- `14.21.1.2` **Each connection is a fiber.**
+  - Requirement: Each connection is a fiber.
+  - Source: `§14.21 L6895-L6896`
+  - Related spec refs: none
+- `14.21.1.3` **Thousands concurrent.**
+  - Requirement: Thousands concurrent.
+  - Source: `§14.21 L6895-L6896`
+  - Related spec refs: none
+- `14.21.1.4` **No callbacks, no state machines, no type gymnastics.**
+  - Requirement: No callbacks, no state machines, no type gymnastics.
+  - Source: `§14.21 L6895-L6896`
+  - Related spec refs: none
+
+### §14.22 Task Ephemerality and Send
+
+- `14.22.1.1` **A Task[T] may capture values from its spawning environment.**
+  - Requirement: A `Task[T]` may capture values from its spawning environment.
+  - Source: `§14.22 L6900-L6902`
+  - Related spec refs: none
+- `14.22.1.2` **The ephemerality and Send-ability of the task depends on what it captures:**
+  - Requirement: The ephemerality and `Send`-ability of the task depends on what it captures:
+  - Source: `§14.22 L6900-L6902`
+  - Related spec refs: none
+- `14.22.1.3` **Rule: A Task[T] is ephemeral if its spawned fiber environment contains any ephemera...**
+  - Requirement: **Rule:** A `Task[T]` is ephemeral if its spawned fiber environment contains any ephemeral values (references, views, guards).
+  - Source: `§14.22 L6904-L6907`
+  - Related spec refs: none
+- `14.22.1.4` **A Task[T] is Send only if all captured values are Send and the task is not ephemeral.**
+  - Requirement: A `Task[T]` is `Send` only if all captured values are `Send` and the task is not ephemeral.
+  - Source: `§14.22 L6904-L6907`
+  - Related spec refs: none
+- `14.22.1.5` **How the compiler tracks this: Ephemerality is a per-binding property, not a per-typ...**
+  - Requirement: **How the compiler tracks this:** Ephemerality is a per-binding property, not a per-type property.
+  - Source: `§14.22 L6921-L6927`
+  - Related spec refs: none
+- `14.22.1.6` **The type Task[i32] is the same whether ephemeral or storable.**
+  - Requirement: The type `Task[i32]` is the same whether ephemeral or storable.
+  - Source: `§14.22 L6921-L6927`
+  - Related spec refs: none
+- `14.22.1.7` **The compiler determines ephemerality at the creation site by analyzing the argument...**
+  - Requirement: The compiler determines ephemerality at the creation site by analyzing the arguments: if any argument is a reference or ephemeral value, the resulting Task binding is marked ephemeral.
+  - Source: `§14.22 L6921-L6927`
+  - Related spec refs: none
+- `14.22.1.8` **This marking propagates through assignments and function calls.**
+  - Requirement: This marking propagates through assignments and function calls.
+  - Source: `§14.22 L6921-L6927`
+  - Related spec refs: none
+- `14.22.1.9` **Passing ephemeral values to functions: Ephemeral values can be passed to functions...**
+  - Requirement: **Passing ephemeral values to functions:** Ephemeral values can be passed to functions — by reference or by value.
+  - Source: `§14.22 L6929-L6931`
+  - Related spec refs: none
+- `14.22.1.10` **The compiler tracks ephemerality and warns if a value might escape its safe scope:**
+  - Requirement: The compiler tracks ephemerality and warns if a value might escape its safe scope:
+  - Source: `§14.22 L6929-L6931`
+  - Related spec refs: none
+- `14.22.1.11` **The compiler catches the clear bugs (storing ephemeral refs in globals, sending the...**
+  - Requirement: The compiler catches the clear bugs (storing ephemeral refs in globals, sending them across threads).
+  - Source: `§14.22 L6948-L6951`
+  - Related spec refs: none
+- `14.22.1.12` **For ambiguous cases, it warns rather than blocks.**
+  - Requirement: For ambiguous cases, it warns rather than blocks.
+  - Source: `§14.22 L6948-L6951`
+  - Related spec refs: none
+- `14.22.1.13` **You're a systems programmer — you can read a warning.**
+  - Requirement: You're a systems programmer — you can read a warning.
+  - Source: `§14.22 L6948-L6951`
+  - Related spec refs: none
+- `14.22.1.14` **Ephemeral tasks CAN be returned from functions — the caller's binding inherits the...**
+  - Requirement: **Ephemeral tasks CAN be returned from functions** — the caller's binding inherits the ephemerality (Rule 8, §22.1).
+  - Source: `§14.22 L6953-L6959`
+  - Related spec refs: §22.1
+- `14.22.1.15` **This is essential: async fn get_profile(self: &UserService) returns a Task that cap...**
+  - Requirement: This is essential: `async fn get_profile(self: &UserService)` returns a `Task` that captures `&self`.
+  - Source: `§14.22 L6953-L6959`
+  - Related spec refs: none
+- `14.22.1.16` **The returned task is ephemeral at the call site, preventing the caller from outlivi...**
+  - Requirement: The returned task is ephemeral at the call site, preventing the caller from outliving `&self`: the call site, preventing the caller from storing it or outliving the referenced data:
+  - Source: `§14.22 L6953-L6959`
+  - Related spec refs: none
+- `14.22.1.17` **async scope is the ergonomic solution for borrowing tasks:**
+  - Requirement: **`async scope` is the ergonomic solution** for borrowing tasks:
+  - Source: `§14.22 L6967`
+  - Related spec refs: none
+- `14.22.1.18` **Because async scope guarantees all tracked tasks complete before the scope exits, t...**
+  - Requirement: Because `async scope` guarantees all tracked tasks complete before the scope exits, the compiler knows the borrows cannot outlive their referents — no lifetime annotations needed.
+  - Source: `§14.22 L6981-L6983`
+  - Related spec refs: none
+- `14.22.1.19` **Only owned values; No; Yes; Yes (if T: Send)**
+  - Requirement: Only owned values; No; Yes; Yes (if `T: Send`)
+  - Source: `§14.22 L6989`
+  - Related spec refs: none
+- `14.22.1.20` **References/views; Yes; No; No**
+  - Requirement: References/views; Yes; No; No
+  - Source: `§14.22 L6990`
+  - Related spec refs: none
+- `14.22.1.21` **@[no_await_guard] guards; N/A; N/A; Compile error (§7.9)**
+  - Requirement: `@[no_await_guard]` guards; N/A; N/A; Compile error (§7.9)
+  - Source: `§14.22 L6991`
+  - Related spec refs: §7.9
+- `14.22.1.22` **This is the same rule as generators (§14.20): if the suspended environment contains...**
+  - Requirement: This is the same rule as generators (§14.20): if the suspended environment contains ephemerals, the handle is ephemeral.
+  - Source: `§14.22 L6993-L6995`
+  - Related spec refs: §14.20
+- `14.22.1.23` **This avoids reintroducing lifetime annotations while preserving safety.**
+  - Requirement: This avoids reintroducing lifetime annotations while preserving safety.
+  - Source: `§14.22 L6993-L6995`
+  - Related spec refs: none
+
+## 15. Strings
+
+### §15.1 String Types
+
+- `15.1.1.1` **str; Owned, heap-allocated, UTF-8 string; Storing strings, struct fields, return va...**
+  - Requirement: `str`; Owned, heap-allocated, UTF-8 string; Storing strings, struct fields, return values
+  - Source: `§15.1 L7007`
+  - Related spec refs: none
+- `15.1.1.2` **&str; Borrowed view into a string; Function parameters, read-only access**
+  - Requirement: `&str`; Borrowed view into a string; Function parameters, read-only access
+  - Source: `§15.1 L7008`
+  - Related spec refs: none
+- `15.1.1.3` **That's it.**
+  - Requirement: That's it.
+  - Source: `§15.1 L7010-L7011`
+  - Related spec refs: none
+- `15.1.1.4` **str for owning, &str for borrowing.**
+  - Requirement: `str` for owning, `&str` for borrowing.
+  - Source: `§15.1 L7010-L7011`
+  - Related spec refs: none
+- `15.1.1.5` **Everything else is an implementation detail or FFI-specific.**
+  - Requirement: Everything else is an implementation detail or FFI-specific.
+  - Source: `§15.1 L7010-L7011`
+  - Related spec refs: none
+- `15.1.1.6` **String literals ("hello") are str by default (owned).**
+  - Requirement: **String literals** (`"hello"`) are `str` by default (owned).
+  - Source: `§15.1 L7019-L7024`
+  - Related spec refs: none
+- `15.1.1.7` **The compiler is smart about this — when it can prove the string is only read (never...**
+  - Requirement: The compiler is smart about this — when it can prove the string is only read (never stored, never returned, never mutated), it silently optimizes away the allocation and uses a static reference internally.
+  - Source: `§15.1 L7019-L7024`
+  - Related spec refs: none
+- `15.1.1.8` **You don't think about this.**
+  - Requirement: You don't think about this.
+  - Source: `§15.1 L7019-L7024`
+  - Related spec refs: none
+- `15.1.1.9` **You write strings, the compiler does the right thing:**
+  - Requirement: You write strings, the compiler does the right thing:
+  - Source: `§15.1 L7019-L7024`
+  - Related spec refs: none
+- `15.1.1.10` **When you explicitly want a borrowed view (e.g., for performance in a tight loop ove...**
+  - Requirement: **When you explicitly want a borrowed view** (e.g., for performance in a tight loop over slices), annotate it:
+  - Source: `§15.1 L7031-L7032`
+  - Related spec refs: none
+- `15.1.1.11` **Advanced types (you rarely need these directly):**
+  - Requirement: **Advanced types** (you rarely need these directly):
+  - Source: `§15.1 L7039`
+  - Related spec refs: none
+- `15.1.1.12` **String; Same as str — str is an alias for String**
+  - Requirement: `String`; Same as `str` — `str` is an alias for `String`
+  - Source: `§15.1 L7043`
+  - Related spec refs: none
+- `15.1.1.13` **StrView; Same as &str — &str is an alias for StrView**
+  - Requirement: `StrView`; Same as `&str` — `&str` is an alias for `StrView`
+  - Source: `§15.1 L7044`
+  - Related spec refs: none
+- `15.1.1.14` **CStr; NUL-terminated C string view (FFI only)**
+  - Requirement: `CStr`; NUL-terminated C string view (FFI only)
+  - Source: `§15.1 L7045`
+  - Related spec refs: none
+- `15.1.1.15` **CString; Owned NUL-terminated C string (FFI only)**
+  - Requirement: `CString`; Owned NUL-terminated C string (FFI only)
+  - Source: `§15.1 L7046`
+  - Related spec refs: none
+
+### §15.2 Conversions
+
+- `15.2.1.1` **str; &str; auto-borrow or .as_view()**
+  - Requirement: `str`; `&str`; auto-borrow or `.as_view()`
+  - Source: `§15.2 L7052`
+  - Related spec refs: none
+- `15.2.1.2` **&str; str; .to_owned() (allocates)**
+  - Requirement: `&str`; `str`; `.to_owned()` (allocates)
+  - Source: `§15.2 L7053`
+  - Related spec refs: none
+- `15.2.1.3` **"literal"; str; direct (default)**
+  - Requirement: `"literal"`; `str`; direct (default)
+  - Source: `§15.2 L7054`
+  - Related spec refs: none
+- `15.2.1.4` **"literal"; &str; when type context is &str, zero-cost static ref**
+  - Requirement: `"literal"`; `&str`; when type context is `&str`, zero-cost static ref
+  - Source: `§15.2 L7055`
+  - Related spec refs: none
+- `15.2.1.5` **str; CString; .to_cstring() (appends NUL)**
+  - Requirement: `str`; `CString`; `.to_cstring()` (appends NUL)
+  - Source: `§15.2 L7056`
+  - Related spec refs: none
+- `15.2.1.6` **CString; CStr; .as_cstr()**
+  - Requirement: `CString`; `CStr`; `.as_cstr()`
+  - Source: `§15.2 L7057`
+  - Related spec refs: none
+
+### §15.3 String Literals
+
+- `15.3.1.1` **String literals like "hello" default to owned str.**
+  - Requirement: String literals like `"hello"` default to owned `str`.
+  - Source: `§15.3 L7061-L7062`
+  - Related spec refs: none
+- `15.3.1.2` **You never need a type annotation to use a string:**
+  - Requirement: You never need a type annotation to use a string:
+  - Source: `§15.3 L7061-L7062`
+  - Related spec refs: none
+- `15.3.1.3` **How it works: A bare string literal produces an owned str.**
+  - Requirement: **How it works:** A bare string literal produces an owned `str`.
+  - Source: `§15.3 L7081-L7088`
+  - Related spec refs: none
+- `15.3.1.4` **The compiler may elide the allocation when it can prove the string is never mutated...**
+  - Requirement: The compiler may elide the allocation when it can prove the string is never mutated, never stored in a heap structure, and never escapes the current scope — but this is an optimization, not a source-level guarantee.
+  - Source: `§15.3 L7081-L7088`
+  - Related spec refs: none
+- `15.3.1.5` **Performance-sensitive code should not rely on the optimizer proving allocation unne...**
+  - Requirement: Performance-sensitive code should not rely on the optimizer proving allocation unnecessary.
+  - Source: `§15.3 L7081-L7088`
+  - Related spec refs: none
+- `15.3.1.6` **Use an explicit &str annotation or pass to an &str parameter for guaranteed zero-co...**
+  - Requirement: Use an explicit `&str` annotation or pass to an `&str` parameter for guaranteed zero-cost static storage.
+  - Source: `§15.3 L7081-L7088`
+  - Related spec refs: none
+- `15.3.1.7` **When the type context is &str (function parameter, explicit annotation), the litera...**
+  - Requirement: When the type context is `&str` (function parameter, explicit annotation), the literal is a zero-cost static reference with no allocation.
+  - Source: `§15.3 L7090-L7093`
+  - Related spec refs: none
+- `15.3.1.8` **This guarantee is unconditional — it does not depend on optimizer analysis.**
+  - Requirement: This guarantee is unconditional — it does not depend on optimizer analysis.
+  - Source: `§15.3 L7090-L7093`
+  - Related spec refs: none
+- `15.3.1.9` **F-string literals (f"user {id}") always produce str (owned) because they must alloc...**
+  - Requirement: **F-string literals** (`f"user {id}"`) always produce `str` (owned) because they must allocate to build the result.
+  - Source: `§15.3 L7100-L7102`
+  - Related spec refs: none
+- `15.3.1.10` **Plain string literals ("hello") do not support interpolation.**
+  - Requirement: Plain string literals (`"hello"`) do not support interpolation.
+  - Source: `§15.3 L7100-L7102`
+  - Related spec refs: none
+- `15.3.1.11` **C-string literals: c"hello" produces a &CStr — a compile- time reference to a NUL-t...**
+  - Requirement: **C-string literals:** `c"hello"` produces a `&CStr` — a compile- time reference to a NUL-terminated string in static memory.
+  - Source: `§15.3 L7104-L7107`
+  - Related spec refs: none
+- `15.3.1.12` **The NUL byte is appended automatically by the compiler; the user does not write \0:**
+  - Requirement: The NUL byte is appended automatically by the compiler; the user does not write `\0`:
+  - Source: `§15.3 L7104-L7107`
+  - Related spec refs: none
+- `15.3.1.13` **c"..." does not support string interpolation.**
+  - Requirement: `c"..."` does not support string interpolation.
+  - Source: `§15.3 L7118-L7119`
+  - Related spec refs: none
+- `15.3.1.14` **For dynamic C strings, construct a CString from an owned str.**
+  - Requirement: For dynamic C strings, construct a `CString` from an owned `str`.
+  - Source: `§15.3 L7118-L7119`
+  - Related spec refs: none
+
+### §15.4 Formatted String Interpolation (F-Strings)
+
+- `15.4.1.1` **F-strings are the sole formatting mechanism in With.**
+  - Requirement: F-strings are the sole formatting mechanism in With.
+  - Source: `§15.4 L7123-L7125`
+  - Related spec refs: none
+- `15.4.1.2` **There is no printf, no format() function, no format-string varargs.**
+  - Requirement: There is no `printf`, no `format()` function, no format-string varargs.
+  - Source: `§15.4 L7123-L7125`
+  - Related spec refs: none
+- `15.4.1.3` **print takes str.**
+  - Requirement: `print` takes `str`.
+  - Source: `§15.4 L7123-L7125`
+  - Related spec refs: none
+- `15.4.1.4` **f"..." returns str.**
+  - Requirement: `f"..."` returns `str`.
+  - Source: `§15.4 L7123-L7125`
+  - Related spec refs: none
+- `15.4.1.5` **One way to format.**
+  - Requirement: One way to format.
+  - Source: `§15.4 L7123-L7125`
+  - Related spec refs: none
+- `15.4.1.6` **An f-string is a string literal prefixed with f containing interpolation holes deli...**
+  - Requirement: An f-string is a string literal prefixed with `f` containing interpolation holes delimited by `{}`.
+  - Source: `§15.4 L7133-L7136`
+  - Related spec refs: none
+- `15.4.1.7` **Each hole contains an expression and an optional format specification separated by :.**
+  - Requirement: Each hole contains an expression and an optional format specification separated by `:`.
+  - Source: `§15.4 L7133-L7136`
+  - Related spec refs: none
+- `15.4.1.8` **An f-string evaluates to str.**
+  - Requirement: An f-string evaluates to `str`.
+  - Source: `§15.4 L7133-L7136`
+  - Related spec refs: none
+- `15.4.1.9` **The expression may be any With expression: variable, field access, method call, ari...**
+  - Requirement: The expression may be any With expression: variable, field access, method call, arithmetic, index, function call.
+  - Source: `§15.4 L7142-L7144`
+  - Related spec refs: none
+- `15.4.1.10` **The format spec controls how the value is rendered as text.**
+  - Requirement: The format spec controls how the value is rendered as text.
+  - Source: `§15.4 L7142-L7144`
+  - Related spec refs: none
+- `15.4.1.11` **Literal { and } characters are written as {{ and }}:**
+  - Requirement: Literal `{` and `}` characters are written as `{{` and `}}`:
+  - Source: `§15.4 L7146`
+  - Related spec refs: none
+- `15.4.1.12` **Plain string literals ("hello") do not support interpolation.**
+  - Requirement: Plain string literals (`"hello"`) do not support interpolation.
+  - Source: `§15.4 L7152-L7153`
+  - Related spec refs: none
+- `15.4.1.13` **F-strings may not be nested.**
+  - Requirement: F-strings may not be nested.
+  - Source: `§15.4 L7152-L7153`
+  - Related spec refs: none
+- `15.4.1.14` **Each {expr} is type-checked at compile time.**
+  - Requirement: Each `{expr}` is type-checked at compile time.
+  - Source: `§15.4 L7157`
+  - Related spec refs: none
+- `15.4.1.15` **Non-str expressions are converted to str via built-in formatting functions (no trai...**
+  - Requirement: Non-`str` expressions are converted to `str` via built-in formatting functions (no trait dispatch).
+  - Source: `§15.4 L7158-L7159`
+  - Related spec refs: none
+- `15.4.1.16` **The ++ operator is str-only. Non-str operands are a compile-time error. Use f-strin...**
+  - Requirement: The `++` operator is `str`-only. Non-`str` operands are a compile-time error. Use f-strings to format values into strings.
+  - Source: `§15.4 L7160-L7161`
+  - Related spec refs: none
+- `15.4.1.17` **F-strings always produce owned str (they allocate).**
+  - Requirement: F-strings always produce owned `str` (they allocate).
+  - Source: `§15.4 L7162`
+  - Related spec refs: none
+
+### §15.4.1 Format Specification Grammar
+
+- `15.4.1.18` **All fields are optional.**
+  - Requirement: All fields are optional.
+  - Source: `§15.4.1 L7170-L7171`
+  - Related spec refs: none
+- `15.4.1.19` **Omitting the entire spec ({expr} with no colon) uses the type's default display.**
+  - Requirement: Omitting the entire spec (`{expr}` with no colon) uses the type's default display.
+  - Source: `§15.4.1 L7170-L7171`
+  - Related spec refs: none
+- `15.4.1.20` **fill; any single byte except { }; Padding character (default: space)**
+  - Requirement: fill; any single byte except `{` `}`; Padding character (default: space)
+  - Source: `§15.4.1 L7175`
+  - Related spec refs: none
+- `15.4.1.21` **align; < left, > right, ^ center; Alignment within width**
+  - Requirement: align; `<` left, `>` right, `^` center; Alignment within width
+  - Source: `§15.4.1 L7176`
+  - Related spec refs: none
+- `15.4.1.22` **sign; + always show sign, - negative only (default); Sign display for numbers**
+  - Requirement: sign; `+` always show sign, `-` negative only (default); Sign display for numbers
+  - Source: `§15.4.1 L7177`
+  - Related spec refs: none
+- `15.4.1.23` **#; literal #; Alternate form: 0x/0b/0o prefix**
+  - Requirement: `#`; literal `#`; Alternate form: `0x`/`0b`/`0o` prefix
+  - Source: `§15.4.1 L7178`
+  - Related spec refs: none
+- `15.4.1.24` **0; literal 0; Zero-pad shorthand (equivalent to 0> fill+align)**
+  - Requirement: `0`; literal `0`; Zero-pad shorthand (equivalent to `0>` fill+align)
+  - Source: `§15.4.1 L7179`
+  - Related spec refs: none
+- `15.4.1.25` **width; positive integer; Minimum field width**
+  - Requirement: width; positive integer; Minimum field width
+  - Source: `§15.4.1 L7180`
+  - Related spec refs: none
+- `15.4.1.26` **precision; . followed by non-negative integer; Decimal places (floats) or max chars...**
+  - Requirement: precision; `.` followed by non-negative integer; Decimal places (floats) or max chars (strings)
+  - Source: `§15.4.1 L7181`
+  - Related spec refs: none
+- `15.4.1.27` **mode; single letter; Rendering mode (see below)**
+  - Requirement: mode; single letter; Rendering mode (see below)
+  - Source: `§15.4.1 L7182`
+  - Related spec refs: none
+- `15.4.1.28` **The fill character is only recognized when followed immediately by an align charact...**
+  - Requirement: The fill character is only recognized when followed immediately by an align character (`<`, `>`, `^`).
+  - Source: `§15.4.1 L7184-L7186`
+  - Related spec refs: none
+- `15.4.1.29` **Otherwise the character is parsed as a later field.**
+  - Requirement: Otherwise the character is parsed as a later field.
+  - Source: `§15.4.1 L7184-L7186`
+  - Related spec refs: none
+- `15.4.1.30` **This matches Python's rule.**
+  - Requirement: This matches Python's rule.
+  - Source: `§15.4.1 L7184-L7186`
+  - Related spec refs: none
+
+### §15.4.2 Modes
+
+- `15.4.2.1` **d; integers; Decimal (default for integers); 42**
+  - Requirement: `d`; integers; Decimal (default for integers); `42`
+  - Source: `§15.4.2 L7192`
+  - Related spec refs: none
+- `15.4.2.2` **x; integers; Lowercase hexadecimal; 2a**
+  - Requirement: `x`; integers; Lowercase hexadecimal; `2a`
+  - Source: `§15.4.2 L7193`
+  - Related spec refs: none
+- `15.4.2.3` **X; integers; Uppercase hexadecimal; 2A**
+  - Requirement: `X`; integers; Uppercase hexadecimal; `2A`
+  - Source: `§15.4.2 L7194`
+  - Related spec refs: none
+- `15.4.2.4` **b; integers; Binary; 101010**
+  - Requirement: `b`; integers; Binary; `101010`
+  - Source: `§15.4.2 L7195`
+  - Related spec refs: none
+- `15.4.2.5` **o; integers; Octal; 52**
+  - Requirement: `o`; integers; Octal; `52`
+  - Source: `§15.4.2 L7196`
+  - Related spec refs: none
+- `15.4.2.6` **f; floats; Fixed-point; 3.140000**
+  - Requirement: `f`; floats; Fixed-point; `3.140000`
+  - Source: `§15.4.2 L7197`
+  - Related spec refs: none
+- `15.4.2.7` **e; floats; Scientific notation; 3.14e+00**
+  - Requirement: `e`; floats; Scientific notation; `3.14e+00`
+  - Source: `§15.4.2 L7198`
+  - Related spec refs: none
+- `15.4.2.8` **g; floats; General: shortest of fixed/scientific (default); 3.14**
+  - Requirement: `g`; floats; General: shortest of fixed/scientific (default); `3.14`
+  - Source: `§15.4.2 L7199`
+  - Related spec refs: none
+- `15.4.2.9` **s; strings; String (default for strings); hello**
+  - Requirement: `s`; strings; String (default for strings); `hello`
+  - Source: `§15.4.2 L7200`
+  - Related spec refs: none
+- `15.4.2.10` **?; any type; Debug representation; Point { x: 1, y: 2 }**
+  - Requirement: `?`; any type; Debug representation; `Point { x: 1, y: 2 }`
+  - Source: `§15.4.2 L7201`
+  - Related spec refs: none
+
+### §15.4.3 Integer Formatting
+
+- `15.4.3.1` **Default (no spec): decimal with no padding.**
+  - Requirement: Default (no spec): decimal with no padding.
+  - Source: `§15.4.3 L7205`
+  - Related spec refs: none
+- `15.4.3.2` **Hex, binary, octal:**
+  - Requirement: Hex, binary, octal:
+  - Source: `§15.4.3 L7212`
+  - Related spec refs: none
+- `15.4.3.3` **Width and zero-padding:**
+  - Requirement: Width and zero-padding:
+  - Source: `§15.4.3 L7223`
+  - Related spec refs: none
+- `15.4.3.4` **Precision on integers is a compile-time error.**
+  - Requirement: Precision on integers is a compile-time error.
+  - Source: `§15.4.3 L7240`
+  - Related spec refs: none
+
+### §15.4.4 Float Formatting
+
+- `15.4.4.1` **Default (no spec): general format.**
+  - Requirement: Default (no spec): general format.
+  - Source: `§15.4.4 L7244-L7245`
+  - Related spec refs: none
+- `15.4.4.2` **When precision is specified without a mode letter, the mode defaults to f (fixed-po...**
+  - Requirement: When precision is specified without a mode letter, the mode defaults to `f` (fixed-point).
+  - Source: `§15.4.4 L7244-L7245`
+  - Related spec refs: none
+- `15.4.4.3` **Integer modes on floats are compile-time errors.**
+  - Requirement: Integer modes on floats are compile-time errors.
+  - Source: `§15.4.4 L7255`
+  - Related spec refs: none
+
+### §15.4.5 String Formatting
+
+- `15.4.5.1` **Default (no spec): the string itself, unmodified.**
+  - Requirement: Default (no spec): the string itself, unmodified.
+  - Source: `§15.4.5 L7259`
+  - Related spec refs: none
+- `15.4.5.2` **Numeric modes on strings are compile-time errors.**
+  - Requirement: Numeric modes on strings are compile-time errors.
+  - Source: `§15.4.5 L7268`
+  - Related spec refs: none
+
+### §15.4.6 Boolean Formatting
+
+- `15.4.6.1` **Default: true or false.**
+  - Requirement: Default: `true` or `false`.
+  - Source: `§15.4.6 L7272-L7273`
+  - Related spec refs: none
+- `15.4.6.2` **Only ? mode and width/alignment are valid.**
+  - Requirement: Only `?` mode and width/alignment are valid.
+  - Source: `§15.4.6 L7272-L7273`
+  - Related spec refs: none
+- `15.4.6.3` **All other modes are compile-time errors.**
+  - Requirement: All other modes are compile-time errors.
+  - Source: `§15.4.6 L7272-L7273`
+  - Related spec refs: none
+
+### §15.4.7 Debug Mode `:?`
+
+- `15.4.7.1` **Available for all types.**
+  - Requirement: Available for all types.
+  - Source: `§15.4.7 L7277`
+  - Related spec refs: none
+- `15.4.7.2` **Prints a structural representation:**
+  - Requirement: Prints a structural representation:
+  - Source: `§15.4.7 L7277`
+  - Related spec refs: none
+- `15.4.7.3` **integer; Same as default: 42**
+  - Requirement: integer; Same as default: `42`
+  - Source: `§15.4.7 L7281`
+  - Related spec refs: none
+- `15.4.7.4` **float; Same as default: 3.14**
+  - Requirement: float; Same as default: `3.14`
+  - Source: `§15.4.7 L7282`
+  - Related spec refs: none
+- `15.4.7.5` **str; Quoted: "hello"**
+  - Requirement: str; Quoted: `"hello"`
+  - Source: `§15.4.7 L7283`
+  - Related spec refs: none
+- `15.4.7.6` **bool; true / false**
+  - Requirement: bool; `true` / `false`
+  - Source: `§15.4.7 L7284`
+  - Related spec refs: none
+- `15.4.7.7` **struct; TypeName { field: value, field: value }**
+  - Requirement: struct; `TypeName { field: value, field: value }`
+  - Source: `§15.4.7 L7285`
+  - Related spec refs: none
+- `15.4.7.8` **Debug mode for structs generates inline formatting code at compile time — each fiel...**
+  - Requirement: Debug mode for structs generates inline formatting code at compile time — each field is extracted and formatted.
+  - Source: `§15.4.7 L7293-L7295`
+  - Related spec refs: none
+- `15.4.7.9` **No runtime reflection or trait dispatch is used.**
+  - Requirement: No runtime reflection or trait dispatch is used.
+  - Source: `§15.4.7 L7293-L7295`
+  - Related spec refs: none
+
+### §15.4.8 Compile-Time Validation
+
+- `15.4.8.1` **All invalid type/mode combinations produce clear compile-time errors:**
+  - Requirement: All invalid type/mode combinations produce clear compile-time errors:
+  - Source: `§15.4.8 L7299-L7300`
+  - Related spec refs: none
+- `15.4.8.2` **integer; ✓; ✓; error; error; ✓**
+  - Requirement: **integer**; ✓; ✓; error; error; ✓
+  - Source: `§15.4.8 L7304`
+  - Related spec refs: none
+- `15.4.8.3` **float; error; error; ✓; error; ✓**
+  - Requirement: **float**; error; error; ✓; error; ✓
+  - Source: `§15.4.8 L7305`
+  - Related spec refs: none
+- `15.4.8.4` **str; error; error; error; ✓; ✓**
+  - Requirement: **str**; error; error; error; ✓; ✓
+  - Source: `§15.4.8 L7306`
+  - Related spec refs: none
+- `15.4.8.5` **bool; error; error; error; error; ✓**
+  - Requirement: **bool**; error; error; error; error; ✓
+  - Source: `§15.4.8 L7307`
+  - Related spec refs: none
+- `15.4.8.6` **struct; error; error; error; error; ✓**
+  - Requirement: **struct**; error; error; error; error; ✓
+  - Source: `§15.4.8 L7308`
+  - Related spec refs: none
+- `15.4.8.7` **Using {some_struct} without :? is a compile-time error:**
+  - Requirement: Using `{some_struct}` without `:?` is a compile-time error:
+  - Source: `§15.4.8 L7310`
+  - Related spec refs: none
+
+### §15.4.9 String Concatenation (`++`)
+
+- `15.4.9.1` **The ++ operator concatenates two str values.**
+  - Requirement: The `++` operator concatenates two `str` values.
+  - Source: `§15.4.9 L7319-L7320`
+  - Related spec refs: none
+- `15.4.9.2` **Both operands must be str — non-str operands are a compile-time error.**
+  - Requirement: Both operands must be `str` — non-`str` operands are a compile-time error.
+  - Source: `§15.4.9 L7319-L7320`
+  - Related spec refs: none
+- `15.4.9.3` **To include non-string values in a string, use f-strings:**
+  - Requirement: To include non-string values in a string, use f-strings:
+  - Source: `§15.4.9 L7327`
+  - Related spec refs: none
+
+### §15.7 Output Functions
+
+- `15.7.1.1` **Four output functions.**
+  - Requirement: Four output functions.
+  - Source: `§15.7 L7339-L7340`
+  - Related spec refs: none
+- `15.7.1.2` **print and eprint append a newline.**
+  - Requirement: `print` and `eprint` append a newline.
+  - Source: `§15.7 L7339-L7340`
+  - Related spec refs: none
+- `15.7.1.3` **write and ewrite do not.**
+  - Requirement: `write` and `ewrite` do not.
+  - Source: `§15.7 L7339-L7340`
+  - Related spec refs: none
+- `15.7.1.4` **print(s); stdout; Always**
+  - Requirement: `print(s)`; stdout; Always
+  - Source: `§15.7 L7344`
+  - Related spec refs: none
+- `15.7.1.5` **eprint(s); stderr; Always**
+  - Requirement: `eprint(s)`; stderr; Always
+  - Source: `§15.7 L7345`
+  - Related spec refs: none
+- `15.7.1.6` **write(s); stdout; Never**
+  - Requirement: `write(s)`; stdout; Never
+  - Source: `§15.7 L7346`
+  - Related spec refs: none
+- `15.7.1.7` **ewrite(s); stderr; Never**
+  - Requirement: `ewrite(s)`; stderr; Never
+  - Source: `§15.7 L7347`
+  - Related spec refs: none
+- `15.7.1.8` **All four take a single str argument.**
+  - Requirement: All four take a single `str` argument.
+  - Source: `§15.7 L7358-L7360`
+  - Related spec refs: none
+- `15.7.1.9` **Formatting is done via f-strings, not via the output function itself.**
+  - Requirement: Formatting is done via f-strings, not via the output function itself.
+  - Source: `§15.7 L7358-L7360`
+  - Related spec refs: none
+- `15.7.1.10` **There are no format arguments, no varargs, no separator or end parameters.**
+  - Requirement: There are no format arguments, no varargs, no separator or end parameters.
+  - Source: `§15.7 L7358-L7360`
+  - Related spec refs: none
+- `15.7.1.11` **println and eprintln do not exist.**
+  - Requirement: **`println` and `eprintln` do not exist.**
+  - Source: `§15.7 L7371-L7373`
+  - Related spec refs: none
+- `15.7.1.12` **print and eprint always append a newline.**
+  - Requirement: `print` and `eprint` always append a newline.
+  - Source: `§15.7 L7371-L7373`
+  - Related spec refs: none
+- `15.7.1.13` **Use write when raw output without a newline is needed.**
+  - Requirement: Use `write` when raw output without a newline is needed.
+  - Source: `§15.7 L7371-L7373`
+  - Related spec refs: none
+- `15.7.1.14` **The overwhelmingly common case is line-terminated output**
+  - Requirement: The overwhelmingly common case is line-terminated output
+  - Source: `§15.7 L7376`
+  - Related spec refs: none
+- `15.7.1.15` **Forgetting a newline produces garbled terminal output; forgetting to suppress one i...**
+  - Requirement: Forgetting a newline produces garbled terminal output; forgetting to suppress one is harmless
+  - Source: `§15.7 L7377-L7378`
+  - Related spec refs: none
+- `15.7.1.16` **The ln suffix is visual noise on nearly every print call**
+  - Requirement: The `ln` suffix is visual noise on nearly every print call
+  - Source: `§15.7 L7379`
+  - Related spec refs: none
+- `15.7.1.17` **F-strings handle all formatting — no need for sep/end parameters**
+  - Requirement: F-strings handle all formatting — no need for `sep`/`end` parameters
+  - Source: `§15.7 L7380`
+  - Related spec refs: none
+- `15.7.1.18` **write/ewrite are the explicit opt-in for no-newline output (progress bars, prompts...**
+  - Requirement: `write`/`ewrite` are the explicit opt-in for no-newline output (progress bars, prompts, terminal control)
+  - Source: `§15.7 L7381-L7382`
+  - Related spec refs: none
+
+## 16. FFI and C Interoperability
+
+### §16 FFI and C Interoperability
+
+- `16.1.1.1` **C interoperability is not a bolt-on feature.**
+  - Requirement: C interoperability is not a bolt-on feature.
+  - Source: `§16 L7388-L7391`
+  - Related spec refs: none
+- `16.1.1.2` **It is a day-zero requirement.**
+  - Requirement: It is a **day-zero requirement**.
+  - Source: `§16 L7388-L7391`
+  - Related spec refs: none
+- `16.1.1.3` **A systems language that cannot trivially use existing C libraries — libc, OpenSSL...**
+  - Requirement: A systems language that cannot trivially use existing C libraries — libc, OpenSSL, SQLite, Vulkan, POSIX, Win32 — is not a systems language.
+  - Source: `§16 L7388-L7391`
+  - Related spec refs: none
+- `16.1.1.4` **It is a toy.**
+  - Requirement: It is a toy.
+  - Source: `§16 L7388-L7391`
+  - Related spec refs: none
+
+### §16.1 `c_import`: Automatic C Header Import
+
+- `16.1.1.5` **The primary mechanism for C interop is direct header import:**
+  - Requirement: The primary mechanism for C interop is direct header import:
+  - Source: `§16.1 L7395`
+  - Related spec refs: none
+- `16.1.1.6` **c_import reads a C header file at compile time, parses it, and makes all declaratio...**
+  - Requirement: `c_import` reads a C header file at compile time, parses it, and makes all declarations available as With symbols.
+  - Source: `§16.1 L7403-L7404`
+  - Related spec refs: none
+- `16.1.1.7` **This includes:**
+  - Requirement: This includes:
+  - Source: `§16.1 L7403-L7404`
+  - Related spec refs: none
+- `16.1.1.8` **Functions → callable directly (the c_import is the opt-in)**
+  - Requirement: **Functions** → callable directly (the `c_import` is the opt-in)
+  - Source: `§16.1 L7406`
+  - Related spec refs: none
+- `16.1.1.9` **Structs → @[repr(C)] struct types**
+  - Requirement: **Structs** → `@[repr(C)]` struct types
+  - Source: `§16.1 L7407`
+  - Related spec refs: none
+- `16.1.1.10` **Enums → integer constants or With enums**
+  - Requirement: **Enums** → integer constants or With enums
+  - Source: `§16.1 L7408`
+  - Related spec refs: none
+- `16.1.1.11` **Typedefs → type aliases**
+  - Requirement: **Typedefs** → type aliases
+  - Source: `§16.1 L7409`
+  - Related spec refs: none
+- `16.1.1.12` **#define constants → const values (integer and string literals)**
+  - Requirement: **`#define` constants** → `const` values (integer and string literals)
+  - Source: `§16.1 L7410`
+  - Related spec refs: none
+- `16.1.1.13` **Function-like macros → not translated (warning emitted; see §16.2)**
+  - Requirement: **Function-like macros** → not translated (warning emitted; see §16.2)
+  - Source: `§16.1 L7411`
+  - Related spec refs: §16.2
+- `16.1.1.14` **Why no unsafe on every call?**
+  - Requirement: **Why no `unsafe` on every call?**
+  - Source: `§16.1 L7425-L7430`
+  - Related spec refs: none
+- `16.1.1.15` **The c_import itself is the opt-in.**
+  - Requirement: The `c_import` itself is the opt-in.
+  - Source: `§16.1 L7425-L7430`
+  - Related spec refs: none
+- `16.1.1.16` **You imported a C library — you know you're calling C code.**
+  - Requirement: You imported a C library — you know you're calling C code.
+  - Source: `§16.1 L7425-L7430`
+  - Related spec refs: none
+- `16.1.1.17` **Wrapping every call in unsafe {} is ceremony without safety.**
+  - Requirement: Wrapping every call in `unsafe {}` is ceremony without safety.
+  - Source: `§16.1 L7425-L7430`
+  - Related spec refs: none
+- `16.1.1.18` **The real safety boundary is the With wrapper that the stdlib provides (e.g., Databa...**
+  - Requirement: The real safety boundary is the **With wrapper** that the stdlib provides (e.g., `Database.open()` wraps `sqlite3_open` with proper error handling and resource management).
+  - Source: `§16.1 L7425-L7430`
+  - Related spec refs: none
+- `16.1.1.19` **unsafe is still required for raw pointer operations (dereferencing *mut T, pointer...**
+  - Requirement: `unsafe` is still required for raw pointer operations (dereferencing `*mut T`, pointer arithmetic, transmutes).
+  - Source: `§16.1 L7432-L7434`
+  - Related spec refs: none
+- `16.1.1.20` **But calling an imported C function that takes normal arguments is just a function c...**
+  - Requirement: But calling an imported C function that takes normal arguments is just a function call.
+  - Source: `§16.1 L7432-L7434`
+  - Related spec refs: none
+- `16.1.1.21` **Null-safe pointer conversion: Raw pointers from C are inherently nullable.**
+  - Requirement: **Null-safe pointer conversion:** Raw pointers from C are inherently nullable.
+  - Source: `§16.1 L7448-L7450`
+  - Related spec refs: none
+- `16.1.1.22` **The .as_option() method on raw pointers converts them to Option, making null handli...**
+  - Requirement: The `.as_option()` method on raw pointers converts them to `Option`, making null handling ergonomic:
+  - Source: `§16.1 L7448-L7450`
+  - Related spec refs: none
+- `16.1.1.23` **.as_option() is safe — it only checks for null, it doesn't dereference the pointer.**
+  - Requirement: `.as_option()` is safe — it only checks for null, it doesn't dereference the pointer.
+  - Source: `§16.1 L7465-L7467`
+  - Related spec refs: none
+- `16.1.1.24` **The resulting Option[*const T] or Option[*mut T] still requires unsafe to dereference.**
+  - Requirement: The resulting `Option[*const T]` or `Option[*mut T]` still requires `unsafe` to dereference.
+  - Source: `§16.1 L7465-L7467`
+  - Related spec refs: none
+- `16.1.1.25` **The C toolchain is a dependency.**
+  - Requirement: **The C toolchain is a dependency.**
+  - Source: `§16.1 L7469-L7472`
+  - Related spec refs: none
+- `16.1.1.26` **c_import invokes the system C compiler's preprocessor (configurable, default: cc -E...**
+  - Requirement: `c_import` invokes the system C compiler's preprocessor (configurable, default: `cc -E`) to expand includes, resolve `#ifdef`s, and handle platform-specific headers.
+  - Source: `§16.1 L7469-L7472`
+  - Related spec refs: none
+- `16.1.1.27` **The With compiler then parses the preprocessed output.**
+  - Requirement: The With compiler then parses the preprocessed output.
+  - Source: `§16.1 L7469-L7472`
+  - Related spec refs: none
+- `16.1.1.28` **Cross-compilation limitation: Unlike Zig (which embeds Clang), With's Phase 0 c_imp...**
+  - Requirement: **Cross-compilation limitation:** Unlike Zig (which embeds Clang), With's Phase 0 `c_import` depends on the host system's C toolchain.
+  - Source: `§16.1 L7474-L7479`
+  - Related spec refs: none
+- `16.1.1.29` **Cross-compiling for a different target requires a cross-compiler (e.g., aarch64-lin...**
+  - Requirement: Cross-compiling for a different target requires a cross-compiler (e.g., `aarch64-linux-gnu-gcc`) to be installed and configured in `with.toml`.
+  - Source: `§16.1 L7474-L7479`
+  - Related spec refs: none
+- `16.1.1.30` **Phase 2+ may embed a C header parser to eliminate this dependency and enable self-c...**
+  - Requirement: Phase 2+ may embed a C header parser to eliminate this dependency and enable self-contained cross-compilation.
+  - Source: `§16.1 L7474-L7479`
+  - Related spec refs: none
+
+### §16.2 Macro Handling
+
+- `16.2.1.1` **C macros that are simple constants are translated automatically:**
+  - Requirement: C macros that are simple constants are translated automatically:
+  - Source: `§16.2 L7493`
+  - Related spec refs: none
+- `16.2.1.2` **Function-like macros are not automatically translated in Phase 0.**
+  - Requirement: Function-like macros are **not automatically translated in Phase 0.**
+  - Source: `§16.2 L7501-L7505`
+  - Related spec refs: none
+- `16.2.1.3` **C macros are preprocessor token replacements — they do not exist in the C AST that...**
+  - Requirement: C macros are preprocessor token replacements — they do not exist in the C AST that `libclang` parses.
+  - Source: `§16.2 L7501-L7505`
+  - Related spec refs: none
+- `16.2.1.4` **Translating function-like macros requires heuristic token-stream analysis (which Zi...**
+  - Requirement: Translating function-like macros requires heuristic token-stream analysis (which Zig spent years perfecting).
+  - Source: `§16.2 L7501-L7505`
+  - Related spec refs: none
+- `16.2.1.5` **Phase 0 translates only #define constants:**
+  - Requirement: Phase 0 translates only `#define` constants:
+  - Source: `§16.2 L7501-L7505`
+  - Related spec refs: none
+- `16.2.1.6` **Complex macros (token pasting, stringification, variadic macros, statement-expressi...**
+  - Requirement: Complex macros (token pasting, stringification, variadic macros, statement-expression macros) are never translated.
+  - Source: `§16.2 L7513-L7516`
+  - Related spec refs: none
+- `16.2.1.7` **The compiler emits a warning listing all untranslated macros.**
+  - Requirement: The compiler emits a warning listing all untranslated macros.
+  - Source: `§16.2 L7513-L7516`
+  - Related spec refs: none
+- `16.2.1.8` **Users wrap these in a thin C shim file or write manual extern "C" bindings.**
+  - Requirement: Users wrap these in a thin C shim file or write manual `extern "C"` bindings.
+  - Source: `§16.2 L7513-L7516`
+  - Related spec refs: none
+- `16.2.1.9` **Function-like macro translation: Simple expression macros are translated to generic...**
+  - Requirement: **Function-like macro translation:** Simple expression macros are translated to generic functions:
+  - Source: `§16.2 L7518-L7519`
+  - Related spec refs: none
+- `16.2.1.10` **Macros with bodies that cannot be pattern-matched to With expressions emit a stub w...**
+  - Requirement: Macros with bodies that cannot be pattern-matched to With expressions emit a stub with `comptime_error`:
+  - Source: `§16.2 L7529-L7530`
+  - Related spec refs: none
+- `16.2.1.11` **Acknowledged omissions: allow_untranslated names declarations, macros, or other imp...**
+  - Requirement: **Acknowledged omissions:** `allow_untranslated` names declarations, macros, or other imported C entities that the project explicitly accepts as unavailable.
+  - Source: `§16.2 L7537-L7541`
+  - Related spec refs: none
+- `16.2.1.12` **The compiler includes this allow-list in the c_import cache key so changing it cann...**
+  - Requirement: The compiler includes this allow-list in the `c_import` cache key so changing it cannot reuse stale generated bindings.
+  - Source: `§16.2 L7537-L7541`
+  - Related spec refs: none
+- `16.2.1.13` **This is not a silent fallback.**
+  - Requirement: This is not a silent fallback.
+  - Source: `§16.2 L7550-L7553`
+  - Related spec refs: none
+- `16.2.1.14` **Anything outside the allow-list that cannot be translated correctly must still prod...**
+  - Requirement: Anything outside the allow-list that cannot be translated correctly must still produce a diagnostic or a loud `comptime_error` stub.
+  - Source: `§16.2 L7550-L7553`
+  - Related spec refs: none
+- `16.2.1.15` **A generated binding surface must never pretend an untranslatable construct works.**
+  - Requirement: A generated binding surface must never pretend an untranslatable construct works.
+  - Source: `§16.2 L7550-L7553`
+  - Related spec refs: none
+- `16.2.1.16` **Constant expression evaluation: #define macros with arithmetic expressions, bitwise...**
+  - Requirement: **Constant expression evaluation:** `#define` macros with arithmetic expressions, bitwise operations, casts, and references to other macros are evaluated via the C compiler's constant evaluator:
+  - Source: `§16.2 L7555-L7557`
+  - Related spec refs: none
+- `16.2.1.17` **Collision mangling: When c_import encounters duplicate names from transitive includ...**
+  - Requirement: **Collision mangling:** When `c_import` encounters duplicate names from transitive includes, numeric suffixes are appended: `name_2`, `name_3`, etc.
+  - Source: `§16.2 L7565-L7567`
+  - Related spec refs: none
+
+### §16.2a Auto-Method Generation
+
+- `16.2.2.1` **When c_import translates a C header, the compiler detects naming patterns like stru...**
+  - Requirement: When `c_import` translates a C header, the compiler detects naming patterns like `structname_method(self, ...)` and auto-generates method syntax so C APIs feel like native With APIs.
+  - Source: `§16.2a L7571-L7575`
+  - Related spec refs: none
+- `16.2.2.2` **This is sugar — table.insert("key", "val") compiles to exactly g_hash_table_insert(...**
+  - Requirement: This is sugar — `table.insert("key", "val")` compiles to exactly `g_hash_table_insert(table, "key", "val")`.
+  - Source: `§16.2a L7571-L7575`
+  - Related spec refs: none
+- `16.2.2.3` **Zero runtime cost.**
+  - Requirement: Zero runtime cost.
+  - Source: `§16.2a L7571-L7575`
+  - Related spec refs: none
+- `16.2.2.4` **Detection rules.**
+  - Requirement: **Detection rules.**
+  - Source: `§16.2a L7589-L7596`
+  - Related spec refs: none
+- `16.2.2.5` **For each struct S from c_import, the compiler converts the name to snake_case (GHas...**
+  - Requirement: For each struct `S` from `c_import`, the compiler converts the name to snake_case (`GHashTable` → `g_hash_table_`) and checks if imported functions start with that prefix.
+  - Source: `§16.2a L7589-L7596`
+  - Related spec refs: none
+- `16.2.2.6` **A function is a method candidate if its first parameter is *S, *mut S, *const S, or S.**
+  - Requirement: A function is a **method candidate** if its first parameter is `*S`, `*mut S`, `*const S`, or `S`.
+  - Source: `§16.2a L7589-L7596`
+  - Related spec refs: none
+- `16.2.2.7` **A function is a constructor candidate if it returns *S / *mut S without taking self.**
+  - Requirement: A function is a **constructor candidate** if it returns `*S` / `*mut S` without taking self.
+  - Source: `§16.2a L7589-L7596`
+  - Related spec refs: none
+- `16.2.2.8` **The method name is the function name with the prefix stripped:**
+  - Requirement: The method name is the function name with the prefix stripped:
+  - Source: `§16.2a L7589-L7596`
+  - Related spec refs: none
+- `16.2.2.9` **Constructor syntax.**
+  - Requirement: **Constructor syntax.**
+  - Source: `§16.2a L7605-L7607`
+  - Related spec refs: none
+- `16.2.2.10` **If a type has a .new method, the type name itself becomes callable: GHashTable(args...**
+  - Requirement: If a type has a `.new` method, the type name itself becomes callable: `GHashTable(args)` is sugar for `GHashTable.new(args)`.
+  - Source: `§16.2a L7605-L7607`
+  - Related spec refs: none
+- `16.2.2.11` **Destructor detection and auto-defer.**
+  - Requirement: **Destructor detection and auto-defer.**
+  - Source: `§16.2a L7609-L7615`
+  - Related spec refs: none
+- `16.2.2.12` **Functions matching prefix_destroy, prefix_free, prefix_close, prefix_unref, or pref...**
+  - Requirement: Functions matching `prefix_destroy`, `prefix_free`, `prefix_close`, `prefix_unref`, or `prefix_release` are tagged as destructors.
+  - Source: `§16.2a L7609-L7615`
+  - Related spec refs: none
+- `16.2.2.13` **When a constructor result is bound to a non-escaping let, the compiler inserts defe...**
+  - Requirement: When a constructor result is bound to a non-escaping `let`, the compiler inserts `defer obj.destructor()` automatically.
+  - Source: `§16.2a L7609-L7615`
+  - Related spec refs: none
+- `16.2.2.14` **Auto-defer does NOT apply when the value is returned, stored in a collection, bound...**
+  - Requirement: Auto-defer does NOT apply when the value is returned, stored in a collection, bound to `var`, or passed to an ownership-transferring function.
+  - Source: `§16.2a L7609-L7615`
+  - Related spec refs: none
+- `16.2.2.15` **Opt-out.**
+  - Requirement: **Opt-out.**
+  - Source: `§16.2a L7617-L7619`
+  - Related spec refs: none
+- `16.2.2.16` **Per-type: use c_import("lib.h", no_methods: "Type").**
+  - Requirement: Per-type: `use c_import("lib.h", no_methods: "Type")`.
+  - Source: `§16.2a L7617-L7619`
+  - Related spec refs: none
+- `16.2.2.17` **Global: use c_import("lib.h", no_methods: true).**
+  - Requirement: Global: `use c_import("lib.h", no_methods: true)`.
+  - Source: `§16.2a L7617-L7619`
+  - Related spec refs: none
+- `16.2.2.18` **Flat C functions are always available regardless.**
+  - Requirement: Flat C functions are always available regardless.
+  - Source: `§16.2a L7617-L7619`
+  - Related spec refs: none
+- `16.2.2.19` **Ambiguity.**
+  - Requirement: **Ambiguity.**
+  - Source: `§16.2a L7621-L7624`
+  - Related spec refs: none
+- `16.2.2.20` **If multiple structs could claim the same function, the longest prefix wins.**
+  - Requirement: If multiple structs could claim the same function, the longest prefix wins.
+  - Source: `§16.2a L7621-L7624`
+  - Related spec refs: none
+- `16.2.2.21` **If equal length, neither claims it.**
+  - Requirement: If equal length, neither claims it.
+  - Source: `§16.2a L7621-L7624`
+  - Related spec refs: none
+- `16.2.2.22` **User-written impl methods always take priority over auto-generated ones.**
+  - Requirement: User-written `impl` methods always take priority over auto-generated ones.
+  - Source: `§16.2a L7621-L7624`
+  - Related spec refs: none
+
+### §16.3 Manual Declarations
+
+- `16.3.1.1` **For cases where c_import is insufficient or when fine-grained control is needed, ma...**
+  - Requirement: For cases where `c_import` is insufficient or when fine-grained control is needed, manual declarations are supported:
+  - Source: `§16.3 L7628-L7629`
+  - Related spec refs: none
+- `16.3.1.2` **All extern "C" calls require unsafe.**
+  - Requirement: All `extern "C"` calls require `unsafe`.
+  - Source: `§16.3 L7638`
+  - Related spec refs: none
+
+### §16.3b External Variables
+
+- `16.3.3.1` **Global variables defined in C libraries can be declared with extern var (mutable) o...**
+  - Requirement: Global variables defined in C libraries can be declared with `extern var` (mutable) or `extern let` (read-only):
+  - Source: `§16.3b L7642-L7643`
+  - Related spec refs: none
+- `16.3.3.2` **No initializer — the symbol is resolved at link time.**
+  - Requirement: No initializer — the symbol is resolved at link time.
+  - Source: `§16.3b L7652`
+  - Related spec refs: none
+- `16.3.3.3` **extern let produces a compile error if assigned to.**
+  - Requirement: `extern let` produces a compile error if assigned to.
+  - Source: `§16.3b L7653`
+  - Related spec refs: none
+- `16.3.3.4` **extern var is mutable — assignment stores to the global.**
+  - Requirement: `extern var` is mutable — assignment stores to the global.
+  - Source: `§16.3b L7654`
+  - Related spec refs: none
+- `16.3.3.5` **The type must be concrete (no generics, no inference).**
+  - Requirement: The type must be concrete (no generics, no inference).
+  - Source: `§16.3b L7655`
+  - Related spec refs: none
+- `16.3.3.6` **Access does not require unsafe (the declaration is the opt-in).**
+  - Requirement: Access does not require `unsafe` (the declaration is the opt-in).
+  - Source: `§16.3b L7656`
+  - Related spec refs: none
+- `16.3.3.7` **c_import emits extern var for C globals with non-const types and extern let for con...**
+  - Requirement: `c_import` emits `extern var` for C globals with non-const types and `extern let` for const-qualified globals.
+  - Source: `§16.3b L7658-L7659`
+  - Related spec refs: none
+- `16.3.3.8` **The c_void type: C's void* maps to *mut c_void (or *const c_void) in With.**
+  - Requirement: **The `c_void` type:** C's `void*` maps to `*mut c_void` (or `*const c_void`) in With.
+  - Source: `§16.3b L7661-L7666`
+  - Related spec refs: none
+- `16.3.3.9` **c_void is an opaque, zero-sized type defined in std.ffi that cannot be instantiated...**
+  - Requirement: `c_void` is an opaque, zero-sized type defined in `std.ffi` that cannot be instantiated — it exists only to be pointed at.
+  - Source: `§16.3b L7661-L7666`
+  - Related spec refs: none
+- `16.3.3.10` **void is not a keyword or built-in type in With (the unit type is Unit).**
+  - Requirement: `void` is not a keyword or built-in type in With (the unit type is `Unit`).
+  - Source: `§16.3b L7661-L7666`
+  - Related spec refs: none
+- `16.3.3.11` **c_import automatically translates C's void* parameters to *mut c_void.**
+  - Requirement: `c_import` automatically translates C's `void*` parameters to `*mut c_void`.
+  - Source: `§16.3b L7661-L7666`
+  - Related spec refs: none
+
+### §16.3c Auto-Coercion at `c_import` Boundaries
+
+- `16.3.4.1` **C APIs use void* as an opaque data type. glib, CoreFoundation, Win32, POSIX — every...**
+  - Requirement: C APIs use `void*` as an opaque data type. glib, CoreFoundation, Win32, POSIX — every major C library passes data through opaque pointers.
+  - Source: `§16.3c L7670-L7673`
+  - Related spec refs: none
+- `16.3.4.2` **Requiring explicit casts on every call defeats With's "C interop should feel native...**
+  - Requirement: Requiring explicit casts on every call defeats With's "C interop should feel native" promise.
+  - Source: `§16.3c L7670-L7673`
+  - Related spec refs: none
+- `16.3.4.3` **The compiler auto-coerces at c_import function call boundaries when the conversion...**
+  - Requirement: The compiler auto-coerces at `c_import` function call boundaries when the conversion is unambiguous.
+  - Source: `§16.3c L7675-L7677`
+  - Related spec refs: none
+- `16.3.4.4` **The user writes normal With types.**
+  - Requirement: The user writes normal With types.
+  - Source: `§16.3c L7675-L7677`
+  - Related spec refs: none
+- `16.3.4.5` **The compiler inserts the ABI translation.**
+  - Requirement: The compiler inserts the ABI translation.
+  - Source: `§16.3c L7675-L7677`
+  - Related spec refs: none
+- `16.3.4.6` **Parameter coercions (With → C).**
+  - Requirement: **Parameter coercions (With → C).**
+  - Source: `§16.3c L7689-L7691`
+  - Related spec refs: none
+- `16.3.4.7` **When calling a function imported via c_import, if an argument type doesn't match th...**
+  - Requirement: When calling a function imported via `c_import`, if an argument type doesn't match the parameter type, the compiler attempts auto-coercion:
+  - Source: `§16.3c L7689-L7691`
+  - Related spec refs: none
+- `16.3.4.8` **str; *mut c_void; pointer to string data**
+  - Requirement: `str`; `*mut c_void`; pointer to string data
+  - Source: `§16.3c L7695`
+  - Related spec refs: none
+- `16.3.4.9` **str; *const c_void; pointer to string data**
+  - Requirement: `str`; `*const c_void`; pointer to string data
+  - Source: `§16.3c L7696`
+  - Related spec refs: none
+- `16.3.4.10` **str; *const u8; pointer to string data**
+  - Requirement: `str`; `*const u8`; pointer to string data
+  - Source: `§16.3c L7697`
+  - Related spec refs: none
+- `16.3.4.11` **str; *const c_char; pointer to string data (null-terminated)**
+  - Requirement: `str`; `*const c_char`; pointer to string data (null-terminated)
+  - Source: `§16.3c L7698`
+  - Related spec refs: none
+- `16.3.4.12` **str; *mut c_char; pointer to copy (caller must free — warn)**
+  - Requirement: `str`; `*mut c_char`; pointer to copy (caller must free — warn)
+  - Source: `§16.3c L7699`
+  - Related spec refs: none
+- `16.3.4.13` **i32; c_int; identity (same repr)**
+  - Requirement: `i32`; `c_int`; identity (same repr)
+  - Source: `§16.3c L7700`
+  - Related spec refs: none
+- `16.3.4.14` **bool; c_int; 1 or 0**
+  - Requirement: `bool`; `c_int`; 1 or 0
+  - Source: `§16.3c L7701`
+  - Related spec refs: none
+- `16.3.4.15` ***mut T; *mut c_void; pointer cast**
+  - Requirement: `*mut T`; `*mut c_void`; pointer cast
+  - Source: `§16.3c L7702`
+  - Related spec refs: none
+- `16.3.4.16` ***const T; *const c_void; pointer cast**
+  - Requirement: `*const T`; `*const c_void`; pointer cast
+  - Source: `§16.3c L7703`
+  - Related spec refs: none
+- `16.3.4.17` **These coercions ONLY apply at c_import function call sites.**
+  - Requirement: These coercions ONLY apply at `c_import` function call sites.
+  - Source: `§16.3c L7705-L7707`
+  - Related spec refs: none
+- `16.3.4.18` **They do not apply to user-defined functions, assignments, or any other context.**
+  - Requirement: They do not apply to user-defined functions, assignments, or any other context.
+  - Source: `§16.3c L7705-L7707`
+  - Related spec refs: none
+- `16.3.4.19` **Return coercions (C → With).**
+  - Requirement: **Return coercions (C → With).**
+  - Source: `§16.3c L7709-L7711`
+  - Related spec refs: none
+- `16.3.4.20` **When the return type of a c_import function is *mut c_void or *const c_void, the co...**
+  - Requirement: When the return type of a `c_import` function is `*mut c_void` or `*const c_void`, the compiler coerces based on the receiving context:
+  - Source: `§16.3c L7709-L7711`
+  - Related spec refs: none
+- `16.3.4.21` ***mut c_void; let x: str = ...; null-check + strlen → str view**
+  - Requirement: `*mut c_void`; `let x: str = ...`; null-check + strlen → str view
+  - Source: `§16.3c L7715`
+  - Related spec refs: none
+- `16.3.4.22` ***mut c_void; let x: *mut T = ...; pointer cast**
+  - Requirement: `*mut c_void`; `let x: *mut T = ...`; pointer cast
+  - Source: `§16.3c L7716`
+  - Related spec refs: none
+- `16.3.4.23` ***const c_void; let x: str = ...; null-check + strlen → str view**
+  - Requirement: `*const c_void`; `let x: str = ...`; null-check + strlen → str view
+  - Source: `§16.3c L7717`
+  - Related spec refs: none
+- `16.3.4.24` ***const c_void; let x: *mut T = ...; pointer cast**
+  - Requirement: `*const c_void`; `let x: *mut T = ...`; pointer cast
+  - Source: `§16.3c L7718`
+  - Related spec refs: none
+- `16.3.4.25` ***mut c_void; no annotation; stays *mut c_void (no guess)**
+  - Requirement: `*mut c_void`; no annotation; stays `*mut c_void` (no guess)
+  - Source: `§16.3c L7719`
+  - Related spec refs: none
+- `16.3.4.26` **Without a type annotation, no return coercion happens — the value stays as the C re...**
+  - Requirement: Without a type annotation, no return coercion happens — the value stays as the C return type.
+  - Source: `§16.3c L7721-L7722`
+  - Related spec refs: none
+- `16.3.4.27` **Null safety.**
+  - Requirement: **Null safety.**
+  - Source: `§16.3c L7724-L7726`
+  - Related spec refs: none
+- `16.3.4.28` **The *mut c_void → str coercion always inserts a runtime null check.**
+  - Requirement: The `*mut c_void` → `str` coercion always inserts a runtime null check.
+  - Source: `§16.3c L7724-L7726`
+  - Related spec refs: none
+- `16.3.4.29` **If the pointer is null, the result is "" (empty string, not a crash).**
+  - Requirement: If the pointer is null, the result is `""` (empty string, not a crash).
+  - Source: `§16.3c L7724-L7726`
+  - Related spec refs: none
+- `16.3.4.30` **str → *mut i32 (not a void pointer)**
+  - Requirement: `str` → `*mut i32` (not a void pointer)
+  - Source: `§16.3c L7736`
+  - Related spec refs: none
+- `16.3.4.31` **i32 → *mut c_void (integer to pointer — never implicit)**
+  - Requirement: `i32` → `*mut c_void` (integer to pointer — never implicit)
+  - Source: `§16.3c L7737`
+  - Related spec refs: none
+- `16.3.4.32` **f64 → c_int (lossy — never implicit)**
+  - Requirement: `f64` → `c_int` (lossy — never implicit)
+  - Source: `§16.3c L7738`
+  - Related spec refs: none
+- `16.3.4.33` **Vec[T] → *mut c_void (complex type — never implicit)**
+  - Requirement: `Vec[T]` → `*mut c_void` (complex type — never implicit)
+  - Source: `§16.3c L7739`
+  - Related spec refs: none
+- `16.3.4.34` **str → *mut c_void in non-c_import functions**
+  - Requirement: `str` → `*mut c_void` in non-`c_import` functions
+  - Source: `§16.3c L7740`
+  - Related spec refs: none
+- `16.3.4.35` **The rule: coercions are only between types where the conversion is unambiguous and...**
+  - Requirement: The rule: coercions are only between types where the conversion is unambiguous and lossless at the representation level.
+  - Source: `§16.3c L7742-L7743`
+  - Related spec refs: none
+
+### §16.4 Layout Control
+
+- `16.4.1.1` **Types imported via c_import automatically have repr(C) layout.**
+  - Requirement: Types imported via `c_import` automatically have `repr(C)` layout.
+  - Source: `§16.4 L7752-L7754`
+  - Related spec refs: none
+- `16.4.1.2` **Manually defined types intended for C interop must be explicitly annotated.**
+  - Requirement: Manually defined types intended for C interop must be explicitly annotated.
+  - Source: `§16.4 L7752-L7754`
+  - Related spec refs: none
+- `16.4.1.3` **repr(packed) implies repr(C) and sets alignment to 1 for all fields (no padding).**
+  - Requirement: `repr(packed)` implies `repr(C)` and sets alignment to 1 for all fields (no padding).
+  - Source: `§16.4 L7767-L7770`
+  - Related spec refs: none
+- `16.4.1.4` **The compiler emits unaligned loads/stores.**
+  - Requirement: The compiler emits unaligned loads/stores.
+  - Source: `§16.4 L7767-L7770`
+  - Related spec refs: none
+- `16.4.1.5` **Creating a reference to a packed field is a compile error (the reference would be u...**
+  - Requirement: Creating a reference to a packed field is a compile error (the reference would be unaligned).
+  - Source: `§16.4 L7767-L7770`
+  - Related spec refs: none
+- `16.4.1.6` **Unions have the size of their largest field.**
+  - Requirement: Unions have the size of their largest field.
+  - Source: `§16.4 L7786-L7789`
+  - Related spec refs: none
+- `16.4.1.7` **All fields share offset 0.**
+  - Requirement: All fields share offset 0.
+  - Source: `§16.4 L7786-L7789`
+  - Related spec refs: none
+- `16.4.1.8` **Reading a field that wasn't last written requires unsafe.**
+  - Requirement: Reading a field that wasn't last written requires `unsafe`.
+  - Source: `§16.4 L7786-L7789`
+  - Related spec refs: none
+- `16.4.1.9` **Writing any field is safe.**
+  - Requirement: Writing any field is safe.
+  - Source: `§16.4 L7786-L7789`
+  - Related spec refs: none
+- `16.4.1.10` **Construction requires exactly one field initializer.**
+  - Requirement: Construction requires exactly one field initializer.
+  - Source: `§16.4 L7786-L7789`
+  - Related spec refs: none
+- `16.4.1.11` **c_import translates C union declarations directly.**
+  - Requirement: `c_import` translates C union declarations directly.
+  - Source: `§16.4 L7786-L7789`
+  - Related spec refs: none
+- `16.4.1.12` **Variables, struct fields, and function parameters can specify custom alignment usin...**
+  - Requirement: Variables, struct fields, and function parameters can specify custom alignment using the `align` attribute:
+  - Source: `§16.4 L7793-L7794`
+  - Related spec refs: none
+- `16.4.1.13` **Alignment must be a power of two.**
+  - Requirement: Alignment must be a power of two.
+  - Source: `§16.4 L7811`
+  - Related spec refs: none
+- `16.4.1.14` **Alignment must be at least the natural alignment of the type.**
+  - Requirement: Alignment must be at least the natural alignment of the type.
+  - Source: `§16.4 L7812`
+  - Related spec refs: none
+- `16.4.1.15` **Alignment cannot exceed a platform-defined maximum (65536).**
+  - Requirement: Alignment cannot exceed a platform-defined maximum (65536).
+  - Source: `§16.4 L7813`
+  - Related spec refs: none
+- `16.4.1.16` **Violations are compile-time errors.**
+  - Requirement: Violations are compile-time errors.
+  - Source: `§16.4 L7814`
+  - Related spec refs: none
+- `16.4.1.17` **When a local variable has custom alignment, the compiler emits an aligned stack all...**
+  - Requirement: When a local variable has custom alignment, the compiler emits an aligned stack allocation.
+  - Source: `§16.4 L7816-L7818`
+  - Related spec refs: none
+- `16.4.1.18` **When a struct has an aligned field, the struct's own alignment becomes the maximum...**
+  - Requirement: When a struct has an aligned field, the struct's own alignment becomes the maximum of all field alignments.
+  - Source: `§16.4 L7816-L7818`
+  - Related spec refs: none
+- `16.4.1.19` **Bitpacked layout is described in §4.3b.**
+  - Requirement: **Bitpacked layout** is described in §4.3b.
+  - Source: `§16.4 L7820`
+  - Related spec refs: §4.3b
+
+### §16.5 Exporting to C
+
+- `16.5.1.1` **The toolchain generates C header files for all @[c_export] symbols.**
+  - Requirement: The toolchain generates C header files for all `@[c_export]` symbols.
+  - Source: `§16.5 L7829-L7831`
+  - Related spec refs: none
+- `16.5.1.2` **This enables With libraries to be consumed by C, C++, or any language with a C FFI.**
+  - Requirement: This enables With libraries to be consumed by C, C++, or any language with a C FFI.
+  - Source: `§16.5 L7829-L7831`
+  - Related spec refs: none
+
+### §16.6 Function Pointers
+
+- `16.6.1.1` **fn(...) -> T is a With callable value.**
+  - Requirement: `fn(...) -> T` is a With callable value.
+  - Source: `§16.6 L7835-L7836`
+  - Related spec refs: none
+- `16.6.1.2` **It may carry closure context and is not C ABI compatible.**
+  - Requirement: It may carry closure context and is not C ABI compatible.
+  - Source: `§16.6 L7835-L7836`
+  - Related spec refs: none
+- `16.6.1.3` **extern "C" fn(...) -> T is a raw C ABI function pointer.**
+  - Requirement: `extern "C" fn(...) -> T` is a raw C ABI function pointer.
+  - Source: `§16.6 L7838-L7842`
+  - Related spec refs: none
+- `16.6.1.4` **It is pointer-sized, Copy, and may be stored in repr(C) structs or passed to C impo...**
+  - Requirement: It is pointer-sized, `Copy`, and may be stored in `repr(C)` structs or passed to C imports.
+  - Source: `§16.6 L7838-L7842`
+  - Related spec refs: none
+- `16.6.1.5` **Named functions and non-capturing closures coerce to extern "C" fn when their signa...**
+  - Requirement: Named functions and non-capturing closures coerce to `extern "C" fn` when their signature matches.
+  - Source: `§16.6 L7838-L7842`
+  - Related spec refs: none
+- `16.6.1.6` **Capturing closures do not coerce, because a C function pointer has no place to stor...**
+  - Requirement: Capturing closures do not coerce, because a C function pointer has no place to store With closure context.
+  - Source: `§16.6 L7838-L7842`
+  - Related spec refs: none
+- `16.6.1.7` **Function pointer type parameters may be written with or without names:**
+  - Requirement: Function pointer type parameters may be written with or without names:
+  - Source: `§16.6 L7844`
+  - Related spec refs: none
+
+### §16.7 Callback Pattern
+
+- `16.7.1.1` **Standard library provides helpers for boxing/unboxing closure context.**
+  - Requirement: Standard library provides helpers for boxing/unboxing closure context.
+  - Source: `§16.7 L7862`
+  - Related spec refs: none
+
+### §16.8 Link Directives
+
+- `16.8.1.1` **Libraries to link are specified either in c_import or in with.toml:**
+  - Requirement: Libraries to link are specified either in `c_import` or in `with.toml`:
+  - Source: `§16.8 L7866`
+  - Related spec refs: none
+- `16.8.1.2` **Or inline:**
+  - Requirement: Or inline:
+  - Source: `§16.8 L7875`
+  - Related spec refs: none
+- `16.8.1.3` **The with build command passes these to the linker.**
+  - Requirement: The `with build` command passes these to the linker.
+  - Source: `§16.8 L7881`
+  - Related spec refs: none
+
+### §16.9 Opaque Types
+
+- `16.9.1.1` **Opaque types have unknown size and layout.**
+  - Requirement: Opaque types have unknown size and layout.
+  - Source: `§16.9 L7890-L7894`
+  - Related spec refs: none
+- `16.9.1.2` **They can only appear as pointer targets (*mut FILE, *const FILE).**
+  - Requirement: They can only appear as pointer targets (`*mut FILE`, `*const FILE`).
+  - Source: `§16.9 L7890-L7894`
+  - Related spec refs: none
+- `16.9.1.3` **Any attempt to create a value, copy, sizeof, or access fields of an opaque type is...**
+  - Requirement: Any attempt to create a value, copy, `sizeof`, or access fields of an opaque type is a compile error.
+  - Source: `§16.9 L7890-L7894`
+  - Related spec refs: none
+- `16.9.1.4` **c_import emits type Name = opaque for forward- declared C structs (no body) and str...**
+  - Requirement: `c_import` emits `type Name = opaque` for forward- declared C structs (no body) and structs with bitfields.
+  - Source: `§16.9 L7890-L7894`
+  - Related spec refs: none
+
+### §16.10 Null Pointer Literal
+
+- `16.10.1.1` **null is a typed null pointer constant.**
+  - Requirement: `null` is a typed null pointer constant.
+  - Source: `§16.10 L7904-L7907`
+  - Related spec refs: none
+- `16.10.1.2` **Its type is inferred from context — it requires a pointer type annotation.**
+  - Requirement: Its type is inferred from context — it requires a pointer type annotation.
+  - Source: `§16.10 L7904-L7907`
+  - Related spec refs: none
+- `16.10.1.3` **Using null without type context is a compile error.**
+  - Requirement: Using `null` without type context is a compile error.
+  - Source: `§16.10 L7904-L7907`
+  - Related spec refs: none
+- `16.10.1.4` **null is not the same as 0.**
+  - Requirement: `null` is not the same as `0`.
+  - Source: `§16.10 L7904-L7907`
+  - Related spec refs: none
+- `16.10.1.5` **Dereferencing null is undefined behavior (caught by unsafe).**
+  - Requirement: Dereferencing `null` is undefined behavior (caught by `unsafe`).
+  - Source: `§16.10 L7904-L7907`
+  - Related spec refs: none
+
+### §16.11 Unsafe Context
+
+- `16.11.1.1` **Certain operations in With can violate memory safety if misused.**
+  - Requirement: Certain operations in With can violate memory safety if misused.
+  - Source: `§16.11 L7922-L7925`
+  - Related spec refs: none
+- `16.11.1.2` **These operations are permitted only within an unsafe context: the body of an unsafe...**
+  - Requirement: These operations are permitted only within an `unsafe` context: the body of an `unsafe fn`, the scope of an `unsafe:`/`unsafe {}` block, or the narrow `unsafe *p` / `unsafe p[i]` raw-access prefix.
+  - Source: `§16.11 L7922-L7925`
+  - Related spec refs: none
+- `16.11.1.3` **The operations that require an unsafe context are:**
+  - Requirement: The operations that require an unsafe context are:
+  - Source: `§16.11 L7927`
+  - Related spec refs: none
+- `16.11.1.4` **Raw pointer dereference (*p for read or write)**
+  - Requirement: Raw pointer dereference (`*p` for read or write)
+  - Source: `§16.11 L7929`
+  - Related spec refs: none
+- `16.11.1.5` **Raw pointer indexing (p[i] for read, p[i] = v for write)**
+  - Requirement: Raw pointer indexing (`p[i]` for read, `p[i] = v` for write)
+  - Source: `§16.11 L7930`
+  - Related spec refs: none
+- `16.11.1.6` **Calls to extern functions**
+  - Requirement: Calls to `extern` functions
+  - Source: `§16.11 L7931`
+  - Related spec refs: none
+- `16.11.1.7` **Other operations explicitly marked as unsafe in their definition**
+  - Requirement: Other operations explicitly marked as unsafe in their definition
+  - Source: `§16.11 L7932`
+  - Related spec refs: none
+- `16.11.1.8` **For the common raw-memory access case, unsafe may be used as a narrow prefix over o...**
+  - Requirement: For the common raw-memory access case, `unsafe` may be used as a narrow prefix over one contiguous raw access chain:
+  - Source: `§16.11 L7934-L7935`
+  - Related spec refs: none
+- `16.11.1.9` **The prefix does not wrap arbitrary expressions.**
+  - Requirement: The prefix does not wrap arbitrary expressions.
+  - Source: `§16.11 L7947-L7951`
+  - Related spec refs: none
+- `16.11.1.10` **unsafe *p + 1 means (unsafe *p) + 1; a second raw access must be marked separately...**
+  - Requirement: `unsafe *p + 1` means `(unsafe *p) + 1`; a second raw access must be marked separately or placed in an unsafe block.
+  - Source: `§16.11 L7947-L7951`
+  - Related spec refs: none
+- `16.11.1.11` **Use unsafe { ... } or a newline unsafe: block for unsafe calls, transmutes, asm, an...**
+  - Requirement: Use `unsafe { ... }` or a newline `unsafe:` block for unsafe calls, transmutes, asm, and compound unsafe expressions.
+  - Source: `§16.11 L7947-L7951`
+  - Related spec refs: none
+- `16.11.1.12` **The following operations involving raw pointers are safe and do not require an unsa...**
+  - Requirement: The following operations involving raw pointers are safe and do not require an unsafe context:
+  - Source: `§16.11 L7953-L7954`
+  - Related spec refs: none
+- `16.11.1.13` **Raw pointer arithmetic (p + n, p - n, p - q)**
+  - Requirement: Raw pointer arithmetic (`p + n`, `p - n`, `p - q`)
+  - Source: `§16.11 L7956`
+  - Related spec refs: none
+- `16.11.1.14` **Raw pointer comparison (p == q, p < q, etc.)**
+  - Requirement: Raw pointer comparison (`p == q`, `p < q`, etc.)
+  - Source: `§16.11 L7957`
+  - Related spec refs: none
+- `16.11.1.15` **Taking the address of a value (&x, &raw mut x)**
+  - Requirement: Taking the address of a value (`&x`, `&raw mut x`)
+  - Source: `§16.11 L7958`
+  - Related spec refs: none
+- `16.11.1.16` **Casting a pointer to an integer (p as usize)**
+  - Requirement: Casting a pointer to an integer (`p as usize`)
+  - Source: `§16.11 L7959`
+  - Related spec refs: none
+- `16.11.1.17` **Casting an integer to a pointer (n as *T)**
+  - Requirement: Casting an integer to a pointer (`n as *T`)
+  - Source: `§16.11 L7960`
+  - Related spec refs: none
+- `16.11.1.18` **Raw pointer arithmetic uses element units:**
+  - Requirement: Raw pointer arithmetic uses element units:
+  - Source: `§16.11 L7962`
+  - Related spec refs: none
+- `16.11.1.19` **ptr + n advances by n * sizeof(T) bytes.**
+  - Requirement: `ptr + n` advances by `n * sizeof(T)` bytes.
+  - Source: `§16.11 L7964`
+  - Related spec refs: none
+- `16.11.1.20` **ptr - n retreats by n * sizeof(T) bytes.**
+  - Requirement: `ptr - n` retreats by `n * sizeof(T)` bytes.
+  - Source: `§16.11 L7965`
+  - Related spec refs: none
+- `16.11.1.21` **ptr1 - ptr2 returns the element count between pointers.**
+  - Requirement: `ptr1 - ptr2` returns the element count between pointers.
+  - Source: `§16.11 L7966`
+  - Related spec refs: none
+- `16.11.1.22` **Result preserves mutability: *mut T + n -> *mut T.**
+  - Requirement: Result preserves mutability: `*mut T + n` -> `*mut T`.
+  - Source: `§16.11 L7967`
+  - Related spec refs: none
+- `16.11.1.23` **Computing a pointer value cannot by itself read invalid memory, write invalid memor...**
+  - Requirement: Computing a pointer value cannot by itself read invalid memory, write invalid memory, or violate type invariants.
+  - Source: `§16.11 L7969-L7972`
+  - Related spec refs: none
+- `16.11.1.24` **The unsafe requirement is placed at the access site, not at every intermediate comp...**
+  - Requirement: The unsafe requirement is placed at the access site, not at every intermediate computation:
+  - Source: `§16.11 L7969-L7972`
+  - Related spec refs: none
+- `16.11.1.25` **> unsafe is required when you are about to touch memory through > a raw pointer, no...**
+  - Requirement: > `unsafe` is required when you are about to touch memory through > a raw pointer, not when you are merely computing one.
+  - Source: `§16.11 L7974-L7975`
+  - Related spec refs: none
+- `16.11.1.26` **Users may freely compute pointer addresses in safe code.**
+  - Requirement: Users may freely compute pointer addresses in safe code.
+  - Source: `§16.11 L7977-L7980`
+  - Related spec refs: none
+- `16.11.1.27` **The resulting pointer value carries the same responsibility as any raw pointer: it...**
+  - Requirement: The resulting pointer value carries the same responsibility as any raw pointer: it may only be used to access memory within an unsafe context.
+  - Source: `§16.11 L7977-L7980`
+  - Related spec refs: none
+
+### §16.12 Intrinsics
+
+- `16.12.1.1` **Built-in generic functions that return the size (in bytes) and ABI alignment of a t...**
+  - Requirement: Built-in generic functions that return the size (in bytes) and ABI alignment of a type at compile time.
+  - Source: `§16.12 L7991-L7994`
+  - Related spec refs: none
+- `16.12.1.2` **Required for allocator implementations, C interop buffer sizing, and packed struct...**
+  - Requirement: Required for allocator implementations, C interop buffer sizing, and packed struct calculations.
+  - Source: `§16.12 L7991-L7994`
+  - Related spec refs: none
+- `16.12.1.3` **Reinterprets the bits of one type as another.**
+  - Requirement: Reinterprets the bits of one type as another.
+  - Source: `§16.12 L8002-L8003`
+  - Related spec refs: none
+- `16.12.1.4` **Both types must have the same size (compile error otherwise).**
+  - Requirement: Both types must have the same size (compile error otherwise).
+  - Source: `§16.12 L8002-L8003`
+  - Related spec refs: none
+- `16.12.1.5` **Requires unsafe context.**
+  - Requirement: Requires `unsafe` context.
+  - Source: `§16.12 L8002-L8003`
+  - Related spec refs: none
+
+### §16.13 Inline Assembly
+
+- `16.13.1.1` **The asm expression embeds target-specific assembly instructions.**
+  - Requirement: The `asm` expression embeds target-specific assembly instructions.
+  - Source: `§16.13 L8007-L8008`
+  - Related spec refs: none
+- `16.13.1.2` **It requires unsafe context.**
+  - Requirement: It requires `unsafe` context.
+  - Source: `§16.13 L8007-L8008`
+  - Related spec refs: none
+- `16.13.1.3` **Each section is optional.**
+  - Requirement: Each section is optional.
+  - Source: `§16.13 L8024`
+  - Related spec refs: none
+- `16.13.1.4` **A trailing : section can be omitted.**
+  - Requirement: A trailing `:` section can be omitted.
+  - Source: `§16.13 L8024`
+  - Related spec refs: none
+- `16.13.1.5` **Template: A string literal containing assembly instructions.**
+  - Requirement: **Template:** A string literal containing assembly instructions.
+  - Source: `§16.13 L8026-L8028`
+  - Related spec refs: none
+- `16.13.1.6` **Register placeholders use {name} syntax, where name matches an output or input bind...**
+  - Requirement: Register placeholders use `{name}` syntax, where `name` matches an output or input binding.
+  - Source: `§16.13 L8026-L8028`
+  - Related spec refs: none
+- `16.13.1.7` **Outputs: Comma-separated list of name(constraint) -> type.**
+  - Requirement: **Outputs:** Comma-separated list of `name(constraint) -> type`.
+  - Source: `§16.13 L8030`
+  - Related spec refs: none
+- `16.13.1.8` **Inputs: Comma-separated list of name(constraint) value.**
+  - Requirement: **Inputs:** Comma-separated list of `name(constraint) value`.
+  - Source: `§16.13 L8036`
+  - Related spec refs: none
+- `16.13.1.9` **Clobbers: Comma-separated list of registers or "memory" / "cc" that the assembly mo...**
+  - Requirement: **Clobbers:** Comma-separated list of registers or `"memory"` / `"cc"` that the assembly modifies but that are not outputs.
+  - Source: `§16.13 L8044-L8045`
+  - Related spec refs: none
+- `16.13.1.10` **Volatile: Marks the assembly as having side effects that the optimizer must not eli...**
+  - Requirement: **Volatile:** Marks the assembly as having side effects that the optimizer must not eliminate:
+  - Source: `§16.13 L8054-L8055`
+  - Related spec refs: none
+- `16.13.1.11` **Assembly is inherently non-portable.**
+  - Requirement: Assembly is inherently non-portable.
+  - Source: `§16.13 L8061-L8063`
+  - Related spec refs: none
+- `16.13.1.12` **The @[target("aarch64")] or @[target("x86_64")] attribute can guard architecture-sp...**
+  - Requirement: The `@[target("aarch64")]` or `@[target("x86_64")]` attribute can guard architecture-specific blocks.
+  - Source: `§16.13 L8061-L8063`
+  - Related spec refs: none
+
+## 17. Metaprogramming
+
+### §17 Metaprogramming
+
+- `17.1.1.1` **With does not have macros.**
+  - Requirement: With does not have macros.
+  - Source: `§17 L8069-L8074`
+  - Related spec refs: none
+- `17.1.1.2` **It has comptime — compile-time execution of regular With code with access to type i...**
+  - Requirement: It has `comptime` — compile-time execution of regular With code with access to type information.
+  - Source: `§17 L8069-L8074`
+  - Related spec refs: none
+- `17.1.1.3` **This replaces derive macros, reflection-based codegen, and most uses of procedural...**
+  - Requirement: This replaces derive macros, reflection-based codegen, and most uses of procedural macros from other languages.
+  - Source: `§17 L8069-L8074`
+  - Related spec refs: none
+- `17.1.1.4` **The key property: generated code is regular With code that goes through the full ty...**
+  - Requirement: The key property: generated code is regular With code that goes through the full type checker and borrow checker.
+  - Source: `§17 L8069-L8074`
+  - Related spec refs: none
+- `17.1.1.5` **Nothing is hidden from the safety machinery.**
+  - Requirement: Nothing is hidden from the safety machinery.
+  - Source: `§17 L8069-L8074`
+  - Related spec refs: none
+
+### §17.0 Magic Constants
+
+- `17.0.1.1` **With provides three built-in magic constants, evaluated at the point of use:**
+  - Requirement: With provides three built-in magic constants, evaluated at the point of use:
+  - Source: `§17.0 L8078`
+  - Related spec refs: none
+- `17.0.1.2` **__FILE__; str; Path of the current source file**
+  - Requirement: `__FILE__`; `str`; Path of the current source file
+  - Source: `§17.0 L8082`
+  - Related spec refs: none
+- `17.0.1.3` **__LINE__; u32; Line number of the expression**
+  - Requirement: `__LINE__`; `u32`; Line number of the expression
+  - Source: `§17.0 L8083`
+  - Related spec refs: none
+- `17.0.1.4` **__FN__; str; Name of the current function**
+  - Requirement: `__FN__`; `str`; Name of the current function
+  - Source: `§17.0 L8084`
+  - Related spec refs: none
+- `17.0.1.5` **These are especially useful as default parameter values for assertion and logging f...**
+  - Requirement: These are especially useful as default parameter values for assertion and logging functions:
+  - Source: `§17.0 L8092-L8093`
+  - Related spec refs: none
+
+### §17.1 Compile-Time Evaluation
+
+- `17.1.1.6` **comptime executes code at compile time.**
+  - Requirement: `comptime` executes code at compile time.
+  - Source: `§17.1 L8104`
+  - Related spec refs: none
+- `17.1.1.7` **Deterministic, side-effect-free.**
+  - Requirement: Deterministic, side-effect-free.
+  - Source: `§17.1 L8104`
+  - Related spec refs: none
+- `17.1.1.8` **Any function marked comptime fn can only call other comptime functions and use type...**
+  - Requirement: Any function marked `comptime fn` can only call other `comptime` functions and use types that are available at compile time.
+  - Source: `§17.1 L8118-L8122`
+  - Related spec refs: none
+- `17.1.1.9` **It cannot perform I/O, allocate heap memory that persists to runtime, or call FFI f...**
+  - Requirement: It cannot perform I/O, allocate heap memory that persists to runtime, or call FFI functions.
+  - Source: `§17.1 L8118-L8122`
+  - Related spec refs: none
+- `17.1.1.10` **The result must be a value that can be embedded in the binary as a constant.**
+  - Requirement: The result must be a value that can be embedded in the binary as a constant.
+  - Source: `§17.1 L8118-L8122`
+  - Related spec refs: none
+
+### §17.1a Capability-Bearing Comptime
+
+- `17.1.2.1` **Pure comptime is deterministic and effect-free.**
+  - Requirement: Pure comptime is deterministic and effect-free.
+  - Source: `§17.1a L8126-L8129`
+  - Related spec refs: none
+- `17.1.2.2` **Build orchestration and compiler-driver tools use the same comptime evaluator, but...**
+  - Requirement: Build orchestration and compiler-driver tools use the same comptime evaluator, but with explicit driver-minted capabilities.
+  - Source: `§17.1a L8126-L8129`
+  - Related spec refs: none
+- `17.1.2.3` **A capability-bearing comptime entry point declares the capabilities it requires wit...**
+  - Requirement: A capability-bearing comptime entry point declares the capabilities it requires with a `comptime with` clause.
+  - Source: `§17.1a L8126-L8129`
+  - Related spec refs: none
+- `17.1.2.4` **The canonical form names both the capability type and the local binding:**
+  - Requirement: The canonical form names both the capability type and the local binding:
+  - Source: `§17.1a L8131`
+  - Related spec refs: none
+- `17.1.2.5` **Capability access is through this local binding.**
+  - Requirement: Capability access is through this local binding.
+  - Source: `§17.1a L8142-L8144`
+  - Related spec refs: none
+- `17.1.2.6` **The with clause does not create implicit globals; it binds driver-minted capability...**
+  - Requirement: The `with` clause does not create implicit globals; it binds driver-minted capability values into the function's lexical scope.
+  - Source: `§17.1a L8142-L8144`
+  - Related spec refs: none
+- `17.1.2.7` **The shorthand omits as name only when the capability type has a standard default bi...**
+  - Requirement: The shorthand omits `as name` only when the capability type has a standard default binding:
+  - Source: `§17.1a L8146-L8147`
+  - Related spec refs: none
+- `17.1.2.8` **This desugars to:**
+  - Requirement: This desugars to:
+  - Source: `§17.1a L8155`
+  - Related spec refs: none
+- `17.1.2.9` **Default bindings are part of the standard library capability contract.**
+  - Requirement: Default bindings are part of the standard library capability contract.
+  - Source: `§17.1a L8161-L8162`
+  - Related spec refs: none
+- `17.1.2.10` **Initial defaults:**
+  - Requirement: Initial defaults:
+  - Source: `§17.1a L8161-L8162`
+  - Related spec refs: none
+- `17.1.2.11` **BuildCtx; ctx**
+  - Requirement: `BuildCtx`; `ctx`
+  - Source: `§17.1a L8166`
+  - Related spec refs: none
+- `17.1.2.12` **ActionCtx; ctx**
+  - Requirement: `ActionCtx`; `ctx`
+  - Source: `§17.1a L8167`
+  - Related spec refs: none
+- `17.1.2.13` **ToolFs; fs**
+  - Requirement: `ToolFs`; `fs`
+  - Source: `§17.1a L8168`
+  - Related spec refs: none
+- `17.1.2.14` **ProcessRunner; proc**
+  - Requirement: `ProcessRunner`; `proc`
+  - Source: `§17.1a L8169`
+  - Related spec refs: none
+- `17.1.2.15` **Diagnostics; diag**
+  - Requirement: `Diagnostics`; `diag`
+  - Source: `§17.1a L8170`
+  - Related spec refs: none
+- `17.1.2.16` **SourceEmitter; emit**
+  - Requirement: `SourceEmitter`; `emit`
+  - Source: `§17.1a L8171`
+  - Related spec refs: none
+- `17.1.2.17` **ProjectInfo; project**
+  - Requirement: `ProjectInfo`; `project`
+  - Source: `§17.1a L8172`
+  - Related spec refs: none
+- `17.1.2.18` **Workspace; workspace**
+  - Requirement: `Workspace`; `workspace`
+  - Source: `§17.1a L8173`
+  - Related spec refs: none
+- `17.1.2.19` **Multiple capabilities compose with commas:**
+  - Requirement: Multiple capabilities compose with commas:
+  - Source: `§17.1a L8175`
+  - Related spec refs: none
+- `17.1.2.20` **If two capabilities would use the same default binding in one with clause, the shor...**
+  - Requirement: If two capabilities would use the same default binding in one `with` clause, the shorthand is ambiguous and the program must use explicit `as` bindings.
+  - Source: `§17.1a L8186-L8189`
+  - Related spec refs: none
+- `17.1.2.21` **Reusing a local capability binding name in the same with clause is an error.**
+  - Requirement: Reusing a local capability binding name in the same `with` clause is an error.
+  - Source: `§17.1a L8186-L8189`
+  - Related spec refs: none
+- `17.1.2.22` **Pure comptime cannot forge or construct capability values.**
+  - Requirement: Pure comptime cannot forge or construct capability values.
+  - Source: `§17.1a L8191-L8196`
+  - Related spec refs: none
+- `17.1.2.23` **Only the compiler driver and explicitly privileged test harnesses can mint capabili...**
+  - Requirement: Only the compiler driver and explicitly privileged test harnesses can mint capabilities.
+  - Source: `§17.1a L8191-L8196`
+  - Related spec refs: none
+- `17.1.2.24` **A function that requires capabilities can be invoked only from a comptime context t...**
+  - Requirement: A function that requires capabilities can be invoked only from a comptime context that already has those capabilities in scope or from a driver-discovered entry point such as `build.w` or an action target.
+  - Source: `§17.1a L8191-L8196`
+  - Related spec refs: none
+
+### §17.2 Compile-Time Type Introspection
+
+- `17.2.1.1` **Comptime code can inspect type metadata by calling methods on type parameters direc...**
+  - Requirement: Comptime code can inspect type metadata by calling methods on type parameters directly.
+  - Source: `§17.2 L8200-L8201`
+  - Related spec refs: none
+- `17.2.1.2` **Inside comptime context, types are objects:**
+  - Requirement: Inside comptime context, types are objects:
+  - Source: `§17.2 L8200-L8201`
+  - Related spec refs: none
+- `17.2.1.3` **T.fields(); [FieldInfo]; Struct field names, types, offsets**
+  - Requirement: `T.fields()`; `[FieldInfo]`; Struct field names, types, offsets
+  - Source: `§17.2 L8207`
+  - Related spec refs: none
+- `17.2.1.4` **T.variants(); [VariantInfo]; Enum variant names and payloads**
+  - Requirement: `T.variants()`; `[VariantInfo]`; Enum variant names and payloads
+  - Source: `§17.2 L8208`
+  - Related spec refs: none
+- `17.2.1.5` **T.size(); usize; Size in bytes**
+  - Requirement: `T.size()`; `usize`; Size in bytes
+  - Source: `§17.2 L8209`
+  - Related spec refs: none
+- `17.2.1.6` **T.align(); usize; Alignment in bytes**
+  - Requirement: `T.align()`; `usize`; Alignment in bytes
+  - Source: `§17.2 L8210`
+  - Related spec refs: none
+- `17.2.1.7` **T.name(); str; Type name as string**
+  - Requirement: `T.name()`; `str`; Type name as string
+  - Source: `§17.2 L8211`
+  - Related spec refs: none
+- `17.2.1.8` **T.implements(Trait); bool; Whether T implements Trait**
+  - Requirement: `T.implements(Trait)`; `bool`; Whether T implements Trait
+  - Source: `§17.2 L8212`
+  - Related spec refs: none
+- `17.2.1.9` **T.is_copy(); bool; Whether T is Copy**
+  - Requirement: `T.is_copy()`; `bool`; Whether T is Copy
+  - Source: `§17.2 L8213`
+  - Related spec refs: none
+- `17.2.1.10` **The TypeInfo module provides the same API for non-generic contexts: TypeInfo.fields...**
+  - Requirement: The `TypeInfo` module provides the same API for non-generic contexts: `TypeInfo.fields[SomeType]()`, `TypeInfo.size[SomeType]()`, etc.
+  - Source: `§17.2 L8221-L8224`
+  - Related spec refs: none
+- `17.2.1.11` **Inside comptime generic functions, T.fields() is preferred — it reads like natural...**
+  - Requirement: Inside comptime generic functions, `T.fields()` is preferred — it reads like natural reflection.
+  - Source: `§17.2 L8221-L8224`
+  - Related spec refs: none
+- `17.2.1.12` **FieldInfo contains:**
+  - Requirement: `FieldInfo` contains:
+  - Source: `§17.2 L8226`
+  - Related spec refs: none
+
+### §17.3 Derive-Like Code Generation
+
+- `17.3.1.1` **The primary use case: generating trait implementations from type structure.**
+  - Requirement: The primary use case: generating trait implementations from type structure.
+  - Source: `§17.3 L8240-L8241`
+  - Related spec refs: none
+- `17.3.1.2` **@[derive(Serialize)] is sugar for invoking derive_serialize[User]() at compile time.**
+  - Requirement: `@[derive(Serialize)]` is sugar for invoking `derive_serialize[User]()` at compile time.
+  - Source: `§17.3 L8271-L8274`
+  - Related spec refs: none
+- `17.3.1.3` **The generated code is regular With code — it goes through type checking and borrow...**
+  - Requirement: The generated code is regular With code — it goes through type checking and borrow checking like any hand-written implementation.
+  - Source: `§17.3 L8271-L8274`
+  - Related spec refs: none
+
+### §17.4 comptime Loops
+
+- `17.4.1.1` **comptime for unrolls at compile time.**
+  - Requirement: `comptime for` unrolls at compile time.
+  - Source: `§17.4 L8278-L8279`
+  - Related spec refs: none
+- `17.4.1.2` **The loop body is stamped out once per iteration with compile-time constants substit...**
+  - Requirement: The loop body is stamped out once per iteration with compile-time constants substituted:
+  - Source: `§17.4 L8278-L8279`
+  - Related spec refs: none
+- `17.4.1.3` **Comptime cascade: Inside a comptime fn or comptime for, all code is already executi...**
+  - Requirement: **Comptime cascade:** Inside a `comptime fn` or `comptime for`, all code is already executing at compile time.
+  - Source: `§17.4 L8293-L8296`
+  - Related spec refs: none
+- `17.4.1.4` **You don't need to prefix inner for, if, or other statements with comptime — it casc...**
+  - Requirement: You don't need to prefix inner `for`, `if`, or other statements with `comptime` — it cascades automatically:
+  - Source: `§17.4 L8293-L8296`
+  - Related spec refs: none
+- `17.4.1.5` **The comptime prefix is only needed at the entry point — the outermost comptime fn...**
+  - Requirement: The `comptime` prefix is only needed at the **entry point** — the outermost `comptime fn`, `comptime for`, or `comptime if`.
+  - Source: `§17.4 L8308-L8310`
+  - Related spec refs: none
+- `17.4.1.6` **Everything inside is already compile-time by context.**
+  - Requirement: Everything inside is already compile-time by context.
+  - Source: `§17.4 L8308-L8310`
+  - Related spec refs: none
+
+### §17.5 Compile-Time Branching
+
+- `17.5.1.1` **comptime if selects code paths at compile time.**
+  - Requirement: `comptime if` selects code paths at compile time.
+  - Source: `§17.5 L8314-L8315`
+  - Related spec refs: none
+- `17.5.1.2` **Dead branches are not compiled:**
+  - Requirement: Dead branches are not compiled:
+  - Source: `§17.5 L8314-L8315`
+  - Related spec refs: none
+- `17.5.1.3` **comptime_error produces a compile error with a custom message.**
+  - Requirement: `comptime_error` produces a compile error with a custom message.
+  - Source: `§17.5 L8328-L8330`
+  - Related spec refs: none
+- `17.5.1.4` **This is the mechanism for "concept checking" — enforcing constraints that can't be...**
+  - Requirement: This is the mechanism for "concept checking" — enforcing constraints that can't be expressed as trait bounds.
+  - Source: `§17.5 L8328-L8330`
+  - Related spec refs: none
+- `17.5.1.5` **comptime_error(msg) is an expression of type never.**
+  - Requirement: `comptime_error(msg)` is an expression of type `never`.
+  - Source: `§17.5 L8334-L8338`
+  - Related spec refs: none
+- `17.5.1.6` **It does not fire when parsed — it fires only when the containing code is actually c...**
+  - Requirement: It does not fire when parsed — it fires only when the containing code is actually compiled (instantiated for a specific set of type arguments, or called).
+  - Source: `§17.5 L8334-L8338`
+  - Related spec refs: none
+- `17.5.1.7` **A function whose body is only comptime_error(...) is legal to declare and reference...**
+  - Requirement: A function whose body is only `comptime_error(...)` is legal to declare and reference — the error fires on call.
+  - Source: `§17.5 L8334-L8338`
+  - Related spec refs: none
+- `17.5.1.8` **c_import uses comptime_error for untranslatable C constructs:**
+  - Requirement: `c_import` uses `comptime_error` for untranslatable C constructs:
+  - Source: `§17.5 L8348`
+  - Related spec refs: none
+
+### §17.6a Compiler Intrinsics
+
+- `17.6.2.1` **src() returns the source location of the call site as a string in "file:line:col" f...**
+  - Requirement: **`src()`** returns the source location of the call site as a string in `"file:line:col"` format:
+  - Source: `§17.6a L8395-L8396`
+  - Related spec refs: none
+- `17.6.2.2` **embed_file(path) reads a file at compile time and embeds its contents as a string c...**
+  - Requirement: **`embed_file(path)`** reads a file at compile time and embeds its contents as a string constant:
+  - Source: `§17.6a L8405-L8406`
+  - Related spec refs: none
+- `17.6.2.3` **The path is resolved relative to the source file.**
+  - Requirement: The path is resolved relative to the source file.
+  - Source: `§17.6a L8413-L8415`
+  - Related spec refs: none
+- `17.6.2.4` **If the file does not exist, a compile error is emitted.**
+  - Requirement: If the file does not exist, a compile error is emitted.
+  - Source: `§17.6a L8413-L8415`
+  - Related spec refs: none
+- `17.6.2.5` **The file contents are embedded verbatim as a string constant in the binary.**
+  - Requirement: The file contents are embedded verbatim as a string constant in the binary.
+  - Source: `§17.6a L8413-L8415`
+  - Related spec refs: none
+- `17.6.2.6` **min and max — Return the smaller or larger of two values.**
+  - Requirement: **`min` and `max`** — Return the smaller or larger of two values.
+  - Source: `§17.6a L8426-L8428`
+  - Related spec refs: none
+- `17.6.2.7` **Both operands must be the same type.**
+  - Requirement: Both operands must be the same type.
+  - Source: `§17.6a L8426-L8428`
+  - Related spec refs: none
+- `17.6.2.8` **Defined for all integer and floating-point types.**
+  - Requirement: Defined for all integer and floating-point types.
+  - Source: `§17.6a L8426-L8428`
+  - Related spec refs: none
+- `17.6.2.9` **Return type matches the input type.**
+  - Requirement: Return type matches the input type.
+  - Source: `§17.6a L8426-L8428`
+  - Related spec refs: none
+- `17.6.2.10` **For floats, min and max follow IEEE 754-2019 minimum/maximum semantics: NaN is neve...**
+  - Requirement: For floats, `min` and `max` follow IEEE 754-2019 minimum/maximum semantics: NaN is never selected unless both operands are NaN.
+  - Source: `§17.6a L8436-L8437`
+  - Related spec refs: none
+- `17.6.2.11` **abs — Returns the absolute value.**
+  - Requirement: **`abs`** — Returns the absolute value.
+  - Source: `§17.6a L8439-L8441`
+  - Related spec refs: none
+- `17.6.2.12` **For signed integers, the return type is the corresponding unsigned type to avoid ab...**
+  - Requirement: For signed integers, the return type is the corresponding unsigned type to avoid `abs(INT_MIN)` undefined behavior:
+  - Source: `§17.6a L8439-L8441`
+  - Related spec refs: none
+- `17.6.2.13` **For unsigned integers: identity function.**
+  - Requirement: For unsigned integers: identity function.
+  - Source: `§17.6a L8449-L8450`
+  - Related spec refs: none
+- `17.6.2.14` **For floats: return type is the same float type (clears the sign bit per IEEE 754).**
+  - Requirement: For floats: return type is the same float type (clears the sign bit per IEEE 754).
+  - Source: `§17.6a L8449-L8450`
+  - Related spec refs: none
+- `17.6.2.15` **mul_add — Fused multiply-add.**
+  - Requirement: **`mul_add`** — Fused multiply-add.
+  - Source: `§17.6a L8452-L8455`
+  - Related spec refs: none
+- `17.6.2.16` **Computes a * b + c as a single floating-point operation with one rounding step.**
+  - Requirement: Computes `a * b + c` as a single floating-point operation with one rounding step.
+  - Source: `§17.6a L8452-L8455`
+  - Related spec refs: none
+- `17.6.2.17` **Available for f32 and f64 only.**
+  - Requirement: Available for `f32` and `f64` only.
+  - Source: `§17.6a L8452-L8455`
+  - Related spec refs: none
+- `17.6.2.18` **Critical for numerical algorithms where accumulated rounding error matters.**
+  - Requirement: Critical for numerical algorithms where accumulated rounding error matters.
+  - Source: `§17.6a L8452-L8455`
+  - Related spec refs: none
+- `17.6.2.19` **Maps to a single hardware instruction on all modern architectures (via LLVM's llvm...**
+  - Requirement: Maps to a single hardware instruction on all modern architectures (via LLVM's `llvm.fma` intrinsic).
+  - Source: `§17.6a L8461-L8462`
+  - Related spec refs: none
+
+### §17.7 Constraints
+
+- `17.7.1.1` **No runtime reflection. TypeInfo is only available in comptime contexts. There is no...**
+  - Requirement: **No runtime reflection.** `TypeInfo` is only available in `comptime` contexts. There is no way to inspect types at runtime.
+  - Source: `§17.7 L8466-L8467`
+  - Related spec refs: none
+- `17.7.1.2` **Generated code is checked. All code produced by comptime goes through the type chec...**
+  - Requirement: **Generated code is checked.** All code produced by comptime goes through the type checker and borrow checker. comptime cannot violate language invariants.
+  - Source: `§17.7 L8468-L8470`
+  - Related spec refs: none
+- `17.7.1.3` **No I/O. comptime code cannot read files, make network calls, or access the environm...**
+  - Requirement: **No I/O.** comptime code cannot read files, make network calls, or access the environment.
+  - Source: `§17.7 L8471-L8472`
+  - Related spec refs: none
+- `17.7.1.4` **Deterministic. The same comptime expression with the same inputs always produces th...**
+  - Requirement: **Deterministic.** The same comptime expression with the same inputs always produces the same output.
+  - Source: `§17.7 L8473-L8474`
+  - Related spec refs: none
+- `17.7.1.5` **No macros. With does not have token-level or AST-level macros. comptime with type i...**
+  - Requirement: **No macros.** With does not have token-level or AST-level macros. comptime with type introspection replaces the need for them. This is a deliberate choice to keep the compilation model simple — one phase, not two.
+  - Source: `§17.7 L8475-L8478`
+  - Related spec refs: none
+- `17.7.1.6` **Comptime in generic functions: When a generic function contains comptime if branche...**
+  - Requirement: **Comptime in generic functions:** When a generic function contains `comptime if` branches that depend on the type parameter `T`, the type checker uses **deferred branch checking**.
+  - Source: `§17.7 L8480-L8489`
+  - Related spec refs: none
+- `17.7.1.7` **The compiler validates syntax and declared types up front, but operations that depe...**
+  - Requirement: The compiler validates syntax and declared types up front, but operations that depend on the concrete capabilities of `T` are checked when the generic is instantiated.
+  - Source: `§17.7 L8480-L8489`
+  - Related spec refs: none
+- `17.7.1.8` **Code inside comptime if branches that depend on T is likewise deferred until monomo...**
+  - Requirement: Code inside `comptime if` branches that depend on `T` is likewise deferred until monomorphization.
+  - Source: `§17.7 L8480-L8489`
+  - Related spec refs: none
+- `17.7.1.9` **When T is known, the comptime if condition is evaluated, the taken branch is type-...**
+  - Requirement: When `T` is known, the `comptime if` condition is evaluated, the taken branch is type- checked against the concrete `T`, and the erased branch is discarded without checking.
+  - Source: `§17.7 L8480-L8489`
+  - Related spec refs: none
+- `17.7.1.10` **This is intentionally close to C++ and Zig style instantiation-time checking, but W...**
+  - Requirement: This is intentionally close to C++ and Zig style instantiation-time checking, but With keeps optional explicit bounds for APIs that want the contract written at the signature.
+  - Source: `§17.7 L8491-L8493`
+  - Related spec refs: none
+
+## 18. Modules and Packages
+
+### §18.2 Imports
+
+- `18.2.1.1` **Names are imported with use.**
+  - Requirement: Names are imported with `use`.
+  - Source: `§18.2 L8516-L8517`
+  - Related spec refs: none
+- `18.2.1.2` **Variant constructors, functions, and types can all be imported:**
+  - Requirement: Variant constructors, functions, and types can all be imported:
+  - Source: `§18.2 L8516-L8517`
+  - Related spec refs: none
+- `18.2.1.3` **Prelude: The following are automatically imported into every module:**
+  - Requirement: **Prelude:** The following are automatically imported into every module:
+  - Source: `§18.2 L8525`
+  - Related spec refs: none
+- `18.2.1.4` **Option.{Some, None}**
+  - Requirement: `Option.{Some, None}`
+  - Source: `§18.2 L8526`
+  - Related spec refs: none
+- `18.2.1.5` **Result.{Ok, Err}**
+  - Requirement: `Result.{Ok, Err}`
+  - Source: `§18.2 L8527`
+  - Related spec refs: none
+- `18.2.1.6` **Bool.{true, false}**
+  - Requirement: `Bool.{true, false}`
+  - Source: `§18.2 L8528`
+  - Related spec refs: none
+- `18.2.1.7` **Primitive types (i32, i64, f64, bool, Int, UInt, etc.)**
+  - Requirement: Primitive types (`i32`, `i64`, `f64`, `bool`, `Int`, `UInt`, etc.)
+  - Source: `§18.2 L8529`
+  - Related spec refs: none
+- `18.2.1.8` **Vec[T], String / str**
+  - Requirement: `Vec[T]`, `String` / `str`
+  - Source: `§18.2 L8531`
+  - Related spec refs: none
+- `18.2.1.9` **Traits: Eq, Ord, Hash, Debug, Display, Default, Drop**
+  - Requirement: Traits: `Eq`, `Ord`, `Hash`, `Debug`, `Display`, `Default`, `Drop`
+  - Source: `§18.2 L8532`
+  - Related spec refs: none
+- `18.2.1.10` **print, eprint**
+  - Requirement: `print`, `eprint`
+  - Source: `§18.2 L8533`
+  - Related spec refs: none
+- `18.2.1.11` **assert, assert_eq, assert_ne, require, check, panic, unreachable, todo**
+  - Requirement: `assert`, `assert_eq`, `assert_ne`, `require`, `check`, `panic`, `unreachable`, `todo`
+  - Source: `§18.2 L8534`
+  - Related spec refs: none
+- `18.2.1.12` **drop[T](val: T) — explicitly drop a value to trigger cleanup**
+  - Requirement: `drop[T](val: T)` — explicitly drop a value to trigger cleanup
+  - Source: `§18.2 L8535`
+  - Related spec refs: none
+- `18.2.1.13` **Name precedence is deterministic: local bindings and explicit use imports win over...**
+  - Requirement: Name precedence is deterministic: local bindings and explicit `use` imports win over prelude names.
+  - Source: `§18.2 L8537-L8539`
+  - Related spec refs: none
+- `18.2.1.14` **If you define print in a module, calls to print(...) resolve to your definition in...**
+  - Requirement: If you define `print` in a module, calls to `print(...)` resolve to your definition in that scope.
+  - Source: `§18.2 L8537-L8539`
+  - Related spec refs: none
+- `18.2.1.15` **drop is a built-in identity function that takes any value by move and does nothing...**
+  - Requirement: `drop` is a built-in identity function that takes any value by move and does nothing — the value is destroyed when the argument goes out of scope:
+  - Source: `§18.2 L8541-L8543`
+  - Related spec refs: none
+- `18.2.1.16` **This is used to trigger resource cleanup at a specific point:**
+  - Requirement: This is used to trigger resource cleanup at a specific point:
+  - Source: `§18.2 L8549`
+  - Related spec refs: none
+
+### §18.3 Visibility
+
+- `18.3.1.1` **pub exports names.**
+  - Requirement: `pub` exports names.
+  - Source: `§18.3 L8561`
+  - Related spec refs: none
+- `18.3.1.2` **No pub = module-private.**
+  - Requirement: No `pub` = module-private.
+  - Source: `§18.3 L8561`
+  - Related spec refs: none
+
+### §18.4 Packages
+
+- `18.4.1.1` **Directory with with.toml.**
+  - Requirement: Directory with `with.toml`.
+  - Source: `§18.4 L8565-L8566`
+  - Related spec refs: none
+- `18.4.1.2` **Single-file programs need no manifest.**
+  - Requirement: Single-file programs need no manifest.
+  - Source: `§18.4 L8565-L8566`
+  - Related spec refs: none
+- `18.4.1.3` **Dependencies hash-pinned in lockfile.**
+  - Requirement: Dependencies hash-pinned in lockfile.
+  - Source: `§18.4 L8565-L8566`
+  - Related spec refs: none
+
+### §18.5 Toolchain
+
+- `18.5.1.1` **A single binary provides all tools:**
+  - Requirement: A single binary provides all tools:
+  - Source: `§18.5 L8570`
+  - Related spec refs: none
+- `18.5.1.2` **Cross-compilation is a normal mode, not special.**
+  - Requirement: Cross-compilation is a normal mode, not special.
+  - Source: `§18.5 L8584`
+  - Related spec refs: none
+
+### §18.5a Project Builds
+
+- `18.5.2.1` **build.w is executable build behavior written in With.**
+  - Requirement: `build.w` is executable build behavior written in With.
+  - Source: `§18.5a L8588-L8590`
+  - Related spec refs: none
+- `18.5.2.2` **with.toml is declarative package configuration.**
+  - Requirement: `with.toml` is declarative package configuration.
+  - Source: `§18.5a L8588-L8590`
+  - Related spec refs: none
+- `18.5.2.3` **Imperative build concerns belong in build.w, not in with.toml.**
+  - Requirement: Imperative build concerns belong in `build.w`, not in `with.toml`.
+  - Source: `§18.5a L8588-L8590`
+  - Related spec refs: none
+- `18.5.2.4` **Allowed in with.toml:**
+  - Requirement: Allowed in `with.toml`:
+  - Source: `§18.5a L8592`
+  - Related spec refs: none
+- `18.5.2.5` **Package identity such as name and version**
+  - Requirement: Package identity such as name and version
+  - Source: `§18.5a L8594`
+  - Related spec refs: none
+- `18.5.2.6` **Dependencies and version constraints**
+  - Requirement: Dependencies and version constraints
+  - Source: `§18.5a L8595`
+  - Related spec refs: none
+- `18.5.2.7` **Target defaults and feature flags**
+  - Requirement: Target defaults and feature flags
+  - Source: `§18.5a L8596`
+  - Related spec refs: none
+- `18.5.2.8` **C include paths, defines, link libraries, and link search paths**
+  - Requirement: C include paths, defines, link libraries, and link search paths
+  - Source: `§18.5a L8597`
+  - Related spec refs: none
+- `18.5.2.9` **Publishing metadata and lint/runtime policy**
+  - Requirement: Publishing metadata and lint/runtime policy
+  - Source: `§18.5a L8598`
+  - Related spec refs: none
+- `18.5.2.10` **Not allowed in with.toml:**
+  - Requirement: Not allowed in `with.toml`:
+  - Source: `§18.5a L8600`
+  - Related spec refs: none
+- `18.5.2.11` **Conditionals or loops**
+  - Requirement: Conditionals or loops
+  - Source: `§18.5a L8602`
+  - Related spec refs: none
+- `18.5.2.12` **Generated-file steps**
+  - Requirement: Generated-file steps
+  - Source: `§18.5a L8603`
+  - Related spec refs: none
+- `18.5.2.13` **Asset pipelines or shader compilation**
+  - Requirement: Asset pipelines or shader compilation
+  - Source: `§18.5a L8604`
+  - Related spec refs: none
+- `18.5.2.14` **Custom shell commands**
+  - Requirement: Custom shell commands
+  - Source: `§18.5a L8605`
+  - Related spec refs: none
+- `18.5.2.15` **Target graph construction**
+  - Requirement: Target graph construction
+  - Source: `§18.5a L8606`
+  - Related spec refs: none
+- `18.5.2.16` **Platform-specific branching logic**
+  - Requirement: Platform-specific branching logic
+  - Source: `§18.5a L8607`
+  - Related spec refs: none
+- `18.5.2.17` **Multi-binary or multi-library build behavior**
+  - Requirement: Multi-binary or multi-library build behavior
+  - Source: `§18.5a L8608`
+  - Related spec refs: none
+- `18.5.2.18` **Those belong in build.w.**
+  - Requirement: Those belong in `build.w`.
+  - Source: `§18.5a L8610`
+  - Related spec refs: none
+- `18.5.2.19` **For simple projects with no build.w, the compiler synthesizes the default recipe:**
+  - Requirement: For simple projects with no `build.w`, the compiler synthesizes the default recipe:
+  - Source: `§18.5a L8612-L8613`
+  - Related spec refs: none
+- `18.5.2.20` **The standard build graph API lives in std.build.**
+  - Requirement: The standard build graph API lives in `std.build`.
+  - Source: `§18.5a L8624-L8629`
+  - Related spec refs: none
+- `18.5.2.21` **It defines Package, Build, Target, BuildKind, BuildTarget, and OptimizeMode, plus t...**
+  - Requirement: It defines `Package`, `Build`, `Target`, `BuildKind`, `BuildTarget`, and `OptimizeMode`, plus target construction methods such as `Build.executable`, `Build.library`, `Build.test`, `Build.generated_source`, `Target.optimize`, `Target.link_system_lib`, `Target.include_path`, and `Target.define`.
+  - Source: `§18.5a L8624-L8629`
+  - Related spec refs: none
+- `18.5.2.22` **build.w runs as capability-bearing comptime, not ordinary pure comptime.**
+  - Requirement: `build.w` runs as capability-bearing comptime, not ordinary pure `comptime`.
+  - Source: `§18.5a L8631-L8633`
+  - Related spec refs: none
+- `18.5.2.23` **Build code may perform effects only through std.build capabilities supplied by the...**
+  - Requirement: Build code may perform effects only through `std.build` capabilities supplied by the driver.
+  - Source: `§18.5a L8631-L8633`
+  - Related spec refs: none
+- `18.5.2.24` **The compiler driver discovers build.w, evaluates the build entry point with a drive...**
+  - Requirement: The compiler driver discovers `build.w`, evaluates the `build` entry point with a driver-minted `BuildCtx`, consumes the returned typed build graph, and builds executable, library, and test targets.
+  - Source: `§18.5a L8635-L8648`
+  - Related spec refs: none
+- `18.5.2.25` **Per-target link_system_lib, include_path, and define settings are honored by the co...**
+  - Requirement: Per-target `link_system_lib`, `include_path`, and `define` settings are honored by the corresponding compile/test path.
+  - Source: `§18.5a L8635-L8648`
+  - Related spec refs: none
+- `18.5.2.26` **Build.generated_source(path, contents) declares a generated source file to write be...**
+  - Requirement: `Build.generated_source(path, contents)` declares a generated source file to write before target compilation; generated paths are project-relative and escaping paths must fail loudly.
+  - Source: `§18.5a L8635-L8648`
+  - Related spec refs: none
+- `18.5.2.27` **BuildTarget can represent non-native targets, but until cross-target codegen/linkin...**
+  - Requirement: `BuildTarget` can represent non-native targets, but until cross-target codegen/linking is implemented those selections must fail loudly instead of falling back to native output.
+  - Source: `§18.5a L8635-L8648`
+  - Related spec refs: none
+- `18.5.2.28` **Unsupported graph features must likewise fail loudly instead of being ignored.**
+  - Requirement: Unsupported graph features must likewise fail loudly instead of being ignored.
+  - Source: `§18.5a L8635-L8648`
+  - Related spec refs: none
+- `18.5.2.29` **A compiler version that recognizes project build.w files but does not execute them...**
+  - Requirement: A compiler version that recognizes project `build.w` files but does not execute them must likewise fail loudly instead of silently building some other target.
+  - Source: `§18.5a L8635-L8648`
+  - Related spec refs: none
+
+### §18.5b CLI One-Liners
+
+- `18.5.3.1` **The with CLI supports small programs directly on the command line:**
+  - Requirement: The `with` CLI supports small programs directly on the command line:
+  - Source: `§18.5b L8652`
+  - Related spec refs: none
+- `18.5.3.2` **One-liners are not interpreted and do not use a separate execution model.**
+  - Requirement: One-liners are not interpreted and do not use a separate execution model.
+  - Source: `§18.5b L8660-L8665`
+  - Related spec refs: none
+- `18.5.3.3` **The CLI constructs a synthetic With entry source file, compiles it through the norm...**
+  - Requirement: The CLI constructs a synthetic With entry source file, compiles it through the normal build/run pipeline, runs the resulting binary, and returns that binary's exit code.
+  - Source: `§18.5b L8660-L8665`
+  - Related spec refs: none
+- `18.5.3.4` **The generated source uses top-level executable statements and the normal implicit-m...**
+  - Requirement: The generated source uses top-level executable statements and the normal implicit-main feature; the CLI does not generate an explicit `fn main` wrapper.
+  - Source: `§18.5b L8660-L8665`
+  - Related spec refs: none
+- `18.5.3.5` **Exactly one one-liner mode may be used in a single invocation:**
+  - Requirement: Exactly one one-liner mode may be used in a single invocation:
+  - Source: `§18.5b L8667`
+  - Related spec refs: none
+- `18.5.3.6` **-e CODE; Compile and run CODE as top-level executable statements**
+  - Requirement: `-e CODE`; Compile and run `CODE` as top-level executable statements
+  - Source: `§18.5b L8671`
+  - Related spec refs: none
+- `18.5.3.7` **-n CODE; Loop over stdin lines and run CODE for each line**
+  - Requirement: `-n CODE`; Loop over stdin lines and run `CODE` for each line
+  - Source: `§18.5b L8672`
+  - Related spec refs: none
+- `18.5.3.8` **-p CODE; Like -n, then print the current line after CODE**
+  - Requirement: `-p CODE`; Like `-n`, then print the current `line` after `CODE`
+  - Source: `§18.5b L8673`
+  - Related spec refs: none
+- `18.5.3.9` **Multiple flags of the same mode are allowed and concatenate as separate generated l...**
+  - Requirement: Multiple flags of the same mode are allowed and concatenate as separate generated lines:
+  - Source: `§18.5b L8675-L8676`
+  - Related spec refs: none
+- `18.5.3.10` **One-liner code cannot be combined with a source file argument.**
+  - Requirement: One-liner code cannot be combined with a source file argument.
+  - Source: `§18.5b L8682`
+  - Related spec refs: none
+
+### §18.5b.1 Generated Environment
+
+- `18.5.3.11` **All one-liner modes implicitly import common modules, including I/O, string helpers...**
+  - Requirement: All one-liner modes implicitly import common modules, including I/O, string helpers, regex support, math, collections, and builtins.
+  - Source: `§18.5b.1 L8686-L8689`
+  - Related spec refs: none
+- `18.5.3.12` **The exact generated helper names are implementation-defined; the following bindings...**
+  - Requirement: The exact generated helper names are implementation-defined; the following bindings are user-visible:
+  - Source: `§18.5b.1 L8686-L8689`
+  - Related spec refs: none
+- `18.5.3.13` **args; all; Vec[str] containing arguments after --**
+  - Requirement: `args`; all; `Vec[str]` containing arguments after `--`
+  - Source: `§18.5b.1 L8693`
+  - Related spec refs: none
+- `18.5.3.14` **line; -n, -p; current stdin line, without trailing newline or CRLF \r**
+  - Requirement: `line`; `-n`, `-p`; current stdin line, without trailing newline or CRLF `\r`
+  - Source: `§18.5b.1 L8694`
+  - Related spec refs: none
+- `18.5.3.15` **nr; -n, -p; 1-based line number, i64**
+  - Requirement: `nr`; `-n`, `-p`; 1-based line number, `i64`
+  - Source: `§18.5b.1 L8695`
+  - Related spec refs: none
+- `18.5.3.16` **Arguments after -- are passed to args and are not parsed as With CLI options:**
+  - Requirement: Arguments after `--` are passed to `args` and are not parsed as With CLI options:
+  - Source: `§18.5b.1 L8697-L8698`
+  - Related spec refs: none
+
+### §18.5b.2 `-e`
+
+- `18.5.3.17` **-e CODE emits CODE as top-level executable statements after the implicit imports an...**
+  - Requirement: `-e CODE` emits `CODE` as top-level executable statements after the implicit imports and `args` binding:
+  - Source: `§18.5b.2 L8706-L8707`
+  - Related spec refs: none
+- `18.5.3.18` **is equivalent, modulo implementation-defined helper names, to an entry file contain...**
+  - Requirement: is equivalent, modulo implementation-defined helper names, to an entry file containing:
+  - Source: `§18.5b.2 L8713-L8714`
+  - Related spec refs: none
+
+### §18.5b.3 `-n`
+
+- `18.5.3.19` **-n CODE emits a top-level loop over stdin.lines().**
+  - Requirement: `-n CODE` emits a top-level loop over `stdin.lines()`.
+  - Source: `§18.5b.3 L8730-L8732`
+  - Related spec refs: none
+- `18.5.3.20` **For each input line, line is bound to the current line and nr is incremented before...**
+  - Requirement: For each input line, `line` is bound to the current line and `nr` is incremented before the user code runs:
+  - Source: `§18.5b.3 L8730-L8732`
+  - Related spec refs: none
+- `18.5.3.21` **is equivalent to:**
+  - Requirement: is equivalent to:
+  - Source: `§18.5b.3 L8738`
+  - Related spec refs: none
+- `18.5.3.22` **stdin.lines() used by one-liners removes the trailing newline.**
+  - Requirement: `stdin.lines()` used by one-liners removes the trailing newline.
+  - Source: `§18.5b.3 L8747-L8748`
+  - Related spec refs: none
+- `18.5.3.23` **For CRLF input, the trailing \r is also removed.**
+  - Requirement: For CRLF input, the trailing `\r` is also removed.
+  - Source: `§18.5b.3 L8747-L8748`
+  - Related spec refs: none
+
+### §18.5b.4 `-p`
+
+- `18.5.3.24` **-p CODE is like -n, but prints line after CODE runs.**
+  - Requirement: `-p CODE` is like `-n`, but prints `line` after `CODE` runs.
+  - Source: `§18.5b.4 L8752-L8754`
+  - Related spec refs: none
+- `18.5.3.25` **line is a mutable per-line binding in -p, so assignments affect the printed value:**
+  - Requirement: `line` is a mutable per-line binding in `-p`, so assignments affect the printed value:
+  - Source: `§18.5b.4 L8752-L8754`
+  - Related spec refs: none
+- `18.5.3.26` **is equivalent to:**
+  - Requirement: is equivalent to:
+  - Source: `§18.5b.4 L8760`
+  - Related spec refs: none
+- `18.5.3.27` **For filtering, use -n; -p always prints once per input line.**
+  - Requirement: For filtering, use `-n`; `-p` always prints once per input line.
+  - Source: `§18.5b.4 L8771`
+  - Related spec refs: none
+
+### §18.5b.5 Semicolons
+
+- `18.5.3.28` **Shell one-liners often need multiple statements.**
+  - Requirement: Shell one-liners often need multiple statements.
+  - Source: `§18.5b.5 L8775-L8776`
+  - Related spec refs: none
+- `18.5.3.29` **Within -e, -n, and -p code strings, semicolons act as line separators:**
+  - Requirement: Within `-e`, `-n`, and `-p` code strings, semicolons act as line separators:
+  - Source: `§18.5b.5 L8775-L8776`
+  - Related spec refs: none
+- `18.5.3.30` **The semicolon pass is lexical.**
+  - Requirement: The semicolon pass is lexical.
+  - Source: `§18.5b.5 L8782-L8785`
+  - Related spec refs: none
+- `18.5.3.31` **It must not split semicolons inside string literals, regex literals, character lite...**
+  - Requirement: It must not split semicolons inside string literals, regex literals, character literals, or balanced delimiter groups.
+  - Source: `§18.5b.5 L8782-L8785`
+  - Related spec refs: none
+- `18.5.3.32` **Braced blocks may still contain ordinary semicolon separators:**
+  - Requirement: Braced blocks may still contain ordinary semicolon separators:
+  - Source: `§18.5b.5 L8782-L8785`
+  - Related spec refs: none
+
+### §18.5b.6 Regex One-Liners
+
+- `18.5.3.33` **Regex one-liners use the normal With regex syntax:**
+  - Requirement: Regex one-liners use the normal With regex syntax:
+  - Source: `§18.5b.6 L8793`
+  - Related spec refs: none
+- `18.5.3.34` **literal; /pattern/flags**
+  - Requirement: literal; `/pattern/flags`
+  - Source: `§18.5b.6 L8797`
+  - Related spec refs: none
+- `18.5.3.35` **positive match; text =~ /pattern/**
+  - Requirement: positive match; `text =~ /pattern/`
+  - Source: `§18.5b.6 L8798`
+  - Related spec refs: none
+- `18.5.3.36` **negative match; text !~ /pattern/**
+  - Requirement: negative match; `text !~ /pattern/`
+  - Source: `§18.5b.6 L8799`
+  - Related spec refs: none
+- `18.5.3.37` **numbered captures; $0, $1, $2, ...**
+  - Requirement: numbered captures; `$0`, `$1`, `$2`, ...
+  - Source: `§18.5b.6 L8800`
+  - Related spec refs: none
+- `18.5.3.38` **named captures; $name**
+  - Requirement: named captures; `$name`
+  - Source: `§18.5b.6 L8801`
+  - Related spec refs: none
+- `18.5.3.39` **Capture bindings are created only for direct positive regex conditions whose right...**
+  - Requirement: Capture bindings are created only for direct positive regex conditions whose right side is a regex literal:
+  - Source: `§18.5b.6 L8803-L8804`
+  - Related spec refs: none
+- `18.5.3.40` **Named captures include the $ prefix.**
+  - Requirement: Named captures include the `$` prefix.
+  - Source: `§18.5b.6 L8811-L8812`
+  - Related spec refs: none
+- `18.5.3.41` **A regex capture named level is referenced as $level, including inside f-string holes:**
+  - Requirement: A regex capture named `level` is referenced as `$level`, including inside f-string holes:
+  - Source: `§18.5b.6 L8811-L8812`
+  - Related spec refs: none
+- `18.5.3.42` **!~ is valid for boolean matching but does not create capture bindings:**
+  - Requirement: `!~` is valid for boolean matching but does not create capture bindings:
+  - Source: `§18.5b.6 L8818-L8819`
+  - Related spec refs: none
+- `18.5.3.43` **Compound boolean expressions do not create capture bindings for their subexpressions.**
+  - Requirement: Compound boolean expressions do not create capture bindings for their subexpressions.
+  - Source: `§18.5b.6 L8825-L8827`
+  - Related spec refs: none
+- `18.5.3.44` **To combine capture use with other conditions, nest the logic:**
+  - Requirement: To combine capture use with other conditions, nest the logic:
+  - Source: `§18.5b.6 L8825-L8827`
+  - Related spec refs: none
+- `18.5.3.45` **Regex literals are ordinary Regex values in one-liners:**
+  - Requirement: Regex literals are ordinary `Regex` values in one-liners:
+  - Source: `§18.5b.6 L8833`
+  - Related spec refs: none
+
+### §18.5b.7 Diagnostics
+
+- `18.5.3.46` **Compiler errors from one-liner user code must point at the user's CLI argument, not...**
+  - Requirement: Compiler errors from one-liner user code must point at the user's CLI argument, not at generated imports, helper bindings, temporary files, or wrapper code.
+  - Source: `§18.5b.7 L8841-L8843`
+  - Related spec refs: none
+- `18.5.3.47` **Diagnostic source names identify the originating argument:**
+  - Requirement: Diagnostic source names identify the originating argument:
+  - Source: `§18.5b.7 L8841-L8843`
+  - Related spec refs: none
+- `18.5.3.48` **reports against <cli -e #1>.**
+  - Requirement: reports against `<cli -e #1>`.
+  - Source: `§18.5b.7 L8849-L8852`
+  - Related spec refs: none
+- `18.5.3.49` **Multiple same-mode code arguments use #1, #2, and so on.**
+  - Requirement: Multiple same-mode code arguments use `#1`, `#2`, and so on.
+  - Source: `§18.5b.7 L8849-L8852`
+  - Related spec refs: none
+- `18.5.3.50` **Failed one-liner compilation should emit the normal compiler diagnostic and exit no...**
+  - Requirement: Failed one-liner compilation should emit the normal compiler diagnostic and exit non-zero; it must not add vague wrapper errors such as "one-liner compilation failed".
+  - Source: `§18.5b.7 L8849-L8852`
+  - Related spec refs: none
+
+### §18.5b.8 Non-Goals
+
+- `18.5.3.51` **One-liners do not add shell execution, s/// substitution syntax, a REPL execution m...**
+  - Requirement: One-liners do not add shell execution, `s///` substitution syntax, a REPL execution model, or a separate data-processing mini-language.
+  - Source: `§18.5b.8 L8856-L8859`
+  - Related spec refs: none
+- `18.5.3.52` **Replacement, splitting, and more advanced regex operations use the normal std.regex...**
+  - Requirement: Replacement, splitting, and more advanced regex operations use the normal `std.regex` API.
+  - Source: `§18.5b.8 L8856-L8859`
+  - Related spec refs: none
+
+### §18.6 Standard Library Design
+
+- `18.6.1.1` **The standard library is layered.**
+  - Requirement: The standard library is layered.
+  - Source: `§18.6 L8863-L8865`
+  - Related spec refs: none
+- `18.6.1.2` **Users write idiomatic With code against std.* modules.**
+  - Requirement: Users write idiomatic With code against `std.*` modules.
+  - Source: `§18.6 L8863-L8865`
+  - Related spec refs: none
+- `18.6.1.3` **They should never need c_import for ordinary programming tasks.**
+  - Requirement: They should never need `c_import` for ordinary programming tasks.
+  - Source: `§18.6 L8863-L8865`
+  - Related spec refs: none
+- `18.6.1.4` **Layer 0: c_import — compiler built-in (Phase 0).**
+  - Requirement: **Layer 0: `c_import`** — compiler built-in (Phase 0).
+  - Source: `§18.6 L8867-L8868`
+  - Related spec refs: none
+- `18.6.1.5` **The mechanism by which the standard library itself accesses platform APIs.**
+  - Requirement: The mechanism by which the standard library itself accesses platform APIs.
+  - Source: `§18.6 L8867-L8868`
+  - Related spec refs: none
+- `18.6.1.6` **Layer 1: std.os — thin safe wrappers around platform APIs (libc, POSIX, Win32).**
+  - Requirement: **Layer 1: `std.os`** — thin safe wrappers around platform APIs (libc, POSIX, Win32).
+  - Source: `§18.6 L8870-L8872`
+  - Related spec refs: none
+- `18.6.1.7` **Written using c_import internally.**
+  - Requirement: Written using `c_import` internally.
+  - Source: `§18.6 L8870-L8872`
+  - Related spec refs: none
+- `18.6.1.8` **Not intended for direct use by application developers.**
+  - Requirement: Not intended for direct use by application developers.
+  - Source: `§18.6 L8870-L8872`
+  - Related spec refs: none
+- `18.6.1.9` **Layer 2: std.* — idiomatic, safe, cross-platform APIs.**
+  - Requirement: **Layer 2: `std.*`** — idiomatic, safe, cross-platform APIs.
+  - Source: `§18.6 L8874-L8875`
+  - Related spec refs: none
+- `18.6.1.10` **This is what users import.**
+  - Requirement: This is what users import.
+  - Source: `§18.6 L8874-L8875`
+  - Related spec refs: none
+
+### §18.7 Freestanding Mode (`no_std`)
+
+- `18.7.1.1` **For embedded, kernel, bootloader, and bare-metal targets, the standard library can...**
+  - Requirement: For embedded, kernel, bootloader, and bare-metal targets, the standard library can be skipped entirely.
+  - Source: `§18.7 L8912-L8914`
+  - Related spec refs: none
+- `18.7.1.2` **Set std = false in with.toml:**
+  - Requirement: Set `std = false` in `with.toml`:
+  - Source: `§18.7 L8912-L8914`
+  - Related spec refs: none
+- `18.7.1.3` **Or pass --no-std to the compiler:**
+  - Requirement: Or pass `--no-std` to the compiler:
+  - Source: `§18.7 L8922`
+  - Related spec refs: none
+- `18.7.1.4` **The core library is always available.**
+  - Requirement: The `core` library is always available.
+  - Source: `§18.7 L8930-L8931`
+  - Related spec refs: none
+- `18.7.1.5` **It contains everything that doesn't need a heap allocator or OS:**
+  - Requirement: It contains everything that doesn't need a heap allocator or OS:
+  - Source: `§18.7 L8930-L8931`
+  - Related spec refs: none
+- `18.7.1.6` **Primitives; i8–i64, u8–u64, f32, f64, bool, usize**
+  - Requirement: Primitives; `i8`–`i64`, `u8`–`u64`, `f32`, `f64`, `bool`, `usize`
+  - Source: `§18.7 L8935`
+  - Related spec refs: none
+- `18.7.1.7` **Traits; Copy, Clone, Drop, Default, Debug, Eq, Ord, Hash**
+  - Requirement: Traits; `Copy`, `Clone`, `Drop`, `Default`, `Debug`, `Eq`, `Ord`, `Hash`
+  - Source: `§18.7 L8936`
+  - Related spec refs: none
+- `18.7.1.8` **Option/Result; Option[T], Result[T, E] and all methods**
+  - Requirement: Option/Result; `Option[T]`, `Result[T, E]` and all methods
+  - Source: `§18.7 L8937`
+  - Related spec refs: none
+- `18.7.1.9` **Slices; &[T] — borrowed views into arrays**
+  - Requirement: Slices; `&[T]` — borrowed views into arrays
+  - Source: `§18.7 L8938`
+  - Related spec refs: none
+- `18.7.1.10` **Fixed arrays; [T; N] — stack-allocated**
+  - Requirement: Fixed arrays; `[T; N]` — stack-allocated
+  - Source: `§18.7 L8939`
+  - Related spec refs: none
+- `18.7.1.11` **Tuples; (A, B, ...)**
+  - Requirement: Tuples; `(A, B, ...)`
+  - Source: `§18.7 L8940`
+  - Related spec refs: none
+- `18.7.1.12` **Ranges; 0..10, 0..=10**
+  - Requirement: Ranges; `0..10`, `0..=10`
+  - Source: `§18.7 L8941`
+  - Related spec refs: none
+- `18.7.1.13` **Math; Integer and float arithmetic, min, max, abs**
+  - Requirement: Math; Integer and float arithmetic, `min`, `max`, `abs`
+  - Source: `§18.7 L8942`
+  - Related spec refs: none
+- `18.7.1.14` **Bitwise; All bit operations on integer types**
+  - Requirement: Bitwise; All bit operations on integer types
+  - Source: `§18.7 L8943`
+  - Related spec refs: none
+- `18.7.1.15` **Pointers; *T, *mut T, raw pointer operations (unsafe)**
+  - Requirement: Pointers; `*T`, `*mut T`, raw pointer operations (unsafe)
+  - Source: `§18.7 L8944`
+  - Related spec refs: none
+- `18.7.1.16` **Comptime; All compile-time evaluation (§17)**
+  - Requirement: Comptime; All compile-time evaluation (§17)
+  - Source: `§18.7 L8945`
+  - Related spec refs: §17
+- `18.7.1.17` **c_import; Full C interop — this is how you talk to hardware**
+  - Requirement: `c_import`; Full C interop — this is how you talk to hardware
+  - Source: `§18.7 L8946`
+  - Related spec refs: none
+- `18.7.1.18` **Ownership; Full borrow checker, move semantics, drop — all compile-time, zero cost**
+  - Requirement: Ownership; Full borrow checker, move semantics, drop — all compile-time, zero cost
+  - Source: `§18.7 L8947`
+  - Related spec refs: none
+- `18.7.1.19` **@[panic_handler]; Custom panic behavior (see below)**
+  - Requirement: `@[panic_handler]`; Custom panic behavior (see below)
+  - Source: `§18.7 L8948`
+  - Related spec refs: none
+- `18.7.1.20` **Never type; For diverging functions**
+  - Requirement: `Never` type; For diverging functions
+  - Source: `§18.7 L8949`
+  - Related spec refs: none
+- `18.7.1.21` **unsafe blocks; Full unsafe capabilities**
+  - Requirement: `unsafe` blocks; Full unsafe capabilities
+  - Source: `§18.7 L8950`
+  - Related spec refs: none
+- `18.7.1.22` **comptime if; Conditional compilation**
+  - Requirement: `comptime if`; Conditional compilation
+  - Source: `§18.7 L8951`
+  - Related spec refs: none
+- `18.7.1.23` **str, String; Yes; Heap-allocated**
+  - Requirement: `str`, `String`; Yes; Heap-allocated
+  - Source: `§18.7 L8957`
+  - Related spec refs: none
+- `18.7.1.24` **Vec[T]; Yes; Heap-allocated**
+  - Requirement: `Vec[T]`; Yes; Heap-allocated
+  - Source: `§18.7 L8958`
+  - Related spec refs: none
+- `18.7.1.25` **HashMap, HashSet; Yes; Heap-allocated**
+  - Requirement: `HashMap`, `HashSet`; Yes; Heap-allocated
+  - Source: `§18.7 L8959`
+  - Related spec refs: none
+- `18.7.1.26` **Box[T]; Yes; Heap-allocated**
+  - Requirement: `Box[T]`; Yes; Heap-allocated
+  - Source: `§18.7 L8960`
+  - Related spec refs: none
+- `18.7.1.27` **print, eprint, write, ewrite; Yes; Needs stdout/stderr**
+  - Requirement: `print`, `eprint`, `write`, `ewrite`; Yes; Needs stdout/stderr
+  - Source: `§18.7 L8961`
+  - Related spec refs: none
+- `18.7.1.28` **std.io, std.fs; Yes; Needs OS**
+  - Requirement: `std.io`, `std.fs`; Yes; Needs OS
+  - Source: `§18.7 L8962`
+  - Related spec refs: none
+- `18.7.1.29` **std.net; Yes; Needs OS**
+  - Requirement: `std.net`; Yes; Needs OS
+  - Source: `§18.7 L8963`
+  - Related spec refs: none
+- `18.7.1.30` **async fn, .await; Yes; Needs fiber runtime**
+  - Requirement: `async fn`, `.await`; Yes; Needs fiber runtime
+  - Source: `§18.7 L8964`
+  - Related spec refs: none
+- `18.7.1.31` **std.sync (channels); Yes; Needs OS threads**
+  - Requirement: `std.sync` (channels); Yes; Needs OS threads
+  - Source: `§18.7 L8965`
+  - Related spec refs: none
+- `18.7.1.32` **String literals in no_std: Bare "hello" is &str (static reference) in no_std mode —...**
+  - Requirement: **String literals in `no_std`:** Bare `"hello"` is `&str` (static reference) in `no_std` mode — there is no allocator to create an owned `str`.
+  - Source: `§18.7 L8967-L8972`
+  - Related spec refs: none
+- `18.7.1.33` **This is the one context where the default type of a string literal changes.**
+  - Requirement: This is the one context where the default type of a string literal changes.
+  - Source: `§18.7 L8967-L8972`
+  - Related spec refs: none
+- `18.7.1.34` **If you need owned strings in no_std, bring your own allocator and use FixedString[N...**
+  - Requirement: If you need owned strings in `no_std`, bring your own allocator and use `FixedString[N]` or a similar stack-allocated string type.
+  - Source: `§18.7 L8967-L8972`
+  - Related spec refs: none
+- `18.7.1.35` **Panic handler: In no_std mode, you must provide a panic handler.**
+  - Requirement: **Panic handler:** In `no_std` mode, you must provide a panic handler.
+  - Source: `§18.7 L8974-L8975`
+  - Related spec refs: none
+- `18.7.1.36` **Without one, the compiler errors:**
+  - Requirement: Without one, the compiler errors:
+  - Source: `§18.7 L8974-L8975`
+  - Related spec refs: none
+- `18.7.1.37` **Entry point: There is no fn main in no_std unless you define it yourself.**
+  - Requirement: **Entry point:** There is no `fn main` in `no_std` unless you define it yourself.
+  - Source: `§18.7 L8987-L8990`
+  - Related spec refs: none
+- `18.7.1.38` **Use @[entry] to mark your entry point, or @[no_main] to handle startup entirely thr...**
+  - Requirement: Use `@[entry]` to mark your entry point, or `@[no_main]` to handle startup entirely through C interop or linker scripts:
+  - Source: `§18.7 L8987-L8990`
+  - Related spec refs: none
+- `18.7.1.39` **Allocator opt-in: You can get Vec, str, Box, and other heap types back without pull...**
+  - Requirement: **Allocator opt-in:** You can get `Vec`, `str`, `Box`, and other heap types back without pulling in the full `std` by providing a global allocator:
+  - Source: `§18.7 L9003-L9005`
+  - Related spec refs: none
+- `18.7.1.40` **With alloc = true, you get Vec[T], Box[T], str, String, HashMap, and HashSet — but...**
+  - Requirement: With `alloc = true`, you get `Vec[T]`, `Box[T]`, `str`, `String`, `HashMap`, and `HashSet` — but still no I/O, no filesystem, no async runtime, no OS-dependent features.
+  - Source: `§18.7 L9022-L9024`
+  - Related spec refs: none
+- `18.7.1.41` **Full; std = true (default); Everything**
+  - Requirement: Full; `std = true` (default); Everything
+  - Source: `§18.7 L9030`
+  - Related spec refs: none
+- `18.7.1.42` **Alloc; std = false, alloc = true; core + heap types**
+  - Requirement: Alloc; `std = false`, `alloc = true`; `core` + heap types
+  - Source: `§18.7 L9031`
+  - Related spec refs: none
+- `18.7.1.43` **Freestanding; std = false; core only — no heap**
+  - Requirement: Freestanding; `std = false`; `core` only — no heap
+  - Source: `§18.7 L9032`
+  - Related spec refs: none
+- `18.7.1.44` **Everything With gives you — ownership, borrow checking, c_import, match, comptime...**
+  - Requirement: Everything With gives you — ownership, borrow checking, `c_import`, `match`, `comptime`, type inference — works in freestanding mode.
+  - Source: `§18.7 L9053-L9055`
+  - Related spec refs: none
+- `18.7.1.45` **You're just writing With without a heap or an OS.**
+  - Requirement: You're just writing With without a heap or an OS.
+  - Source: `§18.7 L9053-L9055`
+  - Related spec refs: none
+
+### §18.7 Package Management
+
+- `18.7.1.46` **With has two dependency sources managed through the same CLI and with.toml:**
+  - Requirement: With has two dependency sources managed through the same CLI and `with.toml`:
+  - Source: `§18.7 L9059-L9060`
+  - Related spec refs: none
+- `18.7.1.47` **With packages — with get json, with get http**
+  - Requirement: **With packages** — `with get json`, `with get http`
+  - Source: `§18.7 L9062`
+  - Related spec refs: none
+- `18.7.1.48` **C packages — with get c.glib, with get c.sqlite3**
+  - Requirement: **C packages** — `with get c.glib`, `with get c.sqlite3`
+  - Source: `§18.7 L9063`
+  - Related spec refs: none
+- `18.7.1.49` **The c. prefix routes through Conan Center (conan.io/center).**
+  - Requirement: The `c.` prefix routes through Conan Center (conan.io/center).
+  - Source: `§18.7 L9065-L9067`
+  - Related spec refs: none
+- `18.7.1.50` **With packages come from the With package registry (future).**
+  - Requirement: With packages come from the With package registry (future).
+  - Source: `§18.7 L9065-L9067`
+  - Related spec refs: none
+- `18.7.1.51` **Both produce entries in with.toml:**
+  - Requirement: Both produce entries in `with.toml`:
+  - Source: `§18.7 L9065-L9067`
+  - Related spec refs: none
+- `18.7.1.52` **with get c.X resolves the package from Conan Center, downloads headers, prebuilt li...**
+  - Requirement: **`with get c.X`** resolves the package from Conan Center, downloads headers, prebuilt libraries, and transitive deps into `.with/deps/c/<name>/<version>/`, and updates `with.toml`.
+  - Source: `§18.7 L9079-L9083`
+  - Related spec refs: none
+- `18.7.1.53` **Each package includes a metadata.json with include paths, library paths, library na...**
+  - Requirement: Each package includes a `metadata.json` with include paths, library paths, library names, and transitive dependencies.
+  - Source: `§18.7 L9079-L9083`
+  - Related spec refs: none
+- `18.7.1.54` **Build integration.**
+  - Requirement: **Build integration.**
+  - Source: `§18.7 L9085-L9090`
+  - Related spec refs: none
+- `18.7.1.55` **When with build encounters use c_import("<glib.h>"), the compiler reads with.toml...**
+  - Requirement: When `with build` encounters `use c_import("<glib.h>")`, the compiler reads `with.toml`, finds all `c.*` deps, reads their `metadata.json`, and constructs include and link paths automatically.
+  - Source: `§18.7 L9085-L9090`
+  - Related spec refs: none
+- `18.7.1.56` **The user never writes -I or -l flags.**
+  - Requirement: The user never writes `-I` or `-l` flags.
+  - Source: `§18.7 L9085-L9090`
+  - Related spec refs: none
+- `18.7.1.57` **c_import headers are found by searching each dep's include paths, and the matching...**
+  - Requirement: `c_import` headers are found by searching each dep's include paths, and the matching package's libraries are linked automatically.
+  - Source: `§18.7 L9085-L9090`
+  - Related spec refs: none
+- `18.7.1.58` **Explicit override.**
+  - Requirement: **Explicit override.**
+  - Source: `§18.7 L9092`
+  - Related spec refs: none
+- `18.7.1.59` **If auto-resolution picks the wrong library:**
+  - Requirement: If auto-resolution picks the wrong library:
+  - Source: `§18.7 L9092`
+  - Related spec refs: none
+- `18.7.1.60` **Manual C deps work without Conan by specifying paths directly:**
+  - Requirement: **Manual C deps** work without Conan by specifying paths directly:
+  - Source: `§18.7 L9098`
+  - Related spec refs: none
+- `18.7.1.61` **with init; Create new project with with.toml and src/main.w**
+  - Requirement: `with init`; Create new project with `with.toml` and `src/main.w`
+  - Source: `§18.7 L9111`
+  - Related spec refs: none
+- `18.7.1.62` **with get c.X; Add C dependency via Conan**
+  - Requirement: `with get c.X`; Add C dependency via Conan
+  - Source: `§18.7 L9112`
+  - Related spec refs: none
+- `18.7.1.63` **with get c.X@2.78; Pin specific version**
+  - Requirement: `with get c.X@2.78`; Pin specific version
+  - Source: `§18.7 L9113`
+  - Related spec refs: none
+- `18.7.1.64` **with get --force-reinstall c.X@2.78; Delete and recreate the local installed C package**
+  - Requirement: `with get --force-reinstall c.X@2.78`; Delete and recreate the local installed C package
+  - Source: `§18.7 L9114`
+  - Related spec refs: none
+- `18.7.1.65` **with remove c.X; Remove dependency**
+  - Requirement: `with remove c.X`; Remove dependency
+  - Source: `§18.7 L9115`
+  - Related spec refs: none
+- `18.7.1.66` **with update; Update all deps to latest compatible**
+  - Requirement: `with update`; Update all deps to latest compatible
+  - Source: `§18.7 L9116`
+  - Related spec refs: none
+- `18.7.1.67` **with get (no args); Restore deps from lock file**
+  - Requirement: `with get` (no args); Restore deps from lock file
+  - Source: `§18.7 L9117`
+  - Related spec refs: none
+- `18.7.1.68` **.with/ is gitignored.**
+  - Requirement: `.with/` is gitignored.
+  - Source: `§18.7 L9128`
+  - Related spec refs: none
+- `18.7.1.69` **with.toml and lock.json are committed.**
+  - Requirement: `with.toml` and `lock.json` are committed.
+  - Source: `§18.7 L9128`
+  - Related spec refs: none
+
+## 19. Safety Boundaries
+
+### §19.1 Safe by Default
+
+- `19.1.1.1` **All code is safe unless explicitly unsafe.**
+  - Requirement: All code is safe unless explicitly `unsafe`.
+  - Source: `§19.1 L9136`
+  - Related spec refs: none
+
+### §19.2 `unsafe` Required For
+
+- `19.2.1.1` **Raw pointer dereference**
+  - Requirement: Raw pointer dereference
+  - Source: `§19.2 L9140`
+  - Related spec refs: none
+- `19.2.1.2` **Raw pointer indexing**
+  - Requirement: Raw pointer indexing
+  - Source: `§19.2 L9141`
+  - Related spec refs: none
+- `19.2.1.3` **FFI function calls**
+  - Requirement: FFI function calls
+  - Source: `§19.2 L9142`
+  - Related spec refs: none
+- `19.2.1.4` **Inline assembly (asm expressions)**
+  - Requirement: Inline assembly (`asm` expressions)
+  - Source: `§19.2 L9143`
+  - Related spec refs: none
+- `19.2.1.5` **Intrusive / self-referential structures**
+  - Requirement: Intrusive / self-referential structures
+  - Source: `§19.2 L9144`
+  - Related spec refs: none
+- `19.2.1.6` **Manual memory management beyond allocators**
+  - Requirement: Manual memory management beyond allocators
+  - Source: `§19.2 L9145`
+  - Related spec refs: none
+- `19.2.1.7` **Calling functions marked unsafe**
+  - Requirement: Calling functions marked `unsafe`
+  - Source: `§19.2 L9146`
+  - Related spec refs: none
+
+### §19.2a `unsafe fn` — Function-Level Unsafe Context
+
+- `19.2.2.1` **Functions that pervasively perform unsafe memory accesses may be declared unsafe fn:**
+  - Requirement: Functions that pervasively perform unsafe memory accesses may be declared `unsafe fn`:
+  - Source: `§19.2a L9150-L9151`
+  - Related spec refs: none
+- `19.2.2.2` **Inside an unsafe fn body, all operations that would normally require unsafe, unsafe...**
+  - Requirement: Inside an `unsafe fn` body, all operations that would normally require `unsafe`, `unsafe:`, or `unsafe {}` are permitted without a wrapper.
+  - Source: `§19.2a L9159-L9162`
+  - Related spec refs: none
+- `19.2.2.3` **The unsafe keyword on the function signature is the declaration of intent — every l...**
+  - Requirement: The `unsafe` keyword on the function signature is the declaration of intent — every line in the body is implicitly unsafe.
+  - Source: `§19.2a L9159-L9162`
+  - Related spec refs: none
+- `19.2.2.4` **Callers must acknowledge the unsafety: Calling an unsafe fn from safe code requires...**
+  - Requirement: **Callers must acknowledge the unsafety:** Calling an `unsafe fn` from safe code requires an unsafe block at the call site (or being inside another `unsafe fn`):
+  - Source: `§19.2a L9164-L9166`
+  - Related spec refs: none
+- `19.2.2.5` **This preserves the audit trail — grep unsafe finds every boundary where safe code t...**
+  - Requirement: This preserves the audit trail — `grep unsafe` finds every boundary where safe code transitions to unsafe code.
+  - Source: `§19.2a L9172-L9173`
+  - Related spec refs: none
+
+### §19.3 `unsafe` Constraints Across Suspension Points
+
+- `19.3.1.1` **Language rule: Unsafe code must not retain raw pointers (*const T, *mut T) to fiber...**
+  - Requirement: **Language rule:** Unsafe code must not retain raw pointers (`*const T`, `*mut T`) to fiber stack locals across `await` points.
+  - Source: `§19.3 L9177-L9180`
+  - Related spec refs: none
+- `19.3.1.2` **A raw pointer to a stack-allocated value is valid only until the next await in the...**
+  - Requirement: A raw pointer to a stack-allocated value is valid only until the next `await` in the same fiber.
+  - Source: `§19.3 L9177-L9180`
+  - Related spec refs: none
+- `19.3.1.3` **Safe code is not affected by this rule — ephemeral references across await points a...**
+  - Requirement: Safe code is not affected by this rule — ephemeral references across `await` points are handled correctly by the compiler.
+  - Source: `§19.3 L9198-L9200`
+  - Related spec refs: none
+- `19.3.1.4` **This constraint applies only to raw pointers obtained through unsafe.**
+  - Requirement: This constraint applies only to raw pointers obtained through `unsafe`.
+  - Source: `§19.3 L9198-L9200`
+  - Related spec refs: none
+
+### §19.4 Unnecessary `unsafe` is a Compile Error
+
+- `19.4.1.1` **An unsafe block that contains no unsafe operations is a compile error:**
+  - Requirement: An `unsafe` block that contains no unsafe operations is a compile error:
+  - Source: `§19.4 L9204-L9205`
+  - Related spec refs: none
+- `19.4.1.2` **Every unsafe block in a codebase is a place reviewers must scrutinize.**
+  - Requirement: Every `unsafe` block in a codebase is a place reviewers must scrutinize.
+  - Source: `§19.4 L9214-L9217`
+  - Related spec refs: none
+- `19.4.1.3` **False positives dilute that signal.**
+  - Requirement: False positives dilute that signal.
+  - Source: `§19.4 L9214-L9217`
+  - Related spec refs: none
+- `19.4.1.4` **If the block contains no raw pointer dereference, no FFI call, and no unsafe fn cal...**
+  - Requirement: If the block contains no raw pointer dereference, no FFI call, and no `unsafe fn` call, the compiler rejects it.
+  - Source: `§19.4 L9214-L9217`
+  - Related spec refs: none
+
+## 20. Performance Guarantees
+
+### §20 Performance Guarantees
+
+- `20.1.1.1` **Allocations are obvious. You can see where allocation happens — Vec.new(), .to_owne...**
+  - Requirement: **Allocations are obvious.** You can see where allocation happens — `Vec.new()`, `.to_owned()`, `[x for x in ...]`, `"hello {name}"`. No allocation hides behind innocent syntax. But the language doesn't force you to type `collect[Vec]()` when the intent is already clear.
+  - Source: `§20 L9223-L9227`
+  - Related spec refs: none
+- `20.1.1.2` **No hidden copies. Values move unless Copy.**
+  - Requirement: **No hidden copies.** Values move unless `Copy`.
+  - Source: `§20 L9228`
+  - Related spec refs: none
+- `20.1.1.3` **No hidden reference counting. Only via explicit Rc/Arc.**
+  - Requirement: **No hidden reference counting.** Only via explicit `Rc`/`Arc`.
+  - Source: `§20 L9229`
+  - Related spec refs: none
+- `20.1.1.4` **No hidden synchronization. Locks, atomics always explicit.**
+  - Requirement: **No hidden synchronization.** Locks, atomics always explicit.
+  - Source: `§20 L9230`
+  - Related spec refs: none
+- `20.1.1.5` **No hidden runtime in no_runtime builds. The fiber scheduler is the one blessed runt...**
+  - Requirement: **No hidden runtime in `no_runtime` builds.** The fiber scheduler is the one blessed runtime; it is opt-in via `async` and absent when disabled. Suspension is always marked with `await`.
+  - Source: `§20 L9231-L9233`
+  - Related spec refs: none
+- `20.1.1.6` **Deterministic destruction. Reverse declaration order.**
+  - Requirement: **Deterministic destruction.** Reverse declaration order.
+  - Source: `§20 L9234`
+  - Related spec refs: none
+- `20.1.1.7` **Disjoint borrow analysis guaranteed.**
+  - Requirement: **Disjoint borrow analysis guaranteed.**
+  - Source: `§20 L9235`
+  - Related spec refs: none
+
+### §20b Denied Patterns (Compile Errors)
+
+- `20.2.1.1` **With forbids patterns that are almost always bugs and have clean alternatives.**
+  - Requirement: With forbids patterns that are almost always bugs and have clean alternatives.
+  - Source: `§20b L9241-L9243`
+  - Related spec refs: none
+- `20.2.1.2` **These are compile errors, not warnings.**
+  - Requirement: These are compile errors, not warnings.
+  - Source: `§20b L9241-L9243`
+  - Related spec refs: none
+- `20.2.1.3` **The philosophy: if a pattern is wrong 99% of the time, don't warn — forbid.**
+  - Requirement: The philosophy: if a pattern is wrong 99% of the time, don't warn — forbid.
+  - Source: `§20b L9241-L9243`
+  - Related spec refs: none
+
+### §20b.1 `.await` Inside `@[no_await_guard]` Guard
+
+- `20.2.1.4` **Types annotated @[no_await_guard] (synchronization guards like MutexGuard, ReadGuar...**
+  - Requirement: Types annotated `@[no_await_guard]` (synchronization guards like `MutexGuard`, `ReadGuard`, `WriteGuard`, `ArenaScope`) must not be held across suspension points.
+  - Source: `§20b.1 L9247-L9250`
+  - Related spec refs: none
+- `20.2.1.5` **Holding a mutex across .await blocks all other fibers waiting for that lock.**
+  - Requirement: Holding a mutex across `.await` blocks all other fibers waiting for that lock.
+  - Source: `§20b.1 L9247-L9250`
+  - Related spec refs: none
+- `20.2.1.6` **This does NOT apply to connection pools, transactions, file handles, or other guard...**
+  - Requirement: This does NOT apply to connection pools, transactions, file handles, or other guarded types that don't carry the annotation.
+  - Source: `§20b.1 L9263-L9264`
+  - Related spec refs: none
+- `20.2.1.7` **See §7.9.**
+  - Requirement: See §7.9.
+  - Source: `§20b.1 L9263-L9264`
+  - Related spec refs: §7.9
+
+### §20b.2 Unused `Task`
+
+- `20.2.2.1` **Dropping a Task without awaiting or canceling it silently cancels work.**
+  - Requirement: Dropping a `Task` without `await`ing or `cancel`ing it silently cancels work.
+  - Source: `§20b.2 L9268-L9269`
+  - Related spec refs: none
+- `20.2.2.2` **WARNING: let _ = send_analytics(...) is NOT fire-and-forget.**
+  - Requirement: **WARNING:** `let _ = send_analytics(...)` is NOT fire-and-forget.
+  - Source: `§20b.2 L9286-L9289`
+  - Related spec refs: none
+- `20.2.2.3` **It immediately drops the Task, cancelling it before it completes.**
+  - Requirement: It immediately drops the Task, cancelling it before it completes.
+  - Source: `§20b.2 L9286-L9289`
+  - Related spec refs: none
+- `20.2.2.4` **The compiler warns about this pattern.**
+  - Requirement: The compiler warns about this pattern.
+  - Source: `§20b.2 L9286-L9289`
+  - Related spec refs: none
+- `20.2.2.5` **Use spawn for true fire-and-forget.**
+  - Requirement: Use `spawn` for true fire-and-forget.
+  - Source: `§20b.2 L9286-L9289`
+  - Related spec refs: none
+- `20.2.2.6` **See §14.7.**
+  - Requirement: See §14.7.
+  - Source: `§20b.2 L9291`
+  - Related spec refs: §14.7
+
+### §20b.3 Unnecessary `unsafe` Block
+
+- `20.2.3.1` **An unsafe block with no unsafe operations dilutes the safety signal.**
+  - Requirement: An `unsafe` block with no unsafe operations dilutes the safety signal.
+  - Source: `§20b.3 L9295-L9296`
+  - Related spec refs: none
+- `20.2.3.2` **See §19.4.**
+  - Requirement: See §19.4.
+  - Source: `§20b.3 L9306`
+  - Related spec refs: §19.4
+
+### §20b.4 Implicit Numeric Narrowing
+
+- `20.2.4.1` **Assigning a wider type to a narrower type silently truncates.**
+  - Requirement: Assigning a wider type to a narrower type silently truncates.
+  - Source: `§20b.4 L9310`
+  - Related spec refs: none
+- `20.2.4.2` **Signed/unsigned conversions at the same width also require as.**
+  - Requirement: Signed/unsigned conversions at the same width also require `as`.
+  - Source: `§20b.4 L9321-L9322`
+  - Related spec refs: none
+- `20.2.4.3` **See §4.2.**
+  - Requirement: See §4.2.
+  - Source: `§20b.4 L9321-L9322`
+  - Related spec refs: §4.2
+
+### §20b.5 Unreachable Code
+
+- `20.2.5.1` **Code after an unconditional return, labeled or unlabeled break, labeled or unlabele...**
+  - Requirement: Code after an unconditional `return`, labeled or unlabeled `break`, labeled or unlabeled `continue`, `goto`, or diverging expression is dead.
+  - Source: `§20b.5 L9326-L9328`
+  - Related spec refs: none
+- `20.2.5.2` **It is always either a bug or leftover from refactoring.**
+  - Requirement: It is always either a bug or leftover from refactoring.
+  - Source: `§20b.5 L9326-L9328`
+  - Related spec refs: none
+- `20.2.5.3` **The compiler detects unreachable code via control flow analysis and rejects it.**
+  - Requirement: The compiler detects unreachable code via control flow analysis and rejects it.
+  - Source: `§20b.5 L9343-L9347`
+  - Related spec refs: none
+- `20.2.5.4` **This applies to all code after unconditional control flow transfers, including retu...**
+  - Requirement: This applies to all code after unconditional control flow transfers, including `return`, labeled or unlabeled `break`, labeled or unlabeled `continue`, `goto`, and calls to functions with return type `Never` (e.g., `exit()`, `panic()`).
+  - Source: `§20b.5 L9343-L9347`
+  - Related spec refs: none
+- `20.2.5.5` **A labeled statement may be reachable only via goto.**
+  - Requirement: A labeled statement may be reachable only via `goto`.
+  - Source: `§20b.5 L9349-L9352`
+  - Related spec refs: none
+- `20.2.5.6` **Ordinary unreachable-code diagnostics are suppressed for a labeled statement and fo...**
+  - Requirement: Ordinary unreachable-code diagnostics are suppressed for a labeled statement and for following statements until the next control-flow terminator or the next labeled statement:
+  - Source: `§20b.5 L9349-L9352`
+  - Related spec refs: none
+- `20.2.5.7` **Exception for comptime if: The unreachable code check runs after comptime evaluation.**
+  - Requirement: **Exception for `comptime if`:** The unreachable code check runs **after** comptime evaluation.
+  - Source: `§20b.5 L9362-L9365`
+  - Related spec refs: none
+- `20.2.5.8` **Branches eliminated by comptime if are erased before the check, so code that is onl...**
+  - Requirement: Branches eliminated by `comptime if` are erased before the check, so code that is only unreachable due to comptime decisions does not trigger an error:
+  - Source: `§20b.5 L9362-L9365`
+  - Related spec refs: none
+
+### §20b.6 Pointer Compared to Array
+
+- `20.2.6.1` **Arrays never implicitly decay to pointers, so comparing a pointer directly with an...**
+  - Requirement: Arrays never implicitly decay to pointers, so comparing a pointer directly with an array is rejected:
+  - Source: `§20b.6 L9376-L9377`
+  - Related spec refs: none
+- `20.2.6.2` **Use explicit decay (&arr[0] as *const T).**
+  - Requirement: Use explicit decay (`&arr[0] as *const T`).
+  - Source: `§20b.6 L9384`
+  - Related spec refs: none
+- `20.2.6.3` **See §4.3a.1.**
+  - Requirement: See §4.3a.1.
+  - Source: `§20b.6 L9384`
+  - Related spec refs: §4.3a.1
+
+## 21. Borrow Checker Rules
+
+### §21 Borrow Checker Rules
+
+- `21.1.1.1` **The borrow checker is primarily local, but function boundaries do participate in li...**
+  - Requirement: The borrow checker is primarily local, but function boundaries do participate in lifetime reasoning through inferred effect summaries.
+  - Source: `§21 L9398-L9403`
+  - Related spec refs: none
+- `21.1.1.2` **In particular, when a function returns a view derived from one or more parameters...**
+  - Requirement: In particular, when a function returns a view derived from one or more parameters, the compiler tracks which parameters may be origins of that returned view and enforces that those origins outlive all uses of the result.
+  - Source: `§21 L9398-L9403`
+  - Related spec refs: none
+
+### §21.1 Rules
+
+- `21.1.1.3` **At every program point, the following must hold:**
+  - Requirement: At every program point, the following must hold:
+  - Source: `§21.1 L9407`
+  - Related spec refs: none
+- `21.1.1.4` **View-liveness rule. Active shared borrows (&T) of a place are invalidated when the...**
+  - Requirement: **View-liveness rule.** Active shared borrows (`&T`) of a place are invalidated when the place is mutated. Mutation includes assignment, calling a `mut self` method, and modification through `with` or `IndexPlace`. The compiler rejects code that uses a borrow after the borrowed place has been mutated.
+  - Source: `§21.1 L9409-L9413`
+  - Related spec refs: none
+- `21.1.1.5` **Move validity. A move of a place must not occur while any borrow of that place (or...**
+  - Requirement: **Move validity.** A move of a place must not occur while any borrow of that place (or an overlapping place) is active.
+  - Source: `§21.1 L9415-L9416`
+  - Related spec refs: none
+- `21.1.1.6` **Use-after-move. A binding that has been moved from must not be used.**
+  - Requirement: **Use-after-move.** A binding that has been moved from must not be used.
+  - Source: `§21.1 L9418-L9419`
+  - Related spec refs: none
+- `21.1.1.7` **NLL scoping. A borrow is active from its creation to the last program point that us...**
+  - Requirement: **NLL scoping.** A borrow is active from its creation to the last program point that uses the borrowed reference. Not to the end of the enclosing block.
+  - Source: `§21.1 L9421-L9423`
+  - Related spec refs: none
+- `21.1.1.8` **Disjoint field access. Two borrows of field paths that diverge at any field access...**
+  - Requirement: **Disjoint field access.** Two borrows of field paths that diverge at any field access are non-overlapping and may coexist. Array/slice indices are conservatively treated as overlapping.
+  - Source: `§21.1 L9425-L9427`
+  - Related spec refs: none
+- `21.1.1.9` **Returned-view origin tracking. When a function returns a reference or other view de...**
+  - Requirement: **Returned-view origin tracking.** When a function returns a reference or other view derived from one or more parameters, the compiler records the set of possible origin parameters in the function's effect summary. At the call site, the result is tied to the intersection of those origin lifetimes. If any possible origin dies before the view's last use, the program is rejected.
+  - Source: `§21.1 L9429-L9434`
+  - Related spec refs: none
+- `21.1.1.10` **Implicit drop is a use. When a variable implementing Drop goes out of scope, its im...**
+  - Requirement: **Implicit drop is a use.** When a variable implementing `Drop` goes out of scope, its implicit destructor call is treated as a **use** of that variable for borrow-checking purposes. This prevents use-after-free in cases like:
+  - Source: `§21.1 L9452-L9455`
+  - Related spec refs: none
+- `21.1.1.11` **The compiler inserts implicit drop points at scope exit in reverse declaration order.**
+  - Requirement: The compiler inserts implicit drop points at scope exit in reverse declaration order.
+  - Source: `§21.1 L9466-L9469`
+  - Related spec refs: none
+- `21.1.1.12` **Each drop point is a "use" of the variable being dropped, extending the borrow life...**
+  - Requirement: Each drop point is a "use" of the variable being dropped, extending the borrow lifetime through the destructor.
+  - Source: `§21.1 L9466-L9469`
+  - Related spec refs: none
+- `21.1.1.13` **Mutation composability. Mutation through mut self receivers does not require reborr...**
+  - Requirement: **Mutation composability.** Mutation through `mut self` receivers does not require reborrowing — the receiver is the caller's place, so method chains compose naturally. Each `mut self` call mutates that place and leaves it valid for subsequent calls.
+  - Source: `§21.1 L9471-L9474`
+  - Related spec refs: none
+
+## 22. Ephemeral Type Rules
+
+### §22 Ephemeral Type Rules
+
+- `22.1.1.1` **Post-type-check analysis.**
+  - Requirement: Post-type-check analysis.
+  - Source: `§22 L9480-L9481`
+  - Related spec refs: none
+- `22.1.1.2` **No dataflow required — ephemerality is determined structurally by types.**
+  - Requirement: No dataflow required — ephemerality is determined structurally by types.
+  - Source: `§22 L9480-L9481`
+  - Related spec refs: none
+
+### §22.1 Rules
+
+- `22.1.1.3` **1; Type is &T, StrView, &[T]; Ephemeral**
+  - Requirement: 1; Type is `&T`, `StrView`, `&[T]`; Ephemeral
+  - Source: `§22.1 L9487`
+  - Related spec refs: none
+- `22.1.1.4` **2; Type is declared ephemeral; Ephemeral**
+  - Requirement: 2; Type is declared `ephemeral`; Ephemeral
+  - Source: `§22.1 L9488`
+  - Related spec refs: none
+- `22.1.1.5` **3; Generic F[T] where T is ephemeral; Ephemeral**
+  - Requirement: 3; Generic `F[T]` where `T` is ephemeral; Ephemeral
+  - Source: `§22.1 L9489`
+  - Related spec refs: none
+- `22.1.1.6` **4; Struct has ephemeral field but is not marked ephemeral; Reject definition**
+  - Requirement: 4; Struct has ephemeral field but is not marked `ephemeral`; Reject definition
+  - Source: `§22.1 L9490`
+  - Related spec refs: none
+- `22.1.1.7` **5; let x = expr where expr is ephemeral; Bind x as ephemeral**
+  - Requirement: 5; `let x = expr` where expr is ephemeral; Bind `x` as ephemeral
+  - Source: `§22.1 L9491`
+  - Related spec refs: none
+- `22.1.1.8` **6; Struct field declared with ephemeral type; Reject**
+  - Requirement: 6; Struct field declared with ephemeral type; Reject
+  - Source: `§22.1 L9492`
+  - Related spec refs: none
+- `22.1.1.9` **7; Ephemeral value inserted into heap container; Container becomes ephemeral**
+  - Requirement: 7; Ephemeral value inserted into heap container; Container becomes ephemeral
+  - Source: `§22.1 L9493`
+  - Related spec refs: none
+- `22.1.1.10` **8; Function returns ephemeral type; Callers inherit restriction**
+  - Requirement: 8; Function returns ephemeral type; Callers inherit restriction
+  - Source: `§22.1 L9494`
+  - Related spec refs: none
+- `22.1.1.11` **9; Escaping closure captures ephemeral value; Reject**
+  - Requirement: 9; Escaping closure captures ephemeral value; Reject
+  - Source: `§22.1 L9495`
+  - Related spec refs: none
+- `22.1.1.12` **10; Guarded with block (Form 1) result is ephemeral; Reject**
+  - Requirement: 10; Guarded `with` block (Form 1) result is ephemeral; Reject
+  - Source: `§22.1 L9496`
+  - Related spec refs: none
+- `22.1.1.13` **Rule 7: A Vec[T] where T is ephemeral becomes an ephemeral Vec.**
+  - Requirement: Rule 7: A `Vec[T]` where `T` is ephemeral becomes an ephemeral `Vec`.
+  - Source: `§22.1 L9498-L9501`
+  - Related spec refs: none
+- `22.1.1.14` **It can be used as a local variable but cannot be stored in structs, returned from f...**
+  - Requirement: It can be used as a local variable but cannot be stored in structs, returned from functions, or sent to other threads.
+  - Source: `§22.1 L9498-L9501`
+  - Related spec refs: none
+- `22.1.1.15` **This enables common patterns like collecting tokens from a parser:**
+  - Requirement: This enables common patterns like collecting tokens from a parser:
+  - Source: `§22.1 L9498-L9501`
+  - Related spec refs: none
+- `22.1.1.16` **This is consistent with Rule 3 (generic container inherits ephemerality from its ty...**
+  - Requirement: This is consistent with Rule 3 (generic container inherits ephemerality from its type parameter).
+  - Source: `§22.1 L9512-L9513`
+  - Related spec refs: none
+- `22.1.1.17` **Rule 10 applies only to Form 1 (guarded access).**
+  - Requirement: Rule 10 applies only to Form 1 (guarded access).
+  - Source: `§22.1 L9515-L9519`
+  - Related spec refs: none
+- `22.1.1.18` **The guard is released when the block exits, so any ephemeral borrowing from the gua...**
+  - Requirement: The guard is released when the block exits, so any ephemeral borrowing from the guard's payload would dangle.
+  - Source: `§22.1 L9515-L9519`
+  - Related spec refs: none
+- `22.1.1.19` **Forms 2 and 3 desugar to plain let/var blocks — their results follow normal ephemer...**
+  - Requirement: Forms 2 and 3 desugar to plain `let`/`var` blocks — their results follow normal ephemeral rules (rules 5, 8).
+  - Source: `§22.1 L9515-L9519`
+  - Related spec refs: none
+
+### §22.2 Closure Escaping (v1.0)
+
+- `22.2.1.1` **A closure is non-escaping if and only if it appears as a direct argument to a funct...**
+  - Requirement: A closure is non-escaping if and only if it appears as a direct argument to a function call.
+  - Source: `§22.2 L9523-L9524`
+  - Related spec refs: none
+- `22.2.1.2` **All other closures are escaping.**
+  - Requirement: All other closures are escaping.
+  - Source: `§22.2 L9523-L9524`
+  - Related spec refs: none
+
+## 23. `with` Block Semantics
+
+### §23.1 Dispatch Rule
+
+- `23.1.1.1` **The compiler desugars with based on the mut keyword:**
+  - Requirement: The compiler desugars `with` based on the `mut` keyword:
+  - Source: `§23.1 L9532`
+  - Related spec refs: none
+- `23.1.1.2` **with e as mut x: body; { var x = e; body; x } (if body is Unit)**
+  - Requirement: `with e as mut x: body`; `{ var x = e; body; x }` (if body is Unit)
+  - Source: `§23.1 L9536`
+  - Related spec refs: none
+- `23.1.1.3` **with e as x: body; { let x = e; body }**
+  - Requirement: `with e as x: body`; `{ let x = e; body }`
+  - Source: `§23.1 L9537`
+  - Related spec refs: none
+- `23.1.1.4` **The binding is scoped to the block and cannot escape.**
+  - Requirement: The binding is scoped to the block and cannot escape.
+  - Source: `§23.1 L9539`
+  - Related spec refs: none
+
+### §23.2 Multiple Bindings
+
+- `23.2.1.1` **Multiple bindings nest left-to-right: with a as x, b as mut y: body desugars to nes...**
+  - Requirement: Multiple bindings nest left-to-right: `with a as x, b as mut y: body` desugars to nested scoped blocks.
+  - Source: `§23.2 L9543-L9544`
+  - Related spec refs: none
+- `23.2.1.2` **Multiple bindings in the non-guarded (binding) forms follow the same nesting: each...**
+  - Requirement: Multiple bindings in the non-guarded (binding) forms follow the same nesting: each binding is in scope for all subsequent bindings and the body.
+  - Source: `§23.2 L9546-L9548`
+  - Related spec refs: none
+
+### §23.3 Non-Local Control Flow
+
+- `23.3.1.1` **All with forms are transparent for control flow.**
+  - Requirement: All `with` forms are transparent for control flow.
+  - Source: `§23.3 L9552-L9553`
+  - Related spec refs: none
+- `23.3.1.2` **The following observable behaviors are required:**
+  - Requirement: The following observable behaviors are required:
+  - Source: `§23.3 L9552-L9553`
+  - Related spec refs: none
+- `23.3.1.3` **return inside a with block returns from the enclosing function.**
+  - Requirement: `return` inside a `with` block returns from the **enclosing function**.
+  - Source: `§23.3 L9555`
+  - Related spec refs: none
+- `23.3.1.4` **break inside a with block breaks the enclosing loop.**
+  - Requirement: `break` inside a `with` block breaks the **enclosing loop**.
+  - Source: `§23.3 L9556`
+  - Related spec refs: none
+- `23.3.1.5` **continue inside a with block continues the enclosing loop.**
+  - Requirement: `continue` inside a `with` block continues the **enclosing loop**.
+  - Source: `§23.3 L9557`
+  - Related spec refs: none
+- `23.3.1.6` **Labeled break 'label and continue 'label inside a with block may target visible lab...**
+  - Requirement: Labeled `break 'label` and `continue 'label` inside a `with` block may target visible labels in the enclosing function; `with` blocks do not hide labels.
+  - Source: `§23.3 L9558-L9560`
+  - Related spec refs: none
+- `23.3.1.7` **goto 'label inside a with block may target a visible label in the enclosing functio...**
+  - Requirement: `goto 'label` inside a `with` block may target a visible label in the enclosing function, subject to the normal goto restrictions (§13.5b).
+  - Source: `§23.3 L9561-L9563`
+  - Related spec refs: §13.5b
+- `23.3.1.8` **? inside a with block propagates to the enclosing function.**
+  - Requirement: `?` inside a `with` block propagates to the **enclosing function**.
+  - Source: `§23.3 L9564`
+  - Related spec refs: none
+- `23.3.1.9` **The mechanism by which the compiler achieves this is unspecified.**
+  - Requirement: The mechanism by which the compiler achieves this is unspecified.
+  - Source: `§23.3 L9566-L9568`
+  - Related spec refs: none
+- `23.3.1.10` **Possible approaches include tagged-union returns, inlining the enter call, or compi...**
+  - Requirement: Possible approaches include tagged-union returns, inlining the `enter` call, or compiler-special-cased lowering.
+  - Source: `§23.3 L9566-L9568`
+  - Related spec refs: none
+
+## 24. `async`/`.await` Equivalences
+
+### §24.1 `async fn` Equivalence
+
+- `24.1.1.1` **async fn foo(x: T) -> U: body is equivalent to a function that spawns a fiber execu...**
+  - Requirement: `async fn foo(x: T) -> U: body` is equivalent to a function that spawns a fiber executing `body` and returns a `Task[U]`:
+  - Source: `§24.1 L9576-L9577`
+  - Related spec refs: none
+- `24.1.1.2` **There is no separate "async function type."**
+  - Requirement: There is no separate "async function type."
+  - Source: `§24.1 L9583-L9585`
+  - Related spec refs: none
+- `24.1.1.3` **foo is a regular function that returns Task[U].**
+  - Requirement: `foo` is a regular function that returns `Task[U]`.
+  - Source: `§24.1 L9583-L9585`
+  - Related spec refs: none
+- `24.1.1.4` **This is why Invariant 1 (no async function type) holds.**
+  - Requirement: This is why Invariant 1 (no async function type) holds.
+  - Source: `§24.1 L9583-L9585`
+  - Related spec refs: none
+
+### §24.2 `.await` Equivalence
+
+- `24.2.1.1` **task.await suspends the current fiber until task completes, then evaluates to the t...**
+  - Requirement: `task.await` suspends the current fiber until `task` completes, then evaluates to the task's result.
+  - Source: `§24.2 L9589-L9591`
+  - Related spec refs: none
+- `24.2.1.2` **If the task is already complete, no suspension occurs.**
+  - Requirement: If the task is already complete, no suspension occurs.
+  - Source: `§24.2 L9589-L9591`
+  - Related spec refs: none
+
+### §24.3 `no_runtime` Gate
+
+- `24.3.1.1` **In no_runtime builds, any occurrence of async fn, .await, or async scope is a compi...**
+  - Requirement: In `no_runtime` builds, any occurrence of `async fn`, `.await`, or `async scope` is a **compile error**.
+  - Source: `§24.3 L9595-L9597`
+  - Related spec refs: none
+- `24.3.1.2` **This is a hard gate, not a runtime fallback.**
+  - Requirement: This is a hard gate, not a runtime fallback.
+  - Source: `§24.3 L9595-L9597`
+  - Related spec refs: none
+
+## 29. Additional Lexical and Binding Rules (Wave Language Rules)
+
+### §29.1 Numeric separators
+
+- `29.1.1.1` **Numeric literals permit _ separators for readability:**
+  - Requirement: Numeric literals permit `_` separators for readability:
+  - Source: `§29.1 L9633`
+  - Related spec refs: none
+- `29.1.1.2` **Decimal: 1_000_000**
+  - Requirement: Decimal: `1_000_000`
+  - Source: `§29.1 L9635`
+  - Related spec refs: none
+- `29.1.1.3` **Hex: 0xFF_AA_22**
+  - Requirement: Hex: `0xFF_AA_22`
+  - Source: `§29.1 L9636`
+  - Related spec refs: none
+- `29.1.1.4` **Binary: 0b1111_0000**
+  - Requirement: Binary: `0b1111_0000`
+  - Source: `§29.1 L9637`
+  - Related spec refs: none
+- `29.1.1.5` **Float: 3.141_592_653**
+  - Requirement: Float: `3.141_592_653`
+  - Source: `§29.1 L9638`
+  - Related spec refs: none
+- `29.1.1.6` **Separators are ignored for numeric value parsing.**
+  - Requirement: Separators are ignored for numeric value parsing.
+  - Source: `§29.1 L9640`
+  - Related spec refs: none
+- `29.1.1.7` **Type suffixes, when present, begin after the numeric portion of the literal ends.**
+  - Requirement: Type suffixes, when present, begin after the numeric portion of the literal ends.
+  - Source: `§29.1 L9642-L9643`
+  - Related spec refs: none
+- `29.1.1.8` **The suffix itself does not contain separators:**
+  - Requirement: The suffix itself does not contain separators:
+  - Source: `§29.1 L9642-L9643`
+  - Related spec refs: none
+- `29.1.1.9` **Valid: 1_000u64, 0xFF_FFu32, 3.25f32**
+  - Requirement: Valid: `1_000u64`, `0xFF_FFu32`, `3.25f32`
+  - Source: `§29.1 L9645`
+  - Related spec refs: none
+- `29.1.1.10` **Invalid: 1_000_u64, 0xFF_FF_u32**
+  - Requirement: Invalid: `1_000_u64`, `0xFF_FF_u32`
+  - Source: `§29.1 L9646`
+  - Related spec refs: none
+- `29.1.1.11` **The suffix is matched greedily from the closed set of numeric suffixes defined in §...**
+  - Requirement: The suffix is matched greedily from the closed set of numeric suffixes defined in §4.2.1.
+  - Source: `§29.1 L9648-L9649`
+  - Related spec refs: §4.2.1
+
+### §29.2 Trailing commas
+
+- `29.2.1.1` **Trailing commas are permitted but never required in list-like grammar positions, in...**
+  - Requirement: Trailing commas are **permitted but never required** in list-like grammar positions, including:
+  - Source: `§29.2 L9653`
+  - Related spec refs: none
+- `29.2.1.2` **Function parameter lists and argument lists**
+  - Requirement: Function parameter lists and argument lists
+  - Source: `§29.2 L9655`
+  - Related spec refs: none
+- `29.2.1.3` **Type parameter and type argument lists**
+  - Requirement: Type parameter and type argument lists
+  - Source: `§29.2 L9656`
+  - Related spec refs: none
+- `29.2.1.4` **Record/struct field lists**
+  - Requirement: Record/struct field lists
+  - Source: `§29.2 L9657`
+  - Related spec refs: none
+- `29.2.1.5` **Tuple/array literal element lists**
+  - Requirement: Tuple/array literal element lists
+  - Source: `§29.2 L9658`
+  - Related spec refs: none
+- `29.2.1.6` **Match arms and import/use lists**
+  - Requirement: Match arms and import/use lists
+  - Source: `§29.2 L9659`
+  - Related spec refs: none
+- `29.2.1.7` **Inside matched (), [], and {}, list-like grammar positions treat optional newlines...**
+  - Requirement: Inside matched `()`, `[]`, and `{}`, list-like grammar positions treat optional newlines like separator whitespace.
+  - Source: `§29.2 L9661-L9664`
+  - Related spec refs: none
+- `29.2.1.8` **This means multiline parameter lists, argument lists, tuple literals, array literal...**
+  - Requirement: This means multiline parameter lists, argument lists, tuple literals, array literals, struct literals, indexing, and type/generic lists are legal as long as the delimiters are balanced.
+  - Source: `§29.2 L9661-L9664`
+  - Related spec refs: none
+- `29.2.1.9` **This rule applies to the delimited list itself, not to nested block bodies.**
+  - Requirement: This rule applies to the delimited list itself, not to nested block bodies.
+  - Source: `§29.2 L9666-L9667`
+  - Related spec refs: none
+- `29.2.1.10` **Newlines that start a block after : or => retain their normal significance.**
+  - Requirement: Newlines that start a block after `:` or `=>` retain their normal significance.
+  - Source: `§29.2 L9666-L9667`
+  - Related spec refs: none
+
+### §29.3 Raw string literals
+
+- `29.3.1.1` **Raw string forms are supported:**
+  - Requirement: Raw string forms are supported:
+  - Source: `§29.3 L9671`
+  - Related spec refs: none
+- `29.3.1.2` **r"..."**
+  - Requirement: `r"..."`
+  - Source: `§29.3 L9673`
+  - Related spec refs: none
+- `29.3.1.3` **r#"..."#**
+  - Requirement: `r#"..."#`
+  - Source: `§29.3 L9674`
+  - Related spec refs: none
+- `29.3.1.4` **r##"..."## (and higher # counts)**
+  - Requirement: `r##"..."##` (and higher `#` counts)
+  - Source: `§29.3 L9675`
+  - Related spec refs: none
+- `29.3.1.5` **Raw strings disable escape and interpolation parsing in the lexer/parser path; deli...**
+  - Requirement: Raw strings disable escape and interpolation parsing in the lexer/parser path; delimiter matching uses the same `#` count.
+  - Source: `§29.3 L9677`
+  - Related spec refs: none
+
+### §29.4 Triple-quoted multiline strings
+
+- `29.4.1.1` **"""...""" literals:**
+  - Requirement: `"""..."""` literals:
+  - Source: `§29.4 L9681`
+  - Related spec refs: none
+- `29.4.1.2` **May start with an optional newline immediately after the opening delimiter.**
+  - Requirement: May start with an optional newline immediately after the opening delimiter.
+  - Source: `§29.4 L9683`
+  - Related spec refs: none
+- `29.4.1.3` **May end with a trailing newline immediately before the closing delimiter.**
+  - Requirement: May end with a trailing newline immediately before the closing delimiter.
+  - Source: `§29.4 L9684`
+  - Related spec refs: none
+- `29.4.1.4` **Are dedented by common leading indentation across non-empty lines.**
+  - Requirement: Are dedented by common leading indentation across non-empty lines.
+  - Source: `§29.4 L9685`
+  - Related spec refs: none
+
+### §29.5 Byte literals
+
+- `29.5.1.1` **b'X' and escaped forms (for example b'\x41') are accepted.**
+  - Requirement: `b'X'` and escaped forms (for example `b'\x41'`) are accepted.
+  - Source: `§29.5 L9689`
+  - Related spec refs: none
+- `29.5.1.2` **Bootstrap lowering treats character and byte literals as integer literal values dur...**
+  - Requirement: Bootstrap lowering treats character and byte literals as integer literal values during AST construction; type-checking follows normal integer coercion rules.
+  - Source: `§29.5 L9691`
+  - Related spec refs: none
+
+### §29.5a Labels
+
+- `29.5.2.1` **A LABEL token is a single quote followed immediately by an identifier, with no whit...**
+  - Requirement: A `LABEL` token is a single quote followed immediately by an identifier, with no whitespace between the quote and the identifier:
+  - Source: `§29.5a L9695-L9696`
+  - Related spec refs: none
+- `29.5.2.2` **The identifier part follows the ordinary identifier spelling rules: it starts with...**
+  - Requirement: The identifier part follows the ordinary identifier spelling rules: it starts with a letter or underscore and may contain letters, digits, and underscores.
+  - Source: `§29.5a L9704-L9709`
+  - Related spec refs: none
+- `29.5.2.3` **Labels are syntactically distinct from ordinary identifiers because of the leading...**
+  - Requirement: Labels are syntactically distinct from ordinary identifiers because of the leading quote and live in a separate namespace.
+  - Source: `§29.5a L9704-L9709`
+  - Related spec refs: none
+- `29.5.2.4` **That namespace is shared by label declarations and the target operands of goto, bre...**
+  - Requirement: That namespace is shared by label declarations and the target operands of `goto`, `break`, and `continue`.
+  - Source: `§29.5a L9704-L9709`
+  - Related spec refs: none
+- `29.5.2.5` **Single-quoted character literals are also valid syntax.**
+  - Requirement: Single-quoted character literals are also valid syntax.
+  - Source: `§29.5a L9711-L9713`
+  - Related spec refs: none
+- `29.5.2.6` **A character literal is a single quote, followed by one character or escape sequence...**
+  - Requirement: A character literal is a single quote, followed by one character or escape sequence, followed by a closing single quote:
+  - Source: `§29.5a L9711-L9713`
+  - Related spec refs: none
+- `29.5.2.7` **Lexer priority for apostrophe-related tokens is:**
+  - Requirement: Lexer priority for apostrophe-related tokens is:
+  - Source: `§29.5a L9721`
+  - Related spec refs: none
+- `29.5.2.8` **Byte literals such as b'X' or b'\n'.**
+  - Requirement: Byte literals such as `b'X'` or `b'\n'`.
+  - Source: `§29.5a L9723`
+  - Related spec refs: none
+- `29.5.2.9` **Closed character literals such as 'a', '@', or '\n'.**
+  - Requirement: Closed character literals such as `'a'`, `'@'`, or `'\n'`.
+  - Source: `§29.5a L9724`
+  - Related spec refs: none
+- `29.5.2.10` **Labels such as 'outer, 'L0, or 'scan.**
+  - Requirement: Labels such as `'outer`, `'L0`, or `'scan`.
+  - Source: `§29.5a L9725`
+  - Related spec refs: none
+- `29.5.2.11` **A label has no closing quote.**
+  - Requirement: A label has no closing quote.
+  - Source: `§29.5a L9727-L9729`
+  - Related spec refs: none
+- `29.5.2.12` **A character literal must have a closing quote.**
+  - Requirement: A character literal must have a closing quote.
+  - Source: `§29.5a L9727-L9729`
+  - Related spec refs: none
+- `29.5.2.13` **Inside string literals, apostrophe is ordinary string content and never starts a la...**
+  - Requirement: Inside string literals, apostrophe is ordinary string content and never starts a label or character literal.
+  - Source: `§29.5a L9727-L9729`
+  - Related spec refs: none
+
+### §29.6 Unused bindings
+
+- `29.6.1.1` **_ is an explicit discard binding.**
+  - Requirement: `_` is an explicit discard binding.
+  - Source: `§29.6 L9733`
+  - Related spec refs: none
+- `29.6.1.2` **It is legal in binding positions (for example let _ = expr, parameter bindings, pat...**
+  - Requirement: It is legal in binding positions (for example `let _ = expr`, parameter bindings, pattern bindings) and does not introduce a usable name.
+  - Source: `§29.6 L9733`
+  - Related spec refs: none
+
+### §29.7 String escape parity
+
+- `29.7.1.1` **String processing supports:**
+  - Requirement: String processing supports:
+  - Source: `§29.7 L9737`
+  - Related spec refs: none
+- `29.7.1.2` **Standard escapes: \\, \", \n, \r, \t**
+  - Requirement: Standard escapes: `\\`, `\"`, `\n`, `\r`, `\t`
+  - Source: `§29.7 L9739`
+  - Related spec refs: none
+- `29.7.1.3` **Null byte: \0**
+  - Requirement: Null byte: `\0`
+  - Source: `§29.7 L9740`
+  - Related spec refs: none
+- `29.7.1.4` **Hex byte: \xNN (two hexadecimal digits)**
+  - Requirement: Hex byte: `\xNN` (two hexadecimal digits)
+  - Source: `§29.7 L9741`
+  - Related spec refs: none
+- `29.7.1.5` **These rules apply consistently to standard and C-string literal processing.**
+  - Requirement: These rules apply consistently to standard and C-string literal processing.
+  - Source: `§29.7 L9743`
+  - Related spec refs: none
+
+### §29.8 No-shadowing
+
+- `29.8.1.1` **Shadowing is disallowed for local bindings.**
+  - Requirement: Shadowing is disallowed for local bindings.
+  - Source: `§29.8 L9747`
+  - Related spec refs: none
+- `29.8.1.2` **Rebinding an existing visible name emits a diagnostic (for example, shadowing is no...**
+  - Requirement: Rebinding an existing visible name emits a diagnostic (for example, `shadowing is not allowed for 'x'`).
+  - Source: `§29.8 L9747`
+  - Related spec refs: none
+
+### §29.9 Pipeline-first guidance
+
+- `29.9.1.1` **Because rebinding/shadowing is disallowed, stepwise transformations should use pipe...**
+  - Requirement: Because rebinding/shadowing is disallowed, stepwise transformations should use pipelines (`|>`) and scoped `with` bindings instead of repeated `let name = ...` rebinding.
+  - Source: `§29.9 L9751`
+  - Related spec refs: none
+
+### §29.10 `todo` and `unreachable`
+
+- `29.10.1.1` **todo() and unreachable() are divergence-oriented builtins with type Never.**
+  - Requirement: `todo()` and `unreachable()` are divergence-oriented builtins with type `Never`.
+  - Source: `§29.10 L9755`
+  - Related spec refs: none
+- `29.10.1.2` **They accept zero arguments or one str-compatible message argument.**
+  - Requirement: They accept zero arguments or one `str`-compatible message argument.
+  - Source: `§29.10 L9757`
+  - Related spec refs: none
+- `29.10.1.3` **Their type is Never, which is compatible in value position with any expected type.**
+  - Requirement: Their type is `Never`, which is compatible in value position with any expected type.
+  - Source: `§29.10 L9758`
+  - Related spec refs: none
+- `29.10.1.4` **They are treated as diverging control-flow points for typing and reachability analy...**
+  - Requirement: They are treated as diverging control-flow points for typing and reachability analysis.
+  - Source: `§29.10 L9759`
+  - Related spec refs: none
+
+### §29.11 Reserved Keywords
+
+- `29.11.1.1` **The following keywords are reserved and cannot be used as identifiers:**
+  - Requirement: The following keywords are reserved and cannot be used as identifiers:
+  - Source: `§29.11 L9763`
+  - Related spec refs: none
+- `29.11.1.2` **fn; Function declaration**
+  - Requirement: `fn`; Function declaration
+  - Source: `§29.11 L9767`
+  - Related spec refs: none
+- `29.11.1.3` **let; Variable binding**
+  - Requirement: `let`; Variable binding
+  - Source: `§29.11 L9768`
+  - Related spec refs: none
+- `29.11.1.4` **mut; Mutable binding modifier**
+  - Requirement: `mut`; Mutable binding modifier
+  - Source: `§29.11 L9769`
+  - Related spec refs: none
+- `29.11.1.5` **type; Type declaration**
+  - Requirement: `type`; Type declaration
+  - Source: `§29.11 L9770`
+  - Related spec refs: none
+- `29.11.1.6` **use; Import**
+  - Requirement: `use`; Import
+  - Source: `§29.11 L9771`
+  - Related spec refs: none
+- `29.11.1.7` **extern; External function declaration**
+  - Requirement: `extern`; External function declaration
+  - Source: `§29.11 L9772`
+  - Related spec refs: none
+- `29.11.1.8` **if; Conditional**
+  - Requirement: `if`; Conditional
+  - Source: `§29.11 L9773`
+  - Related spec refs: none
+- `29.11.1.9` **then; Inline if body introducer (expression form)**
+  - Requirement: `then`; Inline `if` body introducer (expression form)
+  - Source: `§29.11 L9774`
+  - Related spec refs: none
+- `29.11.1.10` **else if; Chained conditional continuation**
+  - Requirement: `else if`; Chained conditional continuation
+  - Source: `§29.11 L9775`
+  - Related spec refs: none
+- `29.11.1.11` **else; Conditional branch**
+  - Requirement: `else`; Conditional branch
+  - Source: `§29.11 L9776`
+  - Related spec refs: none
+- `29.11.1.12` **match; Pattern matching**
+  - Requirement: `match`; Pattern matching
+  - Source: `§29.11 L9777`
+  - Related spec refs: none
+- `29.11.1.13` **for; Loop over iterables**
+  - Requirement: `for`; Loop over iterables
+  - Source: `§29.11 L9778`
+  - Related spec refs: none
+- `29.11.1.14` **while; Conditional loop**
+  - Requirement: `while`; Conditional loop
+  - Source: `§29.11 L9779`
+  - Related spec refs: none
+- `29.11.1.15` **do; Do-while loop**
+  - Requirement: `do`; Do-while loop
+  - Source: `§29.11 L9780`
+  - Related spec refs: none
+- `29.11.1.16` **goto; Unconditional jump to label**
+  - Requirement: `goto`; Unconditional jump to label
+  - Source: `§29.11 L9781`
+  - Related spec refs: none
+- `29.11.1.17` **yield; Generator / comprehension yield**
+  - Requirement: `yield`; Generator / comprehension yield
+  - Source: `§29.11 L9782`
+  - Related spec refs: none
+- `29.11.1.18` **return; Early return**
+  - Requirement: `return`; Early return
+  - Source: `§29.11 L9783`
+  - Related spec refs: none
+- `29.11.1.19` **break; Break from loop or labeled block**
+  - Requirement: `break`; Break from loop or labeled block
+  - Source: `§29.11 L9784`
+  - Related spec refs: none
+- `29.11.1.20` **continue; Continue to next loop iteration**
+  - Requirement: `continue`; Continue to next loop iteration
+  - Source: `§29.11 L9785`
+  - Related spec refs: none
+- `29.11.1.21` **true, false; Boolean literals**
+  - Requirement: `true`, `false`; Boolean literals
+  - Source: `§29.11 L9786`
+  - Related spec refs: none
+- `29.11.1.22` **and, or, not; Logical operators**
+  - Requirement: `and`, `or`, `not`; Logical operators
+  - Source: `§29.11 L9787`
+  - Related spec refs: none
+- `29.11.1.23` **in; Membership/iteration operator**
+  - Requirement: `in`; Membership/iteration operator
+  - Source: `§29.11 L9788`
+  - Related spec refs: none
+- `29.11.1.24` **as; Type cast**
+  - Requirement: `as`; Type cast
+  - Source: `§29.11 L9789`
+  - Related spec refs: none
+- `29.11.1.25` **defer; Deferred execution**
+  - Requirement: `defer`; Deferred execution
+  - Source: `§29.11 L9790`
+  - Related spec refs: none
+- `29.11.1.26` **errdefer; Error-path deferred execution**
+  - Requirement: `errdefer`; Error-path deferred execution
+  - Source: `§29.11 L9791`
+  - Related spec refs: none
+- `29.11.1.27` **async, await; Async function/await**
+  - Requirement: `async`, `await`; Async function/await
+  - Source: `§29.11 L9792`
+  - Related spec refs: none
+- `29.11.1.28` **spawn; Fiber creation**
+  - Requirement: `spawn`; Fiber creation
+  - Source: `§29.11 L9793`
+  - Related spec refs: none
+- `29.11.1.29` **trait, impl; Trait definition/implementation**
+  - Requirement: `trait`, `impl`; Trait definition/implementation
+  - Source: `§29.11 L9794`
+  - Related spec refs: none
+- `29.11.1.30` **pub; Visibility modifier**
+  - Requirement: `pub`; Visibility modifier
+  - Source: `§29.11 L9795`
+  - Related spec refs: none
+- `29.11.1.31` **const; Compile-time constant**
+  - Requirement: `const`; Compile-time constant
+  - Source: `§29.11 L9796`
+  - Related spec refs: none
+- `29.11.1.32` **implicit; Implicit parameter modifier**
+  - Requirement: `implicit`; Implicit parameter modifier
+  - Source: `§29.11 L9797`
+  - Related spec refs: none
+- `29.11.1.33` **newaxis; Multi-index dimension insertion**
+  - Requirement: `newaxis`; Multi-index dimension insertion
+  - Source: `§29.11 L9798`
+  - Related spec refs: none
+- `29.11.1.34` **it; Implicit closure parameter**
+  - Requirement: `it`; Implicit closure parameter
+  - Source: `§29.11 L9799`
+  - Related spec refs: none
+- `29.11.1.35` **where; Trait bound clauses**
+  - Requirement: `where`; Trait bound clauses
+  - Source: `§29.11 L9800`
+  - Related spec refs: none
+- `29.11.1.36` **move; Ownership-transfer annotation and move closure**
+  - Requirement: `move`; Ownership-transfer annotation and move closure
+  - Source: `§29.11 L9801`
+  - Related spec refs: none
+- `29.11.1.37` **unsafe; Unsafe block**
+  - Requirement: `unsafe`; Unsafe block
+  - Source: `§29.11 L9802`
+  - Related spec refs: none
+- `29.11.1.38` **comptime; Compile-time evaluation**
+  - Requirement: `comptime`; Compile-time evaluation
+  - Source: `§29.11 L9803`
+  - Related spec refs: none
+
+### §29.12 Error Codes
+
+- `29.12.1.1` **E0901; Non-local control flow (return, break, continue, goto, ?) inside defer/errdefer**
+  - Requirement: E0901; Non-local control flow (`return`, `break`, `continue`, `goto`, `?`) inside `defer`/`errdefer`
+  - Source: `§29.12 L9809`
+  - Related spec refs: none
+- `29.12.1.2` **E0951; Nested implicit it is ambiguous — use explicit param => expr for inner closure**
+  - Requirement: E0951; Nested implicit `it` is ambiguous — use explicit `param => expr` for inner closure
+  - Source: `§29.12 L9810`
+  - Related spec refs: none
+- `29.12.1.3` **E0952; it used in context expecting N != 1 parameters**
+  - Requirement: E0952; `it` used in context expecting N != 1 parameters
+  - Source: `§29.12 L9811`
+  - Related spec refs: none
+- `29.12.1.4` **E0953; it is a reserved keyword and cannot be used as an identifier**
+  - Requirement: E0953; `it` is a reserved keyword and cannot be used as an identifier
+  - Source: `§29.12 L9812`
+  - Related spec refs: none
+- `29.12.1.5` **E1101; Orphan rule violation: impl requires a local trait or local type**
+  - Requirement: E1101; Orphan rule violation: impl requires a local trait or local type
+  - Source: `§29.12 L9813`
+  - Related spec refs: none
+- `29.12.1.6` **E1102; Duplicate implementation of trait for type**
+  - Requirement: E1102; Duplicate implementation of trait for type
+  - Source: `§29.12 L9814`
+  - Related spec refs: none
+- `29.12.1.7` **E1201; Overlapping trait implementations**
+  - Requirement: E1201; Overlapping trait implementations
+  - Source: `§29.12 L9815`
+  - Related spec refs: none
+
+### §29.13 Block Body Syntax
+
+- `29.13.1.1` **Most constructs that introduce a statement or expression body support three interch...**
+  - Requirement: Most constructs that introduce a statement or expression body support three interchangeable body forms.
+  - Source: `§29.13 L9819-L9824`
+  - Related spec refs: none
+- `29.13.1.2` **The choice is purely stylistic; all three produce identical AST and compiled output.**
+  - Requirement: The choice is purely stylistic; all three produce identical AST and compiled output.
+  - Source: `§29.13 L9819-L9824`
+  - Related spec refs: none
+- `29.13.1.3` **The three-form rule applies to fn, while, for, loop, with, defer, errdefer, comptim...**
+  - Requirement: The three-form rule applies to `fn`, `while`, `for`, `loop`, `with`, `defer`, `errdefer`, `comptime`, labeled blocks, match arms, and any future block-introducing construct unless that construct states a narrower syntax.
+  - Source: `§29.13 L9819-L9824`
+  - Related spec refs: none
+- `29.13.1.4` **unsafe is the deliberate exception: unsafe: is always a newline block, unsafe {...**
+  - Requirement: `unsafe` is the deliberate exception: `unsafe:` is always a newline block, `unsafe { ... }` is the inline block expression form, and `unsafe *p` / `unsafe p[i]` is the narrow raw-access prefix form.
+  - Source: `§29.13 L9826-L9828`
+  - Related spec refs: none
+- `29.13.1.5` **if/else if/else support all three forms.**
+  - Requirement: `if`/`else if`/`else` support all three forms.
+  - Source: `§29.13 L9830-L9831`
+  - Related spec refs: none
+- `29.13.1.6` **if additionally supports the then expression shorthand; see §9.1 for the full if sy...**
+  - Requirement: `if` additionally supports the `then` expression shorthand; see §9.1 for the full `if` syntax.
+  - Source: `§29.13 L9830-L9831`
+  - Related spec refs: §9.1
+- `29.13.1.7` **Form 1 — Inline colon.**
+  - Requirement: **Form 1 — Inline colon.**
+  - Source: `§29.13 L9833-L9834`
+  - Related spec refs: none
+- `29.13.1.8` **A colon immediately followed by content on the same line.**
+  - Requirement: A colon immediately followed by content on the same line.
+  - Source: `§29.13 L9833-L9834`
+  - Related spec refs: none
+- `29.13.1.9` **The body is a single block item.**
+  - Requirement: The body is a single block item.
+  - Source: `§29.13 L9843-L9845`
+  - Related spec refs: none
+- `29.13.1.10` **The inline body ends at the first top-level newline.**
+  - Requirement: The inline body ends at the first top-level newline.
+  - Source: `§29.13 L9843-L9845`
+  - Related spec refs: none
+- `29.13.1.11` **Newlines inside balanced delimiters (parentheses, brackets, braces) do not terminat...**
+  - Requirement: Newlines inside balanced delimiters (parentheses, brackets, braces) do not terminate the inline body.
+  - Source: `§29.13 L9843-L9845`
+  - Related spec refs: none
+- `29.13.1.12` **Form 2 — Indented colon.**
+  - Requirement: **Form 2 — Indented colon.**
+  - Source: `§29.13 L9847-L9848`
+  - Related spec refs: none
+- `29.13.1.13` **The colon ends the line; the body is the indented block on subsequent lines.**
+  - Requirement: The colon ends the line; the body is the indented block on subsequent lines.
+  - Source: `§29.13 L9847-L9848`
+  - Related spec refs: none
+- `29.13.1.14` **The body ends when indentation returns to or below the introducing construct's level.**
+  - Requirement: The body ends when indentation returns to or below the introducing construct's level.
+  - Source: `§29.13 L9860-L9862`
+  - Related spec refs: none
+- `29.13.1.15` **A colon at end of line with nothing following (no indented block) is a syntax error.**
+  - Requirement: A colon at end of line with nothing following (no indented block) is a syntax error.
+  - Source: `§29.13 L9860-L9862`
+  - Related spec refs: none
+- `29.13.1.16` **Form 3 — Braced.**
+  - Requirement: **Form 3 — Braced.**
+  - Source: `§29.13 L9864-L9865`
+  - Related spec refs: none
+- `29.13.1.17` **Curly braces follow the construct's header directly, with no intervening colon.**
+  - Requirement: Curly braces follow the construct's header directly, with no intervening colon.
+  - Source: `§29.13 L9864-L9865`
+  - Related spec refs: none
+- `29.13.1.18` **Whitespace inside braces is insignificant.**
+  - Requirement: Whitespace inside braces is insignificant.
+  - Source: `§29.13 L9876-L9878`
+  - Related spec refs: none
+- `29.13.1.19` **Statements are separated by newlines or semicolons.**
+  - Requirement: Statements are separated by newlines or semicolons.
+  - Source: `§29.13 L9876-L9878`
+  - Related spec refs: none
+- `29.13.1.20` **Empty brace body {} is legal (returns Unit).**
+  - Requirement: Empty brace body `{}` is legal (returns `Unit`).
+  - Source: `§29.13 L9876-L9878`
+  - Related spec refs: none
+- `29.13.1.21` **After a construct's header, a body introducer is required.**
+  - Requirement: **After a construct's header, a body introducer is required.**
+  - Source: `§29.13 L9880-L9883`
+  - Related spec refs: none
+- `29.13.1.22` **For all constructs except if, the introducer must be : or {; omitting it is a parse...**
+  - Requirement: For all constructs except `if`, the introducer must be `:` or `{`; omitting it is a parse error.
+  - Source: `§29.13 L9880-L9883`
+  - Related spec refs: none
+- `29.13.1.23` **For if, then is also a valid body introducer (see §9.1).**
+  - Requirement: For `if`, `then` is also a valid body introducer (see §9.1).
+  - Source: `§29.13 L9880-L9883`
+  - Related spec refs: §9.1
+- `29.13.1.24` **Colon-then-brace: fn f: { body } — the { } is parsed as an inline body expression (...**
+  - Requirement: Colon-then-brace: `fn f: { body }` — the `{ }` is parsed as an inline body expression (e.g. a record literal), not a braced body. This is valid only if `{ body }` is a meaningful expression.
+  - Source: `§29.13 L9887-L9889`
+  - Related spec refs: none
+- `29.13.1.25` **No introducer: while cond\n body — parse error; : or { is required after the condit...**
+  - Requirement: No introducer: `while cond\n body` — parse error; `:` or `{` is required after the condition.
+  - Source: `§29.13 L9890-L9891`
+  - Related spec refs: none
+- `29.13.1.26` **Labels are statement prefixes (§13.5a).**
+  - Requirement: Labels are statement prefixes (§13.5a).
+  - Source: `§29.13 L9895-L9899`
+  - Related spec refs: §13.5a
+- `29.13.1.27` **A label may prefix any statement, either on the same line or on its own line immedi...**
+  - Requirement: A label may prefix any statement, either on the same line or on its own line immediately before the statement it labels.
+  - Source: `§29.13 L9895-L9899`
+  - Related spec refs: none
+- `29.13.1.28` **A label has no trailing colon of its own; when the labeled statement is a block, lo...**
+  - Requirement: A label has no trailing colon of its own; when the labeled statement is a block, loop, or other body form, that construct still supplies its normal body introducer:
+  - Source: `§29.13 L9895-L9899`
+  - Related spec refs: none
+- `29.13.1.29` **For labeled while and for, the loop still has its own body introducer.**
+  - Requirement: For labeled `while` and `for`, the loop still has its own body introducer.
+  - Source: `§29.13 L9920-L9923`
+  - Related spec refs: none
+- `29.13.1.30` **For colon-form labeled blocks, the colon after the label is the block-body introducer.**
+  - Requirement: For colon-form labeled blocks, the colon after the label is the block-body introducer.
+  - Source: `§29.13 L9920-L9923`
+  - Related spec refs: none
+- `29.13.1.31` **Labels on non-body statements, such as 'done return, do not introduce a block.**
+  - Requirement: Labels on non-body statements, such as `'done return`, do not introduce a block.
+  - Source: `§29.13 L9920-L9923`
+  - Related spec refs: none
+- `29.13.1.32` **The semicolon (;) is a statement separator, not a terminator.**
+  - Requirement: The semicolon (`;`) is a statement separator, not a terminator.
+  - Source: `§29.13 L9968-L9969`
+  - Related spec refs: none
+- `29.13.1.33` **It may be used anywhere a newline separates statements:**
+  - Requirement: It may be used anywhere a newline separates statements:
+  - Source: `§29.13 L9968-L9969`
+  - Related spec refs: none
+- `29.13.1.34` **Consecutive semicolons and mixed semicolons/newlines collapse to a single separator...**
+  - Requirement: Consecutive semicolons and mixed semicolons/newlines collapse to a single separator, just as consecutive newlines do:
+  - Source: `§29.13 L9976-L9977`
+  - Related spec refs: none
+- `29.13.1.35` **with fmt normalizes semicolons to newlines — semicolons never appear in formatted o...**
+  - Requirement: `with fmt` normalizes semicolons to newlines — semicolons never appear in formatted output.
+  - Source: `§29.13 L9985-L9986`
+  - Related spec refs: none
+- `29.13.1.36` **Semicolons inside […] retain their existing meaning (array fill and for-comprehensi...**
+  - Requirement: Semicolons inside `[…]` retain their existing meaning (array fill and for-comprehension monadic chaining) and are not affected by this rule.
+  - Source: `§29.13 L9988-L9990`
+  - Related spec refs: none
+- `29.13.1.37` **Style guidance: Hand-written code typically uses colon form.**
+  - Requirement: **Style guidance:** Hand-written code typically uses colon form.
+  - Source: `§29.13 L9992-L9994`
+  - Related spec refs: none
+- `29.13.1.38` **Generated code (code generators, derive macros, comptime expansions) should use bra...**
+  - Requirement: Generated code (code generators, derive macros, comptime expansions) should use brace form to avoid indentation-sensitivity issues.
+  - Source: `§29.13 L9992-L9994`
+  - Related spec refs: none
+- `29.13.1.39` **with fmt (default): preserves the author's chosen form.**
+  - Requirement: `with fmt` (default): preserves the author's chosen form.
+  - Source: `§29.13 L9998`
+  - Related spec refs: none
+- `29.13.1.40` **with fmt --prefer-brace: converts inline colon to inline brace. fn f: expr becomes...**
+  - Requirement: `with fmt --prefer-brace`: converts inline colon to inline brace. `fn f: expr` becomes `fn f { expr }`. Multi-line colon becomes multi-line brace. Lossless.
+  - Source: `§29.13 L9999-L10001`
+  - Related spec refs: none
+- `29.13.1.41` **with fmt --prefer-colon: converts inline brace to inline colon when the body is a s...**
+  - Requirement: `with fmt --prefer-colon`: converts inline brace to inline colon when the body is a single expression. Multi-statement braced bodies convert to multi-line colon form. Lossless.
+  - Source: `§29.13 L10002-L10004`
+  - Related spec refs: none
+
+## 30. Formal Grammar (Informative)
+
+### §30 Formal Grammar (Informative)
+
+- `30.1.1.1` **This appendix collects syntactic productions from throughout the specification into...**
+  - Requirement: This appendix collects syntactic productions from throughout the specification into a unified reference.
+  - Source: `§30 L10010-L10012`
+  - Related spec refs: none
+- `30.1.1.2` **The normative definitions remain in their respective sections; this is a convenienc...**
+  - Requirement: The normative definitions remain in their respective sections; this is a convenience index.
+  - Source: `§30 L10010-L10012`
+  - Related spec refs: none
+
+### §30.1 Notation
+
+- `30.1.1.3` **Productions use EBNF-like notation:**
+  - Requirement: Productions use EBNF-like notation:
+  - Source: `§30.1 L10016`
+  - Related spec refs: none
+- `30.1.1.4` **| alternatives**
+  - Requirement: `|` alternatives
+  - Source: `§30.1 L10018`
+  - Related spec refs: none
+- `30.1.1.5` **[ ] optional**
+  - Requirement: `[ ]` optional
+  - Source: `§30.1 L10019`
+  - Related spec refs: none
+- `30.1.1.6` **{ } zero or more repetitions**
+  - Requirement: `{ }` zero or more repetitions
+  - Source: `§30.1 L10020`
+  - Related spec refs: none
+- `30.1.1.7` **( ) grouping**
+  - Requirement: `( )` grouping
+  - Source: `§30.1 L10021`
+  - Related spec refs: none
+- `30.1.1.8` **'...' terminal tokens**
+  - Requirement: `'...'` terminal tokens
+  - Source: `§30.1 L10022`
+  - Related spec refs: none
+- `30.1.1.9` **UPPER non-terminal symbols**
+  - Requirement: `UPPER` non-terminal symbols
+  - Source: `§30.1 L10023`
+  - Related spec refs: none
+
+### §30.2 Lexical Grammar
+
+- `30.2.1.1` **When the lexer sees a bare apostrophe, it tries CHAR_LIT before LABEL.**
+  - Requirement: When the lexer sees a bare apostrophe, it tries `CHAR_LIT` before `LABEL`.
+  - Source: `§30.2 L10060-L10061`
+  - Related spec refs: none
+- `30.2.1.2` **A label has no closing apostrophe.**
+  - Requirement: A label has no closing apostrophe.
+  - Source: `§30.2 L10060-L10061`
+  - Related spec refs: none
+- `30.2.1.3` **LABEL may appear as a statement prefix or as the target operand of goto, break, and...**
+  - Requirement: `LABEL` may appear as a statement prefix or as the target operand of `goto`, `break`, and `continue`.
+  - Source: `§30.2 L10069-L10071`
+  - Related spec refs: none
+- `30.2.1.4` **As a statement prefix, it must be the first token of the statement and has no trail...**
+  - Requirement: As a statement prefix, it must be the first token of the statement and has no trailing colon of its own.
+  - Source: `§30.2 L10069-L10071`
+  - Related spec refs: none
+
+### §30.5 Expressions
+
+- `30.5.1.1` **Operator precedence (§9.9) — low to high:**
+  - Requirement: **Operator precedence** (§9.9) — low to high:
+  - Source: `§30.5 L10157`
+  - Related spec refs: §9.9
+- `30.5.1.2` **1; or; Left**
+  - Requirement: 1; `or`; Left
+  - Source: `§30.5 L10161`
+  - Related spec refs: none
+- `30.5.1.3` **2; and; Left**
+  - Requirement: 2; `and`; Left
+  - Source: `§30.5 L10162`
+  - Related spec refs: none
+- `30.5.1.4` **3; ==, !=, in, not in; Non-associative**
+  - Requirement: 3; `==`, `!=`, `in`, `not in`; Non-associative
+  - Source: `§30.5 L10163`
+  - Related spec refs: none
+- `30.5.1.5` **4; <, >, <=, >=; Chained**
+  - Requirement: 4; `<`, `>`, `<=`, `>=`; Chained
+  - Source: `§30.5 L10164`
+  - Related spec refs: none
+- `30.5.1.6` **5; \|> (pipeline); Left**
+  - Requirement: 5; `\|>` (pipeline); Left
+  - Source: `§30.5 L10165`
+  - Related spec refs: none
+- `30.5.1.7` **6; \|; Left**
+  - Requirement: 6; `\|`; Left
+  - Source: `§30.5 L10166`
+  - Related spec refs: none
+- `30.5.1.8` **7; ^; Left**
+  - Requirement: 7; `^`; Left
+  - Source: `§30.5 L10167`
+  - Related spec refs: none
+- `30.5.1.9` **8; &; Left**
+  - Requirement: 8; `&`; Left
+  - Source: `§30.5 L10168`
+  - Related spec refs: none
+- `30.5.1.10` **9; <<, >>; Left**
+  - Requirement: 9; `<<`, `>>`; Left
+  - Source: `§30.5 L10169`
+  - Related spec refs: none
+- `30.5.1.11` **10; +, -, ++, ??; Left**
+  - Requirement: 10; `+`, `-`, `++`, `??`; Left
+  - Source: `§30.5 L10170`
+  - Related spec refs: none
+- `30.5.1.12` **11; *, /, %, @; Left**
+  - Requirement: 11; `*`, `/`, `%`, `@`; Left
+  - Source: `§30.5 L10171`
+  - Related spec refs: none
+- `30.5.1.13` **12; Unary prefix (not, -, ~, &, &raw mut); —**
+  - Requirement: 12; Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`); —
+  - Source: `§30.5 L10172`
+  - Related spec refs: none
+- `30.5.1.14` **13; Postfix (.await, ?, .field, [i], ()); Left**
+  - Requirement: 13; Postfix (`.await`, `?`, `.field`, `[i]`, `()`); Left
+  - Source: `§30.5 L10173`
+  - Related spec refs: none
+
+### §30.8 Block Syntax
+
+- `30.8.1.1` **All three forms are interchangeable for every block-introducing construct: fn, else...**
+  - Requirement: All three forms are interchangeable for every block-introducing construct: `fn`, `else`, `while`, `for`, `loop`, `with`, `defer`, `errdefer`, `comptime`, `unsafe`, labeled blocks, and match arms.
+  - Source: `§30.8 L10230-L10234`
+  - Related spec refs: none
+- `30.8.1.2` **if and else if additionally accept then EXPR.**
+  - Requirement: `if` and `else if` additionally accept `then EXPR`.
+  - Source: `§30.8 L10230-L10234`
+  - Related spec refs: none
+- `30.8.1.3` **Missing body introducers are parse errors.**
+  - Requirement: Missing body introducers are parse errors.
+  - Source: `§30.8 L10230-L10234`
+  - Related spec refs: none
+
+### §30.9 Reserved Keywords
+
+- `30.9.1.1` **The following identifiers are reserved (§29.11):**
+  - Requirement: The following identifiers are reserved (§29.11):
+  - Source: `§30.9 L10238`
+  - Related spec refs: §29.11
+

@@ -5021,6 +5021,72 @@ fn CiStmtPool.lower_cfprintf_effect_ir(self: CiStmtPool, session: i64, cursor: i
     let end_stmt = self.expr_stmt(end_call)
     self.merge_ir( setup, self.merge3_ir( begin_stmt, fprintf_stmt, end_stmt))
 
+fn ci_cursor_is_void_cstyle_cast(session: i64, cursor: i32) -> bool:
+    if with_ci_cursor_kind(session, cursor) != CXK_CSTYLE_CAST:
+        return false
+    let ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+    ty == "void" or ty == "unit"
+
+fn CiStmtPool.empty_stmt_ir(self: CiStmtPool) -> CiStmtId:
+    self.block(self.extra_len(), 0)
+
+fn CiStmtPool.lower_discard_expr_side_effects_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+
+    if kind == CXK_UNEXPOSED_STMT:
+        let inner = ci_find_last_expr_child(session, cursor)
+        if inner >= 0:
+            return self.lower_discard_expr_side_effects_ir(session, inner, exprs, types, scope)
+        return self.empty_stmt_ir()
+
+    if kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100 or kind == 122:
+        if nc == 1:
+            return self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+        if nc > 0:
+            return self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, nc - 1), exprs, types, scope)
+        return self.empty_stmt_ir()
+
+    if kind == CXK_CSTYLE_CAST:
+        let inner = ci_find_last_expr_child(session, cursor)
+        if inner < 0:
+            return self.empty_stmt_ir()
+        if ci_cursor_is_void_cstyle_cast(session, cursor):
+            return self.lower_discard_expr_side_effects_ir(session, inner, exprs, types, scope)
+        return self.lower_effect_expr_ir(session, inner, exprs, types, scope)
+
+    if kind == CXK_BINARY_OP and nc >= 2 and with_ci_binary_op(session, cursor) == BO_COMMA:
+        let lhs_stmt = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+        let rhs_stmt = self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 1), exprs, types, scope)
+        return self.merge_ir( lhs_stmt, rhs_stmt)
+
+    if kind == CXK_CALL_EXPR or kind == CXK_COMPOUND_ASSIGN_OP or kind == CXK_COND_OP:
+        let stmt = self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
+        if (stmt as i32) != 0:
+            return stmt
+        return self.empty_stmt_ir()
+
+    if kind == CXK_BINARY_OP:
+        let op = with_ci_binary_op(session, cursor)
+        if op == BO_ASSIGN:
+            let stmt = self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
+            if (stmt as i32) != 0:
+                return stmt
+        return self.empty_stmt_ir()
+
+    if kind == CXK_UNARY_OP:
+        let op = with_ci_unary_op(session, cursor)
+        if op == UO_PRE_INC or op == UO_PRE_DEC or op == UO_POST_INC or op == UO_POST_DEC:
+            let stmt = self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
+            if (stmt as i32) != 0:
+                return stmt
+        return self.empty_stmt_ir()
+
+    let lowered = self.lower_value_expr_ir(session, cursor, exprs, types, scope)
+    if ci_value_ir_valid(lowered) and (lowered.setup_stmt as i32) != 0:
+        return lowered.setup_stmt
+    self.empty_stmt_ir()
+
 fn CiStmtPool.lower_effect_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
@@ -5041,6 +5107,8 @@ fn CiStmtPool.lower_effect_expr_ir(self: CiStmtPool, session: i64, cursor: i32, 
     if kind == CXK_CSTYLE_CAST:
         let inner = ci_find_last_expr_child(session, cursor)
         if inner >= 0:
+            if ci_cursor_is_void_cstyle_cast(session, cursor):
+                return self.lower_discard_expr_side_effects_ir(session, inner, exprs, types, scope)
             return self.lower_effect_expr_ir(session, inner, exprs, types, scope)
         return 0 as CiStmtId
 
@@ -5137,7 +5205,7 @@ fn ci_cursor_is_simple_storage_ref(session: i64, cursor: i32) -> bool:
     if kind != CXK_DECL_REF:
         return false
     let operand_ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
-    if ci_starts_with(operand_ty, "fn("):
+    if ci_starts_with(operand_ty, "fn(") or ci_starts_with(operand_ty, "extern \"C\" fn("):
         return false
     true
 
@@ -5154,7 +5222,7 @@ fn ci_cursor_is_function_ref(session: i64, cursor: i32) -> bool:
     if kind != CXK_DECL_REF:
         return false
     let operand_ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
-    if ci_starts_with(operand_ty, "fn("):
+    if ci_starts_with(operand_ty, "fn(") or ci_starts_with(operand_ty, "extern \"C\" fn("):
         return true
     let cxtype = with_ci_cursor_type(session, cursor)
     let canon_kind = with_ci_type_kind(session, cxtype)
@@ -6435,19 +6503,18 @@ fn ci_classify_implicit_cast_safe(session: i64, cursor: i32, inner_cursor: i32) 
     // used in pointer context (e.g. as a call callee or function-
     // pointer arg) is a no-op from the printer's perspective —
     // the bare name already parses as a callable identifier.
-    // Check the inner translated spelling ("fn(..." for normal
+    // Check the inner translated spelling ("extern \"C\" fn(..." for C
     // function types), the raw CXType kind (CXT_FunctionProto /
     // CXT_FunctionNoProto for builtins), AND the outer translated
-    // spelling ("*const fn(" / "*mut fn(" for the decayed pointer
-    // target) to catch all the shapes libclang produces for builtin
-    // function decls.
-    if ci_starts_with(inner_ty_str, "fn("):
+    // spelling from older bootstrap compilers ("*const fn(" / "*mut fn(")
+    // to catch all the shapes libclang produces for builtin function decls.
+    if ci_starts_with(inner_ty_str, "fn(") or ci_starts_with(inner_ty_str, "extern \"C\" fn("):
         return CI_CAST_NOOP
     let inner_cxtype = with_ci_cursor_type(session, inner_cursor)
     let inner_canon_kind = with_ci_type_kind(session, inner_cxtype)
     if inner_canon_kind == CXT_FunctionProto or inner_canon_kind == CXT_FunctionNoProto:
         return CI_CAST_NOOP
-    if ci_starts_with(outer_ty_str, "*const fn(") or ci_starts_with(outer_ty_str, "*mut fn("):
+    if ci_starts_with(outer_ty_str, "extern \"C\" fn(") or ci_starts_with(outer_ty_str, "*const fn(") or ci_starts_with(outer_ty_str, "*mut fn("):
         return CI_CAST_NOOP
     let outer_is_bool = with_ci_type_is_bool(session, cursor) != 0
     let inner_is_bool = with_ci_type_is_bool(session, inner_cursor) != 0

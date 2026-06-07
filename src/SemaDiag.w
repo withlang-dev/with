@@ -1201,6 +1201,15 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
                 out = out ++ ", "
             out = out ++ self.type_name(self.type_extra.get((te_start + pi) as i64))
         return out ++ ") -> " ++ self.type_name(self.get_type_d2(resolved))
+    if tk == TypeKind.TY_EXTERN_FN:
+        let te_start = self.get_type_d0(resolved)
+        let param_count = self.get_type_d1(resolved)
+        var out = "extern \"C\" fn("
+        for pi in 0..param_count:
+            if pi > 0:
+                out = out ++ ", "
+            out = out ++ self.type_name(self.type_extra.get((te_start + pi) as i64))
+        return out ++ ") -> " ++ self.type_name(self.get_type_d2(resolved))
     if tk == TypeKind.TY_PTR:
         let pointee = self.type_name(self.get_type_d0(resolved))
         if self.get_type_d1(resolved) != 0:

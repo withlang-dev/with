@@ -1356,6 +1356,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
         return self.finish_type_decl(node)
 
     if self.peek() == TokenKind.TK_KW_FN or
+       self.peek() == TokenKind.TK_KW_EXTERN or
        self.peek() == TokenKind.TK_IDENT or
        self.peek() == TokenKind.TK_AMPERSAND or
        self.peek() == TokenKind.TK_L_PAREN or
@@ -4612,9 +4613,7 @@ fn Parser.parse_if_else_body(self: Parser, use_then: bool) -> NodeId:
         return self.parse_if_expr()
     if use_then:
         return self.parse_expr()
-    if self.peek() == TokenKind.TK_L_BRACE or self.peek() == TokenKind.TK_COLON:
-        return self.parse_body()
-    self.parse_expr()
+    self.parse_body()
 
 fn Parser.parse_if_expr(self: Parser) -> NodeId:
     let start = self.current_start()
@@ -6586,6 +6585,40 @@ fn Parser.parse_braced_body(self: Parser) -> NodeId:
 
 // ── Type expression parsing ──────────────────────────────────────
 
+fn Parser.parse_fn_type_param_type(self: Parser) -> NodeId:
+    if self.peek() == TokenKind.TK_IDENT and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_COLON:
+        self.advance()
+        self.advance()
+        self.skip_newlines()
+    self.parse_type_expr()
+
+fn Parser.parse_fn_type_node(self: Parser, start: i32, kind: i32) -> NodeId:
+    self.advance()
+    self.expect(TokenKind.TK_L_PAREN)
+    self.skip_newlines()
+    var params: Vec[i32] = Vec.new()
+    if self.peek() != TokenKind.TK_R_PAREN:
+        let ty = self.parse_fn_type_param_type()
+        params.push(ty as i32)
+        self.skip_newlines()
+        while self.peek() == TokenKind.TK_COMMA:
+            self.advance()
+            self.skip_newlines()
+            if self.peek() == TokenKind.TK_R_PAREN:
+                break
+            let ty2 = self.parse_fn_type_param_type()
+            params.push(ty2 as i32)
+            self.skip_newlines()
+    self.skip_newlines()
+    self.expect(TokenKind.TK_R_PAREN)
+    self.expect(TokenKind.TK_ARROW)
+    let ret = self.parse_type_expr()
+    let extra_start = self.pool.extra_len()
+    for pi in 0..params.len() as i32:
+        self.pool.add_extra(params.get(pi as i64))
+    let count = params.len() as i32
+    self.pool.add_node(kind, start, self.prev_end(), extra_start, count, ret)
+
 fn Parser.parse_type_expr(self: Parser) -> NodeId:
     let t = self.peek()
     let start = self.current_start()
@@ -6620,6 +6653,21 @@ fn Parser.parse_type_expr(self: Parser) -> NodeId:
         let inner = self.parse_type_expr()
         return self.pool.add_node(NodeKind.NK_TYPE_OPTIONAL, start, self.prev_end(), inner, 0, 0)
 
+    if t == TokenKind.TK_KW_EXTERN:
+        self.advance()
+        if self.peek() != TokenKind.TK_STRING_LIT:
+            self.emit_error("expected ABI string in extern function pointer type, e.g. extern \"C\" fn(...) -> T")
+            return self.poisoned_expr()
+        let abi_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+        let abi = strip_string_token_text(abi_raw)
+        if abi != "C":
+            self.emit_error("only extern \"C\" function pointer types are supported")
+        self.advance()
+        if self.peek() != TokenKind.TK_KW_FN:
+            self.emit_error("expected fn after extern ABI string in function pointer type")
+            return self.poisoned_expr()
+        return self.parse_fn_type_node(start, NodeKind.NK_TYPE_EXTERN_FN)
+
     if t == TokenKind.TK_L_PAREN:
         self.advance()
         self.skip_newlines()
@@ -6645,31 +6693,7 @@ fn Parser.parse_type_expr(self: Parser) -> NodeId:
         return self.pool.add_node(NodeKind.NK_TYPE_TUPLE, start, self.prev_end(), extra_start, count, 0)
 
     if t == TokenKind.TK_KW_FN:
-        self.advance()
-        self.expect(TokenKind.TK_L_PAREN)
-        self.skip_newlines()
-        var params: Vec[i32] = Vec.new()
-        if self.peek() != TokenKind.TK_R_PAREN:
-            let ty = self.parse_type_expr()
-            params.push(ty as i32)
-            self.skip_newlines()
-            while self.peek() == TokenKind.TK_COMMA:
-                self.advance()
-                self.skip_newlines()
-                if self.peek() == TokenKind.TK_R_PAREN:
-                    break
-                let ty2 = self.parse_type_expr()
-                params.push(ty2 as i32)
-                self.skip_newlines()
-        self.skip_newlines()
-        self.expect(TokenKind.TK_R_PAREN)
-        self.expect(TokenKind.TK_ARROW)
-        let ret = self.parse_type_expr()
-        let extra_start = self.pool.extra_len()
-        for pi in 0..params.len() as i32:
-            self.pool.add_extra(params.get(pi as i64))
-        let count = params.len() as i32
-        return self.pool.add_node(NodeKind.NK_TYPE_FN, start, self.prev_end(), extra_start, count, ret)
+        return self.parse_fn_type_node(start, NodeKind.NK_TYPE_FN)
 
     if t == TokenKind.TK_STAR:
         self.advance()

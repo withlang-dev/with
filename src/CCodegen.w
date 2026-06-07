@@ -1139,7 +1139,7 @@ fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
         let inner_tid = self.sema.get_type_d0(resolved)
         let inner_resolved = self.sema.resolve_alias(inner_tid)
         let inner_kind = self.sema.get_type_kind(inner_resolved)
-        if inner_kind == TypeKind.TY_FN:
+        if inner_kind == TypeKind.TY_FN or inner_kind == TypeKind.TY_EXTERN_FN:
             return self.fn_type_c_name(inner_resolved as i32)
         if inner_kind == TypeKind.TY_VOID:
             if tk == TypeKind.TY_REF and self.sema.get_type_d1(resolved) == 0:
@@ -1172,7 +1172,7 @@ fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
         return self.c_type(elem_tid, 0) ++ "*"
     if tk == TypeKind.TY_TUPLE:
         return "int64_t"  // tuples lowered conservatively
-    if tk == TypeKind.TY_FN:
+    if tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN:
         return self.fn_type_c_name(resolved as i32)
     // Conservative fallback
     "int64_t"
@@ -4347,7 +4347,7 @@ fn CCodegen.call_return_tid(self: CCodegen, body: MirBody, bb: i32, callee_opera
     let od = body.operand_d0.get(callee_operand as i64)
 
     if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
-        let callee_tid = self.sema.callable_fn_type(self.operand_tid(body, callee_operand) as TypeId)
+        let callee_tid = self.sema.callable_any_fn_type(self.operand_tid(body, callee_operand) as TypeId)
         if callee_tid != 0:
             return self.sema.get_type_d2(callee_tid)
         let local_id = self.place_local_id(body, od)
@@ -4552,7 +4552,7 @@ fn CCodegen.callee_fn_type_from_operand(self: CCodegen, body: MirBody, callee_op
         return 0
     let ok = body.operand_kinds.get(callee_op as i64)
     if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
-        return self.sema.callable_fn_type(self.operand_tid_no_infer(body, callee_op) as TypeId)
+        return self.sema.callable_any_fn_type(self.operand_tid_no_infer(body, callee_op) as TypeId)
     0
 
 fn CCodegen.operand_ref_target_tid(self: CCodegen, body: MirBody, operand_id: i32) -> i32:
@@ -4592,7 +4592,7 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
             continue
         // If the argument is a struct value but the callee expects a pointer, emit &
         if i < callee_param_count:
-            let p_tid = if callee_sig >= 0: self.sema.sig_param_type(callee_sig, i) else: self.sema.callable_fn_param_type(callee_fn_tid as TypeId, i)
+            let p_tid = if callee_sig >= 0: self.sema.sig_param_type(callee_sig, i) else: self.sema.fn_type_param_type(callee_fn_tid, i)
             let p_resolved = self.sema.resolve_alias(p_tid)
             let p_tk = self.sema.get_type_kind(p_resolved)
             if p_tk == TypeKind.TY_PTR or p_tk == TypeKind.TY_REF:
@@ -4604,7 +4604,7 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
                 let arg_tid_for_ptr = self.operand_tid(body, op_id)
                 let arg_resolved_for_ptr = self.sema.resolve_alias(arg_tid_for_ptr)
                 let arg_tk_for_ptr = self.sema.get_type_kind(arg_resolved_for_ptr)
-                if p_inner_tk == TypeKind.TY_FN and arg_tk_for_ptr == TypeKind.TY_FN:
+                if (p_inner_tk == TypeKind.TY_FN or p_inner_tk == TypeKind.TY_EXTERN_FN) and (arg_tk_for_ptr == TypeKind.TY_FN or arg_tk_for_ptr == TypeKind.TY_EXTERN_FN):
                     out = out ++ arg_text
                     continue
                 if arg_tk_for_ptr == TypeKind.TY_STR:
@@ -6625,7 +6625,7 @@ fn CCodegen.collect_fn_types_from_tid(self: CCodegen, acc: CollectFnTypes, tid: 
         return cur
     cur.seen_types.insert(resolved as i32, 1)
     let tk = self.sema.get_type_kind(resolved)
-    if tk == TypeKind.TY_FN:
+    if tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN:
         if not cur.seen_names.contains(resolved as i32):
             cur.seen_names.insert(resolved as i32, 1)
             cur.out.push(resolved as i32)
@@ -6757,7 +6757,8 @@ fn CCodegen.emit_fn_type_defs(self: CCodegen) -> str:
         if self.check_interrupted() != 0:
             return ""
         let tid = self.sema.resolve_alias(fn_tids.get(i as i64) as TypeId)
-        if self.sema.get_type_kind(tid) != TypeKind.TY_FN:
+        let tid_kind = self.sema.get_type_kind(tid)
+        if tid_kind != TypeKind.TY_FN and tid_kind != TypeKind.TY_EXTERN_FN:
             continue
         let ret_tid = self.sema.get_type_d2(tid)
         let start = self.sema.get_type_d0(tid)
