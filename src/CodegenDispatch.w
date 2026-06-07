@@ -11857,6 +11857,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     let cl_ret_alloca = self.create_entry_alloca(cl_ret_storage_ty)
     self.mir_local_ptrs.insert(0, cl_ret_alloca)
     self.mir_local_types.insert(0, cl_ret_storage_ty)
+    self.mir_scan_memory_locals(closure_body)
 
     // Map capture MIR locals to existing LLVM allocas
     for cl_mi in 0..capture_count:
