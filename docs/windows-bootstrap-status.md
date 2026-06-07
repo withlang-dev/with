@@ -22,18 +22,20 @@ Current blocker:
 
 - Windows bootstrap/fixpoint frontier is green.
 - Windows `with build :emit-c-fixpoint`: PASS from rebuilt stage2 candidate.
-- Linux `build`, `:fixpoint`, and `:emit-c-fixpoint`: PASS from the repaired
-  With-owned Linux LLVM SDK and SDK clang/clang++.
+- Linux release gate was blocked in `with build :test` by regex behavior tests
+  after `build` and `:fixpoint` passed.
+- Current failure class: Linux regex runtime FFI subject pointer bug, fixed in
+  source by extracting `str` data before calling PCRE2.
+- Latest focused check: Linux `behav_regex_language_semantics.w` and
+  `behav_regex_capture_fstring.w` PASS after rebuilding `regex-runtime-object`.
+- Next command: rerun the full Linux release gate from the current source.
 - Cross-host emitted-C determinism: PASS after normalizing frontend/imported
   source text and embedded stdlib text to LF. Windows and Linux emitted
   `out/emit-c-test/main.c` matched byte-for-byte at SHA256
   `296ebbe9a72ef6d7b711f1e1a3eb04f33b0f9cad0012c361ccf3077ee773238f`.
-- Current failure class: none at the bootstrap acceptance frontier.
 - Known non-blocking debt: stack-budget checker still reports one frame above
   64 KiB (`max_frame: 99304`) while the Windows stage2 PE stack reserve remains
   the intended 8 MiB.
-- Next command: final source hygiene only (`git diff --check`, status review,
-  no BOM/NUL verification) before commit.
 
 Do not reopen without fresh evidence:
 
@@ -42,6 +44,7 @@ Do not reopen without fresh evidence:
 - Broad ABI redesign.
 - Hand edits to generated C/artifacts.
 - Old regex runtime pointer-temporary issue.
+- Old regex runtime `str as *const u8` subject pointer bug.
 - Old LLVM/Clang DLL import issue.
 - Old `with_arg_at` runtime extern ABI issue.
 - Old `to_cstr` terminator issue.
@@ -59,6 +62,19 @@ Known debt, not current blocker:
   compiler frames; that is not the current `:emit-c-fixpoint` blocker.
 
 Latest transition:
+
+- Linux regex behavior root cause:
+  - `with build :test` failed in `behav_regex_language_semantics.w` and
+    `behav_regex_capture_fstring.w`.
+  - LLDB breakpoint on `pcre2_match_8` showed the subject pointer register
+    contained a pointer to a With `str` value on the stack. The bytes at that
+    address were `{data_ptr, len, ...}`, not the subject bytes `"a1 b2"`.
+  - Root cause: `rt/regex_runtime.w` passed `text as *const u8` to PCRE2.
+    `str` is a value type, so the runtime must extract the first field rather
+    than cast the whole value to a byte pointer.
+  - Fix: added `regex_str_data` and used it for PCRE2 match/substitute subject
+    pointers. Replacement strings already use `regex_to_cstr`.
+  - Focused Linux checks PASS after forcing `:regex-runtime-object` rebuild.
 
 - Restored `build/compiler.w` compiler-child actions to use
   `run_capture_with_env` on Windows. The prior no-capture diagnostic branch
