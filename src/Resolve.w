@@ -473,7 +473,7 @@ fn ResolveState.walk_type_expr(self: ResolveState, pool: AstPool, module_id: i32
             self.walk_type_expr(pool, module_id, current_scope, child)
         return
 
-    if kind == NodeKind.NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let start = pool.get_data0(node)
         let count = pool.get_data1(node)
         for i in 0..count:

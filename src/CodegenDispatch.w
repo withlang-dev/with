@@ -168,6 +168,8 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         fat_types.push(ptr_ty)
         fat_types.push(ptr_ty)
         return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+    if tk == TypeKind.TY_EXTERN_FN:
+        return wl_ptr_type(self.context)
     if tk == TypeKind.TY_SLICE:
         let body_types: Vec[i64] = Vec.new()
         body_types.push(wl_ptr_type(self.context))
@@ -337,7 +339,7 @@ fn Codegen.mir_build_raw_fn_type(self: Codegen, sema_ty: i32) -> i64:
             resolved = self.sema.resolve_alias(resolved) as i32
             tk = self.sema.get_type_kind(resolved)
 
-    if tk != TypeKind.TY_FN:
+    if tk != TypeKind.TY_FN and tk != TypeKind.TY_EXTERN_FN:
         return 0
 
     var extra_start = self.mir_input.mir_get_type_d0(resolved)
@@ -1188,7 +1190,7 @@ fn Codegen.mir_compare_dispatch_kind(self: Codegen, sema_ty: i32) -> i32:
         return 2
     if tk == TypeKind.TY_FLOAT:
         return 3
-    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_GENERIC_FN:
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN:
         return 4
     if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL:
         return 5
@@ -4012,7 +4014,7 @@ fn Codegen.ast_static_type_expr(self: Codegen, node: i32) -> i32:
         if self.sema.named_types.contains(sym):
             return self.sema.named_types.get(sym).unwrap() as i32
         return 0
-    if kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+    if kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
         return self.sema.resolve_type_expr(node) as i32
     if kind == NodeKind.NK_INDEX:
         let base = self.pool.get_data0(node)
@@ -10907,10 +10909,17 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     var closure_fn_param_start = 0
     var closure_fn_param_count = 0
     var closure_fn_ret_tid = 0
+    var is_extern_closure = false
     let closure_node_ty = self.sema_type_of_node(node)
     if closure_node_ty != 0:
         let resolved_closure_ty = self.sema.resolve_alias(closure_node_ty)
         if self.sema.get_type_kind(resolved_closure_ty) == TypeKind.TY_FN:
+            closure_fn_tid = resolved_closure_ty as i32
+            closure_fn_param_start = self.sema.get_type_d0(resolved_closure_ty)
+            closure_fn_param_count = self.sema.get_type_d1(resolved_closure_ty)
+            closure_fn_ret_tid = self.sema.get_type_d2(resolved_closure_ty)
+        else if self.sema.get_type_kind(resolved_closure_ty) == TypeKind.TY_EXTERN_FN:
+            is_extern_closure = true
             closure_fn_tid = resolved_closure_ty as i32
             closure_fn_param_start = self.sema.get_type_d0(resolved_closure_ty)
             closure_fn_param_count = self.sema.get_type_d1(resolved_closure_ty)
@@ -10935,6 +10944,9 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         if is_param == 0:
             captures.push(sym)
     let capture_count = captures.len() as i32
+    if is_extern_closure and capture_count > 0:
+        with_eprint("internal error: capturing closure reached extern C function pointer lowering")
+        self.had_error = 1
 
     // Determine if this is a non-escaping closure (reference capture)
     let is_ref_capture = self.pool.is_non_escaping_closure(node) == 1 and self.pool.is_move_closure(node) == 0
@@ -10970,7 +10982,9 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     // can recover pointee types for reference parameters.
     let closure_param_sema_types: Vec[i32] = Vec.new()
     let param_types: Vec[i64] = Vec.new()
-    param_types.push(ptr_ty)
+    let closure_param_offset = if is_extern_closure: 0 else: 1
+    if not is_extern_closure:
+        param_types.push(ptr_ty)
     for i in 0..param_count:
         let p_type = self.pool.get_extra(extra_start + i * 2 + 1)
         var p_sema_ty = self.sema.ty_i32 as i32
@@ -10996,7 +11010,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         let expected_ret_ty = self.sema_type_to_llvm(closure_fn_ret_tid)
         if expected_ret_ty != 0:
             ret_ty = expected_ret_ty
-    let fn_ty = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count + 1, 0)
+    let fn_ty = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count + closure_param_offset, 0)
     let closure_fn = wl_add_function(self.llmod, "__closure", fn_ty)
     // Save current state
     let saved_fn = self.current_function
@@ -11020,7 +11034,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     wl_position_at_end(self.builder, entry)
 
     // Load captured values from context pointer (param 0)
-    if capture_count > 0:
+    if not is_extern_closure and capture_count > 0:
         let cap_ptr = wl_get_param(closure_fn, 0)
         for ci in 0..capture_count:
             let sym = captures.get(ci as i64)
@@ -11048,10 +11062,10 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                 wl_build_store(self.builder, loaded, alloca)
                 self.record_local(sym, alloca, cap_ty, 0)
 
-    // Add params as locals (skip param 0 which is context ptr)
+    // Add params as locals (normal closures skip param 0, the context ptr).
     for i in 0..param_count:
         let p_name = self.pool.get_extra(extra_start + i * 2)
-        let param_val = wl_get_param(closure_fn, i + 1)
+        let param_val = wl_get_param(closure_fn, i + closure_param_offset)
         let param_ty = wl_type_of(param_val)
         let alloca = self.create_entry_alloca(param_ty)
         wl_build_store(self.builder, param_val, alloca)
@@ -11248,7 +11262,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
 
     // Build capture struct on stack and store captured values
     var ctx_ptr = wl_const_null(ptr_ty)
-    if capture_count > 0:
+    if not is_extern_closure and capture_count > 0:
         let cap_alloca = wl_build_alloca(self.builder, cap_struct_type)
         for ci in 0..capture_count:
             let sym = captures.get(ci as i64)
@@ -11267,6 +11281,9 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                     let val = wl_build_load(self.builder, cap_ty, alloca_opt.unwrap() as i64)
                     wl_build_store(self.builder, val, gep)
         ctx_ptr = cap_alloca
+
+    if is_extern_closure:
+        return closure_fn
 
     // Build fat pointer {fn_ptr, ctx_ptr}
     let fat_types: Vec[i64] = Vec.new()

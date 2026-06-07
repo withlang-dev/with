@@ -114,9 +114,9 @@ Use this when a working With seed already exists for the host.
 3. Build the stage chain:
 
    ```sh
-   make build
-   make fixpoint
-   make test
+   with build
+   with build :fixpoint
+   with build :test
    ```
 
 4. Verify the binary has no dynamic LLVM or Clang dependency:
@@ -134,7 +134,7 @@ Use this when a working With seed already exists for the host.
 5. Install only after all gates pass:
 
    ```sh
-   make install-user
+   with build :install-user
    ```
 
 ### Path B: Emit-C Bootstrap
@@ -164,9 +164,9 @@ for creating the first native With compiler.
    export WITH=/path/to/native/bootstrap/with
    export LLVM_PREFIX=/path/to/llvm-static-sdk
    export WITH_LIBCLANG="$LLVM_PREFIX/lib/libclang.a"
-   make build
-   make fixpoint
-   make test
+   with build
+   with build :fixpoint
+   with build :test
    ```
 
 5. Verify the final `out/bin/with` has no dynamic LLVM or Clang dependency.
@@ -176,7 +176,7 @@ for creating the first native With compiler.
 6. Before publishing the new platform, run the emitted-C self-host gate:
 
    ```sh
-   make emit-c-fixpoint
+   with build :emit-c-fixpoint
    ```
 
    This builds binary A through the normal self-host path, emits the compiler
@@ -400,8 +400,8 @@ method dispatch, `MultiIndex`, `Vec.get_disjoint` (tuple-valued slots),
 `SlotMap`, and `VecRange` (plus their `len32`/`len64`/`ulen32` variants). The
 compiler does not use any of these internally, so they can never block this
 bootstrap. The guarantee is enforced, not assumed: if a future compiler change
-starts using one of them, the `make emit-c-fixpoint` gate above fails loudly and
-points at it.
+starts using one of them, the `with build :emit-c-fixpoint` gate above fails
+loudly and points at it.
 
 Reaching LLVM↔C parity for these families is therefore **not a requirement**
 (issue #301). Keep the loud failure; never add a silent fallback to make

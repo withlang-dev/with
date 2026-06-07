@@ -1024,6 +1024,18 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: NodeId) -> str:
         out = out ++ ") -> " ++ render_type_expr(pool, intern, (ret) as NodeId)
         return out
 
+    if kind == NodeKind.NK_TYPE_EXTERN_FN:
+        let extra_start = pool.get_data0(node)
+        let param_count = pool.get_data1(node)
+        let ret = pool.get_data2(node)
+        var out = "extern \"C\" fn("
+        for pi in 0..param_count:
+            if pi > 0:
+                out = out ++ ", "
+            out = out ++ render_type_expr(pool, intern, (pool.get_extra(extra_start + pi)) as NodeId)
+        out = out ++ ") -> " ++ render_type_expr(pool, intern, (ret) as NodeId)
+        return out
+
     if kind == NodeKind.NK_TYPE_TUPLE:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)

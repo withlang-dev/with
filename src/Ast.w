@@ -130,6 +130,7 @@ enum NodeKind: i32:
     NK_TYPE_INFERRED = 90
     NK_TYPE_ASSOC = 91  // d0=base_sym (e.g. Self), d1=assoc_sym (e.g. Output), d2=0
     NK_TYPE_TYPEOF = 92 // d0=expr(node), d1=0, d2=0
+    NK_TYPE_EXTERN_FN = 127
     // Patterns (for match arms)
     NK_PAT_WILDCARD = 100
     NK_PAT_IDENT = 101
@@ -1523,6 +1524,7 @@ fn AstPool.comprehension_binding_is_pattern(self: AstPool, node: NodeId, binding
 // NodeKind.NK_TYPE_REF:      d0=pointee(node), d1=is_mut(0/1), d2=0
 // NodeKind.NK_TYPE_PTR:      d0=pointee(node), d1=is_mut(0/1), d2=0
 // NodeKind.NK_TYPE_FN:       d0=extra_start, d1=param_count, d2=return_type(node)
+// NodeKind.NK_TYPE_EXTERN_FN: d0=extra_start, d1=param_count, d2=return_type(node)
 // NodeKind.NK_TYPE_TUPLE:    d0=extra_start, d1=elem_count, d2=0
 // NodeKind.NK_TYPE_OPTIONAL: d0=inner(node), d1=0, d2=0
 // NodeKind.NK_TYPE_ARRAY:    d0=element(node), d1=size_low, d2=size_high

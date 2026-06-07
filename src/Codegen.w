@@ -2038,6 +2038,9 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         fat_types.push(ptr_ty)
         return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
 
+    if kind == NodeKind.NK_TYPE_EXTERN_FN:
+        return wl_ptr_type(self.context)
+
     if kind == NodeKind.NK_TYPE_ARRAY:
         let elem_node = self.pool.get_data0(type_node)
         let size_lo = self.pool.get_data1(type_node)
@@ -2487,6 +2490,8 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         fat_types.push(ptr_ty)
         fat_types.push(ptr_ty)
         return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+    if tk == TypeKind.TY_EXTERN_FN:
+        return wl_ptr_type(self.context)
     if tk == TypeKind.TY_SLICE:
         let slice_fields: Vec[i64] = Vec.new()
         slice_fields.push(wl_ptr_type(self.context))
@@ -3411,6 +3416,10 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             fat.push(ptr_ty)
             fat.push(ptr_ty)
             param_types.push(wl_struct_type(self.context, vec_data_i64(&fat), 2, 0))
+            pi = pi + 1
+            continue
+        if p_kind == NodeKind.NK_TYPE_EXTERN_FN:
+            param_types.push(wl_ptr_type(self.context))
             pi = pi + 1
             continue
 
