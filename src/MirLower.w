@@ -8820,20 +8820,20 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
 
     builder.body
 
-fn MirBody.optimize_self_tail_calls(self: &mut MirBody):
+fn MirBody.optimize_self_tail_calls(mut self: MirBody):
     let fn_sym = self.fn_sym
     if fn_sym == 0 or self.n_params == 0:
         return
     let bb_count = self.block_count()
     var bb = 0
     while bb < bb_count:
-        if self.term_kind(bb) != TermKind.TK_CALL:
+        if bb < 0 or bb >= self.bb_term_kinds.len() as i32 or self.bb_term_kinds.get(bb as i64) != TermKind.TK_CALL:
             bb = bb + 1
             continue
-        let callee_op_id = self.term_data0(bb)
-        let args_id = self.term_data1(bb)
-        let result_place = self.term_data2(bb)
-        let next_bb = self.term_data3(bb)
+        let callee_op_id = if bb >= 0 and bb < self.bb_term_d0.len() as i32: self.bb_term_d0.get(bb as i64) else: 0
+        let args_id = if bb >= 0 and bb < self.bb_term_d1.len() as i32: self.bb_term_d1.get(bb as i64) else: 0
+        let result_place = if bb >= 0 and bb < self.bb_term_d2.len() as i32: self.bb_term_d2.get(bb as i64) else: 0
+        let next_bb = if bb >= 0 and bb < self.bb_term_d3.len() as i32: self.bb_term_d3.get(bb as i64) else: 0
         // Check: callee is this function
         if callee_op_id < 0 or callee_op_id >= self.operand_kinds.len() as i32:
             bb = bb + 1
@@ -8861,7 +8861,7 @@ fn MirBody.optimize_self_tail_calls(self: &mut MirBody):
         if next_bb < 0 or next_bb >= bb_count:
             bb = bb + 1
             continue
-        if self.term_kind(next_bb) != TermKind.TK_RETURN:
+        if next_bb < 0 or next_bb >= self.bb_term_kinds.len() as i32 or self.bb_term_kinds.get(next_bb as i64) != TermKind.TK_RETURN:
             bb = bb + 1
             continue
         if self.bb_stmt_counts.get(next_bb as i64) != 0:
