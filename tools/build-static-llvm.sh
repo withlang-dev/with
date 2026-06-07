@@ -109,6 +109,18 @@ if [ ! -f "$libclang" ]; then
   exit 1
 fi
 
+clang_tool="$INSTALL_PREFIX/bin/clang"
+if [ ! -x "$clang_tool" ]; then
+  echo "error: missing clang driver in static SDK: $clang_tool" >&2
+  exit 1
+fi
+
+clangxx_tool="$INSTALL_PREFIX/bin/clang++"
+if [ ! -x "$clangxx_tool" ]; then
+  echo "error: missing clang++ driver in static SDK: $clangxx_tool" >&2
+  exit 1
+fi
+
 nm_tool="$INSTALL_PREFIX/bin/llvm-nm"
 if [ ! -x "$nm_tool" ]; then
   echo "error: missing llvm-nm in static SDK: $nm_tool" >&2

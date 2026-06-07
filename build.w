@@ -28,7 +28,7 @@ fn with_object_target(name: str, compiler: str, source: str, output: str, opt: s
     target = target.arg("--emit-obj")
     target = target.arg("--no-prelude")
     target = target.arg(opt)
-    target = target.extra_output("out/command/" ++ name)
+    target = target.write_scope("out/command/" ++ name)
     target = target.write_scope(build_project_dirname(output))
     if dep.len() > 0:
         target = target.dep(dep)
@@ -104,6 +104,21 @@ fn target_with_compiler_c_export_audit_inputs(target: Target, ctx: BuildCtx) -> 
                 out = out.input(path)
     out
 
+fn target_with_compiler_source_inputs(target: Target, ctx: BuildCtx) -> Target:
+    var out = target
+    let roots: Vec[str] = Vec.new()
+    roots.push("src")
+    roots.push("rt")
+    roots.push("build")
+    roots.push("lib/std")
+    for ri in 0..roots.len() as i32:
+        let files = ctx.fs().list_files(roots.get(ri as i64))
+        for fi in 0..files.len() as i32:
+            let path = files.get(fi as i64)
+            if path.ends_with(".w"):
+                out = out.input(path)
+    out.input("build.w")
+
 fn build_project_trim_line(text: str) -> str:
     var end = 0
     while end < text.len() as i32:
@@ -169,6 +184,18 @@ fn host_exe_suffix() -> str:
 
 fn host_bin(path: str) -> str:
     path ++ host_exe_suffix()
+
+fn bootstrap_compiler_bin(name: str) -> str:
+    host_bin("out/bootstrap/bin/" ++ name)
+
+fn stage_compiler_bin(name: str) -> str:
+    host_bin("out/stage/bin/" ++ name)
+
+fn stage_compiler_obj(name: str) -> str:
+    "out/stage/bin/" ++ name
+
+fn release_compiler_bin(name: str) -> str:
+    host_bin("out/release/bin/" ++ name)
 
 fn host_runtime_spec() -> HostRuntimeSpec:
     if os() == "Linux" and arch() == "x86_64":
@@ -372,6 +399,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_sources = target_with_version_inputs(compiler_sources, ctx)
     out = out.add_target(compiler_sources)
 
+    var bootstrap_c_emit_sources = target_new(.Action, "bootstrap-c-emit-sources", "").output("out/bootstrap-c/src/with_compiler.c")
+    bootstrap_c_emit_sources.action = run_bootstrap_c_emit_sources_action
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/gen/wl_decls.h")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/gen/wl_stubs.c")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/bootstrap-c/src")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/gen")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/command/bootstrap-c-emit-sources")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.dep("compiler-sources")
+    out = out.add_target(bootstrap_c_emit_sources)
+
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
     compat_runtime = compat_runtime.input(host_runtime.compat_source)
@@ -388,6 +425,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     var compiler_no_c_export = target_new(.Action, "compiler-no-c-export", "").output("out/.build-state/compiler-no-c-export.txt")
     compiler_no_c_export.action = run_check_compiler_no_new_c_export_action
     compiler_no_c_export = compiler_no_c_export.write_scope("out/.build-state")
+    compiler_no_c_export = compiler_no_c_export.write_scope("out/command/compiler-no-c-export")
+    compiler_no_c_export = compiler_no_c_export.input("scripts/check-no-c-export.py")
     compiler_no_c_export = target_with_compiler_c_export_audit_inputs(compiler_no_c_export, ctx)
     out = out.add_target(compiler_no_c_export)
 
@@ -487,8 +526,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.dep("bootstrap-runtime")
     out = out.add_target(prepare_bootstrap_link_root)
 
-    out = out.add_target(with_object_target("llvm-bridge-object", host_bin("out/bin/with-stage2"), "src/compiler/LlvmBridge.w", "out/lib/llvm_bridge.o", "-O0", "stage2"))
-    out = out.add_target(with_object_target("clang-bridge-object", host_bin("out/bin/with-stage2"), "src/compiler/ClangBridge.w", "out/lib/clang_bridge.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("llvm-bridge-object", stage_compiler_bin("with-stage2"), "src/compiler/LlvmBridge.w", "out/lib/llvm_bridge.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("clang-bridge-object", stage_compiler_bin("with-stage2"), "src/compiler/ClangBridge.w", "out/lib/clang_bridge.o", "-O0", "stage2"))
 
     var llvm_link_metadata = target_new(.Action, "llvm-link-metadata", "").output("out/lib/.llvm-link-ready")
     llvm_link_metadata.action = run_generate_llvm_link_metadata_action
@@ -502,14 +541,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     llvm_link_metadata = llvm_link_metadata.dep("clang-bridge-object")
     out = out.add_target(llvm_link_metadata)
 
-    var stage1 = target_new(.Action, "stage1", "").output(host_bin("out/bin/with-stage1"))
+    var stage1 = target_new(.Action, "stage1", "").output(bootstrap_compiler_bin("with-stage1"))
     stage1.action = run_with_compiler_build_action
     stage1 = stage1.compiler("seed")
     stage1 = stage1.input("out/gen/main.w")
+    stage1 = target_with_compiler_source_inputs(stage1, ctx)
     stage1 = stage1.arg("-O0")
     stage1 = stage1.extra_output("out/command/stage1")
     stage1 = stage1.extra_output("out/.build-state/seed-input.json")
-    stage1 = stage1.write_scope("out/bin")
+    stage1 = stage1.write_scope("out/bootstrap/bin")
     stage1 = stage1.write_scope("out/.build-state")
     stage1 = stage1.dep("compiler-sources")
     stage1 = stage1.dep("compat-runtime-source")
@@ -518,65 +558,69 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.dep("prepare-bootstrap-link-root")
     out = out.add_target(stage1)
 
-    var stage2 = target_new(.Action, "stage2", "").output(host_bin("out/bin/with-stage2"))
+    var stage2 = target_new(.Action, "stage2", "").output(stage_compiler_bin("with-stage2"))
     stage2.action = run_with_compiler_build_action
-    stage2 = stage2.compiler(host_bin("out/bin/with-stage1"))
+    stage2 = stage2.compiler(bootstrap_compiler_bin("with-stage1"))
     stage2 = stage2.input("out/gen/main.w")
+    stage2 = target_with_compiler_source_inputs(stage2, ctx)
     stage2 = stage2.arg("-O0")
     stage2 = stage2.extra_output("out/command/stage2")
-    stage2 = stage2.write_scope("out/bin")
+    stage2 = stage2.write_scope("out/stage/bin")
     stage2 = stage2.dep("stage1")
     stage2 = stage2.dep("compat-runtime-source")
     stage2 = stage2.dep("embedded-clang-resource-source")
     out = out.add_target(stage2)
 
-    var stage3 = target_new(.Action, "stage3", "").output(host_bin("out/bin/with-stage3"))
+    var stage3 = target_new(.Action, "stage3", "").output(stage_compiler_bin("with-stage3"))
     stage3.action = run_with_compiler_build_action
-    stage3 = stage3.compiler(host_bin("out/bin/with-stage2"))
+    stage3 = stage3.compiler(stage_compiler_bin("with-stage2"))
     stage3 = stage3.input("out/gen/main.w")
+    stage3 = target_with_compiler_source_inputs(stage3, ctx)
     stage3 = stage3.arg("-O0")
     stage3 = stage3.extra_output("out/command/stage3")
-    stage3 = stage3.write_scope("out/bin")
+    stage3 = stage3.write_scope("out/stage/bin")
     stage3 = stage3.dep("stage2")
     stage3 = stage3.dep("compat-runtime-source")
     stage3 = stage3.dep("embedded-clang-resource-source")
     out = out.add_target(stage3)
 
-    var stage2_fixpoint = target_new(.Action, "stage2-fixpoint-object", "").output("out/bin/with-stage2-fixpoint.o")
+    var stage2_fixpoint = target_new(.Action, "stage2-fixpoint-object", "").output(stage_compiler_obj("with-stage2-fixpoint.o"))
     stage2_fixpoint.action = run_with_compiler_build_action
-    stage2_fixpoint = stage2_fixpoint.compiler(host_bin("out/bin/with-stage1"))
+    stage2_fixpoint = stage2_fixpoint.compiler(bootstrap_compiler_bin("with-stage1"))
     stage2_fixpoint = stage2_fixpoint.input("out/gen/main.w")
+    stage2_fixpoint = target_with_compiler_source_inputs(stage2_fixpoint, ctx)
     stage2_fixpoint = stage2_fixpoint.arg("--emit-obj")
     stage2_fixpoint = stage2_fixpoint.arg("-O0")
     stage2_fixpoint = stage2_fixpoint.extra_output("out/command/stage2-fixpoint-object")
-    stage2_fixpoint = stage2_fixpoint.write_scope("out/bin")
+    stage2_fixpoint = stage2_fixpoint.write_scope("out/stage/bin")
     stage2_fixpoint = stage2_fixpoint.dep("stage1")
     stage2_fixpoint = stage2_fixpoint.dep("compat-runtime-source")
     stage2_fixpoint = stage2_fixpoint.dep("embedded-clang-resource-source")
     out = out.add_target(stage2_fixpoint)
 
-    var stage3_fixpoint = target_new(.Action, "stage3-fixpoint-object", "").output("out/bin/with-stage3-fixpoint.o")
+    var stage3_fixpoint = target_new(.Action, "stage3-fixpoint-object", "").output(stage_compiler_obj("with-stage3-fixpoint.o"))
     stage3_fixpoint.action = run_with_compiler_build_action
-    stage3_fixpoint = stage3_fixpoint.compiler(host_bin("out/bin/with-stage2"))
+    stage3_fixpoint = stage3_fixpoint.compiler(stage_compiler_bin("with-stage2"))
     stage3_fixpoint = stage3_fixpoint.input("out/gen/main.w")
+    stage3_fixpoint = target_with_compiler_source_inputs(stage3_fixpoint, ctx)
     stage3_fixpoint = stage3_fixpoint.arg("--emit-obj")
     stage3_fixpoint = stage3_fixpoint.arg("-O0")
     stage3_fixpoint = stage3_fixpoint.extra_output("out/command/stage3-fixpoint-object")
-    stage3_fixpoint = stage3_fixpoint.write_scope("out/bin")
+    stage3_fixpoint = stage3_fixpoint.write_scope("out/stage/bin")
     stage3_fixpoint = stage3_fixpoint.dep("stage2")
     stage3_fixpoint = stage3_fixpoint.dep("compat-runtime-source")
     stage3_fixpoint = stage3_fixpoint.dep("embedded-clang-resource-source")
     out = out.add_target(stage3_fixpoint)
 
-    var selfcheck = target_new(.RunCorpusTest, "selfcheck", host_bin("out/bin/with-stage2"))
+    var selfcheck = target_new(.RunCorpusTest, "selfcheck", stage_compiler_bin("with-stage2"))
     selfcheck = selfcheck.output("out/corpus/selfcheck")
     selfcheck = selfcheck.arg("check")
     selfcheck = selfcheck.arg("src/main.w")
     selfcheck = selfcheck.dep("stage2")
     out = out.add_target(selfcheck)
 
-    var fixpoint_compare = target_new(.FixpointCompare, "fixpoint-compare", "out/bin/with-stage2-fixpoint.o")
-    fixpoint_compare = fixpoint_compare.arg("out/bin/with-stage3-fixpoint.o")
+    var fixpoint_compare = target_new(.FixpointCompare, "fixpoint-compare", stage_compiler_obj("with-stage2-fixpoint.o"))
+    fixpoint_compare = fixpoint_compare.arg(stage_compiler_obj("with-stage3-fixpoint.o"))
     fixpoint_compare = fixpoint_compare.dep("stage2-fixpoint-object")
     fixpoint_compare = fixpoint_compare.dep("stage3-fixpoint-object")
     out = out.add_target(fixpoint_compare)
@@ -597,24 +641,24 @@ pub fn build(ctx: BuildCtx) -> Build:
     verified = verified.dep("fixpoint")
     out = out.add_target(verified)
 
-    out = out.add_target(with_object_target("rt-core-object", host_bin("out/bin/with-stage2"), "rt/rt_core.w", "out/lib/rt_core.o", "-O2", "stage2"))
-    out = out.add_target(with_object_target("rt-platform-object", host_bin("out/bin/with-stage2"), host_runtime.platform_source, host_runtime.platform_object, "-O2", "stage2"))
+    out = out.add_target(with_object_target("rt-core-object", stage_compiler_bin("with-stage2"), "rt/rt_core.w", "out/lib/rt_core.o", "-O2", "stage2"))
+    out = out.add_target(with_object_target("rt-platform-object", stage_compiler_bin("with-stage2"), host_runtime.platform_source, host_runtime.platform_object, "-O2", "stage2"))
     out = out.add_target(empty_file_target("empty-opposite-runtime-blob", host_runtime.opposite_platform_blob))
     out = out.add_target(empty_file_target("empty-second-opposite-runtime-blob", host_runtime.second_opposite_platform_blob))
-    out = out.add_target(with_object_target("cimport-stubs-object", host_bin("out/bin/with-stage2"), "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O0", "stage2"))
-    var compat_runtime_obj = with_object_target("compat-runtime-object", host_bin("out/bin/with-stage2"), "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O0", "stage2")
+    out = out.add_target(with_object_target("cimport-stubs-object", stage_compiler_bin("with-stage2"), "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O0", "stage2"))
+    var compat_runtime_obj = with_object_target("compat-runtime-object", stage_compiler_bin("with-stage2"), "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O0", "stage2")
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
     out = out.add_target(compat_runtime_obj)
-    out = out.add_target(with_object_target("panic-runtime-object", host_bin("out/bin/with-stage2"), "rt/panic_runtime.w", "out/lib/panic_runtime.o", "-O0", "stage2"))
-    out = out.add_target(with_ir_target("regex-runtime-ir", host_bin("out/bin/with-stage2"), "rt/regex_runtime.w", "out/tmp/regex_runtime.ll", "stage2"))
+    out = out.add_target(with_object_target("panic-runtime-object", stage_compiler_bin("with-stage2"), "rt/panic_runtime.w", "out/lib/panic_runtime.o", "-O0", "stage2"))
+    out = out.add_target(with_ir_target("regex-runtime-ir", stage_compiler_bin("with-stage2"), "rt/regex_runtime.w", "out/tmp/regex_runtime.ll", "stage2"))
 
     var regex_runtime = target_new(.CompileLlvmIrObject, "regex-runtime-object", "out/tmp/regex_runtime.ll").output("out/lib/regex_runtime.o")
     out = out.add_target(regex_runtime)
 
-    out = out.add_target(with_object_target("fiber-stubs-object", host_bin("out/bin/with-stage2"), "rt/fiber_stubs.w", "out/lib/fiber_stubs.o", "-O0", "stage2"))
-    out = out.add_target(with_object_target("channel-runtime-object", host_bin("out/bin/with-stage2"), "rt/channel_runtime.w", "out/lib/channel_runtime.o", "-O0", "stage2"))
-    out = out.add_target(with_object_target("fiber-runtime-object", host_bin("out/bin/with-stage2"), "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O0", "stage2"))
-    out = out.add_target(with_object_target("fiber-core-object", host_bin("out/bin/with-stage2"), host_runtime.fiber_core_source, "out/lib/fiber.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("fiber-stubs-object", stage_compiler_bin("with-stage2"), "rt/fiber_stubs.w", "out/lib/fiber_stubs.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("channel-runtime-object", stage_compiler_bin("with-stage2"), "rt/channel_runtime.w", "out/lib/channel_runtime.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("fiber-runtime-object", stage_compiler_bin("with-stage2"), "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("fiber-core-object", stage_compiler_bin("with-stage2"), host_runtime.fiber_core_source, "out/lib/fiber.o", "-O0", "stage2"))
 
     var fiber_asm = target_new(.CompileAsmObject, "fiber-asm-object", host_runtime.fiber_asm_source).output("out/lib/fiber_asm.o")
     out = out.add_target(fiber_asm)
@@ -657,20 +701,21 @@ pub fn build(ctx: BuildCtx) -> Build:
     runtime = runtime.dep("empty-second-opposite-runtime-blob")
     out = out.add_target(runtime)
 
-    var compiler = target_new(.Action, "build", "").output(host_bin("out/bin/with"))
+    var compiler = target_new(.Action, "build", "").output(release_compiler_bin("with"))
     compiler.action = run_with_compiler_build_action
-    compiler = compiler.compiler(host_bin("out/bin/with-stage2"))
+    compiler = compiler.compiler(stage_compiler_bin("with-stage2"))
     compiler = compiler.input("out/gen/main.w")
+    compiler = target_with_compiler_source_inputs(compiler, ctx)
     compiler = compiler.arg("-O0")
     compiler = compiler.extra_output("out/command/build")
-    compiler = compiler.write_scope("out/bin")
+    compiler = compiler.write_scope("out/release/bin")
     compiler = compiler.dep("llvm-link-metadata")
     compiler = compiler.dep("embedded-objects-object")
     out = out.add_target(compiler)
 
     var emit_c_test = target_new(.Action, "emit-c-test", "").output("out/gen/.emit-c-test-stamp")
     emit_c_test.action = run_emit_c_test_action
-    emit_c_test = emit_c_test.input(host_bin("out/bin/with"))
+    emit_c_test = emit_c_test.input(release_compiler_bin("with"))
     emit_c_test = emit_c_test.extra_output("out/emit-c-test")
     emit_c_test = emit_c_test.extra_output("out/gen/wl_decls.h")
     emit_c_test = emit_c_test.extra_output("out/gen/wl_stubs.c")
@@ -681,7 +726,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var emit_c_fixpoint = target_new(.Action, "emit-c-fixpoint", "").output("out/gen/.emit-c-fixpoint-stamp")
     emit_c_fixpoint.action = run_emit_c_fixpoint_action
     emit_c_fixpoint = emit_c_fixpoint.input("out/emit-c-test/main.c")
-    emit_c_fixpoint = emit_c_fixpoint.input("out/emit-c-test/with-from-c")
+    emit_c_fixpoint = emit_c_fixpoint.input(host_bin("out/emit-c-test/with-from-c"))
     emit_c_fixpoint = emit_c_fixpoint.extra_output("out/emit-c-test/main2.c")
     emit_c_fixpoint = emit_c_fixpoint.extra_output("out/command/emit-c-fixpoint")
     emit_c_fixpoint = emit_c_fixpoint.dep("emit-c-test")
@@ -689,7 +734,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var emit_c_roundtrip = target_new(.Action, "emit-c-roundtrip", "").output("out/gen/.emit-c-roundtrip-stamp")
     emit_c_roundtrip.action = run_emit_c_roundtrip_action
-    emit_c_roundtrip = emit_c_roundtrip.input(host_bin("out/bin/with"))
+    emit_c_roundtrip = emit_c_roundtrip.input(release_compiler_bin("with"))
     emit_c_roundtrip = emit_c_roundtrip.extra_output("out/emit-c-roundtrip")
     emit_c_roundtrip = emit_c_roundtrip.extra_output("out/gen/wl_decls.h")
     emit_c_roundtrip = emit_c_roundtrip.extra_output("out/gen/wl_stubs.c")
@@ -698,94 +743,94 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(emit_c_roundtrip)
 
     var behavior_tests = target_new(.Test, "behavior-tests", "test/behavior/*.w")
-    behavior_tests = behavior_tests.arg("compiler=" ++ host_bin("out/bin/with"))
+    behavior_tests = behavior_tests.arg("compiler=" ++ release_compiler_bin("with"))
     behavior_tests = behavior_tests.dep("build")
     out = out.add_target(behavior_tests)
 
     var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
-    native_compile_error_tests = native_compile_error_tests.arg("compiler=" ++ host_bin("out/bin/with"))
+    native_compile_error_tests = native_compile_error_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_compile_error_tests = native_compile_error_tests.dep("build")
     native_compile_error_tests = native_compile_error_tests.dep("selfcheck")
     out = out.add_target(native_compile_error_tests)
 
     var native_codegen_tests = target_new(.Test, "native-codegen-tests", "test/codegen/*.w")
-    native_codegen_tests = native_codegen_tests.arg("compiler=" ++ host_bin("out/bin/with"))
+    native_codegen_tests = native_codegen_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_codegen_tests = native_codegen_tests.dep("build")
     native_codegen_tests = native_codegen_tests.dep("selfcheck")
     out = out.add_target(native_codegen_tests)
 
     var native_spec_tests = target_new(.Test, "native-spec-tests", "test/spec/*.w")
-    native_spec_tests = native_spec_tests.arg("compiler=" ++ host_bin("out/bin/with"))
+    native_spec_tests = native_spec_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_spec_tests = native_spec_tests.dep("build")
     native_spec_tests = native_spec_tests.dep("selfcheck")
     out = out.add_target(native_spec_tests)
 
     var native_phase_tests = target_new(.Test, "native-phase-tests", "test/phase/*.w")
-    native_phase_tests = native_phase_tests.arg("compiler=" ++ host_bin("out/bin/with"))
+    native_phase_tests = native_phase_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_phase_tests = native_phase_tests.dep("build")
     native_phase_tests = native_phase_tests.dep("selfcheck")
     out = out.add_target(native_phase_tests)
 
     var cli_selfhost_smoke_tests = target_new(.Action, "cli-selfhost-smoke-tests", "").output("out/test-graph/cli-selfhost-smoke-tests")
     cli_selfhost_smoke_tests.action = run_cli_selfhost_smoke_action
-    cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input(host_bin("out/bin/with"))
+    cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input(release_compiler_bin("with"))
     cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.dep("build")
     out = out.add_target(cli_selfhost_smoke_tests)
 
     var cli_selfhost_one_liner_tests = target_new(.Action, "cli-selfhost-one-liner-tests", "").output("out/test-graph/cli-selfhost-one-liner-tests")
     cli_selfhost_one_liner_tests.action = run_cli_selfhost_one_liner_action
-    cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.input(host_bin("out/bin/with"))
+    cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.input(release_compiler_bin("with"))
     cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.dep("build")
     out = out.add_target(cli_selfhost_one_liner_tests)
 
     var cli_selfhost_object_symbol_tests = target_new(.Action, "cli-selfhost-object-symbol-tests", "").output("out/test-graph/cli-selfhost-object-symbol-tests")
     cli_selfhost_object_symbol_tests.action = run_cli_selfhost_object_symbol_action
     cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.arg("nm")
-    cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.input(host_bin("out/bin/with"))
+    cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.input(release_compiler_bin("with"))
     cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.dep("build")
     out = out.add_target(cli_selfhost_object_symbol_tests)
 
     var cli_selfhost_build_w_tests = target_new(.Action, "cli-selfhost-build-w-tests", "").output("out/test-graph/cli-selfhost-build-w-tests")
     cli_selfhost_build_w_tests.action = run_cli_selfhost_build_w_action
-    cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.input(host_bin("out/bin/with"))
+    cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.input(release_compiler_bin("with"))
     cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.dep("build")
     out = out.add_target(cli_selfhost_build_w_tests)
 
     var cli_selfhost_project_tests = target_new(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
     cli_selfhost_project_tests.action = run_cli_selfhost_project_action
-    cli_selfhost_project_tests = cli_selfhost_project_tests.input(host_bin("out/bin/with"))
+    cli_selfhost_project_tests = cli_selfhost_project_tests.input(release_compiler_bin("with"))
     cli_selfhost_project_tests = cli_selfhost_project_tests.allow_network()
     cli_selfhost_project_tests = cli_selfhost_project_tests.dep("build")
     out = out.add_target(cli_selfhost_project_tests)
 
     var cli_selfhost_edge_tests = target_new(.Action, "cli-selfhost-edge-tests", "").output("out/test-graph/cli-selfhost-edge-tests")
     cli_selfhost_edge_tests.action = run_cli_selfhost_edge_action
-    cli_selfhost_edge_tests = cli_selfhost_edge_tests.input(host_bin("out/bin/with"))
+    cli_selfhost_edge_tests = cli_selfhost_edge_tests.input(release_compiler_bin("with"))
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("build")
     out = out.add_target(cli_selfhost_edge_tests)
 
     var cli_selfhost_parallel_tests = target_new(.Action, "cli-selfhost-parallel-tests", "").output("out/test-graph/cli-selfhost-parallel-tests")
     cli_selfhost_parallel_tests.action = run_cli_selfhost_parallel_action
-    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.input(host_bin("out/bin/with"))
+    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.input(release_compiler_bin("with"))
     cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.dep("build")
     out = out.add_target(cli_selfhost_parallel_tests)
 
     var c_migrator_pcre2_prep_tests = target_new(.Action, "c-migrator-pcre2-prep-tests", "").output("out/test-graph/c-migrator-pcre2-prep-tests")
     c_migrator_pcre2_prep_tests.action = run_cli_selfhost_pcre2_prep_action
-    c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.input(host_bin("out/bin/with"))
+    c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.input(release_compiler_bin("with"))
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.write_scope("out/pcre2_tmp")
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.dep("build")
     out = out.add_target(c_migrator_pcre2_prep_tests)
 
     var c_migrator_basic_tests = target_new(.Action, "c-migrator-basic-tests", "").output("out/test-graph/c-migrator-basic-tests")
     c_migrator_basic_tests.action = run_cli_selfhost_migrate_basic_action
-    c_migrator_basic_tests = c_migrator_basic_tests.input(host_bin("out/bin/with"))
+    c_migrator_basic_tests = c_migrator_basic_tests.input(release_compiler_bin("with"))
     c_migrator_basic_tests = c_migrator_basic_tests.dep("build")
     out = out.add_target(c_migrator_basic_tests)
 
     var c_migrator_core_tests = target_new(.Action, "c-migrator-core-tests", "").output("out/test-graph/c-migrator-core-tests")
     c_migrator_core_tests.action = run_cli_selfhost_migrate_core_action
-    c_migrator_core_tests = c_migrator_core_tests.input(host_bin("out/bin/with"))
+    c_migrator_core_tests = c_migrator_core_tests.input(release_compiler_bin("with"))
     c_migrator_core_tests = c_migrator_core_tests.dep("build")
     out = out.add_target(c_migrator_core_tests)
 
@@ -796,19 +841,19 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var issue61_regression = target_new(.Action, "issue61-regression", "").output("out/test-graph/issue61-regression")
     issue61_regression.action = issue61_regression_action
-    issue61_regression = issue61_regression.input(host_bin("out/bin/with"))
+    issue61_regression = issue61_regression.input(release_compiler_bin("with"))
     issue61_regression = issue61_regression.dep("build")
     out = out.add_target(issue61_regression)
 
     var embedded_runtime_regression = target_new(.Action, "embedded-runtime-regression", "").output("out/test-graph/embedded-runtime-regression")
     embedded_runtime_regression.action = run_embedded_runtime_regression_action
-    embedded_runtime_regression = embedded_runtime_regression.input(host_bin("out/bin/with"))
+    embedded_runtime_regression = embedded_runtime_regression.input(release_compiler_bin("with"))
     embedded_runtime_regression = embedded_runtime_regression.dep("build")
     out = out.add_target(embedded_runtime_regression)
 
     var emit_c_smoke = target_new(.Action, "emit-c-smoke", "").output("out/test-graph/emit-c-smoke")
     emit_c_smoke.action = run_emit_c_smoke_action
-    emit_c_smoke = emit_c_smoke.input(host_bin("out/bin/with"))
+    emit_c_smoke = emit_c_smoke.input(release_compiler_bin("with"))
     emit_c_smoke = emit_c_smoke.input("test/hello.w")
     emit_c_smoke = emit_c_smoke.dep("build")
     emit_c_smoke = emit_c_smoke.dep("runtime")
@@ -842,9 +887,9 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var last_green = target_new(.Action, "last-green", "").output("out/.build-state/last-green.json")
     last_green.action = run_last_green_action
-    last_green = last_green.input(host_bin("out/bin/with"))
-    last_green = last_green.input("out/bin/with-stage2-fixpoint.o")
-    last_green = last_green.input("out/bin/with-stage3-fixpoint.o")
+    last_green = last_green.input(release_compiler_bin("with"))
+    last_green = last_green.input(stage_compiler_obj("with-stage2-fixpoint.o"))
+    last_green = last_green.input(stage_compiler_obj("with-stage3-fixpoint.o"))
     last_green = last_green.input("out/.build-state/seed-input.json")
     last_green = last_green.input("src/version")
     last_green = last_green.extra_output("out/seed-archive")
@@ -867,14 +912,14 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var install_user = target_new(.Action, "install-user", "").output("out/command/install-user/ok")
     install_user.action = run_install_verified_compiler_action
-    install_user = install_user.arg(host_bin("out/bin/with"))
+    install_user = install_user.arg(release_compiler_bin("with"))
     install_user = install_user.arg("$HOME/.local/bin/with")
     install_user = install_user.arg("0755")
     install_user = install_user.write_scope("out/command/install-user")
     install_user = install_user.dep("require-last-green")
     out = out.add_target(install_user)
 
-    out = out.add_target(install_file_target("install-compiler", host_bin("out/bin/with-stage2"), "$INSTALL_BINDIR/with" ++ host_exe_suffix(), "0755", "stage2"))
+    out = out.add_target(install_file_target("install-compiler", release_compiler_bin("with"), "$INSTALL_BINDIR/with" ++ host_exe_suffix(), "0755", "build"))
     out = out.add_target(install_file_target("install-rt-core", "out/lib/rt_core.o", "$INSTALL_LIBDIR/rt_core.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-rt-platform", host_runtime.platform_object, "$INSTALL_LIBDIR/" ++ host_runtime.platform_install_object, "0644", "runtime"))
     out = out.add_target(install_file_target("install-cimport-stubs", "out/lib/cimport_stubs.o", "$INSTALL_LIBDIR/cimport_stubs.o", "0644", "runtime"))
@@ -938,7 +983,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var update_seed = target_new(.Action, "update-seed", "").output("src/main")
     update_seed.action = run_install_verified_compiler_action
-    update_seed = update_seed.arg(host_bin("out/bin/with"))
+    update_seed = update_seed.arg(release_compiler_bin("with"))
     update_seed = update_seed.arg("src/main")
     update_seed = update_seed.arg("0755")
     update_seed = update_seed.write_scope("src")
@@ -1038,6 +1083,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     prune = prune.arg("live-target=prune-apply")
     prune = target_with_live_targets(prune, out)
     prune = prune.write_scope("out/bin")
+    prune = prune.write_scope("out/bootstrap/bin")
+    prune = prune.write_scope("out/stage/bin")
+    prune = prune.write_scope("out/release/bin")
     prune = prune.write_scope("out/lib")
     prune = prune.write_scope("out/bootstrap-lib")
     prune = prune.write_scope("out/.build-state")
@@ -1054,6 +1102,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     prune_apply = prune_apply.arg("live-target=prune-apply")
     prune_apply = target_with_live_targets(prune_apply, out)
     prune_apply = prune_apply.write_scope("out/bin")
+    prune_apply = prune_apply.write_scope("out/bootstrap/bin")
+    prune_apply = prune_apply.write_scope("out/stage/bin")
+    prune_apply = prune_apply.write_scope("out/release/bin")
     prune_apply = prune_apply.write_scope("out/lib")
     prune_apply = prune_apply.write_scope("out/bootstrap-lib")
     prune_apply = prune_apply.write_scope("out/.build-state")

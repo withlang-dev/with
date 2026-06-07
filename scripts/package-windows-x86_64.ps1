@@ -7,9 +7,9 @@
 # PowerShell"). Run from the x64 Developer PowerShell for VS so that dumpbin.exe
 # is on PATH for the dependency gate.
 #
-# Not yet run end-to-end: the Windows build system / stage chain are still in
-# progress, so no native release with.exe exists at out\bin\with.exe yet. Written
-# against docs/with-bootstrap-runbook.md (Failure Policy, Release Handoff).
+# Written against docs/with-bootstrap-runbook.md (Failure Policy, Release
+# Handoff). The normal native stage chain writes the release compiler under
+# out\release\bin.
 #
 # Windows specifics vs the Unix scripts:
 #   - Dependency gate uses `dumpbin /DEPENDENTS` (the project's documented Windows
@@ -28,7 +28,7 @@ $ErrorActionPreference = "Stop"
 
 $asset = "with-windows-x86_64"
 # Default assumes the normal `with build` release output; override if it differs.
-$compiler = if ($env:WITH_RELEASE_COMPILER) { $env:WITH_RELEASE_COMPILER } else { "out\bin\with.exe" }
+$compiler = if ($env:WITH_RELEASE_COMPILER) { $env:WITH_RELEASE_COMPILER } else { "out\release\bin\with.exe" }
 $releaseDir = if ($env:WITH_RELEASE_DIR) { $env:WITH_RELEASE_DIR } else { "out\release" }
 
 $version = $env:WITH_VERSION

@@ -33,6 +33,8 @@ extern fn with_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path:
 extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
 extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> void
 extern fn with_println_str(s: str) -> void
 extern fn with_println_i32(n: i32) -> void
 extern fn with_println_i64(n: i64) -> void
@@ -166,7 +168,7 @@ type ComptimeWorkspaceCompilePlan {
 type ComptimeWorkspaceNativeCompileResult {
     rc: i32,
     artifact_path: str,
-    comp: Compilation,
+    comp: *mut Compilation,
     is_migrate: i32,
 }
 
@@ -418,33 +420,36 @@ fn comptime_tool_join(root: str, path: str) -> str:
         return root ++ path
     root ++ "/" ++ path
 
+fn comptime_tool_path_push_part(parts: Vec[str], part: str, is_absolute: bool) -> Vec[str]:
+    var out = parts
+    if part == ".":
+        return out
+    if part != "..":
+        out.push(part)
+        return out
+    if out.len() > 0 and out.get(out.len() - 1) != "..":
+        out.pop()
+        return out
+    if not is_absolute:
+        out.push(part)
+    out
+
 fn comptime_tool_path_normalize(path: str) -> str:
     if path.len() == 0:
         return "."
-    let parts: Vec[str] = Vec.new()
+    var parts: Vec[str] = Vec.new()
     var start = 0
-    var is_absolute = path.byte_at(0) == 47
+    var is_absolute = path.byte_at(0) == 47 or path.byte_at(0) == 92
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             if i > start:
                 let part = path.slice(start as i64, i as i64)
-                if part == "..":
-                    if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
-                        parts.pop()
-                    else if not is_absolute:
-                        parts.push(part)
-                else if part != ".":
-                    parts.push(part)
+                parts = comptime_tool_path_push_part(parts, part, is_absolute)
             start = i + 1
     if start < path.len() as i32:
         let part = path.slice(start as i64, path.len() as i64)
-        if part == "..":
-            if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
-                parts.pop()
-            else if not is_absolute:
-                parts.push(part)
-        else if part != ".":
-            parts.push(part)
+        parts = comptime_tool_path_push_part(parts, part, is_absolute)
     if parts.len() == 0:
         if is_absolute:
             return "/"
@@ -486,7 +491,8 @@ fn comptime_glob_split_by_slash(path: str) -> Vec[str]:
     let parts: Vec[str] = Vec.new()
     var start = 0
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             if i > start:
                 parts.push(path.slice(start as i64, i as i64))
             start = i + 1
@@ -2164,12 +2170,14 @@ fn ComptimeEvaluator.capability_require_mkdir_allowed(self: ComptimeEvaluator, r
     true
 
 fn ComptimeEvaluator.capability_project_relative_path(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str) -> str:
+    let normalized = comptime_tool_path_normalize(path)
     if record.project_root.len() == 0 or record.project_root == ".":
-        return path
-    let prefix = if record.project_root.ends_with("/"): record.project_root else: record.project_root ++ "/"
-    if path.starts_with(prefix):
-        return path.slice(prefix.len(), path.len())
-    path
+        return normalized
+    let root = comptime_tool_path_normalize(record.project_root)
+    let prefix = if root.ends_with("/"): root else: root ++ "/"
+    if normalized.starts_with(prefix):
+        return normalized.slice(prefix.len(), normalized.len())
+    normalized
 
 fn ComptimeEvaluator.str_vec_value(self: ComptimeEvaluator, values: Vec[str], node: i32) -> ComptimeValue:
     let vec_type = self.node_type_or(node, 0)
@@ -2887,7 +2895,21 @@ fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
     }
 
 fn comptime_workspace_native_compile_invalid() -> ComptimeWorkspaceNativeCompileResult:
-    ComptimeWorkspaceNativeCompileResult { rc: 1, artifact_path: "", comp: Compilation.init(), is_migrate: 0 }
+    ComptimeWorkspaceNativeCompileResult { rc: 1, artifact_path: "", comp: null as *mut Compilation, is_migrate: 0 }
+
+fn comptime_workspace_native_compile_result(rc: i32, artifact_path: str, comp: Compilation, is_migrate: i32) -> ComptimeWorkspaceNativeCompileResult:
+    if is_migrate != 0:
+        return ComptimeWorkspaceNativeCompileResult { rc, artifact_path, comp: null as *mut Compilation, is_migrate }
+    let comp_ptr = with_alloc(sizeof[Compilation]()) as *mut Compilation
+    if comp_ptr as i64 == 0:
+        return ComptimeWorkspaceNativeCompileResult { rc: 1, artifact_path: "", comp: null as *mut Compilation, is_migrate }
+    unsafe:
+        *comp_ptr = comp
+    ComptimeWorkspaceNativeCompileResult { rc, artifact_path, comp: comp_ptr, is_migrate }
+
+fn comptime_workspace_native_compile_result_free(native: ComptimeWorkspaceNativeCompileResult):
+    if native.comp as i64 != 0:
+        with_free(native.comp as *mut u8)
 
 fn comptime_workspace_output_kind_supported(kind: i32) -> bool:
     kind == 0 or kind == 1 or kind == 2 or kind == 4 or kind == 5
@@ -3062,12 +3084,7 @@ fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -
         return comptime_workspace_native_compile_invalid()
     if plan.is_migrate != 0:
         let rc = comptime_execute_workspace_migrate_plan(plan)
-        return ComptimeWorkspaceNativeCompileResult {
-            rc: rc,
-            artifact_path: if rc == 0: plan.final_output else: "",
-            comp: Compilation.init(),
-            is_migrate: 1,
-        }
+        return comptime_workspace_native_compile_result(rc, if rc == 0: plan.final_output else: "", Compilation.init(), 1)
     var comp = Compilation.init()
     comp.configure(plan.opt_level, plan.no_std, plan.alloc_mode, plan.runtime_available)
     comp.set_debug_info(plan.debug_info)
@@ -3101,12 +3118,7 @@ fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -
                 success = true
         else:
             return comptime_workspace_native_compile_invalid()
-    ComptimeWorkspaceNativeCompileResult {
-        rc: if success: 0 else: 1,
-        artifact_path: artifact_path,
-        comp: comp,
-        is_migrate: 0,
-    }
+    comptime_workspace_native_compile_result(if success: 0 else: 1, artifact_path, comp, 0)
 
 fn comptime_workspace_thread_entry(arg: *mut u8) -> i32:
     let job = arg as *mut ComptimeWorkspaceThreadJob
@@ -3123,12 +3135,15 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
     let result_artifact_path = if plan.output_kind == 5 and plan.is_migrate == 0: "" else: plan.final_output
     let result = self.workspace_build_result_value(plan.name, native.rc, artifact_kind, result_artifact_path, node)
     if result.kind == ComptimeValueKind.CV_INVALID:
+        comptime_workspace_native_compile_result_free(native)
         return comptime_workspace_compile_invalid()
     let messages =
-        if want_messages != 0 and native.rc == 0 and native.is_migrate == 0:
-            self.workspace_success_messages(native.comp, native.comp.zcu.last_sema.ast, node)
+        if want_messages != 0 and native.rc == 0 and native.is_migrate == 0 and native.comp as i64 != 0:
+            unsafe:
+                self.workspace_success_messages(*native.comp, (*native.comp).zcu.last_sema.ast, node)
         else:
             Vec.new()
+    comptime_workspace_native_compile_result_free(native)
     if self.had_error != 0:
         return comptime_workspace_compile_invalid()
     comptime_workspace_compile_result(result, messages)
@@ -5444,19 +5459,23 @@ fn ComptimeEvaluator.eval_parallel_workspaces_call(self: ComptimeEvaluator, arg_
             with_eprint(f"error: parallel workspace '{plan.name}' failed with exit code {native.rc}\n")
         let result = self.workspace_build_result_value(plan.name, native.rc, self.workspace_artifact_kind_for_output(plan.output_kind), plan.final_output, node)
         if result.kind == ComptimeValueKind.CV_INVALID:
+            comptime_workspace_native_compile_result_free(native)
             return comptime_control_error()
         if intercepted.get(i as i64) != 0:
             var record = self.workspace_records.get(workspace_ids.get(i as i64) as i64)
             let messages =
-                if native.rc == 0:
-                    self.workspace_success_messages(native.comp, native.comp.zcu.last_sema.ast, node)
+                if native.rc == 0 and native.comp as i64 != 0:
+                    unsafe:
+                        self.workspace_success_messages(*native.comp, (*native.comp).zcu.last_sema.ast, node)
                 else:
                     Vec.new()
             record.intercept_started = 1
             record = self.enqueue_workspace_compile_result(record, result, messages, node)
             if self.had_error != 0:
+                comptime_workspace_native_compile_result_free(native)
                 return comptime_control_error()
             self.store_workspace_record(workspace_ids.get(i as i64), record)
+        comptime_workspace_native_compile_result_free(native)
         results.push(result)
     let start = self.extra_values.len() as i32
     for i in 0..results.len() as i32:

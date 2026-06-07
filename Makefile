@@ -12,15 +12,16 @@ WITH_BUILD_ENV := WITH_OUT_DIR="$(ROOT_DIR)/out"
 
 OUT ?= out
 OUT_BIN_DIR := $(OUT)/bin
+OUT_RELEASE_BIN_DIR := $(OUT)/release/bin
 OUT_TMP_DIR := $(OUT)/tmp
 OUT_GEN_DIR := $(OUT)/gen
 
-CANONICAL_BIN := $(OUT_BIN_DIR)/with
+CANONICAL_BIN := $(OUT_RELEASE_BIN_DIR)/with
 SEED_PATH := src/main
 SEED_VERSION ?=
 SEED_ASSET ?= auto
 
-# Seed compiler: WITH env var, out/bin/with, `with` on PATH, or src/main.
+# Seed compiler: WITH env var, out/release/bin/with, `with` on PATH, or src/main.
 WITH ?= $(shell \
 	if [ -x "$(CANONICAL_BIN)" ]; then \
 		printf '%s\n' "$(CANONICAL_BIN)"; \
@@ -299,7 +300,7 @@ cross: build
 	fi
 	@echo "=== cross-compile: $(CROSS_TARGET) ==="
 	mkdir -p out/cross/$(CROSS_TARGET)
-	$(WITH_BUILD_ENV) ./out/bin/with build out/gen/main.w --emit-c -o out/cross/$(CROSS_TARGET)/with.c
+	$(WITH_BUILD_ENV) ./out/release/bin/with build out/gen/main.w --emit-c -o out/cross/$(CROSS_TARGET)/with.c
 	@bash "$(ROOT_DIR)/scripts/generate_wl_stubs.sh" runtime/llvm_bridge.c out/cross/$(CROSS_TARGET)/with.c $(OUT_GEN_DIR)
 	cd out/cross/$(CROSS_TARGET) && zig cc \
 		-target $(CROSS_TARGET) \
