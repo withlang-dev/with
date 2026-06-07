@@ -8820,7 +8820,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
 
     builder.body
 
-fn MirBody.optimize_self_tail_calls(mut self: MirBody):
+fn MirBody.optimize_self_tail_calls(self: &mut MirBody):
     let fn_sym = self.fn_sym
     if fn_sym == 0 or self.n_params == 0:
         return
