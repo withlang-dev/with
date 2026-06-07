@@ -67,8 +67,9 @@ the seed (issue #313):
 - **Package** (per platform, after the SDK exists in `.deps`):
   `scripts/package-llvm-sdk.sh` → `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst`.
   It ships only what the build links against — `lib/*.a`, `lib/clang/<v>/include/`,
-  and `bin/lld` (+ driver symlinks) and `bin/llvm-nm` — not `bin/clang` or the
-  LLVM C++ `include/` tree, so the asset is ~65 MB, not ~2 GB.
+  `bin/clang`, `bin/lld` (+ driver symlinks), and `bin/llvm-nm` — not the LLVM
+  C++ `include/` tree, so the asset remains small while still carrying the
+  With-owned Clang driver required by emitted-C bootstrap.
 - **Fetch**: `with build :deps` downloads
   `with-llvm-sdk-<COMPILER_LLVM_VERSION>-<host>.tar.zst` from the matching
   release and extracts it into `.deps/llvm-<ver>-<host>`. `WITH_LLVM_SDK_VERSION`

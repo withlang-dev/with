@@ -279,7 +279,7 @@ static int list_walk(const char *path, char **buf, size_t *len, size_t *cap) {
     do {
         if (strcmp(data.cFileName, ".") == 0 || strcmp(data.cFileName, "..") == 0) continue;
         char child[MAX_PATH * 4];
-        snprintf(child, sizeof(child), "%s\\%s", path, data.cFileName);
+        snprintf(child, sizeof(child), "%s/%s", path, data.cFileName);
         int rc = list_walk(child, buf, len, cap);
         if (rc != 0) { FindClose(h); return rc; }
     } while (FindNextFileA(h, &data));

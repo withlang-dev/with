@@ -123,24 +123,24 @@ fn suspend_gen_rvalue(bits: Vec[i32], body: &MirBody, rval_id: i32):
     if kind == RvalueKind.RK_STR_CONCAT_N:
         suspend_gen_call_args(bits, body, d0)
 
-fn suspend_type_owner_sym(sema: Sema, tid: i32) -> i32:
+fn suspend_type_owner_sym(sema: &Sema, tid: i32) -> i32:
     if tid <= 0:
         return 0
     sema.get_type_name(tid as TypeId)
 
-fn suspend_type_has_semantic_drop(sema: Sema, tid: i32) -> i32:
+fn suspend_type_has_semantic_drop(sema: &Sema, tid: i32) -> i32:
     let owner = suspend_type_owner_sym(sema, tid)
     if owner == 0:
         return 0
     sema.has_drop_method(owner)
 
-fn suspend_drop_is_semantic(sema: Sema, body: &MirBody, place_id: i32) -> i32:
+fn suspend_drop_is_semantic(sema: &Sema, body: &MirBody, place_id: i32) -> i32:
     let local = suspend_place_root_local(body, place_id)
     if local < 0 or local >= body.local_type_ids.len() as i32:
         return 0
     suspend_type_has_semantic_drop(sema, body.local_type_ids.get(local as i64))
 
-fn suspend_transfer_stmt(bits: Vec[i32], sema: Sema, body: &MirBody, stmt_id: i32):
+fn suspend_transfer_stmt(bits: Vec[i32], sema: &Sema, body: &MirBody, stmt_id: i32):
     let kind = body.stmt_kind(stmt_id)
     let d0 = body.stmt_data0(stmt_id)
     let d1 = body.stmt_data1(stmt_id)
@@ -157,7 +157,7 @@ fn suspend_transfer_stmt(bits: Vec[i32], sema: Sema, body: &MirBody, stmt_id: i3
         if suspend_drop_is_semantic(sema, body, d0) != 0:
             suspend_gen_place(bits, body, d0)
 
-fn suspend_transfer_term(bits: Vec[i32], sema: Sema, body: &MirBody, bb: i32):
+fn suspend_transfer_term(bits: Vec[i32], sema: &Sema, body: &MirBody, bb: i32):
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
     let d1 = body.term_data1(bb)
@@ -176,7 +176,7 @@ fn suspend_transfer_term(bits: Vec[i32], sema: Sema, body: &MirBody, bb: i32):
         if suspend_drop_is_semantic(sema, body, d0) != 0:
             suspend_gen_place(bits, body, d0)
 
-fn suspend_compute_live_in_for_block(body: &MirBody, sema: Sema, live_out: Vec[i32], local_count: i32, bb: i32) -> Vec[i32]:
+fn suspend_compute_live_in_for_block(body: &MirBody, sema: &Sema, live_out: Vec[i32], local_count: i32, bb: i32) -> Vec[i32]:
     let bits = suspend_copy_block_bits(live_out, local_count, bb)
     suspend_transfer_term(bits, sema, body, bb)
 
@@ -313,10 +313,10 @@ fn suspend_term_may_suspend(body: &MirBody, body_by_fn: HashMap[i32, i32], body_
         return 0
     body_may_suspend.get(callee_idx as i64)
 
-fn suspend_type_is_no_await_guard(sema: Sema, tid: i32) -> i32:
+fn suspend_type_is_no_await_guard(sema: &Sema, tid: i32) -> i32:
     sema.type_is_no_await_guard(tid)
 
-fn suspend_type_is_ref_like(sema: Sema, tid: i32) -> i32:
+fn suspend_type_is_ref_like(sema: &Sema, tid: i32) -> i32:
     if tid <= 0:
         return 0
     let kind = sema.get_type_kind(sema.resolve_alias(tid as TypeId))
@@ -324,12 +324,12 @@ fn suspend_type_is_ref_like(sema: Sema, tid: i32) -> i32:
         return 1
     0
 
-fn suspend_local_is_ref_like(sema: Sema, body: &MirBody, local: i32) -> i32:
+fn suspend_local_is_ref_like(sema: &Sema, body: &MirBody, local: i32) -> i32:
     if local < 0 or local >= body.local_type_ids.len() as i32:
         return 0
     suspend_type_is_ref_like(sema, body.local_type_ids.get(local as i64))
 
-fn suspend_body_has_guard_local(sema: Sema, body: &MirBody) -> i32:
+fn suspend_body_has_guard_local(sema: &Sema, body: &MirBody) -> i32:
     for li in 0..body.local_count():
         let local_ty = body.local_type_ids.get(li as i64)
         if suspend_type_is_no_await_guard(sema, local_ty) != 0:
@@ -342,7 +342,7 @@ fn suspend_body_has_may_suspend_term(body: &MirBody, body_by_fn: HashMap[i32, i3
             return 1
     0
 
-fn suspend_collect_guard_locals(sema: Sema, body: &MirBody) -> Vec[i32]:
+fn suspend_collect_guard_locals(sema: &Sema, body: &MirBody) -> Vec[i32]:
     let out: Vec[i32] = Vec.new()
     for li in 0..body.local_count():
         let local_ty = body.local_type_ids.get(li as i64)
@@ -462,7 +462,7 @@ fn suspend_prov_origins_from_rvalue(bits: Vec[i32], body: &MirBody, guard_locals
         return suspend_prov_origins_from_operand(bits, body, guard_count, d0)
     origins
 
-fn suspend_sig_for_callee(sema: Sema, body: &MirBody, callee_operand: i32) -> i32:
+fn suspend_sig_for_callee(sema: &Sema, body: &MirBody, callee_operand: i32) -> i32:
     let fn_sym = suspend_callee_sym(body, callee_operand)
     if fn_sym == 0:
         return -1
@@ -474,7 +474,7 @@ fn suspend_sig_for_callee(sema: Sema, body: &MirBody, callee_operand: i32) -> i3
         return sema.get_sig(sema_sym)
     -1
 
-fn suspend_prov_origins_from_call(bits: Vec[i32], sema: Sema, body: &MirBody, guard_locals: Vec[i32], guard_count: i32, callee_operand: i32, call_id: i32) -> Vec[i32]:
+fn suspend_prov_origins_from_call(bits: Vec[i32], sema: &Sema, body: &MirBody, guard_locals: Vec[i32], guard_count: i32, callee_operand: i32, call_id: i32) -> Vec[i32]:
     let origins = suspend_prov_origins_empty(guard_count)
     if call_id < 0 or call_id >= body.call_arg_starts.len() as i32:
         return origins
@@ -507,7 +507,7 @@ fn suspend_prov_origins_from_call(bits: Vec[i32], sema: Sema, body: &MirBody, gu
             origins.set_i32(guard_idx, 1)
     origins
 
-fn suspend_prov_transfer_stmt(bits: Vec[i32], sema: Sema, body: &MirBody, guard_locals: Vec[i32], guard_count: i32, stmt_id: i32):
+fn suspend_prov_transfer_stmt(bits: Vec[i32], sema: &Sema, body: &MirBody, guard_locals: Vec[i32], guard_count: i32, stmt_id: i32):
     let kind = body.stmt_kind(stmt_id)
     let d0 = body.stmt_data0(stmt_id)
     let d1 = body.stmt_data1(stmt_id)
@@ -525,7 +525,7 @@ fn suspend_prov_transfer_stmt(bits: Vec[i32], sema: Sema, body: &MirBody, guard_
     if kind == StmtKind.Drop:
         suspend_prov_clear_local(bits, local_count, guard_count, suspend_direct_place_local(body, d0))
 
-fn suspend_prov_transfer_term(bits: Vec[i32], sema: Sema, body: &MirBody, guard_locals: Vec[i32], guard_count: i32, bb: i32):
+fn suspend_prov_transfer_term(bits: Vec[i32], sema: &Sema, body: &MirBody, guard_locals: Vec[i32], guard_count: i32, bb: i32):
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
     let d1 = body.term_data1(bb)
@@ -544,7 +544,7 @@ fn suspend_prov_transfer_term(bits: Vec[i32], sema: Sema, body: &MirBody, guard_
     if kind == TermKind.TK_DROP_AND_GOTO:
         suspend_prov_clear_local(bits, local_count, guard_count, suspend_direct_place_local(body, d0))
 
-fn suspend_prov_transfer_stmts(bits: Vec[i32], sema: Sema, body: &MirBody, guard_locals: Vec[i32], guard_count: i32, bb: i32):
+fn suspend_prov_transfer_stmts(bits: Vec[i32], sema: &Sema, body: &MirBody, guard_locals: Vec[i32], guard_count: i32, bb: i32):
     let stmt_start = body.bb_stmt_starts.get(bb as i64)
     let stmt_count = body.bb_stmt_counts.get(bb as i64)
     for si in 0..stmt_count:
@@ -599,7 +599,7 @@ fn suspend_prov_add_successors(body: &MirBody, prov_in: Vec[i32], local_count: i
             changed = 1
     changed
 
-fn suspend_compute_prov_in_for_body(sema: Sema, body: &MirBody, guard_locals: Vec[i32]) -> Vec[i32]:
+fn suspend_compute_prov_in_for_body(sema: &Sema, body: &MirBody, guard_locals: Vec[i32]) -> Vec[i32]:
     let local_count = body.local_count()
     let bb_count = body.block_count()
     let guard_count = guard_locals.len() as i32
@@ -618,7 +618,7 @@ fn suspend_compute_prov_in_for_body(sema: Sema, body: &MirBody, guard_locals: Ve
                 changed = 1
     prov_in
 
-fn suspend_prov_before_term_for_block(prov_in: Vec[i32], sema: Sema, body: &MirBody, guard_locals: Vec[i32], local_count: i32, guard_count: i32, bb: i32) -> Vec[i32]:
+fn suspend_prov_before_term_for_block(prov_in: Vec[i32], sema: &Sema, body: &MirBody, guard_locals: Vec[i32], local_count: i32, guard_count: i32, bb: i32) -> Vec[i32]:
     let bits = suspend_prov_copy_block_bits(prov_in, local_count, guard_count, bb)
     suspend_prov_transfer_stmts(bits, sema, body, guard_locals, guard_count, bb)
     bits
@@ -663,7 +663,7 @@ fn suspend_reported_no_suspend_site(reported_starts: &Vec[i32], reported_ends: &
             return true
     false
 
-fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: Sema, body: &MirBody, body_by_fn: HashMap[i32, i32], body_may_suspend: Vec[i32], site: SuspendSiteSpan, bb: i32) -> DiagnosticList:
+fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, body_by_fn: HashMap[i32, i32], body_may_suspend: Vec[i32], site: SuspendSiteSpan, bb: i32) -> DiagnosticList:
     var out = diags
     var diag = Diagnostic.err("E0702: suspension is not allowed inside no_suspend block", Span { file: sema.local_file_id, start: site.start, end: site.end })
     let call_id = body.term_data1(bb)
@@ -684,7 +684,7 @@ fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: Sema, body: &MirBo
     out.emit(diag)
     out
 
-fn suspend_emit_guard_error(diags: DiagnosticList, sema: Sema, body: &MirBody, site: SuspendSiteSpan, guard_local: i32) -> DiagnosticList:
+fn suspend_emit_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, site: SuspendSiteSpan, guard_local: i32) -> DiagnosticList:
     var out = diags
     let guard_ty = if guard_local >= 0 and guard_local < body.local_type_ids.len() as i32: body.local_type_ids.get(guard_local as i64) else: 0
     let guard_name_sym = if guard_local >= 0 and guard_local < body.local_names.len() as i32: body.local_names.get(guard_local as i64) else: 0
@@ -697,7 +697,7 @@ fn suspend_emit_guard_error(diags: DiagnosticList, sema: Sema, body: &MirBody, s
     out.emit(diag)
     out
 
-fn suspend_emit_derived_guard_error(diags: DiagnosticList, sema: Sema, body: &MirBody, site: SuspendSiteSpan, view_local: i32, guard_local: i32) -> DiagnosticList:
+fn suspend_emit_derived_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, site: SuspendSiteSpan, view_local: i32, guard_local: i32) -> DiagnosticList:
     var out = diags
     let guard_ty = if guard_local >= 0 and guard_local < body.local_type_ids.len() as i32: body.local_type_ids.get(guard_local as i64) else: 0
     let guard_name_sym = if guard_local >= 0 and guard_local < body.local_names.len() as i32: body.local_names.get(guard_local as i64) else: 0
@@ -714,7 +714,7 @@ fn suspend_emit_derived_guard_error(diags: DiagnosticList, sema: Sema, body: &Mi
     out.emit(diag)
     out
 
-fn suspend_check_body(ast: AstPool, sema: Sema, body_by_fn: HashMap[i32, i32], body_may_suspend: Vec[i32], body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
+fn suspend_check_body(ast: AstPool, sema: &Sema, body_by_fn: HashMap[i32, i32], body_may_suspend: Vec[i32], body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let local_count = body.local_count()
     let bb_count = body.block_count()
@@ -796,7 +796,7 @@ fn suspend_check_body(ast: AstPool, sema: Sema, body_by_fn: HashMap[i32, i32], b
                 break
     out
 
-fn suspend_check_no_suspend_body(ast: AstPool, sema: Sema, body_by_fn: HashMap[i32, i32], body_may_suspend: Vec[i32], body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
+fn suspend_check_no_suspend_body(ast: AstPool, sema: &Sema, body_by_fn: HashMap[i32, i32], body_may_suspend: Vec[i32], body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let reported_starts: Vec[i32] = Vec.new()
     let reported_ends: Vec[i32] = Vec.new()
@@ -816,7 +816,7 @@ fn suspend_check_no_suspend_body(ast: AstPool, sema: Sema, body_by_fn: HashMap[i
         out = suspend_emit_no_suspend_error(out, sema, body, body_by_fn, body_may_suspend, site, bb)
     out
 
-fn check_no_await_guard_suspends(mir_mod: MirModule, ast: AstPool, sema: Sema, diags: DiagnosticList) -> DiagnosticList:
+fn check_no_await_guard_suspends(mir_mod: MirModule, ast: AstPool, sema: &Sema, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let body_by_fn = suspend_build_body_index(mir_mod)
     let body_may_suspend = suspend_compute_may_suspend(mir_mod, body_by_fn)

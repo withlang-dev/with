@@ -111,6 +111,20 @@ fn br_raw_string_literal(text: str) -> str:
         hashes = hashes ++ "#"
     "r" ++ hashes ++ "\"" ++ text ++ "\"" ++ hashes
 
+fn br_normalize_embedded_source(text: str) -> str:
+    var out = StringBuilder.with_capacity(text.len())
+    var i = 0
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 13:
+            if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
+                i = i + 1
+            out.push_byte(10 as u8)
+        else:
+            out.push_str(text.slice(i as i64, (i + 1) as i64))
+        i = i + 1
+    out.to_str()
+
 fn br_embedded_rel_path(path: str) -> str:
     if path.starts_with("lib/"):
         return path.slice(4, path.len())
@@ -124,7 +138,7 @@ fn br_generate_embedded_stdlib(ctx: ActionCtx, files: Vec[str]) -> str:
     for i in 0..files.len() as i32:
         let path = files.get(i as i64)
         let rel = br_embedded_rel_path(path)
-        let source = fs.read_text(path)
+        let source = br_normalize_embedded_source(fs.read_text(path))
         if source.len() == 0:
             ctx.diagnostics().error("compat-runtime-source: failed to read stdlib source: " ++ path)
             return ""

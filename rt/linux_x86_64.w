@@ -826,7 +826,7 @@ pub fn rt_compat_raise_stack_limit():
     let lim_base = (&raw mut lim) as *mut [16]u8 as i64
     if getrlimit(POSIX_RLIMIT_STACK, lim_base as *mut u8) != 0:
         return
-    var want: u64 = (64 * 1024 * 1024) as u64
+    var want: u64 = (8 * 1024 * 1024) as u64
     let lim_max = posix_load_u64(lim_base, 8)
     if lim_max != POSIX_RLIM_INFINITY and want > lim_max:
         want = lim_max

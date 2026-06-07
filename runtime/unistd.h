@@ -26,5 +26,6 @@ int unlink(const char *path);
 int getpid(void);
 int mkstemp(char *template_path);
 char *realpath(const char *path, char *resolved_path);
+int gethostname(void *name, uint64_t len);
 
 #endif

@@ -141,8 +141,23 @@ type ResolveState {
     emit_resolve_diags: bool,
 }
 
+fn resolve_normalize_source_text(text: str) -> str:
+    var out = StringBuilder.with_capacity(text.len())
+    var i = 0
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 13:
+            if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
+                i = i + 1
+            out.push_byte(10 as u8)
+        else:
+            out.push_byte(ch as u8)
+        i = i + 1
+    out.to_str()
+
 fn resolve_from_root_pool(root_path: str, root_text: str, root_file_id: i32, root_pool: AstPool, pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveArtifacts:
     var state = ResolveState.init(pool, diags, emit_resolve_diags)
+    let normalized_root_text = resolve_normalize_source_text(root_text)
     let root_dir = resolve_dirname(root_path)
     state.root_source_dir = root_dir
     let root_module = state.reserve_module(root_path, root_dir, root_file_id)
@@ -154,11 +169,11 @@ fn resolve_from_root_pool(root_path: str, root_text: str, root_file_id: i32, roo
             continue
 
         if work == root_module:
-            state.process_module_with_pool(work, root_text, root_pool)
+            state.process_module_with_pool(work, normalized_root_text, root_pool)
         else:
             let path = state.module_paths.get(work as i64)
             let embedded_rel = embedded_std_rel_path(path)
-            let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: with_fs_read_file(path)
+            let text = resolve_normalize_source_text(if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: with_fs_read_file(path))
             if text.len() == 0:
                 state.emit_import_error(work, "failed to read imported module")
                 state.module_processed.set_i32(work as i64, 1)

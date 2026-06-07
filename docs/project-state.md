@@ -112,21 +112,24 @@ E0702. #333 is implemented: `with test --help` prints test-specific usage,
 and explicit multi-file or directory test invocations run each listed target
 in order instead of silently ignoring everything after the first file.
 
-Build and release flow now treats `with build` as canonical. `with build
-:test` records `out/.build-state/test-green.json` after the full suite passes.
-`with build :last-green` consumes current fixpoint and test evidence without
-rerunning the test suite, records the seed used for stage1, writes
-`out/.build-state/last-green.json`, and archives verified `out/bin/with` under
-`out/seed-archive/` with a five-seed retention window. `with build
-:update-seed` copies the verified final compiler (`out/bin/with`) to `src/main`,
-and `with build :install-user` installs the same verified final compiler to
-`~/.local/bin/with`. `with build :prune` is a dry-run report for stale build
-artifacts; `with build :prune-apply` removes stale temporary dSYM bundles,
-runtime archive wrappers, stale build state, stale retained test-graph compiler
-copies, stale issue61 regression fixture directories, old seed archives, and
-versioned `out/release/` byproducts beyond the five most recent release
-versions, without touching `.deps/`, current unversioned release binaries,
-`install.sh`, or platform SDK archives.
+Build and release flow now treats `with build` as canonical. Compiler artifacts
+are split by role: bootstrap binaries under `out/bootstrap/bin`, intermediate
+stage binaries under `out/stage/bin`, and the release compiler under
+`out/release/bin`. `with build :test` records
+`out/.build-state/test-green.json` after the full suite passes. `with build
+:last-green` consumes current fixpoint and test evidence without rerunning the
+test suite, records the seed used for stage1, writes
+`out/.build-state/last-green.json`, and archives verified
+`out/release/bin/with` under `out/seed-archive/` with a five-seed retention
+window. `with build :update-seed` copies the verified final compiler
+(`out/release/bin/with`) to `src/main`, and `with build :install-user` installs
+the same verified final compiler to `~/.local/bin/with`. `with build :prune` is
+a dry-run report for stale build artifacts; `with build :prune-apply` removes
+stale temporary dSYM bundles, runtime archive wrappers, stale build state,
+stale retained test-graph compiler copies, stale issue61 regression fixture
+directories, old seed archives, and versioned `out/release/` byproducts beyond
+the five most recent release versions, without touching `.deps/`, current
+unversioned release binaries, `install.sh`, or platform SDK archives.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D

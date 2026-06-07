@@ -17,7 +17,7 @@ if [ "$source_version" != "$version" ]; then
     exit 1
 fi
 
-compiler="${WITH_RELEASE_COMPILER:-out/bin/with}"
+compiler="${WITH_RELEASE_COMPILER:-out/release/bin/with}"
 if [ ! -x "$compiler" ]; then
     echo "error: missing compiler: $compiler" >&2
     exit 1
@@ -416,21 +416,25 @@ Then compile the C files and link with a C++ linker driver because LLVM's
 static libraries contain C++:
 
     LLVM_PREFIX=/path/to/llvm-static-sdk
+    CLANG="\$LLVM_PREFIX/bin/clang"
+    CLANGXX="\$LLVM_PREFIX/bin/clang++"
+    test -x "\$CLANG"
+    test -x "\$CLANGXX"
     mkdir -p obj
 
-    cc -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
+    "\$CLANG" -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
       -include runtime/wl_decls.h -c src/with_compiler.c -o obj/with_compiler.o
 
     for file in src/llvm_bridge.c src/clang_bridge.c src/linux_platform.c; do
-      cc -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
+      "\$CLANG" -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
         -c "\$file" -o "obj/\$(basename "\$file" .c).o"
     done
 
     for file in src/rt_core.c src/panic_runtime.c src/regex_runtime.c src/fiber_stubs.c src/compat_runtime.c; do
-      cc -std=gnu11 -O2 -D_GNU_SOURCE -DWITH_RUNTIME_H -Iruntime -I"\$LLVM_PREFIX/include" \\
+      "\$CLANG" -std=gnu11 -O2 -D_GNU_SOURCE -DWITH_RUNTIME_H -Iruntime -I"\$LLVM_PREFIX/include" \\
         -include runtime/bootstrap_types.h -c "\$file" -o "obj/\$(basename "\$file" .c).o"
     done
-    c++ obj/*.o \\
+    "\$CLANGXX" obj/*.o \\
       -Wl,--start-group "\$LLVM_PREFIX"/lib/libclang*.a "\$LLVM_PREFIX"/lib/libLLVM*.a "\$LLVM_PREFIX"/lib/liblld*.a -Wl,--end-group \\
       -lpthread -ldl -lm -lz -lzstd -lxml2 -lc \\
       -o with-bootstrap
