@@ -20,15 +20,30 @@ fn comp_join(left: str, right: str) -> str:
         return left ++ right
     left ++ "/" ++ right
 
+fn comp_is_absolute_path(path: str) -> bool:
+    if path.len() == 0:
+        return false
+    if path.byte_at(0) == 47 or path.byte_at(0) == 92:
+        return true
+    if os() == "Windows" and path.len() >= 3:
+        let drive = path.byte_at(0)
+        let colon = path.byte_at(1)
+        let slash = path.byte_at(2)
+        if colon == 58 and (slash == 47 or slash == 92):
+            if (drive >= 65 and drive <= 90) or (drive >= 97 and drive <= 122):
+                return true
+    false
+
 fn comp_abs(root: str, path: str) -> str:
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if comp_is_absolute_path(path):
         return path
     comp_join(root, path)
 
 fn comp_dirname(path: str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -39,11 +54,45 @@ fn comp_dirname(path: str) -> str:
 fn comp_path_basename(path: str) -> str:
     var last_slash: i64 = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             last_slash = i as i64
     if last_slash >= 0:
         return path.slice(last_slash + 1, path.len())
     path
+
+fn comp_rsp_path(path: str) -> str:
+    let normalized = comp_replace_all(path, "\\", "/")
+    if comp_index_of(normalized, " ") >= 0:
+        return "\"" ++ normalized ++ "\""
+    normalized
+
+fn comp_windows_sdk_um_lib(name: str) -> str:
+    comp_rsp_path("C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64/" ++ name)
+
+fn comp_windows_sdk_ucrt_lib(name: str) -> str:
+    comp_rsp_path("C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64/" ++ name)
+
+fn comp_windows_msvc_lib(name: str) -> str:
+    comp_rsp_path("C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64/" ++ name)
+
+fn comp_linux_system_lib_arg(fs: ToolFs, name: str) -> str:
+    if name == "z":
+        if fs.host_exists("/usr/lib/x86_64-linux-gnu/libz.so"):
+            return "-lz"
+        if fs.host_exists("/usr/lib/x86_64-linux-gnu/libz.so.1"):
+            return "/usr/lib/x86_64-linux-gnu/libz.so.1"
+    if name == "zstd":
+        if fs.host_exists("/usr/lib/x86_64-linux-gnu/libzstd.so"):
+            return "-lzstd"
+        if fs.host_exists("/usr/lib/x86_64-linux-gnu/libzstd.so.1"):
+            return "/usr/lib/x86_64-linux-gnu/libzstd.so.1"
+    if name == "xml2":
+        if fs.host_exists("/usr/lib/x86_64-linux-gnu/libxml2.so"):
+            return "-lxml2"
+        if fs.host_exists("/usr/lib/x86_64-linux-gnu/libxml2.so.16"):
+            return "/usr/lib/x86_64-linux-gnu/libxml2.so.16"
+    "-l" ++ name
 
 fn comp_trim(text: str) -> str:
     var start = 0
@@ -103,6 +152,20 @@ fn comp_replace_all(text: str, needle: str, replacement: str) -> str:
         out = out ++ text.slice(start as i64, matched_at as i64) ++ replacement
         start = matched_at + needle.len() as i32
     out
+
+fn comp_normalize_line_endings(text: str) -> str:
+    var out = StringBuilder.with_capacity(text.len())
+    var i = 0
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 13:
+            if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
+                i = i + 1
+            out.push_byte(10 as u8)
+        else:
+            out.push_byte(ch as u8)
+        i = i + 1
+    out.to_str()
 
 fn comp_tool_from_env(primary: str, legacy: str, fallback: str) -> str:
     let explicit = env(primary)
@@ -226,9 +289,12 @@ fn comp_resolve_seed_compiler(ctx: ActionCtx) -> str:
     if explicit.len() > 0:
         return explicit
     let fs = ctx.fs()
-    let local_compiler = "out/bin/with" ++ comp_host_exe_suffix()
+    let local_compiler = "out/release/bin/with" ++ comp_host_exe_suffix()
     if fs.exists(local_compiler):
         return local_compiler
+    let legacy_compiler = "out/bin/with" ++ comp_host_exe_suffix()
+    if fs.exists(legacy_compiler):
+        return legacy_compiler
     let path_env = env("PATH")
     if path_env.len() > 0:
         var start = 0
@@ -254,12 +320,14 @@ fn comp_compiler_path(ctx: ActionCtx, compiler: str) -> str:
 fn comp_path_exists(ctx: ActionCtx, path: str) -> bool:
     if path == "with":
         return true
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if comp_is_absolute_path(path):
         return ctx.fs().host_exists(path)
     ctx.fs().exists(path)
 
 fn comp_path_for_process(root: str, path: str) -> str:
     if path == "with":
+        return path
+    if comp_is_absolute_path(path):
         return path
     comp_abs(root, path)
 
@@ -267,6 +335,27 @@ fn comp_run_compiler_capture(ctx: ActionCtx, label: str, argv: Vec[str], stdout_
     let root = ctx.project_info().project_root()
     var process_env = process_env()
     process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
+    let llvm_prefix = env("LLVM_PREFIX")
+    if llvm_prefix.len() > 0:
+        process_env = process_env.set("LLVM_PREFIX", llvm_prefix)
+    let with_llvm_ld = env("WITH_LLVM_LD")
+    if with_llvm_ld.len() > 0:
+        process_env = process_env.set("WITH_LLVM_LD", with_llvm_ld)
+    let llvm_ld = env("LLVM_LD")
+    if llvm_ld.len() > 0:
+        process_env = process_env.set("LLVM_LD", llvm_ld)
+    let with_llvm_cc = env("WITH_LLVM_CC")
+    if with_llvm_cc.len() > 0:
+        process_env = process_env.set("WITH_LLVM_CC", with_llvm_cc)
+    let llvm_cc = env("LLVM_CC")
+    if llvm_cc.len() > 0:
+        process_env = process_env.set("LLVM_CC", llvm_cc)
+    let with_libclang = env("WITH_LIBCLANG")
+    if with_libclang.len() > 0:
+        process_env = process_env.set("WITH_LIBCLANG", with_libclang)
+    let libclang_file = env("LIBCLANG_FILE")
+    if libclang_file.len() > 0:
+        process_env = process_env.set("LIBCLANG_FILE", libclang_file)
     let result = ctx.process_runner().run_capture_with_env(argv, comp_abs(root, stdout_path), comp_abs(root, stderr_path), timeout_ms, process_env)
     if result.rc == 124:
         return comp_fail(ctx, "step '" ++ label ++ "' timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
@@ -274,6 +363,9 @@ fn comp_run_compiler_capture(ctx: ActionCtx, label: str, argv: Vec[str], stdout_
         if result.stderr.len() > 0:
             ctx.diagnostics().error(result.stderr)
         return comp_fail(ctx, "step '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    let fs = ctx.fs()
+    let _stdout = fs.write_text(stdout_path, result.stdout ++ "\n")
+    let _stderr = fs.write_text(stderr_path, result.stderr ++ "\n")
     0
 
 fn comp_compile_args(ctx: ActionCtx, command: str, compiler_path: str, source_path: str) -> Vec[str]:
@@ -318,24 +410,23 @@ fn comp_first_field(text: str) -> str:
 
 fn comp_count_actual_c_export_attrs(text: str) -> i32:
     var count = 0
-    var line_start = 0
-    var i = 0
-    while i <= text.len() as i32:
-        let at_end = i == text.len() as i32
-        if at_end or text.byte_at(i as i64) == 10:
+    var line_start: i64 = 0
+    var i: i64 = 0
+    while i <= text.len():
+        let at_end = i == text.len()
+        if at_end or text.byte_at(i) == 10:
             var p = line_start
             while p < i:
-                let ch = text.byte_at(p as i64)
+                let ch = text.byte_at(p)
                 if ch != 9 and ch != 32:
                     break
                 p = p + 1
-            if p < i and text.byte_at(p as i64) == 64:
-                var q = p
-                while q + 11 <= i:
-                    if text.slice(q as i64, (q + 11) as i64) == "@[c_export(":
-                        count = count + 1
-                        break
-                    q = q + 1
+            if p + 11 <= i and text.byte_at(p) == 64:
+                if text.byte_at(p + 1) == 91 and text.byte_at(p + 2) == 99 and text.byte_at(p + 3) == 95 and
+                    text.byte_at(p + 4) == 101 and text.byte_at(p + 5) == 120 and text.byte_at(p + 6) == 112 and
+                    text.byte_at(p + 7) == 111 and text.byte_at(p + 8) == 114 and text.byte_at(p + 9) == 116 and
+                    text.byte_at(p + 10) == 40:
+                    count = count + 1
             line_start = i + 1
         i = i + 1
     count
@@ -363,17 +454,20 @@ fn comp_check_c_export_path(ctx: ActionCtx, path: str) -> i32:
     0
 
 pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
-    let roots: Vec[str] = Vec.new()
-    roots.push("src")
-    roots.push("rt")
-    roots.push("lib/std")
-    var errors = 0
-    for ri in 0..roots.len() as i32:
-        let files = ctx.fs().list_files(roots.get(ri as i64))
-        for fi in 0..files.len() as i32:
-            errors = errors + comp_check_c_export_path(ctx, files.get(fi as i64))
-    if errors != 0:
-        return 1
+    let root = ctx.project_info().project_root()
+    let capture_dir = comp_join("out/command", ctx.target_name())
+    if ctx.fs().mkdir_all(capture_dir) != 0:
+        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    let argv: Vec[str] = Vec.new()
+    argv.push(if os() == "Windows": "python" else: "python3")
+    argv.push("scripts/check-no-c-export.py")
+    let result = ctx.process_runner().run_capture(argv, comp_abs(root, comp_join(capture_dir, "stdout.txt")), comp_abs(root, comp_join(capture_dir, "stderr.txt")), 60000)
+    if result.rc != 0:
+        if result.stderr.len() > 0:
+            ctx.diagnostics().error(result.stderr)
+        else:
+            ctx.diagnostics().error("compiler-owned source has forbidden @[c_export] attributes")
+        return result.rc
     let output = ctx.output()
     if output.len() > 0:
         let dir = comp_dirname(output)
@@ -413,6 +507,23 @@ fn comp_resolve_command_file(ctx: ActionCtx, capture_dir: str, path: str) -> str
     path
 
 fn comp_sha256_file(ctx: ActionCtx, capture_dir: str, label: str, path: str) -> str:
+    if os() == "Windows":
+        let certutil_args: Vec[str] = Vec.new()
+        certutil_args.push("certutil")
+        certutil_args.push("-hashfile")
+        certutil_args.push(path)
+        certutil_args.push("SHA256")
+        let raw = comp_run_first_line(ctx, capture_dir, label ++ "-certutil", certutil_args, 30000)
+        let certutil_text = ctx.fs().read_text(comp_join(capture_dir, label ++ "-certutil.stdout"))
+        var line_start: i64 = 0
+        for i in 0..certutil_text.len() as i32:
+            if certutil_text.byte_at(i as i64) == 10:
+                let line = comp_trim(certutil_text.slice(line_start, i as i64))
+                if line.len() == 64:
+                    return line
+                line_start = i as i64 + 1
+        if raw.len() == 64:
+            return raw
     let shasum_args: Vec[str] = Vec.new()
     shasum_args.push("shasum")
     shasum_args.push("-a")
@@ -514,7 +625,7 @@ fn comp_write_versioned_source(ctx: ActionCtx, source: str, output: str, version
     if fs.mkdir_all(output_dir) != 0:
         return comp_fail(ctx, "could not create output directory: " ++ output_dir)
     let placeholder = "WITH_VERSION" ++ "_PLACEHOLDER"
-    let replaced = comp_replace_all(text, placeholder, version)
+    let replaced = comp_normalize_line_endings(comp_replace_all(text, placeholder, version))
     if fs.write_text(output, replaced) != 0:
         return comp_fail(ctx, "could not write: " ++ output)
     0
@@ -577,25 +688,25 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         let path = lib_files.get(i as i64)
         let name = comp_path_basename(path)
         if name.ends_with(".a") or name.ends_with(".lib"):
-            if name.starts_with("libclang") and path != libclang:
+            if (name.starts_with("libclang") or (os() == "Windows" and name.starts_with("clang"))) and path != libclang:
                 clang_archives.push(path)
             else:
-                if name.starts_with("libLLVM") or name.starts_with("LLVM"):
+                if (name.starts_with("libLLVM") or name.starts_with("LLVM")) and name != "LLVM-C.lib":
                     llvm_archives.push(path)
     var rsp = ""
     var ld_rsp = ""
-    rsp = rsp ++ libclang ++ "\n"
-    ld_rsp = ld_rsp ++ libclang ++ "\n"
+    rsp = rsp ++ comp_rsp_path(libclang) ++ "\n"
+    ld_rsp = ld_rsp ++ comp_rsp_path(libclang) ++ "\n"
     let sorted_clang_archives = comp_sort_strings(clang_archives)
     for i in 0..sorted_clang_archives.len() as i32:
         let path = sorted_clang_archives.get(i as i64)
-        rsp = rsp ++ path ++ "\n"
-        ld_rsp = ld_rsp ++ path ++ "\n"
+        rsp = rsp ++ comp_rsp_path(path) ++ "\n"
+        ld_rsp = ld_rsp ++ comp_rsp_path(path) ++ "\n"
     let sorted_llvm_archives = comp_sort_strings(llvm_archives)
     for i in 0..sorted_llvm_archives.len() as i32:
         let path = sorted_llvm_archives.get(i as i64)
-        rsp = rsp ++ path ++ "\n"
-        ld_rsp = ld_rsp ++ path ++ "\n"
+        rsp = rsp ++ comp_rsp_path(path) ++ "\n"
+        ld_rsp = ld_rsp ++ comp_rsp_path(path) ++ "\n"
     if os() == "Macos":
         let sdk_path = comp_host_sdk_path(ctx)
         if sdk_path.len() > 0:
@@ -611,9 +722,9 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         rsp = rsp ++ "-lm\n"
         rsp = rsp ++ "-static-libstdc++\n"
         rsp = rsp ++ "-static-libgcc\n"
-        rsp = rsp ++ "-lz\n"
-        rsp = rsp ++ "-lzstd\n"
-        rsp = rsp ++ "-lxml2\n"
+        rsp = rsp ++ comp_linux_system_lib_arg(fs, "z") ++ "\n"
+        rsp = rsp ++ comp_linux_system_lib_arg(fs, "zstd") ++ "\n"
+        rsp = rsp ++ comp_linux_system_lib_arg(fs, "xml2") ++ "\n"
         ld_rsp = ld_rsp ++ "-Bstatic\n"
         ld_rsp = ld_rsp ++ "-lstdc++\n"
         ld_rsp = ld_rsp ++ "-lgcc\n"
@@ -622,40 +733,42 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ld_rsp = ld_rsp ++ "-lpthread\n"
         ld_rsp = ld_rsp ++ "-ldl\n"
         ld_rsp = ld_rsp ++ "-lm\n"
-        ld_rsp = ld_rsp ++ "-lz\n"
-        ld_rsp = ld_rsp ++ "-lzstd\n"
-        ld_rsp = ld_rsp ++ "-lxml2\n"
+        ld_rsp = ld_rsp ++ comp_linux_system_lib_arg(fs, "z") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_linux_system_lib_arg(fs, "zstd") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_linux_system_lib_arg(fs, "xml2") ++ "\n"
     else if os() == "Windows":
-        rsp = rsp ++ "libcpmt.lib\n"
-        rsp = rsp ++ "libcmt.lib\n"
-        rsp = rsp ++ "oldnames.lib\n"
-        rsp = rsp ++ "kernel32.lib\n"
-        rsp = rsp ++ "advapi32.lib\n"
-        rsp = rsp ++ "bcrypt.lib\n"
-        rsp = rsp ++ "shell32.lib\n"
-        rsp = rsp ++ "user32.lib\n"
-        rsp = rsp ++ "ole32.lib\n"
-        rsp = rsp ++ "oleaut32.lib\n"
-        rsp = rsp ++ "uuid.lib\n"
-        rsp = rsp ++ "ws2_32.lib\n"
-        rsp = rsp ++ "version.lib\n"
-        rsp = rsp ++ "psapi.lib\n"
-        rsp = rsp ++ "dbghelp.lib\n"
-        ld_rsp = ld_rsp ++ "libcpmt.lib\n"
-        ld_rsp = ld_rsp ++ "libcmt.lib\n"
-        ld_rsp = ld_rsp ++ "oldnames.lib\n"
-        ld_rsp = ld_rsp ++ "kernel32.lib\n"
-        ld_rsp = ld_rsp ++ "advapi32.lib\n"
-        ld_rsp = ld_rsp ++ "bcrypt.lib\n"
-        ld_rsp = ld_rsp ++ "shell32.lib\n"
-        ld_rsp = ld_rsp ++ "user32.lib\n"
-        ld_rsp = ld_rsp ++ "ole32.lib\n"
-        ld_rsp = ld_rsp ++ "oleaut32.lib\n"
-        ld_rsp = ld_rsp ++ "uuid.lib\n"
-        ld_rsp = ld_rsp ++ "ws2_32.lib\n"
-        ld_rsp = ld_rsp ++ "version.lib\n"
-        ld_rsp = ld_rsp ++ "psapi.lib\n"
-        ld_rsp = ld_rsp ++ "dbghelp.lib\n"
+        rsp = rsp ++ comp_windows_msvc_lib("libcpmt.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_msvc_lib("libcmt.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_msvc_lib("oldnames.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("kernel32.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("advapi32.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("bcrypt.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("shell32.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("user32.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("ole32.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("oleaut32.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("uuid.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("ws2_32.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("version.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("psapi.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("dbghelp.lib") ++ "\n"
+        rsp = rsp ++ comp_windows_sdk_um_lib("ntdll.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_msvc_lib("libcpmt.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_msvc_lib("libcmt.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_msvc_lib("oldnames.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("kernel32.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("advapi32.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("bcrypt.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("shell32.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("user32.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("ole32.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("oleaut32.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("uuid.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("ws2_32.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("version.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("psapi.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("dbghelp.lib") ++ "\n"
+        ld_rsp = ld_rsp ++ comp_windows_sdk_um_lib("ntdll.lib") ++ "\n"
     else:
         return comp_fail(ctx, "unsupported host for LLVM link metadata: " ++ os() ++ "/" ++ arch())
     if comp_link_path_is_dynamic(libclang):

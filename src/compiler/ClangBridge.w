@@ -20,12 +20,12 @@ extern fn write(fd: i32, buf: *const u8, nbyte: u64) -> i64
 extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
-extern fn getenv(name: *const u8) -> *const u8
 extern fn strtod(str: *const u8, endptr: *mut *mut u8) -> f64
 extern fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
+extern fn with_getenv_str(name: str) -> str
 
 // ── libclang types ──────────────────────────────────────────────
 // Struct layouts match the C ABI exactly.
@@ -675,9 +675,9 @@ unsafe fn get_clang_resource_dir() -> *const u8:
         // embedded set. We do NOT auto-probe LLVM_PREFIX / llvm-config /
         // /usr/local/llvm: the seed is self-contained and never trusts a
         // system LLVM (see AGENTS.md → Self-Contained Toolchain).
-        let explicit = getenv("WITH_CLANG_RESOURCE_DIR\0" as *const u8)
-        if explicit as i64 != 0 and explicit[0] != 0:
-            copy_cstr_to_buf(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, 1024, explicit)
+        let explicit = with_getenv_str("WITH_CLANG_RESOURCE_DIR")
+        if explicit.len() > 0:
+            let _copied = copy_first_line_to_buf(explicit, &raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, 1024)
     if resource_dir_buf[0] != 0:
         return &resource_dir_buf as *const [1024]u8 as *const u8
     0 as *const u8
@@ -1080,9 +1080,9 @@ pub fn with_cimport_is_name_emitted(name: str) -> i32:
         buf[len as i64] = 0
         is_name_emitted(&buf as *const [512]u8 as *const u8)
 
-pub fn with_cimport_mark_name_emitted(name: str):
+pub fn with_cimport_mark_name_emitted(name: str) -> i32:
     unsafe:
-        if name.len() <= 0: return
+        if name.len() <= 0: return 0
         var buf: [512]u8 = [0 as u8; 512]
         let len = if name.len() < 511: name.len() else: 511
         if len > 0:
@@ -1091,7 +1091,7 @@ pub fn with_cimport_mark_name_emitted(name: str):
         buf[len as i64] = 0
         mark_name_emitted(&buf as *const [512]u8 as *const u8)
 
-pub fn with_cimport_reset_names():
+pub fn with_cimport_reset_names() -> i32:
     unsafe:
         var i: i32 = 0
         while i < g_emitted_count:
@@ -1103,27 +1103,30 @@ pub fn with_cimport_reset_names():
         g_emitted_names = 0 as *mut *mut u8
         g_emitted_count = 0
         g_emitted_cap = 0
+        0
 
-pub fn with_cimport_add_include_path(path: str):
+pub fn with_cimport_add_include_path(path: str) -> i32:
     unsafe:
-        if g_cimport_include_count >= 32 or path.len() <= 0: return
+        if g_cimport_include_count >= 32 or path.len() <= 0: return 0
         let buf = with_alloc(path.len() + 1)
-        if buf as i64 == 0: return
+        if buf as i64 == 0: return 0
         let sp = *(&path as *const *const u8)
         with_memcpy(buf, sp, path.len())
         *((buf as i64 + path.len()) as *mut u8) = 0
         g_cimport_include_paths[g_cimport_include_count as i64] = buf
         g_cimport_include_count = g_cimport_include_count + 1
+        0
 
-pub fn with_cimport_clear_include_paths():
+pub fn with_cimport_clear_include_paths() -> i32:
     var i: i32 = 0
     while i < g_cimport_include_count:
         with_free(g_cimport_include_paths[i as i64])
         g_cimport_include_paths[i as i64] = 0 as *mut u8
         i = i + 1
     g_cimport_include_count = 0
+    0
 
-pub fn with_cimport_set_resource_dir(path: str):
+pub fn with_cimport_set_resource_dir(path: str) -> void:
     unsafe:
         resource_dir_resolved = 1
         if path.len() <= 0:

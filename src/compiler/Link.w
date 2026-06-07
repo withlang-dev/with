@@ -219,7 +219,7 @@ fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extra
     LinkStageCommand { linker, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_file_exists(path: str) -> bool:
-    runtime_read_file(path).len() > 0
+    runtime_file_exists(path) != 0
 
 fn link_stage_linux_dynamic_linker() -> str:
     if link_stage_file_exists("/lib64/ld-linux-x86-64.so.2"):
@@ -239,6 +239,7 @@ fn link_stage_linux_crt_object(name: str) -> str:
 
 fn link_stage_linux_gcc_dir() -> str:
     let candidates: Vec[str] = Vec.new()
+    candidates.push("/usr/lib/gcc/x86_64-linux-gnu/15")
     candidates.push("/usr/lib/gcc/x86_64-linux-gnu/14")
     candidates.push("/usr/lib/gcc/x86_64-linux-gnu/13")
     candidates.push("/usr/lib/gcc/x86_64-linux-gnu/12")
@@ -249,6 +250,24 @@ fn link_stage_linux_gcc_dir() -> str:
         let dir = candidates.get(i as i64)
         if link_stage_file_exists(dir ++ "/crtbegin.o"):
             return dir
+    ""
+
+fn link_stage_linux_system_lib_path(name: str) -> str:
+    if name == "z":
+        if link_stage_file_exists("/usr/lib/x86_64-linux-gnu/libz.so"):
+            return ""
+        if link_stage_file_exists("/usr/lib/x86_64-linux-gnu/libz.so.1"):
+            return "/usr/lib/x86_64-linux-gnu/libz.so.1"
+    if name == "zstd":
+        if link_stage_file_exists("/usr/lib/x86_64-linux-gnu/libzstd.so"):
+            return ""
+        if link_stage_file_exists("/usr/lib/x86_64-linux-gnu/libzstd.so.1"):
+            return "/usr/lib/x86_64-linux-gnu/libzstd.so.1"
+    if name == "xml2":
+        if link_stage_file_exists("/usr/lib/x86_64-linux-gnu/libxml2.so"):
+            return ""
+        if link_stage_file_exists("/usr/lib/x86_64-linux-gnu/libxml2.so.16"):
+            return "/usr/lib/x86_64-linux-gnu/libxml2.so.16"
     ""
 
 fn link_stage_make_darwin_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
@@ -328,7 +347,13 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
     args.push("-L/usr/lib")
     args.push("-L/lib")
     for i in 0..link_libs.len() as i32:
-        args.push("-l" ++ link_libs.get(i as i64))
+        let lib = link_libs.get(i as i64)
+        let fallback_lib = link_stage_linux_system_lib_path(lib)
+        if fallback_lib.len() > 0:
+            args.push(fallback_lib)
+            inputs.push(fallback_lib)
+        else:
+            args.push("-l" ++ lib)
     for i in 0..link_args.len() as i32:
         args.push(link_args.get(i as i64))
     args.push("-lc")
@@ -349,8 +374,14 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: str, obj_path: str, bin_pa
     let outputs: Vec[str] = Vec.new()
     args.push("/nologo")
     args.push("/subsystem:console")
+    args.push("/debug")
+    args.push("/pdb:" ++ bin_path ++ ".pdb")
+    args.push("/stack:8388608")
     args.push("/opt:ref")
     args.push("/opt:icf")
+    args.push("/libpath:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64")
+    args.push("/libpath:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64")
+    args.push("/libpath:C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64")
     args.push("/out:" ++ bin_path)
     outputs.push(bin_path)
     args.push(obj_path)
@@ -359,6 +390,8 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: str, obj_path: str, bin_pa
         let extra = extras.get(i as i64)
         if extra.starts_with("-L"):
             args.push("/libpath:" ++ extra.slice(2, extra.len()))
+        else if extra.starts_with("@"):
+            args.push(extra)
         else:
             args.push(extra)
             inputs.push(extra)
@@ -385,6 +418,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: str, obj_path: str, bin_pa
     args.push("version.lib")
     args.push("psapi.lib")
     args.push("dbghelp.lib")
+    args.push("ntdll.lib")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
 
@@ -523,7 +557,15 @@ fn link_stage_undefined_symbols_for_object(obj_path: str) -> str:
     let report_path = obj_path ++ ".undef"
     let null_path = if runtime_sysinfo_os() == "Windows": "NUL" else: "/dev/null"
     var argv = ""
-    argv = link_stage_argv_append(argv, "nm")
+    var nm_tool = "nm"
+    if runtime_sysinfo_os() == "Windows":
+        let root = link_stage_resolve_runtime_root()
+        let ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
+        if ld_path.len() > 0:
+            nm_tool = link_stage_dirname(ld_path) ++ "/llvm-nm.exe"
+        else:
+            nm_tool = "llvm-nm.exe"
+    argv = link_stage_argv_append(argv, nm_tool)
     argv = link_stage_argv_append(argv, "-u")
     argv = link_stage_argv_append(argv, obj_path)
     let probe_rc = runtime_exec_argv_capture(argv, report_path, null_path, 0)
