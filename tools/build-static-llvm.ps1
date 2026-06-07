@@ -72,6 +72,16 @@ if (-not (Test-Path $libclang)) {
   throw "static libclang archive was not installed: $libclang"
 }
 
+$clang = Join-Path $INSTALL_PREFIX "bin\clang.exe"
+if (-not (Test-Path $clang)) {
+  throw "missing clang driver in static SDK: $clang"
+}
+
+$clangxx = Join-Path $INSTALL_PREFIX "bin\clang++.exe"
+if (-not (Test-Path $clangxx)) {
+  throw "missing clang++ driver in static SDK: $clangxx"
+}
+
 $nm = Join-Path $INSTALL_PREFIX "bin\llvm-nm.exe"
 if (-not (Test-Path $nm)) {
   throw "missing llvm-nm in static SDK: $nm"

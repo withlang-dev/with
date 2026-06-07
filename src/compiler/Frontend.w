@@ -39,6 +39,20 @@ fn frontend_owned_text(text: str) -> str:
         return ""
     runtime_str_clone(text)
 
+fn frontend_normalize_source_text(text: str) -> str:
+    var out = StringBuilder.with_capacity(text.len())
+    var i = 0
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 13:
+            if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
+                i = i + 1
+            out.push_byte(10 as u8)
+        else:
+            out.push_byte(ch as u8)
+        i = i + 1
+    out.to_str()
+
 fn frontend_str_contains_byte(text: str, target: i32) -> bool:
     for i in 0..text.len():
         if text.byte_at(i as i64) == target:
@@ -994,15 +1008,16 @@ fn Zcu.compile_file_frontend_with_config(self: Zcu, path: str, cfg: ProjectConfi
         return AstPool.new()
 
     let t_read = runtime_clock_nanos()
-    let text = runtime_read_file(path)
-    if text.len() == 0:
+    let raw_text = runtime_read_file(path)
+    if raw_text.len() == 0:
         runtime_eprint("error: cannot open '" ++ path ++ "'")
         self.set_resolve_snapshot(ResolveResult.init(), path)
         return AstPool.new()
     if do_profile:
         let read_ns = runtime_clock_nanos() - t_read
-        runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={text.len() as i32}")
+        runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={raw_text.len() as i32}")
 
+    let text = frontend_normalize_source_text(raw_text)
     self.set_current_source(source_dir, path, text)
     if zcu_debug_init_enabled() != 0:
         runtime_eprint(f"[frontend] compile_file:source_ready bytes={text.len() as i32}")
@@ -1028,15 +1043,16 @@ fn Zcu.compile_file_frontend_entry_with_config(self: Zcu, path: str, cfg: Projec
         return AstPool.new()
 
     let t_read = runtime_clock_nanos()
-    let text = runtime_read_file(path)
-    if text.len() == 0:
+    let raw_text = runtime_read_file(path)
+    if raw_text.len() == 0:
         runtime_eprint("error: cannot open '" ++ path ++ "'")
         self.set_resolve_snapshot(ResolveResult.init(), path)
         return AstPool.new()
     if do_profile:
         let read_ns = runtime_clock_nanos() - t_read
-        runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={text.len() as i32}")
+        runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={raw_text.len() as i32}")
 
+    let text = frontend_normalize_source_text(raw_text)
     self.set_current_source(source_dir, path, text)
     let pool = self.compile_source_frontend_mode(text, path, 0, 1)
     if pool.decl_count() == 0 and not self.diagnostics.has_errors():
@@ -1050,6 +1066,9 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
     if zcu_debug_init_enabled() != 0:
         runtime_eprint("[frontend] compile_source:parse")
+    let normalized_text = frontend_normalize_source_text(text)
+    self.current_source_path = name
+    self.current_source_text = normalized_text
 
     // Phase 1+2: Lex + Parse.  When prelude is enabled, parse the prelude
     // USE declaration first so it appears at decl position 0, ensuring
@@ -1057,11 +1076,11 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     let t_parse = runtime_clock_nanos()
     var pool: AstPool = AstPool.new()
     if self.prelude_mode != PRELUDE_NONE():
-        pool = self.parse_with_prelude_first_mode(text, file_id, implicit_main_mode)
+        pool = self.parse_with_prelude_first_mode(normalized_text, file_id, implicit_main_mode)
     else:
-        var lexer = Lexer.init(text, file_id)
+        var lexer = Lexer.init(normalized_text, file_id)
         let tokens = lexer.tokenize()
-        var parser = Parser.init(tokens, text, file_id, self.pool, self.diagnostics)
+        var parser = Parser.init(tokens, normalized_text, file_id, self.pool, self.diagnostics)
         if implicit_main_mode != 0:
             parser.enable_implicit_main_mode()
         pool = parser.parse_module()
@@ -1071,7 +1090,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     self.seed_decl_source_paths(pool, name, file_id)
     for extra_i in 0..self.extra_source_names.len() as i32:
         let extra_name = self.extra_source_names.get(extra_i as i64)
-        let extra_text = self.extra_source_texts.get(extra_i as i64)
+        let extra_text = frontend_normalize_source_text(self.extra_source_texts.get(extra_i as i64))
         let extra_file_id = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         self.add_source_text_mapping(extra_file_id, extra_name, extra_text)
@@ -1098,7 +1117,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         runtime_eprint("[frontend] compile_source:resolve")
     // Wave 4: sidecar resolved artifact.
     let t_resolve = runtime_clock_nanos()
-    let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, false)
+    let artifacts = resolve_from_root_pool(name, normalized_text, file_id, pool, self.pool, self.diagnostics, false)
     if do_profile:
         let resolve_ns = runtime_clock_nanos() - t_resolve
         runtime_eprint(f"[profile] frontend.resolve  {resolve_ns / 1000000}.{(resolve_ns % 1000000) / 1000} ms")
@@ -1221,7 +1240,7 @@ fn Zcu.merge_resolved_modules_frontend(self: Zcu, root_pool: AstPool, root_path:
         if path.len() == 0 or path == root_path:
             continue
 
-        let text = runtime_read_file(path)
+        let text = frontend_normalize_source_text(runtime_read_file(path))
         if text.len() == 0:
             let span = Span { file: 0, start: 0, end: 0 }
             self.diagnostics.emit(Diagnostic.err("failed to read imported module", span))
@@ -1764,7 +1783,7 @@ fn Zcu.resolve_module_path_frontend(self: Zcu, module_name: str, source_dir_raw:
 
 fn Zcu.parse_imported_file_frontend(self: Zcu, path: str, target_pool: AstPool) -> AstPool:
     let embedded_rel = embedded_std_rel_path(path)
-    let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: runtime_read_file(path)
+    let text = frontend_normalize_source_text(if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: runtime_read_file(path))
     if text.len() == 0:
         return target_pool
 

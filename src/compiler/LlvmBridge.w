@@ -426,7 +426,7 @@ fn to_cstr(s: str) -> *const u8:
     let src = unsafe *(&s as *const *const u8)
     let dst = &raw mut cstr_bufs[slot as i64][idx as i64] as *mut u8
     with_memcpy(dst, src, n)
-    unsafe *((dst as i64 + n) as *mut u8) = 0
+    cstr_bufs[slot as i64][idx as i64][n] = 0 as u8
     dst as *const u8
 
 fn c_strlen(s: *const u8) -> i64:
@@ -1049,7 +1049,7 @@ pub fn wl_optimize(m: i64, tm: i64, level: i32):
             else if level == 3: "default<O3>"
             else: "default<O2>"
         let opts = LLVMCreatePassBuilderOptions()
-        let err = LLVMRunPasses(m as *mut u8, passes as *const u8, tm as *mut u8, opts)
+        let err = LLVMRunPasses(m as *mut u8, to_cstr(passes), tm as *mut u8, opts)
         if err as i64 != 0:
             let msg = LLVMGetErrorMessage(err)
             if msg as i64 != 0: LLVMDisposeErrorMessage(msg)
@@ -1058,7 +1058,7 @@ pub fn wl_optimize(m: i64, tm: i64, level: i32):
 pub fn wl_run_always_inline(m: i64, tm: i64):
     unsafe:
         let opts = LLVMCreatePassBuilderOptions()
-        let err = LLVMRunPasses(m as *mut u8, "always-inline" as *const u8, tm as *mut u8, opts)
+        let err = LLVMRunPasses(m as *mut u8, to_cstr("always-inline"), tm as *mut u8, opts)
         if err as i64 != 0:
             let msg = LLVMGetErrorMessage(err)
             if msg as i64 != 0: LLVMDisposeErrorMessage(msg)
@@ -1067,11 +1067,32 @@ pub fn wl_run_always_inline(m: i64, tm: i64):
 pub fn wl_promote_allocas(fn_val: i64, tm: i64):
     unsafe:
         let opts = LLVMCreatePassBuilderOptions()
-        let err = LLVMRunPassesOnFunction(fn_val as *mut u8, "mem2reg" as *const u8, tm as *mut u8, opts)
+        let err = LLVMRunPassesOnFunction(fn_val as *mut u8, to_cstr("mem2reg"), tm as *mut u8, opts)
         if err as i64 != 0:
             let msg = LLVMGetErrorMessage(err)
             if msg as i64 != 0: LLVMDisposeErrorMessage(msg)
         LLVMDisposePassBuilderOptions(opts)
+
+pub fn wl_run_function_passes(fn_val: i64, tm: i64, passes: str) -> i32:
+    unsafe:
+        let opts = LLVMCreatePassBuilderOptions()
+        let err = LLVMRunPassesOnFunction(fn_val as *mut u8, to_cstr(passes), tm as *mut u8, opts)
+        if err as i64 != 0:
+            let msg = LLVMGetErrorMessage(err)
+            if msg as i64 != 0:
+                let len = c_strlen(msg as *const u8)
+                if len > 0:
+                    let _ = rt_write(2, msg as *const u8, len as u64)
+                    let _ = rt_write(2, "\n" as *const u8, 1)
+                LLVMDisposeErrorMessage(msg)
+            LLVMDisposePassBuilderOptions(opts)
+            return 1
+        LLVMDisposePassBuilderOptions(opts)
+        0
+
+pub fn wl_verify_function(fn_val: i64) -> i32:
+    unsafe:
+        LLVMVerifyFunction(fn_val as *mut u8, LLVM_ReturnStatusAction)
 
 pub fn wl_dump_value(v: i64): unsafe { LLVMDumpValue(v as *mut u8) }
 

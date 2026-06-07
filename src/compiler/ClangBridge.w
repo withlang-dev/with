@@ -1084,9 +1084,9 @@ pub fn with_cimport_is_name_emitted(name: str) -> i32:
         buf[len as i64] = 0
         is_name_emitted(&buf as *const [512]u8 as *const u8)
 
-pub fn with_cimport_mark_name_emitted(name: str):
+pub fn with_cimport_mark_name_emitted(name: str) -> i32:
     unsafe:
-        if name.len() <= 0: return
+        if name.len() <= 0: return 0
         var buf: [512]u8 = [0 as u8; 512]
         let len = if name.len() < 511: name.len() else: 511
         if len > 0:
@@ -1095,7 +1095,7 @@ pub fn with_cimport_mark_name_emitted(name: str):
         buf[len as i64] = 0
         mark_name_emitted(&buf as *const [512]u8 as *const u8)
 
-pub fn with_cimport_reset_names():
+pub fn with_cimport_reset_names() -> i32:
     unsafe:
         var i: i32 = 0
         while i < g_emitted_count:
@@ -1107,27 +1107,30 @@ pub fn with_cimport_reset_names():
         g_emitted_names = 0 as *mut *mut u8
         g_emitted_count = 0
         g_emitted_cap = 0
+        0
 
-pub fn with_cimport_add_include_path(path: str):
+pub fn with_cimport_add_include_path(path: str) -> i32:
     unsafe:
-        if g_cimport_include_count >= 32 or path.len() <= 0: return
+        if g_cimport_include_count >= 32 or path.len() <= 0: return 0
         let buf = with_alloc(path.len() + 1)
-        if buf as i64 == 0: return
+        if buf as i64 == 0: return 0
         let sp = *(&path as *const *const u8)
         with_memcpy(buf, sp, path.len())
         *((buf as i64 + path.len()) as *mut u8) = 0
         g_cimport_include_paths[g_cimport_include_count as i64] = buf
         g_cimport_include_count = g_cimport_include_count + 1
+        0
 
-pub fn with_cimport_clear_include_paths():
+pub fn with_cimport_clear_include_paths() -> i32:
     var i: i32 = 0
     while i < g_cimport_include_count:
         with_free(g_cimport_include_paths[i as i64])
         g_cimport_include_paths[i as i64] = 0 as *mut u8
         i = i + 1
     g_cimport_include_count = 0
+    0
 
-pub fn with_cimport_set_resource_dir(path: str):
+pub fn with_cimport_set_resource_dir(path: str) -> void:
     unsafe:
         resource_dir_resolved = 1
         if path.len() <= 0:

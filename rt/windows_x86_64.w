@@ -488,10 +488,15 @@ unsafe fn win_copy_file(src: *const u8, dst: *const u8) -> i32:
     if out_fd < 0:
         let _ = rt_close(in_fd)
         return out_fd
-    var buf: [65536]u8 = [0 as u8; 65536]
+    let buf = with_alloc(65536)
+    if buf as i64 == 0:
+        let _ = rt_close(in_fd)
+        let _ = rt_close(out_fd)
+        return -12
     while true:
-        let n = rt_read(in_fd, &raw mut buf as *mut [65536]u8 as *mut u8, 65536)
+        let n = rt_read(in_fd, buf, 65536)
         if n < 0:
+            with_free(buf)
             let _ = rt_close(in_fd)
             let _ = rt_close(out_fd)
             return n as i32
@@ -499,12 +504,14 @@ unsafe fn win_copy_file(src: *const u8, dst: *const u8) -> i32:
             break
         var off: i64 = 0
         while off < n:
-            let w = rt_write(out_fd, (&buf as i64 + off) as *const u8, n - off)
+            let w = rt_write(out_fd, (buf as i64 + off) as *const u8, n - off)
             if w <= 0:
+                with_free(buf)
                 let _ = rt_close(in_fd)
                 let _ = rt_close(out_fd)
                 return if w < 0: w as i32 else: -5
             off = off + w
+    with_free(buf)
     let cin = rt_close(in_fd)
     let cout = rt_close(out_fd)
     if cin != 0: cin else: cout
@@ -810,8 +817,11 @@ unsafe fn win_open_redirect(path: str, write_mode: bool) -> i64:
 unsafe fn win_spawn_argv(args: str, stdout_path: str, stderr_path: str, stdin_path: str, cwd: str, wait: bool, timeout_ms: i32) -> i32:
     let sp = &args as *const *const u8
     let data = unsafe *sp
-    var cmd: [32768]u16 = [0 as u16; 32768]
-    if win_build_command_line(data, args.len(), &raw mut cmd as *mut [32768]u16 as *mut u16, 32768) != 0:
+    let cmd = with_alloc(32768 * 2)
+    if cmd as i64 == 0:
+        return -12
+    if win_build_command_line(data, args.len(), cmd as *mut u16, 32768) != 0:
+        with_free(cmd)
         return -1
     var startup: [104]u8 = [0 as u8; 104]
     var proc_info: [24]u8 = [0 as u8; 24]
@@ -840,7 +850,8 @@ unsafe fn win_spawn_argv(args: str, stdout_path: str, stderr_path: str, stdin_pa
     if cwd.len() > 0:
         let _ = win_str_to_utf16_buf(cwd, &raw mut cwdw as *mut [4096]u16 as *mut u16, 4096)
         cwdp = &cwdw as *const [4096]u16 as *const u16
-    let ok = CreateProcessW(0 as *const u16, &raw mut cmd as *mut [32768]u16 as *mut u16, 0 as *mut u8, 0 as *mut u8, inherit, 0 as u32, 0 as *mut u8, cwdp, &raw mut startup as *mut [104]u8 as *mut u8, &raw mut proc_info as *mut [24]u8 as *mut u8)
+    let ok = CreateProcessW(0 as *const u16, cmd as *mut u16, 0 as *mut u8, 0 as *mut u8, inherit, 0 as u32, 0 as *mut u8, cwdp, &raw mut startup as *mut [104]u8 as *mut u8, &raw mut proc_info as *mut [24]u8 as *mut u8)
+    with_free(cmd)
     if stdin_path.len() > 0 and stdin_h != 0 and stdin_h != INVALID_HANDLE_VALUE:
         let _ = CloseHandle(stdin_h)
     if stdout_path.len() > 0 and stdout_h != 0 and stdout_h != INVALID_HANDLE_VALUE:

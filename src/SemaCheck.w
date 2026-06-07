@@ -98,21 +98,23 @@ fn sema_resolve_embed_file_path(source_path: str, raw_path: str) -> str:
 fn sema_path_is_std_implementation(path: str) -> i32:
     if path.starts_with("lib/std/") or path.starts_with("<embedded-std>/"):
         return 1
-    if path.contains("/lib/std/"):
+    if path.contains("/lib/std/") or path.contains("\\lib\\std\\"):
         return 1
     0
 
 fn sema_path_is_runtime_implementation(path: str) -> i32:
-    if path.starts_with("rt/") or path.starts_with("out/gen/"):
+    if path.starts_with("rt/") or path.starts_with("rt\\") or
+        path.starts_with("out/gen/") or path.starts_with("out\\gen\\"):
         return 1
-    if path.contains("/rt/") or path.contains("/out/gen/"):
+    if path.contains("/rt/") or path.contains("\\rt\\") or
+        path.contains("/out/gen/") or path.contains("\\out\\gen\\"):
         return 1
     0
 
 fn sema_path_is_migrated_regex_implementation(path: str) -> i32:
     if path.starts_with("lib/std/re/") or path.starts_with("<embedded-std>/std/re/"):
         return 1
-    if path.contains("/lib/std/re/"):
+    if path.contains("/lib/std/re/") or path.contains("\\lib\\std\\re\\"):
         return 1
     0
 
@@ -124,9 +126,9 @@ fn sema_name_is_compiler_abi_extern(name: str) -> i32:
     0
 
 fn sema_path_is_compiler_source_implementation(path: str) -> i32:
-    if path.starts_with("src/"):
+    if path.starts_with("src/") or path.starts_with("src\\"):
         return 1
-    if path.contains("/src/"):
+    if path.contains("/src/") or path.contains("\\src\\"):
         return 1
     0
 

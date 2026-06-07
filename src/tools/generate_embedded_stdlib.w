@@ -31,6 +31,20 @@ fn raw_string_literal(text: str) -> str:
         hashes = hashes ++ "#"
     "r" ++ hashes ++ "\"" ++ text ++ "\"" ++ hashes
 
+fn normalize_embedded_source(text: str) -> str:
+    var out = StringBuilder.with_capacity(text.len())
+    var i = 0
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 13:
+            if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
+                i = i + 1
+            out.push_byte(10 as u8)
+        else:
+            out.push_str(text.slice(i as i64, (i + 1) as i64))
+        i = i + 1
+    out.to_str()
+
 fn embedded_rel_path(root: str, path: str) -> str:
     let root_lib = root ++ "/lib/"
     if path.starts_with(root_lib):
@@ -60,7 +74,7 @@ fn main -> void:
     while i < argc:
         let path = with_arg_at(i)
         let rel = embedded_rel_path(root, path)
-        let source = with_fs_read_file(path)
+        let source = normalize_embedded_source(with_fs_read_file(path))
         if source.len() == 0:
             with_eprint("error: failed to read stdlib source: " ++ path)
             exit(1)
