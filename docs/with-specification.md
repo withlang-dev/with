@@ -880,7 +880,58 @@ a >> n      // right shift
 ```
 
 All bitwise operators work on all integer types (`i8`–`i64`,
-`u8`–`u64`). Mixed-width operands are promoted to the wider type.
+`u8`–`u64`).
+
+For `&`, `|`, and `^`, the operation preserves bit patterns, not
+numeric values. The operand rules are therefore narrower than
+arithmetic promotion:
+
+1. An untyped integer literal adopts the other operand's integer type.
+   The literal is valid if its bit pattern fits that type's width, not
+   if its signed numeric value fits the type's range.
+
+   ```
+   let flags: u32 = 0xf000
+   let a = flags | 0xff           // 0xff is a 32-bit mask
+
+   let byte: i8 = -1
+   let b: i8 = byte & 0xff        // OK: 0xff is an 8-bit pattern
+   let c: i8 = byte & 0x1ff       // ERROR: 9-bit pattern
+   ```
+
+2. Two typed operands with the same signedness and different widths
+   widen to the wider type. Unsigned operands zero-extend; signed
+   operands sign-extend.
+
+   ```
+   let a: u8 = 1
+   let b: u32 = 0xff00
+   let c = a | b                  // u32
+
+   let x: i8 = -1
+   let y: i32 = 0xff00
+   let z = x & y                  // i32
+   ```
+
+3. Two typed operands with different signedness require an explicit
+   `as` cast. There is no implicit third-type widening for bitwise
+   operators.
+
+   ```
+   let u: u32 = 1
+   let i: i32 = -1
+
+   u | i                          // ERROR: mixed signedness
+   (u as i32) | i                 // OK: caller chose signed bits
+   u | (i as u32)                 // OK: caller chose unsigned bits
+   (u as i64) | (i as i64)        // OK: caller chose 64-bit signed bits
+   ```
+
+The result type is the adopted operand type from rule 1, the wider
+same-signedness type from rule 2, or the explicit cast type chosen by
+the caller in rule 3.
+
+Unary `~` preserves the operand type.
 
 **Right shift semantics:**
 
@@ -1330,10 +1381,14 @@ arr.len()        // length: returns N (compile-time constant)
 
 - Length `N` must be a compile-time constant (integer literal or `const`).
 - `[T; N]` has size `N * sizeof(T)` and alignment `alignof(T)`.
-- Passed by value (copied on assignment). For large arrays, pass
-  by reference.
+- Fixed-size arrays are value types and follow normal ownership
+  rules.
+- `[T; N]` is `Copy` only when `T` is `Copy`; otherwise assignment
+  moves the array.
+- Argument passing follows the normal call-mode and effect rules for
+  the callee. For large arrays, pass by reference unless by-value
+  movement or copying is intended.
 - Bounds checking in debug mode, unchecked in release.
-- `Copy` if the element type is `Copy`.
 
 #### 4.3a.1 Array-to-Pointer Decay
 With has no implicit array-to-pointer decay. Use explicit decay:
@@ -2438,29 +2493,45 @@ consumed).
 
 ### 7.5 Dispatch Rule
 
-The `with` block form is determined by the **type** of the
-expression:
+Full `with` dispatch is syntax-first, type/protocol-driven, and
+`mut`-refined.
+
+1. The parser first distinguishes the syntactic shape:
+   `with e`, `with e as x`, `with e as mut x`,
+   `with name(expr):`, and record-update forms.
+2. For forms that can be either guarded access or plain binding,
+   the expression's type and protocols decide the path. If the
+   expression implements a guarded-access protocol such as `Scoped[T]`
+   or `ScopedMut[T]`, the form is guarded. Otherwise it is a plain
+   scoped binding.
+3. `mut` refines mutability within the selected path. It is not the
+   global dispatcher.
 
 ```
-with name(expr):                  →  introduce implicit context for body
-
-// Scoped access — binding cannot escape the block
-with lock.read() as data:          →  { let data = lock.read(); body }
-with store.write() as mut data:    →  { var data = store.write(); body; data }
-
-// Simple binding
-with expr as mut name:             →  { var name = expr; body }
+// Plain binding path
 with expr as name:                 →  { let name = expr; body }
+with expr as mut name:             →  { var name = expr; body }
 ```
+
+In the guarded path, the guard protocol supplies acquire/release
+behavior and the payload type. `mut` requests mutable access to the
+guarded value and must be supported by a mutable guard capability. For
+example, `with lock.read() as mut data:` is invalid if `lock.read()`
+produces only an immutable guard; the keyword does not select a
+different protocol.
 
 ```
 // Guarded access — lock.write() returns a guard
 with lock.write() as data:
     data.x = 1                         // guard released at block exit
 
-// Builder — simple scoped mutation
+// Builder — plain scoped mutation
 let config = with Config.default() as mut c:
     c.retries = 3
+
+// Implicit context
+with context(default_context()):
+    log("started")
 ```
 
 ### 7.6 `with` as Expression
@@ -2584,9 +2655,9 @@ type ReadGuard[T] { ... }
 type WriteGuard[T] { ... }
 ```
 
-The compiler rejects `.await` **or any `may_suspend` function call**
-while a `@[no_await_guard]` value is **live in the NLL sense** —
-regardless of whether it was created via `with` or a plain
+The compiler rejects any same-fiber operation that may suspend the
+current fiber while a `@[no_await_guard]` value is **live in the NLL
+sense** — regardless of whether it was created via `with` or a plain
 `let` binding (see Invariant 5, §14.3):
 
 ```
@@ -2603,7 +2674,7 @@ fetch(data.url).await                    // compile error E0701!
 // ERROR: helper() is may_suspend (it contains .await internally)
 with lock.read() as data:
     let result = helper(data.url)        // compile error E0701
-    //           ^^^^^^ may_suspend function called while
+    //           ^^^^^^ same-fiber may_suspend call while
     //                  @[no_await_guard] ReadGuard is live
 
 // FIX: drop guard before awaiting
@@ -2910,21 +2981,33 @@ greet(greeting: "Hi", name: "Dae")
 Compile-time constants are declared with `const`:
 
 ```
-const MAX_SIZE: i32 = 1024
-const PI: f64 = 3.14159
+const MAX_SIZE = 1024
+const PI = 3.14159
 const HEADER: str = "X-Custom"
 ```
 
-**Syntax:** `const NAME: TYPE = EXPR`
+**Syntax:** `const NAME [: TYPE] = EXPR`
 
-The type annotation is required. The expression must be evaluable at compile
-time — integer literals, arithmetic (`+`, `-`, `*`, `/`, `%`), unary negate,
-logical `not`, and references to other `const` values.
+The type annotation may be omitted when the initializer determines an
+unambiguous type. If omitted, ordinary expression inference and default
+literal rules choose the type. The annotation is required when the
+initializer cannot determine a concrete type, and public exported constants
+must include an explicit type so the API surface is stable.
+
+`const NAME: TYPE = EXPR` remains the spelling for API clarity and
+disambiguation. Use it whenever the default literal type would be
+surprising.
+
+The expression must be evaluable at compile time — integer literals,
+arithmetic (`+`, `-`, `*`, `/`, `%`), unary negate, logical `not`, and
+references to other `const` values.
 
 ```
-const WIDTH: i32 = 80
-const HEIGHT: i32 = 24
-const AREA: i32 = WIDTH * HEIGHT    // computed at compile time
+const WIDTH = 80
+const HEIGHT = 24
+const AREA = WIDTH * HEIGHT    // computed at compile time
+
+pub const PROTOCOL_VERSION: u16 = 3
 ```
 
 `const` values are inlined at every use site. They have no runtime address and
@@ -5735,12 +5818,14 @@ Three hard constraints govern the concurrency model:
    a function can yield. Hidden suspension violates "predictable from
    source." This rules out Go-style implicit yielding.
 
-   **Controlled exception:** Dropping an ephemeral `Task` without
-   explicit `.await` or `cancel` may yield the current fiber (§14.7)
-   to ensure memory safety. This is the only implicit suspension
-   point in the language. The compiler emits a **warning** at any
-   scope exit where an ephemeral Task is implicitly dropped without
-   being awaited or cancelled, recommending explicit handling.
+   **Controlled exception:** Explicit cancellation or cleanup of an
+   ephemeral `Task` may yield the current fiber (§14.7) to ensure
+   memory safety. This is the only implicit suspension point in the
+   language. The compiler does not silently detach ephemeral tasks:
+   a task expression in statement position may detach only when the
+   detach-safety check proves the task can outlive the current scope.
+   If that proof fails, the statement is a compile error and the task
+   must be awaited, cancelled, returned, or tracked before scope exit.
    Ephemeral Tasks cannot be created on OS threads or in FFI
    callbacks, because these contexts cannot suspend.
 
@@ -5805,7 +5890,8 @@ Using `.await` in a `no_runtime` build is a compile error (Invariant
 4). This is narrower than Rust's coloring: the restriction is on
 *suspending*, not on *calling* async functions. A function that calls
 `fetch_user(id)` but never awaits the result works in any build.
-Only the `.await` operator is gated.
+Only current-fiber suspension operations are gated; plain async calls
+that only create a `Task[T]` are not.
 
 **INVARIANT 2: No Future trait exists.**
 `Task[T]` is an opaque handle. It has no `poll` method, no `Waker`,
@@ -5824,39 +5910,74 @@ scheduler exists, `async` does not compile. The cost model is
 always honest.
 
 **INVARIANT 5: Suspension is trackable.**
-The compiler statically computes a **`may_suspend`** property for
-every function. A function is `may_suspend` if it directly contains
-`.await`, or if it calls any function that is `may_suspend`. This
-is a whole-program boolean propagation, not lifetime inference —
-it is cheap to compute.
+With does not choose syntactic suspension visibility. It chooses
+compiler suspension visibility. The compiler statically computes a
+**`may_suspend`** property for every function and for callable type
+information. Suspension need not be written at every call site, but it
+must always be known to the compiler and surfaced in diagnostics when
+it matters.
 
-This is **restricted coloring**. Callers are not generally restricted
-by callee color: any function can call an async function and receive a
-`Task[T]`. However, specific safety contexts enforce constraints based
-on callee color:
+`may_suspend` is a **current-fiber** property, and fiber creation is
+the firewall. A function is `may_suspend` if it directly performs a
+primitive current-fiber suspension, or if it makes a same-fiber call
+through a callable whose type is `may_suspend`. Calling an `async fn`
+does not by itself make the caller `may_suspend`: it creates or starts
+a separate fiber and returns a `Task[T]`. The caller suspends only if
+it awaits, joins, performs async-scope cleanup, or otherwise invokes a
+current-fiber suspension operation.
 
-1. **`@[no_await_guard]` enforcement:** Calling any `may_suspend`
-   function while a `@[no_await_guard]` guard is live is a compile
-   error — even if the `.await` is buried three calls deep.
+The primitive current-fiber suspension set is closed and deterministic:
+
+- `.await`;
+- collection / select await;
+- explicit yield primitives;
+- async-scope await-all and other structured-concurrency joins;
+- implicit cleanup await at scope exit for a live ephemeral task;
+- fiber-aware runtime operations that yield the current fiber when they
+  cannot complete immediately: lock acquire when unavailable, channel
+  send when full, channel receive when empty, timer/sleep until its
+  deadline, and socket/file read or write when not ready.
+
+Fiber-aware I/O and synchronization must choose one model explicitly:
+either the operation is a direct current-fiber suspension primitive and
+therefore participates in `may_suspend`, or it returns a `Task` and
+suspends only when that task is awaited. The specification must not
+leave that boundary ambiguous.
+
+`may_suspend` is part of callable type information for function
+pointers, closures, trait and `dyn` callables, callbacks, and every
+other indirect-call surface. This does not reintroduce call-site
+coloring: ordinary calls remain unannotated, and the typing burden
+appears only when a function becomes a value.
+
+Specific safety contexts enforce constraints based on current-fiber
+suspension:
+
+1. **`@[no_await_guard]` enforcement:** Making a same-fiber
+   `may_suspend` call while a `@[no_await_guard]` guard is live is a
+   compile error — even if the `.await` or yield primitive is buried
+   three calls deep.
 2. **FFI callback safety:** Functions passed as `extern "C"`
    callbacks must not be `may_suspend` (see §14.19).
 3. **`no_suspend` blocks:** Expert code may assert that a region
    contains no operation that yields to the scheduler. The compiler
-   rejects direct `.await`/`select await`, transitive `may_suspend`
-   calls, async-scope await-all, and implicit cleanup awaits in that
-   region.
+   rejects direct `.await`, collection/select await, same-fiber
+   `may_suspend` calls, structured-concurrency joins, implicit cleanup
+   awaits, and direct fiber-aware runtime operations in that region.
 
 Programmers do not declare or annotate `may_suspend`. The compiler
 computes it internally; it may appear in diagnostics when a safety
 violation occurs. There are no separate `async` and `sync` function
-types, no trait split, and no closure type changes.
+types and no trait split. Callable values still carry whether invoking
+them may suspend the current fiber, because indirect calls must be
+checkable.
 
 ```
 fn helper:
     some_io().await        // makes helper() may_suspend
 
 with lock.write() as data:
-    helper()               // ERROR E0701: may_suspend function called
+    helper()               // ERROR E0701: same-fiber may_suspend call
                            // while @[no_await_guard] WriteGuard is live
     data.x = 1             // OK: no suspension
 ```
@@ -5887,10 +6008,12 @@ not allowed.
 The compiler rejects any scheduler-yielding operation inside the block,
 including:
 
-- direct `.await` or `select await`
-- calls to functions whose body is `may_suspend`
-- async-scope await-all
+- direct `.await`, collection await, or `select await`
+- same-fiber calls through `may_suspend` callables
+- async-scope await-all and other structured-concurrency joins
 - implicit cleanup await for an ephemeral `Task`
+- direct fiber-aware runtime operations that may yield the current
+  fiber
 
 This check exists because suspending inside such a region can deadlock
 or expose partially-updated state to other fibers. It is independent of
@@ -5910,8 +6033,9 @@ Calling `fetch(url)` does the following:
 3. Returns a `Task[Result[String, IoError]]` handle immediately
    to the caller.
 
-The fiber runs concurrently. It suspends at `await` points and is
-resumed by the scheduler when the awaited operation completes.
+The fiber runs concurrently. It suspends at compiler-known
+current-fiber suspension points and is resumed by the scheduler when
+the awaited operation or runtime wait completes.
 
 ### 14.5 `.await` Semantics
 
@@ -5928,9 +6052,15 @@ let result = task.await
 3. If called from an OS thread with no fiber runtime, this is a
    **compile error** (see Invariant 4).
 
-`.await` is the only way to extract a value from a `Task[T]`. It is
-the only point where a fiber can suspend. Suspension is always
-visible in the source code.
+`.await` is the primary explicit suspension operator for observing a
+single `Task[T]` result. Tuple `.await`, collection await combinators,
+and `select await` are also result-observing suspension forms for
+multiple tasks.
+
+`.await` is not the only operation that can suspend the current fiber.
+Any operation classified by the compiler as `may_suspend` may yield the
+current fiber. Suspension is always known to the compiler and surfaced
+in diagnostics, but it is not necessarily spelled at every call site.
 
 `.await` is postfix — it appears after the expression it operates
 on. This allows natural chaining:
@@ -5998,59 +6128,89 @@ type Task[T]       // opaque handle to a running fiber
 | `cancel` | `(Task[T]) -> Unit` | Cooperative cancellation |
 | `is_done` | `(&Task[T]) -> bool` | Check without blocking |
 
-`Task[T]` is `Send` when `T: Send` and `T` is not ephemeral. It is
-an owned value. It can be stored in data structures when non-ephemeral.
+`Task[T]` has one type spelling. Storability and sendability are
+properties of the task value and binding, inferred from what the task
+captures and returns:
+
+- **Ephemeral vs non-ephemeral** is the lifetime gate. A task is
+  ephemeral if its captured environment or result contains references,
+  allocator-borrowed values, scope-bound resources, or any other
+  ephemeral value.
+- **Storable** means the task may be placed in long-lived data. A task
+  is storable iff it is non-ephemeral. Storage alone does not require
+  `Send`; a non-`Send` task may be stored in same-thread data, and that
+  container is then itself non-`Send`.
+- **Sendable** means the task may cross a thread boundary. A task is
+  sendable iff it is non-ephemeral, `T: Send`, and its captured
+  environment is `Send`.
 
 A `Task[T]` that captures references is **ephemeral** (see §14.22).
 Ephemeral tasks cannot be stored, returned, or sent to other threads.
 They must be awaited or tracked in a scope before the borrowed data
 goes out of scope.
 
-**`@[must_use]`:** `Task[T]` is annotated `@[must_use]`. Dropping a
-`Task` without `await`ing or explicitly `cancel`ing it is a compile
-error:
+**Task disposition:** A `Task` handle represents running work. The
+compiler uses syntactic position as the programmer's intent.
+
+A `Task` in **statement position** is intentional fire-and-forget
+detachment:
 
 ```
-error[E0801]: unused `Task` will be cancelled on drop
+send_analytics("page_view")  // detach if both checks below pass
+```
+
+This means: start the work, do not await it, and discard interest in
+its result or failure. It is allowed only when two independent checks
+both pass:
+
+1. **must-observe:** the API author has not marked the task's
+   completion or failure as requiring observation.
+2. **detach-safety:** the compiler proves the task may safely outlive
+   the current scope. It must not carry borrowed stack data, ephemeral
+   captures, allocator-borrowed or scope-bound resources, or structured
+   concurrency cleanup obligations out of the scope that owns them.
+
+Author intent never substitutes for the lifetime proof, and the
+lifetime proof never overrides author intent. Both gates must clear.
+
+When statement-position detachment fails, the compiler emits a hard
+error naming the failed check:
+
+```
+error[E0801]: task result must be observed
   --> src/service.w:42:9
    |
-42 |     send_analytics("page_view")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Task[Result[Unit, NotifyError]] created but not used
+42 |     send_invoice(invoice)
+   |     ^^^^^^^^^^^^^^^^^^^^^ this task is marked must-observe
    |
-   = note: dropping a Task cancels the fiber cooperatively
-   = help: use `spawn send_analytics(...)` for fire-and-forget
-   = help: use `.await` to wait for the result
-   = help: use `cancel(task)` to explicitly cancel
-```
+   = help: await, cancel, return, store, or otherwise handle the task
 
-This catches accidental task drops — a common source of "why isn't
-this code running?" bugs in concurrent systems.
-
-**`spawn` for fire-and-forget:** The `spawn` keyword creates a
-**detached task** that runs to completion independently. It is not
-owned by any scope or variable — the runtime keeps it alive:
-
-```
-spawn send_analytics("page_view")  // runs to completion, no handle
-```
-
-`spawn` returns `Unit`, not `Task[T]`. The spawned fiber is
-unowned — it runs until it completes, panics, or the program exits.
-This is the only correct way to do fire-and-forget.
-
-**WARNING: `let _ = task` is NOT fire-and-forget.** Writing
-`let _ = send_analytics(...)` immediately drops the task, which
-cancels the fiber. The analytics request will abort at its first
-`.await` point — almost certainly before it completes. The compiler
-emits a warning for `let _ = <Task expression>`:
-
-```
-warning: `let _ = ...` on a Task immediately cancels it
-  --> src/service.w:42:9
+error[E0802]: task cannot be detached safely
+  --> src/service.w:51:9
    |
-   = help: use `spawn ...` for fire-and-forget
-   = help: use `cancel(task)` for explicit cancellation
+51 |     borrow_until_done(&buffer)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ task captures data owned by this scope
+   |
+   = help: await, cancel, return, or restructure so the task no longer carries scope-bound state out of scope
 ```
+
+A task **bound to a name** declares intent to observe:
+
+```
+let task = send_invoice(invoice)
+task.await?
+```
+
+An unused bound task handle is a compile error. The handle must be
+awaited, cancelled, returned, stored when non-ephemeral, tracked in an
+`async scope`, or otherwise given a valid disposition before it is
+lost.
+
+**`let _ = task` is not the fire-and-forget spelling.** Statement
+position already expresses detachment. The compiler rejects
+`let _ = <Task expression>` for task values; use a bare statement for
+permitted fire-and-forget work, or bind the task and call `cancel`
+when cancellation is the intended effect.
 
 See §20b.2.
 
@@ -6101,9 +6261,10 @@ tasks. When `cancel()` is called or a non-ephemeral `Task` is dropped:
    never need to add a `Cancelled` variant to your own types.
 
 **Cancellation of ephemeral tasks:** If a `Task` is ephemeral
-(captures references), dropping or cancelling it must ensure the
-fiber has stopped before the caller proceeds. This is mandatory for
-memory safety: the fiber holds references to the caller's stack.
+(captures references), cancelling it or unwinding the scope that owns
+it must ensure the fiber has stopped before the caller proceeds. This
+is mandatory for memory safety: the fiber holds references to the
+caller's stack.
 
 **The runtime handles this without blocking the OS thread:**
 
@@ -6122,13 +6283,14 @@ memory safety: the fiber holds references to the caller's stack.
 
 This avoids the deadlock scenario where N OS threads all block
 waiting for fibers that can never be scheduled. The key insight is
-that fiber drops happen inside fibers (which can yield), not inside
-raw OS thread code.
+that ephemeral task cleanup happens inside fibers (which can yield),
+not inside raw OS thread code.
 
 ```
 var data = vec![1, 2, 3]
-let _ = process(data)       // ephemeral task: runtime ensures fiber
-                             // stops before proceeding (may yield)
+let task = process(data)
+cancel(task)                // runtime ensures fiber stops before
+                            // proceeding (may yield)
 // data is safe — fiber is guaranteed stopped
 ```
 
@@ -6147,8 +6309,8 @@ trade-off of memory safety without `Pin`.
 (async contexts). Creating an ephemeral task on a bare OS thread
 (e.g., inside `thread.spawn_os`) or in an FFI callback is a
 **compile error**, because these contexts cannot yield to the
-scheduler and dropping the task would deadlock. Non-ephemeral tasks
-(capturing only owned values) can be created anywhere.
+scheduler and ephemeral cleanup could need to yield. Non-ephemeral
+tasks (capturing only owned values) can be created anywhere.
 
 ### 14.8 Parallel Execution
 
@@ -6422,7 +6584,7 @@ semantics are completion of all tasks with results in tuple order.
 | All results including errors | `tasks |> await_settled` |
 | First of N with pattern dispatch | `select await` (§14.10) |
 | Dynamic spawn + cancellation scope | `async scope` (§14.9) |
-| Fire-and-forget | `spawn expr` (§14.7) |
+| Fire-and-forget | task expression statement (§14.7) |
 
 #### 14.11.1 Collection Await (Standard Library)
 
@@ -6627,6 +6789,10 @@ async scope s =>
 
 All are usable with `with` blocks for scoped access. Lock operations
 are fiber-aware: contended locks yield the fiber, not the OS thread.
+Any synchronization primitive that can yield the current fiber must be
+represented in `may_suspend` analysis, either as a direct
+scheduler-yielding operation or as an operation returning a `Task` that
+suspends only when awaited.
 
 #### 14.17.1 Atomic[T]
 
@@ -6703,9 +6869,9 @@ The fiber scheduler is part of the standard library. It is:
 - Absent in `no_runtime` builds (and `async` is then a compile error)
 
 The runtime is the one component with hidden scheduling cost. This is
-acceptable because: (a) it is opt-in via `async`, (b) suspension
-points are always marked with `await`, and (c) `no_runtime` builds
-can disable it entirely.
+acceptable because: (a) it is opt-in via `async`, (b) current-fiber
+suspension is known to the compiler and enforced by `may_suspend`
+checks, and (c) `no_runtime` builds can disable it entirely.
 
 ### 14.19 Fiber Stack Management
 
@@ -6796,9 +6962,9 @@ unsafe { c_sort(items.ptr, items.len, (a, b) =>
     a.weight <=> b.weight
 ) }
 
-// OK: spawn a detached task (no .await needed)
+// OK: start a detached task (no .await needed)
 unsafe { c_on_event(event =>
-    spawn handle_event(event)   // detached, runs to completion
+    handle_event(copy_event(event))   // detached if both checks pass
 ) }
 ```
 
@@ -6848,10 +7014,11 @@ mechanisms:
 |--|---------|-----------|
 | **Mechanism** | State machine (compile-time) | Fiber (runtime) |
 | **Runtime required** | No | Yes |
-| **Suspends** | At `yield` | At `await` |
+| **Suspends** | At `yield` | At compiler-known current-fiber suspension points |
 | **Driver** | Caller calls `next()` | Fiber scheduler |
 | **Allocation** | Stack at call site | Heap stack per fiber |
-| **Storable** | Yes (if no captured refs) | `Task[T]` is always storable |
+| **Storable** | Yes (if no captured refs) | Task handle; storable only when non-ephemeral |
+| **Sendable** | Yes if state is `Send` | Only when non-ephemeral, `T: Send`, and captures are `Send` |
 | **`no_runtime` builds** | Works | Compile error |
 
 `gen fn` compiles entirely away — the compiler rewrites it into a
@@ -6859,8 +7026,8 @@ struct and a `next()` method. It has no scheduler dependency and
 works in `no_runtime` builds. It cannot use `.await`.
 
 `async fn` allocates a fiber with a real stack and requires the fiber
-runtime. It can suspend at any `await` point and be driven by the
-scheduler.
+runtime. It can suspend at compiler-known current-fiber suspension
+points and be driven by the scheduler.
 
 If you want a lazy sequence that works everywhere, use `gen fn`. If
 you want concurrent I/O, use `async fn`. They are complementary
@@ -6875,7 +7042,7 @@ async fn main:
 
     loop:
         let conn = listener.accept().await
-        spawn handle_connection(conn)
+        handle_connection(conn)
 
 async fn handle_connection(conn: TcpStream):
     let req = http.parse_request(&conn).await
@@ -6927,36 +7094,47 @@ binding is marked ephemeral. This marking propagates through
 assignments and function calls.
 
 **Passing ephemeral values to functions:** Ephemeral values can be
-passed to functions — by reference or by value. The compiler tracks
-ephemerality and warns if a value might escape its safe scope:
+passed to functions — by reference or by value — only when the
+compiler can prove the value remains within its valid scope, or when
+the callee's effect summary propagates the ephemerality/origin
+information to its result. Ephemerality is part of With's safety
+contract: if the compiler cannot prove that an ephemeral value's
+origin outlives every use, the program is not safe With code.
+
+Clear ephemeral escapes are compile errors. Ambiguous or unproven
+ephemeral escapes are also compile errors, because ambiguity means the
+compiler cannot prove safety. The user can resolve the error by
+keeping the value within scope, returning it with propagated
+ephemerality, converting or copying into owned data, or crossing an
+explicit `unsafe` boundary.
 
 ```
 fn process_task(t: Task[i32]):
     t.await                          // OK: consumes the task
 
 fn store_globally(t: Task[i32]):
-    GLOBAL_TASKS.push(t)            // WARNING: storing a value that
+    GLOBAL_TASKS.push(t)            // ERROR: storing a value that
                                      // may be ephemeral at some call sites
 
 var v = vec![1, 2, 3]
 let task = process(&v)              // ephemeral task
 process_task(task)                   // OK: compiler sees task is consumed
-store_globally(task)                 // ERROR: compiler detects storage of
-                                     // ephemeral value in a global
+store_globally(task)                 // ERROR: compiler cannot prove the
+                                     // ephemeral task stays in scope
 ```
 
-The compiler catches the clear bugs (storing ephemeral refs in
-globals, sending them across threads). For ambiguous cases, it
-warns rather than blocks. You're a systems programmer — you can
-read a warning.
+Warnings are appropriate for weird-but-safe code, performance
+guidance, style, or suspicious but semantically valid patterns. They
+are not sufficient when accepting the program could produce a dangling
+reference, cross-thread borrowed value, detached ephemeral task, or
+erased origin.
 
 **Ephemeral tasks CAN be returned from functions** — the caller's
 binding inherits the ephemerality (Rule 8, §22.1). This is
 essential: `async fn get_profile(self: &UserService)` returns a
 `Task` that captures `&self`. The returned task is ephemeral at
-the call site, preventing the caller from outliving `&self`:
-the call site, preventing the caller from storing it or outliving
-the referenced data:
+the call site, preventing the caller from storing it or outliving the
+referenced data:
 
 ```
 let task = svc.get_profile(id)   // ephemeral: borrows &svc
@@ -6986,7 +7164,8 @@ referents — no lifetime annotations needed.
 
 | Task captures | Ephemeral? | Storable? | `Send`? |
 |---------------|-----------|-----------|---------|
-| Only owned values | No | Yes | Yes (if `T: Send`) |
+| Only owned `Send` values | No | Yes | Yes (if `T: Send`) |
+| Owned but non-`Send` values | No | Yes | No |
 | References/views | Yes | No | No |
 | `@[no_await_guard]` guards | N/A | N/A | Compile error (§7.9) |
 
@@ -7078,13 +7257,20 @@ greet("world")                               // OK: str auto-borrows to &str
 let view: &str = "hello"                     // no allocation, static memory
 ```
 
-**How it works:** A bare string literal produces an owned `str`.
-The compiler may elide the allocation when it can prove the string
-is never mutated, never stored in a heap structure, and never
-escapes the current scope — but this is an optimization, not a
-source-level guarantee. Performance-sensitive code should not rely
-on the optimizer proving allocation unnecessary. Use an explicit
-`&str` annotation or pass to an `&str` parameter for guaranteed
+**How it works:** Type context decides the storage class
+deterministically.
+
+- In `&str` context, the literal is a zero-cost static reference.
+- In owned `str` context, the literal produces an owned `str`. This may
+  allocate or copy unless the compiler applies a documented deterministic
+  elision rule.
+- Elision is allowed only when the compiler can prove the owned value is
+  equivalent to a static immutable string for all observable purposes.
+  The rule is deterministic and participates in no-allocation checking;
+  it is not an unstable optimizer guess.
+
+Performance-sensitive code that requires zero allocation should use an
+explicit `&str` annotation or pass to an `&str` parameter for guaranteed
 zero-cost static storage.
 
 When the type context is `&str` (function parameter, explicit
@@ -7443,12 +7629,21 @@ at the call boundary. The answer is still not "all C calls are
 unsafe." The answer is: generate a safe wrapper when the contract is
 known, or keep the raw ABI surface explicit when it is not.
 
-`unsafe` is still required for raw pointer operations (dereferencing
-`*mut T`, raw pointer indexing, transmutes) and for manual or
-unmodeled raw ABI calls. Calling a modeled `c_import` binding with
-ordinary value arguments is just a function call.
+`unsafe` is still required for operations whose correctness depends on
+facts the compiler cannot prove: raw pointer dereference, raw pointer
+indexing that reads or writes, raw-pointer-to-reference/slice/view
+conversion, allocation-relative pointer distance when same-allocation
+facts are not proven, transmute, pointer-domain casts not specified as
+safe validity-less raw conversions by the target model, unsafe calls,
+and manual or unmodeled raw ABI calls. Raw pointer arithmetic, null
+checks, raw address comparison and difference, pointer-to-address
+observation, address-to-raw-pointer construction, same-domain raw
+pointer relabeling, and raw-address-of operations that do not create
+safe references are safe raw pointer computations; see §16.11. Calling
+a modeled `c_import` binding with ordinary value arguments is just a
+function call.
 
-**Raw pointer operations still need `unsafe`:**
+**Raw pointer access still needs `unsafe`:**
 
 ```
 use c_import("my_lib.h")
@@ -7461,6 +7656,9 @@ let handle = unsafe { my_lib_raw_handle() }
 
 // Pointer dereference — unsafe required
 let value = unsafe { *handle }
+
+// Pointer arithmetic — no unsafe, because no memory is touched
+let next = handle + 1
 ```
 
 **Null-safe pointer conversion:** Raw pointers from C are
@@ -7484,26 +7682,48 @@ let name = ptr_to_string(name_ptr.as_option() ?? return default_name())
 dereference the pointer. The resulting `Option[*const T]` or
 `Option[*mut T]` still requires `unsafe` to dereference.
 
-**The C toolchain is a dependency.** `c_import` invokes the system
-C compiler's preprocessor (configurable, default: `cc -E`) to expand
-includes, resolve `#ifdef`s, and handle platform-specific headers.
-The With compiler then parses the preprocessed output.
+**Compiler-owned C parsing.** `c_import` uses With's compiler-owned
+libclang bridge, not a random system C compiler. Release compilers
+statically link the LLVM/Clang/lld SDK built by the With project, and
+embed Clang's builtin resource headers. At compile time, the compiler
+materializes those embedded resources to a cache and passes that
+resource dir to libclang.
 
-**Cross-compilation limitation:** Unlike Zig (which embeds Clang),
-With's Phase 0 `c_import` depends on the host system's C toolchain.
-Cross-compiling for a different target requires a cross-compiler
-(e.g., `aarch64-linux-gnu-gcc`) to be installed and configured in
-`with.toml`. Phase 2+ may embed a C header parser to eliminate this
-dependency and enable self-contained cross-compilation.
+The normal `c_import` path parses the header with this embedded Clang
+resource setup. It does not probe a system LLVM install, does not
+depend on `llvm-config`, and does not invoke `cc -E` as the core
+header-import mechanism.
+
+**Target C headers are inputs.** Platform libc headers, operating
+system SDKs, vendor headers, and package headers are part of the
+target environment being imported. They may be supplied by the host
+platform SDK, by package metadata such as `with get c.*`, by
+`with.toml`, or by build target include paths. Those headers are
+target inputs, not a dependency on an arbitrary host LLVM/Clang
+installation.
+
+**Cross-compilation.** The parser and Clang resource headers are
+self-contained in the With compiler. Cross-target C interop requires
+the target's headers, sysroot/SDK, and link libraries, but it does not
+fundamentally require an external cross-compiler as a preprocessing
+step. Any remaining shell-out to host tools for SDK discovery or
+macro/preprocessor helper paths is an implementation gap, not a
+language requirement.
 
 **Build configuration:**
 
 ```toml
 # with.toml
 [c_import]
-cc = "cc"                           # C compiler for preprocessing
-include_paths = ["/usr/include"]    # additional -I paths
-defines = { "DEBUG" = "1" }         # additional -D flags
+include_paths = ["vendor/include"]  # additional target header roots
+```
+
+Build targets can also contribute target-specific C import inputs:
+
+```
+target.include_path("vendor/include")
+target.define("DEBUG=1")
+target.link_system_lib("sqlite3")
 ```
 
 ### 16.2 Macro Handling
@@ -7516,11 +7736,11 @@ C macros that are simple constants are translated automatically:
 #define NULL ((void*)0)          // → recognized as null
 ```
 
-Function-like macros are **not automatically translated in Phase 0.**
-C macros are preprocessor token replacements — they do not exist in
-the C AST that `libclang` parses. Translating function-like macros
-requires heuristic token-stream analysis (which Zig spent years
-perfecting). Phase 0 translates only `#define` constants:
+Not every function-like macro can be translated automatically. C
+macros are preprocessor token replacements — they do not exist in the
+C AST that `libclang` parses. Translating function-like macros
+requires heuristic token-stream analysis. The importer always
+translates straightforward object-like `#define` constants:
 
 ```c
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -7529,9 +7749,10 @@ perfecting). Phase 0 translates only `#define` constants:
 ```
 
 Complex macros (token pasting, stringification, variadic macros,
-statement-expression macros) are never translated. The compiler
-emits a warning listing all untranslated macros. Users wrap these
-in a thin C shim file or write manual `extern "C"` bindings.
+statement-expression macros) are not part of the modeled safe surface
+unless the importer can prove an equivalent With expression. Users
+wrap these in a thin C shim file, use the raw surface when one exists,
+or write manual `extern "C"` bindings.
 
 **Function-like macro translation:** Simple expression macros are
 translated to generic functions:
@@ -7544,13 +7765,27 @@ translated to generic functions:
 // → fn ABS[T](a: T) -> T: if a < 0: 0 - a else: a
 ```
 
-Macros with bodies that cannot be pattern-matched to With expressions
-emit a stub with `comptime_error`:
+**Honest generated surface:** A generated `c_import` surface contains
+only real bindings:
 
-```
-fn COMPLEX_MACRO():
-    comptime_error("c_import: macro COMPLEX_MACRO not translatable")
-```
+1. safely modeled bindings, callable as ordinary With APIs; or
+2. raw ABI bindings per §16.1 when the C construct is ABI-expressible
+   but not safely modeled.
+
+An untranslatable construct is inexpressible even as a raw binding: for
+example, a token-paste macro with no stable value or type meaning, a
+compiler extension With cannot represent, or a type that cannot be
+expressed in either the safe or raw surface. Such constructs are
+omitted from the generated binding surface and recorded in the import
+manifest with their name, source location, and reason. Dependent
+bindings that require an omitted inexpressible construct are also
+omitted and recorded with the same reason chain.
+
+Generated bindings must never contain `comptime_error` placeholders or
+any other callable/value stub that pretends an inexpressible C
+construct is part of the usable With surface. `comptime_error` remains
+a user-authored language feature, not a compiler-generated fallback for
+failed C translation.
 
 **Acknowledged omissions:** `allow_untranslated` names declarations,
 macros, or other imported C entities that the project explicitly
@@ -7565,10 +7800,30 @@ use c_import("complex_lib.h",
 )
 ```
 
-This is not a silent fallback. Anything outside the allow-list that
-cannot be translated correctly must still produce a diagnostic or a
-loud `comptime_error` stub. A generated binding surface must never
-pretend an untranslatable construct works.
+This is not a silent fallback. Allow-listed omissions are still omitted
+and recorded as unavailable; they are not emitted as callable
+placeholder APIs. Anything outside the allow-list that is
+inexpressible must also be omitted and reported.
+
+The requested surface of a bare `use c_import("h")` is the available
+surface of that header under the selected platform and preprocessor
+configuration. Inexpressible constructs in that surface are
+partial-but-honest omissions: ordinary import reports every gap but
+does not fail merely because such a construct exists. Referencing an
+omitted symbol is a directional compile error that names the symbol,
+why it could not be translated, and the alternative: use the raw
+surface if this is a §16.1 unsafe/raw-modeling case, or accept that the
+C construct has no With representation if it is genuinely
+inexpressible.
+
+Whole-import non-zero failure is reserved for:
+
+- an explicit selective import request that names an inexpressible
+  symbol;
+- completeness mode (`with migrate`, or an explicit strict import flag)
+  where incomplete translation is itself the error; and
+- import failures such as a missing header, parse failure, unsupported
+  target configuration, or toolchain crash.
 
 **Constant expression evaluation:** `#define` macros with arithmetic
 expressions, bitwise operations, casts, and references to other macros
@@ -7598,10 +7853,10 @@ let table = g_hash_table_new(g_str_hash, g_str_equal)
 g_hash_table_insert(table, "name", "Eric")
 g_hash_table_destroy(table)
 
-// With auto-methods:
+// With modeled owning wrapper, when ownership evidence exists:
 let table = GHashTable()
 table.insert("name", "Eric")
-// table.destroy() called automatically at scope exit
+// Drop calls g_hash_table_destroy when table's value lifetime ends.
 ```
 
 **Detection rules.** For each struct `S` from `c_import`, the
@@ -7617,20 +7872,48 @@ stripped:
 g_hash_table_new       → GHashTable.new(...)      // constructor
 g_hash_table_insert    → .insert(...)              // method
 g_hash_table_lookup    → .lookup(...)              // method
-g_hash_table_destroy   → .destroy()                // destructor
+g_hash_table_destroy   → .destroy()                // method candidate
 ```
 
 **Constructor syntax.** If a type has a `.new` method, the type
 name itself becomes callable: `GHashTable(args)` is sugar for
 `GHashTable.new(args)`.
 
-**Destructor detection and auto-defer.** Functions matching
-`prefix_destroy`, `prefix_free`, `prefix_close`, `prefix_unref`,
-or `prefix_release` are tagged as destructors. When a constructor
-result is bound to a non-escaping `let`, the compiler inserts
-`defer obj.destructor()` automatically. Auto-defer does NOT apply
-when the value is returned, stored in a collection, bound to `var`,
-or passed to an ownership-transferring function.
+**Proven ownership cleanup.** Method-name detection and ownership are
+separate facts. Name heuristics such as `prefix_destroy`,
+`prefix_free`, `prefix_close`, `prefix_unref`, and `prefix_release`
+may produce candidates, import-manifest notes, or diagnostics
+suggesting a likely constructor/destructor pairing. They may not, by
+themselves, insert cleanup, call a destructor, generate an owning
+wrapper, or mark a raw C value as owned.
+
+`c_import` may treat a C resource as owned only when ownership is known
+from evidence that proves or asserts the contract:
+
+- an explicit annotation;
+- author-supplied or imported metadata;
+- conservative source/header analysis strong enough to prove the
+  ownership contract;
+- a curated, library-specific convention that asserts facts about a
+  known library; or
+- a hand-written owning wrapper.
+
+Generic naming conventions and speculative source analysis are not
+ownership evidence.
+
+When ownership is established, cleanup is expressed only as a generated
+owning wrapper type whose `Drop` calls the correct C destructor. The
+compiler does not insert scope-local `defer` for C resources. A
+`Drop`-owning wrapper handles locals, returned values, and values
+stored inside other owning structures because cleanup follows the
+value's lifetime rather than a lexical scope.
+
+Raw pointers and raw handles stay raw unless wrapped by a proven
+ownership model. Reference-counted resources are modeled according to
+their actual contract: a `Drop` wrapper that calls `unref` is generated
+only for values built from an owning constructor or retain/copy/create
+operation that returns a +1 reference. Borrowing accessors produce
+non-owning handles with no `Drop`.
 
 **Opt-out.** Per-type: `use c_import("lib.h", no_methods: "Type")`.
 Global: `use c_import("lib.h", no_methods: true)`. Flat C functions
@@ -7686,82 +7969,98 @@ to be pointed at. `void` is not a keyword or built-in type in With
 (the unit type is `Unit`). `c_import` automatically translates C's
 `void*` parameters to `*mut c_void`.
 
-### 16.3c Auto-Coercion at `c_import` Boundaries
+### 16.3c Contract-Driven Coercion at `c_import` Boundaries
 
-C APIs use `void*` as an opaque data type. glib, CoreFoundation,
-Win32, POSIX — every major C library passes data through opaque
-pointers. Requiring explicit casts on every call defeats With's
-"C interop should feel native" promise.
+C APIs use strings, byte buffers, mutable buffers, and `void*` through
+contracts that are not fully present in the C type spelling. With keeps
+those APIs ergonomic by modeling the contract in the binding and
+generating the correct bridge. It does not reinterpret values from type
+spelling or receiving context alone.
 
-The compiler auto-coerces at `c_import` function call boundaries
-when the conversion is unambiguous. The user writes normal With
-types. The compiler inserts the ABI translation.
-
-```
-// Without auto-coercion (explicit casts):
-g_hash_table_insert(table, "name" as *mut c_void, "Eric" as *mut c_void)
-let val = g_hash_table_lookup(table, "name" as *mut c_void) as *const u8
-
-// With auto-coercion (compiler inserts conversions):
-table.insert("name", "Eric")
-let val: str = table.lookup("name")
-```
-
-**Parameter coercions (With → C).** When calling a function
-imported via `c_import`, if an argument type doesn't match the
-parameter type, the compiler attempts auto-coercion:
-
-| Argument type   | Parameter type    | Coercion                                  |
-|-----------------|-------------------|-------------------------------------------|
-| `str`           | `*mut c_void`     | pointer to string data                    |
-| `str`           | `*const c_void`   | pointer to string data                    |
-| `str`           | `*const u8`       | pointer to string data                    |
-| `str`           | `*const c_char`   | pointer to string data (null-terminated)  |
-| `str`           | `*mut c_char`     | pointer to copy (caller must free — warn) |
-| `i32`           | `c_int`           | identity (same repr)                      |
-| `bool`          | `c_int`           | 1 or 0                                    |
-| `*mut T`        | `*mut c_void`     | pointer cast                              |
-| `*const T`      | `*const c_void`   | pointer cast                              |
-
-These coercions ONLY apply at `c_import` function call sites.
-They do not apply to user-defined functions, assignments, or
-any other context.
-
-**Return coercions (C → With).** When the return type of a
-`c_import` function is `*mut c_void` or `*const c_void`, the
-compiler coerces based on the receiving context:
-
-| Return type     | Receiving context   | Coercion                       |
-|-----------------|---------------------|--------------------------------|
-| `*mut c_void`   | `let x: str = ...`   | null-check + strlen → str view |
-| `*mut c_void`   | `let x: *mut T = ...`| pointer cast                   |
-| `*const c_void` | `let x: str = ...`   | null-check + strlen → str view |
-| `*const c_void` | `let x: *mut T = ...`| pointer cast                   |
-| `*mut c_void`   | no annotation        | stays `*mut c_void` (no guess) |
-
-Without a type annotation, no return coercion happens — the value
-stays as the C return type.
-
-**Null safety.** The `*mut c_void` → `str` coercion always inserts
-a runtime null check. If the pointer is null, the result is `""`
-(empty string, not a crash).
+The compiler may auto-coerce at a `c_import` boundary only when the
+compiler or binding models the full contract needed for that
+conversion: sentinel, length or capacity, lifetime and retention,
+nullability, mutability, ownership, allocation, cleanup, and copy-back.
+If those facts are missing, the operation stays on the raw surface.
 
 ```
-// Option form for explicit null handling:
-let name: Option[str] = table.lookup("name")
-// None if null, Some(str) if non-null
+// Modeled input C string contract:
+fopen(path, mode)        // compiler supplies call-scoped C strings
+
+// Modeled byte-buffer contract:
+write(fd, data)          // compiler supplies data.ptr and data.len together
+
+// Raw surface when the contract is unknown:
+raw_register_callback(name_ptr as *const c_char)
 ```
 
-**What does NOT auto-coerce:**
+**`str` → input C string (`*const c_char`).** A `str` may be passed
+automatically to a `*const c_char` parameter only when the binding
+establishes all of these facts:
 
-- `str` → `*mut i32` (not a void pointer)
-- `i32` → `*mut c_void` (integer to pointer — never implicit)
-- `f64` → `c_int` (lossy — never implicit)
-- `Vec[T]` → `*mut c_void` (complex type — never implicit)
-- `str` → `*mut c_void` in non-`c_import` functions
+1. the parameter is a read-only, NUL-terminated input string;
+2. the value has no interior NUL, or the conversion handles one loudly;
+3. the C callee does not retain the pointer after the call.
 
-The rule: coercions are only between types where the conversion is
-unambiguous and lossless at the representation level.
+If the argument is a string literal or another value the compiler can
+prove already lives in valid NUL-terminated storage, the compiler may
+pass it directly. Otherwise it generates a call-scoped
+NUL-terminated temporary and frees it when the call returns.
+
+Interior NUL is never silently truncated. A proven interior NUL is a
+compile error; a dynamic interior NUL is checked at runtime and
+reported according to the binding's error model. The conversion passes
+the `str` bytes unchanged and does not silently transcode.
+
+When the binding cannot prove non-retention, or knows that C stores the
+pointer, a call-scoped temporary is forbidden. The safe surface must
+require caller-managed storage such as `CStr`, `CString`, or a
+generated wrapper with a suitable lifetime, or the API remains raw.
+
+**`str` → byte buffer (`*const u8`).** A safe byte-buffer binding must
+convey both the data pointer and its paired length or equivalent bound.
+`str` may be adapted to C APIs such as `write(fd, data.ptr, data.len)`
+when the binding models that pair. Passing only `data.ptr` to an
+unbounded C reader is raw pointer interop.
+
+**`str` → mutable C string or writable buffer (`*mut c_char`).** There
+is no implicit `str` to `*mut c_char` conversion with a hidden
+caller-must-free allocation. A writable C buffer requires a modeled
+buffer contract: a caller-provided `mut` slice or buffer with known
+capacity, a generated owned buffer type whose `Drop` handles cleanup,
+or a generated wrapper that defines allocation, capacity, initialized
+length, mutation behavior, cleanup, and whether contents copy back into
+With.
+
+**`void*` and opaque pointers.** `*mut c_void` and `*const c_void` are
+opaque. Expected-type context does not prove pointee type, lifetime,
+ownership, nullability, or validity. A `void*` may be converted
+automatically only when trusted binding metadata or a generated wrapper
+proves what it represents. Otherwise it remains `*c_void`; using it
+requires the raw surface or an explicit cast.
+
+In particular, `void*` to `str` is never generated merely because the
+receiving context is `str`. Calling `strlen` on an arbitrary `void*`
+is an unsafe memory read based on a guess. It is allowed only when the
+binding proves the pointer is a valid NUL-terminated string with known
+lifetime and nullability.
+
+**Nullability.** Null is information. A nullable C string or pointer
+return is modeled as `Option[str]`, `Option[*T]`, or an equivalent
+generated wrapper. `None` and `Some("")` are distinct unless the C
+contract explicitly states that null means empty.
+
+**Always raw unless modeled:** arbitrary `void*`, retained or
+unknown-lifetime string pointers, mutable C buffers without a modeled
+contract, pointer-only byte buffers with no bound, explicit pointer
+casts, and any API whose lifetime, ownership, or nullability cannot be
+proven.
+
+No safe conversion may silently truncate at an interior NUL, allocate
+hidden caller-owned memory, pass a call-scoped temporary to an API that
+retains it, silently transcode string bytes, erase nullability, call
+`strlen` on an unproven pointer, or reinterpret a `void*` from expected
+type alone.
 
 ### 16.4 Layout Control
 
@@ -7927,17 +8226,22 @@ context — it requires a pointer type annotation. Using `null` without
 type context is a compile error. `null` is not the same as `0`.
 Dereferencing `null` is undefined behavior (caught by `unsafe`).
 
-### 16.11 Unsafe Context
+### 16.11 Raw Pointer Operations and `unsafe`
 
 ```
 fn use_ptr(p: *mut i32, end: *mut i32):
-    let third = p + 2          // pointer arithmetic is safe
-    let diff = end - p         // pointer difference is safe
+    let q = p + 2              // raw pointer arithmetic is safe
+    let at_end = q == end      // raw pointer comparison is safe
+    let addr = p as usize      // address observation is safe
+    let r = addr as *mut i32   // validity-less raw pointer construction
+    let bytes = q as *mut u8   // same-domain raw pointer relabeling
 
     unsafe:
-        let val = *third       // raw pointer dereference
-        let val2 = p[2]        // raw pointer indexing
-        p[0] = 42              // write through raw pointer
+        let val = *q           // raw pointer dereference
+        let val2 = p[2]        // raw pointer indexing that reads
+        p[0] = 42              // raw pointer indexing that writes
+        let ref = q as &i32    // raw pointer to safe reference
+        let s = slice(q, 2)    // raw pointer to safe slice/view
 ```
 
 Certain operations in With can violate memory safety if misused.
@@ -7945,11 +8249,38 @@ These operations are permitted only within an `unsafe` context:
 the body of an `unsafe fn`, the scope of an `unsafe:`/`unsafe {}` block,
 or the narrow `unsafe *p` / `unsafe p[i]` raw-access prefix.
 
+The boundary is:
+
+> Address computation, comparison, and same-domain raw-pointer
+> relabeling are safe. Memory access or validity assertion is unsafe.
+
+`unsafe` is not a tax on foreignness, and it is not a tax on pointers.
+It marks the operation whose safety the compiler cannot prove. Pointer
+arithmetic computes an address. Pointer comparison compares addresses.
+Same-domain raw-pointer casts relabel raw pointer values. None of these
+operations reads memory, writes memory, creates a safe reference, or
+proves bounds, alignment, liveness, initialization, ownership,
+uniqueness, permissions, or provenance.
+
 The operations that require an unsafe context are:
 
 - Raw pointer dereference (`*p` for read or write)
 - Raw pointer indexing (`p[i]` for read, `p[i] = v` for write)
+- Raw-pointer-to-reference conversion (`p as &T`)
+- Raw-pointer-to-slice/view conversion (`slice(p, len)` or equivalent)
+- Allocation-relative pointer distance when same-allocation facts are
+  not proven
+- `transmute`, or reinterpretation into a non-raw value, safe
+  reference, safe memory abstraction, or other type whose invariants
+  safe code will trust
+- Pointer-domain casts not specified as safe validity-less raw
+  conversions by the target model
+- Calls to `unsafe fn`
 - Calls to manual `extern` functions or raw/unmodeled ABI bindings
+- Any operation whose correctness depends on the pointer being valid,
+  live, aligned, initialized, in bounds, dereferenceable, owned,
+  uniquely writable, carrying the required permissions, or carrying the
+  required provenance
 - Other operations explicitly marked as unsafe in their definition
 
 For the common raw-memory access case, `unsafe` may be used as a
@@ -7971,34 +8302,197 @@ separately or placed in an unsafe block. Use `unsafe { ... }` or a
 newline `unsafe:` block for unsafe calls, transmutes, asm, and
 compound unsafe expressions.
 
-The following operations involving raw pointers are safe and do
-not require an unsafe context:
+The following operations involving raw pointers are safe and do not
+require an unsafe context:
 
-- Raw pointer arithmetic (`p + n`, `p - n`, `p - q`)
-- Raw pointer comparison (`p == q`, `p < q`, etc.)
-- Taking the address of a value (`&x`, `&raw mut x`)
-- Casting a pointer to an integer (`p as usize`)
-- Casting an integer to a pointer (`n as *T`)
+- Raw pointer arithmetic (`p + n`, `p - n`)
+- Raw pointer offset calculation
+- Raw pointer equality comparison
+- Raw pointer null checks
+- Raw address ordering/comparison (`p < q`, `p >= q`, etc.)
+- Raw address difference, when specified as integer address subtraction
+- Pointer-to-address/integer observation (`p as usize`)
+- Integer/address-to-raw-pointer construction of a validity-less raw
+  pointer value (`n as *T`)
+- Same-domain raw-pointer-to-raw-pointer casts that relabel the pointee
+  type or source-level mutability qualifier
+- Raw-address-of operations that do not materialize a safe reference
 
-Raw pointer arithmetic uses element units:
+These operations compute, compare, observe, or relabel raw pointer
+values only. They do not read memory, write memory, create a safe
+reference, create a slice/view, or assert that the resulting pointer is
+valid to use.
 
-- `ptr + n` advances by `n * sizeof(T)` bytes.
-- `ptr - n` retreats by `n * sizeof(T)` bytes.
-- `ptr1 - ptr2` returns the element count between pointers.
-- Result preserves mutability: `*mut T + n` -> `*mut T`.
+For typed pointer arithmetic, `p + n` means address computation scaled
+by the pointee size: conceptually `addr(p) + n * sizeof(T)` under the
+target raw-pointer model. Under the flat-address default, both the
+scaling and the address addition use deterministic wrapping arithmetic
+over the target pointer-address width. The result is still only a raw
+pointer value, not a validity claim.
 
-Computing a pointer value cannot by itself read invalid memory,
-write invalid memory, or violate type invariants. The unsafe
-requirement is placed at the access site, not at every intermediate
-computation:
+An overflowing raw pointer offset produces a raw pointer value by
+deterministic wrapping address computation under the flat-address
+default. It does not produce an implicit validity claim. The resulting
+pointer may be invalid to dereference, but computing it is defined.
 
-> `unsafe` is required when you are about to touch memory through
-> a raw pointer, not when you are merely computing one.
+Raw pointer difference is safe only when it is specified as
+address-value subtraction. If an operation instead claims
+same-allocation element distance, then same-allocation provenance and
+bounds are being asserted. That stronger operation is safe only when
+proven; otherwise it belongs behind `unsafe` or on the raw surface.
 
-Users may freely compute pointer addresses in safe code. The
-resulting pointer value carries the same responsibility as any raw
-pointer: it may only be used to access memory within an unsafe
-context.
+A raw-pointer-to-raw-pointer cast is safe when it relabels the pointee
+type or source-level mutability qualifier (`*const` <-> `*mut`) without
+changing the pointer's domain or representation. Such a cast relabels
+the raw pointer value. It is not the value-bit transmute of the unsafe
+list, and it asserts nothing about the new pointee type. Alignment,
+validity, initialization, aliasing permission, and provenance for the
+new type are asserted only when the pointer is dereferenced or
+converted to a safe abstraction, which already requires `unsafe`.
+
+Changing the source-level mutability qualifier is a relabel, not a
+capability grant. Casting `*const T` to `*mut U` constructs only a raw
+mutable pointer value; it grants no write capability, uniqueness,
+ownership, or validity, and any write through the result remains unsafe
+under the ordinary raw-pointer access contract.
+
+A **pointer-domain cast** changes the pointer's address space,
+capability class, segment class, function/data-pointer class,
+host/device domain, hardware or capability permission bits, or
+representation. It is not an ordinary relabel. Which such casts exist
+and how they behave is governed by the target raw-pointer model. A
+pointer-domain cast is safe only if the target model specifies it as a
+validity-less raw pointer conversion; otherwise it requires `unsafe` or
+is rejected through an explicit target-defined cast form rather than the
+ordinary `as` relabel.
+
+The source-level mutability qualifier is not a permission in this
+target-model sense. Hardware or capability permission bits, such as
+CHERI load/store/execute permissions, are target-defined facts;
+manufacturing or stripping them is a pointer-domain cast, not a
+same-domain relabel.
+
+Converting a raw pointer into a safe memory abstraction is also an
+unsafe access boundary. A reference, slice, view, span, or similar safe
+type asserts validity, bounds, alignment, lifetime, initialization, and,
+where applicable, provenance. That assertion must be made in an unsafe
+context at the conversion site; it is not deferred until later safe code
+uses the converted value.
+
+Passing a raw pointer to a function is not unsafe by itself. The
+obligation, if any, lives in the callee's signature or wrapper contract.
+A function that dereferences, retains, mutates through, converts, or
+otherwise relies on caller-guaranteed validity of a raw pointer
+parameter has a safety precondition that the raw pointer type does not
+encode. Such a function is an `unsafe fn`, unless the compiler or
+binding wraps the contract into a safe surface.
+
+For in-language functions, the compiler may prove that the function
+does not rely on the pointer's validity: it never dereferences, retains,
+mutates through, converts to a safe reference/view, or passes the
+pointer to a contract that relies on validity. A function proven not to
+rely on the pointer's validity may be safe, and passing a raw pointer to
+it is safe.
+
+For foreign functions, the compiler cannot infer that contract across
+the boundary. A foreign function that takes raw pointers is unsafe by
+default unless the binding declares the pointer contract safe, or
+generates a safe wrapper that validates and models the relevant
+nullability, bounds, lifetime, ownership, retention, mutation, and
+permission rules.
+
+Indexing must distinguish address calculation from memory access. If
+`p + i` computes the address of element `i`, it is safe. If `p[i]`
+reads or writes element `i`, it is unsafe. If the language provides an
+address-only form such as `&raw p[i]` or equivalent, that form is safe
+only if it is specified to compute a raw address without materializing a
+safe reference. A form that creates `&T` from a raw pointer is unsafe,
+even if the reference exists only transiently.
+
+If With's memory model carries pointer provenance, the safe/unsafe
+split remains the same. Raw pointer arithmetic computes a raw pointer
+value without asserting that the pointer has the provenance required for
+any future access. Integer-to-pointer conversion constructs a raw
+pointer value without asserting valid provenance. Same-domain raw
+pointer casts relabel the raw pointer value without asserting provenance
+for the new pointee type.
+
+The unsafe dereference, raw-pointer-to-reference conversion,
+raw-pointer-to-slice conversion, or unsafe call is where the programmer
+asserts that the pointer has the required validity and provenance. This
+section defines that constructing, computing, comparing, and relabeling
+raw pointer values is safe, while relying on them as memory requires
+`unsafe`. It does not decide which integer-derived or relabeled pointers
+are actually usable under With's memory model.
+
+Under an exposed/permissive-provenance model, a later unsafe access may
+be valid when the programmer upholds the contract. Under a
+strict-provenance model, some integer-derived pointers may remain
+invalid to dereference regardless of `unsafe`. That determination
+belongs to the memory-model section. Provenance does not move the unsafe
+boundary to arithmetic or relabeling; it is part of what the unsafe
+access or conversion asserts.
+
+On capability, segmented, or otherwise non-flat-address targets, the
+target-specific raw-pointer model governs and overrides the flat-address
+default. Such a target must specify how safe raw pointer arithmetic
+behaves: preferably by producing a deterministic validity-less,
+narrowed, untagged, or otherwise invalid raw pointer value whose later
+use is where failure occurs; or, if the hardware or ABI genuinely
+requires arithmetic itself to trap, by documenting that target-defined
+trapping behavior explicitly. A backend for such a target is not
+required to fabricate flat wrapping semantics it cannot provide, but it
+must specify its raw-pointer model and keep the safe/unsafe boundary
+honest for that target.
+
+**Backend obligation:** Safe raw pointer arithmetic, comparison, address
+difference, and same-domain raw-pointer relabeling must lower as raw
+address operations. The compiler must not introduce undefined behavior,
+poison, trapping behavior, or optimizer assumptions unless the
+corresponding fact has been proven, subject to the specified target
+raw-pointer model.
+
+For these operations the backend must not attach or imply in-bounds,
+in-range, dereferenceability, alignment, no-overflow,
+allocation-membership, provenance, ownership, uniqueness,
+write-permission, or lifetime assumptions unless those facts are
+proven. For LLVM backends, ordinary raw pointer arithmetic must not be
+lowered with `inbounds` or `inrange` GEP, or equivalent metadata, unless
+those facts have been proven. It also must not use `nuw`/`nsw`-style
+assumptions for address arithmetic unless overflow has been proven
+impossible. Absent such proof, arithmetic lowers to the target's
+specified raw address computation, which is deterministic wrapping
+arithmetic under the flat-address default.
+
+Raw pointer comparison must lower to address-value comparison without
+range, provenance, allocation-membership, dereferenceability, or
+lifetime assumptions. LLVM pointer `icmp` or target-approved
+integer-address comparison may be used when it preserves With's raw
+address comparison semantics. C relational pointer comparison is not an
+acceptable lowering for arbitrary raw addresses, because C imposes
+restrictions on relational comparison of pointers from unrelated
+objects.
+
+Raw address difference carries the same obligation as comparison: it
+must lower to integer subtraction of the address values, with no
+same-allocation, provenance, or allocation-membership assumption. It
+must not be lowered as C pointer subtraction, whose result is defined
+only for pointers into the same object. Allocation-relative element
+distance is a distinct, stronger operation and is lowered only where the
+same-allocation facts have been proven.
+
+A same-domain raw-pointer relabeling cast lowers to a no-op, bitcast, or
+target-approved raw pointer cast that preserves the raw pointer value
+without adding alignment, dereferenceability, provenance, address-space,
+capability, permission, or lifetime assumptions for the new pointee
+type. Pointer-domain casts lower according to the target raw-pointer
+model.
+
+This does not forbid optimization. If the compiler has proven a stronger
+fact, such as a checked slice index being in bounds, it may use a
+stronger lowering for that proven case. The rule forbids assuming those
+facts for arbitrary raw pointer arithmetic, comparison, difference, or
+relabeling.
 
 ### 16.12 Intrinsics
 
@@ -8122,7 +8616,30 @@ log("hello")  // prints "[src/main.w:5] hello"
 
 ### 17.1 Compile-Time Evaluation
 
-`comptime` executes code at compile time. Deterministic, side-effect-free.
+`comptime` executes code at compile time. The invariant is not "no
+effects"; it is: no build output may depend on undeclared, untracked,
+ambient state. Comptime may use information only when that information is
+declared, authorized, and tracked.
+
+There are two independent questions:
+
+1. **Determinism:** is the result a deterministic function of declared,
+   tracked inputs?
+2. **Access authority:** is the operation allowed to touch the thing it
+   wants to touch?
+
+A capability grants access authority. It does not grant permission to
+produce nondeterministic output.
+
+With has three comptime modes:
+
+1. **Pure comptime** — deterministic computation over values.
+2. **Tracked-input comptime** — deterministic reads of explicitly named
+   or purely-computed authorized inputs, each recorded as a build
+   dependency.
+3. **Capability-bearing comptime** — build, package, C interop,
+   migration, code generation, and tool effects mediated by
+   driver-minted capabilities.
 
 ```
 comptime fn build_table(keys: [str]) -> HashMap[str, usize]:
@@ -8138,16 +8655,91 @@ const ROUTES = comptime build_table(["/", "/health", "/users"])
 
 Any function marked `comptime fn` can only call other `comptime`
 functions and use types that are available at compile time. It cannot
-perform I/O, allocate heap memory that persists to runtime, or call
-FFI functions. The result must be a value that can be embedded in the
-binary as a constant.
+perform ambient I/O, inspect directories, read the environment or clock,
+make network calls, spawn processes, call FFI, mint capabilities, depend
+on host-global state, call the runtime heap allocator, or carry runtime
+allocator identity across the compile/runtime boundary. It may allocate
+inside the compiler evaluator and produce static program data such as
+constants, generated tables, generated bytes, and embedded assets. The
+result must be a value that can be embedded in the binary as a constant.
 
-### 17.1a Capability-Bearing Comptime
+Pure comptime may not call FFI. Capability-bearing comptime may invoke
+trusted, tracked foreign tools through explicit capabilities, preferring
+sandboxable subprocesses. In-process FFI is restricted to compiler-owned
+pinned toolchain integrations or explicitly trusted local build code; it
+is never ambient authority for dependency code.
 
-Pure comptime is deterministic and effect-free. Build orchestration and
-compiler-driver tools use the same comptime evaluator, but with explicit
-driver-minted capabilities. A capability-bearing comptime entry point
-declares the capabilities it requires with a `comptime with` clause.
+### 17.1a Tracked-Input Comptime
+
+Some comptime operations read external inputs and still remain
+deterministic because the input is explicitly named, authorized, and
+tracked. `embed_file("logo.png")` is the canonical example: it is not
+general file I/O, it is a declaration that `logo.png` is a compile-time
+input.
+
+A tracked-input operation is allowed when:
+
+1. the input is resolved by pure comptime before it is read;
+2. the resolved input is inside an authorized package/source root, or
+   access is granted by an explicit capability;
+3. the operation is deterministic over that resolved input;
+4. the input is recorded in the build graph before or as it is read.
+
+The decisive distinction is declared input versus discovered input.
+Computing `"assets/" ++ name ++ ".png"` from pure comptime constants is
+allowed if the resolved path is registered before the read. Globbing a
+directory, listing files, reading `$HOME`, consulting the environment, or
+inspecting the filesystem to decide what to read is input discovery. If
+discovery is needed, it belongs in capability-bearing comptime, where the
+discovery itself becomes part of the build graph, manifest, or
+reproducibility record.
+
+The model may extend beyond `embed_file`, but only through
+compiler-recognized APIs that declare their inputs to the build graph
+before reading them. Ordinary pure comptime does not get ambient file I/O
+by promising to be deterministic.
+
+### 17.1b Capability-Bearing Comptime
+
+Capability-bearing comptime is a separate mode for build orchestration,
+package integration, C interop, migration, code generation, and tool
+execution. Build orchestration and compiler-driver tools use the same
+comptime evaluator, but with explicit driver-minted capabilities. A
+capability-bearing comptime entry point declares the capabilities it
+requires with a `comptime with` clause.
+
+Capabilities are unforgeable values granting specific authority:
+filesystem access, process execution, package/network access,
+environment access, output writing, tool invocation, or similar. They
+bound what build code may touch, especially for untrusted fetched
+dependencies. A dependency's `build.w` does not receive ambient access to
+the user's machine merely because the package was fetched.
+
+Capabilities are not a determinism waiver. Any effect that affects the
+compiled output must still be deterministic over declared, tracked, or
+pinned inputs. A package fetch must be pinned and content-addressed. A
+code generator must run hermetically or record its inputs. A process
+invocation that affects output must track its command, inputs, outputs,
+environment, and relevant tool identity. An environment variable that
+affects output must be declared as a build input.
+
+If an effect is genuinely nondeterministic, that nondeterminism must be
+visible: recorded, marked non-reproducible, or rejected in strict mode.
+Self-hosting compiler builds reject nondeterminism; the fixpoint requires
+it to be absent.
+
+`c_import` is the canonical cross-case. It reads C headers, which are
+declared and tracked inputs, and it uses the compiler-owned C
+parser/toolchain. That toolchain identity is itself a tracked input. The
+embedded LLVM/Clang SDK is therefore part of the reproducibility model:
+using an ambient system Clang would make bindings depend on undeclared
+host state.
+
+`with migrate` is capability-bearing tooling. Its output is normally
+reviewable source that the user commits, so nondeterminism there is a
+quality and trust issue before it is a fixpoint issue. If migration or
+code generation is invoked as part of a build action, the normal
+capability-bearing rules apply.
 
 The canonical form names both the capability type and the local binding:
 
@@ -8366,12 +8958,12 @@ fn legacy_api():
 // Calling legacy_api() anywhere → immediate compile error.
 ```
 
-`c_import` uses `comptime_error` for untranslatable C constructs:
-
-```
-fn __builtin_complex():
-    comptime_error("c_import: __builtin_complex not translatable")
-```
+Compiler-generated `c_import` bindings do not use `comptime_error` as
+a fallback for untranslatable C constructs. User-authored
+`comptime_error` is for concept checks, removed APIs, and other
+intentional compile-time failures. Failed C translation is handled by
+the honest-surface rule in §16.2: omit and report inexpressible
+constructs, and never generate callable placeholder bindings.
 
 ### 17.6 Real-World Examples
 
@@ -8431,9 +9023,18 @@ const HELP_TEXT: str = embed_file("help.txt")
 const TEMPLATE: str = embed_file("templates/page.html")
 ```
 
-The path is resolved relative to the source file. If the file does not
-exist, a compile error is emitted. The file contents are embedded verbatim
-as a string constant in the binary.
+`embed_file` is a tracked-input comptime intrinsic, not ordinary file
+I/O. The path expression must resolve by pure comptime before the read.
+The resolved path is relative to the source file and must be inside an
+authorized package/source root unless an explicit capability grants
+broader access. The compiler records the file as a build dependency
+before or as it reads it, and rebuilds when the file changes. If the file
+does not exist, a compile error is emitted. The file contents are
+embedded verbatim as a string constant in the binary.
+
+`embed_file` reads declared inputs. It does not inspect directories,
+expand globs, consult the environment, or discover which files to embed
+from ambient filesystem state.
 
 **Numeric builtins:**
 
@@ -8489,10 +9090,15 @@ Maps to a single hardware instruction on all modern architectures
 2. **Generated code is checked.** All code produced by comptime goes
    through the type checker and borrow checker. comptime cannot
    violate language invariants.
-3. **No I/O.** comptime code cannot read files, make network calls,
-   or access the environment.
-4. **Deterministic.** The same comptime expression with the same
-   inputs always produces the same output.
+3. **No ambient effects.** Pure comptime cannot read files, inspect
+   directories, make network calls, access the environment, read the
+   clock, spawn processes, call FFI, mint capabilities, or depend on
+   host-global state. Tracked-input intrinsics and capability-bearing
+   comptime are separate modes described in §17.1.
+4. **Deterministic over tracked inputs.** The same comptime expression
+   with the same declared, authorized, tracked inputs always produces the
+   same output. No comptime mode may let undeclared ambient state affect
+   the build output silently.
 5. **No macros.** With does not have token-level or AST-level macros.
    comptime with type introspection replaces the need for them. This
    is a deliberate choice to keep the compilation model simple — one
@@ -8651,7 +9257,14 @@ The standard build graph API lives in `std.build`. It defines
 
 `build.w` runs as capability-bearing comptime, not ordinary pure
 `comptime`. Build code may perform effects only through `std.build`
-capabilities supplied by the driver.
+capabilities supplied by the driver. Those capabilities grant authority,
+not nondeterminism: any output-affecting effect must be deterministic
+over declared, tracked, or pinned inputs, or it must be recorded as
+nondeterministic and rejected in strict and self-hosting builds.
+Untrusted fetched build code receives only the capabilities the driver
+grants it; compiling a project does not give dependencies ambient access
+to the user's filesystem, environment, network, process table, or
+toolchain.
 
 The compiler driver discovers `build.w`, evaluates the `build` entry
 point with a driver-minted `BuildCtx`, consumes the returned typed build
@@ -8885,8 +9498,8 @@ The standard library is layered. Users write idiomatic With code
 against `std.*` modules. They should never need `c_import` for
 ordinary programming tasks.
 
-**Layer 0: `c_import`** — compiler built-in (Phase 0). The mechanism
-by which the standard library itself accesses platform APIs.
+**Layer 0: `c_import`** — compiler built-in. The mechanism by which
+the standard library itself accesses platform APIs.
 
 **Layer 1: `std.os`** — thin safe wrappers around platform APIs
 (libc, POSIX, Win32). Written using `c_import` internally. Not
@@ -8962,7 +9575,7 @@ that doesn't need a heap allocator or OS:
 | Ranges | `0..10`, `0..=10` |
 | Math | Integer and float arithmetic, `min`, `max`, `abs` |
 | Bitwise | All bit operations on integer types |
-| Pointers | `*T`, `*mut T`, raw pointer operations (unsafe) |
+| Pointers | `*T`, `*mut T`, safe raw address arithmetic/comparison, unsafe raw memory access/conversion (§16.11) |
 | Comptime | All compile-time evaluation (§17) |
 | `c_import` | Full C interop — this is how you talk to hardware |
 | Ownership | Full borrow checker, move semantics, drop — all compile-time, zero cost |
@@ -9241,19 +9854,50 @@ the compiler rejects it.
 
 ## 20. Performance Guarantees
 
-1. **Allocations are obvious.** You can see where allocation
-   happens — `Vec.new()`, `.to_owned()`, `[x for x in ...]`,
-   `"hello {name}"`. No allocation hides behind innocent syntax.
-   But the language doesn't force you to type `collect[Vec]()` when
+1. **Allocation is attributable.** Allocation need not be spelled as
+   `malloc`, but every allocation must be attributable to a visible
+   construct, owning type, explicit allocation API, or compiler-owned
+   adapter whose cost model is documented and diagnosable.
+2. **Allocation-producing constructs are enumerated.** Examples include
+   allocator calls, `Vec.new()`, `.to_owned()`, owned buffer
+   constructors, comprehensions, f-strings, owned string literals when
+   not elided, `async fn` calls and `async:` blocks that allocate
+   fibers/tasks, and modeled FFI temporaries such as call-scoped
+   C-string adapters. The construct or owning result type is the signal;
+   the language does not force users to spell allocation machinery when
    the intent is already clear.
-2. **No hidden copies.** Values move unless `Copy`.
-3. **No hidden reference counting.** Only via explicit `Rc`/`Arc`.
-4. **No hidden synchronization.** Locks, atomics always explicit.
-5. **No hidden runtime in `no_runtime` builds.** The fiber scheduler
+3. **Allocation cost models are documented.** Each allocation-producing
+   construct specifies what may allocate, which allocator or allocation
+   policy is used, whether allocation may be elided, what happens on
+   allocation failure, and what owns the result. String-literal
+   allocation elision must be deterministic and documented. Fiber
+   allocation is legible through `Task` and compiler-visible allocation
+   analysis, not call-site coloring.
+4. **No invisible allocation obligations.** An allocation must never
+   create an invisible ownership, lifetime, cleanup, or caller-must-free
+   responsibility. Compiler-generated allocations must be
+   compiler-owned with a non-escaping lifetime, or represented by a
+   visible owning type whose `Drop` handles cleanup. Hidden caller
+   obligations are forbidden. A call-scoped FFI temporary is valid only
+   when it cannot escape and the compiler frees it; retained pointers,
+   mutable buffers, copy-back, and ownership transfer require modeled
+   contracts or visible owning types.
+5. **Allocation is checkable.** Allocation-producing constructs are
+   visible to compiler diagnostics and no-allocation checking.
+   No-allocation contexts, co-designed with the tier and allocator
+   model, reject allocating constructs unless the allocation is proven
+   elided or routed through an explicit arena, allocator, or capability.
+   Conservative false rejection is a compiler-precision bug, not a
+   reason to require user ceremony.
+6. **No hidden copies.** Values move unless `Copy`.
+7. **No hidden reference counting.** Only via explicit `Rc`/`Arc`.
+8. **No hidden synchronization.** Locks, atomics always explicit.
+9. **No hidden runtime in `no_runtime` builds.** The fiber scheduler
    is the one blessed runtime; it is opt-in via `async` and absent
-   when disabled. Suspension is always marked with `await`.
-6. **Deterministic destruction.** Reverse declaration order.
-7. **Disjoint borrow analysis guaranteed.**
+   when disabled. Suspension is always known to the compiler; ordinary
+   call sites are not colored merely because the callee may suspend.
+10. **Deterministic destruction.** Reverse declaration order.
+11. **Disjoint borrow analysis guaranteed.**
 
 ---
 
@@ -9284,30 +9928,33 @@ fetch(url).await
 This does NOT apply to connection pools, transactions, file handles,
 or other guarded types that don't carry the annotation. See §7.9.
 
-### 20b.2 Unused `Task`
+### 20b.2 Task Disposition
 
-Dropping a `Task` without `await`ing or `cancel`ing it silently
-cancels work.
+A task in statement position is intentional fire-and-forget
+detachment, allowed only when the API does not require observation and
+the compiler proves the task can safely outlive the current scope.
 
 ```
-// ERROR:
+// OK when `send_analytics` is best-effort and detach-safe:
 send_analytics("page_view")
 
-// FIX — await the result:
-send_analytics("page_view").await
+// OK: await the result:
+send_invoice(invoice).await?
 
-// FIX — fire-and-forget (runs to completion, detached):
-spawn send_analytics("page_view")
-
-// FIX — explicit cancellation:
-let task = send_analytics("page_view")
+// OK: explicit cancellation:
+let task = warm_cache(key)
 cancel(task)
+
+// ERROR: a bound handle says "I will observe this"
+let task = send_invoice(invoice)
+
+// ERROR: not the detach spelling
+let _ = send_analytics("page_view")
 ```
 
-**WARNING:** `let _ = send_analytics(...)` is NOT fire-and-forget.
-It immediately drops the Task, cancelling it before it completes.
-The compiler warns about this pattern. Use `spawn` for true
-fire-and-forget.
+When detachment is rejected, the diagnostic must say whether the task
+is must-observe or whether detach-safety failed, because the remedies
+are different.
 
 See §14.7.
 
@@ -9498,8 +10145,42 @@ At every program point, the following must hold:
 
 ## 22. Ephemeral Type Rules
 
-Post-type-check analysis. No dataflow required — ephemerality is
-determined structurally by types.
+The programmer writes no lifetime or ephemerality annotations. The
+compiler carries the origin and provenance facts needed to make that safe.
+
+Type-level ephemerality is structural. References carry origin
+constraints. Declared-ephemeral types are ephemeral by declaration.
+Aggregates and generic containers whose type structurally contains an
+ephemeral component are ephemeral by structure, such as `Vec[&T]`. This
+determines which type shapes can carry ephemeral constraints.
+
+Value-level ephemerality is provenance-tracked. Binding-level
+ephemerality, returned-origin sets, task capture ephemerality, closure
+capture ephemerality, assignment propagation, call propagation,
+returned-view checking, and escape checks require deterministic
+provenance analysis.
+
+Tasks are value-level. `Task[T]` has one spelling whether ephemeral or
+non-ephemeral. A task binding is ephemeral when the task captures or
+depends on an ephemeral origin. That fact is inferred and propagated, not
+determined from the structural type alone.
+
+Closures and callable values carry summaries. An implementation may
+encode captures structurally in anonymous closure types, but the spec
+guarantee is a compiler-carried callable summary: captures, origin sets,
+ephemerality, and `may_suspend` facts are carried across closure,
+function pointer, trait object, and wrapper boundaries.
+
+The analysis is modular and inferred: intra-procedural dataflow inside
+each function body, plus inferred summaries across interfaces, including
+returned-origin sets, task ephemerality, closure/callable capture
+provenance, and `may_suspend` facts. The user writes no lifetime or
+ephemerality annotations.
+
+The analysis is deterministic and conservative. Verdicts are
+reproducible. If the compiler cannot prove that an ephemeral value does
+not escape, it rejects. False rejection of actually-safe code is compiler
+precision debt, not user ceremony.
 
 ### 22.1 Rules
 
@@ -9548,16 +10229,23 @@ argument to a function call. All other closures are escaping.
 
 ## 23. `with` Block Semantics
 
-### 23.1 Dispatch Rule
+### 23.1 Plain Binding Desugaring
 
-The compiler desugars `with` based on the `mut` keyword:
+Section 7 owns the full `with` dispatch rule. This section specifies
+only the desugaring of plain, non-guarded `with e as x` and
+`with e as mut x` forms after full dispatch has selected the plain
+binding path. It does not define guarded access, implicit context,
+record update, or the global `with` dispatch order.
 
 | Syntax | Desugaring |
 |--------|------------|
 | `with e as mut x: body` | `{ var x = e; body; x }` (if body is Unit) |
 | `with e as x: body` | `{ let x = e; body }` |
 
-The binding is scoped to the block and cannot escape.
+The binding is scoped to the block and cannot escape. In the plain
+binding path, `mut` selects a mutable local binding; without `mut`, the
+binding is immutable. In the guarded path, `mut` is checked against the
+selected guard protocol instead.
 
 ### 23.2 Multiple Bindings
 
@@ -10031,6 +10719,10 @@ should use brace form to avoid indentation-sensitivity issues.
 This appendix collects syntactic productions from throughout the
 specification into a unified reference. The normative definitions
 remain in their respective sections; this is a convenience index.
+If this appendix drifts from a normative section, the normative
+section wins. Requirements, conformance tests, and implementation
+work must cite the owning normative section; this appendix may be
+cited only as related context.
 
 ### 30.1 Notation
 
@@ -10136,7 +10828,7 @@ MODULE_PATH := IDENT { '.' IDENT }
 **Const declaration** (§9.1b):
 
 ```
-CONST_DECL  := 'const' IDENT ':' TYPE '=' EXPR
+CONST_DECL  := 'const' IDENT [ ':' TYPE ] '=' EXPR
 ```
 
 ### 30.4 Statements
