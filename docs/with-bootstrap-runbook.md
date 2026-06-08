@@ -55,6 +55,9 @@ lib/libclang.lib
 Use the repo scripts to build this SDK:
 
 ```sh
+command -v clang
+command -v clang++
+command -v ld.lld
 HOST_TAG=darwin-arm64 tools/build-static-llvm.sh
 HOST_TAG=linux-x86_64 tools/build-static-llvm.sh
 ```
@@ -62,11 +65,26 @@ HOST_TAG=linux-x86_64 tools/build-static-llvm.sh
 On Windows, run from Developer PowerShell:
 
 ```powershell
+where.exe clang-cl
+where.exe lld-link
 .\tools\build-static-llvm.ps1
 ```
 
 The scripts fail unless the static libclang archive exists and exports
-`clang_createIndex`.
+`clang_createIndex`. They also fail/package-reject unless the SDK itself was
+built with Clang:
+
+- Linux/macOS: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`, and
+  `-fuse-ld=lld`.
+- Windows: `CMAKE_C_COMPILER=clang-cl`, `CMAKE_CXX_COMPILER=clang-cl`, and
+  `lld-link`.
+
+Do not accept a static SDK whose CMake cache names `/usr/bin/cc`,
+`/usr/bin/c++`, GCC, or MSVC `cl.exe` as the compiler. The first SDK build may
+use an externally installed Clang as a bootstrap tool, but that Clang is only a
+host compiler used to produce the pinned With-owned LLVM/Clang SDK from the
+exact `llvmorg-<version>` source tag. All later With compiler, emitted-C,
+bootstrap, and release builds use the Clang inside that SDK.
 
 **This is the only runbook that builds the static SDK from LLVM source.**
 Building the `.a` archives and clang's builtin headers from source is a

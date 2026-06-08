@@ -290,6 +290,24 @@ Allowed platform C drivers:
   Studio Build Tools/Windows SDK may provide headers, libraries, and CRT
   import/static libraries, but `cl.exe` is not the compiler.
 
+The static LLVM SDK itself must also be built with Clang:
+
+- Linux/macOS SDK CMake cache must name `clang` and `clang++`.
+- Windows SDK CMake cache must name `clang-cl`, not MSVC `cl.exe`.
+- Linux/macOS SDK builds must link with lld (`-fuse-ld=lld`) where CMake drives
+  a linker.
+
+The first SDK build for a new platform may use an externally installed Clang as
+the bootstrap compiler, but that compiler is only used to build the pinned
+With-owned SDK from the exact LLVM source tag. Every later compiler/bootstrap/
+release artifact must use the Clang, lld, libclang, and LLVM archives from that
+SDK. Packaging scripts must reject SDKs whose CMake cache names GCC,
+`/usr/bin/cc`, `/usr/bin/c++`, or MSVC `cl.exe`.
+
+Release binary size parity is a toolchain-parity check. Large `.text`
+differences between platforms are not harmless until explained; first verify
+the SDK compiler, linker folding/GC policy, and strip policy.
+
 ---
 
 ## Build System
