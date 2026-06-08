@@ -11,6 +11,7 @@ use compiler.Link
 use compiler.ProjectConfig
 use render
 use CiMigrate
+use Overflow
 
 extern fn with_eprint(s: str) -> void
 extern fn with_fs_read_file(path: str) -> str
@@ -149,6 +150,7 @@ type ComptimeWorkspaceCompilePlan {
     debug_info: bool,
     compiler_hooks_enabled: bool,
     prelude_mode: i32,
+    overflow_mode: i32,
     migrate_is_dir: i32,
     migrate_source: str,
     migrate_include_paths: Vec[str],
@@ -2878,6 +2880,7 @@ fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
         debug_info: false,
         compiler_hooks_enabled: false,
         prelude_mode: 0,
+        overflow_mode: -1,
         migrate_is_dir: 0,
         migrate_source: "",
         migrate_include_paths: Vec.new(),
@@ -2983,6 +2986,7 @@ fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: Com
             debug_info: false,
             compiler_hooks_enabled: false,
             prelude_mode: 0,
+            overflow_mode: -1,
             migrate_is_dir,
             migrate_source,
             migrate_include_paths: self.workspace_path_vec_field(capability.project_root, migrate_options, "include_paths"),
@@ -3063,6 +3067,7 @@ fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: Com
         debug_info: self.workspace_bool_option(options, "debug_info", true),
         compiler_hooks_enabled: self.workspace_bool_option(options, "compiler_hooks_enabled", true),
         prelude_mode: self.workspace_i32_option(options, "prelude_mode", 0),
+        overflow_mode: self.workspace_i32_option(options, "overflow_mode", -1),
         migrate_is_dir: 0,
         migrate_source: "",
         migrate_include_paths: Vec.new(),
@@ -3087,6 +3092,7 @@ fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -
         return comptime_workspace_native_compile_result(rc, if rc == 0: plan.final_output else: "", Compilation.init(), 1)
     var comp = Compilation.init()
     comp.configure(plan.opt_level, plan.no_std, plan.alloc_mode, plan.runtime_available)
+    comp.set_overflow_mode(plan.overflow_mode)
     comp.set_debug_info(plan.debug_info)
     comp.set_compiler_hooks_enabled(plan.compiler_hooks_enabled)
     comp.set_prelude_mode(plan.prelude_mode)
@@ -3186,6 +3192,7 @@ fn ComptimeEvaluator.start_intercept_workspace_compile(self: ComptimeEvaluator, 
 
     var comp = Compilation.init()
     comp.configure(self.workspace_i32_option(options, "opt_level", 1), self.workspace_bool_option(options, "no_std", false), self.workspace_bool_option(options, "alloc_mode", false), self.workspace_bool_option(options, "runtime_available", true))
+    comp.set_overflow_mode(self.workspace_i32_option(options, "overflow_mode", -1))
     comp.set_debug_info(self.workspace_bool_option(options, "debug_info", true))
     comp.set_compiler_hooks_enabled(self.workspace_bool_option(options, "compiler_hooks_enabled", true))
     comp.set_prelude_mode(self.workspace_i32_option(options, "prelude_mode", 0))
@@ -4428,7 +4435,12 @@ fn ComptimeEvaluator.eval_unary(self: ComptimeEvaluator, node: i32) -> ComptimeC
     if op == UnaryOp.UOP_NEGATE:
         if comptime_value_is_intlike(inner.value) == 0:
             return self.fail(node, "unary '-' requires integer comptime values")
-        return comptime_control_value(comptime_value_int(result_ty, 0 - comptime_value_intlike(inner.value)))
+        let arith = int_eval_unary_neg(comptime_value_intlike(inner.value), self.comptime_int_width(result_ty), self.sema.overflow_mode)
+        if arith.ok == 0:
+            return self.fail(node, "integer arithmetic is not comptime-evaluable")
+        if arith.overflow != 0:
+            return self.fail(node, "integer overflow in comptime")
+        return comptime_control_value(comptime_value_int(result_ty, arith.value))
     if op == UnaryOp.UOP_BIT_NOT:
         if comptime_value_is_intlike(inner.value) == 0:
             return self.fail(node, "bitwise not requires integer comptime values")
@@ -4565,18 +4577,43 @@ fn ComptimeEvaluator.eval_binary(self: ComptimeEvaluator, node: i32) -> Comptime
     let rv = comptime_value_intlike(rhs)
     let result_ty = self.node_type_or(node, if lhs.type_id != 0: lhs.type_id else: rhs.type_id)
     if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_ADD_SAT:
-        return comptime_control_value(comptime_value_int(result_ty, lv + rv))
+        let arith = int_eval_binary_arithmetic(op, lv, rv, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty), self.sema.overflow_mode)
+        if arith.ok == 0:
+            return self.fail(node, "integer arithmetic is not comptime-evaluable")
+        if arith.overflow != 0:
+            return self.fail(node, "integer overflow in comptime")
+        return comptime_control_value(comptime_value_int(result_ty, arith.value))
     if op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_SUB_SAT:
-        return comptime_control_value(comptime_value_int(result_ty, lv - rv))
+        let arith = int_eval_binary_arithmetic(op, lv, rv, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty), self.sema.overflow_mode)
+        if arith.ok == 0:
+            return self.fail(node, "integer arithmetic is not comptime-evaluable")
+        if arith.overflow != 0:
+            return self.fail(node, "integer overflow in comptime")
+        return comptime_control_value(comptime_value_int(result_ty, arith.value))
     if op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP or op == BinaryOp.OP_MUL_SAT:
-        return comptime_control_value(comptime_value_int(result_ty, lv * rv))
+        let arith = int_eval_binary_arithmetic(op, lv, rv, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty), self.sema.overflow_mode)
+        if arith.ok == 0:
+            return self.fail(node, "integer arithmetic is not comptime-evaluable")
+        if arith.overflow != 0:
+            return self.fail(node, "integer overflow in comptime")
+        return comptime_control_value(comptime_value_int(result_ty, arith.value))
     if op == BinaryOp.OP_DIV:
         if rv == 0:
             return self.fail(node, "division by zero in comptime")
+        if int_div_overflows(lv, rv, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty)):
+            if self.sema.overflow_mode == OVERFLOW_MODE_WRAP():
+                return comptime_control_value(comptime_value_int(result_ty, int_signed_min(self.comptime_int_width(result_ty))))
+            if self.sema.overflow_mode == OVERFLOW_MODE_SATURATE():
+                return comptime_control_value(comptime_value_int(result_ty, int_signed_max(self.comptime_int_width(result_ty))))
+            return self.fail(node, "integer overflow in comptime")
         return comptime_control_value(comptime_value_int(result_ty, lv / rv))
     if op == BinaryOp.OP_MOD:
         if rv == 0:
             return self.fail(node, "modulo by zero in comptime")
+        if int_div_overflows(lv, rv, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty)):
+            if self.sema.overflow_mode == OVERFLOW_MODE_WRAP() or self.sema.overflow_mode == OVERFLOW_MODE_SATURATE():
+                return comptime_control_value(comptime_value_int(result_ty, 0))
+            return self.fail(node, "integer overflow in comptime")
         return comptime_control_value(comptime_value_int(result_ty, lv % rv))
     if op == BinaryOp.OP_SHL:
         return comptime_control_value(comptime_value_int(result_ty, self.eval_shift_value(op, result_ty, lv, rv)))
@@ -5636,6 +5673,11 @@ fn Sema.check_top_level_comptime_let_values(mut self: Sema):
                     self.emit_error("type mismatch in binding", decl)
         if val_type != 0 and ann_type == 0:
             self.typed_binding_types.insert(decl as i32, val_type as i32)
+        if ann_type != 0:
+            self.typed_expr_types.insert(value, ann_type as i32)
+            let inner = self.ast.get_data0(value)
+            if inner != 0:
+                self.typed_expr_types.insert(inner, ann_type as i32)
         if self.diags.has_errors():
             return
         let _ = self.force_eval_comptime_expr(value)

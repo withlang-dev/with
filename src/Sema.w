@@ -11,6 +11,7 @@ use Span
 use Diagnostic
 use InternPool
 use render
+use Overflow
 
 extern fn with_write(s: str) -> void
 extern fn with_eprint(s: str) -> void
@@ -538,6 +539,7 @@ type Sema {
     no_std: i32,
     alloc: i32,
     runtime_available: i32,
+    overflow_mode: i32,
     in_defer: i32,
     in_unsafe: i32,
     unsafe_scope_used: Vec[i32],
@@ -1162,6 +1164,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         no_std: 0,
         alloc: 0,
         runtime_available: 1,
+        overflow_mode: overflow_mode_default(),
         in_defer: 0,
         in_unsafe: 0,
         unsafe_scope_used: Vec.new(),
@@ -1926,7 +1929,7 @@ fn Sema.fn_types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
 fn sema_generic_inst_hash(base_sym: i32, args: Vec[i32], arg_count: i32) -> i64:
     var h: i64 = base_sym as i64
     for ai in 0..arg_count:
-        h = h * 31 + (args.get(ai as i64) as i64)
+        h = (h *% 31) +% (args.get(ai as i64) as i64)
     h
 
 fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> TypeId:

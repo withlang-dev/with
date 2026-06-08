@@ -648,6 +648,7 @@ fn run_cli(argc: i32) -> i32:
         var comp = Compilation.init()
         comp.configure(opt_level, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
+        comp.set_overflow_mode(driver_internal_overflow_mode())
         let pool = comp.compile_file(source)
         if pool.decl_count() == 0:
             with_eprint("error: IR generation failed during compilation")
@@ -2520,6 +2521,8 @@ fn print_usage:
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
+    with_write("  --overflow=<mode>\n")
+    with_write("                   Select overflow mode for builds: panic, wrap, saturate\n")
     with_write("  --freestanding   Alias for --no-std --no-runtime --prelude=core\n")
 
 fn print_build_usage:
@@ -2549,6 +2552,8 @@ fn print_build_usage:
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
+    with_write("  --overflow=<mode>\n")
+    with_write("                   Select overflow mode: panic, wrap, saturate\n")
     with_write("  --freestanding   Alias for --no-std --no-runtime --prelude=core\n")
 
 fn print_test_usage:

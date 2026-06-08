@@ -78,6 +78,12 @@ pub enum PreludeMode: i32:
     Core = 1
     None = 2
 
+pub enum OverflowMode: i32:
+    Default = -1
+    Panic = 0
+    Wrap = 1
+    Saturate = 2
+
 pub type BuildOptions {
     source_path: str,
     output_path: str,
@@ -87,6 +93,7 @@ pub type BuildOptions {
     no_std: bool,
     alloc_mode: bool,
     prelude_mode: PreludeMode,
+    overflow_mode: OverflowMode,
     deterministic: bool,
     target: BuildTarget,
     include_paths: Vec[str],
@@ -474,6 +481,7 @@ pub fn Workspace.options(self: &Self) -> BuildOptions:
         no_std: false,
         alloc_mode: false,
         prelude_mode: PreludeMode.Full,
+        overflow_mode: OverflowMode.Default,
         deterministic: false,
         target: BuildTarget.native,
         include_paths: Vec.new(),
