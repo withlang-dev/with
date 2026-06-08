@@ -93,8 +93,15 @@ $cmakeArgs = @(
 & $CMAKE_TOOL @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "LLVM CMake configure failed" }
 
-& $CMAKE_TOOL --build $BUILD_DIR --target install --parallel
-if ($LASTEXITCODE -ne 0) { throw "LLVM CMake build failed" }
+$oldPath = $env:PATH
+try {
+  $env:PATH = "$(Split-Path $LLVM_BOOTSTRAP_MT);$oldPath"
+  & $CMAKE_TOOL --build $BUILD_DIR --target install --parallel
+  if ($LASTEXITCODE -ne 0) { throw "LLVM CMake build failed" }
+}
+finally {
+  $env:PATH = $oldPath
+}
 
 $libclang = Join-Path $INSTALL_PREFIX "lib\libclang.lib"
 if (-not (Test-Path $libclang)) {

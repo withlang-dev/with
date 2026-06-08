@@ -62,6 +62,7 @@ $cmakeArgs = @(
   "-DCMAKE_LINKER=$lldLink",
   "-DCMAKE_MAKE_PROGRAM=$sdkNinja",
   "-DCMAKE_MT=$mt",
+  "-DBUILD_TESTING=OFF",
   "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
   "-DCMAKE_USE_OPENSSL=OFF"
 )
@@ -69,8 +70,15 @@ $cmakeArgs = @(
 & $bootstrapCmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
 
-& $bootstrapCmake --build $BUILD_DIR --config Release --target install --parallel
-if ($LASTEXITCODE -ne 0) { throw "CMake build failed" }
+$oldPath = $env:PATH
+try {
+  $env:PATH = "$(Split-Path $mt);$oldPath"
+  & $bootstrapCmake --build $BUILD_DIR --config Release --target install --parallel
+  if ($LASTEXITCODE -ne 0) { throw "CMake build failed" }
+}
+finally {
+  $env:PATH = $oldPath
+}
 
 $cmakeTool = Join-Path $INSTALL_PREFIX "bin\cmake.exe"
 if (-not (Test-Path -PathType Leaf $cmakeTool)) {
