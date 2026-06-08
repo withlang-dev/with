@@ -31,11 +31,16 @@ sha256_check() {
 
 CMAKE_BOOTSTRAP_CC="${CMAKE_BOOTSTRAP_CC:-clang}"
 CMAKE_BOOTSTRAP_CXX="${CMAKE_BOOTSTRAP_CXX:-clang++}"
+SDK_NINJA="${SDK_NINJA:-$INSTALL_PREFIX/bin/ninja}"
 require_tool curl
 require_tool tar
-require_tool make
 require_tool "$CMAKE_BOOTSTRAP_CC"
 require_tool "$CMAKE_BOOTSTRAP_CXX"
+if [ ! -x "$SDK_NINJA" ]; then
+  echo "error: missing SDK Ninja: $SDK_NINJA" >&2
+  echo "build it first: HOST_TAG=$HOST_TAG tools/build-ninja.sh" >&2
+  exit 1
+fi
 
 mkdir -p "$SRC_DIR" "$BUILD_DIR"
 cd "$SRC_DIR"
@@ -52,16 +57,17 @@ if [ ! -d "$source_dir" ]; then
 fi
 
 cd "$BUILD_DIR"
-CC="$CMAKE_BOOTSTRAP_CC" CXX="$CMAKE_BOOTSTRAP_CXX" \
-  "$SRC_DIR/$source_dir/bootstrap" \
-    --prefix="$INSTALL_PREFIX" \
-    --parallel="${PARALLEL_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}" \
-    -- \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_USE_OPENSSL=OFF
+CC="$CMAKE_BOOTSTRAP_CC" CXX="$CMAKE_BOOTSTRAP_CXX" "$SRC_DIR/$source_dir/bootstrap" \
+  --prefix="$INSTALL_PREFIX" \
+  --parallel="${PARALLEL_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}" \
+  --generator=Ninja \
+  -- \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_MAKE_PROGRAM="$SDK_NINJA" \
+  -DCMAKE_USE_OPENSSL=OFF
 
-make -j "${PARALLEL_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}"
-make install
+"$SDK_NINJA" -j "${PARALLEL_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}"
+"$SDK_NINJA" install
 
 cmake_tool="$INSTALL_PREFIX/bin/cmake"
 if [ ! -x "$cmake_tool" ]; then

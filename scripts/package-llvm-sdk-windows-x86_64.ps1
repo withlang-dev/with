@@ -45,7 +45,7 @@ if ($cacheText -notmatch "CMAKE_C_COMPILER:FILEPATH=.*clang-cl(\\.exe)?" -or
     throw "refusing to package SDK not built with clang-cl: $($compilerLines -join '; ')"
 }
 
-foreach ($tool in @("clang.exe", "clang++.exe", "clang-cl.exe", "cmake.exe", "lld-link.exe", "llvm-nm.exe", "llvm-readobj.exe", "llvm-strip.exe")) {
+foreach ($tool in @("clang.exe", "clang++.exe", "clang-cl.exe", "cmake.exe", "ninja.exe", "lld-link.exe", "llvm-nm.exe", "llvm-readobj.exe", "llvm-strip.exe")) {
     $path = Join-Path $prefix "bin\$tool"
     if (-not (Test-Path -PathType Leaf $path)) {
         throw "static SDK is missing required tool: $path"
@@ -67,7 +67,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $stage "bin") | Out-Null
 Copy-Item -Path (Join-Path $prefix "lib\*.lib") -Destination (Join-Path $stage "lib") -Force
 Copy-Item -Path $clangInclude -Destination (Join-Path $stage "lib") -Recurse -Force
 
-foreach ($tool in @("clang.exe", "clang++.exe", "clang-cl.exe", "cmake.exe", "lld-link.exe", "llvm-nm.exe", "llvm-readobj.exe", "llvm-strip.exe")) {
+foreach ($tool in @("clang.exe", "clang++.exe", "clang-cl.exe", "cmake.exe", "ninja.exe", "lld-link.exe", "llvm-nm.exe", "llvm-readobj.exe", "llvm-strip.exe")) {
     Copy-Item -Path (Join-Path $prefix "bin\$tool") -Destination (Join-Path $stage "bin") -Force
 }
 foreach ($tool in @("ctest.exe", "cpack.exe")) {
@@ -100,7 +100,7 @@ if (-not ($listing | Select-String -SimpleMatch "$sdkBase/lib/libclang.lib")) {
 if (-not ($listing | Select-String -Pattern "$([regex]::Escape($sdkBase))/lib/clang/.*/include/stddef.h")) {
     throw "packaged SDK is missing clang builtin headers"
 }
-foreach ($tool in @("clang.exe", "clang++.exe", "clang-cl.exe", "cmake.exe", "lld-link.exe", "llvm-nm.exe", "llvm-readobj.exe", "llvm-strip.exe")) {
+foreach ($tool in @("clang.exe", "clang++.exe", "clang-cl.exe", "cmake.exe", "ninja.exe", "lld-link.exe", "llvm-nm.exe", "llvm-readobj.exe", "llvm-strip.exe")) {
     if (-not ($listing | Select-String -SimpleMatch "$sdkBase/bin/$tool")) {
         throw "packaged SDK is missing bin/$tool"
     }

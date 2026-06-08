@@ -222,10 +222,11 @@ This is a hard invariant, not an aspiration.
 
 *We* build the entire static LLVM/Clang/lld SDK from source via
 `tools/build-static-llvm.sh` (`cmake --build --target install` into
-`.deps/llvm-<ver>-<host>` = `LLVM_PREFIX`). CMake is also a With-owned SDK
-tool: build it from source with `tools/build-cmake.sh` /
-`tools/build-cmake.ps1` and install it into the same SDK prefix before the LLVM
-build. That SDK produces every static resource the compiler needs:
+`.deps/llvm-<ver>-<host>` = `LLVM_PREFIX`). CMake and its generator backend are
+also With-owned SDK tools: build Ninja from source with `tools/build-ninja.*`,
+then build CMake from source with `tools/build-cmake.*`, installing both into
+the same SDK prefix before the LLVM build. That SDK produces every static
+resource the compiler needs:
 
 - `lib/libclang.a`, `lib/libLLVM*.a`, `lib/liblld*.a` — the archives.
 - `lib/clang/<v>/include/` — clang's **builtin headers** (`stddef.h`,
@@ -233,6 +234,8 @@ build. That SDK produces every static resource the compiler needs:
 - `bin/clang` and `bin/clang++` — the With-owned C/C++ drivers used by
   emitted-C bootstrap. Bootstrap must not fall back to GCC or MSVC `cl.exe`.
 - `bin/cmake` — the With-owned CMake used for repeat SDK production.
+- `bin/ninja` — the With-owned CMake generator backend used for repeat SDK
+  production.
 - `bin/lld` plus driver symlinks, `bin/llvm-nm`, and `bin/llvm-strip` —
   linker, symbol, and release packaging tools.
 
@@ -308,13 +311,12 @@ release artifact must use the Clang, lld, libclang, and LLVM archives from that
 SDK. Packaging scripts must reject SDKs whose CMake cache names GCC,
 `/usr/bin/cc`, `/usr/bin/c++`, or MSVC `cl.exe`.
 
-The first SDK build may use an external CMake only to build the SDK's own
-`bin/cmake`, because CMake bootstraps itself. After that point, repeat LLVM SDK
-production uses `LLVM_PREFIX/bin/cmake`; SDK packaging must reject archives that
-do not include CMake. Do not introduce Ninja as an assumed requirement. If a
-specific SDK build deliberately needs a generator backend, make that an explicit
-bootstrap-tooling decision and package the resulting required tool with the SDK
-instead of depending on the host.
+The first SDK build may use external Python and an external CMake only to build
+the SDK's own `bin/ninja` and `bin/cmake`, because these tools bootstrap the SDK
+build system. After that point, repeat LLVM SDK production uses
+`LLVM_PREFIX/bin/cmake` and `LLVM_PREFIX/bin/ninja`; SDK packaging must reject
+archives that do not include both tools. Do not depend on a host Ninja, Make,
+MSBuild, or Visual Studio generator for repeat SDK production.
 
 Release binary size parity is a toolchain-parity check. Large `.text`
 differences between platforms are not harmless until explained; first verify

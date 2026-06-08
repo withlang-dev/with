@@ -19,8 +19,12 @@ function Require-Tool($name) {
 $bootstrapCmake = if ($env:CMAKE_BOOTSTRAP_CMAKE) { $env:CMAKE_BOOTSTRAP_CMAKE } else { Require-Tool "cmake.exe" }
 $clangCl = if ($env:CMAKE_BOOTSTRAP_CLANG_CL) { $env:CMAKE_BOOTSTRAP_CLANG_CL } else { Require-Tool "clang-cl.exe" }
 $lldLink = if ($env:CMAKE_BOOTSTRAP_LLD_LINK) { $env:CMAKE_BOOTSTRAP_LLD_LINK } else { Require-Tool "lld-link.exe" }
+$sdkNinja = if ($env:SDK_NINJA) { $env:SDK_NINJA } else { Join-Path $INSTALL_PREFIX "bin\ninja.exe" }
 Require-Tool "curl.exe" | Out-Null
 Require-Tool "tar.exe" | Out-Null
+if (-not (Test-Path -PathType Leaf $sdkNinja)) {
+  throw "missing SDK Ninja: $sdkNinja; build it first with tools\build-ninja.ps1"
+}
 
 New-Item -ItemType Directory -Force -Path $SRC_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $BUILD_DIR | Out-Null
@@ -43,6 +47,7 @@ if (-not (Test-Path $sourceDir)) {
 }
 
 $cmakeArgs = @(
+  "-G", "Ninja",
   "-S", (Join-Path $SRC_DIR $sourceDir),
   "-B", $BUILD_DIR,
   "-DCMAKE_BUILD_TYPE=Release",
@@ -50,12 +55,10 @@ $cmakeArgs = @(
   "-DCMAKE_C_COMPILER=$clangCl",
   "-DCMAKE_CXX_COMPILER=$clangCl",
   "-DCMAKE_LINKER=$lldLink",
+  "-DCMAKE_MAKE_PROGRAM=$sdkNinja",
   "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
   "-DCMAKE_USE_OPENSSL=OFF"
 )
-if ($env:CMAKE_GENERATOR) {
-  $cmakeArgs = @("-G", $env:CMAKE_GENERATOR) + $cmakeArgs
-}
 
 & $bootstrapCmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }

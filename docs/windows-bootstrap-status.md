@@ -74,8 +74,9 @@ Current blocker:
 - Current SDK/release-tooling frontier: old Windows and Linux LLVM SDKs are
   intentionally rejected because they were not built by the required Clang SDK
   path (`cl.exe` on Windows, `/usr/bin/cc`/`c++` on Linux). Next SDK rebuild
-  order is `tools/build-cmake.*`, then `tools/build-static-llvm.*`, then package
-  SDK assets that include SDK CMake and LLVM utility tools.
+  order is `tools/build-ninja.*`, then `tools/build-cmake.*`, then
+  `tools/build-static-llvm.*`, then package SDK assets that include SDK Ninja,
+  SDK CMake, and LLVM utility tools.
 - Known non-blocking debt: stack-budget checker still reports one frame above
   64 KiB (`max_frame: 99304`) while the Windows stage2 PE stack reserve remains
   the intended 8 MiB.
@@ -1220,14 +1221,15 @@ Completed:
 
 ### 2026-06-07 SDK CMake Packaging Rule
 
-- Release-tooling correction: LLVM may use CMake, but CMake must be a With-owned
-  SDK tool after the first bootstrap. Source scripts now build CMake from pinned
-  source into `LLVM_PREFIX/bin/cmake` and `tools/build-static-llvm.{sh,ps1}`
-  prefer that SDK CMake for LLVM configuration.
+- Release-tooling correction: LLVM may use CMake, but CMake and its generator
+  backend must be With-owned SDK tools after the first bootstrap. Source scripts
+  now build Ninja and CMake from pinned source into `LLVM_PREFIX/bin/`, and
+  `tools/build-static-llvm.{sh,ps1}` requires SDK CMake plus SDK Ninja for LLVM
+  configuration/build.
 - Package scripts now require and include SDK CMake plus LLVM utility tools:
-  Unix packages include `bin/cmake` and `bin/llvm-strip`; Windows packages
-  include `cmake.exe`, `clang-cl.exe`, and `llvm-strip.exe` in addition to the
-  existing Clang/lld tools.
+  Unix packages include `bin/ninja`, `bin/cmake`, and `bin/llvm-strip`;
+  Windows packages include `ninja.exe`, `cmake.exe`, `clang-cl.exe`, and
+  `llvm-strip.exe` in addition to the existing Clang/lld tools.
 - Classification: SDK hermeticity/policy bug, not compiler codegen. Do not
-  reintroduce Ninja as an assumed dependency; if a backend generator is required,
-  it must become an explicit packaged SDK tool.
+  use host Ninja, Make, MSBuild, or a Visual Studio generator for repeat SDK
+  production.

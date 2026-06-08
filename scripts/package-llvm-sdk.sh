@@ -11,6 +11,7 @@ set -eu
 #   - lib/clang/<v>/include/   clang builtin headers (also the embed source, #312)
 #   - bin/clang                C driver for emitted-C bootstrap on every host
 #   - bin/cmake                With-owned CMake for repeat SDK production
+#   - bin/ninja                With-owned CMake generator backend
 #   - bin/lld (+ driver symlinks ld.lld/ld64.lld/...) and LLVM utility tools
 # It deliberately omits the LLVM C++ include/ tree (the bridges are .w extern
 # decls). Normal self-host builds link via lld and do not invoke clang, but
@@ -68,6 +69,11 @@ if [ ! -x "$prefix/bin/cmake" ]; then
     echo "build it first: HOST_TAG=$host_tag tools/build-cmake.sh" >&2
     exit 1
 fi
+if [ ! -x "$prefix/bin/ninja" ]; then
+    echo "error: static SDK is missing Ninja: $prefix/bin/ninja" >&2
+    echo "build it first: HOST_TAG=$host_tag tools/build-ninja.sh" >&2
+    exit 1
+fi
 if [ ! -x "$prefix/bin/llvm-strip" ]; then
     echo "error: static SDK is missing llvm-strip: $prefix/bin/llvm-strip" >&2
     echo "rebuild the SDK: HOST_TAG=$host_tag tools/build-static-llvm.sh" >&2
@@ -83,14 +89,15 @@ mkdir -p "$stage/lib" "$stage/bin"
 cp "$prefix"/lib/*.a "$stage/lib/"
 cp -R "$prefix/lib/clang" "$stage/lib/clang"
 
-# Clang driver, CMake, linker (lld) and its driver symlinks, plus LLVM utility
-# tools. -P keeps symlinks as-is so ld.lld/ld64.lld stay pointing at lld inside
-# the archive.
+# Clang driver, CMake, Ninja, linker (lld) and its driver symlinks, plus LLVM
+# utility tools. -P keeps symlinks as-is so ld.lld/ld64.lld stay pointing at
+# lld inside the archive.
 cp -P "$prefix/bin/clang" "$stage/bin/"
 if [ -e "$prefix/bin/clang++" ] || [ -L "$prefix/bin/clang++" ]; then
     cp -P "$prefix/bin/clang++" "$stage/bin/"
 fi
 cp -P "$prefix/bin/cmake" "$stage/bin/"
+cp -P "$prefix/bin/ninja" "$stage/bin/"
 for tool in ctest cpack; do
     if [ -e "$prefix/bin/$tool" ] || [ -L "$prefix/bin/$tool" ]; then
         cp -P "$prefix/bin/$tool" "$stage/bin/"
@@ -134,6 +141,11 @@ if ! grep -q "$sdk_base/bin/clang++" "$listing"; then
 fi
 if ! grep -q "$sdk_base/bin/cmake" "$listing"; then
     echo "error: packaged SDK is missing bin/cmake" >&2
+    rm -f "$listing"
+    exit 1
+fi
+if ! grep -q "$sdk_base/bin/ninja" "$listing"; then
+    echo "error: packaged SDK is missing bin/ninja" >&2
     rm -f "$listing"
     exit 1
 fi

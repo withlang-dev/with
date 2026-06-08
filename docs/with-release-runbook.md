@@ -48,9 +48,10 @@ Packaging scripts enforce this:
 - Unix SDK package: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`.
 - Windows SDK package: `CMAKE_C_COMPILER=clang-cl`,
   `CMAKE_CXX_COMPILER=clang-cl`.
-- All SDK packages must include `bin/cmake` built from source and installed by
-  the bootstrap runbook. An external CMake may bootstrap that first CMake
-  binary, but release packaging must not publish an SDK that lacks it.
+- All SDK packages must include `bin/ninja` and `bin/cmake` built from source
+  and installed by the bootstrap runbook. External Python/CMake may bootstrap
+  those first SDK build tools, but release packaging must not publish an SDK
+  that lacks either one.
 
 Release-size comparisons are a toolchain parity check. The same LLVM source tag
 must be compiled with Clang on every host and linked with the same retention
@@ -92,8 +93,8 @@ the seed (issue #313):
   The package scripts refuse SDKs not built with Clang/clang-cl by
   `tools/build-static-llvm.{sh,ps1}`.
   It ships only what the build links against — `lib/*.a`, `lib/clang/<v>/include/`,
-  `bin/cmake`, `bin/clang`, `bin/lld` (+ driver symlinks), `bin/llvm-nm`, and
-  `bin/llvm-strip` — not the LLVM C++ `include/` tree, so the asset remains
+  `bin/ninja`, `bin/cmake`, `bin/clang`, `bin/lld` (+ driver symlinks),
+  `bin/llvm-nm`, and `bin/llvm-strip` — not the LLVM C++ `include/` tree, so the asset remains
   small while still carrying the With-owned build tools required by SDK
   production, emitted-C bootstrap, and release packaging.
 - **Fetch**: `with build :deps` downloads
@@ -300,7 +301,7 @@ asset back alongside the Linux binary:
 
 On Windows, `scripts/package-llvm-sdk-windows-x86_64.ps1` packages the
 `.deps\llvm-<ver>-windows-x86_64-msvc` SDK and includes the required CMake,
-Clang/lld, and LLVM utility tools (`cmake.exe`, `clang.exe`, `clang++.exe`,
+Clang/lld, and LLVM utility tools (`ninja.exe`, `cmake.exe`, `clang.exe`, `clang++.exe`,
 `clang-cl.exe`, `lld-link.exe`, `llvm-nm.exe`, `llvm-readobj.exe`,
 `llvm-strip.exe`), static `.lib` archives, and clang builtin headers.
 

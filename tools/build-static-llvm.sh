@@ -42,11 +42,17 @@ require_tool "$LLVM_BOOTSTRAP_CXX"
 require_tool "$LLVM_BOOTSTRAP_LD"
 
 SDK_CMAKE="${SDK_CMAKE:-$INSTALL_PREFIX/bin/cmake}"
+SDK_NINJA="${SDK_NINJA:-$INSTALL_PREFIX/bin/ninja}"
 if [ -x "$SDK_CMAKE" ]; then
   CMAKE_TOOL="$SDK_CMAKE"
 else
   echo "error: missing SDK CMake: $SDK_CMAKE" >&2
   echo "build it first: HOST_TAG=$HOST_TAG tools/build-cmake.sh" >&2
+  exit 1
+fi
+if [ ! -x "$SDK_NINJA" ]; then
+  echo "error: missing SDK Ninja: $SDK_NINJA" >&2
+  echo "build it first: HOST_TAG=$HOST_TAG tools/build-ninja.sh" >&2
   exit 1
 fi
 
@@ -89,6 +95,7 @@ case "$(uname -s)" in
 esac
 
 CMAKE_ARGS=(
+  -G Ninja
   -S "$SRC_DIR/$source_dir/llvm"
   -B "$BUILD_DIR"
   -DCMAKE_BUILD_TYPE=Release
@@ -98,6 +105,7 @@ CMAKE_ARGS=(
   -DCMAKE_MODULE_LINKER_FLAGS_INIT="-fuse-ld=lld"
   -DCMAKE_SHARED_LINKER_FLAGS_INIT="-fuse-ld=lld"
   -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX"
+  -DCMAKE_MAKE_PROGRAM="$SDK_NINJA"
   -DLLVM_ENABLE_PROJECTS="clang;lld"
   -DLLVM_TARGETS_TO_BUILD="$TARGETS"
   -DLIBCLANG_BUILD_STATIC=ON
@@ -115,9 +123,6 @@ CMAKE_ARGS=(
   -DLLVM_ENABLE_ZSTD=OFF
   "${extra_cmake_args[@]}"
 )
-if [ -n "${LLVM_CMAKE_GENERATOR:-}" ]; then
-  CMAKE_ARGS=(-G "$LLVM_CMAKE_GENERATOR" "${CMAKE_ARGS[@]}")
-fi
 "$CMAKE_TOOL" "${CMAKE_ARGS[@]}"
 
 if [ -n "${PARALLEL_JOBS:-}" ]; then

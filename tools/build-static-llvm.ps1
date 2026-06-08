@@ -24,11 +24,15 @@ $LLVM_BOOTSTRAP_LLD_LINK = if ($env:LLVM_BOOTSTRAP_LLD_LINK) { $env:LLVM_BOOTSTR
 Require-Tool $LLVM_BOOTSTRAP_CLANG_CL
 Require-Tool $LLVM_BOOTSTRAP_LLD_LINK
 $sdkCmake = if ($env:SDK_CMAKE) { $env:SDK_CMAKE } else { Join-Path $INSTALL_PREFIX "bin\cmake.exe" }
+$sdkNinja = if ($env:SDK_NINJA) { $env:SDK_NINJA } else { Join-Path $INSTALL_PREFIX "bin\ninja.exe" }
 if (Test-Path -PathType Leaf $sdkCmake) {
   $CMAKE_TOOL = $sdkCmake
 }
 else {
   throw "missing SDK CMake: $sdkCmake; build it first with tools\build-cmake.ps1"
+}
+if (-not (Test-Path -PathType Leaf $sdkNinja)) {
+  throw "missing SDK Ninja: $sdkNinja; build it first with tools\build-ninja.ps1"
 }
 
 New-Item -ItemType Directory -Force -Path $SRC_DIR | Out-Null
@@ -52,6 +56,7 @@ if (-not (Test-Path $sourceDir)) {
 }
 
 $cmakeArgs = @(
+  "-G", "Ninja",
   "-S", (Join-Path $SRC_DIR "$sourceDir\llvm"),
   "-B", $BUILD_DIR,
   "-DCMAKE_BUILD_TYPE=Release",
@@ -59,6 +64,7 @@ $cmakeArgs = @(
   "-DCMAKE_CXX_COMPILER=$LLVM_BOOTSTRAP_CLANG_CL",
   "-DCMAKE_LINKER=$LLVM_BOOTSTRAP_LLD_LINK",
   "-DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX",
+  "-DCMAKE_MAKE_PROGRAM=$sdkNinja",
   "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
   "-DLLVM_ENABLE_PROJECTS=clang;lld",
   "-DLLVM_TARGETS_TO_BUILD=$TARGETS",
@@ -77,9 +83,6 @@ $cmakeArgs = @(
   "-DLLVM_ENABLE_ZSTD=OFF",
   "-DLLVM_ENABLE_DIA_SDK=OFF"
 )
-if ($env:LLVM_CMAKE_GENERATOR) {
-  $cmakeArgs = @("-G", $env:LLVM_CMAKE_GENERATOR) + $cmakeArgs
-}
 
 & $CMAKE_TOOL @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "LLVM CMake configure failed" }
