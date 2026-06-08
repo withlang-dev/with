@@ -21,10 +21,14 @@ $bootstrapCmake = if ($env:CMAKE_BOOTSTRAP_CMAKE) { $env:CMAKE_BOOTSTRAP_CMAKE }
 $clangCl = if ($env:CMAKE_BOOTSTRAP_CLANG_CL) { $env:CMAKE_BOOTSTRAP_CLANG_CL } else { Require-Tool "clang-cl.exe" }
 $lldLink = if ($env:CMAKE_BOOTSTRAP_LLD_LINK) { $env:CMAKE_BOOTSTRAP_LLD_LINK } else { Require-Tool "lld-link.exe" }
 $sdkNinja = if ($env:SDK_NINJA) { $env:SDK_NINJA } else { Join-Path $INSTALL_PREFIX "bin\ninja.exe" }
+$mt = if ($env:CMAKE_MT) { $env:CMAKE_MT } else { "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\mt.exe" }
 Require-Tool "curl.exe" | Out-Null
 Require-Tool "tar.exe" | Out-Null
 if (-not (Test-Path -PathType Leaf $sdkNinja)) {
   throw "missing SDK Ninja: $sdkNinja; build it first with tools\build-ninja.ps1"
+}
+if (-not (Test-Path -PathType Leaf $mt)) {
+  throw "missing Windows SDK manifest tool: $mt"
 }
 
 New-Item -ItemType Directory -Force -Path $SRC_DIR | Out-Null
@@ -57,6 +61,7 @@ $cmakeArgs = @(
   "-DCMAKE_CXX_COMPILER=$clangCl",
   "-DCMAKE_LINKER=$lldLink",
   "-DCMAKE_MAKE_PROGRAM=$sdkNinja",
+  "-DCMAKE_MT=$mt",
   "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
   "-DCMAKE_USE_OPENSSL=OFF"
 )

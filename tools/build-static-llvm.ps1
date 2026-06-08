@@ -22,8 +22,12 @@ Require-Tool "curl.exe"
 Require-Tool "tar.exe"
 $LLVM_BOOTSTRAP_CLANG_CL = if ($env:LLVM_BOOTSTRAP_CLANG_CL) { $env:LLVM_BOOTSTRAP_CLANG_CL } else { "clang-cl.exe" }
 $LLVM_BOOTSTRAP_LLD_LINK = if ($env:LLVM_BOOTSTRAP_LLD_LINK) { $env:LLVM_BOOTSTRAP_LLD_LINK } else { "lld-link.exe" }
+$LLVM_BOOTSTRAP_MT = if ($env:LLVM_BOOTSTRAP_MT) { $env:LLVM_BOOTSTRAP_MT } else { "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\mt.exe" }
 Require-Tool $LLVM_BOOTSTRAP_CLANG_CL
 Require-Tool $LLVM_BOOTSTRAP_LLD_LINK
+if (-not (Test-Path -PathType Leaf $LLVM_BOOTSTRAP_MT)) {
+  throw "missing Windows SDK manifest tool: $LLVM_BOOTSTRAP_MT"
+}
 $sdkCmake = if ($env:SDK_CMAKE) { $env:SDK_CMAKE } else { Join-Path $INSTALL_PREFIX "bin\cmake.exe" }
 $sdkNinja = if ($env:SDK_NINJA) { $env:SDK_NINJA } else { Join-Path $INSTALL_PREFIX "bin\ninja.exe" }
 if (Test-Path -PathType Leaf $sdkCmake) {
@@ -66,6 +70,7 @@ $cmakeArgs = @(
   "-DCMAKE_LINKER=$LLVM_BOOTSTRAP_LLD_LINK",
   "-DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX",
   "-DCMAKE_MAKE_PROGRAM=$sdkNinja",
+  "-DCMAKE_MT=$LLVM_BOOTSTRAP_MT",
   "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
   "-DLLVM_ENABLE_PROJECTS=clang;lld",
   "-DLLVM_TARGETS_TO_BUILD=$TARGETS",
