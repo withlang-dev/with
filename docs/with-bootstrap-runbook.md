@@ -259,6 +259,7 @@ bin\clang++.exe
 bin\clang-cl.exe
 bin\cmake.exe
 bin\ninja.exe
+bin\llvm-lib.exe
 bin\llvm-nm.exe
 bin\llvm-readobj.exe
 bin\llvm-strip.exe

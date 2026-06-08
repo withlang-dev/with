@@ -18,6 +18,7 @@ function Require-Tool($name) {
 $python = if ($env:NINJA_BOOTSTRAP_PYTHON) { $env:NINJA_BOOTSTRAP_PYTHON } else { Require-Tool "python.exe" }
 $clangCl = if ($env:NINJA_BOOTSTRAP_CLANG_CL) { $env:NINJA_BOOTSTRAP_CLANG_CL } else { Require-Tool "clang-cl.exe" }
 $lldLink = if ($env:NINJA_BOOTSTRAP_LLD_LINK) { $env:NINJA_BOOTSTRAP_LLD_LINK } else { Require-Tool "lld-link.exe" }
+$llvmLib = if ($env:NINJA_BOOTSTRAP_LLVM_LIB) { $env:NINJA_BOOTSTRAP_LLVM_LIB } else { Require-Tool "llvm-lib.exe" }
 Require-Tool "curl.exe" | Out-Null
 Require-Tool "tar.exe" | Out-Null
 
@@ -50,6 +51,7 @@ try {
   New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
   Copy-Item -Path $clangCl -Destination (Join-Path $shimDir "cl.exe") -Force
   Copy-Item -Path $lldLink -Destination (Join-Path $shimDir "link.exe") -Force
+  Copy-Item -Path $llvmLib -Destination (Join-Path $shimDir "lib.exe") -Force
   $env:CXX = "cl"
   $env:CXXFLAGS = "/WX-"
   $env:PATH = "$shimDir;$oldPath"

@@ -302,7 +302,7 @@ asset back alongside the Linux binary:
 On Windows, `scripts/package-llvm-sdk-windows-x86_64.ps1` packages the
 `.deps\llvm-<ver>-windows-x86_64-msvc` SDK and includes the required CMake,
 Clang/lld, and LLVM utility tools (`ninja.exe`, `cmake.exe`, `clang.exe`, `clang++.exe`,
-`clang-cl.exe`, `lld-link.exe`, `llvm-nm.exe`, `llvm-readobj.exe`,
+`clang-cl.exe`, `lld-link.exe`, `llvm-lib.exe`, `llvm-nm.exe`, `llvm-readobj.exe`,
 `llvm-strip.exe`), static `.lib` archives, and clang builtin headers.
 
 ```sh
