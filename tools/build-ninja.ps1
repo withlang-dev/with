@@ -44,18 +44,21 @@ if (-not (Test-Path $sourceDir)) {
 Push-Location $sourceDir
 try {
   $oldCxx = $env:CXX
+  $oldCxxFlags = $env:CXXFLAGS
   $oldPath = $env:PATH
   $shimDir = Join-Path $INSTALL_PREFIX "bootstrap-tools"
   New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
   Copy-Item -Path $clangCl -Destination (Join-Path $shimDir "cl.exe") -Force
   Copy-Item -Path $lldLink -Destination (Join-Path $shimDir "link.exe") -Force
   $env:CXX = "cl"
+  $env:CXXFLAGS = "/clang:-Wno-unused-command-line-argument"
   $env:PATH = "$shimDir;$oldPath"
   & $python configure.py --bootstrap
   if ($LASTEXITCODE -ne 0) { throw "Ninja bootstrap failed" }
 }
 finally {
   $env:CXX = $oldCxx
+  $env:CXXFLAGS = $oldCxxFlags
   $env:PATH = $oldPath
   Pop-Location
 }
