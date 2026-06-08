@@ -7,6 +7,7 @@ $HOST_TAG = if ($env:HOST_TAG) { $env:HOST_TAG } else { "windows-x86_64-msvc" }
 $SRC_DIR = Join-Path $ROOT "src"
 $BUILD_DIR = Join-Path $ROOT "build\cmake-$CMAKE_VERSION-$HOST_TAG"
 $INSTALL_PREFIX = if ($env:INSTALL_PREFIX) { $env:INSTALL_PREFIX } else { Join-Path $ROOT "llvm-22.1.6-$HOST_TAG" }
+$PARALLEL_JOBS = if ($env:PARALLEL_JOBS) { $env:PARALLEL_JOBS } else { "" }
 $START_DIR = Get-Location
 
 function Require-Tool($name) {
@@ -73,7 +74,12 @@ if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
 $oldPath = $env:PATH
 try {
   $env:PATH = "$(Split-Path $mt);$oldPath"
-  & $bootstrapCmake --build $BUILD_DIR --config Release --target install --parallel
+  if ($PARALLEL_JOBS) {
+    & $bootstrapCmake --build $BUILD_DIR --config Release --target install --parallel $PARALLEL_JOBS
+  }
+  else {
+    & $bootstrapCmake --build $BUILD_DIR --config Release --target install --parallel
+  }
   if ($LASTEXITCODE -ne 0) { throw "CMake build failed" }
 }
 finally {

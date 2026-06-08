@@ -10,6 +10,7 @@ $HOST_TAG = if ($env:HOST_TAG) { $env:HOST_TAG } else { "windows-x86_64-msvc" }
 $SRC_DIR = Join-Path $ROOT "src"
 $BUILD_DIR = Join-Path $ROOT "build\llvm-$LLVM_VERSION-$HOST_TAG"
 $INSTALL_PREFIX = if ($env:INSTALL_PREFIX) { $env:INSTALL_PREFIX } else { Join-Path $ROOT "llvm-$LLVM_VERSION-$HOST_TAG" }
+$PARALLEL_JOBS = if ($env:PARALLEL_JOBS) { $env:PARALLEL_JOBS } else { "" }
 $START_DIR = Get-Location
 
 function Require-Tool($name) {
@@ -99,7 +100,12 @@ if ($LASTEXITCODE -ne 0) { throw "LLVM CMake configure failed" }
 $oldPath = $env:PATH
 try {
   $env:PATH = "$(Split-Path $LLVM_BOOTSTRAP_MT);$(Split-Path $LLVM_BOOTSTRAP_LLVM_ML);$oldPath"
-  & $CMAKE_TOOL --build $BUILD_DIR --target install --parallel
+  if ($PARALLEL_JOBS) {
+    & $CMAKE_TOOL --build $BUILD_DIR --target install --parallel $PARALLEL_JOBS
+  }
+  else {
+    & $CMAKE_TOOL --build $BUILD_DIR --target install --parallel
+  }
   if ($LASTEXITCODE -ne 0) { throw "LLVM CMake build failed" }
 }
 finally {

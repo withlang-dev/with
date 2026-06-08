@@ -1,6 +1,6 @@
 # Windows Bootstrap Status
 
-Last updated: 2026-06-08 00:29 -0700.
+Last updated: 2026-06-08 00:35 -0700.
 
 ## Anti-Loop Summary
 
@@ -92,7 +92,9 @@ Current blocker:
     `CMAKE_CXX_COMPILER=<SDK>\bin\clang-cl.exe`, and
     `CMAKE_LINKER=<SDK>\bin\lld-link.exe`, but `llvm-ml.exe` assembled x64
     BLAKE3 MASM as 32-bit and rejected x64 registers. Fix is tightened to use
-    SDK `llvm-ml64.exe`, the x64 wrapper matching external `ml64`.
+    SDK `llvm-ml64.exe`, the x64 wrapper matching external `ml64`. Current
+    rebuild passed the previous BLAKE3 MASM failure point and linked
+    `LLVMSupport.lib`; LLVM build/install is still in progress.
 - Known non-blocking debt: stack-budget checker still reports one frame above
   64 KiB (`max_frame: 99304`) while the Windows stage2 PE stack reserve remains
   the intended 8 MiB.
