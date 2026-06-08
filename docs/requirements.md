@@ -94,31 +94,31 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Related spec refs: none
 - `1.1.1.19` **No garbage collector.**
   - Requirement: No garbage collector.
-  - Source: `§1.1 L88-L91`
+  - Source: `§1.1 L88-L94`
   - Related spec refs: none
 - `1.1.1.20` **No lifetime annotations.**
   - Requirement: No lifetime annotations.
-  - Source: `§1.1 L88-L91`
+  - Source: `§1.1 L88-L94`
   - Related spec refs: none
 - `1.1.1.21` **No Ok(()).**
   - Requirement: No `Ok(())`.
-  - Source: `§1.1 L88-L91`
+  - Source: `§1.1 L88-L94`
   - Related spec refs: none
 - `1.1.1.22` **No .to_owned().**
   - Requirement: No `.to_owned()`.
-  - Source: `§1.1 L88-L91`
+  - Source: `§1.1 L88-L94`
   - Related spec refs: none
-- `1.1.1.23` **No unsafe.**
-  - Requirement: No `unsafe`.
-  - Source: `§1.1 L88-L91`
-  - Related spec refs: none
-- `1.1.1.24` **Zero explicit memory management, fully statically typed, native-compiled, memory-safe.**
-  - Requirement: Zero explicit memory management, fully statically typed, native-compiled, memory-safe.
-  - Source: `§1.1 L88-L91`
-  - Related spec refs: none
+- `1.1.1.23` **No unsafe in ordinary safe application code.**
+  - Requirement: Ordinary safe application code should not require `unsafe`; explicit unsafe boundaries remain available at the systems edge for operations the compiler cannot prove safe.
+  - Source: `§1.1 L88-L94`
+  - Related spec refs: `§16.11`, `§19`
+- `1.1.1.24` **No explicit memory-management ceremony in ordinary safe application code.**
+  - Requirement: Ordinary safe application code should not require explicit memory-management ceremony; allocator-aware APIs, raw pointers, and manual resource-management APIs remain part of the systems surface behind explicit boundaries.
+  - Source: `§1.1 L88-L94`
+  - Related spec refs: `§8`, `§16.11`, `§19`
 - `1.1.1.25` **It reads like Python, runs like C.**
   - Requirement: It reads like Python, runs like C.
-  - Source: `§1.1 L88-L91`
+  - Source: `§1.1 L88-L94`
   - Related spec refs: none
 
 ### §1.2 Positioning

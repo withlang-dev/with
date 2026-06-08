@@ -86,9 +86,12 @@ async fn handle_signup(req: HttpRequest, db: &Database) -> Result[HttpResponse, 
 ```
 
 No garbage collector. No lifetime annotations. No `Ok(())`. No
-`.to_owned()`. No `unsafe`. Zero explicit memory management,
-fully statically typed, native-compiled, memory-safe. It reads
-like Python, runs like C.
+`.to_owned()`. In ordinary safe application code: no `unsafe`, no
+explicit memory-management ceremony. At the systems edge, explicit
+unsafe boundaries (§19), raw pointer access (§16.11), allocator-aware
+APIs (§8), and manual resource-management APIs remain available. The
+common path stays fully statically typed, native-compiled, and
+memory-safe. It reads like Python, runs like C.
 
 ### 1.2 Positioning
 
