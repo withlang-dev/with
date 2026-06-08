@@ -172,7 +172,7 @@ static DWORD WINAPI thread_thunk(LPVOID arg) {
 }
 
 int64_t rt_thread_spawn(uint8_t *start_routine, uint8_t *arg) {
-    void **pair = (void **)malloc(sizeof(void *) * 2);
+    void **pair = (void **)calloc(2, sizeof(void *));
     if (pair == NULL) return 0;
     pair[0] = start_routine;
     pair[1] = arg;
@@ -314,7 +314,7 @@ int mkstemp(char *template_path) {
     if (n == 0 || n >= sizeof(dir)) return -1;
     char name[MAX_PATH];
     if (GetTempFileNameA(dir, "with", 0, name) == 0) return -1;
-    strcpy(template_path, name);
+    strcpy_s(template_path, MAX_PATH, name);
     HANDLE h = CreateFileA(name, GENERIC_READ | GENERIC_WRITE,
                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                            NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
