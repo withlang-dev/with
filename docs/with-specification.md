@@ -18,7 +18,7 @@ roadmap to `docs/roadmap.md`, design rationale to `docs/design-rationale.md`,
 stdlib API tables to `docs/libstd-spec.md`. Added grammar appendix (§30).
 Added labels on arbitrary statements and `goto` (§13.5a, §13.5b).
 **Positioning:** Systems programming that feels like a modern language.
-**Principle:** Make the common case delightful. Be safe where it matters. Trust the programmer at the edges.
+**Principle:** Make the common case delightful. Be as safe as Rust without front-loading Rust's ceremony. Trust the programmer at the edges without accepting safety-contract violations.
 
 ---
 
@@ -56,8 +56,8 @@ the tricky parts internally, and if you hit a genuine edge case,
   work. The compiler is smart about common patterns even when it can't
   formally prove safety. If it's wrong, the stdlib uses `unsafe`
   internally. You never see it.
-- **Trust the programmer.** If you write something weird, the compiler
-  warns you. It doesn't block you. You're an adult.
+- **Trust the programmer within the safety contract.** Warn for weird-but-safe code when the compiler can preserve its meaning.
+  Reject code that violates safety, ownership, concurrency, determinism, or code-generation correctness.
 
 **With thrives in:**
 

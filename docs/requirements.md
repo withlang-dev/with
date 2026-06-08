@@ -72,8 +72,8 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: **Pragmatic at the edges.** HashMap::get just works. Iterators just work. The compiler is smart about common patterns even when it can't formally prove safety. If it's wrong, the stdlib uses `unsafe` internally. You never see it.
   - Source: `§1.1 L55-L58`
   - Related spec refs: none
-- `1.1.1.14` **Trust the programmer. If you write something weird, the compiler warns you. It does...**
-  - Requirement: **Trust the programmer.** If you write something weird, the compiler warns you. It doesn't block you. You're an adult.
+- `1.1.1.14` **Trust the programmer within the safety contract.**
+  - Requirement: **Trust the programmer within the safety contract.** Warn for weird-but-safe code when the compiler can preserve its meaning. Reject code that violates safety, ownership, concurrency, determinism, or code-generation correctness.
   - Source: `§1.1 L59-L60`
   - Related spec refs: none
 - `1.1.1.15` **Service architecture (async, DI, error handling)**
