@@ -913,6 +913,94 @@ Preferred requirement shape:
 - Generated bindings must never contain stubs that pretend an untranslatable C
   construct is part of the usable With surface.
 
+BDFL Response: Accept with clarification.
+
+`comptime_error` is a valid With feature for user-authored compile-time checks.
+It is not a valid fallback for compiler-generated `c_import` bindings when the
+importer failed to translate a C construct.
+
+A generated binding is a promise: this name is part of the usable With surface.
+If the importer emits a callable function, constant, macro wrapper, or type
+placeholder whose body merely fails later with `comptime_error`, the import has
+lied about what it successfully modeled and pushed the failure to a use-site
+landmine. That violates the C-interop mission: interop must be first-class, not
+a delayed error minefield.
+
+The surface a `c_import` may expose is exactly the two tiers from #4, not one:
+
+* safely modeled bindings — the safe surface; and
+* ABI-expressible-but-not-safely-modeled bindings — the raw surface, available
+  through the #4 escape hatch but not blessed as safe.
+
+"Untranslatable," for the purpose of this rule, means **inexpressible even as a
+raw binding** — not a callable or value at the ABI level at all: a token-paste
+macro with no stable value or type meaning, a compiler extension With cannot
+represent, or a type that cannot be expressed in either the safe or raw surface.
+
+This is the bottom tier of the #4 hierarchy, not a parallel rule. A construct
+that is merely hard to model safely — a variadic function, a raw buffer
+contract, an out-parameter, or an ownership-transfer API — is not
+untranslatable. It belongs on the raw surface, per #4, and must not be omitted
+on the grounds that it is unsafe. #15 and #4 must give the same answer for the
+same construct.
+
+The rule:
+
+* A generated `c_import` surface contains only valid bindings: safely modeled
+  bindings, or raw bindings per #4. It never contains a `comptime_error`
+  placeholder or any stub that pretends an inexpressible construct is part of
+  the usable surface.
+
+* A genuinely inexpressible construct is omitted from the generated surface and
+  recorded in an import manifest: name, source location, and reason. It is never
+  emitted as a callable API.
+
+* Omission is allowed, but never silent. A construct may be omitted when it is
+  inexpressible, outside the requested surface, inactive under the selected
+  preprocessor/platform configuration, or explicitly allow-listed as
+  unavailable. Dependent bindings that require an omitted inexpressible
+  construct are also omitted and recorded with the same reason chain.
+
+* The requested surface of a bare `use c_import("h")` is the available surface
+  of that header under the selected platform/preprocessor configuration.
+  Inexpressible constructs in that surface are omitted and reported; they do not
+  brick the import merely by existing.
+
+* Routine failure is gated on reference or explicit completeness. Referencing an
+  omitted/inexpressible symbol produces a directional diagnostic: the name, why
+  it could not be translated, and the alternative — the raw surface if it is a
+  #4 case, or "this C construct has no With representation" if it is genuinely
+  inexpressible.
+
+* Whole-import non-zero exit is reserved for: an explicit selective request
+  (`use c_import("h").{a, b}`) that names something inexpressible; completeness
+  mode (`with migrate`, or an explicit strict flag) where incomplete translation
+  is itself the error; and could-not-import-at-all failures such as a missing
+  header, parse failure, unsupported target configuration, or toolchain crash.
+  Ordinary `use c_import` is partial-but-honest. `with migrate` is
+  complete-or-fail.
+
+* `comptime_error` remains available for user-authored APIs and concept checks,
+  never as a compiler-generated placeholder for failed C translation.
+
+Spec update: replace the `comptime_error` stub requirements (`16.2.1.10`,
+`16.2.1.14`, `17.5.1.8`) with an honest-surface rule. Generated `c_import`
+output contains only valid bindings — safely modeled or raw per #4.
+Inexpressible constructs are omitted and recorded as manifest metadata, never
+emitted as callable stubs. Referencing one is a directional compile error.
+Ordinary import is partial-but-honest and reports all gaps; `migrate`, strict
+mode, and explicit selective requests fail on incompleteness; parse/host
+failures exit non-zero.
+
+This preserves both mission clauses:
+
+**The compiler reports every translation gap by name — you never sort through C
+failures by hand, and never hit one as a later landmine.**
+
+**Every generated binding is a real one — no stub ever pretends an unmodeled C
+construct is safely available.**
+
+
 ## 16. Heuristic-only C destructor auto-defer is unsafe
 
 Affected requirements:
@@ -950,6 +1038,99 @@ Preferred requirement shape:
 - It may suggest likely destructor functions in diagnostics or generated
   metadata when ownership is plausible but unproven.
 - Name heuristics alone must not insert `defer` calls.
+
+BDFL Response: Accept.
+
+The ergonomic goal is right: With should make C resource management humane. When
+the compiler knows the ownership contract, it should generate cleanup so the
+programmer never writes boilerplate `defer foo_destroy(x)`. But name heuristics
+are not ownership knowledge — they are at most a hint, and acting on a hint here
+produces memory-safety bugs.
+
+C does not reliably encode ownership in names. A constructor-looking function may
+return a borrowed handle, a retained reference, a singleton, an arena-owned
+pointer, a resource freed by another API, or a handle with thread/state
+preconditions. A `free`/`destroy`/`close`/`unref`/`release`-looking function may
+be the correct cleanup for some values and catastrophic for others. Inserting
+cleanup from names alone manufactures double-frees, use-after-free, refcount
+underflow, and invalid close/release calls. That fails the mission: the compiler
+removes ceremony only when it can carry the information, and it must never guess
+information the programmer or API author has not supplied.
+
+The rule has two distinct steps that the earlier requirement conflated:
+establishing the ownership fact, and expressing it. They are not the same, and
+the second is not a matter of evidence at all.
+
+**Establishing ownership (the evidence).** `c_import` may treat a resource as
+owned only when ownership is known from a source that proves or asserts it:
+
+* an explicit annotation;
+* author-supplied or imported metadata;
+* source/header analysis strong enough to *prove* the contract (conservative,
+  not speculative — analysis that merely raises confidence does not qualify);
+* a curated, library-specific convention (asserting facts about a known library,
+  e.g. Core Foundation's Create/Copy/Get rule — not a generic
+  "any `_free` frees its argument" pattern, which is just the name heuristic
+  renamed);
+* a hand-written owning wrapper, whose existence is a human assertion of
+  ownership.
+
+Name heuristics, generic conventions, and speculative source analysis are not in
+this set. They are guesses.
+
+**Expressing cleanup (the mechanism).** When ownership is established, cleanup is
+expressed only one way: a generated owning wrapper type whose `Drop` calls the
+correct C destructor. The compiler does **not** insert scope-local `defer`.
+
+Scope-local `defer` is unsound even with proven ownership, because it does not
+compose with the ownership model. `defer foo_destroy(x)` at a non-escaping `let`
+cannot handle the value being *stored* in a struct — there is no local scope-exit
+to fire at, so cleanup never runs or runs while the struct still holds the
+pointer. The original "skip auto-defer when the value escapes" patch only proves
+the point: it means a proven-owned resource that is returned or stored gets no
+cleanup help at all. A `Drop`-owning wrapper handles every case uniformly —
+local, moved to a caller, or stored in a struct that is later dropped — because
+cleanup is tied to the value's life, not a lexical scope. So `Drop` does not
+merely improve on scope-local `defer`; it removes any reason to keep it.
+
+This is the #4 safe surface applied to resources. A raw pointer or raw handle has
+no ownership semantics, so it stays raw — manual `foo_destroy`, in `unsafe`, the
+programmer's responsibility — unless it is wrapped by a proven ownership model.
+The "make it safe" path is always: model the contract into an owning `Drop`
+wrapper, or leave it raw. Never bolt cleanup onto a raw pointer by a guess.
+
+Reference counting is a distinct contract and must be modeled as one. A `Drop`
+that calls `unref` is correct only for a wrapper built from an *owning*
+constructor (a `retain`/`copy`/`create` that returns a +1 reference). A function
+that returns a *borrowed* reference must become a handle with **no** `Drop`, or
+the count underflows into a use-after-free. Owned-versus-borrowed is the
+distinction the core ownership model already makes, and exactly the one names
+cannot encode — which is why even Core Foundation needed a naming *convention*
+to state it.
+
+Name heuristics retain a real but bounded role: they may produce candidates,
+import-manifest notes, and a directional diagnostic suggesting the likely
+constructor/destructor pairing and recommending an annotation or wrapper. They
+may not, by themselves, insert cleanup, call a destructor, generate an owning
+wrapper, or mark a raw C value as owned.
+
+Spec update: replace heuristic-only destructor auto-defer (`16.2.2.11`–
+`16.2.2.14`) with a two-step proven-ownership rule. Ownership is established only
+from annotations, metadata, conservative proving analysis, curated
+library-specific conventions, or a hand-written owning wrapper. When established,
+cleanup is expressed only as a generated `Drop`-owning wrapper — never as
+scope-local `defer`. Raw pointers stay raw unless wrapped by a proven model.
+Reference-counted resources get a `Drop`-as-`unref` wrapper only when built from
+an owning constructor; borrowing accessors get a handle with no `Drop`. Name
+heuristics may suggest, never generate.
+
+This preserves both mission clauses:
+
+**The compiler removes cleanup ceremony whenever it actually knows the ownership
+contract — inferred, annotated, or modeled, never spelled by hand.**
+**The compiler never guesses ownership, and never lets C-interop ergonomics
+manufacture a memory-safety bug — unproven resources stay raw, and cleanup is
+only ever real.**
 
 ## 17. `str`/`c_char`/`c_void` auto-coercions are unsound as written
 
@@ -1002,6 +1183,169 @@ Preferred requirement shape:
   the user explicitly casts or a binding has trustworthy metadata.
 - Null pointer results should map to `Option`, not `""`.
 
+BDFL Response: Accept with clarification.
+
+The ergonomic goal is right, and protecting it is the first job. With should make
+C string, buffer, and opaque-pointer interop feel natural. The programmer should
+not write `CString::new(path)?`, manual length plumbing, scratch buffers, or
+pointer casts at every ordinary C call when the compiler can model the contract
+and generate the correct bridge. So the fix is *not* "make all conversions
+explicit." That would reintroduce the exact ceremony that makes C interop
+miserable everywhere else, and it would fail the mission's first clause.
+
+The requirements are unsound because they confuse automatic conversion with
+unchecked reinterpretation. A With `str` is not inherently a C string — it need
+not be NUL-terminated and may contain interior NULs. A `void*` is not evidence of
+its pointee's type. A null pointer is not an empty string. None of these are
+ceremony; they are information the compiler does not have unless a contract
+supplies it.
+
+This is the #4 doctrine applied to strings, buffers, and opaque pointers:
+
+> Model the C contract into a safe surface, or leave the operation raw. Never
+> fake it.
+
+An automatic conversion is allowed exactly when the compiler or binding models
+the *full* contract relevant to it: sentinel, length, lifetime (including whether
+the pointer is retained past the call), nullability, mutability, ownership,
+allocation, cleanup, and copy-back. Anything less stays raw.
+
+### `str` to a C input string (`*const c_char`)
+
+A `str` may be passed automatically to a `*const c_char` parameter when the
+binding establishes three facts, not two:
+
+1. the parameter is a read-only, NUL-terminated input string;
+2. the value has no interior NUL (or the conversion handles one loudly); and
+3. the pointer is **not retained past the call**.
+
+Given those, the compiler satisfies the contract the cheapest correct way:
+
+* If the argument is a string literal or other value the compiler can prove is
+  already valid NUL-terminated storage, it passes it directly — zero copy, zero
+  allocation. This is the common case and it must be free.
+* Otherwise it generates a call-scoped NUL-terminated temporary and frees it when
+  the call returns.
+
+The interior-NUL rule is not negotiable: the conversion must fail loudly, never
+silently truncate. `"safe.txt\0.evil"` must not become `"safe.txt"` by accident —
+that is a poison-NUL vulnerability, not a "specified behavior." If the compiler
+can prove the NUL at compile time (a literal, statically-known data), it is a
+compile error. If the value is dynamic, the generated wrapper checks at runtime
+and reports failure per the binding's error model. A `str` with an interior NUL
+may still be passed as bytes to a pointer-plus-length API; it simply cannot be a
+faithful NUL-terminated C string.
+
+The non-retention requirement is the lifetime half of the contract, and it is the
+one easiest to forget. A call-scoped temporary is freed when the call returns,
+which is sound only if C does not keep the pointer. `putenv(char*)` is the
+textbook counterexample: it stores the pointer into the environment rather than
+copying, so a call-scoped temporary leaves the environment holding freed memory.
+Registration and config APIs that retain a `const char*` are the same hazard.
+When the binding cannot establish non-retention — or knows the pointer *is*
+retained — the call-scoped temporary is unsound, and the conversion must instead
+require caller-managed storage (`CStr`/`CString`, whose lifetime the caller
+controls) or fall to the raw surface. This is #12's ephemeral-escape rule
+projected across the FFI boundary: the generated temporary is ephemeral, "C
+retains it" is the escape, and since C cannot be inspected, the binding must
+carry the non-retention fact the way it carries the sentinel and the length.
+
+The conversion passes the `str`'s bytes unchanged. It does not silently transcode.
+A With `str` is UTF-8; a C function may expect a locale or other encoding, but
+that mismatch is the binding's or programmer's concern, not something the
+compiler papers over by re-encoding behind the call — silent transcoding would be
+exactly the hidden behavior this ruling forbids. Pass the bytes (plus the NUL),
+honestly.
+
+`CStr`/`CString` and generated wrapper types remain available whenever the user
+needs storage that outlives the call.
+
+### `str` to a byte buffer (`*const u8`)
+
+`str -> *const u8` is not a safe conversion to a naked pointer. A `str` carries a
+pointer *and* a length, and a safe buffer binding must convey both to C: the data
+pointer and its paired length/capacity parameter, or an equivalent
+wrapper-modeled bound. `write(fd, data)` may be ergonomic when the binding knows
+to pass `data.ptr` and `data.len` together. Passing `data.ptr` alone to an
+unbounded C reader is not inference; it is raw pointer interop and belongs on the
+raw surface. A bare pointer with no modeled bound is unsafe regardless of NUL
+expectations.
+
+### `str` to a mutable C string or writable buffer (`*mut c_char`)
+
+There is no implicit `str -> *mut c_char` conversion with a hidden
+caller-must-free obligation. A hidden allocation the caller must later free is
+not humane — it is invisible ownership transfer, and it manufactures leaks,
+double-frees, and copy-back ambiguity.
+
+A writable C buffer requires a modeled buffer contract. The safe surface may
+expose:
+
+* a caller-provided `mut` slice or buffer with known capacity;
+* a generated owned buffer type whose `Drop` handles cleanup (per #16, so cleanup
+  composes with moves, returns, and storage rather than relying on a remembered
+  manual `free`);
+* a generated wrapper defining allocation, capacity, initialized length, mutation
+  behavior, and whether contents are copied back into With.
+
+Absent those facts, the API stays raw.
+
+### `c_void` and opaque pointers
+
+`*mut c_void` and `*const c_void` are opaque. Expected-type context proves nothing
+about the pointee's type, lifetime, ownership, nullability, or validity. A `void*`
+may be converted automatically only when trusted binding metadata or a generated
+wrapper proves what it represents. Otherwise it remains `*c_void`, and using it
+requires the raw surface or an explicit cast.
+
+In particular, `void* -> str` must never be generated merely because the expected
+type is `str`. Calling `strlen` on an arbitrary `void*` is an unsafe memory read
+based on a guess. It is allowed only when the binding proves the pointer is a
+valid NUL-terminated string with known lifetime and nullability — at which point
+it is a modeled conversion, not a coercion from context.
+
+### Nullability
+
+Null is information and must not collapse to `""`. A nullable C string or pointer
+return is modeled as `Option[str]` (or an equivalent generated wrapper). `None`
+and `Some("")` are different values and remain different unless the C contract
+explicitly states that null means empty — an explicit modeled assertion by
+someone who knows the API, never a silent default.
+
+### Spec update
+
+Replace the automatic `str`/`c_char`/`c_void` coercion rules with a
+contract-driven conversion rule. The safe `c_import` surface may generate:
+
+* zero-copy direct passing for literals and values proven already-valid C strings;
+* call-scoped C-string temporaries for `str -> *const c_char`, only when the
+  pointer is not retained past the call;
+* interior-NUL checks (compile-time where provable, runtime otherwise) for dynamic
+  `str` values;
+* pointer-plus-length adapters for byte-buffer APIs;
+* owned writable-buffer wrappers with `Drop`, or caller-provided `mut` buffers;
+* `Option` for nullable C string or pointer returns;
+* typed wrappers for trusted `void*` contracts.
+
+The raw surface remains for explicit casts, unmodeled pointer behavior, arbitrary
+`void*`, retained or unknown-lifetime string pointers, mutable C buffers without a
+modeled contract, and any API whose lifetime, ownership, or nullability cannot be
+proven.
+
+No safe conversion may silently truncate at an interior NUL, allocate hidden
+caller-owned memory, pass a call-scoped temporary to an API that retains it,
+silently transcode string bytes, erase nullability, call `strlen` on an unproven
+pointer, or reinterpret a `void*` from expected type alone.
+
+This preserves both mission clauses:
+
+**C interop stays ergonomic — `fopen(path, mode)` remains beautiful wherever the
+binding can model the C-string contract, and the literal case costs nothing.**
+
+**No guardrail is removed by pretending bytes, sentinels, lifetimes, nullability,
+mutability, ownership, or `void*` pointee type are facts the compiler has not
+proven.**
+
 ## 18. Pure comptime and capability-bearing comptime are conflated
 
 Affected requirements:
@@ -1031,6 +1375,152 @@ Preferred requirement shape:
   the required capability set and mediated by driver-provided values.
 - Build-system effects belong only in capability-bearing comptime, never in
   ordinary pure comptime.
+
+BDFL Response: Accept with clarification.
+
+The contradiction is real, and it guards the fixpoint, so it cannot stand.
+
+The spec currently uses “comptime” for several different execution modes, then applies the purity rule for one of them to all of them. Pure comptime should be deterministic and effect-limited. But `embed_file` reads a file, `c_import` parses C headers with the compiler’s C toolchain, and `build.w` intentionally performs filesystem, process, package, and toolchain effects. Those are not mistakes. They are part of With’s promise. The mistake is pretending they are all the same kind of comptime.
+
+The invariant that matters is not “no effects.” The invariant is:
+
+> No build output may depend on undeclared, untracked, ambient state.
+
+With self-hosts and must pass the byte-identical fixpoint. If compile-time execution can silently read the clock, the environment, the network, the host filesystem, an ambient compiler, or untracked process output, then two builds of the same source tree can produce different binaries. That breaks determinism, reproducibility, and the compiler’s own correctness contract.
+
+So the governing rule is:
+
+> Comptime may use information only when that information is declared, authorized, and tracked.
+
+There are two independent axes:
+
+1. **Determinism:** is the result a deterministic function of declared, tracked inputs?
+2. **Access authority:** is the operation allowed to touch the thing it wants to touch?
+
+These axes do not move together. `embed_file("logo.png")` inside the package root is deterministic and covered by the compiler’s implicit authority over declared package inputs. `embed_file("/outside/root/logo.png")` may still be deterministic, but it needs explicit access authority. A `build.w` package fetch needs authority and must also be made deterministic through pinning and content addressing.
+
+A capability answers what code may touch. It does not grant permission to produce nondeterministic output.
+
+### Pure comptime
+
+Pure comptime computes values. It does not perform ambient effects.
+
+It may evaluate expressions, instantiate types, fold constants, run pure user code, and produce program data. Producing program data is the point of comptime; it is not an effect in the forbidden sense.
+
+Pure comptime may not:
+
+* read the filesystem;
+* inspect directories;
+* access the environment;
+* read the clock;
+* make network calls;
+* spawn processes;
+* call FFI;
+* mint capabilities;
+* depend on host-global state;
+* call the runtime heap allocator or carry runtime allocator identity across the compile/runtime boundary.
+
+The current wording “cannot allocate heap memory that persists to runtime” should be corrected. Pure comptime may produce static program data: constants, tables, generated bytes, and embedded assets. What it may not do is allocate runtime heap objects or smuggle runtime heap identity across the phase boundary. The ban is on runtime allocation and ambient effects, not on persistence of compiler-produced data.
+
+### Tracked-input comptime
+
+Some comptime operations read external inputs and still remain deterministic because the input is explicitly named, authorized, and tracked.
+
+`embed_file("logo.png")` is the canonical example. It is not general file I/O. It is a declaration that `logo.png` is a compile-time input. The compiler reads it, records it as a dependency, and rebuilds when it changes.
+
+This permission is a property, not a magic list of blessed intrinsics. A tracked-input operation is allowed when:
+
+* the input is resolved by pure comptime before it is read;
+* the resolved input is inside an authorized package/source root, or access is granted by an explicit capability;
+* the operation is deterministic over that resolved input;
+* the input is recorded in the build graph before or as it is read.
+
+The decisive distinction is declared input versus discovered input.
+
+Reading `embed_file("logo.png")` is allowed because the file is named and tracked. Computing `"assets/" ++ name ++ ".png"` from pure comptime constants is also allowed if the resolved path is registered before the read. But globbing `assets/*.png`, listing a directory, reading `$HOME`, consulting the environment, or inspecting the filesystem to decide what to read is input discovery. Discovery makes the input set depend on ambient state, so it does not belong in pure comptime.
+
+If discovery is needed, it belongs in capability-bearing comptime, where the discovery itself becomes part of the build graph, manifest, or reproducibility record.
+
+The model may be extended beyond `embed_file`, but only through compiler-recognized APIs that declare their inputs to the build graph before reading them. Ordinary user comptime does not get ambient file I/O by promising to be deterministic.
+
+### Capability-bearing comptime
+
+Capability-bearing comptime is a separate mode for build orchestration, package integration, C interop, migration, code generation, and tool execution.
+
+This is where `build.w`, `with get`, package fetching, C library integration, generated binding workflows, and build-time tool invocations live.
+
+Capability-bearing comptime may perform effects only through driver-minted capabilities. A capability is an unforgeable value granting specific authority: filesystem access, process execution, package/network access, environment access, output writing, tool invocation, or similar.
+
+Capabilities have three roles.
+
+First, they are an access-control boundary:
+
+> What may this code touch?
+
+A dependency’s `build.w` does not receive ambient access to the user’s machine merely because the package was fetched. The driver chooses what capabilities to mint. Untrusted fetched build code gets only the authority it was granted, so compiling a project does not automatically let a dependency read credentials, phone home, or write outside its sandbox.
+
+Second, they are not a determinism waiver.
+
+> What may this code touch?
+> is not the same question as:
+> May this output become nondeterministic?
+
+Anything that affects the compiled output must still be deterministic over declared, tracked, or pinned inputs. A package fetch must be pinned and content-addressed. A code generator must run hermetically or record its inputs. A process invocation that affects output must track its command, inputs, outputs, environment, and relevant tool identity. An environment variable that affects output must be declared as a build input.
+
+If an effect is genuinely nondeterministic, that nondeterminism must be visible: recorded, marked non-reproducible, or rejected in strict mode. It must never silently enter the build output while the compiler pretends the build is deterministic.
+
+Third, capabilities are the way build effects become auditable. They give the build graph a place to record what was read, written, fetched, invoked, or depended on.
+
+### Foreign code and FFI
+
+Pure comptime may not call FFI.
+
+Capability-bearing comptime may invoke foreign tools only through explicit capabilities, and the safe default is subprocess execution. A subprocess can be sandboxed, given explicit inputs, denied ambient access, and recorded as a build action.
+
+In-process FFI is sharper. It loads foreign code into the compiler’s own address space; a crash or exploit compromises the compiler process itself. It cannot be sandboxed like a subprocess. Therefore in-process FFI during comptime is not an ordinary user/dependency capability. It is disallowed for untrusted fetched code by default and is acceptable only for trusted, pinned compiler/toolchain integrations or for explicitly trusted local build code under the strongest capability.
+
+FFI must not become ambient effects through the side door.
+
+### `c_import` as the canonical cross-case
+
+`c_import` is the most important example of this model.
+
+It reads C headers, which are declared and tracked inputs. But it also uses a C parser/toolchain, which is an effect requiring authority and a toolchain whose identity matters. For the fixpoint to hold, the same headers plus the same toolchain must produce the same bindings. Therefore the toolchain itself is a tracked input.
+
+This is why With’s embedded LLVM/Clang SDK matters for reproducibility, not merely for dependency-freeness. A pinned Clang is part of the declared input set. An ambient system Clang is not. If `c_import` depends on whichever Clang happens to be installed, two machines can generate different bindings from the same With source.
+
+`c_import`’s use of libclang is not ordinary user comptime FFI. It is compiler-owned integration with the pinned With toolchain. That is acceptable because the compiler owns and tracks the toolchain. General dependency-supplied in-process FFI remains disallowed by default.
+
+The no-deps compiler work and the comptime determinism rule are the same concern from two directions: the build output must depend only on declared, authorized, tracked inputs — toolchain included.
+
+### `with migrate`
+
+`with migrate` is capability-bearing tooling. Its output is normally reviewable source that the user commits, so nondeterminism there is a quality and trust concern before it is a fixpoint concern.
+
+But if migration or code generation is invoked as part of a build action, the normal capability-bearing rules apply: inputs, tool identity, environment, and outputs must be tracked when they affect the binary.
+
+The compiler’s own self-hosting build has no escape hatch. The fixpoint requires full determinism. For that build, nondeterminism cannot merely be visible; it must be absent.
+
+### Spec update
+
+Replace the blanket purity wording in `17.1.1.7`, `17.1.1.9`, and `17.7.1.3`, and reconcile `embed_file` and `build.w` in `17.6.2.2` and `18.5.2.22`, with a comptime model organized around two axes: determinism over declared/tracked inputs, and access authority.
+
+* **Pure comptime:** deterministic computation over values. No ambient I/O, filesystem inspection, environment access, clock reads, network, FFI, process execution, capability minting, runtime allocation, or host-global state. It may produce static program data.
+
+* **Tracked-input comptime:** deterministic reads of explicitly named or purely-computed authorized inputs, each recorded as a build dependency. `embed_file` belongs here. This tier reads declared inputs; it does not discover inputs from ambient state. Access beyond the package/source root requires an explicit capability without changing the determinism requirement.
+
+* **Capability-bearing comptime:** build, package, C interop, migration, and tool effects mediated by driver-minted capabilities. Capabilities grant authority, not nondeterminism, and bound the authority of untrusted fetched build code. Output-affecting effects must be deterministic over declared, tracked, or pinned inputs — including toolchain identity — or be explicitly recorded as nondeterministic. Strict and self-hosting builds reject nondeterminism.
+
+The blanket FFI ban narrows accordingly: pure comptime still may not call FFI; capability-bearing comptime may invoke trusted, tracked foreign tools, preferring sandboxable subprocesses. In-process FFI is restricted to compiler-owned pinned toolchain integrations or explicitly trusted local build code, never ambient dependency code.
+
+No comptime mode may let undeclared ambient state affect the build output silently. No mode may let untrusted fetched code exceed the authority the driver granted it. Determinism relative to declared, authorized, tracked inputs is a whole-pipeline invariant, not a property of one syntax form.
+
+This preserves both mission clauses:
+
+**The compiler removes ceremony: embedding files, importing C, fetching native packages, generating code, and running build logic are first-class instead of hand-written build-system suffering.**
+
+**The compiler preserves the guardrail: every output is a deterministic function of declared, authorized, tracked inputs — toolchain included — so the self-hosting fixpoint survives. Untrusted build code receives only the authority the driver grants, so compiling a project cannot compromise the machine.**
+
 
 ## 19. Allocation visibility wording is too absolute
 
@@ -1073,6 +1563,96 @@ Preferred requirement shape:
   ownership explicit. It should not create caller-must-free obligations
   invisibly.
 
+BDFL Response: Accept the flag; modify the rule.
+
+`20.1.1.1` is wrong as an absolute. “No allocation hides behind innocent syntax” conflicts with the language the spec already describes: f-strings allocate, comprehensions allocate, owned string literals may allocate when not elided, `async fn` calls allocate fibers, and `async:` allocates a fiber. The spec bans what it defines.
+
+But the fix is not to make every allocation explicit. This is the rare ruling where the ergonomics clause pushes toward hiding implementation machinery. F-strings, comprehensions, owned literals, and async fibers exist precisely so the programmer does not hand-write string builders, collection allocation, `malloc`, or fiber setup. Making that machinery explicit would reintroduce the suffering With exists to automate.
+
+The old wording conflates two concerns:
+
+* **Cost legibility:** can a systems programmer identify where allocation may happen?
+* **Obligation legibility:** does an allocation create ownership, cleanup, lifetime, or caller responsibility the code does not show?
+
+Those are different rules. Cost legibility is about performance predictability. Obligation legibility is about safety and correctness. The first can tolerate compiler-owned hidden machinery when the construct makes the cost attributable. The second cannot tolerate hidden responsibility at all.
+
+The replacement rule is:
+
+> Allocation need not be spelled, but it must be attributable, documented, checkable, and must never create an invisible obligation.
+
+### Cost legibility
+
+Allocation has a cost, and systems programmers must be able to find that cost. But finding it does not require seeing `malloc`.
+
+An allocation is legible when it is attributable to a visible construct, owning type, explicit allocation API, or compiler-owned adapter whose cost model is documented and diagnosable. The construct or type is the signal.
+
+Examples of allocation-producing constructs include:
+
+* explicit allocation APIs: allocator calls, `Vec.new`, owned buffer constructors, `.to_owned`;
+* collection-producing constructs: comprehensions;
+* string-producing constructs: f-strings and owned string literals when not elided;
+* concurrency constructs: `async fn` calls and `async:` blocks, which allocate fibers/tasks;
+* compiler-owned adapters: call-scoped C-string temporaries, ABI buffers, and other modeled FFI bridges whose lifetime the compiler owns.
+
+An f-string signals “build a string.” A comprehension signals “build a collection.” A `Task` signals async work and its fiber/task representation. A generated C-string adapter is attributable to a modeled FFI conversion.
+
+Each allocation-producing construct must have a documented cost model: what may allocate, which allocator or allocation policy is used, whether allocation may be elided, what happens on allocation failure, and what owns the result. In-code legibility is primary; documentation supplements it.
+
+Two cases need special precision.
+
+First, owned string literal elision must be deterministic and documented. “Sometimes allocated, sometimes elided, depending on compiler mood” is not legible, and it is bad for the fixpoint. The spec must say when a literal is static, when it is copied, and when allocation is elided. The rule must be predictable.
+
+Second, async allocation is legible through type, not call-site coloring. Per the no-colored-functions design, an async call should not require extra syntax at every call site just to say “this allocates a fiber.” The allocation is type-attributable through `Task` and compiler-visible to allocation analysis, diagnostics, and no-allocation checking. That is consistent with no-colored-functions, not an exception to it.
+
+### Obligation legibility
+
+This is the hard rule.
+
+An allocation must never create an invisible ownership, lifetime, cleanup, or caller responsibility.
+
+Compiler-generated allocation is acceptable when the compiler owns the entire lifetime: allocate, use, free. A call-scoped FFI temporary is fine when it cannot escape and the compiler frees it. A generated owned wrapper is fine when its `Drop` owns cleanup. A comprehension returning an owned collection is fine because the owning type carries the responsibility.
+
+The forbidden cases are hidden responsibilities:
+
+* a hidden allocation the caller must later free;
+* a call-scoped temporary passed to a C function that retains it past the call;
+* a raw pointer returned with an unstated ownership obligation;
+* an allocation whose cleanup depends on a convention the type does not express;
+* a compiler-generated buffer whose mutation, copy-back, or lifetime contract is not modeled.
+
+This is the same rule as #16 and #17 viewed from the allocation angle. The implicit `str -> *mut c_char` conversion was not wrong merely because it allocated. It was wrong because it created an invisible caller-must-free obligation with undefined copy-back. The correct forms are compiler-owned temporary storage, a caller-provided `mut` buffer, or an owned wrapper with `Drop`.
+
+The sin is not hidden allocation machinery. The sin is hidden allocation responsibility.
+
+### No-allocation contexts
+
+Because With is close to the machine, allocation legibility must be enforceable.
+
+The language should support contexts where allocation is forbidden or restricted: freestanding code, interrupt/signal-critical regions, allocator-constrained scopes, `no_alloc` regions, or equivalent mechanisms. This should be co-designed with the tier and allocator model, not invented as a separate one-off rule.
+
+In such contexts, allocation-producing constructs are rejected unless the compiler proves the allocation is elided or the allocation is routed through an explicitly allowed arena, allocator, or capability. The explicit arena/capability is the visible allocation intent: it says where allocation is allowed and who owns the resulting lifetime.
+
+This rule depends on deterministic elision. A `no_alloc` region cannot be meaningful if whether an f-string allocates depends on an unstable compiler choice. Elision rules must be deterministic so allocation checking is deterministic.
+
+This also inherits the usual precision discipline: if a `no_alloc` region rejects code whose allocation is actually elidable, that is a compiler-precision bug to fix, not a user ceremony requirement. The user may supply real information through an explicit arena or allocator capability, but they should not restructure code merely to appease a weak checker.
+
+### Spec update
+
+Replace `20.1.1.1` with two rules.
+
+**Cost legibility:** allocation need not be syntactically spelled, but every allocation must be attributable to a visible construct, owning type, explicit allocation API, or compiler-owned adapter. Allocation-producing constructs must be enumerated and documented: allocator calls, `Vec.new`, `.to_owned`, comprehensions, f-strings, owned literals under deterministic elision rules, `async fn`/`Task` fiber allocation, `async:` fiber allocation, and modeled FFI temporaries. Each must specify allocator policy, failure behavior, lifetime, and elision rules where relevant. Fiber allocation is legible through `Task` and compiler-visible, not call-site-spelled.
+
+**Obligation legibility:** no allocation may create an invisible ownership, lifetime, cleanup, or caller-must-free obligation. Compiler-generated allocations must be compiler-owned with a non-escaping lifetime, or represented by a visible owning type whose `Drop` handles cleanup. Hidden caller obligations are forbidden. This is the same rule as #16 and #17.
+
+Allocation-producing constructs must be visible to compiler diagnostics and no-allocation checking. No-allocation contexts, co-designed with the tier and allocator model, reject allocating constructs unless the allocation is proven elided or routed through an explicit arena, allocator, or capability. Conservative rejection inherits the compiler-precision discipline: false rejections are compiler work, not user ceremony.
+
+This preserves both mission clauses:
+
+**The compiler removes ceremony: programmers do not spell allocation machinery when f-strings, comprehensions, fibers, owning types, and FFI adapters already express the work.**
+
+**The compiler preserves the guardrail: every allocation is attributable, documented, and checkable, and no allocation ever hides an ownership or cleanup obligation.**
+
+
 ## 20. Ephemerality is not purely structural and dataflow-free
 
 Affected requirement:
@@ -1102,6 +1682,129 @@ Preferred requirement shape:
 - The implementation should keep this analysis simple and deterministic, but
   the spec should not claim it does not exist.
 
+BDFL Response: Accept the flag; reframe the rule.
+
+`22.1.1.2` is wrong as written. “No dataflow required; ephemerality is determined structurally by types” contradicts the rest of the spec.
+
+Returned-origin inference, returned-view origin tracking, task ephemerality propagation, assignment propagation, call-site enforcement, and escape checks are all dataflow-shaped. The requirement describes a simpler system than the one With actually needs, and that simpler system is not sound.
+
+The underlying intent is right: the user should not write lifetime or ephemerality annotations. With must not become Rust with different punctuation. The mistake is confusing **no user ceremony** with **no compiler analysis**.
+
+The mission says With pays compiler complexity to eliminate user ceremony. Ephemerality analysis is exactly that payment. The simplicity is user-facing, not implementation-facing.
+
+No annotations does not mean no information. Origins, captures, lifetimes, and escape constraints exist. The compiler carries them so the programmer does not have to spell them out.
+
+### Structural ephemerality versus provenance
+
+The correct split is:
+
+> Type-level ephemerality is structural.
+> Value-level ephemerality is provenance-tracked.
+
+Type-level ephemerality answers:
+
+> Can this type carry an ephemeral value?
+
+That can be structural. References carry origin constraints. Declared-ephemeral types are ephemeral by declaration. Aggregates and generic containers whose type structurally contains an ephemeral component are ephemeral by structure: `Vec[&T]` is ephemeral-shaped because the type itself contains `&T`.
+
+No dataflow is needed to classify that type shape.
+
+Value-level ephemerality answers a different question:
+
+> Where did this value come from, and where may it go?
+
+That cannot be answered from the type alone.
+
+A returned `&T` does not merely have type `&T`; it has an origin set: parameter `a`, parameter `b`, receiver field `self.x`, captured environment, static storage, or some combination.
+
+A `Task[T]` is not ephemeral by structure. Per the task model, there is one `Task[T]` spelling whether the task is ephemeral or not. A particular task binding becomes ephemeral because that task captured a borrowed stack value, an ephemeral resource, a scope-bound allocator, or another non-escaping origin. Task ephemerality is therefore value-level, not structural.
+
+Closures follow the same principle. An implementation may encode captures structurally in anonymous closure types, but the spec guarantee should be compiler-carried closure/callable summaries, not source-visible lifetime structure. A closure that captures an ephemeral value carries that provenance in its callable summary. If the closure escapes, the summary must be checked.
+
+Assignment may transfer an origin. A call may return a value whose origin is summarized by the callee. An escape check must know which origin would escape. These are properties of values flowing through the program, not just of types.
+
+### Modular dataflow, not global lifetime ceremony
+
+The analysis must be bounded and modular. This is not a license for an inscrutable whole-program lifetime solver, and it is not a reason to make the user annotate lifetimes.
+
+The shape is:
+
+* intra-procedural dataflow inside each function body;
+* compiler-carried summaries at function and callable boundaries;
+* call-site enforcement using those summaries.
+
+Function summaries record which returned values may originate from which parameters, receiver, captures, globals, static storage, or local ephemeral sources.
+
+Callable summaries carry the same facts for function pointers, closures, trait objects, generated wrappers, and other indirect-call surfaces.
+
+Task summaries carry capture ephemerality, detachment eligibility, and `may_suspend` facts.
+
+Returned-view summaries carry origin sets.
+
+These summaries are real compiler metadata. They are not user-written lifetime syntax.
+
+This is the same pattern as the rest of With: infer the facts, carry them across interfaces, and reject escapes when the facts prove a value cannot safely outlive its origin.
+
+That is also the shared principle behind the callable `may_suspend` model and returned-origin summaries: inferred to spare the user, carried on interfaces so the analysis stays modular and sound across boundaries.
+
+### Why the old wording is dangerous
+
+The danger of “no dataflow required” is not merely over-rejection. It is unsoundness.
+
+A structural-only checker can see that `&T` is reference-shaped, but it cannot know whether a returned reference came from a local temporary, a parameter, a receiver field, a capture, or static storage. It cannot know which task binding captured a borrowed value. It cannot know whether an assignment moved an ephemeral origin into a stored value. It cannot soundly check returned views, detached tasks, or closures that escape their capture scope.
+
+So it accepts programs it should reject: dangling references, escaped borrows, invalid returned views, and tasks or closures that outlive captured stack data.
+
+This is a clause-two issue. The quiet half of the mission requires the compiler to track the information that keeps no-ceremony safe.
+
+### Determinism and precision
+
+The analysis must be deterministic. Its hard-error boundary cannot depend on optimization level, analysis budget, hash iteration order, or build accident. The same program must receive the same ephemerality verdict across builds.
+
+That is required for user trust, for hard-error diagnostics, and for the self-hosting fixpoint.
+
+The analysis may be conservative for soundness. If the compiler cannot prove that an ephemeral value does not escape, it must reject.
+
+But avoidable false rejection is compiler precision debt, not user responsibility. If safe code is rejected only because the analysis is too weak, the long-term answer is to improve the compiler, not to make the programmer write lifetime annotations or restructure obvious code to appease the checker.
+
+The user may supply real information through explicit constructs when needed: choosing an owning type, returning an owned value instead of a view, using a safe wrapper, or otherwise changing the program’s ownership shape. That is information, not ceremony. But the default burden belongs to the compiler.
+
+### Spec update
+
+Replace `22.1.1.2` with the following rule:
+
+**Type-level ephemerality is structural.**
+References carry origin constraints. Declared-ephemeral types are ephemeral by declaration. Aggregates and containers whose type structurally contains an ephemeral component are ephemeral by structure, such as `Vec[&T]`. This determines which type shapes can carry ephemeral constraints.
+
+**Value-level ephemerality is provenance-tracked.**
+Binding-level ephemerality, returned-origin sets, task capture ephemerality, closure capture ephemerality, assignment propagation, call propagation, returned-view checking, and escape checks require deterministic provenance analysis.
+
+**Tasks are value-level.**
+`Task[T]` has one spelling whether ephemeral or non-ephemeral. A task binding is ephemeral when the task captures or depends on an ephemeral origin. That fact is inferred and propagated, not determined from the structural type alone.
+
+**Closures and callable values carry summaries.**
+An implementation may encode captures structurally in anonymous closure types, but the spec guarantee is a compiler-carried callable summary: captures, origin sets, ephemerality, and `may_suspend` facts are carried across closure, function pointer, trait object, and wrapper boundaries.
+
+**The analysis is modular.**
+The compiler performs intra-procedural dataflow and carries inferred summaries across interfaces: returned-origin sets, task ephemerality, closure capture provenance, callable provenance, and `may_suspend` facts.
+
+**The analysis is inferred.**
+The user writes no lifetime or ephemerality annotations. The compiler infers and carries the facts.
+
+**The analysis is deterministic and conservative.**
+Verdicts are reproducible. Rejection is required when safety cannot be proven. False rejection of actually-safe code is compiler precision debt.
+
+The spec must not claim the analysis does not exist. The claim With should make is stronger and more honest:
+
+> The programmer writes no ephemerality annotations because the compiler performs the provenance analysis.
+
+This preserves both mission clauses:
+
+**The user writes no lifetime or ephemerality ceremony — origins, captures, and escape constraints are inferred and carried by the compiler.**
+
+**The compiler preserves the guardrail with sound, modular, deterministic provenance analysis, so references, returned views, tasks, closures, and ephemeral values cannot escape the origins that make them safe.**
+
+
 ## 21. `with` dispatch is underspecified in the later semantics section
 
 Affected requirements:
@@ -1129,6 +1832,87 @@ Preferred requirement shape:
 - Full `with` dispatch should first distinguish syntax/form and guard
   protocol, then use `mut` to choose scoped mutation versus immutable scoped
   binding for the plain binding forms.
+
+BDFL Response: Accept the flag; subordinate Section 23.
+
+`23.1.1.1`–`23.1.1.3` are wrong as a complete `with` dispatch rule.
+
+They say the compiler desugars `with` based on the `mut` keyword. That is only true for one narrow family: the plain, non-guarded binding forms. It is not true for `with` as a whole.
+
+Section 7 is the controlling rule: the `with` block form is determined by syntax and by the type/protocol of the expression. Section 23 currently describes only `with e as x` and `with e as mut x`, then presents `mut` as if it were the global dispatcher. That inverts the hierarchy.
+
+The correct rule is:
+
+> `with` dispatch is syntax-first, type/protocol-driven, and `mut`-refined.
+
+The syntactic shape narrows the candidates. The expression’s type and protocol determine whether the form is guarded access, plain scoped binding, implicit context, or record update. `mut` only refines mutability within the selected path.
+
+This matters because `with` is not just binding sugar. Guarded `with` carries real safety machinery: acquire on entry, release on scope exit, and no-await-while-guarded enforcement. If an implementer follows Section 23 literally and treats all `with as` forms as plain bindings selected by `mut`, guarded access is silently miscompiled. The guard protocol is skipped, cleanup does not run, and the no-await-guard check is lost. That is a clause-two failure, not a wording nit.
+
+### Dispatch order
+
+Full `with` dispatch is:
+
+1. **Syntactic form first.**
+   The parser distinguishes the gross shape:
+
+   * `with e`
+   * `with e as x`
+   * `with e as mut x`
+   * record-update forms
+   * implicit-context forms, if syntactically distinct
+
+2. **Type/protocol next.**
+   For forms that can be either plain binding or guarded access, the expression’s type decides. If the expression implements the guarded-access protocol — for example `Scoped` / `ScopedMut`, or whatever the final protocol names are — then the form is guarded. Otherwise it is a plain scoped binding.
+
+3. **`mut` last.**
+   `mut` is information, not ceremony. The compiler generally cannot infer whether the user intends to mutate a bound name, so the user supplies that fact. But `mut` is a refinement, not the dispatcher.
+
+   In the plain binding path:
+
+   * `with e as x` introduces an immutable scoped binding.
+   * `with e as mut x` introduces a mutable scoped binding.
+
+   In the guarded path:
+
+   * the guard protocol determines whether mutable access is available;
+   * `mut` requests mutable access to the guarded value;
+   * `mut` must be checked against the selected guard capability.
+
+   For example, `with lock.read() as mut x` is invalid if `lock.read()` produces only an immutable guard. The keyword does not select the mutable protocol. It requests mutability, and the type must support it.
+
+### Section 23’s role
+
+Section 23 must not stand as a global `with` dispatch rule. It should either be narrowed or replaced.
+
+Preferred fix:
+
+* Section 7 owns the full `with` dispatch rule.
+* Section 23 is retitled and scoped to the non-guarded binding desugarings only.
+
+For example:
+
+> Section 23 specifies the desugaring of plain, non-guarded `with e as x` and `with e as mut x` forms after full `with` dispatch has already selected the plain binding path. It does not define guarded access, implicit context, record update, or the global `with` dispatch order.
+
+If Section 23 restates the full rule instead, it must use the order above: syntactic shape, then type/protocol, then `mut` as a path-dependent mutability refinement.
+
+### Spec update
+
+Replace `23.1.1.1`–`23.1.1.3` with a rule that subordinates Section 23 to Section 7:
+
+* Full `with` dispatch is syntax-first and type/protocol-driven.
+* Guarded access is selected by the expression’s guard protocol, not by `mut`.
+* Plain scoped binding is selected only when no guarded/context/record-update form applies.
+* `mut` refines mutability within the selected form.
+* In the guarded path, `mut` requires a mutable guard capability; it does not choose the protocol.
+* Section 23 describes only the desugaring of plain, non-guarded binding forms unless it explicitly restates the full dispatch order.
+
+This preserves both mission clauses:
+
+**The user does not spell “guarded” versus “plain” when the type/protocol already determines it. The compiler reads the form from syntax and type.**
+
+**The guardrail remains intact: type-first dispatch preserves guarded acquire/release behavior and no-await-guard enforcement, while keyword-first dispatch would silently drop them.**
+
 
 ## 22. Raw pointer arithmetic has conflicting unsafe requirements
 
@@ -1161,3 +1945,86 @@ Preferred requirement shape:
 - Raw pointer arithmetic and comparison are safe computations, provided the
   compiler lowers them without introducing backend undefined behavior.
 - Any later memory access through the computed pointer requires unsafe.
+
+BDFL Response: Accept; adopt §16.11 as normative.
+
+`16.1.1.19` is stale and over-broad. It says `unsafe` is required for raw pointer operations, including pointer arithmetic. That contradicts §16.11, which gives the correct operation-specific rule: computing a raw pointer value is not the dangerous operation. Touching memory through it, or asserting that it is valid to touch, is.
+
+Adopt §16.11 and delete pointer arithmetic from the §16.1 unsafe list.
+
+This is the #4 doctrine applied to pointers. `unsafe` is not a tax on foreignness, and it is not a tax on pointers either. It marks the operation whose safety the compiler cannot prove.
+
+Pointer arithmetic computes an address. Pointer comparison compares addresses. Neither reads memory, writes memory, creates a reference, or proves bounds, alignment, liveness, initialization, ownership, or provenance. Requiring `unsafe` around `p + 1` or `p == end` is ceremony that buys no safety.
+
+The boundary is:
+
+> Address computation and comparison are safe. Memory access or validity assertion is unsafe.
+
+The second half matters as much as the first. The unsafe point is not only where the program touches memory. It is also where the program launders a raw pointer into a safe abstraction.
+
+Converting a raw pointer into `&T`, a slice, a view, or any other safe memory abstraction asserts facts the safe type system will trust afterward: validity, bounds, alignment, lifetime, initialization, and, if With’s memory model carries it, provenance. That assertion must be unsafe at the conversion site. It cannot be deferred until downstream safe code dereferences the now-safe value.
+
+For example:
+
+```with
+let q = p + n          // safe: computes a raw pointer value
+let at_end = q == end  // safe: compares raw pointer values
+
+unsafe:
+    let x = *q             // unsafe: reads through a raw pointer
+    *q = 42                // unsafe: writes through a raw pointer
+    let r = q as &T        // unsafe: asserts reference validity
+    let s = slice(q, len)  // unsafe: asserts bounds, lifetime, validity
+```
+
+Indexing splits along the same line. Address-only indexing is safe; access indexing is unsafe.
+
+```with
+let q = p + i      // safe: address calculation
+let q2 = &p[i]     // safe only if this is specified as address calculation
+
+unsafe:
+    let x = p[i]   // unsafe if this reads memory
+    p[i] = value   // unsafe if this writes memory
+```
+
+The spec must not use one word, “indexing,” for both address calculation and memory access without saying which is meant.
+
+### Backend obligation
+
+This is not only a surface-syntax rule. It is a backend contract.
+
+If With says raw pointer arithmetic is safe address computation, the compiler must lower it in a way that remains defined for arbitrary raw pointer values. The backend must not turn a safe raw address calculation into a hidden assertion that the pointer is in-bounds, dereferenceable, aligned, live, initialized, or attached to a particular allocation.
+
+Safe raw pointer arithmetic and comparison must not be lowered with — nor given metadata implying — any of the following unless the corresponding fact is proven:
+
+* in-bounds or in-range assumptions;
+* dereferenceability assumptions;
+* alignment assumptions;
+* no-overflow assumptions;
+* provenance or allocation-membership assumptions;
+* lifetime assumptions.
+
+For LLVM, this means ordinary raw pointer arithmetic must not use `inbounds` or `inrange` GEP, or equivalent assumptions, unless the compiler has proved the corresponding facts. Otherwise an out-of-range address calculation can become poison or otherwise give the optimizer facts With did not establish. Safe raw arithmetic must remain raw address computation.
+
+This does not forbid optimization. If the compiler has proved the offset is in-bounds — for example, from a checked slice index — it may use the stronger lowering. The rule forbids assuming those facts for unproven raw arithmetic.
+
+Pointer comparison carries the same obligation. It must lower to address-value comparison without range, provenance, allocation-membership, dereferenceability, or lifetime assumptions. LLVM pointer `icmp` or explicit integer-address comparison may be acceptable depending on the target model; C relational pointer comparison is not an acceptable lowering for arbitrary raw addresses, because C gives it validity constraints between unrelated objects. The With operation is raw address comparison, not a hidden allocation-membership assertion.
+
+If With’s memory model carries provenance, the split survives unchanged. Arithmetic computes a raw address value. The unsafe dereference or raw-to-safe conversion is where the programmer asserts that the pointer has the required validity, provenance, alignment, lifetime, initialization, and bounds. Provenance does not move the unsafe boundary to arithmetic; it is part of what the unsafe access or conversion asserts.
+
+### Spec update
+
+Replace the broad rule in `16.1.1.19` with §16.11’s operation-specific boundary:
+
+* **Safe in safe code:** raw pointer arithmetic, offset calculation, null checks, equality checks, and raw address comparison. These produce or compare raw pointer values only and touch no memory.
+* **`unsafe` required:** raw pointer dereference; raw pointer indexing that reads or writes; raw-pointer-to-reference conversion; raw-pointer-to-slice/view conversion; transmute; `unsafe` calls; and any operation whose correctness depends on a pointer’s validity, provenance, bounds, alignment, initialization, liveness, ownership, or lifetime.
+* **Backend obligation:** the compiler lowers safe raw pointer arithmetic and comparison without introducing undefined behavior, poison, or optimizer assumptions — in-bounds, range, dereferenceability, alignment, no-overflow, provenance, ownership, or lifetime — unless those facts are proven.
+
+`16.1.1.19`’s inclusion of arithmetic in the unsafe list is deleted. §16.11’s operation-specific rule is normative.
+
+This preserves both mission clauses:
+
+**No `unsafe` around address arithmetic or comparison — computing or comparing a pointer touches nothing, so demanding the marker is ceremony that buys no safety.**
+
+**`unsafe` stays exactly where the guardrail belongs: the first operation that touches memory or asserts that a raw pointer is valid to use.**
