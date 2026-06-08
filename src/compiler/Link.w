@@ -507,6 +507,13 @@ fn link_stage_link_with_extras_and_libs_plan(obj_path: str, bin_path: str, extra
     link_stage_link_with_extras_libs_args_plan(obj_path, bin_path, extras, link_libs, link_args)
 
 fn link_stage_link_with_extras_libs_args_plan(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStagePlan:
+    if runtime_sysinfo_os() == "Windows":
+        let root = link_stage_resolve_runtime_root()
+        let ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
+        if ld_path.len() == 0:
+            with_eprint("error: missing Windows LLVM linker metadata")
+            return link_stage_plan_fail()
+        return link_stage_link_with_llvm_args_plan(obj_path, bin_path, extras, link_libs, link_args, ld_path)
     let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs, link_args)
     link_stage_plan_for_command(command)
 

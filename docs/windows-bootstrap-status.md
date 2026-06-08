@@ -28,7 +28,45 @@ Current blocker:
   source by extracting `str` data before calling PCRE2.
 - Latest focused check: Linux `behav_regex_language_semantics.w` and
   `behav_regex_capture_fstring.w` PASS after rebuilding `regex-runtime-object`.
-- Next command: rerun the full Linux release gate from the current source.
+- Linux committed-source release gate PASS: `build`, `:fixpoint`, `:test`,
+  `:test-green`, and `:last-green`.
+- Windows user-program linker path: fixed in source by routing Windows
+  non-LLVM links through `out/lib/llvm_ld` and the existing `lld-link` command
+  builder.
+- Windows basic async runtime bootstrap: improved enough for focused
+  `test/behavior/async_basic.w` to pass by selecting the Windows fiber core and
+  Windows x64 fiber assembly.
+- Windows action process test: fixed in source by invoking With itself via
+  `version`; this avoids external `echo`/shell dependencies after bootstrap.
+- Windows async cancellation behavior is not release-gating for v0.15.0.
+  It is tracked as GitHub issue #341:
+  https://github.com/withlang-dev/with/issues/341
+- Current v0.15.0 Windows release gate: rebuild candidate compiler, rerun
+  `:fixpoint`, `:emit-c-fixpoint`, PE import checks, stack-reserve checks, and
+  Linux build/fixpoint gate from the same source. Full Windows `:test` remains
+  expected to fail until #341 is fixed.
+- Current release-flow correction: `build` writes the release compiler to
+  `out/release/bin/with(.exe)`. A separate explicit `update-bin` target copies
+  that artifact to `out/bin/with(.exe)` after gates. On Windows, `update-bin`
+  cannot be run from the same `out/bin/with.exe` process because Windows locks
+  the running executable.
+- Windows v0.15.0 gate after release-flow correction: PASS.
+  - `out/bin/with.exe build`: PASS.
+  - `out/bin/with.exe build :fixpoint`: PASS.
+  - `out/bin/with.exe build :emit-c-fixpoint`: PASS.
+  - PE stack reserve: PASS, `SizeOfStackReserve: 8388608`.
+  - PE imports: PASS, system DLLs only.
+  - Handoff copy from `out/release/bin/with.exe` to `out/bin/with.exe`: PASS.
+  - `out/bin/with.exe version`: PASS, `with v0.15.0`.
+- Linux same-source gate from fresh worktree: PASS.
+  - Source copied into `/home/lazarus/with-linux-gate-v0.15.0` from the
+    Windows checkout.
+  - Static LLVM SDK linked from `/home/lazarus/with/.deps`.
+  - `build`: PASS.
+  - `:fixpoint`: PASS.
+  - `:emit-c-fixpoint`: PASS.
+  - Handoff copy from `out/release/bin/with` to `out/bin/with`: PASS.
+  - `out/bin/with version`: PASS, `with v0.15.0`.
 - Cross-host emitted-C determinism: PASS after normalizing frontend/imported
   source text and embedded stdlib text to LF. Windows and Linux emitted
   `out/emit-c-test/main.c` matched byte-for-byte at SHA256
@@ -53,6 +91,7 @@ Do not reopen without fresh evidence:
 - Old emitted-C value-ref pointer argument classification issue.
 - Old repeated-string-concat decoder hypothesis.
 - Old emitted-C `Vec.with_capacity` zero-`elem_size` issue.
+- Old assumption that Windows behavior-test failures are regex-specific.
 
 Known debt, not current blocker:
 
@@ -62,6 +101,54 @@ Known debt, not current blocker:
   compiler frames; that is not the current `:emit-c-fixpoint` blocker.
 
 Latest transition:
+
+- Rebase-overflow regression root cause:
+  - After rebasing onto `24d6b4d0`, Windows `build` and `:fixpoint` passed,
+    but `:emit-c-fixpoint` crashed during `emit-compiler-c` with
+    `0xc0000005`.
+  - LLDB showed the crash entered `with_panic` from `rt_clock_ns`; registers
+    contained the panic text `"integer overflow"`.
+  - Five whys: emit-C calls `runtime_clock_nanos`; Windows implements that via
+    `rt_clock_ns`; `rt_clock_ns` computed `now * 1000000000 / qpc_freq`;
+    commit `36f2ecd0` made integer overflow checked by default; QPC tick counts
+    can overflow i64 in the multiply before the division.
+  - Why Linux passed: the Linux clock runtime path does not perform this QPC
+    tick-count multiply, so checked overflow did not trip there.
+  - Source fix: compute Windows QPC nanoseconds as whole seconds plus scaled
+    remainder: `seconds * 1000000000 + (remainder * 1000000000) / qpc_freq`.
+    This preserves checked overflow and fixes the runtime math.
+  - Bootstrap recovery: the broken `out/release/bin/with.exe` contained the old
+    overflowing clock runtime, so seed resolution had to fall back to the
+    pre-rebase `out/bin/with.exe` seed. After moving the broken generated
+    release binary aside, `out/bin/with.exe build`, `:fixpoint`, and
+    `:emit-c-fixpoint` passed from the final source.
+  - Windows `update-bin` target is not safe to run from `out/bin/with.exe` or
+    `out/stage/bin/with-stage2.exe`, because Windows locks the running
+    executable while dependencies try to refresh it. The release handoff was
+    completed by copying `out/release/bin/with.exe` to `out/bin/with.exe` after
+    all With processes exited.
+
+- Windows release-flow root cause:
+  - Running `:fixpoint` from `out/release/bin/with.exe` failed with
+    `could not move output to: out/release/bin/with.exe`.
+  - Five whys: Windows refuses to replace a running executable; the gate was
+    run from the release output; the intended stable self-host seed path is
+    `out/bin/with(.exe)`; commit `73cbb94c` moved compiler outputs into
+    `out/release/bin` but did not add the handoff copy back to `out/bin`; the
+    release runbook and build graph therefore diverged.
+  - First attempted source fix made `build` a copy handoff, but that caused
+    `:fixpoint` from `out/bin/with.exe` to fail when the build graph tried to
+    overwrite the running executable.
+  - Corrected source fix: keep `build` as the release compiler action writing
+    `out/release/bin/with(.exe)` and add a separate explicit `update-bin`
+    `CopyFile` target for the post-gate handoff.
+  - Verification: from `out/bin/with.exe`, `build`, `:fixpoint`, and
+    `:emit-c-fixpoint` pass. Running `update-bin` from
+    `out/stage/bin/with-release-seed.exe` refreshes `out/bin/with.exe`, which
+    then reports `with v0.15.0`.
+  - Linux verification from fresh worktree also passes `build`, `:fixpoint`,
+    `:emit-c-fixpoint`, release-to-bin handoff copy, and
+    `out/bin/with version`.
 
 - Linux regex behavior root cause:
   - `with build :test` failed in `behav_regex_language_semantics.w` and
@@ -75,6 +162,79 @@ Latest transition:
   - Fix: added `regex_str_data` and used it for PCRE2 match/substitute subject
     pointers. Replacement strings already use `regex_to_cstr`.
   - Focused Linux checks PASS after forcing `:regex-runtime-object` rebuild.
+  - Full committed-source Linux release gate PASS.
+
+- Windows release-test root cause:
+  - `check` and `--emit-obj` passed for `test/behavior/assoc_type_basic.w`,
+    while binary `build` failed silently.
+  - `test/hello.w` showed the same object-pass/binary-fail pattern, so this
+    was a link path failure, not an associated-type or async compiler bug.
+  - Source inspection showed non-LLVM/user-program links call
+    `link_stage_make_link_command("cc", ...)`. Linux passed because that path
+    exists there; Windows needs `lld-link`.
+  - Source fix: route Windows non-LLVM links through the existing Windows
+    LLVM linker command builder using `out/lib/llvm_ld`.
+
+- Windows async runtime root cause:
+  - After the linker fix, `test/hello.w` built and ran.
+  - `:test` advanced to `async_basic.w` and failed with unresolved
+    `with_fiber_spawn`, `with_runtime_core_*`, and related scheduler symbols.
+  - `build.w` selected `rt/fiber_core_windows_stub.w`; that file intentionally
+    exported only `with_windows_fiber_core_stub`.
+  - Source fix: select the shared fiber core for Windows, add Windows system
+    call shims for the POSIX-shaped hooks it imports, and replace the Windows
+    assembly placeholder with `with_fiber_switch` and
+    `with_fiber_prepare_initial_context`.
+  - Follow-up correction: POSIX-name shim functions in `rt/windows_x86_64.w`
+    were module-mangled and therefore did not satisfy `extern fn mmap` from a
+    separate object. The final source keeps Windows fiber core separate and
+    calls existing unmangled `rt_*` platform hooks.
+  - Focused `test/behavior/async_basic.w`: PASS.
+
+- Windows action process test root cause:
+  - Full Windows `:test` later failed only in
+    `behav_action_capability_process.w`.
+  - The generated nested `build.w` pushed `"/bin/echo"` into
+    `ctx.process_runner().run_capture`.
+  - Linux passed because `/bin/echo` exists; Windows failed at run stage with
+    exit 134 because the nested action could not run the hardcoded POSIX path.
+  - Initial host-selected `cmd.exe`/`/bin/echo` fix was rejected because
+    post-bootstrap stages should not depend on external userland tools.
+  - Intermediate With one-liner fix passed linker metadata into the child, but
+    `with -e` is a nested compile/run path on Windows: the direct child emitted
+    `lld-link` debug-section warnings on stderr and did not provide the expected
+    one-liner stdout to this capture test.
+  - Final focused source fix: invoke With itself via `version`. This keeps the
+    test free of external userland dependencies and verifies direct process
+    stdout/stderr capture without adding a nested compiler-runner behavior to
+    this unit test.
+
+- Windows async cancellation root cause:
+  - `behav_async_cancel_await_cleans_children.w` and
+    `behav_async_cancel_nested_unwind.w` crashed with `0xc0000005`.
+  - LLDB crash site: `store_i32` inside
+    `with_runtime_current_set_cancelled_return`, writing the cancelled-return
+    flag through `current_fiber`.
+  - Corrected register analysis: RCX at the final `store_i32` was the value
+    being stored, not the fiber pointer. The base was `RAX - 0xd8`.
+  - `memory region` showed the current fiber record's page was `---`.
+  - Breakpoint on `rt_munmap` showed the page was released immediately before
+    the crash by `with_free` from `chain` at the `child.await` source line.
+  - Source/codegen inspection showed raw Task await frees `result_buf` but did
+    not clear the source Task local. Cleanup/drop paths then saw the old Task
+    value and tried to detach/free the same `result_buf` again.
+  - Experimental fix attempt cleared all awaited Task locals in `FIBER_AWAIT`
+    codegen. That removed the access violation but caused the live-fiber
+    assertion to fail because child-cancel propagation later read the cleared
+    Task id. This source change was reverted.
+  - Experimental follow-up moved the ownership cancellation into MIR lowering
+    after the child-cancel check and limited source-place clearing to
+    cleanup-only await codegen. This was still incomplete and was reverted.
+  - Further LLDB evidence showed `with_free` was still reached directly from
+    the normal `child.await` codegen after `with_fiber_await` returned because
+    the current fiber was cancelled.
+  - Decision for v0.15.0: do not keep layering async patches during the Windows
+    compiler-bootstrap release. Track this as post-release issue #341.
 
 - Restored `build/compiler.w` compiler-child actions to use
   `run_capture_with_env` on Windows. The prior no-capture diagnostic branch

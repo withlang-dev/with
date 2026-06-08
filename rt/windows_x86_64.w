@@ -297,7 +297,9 @@ pub unsafe fn rt_clock_ns() -> i64:
     let _ = QueryPerformanceCounter(&raw mut now)
     if qpc_freq <= 0:
         return 0
-    now * 1000000000 / qpc_freq
+    let seconds = now / qpc_freq
+    let remainder = now % qpc_freq
+    seconds * 1000000000 + (remainder * 1000000000) / qpc_freq
 
 pub unsafe fn rt_nanosleep(ns: i64) -> i32:
     let ms = if ns <= 0: 0 else: ((ns + 999999) / 1000000) as u32

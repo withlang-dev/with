@@ -234,7 +234,7 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_symbol: "rt_linux_x86_64_o",
-            fiber_core_source: "rt/fiber_core_windows_stub.w",
+            fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_x86_64.s",
         }
     HostRuntimeSpec {
@@ -717,6 +717,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = compiler.dep("llvm-link-metadata")
     compiler = compiler.dep("embedded-objects-object")
     out = out.add_target(compiler)
+
+    var build_handoff = target_new(.CopyFile, "update-bin", release_compiler_bin("with")).output(host_bin("out/bin/with"))
+    build_handoff = build_handoff.arg("0755")
+    build_handoff = build_handoff.write_scope("out/bin")
+    build_handoff = build_handoff.dep("build")
+    out = out.add_target(build_handoff)
 
     var emit_c_test = target_new(.Action, "emit-c-test", "").output("out/gen/.emit-c-test-stamp")
     emit_c_test.action = run_emit_c_test_action
