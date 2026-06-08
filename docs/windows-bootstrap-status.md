@@ -71,9 +71,8 @@ Current blocker:
   source text and embedded stdlib text to LF. Windows and Linux emitted
   `out/emit-c-test/main.c` matched byte-for-byte at SHA256
   `296ebbe9a72ef6d7b711f1e1a3eb04f33b0f9cad0012c361ccf3077ee773238f`.
-- Current SDK/release-tooling frontier: Linux LLVM SDK rebuild/package is PASS
-  from the Clang toolchain path. Windows LLVM SDK rebuild is in progress from
-  the Clang toolchain path.
+- Current SDK/release-tooling frontier: Linux and Windows LLVM SDK
+  rebuild/package are PASS from the Clang toolchain path.
   - Linux SDK build order `build-ninja.sh`, `build-cmake.sh`,
     `build-static-llvm.sh`: PASS.
   - Linux SDK compiler cache: PASS, `CMAKE_C_COMPILER=/usr/bin/clang`,
@@ -105,7 +104,7 @@ Current blocker:
     PE stack reserve is 8 MiB; imports are Windows system DLLs only:
     `KERNEL32`, `ADVAPI32`, `ntdll`, `SHELL32`, `ole32`, `VERSION`,
     `OLEAUT32`.
-  - Linux same-source gate after syncing to `305b96d1`: PASS.
+  - Linux same-source gate after syncing to `c18e9040`: PASS.
     `build`, `:fixpoint`, and `:emit-c-fixpoint` all completed with the
     Clang-built Linux SDK. Rebuilt release compiler is `out/release/bin/with`,
     117 MiB.
