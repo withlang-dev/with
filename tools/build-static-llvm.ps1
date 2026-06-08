@@ -22,9 +22,11 @@ Require-Tool "curl.exe"
 Require-Tool "tar.exe"
 $LLVM_BOOTSTRAP_CLANG_CL = if ($env:LLVM_BOOTSTRAP_CLANG_CL) { $env:LLVM_BOOTSTRAP_CLANG_CL } else { "clang-cl.exe" }
 $LLVM_BOOTSTRAP_LLD_LINK = if ($env:LLVM_BOOTSTRAP_LLD_LINK) { $env:LLVM_BOOTSTRAP_LLD_LINK } else { "lld-link.exe" }
+$LLVM_BOOTSTRAP_LLVM_ML = if ($env:LLVM_BOOTSTRAP_LLVM_ML) { $env:LLVM_BOOTSTRAP_LLVM_ML } else { Join-Path $INSTALL_PREFIX "bin\llvm-ml.exe" }
 $LLVM_BOOTSTRAP_MT = if ($env:LLVM_BOOTSTRAP_MT) { $env:LLVM_BOOTSTRAP_MT } else { "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\mt.exe" }
 Require-Tool $LLVM_BOOTSTRAP_CLANG_CL
 Require-Tool $LLVM_BOOTSTRAP_LLD_LINK
+Require-Tool $LLVM_BOOTSTRAP_LLVM_ML
 if (-not (Test-Path -PathType Leaf $LLVM_BOOTSTRAP_MT)) {
   throw "missing Windows SDK manifest tool: $LLVM_BOOTSTRAP_MT"
 }
@@ -67,6 +69,7 @@ $cmakeArgs = @(
   "-DCMAKE_BUILD_TYPE=Release",
   "-DCMAKE_C_COMPILER=$LLVM_BOOTSTRAP_CLANG_CL",
   "-DCMAKE_CXX_COMPILER=$LLVM_BOOTSTRAP_CLANG_CL",
+  "-DCMAKE_ASM_MASM_COMPILER=$LLVM_BOOTSTRAP_LLVM_ML",
   "-DCMAKE_LINKER=$LLVM_BOOTSTRAP_LLD_LINK",
   "-DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX",
   "-DCMAKE_MAKE_PROGRAM=$sdkNinja",
@@ -95,7 +98,7 @@ if ($LASTEXITCODE -ne 0) { throw "LLVM CMake configure failed" }
 
 $oldPath = $env:PATH
 try {
-  $env:PATH = "$(Split-Path $LLVM_BOOTSTRAP_MT);$oldPath"
+  $env:PATH = "$(Split-Path $LLVM_BOOTSTRAP_MT);$(Split-Path $LLVM_BOOTSTRAP_LLVM_ML);$oldPath"
   & $CMAKE_TOOL --build $BUILD_DIR --target install --parallel
   if ($LASTEXITCODE -ne 0) { throw "LLVM CMake build failed" }
 }

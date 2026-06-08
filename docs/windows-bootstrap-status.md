@@ -1,6 +1,6 @@
 # Windows Bootstrap Status
 
-Last updated: 2026-06-07.
+Last updated: 2026-06-08 00:12 -0700.
 
 ## Anti-Loop Summary
 
@@ -71,12 +71,28 @@ Current blocker:
   source text and embedded stdlib text to LF. Windows and Linux emitted
   `out/emit-c-test/main.c` matched byte-for-byte at SHA256
   `296ebbe9a72ef6d7b711f1e1a3eb04f33b0f9cad0012c361ccf3077ee773238f`.
-- Current SDK/release-tooling frontier: old Windows and Linux LLVM SDKs are
-  intentionally rejected because they were not built by the required Clang SDK
-  path (`cl.exe` on Windows, `/usr/bin/cc`/`c++` on Linux). Next SDK rebuild
-  order is `tools/build-ninja.*`, then `tools/build-cmake.*`, then
-  `tools/build-static-llvm.*`, then package SDK assets that include SDK Ninja,
-  SDK CMake, and LLVM utility tools.
+- Current SDK/release-tooling frontier: Linux LLVM SDK rebuild/package is PASS
+  from the Clang toolchain path. Windows LLVM SDK rebuild is in progress from
+  the Clang toolchain path.
+  - Linux SDK build order `build-ninja.sh`, `build-cmake.sh`,
+    `build-static-llvm.sh`: PASS.
+  - Linux SDK compiler cache: PASS, `CMAKE_C_COMPILER=/usr/bin/clang`,
+    `CMAKE_CXX_COMPILER=/usr/bin/clang++`, `CMAKE_LINKER=/usr/bin/ld.lld`.
+  - Linux SDK package: PASS,
+    `out/release/with-llvm-sdk-22.1.6-linux-x86_64.tar.zst`, 91 MiB,
+    SHA256 `f978cae85045617ce9f8e426e64bb05c667cd15d47e0e39adc541e9575b4b387`.
+  - Linux With rebuild from Clang-built SDK: PASS.
+    `build`, `:fixpoint`, and `:emit-c-fixpoint` all completed. Rebuilt
+    release compiler is `out/release/bin/with`, 117 MiB.
+  - Windows SDK build order `build-ninja.ps1`, `build-cmake.ps1`,
+    `build-static-llvm.ps1`: BLOCKED once, source patch in progress. SDK Ninja
+    and SDK CMake built successfully with `clang-cl`/`lld-link`; LLVM configure
+    then selected external `ml64` for MASM assembly and failed at
+    `blake3_sse2_x86-64_windows_msvc.asm` because `ml64` is not an SDK tool.
+    Root cause: Windows static LLVM build did not set
+    `CMAKE_ASM_MASM_COMPILER` to SDK `llvm-ml.exe`. Fix: `build-static-llvm.ps1`
+    now passes SDK `llvm-ml.exe`, package script rejects `ml64`, and docs record
+    the SDK assembler invariant.
 - Known non-blocking debt: stack-budget checker still reports one frame above
   64 KiB (`max_frame: 99304`) while the Windows stage2 PE stack reserve remains
   the intended 8 MiB.

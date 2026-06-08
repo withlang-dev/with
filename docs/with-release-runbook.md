@@ -47,7 +47,7 @@ Packaging scripts enforce this:
 
 - Unix SDK package: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`.
 - Windows SDK package: `CMAKE_C_COMPILER=clang-cl`,
-  `CMAKE_CXX_COMPILER=clang-cl`.
+  `CMAKE_CXX_COMPILER=clang-cl`, `CMAKE_ASM_MASM_COMPILER=llvm-ml`.
 - All SDK packages must include `bin/ninja` and `bin/cmake` built from source
   and installed by the bootstrap runbook. External Python/CMake may bootstrap
   those first SDK build tools, but release packaging must not publish an SDK
@@ -94,7 +94,8 @@ the seed (issue #313):
   `tools/build-static-llvm.{sh,ps1}`.
   It ships only what the build links against — `lib/*.a`, `lib/clang/<v>/include/`,
   `bin/ninja`, `bin/cmake`, `bin/clang`, `bin/lld` (+ driver symlinks),
-  `bin/llvm-nm`, and `bin/llvm-strip` — not the LLVM C++ `include/` tree, so the asset remains
+  `bin/llvm-ml`/`bin/llvm-ml64` on Windows, `bin/llvm-nm`, and
+  `bin/llvm-strip` — not the LLVM C++ `include/` tree, so the asset remains
   small while still carrying the With-owned build tools required by SDK
   production, emitted-C bootstrap, and release packaging.
 - **Fetch**: `with build :deps` downloads
@@ -302,8 +303,9 @@ asset back alongside the Linux binary:
 On Windows, `scripts/package-llvm-sdk-windows-x86_64.ps1` packages the
 `.deps\llvm-<ver>-windows-x86_64-msvc` SDK and includes the required CMake,
 Clang/lld, and LLVM utility tools (`ninja.exe`, `cmake.exe`, `clang.exe`, `clang++.exe`,
-`clang-cl.exe`, `lld-link.exe`, `llvm-lib.exe`, `llvm-nm.exe`, `llvm-readobj.exe`,
-`llvm-strip.exe`), static `.lib` archives, and clang builtin headers.
+`clang-cl.exe`, `lld-link.exe`, `llvm-lib.exe`, `llvm-ml.exe`, `llvm-ml64.exe`,
+`llvm-nm.exe`, `llvm-readobj.exe`, `llvm-strip.exe`), static `.lib` archives,
+and clang builtin headers.
 
 ```sh
 scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-llvm-sdk-*-linux-x86_64.tar.zst out/release/

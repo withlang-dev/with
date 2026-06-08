@@ -236,8 +236,9 @@ resource the compiler needs:
 - `bin/cmake` — the With-owned CMake used for repeat SDK production.
 - `bin/ninja` — the With-owned CMake generator backend used for repeat SDK
   production.
-- `bin/lld` plus driver symlinks, `bin/llvm-nm`, and `bin/llvm-strip` —
-  linker, symbol, and release packaging tools.
+- `bin/lld` plus driver symlinks, `bin/llvm-ml`/`bin/llvm-ml64`,
+  `bin/llvm-nm`, and `bin/llvm-strip` — linker, assembler, symbol, and
+  release packaging tools.
 
 The release binary **embeds** these, the same way it already embeds the
 stdlib (`build/runtime.w` → `EmbeddedStdlibData.w`, served via the
@@ -301,6 +302,8 @@ The static LLVM SDK itself must also be built with Clang:
 
 - Linux/macOS SDK CMake cache must name `clang` and `clang++`.
 - Windows SDK CMake cache must name `clang-cl`, not MSVC `cl.exe`.
+- Windows SDK CMake cache must name SDK `llvm-ml`, not external MSVC `ml64`,
+  for MASM assembly.
 - Linux/macOS SDK builds must link with lld (`-fuse-ld=lld`) where CMake drives
   a linker.
 
@@ -309,7 +312,7 @@ the bootstrap compiler, but that compiler is only used to build the pinned
 With-owned SDK from the exact LLVM source tag. Every later compiler/bootstrap/
 release artifact must use the Clang, lld, libclang, and LLVM archives from that
 SDK. Packaging scripts must reject SDKs whose CMake cache names GCC,
-`/usr/bin/cc`, `/usr/bin/c++`, or MSVC `cl.exe`.
+`/usr/bin/cc`, `/usr/bin/c++`, MSVC `cl.exe`, or MSVC `ml64`.
 
 The first SDK build may use external Python and an external CMake only to build
 the SDK's own `bin/ninja` and `bin/cmake`, because these tools bootstrap the SDK

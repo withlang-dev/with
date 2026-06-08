@@ -86,7 +86,8 @@ built with Clang:
 - Linux/macOS: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`, and
   `-fuse-ld=lld`.
 - Windows: `CMAKE_C_COMPILER=clang-cl`, `CMAKE_CXX_COMPILER=clang-cl`, and
-  `lld-link`.
+  `lld-link`; `CMAKE_ASM_MASM_COMPILER` must be SDK `llvm-ml`, not external
+  MSVC `ml64`.
 - The SDK contains the With-owned `bin/cmake` built from source and installed
   into the same `LLVM_PREFIX`; repeat SDK production uses that CMake rather
   than a host CMake.
@@ -95,14 +96,14 @@ built with Clang:
   than host Ninja, Make, MSBuild, or a Visual Studio generator.
 
 Do not accept a static SDK whose CMake cache names `/usr/bin/cc`,
-`/usr/bin/c++`, GCC, or MSVC `cl.exe` as the compiler. The first SDK build may
-use an externally installed Clang as a bootstrap tool, but that Clang is only a
-host compiler used to produce the pinned With-owned LLVM/Clang SDK from the
-exact `llvmorg-<version>` source tag. All later With compiler, emitted-C,
-bootstrap, and release builds use the Clang inside that SDK. External Python
-and CMake are permitted only to bootstrap the SDK's own Ninja and CMake
-binaries; package scripts must reject SDK archives that do not include
-`bin/ninja` and `bin/cmake`.
+`/usr/bin/c++`, GCC, MSVC `cl.exe`, or MSVC `ml64` as a compiler/assembler.
+The first SDK build may use an externally installed Clang as a bootstrap tool,
+but that Clang is only a host compiler used to produce the pinned With-owned
+LLVM/Clang SDK from the exact `llvmorg-<version>` source tag. All later With
+compiler, emitted-C, bootstrap, and release builds use the Clang inside that
+SDK. External Python and CMake are permitted only to bootstrap the SDK's own
+Ninja and CMake binaries; package scripts must reject SDK archives that do not
+include `bin/ninja` and `bin/cmake`.
 
 **This is the only runbook that builds the static SDK from LLVM source.**
 Building the `.a` archives and clang's builtin headers from source is a
