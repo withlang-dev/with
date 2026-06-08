@@ -1,6 +1,6 @@
 # Windows Bootstrap Status
 
-Last updated: 2026-06-08 00:35 -0700.
+Last updated: 2026-06-08 03:22 -0700.
 
 ## Anti-Loop Summary
 
@@ -85,7 +85,7 @@ Current blocker:
     `build`, `:fixpoint`, and `:emit-c-fixpoint` all completed. Rebuilt
     release compiler is `out/release/bin/with`, 117 MiB.
   - Windows SDK build order `build-ninja.ps1`, `build-cmake.ps1`,
-    `build-static-llvm.ps1`: IN PROGRESS. SDK Ninja and SDK CMake built
+    `build-static-llvm.ps1`: PASS. SDK Ninja and SDK CMake built
     successfully with `clang-cl`/`lld-link`. LLVM failed once because CMake
     selected external `ml64` for MASM assembly. Source fix is applied and the
     current LLVM CMake cache verified `CMAKE_C_COMPILER=<SDK>\bin\clang-cl.exe`,
@@ -94,7 +94,11 @@ Current blocker:
     BLAKE3 MASM as 32-bit and rejected x64 registers. Fix is tightened to use
     SDK `llvm-ml64.exe`, the x64 wrapper matching external `ml64`. Current
     rebuild passed the previous BLAKE3 MASM failure point and linked
-    `LLVMSupport.lib`; LLVM build/install is still in progress.
+    `LLVMSupport.lib`; LLVM build/install completed.
+  - Windows SDK package: PASS,
+    `out\release\with-llvm-sdk-22.1.6-windows-x86_64.tar.zst`,
+    189,641,655 bytes,
+    SHA256 `0c4f9860cf528b3821781d89e5b42947ef8ee2249327cffa64fb9fb5eac09a4a`.
 - Known non-blocking debt: stack-budget checker still reports one frame above
   64 KiB (`max_frame: 99304`) while the Windows stage2 PE stack reserve remains
   the intended 8 MiB.

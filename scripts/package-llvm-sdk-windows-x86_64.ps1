@@ -93,7 +93,7 @@ finally {
     Pop-Location
 }
 
-zstd.exe -19 -T0 -f $tarPath -o $asset
+zstd.exe -q -19 -T0 -f $tarPath -o $asset
 Remove-Item -Recurse -Force -Path $stageRoot
 Remove-Item -Force -Path $tarPath
 
