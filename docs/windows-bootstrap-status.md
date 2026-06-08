@@ -1,6 +1,6 @@
 # Windows Bootstrap Status
 
-Last updated: 2026-06-08 03:22 -0700.
+Last updated: 2026-06-08 06:45 -0700.
 
 ## Anti-Loop Summary
 
@@ -99,6 +99,16 @@ Current blocker:
     `out\release\with-llvm-sdk-22.1.6-windows-x86_64.tar.zst`,
     189,641,655 bytes,
     SHA256 `0c4f9860cf528b3821781d89e5b42947ef8ee2249327cffa64fb9fb5eac09a4a`.
+  - Windows With rebuild from Clang-built SDK: PASS.
+    `build`, `:fixpoint`, and `:emit-c-fixpoint` all completed. Rebuilt
+    release compiler is `out\release\bin\with.exe`, 97,593,344 bytes.
+    PE stack reserve is 8 MiB; imports are Windows system DLLs only:
+    `KERNEL32`, `ADVAPI32`, `ntdll`, `SHELL32`, `ole32`, `VERSION`,
+    `OLEAUT32`.
+  - Linux same-source gate after syncing to `305b96d1`: PASS.
+    `build`, `:fixpoint`, and `:emit-c-fixpoint` all completed with the
+    Clang-built Linux SDK. Rebuilt release compiler is `out/release/bin/with`,
+    117 MiB.
 - Known non-blocking debt: stack-budget checker still reports one frame above
   64 KiB (`max_frame: 99304`) while the Windows stage2 PE stack reserve remains
   the intended 8 MiB.
