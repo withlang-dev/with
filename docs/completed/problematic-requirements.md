@@ -53,7 +53,7 @@ Preferred requirement shape:
 - Allocation should be ergonomic, but allocator-aware and manual-memory APIs
   remain part of the systems surface.
 
-BDFL Response:  Correct.  unsafe is very much a part of With.  Implementation is correct; Spec is stale and needs updated.
+BDFL Ruling:  Correct.  unsafe is very much a part of With.  Implementation is correct; Spec is stale and needs updated.
 
 ## 2. "Warnings, not blocking" as a global compiler rule
 
@@ -81,7 +81,7 @@ Preferred requirement shape:
 - Reject code when accepting it would violate safety, ownership, concurrency,
   determinism, or code-generation correctness.
 
-BDFL Response:
+BDFL Ruling:
 This is not a rule but rather a rule-of-thumb.  We DO want to be EXACTLY AS SAFE as Rust - but we do so by automatically choosing sensible DEFAULTS instead of FORCING the user to specify everything up front.  I am ok if we update the spec to reflect this.  The spec is pontificating here.
 
 
@@ -129,7 +129,7 @@ Preferred requirement shape:
 - No naked `if condition expr`, no naked `else expr`, and no separate `then`
   body form.
 
-  BDFL Response: Yes - if form has evolved since the spec was written.  The Implementation is correct.  The Spec is wrong, please udpate it to match the current compiler implementation.
+  BDFL Ruling: Yes - if form has evolved since the spec was written.  The Implementation is correct.  The Spec is wrong, please udpate it to match the current compiler implementation.
 
 ## 4. FFI unsafe boundary stated too broadly
 
@@ -166,7 +166,7 @@ Preferred requirement shape:
   actually perform unsafe memory effects, not a blanket wrapper around every
   imported call.
 
-BDFL Response: Accept with stronger clarification.
+BDFL Ruling: Accept with stronger clarification.
 
 The statement “all FFI calls are unsafe” is wrong for With.
 
@@ -227,6 +227,8 @@ Preferred requirement shape:
 - Any remaining shell-out to host tools must be called out as a temporary
   implementation gap, not a language requirement.
 
+
+BDFL Ruling:
 Correct.  The spec is stale.  c_import is now fully implemented, please make the spec reflect the current implementation
 
 ## 6. Task discard severity is internally inconsistent
@@ -264,7 +266,7 @@ Preferred requirement shape:
   why it is sufficient explicit cancellation and how that differs from the
   compile-error case. Right now the distinction is not coherent.
 
-BDFL Response: Modify.
+BDFL Ruling: Modify.
 
 The "every unawaited task is an error" model is too strict for With, and it
 fails the mission for the same reason the audit's other fixes succeed: it
@@ -384,7 +386,7 @@ Preferred requirement shape:
 - For grammar requirements, point to the normative sections that define the
   construct.
 
-BDFL Response:
+BDFL Ruling:
 Agreed.  Update the spec and requirements.
 
 ## 8. Mixed-width bitwise promotion bypasses numeric conversion rules
@@ -415,7 +417,7 @@ Preferred requirement shape:
   `as`.
 - The result type is the common type selected by those rules.
 
-BDFL Response: Accept the flag; modify the rule.
+BDFL Ruling: Accept the flag; modify the rule.
 
 `4.2.4.2` ("mixed-width operands are promoted to the wider type") is too broad,
 as the audit says. But the fix is neither the arithmetic common-type rule nor
@@ -521,7 +523,7 @@ Preferred requirement shape:
 - `[T; N]` is `Copy` only when `T` is `Copy`; otherwise assignment moves.
 - Large arrays should generally be passed by reference for performance.
 
-BDFL Response: Accept.
+BDFL Ruling: Accept.
 The spec is wrong as written. Fixed-size arrays are value types, but
 they are not unconditionally copied on assignment. Arrays follow normal ownership
 semantics: [T; N] is Copy only when T is Copy; otherwise assignment moves the
@@ -555,7 +557,7 @@ Preferred requirement shape:
   cases where the literal/default type would be surprising.
 - Keep `const NAME: TYPE = EXPR` available for API clarity and disambiguation.
 
-BDFL Response: Accept.
+BDFL Ruling: Accept.
 
 ## 11. Suspension points are described too narrowly
 
@@ -599,7 +601,7 @@ Preferred requirement shape:
 - Diagnostics should name the operation that may yield, even when it is buried
   behind a call.
 
-BDFL Response: Accept with clarification.
+BDFL Ruling: Accept with clarification.
 
 The audit is correct, but the issue is not merely that the wording around
 `.await` is too absolute. This settles a real design fork, and the resolution
@@ -740,7 +742,7 @@ Preferred requirement shape:
   `Vec` should refer back to the general propagation rule instead of saying
   "cannot be returned" categorically.
 
-BDFL Response: Accept the flag; modify the rule.
+BDFL Ruling: Accept the flag; modify the rule.
 
 The categorical “cannot be returned” requirements are wrong. Ephemeral values
 may be returned when their origin is reachable from the function’s inputs or
@@ -779,7 +781,7 @@ Preferred requirement shape:
 - Warnings are appropriate for performance or style guidance, not for cases
   where accepting the code could violate memory safety.
 
-BDFL Response: Accept.
+BDFL Ruling: Accept.
 
 The warning model is wrong for ephemeral escape.
 
@@ -818,7 +820,7 @@ Preferred requirement shape:
 - Tables comparing generators and async should say "Task handle; storable only
   when non-ephemeral."
 
-BDFL Response: Accept.
+BDFL Ruling: Accept.
 
 `Task[T] is always storable` is wrong as written.
 
@@ -913,7 +915,7 @@ Preferred requirement shape:
 - Generated bindings must never contain stubs that pretend an untranslatable C
   construct is part of the usable With surface.
 
-BDFL Response: Accept with clarification.
+BDFL Ruling: Accept with clarification.
 
 `comptime_error` is a valid With feature for user-authored compile-time checks.
 It is not a valid fallback for compiler-generated `c_import` bindings when the
@@ -1039,7 +1041,7 @@ Preferred requirement shape:
   metadata when ownership is plausible but unproven.
 - Name heuristics alone must not insert `defer` calls.
 
-BDFL Response: Accept.
+BDFL Ruling: Accept.
 
 The ergonomic goal is right: With should make C resource management humane. When
 the compiler knows the ownership contract, it should generate cleanup so the
@@ -1183,7 +1185,7 @@ Preferred requirement shape:
   the user explicitly casts or a binding has trustworthy metadata.
 - Null pointer results should map to `Option`, not `""`.
 
-BDFL Response: Accept with clarification.
+BDFL Ruling: Accept with clarification.
 
 The ergonomic goal is right, and protecting it is the first job. With should make
 C string, buffer, and opaque-pointer interop feel natural. The programmer should
@@ -1376,7 +1378,7 @@ Preferred requirement shape:
 - Build-system effects belong only in capability-bearing comptime, never in
   ordinary pure comptime.
 
-BDFL Response: Accept with clarification.
+BDFL Ruling: Accept with clarification.
 
 The contradiction is real, and it guards the fixpoint, so it cannot stand.
 
@@ -1563,7 +1565,7 @@ Preferred requirement shape:
   ownership explicit. It should not create caller-must-free obligations
   invisibly.
 
-BDFL Response: Accept the flag; modify the rule.
+BDFL Ruling: Accept the flag; modify the rule.
 
 `20.1.1.1` is wrong as an absolute. “No allocation hides behind innocent syntax” conflicts with the language the spec already describes: f-strings allocate, comprehensions allocate, owned string literals may allocate when not elided, `async fn` calls allocate fibers, and `async:` allocates a fiber. The spec bans what it defines.
 
@@ -1682,7 +1684,7 @@ Preferred requirement shape:
 - The implementation should keep this analysis simple and deterministic, but
   the spec should not claim it does not exist.
 
-BDFL Response: Accept the flag; reframe the rule.
+BDFL Ruling: Accept the flag; reframe the rule.
 
 `22.1.1.2` is wrong as written. “No dataflow required; ephemerality is determined structurally by types” contradicts the rest of the spec.
 
@@ -1833,7 +1835,7 @@ Preferred requirement shape:
   protocol, then use `mut` to choose scoped mutation versus immutable scoped
   binding for the plain binding forms.
 
-BDFL Response: Accept the flag; subordinate Section 23.
+BDFL Ruling: Accept the flag; subordinate Section 23.
 
 `23.1.1.1`–`23.1.1.3` are wrong as a complete `with` dispatch rule.
 
@@ -1946,7 +1948,7 @@ Preferred requirement shape:
   compiler lowers them without introducing backend undefined behavior.
 - Any later memory access through the computed pointer requires unsafe.
 
-BDFL Response: Accept; adopt §16.11 as normative.
+BDFL Ruling: Accept; adopt §16.11 as normative.
 
 `16.1.1.19` is stale and over-broad. It says `unsafe` is required for raw pointer operations, including pointer arithmetic. That contradicts §16.11, which gives the correct operation-specific rule: computing a raw pointer value is not the dangerous operation. Touching memory through it, or asserting that it is valid to touch, is.
 
