@@ -10,7 +10,6 @@ use std.crypto.poly1305
 use std.crypto.chacha20poly1305
 
 extern fn with_eprintln(s: str) -> void
-extern fn int_to_string(n: i32) -> str
 
 var test_count: i32 = 0
 var pass_count: i32 = 0
@@ -23,7 +22,7 @@ fn assert_byte(a: u8, b: i32, msg: str):
         pass_count = pass_count + 1
     else:
         fail_count = fail_count + 1
-        with_eprintln("  FAIL: " ++ msg ++ " (got " ++ int_to_string(av) ++ " expected " ++ int_to_string(b) ++ ")")
+        unsafe { with_eprintln("  FAIL: " ++ msg ++ " (got " ++ int_to_string(av) ++ " expected " ++ int_to_string(b) ++ ")") }
 
 fn assert_eq(a: i32, b: i32, msg: str):
     test_count = test_count + 1
@@ -31,15 +30,15 @@ fn assert_eq(a: i32, b: i32, msg: str):
         pass_count = pass_count + 1
     else:
         fail_count = fail_count + 1
-        with_eprintln("  FAIL: " ++ msg ++ " (got " ++ int_to_string(a) ++ " expected " ++ int_to_string(b) ++ ")")
+        unsafe { with_eprintln("  FAIL: " ++ msg ++ " (got " ++ int_to_string(a) ++ " expected " ++ int_to_string(b) ++ ")") }
 
 // ── SHA-256: NIST test vectors ─────────────────────────────────────
 
 fn test_sha256:
-    with_eprintln("  SHA-256...")
+    unsafe { with_eprintln("  SHA-256...") }
     var empty: [u8; 1] = [0 as u8; 1]
     var hash: [u8; 32] = [0 as u8; 32]
-    let hp = &mut hash[0] as *mut u8
+    let hp = &raw mut hash[0] as *mut u8
     sha256_hash(&empty[0] as *const u8, 0, hp)
     // SHA-256("") = e3b0c44298fc1c14...7852b855
     assert_byte(hash[0], 0xe3, "sha256 empty byte 0")
@@ -53,28 +52,42 @@ fn test_sha256:
     assert_byte(hash[1], 0x78, "sha256 abc byte 1")
     assert_byte(hash[31], 0xad, "sha256 abc byte 31")
 
+    sha256_hash_str("abc", hp)
+    assert_byte(hash[0], 0xba, "sha256 str abc byte 0")
+    assert_byte(hash[1], 0x78, "sha256 str abc byte 1")
+    assert_byte(hash[2], 0x16, "sha256 str abc byte 2")
+    assert_byte(hash[31], 0xad, "sha256 str abc byte 31")
+
 // ── HMAC-SHA256: RFC 4231 ──────────────────────────────────────────
 
 fn test_hmac:
-    with_eprintln("  HMAC-SHA256...")
+    unsafe { with_eprintln("  HMAC-SHA256...") }
     var key1: [u8; 20] = [0x0b as u8; 20]
     var data1: [u8; 8] = [0x48 as u8, 0x69 as u8, 0x20 as u8, 0x54 as u8, 0x68 as u8, 0x65 as u8, 0x72 as u8, 0x65 as u8]
     var mac: [u8; 32] = [0 as u8; 32]
-    let mp = &mut mac[0] as *mut u8
+    let mp = &raw mut mac[0] as *mut u8
     hmac_sha256(&key1[0] as *const u8, 20, &data1[0] as *const u8, 8, mp)
     // Expected: b0344c61...2e32cff7
     assert_byte(mac[0], 0xb0, "hmac tc1 byte 0")
     assert_byte(mac[1], 0x34, "hmac tc1 byte 1")
     assert_byte(mac[31], 0xf7, "hmac tc1 byte 31")
 
+    hmac_sha256_str("Jefe", "what do ya want for nothing?", mp)
+    // RFC 4231 test case 2:
+    // 5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843
+    assert_byte(mac[0], 0x5b, "hmac str tc2 byte 0")
+    assert_byte(mac[1], 0xdc, "hmac str tc2 byte 1")
+    assert_byte(mac[2], 0xc1, "hmac str tc2 byte 2")
+    assert_byte(mac[31], 0x43, "hmac str tc2 byte 31")
+
 // ── AES-128: NIST ECB test vector ──────────────────────────────────
 
 fn test_aes128:
-    with_eprintln("  AES-128...")
+    unsafe { with_eprintln("  AES-128...") }
     var key: [u8; 16] = [0x2b as u8, 0x7e as u8, 0x15 as u8, 0x16 as u8, 0x28 as u8, 0xae as u8, 0xd2 as u8, 0xa6 as u8, 0xab as u8, 0xf7 as u8, 0x15 as u8, 0x88 as u8, 0x09 as u8, 0xcf as u8, 0x4f as u8, 0x3c as u8]
     let ctx = Aes128.new(&key[0] as *const u8)
     var block: [u8; 16] = [0x32 as u8, 0x43 as u8, 0xf6 as u8, 0xa8 as u8, 0x88 as u8, 0x5a as u8, 0x30 as u8, 0x8d as u8, 0x31 as u8, 0x31 as u8, 0x98 as u8, 0xa2 as u8, 0xe0 as u8, 0x37 as u8, 0x07 as u8, 0x34 as u8]
-    Aes128.encrypt_block(&ctx as *const Aes128, &mut block[0] as *mut u8)
+    Aes128.encrypt_block(&ctx as *const Aes128, &raw mut block[0] as *mut u8)
     // Expected: 3925841d02dc09fbdc118597196a0b32
     assert_byte(block[0], 0x39, "aes128 byte 0")
     assert_byte(block[1], 0x25, "aes128 byte 1")
@@ -83,15 +96,15 @@ fn test_aes128:
 // ── AES-128-GCM: NIST SP 800-38D test case 2 ──────────────────────
 
 fn test_aesgcm:
-    with_eprintln("  AES-128-GCM...")
+    unsafe { with_eprintln("  AES-128-GCM...") }
     var key: [u8; 16] = [0 as u8; 16]
     var iv: [u8; 12] = [0 as u8; 12]
     var pt: [u8; 16] = [0 as u8; 16]
     var ct: [u8; 16] = [0 as u8; 16]
     var tag: [u8; 16] = [0 as u8; 16]
     var ctx = AesGcm.new(&key[0] as *const u8, &iv[0] as *const u8, 12)
-    AesGcm.encrypt(&mut ctx as *mut AesGcm, &pt[0] as *const u8, &mut ct[0] as *mut u8, 16)
-    AesGcm.tag(&mut ctx as *mut AesGcm, &mut tag[0] as *mut u8)
+    AesGcm.encrypt(&raw mut ctx as *mut AesGcm, &pt[0] as *const u8, &raw mut ct[0] as *mut u8, 16)
+    AesGcm.tag(&raw mut ctx as *mut AesGcm, &raw mut tag[0] as *mut u8)
     // Expected CT: 0388dace60b6a392f328c2b971b2fe78
     assert_byte(ct[0], 0x03, "aesgcm ct byte 0")
     assert_byte(ct[1], 0x88, "aesgcm ct byte 1")
@@ -102,7 +115,7 @@ fn test_aesgcm:
 // ── ChaCha20: RFC 8439 §2.3.2 ─────────────────────────────────────
 
 fn test_chacha20:
-    with_eprintln("  ChaCha20...")
+    unsafe { with_eprintln("  ChaCha20...") }
     var key: [u8; 32] = [0 as u8; 32]
     for i in 0..32:
         key[i] = i as u8
@@ -110,7 +123,8 @@ fn test_chacha20:
     nonce[3] = 0x09 as u8
     nonce[7] = 0x4a as u8
     var block: [u8; 64] = [0 as u8; 64]
-    unsafe: chacha20_block(&key[0] as *const u8, &nonce[0] as *const u8, 1 as u32, &mut block[0] as *mut u8)
+    unsafe:
+        chacha20_block(&key[0] as *const u8, &nonce[0] as *const u8, 1 as u32, &raw mut block[0] as *mut u8)
     // Expected first 4 bytes: 10 f1 e7 e4
     assert_byte(block[0], 0x10, "chacha20 byte 0")
     assert_byte(block[1], 0xf1, "chacha20 byte 1")
@@ -120,10 +134,10 @@ fn test_chacha20:
 // ── Poly1305: RFC 8439 §2.5.2 ─────────────────────────────────────
 
 fn test_poly1305:
-    with_eprintln("  Poly1305...")
+    unsafe { with_eprintln("  Poly1305...") }
     // Key: 85d6be7857556d337f4452fe42d506a8 0103808afb0db2fd4abff6af4149f51b
     var key: [u8; 32] = [0 as u8; 32]
-    let kp = &mut key[0] as *mut u8
+    let kp = &raw mut key[0] as *mut u8
     unsafe:
         *(kp + 0 as u64) = 0x85 as u8
         *(kp + 1 as u64) = 0xd6 as u8
@@ -159,7 +173,7 @@ fn test_poly1305:
         *(kp + 31 as u64) = 0x1b as u8
     // Message: "Cryptographic Forum Research Group" (34 bytes)
     var msg: [u8; 34] = [0 as u8; 34]
-    let mp = &mut msg[0] as *mut u8
+    let mp = &raw mut msg[0] as *mut u8
     unsafe:
         *(mp + 0 as u64) = 0x43 as u8
         *(mp + 1 as u64) = 0x72 as u8
@@ -196,9 +210,11 @@ fn test_poly1305:
         *(mp + 32 as u64) = 0x75 as u8
         *(mp + 33 as u64) = 0x70 as u8
     var mac = Poly1305.new(kp as *const u8)
-    unsafe: poly1305_update(&mut mac as *mut Poly1305, mp as *const u8, 34)
+    unsafe:
+        poly1305_update(&raw mut mac as *mut Poly1305, mp as *const u8, 34)
     var tag: [u8; 16] = [0 as u8; 16]
-    unsafe: poly1305_finish(&mut mac as *mut Poly1305, &mut tag[0] as *mut u8)
+    unsafe:
+        poly1305_finish(&raw mut mac as *mut Poly1305, &raw mut tag[0] as *mut u8)
     // Expected: a8061dc1305136c6c22b8baf0c0127a9
     assert_byte(tag[0], 0xa8, "poly1305 byte 0")
     assert_byte(tag[1], 0x06, "poly1305 byte 1")
@@ -220,15 +236,15 @@ fn test_poly1305:
 // ── Main ───────────────────────────────────────────────────────────
 
 fn main:
-    with_eprintln("=== Crypto Test Suite ===")
+    unsafe { with_eprintln("=== Crypto Test Suite ===") }
     test_sha256()
     test_hmac()
     test_aes128()
     test_aesgcm()
     test_chacha20()
     test_poly1305()
-    with_eprintln("=== Results: " ++ int_to_string(pass_count) ++ "/" ++ int_to_string(test_count) ++ " passed ===")
+    unsafe { with_eprintln("=== Results: " ++ int_to_string(pass_count) ++ "/" ++ int_to_string(test_count) ++ " passed ===") }
     if fail_count > 0:
-        with_eprintln("FAILURES: " ++ int_to_string(fail_count))
+        unsafe { with_eprintln("FAILURES: " ++ int_to_string(fail_count)) }
     else:
-        with_eprintln("ALL PASSED")
+        unsafe { with_eprintln("ALL PASSED") }

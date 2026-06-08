@@ -84,6 +84,16 @@ fn ar_gnu_member_size(content_size: i64) -> i64:
     let raw = 60 + content_size
     if raw % 2 == 0: raw else: raw + 1
 
+fn ar_gnu_member_name_field(name: str, long_name_offset: i32) -> str:
+    if long_name_offset >= 0:
+        return "/" ++ ar_format_decimal(long_name_offset as i64)
+    if name == "/" or name == "//":
+        return name
+    name ++ "/"
+
+fn ar_gnu_needs_long_name(name: str) -> bool:
+    name.len() + 1 > 16
+
 fn ar_member_size(name: str, content_size: i64) -> i64:
     let padded_name_len = ar_bsd_name_pad_len(name.len())
     let raw = 60 + padded_name_len + content_size
@@ -237,11 +247,23 @@ fn create_gnu_indexed_archive(output_path: str, member_names: Vec[str], member_d
     let ranlib_count = sorted.len() as i32
     let symtab_size = 4 + ranlib_count * 4 + string_table.len() as i32
 
+    var long_name_table = ""
+    let long_name_offsets: Vec[i32] = Vec.new()
+    for i in 0..member_names.len() as i32:
+        let name = member_names.get(i as i64)
+        if ar_gnu_needs_long_name(name):
+            long_name_offsets.push(long_name_table.len() as i32)
+            long_name_table = long_name_table ++ name ++ "/\n"
+        else:
+            long_name_offsets.push(-1)
+
     var member_offsets: Vec[i64] = Vec.new()
     var offset: i64 = 8 + ar_gnu_member_size(symtab_size as i64)
+    if long_name_table.len() > 0:
+        offset = offset + ar_gnu_member_size(long_name_table.len())
     for i in 0..member_names.len() as i32:
         member_offsets.push(offset)
-        offset = offset + ar_member_size(member_names.get(i as i64), member_data.get(i as i64).len())
+        offset = offset + ar_gnu_member_size(member_data.get(i as i64).len())
 
     var symtab = ar_u32_be(ranlib_count)
     for i in 0..ranlib_count:
@@ -255,15 +277,20 @@ fn create_gnu_indexed_archive(output_path: str, member_names: Vec[str], member_d
     if archive.len() % 2 != 0:
         archive = archive ++ "\n"
 
+    if long_name_table.len() > 0:
+        archive = archive ++ ar_gnu_member_header("//", long_name_table.len())
+        archive = archive ++ long_name_table
+        if archive.len() % 2 != 0:
+            archive = archive ++ "\n"
+
     for i in 0..member_names.len() as i32:
         let name = member_names.get(i as i64)
         let data = member_data.get(i as i64)
-        archive = archive ++ ar_member_header(name, data.len())
-        let padded_name = ar_pad_right(name, ar_bsd_name_pad_len(name.len()) as i32, 0)
-        archive = archive ++ padded_name
+        let name_field = ar_gnu_member_name_field(name, long_name_offsets.get(i as i64))
+        archive = archive ++ ar_gnu_member_header(name_field, data.len())
         archive = archive ++ data
-        while archive.len() % 8 != 0:
-            archive = archive ++ str_from_byte(0)
+        if archive.len() % 2 != 0:
+            archive = archive ++ "\n"
 
     let rc = with_fs_write_file(output_path, archive)
     if rc != 0:

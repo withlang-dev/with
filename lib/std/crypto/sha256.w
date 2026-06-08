@@ -2,6 +2,7 @@
 // Constant-time, no dynamic allocation.
 
 use std.crypto.endian
+use std.internal.str_abi
 
 type Sha256  {
     state: [u32; 8],
@@ -146,7 +147,10 @@ fn sha256_hash(data: *const u8, len: i32, out: *mut u8):
 
 // Convenience: hash a string
 fn sha256_hash_str(s: str, out: *mut u8):
-    sha256_hash(s as *const u8, s.len() as i32, out)
+    unsafe:
+        let bytes = str_copy_bytes(s)
+        sha256_hash(bytes as *const u8, s.len() as i32, out)
+        str_free_bytes(bytes)
 
 // Format digest as hex string
 fn sha256_hex(digest: *const u8) -> str:

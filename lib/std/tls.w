@@ -13,6 +13,7 @@ use std.crypto.ecdsa
 use std.crypto.x509
 use std.crypto.endian
 use std.net
+use std.internal.str_abi
 
 // ── TLS constants ──────────────────────────────────────────────────
 
@@ -80,10 +81,9 @@ unsafe fn tls_recv_record(fd: i32, content_type: *mut u8, buf: *mut u8, buf_cap:
         let chunk = recv(fd, (5 - total_read) as i64)
         if chunk.len() == 0:
             return -1
-        let chunk_p = chunk as *const u8
         var ci = 0
         while ci < chunk.len() as i32:
-            let v = *(chunk_p + ci as u64)
+            let v = chunk.byte_at(ci as i64) as u8
             hdr[total_read + ci] = v
             ci = ci + 1
         total_read = total_read + chunk.len() as i32
@@ -101,10 +101,9 @@ unsafe fn tls_recv_record(fd: i32, content_type: *mut u8, buf: *mut u8, buf_cap:
         let chunk = recv(fd, (rec_len - total_read) as i64)
         if chunk.len() == 0:
             return -1
-        let chunk_p = chunk as *const u8
         var ci = 0
         while ci < chunk.len() as i32:
-            let v = *(chunk_p + ci as u64)
+            let v = chunk.byte_at(ci as i64) as u8
             *(buf + (total_read + ci) as u64) = v
             ci = ci + 1
         total_read = total_read + chunk.len() as i32
@@ -779,11 +778,14 @@ unsafe fn tls_recv_server_finish(conn: *mut TlsConn) -> i32:
 // Perform TLS 1.2 handshake on an established TCP connection.
 // Returns 0 on success, -1 on error.
 unsafe fn tls_handshake(conn: *mut TlsConn, hostname: str) -> i32:
-    let hp = hostname as *const u8
     let hl = hostname.len() as i32
 
     // Send ClientHello
-    let r1 = tls_send_client_hello(conn, hp, hl)
+    let r1 = unsafe:
+        let host_bytes = str_copy_bytes(hostname)
+        let n = tls_send_client_hello(conn, host_bytes as *const u8, hl)
+        str_free_bytes(host_bytes)
+        n
     if r1 < 0:
         return -1
 

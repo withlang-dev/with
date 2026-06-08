@@ -3,6 +3,7 @@
 
 use std.tls
 use std.net
+use std.internal.str_abi
 
 extern fn with_eprint(s: str) -> void
 extern fn with_i32_to_str(n: i32) -> str
@@ -88,9 +89,12 @@ fn https_get(url: str) -> str:
         return ""
 
     let req = http_build_get(parsed.host, parsed.path)
-    let req_p = req as *const u8
     let req_len = req.len() as i32
-    let sent = unsafe { tls_send(&raw mut conn, req_p, req_len) }
+    let sent = unsafe:
+        let req_bytes = str_copy_bytes(req)
+        let n = tls_send(&raw mut conn, req_bytes as *const u8, req_len)
+        str_free_bytes(req_bytes)
+        n
     if sent < 0:
         socket_close(conn.fd)
         return ""

@@ -2,6 +2,7 @@
 // Ported from BearSSL src/mac/hmac.c
 
 use std.crypto.sha256
+use std.internal.str_abi
 
 type HmacSha256  {
     inner: Sha256,
@@ -65,4 +66,9 @@ fn hmac_sha256(key: *const u8, key_len: i32, data: *const u8, data_len: i32, out
     unsafe { hmac_finish(p, out) }
 
 fn hmac_sha256_str(key: str, data: str, out: *mut u8):
-    hmac_sha256(key as *const u8, key.len() as i32, data as *const u8, data.len() as i32, out)
+    unsafe:
+        let key_bytes = str_copy_bytes(key)
+        let data_bytes = str_copy_bytes(data)
+        hmac_sha256(key_bytes as *const u8, key.len() as i32, data_bytes as *const u8, data.len() as i32, out)
+        str_free_bytes(data_bytes)
+        str_free_bytes(key_bytes)

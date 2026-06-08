@@ -204,6 +204,7 @@ fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extra
     if runtime_sysinfo_os() == "Macos":
         args.push("-Wl,-dead_strip")
     else if runtime_sysinfo_os() == "Linux":
+        args.push("-fuse-ld=lld")
         args.push("-no-pie")
         args.push("-Wl,--gc-sections")
         args.push("-Wl,--icf=all")
