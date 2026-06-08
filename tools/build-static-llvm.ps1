@@ -21,6 +21,10 @@ Require-Tool "curl.exe"
 Require-Tool "tar.exe"
 Require-Tool "cmake.exe"
 Require-Tool "ninja.exe"
+$LLVM_BOOTSTRAP_CLANG_CL = if ($env:LLVM_BOOTSTRAP_CLANG_CL) { $env:LLVM_BOOTSTRAP_CLANG_CL } else { "clang-cl.exe" }
+$LLVM_BOOTSTRAP_LLD_LINK = if ($env:LLVM_BOOTSTRAP_LLD_LINK) { $env:LLVM_BOOTSTRAP_LLD_LINK } else { "lld-link.exe" }
+Require-Tool $LLVM_BOOTSTRAP_CLANG_CL
+Require-Tool $LLVM_BOOTSTRAP_LLD_LINK
 
 New-Item -ItemType Directory -Force -Path $SRC_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $BUILD_DIR | Out-Null
@@ -46,6 +50,9 @@ cmake.exe -S (Join-Path $SRC_DIR "$sourceDir\llvm") `
   -B $BUILD_DIR `
   -G Ninja `
   -DCMAKE_BUILD_TYPE=Release `
+  -DCMAKE_C_COMPILER="$LLVM_BOOTSTRAP_CLANG_CL" `
+  -DCMAKE_CXX_COMPILER="$LLVM_BOOTSTRAP_CLANG_CL" `
+  -DCMAKE_LINKER="$LLVM_BOOTSTRAP_LLD_LINK" `
   -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" `
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
   -DLLVM_ENABLE_PROJECTS="clang;lld" `

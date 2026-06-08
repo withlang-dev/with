@@ -36,6 +36,12 @@ require_tool curl
 require_tool cmake
 require_tool ninja
 require_tool tar
+LLVM_BOOTSTRAP_CC="${LLVM_BOOTSTRAP_CC:-clang}"
+LLVM_BOOTSTRAP_CXX="${LLVM_BOOTSTRAP_CXX:-clang++}"
+LLVM_BOOTSTRAP_LD="${LLVM_BOOTSTRAP_LD:-ld.lld}"
+require_tool "$LLVM_BOOTSTRAP_CC"
+require_tool "$LLVM_BOOTSTRAP_CXX"
+require_tool "$LLVM_BOOTSTRAP_LD"
 
 mkdir -p "$SRC_DIR" "$BUILD_DIR"
 cd "$SRC_DIR"
@@ -79,6 +85,11 @@ cmake -S "$SRC_DIR/$source_dir/llvm" \
   -B "$BUILD_DIR" \
   -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER="$LLVM_BOOTSTRAP_CC" \
+  -DCMAKE_CXX_COMPILER="$LLVM_BOOTSTRAP_CXX" \
+  -DCMAKE_EXE_LINKER_FLAGS_INIT="-fuse-ld=lld" \
+  -DCMAKE_MODULE_LINKER_FLAGS_INIT="-fuse-ld=lld" \
+  -DCMAKE_SHARED_LINKER_FLAGS_INIT="-fuse-ld=lld" \
   -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
   -DLLVM_ENABLE_PROJECTS="clang;lld" \
   -DLLVM_TARGETS_TO_BUILD="$TARGETS" \

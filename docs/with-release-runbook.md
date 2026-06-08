@@ -40,6 +40,21 @@ platform that has no seed yet. A release does not. Specifically, a release:
 pointing at the already-built `.deps` SDK. They are reused, not rebuilt, and are
 never a runtime dependency.
 
+The reused SDK must itself have been built by the bootstrap runbook with Clang
+from the pinned LLVM source tag. Do not release from an SDK whose CMake cache
+names GCC, `/usr/bin/cc`, `/usr/bin/c++`, or MSVC `cl.exe` as the compiler.
+Packaging scripts enforce this:
+
+- Unix SDK package: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`.
+- Windows SDK package: `CMAKE_C_COMPILER=clang-cl`,
+  `CMAKE_CXX_COMPILER=clang-cl`.
+
+Release-size comparisons are a toolchain parity check. The same LLVM source tag
+must be compiled with Clang on every host and linked with the same retention
+policy where the object format supports it. If one platform's `.text` is much
+larger, investigate the SDK compiler, linker folding, and strip policy before
+publishing.
+
 ## Release Asset
 
 Publish, per release:
@@ -71,6 +86,8 @@ the seed (issue #313):
 - **Package** (per platform, after the SDK exists in `.deps`):
   `scripts/package-llvm-sdk.sh` → `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst`.
   On Windows, use `scripts/package-llvm-sdk-windows-x86_64.ps1`.
+  The package scripts refuse SDKs not built with Clang/clang-cl by
+  `tools/build-static-llvm.{sh,ps1}`.
   It ships only what the build links against — `lib/*.a`, `lib/clang/<v>/include/`,
   `bin/clang`, `bin/lld` (+ driver symlinks), and `bin/llvm-nm` — not the LLVM
   C++ `include/` tree, so the asset remains small while still carrying the

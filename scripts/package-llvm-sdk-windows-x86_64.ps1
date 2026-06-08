@@ -19,6 +19,7 @@ $releaseDir = if ($env:WITH_RELEASE_DIR) { $env:WITH_RELEASE_DIR } else { "out\r
 $prefix = if ($env:LLVM_PREFIX) { $env:LLVM_PREFIX } else { ".deps\llvm-$llvmVersion-$hostTag" }
 $sdkBase = "llvm-$llvmVersion-$hostTag"
 $asset = Join-Path $releaseDir "with-llvm-sdk-$llvmVersion-$platform.tar.zst"
+$buildCache = if ($env:LLVM_BUILD_CACHE) { $env:LLVM_BUILD_CACHE } else { ".deps\build\llvm-$llvmVersion-$hostTag\CMakeCache.txt" }
 
 function Require-Tool($name) {
     if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
@@ -32,6 +33,16 @@ Require-Tool "zstd.exe"
 $libclang = Join-Path $prefix "lib\libclang.lib"
 if (-not (Test-Path -PathType Leaf $libclang)) {
     throw "static SDK not found at $libclang; build it first with tools\build-static-llvm.ps1"
+}
+
+if (-not (Test-Path -PathType Leaf $buildCache)) {
+    throw "missing SDK build cache: $buildCache; package only SDKs built by tools\build-static-llvm.ps1 in this checkout"
+}
+$cacheText = Get-Content -Path $buildCache -Raw
+if ($cacheText -notmatch "CMAKE_C_COMPILER:FILEPATH=.*clang-cl(\\.exe)?" -or
+    $cacheText -notmatch "CMAKE_CXX_COMPILER:FILEPATH=.*clang-cl(\\.exe)?") {
+    $compilerLines = ($cacheText -split "`n") | Where-Object { $_ -match "^CMAKE_(C|CXX)_COMPILER:FILEPATH=" }
+    throw "refusing to package SDK not built with clang-cl: $($compilerLines -join '; ')"
 }
 
 foreach ($tool in @("clang.exe", "clang++.exe", "lld-link.exe", "llvm-nm.exe", "llvm-readobj.exe")) {

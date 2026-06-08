@@ -34,10 +34,22 @@ esac
 prefix="${LLVM_PREFIX:-.deps/llvm-${llvm_version}-${host_tag}}"
 sdk_base="llvm-${llvm_version}-${host_tag}"
 asset="$release_dir/with-llvm-sdk-${llvm_version}-${platform}.tar.zst"
+build_cache="${LLVM_BUILD_CACHE:-.deps/build/llvm-${llvm_version}-${host_tag}/CMakeCache.txt}"
 
 if [ ! -f "$prefix/lib/libclang.a" ]; then
     echo "error: static SDK not found at $prefix/lib/libclang.a" >&2
     echo "build it first (bootstrap): HOST_TAG=$host_tag tools/build-static-llvm.sh" >&2
+    exit 1
+fi
+if [ ! -f "$build_cache" ]; then
+    echo "error: missing SDK build cache: $build_cache" >&2
+    echo "package only SDKs built by tools/build-static-llvm.sh in this checkout" >&2
+    exit 1
+fi
+if ! grep -E '^CMAKE_C_COMPILER:FILEPATH=.*clang([^/]*$|-[0-9.]+$)' "$build_cache" >/dev/null ||
+   ! grep -E '^CMAKE_CXX_COMPILER:FILEPATH=.*clang\+\+([^/]*$|-[0-9.]+$)' "$build_cache" >/dev/null; then
+    echo "error: refusing to package SDK not built with clang/clang++" >&2
+    grep -E '^CMAKE_(C|CXX)_COMPILER:FILEPATH=' "$build_cache" >&2 || true
     exit 1
 fi
 if [ ! -x "$prefix/bin/clang" ]; then
