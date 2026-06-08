@@ -51,7 +51,7 @@ try {
   Copy-Item -Path $clangCl -Destination (Join-Path $shimDir "cl.exe") -Force
   Copy-Item -Path $lldLink -Destination (Join-Path $shimDir "link.exe") -Force
   $env:CXX = "cl"
-  $env:CXXFLAGS = "/clang:-Wno-unused-command-line-argument"
+  $env:CXXFLAGS = "/WX-"
   $env:PATH = "$shimDir;$oldPath"
   & $python configure.py --bootstrap
   if ($LASTEXITCODE -ne 0) { throw "Ninja bootstrap failed" }
