@@ -80,6 +80,8 @@ if ($dependents | Select-String -Pattern 'clang|LLVM|zlib|libxml2|zstd|MSVCP|VCR
 # The Unix scripts copy scripts/install.sh into the release dir here. install.sh
 # selects an asset by `uname` and has no Windows arm, so shipping it unmodified
 # would fail for Windows users. A Windows installer is a separate follow-up.
+Copy-Item -Path "scripts\install.ps1" -Destination (Join-Path $releaseDir "install.ps1") -Force
+Copy-Item -Path "scripts\install.cmd" -Destination (Join-Path $releaseDir "install.cmd") -Force
 
 $hash = (Get-FileHash -Algorithm SHA256 $output).Hash.ToLowerInvariant()
 Write-Output "$hash  $output"
