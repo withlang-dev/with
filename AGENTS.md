@@ -221,16 +221,20 @@ malformed. Users reach regex through `std.regex`, never through
 This is a hard invariant, not an aspiration.
 
 *We* build the entire static LLVM/Clang/lld SDK from source via
-`tools/build-static-llvm.sh` (`cmake --target install` into
-`.deps/llvm-<ver>-<host>` = `LLVM_PREFIX`). That build produces every
-static resource the compiler needs:
+`tools/build-static-llvm.sh` (`cmake --build --target install` into
+`.deps/llvm-<ver>-<host>` = `LLVM_PREFIX`). CMake is also a With-owned SDK
+tool: build it from source with `tools/build-cmake.sh` /
+`tools/build-cmake.ps1` and install it into the same SDK prefix before the LLVM
+build. That SDK produces every static resource the compiler needs:
 
 - `lib/libclang.a`, `lib/libLLVM*.a`, `lib/liblld*.a` — the archives.
 - `lib/clang/<v>/include/` — clang's **builtin headers** (`stddef.h`,
   `stdarg.h`, `stdint.h`, …) that `c_import` needs to parse any C header.
 - `bin/clang` and `bin/clang++` — the With-owned C/C++ drivers used by
   emitted-C bootstrap. Bootstrap must not fall back to GCC or MSVC `cl.exe`.
-- `bin/lld` plus driver symlinks and `bin/llvm-nm` — linker and symbol tools.
+- `bin/cmake` — the With-owned CMake used for repeat SDK production.
+- `bin/lld` plus driver symlinks, `bin/llvm-nm`, and `bin/llvm-strip` —
+  linker, symbol, and release packaging tools.
 
 The release binary **embeds** these, the same way it already embeds the
 stdlib (`build/runtime.w` → `EmbeddedStdlibData.w`, served via the
@@ -303,6 +307,14 @@ With-owned SDK from the exact LLVM source tag. Every later compiler/bootstrap/
 release artifact must use the Clang, lld, libclang, and LLVM archives from that
 SDK. Packaging scripts must reject SDKs whose CMake cache names GCC,
 `/usr/bin/cc`, `/usr/bin/c++`, or MSVC `cl.exe`.
+
+The first SDK build may use an external CMake only to build the SDK's own
+`bin/cmake`, because CMake bootstraps itself. After that point, repeat LLVM SDK
+production uses `LLVM_PREFIX/bin/cmake`; SDK packaging must reject archives that
+do not include CMake. Do not introduce Ninja as an assumed requirement. If a
+specific SDK build deliberately needs a generator backend, make that an explicit
+bootstrap-tooling decision and package the resulting required tool with the SDK
+instead of depending on the host.
 
 Release binary size parity is a toolchain-parity check. Large `.text`
 differences between platforms are not harmless until explained; first verify

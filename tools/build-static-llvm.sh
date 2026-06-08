@@ -33,8 +33,6 @@ sha256_check() {
 }
 
 require_tool curl
-require_tool cmake
-require_tool ninja
 require_tool tar
 LLVM_BOOTSTRAP_CC="${LLVM_BOOTSTRAP_CC:-clang}"
 LLVM_BOOTSTRAP_CXX="${LLVM_BOOTSTRAP_CXX:-clang++}"
@@ -42,6 +40,15 @@ LLVM_BOOTSTRAP_LD="${LLVM_BOOTSTRAP_LD:-ld.lld}"
 require_tool "$LLVM_BOOTSTRAP_CC"
 require_tool "$LLVM_BOOTSTRAP_CXX"
 require_tool "$LLVM_BOOTSTRAP_LD"
+
+SDK_CMAKE="${SDK_CMAKE:-$INSTALL_PREFIX/bin/cmake}"
+if [ -x "$SDK_CMAKE" ]; then
+  CMAKE_TOOL="$SDK_CMAKE"
+else
+  echo "error: missing SDK CMake: $SDK_CMAKE" >&2
+  echo "build it first: HOST_TAG=$HOST_TAG tools/build-cmake.sh" >&2
+  exit 1
+fi
 
 mkdir -p "$SRC_DIR" "$BUILD_DIR"
 cd "$SRC_DIR"
@@ -81,37 +88,42 @@ case "$(uname -s)" in
     ;;
 esac
 
-cmake -S "$SRC_DIR/$source_dir/llvm" \
-  -B "$BUILD_DIR" \
-  -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER="$LLVM_BOOTSTRAP_CC" \
-  -DCMAKE_CXX_COMPILER="$LLVM_BOOTSTRAP_CXX" \
-  -DCMAKE_EXE_LINKER_FLAGS_INIT="-fuse-ld=lld" \
-  -DCMAKE_MODULE_LINKER_FLAGS_INIT="-fuse-ld=lld" \
-  -DCMAKE_SHARED_LINKER_FLAGS_INIT="-fuse-ld=lld" \
-  -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-  -DLLVM_ENABLE_PROJECTS="clang;lld" \
-  -DLLVM_TARGETS_TO_BUILD="$TARGETS" \
-  -DLIBCLANG_BUILD_STATIC=ON \
-  -DLLVM_ENABLE_PIC=ON \
-  -DBUILD_SHARED_LIBS=OFF \
-  -DLLVM_BUILD_LLVM_DYLIB=OFF \
-  -DLLVM_LINK_LLVM_DYLIB=OFF \
-  -DCLANG_LINK_CLANG_DYLIB=OFF \
-  -DLLVM_INCLUDE_TESTS=OFF \
-  -DLLVM_INCLUDE_BENCHMARKS=OFF \
-  -DLLVM_INCLUDE_EXAMPLES=OFF \
-  -DCLANG_INCLUDE_TESTS=OFF \
-  -DCLANG_BUILD_EXAMPLES=OFF \
-  -DLLVM_ENABLE_ZLIB=OFF \
-  -DLLVM_ENABLE_ZSTD=OFF \
+CMAKE_ARGS=(
+  -S "$SRC_DIR/$source_dir/llvm"
+  -B "$BUILD_DIR"
+  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_C_COMPILER="$LLVM_BOOTSTRAP_CC"
+  -DCMAKE_CXX_COMPILER="$LLVM_BOOTSTRAP_CXX"
+  -DCMAKE_EXE_LINKER_FLAGS_INIT="-fuse-ld=lld"
+  -DCMAKE_MODULE_LINKER_FLAGS_INIT="-fuse-ld=lld"
+  -DCMAKE_SHARED_LINKER_FLAGS_INIT="-fuse-ld=lld"
+  -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX"
+  -DLLVM_ENABLE_PROJECTS="clang;lld"
+  -DLLVM_TARGETS_TO_BUILD="$TARGETS"
+  -DLIBCLANG_BUILD_STATIC=ON
+  -DLLVM_ENABLE_PIC=ON
+  -DBUILD_SHARED_LIBS=OFF
+  -DLLVM_BUILD_LLVM_DYLIB=OFF
+  -DLLVM_LINK_LLVM_DYLIB=OFF
+  -DCLANG_LINK_CLANG_DYLIB=OFF
+  -DLLVM_INCLUDE_TESTS=OFF
+  -DLLVM_INCLUDE_BENCHMARKS=OFF
+  -DLLVM_INCLUDE_EXAMPLES=OFF
+  -DCLANG_INCLUDE_TESTS=OFF
+  -DCLANG_BUILD_EXAMPLES=OFF
+  -DLLVM_ENABLE_ZLIB=OFF
+  -DLLVM_ENABLE_ZSTD=OFF
   "${extra_cmake_args[@]}"
+)
+if [ -n "${LLVM_CMAKE_GENERATOR:-}" ]; then
+  CMAKE_ARGS=(-G "$LLVM_CMAKE_GENERATOR" "${CMAKE_ARGS[@]}")
+fi
+"$CMAKE_TOOL" "${CMAKE_ARGS[@]}"
 
 if [ -n "${PARALLEL_JOBS:-}" ]; then
-  cmake --build "$BUILD_DIR" --target install --parallel "$PARALLEL_JOBS"
+  "$CMAKE_TOOL" --build "$BUILD_DIR" --target install --parallel "$PARALLEL_JOBS"
 else
-  cmake --build "$BUILD_DIR" --target install --parallel
+  "$CMAKE_TOOL" --build "$BUILD_DIR" --target install --parallel
 fi
 
 libclang="$INSTALL_PREFIX/lib/libclang.a"

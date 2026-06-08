@@ -19,12 +19,17 @@ function Require-Tool($name) {
 
 Require-Tool "curl.exe"
 Require-Tool "tar.exe"
-Require-Tool "cmake.exe"
-Require-Tool "ninja.exe"
 $LLVM_BOOTSTRAP_CLANG_CL = if ($env:LLVM_BOOTSTRAP_CLANG_CL) { $env:LLVM_BOOTSTRAP_CLANG_CL } else { "clang-cl.exe" }
 $LLVM_BOOTSTRAP_LLD_LINK = if ($env:LLVM_BOOTSTRAP_LLD_LINK) { $env:LLVM_BOOTSTRAP_LLD_LINK } else { "lld-link.exe" }
 Require-Tool $LLVM_BOOTSTRAP_CLANG_CL
 Require-Tool $LLVM_BOOTSTRAP_LLD_LINK
+$sdkCmake = if ($env:SDK_CMAKE) { $env:SDK_CMAKE } else { Join-Path $INSTALL_PREFIX "bin\cmake.exe" }
+if (Test-Path -PathType Leaf $sdkCmake) {
+  $CMAKE_TOOL = $sdkCmake
+}
+else {
+  throw "missing SDK CMake: $sdkCmake; build it first with tools\build-cmake.ps1"
+}
 
 New-Item -ItemType Directory -Force -Path $SRC_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $BUILD_DIR | Out-Null
@@ -46,33 +51,41 @@ if (-not (Test-Path $sourceDir)) {
   tar.exe -xf $archive
 }
 
-cmake.exe -S (Join-Path $SRC_DIR "$sourceDir\llvm") `
-  -B $BUILD_DIR `
-  -G Ninja `
-  -DCMAKE_BUILD_TYPE=Release `
-  -DCMAKE_C_COMPILER="$LLVM_BOOTSTRAP_CLANG_CL" `
-  -DCMAKE_CXX_COMPILER="$LLVM_BOOTSTRAP_CLANG_CL" `
-  -DCMAKE_LINKER="$LLVM_BOOTSTRAP_LLD_LINK" `
-  -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" `
-  -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
-  -DLLVM_ENABLE_PROJECTS="clang;lld" `
-  -DLLVM_TARGETS_TO_BUILD="$TARGETS" `
-  -DLIBCLANG_BUILD_STATIC=ON `
-  -DLLVM_ENABLE_PIC=OFF `
-  -DBUILD_SHARED_LIBS=OFF `
-  -DLLVM_BUILD_LLVM_DYLIB=OFF `
-  -DLLVM_LINK_LLVM_DYLIB=OFF `
-  -DCLANG_LINK_CLANG_DYLIB=OFF `
-  -DLLVM_INCLUDE_TESTS=OFF `
-  -DLLVM_INCLUDE_BENCHMARKS=OFF `
-  -DLLVM_INCLUDE_EXAMPLES=OFF `
-  -DCLANG_INCLUDE_TESTS=OFF `
-  -DCLANG_BUILD_EXAMPLES=OFF `
-  -DLLVM_ENABLE_ZLIB=OFF `
-  -DLLVM_ENABLE_ZSTD=OFF `
-  -DLLVM_ENABLE_DIA_SDK=OFF
+$cmakeArgs = @(
+  "-S", (Join-Path $SRC_DIR "$sourceDir\llvm"),
+  "-B", $BUILD_DIR,
+  "-DCMAKE_BUILD_TYPE=Release",
+  "-DCMAKE_C_COMPILER=$LLVM_BOOTSTRAP_CLANG_CL",
+  "-DCMAKE_CXX_COMPILER=$LLVM_BOOTSTRAP_CLANG_CL",
+  "-DCMAKE_LINKER=$LLVM_BOOTSTRAP_LLD_LINK",
+  "-DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX",
+  "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
+  "-DLLVM_ENABLE_PROJECTS=clang;lld",
+  "-DLLVM_TARGETS_TO_BUILD=$TARGETS",
+  "-DLIBCLANG_BUILD_STATIC=ON",
+  "-DLLVM_ENABLE_PIC=OFF",
+  "-DBUILD_SHARED_LIBS=OFF",
+  "-DLLVM_BUILD_LLVM_DYLIB=OFF",
+  "-DLLVM_LINK_LLVM_DYLIB=OFF",
+  "-DCLANG_LINK_CLANG_DYLIB=OFF",
+  "-DLLVM_INCLUDE_TESTS=OFF",
+  "-DLLVM_INCLUDE_BENCHMARKS=OFF",
+  "-DLLVM_INCLUDE_EXAMPLES=OFF",
+  "-DCLANG_INCLUDE_TESTS=OFF",
+  "-DCLANG_BUILD_EXAMPLES=OFF",
+  "-DLLVM_ENABLE_ZLIB=OFF",
+  "-DLLVM_ENABLE_ZSTD=OFF",
+  "-DLLVM_ENABLE_DIA_SDK=OFF"
+)
+if ($env:LLVM_CMAKE_GENERATOR) {
+  $cmakeArgs = @("-G", $env:LLVM_CMAKE_GENERATOR) + $cmakeArgs
+}
 
-cmake.exe --build $BUILD_DIR --target install --parallel
+& $CMAKE_TOOL @cmakeArgs
+if ($LASTEXITCODE -ne 0) { throw "LLVM CMake configure failed" }
+
+& $CMAKE_TOOL --build $BUILD_DIR --target install --parallel
+if ($LASTEXITCODE -ne 0) { throw "LLVM CMake build failed" }
 
 $libclang = Join-Path $INSTALL_PREFIX "lib\libclang.lib"
 if (-not (Test-Path $libclang)) {
