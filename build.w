@@ -260,14 +260,17 @@ fn release_asset_for_host() -> str:
     if os() == "Macos" and (arch() == "armv8" or arch() == "aarch64"):
         return "with-darwin-aarch64"
     if os() == "Windows" and arch() == "x86_64":
-        return "with-windows-x86_64"
+        return "with-windows-x86_64.exe"
     "with-darwin-aarch64"
 
 // "with-darwin-aarch64" -> "darwin-aarch64"
 fn release_platform_tag() -> str:
     let asset = release_asset_for_host()
     if asset.starts_with("with-"):
-        return asset.slice(5, asset.len())
+        var tag = asset.slice(5, asset.len())
+        if tag.ends_with(".exe"):
+            tag = tag.slice(0, tag.len() - 4)
+        return tag
     asset
 
 // ".deps/llvm-<ver>-<host>" -> "llvm-<ver>-<host>"
