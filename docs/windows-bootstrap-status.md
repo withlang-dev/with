@@ -71,6 +71,11 @@ Current blocker:
   source text and embedded stdlib text to LF. Windows and Linux emitted
   `out/emit-c-test/main.c` matched byte-for-byte at SHA256
   `296ebbe9a72ef6d7b711f1e1a3eb04f33b0f9cad0012c361ccf3077ee773238f`.
+- Current SDK/release-tooling frontier: old Windows and Linux LLVM SDKs are
+  intentionally rejected because they were not built by the required Clang SDK
+  path (`cl.exe` on Windows, `/usr/bin/cc`/`c++` on Linux). Next SDK rebuild
+  order is `tools/build-cmake.*`, then `tools/build-static-llvm.*`, then package
+  SDK assets that include SDK CMake and LLVM utility tools.
 - Known non-blocking debt: stack-budget checker still reports one frame above
   64 KiB (`max_frame: 99304`) while the Windows stage2 PE stack reserve remains
   the intended 8 MiB.
@@ -1211,3 +1216,18 @@ Completed:
 - Result: PASS. The build wrote Linux stage1, stage2, release compiler, then reported `EMIT-C OK` and `EMIT-C FIXPOINT`.
 - Current isolation state: Windows and Linux emit identical `out/emit-c-test/main.c` bytes from matching `out/gen/main.w`; Linux emit-C fixpoint passes. Any remaining failure is now Windows-side compile/link/runtime execution, not cross-host C emission.
 - Next command: rebuild Windows stage1/stage2 from current source, then run Windows direct stage3 object, `:fixpoint`, and `:emit-c-fixpoint`.
+
+
+### 2026-06-07 SDK CMake Packaging Rule
+
+- Release-tooling correction: LLVM may use CMake, but CMake must be a With-owned
+  SDK tool after the first bootstrap. Source scripts now build CMake from pinned
+  source into `LLVM_PREFIX/bin/cmake` and `tools/build-static-llvm.{sh,ps1}`
+  prefer that SDK CMake for LLVM configuration.
+- Package scripts now require and include SDK CMake plus LLVM utility tools:
+  Unix packages include `bin/cmake` and `bin/llvm-strip`; Windows packages
+  include `cmake.exe`, `clang-cl.exe`, and `llvm-strip.exe` in addition to the
+  existing Clang/lld tools.
+- Classification: SDK hermeticity/policy bug, not compiler codegen. Do not
+  reintroduce Ninja as an assumed dependency; if a backend generator is required,
+  it must become an explicit packaged SDK tool.

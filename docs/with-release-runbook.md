@@ -48,6 +48,9 @@ Packaging scripts enforce this:
 - Unix SDK package: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`.
 - Windows SDK package: `CMAKE_C_COMPILER=clang-cl`,
   `CMAKE_CXX_COMPILER=clang-cl`.
+- All SDK packages must include `bin/cmake` built from source and installed by
+  the bootstrap runbook. An external CMake may bootstrap that first CMake
+  binary, but release packaging must not publish an SDK that lacks it.
 
 Release-size comparisons are a toolchain parity check. The same LLVM source tag
 must be compiled with Clang on every host and linked with the same retention
@@ -89,9 +92,10 @@ the seed (issue #313):
   The package scripts refuse SDKs not built with Clang/clang-cl by
   `tools/build-static-llvm.{sh,ps1}`.
   It ships only what the build links against — `lib/*.a`, `lib/clang/<v>/include/`,
-  `bin/clang`, `bin/lld` (+ driver symlinks), and `bin/llvm-nm` — not the LLVM
-  C++ `include/` tree, so the asset remains small while still carrying the
-  With-owned Clang driver required by emitted-C bootstrap.
+  `bin/cmake`, `bin/clang`, `bin/lld` (+ driver symlinks), `bin/llvm-nm`, and
+  `bin/llvm-strip` — not the LLVM C++ `include/` tree, so the asset remains
+  small while still carrying the With-owned build tools required by SDK
+  production, emitted-C bootstrap, and release packaging.
 - **Fetch**: `with build :deps` downloads
   `with-llvm-sdk-<COMPILER_LLVM_VERSION>-<host>.tar.zst` from the matching
   release and extracts it into `.deps/llvm-<ver>-<host>`. `WITH_LLVM_SDK_VERSION`
@@ -295,9 +299,10 @@ host's `.deps/llvm-<ver>-<host>` static SDK into
 asset back alongside the Linux binary:
 
 On Windows, `scripts/package-llvm-sdk-windows-x86_64.ps1` packages the
-`.deps\llvm-<ver>-windows-x86_64-msvc` SDK and includes the required Clang/lld
-tools (`clang.exe`, `clang++.exe`, `lld-link.exe`, `llvm-nm.exe`,
-`llvm-readobj.exe`), static `.lib` archives, and clang builtin headers.
+`.deps\llvm-<ver>-windows-x86_64-msvc` SDK and includes the required CMake,
+Clang/lld, and LLVM utility tools (`cmake.exe`, `clang.exe`, `clang++.exe`,
+`clang-cl.exe`, `lld-link.exe`, `llvm-nm.exe`, `llvm-readobj.exe`,
+`llvm-strip.exe`), static `.lib` archives, and clang builtin headers.
 
 ```sh
 scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-llvm-sdk-*-linux-x86_64.tar.zst out/release/

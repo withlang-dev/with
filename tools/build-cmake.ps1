@@ -1,0 +1,71 @@
+$ErrorActionPreference = "Stop"
+
+$CMAKE_VERSION = if ($env:CMAKE_VERSION) { $env:CMAKE_VERSION } else { "4.2.3" }
+$CMAKE_SOURCE_SHA256 = if ($env:CMAKE_SOURCE_SHA256) { $env:CMAKE_SOURCE_SHA256 } else { "7efaccde8c5a6b2968bad6ce0fe60e19b6e10701a12fce948c2bf79bac8a11e9" }
+$ROOT = if ($env:ROOT) { $env:ROOT } else { Join-Path (Get-Location) ".deps" }
+$HOST_TAG = if ($env:HOST_TAG) { $env:HOST_TAG } else { "windows-x86_64-msvc" }
+$SRC_DIR = Join-Path $ROOT "src"
+$BUILD_DIR = Join-Path $ROOT "build\cmake-$CMAKE_VERSION-$HOST_TAG"
+$INSTALL_PREFIX = if ($env:INSTALL_PREFIX) { $env:INSTALL_PREFIX } else { Join-Path $ROOT "llvm-22.1.6-$HOST_TAG" }
+
+function Require-Tool($name) {
+  $cmd = Get-Command $name -ErrorAction SilentlyContinue
+  if (-not $cmd) {
+    throw "missing required tool: $name"
+  }
+  $cmd.Source
+}
+
+$bootstrapCmake = if ($env:CMAKE_BOOTSTRAP_CMAKE) { $env:CMAKE_BOOTSTRAP_CMAKE } else { Require-Tool "cmake.exe" }
+$clangCl = if ($env:CMAKE_BOOTSTRAP_CLANG_CL) { $env:CMAKE_BOOTSTRAP_CLANG_CL } else { Require-Tool "clang-cl.exe" }
+$lldLink = if ($env:CMAKE_BOOTSTRAP_LLD_LINK) { $env:CMAKE_BOOTSTRAP_LLD_LINK } else { Require-Tool "lld-link.exe" }
+Require-Tool "curl.exe" | Out-Null
+Require-Tool "tar.exe" | Out-Null
+
+New-Item -ItemType Directory -Force -Path $SRC_DIR | Out-Null
+New-Item -ItemType Directory -Force -Path $BUILD_DIR | Out-Null
+Set-Location $SRC_DIR
+
+$archive = "cmake-$CMAKE_VERSION.tar.gz"
+$sourceDir = "cmake-$CMAKE_VERSION"
+
+if (-not (Test-Path $sourceDir)) {
+  if (-not (Test-Path $archive)) {
+    curl.exe -L -O "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/$archive"
+  }
+
+  $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($hash -ne $CMAKE_SOURCE_SHA256) {
+    throw "bad CMake source hash: $hash"
+  }
+
+  tar.exe -xzf $archive
+}
+
+$cmakeArgs = @(
+  "-S", (Join-Path $SRC_DIR $sourceDir),
+  "-B", $BUILD_DIR,
+  "-DCMAKE_BUILD_TYPE=Release",
+  "-DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX",
+  "-DCMAKE_C_COMPILER=$clangCl",
+  "-DCMAKE_CXX_COMPILER=$clangCl",
+  "-DCMAKE_LINKER=$lldLink",
+  "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
+  "-DCMAKE_USE_OPENSSL=OFF"
+)
+if ($env:CMAKE_GENERATOR) {
+  $cmakeArgs = @("-G", $env:CMAKE_GENERATOR) + $cmakeArgs
+}
+
+& $bootstrapCmake @cmakeArgs
+if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
+
+& $bootstrapCmake --build $BUILD_DIR --config Release --target install --parallel
+if ($LASTEXITCODE -ne 0) { throw "CMake build failed" }
+
+$cmakeTool = Join-Path $INSTALL_PREFIX "bin\cmake.exe"
+if (-not (Test-Path -PathType Leaf $cmakeTool)) {
+  throw "CMake did not install to $cmakeTool"
+}
+
+Write-Host "CMake ready: $cmakeTool"

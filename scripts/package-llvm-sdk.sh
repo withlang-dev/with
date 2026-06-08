@@ -10,7 +10,8 @@ set -eu
 #   - lib/*.a                  static LLVM/Clang/lld archives (the bulk)
 #   - lib/clang/<v>/include/   clang builtin headers (also the embed source, #312)
 #   - bin/clang                C driver for emitted-C bootstrap on every host
-#   - bin/lld (+ driver symlinks ld.lld/ld64.lld/...) and bin/llvm-nm
+#   - bin/cmake                With-owned CMake for repeat SDK production
+#   - bin/lld (+ driver symlinks ld.lld/ld64.lld/...) and LLVM utility tools
 # It deliberately omits the LLVM C++ include/ tree (the bridges are .w extern
 # decls). Normal self-host builds link via lld and do not invoke clang, but
 # emitted-C bootstrap must use this With-owned clang, not GCC/MSVC/system LLVM.
@@ -62,6 +63,16 @@ if [ ! -x "$prefix/bin/clang++" ]; then
     echo "rebuild the SDK: HOST_TAG=$host_tag tools/build-static-llvm.sh" >&2
     exit 1
 fi
+if [ ! -x "$prefix/bin/cmake" ]; then
+    echo "error: static SDK is missing CMake: $prefix/bin/cmake" >&2
+    echo "build it first: HOST_TAG=$host_tag tools/build-cmake.sh" >&2
+    exit 1
+fi
+if [ ! -x "$prefix/bin/llvm-strip" ]; then
+    echo "error: static SDK is missing llvm-strip: $prefix/bin/llvm-strip" >&2
+    echo "rebuild the SDK: HOST_TAG=$host_tag tools/build-static-llvm.sh" >&2
+    exit 1
+fi
 
 stage_root="$release_dir/.sdk-stage"
 stage="$stage_root/$sdk_base"
@@ -72,14 +83,21 @@ mkdir -p "$stage/lib" "$stage/bin"
 cp "$prefix"/lib/*.a "$stage/lib/"
 cp -R "$prefix/lib/clang" "$stage/lib/clang"
 
-# Clang driver, linker (lld) and its driver symlinks, plus llvm-nm. -P keeps
-# symlinks as-is so ld.lld/ld64.lld stay pointing at lld inside the archive.
+# Clang driver, CMake, linker (lld) and its driver symlinks, plus LLVM utility
+# tools. -P keeps symlinks as-is so ld.lld/ld64.lld stay pointing at lld inside
+# the archive.
 cp -P "$prefix/bin/clang" "$stage/bin/"
 if [ -e "$prefix/bin/clang++" ] || [ -L "$prefix/bin/clang++" ]; then
     cp -P "$prefix/bin/clang++" "$stage/bin/"
 fi
+cp -P "$prefix/bin/cmake" "$stage/bin/"
+for tool in ctest cpack; do
+    if [ -e "$prefix/bin/$tool" ] || [ -L "$prefix/bin/$tool" ]; then
+        cp -P "$prefix/bin/$tool" "$stage/bin/"
+    fi
+done
 cp -P "$prefix/bin/lld" "$stage/bin/"
-for tool in ld.lld ld64.lld lld-link wasm-ld llvm-nm; do
+for tool in ld.lld ld64.lld lld-link wasm-ld llvm-nm llvm-readobj llvm-strip; do
     if [ -e "$prefix/bin/$tool" ] || [ -L "$prefix/bin/$tool" ]; then
         cp -P "$prefix/bin/$tool" "$stage/bin/"
     fi
@@ -111,6 +129,16 @@ if ! grep -q "$sdk_base/bin/clang" "$listing"; then
 fi
 if ! grep -q "$sdk_base/bin/clang++" "$listing"; then
     echo "error: packaged SDK is missing bin/clang++" >&2
+    rm -f "$listing"
+    exit 1
+fi
+if ! grep -q "$sdk_base/bin/cmake" "$listing"; then
+    echo "error: packaged SDK is missing bin/cmake" >&2
+    rm -f "$listing"
+    exit 1
+fi
+if ! grep -q "$sdk_base/bin/llvm-strip" "$listing"; then
+    echo "error: packaged SDK is missing bin/llvm-strip" >&2
     rm -f "$listing"
     exit 1
 fi
