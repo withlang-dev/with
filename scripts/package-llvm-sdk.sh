@@ -5,12 +5,15 @@ set -eu
 # asset. A release reuses this; it never rebuilds LLVM from source (that is the
 # bootstrap runbook's job) and never trusts a system LLVM.
 #
-# The asset contains only what the compiler *build* links against:
+# The asset contains the With-owned LLVM/Clang tools/resources required by
+# bootstrap and by the compiler *build*:
 #   - lib/*.a                  static LLVM/Clang/lld archives (the bulk)
 #   - lib/clang/<v>/include/   clang builtin headers (also the embed source, #312)
+#   - bin/clang                C driver for emitted-C bootstrap on every host
 #   - bin/lld (+ driver symlinks ld.lld/ld64.lld/...) and bin/llvm-nm
-# It deliberately omits bin/clang (the normal build links via lld, never the
-# clang driver) and the LLVM C++ include/ tree (the bridges are .w extern decls).
+# It deliberately omits the LLVM C++ include/ tree (the bridges are .w extern
+# decls). Normal self-host builds link via lld and do not invoke clang, but
+# emitted-C bootstrap must use this With-owned clang, not GCC/MSVC/system LLVM.
 #
 # Output: out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst
 # The archive's top-level dir is the SDK prefix basename (llvm-<ver>-<host-tag>),
@@ -37,6 +40,16 @@ if [ ! -f "$prefix/lib/libclang.a" ]; then
     echo "build it first (bootstrap): HOST_TAG=$host_tag tools/build-static-llvm.sh" >&2
     exit 1
 fi
+if [ ! -x "$prefix/bin/clang" ]; then
+    echo "error: static SDK is missing clang driver: $prefix/bin/clang" >&2
+    echo "rebuild the SDK: HOST_TAG=$host_tag tools/build-static-llvm.sh" >&2
+    exit 1
+fi
+if [ ! -x "$prefix/bin/clang++" ]; then
+    echo "error: static SDK is missing clang++ driver: $prefix/bin/clang++" >&2
+    echo "rebuild the SDK: HOST_TAG=$host_tag tools/build-static-llvm.sh" >&2
+    exit 1
+fi
 
 stage_root="$release_dir/.sdk-stage"
 stage="$stage_root/$sdk_base"
@@ -47,8 +60,12 @@ mkdir -p "$stage/lib" "$stage/bin"
 cp "$prefix"/lib/*.a "$stage/lib/"
 cp -R "$prefix/lib/clang" "$stage/lib/clang"
 
-# Linker (lld) and its driver symlinks, plus llvm-nm. -P keeps symlinks as-is so
-# ld.lld/ld64.lld stay pointing at lld inside the archive.
+# Clang driver, linker (lld) and its driver symlinks, plus llvm-nm. -P keeps
+# symlinks as-is so ld.lld/ld64.lld stay pointing at lld inside the archive.
+cp -P "$prefix/bin/clang" "$stage/bin/"
+if [ -e "$prefix/bin/clang++" ] || [ -L "$prefix/bin/clang++" ]; then
+    cp -P "$prefix/bin/clang++" "$stage/bin/"
+fi
 cp -P "$prefix/bin/lld" "$stage/bin/"
 for tool in ld.lld ld64.lld lld-link wasm-ld llvm-nm; do
     if [ -e "$prefix/bin/$tool" ] || [ -L "$prefix/bin/$tool" ]; then
@@ -72,6 +89,16 @@ if ! grep -q "$sdk_base/lib/libclang.a" "$listing"; then
 fi
 if ! grep -q "$sdk_base/lib/clang/.*/include/stddef.h" "$listing"; then
     echo "error: packaged SDK is missing clang builtin headers (lib/clang/<v>/include)" >&2
+    rm -f "$listing"
+    exit 1
+fi
+if ! grep -q "$sdk_base/bin/clang" "$listing"; then
+    echo "error: packaged SDK is missing bin/clang" >&2
+    rm -f "$listing"
+    exit 1
+fi
+if ! grep -q "$sdk_base/bin/clang++" "$listing"; then
+    echo "error: packaged SDK is missing bin/clang++" >&2
     rm -f "$listing"
     exit 1
 fi

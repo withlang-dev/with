@@ -18,8 +18,8 @@ It must run on a clean system without an installed LLVM, Clang, libclang,
 Homebrew, apt, pacman, Chocolatey, or Visual Studio toolchain dependency.
 
 The normal compiler build must not require the `clang` executable. The only
-acceptable external C compiler dependency is during emit-C bootstrap work for a
-new platform.
+acceptable external C compiler dependency is **Clang**, and only during emit-C
+bootstrap work for a new platform.
 
 ## Required Inputs
 
@@ -28,6 +28,8 @@ For each release platform, build or fetch a pinned With-owned static LLVM SDK:
 ```text
 llvm-static-sdk/
   bin/
+    clang
+    clang++
     ld64.lld or ld.lld or lld-link
     llvm-nm
   include/
@@ -122,13 +124,13 @@ Use this when a working With seed already exists for the host.
 4. Verify the binary has no dynamic LLVM or Clang dependency:
 
    ```sh
-   otool -L out/bin/with | rg 'clang|LLVM' && exit 1 || true
+   otool -L out/release/bin/with | rg 'clang|LLVM' && exit 1 || true
    ```
 
    On Linux:
 
    ```sh
-   ldd out/bin/with | rg 'libclang|libLLVM' && exit 1 || true
+   ldd out/release/bin/with | rg 'libclang|libLLVM' && exit 1 || true
    ```
 
 5. Install only after all gates pass:
@@ -141,8 +143,10 @@ Use this when a working With seed already exists for the host.
 
 Use this when no working With seed exists for the target platform.
 
-This path may use an external C compiler temporarily. That dependency is only
-for creating the first native With compiler.
+This path may use an external C compiler temporarily. That compiler must be
+Clang on every platform. Do not use GCC on Linux, and do not use MSVC `cl.exe`
+on Windows. That dependency is only for creating the first native With
+compiler.
 
 1. On a supported host, generate the compiler C output:
 
@@ -153,10 +157,12 @@ for creating the first native With compiler.
 2. Transfer or download `out/release/with-bootstrap-c-vX.Y.Z.tar.zst` and the
    static LLVM SDK to the target platform.
 
-3. Compile the emitted C bundle with the target platform C compiler, linking
-   against the static LLVM SDK and static libclang archive. The bundle includes
-   emitted C for the compiler, LLVM bridge, Clang bridge, runtime core, and a
-   temporary Linux x86_64 platform shim.
+3. Compile the emitted C bundle with the target platform Clang driver from the
+   With-owned static LLVM SDK, linking against that SDK and static libclang
+   archive. The bundle includes emitted C for the compiler, LLVM bridge, Clang
+   bridge, runtime core, and the target platform shim. If the SDK package lacks
+   `bin/clang`, rebuild/repackage the SDK; do not switch to GCC or MSVC
+   `cl.exe`.
 
 4. Use the resulting native `with` as `WITH` on the target:
 
@@ -169,7 +175,8 @@ for creating the first native With compiler.
    with build :test
    ```
 
-5. Verify the final `out/bin/with` has no dynamic LLVM or Clang dependency.
+5. Verify the final `out/release/bin/with` has no dynamic LLVM or Clang
+   dependency.
    The temporary C compiler output is not the release asset unless it passes the
    full With stage-chain gates.
 
@@ -183,6 +190,246 @@ for creating the first native With compiler.
    to C, compiles that C to binary B with the host C compiler, then uses B to
    build binary C through the normal build path. A and C must be byte-identical.
    A mismatch is an emit-C bug, not a release packaging issue.
+
+#### Windows x86_64 emitted-C bootstrap
+
+Run the Windows bootstrap from Developer PowerShell. The bootstrap compiler is
+temporary, but it must still link the With-owned static LLVM/libclang SDK and
+must produce a matching PDB for debugger use.
+
+Required tools:
+
+```powershell
+where.exe clang
+where.exe clang++
+where.exe lld-link
+where.exe llvm-nm
+where.exe llvm-readobj
+```
+
+Required assets:
+
+```text
+with-bootstrap-c-vX.Y.Z.tar.zst
+with-llvm-sdk-<llvm-ver>-windows-x86_64-msvc.tar.zst
+```
+
+The static Windows SDK must contain:
+
+```text
+bin\lld-link.exe
+bin\clang.exe
+bin\clang++.exe
+bin\llvm-nm.exe
+bin\llvm-readobj.exe
+include\
+lib\libclang.lib
+lib\LLVM*.lib
+lib\clang\<v>\include\
+```
+
+If no Windows static SDK release asset exists yet, build it once from source:
+
+```powershell
+.\tools\build-static-llvm.ps1
+```
+
+Verify the static libclang archive:
+
+```powershell
+$LLVM_PREFIX = ".deps\llvm-22.1.6-windows-x86_64-msvc"
+Test-Path "$LLVM_PREFIX\lib\libclang.lib"
+& "$LLVM_PREFIX\bin\llvm-nm.exe" -g "$LLVM_PREFIX\lib\libclang.lib" |
+  Select-String clang_createIndex
+```
+
+Unpack the emitted-C bundle:
+
+```powershell
+$Version = "vX.Y.Z"
+$Work = "out\bootstrap-c-$Version"
+New-Item -ItemType Directory -Force $Work | Out-Null
+tar --zstd -xf "out\release\with-bootstrap-c-$Version.tar.zst" -C $Work
+Set-Location $Work
+```
+
+Compile with Clang, targeting the MSVC ABI, and emit CodeView debug records.
+Do not use DWARF for the MSVC target. Do not use `cl.exe`. Use the static MSVC
+runtime so the bootstrap compiler does not pick up a Visual Studio runtime DLL
+dependency while validating the self-contained path.
+
+```powershell
+$RepoRoot = (Resolve-Path "..\..").Path
+$LLVM_PREFIX = Join-Path $RepoRoot ".deps\llvm-22.1.6-windows-x86_64-msvc"
+$Obj = "obj-win"
+New-Item -ItemType Directory -Force $Obj | Out-Null
+
+$CommonCFlags = @(
+  "-target", "x86_64-pc-windows-msvc",
+  "-std=gnu11",
+  "-O0",
+  "-gcodeview",
+  "-fms-runtime-lib=static",
+  "-D_CRT_SECURE_NO_WARNINGS",
+  "-Iruntime",
+  "-I$LLVM_PREFIX\include"
+)
+
+& clang.exe @CommonCFlags `
+  "-include" "runtime\wl_decls.h" `
+  "-c" "src\with_compiler.c" `
+  "-o" "$Obj\with_compiler.obj"
+
+foreach ($File in @(
+  "src\windows_platform.c",
+  "src\windows_compat_runtime.c"
+)) {
+  $Name = [IO.Path]::GetFileNameWithoutExtension($File)
+  & clang.exe @CommonCFlags `
+    "-include" "runtime\wl_decls.h" `
+    "-c" $File `
+    "-o" "$Obj\$Name.obj"
+}
+
+foreach ($File in @(
+  "src\rt_core.c",
+  "src\panic_runtime.c",
+  "src\regex_runtime.c",
+  "src\fiber_stubs.c"
+)) {
+  $Name = [IO.Path]::GetFileNameWithoutExtension($File)
+  & clang.exe @CommonCFlags `
+    "-DWITH_RUNTIME_H" `
+    "-include" "runtime\bootstrap_types.h" `
+    "-c" $File `
+    "-o" "$Obj\$Name.obj"
+}
+
+& clang.exe `
+  "-target" "x86_64-pc-windows-msvc" `
+  "-gcodeview" `
+  "-c" "src\empty_embedded_windows.s" `
+  "-o" "$Obj\empty_embedded_windows.obj"
+```
+
+Warnings from emitted C are bootstrap failures unless this runbook explicitly
+documents the warning and the source revision has an open issue for removing
+it. Do not add broad warning suppressions as part of the canonical procedure.
+
+Do not compile or link `src\llvm_bridge.c` or `src\clang_bridge.c` in this
+Windows bootstrap step: `src\with_compiler.c` already contains the moved
+compiler bridge modules. Do not link `src\compat_runtime.c` on Windows:
+`src\windows_compat_runtime.c` is the Windows implementation for that surface.
+
+Link with LLD through the C++ driver so the static LLVM C++ archives link
+correctly. The link must emit `with-bootstrap.pdb` and reserve enough stack for
+the generated bootstrap compiler.
+
+```powershell
+$Objs = @(
+  "$Obj\with_compiler.obj",
+  "$Obj\windows_platform.obj",
+  "$Obj\windows_compat_runtime.obj",
+  "$Obj\rt_core.obj",
+  "$Obj\panic_runtime.obj",
+  "$Obj\regex_runtime.obj",
+  "$Obj\fiber_stubs.obj",
+  "$Obj\empty_embedded_windows.obj"
+)
+$LlvmLibs = @(
+  "$LLVM_PREFIX\lib\libclang.lib"
+) + (Get-ChildItem "$LLVM_PREFIX\lib" -Filter "LLVM*.lib" |
+      Where-Object { $_.Name -ne "LLVM-C.lib" } |
+      ForEach-Object { $_.FullName }) +
+    (Get-ChildItem "$LLVM_PREFIX\lib" -Filter "lld*.lib" | ForEach-Object { $_.FullName }) +
+    (Get-ChildItem "$LLVM_PREFIX\lib" -Filter "clang*.lib" | ForEach-Object { $_.FullName })
+$WinSdkLib = "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64"
+$SystemLibs = @(
+  "$WinSdkLib\AdvAPI32.Lib",
+  "$WinSdkLib\bcrypt.lib",
+  "$WinSdkLib\Dbghelp.Lib",
+  "$WinSdkLib\ImageHlp.Lib",
+  "$WinSdkLib\ntdll.lib",
+  "$WinSdkLib\Ole32.Lib",
+  "$WinSdkLib\OleAut32.Lib",
+  "$WinSdkLib\Shell32.Lib",
+  "$WinSdkLib\User32.Lib",
+  "$WinSdkLib\Uuid.Lib",
+  "$WinSdkLib\Version.Lib",
+  "$WinSdkLib\Ws2_32.Lib"
+)
+
+& clang++.exe `
+  "-target" "x86_64-pc-windows-msvc" `
+  "-fuse-ld=lld" `
+  "-fms-runtime-lib=static" `
+  @Objs `
+  @LlvmLibs `
+  @SystemLibs `
+  "-Wl,/subsystem:console" `
+  "-Wl,/debug" `
+  "-Wl,/pdb:with-bootstrap.pdb" `
+  "-Wl,/stack:8388608" `
+  "-o" "with-bootstrap.exe"
+```
+
+The Windows compiler stack reserve is 8 MiB, matching the effective main-thread
+stack target used by the POSIX runtime adapters. A larger reserve is a
+workaround, not a platform rule; if the compiler overflows 8 MiB, reduce the
+generated compiler stack frames instead of raising this value.
+
+Do not link `LLVM-C.lib` from the SDK. On Windows that archive can be an import
+library for `LLVM-C.dll`; the bootstrap must link the static LLVM component
+archives directly and then prove that no LLVM/Clang DLL appears in the COFF
+imports.
+
+Verify the temporary bootstrap compiler:
+
+```powershell
+Test-Path .\with-bootstrap.exe
+Test-Path .\with-bootstrap.pdb
+& "$LLVM_PREFIX\bin\llvm-readobj.exe" --file-headers .\with-bootstrap.exe |
+  Select-String "SizeOfStackReserve"
+& "$LLVM_PREFIX\bin\llvm-readobj.exe" --coff-imports .\with-bootstrap.exe |
+  Select-String "DLL name"
+.\with-bootstrap.exe --version
+.\with-bootstrap.exe --help
+.\with-bootstrap.exe check rt\windows_x86_64.w
+```
+
+The stack reserve must report `8388608`. The COFF imports must not include `LLVM-C.dll`,
+`libclang.dll`, `LLVM.dll`, any other LLVM/Clang DLL, or Visual Studio runtime
+DLLs such as `VCRUNTIME*.dll`, `MSVCP*.dll`, or `UCRTBASE.dll`. Windows system
+DLLs such as `KERNEL32.dll`, `ADVAPI32.dll`, `SHELL32.dll`, `ole32.dll`, and
+`ntdll.dll` are acceptable.
+
+If the process crashes, debug the exact binary that has the matching PDB:
+
+```powershell
+lldb.exe -b `
+  -o "run" `
+  -k "bt all" `
+  -k "image lookup -a `$pc" `
+  -- .\with-bootstrap.exe check build.w
+```
+
+Do not continue bootstrap with a crashing seed.
+
+Run the normal stage chain from the repository root:
+
+```powershell
+Set-Location $RepoRoot
+$env:WITH = (Resolve-Path (Join-Path $RepoRoot "$Work\with-bootstrap.exe")).Path
+$env:LLVM_PREFIX = (Resolve-Path ".deps\llvm-22.1.6-windows-x86_64-msvc").Path
+$env:WITH_LIBCLANG = Join-Path $env:LLVM_PREFIX "lib\libclang.lib"
+
+with build
+with build :fixpoint
+with build :test
+```
+
+The release candidate is the verified stage-chain output, not
+`with-bootstrap.exe`.
 
 ### Scope of the C backend (why some intrinsics are LLVM-only)
 
@@ -215,7 +462,12 @@ The build must fail if any of these are true:
 - The static libclang archive does not export `clang_createIndex`.
 - The final release binary loads `libclang`, `libLLVM`, or any other LLVM/Clang
   dynamic library.
+- The bootstrap or final Windows compiler imports Visual Studio runtime DLLs
+  instead of using the static MSVC runtime.
 - The normal build path invokes `clang` as a linker driver.
+- On Windows, `with-bootstrap.pdb` is missing for an emitted-C bootstrap build.
+- On Windows, the bootstrap compiler is linked with the default 1 MiB stack
+  reserve instead of the documented stack reserve.
 
 The same rule applies to **resources, not just archives**. We build our own
 static SDK; the binary embeds it; at runtime the compiler trusts only what it

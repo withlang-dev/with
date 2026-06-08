@@ -57,6 +57,10 @@ fn regex_to_cstr(s: str) -> *const u8:
     unsafe *((out as i64 + s.len()) as *mut u8) = 0
     out as *const u8
 
+fn regex_str_data(s: str) -> *const u8:
+    let p = &s as *const *const u8
+    unsafe *p
+
 pub fn with_regex_error_message(code: i32) -> str:
     let buf = with_alloc(256)
     let rc = pcre2_get_error_message_8(code, buf as *mut u8, 256)
@@ -144,7 +148,7 @@ pub fn with_regex_match_spans_alloc_at(code: *const i8, text: str, start_offset:
         return null
     let rc = pcre2_match_8(
         code as *const pcre2_real_code_8,
-        text as *const u8,
+        regex_str_data(text),
         text.len() as c_ulong,
         start_offset as c_ulong,
         0,
@@ -258,7 +262,7 @@ pub fn with_regex_substitute(code: *const i8, text: str, repl: str, replace_all:
     var buffer = with_alloc(buffer_len as i64 + 1) as *mut u8
     var rc = pcre2_substitute_8(
         code as *const pcre2_real_code_8,
-        text as *const u8,
+        regex_str_data(text),
         text.len() as c_ulong,
         0,
         options,
@@ -274,7 +278,7 @@ pub fn with_regex_substitute(code: *const i8, text: str, repl: str, replace_all:
         buffer = with_alloc(buffer_len as i64 + 1) as *mut u8
         rc = pcre2_substitute_8(
             code as *const pcre2_real_code_8,
-            text as *const u8,
+            regex_str_data(text),
             text.len() as c_ulong,
             0,
             options,

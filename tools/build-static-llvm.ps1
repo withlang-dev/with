@@ -62,13 +62,24 @@ cmake.exe -S (Join-Path $SRC_DIR "$sourceDir\llvm") `
   -DCLANG_INCLUDE_TESTS=OFF `
   -DCLANG_BUILD_EXAMPLES=OFF `
   -DLLVM_ENABLE_ZLIB=OFF `
-  -DLLVM_ENABLE_ZSTD=OFF
+  -DLLVM_ENABLE_ZSTD=OFF `
+  -DLLVM_ENABLE_DIA_SDK=OFF
 
 cmake.exe --build $BUILD_DIR --target install --parallel
 
 $libclang = Join-Path $INSTALL_PREFIX "lib\libclang.lib"
 if (-not (Test-Path $libclang)) {
   throw "static libclang archive was not installed: $libclang"
+}
+
+$clang = Join-Path $INSTALL_PREFIX "bin\clang.exe"
+if (-not (Test-Path $clang)) {
+  throw "missing clang driver in static SDK: $clang"
+}
+
+$clangxx = Join-Path $INSTALL_PREFIX "bin\clang++.exe"
+if (-not (Test-Path $clangxx)) {
+  throw "missing clang++ driver in static SDK: $clangxx"
 }
 
 $nm = Join-Path $INSTALL_PREFIX "bin\llvm-nm.exe"

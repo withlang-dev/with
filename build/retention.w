@@ -331,6 +331,7 @@ fn ret_direct_w_files(fs: ToolFs, dir: str) -> Vec[str]:
 
 fn ret_expected_test_marker(ctx: ActionCtx, target_name: str, entry: str) -> str:
     let fs = ctx.fs()
+    let compiler_path = ret_release_compiler_path()
     var text = "v1\n"
     text = text ++ "target:" ++ target_name ++ "\n"
     text = text ++ "kind:2\n"
@@ -338,13 +339,24 @@ fn ret_expected_test_marker(ctx: ActionCtx, target_name: str, entry: str) -> str
     text = text ++ "output:\n"
     text = text ++ "opt:0\n"
     text = text ++ "target-kind:0\n"
-    text = text ++ "arg:compiler=out/bin/with\n"
-    text = text ++ "compiler:out/bin/with\n"
+    text = text ++ "arg:compiler=" ++ compiler_path ++ "\n"
+    text = text ++ "compiler:" ++ compiler_path ++ "\n"
     let files = ret_direct_w_files(fs, ret_dirname(entry))
     for i in 0..files.len() as i32:
         let path = files.get(i as i64)
         text = text ++ "file:" ++ path ++ "\n"
     text
+
+fn ret_host_bin(path: str) -> str:
+    if os() == "Windows":
+        return path ++ ".exe"
+    path
+
+fn ret_release_compiler_path() -> str:
+    ret_host_bin("out/release/bin/with")
+
+fn ret_stage_fixpoint_path(name: str) -> str:
+    "out/stage/bin/" ++ name
 
 fn ret_append_test_marker(ctx: ActionCtx, combined: str, target_name: str, entry: str) -> str:
     let marker_path = "out/.build-state/" ++ target_name ++ ".test-pass"
@@ -525,7 +537,7 @@ fn ret_archive_verified_seed(ctx: ActionCtx, version: str, commit: str, sha256: 
         return ret_fail(ctx, "could not create out/seed-archive")
     let archive = "out/seed-archive/with-" ++ ret_safe_label(version) ++ "-" ++ ret_short(commit, 12) ++ "-" ++ ret_short(sha256, 12)
     if not fs.exists(archive):
-        if fs.copy_file("out/bin/with", archive) != 0:
+        if fs.copy_file(ret_release_compiler_path(), archive) != 0:
             return ret_fail(ctx, "could not archive verified seed: " ++ archive)
         if fs.chmod(archive, 493) != 0:
             return ret_fail(ctx, "could not chmod archived seed: " ++ archive)
@@ -547,11 +559,12 @@ pub fn run_test_green_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     if fs.mkdir_all("out/.build-state") != 0:
         return ret_fail(ctx, "could not create out/.build-state")
-    if not fs.exists("out/bin/with"):
-        return ret_fail(ctx, "missing out/bin/with")
-    let compiler_sha = ret_sha256_file(ctx, "test-green-compiler", "out/bin/with")
+    let compiler_path = ret_release_compiler_path()
+    if not fs.exists(compiler_path):
+        return ret_fail(ctx, "missing " ++ compiler_path)
+    let compiler_sha = ret_sha256_file(ctx, "test-green-compiler", compiler_path)
     if compiler_sha.len() == 0:
-        return ret_fail(ctx, "could not hash out/bin/with")
+        return ret_fail(ctx, "could not hash " ++ compiler_path)
     let fingerprint = ret_test_green_fingerprint(ctx)
     if fingerprint.len() == 0:
         return 1
@@ -588,19 +601,20 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     if fs.mkdir_all("out/.build-state") != 0:
         return ret_fail(ctx, "could not create out/.build-state")
-    if not fs.exists("out/bin/with"):
-        return ret_fail(ctx, "missing out/bin/with")
+    let compiler_path = ret_release_compiler_path()
+    if not fs.exists(compiler_path):
+        return ret_fail(ctx, "missing " ++ compiler_path)
     let source_version = ret_first_line(fs.read_text("src/version"))
-    let compiler_version = ret_compiler_version(ctx, "out/bin/with")
+    let compiler_version = ret_compiler_version(ctx, compiler_path)
     if compiler_version.len() == 0:
         return ret_fail(ctx, "could not read verified compiler version")
-    let compiler_sha = ret_sha256_file(ctx, "verified-compiler", "out/bin/with")
+    let compiler_sha = ret_sha256_file(ctx, "verified-compiler", compiler_path)
     if compiler_sha.len() == 0:
-        return ret_fail(ctx, "could not hash out/bin/with")
+        return ret_fail(ctx, "could not hash " ++ compiler_path)
     if ret_require_test_green(ctx, compiler_sha) != 0:
         return 1
-    let stage2_sha = ret_sha256_file(ctx, "stage2-fixpoint", "out/bin/with-stage2-fixpoint.o")
-    let stage3_sha = ret_sha256_file(ctx, "stage3-fixpoint", "out/bin/with-stage3-fixpoint.o")
+    let stage2_sha = ret_sha256_file(ctx, "stage2-fixpoint", ret_stage_fixpoint_path("with-stage2-fixpoint.o"))
+    let stage3_sha = ret_sha256_file(ctx, "stage3-fixpoint", ret_stage_fixpoint_path("with-stage3-fixpoint.o"))
     let commit = ret_git_commit(ctx)
     let commit_label = if commit.len() > 0: commit else: "unknown"
     if ret_archive_verified_seed(ctx, source_version, commit_label, compiler_sha) != 0:
@@ -626,17 +640,18 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
 
 pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
-    if not fs.exists("out/bin/with"):
-        return ret_fail(ctx, "missing out/bin/with; run `with build` first")
+    let compiler_path = ret_release_compiler_path()
+    if not fs.exists(compiler_path):
+        return ret_fail(ctx, "missing " ++ compiler_path ++ "; run `with build` first")
     let manifest = fs.read_text("out/.build-state/last-green.json")
     if manifest.len() == 0:
         return ret_fail(ctx, "missing last-green manifest; run `with build :last-green` after build/fixpoint/test")
-    let compiler_sha = ret_sha256_file(ctx, "verified-compiler-check", "out/bin/with")
+    let compiler_sha = ret_sha256_file(ctx, "verified-compiler-check", compiler_path)
     if compiler_sha.len() == 0:
-        return ret_fail(ctx, "could not hash out/bin/with")
+        return ret_fail(ctx, "could not hash " ++ compiler_path)
     let expected = "\"compiler_sha256\": \"" ++ compiler_sha ++ "\""
     if not manifest.contains(expected):
-        return ret_fail(ctx, "out/bin/with is not the compiler recorded by last-green; run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
+        return ret_fail(ctx, compiler_path ++ " is not the compiler recorded by last-green; run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
     let output = ctx.output()
     if output.len() > 0:
         let dir = ret_dirname(output)

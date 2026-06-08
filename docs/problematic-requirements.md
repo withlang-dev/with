@@ -53,6 +53,8 @@ Preferred requirement shape:
 - Allocation should be ergonomic, but allocator-aware and manual-memory APIs
   remain part of the systems surface.
 
+BDFL Response:  Correct.  unsafe is very much a part of With.  Implementation is correct; Spec is stale and needs updated.
+
 ## 2. "Warnings, not blocking" as a global compiler rule
 
 Affected requirement:
@@ -78,6 +80,10 @@ Preferred requirement shape:
   preserve the programmer's meaning.
 - Reject code when accepting it would violate safety, ownership, concurrency,
   determinism, or code-generation correctness.
+
+BDFL Response:
+This is not a rule but rather a rule-of-thumb.  We DO want to be EXACTLY AS SAFE as Rust - but we do so by automatically choosing sensible DEFAULTS instead of FORCING the user to specify everything up front.  I am ok if we update the spec to reflect this.  The spec is pontificating here.
+
 
 ## 3. `if then` and unmarked `else expr` bodies
 
@@ -123,6 +129,8 @@ Preferred requirement shape:
 - No naked `if condition expr`, no naked `else expr`, and no separate `then`
   body form.
 
+  BDFL Response: Yes - if form has evolved since the spec was written.  The Implementation is correct.  The Spec is wrong, please udpate it to match the current compiler implementation.
+
 ## 4. FFI unsafe boundary stated too broadly
 
 Affected requirements:
@@ -157,6 +165,31 @@ Preferred requirement shape:
 - The unsafe boundary for C interop is the wrapper API and the operations that
   actually perform unsafe memory effects, not a blanket wrapper around every
   imported call.
+
+BDFL Response: Accept with stronger clarification.
+
+The statement “all FFI calls are unsafe” is wrong for With.
+
+I do not want normal `c_import` functions to be marked unsafe. That would recreate Rust’s FFI ceremony and directly violate With’s purpose. `c_import` exists so that C libraries can feel like ordinary With libraries whenever the compiler can model their contracts.
+
+The correct boundary is not “foreign call = unsafe.” The correct boundary is “unmodeled memory, ownership, or lifetime contract = unsafe or unavailable as a safe surface.”
+
+For `c_import`, the compiler has three jobs:
+
+1. Import the raw ABI accurately.
+2. Model every contract it can infer, import, or prove into a safe With surface.
+3. Refuse to present unmodeled danger as ordinary safe code.
+
+A generated `c_import` binding should be directly callable by default when the importer has modeled the call sufficiently: value parameters, value returns, safe handle wrappers, slice parameters for buffers, `Option` for nullable returns, owned resource wrappers with `Drop`, `CStr`/`CString` for C string contracts, and so on.
+
+For C APIs such as `memcpy`, `strcpy`, `free`, out-parameter fills, borrowed pointer returns, ownership transfers, or mutable buffers, the unsafe effect may occur at the call boundary. The answer is still not to mark all C calls unsafe. The answer is for the importer to generate a safe wrapper when it can model the contract, and to keep the raw ABI surface explicit when it cannot.
+
+So `memcpy(dst, src, n)` should not become a casually safe raw pointer call. It should become a safe slice-oriented wrapper if the contract is known, or remain part of the raw/low-level/migration surface when the contract is not modeled.
+
+Unsafe remains available for the cases With must support: raw pointer dereference, raw pointer indexing, transmutes, inline assembly, manual extern declarations, unmodeled ownership/lifetime assumptions, and low-level migration code that cannot yet be expressed safely.
+
+Spec update: remove blanket “FFI calls require unsafe.” `c_import` calls are safe and direct when the generated binding models the contract. Unmodeled raw ABI calls remain available for systems work and migration, but they are not the normal safe `c_import` surface.
+
 
 ## 5. Stale `c_import` toolchain dependency requirements
 
@@ -194,6 +227,8 @@ Preferred requirement shape:
 - Any remaining shell-out to host tools must be called out as a temporary
   implementation gap, not a language requirement.
 
+Correct.  The spec is stale.  c_import is now fully implemented, please make the spec reflect the current implementation
+
 ## 6. Task discard severity is internally inconsistent
 
 Affected requirements:
@@ -229,6 +264,97 @@ Preferred requirement shape:
   why it is sufficient explicit cancellation and how that differs from the
   compile-error case. Right now the distinction is not coherent.
 
+BDFL Response: Modify.
+
+The "every unawaited task is an error" model is too strict for With, and it
+fails the mission for the same reason the audit's other fixes succeed: it
+removes a hazard that isn't there at the cost of ceremony that is.
+
+Starting work without observing its completion is a legitimate program.
+Logging, analytics, telemetry, cache warming, and best-effort background writes
+are real. With must not force `let _ = task` or `.detach()` to say what a bare
+statement already says.
+
+The organizing principle is intent, expressed by position:
+
+- A task in **statement position** is a declaration of intent to detach,
+  subject to the must-observe and detach-safety checks below.
+  `send_analytics(event)` means: start the work, do not await it, discard
+  interest in its result or failure. That is the ordinary meaning of
+  expression-statement position applied to a task-producing expression. It is
+  not an accidental drop, and the programmer should not write an extra character
+  to confirm it.
+- A task **bound to a name** is a declaration of intent to observe. `let t =
+  send_analytics(event)` says "I will use this," so losing `t` unused is a bug
+  signal, not a detach. The same call is therefore legal as a bare statement and
+  illegal as an unused binding — not arbitrarily, but because binding and
+  statement position declare opposite intents.
+
+What makes bare detachment safe rather than a footgun is the combination of two
+independent checks, both of which must permit it:
+
+1. **must-observe**, decided by the API author: may completion and failure be
+   ignored?
+2. **detach-safety**, proven by the compiler: may the task safely outlive the
+   current scope?
+
+The author decides observability because the caller often cannot know whether
+ignoring a result or a failure is valid, while the function's author can. A task
+left unmarked is, by its author's choice, best-effort with respect to
+completion and failure. The compiler independently decides lifetime safety: a
+task may be detached only if it does not carry borrowed stack data, ephemeral
+captures, or scope-bound resources out of the scope that owns them. Author
+intent never substitutes for the lifetime proof, and the lifetime proof never
+overrides author intent. Both gates must clear.
+
+A bare task statement is therefore the detach spelling — there is no separate
+`detach()` and no `let _ =` — permitted exactly when both checks pass. When
+either fails, the bare statement is a compile error, and the diagnostic must
+name which check failed, because the remedy differs:
+
+- A must-observe failure is fixed by awaiting, cancelling, propagating, or
+  otherwise handling the task. Detachment was structurally possible; the author
+  forbade it.
+- A detach-safety failure means detachment is unsafe: the task captures
+  borrowed stack data, an allocator-borrowed or scope-bound resource, depends on
+  structured-concurrency scope cleanup, or cannot be proven to outlive the
+  scope. The fix is to await, cancel, return, or restructure so the task no
+  longer carries scope-bound state out of scope.
+
+So the rule is not "unawaited tasks are errors." The rule is:
+
+- A task in statement position is intentional fire-and-forget, allowed when both
+  the must-observe and detach-safety checks permit it; otherwise it is a compile
+  error.
+- A task bound to a name must eventually be awaited, cancelled, returned, stored
+  (when non-ephemeral), or otherwise given a valid disposition. An unused bound
+  task handle is a compile error.
+- `let _ = <Task expression>` is not required and is not the canonical spelling
+  for fire-and-forget. Statement position already expresses it.
+
+This narrows requirement `14.7.1.11`. "Dropping a `Task` without awaiting or
+cancelling is a compile error" is correct for a *bound* handle lost unused, and
+for any task that fails either detachment check. It is not correct for a bare
+statement that clears both checks — that is not "dropping" in the bug sense, and
+treating it as an error is precisely the ceremony this ruling removes.
+`14.7.1.11` must be reworded to apply to bound-handle loss and to failed
+detachment checks, not to all unawaited tasks.
+
+Spec update: replace the warning-only task-discard rules (`14.1.1.5`,
+`14.7.1.21`, `20.2.2.4`) and narrow the blanket error rule (`14.7.1.11`) with a
+single task-disposition rule governed by two checks. A bare task statement is
+fire-and-forget when the author has not marked it must-observe and the compiler
+proves it safe to detach. An unused bound task handle is a compile error.
+Ephemeral, scope-bound, must-observe, or otherwise unprovable tasks cannot be
+detached and must be awaited, cancelled, returned, or handled within their valid
+scope.
+
+This is the With philosophy applied to concurrency, and it preserves both
+mission clauses:
+
+**No ceremony to discard what statement position already discards.**
+**No silent loss of work the compiler — or its author — knows must complete.**
+
 ## 7. Informative grammar appendix treated as normative requirements
 
 Affected requirements:
@@ -258,6 +384,9 @@ Preferred requirement shape:
 - For grammar requirements, point to the normative sections that define the
   construct.
 
+BDFL Response:
+Agreed.  Update the spec and requirements.
+
 ## 8. Mixed-width bitwise promotion bypasses numeric conversion rules
 
 Affected requirement:
@@ -286,6 +415,88 @@ Preferred requirement shape:
   `as`.
 - The result type is the common type selected by those rules.
 
+BDFL Response: Accept the flag; modify the rule.
+
+`4.2.4.2` ("mixed-width operands are promoted to the wider type") is too broad,
+as the audit says. But the fix is neither the arithmetic common-type rule nor
+third-type widening (`u32 | i32 -> i64`). Both import a value-preserving
+invariant into an operation that is not about values.
+
+The principle: **a bitwise operator preserves bit patterns, not numeric
+values.** `+ - * /` produce a number, and value-preserving widening is exactly
+right for them. `& | ^` produce a bit pattern, and the only widening that does
+not silently change which bits participate is widening within a single
+signedness — zero-extension for unsigned, sign-extension for signed. Those are
+the type's own definition of "the same value in more bits," and within one
+signedness there is no ambiguity about what the high bits mean.
+
+Across signedness there is no bit-pattern-preserving common type, because the
+operands disagree about the meaning of the high bit. Widening `u32 | i32` to
+`i64` does not reconcile them; it zero-extends the `u32` and sign-extends the
+`i32`, so whenever the `i32` is negative the result's upper 32 bits fill with
+ones the programmer's 32-bit idiom never intended. That is the C
+integer-promotion trap in a lossless costume: the operand *values* are
+preserved and the operation's *meaning* is not. It also silently doubles a
+32-bit operation to 64-bit — a hidden cost a systems programmer would not
+expect from `|`.
+
+This is settled by With's own rule about casts. A cast in a bitwise expression
+is meaningful: it says "interpret these bits as signed or unsigned at this
+width," which is information the compiler does not have. Mixed signedness in a
+bitwise op *is* exactly that missing information. So the cast is required, not
+ceremony — forcing `(a as i32) | b` is clause one working correctly, because
+the compiler genuinely does not know the intended interpretation, and
+auto-widening to `i64` would be a clause-two failure: a silent representation
+choice that reinterprets bits. The proposal removes a cast that was carrying
+real information and replaces it with a guess.
+
+The rule for `& | ^`:
+
+1. An untyped integer literal adopts the other operand's type and is valid iff
+   its bit pattern fits that operand's WIDTH, not iff its signed value fits the
+   operand's range.
+       `u32 | 0xff` -> `u32`        `i8 & 0xff` -> `i8`
+       `i8 & 0x1ff` -> error (9-bit pattern in an 8-bit operand)
+   (`i8 & 0xff` is the canonical low-byte mask. Asking "does 255 fit in i8?" is
+   the value question; for a bitwise op the bit pattern is what matters, and an
+   8-bit pattern fits an 8-bit operand. It must compile.)
+2. Two typed operands of the SAME signedness, different widths: widen to the
+   wider type (zero-extend unsigned, sign-extend signed).
+       `u8 | u32` -> `u32`         `i8 & i32` -> `i32`
+3. Two typed operands of DIFFERENT signedness: require an explicit `as`. No
+   third-type widening. The cast supplies the interpretation the compiler does
+   not have.
+       `u32 | i32` -> error; write `(a as i32) | b`, `a | (b as u32)`, or
+       `(a as i64) | (b as i64)` per intent.
+4. Result type = the common type from rule 2, or the cast-to type from rule 3.
+
+Shift operators `<<` and `>>` are governed separately: the result type is the
+left operand's type and the right operand is a count, so the common-type
+question does not arise. This rule applies only to `& | ^`.
+
+This keeps the requirements the audit endorsed intact. `4.2.6.1` (lossless
+widening only), `4.2.6.6` (no other implicit conversion), and `4.2.6.9`
+(signed/unsigned needs `as`, even at the same width) all stand; mixed-signedness
+bitwise requiring `as` is exactly what `4.2.6.9` already implies for the
+same-width case, now extended consistently to mixed-width.
+
+Spec update: narrow `4.2.4.2`. Mixed-WIDTH promotion to the wider type holds
+only within a single signedness. Bitwise `& | ^` preserve bit patterns:
+same-signedness operands widen to the wider type; mixed-signedness operands
+require an explicit `as`; untyped literals adopt the operand type by width-fit.
+No implicit third-type widening for bitwise operators.
+
+Note for separate ruling: whether *arithmetic* permits value-preserving
+cross-signedness widening (`u32 + i32 -> i64`) is a distinct question with its
+own cost and clarity tradeoffs. It must be decided on its own — bitwise must not
+inherit that answer either way, because the bit-pattern argument above is
+specific to `& | ^`.
+
+This preserves both mission clauses:
+
+**Same signedness widens freely — the bits are already determined.**
+**Mixed signedness needs `as` — the bits are a choice the compiler cannot make.**
+
 ## 9. Fixed-size arrays are not always copied on assignment
 
 Affected requirement:
@@ -309,6 +520,14 @@ Preferred requirement shape:
 - Assignment and argument passing follow normal ownership rules.
 - `[T; N]` is `Copy` only when `T` is `Copy`; otherwise assignment moves.
 - Large arrays should generally be passed by reference for performance.
+
+BDFL Response: Accept.
+The spec is wrong as written. Fixed-size arrays are value types, but
+they are not unconditionally copied on assignment. Arrays follow normal ownership
+semantics: [T; N] is Copy only when T is Copy; otherwise assignment moves the
+array. Large arrays should generally be passed by reference for performance, but
+that is guidance, not a semantic exception. This preserves With’s rule: the
+compiler eliminates ceremony only when the semantics are already known and safe.
 
 ## 10. `const` declarations require redundant type annotations
 
@@ -335,6 +554,8 @@ Preferred requirement shape:
 - Require or strongly prefer explicit types for public exported constants and
   cases where the literal/default type would be surprising.
 - Keep `const NAME: TYPE = EXPR` available for API clarity and disambiguation.
+
+BDFL Response: Accept.
 
 ## 11. Suspension points are described too narrowly
 
@@ -378,6 +599,107 @@ Preferred requirement shape:
 - Diagnostics should name the operation that may yield, even when it is buried
   behind a call.
 
+BDFL Response: Accept with clarification.
+
+The audit is correct, but the issue is not merely that the wording around
+`.await` is too absolute. This settles a real design fork, and the resolution
+is forced by no-colored-functions.
+
+**With does not choose syntactic suspension visibility. It chooses compiler
+suspension visibility.** Requiring every possible suspension to be marked at the
+call site is function coloring, which With rejects. In With, an ordinary-looking
+same-fiber call may suspend if the callee is `may_suspend`; the programmer does
+not mark that at the call site. The compiler already knows the transitive
+suspension property, so making the programmer spell it everywhere would be
+ceremony. "Suspension is always visible in the source" was never compatible with
+no-colored-functions — not because of a few exotic operations, but structurally,
+the moment an ordinary call is allowed to suspend.
+
+The safety guarantee is therefore not carried by human visual inspection. It is
+carried by compiler enforcement. `may_suspend` participates in hard errors: a
+`no_suspend` function cannot perform a current-fiber suspension, and a
+`@[no_await_guard]` guard cannot be live across any operation that may suspend.
+Hidden suspension is acceptable precisely — and only — because the compiler
+refuses the dangerous combinations.
+
+The core rule:
+
+**`may_suspend` is a current-fiber property, and fiber creation is the
+firewall.** A same-fiber call through a callable whose type is `may_suspend`
+propagates `may_suspend` to the caller. Calling an `async fn` does not: it
+creates/starts a separate fiber and returns a `Task`, so suspensions inside that
+task occur on the task's fiber, not the caller's current fiber. The caller
+suspends later only if it awaits, joins, performs async-scope cleanup, or
+otherwise invokes a current-fiber suspension operation.
+
+Formally, a function is `may_suspend` if it directly performs a primitive
+current-fiber suspension, or if it makes a same-fiber call through a callable
+whose type is `may_suspend`. Fiber-creation boundaries do not propagate
+`may_suspend` to the caller.
+
+The primitive suspension set must be closed and deterministic. It is:
+
+- `.await`;
+- collection / select await;
+- explicit yield primitives;
+- async-scope await-all and other structured-concurrency joins;
+- implicit cleanup await at scope exit for a live ephemeral task;
+- **fiber-aware runtime operations that yield the current fiber when they cannot
+  complete immediately** — lock acquire when unavailable, channel send when full,
+  channel receive when empty, timer/sleep until deadline, and socket/file read
+  or write when not ready.
+
+The last category replaces the earlier "contended blocking primitives" wording,
+which was wrong: a lock yields under contention, but I/O and timers yield on
+external-event wait, not contention. A closed set that omits fiber-aware I/O is
+not closed. The spec must also state explicitly whether fiber-aware I/O is direct
+fiber-yielding (in which case it is a leaf, as above) or is modeled as a `Task`
+that suspends only at `.await` (in which case it reduces to the `.await` leaf).
+It may not leave this ambiguous.
+
+`may_suspend` is part of callable **type** information — for function pointers,
+closures, trait/`dyn` callables, callbacks, and every other indirect-call
+surface. Without this, `no_suspend` and `@[no_await_guard]` have a hole: a
+`no_suspend` function that calls through `cb: fn()` cannot be checked unless the
+type of `cb` carries whether it may suspend. This does not reintroduce
+coloring: ordinary calls remain unannotated, and the typing burden appears only
+when a function becomes a value, which is real semantic information the compiler
+must track. The surface spelling may be inferred in most cases, but the type
+system has to know it.
+
+`.await` is the primary explicit result-observing suspension operator for a
+single `Task`. It is not the only result-observing suspension form if the
+language has collection / select await. The spec must not state that `.await` is
+the only result-extraction mechanism.
+
+Requirement `14.3.1.34` is wrong in two directions and must be fixed in both:
+
+- too narrow: "directly contains `.await`" must become "directly performs a
+  primitive current-fiber suspension" (from the closed set above);
+- too broad: "calls any `may_suspend` function" must become "makes a same-fiber
+  call through a `may_suspend` callable," with fiber-creation boundaries
+  stopping propagation.
+
+Spec update: replace "suspension is always marked with `await`" (`20.1.1.5`) and
+"`.await` is the only point where a fiber can suspend" (`14.5.1.6`) with a
+compiler-visible suspension rule. Suspension need not be syntactically marked at
+every call site. It must be known to the compiler, deterministic from the closed
+primitive set, carried on callable types so indirect calls are checkable,
+propagated only through same-fiber calls, stopped at fiber-creation boundaries,
+and enforced through `no_suspend` and `@[no_await_guard]` hard errors. Reword
+`14.5.1.7` ("always visible in source") accordingly: suspension is always known
+to the compiler and surfaced in diagnostics, not necessarily spelled at the call
+site.
+
+The doctrine: no syntactic call-site coloring; a closed primitive suspension
+set; same-fiber transitive closure; fiber-creation firewall; `may_suspend` on
+callable types; guard safety enforced by compile errors.
+
+This preserves both mission clauses:
+
+**Suspension is never spelled at the call site — the compiler already knows it.**
+**Suspension is never hidden from the compiler — and the dangerous combinations never compile.**
+
 ## 12. Ephemeral return rules are inconsistent
 
 Affected requirements:
@@ -418,6 +740,17 @@ Preferred requirement shape:
   `Vec` should refer back to the general propagation rule instead of saying
   "cannot be returned" categorically.
 
+BDFL Response: Accept the flag; modify the rule.
+
+The categorical “cannot be returned” requirements are wrong. Ephemeral values
+may be returned when their origin is reachable from the function’s inputs or
+program-lifetime storage, and the return remains ephemeral so the caller
+inherits the restriction. An ephemeral whose origin is function-local may not
+be returned. The compiler infers and carries the origin set; the programmer
+does not write lifetime annotations. The invariant is that an ephemeral may
+not be used after its origin dies or placed anywhere that erases origin
+tracking.
+
 ## 13. Ephemeral escape diagnostics are too weak
 
 Affected requirements:
@@ -446,6 +779,18 @@ Preferred requirement shape:
 - Warnings are appropriate for performance or style guidance, not for cases
   where accepting the code could violate memory safety.
 
+BDFL Response: Accept.
+
+The warning model is wrong for ephemeral escape.
+
+Ephemerality is part of With’s safety contract. It is how the compiler carries lifetime/origin information without making the programmer write lifetime annotations. If an ephemeral value might escape its valid scope and the compiler cannot prove otherwise, the program is not safe With code.
+
+Clear ephemeral escapes are hard errors. Ambiguous ephemeral escapes are also hard errors, because ambiguity means the compiler cannot prove the origin outlives every use. The user may resolve the error by keeping the value within scope, returning it with propagated ephemerality, converting/copying into owned data, or crossing an explicit `unsafe` boundary.
+
+Warnings are appropriate for weird-but-safe code, performance guidance, style, or suspicious but semantically valid patterns. They are not appropriate when accepting the program could produce a dangling reference, cross-thread borrowed value, detached ephemeral task, or erased origin.
+
+Spec update: replace `14.22.1.10` through `14.22.1.13` with a proof-based rule. Ephemeral values may be used only where the compiler can prove their origin outlives every use and the ephemerality/origin information is not erased. Proven escape is a compile error. Unproven safety is a compile error. Warnings are not sufficient for possible ephemeral escape.
+
 ## 14. `Task[T]` storability contradicts task ephemerality
 
 Affected requirement:
@@ -472,6 +817,71 @@ Preferred requirement shape:
   ephemeral values and its result satisfies the relevant `Send`/storage rules.
 - Tables comparing generators and async should say "Task handle; storable only
   when non-ephemeral."
+
+BDFL Response: Accept.
+
+`Task[T] is always storable` is wrong as written.
+
+`Task[T]` has one type spelling. The programmer should not write a different
+task type just because the compiler knows the task captured an ephemeral value —
+that would be ceremony for a fact the compiler already infers. But storability
+is not a property of the spelling. It is a property of the task value and its
+binding, inferred from what the task captures and returns.
+
+Storability and sendability are separate axes, and the requirement conflated
+them. There are three properties, in a hierarchy:
+
+- **Ephemeral vs non-ephemeral** — the lifetime gate. A task is ephemeral if its
+  captured environment (or, transitively, its result) contains references,
+  allocator-borrowed values, scope-bound resources, or any other ephemeral
+  value.
+- **Storable** — may be placed in long-lived data. A task is storable iff it is
+  **non-ephemeral**. Storage alone does not require `Send`: a non-`Send` task may
+  be stored in a same-thread container; the only consequence is that the
+  container is then itself non-`Send`.
+- **Sendable** — may cross a thread boundary. A task is sendable iff it is
+  non-ephemeral **and** `T: Send` **and** its captured environment is `Send`.
+
+This is exactly the ladder `14.7.1.4` already implies: `Task[T]` is `Send` when
+`T: Send` and the task is not ephemeral, so `Send` is the stronger property
+sitting on top of non-ephemeral. Requiring `Send` for mere storage would forbid
+the legitimate non-ephemeral-but-not-`Send` rung — storing a task that holds a
+non-`Send` resource in same-thread data.
+
+An ephemeral task is neither storable nor sendable. It may be awaited,
+cancelled, returned with propagated ephemerality, or otherwise handled within
+its valid scope. It may not escape its origin — and "escape" is the general
+ephemeral-escape property from #12/#13, not a fresh list: any operation after
+which the compiler can no longer prove the task's origin outlives every use of
+it. Storing it in long-lived data, sending it across a thread, placing it in a
+channel, and hiding it behind type erasure that loses the origin are all
+instances of that one property; *detaching* it (bare fire-and-forget, per #6) is
+the task-specific instance. Attempting any of them is ephemeral escape, which
+per #13 is a **hard error**, not a warning — the storability verdict is
+enforced, not advisory.
+
+So the table should not say "`Task[T]` is always storable." It should say:
+
+> `Task[T]` is a task handle; storable only when non-ephemeral, sendable only
+> when additionally `Send`.
+
+Spec update: replace `14.20.1.9` with one `Task[T]` spelling whose storability
+and sendability are binding properties inferred from the captured environment
+and result.
+- Ephemeral (captures or returns an ephemeral value): not storable, not
+  sendable; must be awaited, cancelled, returned with propagated ephemerality,
+  or handled in scope; may not escape its origin (hard error, per #12/#13).
+- Non-ephemeral: storable in long-lived data on the same thread regardless of
+  `Send`.
+- Non-ephemeral and `Send` (with a `Send` environment): additionally sendable
+  across threads.
+
+This preserves both mission clauses:
+
+**One `Task` type — the compiler infers storability from the captures; the user
+never spells it.**
+**An ephemeral task never escapes its origin — storing, sending, or detaching it
+is a hard error, not a warning.**
 
 ## 15. `c_import` must not emit `comptime_error` stubs for failed translation
 

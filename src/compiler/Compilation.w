@@ -21,6 +21,9 @@ use compiler.Zcu
 use compiler.Runtime
 use Overflow
 
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> void
+
 fn profile_enabled() -> bool:
     runtime_getenv("WITH_PROFILE").len() > 0
 
@@ -1066,7 +1069,10 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
     if not compilation_ensure_output_dir(link_stage_dirname(final_output)):
         return ""
 
-    let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text, self.zcu.project_config.overflow_mode)
+    var emit_intern = self.zcu.pool
+    if self.zcu.last_sema.pool.state.symbol_texts.len() as i32 > 1:
+        emit_intern = self.zcu.last_sema.pool
+    let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, emit_intern, self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text, self.zcu.project_config.overflow_mode)
     if emitted.ok == 0:
         runtime_eprint("error: C emission failed: " ++ emitted.err_msg)
         return ""
@@ -1158,22 +1164,21 @@ fn Compilation.active_pool(self: Compilation, pool: AstPool) -> AstPool:
 
 fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     let do_profile = profile_enabled()
-    var zcu = self.zcu
     let active_pool = pool
-    compilation_debug_pool_flow("run_mir_lower:start", zcu.pool, active_pool, zcu.last_sema)
-    var sema = Sema.init(zcu.pool, zcu.diagnostics, active_pool)
-    compilation_debug_pool_flow("run_mir_lower:after_init", zcu.pool, active_pool, sema)
-    sema.source_text = zcu.current_source_text
-    sema.decl_source_paths = zcu.decl_source_paths
-    sema.decl_source_file_ids = zcu.decl_source_file_ids
-    sema.decl_is_c_import = zcu.decl_is_c_import
-    sema.tool_mode_entry_path = zcu.tool_mode_entry_path
-    sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
-    sema.overflow_mode = zcu.project_config.overflow_mode
-    sema.init_module_graph(&zcu.last_resolved)
-    if zcu.project_config.no_std or self.config.no_std:
+    compilation_debug_pool_flow("run_mir_lower:start", self.zcu.pool, active_pool, self.zcu.last_sema)
+    var sema = Sema.init(self.zcu.pool, self.zcu.diagnostics, active_pool)
+    compilation_debug_pool_flow("run_mir_lower:after_init", self.zcu.pool, active_pool, sema)
+    sema.source_text = self.zcu.current_source_text
+    sema.decl_source_paths = self.zcu.decl_source_paths
+    sema.decl_source_file_ids = self.zcu.decl_source_file_ids
+    sema.decl_is_c_import = self.zcu.decl_is_c_import
+    sema.tool_mode_entry_path = self.zcu.tool_mode_entry_path
+    sema.runtime_available = if self.zcu.project_config.runtime_available: 1 else: 0
+    sema.overflow_mode = self.zcu.project_config.overflow_mode
+    sema.init_module_graph(&self.zcu.last_resolved)
+    if self.zcu.project_config.no_std or self.config.no_std:
         sema.no_std = 1
-    if zcu.project_config.alloc_mode or self.config.alloc_mode:
+    if self.zcu.project_config.alloc_mode or self.config.alloc_mode:
         sema.alloc = 1
     let t_sema = profile_now()
     sema.check_module()
@@ -1182,83 +1187,77 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     sema.freeze_types()
     if do_profile:
         profile_emit("sema", t_sema, f"types={sema.type_kinds.len() as i32}")
-    compilation_debug_pool_flow("run_mir_lower:after_check", zcu.pool, active_pool, sema)
+    compilation_debug_pool_flow("run_mir_lower:after_check", self.zcu.pool, active_pool, sema)
 
     // Check for sema errors before lowering
     if sema.diags.has_errors():
-        zcu.sync_from_sema(sema)
-        compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
-        zcu.render_current_diagnostics()
-        zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
-        self.zcu = zcu
+        self.zcu.sync_from_sema(sema)
+        compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
+        self.zcu.render_current_diagnostics()
+        self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
         return self.zcu.last_mir_module
 
     let t_mir = profile_now()
-    let mir_mod: MirModule = lower_module(sema, active_pool, zcu.pool)
+    let mir_mod: MirModule = lower_module(sema, active_pool, self.zcu.pool)
     let tailrec_syms = collect_tailrec_fn_syms(active_pool)
     if tailrec_syms.len() > 0:
         let tailrec_violations = mir_mod.verify_tailrec_contracts(&sema, active_pool, tailrec_syms)
         if tailrec_violations.len() > 0:
-            zcu.sync_from_sema(sema)
-            compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
+            self.zcu.sync_from_sema(sema)
+            compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
             for vi in 0..tailrec_violations.len() as i32:
                 let violation = tailrec_violations.get(vi as i64)
                 let start = active_pool.get_start(violation.node)
                 let end_raw = active_pool.get_end(violation.node)
                 let end = if end_raw > start: end_raw else: start + 1
                 let span = Span { file: sema.local_file_id, start, end }
-                zcu.diagnostics.emit(Diagnostic.err(violation.message, span))
-            zcu.render_all_diagnostics_frontend()
-            zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
-            self.zcu = zcu
+                self.zcu.diagnostics.emit(Diagnostic.err(violation.message, span))
+            self.zcu.render_all_diagnostics_frontend()
+            self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
             return self.zcu.last_mir_module
     if sema.diags.has_errors():
-        zcu.sync_from_sema(sema)
-        compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
-        zcu.render_all_diagnostics_frontend()
-        zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
-        self.zcu = zcu
+        self.zcu.sync_from_sema(sema)
+        compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
+        self.zcu.render_all_diagnostics_frontend()
+        self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
         return self.zcu.last_mir_module
     if do_profile:
         profile_emit("mir.lower", t_mir, f"bodies={mir_mod.body_count()}")
     let t_suspend_check = profile_now()
-    sema.diags = check_no_await_guard_suspends(mir_mod, active_pool, sema, sema.diags)
+    sema.diags = check_no_await_guard_suspends(mir_mod, active_pool, &sema, sema.diags)
     if do_profile:
         profile_emit("mir.suspend_check", t_suspend_check, "")
     if sema.diags.has_errors():
-        zcu.sync_from_sema(sema)
-        compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
-        zcu.render_all_diagnostics_frontend()
-        zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
-        self.zcu = zcu
+        self.zcu.sync_from_sema(sema)
+        compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
+        self.zcu.render_all_diagnostics_frontend()
+        self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
         return self.zcu.last_mir_module
-    zcu.sync_from_sema(sema)
+    self.zcu.sync_from_sema(sema)
     let t_mir_validate = profile_now()
     let mir_err = validate_typed_mir_module(mir_mod)
     if do_profile:
         profile_emit("mir.validate", t_mir_validate, "")
     if mir_validation_has_error(mir_err):
-        let diag_span = compilation_mir_error_span(zcu, active_pool, mir_err.fn_sym, mir_err.span)
+        let diag_span = compilation_mir_error_span(self.zcu, active_pool, mir_err.fn_sym, mir_err.span)
         sema.diags.emit(Diagnostic.err("invalid MIR before codegen: " ++ mir_err.message, diag_span))
-        zcu.sync_from_sema(sema)
-        compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
-        zcu.render_all_diagnostics_frontend()
-        zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
-        self.zcu = zcu
+        self.zcu.sync_from_sema(sema)
+        compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
+        self.zcu.render_all_diagnostics_frontend()
+        self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
         return self.zcu.last_mir_module
     let t_async = profile_now()
-    let async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, zcu.pool, sema, zcu.diagnostics)
+    let async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, self.zcu.pool, &sema, self.zcu.diagnostics)
     if do_profile:
         profile_emit("async.lower", t_async, "")
-    zcu.diagnostics = async_artifacts.diags
-    compilation_dump_type_names("post-mir-lower", active_pool, zcu.pool)
+    self.zcu.diagnostics = async_artifacts.diags
+    compilation_dump_type_names("post-mir-lower", active_pool, self.zcu.pool)
 
     // Sync sema AFTER MIR lowering — type tables are frozen but other
     // sema state (e.g. diagnostics) may have been updated.
-    zcu.sync_from_sema(sema)
-    compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
-    zcu.set_codegen_snapshot(mir_mod, "", async_artifacts.out_mod, "")
-    self.zcu = zcu
+    self.zcu.sync_from_sema(sema)
+    compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
+    self.zcu.set_codegen_snapshot(mir_mod, "", async_artifacts.out_mod, "")
     self.zcu.last_mir_module
 
 fn Compilation.run_async_mir_lower(self: Compilation, pool: AstPool) -> AsyncMirModule:

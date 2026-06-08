@@ -586,7 +586,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
     body.new_local(0, 1, 0, 0)
     body
 
-fn MirBody.init(fn_sym: i32, sema: Sema) -> MirBody:
+fn MirBody.init(fn_sym: i32, sema: &Sema) -> MirBody:
     var body = MirBody.init_for_fn(fn_sym)
     if sema.ty_void != 0:
         body.local_type_ids.set_i32(0, sema.ty_void)

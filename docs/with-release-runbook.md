@@ -47,9 +47,11 @@ Publish, per release:
 ```text
 with-darwin-aarch64                          # Darwin arm64 compiler binary
 with-linux-x86_64                            # Linux x86_64 compiler binary
+with-windows-x86_64.exe                      # Windows x86_64 compiler binary
 with-bootstrap-c-vX.Y.Z.tar.zst              # emitted-C bootstrap bundle
 with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst   # static LLVM SDK (Darwin arm64)
 with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst     # static LLVM SDK (Linux x86_64)
+with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.zst   # static LLVM SDK (Windows x86_64)
 install.sh
 ```
 
@@ -66,9 +68,11 @@ the seed (issue #313):
 
 - **Package** (per platform, after the SDK exists in `.deps`):
   `scripts/package-llvm-sdk.sh` → `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst`.
+  On Windows, use `scripts/package-llvm-sdk-windows-x86_64.ps1`.
   It ships only what the build links against — `lib/*.a`, `lib/clang/<v>/include/`,
-  and `bin/lld` (+ driver symlinks) and `bin/llvm-nm` — not `bin/clang` or the
-  LLVM C++ `include/` tree, so the asset is ~65 MB, not ~2 GB.
+  `bin/clang`, `bin/lld` (+ driver symlinks), and `bin/llvm-nm` — not the LLVM
+  C++ `include/` tree, so the asset remains small while still carrying the
+  With-owned Clang driver required by emitted-C bootstrap.
 - **Fetch**: `with build :deps` downloads
   `with-llvm-sdk-<COMPILER_LLVM_VERSION>-<host>.tar.zst` from the matching
   release and extracts it into `.deps/llvm-<ver>-<host>`. `WITH_LLVM_SDK_VERSION`
@@ -86,6 +90,7 @@ Current per-host assets:
 ```text
 Darwin arm64: with-darwin-aarch64   with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst
 Linux x86_64: with-linux-x86_64     with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst
+Windows x86_64: with-windows-x86_64.exe with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.zst
 ```
 
 ## Verification
@@ -259,14 +264,21 @@ Prepare the platform-named assets on their native platforms:
 ```sh
 scripts/package-darwin-aarch64.sh
 scripts/package-linux-x86_64.sh
+scripts/package-windows-x86_64.ps1
 scripts/package-bootstrap-c.sh
 scripts/package-llvm-sdk.sh
+scripts/package-llvm-sdk-windows-x86_64.ps1
 ```
 
 `scripts/package-llvm-sdk.sh` runs on each native platform and packages that
 host's `.deps/llvm-<ver>-<host>` static SDK into
 `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst`. Copy the Linux SDK
 asset back alongside the Linux binary:
+
+On Windows, `scripts/package-llvm-sdk-windows-x86_64.ps1` packages the
+`.deps\llvm-<ver>-windows-x86_64-msvc` SDK and includes the required Clang/lld
+tools (`clang.exe`, `clang++.exe`, `lld-link.exe`, `llvm-nm.exe`,
+`llvm-readobj.exe`), static `.lib` archives, and clang builtin headers.
 
 ```sh
 scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-llvm-sdk-*-linux-x86_64.tar.zst out/release/
@@ -295,6 +307,7 @@ gh release create v0.14.3 \
   out/release/with-bootstrap-c-v0.14.3.tar.zst \
   out/release/with-llvm-sdk-*-darwin-aarch64.tar.zst \
   out/release/with-llvm-sdk-*-linux-x86_64.tar.zst \
+  out/release/with-llvm-sdk-*-windows-x86_64.tar.zst \
   out/release/install.sh \
   --repo withlang-dev/with \
   --title "v0.14.3: <release title>" \
@@ -331,8 +344,10 @@ install.sh
 with-bootstrap-c-v0.14.3.tar.zst
 with-darwin-aarch64
 with-linux-x86_64
+with-windows-x86_64.exe
 with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst
 with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst
+with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.zst
 ```
 
 Confirm the tag points at the verified commit:

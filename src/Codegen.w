@@ -423,6 +423,8 @@ type Codegen {
     mir_dispatch_count: i32,
     mir_input: MirModule,
     mir_local_ptrs: HashMap[i32, i64],
+    mir_local_values: HashMap[i32, i64],
+    mir_memory_locals: HashMap[i32, i32],
     mir_local_types: HashMap[i32, i64],
     mir_indirect_value_local_types: HashMap[i32, i64],
     mir_ref_capture_local_types: HashMap[i32, i64],
@@ -709,6 +711,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         mir_dispatch_count: 0,
         mir_input: MirModule.init(),
         mir_local_ptrs: HashMap.new(),
+        mir_local_values: HashMap.new(),
+        mir_memory_locals: HashMap.new(),
         mir_local_types: HashMap.new(),
         mir_indirect_value_local_types: HashMap.new(),
         mir_ref_capture_local_types: HashMap.new(),
@@ -1528,7 +1532,7 @@ fn Codegen.build_dyn_trait_value(self: Codegen, concrete_val: i64, type_sym: i32
         self.had_error = 1
         return wl_get_undef(self.get_dyn_fat_ptr_type())
 
-    let alloca = wl_build_alloca(self.builder, wl_type_of(concrete_val))
+    let alloca = self.create_entry_alloca(wl_type_of(concrete_val))
     wl_build_store(self.builder, concrete_val, alloca)
 
     let fat_ty = self.get_dyn_fat_ptr_type()
@@ -1633,10 +1637,22 @@ fn Codegen.infer_local_concrete_struct(self: Codegen, value_node: i32, storage_t
 fn Codegen.coerce_call_args_for_fn_value(self: Codegen, fn_sym: i32, fn_val: i64, args_start: i32, arg_node_base_index: i32, args: Vec[i64], arg_count: i32, call_context: str, call_node: i32) -> Vec[i64]:
     let out: Vec[i64] = Vec.new()
     let param_count = wl_count_params(fn_val)
+    let sret_opt = self.extern_fn_has_sret.get(fn_sym)
+    let has_sret = if sret_opt.is_some(): sret_opt.unwrap() else: 0
+    let byval_opt = self.extern_fn_byval_params.get(fn_sym)
+    let byval_mask = if byval_opt.is_some(): byval_opt.unwrap() as i64 else: 0
+    var byval_types: Vec[i64] = Vec.new()
+    let byval_types_opt = self.extern_fn_byval_types.get(fn_sym)
+    if byval_types_opt.is_some():
+        byval_types = byval_types_opt.unwrap()
+    let param_offset = if has_sret != 0: 1 else: 0
     for ai in 0..arg_count:
         var arg_val = args.get(ai as i64)
-        if ai < param_count:
-            let param_ty = wl_type_of(wl_get_param(fn_val, ai))
+        let actual_ai = ai + param_offset
+        if actual_ai < param_count:
+            var param_ty = wl_type_of(wl_get_param(fn_val, actual_ai))
+            if (byval_mask & ((1 as i64) << (ai as u32))) != 0 and ai < byval_types.len() as i32 and byval_types.get(ai as i64) != 0:
+                param_ty = byval_types.get(ai as i64)
             let arg_node = if args_start >= 0 and ai >= arg_node_base_index:
                 self.pool.get_extra(args_start + ai - arg_node_base_index)
             else:
@@ -1650,8 +1666,47 @@ fn Codegen.coerce_call_args_for_fn_value(self: Codegen, fn_sym: i32, fn_val: i64
                     else:
                         arg_val = self.build_dyn_trait_value(arg_val, info.type_sym, trait_sym)
             arg_val = self.coerce_call_arg_to_param(arg_node, arg_val, param_ty, call_context, call_node, ai)
+            if (byval_mask & ((1 as i64) << (ai as u32))) != 0:
+                var indirect_ty = param_ty
+                if ai < byval_types.len() as i32 and byval_types.get(ai as i64) != 0:
+                    indirect_ty = byval_types.get(ai as i64)
+                let tmp = self.create_entry_alloca(indirect_ty)
+                let stored = self.enforce_coerced_type(arg_val, indirect_ty, "indirect aggregate argument")
+                wl_build_store(self.builder, stored, tmp)
+                out.push(tmp)
+                continue
         out.push(arg_val)
     out
+
+fn Codegen.build_call_fn_value(self: Codegen, fn_sym: i32, fn_val: i64, fn_ty: i64, args_start: i32, arg_node_base_index: i32, args: Vec[i64], arg_count: i32, call_context: str, call_node: i32) -> i64:
+    let sret_opt = self.extern_fn_has_sret.get(fn_sym)
+    let has_sret = if sret_opt.is_some(): sret_opt.unwrap() else: 0
+    var sret_ty: i64 = 0
+    if has_sret != 0:
+        let sret_ty_opt = self.extern_fn_sret_type.get(fn_sym)
+        if sret_ty_opt.is_some():
+            sret_ty = sret_ty_opt.unwrap() as i64
+    let coerced = self.coerce_call_args_for_fn_value(fn_sym, fn_val, args_start, arg_node_base_index, args, arg_count, call_context, call_node)
+    let final_args: Vec[i64] = Vec.new()
+    var sret_buf: i64 = 0
+    if has_sret != 0 and sret_ty != 0:
+        sret_buf = self.create_entry_alloca(sret_ty)
+        final_args.push(sret_buf)
+    for i in 0..coerced.len() as i32:
+        final_args.push(coerced.get(i as i64))
+    let call_val = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&final_args), final_args.len() as i32)
+    var byval_mask: i64 = 0
+    var byval_types: Vec[i64] = Vec.new()
+    let byval_opt = self.extern_fn_byval_params.get(fn_sym)
+    if byval_opt.is_some():
+        byval_mask = byval_opt.unwrap() as i64
+    let byval_types_opt = self.extern_fn_byval_types.get(fn_sym)
+    if byval_types_opt.is_some():
+        byval_types = byval_types_opt.unwrap()
+    self.apply_c_abi_call_attrs(call_val, has_sret, sret_ty, byval_mask, byval_types, arg_count, 0)
+    if has_sret != 0 and sret_buf != 0 and sret_ty != 0:
+        return wl_build_load(self.builder, sret_ty, sret_buf)
+    call_val
 
 fn Codegen.mir_call_context(self: Codegen, body: MirBody, callee_operand: i32) -> str:
     var out = "mir " ++ self.function_symbol_name(body.fn_sym) ++ " -> "
@@ -1833,23 +1888,20 @@ fn Codegen.get_with_str_eq_fn_type(self: Codegen) -> i64:
     wl_function_type(wl_i32_type(self.context), vec_data_i64(&param_types), 2, 0)
 
 fn Codegen.ensure_with_str_eq_declared(self: Codegen) -> i64:
-    let existing = wl_get_named_function(self.llmod, "with_str_eq")
-    if existing != 0:
-        return existing
-    let fn_ty = self.get_with_str_eq_fn_type()
-    let fn_val = wl_add_function(self.llmod, "with_str_eq", fn_ty)
-    let fn_sym = self.intern.intern("with_str_eq")
-    self.fn_values.insert(fn_sym, fn_val)
-    self.fn_fn_types.insert(fn_sym, fn_ty)
-    fn_val
+    let str_ty = self.resolve_named_type(self.intern.intern("str"))
+    let param_types: Vec[i64] = Vec.new()
+    param_types.push(str_ty)
+    param_types.push(str_ty)
+    self.ensure_internal_runtime_fn("with_str_eq", param_types, 2, wl_i32_type(self.context))
 
 fn Codegen.compare_str_eq(self: Codegen, lhs: i64, rhs: i64, op: i32) -> i64:
     let fn_val = self.ensure_with_str_eq_declared()
-    let fn_ty = self.get_with_str_eq_fn_type()
+    let fn_sym = self.intern.intern("with_str_eq")
+    let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
     let args: Vec[i64] = Vec.new()
     args.push(lhs)
     args.push(rhs)
-    let cmp = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 2)
+    let cmp = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_str_eq", 0)
     let zero = wl_const_int(wl_i32_type(self.context), 0, 0)
     if op == BinaryOp.OP_EQ:
         return wl_build_icmp(self.builder, wl_int_ne(), cmp, zero)
@@ -3189,13 +3241,18 @@ fn codegen_canonical_module_path(path: str) -> str:
 
 fn codegen_is_runtime_source_file(source_path: str) -> bool:
     source_path.starts_with("rt/") or source_path.contains("/rt/") or
+        source_path.starts_with("rt\\") or source_path.contains("\\rt\\") or
         source_path == "out/gen/compat_runtime.w" or
-        source_path.ends_with("/out/gen/compat_runtime.w")
+        source_path == "out\\gen\\compat_runtime.w" or
+        source_path.ends_with("/out/gen/compat_runtime.w") or
+        source_path.ends_with("\\out\\gen\\compat_runtime.w")
 
 fn codegen_is_runtime_abi_symbol(base_name: str) -> bool:
     if base_name.starts_with("with_") or base_name.starts_with("rt_") or base_name.starts_with("wl_"):
         return true
     base_name == "__error" or base_name == "__open" or
+        base_name == "gethostname" or base_name == "pthread_self" or
+        base_name == "mkstemp" or base_name == "realpath" or
         base_name == "i32_to_str" or base_name == "i64_to_string" or
         base_name == "str_from_byte"
 
@@ -3514,9 +3571,34 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             actual_param_types.push(source_ty)
             byval_types.push(0)
             direct_types.push(0)
+    else if self.internal_abi_needs_sret(ret_ty):
+        has_sret = 1
+        sret_ty = ret_ty
+        actual_ret_ty = wl_void_type(self.context)
+        actual_param_types.push(ptr_ty)
+        for abi_pi2 in 0..param_count:
+            let source_ty2 = param_types.get(abi_pi2 as i64)
+            if self.internal_abi_needs_indirect_param(source_ty2):
+                actual_param_types.push(ptr_ty)
+                byval_mask = byval_mask | ((1 as i64) << (abi_pi2 as u32))
+                byval_types.push(source_ty2)
+                direct_types.push(0)
+            else:
+                actual_param_types.push(source_ty2)
+                byval_types.push(0)
+                direct_types.push(0)
     else:
         for abi_pi in 0..param_count:
-            actual_param_types.push(param_types.get(abi_pi as i64))
+            let source_ty3 = param_types.get(abi_pi as i64)
+            if self.internal_abi_needs_indirect_param(source_ty3):
+                actual_param_types.push(ptr_ty)
+                byval_mask = byval_mask | ((1 as i64) << (abi_pi as u32))
+                byval_types.push(source_ty3)
+                direct_types.push(0)
+            else:
+                actual_param_types.push(source_ty3)
+                byval_types.push(0)
+                direct_types.push(0)
     let actual_param_count = actual_param_types.len() as i32
     let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_param_types), actual_param_count, 0)
 
@@ -3624,9 +3706,39 @@ fn Codegen.declare_function_from_sig(self: Codegen, fn_sym: i32, sig_idx: i32, f
                 self.record_ref_param(fn_sym, pi, param_count)
         param_types.push(p_ty)
 
-    let fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, self.sema.sig_is_variadic(sig_idx))
+    var actual_ret_ty = ret_ty
+    var has_sret = 0
+    var sret_ty: i64 = 0
+    var byval_mask: i64 = 0
+    let byval_types: Vec[i64] = Vec.new()
+    let direct_types: Vec[i64] = Vec.new()
+    let actual_param_types: Vec[i64] = Vec.new()
+    if self.internal_abi_needs_sret(ret_ty):
+        has_sret = 1
+        sret_ty = ret_ty
+        actual_ret_ty = wl_void_type(self.context)
+        actual_param_types.push(wl_ptr_type(self.context))
+    for api in 0..param_count:
+        let source_ty = param_types.get(api as i64)
+        if self.internal_abi_needs_indirect_param(source_ty):
+            actual_param_types.push(wl_ptr_type(self.context))
+            byval_mask = byval_mask | ((1 as i64) << (api as u32))
+            byval_types.push(source_ty)
+            direct_types.push(0)
+        else:
+            actual_param_types.push(source_ty)
+            byval_types.push(0)
+            direct_types.push(0)
+
+    let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_param_types), actual_param_types.len() as i32, self.sema.sig_is_variadic(sig_idx))
     let existing = wl_get_named_function(self.llmod, effective_name)
     let function = if existing != 0: existing else: wl_add_function(self.llmod, effective_name, fn_type)
+    if has_sret != 0:
+        wl_add_sret_attr(self.context, function, 0, sret_ty)
+    if has_sret != 0 or byval_mask != 0:
+        self.record_c_abi_transform(cg_sym, has_sret, sret_ty, byval_mask, byval_types, 0, direct_types, 0)
+        if cg_sym != fn_sym:
+            self.record_c_abi_transform(fn_sym, has_sret, sret_ty, byval_mask, byval_types, 0, direct_types, 0)
     if force_internal != 0:
         wl_set_linkage(function, wl_internal_linkage())
     else if self.module_object_mode == 0:
@@ -3722,6 +3834,11 @@ fn Codegen.fn_callconv_name(self: Codegen, meta: i32) -> str:
 fn Codegen.fn_uses_c_abi(self: Codegen, cc_name: str) -> bool:
     cc_name == "c" or (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:")
 
+fn codegen_extern_uses_internal_abi(name: str, cc_name: str) -> bool:
+    if cc_name.len() > 0:
+        return false
+    codegen_is_runtime_abi_symbol(name)
+
 fn codegen_c_abi_needs_byval_attr() -> bool:
     let os = with_sysinfo_os()
     let arch = with_sysinfo_arch()
@@ -3731,6 +3848,31 @@ fn codegen_c_abi_darwin_arm64() -> bool:
     let os = with_sysinfo_os()
     let arch = with_sysinfo_arch()
     os == "Macos" and (arch == "armv8" or arch == "aarch64")
+
+fn codegen_windows_x86_64() -> bool:
+    let os = with_sysinfo_os()
+    let arch = with_sysinfo_arch()
+    os == "Windows" and arch == "x86_64"
+
+fn Codegen.internal_abi_needs_sret(self: Codegen, ret_ty: i64) -> bool:
+    if not codegen_windows_x86_64():
+        return false
+    if ret_ty == 0:
+        return false
+    let kind = wl_get_type_kind(ret_ty)
+    if kind != wl_struct_type_kind() and kind != wl_array_type_kind():
+        return false
+    self.abi_size_of(ret_ty) > 8
+
+fn Codegen.internal_abi_needs_indirect_param(self: Codegen, param_ty: i64) -> bool:
+    if not codegen_windows_x86_64():
+        return false
+    if param_ty == 0:
+        return false
+    let kind = wl_get_type_kind(param_ty)
+    if kind != wl_struct_type_kind() and kind != wl_array_type_kind():
+        return false
+    self.abi_size_of(param_ty) > 8
 
 fn Codegen.c_abi_integer_aggregate_ok(self: Codegen, ty: i64) -> bool:
     if ty == 0:
@@ -3957,6 +4099,9 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     let param_count = self.pool.fn_meta_param_count(meta)
 
     let ret_ty = self.resolve_type(ret_type_node)
+    let name_str = self.intern.resolve(name_sym)
+    let cc_name = self.fn_callconv_name(meta)
+    let uses_internal_abi = codegen_extern_uses_internal_abi(name_str, cc_name)
 
     // Resolve original param types
     let orig_param_types: Vec[i64] = Vec.new()
@@ -3976,9 +4121,14 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     let direct_types: Vec[i64] = Vec.new()
     var direct_ret_ty: i64 = 0
 
-    // Check return type: direct ABI aggregate or sret for large structs.
+    // Check return type: direct C ABI aggregate, C sret, or internal With sret.
     var actual_ret_ty = ret_ty
-    if ret_ty != 0 and wl_get_type_kind(ret_ty) == wl_struct_type_kind():
+    if uses_internal_abi:
+        if self.internal_abi_needs_sret(ret_ty):
+            has_sret = 1
+            sret_ty = ret_ty
+            actual_ret_ty = wl_void_type(self.context)
+    else if ret_ty != 0 and wl_get_type_kind(ret_ty) == wl_struct_type_kind():
         let direct_ret_abi_ty = self.c_abi_direct_struct_return_type(ret_ty)
         if direct_ret_abi_ty != 0:
             direct_ret_ty = ret_ty
@@ -3999,7 +4149,14 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
 
     for pi in 0..param_count:
         let orig_ty = orig_param_types.get(pi as i64)
-        if wl_get_type_kind(orig_ty) == wl_struct_type_kind():
+        if uses_internal_abi:
+            if self.internal_abi_needs_indirect_param(orig_ty):
+                param_types.push(ptr_ty)
+                byval_mask = byval_mask | ((1 as i64) << (pi as u32))
+                byval_types.push(orig_ty)
+                direct_types.push(0)
+                continue
+        else if wl_get_type_kind(orig_ty) == wl_struct_type_kind():
             let direct_param_ty = self.c_abi_direct_struct_param_type(orig_ty)
             if direct_param_ty != 0:
                 param_types.push(direct_param_ty)
@@ -4021,7 +4178,6 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     let actual_param_count = param_types.len() as i32
     let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&param_types), actual_param_count, is_variadic)
 
-    let name_str = self.intern.resolve(name_sym)
     let link_name = self.canonical_extern_name(name_str)
 
     // Check if already declared
@@ -4041,7 +4197,6 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
 
     // Apply calling convention or c_export if specified
-    let cc_name = self.fn_callconv_name(meta)
     if cc_name.len() > 0:
         if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
             // @[c_export("name")] — set external linkage for C visibility
@@ -4485,8 +4640,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
             args.push(obj)
         for ai in 0..arg_count:
             args.push(pre_args.get(ai as i64))
-        let coerced = self.coerce_call_args_for_fn_value(mono_sym, cached_fv.unwrap() as i64, args_start, 1, args, arg_count + 1, "method " ++ mangled, call_node)
-        return wl_build_call(self.builder, cached_ft.unwrap() as i64, cached_fv.unwrap() as i64, vec_data_i64(&coerced), arg_count + 1)
+        return self.build_call_fn_value(mono_sym, cached_fv.unwrap() as i64, cached_ft.unwrap() as i64, args_start, 1, args, arg_count + 1, "method " ++ mangled, call_node)
 
     // Set up type bindings from the monomorphized struct
     let saved_bind_syms = self.type_binding_syms
@@ -4542,9 +4696,35 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
     let mono_ret_ty_raw = self.resolve_type(ret_type_node)
     let mono_ret_ty = if mono_ret_ty_raw != 0: mono_ret_ty_raw else: self.type_fallback()
 
-    let mono_ft = wl_function_type(mono_ret_ty, vec_data_i64(&mono_param_types), param_count, 0)
+    var mono_actual_ret_ty = mono_ret_ty
+    var mono_has_sret = 0
+    var mono_byval_mask: i64 = 0
+    let mono_byval_types: Vec[i64] = Vec.new()
+    let mono_direct_types: Vec[i64] = Vec.new()
+    let mono_actual_params: Vec[i64] = Vec.new()
+    if self.internal_abi_needs_sret(mono_ret_ty):
+        mono_has_sret = 1
+        mono_actual_ret_ty = wl_void_type(self.context)
+        mono_actual_params.push(wl_ptr_type(self.context))
+    for mpi in 0..param_count:
+        let source_ty = mono_param_types.get(mpi as i64)
+        if self.internal_abi_needs_indirect_param(source_ty):
+            mono_actual_params.push(wl_ptr_type(self.context))
+            mono_byval_mask = mono_byval_mask | ((1 as i64) << (mpi as u32))
+            mono_byval_types.push(source_ty)
+            mono_direct_types.push(0)
+        else:
+            mono_actual_params.push(source_ty)
+            mono_byval_types.push(0)
+            mono_direct_types.push(0)
+
+    let mono_ft = wl_function_type(mono_actual_ret_ty, vec_data_i64(&mono_actual_params), mono_actual_params.len() as i32, 0)
     let mono_fn = wl_add_function(self.llmod, mangled, mono_ft)
-    self.apply_noalias_param_attrs(mono_fn, param_start, param_count)
+    if mono_has_sret != 0:
+        wl_add_sret_attr(self.context, mono_fn, 0, mono_ret_ty)
+    if mono_has_sret != 0 or mono_byval_mask != 0:
+        self.record_c_abi_transform(mono_sym, mono_has_sret, mono_ret_ty, mono_byval_mask, mono_byval_types, 0, mono_direct_types, 0)
+    self.apply_noalias_param_attrs_with_offset(mono_fn, param_start, param_count, if mono_has_sret != 0: 1 else: 0)
     self.fn_values.insert(mono_sym, mono_fn)
     self.fn_fn_types.insert(mono_sym, mono_ft)
     if has_ref_self:
@@ -4635,8 +4815,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
         call_args.push(obj)
     for ai in 0..arg_count:
         call_args.push(pre_args.get(ai as i64))
-    let coerced = self.coerce_call_args_for_fn_value(mono_sym, mono_fn, args_start, 1, call_args, arg_count + 1, "method " ++ mangled, call_node)
-    wl_build_call(self.builder, mono_ft, mono_fn, vec_data_i64(&coerced), arg_count + 1)
+    self.build_call_fn_value(mono_sym, mono_fn, mono_ft, args_start, 1, call_args, arg_count + 1, "method " ++ mangled, call_node)
 
 fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: i32, method_name: str, decl: i32, args_start: i32, arg_count: i32, call_node: i32, pre_args: Vec[i64]) -> i64:
     let tp_start_opt = self.mono_struct_tp_starts.get(mono_type_sym)
@@ -4654,8 +4833,7 @@ fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: 
     let cached_fv = self.fn_values.get(mono_sym)
     let cached_ft = self.fn_fn_types.get(mono_sym)
     if cached_fv.is_some() and cached_ft.is_some():
-        let coerced = self.coerce_call_args_for_fn_value(mono_sym, cached_fv.unwrap() as i64, args_start, 0, pre_args, arg_count, "method " ++ mangled, call_node)
-        return wl_build_call(self.builder, cached_ft.unwrap() as i64, cached_fv.unwrap() as i64, vec_data_i64(&coerced), arg_count)
+        return self.build_call_fn_value(mono_sym, cached_fv.unwrap() as i64, cached_ft.unwrap() as i64, args_start, 0, pre_args, arg_count, "method " ++ mangled, call_node)
 
     let saved_bind_syms = self.type_binding_syms
     let saved_bind_tys = self.type_binding_types
@@ -4690,9 +4868,35 @@ fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: 
     let mono_ret_ty_raw = self.resolve_type(ret_type_node)
     let mono_ret_ty = if mono_ret_ty_raw != 0: mono_ret_ty_raw else: self.type_fallback()
 
-    let mono_ft = wl_function_type(mono_ret_ty, vec_data_i64(&mono_param_types), param_count, 0)
+    var mono_actual_ret_ty = mono_ret_ty
+    var mono_has_sret = 0
+    var mono_byval_mask: i64 = 0
+    let mono_byval_types: Vec[i64] = Vec.new()
+    let mono_direct_types: Vec[i64] = Vec.new()
+    let mono_actual_params: Vec[i64] = Vec.new()
+    if self.internal_abi_needs_sret(mono_ret_ty):
+        mono_has_sret = 1
+        mono_actual_ret_ty = wl_void_type(self.context)
+        mono_actual_params.push(wl_ptr_type(self.context))
+    for mpi in 0..param_count:
+        let source_ty = mono_param_types.get(mpi as i64)
+        if self.internal_abi_needs_indirect_param(source_ty):
+            mono_actual_params.push(wl_ptr_type(self.context))
+            mono_byval_mask = mono_byval_mask | ((1 as i64) << (mpi as u32))
+            mono_byval_types.push(source_ty)
+            mono_direct_types.push(0)
+        else:
+            mono_actual_params.push(source_ty)
+            mono_byval_types.push(0)
+            mono_direct_types.push(0)
+
+    let mono_ft = wl_function_type(mono_actual_ret_ty, vec_data_i64(&mono_actual_params), mono_actual_params.len() as i32, 0)
     let mono_fn = wl_add_function(self.llmod, mangled, mono_ft)
-    self.apply_noalias_param_attrs(mono_fn, param_start, param_count)
+    if mono_has_sret != 0:
+        wl_add_sret_attr(self.context, mono_fn, 0, mono_ret_ty)
+    if mono_has_sret != 0 or mono_byval_mask != 0:
+        self.record_c_abi_transform(mono_sym, mono_has_sret, mono_ret_ty, mono_byval_mask, mono_byval_types, 0, mono_direct_types, 0)
+    self.apply_noalias_param_attrs_with_offset(mono_fn, param_start, param_count, if mono_has_sret != 0: 1 else: 0)
     self.fn_values.insert(mono_sym, mono_fn)
     self.fn_fn_types.insert(mono_sym, mono_ft)
 
@@ -4740,15 +4944,14 @@ fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: 
     self.type_bindings_len = saved_bind_len
     self.current_method_owner_sym = saved_owner
 
-    let coerced = self.coerce_call_args_for_fn_value(mono_sym, mono_fn, args_start, 0, pre_args, arg_count, "method " ++ mangled, call_node)
-    wl_build_call(self.builder, mono_ft, mono_fn, vec_data_i64(&coerced), arg_count)
+    self.build_call_fn_value(mono_sym, mono_fn, mono_ft, args_start, 0, pre_args, arg_count, "method " ++ mangled, call_node)
 
 // ── Build Option Some/None ────────────────────────────────────────
 
 fn Codegen.build_option_some(self: Codegen, payload: i64, opt_type: i64) -> i64:
     if wl_get_type_kind(opt_type) == wl_pointer_type_kind():
         return self.coerce_value_to_type(payload, opt_type)
-    let alloca = wl_build_alloca(self.builder, opt_type)
+    let alloca = self.create_entry_alloca(opt_type)
     // Fully initialize to avoid undef/poison in padding bytes.
     wl_build_store(self.builder, self.build_default_value(opt_type), alloca)
     // Store tag = 0 (Some)
@@ -4766,14 +4969,14 @@ fn Codegen.build_option_some(self: Codegen, payload: i64, opt_type: i64) -> i64:
 fn Codegen.build_option_none(self: Codegen, opt_type: i64) -> i64:
     if wl_get_type_kind(opt_type) == wl_pointer_type_kind():
         return wl_const_null(opt_type)
-    let alloca = wl_build_alloca(self.builder, opt_type)
+    let alloca = self.create_entry_alloca(opt_type)
     wl_build_store(self.builder, self.build_default_value(opt_type), alloca)
     let tag_ptr = wl_build_struct_gep(self.builder, opt_type, alloca, 0)
     wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 1, 0), tag_ptr)
     wl_build_load(self.builder, opt_type, alloca)
 
 fn Codegen.build_result_ok(self: Codegen, val: i64, res_type: i64) -> i64:
-    let alloca = wl_build_alloca(self.builder, res_type)
+    let alloca = self.create_entry_alloca(res_type)
     wl_build_store(self.builder, self.build_default_value(res_type), alloca)
     let tag_ptr = wl_build_struct_gep(self.builder, res_type, alloca, 0)
     wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 0, 0), tag_ptr)
@@ -4785,7 +4988,7 @@ fn Codegen.build_result_ok(self: Codegen, val: i64, res_type: i64) -> i64:
     wl_build_load(self.builder, res_type, alloca)
 
 fn Codegen.build_result_err(self: Codegen, val: i64, res_type: i64) -> i64:
-    let alloca = wl_build_alloca(self.builder, res_type)
+    let alloca = self.create_entry_alloca(res_type)
     wl_build_store(self.builder, self.build_default_value(res_type), alloca)
     let tag_ptr = wl_build_struct_gep(self.builder, res_type, alloca, 0)
     wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), 1, 0), tag_ptr)
@@ -4806,7 +5009,7 @@ fn Codegen.extract_result_payload(self: Codegen, recv: i64, payload_ty: i64) -> 
         return self.build_default_value(payload_ty)
     if wl_count_struct_elem_types(recv_ty) <= 1:
         return self.build_default_value(payload_ty)
-    let alloca = wl_build_alloca(self.builder, recv_ty)
+    let alloca = self.create_entry_alloca(recv_ty)
     wl_build_store(self.builder, recv, alloca)
     let payload_ptr = wl_build_struct_gep(self.builder, recv_ty, alloca, 1)
     let cast_ptr = wl_build_bitcast(self.builder, payload_ptr, wl_ptr_type(self.context))

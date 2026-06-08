@@ -935,7 +935,7 @@ fn AstPool.int_literal_expr_i64(self: AstPool, node: i32) -> ExactIntI64:
 
 fn AstPool.int_literal_exact_expr(self: AstPool, node: i32) -> ExactIntExpr:
     if node == 0:
-        return exact_int_expr_invalid()
+        return ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
     let kind = self.kind(node)
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_CAST:
         return self.int_literal_exact_expr(self.get_data0(node))
@@ -943,32 +943,32 @@ fn AstPool.int_literal_exact_expr(self: AstPool, node: i32) -> ExactIntExpr:
         let inner = self.int_literal_exact_expr(self.get_data1(node))
         if inner.ok == 0 or inner.overflow != 0:
             return inner
-        return exact_int_expr_value(inner.lo, inner.hi, if inner.negative != 0: 0 else: 1)
+        return ExactIntExpr { ok: 1, overflow: 0, negative: if inner.negative != 0: 0 else: 1, lo: inner.lo, hi: inner.hi }
     if kind != NodeKind.NK_INT_LIT:
-        return exact_int_expr_invalid()
+        return ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
     if self.has_int_literal_exact(node):
         let parsed = self.int_literal_exact_value(node)
         return ExactIntExpr { ok: parsed.ok, overflow: parsed.overflow, negative: 0, lo: parsed.lo, hi: parsed.hi }
     let raw = self.int_lit_value(node)
     if raw < 0:
-        return exact_int_expr_invalid()
-    exact_int_expr_value(raw, 0, 0)
+        return ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
+    ExactIntExpr { ok: 1, overflow: 0, negative: 0, lo: raw, hi: 0 }
 
 fn AstPool.int_literal_expr_bits(self: AstPool, node: i32, bits: i32, signed: i32) -> ExactIntValue:
     let expr = self.int_literal_exact_expr(node)
     if expr.ok == 0 or expr.overflow != 0:
-        return exact_int_invalid()
-    let mag = exact_int_expr_magnitude(expr)
+        return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+    let mag = ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }
     if expr.negative == 0:
         if signed != 0:
             if not exact_int_fits_signed_magnitude_bits(mag, bits):
-                return exact_int_invalid()
+                return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
         else:
             if not exact_int_fits_unsigned_bits(mag, bits):
-                return exact_int_invalid()
+                return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
         return mag
     if signed == 0 or not exact_int_fits_signed_negative_bits(mag, bits):
-        return exact_int_invalid()
+        return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
     exact_int_twos_complement_bits(mag, bits)
 
 fn AstPool.has_comptime_nodes(self: AstPool) -> bool:

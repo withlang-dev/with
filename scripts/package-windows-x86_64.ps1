@@ -7,17 +7,16 @@
 # PowerShell"). Run from the x64 Developer PowerShell for VS so that dumpbin.exe
 # is on PATH for the dependency gate.
 #
-# Not yet run end-to-end: the Windows build system / stage chain are still in
-# progress, so no native release with.exe exists at out\bin\with.exe yet. Written
-# against docs/with-bootstrap-runbook.md (Failure Policy, Release Handoff).
+# Written against docs/with-bootstrap-runbook.md (Failure Policy, Release
+# Handoff). The normal native stage chain writes the release compiler under
+# out\release\bin.
 #
 # Windows specifics vs the Unix scripts:
 #   - Dependency gate uses `dumpbin /DEPENDENTS` (the project's documented Windows
 #     "zero dynamic deps" check) in place of ldd / otool -L.
-#   - The release asset is `with-windows-x86_64` (extensionless, matching
-#     build.w release_asset_for_host() and the Linux/Darwin assets). Windows can't
-#     execute an extensionless file, so the binary is staged as .exe to run the
-#     version gate, then renamed to the asset name.
+#   - The release asset is `with-windows-x86_64.exe`, because the downloaded
+#     Windows compiler should be directly executable from File Explorer,
+#     PowerShell, cmd.exe, and tools that infer executability from PATHEXT.
 #   - The Unix `nm -g | clang_createIndex` positive symbol gate is not ported:
 #     link.exe/lld-link don't emit a COFF symbol table for internal statics into
 #     the final .exe, so llvm-nm can't see clang_createIndex there. The negative
@@ -26,9 +25,9 @@
 
 $ErrorActionPreference = "Stop"
 
-$asset = "with-windows-x86_64"
+$asset = "with-windows-x86_64.exe"
 # Default assumes the normal `with build` release output; override if it differs.
-$compiler = if ($env:WITH_RELEASE_COMPILER) { $env:WITH_RELEASE_COMPILER } else { "out\bin\with.exe" }
+$compiler = if ($env:WITH_RELEASE_COMPILER) { $env:WITH_RELEASE_COMPILER } else { "out\release\bin\with.exe" }
 $releaseDir = if ($env:WITH_RELEASE_DIR) { $env:WITH_RELEASE_DIR } else { "out\release" }
 
 $version = $env:WITH_VERSION
@@ -57,9 +56,7 @@ if (-not (Test-Path -PathType Leaf $compiler)) {
 
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 $output = Join-Path $releaseDir $asset
-# Windows cannot execute an extensionless file, so stage as .exe to run the
-# version gate, then rename to the (extensionless) asset name below.
-$staged = "$output.exe"
+$staged = $output
 Copy-Item -Path $compiler -Destination $staged -Force
 
 $versionOutput = (& $staged version | Out-String).Trim()
@@ -83,10 +80,6 @@ if ($dependents | Select-String -Pattern 'clang|LLVM|zlib|libxml2|zstd|MSVCP|VCR
 # The Unix scripts copy scripts/install.sh into the release dir here. install.sh
 # selects an asset by `uname` and has no Windows arm, so shipping it unmodified
 # would fail for Windows users. A Windows installer is a separate follow-up.
-
-# Name the asset per build.w release_asset_for_host() (extensionless, like the
-# Linux/Darwin assets); the installer/seed downloader adds .exe on the target.
-Move-Item -Path $staged -Destination $output -Force
 
 $hash = (Get-FileHash -Algorithm SHA256 $output).Hash.ToLowerInvariant()
 Write-Output "$hash  $output"

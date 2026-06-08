@@ -228,6 +228,9 @@ static resource the compiler needs:
 - `lib/libclang.a`, `lib/libLLVM*.a`, `lib/liblld*.a` — the archives.
 - `lib/clang/<v>/include/` — clang's **builtin headers** (`stddef.h`,
   `stdarg.h`, `stdint.h`, …) that `c_import` needs to parse any C header.
+- `bin/clang` and `bin/clang++` — the With-owned C/C++ drivers used by
+  emitted-C bootstrap. Bootstrap must not fall back to GCC or MSVC `cl.exe`.
+- `bin/lld` plus driver symlinks and `bin/llvm-nm` — linker and symbol tools.
 
 The release binary **embeds** these, the same way it already embeds the
 stdlib (`build/runtime.w` → `EmbeddedStdlibData.w`, served via the
@@ -261,6 +264,31 @@ invariant exists to forbid, and a clean release host won't have it.
 > remains an explicit override-only escape hatch. Remaining #312 items are
 > about the *host's own* libc, not LLVM-we-built: `get_sdk_path()` shells to
 > `xcrun` for the macOS sysroot, and macro extraction shells to `cc`.
+
+### Clang is the only C compiler for bootstrap/release C
+
+All platform bootstrap and release flows that compile C use **Clang**:
+macOS, Linux, and Windows. Do not use GCC on Linux, and do not use MSVC
+`cl.exe` on Windows. This applies to emitted-C bootstrap compilers,
+emit-C fixpoint binaries, C smoke tests, generated bridge C, and release
+packaging checks that compile C.
+
+Reason: the emitted-C bootstrap is a compiler artifact, not a portable
+"try any C compiler" sample. It must be validated through one C frontend
+and one diagnostic/ABI model across all hosts. Mixing GCC, MSVC, and Clang
+turns compiler bootstrap failures into host-compiler dialect differences
+and hides real With codegen bugs.
+
+Allowed platform C drivers:
+
+- macOS: `clang` with the Apple SDK/sysroot and LLVM/lld inputs required by
+  the runbook.
+- Linux: `clang` with the With-owned static LLVM/lld SDK and host glibc CRT
+  inputs. If only `gcc` is installed, install/provision Clang; do not switch
+  the bootstrap to GCC.
+- Windows: `clang -target x86_64-pc-windows-msvc` plus `lld-link`; Visual
+  Studio Build Tools/Windows SDK may provide headers, libraries, and CRT
+  import/static libraries, but `cl.exe` is not the compiler.
 
 ---
 
@@ -437,12 +465,12 @@ old_string doesn't match due to stale context.
 
 ### Quick repro
 ```
-time ./out/bin/with-stage2 check src/main.w
+time ./out/stage/bin/with-stage2 check src/main.w
 ```
 
 ### LLDB (preferred)
 ```
-lldb -- ./out/bin/with-stage2 check src/main.w
+lldb -- ./out/stage/bin/with-stage2 check src/main.w
 (lldb) run
 (lldb) bt all
 ```
@@ -450,12 +478,12 @@ lldb -- ./out/bin/with-stage2 check src/main.w
 ### Heap corruption
 ```
 MallocScribble=1 MallocGuardEdges=1 \
-./out/bin/with-stage2 check src/main.w
+./out/stage/bin/with-stage2 check src/main.w
 ```
 
 ### Leak detection
 ```
-leaks --atExit -- ./out/bin/with-stage2 check src/main.w
+leaks --atExit -- ./out/stage/bin/with-stage2 check src/main.w
 ```
 
 If stacks are nonsense, suspect seed corruption. Replace the
@@ -471,7 +499,9 @@ lib/std/          standard library (.w)
 rt/               runtime interface + platform backends (.w, .s)
 runtime/          legacy C runtime (helpers.c — being migrated out)
 test/             test suite
-out/bin/          compiler binaries (build artifacts)
+out/bootstrap/bin/ bootstrap stage binaries (build artifacts)
+out/stage/bin/   intermediate stage binaries (build artifacts)
+out/release/bin/ release compiler binary (build artifact)
 out/lib/          compiled runtime objects (build artifacts)
 docs/             specifications
 ```
@@ -572,5 +602,5 @@ Each commit must independently pass `with build :fixpoint`.
 9. with build :update-seed (local bootstrap seed is now updated)
 
 ### If bootstrap is broken, don't guess
-Inspect `WITH`, `src/main`, `out/bin/with`, the stage binaries, and runtime
-objects directly before making changes.
+Inspect `WITH`, `src/main`, `out/release/bin/with`, the stage binaries, and
+runtime objects directly before making changes.

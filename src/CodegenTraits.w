@@ -518,7 +518,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
         let p_type_node = self.pool.fn_param_type(param_start, pi)
         let p_val = wl_get_param(function, pi)
         let p_ty = wl_type_of(p_val)
-        let p_alloca = wl_build_alloca(self.builder, p_ty)
+        let p_alloca = self.create_entry_alloca(p_ty)
         wl_build_store(self.builder, p_val, p_alloca)
         self.record_local(p_name, p_alloca, p_ty, 1)
 

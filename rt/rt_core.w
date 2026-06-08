@@ -2205,7 +2205,7 @@ fn fs_path_is_dir_c(path: *const u8) -> bool:
 
 fn fs_mkdir_component(path: *const u8, mode: i32) -> i32:
     let rc = rt_mkdir(path, mode)
-    if rc == -17 and fs_path_is_dir_c(path):
+    if rc != 0 and fs_path_is_dir_c(path):
         return 0
     rc
 
@@ -2249,9 +2249,8 @@ pub fn with_fs_write_file(path: str, data: str) -> i32:
 
 pub fn with_fs_file_exists(path: str) -> i32:
     let cpath = str_to_cstr(path)
-    let fd = rt_open(cpath, 0, 0)
-    if fd < 0: return 0
-    let _ = rt_close(fd)
+    if rt_access(cpath, 0) != 0:
+        return 0
     1
 
 pub fn with_fs_is_dir(path: str) -> i32:
