@@ -323,6 +323,13 @@ doesn't exist. Never rely on memory.
 Don't batch unrelated changes. Small changes make debugging
 possible.
 
+### Commit authorship
+
+Eric Hartford <eric@quixi.ai> is the sole author of this repository.
+Never add an AI assistant, model, tool, or vendor as a commit author,
+co-author, trailer, or credit line. Do not use `Co-Authored-By` for AI
+assistance.
+
 ### Rebuild and verify
 
 After each change:

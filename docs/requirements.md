@@ -335,9 +335,9 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: **Implicit contexts** — `with context(default_device()): sin(x)` wires `implicit` parameters from lexical scope. (§7.3a)
   - Source: `§1.7 L209-L210`
   - Related spec refs: §7.3a
-- `1.7.1.17` **C functions just call — c_import functions are callable directly. No unsafe {} wrap...**
-  - Requirement: **C functions just call** — `c_import` functions are callable directly. No `unsafe {}` wrapper on every FFI call. (§16.1)
-  - Source: `§1.7 L211-L212`
+- `1.7.1.17` **C functions just call when modeled.**
+  - Requirement: **C functions just call when modeled** — `c_import` bindings are callable directly when the importer has modeled the contract. No blanket `unsafe {}` wrapper around C interop. (§16.1)
+  - Source: `§1.7 L212-L214`
   - Related spec refs: §16.1
 - `1.7.1.18` **Postfix .await — chains naturally with ? and |> (§14.5)**
   - Requirement: **Postfix `.await`** — chains naturally with `?` and `|>` (§14.5)
@@ -7695,9 +7695,9 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: This includes:
   - Source: `§16.1 L7403-L7404`
   - Related spec refs: none
-- `16.1.1.8` **Functions → callable directly (the c_import is the opt-in)**
-  - Requirement: **Functions** → callable directly (the `c_import` is the opt-in)
-  - Source: `§16.1 L7406`
+- `16.1.1.8` **Functions → generated bindings; modeled-safe bindings are callable directly.**
+  - Requirement: **Functions** → generated bindings; modeled-safe bindings are callable directly, raw/unmodeled ABI bindings stay explicit.
+  - Source: `§16.1 L7406-L7407`
   - Related spec refs: none
 - `16.1.1.9` **Structs → @[repr(C)] struct types**
   - Requirement: **Structs** → `@[repr(C)]` struct types
@@ -7720,32 +7720,32 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Source: `§16.1 L7411`
   - Related spec refs: §16.2
 - `16.1.1.14` **Why no unsafe on every call?**
-  - Requirement: **Why no `unsafe` on every call?**
-  - Source: `§16.1 L7425-L7430`
+  - Requirement: The unsafe boundary is not "foreign call"; it is an unmodeled memory, ownership, or lifetime contract.
+  - Source: `§16.1 L7426-L7431`
   - Related spec refs: none
-- `16.1.1.15` **The c_import itself is the opt-in.**
-  - Requirement: The `c_import` itself is the opt-in.
-  - Source: `§16.1 L7425-L7430`
+- `16.1.1.15` **c_import is the opt-in for importing a C library.**
+  - Requirement: `c_import` is the opt-in for importing the C library, and when the importer can model a function's contract sufficiently, the generated binding is an ordinary With call.
+  - Source: `§16.1 L7426-L7431`
   - Related spec refs: none
-- `16.1.1.16` **You imported a C library — you know you're calling C code.**
-  - Requirement: You imported a C library — you know you're calling C code.
-  - Source: `§16.1 L7425-L7430`
+- `16.1.1.16` **The importer must model or preserve the raw ABI honestly.**
+  - Requirement: The importer must import the raw ABI accurately, model every contract it can infer, import, or prove into a safe With surface, and refuse to present unmodeled danger as ordinary safe code.
+  - Source: `§16.1 L7433-L7439`
   - Related spec refs: none
-- `16.1.1.17` **Wrapping every call in unsafe {} is ceremony without safety.**
-  - Requirement: Wrapping every call in `unsafe {}` is ceremony without safety.
-  - Source: `§16.1 L7425-L7430`
+- `16.1.1.17` **Wrapping modeled calls in unsafe {} is ceremony without safety.**
+  - Requirement: Wrapping modeled `c_import` calls in `unsafe {}` is ceremony without safety.
+  - Source: `§16.1 L7426-L7431`
   - Related spec refs: none
-- `16.1.1.18` **The real safety boundary is the With wrapper that the stdlib provides (e.g., Databa...**
-  - Requirement: The real safety boundary is the **With wrapper** that the stdlib provides (e.g., `Database.open()` wraps `sqlite3_open` with proper error handling and resource management).
-  - Source: `§16.1 L7425-L7430`
+- `16.1.1.18` **Modeled c_import surfaces can be directly callable.**
+  - Requirement: Value parameters, value returns, safe handle wrappers, slice parameters for buffers, `Option` for nullable returns, owned resource wrappers with `Drop`, and `CStr`/`CString` for C string contracts are examples of modeled surfaces that can be directly callable.
+  - Source: `§16.1 L7433-L7439`
   - Related spec refs: none
-- `16.1.1.19` **unsafe is still required for raw pointer operations (dereferencing *mut T, pointer...**
-  - Requirement: `unsafe` is still required for raw pointer operations (dereferencing `*mut T`, pointer arithmetic, transmutes).
-  - Source: `§16.1 L7432-L7434`
+- `16.1.1.19` **unsafe is still required for raw pointer operations and raw ABI calls.**
+  - Requirement: `unsafe` is still required for raw pointer operations (dereferencing `*mut T`, raw pointer indexing, transmutes) and for manual or unmodeled raw ABI calls.
+  - Source: `§16.1 L7448-L7451`
   - Related spec refs: none
-- `16.1.1.20` **But calling an imported C function that takes normal arguments is just a function c...**
-  - Requirement: But calling an imported C function that takes normal arguments is just a function call.
-  - Source: `§16.1 L7432-L7434`
+- `16.1.1.20` **Calling a modeled c_import binding with ordinary value arguments is just a function call.**
+  - Requirement: Calling a modeled `c_import` binding with ordinary value arguments is just a function call.
+  - Source: `§16.1 L7448-L7451`
   - Related spec refs: none
 - `16.1.1.21` **Null-safe pointer conversion: Raw pointers from C are inherently nullable.**
   - Requirement: **Null-safe pointer conversion:** Raw pointers from C are inherently nullable.
@@ -7956,9 +7956,9 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: For cases where `c_import` is insufficient or when fine-grained control is needed, manual declarations are supported:
   - Source: `§16.3 L7628-L7629`
   - Related spec refs: none
-- `16.3.1.2` **All extern "C" calls require unsafe.**
-  - Requirement: All `extern "C"` calls require `unsafe`.
-  - Source: `§16.3 L7638`
+- `16.3.1.2` **Manual extern "C" calls require unsafe unless wrapped safely.**
+  - Requirement: Manual `extern "C"` declarations are raw ABI declarations. Calls to manual `extern "C"` functions require `unsafe` unless they are wrapped by a safe With API that models the memory, ownership, and lifetime contract.
+  - Source: `§16.3 L7658-L7661`
   - Related spec refs: none
 
 ### §16.3b External Variables
@@ -8358,9 +8358,9 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: Raw pointer indexing (`p[i]` for read, `p[i] = v` for write)
   - Source: `§16.11 L7930`
   - Related spec refs: none
-- `16.11.1.6` **Calls to extern functions**
-  - Requirement: Calls to `extern` functions
-  - Source: `§16.11 L7931`
+- `16.11.1.6` **Calls to manual extern functions or raw/unmodeled ABI bindings**
+  - Requirement: Calls to manual `extern` functions or raw/unmodeled ABI bindings
+  - Source: `§16.11 L7954`
   - Related spec refs: none
 - `16.11.1.7` **Other operations explicitly marked as unsafe in their definition**
   - Requirement: Other operations explicitly marked as unsafe in their definition
@@ -9745,9 +9745,9 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: Raw pointer indexing
   - Source: `§19.2 L9141`
   - Related spec refs: none
-- `19.2.1.3` **FFI function calls**
-  - Requirement: FFI function calls
-  - Source: `§19.2 L9142`
+- `19.2.1.3` **Manual extern calls and raw/unmodeled ABI calls**
+  - Requirement: Manual `extern` calls and raw/unmodeled ABI calls
+  - Source: `§19.2 L9165`
   - Related spec refs: none
 - `19.2.1.4` **Inline assembly (asm expressions)**
   - Requirement: Inline assembly (`asm` expressions)
@@ -9822,9 +9822,9 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: False positives dilute that signal.
   - Source: `§19.4 L9214-L9217`
   - Related spec refs: none
-- `19.4.1.4` **If the block contains no raw pointer dereference, no FFI call, and no unsafe fn cal...**
-  - Requirement: If the block contains no raw pointer dereference, no FFI call, and no `unsafe fn` call, the compiler rejects it.
-  - Source: `§19.4 L9214-L9217`
+- `19.4.1.4` **If the block contains no raw pointer dereference, no raw ABI call, and no unsafe fn...**
+  - Requirement: If the block contains no raw pointer dereference, no raw ABI call, and no `unsafe fn` call, the compiler rejects it.
+  - Source: `§19.4 L9237-L9240`
   - Related spec refs: none
 
 ## 20. Performance Guarantees

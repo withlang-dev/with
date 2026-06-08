@@ -209,8 +209,9 @@ With prioritizes joy. The common case should be effortless:
   compiler knows it's a guard from the type. No keyword. (§7.1)
 - **Implicit contexts** — `with context(default_device()): sin(x)`
   wires `implicit` parameters from lexical scope. (§7.3a)
-- **C functions just call** — `c_import` functions are callable
-  directly. No `unsafe {}` wrapper on every FFI call. (§16.1)
+- **C functions just call when modeled** — `c_import` bindings
+  are callable directly when the importer has modeled the contract.
+  No blanket `unsafe {}` wrapper around C interop. (§16.1)
 - **Postfix `.await`** — chains naturally with `?` and `|>` (§14.5)
 - **Pipeline operator** — `data |> filter(it.active) |> map(it.name)` (§12)
 - **Named arguments** — `connect("localhost", port: 8080)` can mix
@@ -7402,7 +7403,8 @@ use c_import("openssl/ssl.h", link: "ssl", "crypto")
 `c_import` reads a C header file at compile time, parses it, and
 makes all declarations available as With symbols. This includes:
 
-- **Functions** → callable directly (the `c_import` is the opt-in)
+- **Functions** → generated bindings; modeled-safe bindings are
+  callable directly, raw/unmodeled ABI bindings stay explicit
 - **Structs** → `@[repr(C)]` struct types
 - **Enums** → integer constants or With enums
 - **Typedefs** → type aliases
@@ -7413,32 +7415,49 @@ makes all declarations available as With symbols. This includes:
 use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:
-    var db: *mut sqlite3 = null
-    let rc = sqlite3_open(":memory:", &raw mut db)   // direct call
-    if rc != SQLITE_OK:
-        panic("Failed to open database")
-    defer sqlite3_close(db)
-    // ... use sqlite3 API directly
+    let threadsafe = sqlite3_threadsafe()   // modeled value call
+    if threadsafe == 0:
+        panic("SQLite must be built with mutex support")
+    // Higher-level wrappers model handles, ownership, errors, and cleanup.
 ```
 
-**Why no `unsafe` on every call?** The `c_import` itself is the
-opt-in. You imported a C library — you know you're calling C code.
-Wrapping every call in `unsafe {}` is ceremony without safety. The
-real safety boundary is the **With wrapper** that the stdlib
-provides (e.g., `Database.open()` wraps `sqlite3_open` with proper
-error handling and resource management).
+**Why no `unsafe` on every call?** The unsafe boundary is not
+"foreign call." It is an unmodeled memory, ownership, or lifetime
+contract. `c_import` is the opt-in for importing the C library, and
+when the importer can model a function's contract sufficiently, the
+generated binding is an ordinary With call. Wrapping those calls in
+`unsafe {}` is ceremony without safety.
+
+The importer's job is to import the raw ABI accurately, model every
+contract it can infer, import, or prove into a safe With surface, and
+refuse to present unmodeled danger as ordinary safe code. Value
+parameters, value returns, safe handle wrappers, slice parameters for
+buffers, `Option` for nullable returns, owned resource wrappers with
+`Drop`, and `CStr`/`CString` for C string contracts are examples of
+modeled surfaces that can be directly callable.
+
+For APIs such as `memcpy`, `strcpy`, `free`, out-parameter fills,
+borrowed pointer returns, ownership transfers, mutable buffers, or
+other contracts the importer cannot model, the unsafe effect may be
+at the call boundary. The answer is still not "all C calls are
+unsafe." The answer is: generate a safe wrapper when the contract is
+known, or keep the raw ABI surface explicit when it is not.
 
 `unsafe` is still required for raw pointer operations (dereferencing
-`*mut T`, pointer arithmetic, transmutes). But calling an imported
-C function that takes normal arguments is just a function call.
+`*mut T`, raw pointer indexing, transmutes) and for manual or
+unmodeled raw ABI calls. Calling a modeled `c_import` binding with
+ordinary value arguments is just a function call.
 
 **Raw pointer operations still need `unsafe`:**
 
 ```
 use c_import("my_lib.h")
 
-// Direct call — no unsafe needed
-let handle = my_lib_init()
+// Modeled value call — no unsafe needed
+let version = my_lib_version()
+
+// Raw ABI call — unsafe may be needed at the call boundary
+let handle = unsafe { my_lib_raw_handle() }
 
 // Pointer dereference — unsafe required
 let value = unsafe { *handle }
@@ -7634,7 +7653,10 @@ extern "C" {
 }
 ```
 
-All `extern "C"` calls require `unsafe`.
+Manual `extern "C"` declarations are raw ABI declarations. Calls to
+manual `extern "C"` functions require `unsafe` unless they are wrapped
+by a safe With API that models the memory, ownership, and lifetime
+contract.
 
 ### 16.3b External Variables
 
@@ -7927,7 +7949,7 @@ The operations that require an unsafe context are:
 
 - Raw pointer dereference (`*p` for read or write)
 - Raw pointer indexing (`p[i]` for read, `p[i] = v` for write)
-- Calls to `extern` functions
+- Calls to manual `extern` functions or raw/unmodeled ABI bindings
 - Other operations explicitly marked as unsafe in their definition
 
 For the common raw-memory access case, `unsafe` may be used as a
@@ -9138,7 +9160,7 @@ All code is safe unless explicitly `unsafe`.
 
 - Raw pointer dereference
 - Raw pointer indexing
-- FFI function calls
+- Manual `extern` calls and raw/unmodeled ABI calls
 - Inline assembly (`asm` expressions)
 - Intrusive / self-referential structures
 - Manual memory management beyond allocators
@@ -9212,7 +9234,7 @@ unsafe {
 
 Every `unsafe` block in a codebase is a place reviewers must
 scrutinize. False positives dilute that signal. If the block contains
-no raw pointer dereference, no FFI call, and no `unsafe fn` call,
+no raw pointer dereference, no raw ABI call, and no `unsafe fn` call,
 the compiler rejects it.
 
 ---
