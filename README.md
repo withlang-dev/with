@@ -42,19 +42,37 @@ let config = with Config.default() as mut c:
 
 ## Quick Start
 
-Install the latest Darwin arm64 binary:
+Install the latest release on macOS arm64 or Linux x86_64:
 
 ```sh
 curl -fsSL https://github.com/withlang-dev/with/releases/latest/download/install.sh | sh
 ```
 
-Inspect the installer before running it:
+Install the latest release on Windows x86_64 from PowerShell:
+
+```powershell
+irm https://github.com/withlang-dev/with/releases/latest/download/install.ps1 | iex
+```
+
+Or from `cmd.exe`:
+
+```bat
+curl.exe -L -o install.cmd https://github.com/withlang-dev/with/releases/latest/download/install.cmd
+install.cmd
+```
+
+Inspect the installers before running them:
 
 ```sh
 curl -fsSL https://github.com/withlang-dev/with/releases/latest/download/install.sh | less
 ```
 
-The installer writes `with` to `~/.local/bin` by default. Set
+```powershell
+irm https://github.com/withlang-dev/with/releases/latest/download/install.ps1
+```
+
+The Unix installer writes `with` to `~/.local/bin` by default. The Windows
+installer writes `with.exe` to `%USERPROFILE%\.local\bin` by default. Set
 `WITH_INSTALL_DIR` to choose another directory.
 
 Make sure the install directory is on your PATH, then run:
