@@ -1,6 +1,6 @@
 # Windows Bootstrap Status
 
-Last updated: 2026-06-08 00:12 -0700.
+Last updated: 2026-06-08 00:29 -0700.
 
 ## Anti-Loop Summary
 
@@ -85,14 +85,14 @@ Current blocker:
     `build`, `:fixpoint`, and `:emit-c-fixpoint` all completed. Rebuilt
     release compiler is `out/release/bin/with`, 117 MiB.
   - Windows SDK build order `build-ninja.ps1`, `build-cmake.ps1`,
-    `build-static-llvm.ps1`: BLOCKED once, source patch in progress. SDK Ninja
-    and SDK CMake built successfully with `clang-cl`/`lld-link`; LLVM configure
-    then selected external `ml64` for MASM assembly and failed at
-    `blake3_sse2_x86-64_windows_msvc.asm` because `ml64` is not an SDK tool.
-    Root cause: Windows static LLVM build did not set
-    `CMAKE_ASM_MASM_COMPILER` to SDK `llvm-ml.exe`. Fix: `build-static-llvm.ps1`
-    now passes SDK `llvm-ml.exe`, package script rejects `ml64`, and docs record
-    the SDK assembler invariant.
+    `build-static-llvm.ps1`: IN PROGRESS. SDK Ninja and SDK CMake built
+    successfully with `clang-cl`/`lld-link`. LLVM failed once because CMake
+    selected external `ml64` for MASM assembly. Source fix is applied and the
+    current LLVM CMake cache verified `CMAKE_C_COMPILER=<SDK>\bin\clang-cl.exe`,
+    `CMAKE_CXX_COMPILER=<SDK>\bin\clang-cl.exe`, and
+    `CMAKE_LINKER=<SDK>\bin\lld-link.exe`, but `llvm-ml.exe` assembled x64
+    BLAKE3 MASM as 32-bit and rejected x64 registers. Fix is tightened to use
+    SDK `llvm-ml64.exe`, the x64 wrapper matching external `ml64`.
 - Known non-blocking debt: stack-budget checker still reports one frame above
   64 KiB (`max_frame: 99304`) while the Windows stage2 PE stack reserve remains
   the intended 8 MiB.

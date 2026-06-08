@@ -86,7 +86,7 @@ built with Clang:
 - Linux/macOS: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`, and
   `-fuse-ld=lld`.
 - Windows: `CMAKE_C_COMPILER=clang-cl`, `CMAKE_CXX_COMPILER=clang-cl`, and
-  `lld-link`; `CMAKE_ASM_MASM_COMPILER` must be SDK `llvm-ml`, not external
+  `lld-link`; `CMAKE_ASM_MASM_COMPILER` must be SDK `llvm-ml64`, not external
   MSVC `ml64`.
 - The SDK contains the With-owned `bin/cmake` built from source and installed
   into the same `LLVM_PREFIX`; repeat SDK production uses that CMake rather

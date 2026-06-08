@@ -22,7 +22,7 @@ Require-Tool "curl.exe"
 Require-Tool "tar.exe"
 $LLVM_BOOTSTRAP_CLANG_CL = if ($env:LLVM_BOOTSTRAP_CLANG_CL) { $env:LLVM_BOOTSTRAP_CLANG_CL } else { "clang-cl.exe" }
 $LLVM_BOOTSTRAP_LLD_LINK = if ($env:LLVM_BOOTSTRAP_LLD_LINK) { $env:LLVM_BOOTSTRAP_LLD_LINK } else { "lld-link.exe" }
-$LLVM_BOOTSTRAP_LLVM_ML = if ($env:LLVM_BOOTSTRAP_LLVM_ML) { $env:LLVM_BOOTSTRAP_LLVM_ML } else { Join-Path $INSTALL_PREFIX "bin\llvm-ml.exe" }
+$LLVM_BOOTSTRAP_LLVM_ML = if ($env:LLVM_BOOTSTRAP_LLVM_ML) { $env:LLVM_BOOTSTRAP_LLVM_ML } else { Join-Path $INSTALL_PREFIX "bin\llvm-ml64.exe" }
 $LLVM_BOOTSTRAP_MT = if ($env:LLVM_BOOTSTRAP_MT) { $env:LLVM_BOOTSTRAP_MT } else { "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\mt.exe" }
 Require-Tool $LLVM_BOOTSTRAP_CLANG_CL
 Require-Tool $LLVM_BOOTSTRAP_LLD_LINK

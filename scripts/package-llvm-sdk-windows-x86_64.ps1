@@ -44,9 +44,9 @@ if ($cacheText -notmatch "CMAKE_C_COMPILER:[^=]+=.*clang-cl(\\.exe)?" -or
     $compilerLines = ($cacheText -split "`n") | Where-Object { $_ -match "^CMAKE_(C|CXX)_COMPILER:" }
     throw "refusing to package SDK not built with clang-cl: $($compilerLines -join '; ')"
 }
-if ($cacheText -notmatch "CMAKE_ASM_MASM_COMPILER:[^=]+=.*llvm-ml(\\.exe)?") {
+if ($cacheText -notmatch "CMAKE_ASM_MASM_COMPILER:[^=]+=.*llvm-ml64(\\.exe)?") {
     $asmLines = ($cacheText -split "`n") | Where-Object { $_ -match "^CMAKE_ASM_MASM_COMPILER:" }
-    throw "refusing to package SDK not built with llvm-ml for MASM assembly: $($asmLines -join '; ')"
+    throw "refusing to package SDK not built with llvm-ml64 for x64 MASM assembly: $($asmLines -join '; ')"
 }
 
 foreach ($tool in @("clang.exe", "clang++.exe", "clang-cl.exe", "cmake.exe", "ninja.exe", "lld-link.exe", "llvm-lib.exe", "llvm-ml.exe", "llvm-ml64.exe", "llvm-nm.exe", "llvm-readobj.exe", "llvm-strip.exe")) {

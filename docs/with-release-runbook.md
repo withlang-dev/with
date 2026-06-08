@@ -47,7 +47,7 @@ Packaging scripts enforce this:
 
 - Unix SDK package: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`.
 - Windows SDK package: `CMAKE_C_COMPILER=clang-cl`,
-  `CMAKE_CXX_COMPILER=clang-cl`, `CMAKE_ASM_MASM_COMPILER=llvm-ml`.
+  `CMAKE_CXX_COMPILER=clang-cl`, `CMAKE_ASM_MASM_COMPILER=llvm-ml64`.
 - All SDK packages must include `bin/ninja` and `bin/cmake` built from source
   and installed by the bootstrap runbook. External Python/CMake may bootstrap
   those first SDK build tools, but release packaging must not publish an SDK
