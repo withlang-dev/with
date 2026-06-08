@@ -1,6 +1,6 @@
 # Windows Bootstrap Status
 
-Last updated: 2026-06-07.
+Last updated: 2026-06-08 00:35 -0700.
 
 ## Anti-Loop Summary
 
@@ -71,6 +71,30 @@ Current blocker:
   source text and embedded stdlib text to LF. Windows and Linux emitted
   `out/emit-c-test/main.c` matched byte-for-byte at SHA256
   `296ebbe9a72ef6d7b711f1e1a3eb04f33b0f9cad0012c361ccf3077ee773238f`.
+- Current SDK/release-tooling frontier: Linux LLVM SDK rebuild/package is PASS
+  from the Clang toolchain path. Windows LLVM SDK rebuild is in progress from
+  the Clang toolchain path.
+  - Linux SDK build order `build-ninja.sh`, `build-cmake.sh`,
+    `build-static-llvm.sh`: PASS.
+  - Linux SDK compiler cache: PASS, `CMAKE_C_COMPILER=/usr/bin/clang`,
+    `CMAKE_CXX_COMPILER=/usr/bin/clang++`, `CMAKE_LINKER=/usr/bin/ld.lld`.
+  - Linux SDK package: PASS,
+    `out/release/with-llvm-sdk-22.1.6-linux-x86_64.tar.zst`, 91 MiB,
+    SHA256 `f978cae85045617ce9f8e426e64bb05c667cd15d47e0e39adc541e9575b4b387`.
+  - Linux With rebuild from Clang-built SDK: PASS.
+    `build`, `:fixpoint`, and `:emit-c-fixpoint` all completed. Rebuilt
+    release compiler is `out/release/bin/with`, 117 MiB.
+  - Windows SDK build order `build-ninja.ps1`, `build-cmake.ps1`,
+    `build-static-llvm.ps1`: IN PROGRESS. SDK Ninja and SDK CMake built
+    successfully with `clang-cl`/`lld-link`. LLVM failed once because CMake
+    selected external `ml64` for MASM assembly. Source fix is applied and the
+    current LLVM CMake cache verified `CMAKE_C_COMPILER=<SDK>\bin\clang-cl.exe`,
+    `CMAKE_CXX_COMPILER=<SDK>\bin\clang-cl.exe`, and
+    `CMAKE_LINKER=<SDK>\bin\lld-link.exe`, but `llvm-ml.exe` assembled x64
+    BLAKE3 MASM as 32-bit and rejected x64 registers. Fix is tightened to use
+    SDK `llvm-ml64.exe`, the x64 wrapper matching external `ml64`. Current
+    rebuild passed the previous BLAKE3 MASM failure point and linked
+    `LLVMSupport.lib`; LLVM build/install is still in progress.
 - Known non-blocking debt: stack-budget checker still reports one frame above
   64 KiB (`max_frame: 99304`) while the Windows stage2 PE stack reserve remains
   the intended 8 MiB.
@@ -1211,3 +1235,19 @@ Completed:
 - Result: PASS. The build wrote Linux stage1, stage2, release compiler, then reported `EMIT-C OK` and `EMIT-C FIXPOINT`.
 - Current isolation state: Windows and Linux emit identical `out/emit-c-test/main.c` bytes from matching `out/gen/main.w`; Linux emit-C fixpoint passes. Any remaining failure is now Windows-side compile/link/runtime execution, not cross-host C emission.
 - Next command: rebuild Windows stage1/stage2 from current source, then run Windows direct stage3 object, `:fixpoint`, and `:emit-c-fixpoint`.
+
+
+### 2026-06-07 SDK CMake Packaging Rule
+
+- Release-tooling correction: LLVM may use CMake, but CMake and its generator
+  backend must be With-owned SDK tools after the first bootstrap. Source scripts
+  now build Ninja and CMake from pinned source into `LLVM_PREFIX/bin/`, and
+  `tools/build-static-llvm.{sh,ps1}` requires SDK CMake plus SDK Ninja for LLVM
+  configuration/build.
+- Package scripts now require and include SDK CMake plus LLVM utility tools:
+  Unix packages include `bin/ninja`, `bin/cmake`, and `bin/llvm-strip`;
+  Windows packages include `ninja.exe`, `cmake.exe`, `clang-cl.exe`, and
+  `llvm-strip.exe` in addition to the existing Clang/lld tools.
+- Classification: SDK hermeticity/policy bug, not compiler codegen. Do not
+  use host Ninja, Make, MSBuild, or a Visual Studio generator for repeat SDK
+  production.

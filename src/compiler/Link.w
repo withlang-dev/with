@@ -206,6 +206,7 @@ fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extra
     else if runtime_sysinfo_os() == "Linux":
         args.push("-no-pie")
         args.push("-Wl,--gc-sections")
+        args.push("-Wl,--icf=all")
     args.push("-o")
     args.push(bin_path)
     outputs.push(bin_path)
@@ -319,6 +320,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
     args.push("--hash-style=gnu")
     args.push("--build-id")
     args.push("--gc-sections")
+    args.push("--icf=all")
     args.push("--as-needed")
     args.push("-dynamic-linker")
     args.push(dynamic_linker)

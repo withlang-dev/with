@@ -221,16 +221,24 @@ malformed. Users reach regex through `std.regex`, never through
 This is a hard invariant, not an aspiration.
 
 *We* build the entire static LLVM/Clang/lld SDK from source via
-`tools/build-static-llvm.sh` (`cmake --target install` into
-`.deps/llvm-<ver>-<host>` = `LLVM_PREFIX`). That build produces every
-static resource the compiler needs:
+`tools/build-static-llvm.sh` (`cmake --build --target install` into
+`.deps/llvm-<ver>-<host>` = `LLVM_PREFIX`). CMake and its generator backend are
+also With-owned SDK tools: build Ninja from source with `tools/build-ninja.*`,
+then build CMake from source with `tools/build-cmake.*`, installing both into
+the same SDK prefix before the LLVM build. That SDK produces every static
+resource the compiler needs:
 
 - `lib/libclang.a`, `lib/libLLVM*.a`, `lib/liblld*.a` — the archives.
 - `lib/clang/<v>/include/` — clang's **builtin headers** (`stddef.h`,
   `stdarg.h`, `stdint.h`, …) that `c_import` needs to parse any C header.
 - `bin/clang` and `bin/clang++` — the With-owned C/C++ drivers used by
   emitted-C bootstrap. Bootstrap must not fall back to GCC or MSVC `cl.exe`.
-- `bin/lld` plus driver symlinks and `bin/llvm-nm` — linker and symbol tools.
+- `bin/cmake` — the With-owned CMake used for repeat SDK production.
+- `bin/ninja` — the With-owned CMake generator backend used for repeat SDK
+  production.
+- `bin/lld` plus driver symlinks, `bin/llvm-ml`/`bin/llvm-ml64`,
+  `bin/llvm-nm`, and `bin/llvm-strip` — linker, assembler, symbol, and
+  release packaging tools.
 
 The release binary **embeds** these, the same way it already embeds the
 stdlib (`build/runtime.w` → `EmbeddedStdlibData.w`, served via the
@@ -289,6 +297,33 @@ Allowed platform C drivers:
 - Windows: `clang -target x86_64-pc-windows-msvc` plus `lld-link`; Visual
   Studio Build Tools/Windows SDK may provide headers, libraries, and CRT
   import/static libraries, but `cl.exe` is not the compiler.
+
+The static LLVM SDK itself must also be built with Clang:
+
+- Linux/macOS SDK CMake cache must name `clang` and `clang++`.
+- Windows SDK CMake cache must name `clang-cl`, not MSVC `cl.exe`.
+- Windows x64 SDK CMake cache must name SDK `llvm-ml64`, not external MSVC
+  `ml64`, for MASM assembly.
+- Linux/macOS SDK builds must link with lld (`-fuse-ld=lld`) where CMake drives
+  a linker.
+
+The first SDK build for a new platform may use an externally installed Clang as
+the bootstrap compiler, but that compiler is only used to build the pinned
+With-owned SDK from the exact LLVM source tag. Every later compiler/bootstrap/
+release artifact must use the Clang, lld, libclang, and LLVM archives from that
+SDK. Packaging scripts must reject SDKs whose CMake cache names GCC,
+`/usr/bin/cc`, `/usr/bin/c++`, MSVC `cl.exe`, or external MSVC `ml64`.
+
+The first SDK build may use external Python and an external CMake only to build
+the SDK's own `bin/ninja` and `bin/cmake`, because these tools bootstrap the SDK
+build system. After that point, repeat LLVM SDK production uses
+`LLVM_PREFIX/bin/cmake` and `LLVM_PREFIX/bin/ninja`; SDK packaging must reject
+archives that do not include both tools. Do not depend on a host Ninja, Make,
+MSBuild, or Visual Studio generator for repeat SDK production.
+
+Release binary size parity is a toolchain-parity check. Large `.text`
+differences between platforms are not harmless until explained; first verify
+the SDK compiler, linker folding/GC policy, and strip policy.
 
 ---
 

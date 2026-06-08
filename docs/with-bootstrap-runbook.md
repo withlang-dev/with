@@ -28,10 +28,13 @@ For each release platform, build or fetch a pinned With-owned static LLVM SDK:
 ```text
 llvm-static-sdk/
   bin/
+    cmake
+    ninja
     clang
     clang++
     ld64.lld or ld.lld or lld-link
     llvm-nm
+    llvm-strip
   include/
   lib/
     libclang.a              # Unix/macOS
@@ -55,18 +58,52 @@ lib/libclang.lib
 Use the repo scripts to build this SDK:
 
 ```sh
+command -v clang
+command -v clang++
+command -v ld.lld
+HOST_TAG=darwin-arm64 tools/build-ninja.sh
+HOST_TAG=darwin-arm64 tools/build-cmake.sh
 HOST_TAG=darwin-arm64 tools/build-static-llvm.sh
+HOST_TAG=linux-x86_64 tools/build-ninja.sh
+HOST_TAG=linux-x86_64 tools/build-cmake.sh
 HOST_TAG=linux-x86_64 tools/build-static-llvm.sh
 ```
 
 On Windows, run from Developer PowerShell:
 
 ```powershell
+where.exe clang-cl
+where.exe lld-link
+.\tools\build-ninja.ps1
+.\tools\build-cmake.ps1
 .\tools\build-static-llvm.ps1
 ```
 
 The scripts fail unless the static libclang archive exists and exports
-`clang_createIndex`.
+`clang_createIndex`. They also fail/package-reject unless the SDK itself was
+built with Clang:
+
+- Linux/macOS: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`, and
+  `-fuse-ld=lld`.
+- Windows: `CMAKE_C_COMPILER=clang-cl`, `CMAKE_CXX_COMPILER=clang-cl`, and
+  `lld-link`; `CMAKE_ASM_MASM_COMPILER` must be SDK `llvm-ml64`, not external
+  MSVC `ml64`.
+- The SDK contains the With-owned `bin/cmake` built from source and installed
+  into the same `LLVM_PREFIX`; repeat SDK production uses that CMake rather
+  than a host CMake.
+- The SDK contains the With-owned `bin/ninja` built from source and installed
+  into the same `LLVM_PREFIX`; repeat SDK production uses that Ninja rather
+  than host Ninja, Make, MSBuild, or a Visual Studio generator.
+
+Do not accept a static SDK whose CMake cache names `/usr/bin/cc`,
+`/usr/bin/c++`, GCC, MSVC `cl.exe`, or MSVC `ml64` as a compiler/assembler.
+The first SDK build may use an externally installed Clang as a bootstrap tool,
+but that Clang is only a host compiler used to produce the pinned With-owned
+LLVM/Clang SDK from the exact `llvmorg-<version>` source tag. All later With
+compiler, emitted-C, bootstrap, and release builds use the Clang inside that
+SDK. External Python and CMake are permitted only to bootstrap the SDK's own
+Ninja and CMake binaries; package scripts must reject SDK archives that do not
+include `bin/ninja` and `bin/cmake`.
 
 **This is the only runbook that builds the static SDK from LLVM source.**
 Building the `.a` archives and clang's builtin headers from source is a
@@ -220,8 +257,13 @@ The static Windows SDK must contain:
 bin\lld-link.exe
 bin\clang.exe
 bin\clang++.exe
+bin\clang-cl.exe
+bin\cmake.exe
+bin\ninja.exe
+bin\llvm-lib.exe
 bin\llvm-nm.exe
 bin\llvm-readobj.exe
+bin\llvm-strip.exe
 include\
 lib\libclang.lib
 lib\LLVM*.lib
@@ -231,6 +273,8 @@ lib\clang\<v>\include\
 If no Windows static SDK release asset exists yet, build it once from source:
 
 ```powershell
+.\tools\build-ninja.ps1
+.\tools\build-cmake.ps1
 .\tools\build-static-llvm.ps1
 ```
 

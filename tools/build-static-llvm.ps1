@@ -10,6 +10,8 @@ $HOST_TAG = if ($env:HOST_TAG) { $env:HOST_TAG } else { "windows-x86_64-msvc" }
 $SRC_DIR = Join-Path $ROOT "src"
 $BUILD_DIR = Join-Path $ROOT "build\llvm-$LLVM_VERSION-$HOST_TAG"
 $INSTALL_PREFIX = if ($env:INSTALL_PREFIX) { $env:INSTALL_PREFIX } else { Join-Path $ROOT "llvm-$LLVM_VERSION-$HOST_TAG" }
+$PARALLEL_JOBS = if ($env:PARALLEL_JOBS) { $env:PARALLEL_JOBS } else { "" }
+$START_DIR = Get-Location
 
 function Require-Tool($name) {
   if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
@@ -19,8 +21,27 @@ function Require-Tool($name) {
 
 Require-Tool "curl.exe"
 Require-Tool "tar.exe"
-Require-Tool "cmake.exe"
-Require-Tool "ninja.exe"
+$LLVM_BOOTSTRAP_CLANG_CL = if ($env:LLVM_BOOTSTRAP_CLANG_CL) { $env:LLVM_BOOTSTRAP_CLANG_CL } else { "clang-cl.exe" }
+$LLVM_BOOTSTRAP_LLD_LINK = if ($env:LLVM_BOOTSTRAP_LLD_LINK) { $env:LLVM_BOOTSTRAP_LLD_LINK } else { "lld-link.exe" }
+$LLVM_BOOTSTRAP_LLVM_ML = if ($env:LLVM_BOOTSTRAP_LLVM_ML) { $env:LLVM_BOOTSTRAP_LLVM_ML } else { Join-Path $INSTALL_PREFIX "bin\llvm-ml64.exe" }
+$LLVM_BOOTSTRAP_MT = if ($env:LLVM_BOOTSTRAP_MT) { $env:LLVM_BOOTSTRAP_MT } else { "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\mt.exe" }
+Require-Tool $LLVM_BOOTSTRAP_CLANG_CL
+Require-Tool $LLVM_BOOTSTRAP_LLD_LINK
+Require-Tool $LLVM_BOOTSTRAP_LLVM_ML
+if (-not (Test-Path -PathType Leaf $LLVM_BOOTSTRAP_MT)) {
+  throw "missing Windows SDK manifest tool: $LLVM_BOOTSTRAP_MT"
+}
+$sdkCmake = if ($env:SDK_CMAKE) { $env:SDK_CMAKE } else { Join-Path $INSTALL_PREFIX "bin\cmake.exe" }
+$sdkNinja = if ($env:SDK_NINJA) { $env:SDK_NINJA } else { Join-Path $INSTALL_PREFIX "bin\ninja.exe" }
+if (Test-Path -PathType Leaf $sdkCmake) {
+  $CMAKE_TOOL = $sdkCmake
+}
+else {
+  throw "missing SDK CMake: $sdkCmake; build it first with tools\build-cmake.ps1"
+}
+if (-not (Test-Path -PathType Leaf $sdkNinja)) {
+  throw "missing SDK Ninja: $sdkNinja; build it first with tools\build-ninja.ps1"
+}
 
 New-Item -ItemType Directory -Force -Path $SRC_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $BUILD_DIR | Out-Null
@@ -42,30 +63,54 @@ if (-not (Test-Path $sourceDir)) {
   tar.exe -xf $archive
 }
 
-cmake.exe -S (Join-Path $SRC_DIR "$sourceDir\llvm") `
-  -B $BUILD_DIR `
-  -G Ninja `
-  -DCMAKE_BUILD_TYPE=Release `
-  -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" `
-  -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
-  -DLLVM_ENABLE_PROJECTS="clang;lld" `
-  -DLLVM_TARGETS_TO_BUILD="$TARGETS" `
-  -DLIBCLANG_BUILD_STATIC=ON `
-  -DLLVM_ENABLE_PIC=OFF `
-  -DBUILD_SHARED_LIBS=OFF `
-  -DLLVM_BUILD_LLVM_DYLIB=OFF `
-  -DLLVM_LINK_LLVM_DYLIB=OFF `
-  -DCLANG_LINK_CLANG_DYLIB=OFF `
-  -DLLVM_INCLUDE_TESTS=OFF `
-  -DLLVM_INCLUDE_BENCHMARKS=OFF `
-  -DLLVM_INCLUDE_EXAMPLES=OFF `
-  -DCLANG_INCLUDE_TESTS=OFF `
-  -DCLANG_BUILD_EXAMPLES=OFF `
-  -DLLVM_ENABLE_ZLIB=OFF `
-  -DLLVM_ENABLE_ZSTD=OFF `
-  -DLLVM_ENABLE_DIA_SDK=OFF
+$cmakeArgs = @(
+  "-G", "Ninja",
+  "-S", (Join-Path $SRC_DIR "$sourceDir\llvm"),
+  "-B", $BUILD_DIR,
+  "-DCMAKE_BUILD_TYPE=Release",
+  "-DCMAKE_C_COMPILER=$LLVM_BOOTSTRAP_CLANG_CL",
+  "-DCMAKE_CXX_COMPILER=$LLVM_BOOTSTRAP_CLANG_CL",
+  "-DCMAKE_ASM_MASM_COMPILER=$LLVM_BOOTSTRAP_LLVM_ML",
+  "-DCMAKE_LINKER=$LLVM_BOOTSTRAP_LLD_LINK",
+  "-DCMAKE_INSTALL_PREFIX=$INSTALL_PREFIX",
+  "-DCMAKE_MAKE_PROGRAM=$sdkNinja",
+  "-DCMAKE_MT=$LLVM_BOOTSTRAP_MT",
+  "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded",
+  "-DLLVM_ENABLE_PROJECTS=clang;lld",
+  "-DLLVM_TARGETS_TO_BUILD=$TARGETS",
+  "-DLIBCLANG_BUILD_STATIC=ON",
+  "-DLLVM_ENABLE_PIC=OFF",
+  "-DBUILD_SHARED_LIBS=OFF",
+  "-DLLVM_BUILD_LLVM_DYLIB=OFF",
+  "-DLLVM_LINK_LLVM_DYLIB=OFF",
+  "-DCLANG_LINK_CLANG_DYLIB=OFF",
+  "-DLLVM_INCLUDE_TESTS=OFF",
+  "-DLLVM_INCLUDE_BENCHMARKS=OFF",
+  "-DLLVM_INCLUDE_EXAMPLES=OFF",
+  "-DCLANG_INCLUDE_TESTS=OFF",
+  "-DCLANG_BUILD_EXAMPLES=OFF",
+  "-DLLVM_ENABLE_ZLIB=OFF",
+  "-DLLVM_ENABLE_ZSTD=OFF",
+  "-DLLVM_ENABLE_DIA_SDK=OFF"
+)
 
-cmake.exe --build $BUILD_DIR --target install --parallel
+& $CMAKE_TOOL @cmakeArgs
+if ($LASTEXITCODE -ne 0) { throw "LLVM CMake configure failed" }
+
+$oldPath = $env:PATH
+try {
+  $env:PATH = "$(Split-Path $LLVM_BOOTSTRAP_MT);$(Split-Path $LLVM_BOOTSTRAP_LLVM_ML);$oldPath"
+  if ($PARALLEL_JOBS) {
+    & $CMAKE_TOOL --build $BUILD_DIR --target install --parallel $PARALLEL_JOBS
+  }
+  else {
+    & $CMAKE_TOOL --build $BUILD_DIR --target install --parallel
+  }
+  if ($LASTEXITCODE -ne 0) { throw "LLVM CMake build failed" }
+}
+finally {
+  $env:PATH = $oldPath
+}
 
 $libclang = Join-Path $INSTALL_PREFIX "lib\libclang.lib"
 if (-not (Test-Path $libclang)) {
@@ -95,3 +140,4 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "static LLVM SDK ready: $INSTALL_PREFIX"
 Write-Host "`$env:LLVM_PREFIX=`"$INSTALL_PREFIX`""
 Write-Host "`$env:WITH_LIBCLANG=`"$libclang`""
+Set-Location $START_DIR
