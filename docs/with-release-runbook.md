@@ -53,6 +53,8 @@ with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst   # static LLVM SDK (Darwin arm6
 with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst     # static LLVM SDK (Linux x86_64)
 with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.zst   # static LLVM SDK (Windows x86_64)
 install.sh
+install.ps1
+install.cmd
 ```
 
 Do not publish a binary asset named `main`. `src/main` is the local seed path;
@@ -309,6 +311,8 @@ gh release create v0.14.3 \
   out/release/with-llvm-sdk-*-linux-x86_64.tar.zst \
   out/release/with-llvm-sdk-*-windows-x86_64.tar.zst \
   out/release/install.sh \
+  out/release/install.ps1 \
+  out/release/install.cmd \
   --repo withlang-dev/with \
   --title "v0.14.3: <release title>" \
   --notes-file <release-notes.md>
@@ -341,6 +345,8 @@ Expected asset list:
 
 ```text
 install.sh
+install.ps1
+install.cmd
 with-bootstrap-c-v0.14.3.tar.zst
 with-darwin-aarch64
 with-linux-x86_64
