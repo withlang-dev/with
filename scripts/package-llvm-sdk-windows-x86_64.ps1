@@ -39,9 +39,9 @@ if (-not (Test-Path -PathType Leaf $buildCache)) {
     throw "missing SDK build cache: $buildCache; package only SDKs built by tools\build-static-llvm.ps1 in this checkout"
 }
 $cacheText = Get-Content -Path $buildCache -Raw
-if ($cacheText -notmatch "CMAKE_C_COMPILER:FILEPATH=.*clang-cl(\\.exe)?" -or
-    $cacheText -notmatch "CMAKE_CXX_COMPILER:FILEPATH=.*clang-cl(\\.exe)?") {
-    $compilerLines = ($cacheText -split "`n") | Where-Object { $_ -match "^CMAKE_(C|CXX)_COMPILER:FILEPATH=" }
+if ($cacheText -notmatch "CMAKE_C_COMPILER:[^=]+=.*clang-cl(\\.exe)?" -or
+    $cacheText -notmatch "CMAKE_CXX_COMPILER:[^=]+=.*clang-cl(\\.exe)?") {
+    $compilerLines = ($cacheText -split "`n") | Where-Object { $_ -match "^CMAKE_(C|CXX)_COMPILER:" }
     throw "refusing to package SDK not built with clang-cl: $($compilerLines -join '; ')"
 }
 

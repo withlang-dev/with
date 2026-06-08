@@ -48,10 +48,10 @@ if [ ! -f "$build_cache" ]; then
     echo "package only SDKs built by tools/build-static-llvm.sh in this checkout" >&2
     exit 1
 fi
-if ! grep -E '^CMAKE_C_COMPILER:FILEPATH=.*clang([^/]*$|-[0-9.]+$)' "$build_cache" >/dev/null ||
-   ! grep -E '^CMAKE_CXX_COMPILER:FILEPATH=.*clang\+\+([^/]*$|-[0-9.]+$)' "$build_cache" >/dev/null; then
+if ! grep -E '^CMAKE_C_COMPILER:[^=]+=.*clang([^/]*$|-[0-9.]+$)' "$build_cache" >/dev/null ||
+   ! grep -E '^CMAKE_CXX_COMPILER:[^=]+=.*clang\+\+([^/]*$|-[0-9.]+$)' "$build_cache" >/dev/null; then
     echo "error: refusing to package SDK not built with clang/clang++" >&2
-    grep -E '^CMAKE_(C|CXX)_COMPILER:FILEPATH=' "$build_cache" >&2 || true
+    grep -E '^CMAKE_(C|CXX)_COMPILER:' "$build_cache" >&2 || true
     exit 1
 fi
 if [ ! -x "$prefix/bin/clang" ]; then
