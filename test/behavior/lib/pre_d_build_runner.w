@@ -33,6 +33,12 @@ fn p7_argv_append(blob: str, arg: str) -> str:
     blob ++ arg ++ "\0"
 
 pub fn p7_compiler_path -> str:
+    let staged_stage2 = p7_abs("out/stage/bin/with-stage2")
+    if file_exists(staged_stage2):
+        return staged_stage2
+    let release = p7_abs("out/release/bin/with")
+    if file_exists(release):
+        return release
     let stage2 = p7_abs("out/bin/with-stage2")
     if file_exists(stage2):
         return stage2
