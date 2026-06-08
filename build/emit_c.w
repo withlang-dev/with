@@ -52,6 +52,11 @@ fn emitc_basename(path: str) -> str:
             last_slash = i
     path.slice((last_slash + 1) as i64, path.len())
 
+fn emitc_exe_name(name: str) -> str:
+    if os() == "Windows" and not name.ends_with(".exe"):
+        return name ++ ".exe"
+    name
+
 fn emitc_trim(text: str) -> str:
     var start = 0
     var end = text.len() as i32
@@ -74,10 +79,29 @@ fn emitc_c_compiler() -> str:
     let cc = env("CC")
     if cc.len() > 0:
         return cc
-    "cc"
+    let llvm_prefix = env("LLVM_PREFIX")
+    if llvm_prefix.len() > 0:
+        if os() == "Windows":
+            return llvm_prefix ++ "/bin/clang++.exe"
+        return llvm_prefix ++ "/bin/clang++"
+    if os() == "Windows":
+        return ".deps/llvm-22.1.6-windows-x86_64-msvc/bin/clang++.exe"
+    if os() == "Linux":
+        return ".deps/llvm-22.1.6-linux-x86_64/bin/clang++"
+    if os() == "Macos":
+        return ".deps/llvm-22.1.6-darwin-arm64/bin/clang++"
+    "clang++"
 
 fn emitc_push_c_compiler(argv: Vec[str]) -> Vec[str]:
     argv.push(emitc_c_compiler())
+    argv
+
+fn emitc_push_c_source(argv: Vec[str], path: str) -> Vec[str]:
+    argv |> push("-x")
+    argv |> push("c")
+    argv |> push(path)
+    argv |> push("-x")
+    argv |> push("none")
     argv
 
 fn emitc_host_platform_runtime_object() -> str:
@@ -87,17 +111,57 @@ fn emitc_host_platform_runtime_object() -> str:
         return "rt_linux_x86_64.o"
     if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
         return "rt_darwin_aarch64.o"
+    if host_os == "Windows" and host_arch == "x86_64":
+        return "rt_windows_x86_64.o"
     ""
 
 fn emitc_push_host_c_flags(argv: Vec[str]) -> Vec[str]:
     if os() == "Linux":
         argv |> push("-no-pie")
+        argv |> push("-fuse-ld=lld")
+    if os() == "Windows":
+        argv |> push("-target")
+        argv |> push("x86_64-pc-windows-msvc")
+        argv |> push("-fms-runtime-lib=static")
+        argv |> push("-D_CRT_SECURE_NO_WARNINGS")
+        argv |> push("-fuse-ld=lld")
+        argv |> push("-Wl,/stack:8388608")
+        argv |> push("-Wl,/libpath:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64")
+        argv |> push("-Wl,/libpath:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64")
+        argv |> push("-Wl,/libpath:C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64")
     argv
 
+fn emitc_windows_sdk_um_lib(name: str) -> str:
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64/" ++ name
+
+fn emitc_windows_sdk_ucrt_lib(name: str) -> str:
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64/" ++ name
+
+fn emitc_windows_msvc_lib(name: str) -> str:
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64/" ++ name
+
 fn emitc_push_system_libs(argv: Vec[str]) -> Vec[str]:
-    argv |> push("-lc")
-    if os() == "Linux":
-        argv |> push("-lm")
+    if os() == "Windows":
+        argv |> push(emitc_windows_msvc_lib("libcpmt.lib"))
+        argv |> push(emitc_windows_msvc_lib("libcmt.lib"))
+        argv |> push(emitc_windows_msvc_lib("oldnames.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("kernel32.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("advapi32.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("bcrypt.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("shell32.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("user32.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("ole32.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("oleaut32.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("uuid.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("ws2_32.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("version.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("psapi.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("dbghelp.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("ntdll.lib"))
+    else:
+        argv |> push("-lc")
+        if os() == "Linux":
+            argv |> push("-lm")
     argv
 
 fn emitc_index_of(text: str, needle: str) -> i32:
@@ -471,26 +535,39 @@ fn emitc_build_compiler_c_workspace(ctx: ActionCtx, source_w: str, main_c: str) 
         return emitc_fail(ctx, "workspace emit-C did not produce output: " ++ main_c)
     0
 
+pub fn run_bootstrap_c_emit_sources_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let main_c = ctx.output()
+    let out_dir = emitc_dirname(main_c)
+    if fs.mkdir_all(out_dir) != 0:
+        return emitc_fail(ctx, "could not create output directory: " ++ out_dir)
+    var rc = emitc_build_compiler_c_workspace(ctx, "out/gen/main.w", main_c)
+    if rc != 0: return rc
+    emitc_generate_stub_files(ctx)
+
 fn emitc_compile_c_compiler(ctx: ActionCtx, main_c: str, output_path: str) -> i32:
+    let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let platform_obj = emitc_host_platform_runtime_object()
     if platform_obj.len() == 0:
         return emitc_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
+    let llvm_rsp = "out/lib/llvm_link.rsp"
+    if fs.read_text(llvm_rsp).len() == 0:
+        return emitc_fail(ctx, "missing LLVM link metadata: " ++ llvm_rsp)
     var argv: Vec[str] = Vec.new()
     argv = emitc_push_c_compiler(argv)
     argv |> push("-O2")
     argv = emitc_push_host_c_flags(argv)
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
-    argv |> push(emitc_abs(root, main_c))
-    argv |> push(emitc_abs(root, "out/gen/wl_stubs.c"))
+    argv = emitc_push_c_source(argv, emitc_abs(root, main_c))
     argv = emitc_compile_runtime_args(root, argv, platform_obj)
     argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
     argv |> push("-include")
     argv |> push(emitc_abs(root, "out/gen/wl_decls.h"))
-    argv = emitc_push_system_libs(argv)
+    argv |> push("@" ++ emitc_abs(root, llvm_rsp))
     emitc_run_capture(ctx, "compile-with-from-c", argv, 600000)
 
 fn emitc_compile_c_compiler_with_bridges(ctx: ActionCtx, main_c: str, output_path: str) -> i32:
@@ -509,9 +586,7 @@ fn emitc_compile_c_compiler_with_bridges(ctx: ActionCtx, main_c: str, output_pat
     argv |> push("-fuse-ld=lld")
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
-    argv |> push(emitc_abs(root, main_c))
-    argv |> push(emitc_abs(root, "out/lib/llvm_bridge.o"))
-    argv |> push(emitc_abs(root, "out/lib/clang_bridge.o"))
+    argv = emitc_push_c_source(argv, emitc_abs(root, main_c))
     argv = emitc_compile_runtime_args(root, argv, platform_obj)
     argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
     argv |> push("-I")
@@ -519,7 +594,6 @@ fn emitc_compile_c_compiler_with_bridges(ctx: ActionCtx, main_c: str, output_pat
     argv |> push("-include")
     argv |> push(emitc_abs(root, "out/gen/wl_decls.h"))
     argv |> push("@" ++ emitc_abs(root, "out/lib/llvm_link.rsp"))
-    argv = emitc_push_system_libs(argv)
     emitc_run_capture(ctx, "compile-with-from-c-full", argv, 900000)
 
 fn emitc_migrate_compiler_c(ctx: ActionCtx, compiler_path: str, main_c: str, output_w: str) -> i32:
@@ -621,7 +695,7 @@ fn emitc_compile_hello(ctx: ActionCtx, hello_c: str, output_path: str) -> i32:
     argv = emitc_push_host_c_flags(argv)
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
-    argv |> push(emitc_abs(root, hello_c))
+    argv = emitc_push_c_source(argv, emitc_abs(root, hello_c))
     argv = emitc_compile_runtime_args(root, argv, platform_obj)
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
@@ -678,10 +752,10 @@ pub fn run_emit_c_test_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         return emitc_fail(ctx, "could not create output directory: " ++ out_dir)
     let main_c = emitc_join(out_dir, "main.c")
-    let with_from_c = emitc_join(out_dir, "with-from-c")
+    let with_from_c = emitc_join(out_dir, emitc_exe_name("with-from-c"))
     let hello_c = emitc_join(out_dir, "hello_test.c")
-    let hello_bin = emitc_join(out_dir, "hello_test")
-    var rc = emitc_build_compiler_c_workspace(ctx, "out/gen/main.w", main_c)
+    let hello_bin = emitc_join(out_dir, emitc_exe_name("hello_test"))
+    var rc = emitc_build_compiler_c(ctx, compiler_path, main_c)
     if rc != 0: return rc
     rc = emitc_generate_stub_files(ctx)
     if rc != 0: return rc
@@ -745,10 +819,10 @@ pub fn run_emit_c_roundtrip_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(out_dir) != 0:
         return emitc_fail(ctx, "could not create output directory: " ++ out_dir)
     let main_c = emitc_join(out_dir, "main.c")
-    let with_from_c = emitc_join(out_dir, "with-from-c")
+    let with_from_c = emitc_join(out_dir, emitc_exe_name("with-from-c"))
     let migrated_w = emitc_join(out_dir, "main_roundtrip.w")
-    let with_roundtrip = emitc_join(out_dir, "with-roundtrip")
-    let with_rebuilt_by_roundtrip = emitc_join(out_dir, "with-rebuilt-by-roundtrip")
+    let with_roundtrip = emitc_join(out_dir, emitc_exe_name("with-roundtrip"))
+    let with_rebuilt_by_roundtrip = emitc_join(out_dir, emitc_exe_name("with-rebuilt-by-roundtrip"))
     var rc = emitc_build_compiler_c_workspace(ctx, "out/gen/main.w", main_c)
     if rc != 0: return rc
     rc = emitc_generate_stub_files(ctx)

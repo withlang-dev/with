@@ -17,7 +17,7 @@ if [ "$source_version" != "$version" ]; then
     exit 1
 fi
 
-compiler="${WITH_RELEASE_COMPILER:-out/bin/with}"
+compiler="${WITH_RELEASE_COMPILER:-out/release/bin/with}"
 if [ ! -x "$compiler" ]; then
     echo "error: missing compiler: $compiler" >&2
     exit 1
@@ -26,11 +26,12 @@ fi
 rm -rf "$work_dir"
 mkdir -p "$work_dir/src" "$work_dir/runtime"
 
-mkdir -p out/gen
-escaped_version="$(printf '%s' "$version" | sed 's/[\/&]/\\&/g')"
-sed "s|WITH_VERSION_PLACEHOLDER|$escaped_version|g" src/main.w > out/gen/main.w
-printf '%s\n' "$version" > out/gen/version.txt
-"$compiler" build out/gen/main.w --emit-c -o "$work_dir/src/with_compiler.c"
+rm -f out/bootstrap-c/src/with_compiler.c out/gen/wl_decls.h out/gen/wl_stubs.c
+"$compiler" build :bootstrap-c-emit-sources
+if [ "$work_dir" != "out/bootstrap-c" ]; then
+    mkdir -p "$work_dir/src"
+    cp out/bootstrap-c/src/with_compiler.c "$work_dir/src/with_compiler.c"
+fi
 "$compiler" build src/compiler/LlvmBridge.w --emit-c --no-prelude -o "$work_dir/src/llvm_bridge.c"
 "$compiler" build src/compiler/ClangBridge.w --emit-c --no-prelude -o "$work_dir/src/clang_bridge.c"
 "$compiler" build rt/rt_core.w --emit-c --no-prelude -o "$work_dir/src/rt_core.c"
@@ -40,6 +41,10 @@ printf '%s\n' "$version" > out/gen/version.txt
 "$compiler" build rt/compat_runtime.w --emit-c --no-prelude -o "$work_dir/src/compat_runtime.c"
 
 cp runtime/with_runtime.h "$work_dir/runtime/with_runtime.h"
+cp runtime/unistd.h "$work_dir/runtime/unistd.h"
+cp runtime/undef_stdio_macros.h "$work_dir/runtime/undef_stdio_macros.h"
+mkdir -p "$work_dir/runtime/sys"
+cp runtime/sys/resource.h "$work_dir/runtime/sys/resource.h"
 cat >"$work_dir/runtime/bootstrap_types.h" <<'EOF'
 #ifndef WITH_BOOTSTRAP_TYPES_H
 #define WITH_BOOTSTRAP_TYPES_H
@@ -366,7 +371,12 @@ WITH_EMPTY_EMBEDDED_OBJECT(fiber_asm_o);
 WITH_EMPTY_EMBEDDED_OBJECT(rt_core_o);
 WITH_EMPTY_EMBEDDED_OBJECT(rt_darwin_aarch64_o);
 WITH_EMPTY_EMBEDDED_OBJECT(rt_linux_x86_64_o);
+WITH_EMPTY_EMBEDDED_OBJECT(rt_windows_x86_64_o);
 EOF
+
+cp scripts/bootstrap/windows_platform.c "$work_dir/src/windows_platform.c"
+cp scripts/bootstrap/windows_compat_runtime.c "$work_dir/src/windows_compat_runtime.c"
+cp scripts/bootstrap/empty_embedded_windows.s "$work_dir/src/empty_embedded_windows.s"
 
 cat >"$work_dir/README.bootstrap.md" <<EOF
 # With $version Bootstrap C Bundle
@@ -385,6 +395,9 @@ It contains emitted C for:
 - src/fiber_stubs.c: non-async fiber/runtime lifecycle stubs
 - src/compat_runtime.c: compiler process/env compatibility runtime
 - src/linux_platform.c: temporary Linux x86_64 libc platform shim
+- src/windows_platform.c: temporary Windows x86_64 Win32 platform shim
+- src/windows_compat_runtime.c: Windows process/env compatibility runtime shim
+- src/empty_embedded_windows.s: empty embedded-object symbols for Windows bootstrap
 
 The bootstrap compiler is temporary. Use it only to run the normal With stage
 chain on the target platform:
@@ -403,21 +416,25 @@ Then compile the C files and link with a C++ linker driver because LLVM's
 static libraries contain C++:
 
     LLVM_PREFIX=/path/to/llvm-static-sdk
+    CLANG="\$LLVM_PREFIX/bin/clang"
+    CLANGXX="\$LLVM_PREFIX/bin/clang++"
+    test -x "\$CLANG"
+    test -x "\$CLANGXX"
     mkdir -p obj
 
-    cc -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
+    "\$CLANG" -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
       -include runtime/wl_decls.h -c src/with_compiler.c -o obj/with_compiler.o
 
     for file in src/llvm_bridge.c src/clang_bridge.c src/linux_platform.c; do
-      cc -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
+      "\$CLANG" -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
         -c "\$file" -o "obj/\$(basename "\$file" .c).o"
     done
 
     for file in src/rt_core.c src/panic_runtime.c src/regex_runtime.c src/fiber_stubs.c src/compat_runtime.c; do
-      cc -std=gnu11 -O2 -D_GNU_SOURCE -DWITH_RUNTIME_H -Iruntime -I"\$LLVM_PREFIX/include" \\
+      "\$CLANG" -std=gnu11 -O2 -D_GNU_SOURCE -DWITH_RUNTIME_H -Iruntime -I"\$LLVM_PREFIX/include" \\
         -include runtime/bootstrap_types.h -c "\$file" -o "obj/\$(basename "\$file" .c).o"
     done
-    c++ obj/*.o \\
+    "\$CLANGXX" obj/*.o \\
       -Wl,--start-group "\$LLVM_PREFIX"/lib/libclang*.a "\$LLVM_PREFIX"/lib/libLLVM*.a "\$LLVM_PREFIX"/lib/liblld*.a -Wl,--end-group \\
       -lpthread -ldl -lm -lz -lzstd -lxml2 -lc \\
       -o with-bootstrap

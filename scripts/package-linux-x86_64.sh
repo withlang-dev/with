@@ -2,7 +2,7 @@
 set -eu
 
 asset="with-linux-x86_64"
-compiler="${WITH_RELEASE_COMPILER:-out/bin/with}"
+compiler="${WITH_RELEASE_COMPILER:-out/release/bin/with}"
 release_dir="${WITH_RELEASE_DIR:-out/release}"
 
 if [ "${WITH_VERSION:-}" = "" ]; then

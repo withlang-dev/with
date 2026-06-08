@@ -55,6 +55,7 @@ typedef struct {
 
 with_vec with_vec_new(int64_t elem_size);
 void with_vec_new_out(with_vec *out, int64_t elem_size);
+void with_vec_new_with_capacity_out(with_vec *out, int64_t elem_size, int64_t cap);
 void with_vec_push(with_vec *v, const void *elem);
 void *with_vec_get_ptr(with_vec *v, int64_t index);
 int64_t with_vec_len(with_vec *v);

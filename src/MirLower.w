@@ -35,7 +35,7 @@ enum ControlTargetKind: i32:
     CT_LOOP = 1
     CT_BLOCK = 2
 
-type MirBuilder {
+type MirBuilder = ephemeral {
     body: MirBody,
     cur_bb: BlockId,
 
@@ -94,12 +94,12 @@ type MirBuilder {
     string_alias_flags: Vec[i32],
     no_suspend_nodes: Vec[i32],
 
-    sema: Sema,
+    sema: &Sema,
     ast: AstPool,
     pool: InternPool,
 }
 
-fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> MirBuilder:
+fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> MirBuilder:
     var body = MirBody.init(fn_sym, sema)
     let entry = body.new_block()
     MirBuilder {
@@ -8862,13 +8862,13 @@ fn MirBody.optimize_self_tail_calls(mut self: MirBody):
     let bb_count = self.block_count()
     var bb = 0
     while bb < bb_count:
-        if self.term_kind(bb) != TermKind.TK_CALL:
+        if bb < 0 or bb >= self.bb_term_kinds.len() as i32 or self.bb_term_kinds.get(bb as i64) != TermKind.TK_CALL:
             bb = bb + 1
             continue
-        let callee_op_id = self.term_data0(bb)
-        let args_id = self.term_data1(bb)
-        let result_place = self.term_data2(bb)
-        let next_bb = self.term_data3(bb)
+        let callee_op_id = if bb >= 0 and bb < self.bb_term_d0.len() as i32: self.bb_term_d0.get(bb as i64) else: 0
+        let args_id = if bb >= 0 and bb < self.bb_term_d1.len() as i32: self.bb_term_d1.get(bb as i64) else: 0
+        let result_place = if bb >= 0 and bb < self.bb_term_d2.len() as i32: self.bb_term_d2.get(bb as i64) else: 0
+        let next_bb = if bb >= 0 and bb < self.bb_term_d3.len() as i32: self.bb_term_d3.get(bb as i64) else: 0
         // Check: callee is this function
         if callee_op_id < 0 or callee_op_id >= self.operand_kinds.len() as i32:
             bb = bb + 1
@@ -8896,7 +8896,7 @@ fn MirBody.optimize_self_tail_calls(mut self: MirBody):
         if next_bb < 0 or next_bb >= bb_count:
             bb = bb + 1
             continue
-        if self.term_kind(next_bb) != TermKind.TK_RETURN:
+        if next_bb < 0 or next_bb >= self.bb_term_kinds.len() as i32 or self.bb_term_kinds.get(next_bb as i64) != TermKind.TK_RETURN:
             bb = bb + 1
             continue
         if self.bb_stmt_counts.get(next_bb as i64) != 0:
@@ -9073,7 +9073,7 @@ fn mir_gen_remap_rvalue(source: MirBody, local_map: Vec[i32], rv_id: i32, d_inde
 fn lower_generator_constructor(sema: Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, sig_idx: i32) -> MirBody:
     let fn_sym = ast_pool.get_data0(fn_node)
     let state_tid = sema.generator_fn_state_types.get(fn_sym).unwrap()
-    var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
+    var builder = MirBuilder.init(&sema, ast_pool, pool, fn_sym)
     builder.body.local_type_ids.set_i32(0, state_tid)
     builder.push_scope()
 
@@ -9117,7 +9117,7 @@ fn lower_generator_next_body(sema: Sema, source: MirBody, fn_node: i32) -> MirBo
     let state_tid = sema.generator_fn_state_types.get(fn_sym).unwrap()
     let yield_ty = sema.generator_fn_yield_types.get(fn_sym).unwrap()
     let opt_ty = sema.ensure_option_type_for(yield_ty)
-    var out = MirBody.init(next_sym, sema)
+    var out = MirBody.init(next_sym, &sema)
     out.local_type_ids.set_i32(0, opt_ty)
     let entry_bb = out.new_block()
     let self_sym = sema.pool_lookup_symbol("self")
@@ -9287,7 +9287,7 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
             let sig_idx = fn_sema.get_sig(fn_sym)
             if sig_idx < 0:
                 continue
-            var source_builder = MirBuilder.init(fn_sema, ast_pool, pool, fn_sym)
+            var source_builder = MirBuilder.init(&fn_sema, ast_pool, pool, fn_sym)
             source_builder.in_generator = 1
             let source_body = lower_fn_with_sig(source_builder, decl as i32, sig_idx)
             let ctor_body = lower_generator_constructor(fn_sema, ast_pool, pool, decl as i32, sig_idx)
@@ -9295,7 +9295,7 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
             mir_mod.add_body(ctor_body)
             mir_mod.add_body(next_body)
             continue
-        var builder = MirBuilder.init(fn_sema, ast_pool, pool, fn_sym)
+        var builder = MirBuilder.init(&fn_sema, ast_pool, pool, fn_sym)
         let body = lower_fn(builder, decl as i32)
         mir_mod.add_body(body)
 
@@ -9440,7 +9440,7 @@ fn mir_fn_is_tailrec(ast_pool: AstPool, fn_sym: i32) -> i32:
         return 1
     0
 
-fn mir_tailrec_sig_compatible(sema: &Sema, ast_pool: AstPool, fn_a: i32, fn_b: i32) -> i32:
+fn mir_tailrec_sig_compatible(sema: Sema, ast_pool: AstPool, fn_a: i32, fn_b: i32) -> i32:
     let sig_a = sema.get_sig(fn_a)
     let sig_b = sema.get_sig(fn_b)
     if sig_a < 0 or sig_b < 0:
@@ -9693,7 +9693,7 @@ fn MirModule.verify_tailrec_contracts(self: &MirModule, sema: &Sema, ast_pool: A
         let leader_sym = scc_syms.get(0)
         for si in 1..scc_syms.len() as i32:
             let member_sym = scc_syms.get(si as i64)
-            if mir_tailrec_sig_compatible(sema, ast_pool, leader_sym, member_sym) == 0:
+            if mir_tailrec_sig_compatible(*sema, ast_pool, leader_sym, member_sym) == 0:
                 compatible = 0
                 break
         if compatible == 0:
