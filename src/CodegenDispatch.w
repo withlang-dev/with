@@ -5,6 +5,7 @@ use Sema
 use InternPool
 use Diagnostic
 use Source
+use Overflow
 
 extern fn with_eprint(s: str) -> void
 
@@ -1655,6 +1656,154 @@ fn Codegen.mir_build_total_shift(self: Codegen, op: i32, lhs: i64, rhs: i64, is_
     let sign_fill = wl_build_ashr(self.builder, lhs, sign_count)
     wl_build_select(self.builder, too_big, sign_fill, shifted)
 
+fn Codegen.mir_build_saturating_bin_op(self: Codegen, op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
+    if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_SAT:
+        let sat_width = wl_get_int_type_width(wider_ty)
+        let sat_prefix = if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_SAT: if is_unsigned: "llvm.uadd.sat.i" else: "llvm.sadd.sat.i" else if is_unsigned: "llvm.usub.sat.i" else: "llvm.ssub.sat.i"
+        let sat_fn_name = if sat_width == 8: sat_prefix ++ "8" else if sat_width == 16: sat_prefix ++ "16" else if sat_width == 32: sat_prefix ++ "32" else: sat_prefix ++ "64"
+        let sat_sym = self.intern.intern(sat_fn_name)
+        let sat_fv = self.fn_values.get(sat_sym)
+        let sat_ft = self.fn_fn_types.get(sat_sym)
+        if sat_fv.is_some() and sat_ft.is_some():
+            let sat_args: Vec[i64] = Vec.new()
+            sat_args.push(l)
+            sat_args.push(r)
+            return wl_build_call(self.builder, sat_ft.unwrap() as i64, sat_fv.unwrap() as i64, vec_data_i64(&sat_args), 2)
+        let sat_pts: Vec[i64] = Vec.new()
+        sat_pts.push(wider_ty)
+        sat_pts.push(wider_ty)
+        let sat_fnt = wl_function_type(wider_ty, vec_data_i64(&sat_pts), 2, 0)
+        let sat_func = wl_add_function(self.llmod, sat_fn_name, sat_fnt)
+        self.fn_values.insert(sat_sym, sat_func)
+        self.fn_fn_types.insert(sat_sym, sat_fnt)
+        let sat_args: Vec[i64] = Vec.new()
+        sat_args.push(l)
+        sat_args.push(r)
+        return wl_build_call(self.builder, sat_fnt, sat_func, vec_data_i64(&sat_args), 2)
+
+    // Widening multiply + clamp: multiply in 2x width, clamp to [MIN, MAX], truncate.
+    let ms_width = wl_get_int_type_width(wider_ty)
+    let ms_dbl_width = ms_width * 2
+    let ms_dbl_ty = if ms_dbl_width == 16: wl_i16_type(self.context) else if ms_dbl_width == 32: wl_i32_type(self.context) else if ms_dbl_width == 64: wl_i64_type(self.context) else: wl_i128_type(self.context)
+    let ms_wide_l = if is_unsigned: wl_build_zext(self.builder, l, ms_dbl_ty) else: wl_build_sext(self.builder, l, ms_dbl_ty)
+    let ms_wide_r = if is_unsigned: wl_build_zext(self.builder, r, ms_dbl_ty) else: wl_build_sext(self.builder, r, ms_dbl_ty)
+    let ms_wide_result = wl_build_mul(self.builder, ms_wide_l, ms_wide_r)
+    if is_unsigned:
+        let ms_max_val = wl_const_int(ms_dbl_ty, int_unsigned_max(ms_width), 0)
+        let ms_overflow = wl_build_icmp(self.builder, wl_int_ugt(), ms_wide_result, ms_max_val)
+        let ms_clamped = wl_build_select(self.builder, ms_overflow, ms_max_val, ms_wide_result)
+        return wl_build_trunc(self.builder, ms_clamped, wider_ty)
+    let ms_max_val = wl_const_int(ms_dbl_ty, int_signed_max(ms_width), 0)
+    let ms_min_val = wl_const_int(ms_dbl_ty, int_signed_min(ms_width), 1)
+    let ms_too_big = wl_build_icmp(self.builder, wl_int_sgt(), ms_wide_result, ms_max_val)
+    let ms_too_small = wl_build_icmp(self.builder, wl_int_slt(), ms_wide_result, ms_min_val)
+    let ms_clamped_hi = wl_build_select(self.builder, ms_too_big, ms_max_val, ms_wide_result)
+    let ms_clamped = wl_build_select(self.builder, ms_too_small, ms_min_val, ms_clamped_hi)
+    wl_build_trunc(self.builder, ms_clamped, wider_ty)
+
+fn Codegen.mir_checked_overflow_intrinsic_name(self: Codegen, op: i32, is_unsigned: bool) -> str:
+    let _ = self
+    if op == BinaryOp.OP_ADD:
+        return if is_unsigned: "llvm.uadd.with.overflow" else: "llvm.sadd.with.overflow"
+    if op == BinaryOp.OP_SUB:
+        return if is_unsigned: "llvm.usub.with.overflow" else: "llvm.ssub.with.overflow"
+    if op == BinaryOp.OP_MUL:
+        return if is_unsigned: "llvm.umul.with.overflow" else: "llvm.smul.with.overflow"
+    ""
+
+fn Codegen.mir_build_raw_int_bin_op(self: Codegen, op: i32, l: i64, r: i64, is_unsigned: bool) -> i64:
+    if op == BinaryOp.OP_ADD: return wl_build_add(self.builder, l, r)
+    if op == BinaryOp.OP_SUB: return wl_build_sub(self.builder, l, r)
+    if op == BinaryOp.OP_MUL: return wl_build_mul(self.builder, l, r)
+    if op == BinaryOp.OP_DIV:
+        if is_unsigned: return wl_build_udiv(self.builder, l, r)
+        return wl_build_sdiv(self.builder, l, r)
+    if op == BinaryOp.OP_MOD:
+        if is_unsigned: return wl_build_urem(self.builder, l, r)
+        return wl_build_srem(self.builder, l, r)
+    wl_get_undef(wl_type_of(l))
+
+fn Codegen.mir_build_checked_int_bin_op(self: Codegen, op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
+    let name = self.mir_checked_overflow_intrinsic_name(op, is_unsigned)
+    let intrinsic_id = wl_lookup_intrinsic_id(name)
+    if intrinsic_id == 0:
+        self.had_error = 1
+        self.codegen_error_detail = "missing LLVM overflow intrinsic " ++ name
+        return wl_get_undef(wider_ty)
+    let overloads: Vec[i64] = Vec.new()
+    overloads.push(wider_ty)
+    let fn_val = wl_get_intrinsic_decl(self.llmod, intrinsic_id, vec_data_i64(&overloads), 1)
+    let fn_ty = wl_intrinsic_get_type(self.context, intrinsic_id, vec_data_i64(&overloads), 1)
+    let args: Vec[i64] = Vec.new()
+    args.push(l)
+    args.push(r)
+    let pair = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 2)
+    let result = wl_build_extract_value(self.builder, pair, 0)
+    let overflow = wl_build_extract_value(self.builder, pair, 1)
+    let panic_bb = wl_append_bb(self.context, self.current_function, "arith.overflow")
+    let ok_bb = wl_append_bb(self.context, self.current_function, "arith.ok")
+    wl_build_cond_br(self.builder, overflow, panic_bb, ok_bb)
+    wl_position_at_end(self.builder, panic_bb)
+    self.emit_runtime_panic("integer overflow")
+    wl_position_at_end(self.builder, ok_bb)
+    result
+
+fn Codegen.mir_build_checked_div_or_mod(self: Codegen, op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
+    let zero = wl_const_int(wider_ty, 0, 0)
+    let div_zero = wl_build_icmp(self.builder, wl_int_eq(), r, zero)
+    let zero_panic_bb = wl_append_bb(self.context, self.current_function, "arith.divzero")
+    let nonzero_bb = wl_append_bb(self.context, self.current_function, "arith.div.nonzero")
+    wl_build_cond_br(self.builder, div_zero, zero_panic_bb, nonzero_bb)
+    wl_position_at_end(self.builder, zero_panic_bb)
+    self.emit_runtime_panic("division by zero")
+    wl_position_at_end(self.builder, nonzero_bb)
+    if is_unsigned:
+        return self.mir_build_raw_int_bin_op(op, l, r, true)
+
+    let width = wl_get_int_type_width(wider_ty)
+    let min_value = wl_const_int(wider_ty, int_signed_min(width), 1)
+    let neg_one = wl_const_int(wider_ty, -1, 1)
+    let lhs_min = wl_build_icmp(self.builder, wl_int_eq(), l, min_value)
+    let rhs_neg_one = wl_build_icmp(self.builder, wl_int_eq(), r, neg_one)
+    let div_overflow = wl_build_and(self.builder, lhs_min, rhs_neg_one)
+    if self.overflow_mode == OVERFLOW_MODE_WRAP() or self.overflow_mode == OVERFLOW_MODE_SATURATE():
+        let overflow_bb = wl_append_bb(self.context, self.current_function, "arith.div.overflow")
+        let ok_bb = wl_append_bb(self.context, self.current_function, "arith.div.ok")
+        let merge_bb = wl_append_bb(self.context, self.current_function, "arith.div.merge")
+        wl_build_cond_br(self.builder, div_overflow, overflow_bb, ok_bb)
+        wl_position_at_end(self.builder, overflow_bb)
+        let overflow_value =
+            if op == BinaryOp.OP_MOD:
+                zero
+            else if self.overflow_mode == OVERFLOW_MODE_SATURATE():
+                wl_const_int(wider_ty, int_signed_max(width), 0)
+            else:
+                min_value
+        wl_build_br(self.builder, merge_bb)
+        let overflow_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, ok_bb)
+        let normal_value = self.mir_build_raw_int_bin_op(op, l, r, false)
+        wl_build_br(self.builder, merge_bb)
+        let ok_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, merge_bb)
+        let phi = wl_build_phi(self.builder, wider_ty)
+        let vals: Vec[i64] = Vec.new()
+        vals.push(overflow_value)
+        vals.push(normal_value)
+        let bbs: Vec[i64] = Vec.new()
+        bbs.push(overflow_end)
+        bbs.push(ok_end)
+        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        return phi
+
+    let panic_bb = wl_append_bb(self.context, self.current_function, "arith.divoverflow")
+    let ok_bb = wl_append_bb(self.context, self.current_function, "arith.divok")
+    wl_build_cond_br(self.builder, div_overflow, panic_bb, ok_bb)
+    wl_position_at_end(self.builder, panic_bb)
+    self.emit_runtime_panic("integer overflow")
+    wl_position_at_end(self.builder, ok_bb)
+    self.mir_build_raw_int_bin_op(op, l, r, false)
+
 fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsigned: bool, lhs_sema: i32, rhs_sema: i32) -> i64:
     let lk = wl_get_type_kind(wl_type_of(lhs))
     let rk = wl_get_type_kind(wl_type_of(rhs))
@@ -1724,72 +1873,20 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
     let rhs_unsigned = is_unsigned or self.mir_sema_type_is_unsigned(rhs_sema)
     let l = self.coerce_int_ext(lhs, wider_ty, lhs_unsigned)
     let r = self.coerce_int_ext(rhs, wider_ty, rhs_unsigned)
+    let arith_unsigned = lhs_unsigned or rhs_unsigned
     if op == BinaryOp.OP_ADD_WRAP: return wl_build_add(self.builder, l, r)
     if op == BinaryOp.OP_SUB_WRAP: return wl_build_sub(self.builder, l, r)
     if op == BinaryOp.OP_MUL_WRAP: return wl_build_mul(self.builder, l, r)
-    if op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT:
-        let sat_width = wl_get_int_type_width(wider_ty)
-        let sat_prefix = if op == BinaryOp.OP_ADD_SAT: if is_unsigned: "llvm.uadd.sat.i" else: "llvm.sadd.sat.i" else if is_unsigned: "llvm.usub.sat.i" else: "llvm.ssub.sat.i"
-        let sat_fn_name = if sat_width == 8: sat_prefix ++ "8" else if sat_width == 16: sat_prefix ++ "16" else if sat_width == 32: sat_prefix ++ "32" else: sat_prefix ++ "64"
-        let sat_sym = self.intern.intern(sat_fn_name)
-        let sat_fv = self.fn_values.get(sat_sym)
-        let sat_ft = self.fn_fn_types.get(sat_sym)
-        if sat_fv.is_some() and sat_ft.is_some():
-            let sat_args: Vec[i64] = Vec.new()
-            sat_args.push(l)
-            sat_args.push(r)
-            return wl_build_call(self.builder, sat_ft.unwrap() as i64, sat_fv.unwrap() as i64, vec_data_i64(&sat_args), 2)
-        else:
-            let sat_pts: Vec[i64] = Vec.new()
-            sat_pts.push(wider_ty)
-            sat_pts.push(wider_ty)
-            let sat_fnt = wl_function_type(wider_ty, vec_data_i64(&sat_pts), 2, 0)
-            let sat_func = wl_add_function(self.llmod, sat_fn_name, sat_fnt)
-            self.fn_values.insert(sat_sym, sat_func)
-            self.fn_fn_types.insert(sat_sym, sat_fnt)
-            let sat_args: Vec[i64] = Vec.new()
-            sat_args.push(l)
-            sat_args.push(r)
-            return wl_build_call(self.builder, sat_fnt, sat_func, vec_data_i64(&sat_args), 2)
-    if op == BinaryOp.OP_MUL_SAT:
-        // Widening multiply + clamp: multiply in 2x width, clamp to [MIN, MAX], truncate
-        let ms_width = wl_get_int_type_width(wider_ty)
-        let ms_dbl_width = ms_width * 2
-        let ms_dbl_ty = if ms_dbl_width == 16: wl_i16_type(self.context) else if ms_dbl_width == 32: wl_i32_type(self.context) else if ms_dbl_width == 64: wl_i64_type(self.context) else: wl_i128_type(self.context)
-        let ms_wide_l = if is_unsigned: wl_build_zext(self.builder, l, ms_dbl_ty) else: wl_build_sext(self.builder, l, ms_dbl_ty)
-        let ms_wide_r = if is_unsigned: wl_build_zext(self.builder, r, ms_dbl_ty) else: wl_build_sext(self.builder, r, ms_dbl_ty)
-        let ms_wide_result = wl_build_mul(self.builder, ms_wide_l, ms_wide_r)
-        // Clamp using saturating add of 0 in the original width (truncate + sat)
-        // Actually: just truncate and check for overflow with icmp
-        if is_unsigned:
-            let ms_max_val = wl_const_int(ms_dbl_ty, ((1 as i64) << (ms_width as u32)) - 1, 0)
-            let ms_overflow = wl_build_icmp(self.builder, wl_int_ugt(), ms_wide_result, ms_max_val)
-            let ms_clamped = wl_build_select(self.builder, ms_overflow, ms_max_val, ms_wide_result)
-            return wl_build_trunc(self.builder, ms_clamped, wider_ty)
-        else:
-            let ms_half = ms_width as i64 - 1
-            let ms_max_val = wl_const_int(ms_dbl_ty, ((1 as i64) << (ms_half as u32)) - 1, 0)
-            let ms_min_val = wl_const_int(ms_dbl_ty, -((1 as i64) << (ms_half as u32)), 1)
-            let ms_too_big = wl_build_icmp(self.builder, wl_int_sgt(), ms_wide_result, ms_max_val)
-            let ms_too_small = wl_build_icmp(self.builder, wl_int_slt(), ms_wide_result, ms_min_val)
-            let ms_clamped_hi = wl_build_select(self.builder, ms_too_big, ms_max_val, ms_wide_result)
-            let ms_clamped = wl_build_select(self.builder, ms_too_small, ms_min_val, ms_clamped_hi)
-            return wl_build_trunc(self.builder, ms_clamped, wider_ty)
-    if op == BinaryOp.OP_ADD:
-        if is_unsigned: return wl_build_add(self.builder, l, r)
-        return wl_build_nsw_add(self.builder, l, r)
-    if op == BinaryOp.OP_SUB:
-        if is_unsigned: return wl_build_sub(self.builder, l, r)
-        return wl_build_nsw_sub(self.builder, l, r)
-    if op == BinaryOp.OP_MUL:
-        if is_unsigned: return wl_build_mul(self.builder, l, r)
-        return wl_build_nsw_mul(self.builder, l, r)
-    if op == BinaryOp.OP_DIV:
-        if is_unsigned: return wl_build_udiv(self.builder, l, r)
-        return wl_build_sdiv(self.builder, l, r)
-    if op == BinaryOp.OP_MOD:
-        if is_unsigned: return wl_build_urem(self.builder, l, r)
-        return wl_build_srem(self.builder, l, r)
+    if op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT:
+        return self.mir_build_saturating_bin_op(op, l, r, wider_ty, arith_unsigned)
+    if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL:
+        if self.overflow_mode == OVERFLOW_MODE_WRAP():
+            return self.mir_build_raw_int_bin_op(op, l, r, arith_unsigned)
+        if self.overflow_mode == OVERFLOW_MODE_SATURATE():
+            return self.mir_build_saturating_bin_op(op, l, r, wider_ty, arith_unsigned)
+        return self.mir_build_checked_int_bin_op(op, l, r, wider_ty, arith_unsigned)
+    if op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD:
+        return self.mir_build_checked_div_or_mod(op, l, r, wider_ty, arith_unsigned)
     if op == BinaryOp.OP_EQ: return wl_build_icmp(self.builder, wl_int_eq(), l, r)
     if op == BinaryOp.OP_NEQ: return wl_build_icmp(self.builder, wl_int_ne(), l, r)
     if op == BinaryOp.OP_LT:
@@ -2744,6 +2841,21 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             let ak = wl_get_type_kind(wl_type_of(arg))
             if ak == wl_float_type_kind() or ak == wl_double_type_kind():
                 return wl_build_fneg(self.builder, arg)
+            let arg_ty = wl_type_of(arg)
+            let width = wl_get_int_type_width(arg_ty)
+            if self.overflow_mode == OVERFLOW_MODE_WRAP():
+                return wl_build_neg(self.builder, arg)
+            let min_value = wl_const_int(arg_ty, int_signed_min(width), 1)
+            let is_min = wl_build_icmp(self.builder, wl_int_eq(), arg, min_value)
+            if self.overflow_mode == OVERFLOW_MODE_SATURATE():
+                let neg = wl_build_neg(self.builder, arg)
+                return wl_build_select(self.builder, is_min, wl_const_int(arg_ty, int_signed_max(width), 0), neg)
+            let panic_bb = wl_append_bb(self.context, self.current_function, "neg.overflow")
+            let ok_bb = wl_append_bb(self.context, self.current_function, "neg.ok")
+            wl_build_cond_br(self.builder, is_min, panic_bb, ok_bb)
+            wl_position_at_end(self.builder, panic_bb)
+            self.emit_runtime_panic("integer overflow")
+            wl_position_at_end(self.builder, ok_bb)
             return wl_build_neg(self.builder, arg)
         if d0 == UnaryOp.UOP_BIT_NOT:
             return wl_build_not(self.builder, arg)
@@ -7677,11 +7789,53 @@ fn Codegen.mir_generic_base_name(self: Codegen, sema_ty: i32) -> str:
 fn Codegen.mir_type_name(self: Codegen, sema_ty: i32) -> str:
     let sym = self.mir_struct_sym_from_sema_type(sema_ty)
     if sym == 0:
-        return ""
+        let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+        if resolved <= 0:
+            return ""
+        let snapshot_len = self.mir_input.sema_type_kinds.len() as i32
+        let tk = self.mir_input.mir_get_type_kind(resolved)
+        var raw_sym = 0
+        if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_GENERIC_INST:
+            raw_sym = self.mir_input.mir_get_type_d0(resolved)
+        else if tk == 0 and resolved >= snapshot_len:
+            let live_resolved = self.sema.resolve_alias(resolved)
+            let live_tk = self.sema.get_type_kind(live_resolved)
+            if live_tk == TypeKind.TY_STRUCT or live_tk == TypeKind.TY_GENERIC_INST:
+                raw_sym = self.sema.get_type_d0(live_resolved)
+        if raw_sym == 0:
+            return ""
+        let raw_cg_sym = self.sema_sym_to_codegen_sym(raw_sym)
+        if raw_cg_sym != 0:
+            let raw_text = self.intern.resolve(raw_cg_sym)
+            if raw_text.len() > 0:
+                return raw_text
+        return self.sema_symbol_text(raw_sym)
     let text = self.intern.resolve(sym)
     if text.len() > 0:
         return text
     self.sema_symbol_text(sym)
+
+fn Codegen.mir_llvm_type_is_scoped_join_handle(self: Codegen, ty: i64) -> bool:
+    if ty == 0 or wl_get_type_kind(ty) != wl_struct_type_kind():
+        return false
+    let name = wl_get_struct_name(ty)
+    if name == "ScopedJoinHandle":
+        return true
+    if wl_count_struct_elem_types(ty) != 3:
+        return false
+    let f0 = wl_struct_get_type_at(ty, 0)
+    let f1 = wl_struct_get_type_at(ty, 1)
+    let f2 = wl_struct_get_type_at(ty, 2)
+    let f0_is_i64 = wl_get_type_kind(f0) == wl_integer_type_kind() and wl_get_int_type_width(f0) == 64
+    let f1_is_i32 = wl_get_type_kind(f1) == wl_integer_type_kind() and wl_get_int_type_width(f1) == 32
+    let f2_is_i64 = wl_get_type_kind(f2) == wl_integer_type_kind() and wl_get_int_type_width(f2) == 64
+    f0_is_i64 and f1_is_i32 and f2_is_i64
+
+fn Codegen.mir_operand_is_scoped_join_handle(self: Codegen, body: MirBody, operand_id: i32) -> bool:
+    let sema_ty = self.mir_operand_sema_type(body, operand_id)
+    if self.mir_type_name(sema_ty) == "ScopedJoinHandle":
+        return true
+    self.mir_llvm_type_is_scoped_join_handle(self.mir_sema_type_to_llvm(sema_ty))
 
 fn Codegen.mir_generic_arg_tid(self: Codegen, sema_ty: i32, idx: i32) -> i32:
     if sema_ty <= 0:
@@ -9317,6 +9471,10 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                                 let gc_fb_try_sym = self.intern.intern(gc_fb_q2)
                                 if self.fn_values.get(gc_fb_try_sym).is_some():
                                     gc_fb_fn_sym = gc_fb_try_sym
+                if gc_fb_fn_sym != 0 and gc_fb_mir_count > 0 and gc_fb_method == "join":
+                    let gc_fb_recv_op = body.call_arg_operands.get(gc_fb_mir_start as i64)
+                    if self.mir_operand_is_scoped_join_handle(body, gc_fb_recv_op):
+                        gc_fb_fn_sym = 0
                 if gc_fb_fn_sym != 0 and gc_fb_mir_count > 0:
                     let gc_fb_fv = self.fn_values.get(gc_fb_fn_sym)
                     let gc_fb_ft = self.fn_fn_types.get(gc_fb_fn_sym)
@@ -9438,6 +9596,12 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let sjh_dst_ptr = self.mir_place_ptr(body, dest_place, false, sjh_ty)
                         if sjh_dst_ptr != 0:
                             wl_build_store(self.builder, sjh_val, sjh_dst_ptr)
+                        else if dest_place < body.place_locals.len() as i32:
+                            let sjh_local = body.place_locals.get(dest_place as i64)
+                            let sjh_alloca = self.create_entry_alloca(sjh_ty)
+                            wl_build_store(self.builder, sjh_val, sjh_alloca)
+                            self.mir_local_ptrs.insert(sjh_local, sjh_alloca)
+                            self.mir_local_types.insert(sjh_local, sjh_ty)
                     if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                         wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
                     return true
@@ -9447,8 +9611,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 let join_mir_count = body.call_arg_counts.get(args_id as i64)
                 if join_mir_count > 0:
                     let join_recv_op = body.call_arg_operands.get(join_mir_start as i64)
-                    let join_recv_sema = self.mir_operand_sema_type(body, join_recv_op)
-                    if self.mir_type_name(join_recv_sema) == "ScopedJoinHandle":
+                    if self.mir_operand_is_scoped_join_handle(body, join_recv_op):
                         let join_recv_val = self.mir_eval_operand(body, join_recv_op, 0)
                         let join_recv_ty = wl_type_of(join_recv_val)
                         let join_alloca = self.create_entry_alloca(join_recv_ty)
@@ -9477,6 +9640,12 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                             let join_dst_ptr = self.mir_place_ptr(body, dest_place, false, wl_i32_type(self.context))
                             if join_dst_ptr != 0:
                                 wl_build_store(self.builder, join_result, join_dst_ptr)
+                            else if dest_place < body.place_locals.len() as i32:
+                                let join_local = body.place_locals.get(dest_place as i64)
+                                let join_result_alloca = self.create_entry_alloca(wl_i32_type(self.context))
+                                wl_build_store(self.builder, join_result, join_result_alloca)
+                                self.mir_local_ptrs.insert(join_local, join_result_alloca)
+                                self.mir_local_types.insert(join_local, wl_i32_type(self.context))
                         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
                         return true
@@ -10439,10 +10608,12 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
             if not self.mir_emit_stmt(body, stmt_id):
                 if self.debug_mir_codegen_enabled():
                     with_eprint(f"[mir-cg] fn={name_str} bb={bb} stmt_fail={stmt_id}")
-                if wl_get_bb_terminator(llbb) == 0:
+                let fail_bb = wl_get_insert_block(self.builder)
+                if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
                     wl_build_unreachable(self.builder)
                 break
-        if wl_get_bb_terminator(llbb) == 0:
+        let term_bb = wl_get_insert_block(self.builder)
+        if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
             let term_span = body.bb_term_spans.get(bb as i64)
             if term_span > 0:
                 self.debug_set_location(term_span)
@@ -10452,7 +10623,8 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                 if ok:
                     ok_i = 1
                 with_eprint(f"[mir-cg] fn={name_str} bb={bb} term_ok={ok_i}")
-            if not ok and wl_get_bb_terminator(llbb) == 0:
+            let after_term_bb = wl_get_insert_block(self.builder)
+            if not ok and after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
                 wl_build_unreachable(self.builder)
 
     self.di_current_scope = saved_fn_scope
@@ -10824,12 +10996,15 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
         for si in 0..stmt_count:
             let stmt_id = stmt_start + si
             if not self.mir_emit_stmt(body, stmt_id):
-                if wl_get_bb_terminator(llbb) == 0:
+                let fail_bb = wl_get_insert_block(self.builder)
+                if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
                     wl_build_unreachable(self.builder)
                 break
-        if wl_get_bb_terminator(llbb) == 0:
+        let term_bb = wl_get_insert_block(self.builder)
+        if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
             let ok = self.mir_emit_term(body, bb)
-            if not ok and wl_get_bb_terminator(llbb) == 0:
+            let after_term_bb = wl_get_insert_block(self.builder)
+            if not ok and after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
                 wl_build_unreachable(self.builder)
 
     if self.mir_default_unreachable_bbs.len() as i32 > 0:
@@ -11928,11 +12103,14 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         for cl_si in 0..cl_stmt_count:
             let cl_stmt_id = cl_stmt_start + cl_si
             if not self.mir_emit_stmt(closure_body, cl_stmt_id):
-                if wl_get_bb_terminator(cl_llbb) == 0:
+                let fail_bb = wl_get_insert_block(self.builder)
+                if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
                     wl_build_unreachable(self.builder)
-        if wl_get_bb_terminator(cl_llbb) == 0:
+        let term_bb = wl_get_insert_block(self.builder)
+        if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
             if not self.mir_emit_term(closure_body, cl_bb):
-                if wl_get_bb_terminator(cl_llbb) == 0:
+                let after_term_bb = wl_get_insert_block(self.builder)
+                if after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
                     let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
 
     if self.mir_default_unreachable_bbs.len() as i32 > 0:

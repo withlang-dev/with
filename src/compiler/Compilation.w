@@ -19,6 +19,7 @@ use compiler.ProjectConfig
 use compiler.DriverOptions
 use compiler.Zcu
 use compiler.Runtime
+use Overflow
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> void
@@ -347,6 +348,7 @@ fn Compilation.configure(self: Compilation, opt_level: i32, no_std: bool, alloc_
 fn Compilation.configure_options(self: Compilation, options: BuildCommandOptions):
     self.configure(options.opt_level, options.no_std, options.alloc_mode, options.runtime_available)
     self.set_prelude_mode(options.prelude_mode)
+    self.set_overflow_mode(options.overflow_mode)
     self.set_debug_info(options.debug_info)
     self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
 
@@ -360,6 +362,8 @@ fn Compilation.apply_runtime_config(self: Compilation, cfg: ProjectConfig) -> Pr
         out.runtime_available = false
     if out.no_std:
         out.runtime_available = false
+    if overflow_mode_valid(self.config.overflow_mode):
+        out.overflow_mode = self.config.overflow_mode
     out
 
 fn Compilation.project_config_for_source(self: Compilation, source_path: str) -> ProjectConfig:
@@ -372,6 +376,11 @@ fn Compilation.set_prelude_mode(self: Compilation, mode: i32):
     var zcu = self.zcu
     zcu.set_prelude_mode(cfg.prelude_mode)
     self.zcu = zcu
+
+fn Compilation.set_overflow_mode(self: Compilation, mode: i32):
+    var cfg = self.config
+    cfg.overflow_mode = if overflow_mode_valid(mode): mode else: -1
+    self.config = cfg
 
 fn Compilation.set_debug_info(self: Compilation, enabled: bool):
     var cfg = self.config
@@ -1063,7 +1072,7 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
     var emit_intern = self.zcu.pool
     if self.zcu.last_sema.pool.state.symbol_texts.len() as i32 > 1:
         emit_intern = self.zcu.last_sema.pool
-    let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, emit_intern, self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text)
+    let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, emit_intern, self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text, self.zcu.project_config.overflow_mode)
     if emitted.ok == 0:
         runtime_eprint("error: C emission failed: " ++ emitted.err_msg)
         return ""
@@ -1090,6 +1099,7 @@ fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
     sema.source_text = zcu.current_source_text
     sema.tool_mode_entry_path = zcu.tool_mode_entry_path
     sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
+    sema.overflow_mode = zcu.project_config.overflow_mode
     if zcu.project_config.no_std or self.config.no_std:
         sema.no_std = 1
     if zcu.project_config.alloc_mode or self.config.alloc_mode:
@@ -1164,6 +1174,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     sema.decl_is_c_import = self.zcu.decl_is_c_import
     sema.tool_mode_entry_path = self.zcu.tool_mode_entry_path
     sema.runtime_available = if self.zcu.project_config.runtime_available: 1 else: 0
+    sema.overflow_mode = self.zcu.project_config.overflow_mode
     sema.init_module_graph(&self.zcu.last_resolved)
     if self.zcu.project_config.no_std or self.config.no_std:
         sema.no_std = 1

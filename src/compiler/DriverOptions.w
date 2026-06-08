@@ -1,10 +1,13 @@
 // Structured CLI option values for compiler-driver commands.
 
 extern fn with_arg_at(idx: i32) -> str
+extern fn with_getenv_str(name: str) -> str
 extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_len(s: str) -> i64
 extern fn with_str_byte_at(s: str, index: i64) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
+
+use Overflow
 
 pub enum BuildOutputKind: i32:
     Binary = 0
@@ -29,6 +32,7 @@ pub type BuildCommandOptions {
     alloc_mode: bool,
     runtime_available: bool,
     prelude_mode: i32,
+    overflow_mode: i32,
     deterministic: bool,
     target_kind: i32,
     include_paths: Vec[str],
@@ -79,6 +83,12 @@ pub type BuildCommandParseResult {
     graph: BuildGraphCommandOptions,
 }
 
+pub fn driver_internal_overflow_mode -> i32:
+    let mode = overflow_mode_parse(with_getenv_str("WITH_INTERNAL_OVERFLOW_MODE"))
+    if overflow_mode_valid(mode):
+        return mode
+    -1
+
 pub fn build_command_options_default -> BuildCommandOptions:
     BuildCommandOptions {
         source_path: "",
@@ -90,6 +100,7 @@ pub fn build_command_options_default -> BuildCommandOptions:
         alloc_mode: false,
         runtime_available: true,
         prelude_mode: DriverPreludeMode.Full,
+        overflow_mode: driver_internal_overflow_mode(),
         deterministic: false,
         target_kind: 0,
         include_paths: Vec.new(),
@@ -224,6 +235,12 @@ type DriverPreludeParseResult {
     invalid_value: str,
 }
 
+type DriverOverflowParseResult {
+    ok: bool,
+    mode: i32,
+    invalid_value: str,
+}
+
 fn driver_parse_prelude_mode(argc: i32) -> DriverPreludeParseResult:
     var mode = DriverPreludeMode.Full
     var i = 2
@@ -248,6 +265,20 @@ fn driver_parse_prelude_mode(argc: i32) -> DriverPreludeParseResult:
         i = i + 1
     DriverPreludeParseResult { true, mode, "" }
 
+fn driver_parse_overflow_mode(argc: i32) -> DriverOverflowParseResult:
+    var mode = driver_internal_overflow_mode()
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if with_str_starts_with(arg, "--overflow=") != 0:
+            let value = with_str_slice(arg, 11, with_str_len(arg))
+            let parsed = overflow_mode_parse(value)
+            if not overflow_mode_valid(parsed):
+                return DriverOverflowParseResult { false, -1, value }
+            mode = parsed
+        i = i + 1
+    DriverOverflowParseResult { true, mode, "" }
+
 pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
     var build = build_command_options_default()
     var graph = build_graph_command_options_default()
@@ -268,6 +299,16 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
             graph,
         }
     build.prelude_mode = prelude.mode
+
+    let overflow = driver_parse_overflow_mode(argc)
+    if not overflow.ok:
+        return BuildCommandParseResult {
+            ok: false,
+            error_msg: "invalid --overflow value '" ++ overflow.invalid_value ++ "' (expected panic|wrap|saturate)",
+            build,
+            graph,
+        }
+    build.overflow_mode = overflow.mode
 
     let emit_c = driver_has_flag(argc, "--emit-c")
     let emit_obj = driver_has_flag(argc, "--emit-obj")

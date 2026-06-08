@@ -807,8 +807,8 @@ operator trait (§11.7).
 #### 4.2.3 Integer Overflow
 
 Arithmetic is checked in safe code by default. Integer overflow
-causes a panic in debug builds. Release builds may be configured
-for panic, wrap, or saturation; the default is panic.
+causes a panic in all builds unless the project explicitly configures
+wrapping or saturating arithmetic; the default is panic.
 
 ```toml
 # with.toml

@@ -278,6 +278,9 @@ with clean               # clean build artifacts
 --prelude=none          no prelude
 --prelude=core          core prelude
 --prelude=full          full prelude (default)
+--overflow=panic        checked overflow, panic at runtime (default)
+--overflow=wrap         modular/wrapping integer arithmetic
+--overflow=saturate     saturating integer arithmetic
 --emit-obj              emit object file
 --emit-c                emit C (cross-compilation)
 -o <path>              output path (direct source builds)

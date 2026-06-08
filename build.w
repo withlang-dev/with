@@ -46,6 +46,11 @@ fn with_ir_target(name: str, compiler: str, source: str, output: str, dep: str) 
         target = target.dep(dep)
     target
 
+fn with_ir_target_overflow(name: str, compiler: str, source: str, output: str, dep: str, overflow: str) -> Target:
+    var target = with_ir_target(name, compiler, source, output, dep)
+    target = target.arg("overflow=" ++ overflow)
+    target
+
 fn run_write_empty_file_action(ctx: ActionCtx) -> i32:
     let output = ctx.output()
     if output.len() == 0:
@@ -452,7 +457,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O0", ""))
     out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O0", "compat-runtime-source"))
     out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O0", ""))
-    out = out.add_target(with_ir_target("bootstrap-regex-runtime-ir", "seed", "rt/regex_runtime.w", "out/bootstrap-tmp/regex_runtime.ll", ""))
+    out = out.add_target(with_ir_target_overflow("bootstrap-regex-runtime-ir", "seed", "rt/regex_runtime.w", "out/bootstrap-tmp/regex_runtime.ll", "", "wrap"))
     var bootstrap_regex_runtime = target_new(.CompileLlvmIrObject, "bootstrap-regex-runtime-object", "out/bootstrap-tmp/regex_runtime.ll").output("out/bootstrap-lib/regex_runtime.o")
     bootstrap_regex_runtime = bootstrap_regex_runtime.dep("bootstrap-regex-runtime-ir")
     out = out.add_target(bootstrap_regex_runtime)
@@ -650,7 +655,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
     out = out.add_target(compat_runtime_obj)
     out = out.add_target(with_object_target("panic-runtime-object", stage_compiler_bin("with-stage2"), "rt/panic_runtime.w", "out/lib/panic_runtime.o", "-O0", "stage2"))
-    out = out.add_target(with_ir_target("regex-runtime-ir", stage_compiler_bin("with-stage2"), "rt/regex_runtime.w", "out/tmp/regex_runtime.ll", "stage2"))
+    out = out.add_target(with_ir_target_overflow("regex-runtime-ir", stage_compiler_bin("with-stage2"), "rt/regex_runtime.w", "out/tmp/regex_runtime.ll", "stage2", "wrap"))
 
     var regex_runtime = target_new(.CompileLlvmIrObject, "regex-runtime-object", "out/tmp/regex_runtime.ll").output("out/lib/regex_runtime.o")
     out = out.add_target(regex_runtime)

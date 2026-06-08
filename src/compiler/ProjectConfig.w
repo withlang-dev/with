@@ -1,5 +1,6 @@
 use Resolve
 use compiler.Runtime
+use Overflow
 
 type ProjectConfig {
     root_dir: str,
@@ -15,6 +16,7 @@ type ProjectConfig {
     no_std: bool,
     alloc_mode: bool,
     runtime_available: bool,
+    overflow_mode: i32,
 }
 
 fn project_config_default -> ProjectConfig:
@@ -32,6 +34,7 @@ fn project_config_default -> ProjectConfig:
         no_std: false,
         alloc_mode: false,
         runtime_available: true,
+        overflow_mode: overflow_mode_default(),
     }
 
 fn project_config_file_exists(path: str) -> bool:
@@ -135,6 +138,13 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
                 out.manifest_error = "runtime must be true or false"
         else:
             out.runtime_available = parsed_runtime != 0
+    else if section == "build" and key == "overflow":
+        let parsed_overflow = overflow_mode_parse(project_config_strip_quotes(project_config_trim(value)))
+        if parsed_overflow < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "build.overflow must be panic, wrap, or saturate"
+        else:
+            out.overflow_mode = parsed_overflow
     else if section == "c_import" and key == "include_paths":
         out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
     else if section == "link" and key == "search_paths":
@@ -245,11 +255,15 @@ fn project_config_wants_key(section: str, key: str) -> bool:
         return true
     if section == "link" and key == "search_paths":
         return true
+    if section == "build" and key == "overflow":
+        return true
     if section == "deps" and key.starts_with("c."):
         return true
     false
 
 fn project_config_forbidden_entry(section: str, key: str) -> str:
+    if section == "build" and key == "overflow":
+        return ""
     if section == "build" or section == "commands" or section == "scripts" or section == "targets" or section == "target":
         return "imperative build configuration belongs in build.w, not with.toml: [" ++ section ++ "]"
     if section == "assets" or section == "asset" or section == "shaders" or section == "shader":
