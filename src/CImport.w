@@ -4115,9 +4115,9 @@ fn ci_op_length(s: str, idx: i32, slen: i32) -> i32:
     1
 
 fn ci_apply_op(lhs: i64, rhs: i64, op: str) -> str:
-    if op == "+": return f"{lhs + rhs}"
-    if op == "-": return f"{lhs - rhs}"
-    if op == "*": return f"{lhs * rhs}"
+    if op == "+": return f"{lhs +% rhs}"
+    if op == "-": return f"{lhs -% rhs}"
+    if op == "*": return f"{lhs *% rhs}"
     if op == "/":
         if rhs == 0: return ""
         return f"{lhs / rhs}"
@@ -4151,32 +4151,32 @@ fn ci_parse_i64(s: str) -> i64:
                 while j as i64 < s.len():
                     let c = s.byte_at(j as i64)
                     if c >= 48 and c <= 57:
-                        n = n * 16 + (c - 48) as i64
+                        n = (n *% 16) +% (c - 48) as i64
                     else if c >= 97 and c <= 102:
-                        n = n * 16 + (c - 97 + 10) as i64
+                        n = (n *% 16) +% (c - 97 + 10) as i64
                     else if c >= 65 and c <= 70:
-                        n = n * 16 + (c - 65 + 10) as i64
+                        n = (n *% 16) +% (c - 65 + 10) as i64
                     else:
                         break
                     j = j + 1
-                if is_neg: return 0 - n
+                if is_neg: return 0 -% n
                 return n
     var n: i64 = 0
     var j = si
     while j as i64 < s.len():
         let c = s.byte_at(j as i64)
         if c >= 48 and c <= 57:
-            n = n * 10 + (c - 48) as i64
+            n = (n *% 10) +% (c - 48) as i64
         else:
             break
         j = j + 1
-    if is_neg: 0 - n else: n
+    if is_neg: 0 -% n else: n
 
 fn ci_shl(a: i32, b: i32) -> i32:
     var result = a
     var count = b
     while count > 0:
-        result = result * 2
+        result = result *% 2
         count = count - 1
     result
 
@@ -4199,10 +4199,10 @@ fn ci_bitor(a: i32, b: i32) -> i32:
         let ab = aa - (aa / 2) * 2
         let bv = bb - (bb / 2) * 2
         if ab != 0 or bv != 0:
-            result = result + bit
+            result = result +% bit
         aa = aa / 2
         bb = bb / 2
-        bit = bit * 2
+        bit = bit *% 2
         count = count + 1
     result
 
@@ -4216,10 +4216,10 @@ fn ci_bitand(a: i32, b: i32) -> i32:
         let ab = aa - (aa / 2) * 2
         let bv = bb - (bb / 2) * 2
         if ab != 0 and bv != 0:
-            result = result + bit
+            result = result +% bit
         aa = aa / 2
         bb = bb / 2
-        bit = bit * 2
+        bit = bit *% 2
         count = count + 1
     result
 
@@ -4233,10 +4233,10 @@ fn ci_bitxor(a: i32, b: i32) -> i32:
         let ab = aa - (aa / 2) * 2
         let bv = bb - (bb / 2) * 2
         if ab != bv:
-            result = result + bit
+            result = result +% bit
         aa = aa / 2
         bb = bb / 2
-        bit = bit * 2
+        bit = bit *% 2
         count = count + 1
     result
 

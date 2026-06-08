@@ -1,4 +1,4 @@
-//! args: --emit-c
+//! args: --emit-c --overflow=wrap
 //! expect-build-fail: C backend is LLVM-only for dyn trait method dispatch by design
 
 trait Greet:

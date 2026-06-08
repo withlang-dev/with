@@ -6,6 +6,7 @@ use Ast
 use InternPool
 use Mir
 use Sema
+use Overflow
 extern fn with_eprint(s: str) -> void
 extern fn with_fs_read_file(path: str) -> str
 
@@ -777,6 +778,20 @@ fn MirBuilder.expr_type(self: MirBuilder, node: i32) -> i32:
             return typed as i32
     self.fallback_expr_type(node)
 
+fn MirBuilder.mir_const_int_width(self: MirBuilder, type_id: i32) -> i32:
+    let numeric = self.sema.numeric_operand_type(type_id)
+    let resolved = self.sema.resolve_alias(numeric as TypeId)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_INT:
+        return self.sema.get_type_d0(resolved)
+    64
+
+fn MirBuilder.mir_const_int_is_unsigned(self: MirBuilder, type_id: i32) -> bool:
+    let numeric = self.sema.numeric_operand_type(type_id)
+    let resolved = self.sema.resolve_alias(numeric as TypeId)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_INT:
+        return self.sema.get_type_d1(resolved) == 0
+    false
+
 fn MirBuilder.binding_type(self: MirBuilder, node: i32) -> i32:
     if self.sema.typed_binding_types.contains(node):
         let typed = self.sema.typed_binding_types.get(node).unwrap()
@@ -839,9 +854,9 @@ fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
     if type_arg2_node != 0:
         arg2_type = self.resolve_type_arg_node(type_arg2_node)
     // Look up TypeKind.TY_GENERIC_INST from sema cache (created by Sema.check_index)
-    var cache_key: i64 = base_sym as i64 * 31 + arg_type as i64
+    var cache_key: i64 = (base_sym as i64 *% 31) +% arg_type as i64
     if arg2_type > 0:
-        cache_key = cache_key * 31 + arg2_type as i64
+        cache_key = (cache_key *% 31) +% arg2_type as i64
     if self.sema.generic_inst_cache.contains(cache_key):
         return self.sema.generic_inst_cache.get(cache_key).unwrap()
     0
@@ -1607,7 +1622,11 @@ fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
         let op = self.ast.get_data0(node)
         let inner = self.try_eval_const(self.ast.get_data1(node))
         if inner == -9223372036854775807: return -9223372036854775807
-        if op == UnaryOp.UOP_NEGATE: return -inner
+        if op == UnaryOp.UOP_NEGATE:
+            let result_ty = self.expr_type(node)
+            let arith = int_eval_unary_neg(inner, self.mir_const_int_width(result_ty), self.sema.overflow_mode)
+            if arith.ok == 0 or arith.overflow != 0: return -9223372036854775807
+            return arith.value
         if op == UnaryOp.UOP_BIT_NOT: return 0 - inner - 1
         if op == UnaryOp.UOP_NOT:
             if inner == 0: return 1
@@ -1619,14 +1638,28 @@ fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
         if lv == -9223372036854775807: return -9223372036854775807
         let rv = self.try_eval_const(self.ast.get_data2(node))
         if rv == -9223372036854775807: return -9223372036854775807
-        if op == BinaryOp.OP_ADD: return lv + rv
-        if op == BinaryOp.OP_SUB: return lv - rv
-        if op == BinaryOp.OP_MUL: return lv * rv
+        if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP or op == BinaryOp.OP_MUL_SAT:
+            let result_ty = self.expr_type(node)
+            let arith = int_eval_binary_arithmetic(op, lv, rv, self.mir_const_int_width(result_ty), self.mir_const_int_is_unsigned(result_ty), self.sema.overflow_mode)
+            if arith.ok == 0 or arith.overflow != 0: return -9223372036854775807
+            return arith.value
         if op == BinaryOp.OP_DIV:
             if rv == 0: return -9223372036854775807
+            let result_ty = self.expr_type(node)
+            if int_div_overflows(lv, rv, self.mir_const_int_width(result_ty), self.mir_const_int_is_unsigned(result_ty)):
+                if self.sema.overflow_mode == OVERFLOW_MODE_WRAP():
+                    return int_signed_min(self.mir_const_int_width(result_ty))
+                if self.sema.overflow_mode == OVERFLOW_MODE_SATURATE():
+                    return int_signed_max(self.mir_const_int_width(result_ty))
+                return -9223372036854775807
             return lv / rv
         if op == BinaryOp.OP_MOD:
             if rv == 0: return -9223372036854775807
+            let result_ty = self.expr_type(node)
+            if int_div_overflows(lv, rv, self.mir_const_int_width(result_ty), self.mir_const_int_is_unsigned(result_ty)):
+                if self.sema.overflow_mode == OVERFLOW_MODE_WRAP() or self.sema.overflow_mode == OVERFLOW_MODE_SATURATE():
+                    return 0
+                return -9223372036854775807
             return lv % rv
         return -9223372036854775807
     if kind == NodeKind.NK_IDENT:
@@ -6074,7 +6107,7 @@ fn MirBuilder.receiver_option_intrinsic(self: MirBuilder, recv_expr: i32) -> Mir
 
 fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
     // Lower method calls as normal calls with receiver inserted as first arg.
-    let callee_sym = if self.sema.comp_resolved.contains(node):
+    var callee_sym = if self.sema.comp_resolved.contains(node):
         self.sema.comp_resolved.get(node).unwrap()
     else:
         self.resolve_method_callee_sym(self_expr, method_sym)
@@ -6099,6 +6132,8 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
         let resolved_recv = self.sema.resolve_alias(recv_type as TypeId)
         if self.sema.get_type_kind(resolved_recv) == TypeKind.TY_PTR:
             return self.lower_expr(self_expr)
+    if method_name == "join" and self.sema.type_is_scoped_join_handle(recv_type) != 0:
+        callee_sym = method_sym
     if self.receiver_is_static_type_expr(self_expr) != 0 and recv_type != 0 and self.sema.enum_has_variant(recv_type, method_sym) != 0:
         return self.lower_static_enum_variant_call(recv_type, method_sym, arg_start, arg_count, node)
     let enum_accessor_recv_type = if recv_type != 0 and recv_type != self.sema.ty_void as i32: self.sema.auto_deref_ref_ptr_type(recv_type as TypeId) as i32 else: recv_type

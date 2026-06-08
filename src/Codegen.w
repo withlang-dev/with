@@ -16,6 +16,7 @@ use Diagnostic
 use Source
 use Resolve
 use compiler.LlvmBridge.*
+use Overflow
 
 extern fn exit(code: i32) -> void
 extern fn with_fs_read_file(path: str) -> str
@@ -89,6 +90,7 @@ type Codegen {
     intern: InternPool,
     sema: Sema,
     sema_symbol_texts: Vec[str],
+    overflow_mode: i32,
 
     // Current function state
     current_ret_type: i64,
@@ -453,8 +455,10 @@ fn Codegen.init(module_name: str) -> Codegen:
 
 fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: InternPool, sema: Sema) -> Codegen:
     var cg = Codegen.init_with_opt(module_name, opt_level)
+    let overflow_mode = sema.overflow_mode
     cg.intern = intern
     cg.sema = sema
+    cg.overflow_mode = overflow_mode
     cg.capture_sema_symbol_texts()
     // Pre-intern dispatch symbols for O(1) comparisons
     cg.sym_vec = cg.intern.intern("Vec")
@@ -522,6 +526,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         intern: InternPool.init(),
         sema: Sema.init(InternPool.init(), DiagnosticList.init(), AstPool.new()),
         sema_symbol_texts: Vec.new(),
+        overflow_mode: overflow_mode_default(),
         current_ret_type: 0,
         mir_emit_mutual_tail_call: 0,
         async_trampolines: HashMap.new(),
@@ -4268,7 +4273,7 @@ fn Codegen.cache_vec_type(self: Codegen, sema_tid: i32, elem_ty: i64, vec_ty: i6
     vec_ty
 
 fn Codegen.get_or_create_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64, val_ty: i64) -> i64:
-    let hash = if sema_tid > 0: sema_tid as i64 else: key_ty * 65537 + val_ty
+    let hash = if sema_tid > 0: sema_tid as i64 else: (key_ty *% 65537) +% val_ty
     let cached = self.hm_cache_map.get(hash)
     if cached.is_some():
         let existing = cached.unwrap() as i64
@@ -4284,7 +4289,7 @@ fn Codegen.get_or_create_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64,
     hm_ty
 
 fn Codegen.cache_hashmap_type(self: Codegen, sema_tid: i32, key_ty: i64, val_ty: i64, hm_ty: i64) -> i64:
-    let hash = if sema_tid > 0: sema_tid as i64 else: key_ty * 65537 + val_ty
+    let hash = if sema_tid > 0: sema_tid as i64 else: (key_ty *% 65537) +% val_ty
     let cached = self.hm_cache_map.get(hash)
     if cached.is_some():
         let existing = cached.unwrap()

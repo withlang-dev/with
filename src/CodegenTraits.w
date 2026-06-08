@@ -5,6 +5,7 @@ use Sema
 use InternPool
 use Diagnostic
 use Source
+use Overflow
 
 extern fn with_eprint(s: str) -> void
 
@@ -773,6 +774,20 @@ fn const_string_eval_ok(text: str) -> ConstStringEval:
         text,
     }
 
+fn Codegen.codegen_const_int_width(self: Codegen, type_id: i32) -> i32:
+    let numeric = self.sema.numeric_operand_type(type_id)
+    let resolved = self.sema.resolve_alias(numeric as TypeId)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_INT:
+        return self.sema.get_type_d0(resolved)
+    64
+
+fn Codegen.codegen_const_int_is_unsigned(self: Codegen, type_id: i32) -> bool:
+    let numeric = self.sema.numeric_operand_type(type_id)
+    let resolved = self.sema.resolve_alias(numeric as TypeId)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_INT:
+        return self.sema.get_type_d1(resolved) == 0
+    false
+
 fn Codegen.decl_source_path(self: Codegen, decl_index: i32) -> str:
     if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
         let path = self.decl_source_paths.get(decl_index as i64)
@@ -1182,11 +1197,14 @@ fn Codegen.emit_module_runtime_init_fn(self: Codegen, name_sym: i32, value_node:
         for si in 0..stmt_count:
             let stmt_id = stmt_start + si
             if not self.mir_emit_stmt(init_body, stmt_id):
-                if wl_get_bb_terminator(llbb) == 0:
+                let fail_bb = wl_get_insert_block(self.builder)
+                if fail_bb != 0 and wl_get_bb_terminator(fail_bb) == 0:
                     wl_build_unreachable(self.builder)
-        if wl_get_bb_terminator(llbb) == 0:
+        let term_bb = wl_get_insert_block(self.builder)
+        if term_bb != 0 and wl_get_bb_terminator(term_bb) == 0:
             if not self.mir_emit_term(init_body, bb):
-                if wl_get_bb_terminator(llbb) == 0:
+                let after_term_bb = wl_get_insert_block(self.builder)
+                if after_term_bb != 0 and wl_get_bb_terminator(after_term_bb) == 0:
                     let _ = wl_build_ret(self.builder, wl_const_null(ret_ty))
 
     self.mir_local_ptrs = saved_mir_locals
@@ -1527,7 +1545,18 @@ fn Codegen.try_eval_const_struct_llvm(self: Codegen, node: i32, expected_tid: i3
 
     wl_const_named_struct(struct_ty, vec_data_i64(&fields), llvm_field_count)
 
+fn Codegen.try_eval_const_result_type(self: Codegen, node: i32, expected_tid: i32) -> i32:
+    if expected_tid != 0:
+        return expected_tid
+    let typed = self.sema_type_of_node(node)
+    if typed != 0:
+        return typed
+    expected_tid
+
 fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
+    self.try_eval_const_int_expected(node, 0)
+
+fn Codegen.try_eval_const_int_expected(self: Codegen, node: i32, expected_tid: i32) -> i64:
     let kind = self.pool.kind(node)
     if kind == NodeKind.NK_INT_LIT:
         let fast = self.pool.int_literal_fast_i64(node as NodeId)
@@ -1535,18 +1564,22 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
             return CONST_EVAL_FAIL()
         return fast.value
     if kind == NodeKind.NK_COMPTIME:
-        return self.try_eval_const_int(self.pool.get_data0(node))
+        return self.try_eval_const_int_expected(self.pool.get_data0(node), expected_tid)
     if kind == NodeKind.NK_GROUPED:
-        return self.try_eval_const_int(self.pool.get_data0(node))
+        return self.try_eval_const_int_expected(self.pool.get_data0(node), expected_tid)
     if kind == NodeKind.NK_CAST:
-        return self.try_eval_const_int(self.pool.get_data0(node))
+        return self.try_eval_const_int_expected(self.pool.get_data0(node), expected_tid)
     if kind == NodeKind.NK_BOOL_LIT:
         return self.pool.get_data0(node) as i64
     if kind == NodeKind.NK_UNARY:
         let op = self.pool.get_data0(node)
-        let inner_val = self.try_eval_const_int(self.pool.get_data1(node))
+        let inner_val = self.try_eval_const_int_expected(self.pool.get_data1(node), expected_tid)
         if inner_val == CONST_EVAL_FAIL(): return CONST_EVAL_FAIL()
-        if op == UnaryOp.UOP_NEGATE: return -inner_val
+        if op == UnaryOp.UOP_NEGATE:
+            let result_ty = self.try_eval_const_result_type(node, expected_tid)
+            let arith = int_eval_unary_neg(inner_val, self.codegen_const_int_width(result_ty), self.overflow_mode)
+            if arith.ok == 0 or arith.overflow != 0: return CONST_EVAL_FAIL()
+            return arith.value
         if op == UnaryOp.UOP_BIT_NOT: return 0 - inner_val - 1
         if op == UnaryOp.UOP_NOT:
             if inner_val == 0: return 1
@@ -1554,18 +1587,32 @@ fn Codegen.try_eval_const_int(self: Codegen, node: i32) -> i64:
         return CONST_EVAL_FAIL()
     if kind == NodeKind.NK_BINARY:
         let op = self.pool.get_data0(node)
-        let lv = self.try_eval_const_int(self.pool.get_data1(node))
+        let lv = self.try_eval_const_int_expected(self.pool.get_data1(node), expected_tid)
         if lv == CONST_EVAL_FAIL(): return CONST_EVAL_FAIL()
-        let rv = self.try_eval_const_int(self.pool.get_data2(node))
+        let rv = self.try_eval_const_int_expected(self.pool.get_data2(node), expected_tid)
         if rv == CONST_EVAL_FAIL(): return CONST_EVAL_FAIL()
-        if op == BinaryOp.OP_ADD: return lv + rv
-        if op == BinaryOp.OP_SUB: return lv - rv
-        if op == BinaryOp.OP_MUL: return lv * rv
+        if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP or op == BinaryOp.OP_MUL_SAT:
+            let result_ty = self.try_eval_const_result_type(node, expected_tid)
+            let arith = int_eval_binary_arithmetic(op, lv, rv, self.codegen_const_int_width(result_ty), self.codegen_const_int_is_unsigned(result_ty), self.overflow_mode)
+            if arith.ok == 0 or arith.overflow != 0: return CONST_EVAL_FAIL()
+            return arith.value
         if op == BinaryOp.OP_DIV:
             if rv == 0: return CONST_EVAL_FAIL()
+            let result_ty = self.try_eval_const_result_type(node, expected_tid)
+            if int_div_overflows(lv, rv, self.codegen_const_int_width(result_ty), self.codegen_const_int_is_unsigned(result_ty)):
+                if self.overflow_mode == OVERFLOW_MODE_WRAP():
+                    return int_signed_min(self.codegen_const_int_width(result_ty))
+                if self.overflow_mode == OVERFLOW_MODE_SATURATE():
+                    return int_signed_max(self.codegen_const_int_width(result_ty))
+                return CONST_EVAL_FAIL()
             return lv / rv
         if op == BinaryOp.OP_MOD:
             if rv == 0: return CONST_EVAL_FAIL()
+            let result_ty = self.try_eval_const_result_type(node, expected_tid)
+            if int_div_overflows(lv, rv, self.codegen_const_int_width(result_ty), self.codegen_const_int_is_unsigned(result_ty)):
+                if self.overflow_mode == OVERFLOW_MODE_WRAP() or self.overflow_mode == OVERFLOW_MODE_SATURATE():
+                    return 0
+                return CONST_EVAL_FAIL()
             return lv % rv
         if op == BinaryOp.OP_SHL:
             // Implement shift via multiplication to bootstrap (seed doesn't have << operator yet)
@@ -1665,7 +1712,7 @@ fn Codegen.try_eval_const_llvm(self: Codegen, node: i32, expected_tid: i32) -> i
         let exact = self.exact_int_const_llvm(cur, resolved as i32)
         if exact != 0:
             return exact
-        let val = self.try_eval_const_int(cur)
+        let val = self.try_eval_const_int_expected(cur, resolved as i32)
         if val == CONST_EVAL_FAIL():
             return 0
         let llvm_ty = self.sema_type_to_llvm(resolved)
@@ -1720,10 +1767,17 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     var value_node = self.pool.get_data1(let_node)
     let flags = self.pool.get_data2(let_node)
     let is_mut = flags % 2
-    let binding_ty = if self.sema.typed_binding_types.contains(let_node):
+    var binding_ty = if self.sema.typed_binding_types.contains(let_node):
         self.sema.typed_binding_types.get(let_node).unwrap()
     else:
         0
+    if binding_ty == 0:
+        let ann_extra = self.sema.top_level_let_type_ann_extra(flags)
+        if ann_extra >= 0:
+            let ann_node = self.pool.get_extra(ann_extra)
+            let ann_ty = self.sema.resolve_type_expr(ann_node)
+            if ann_ty != 0:
+                binding_ty = ann_ty as i32
     let resolved_binding_ty = if binding_ty != 0: self.sema.resolve_alias(binding_ty) else: 0
     if value_node == 0:
         if resolved_binding_ty == 0:
@@ -1766,7 +1820,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             if global_ty != 0:
                 let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
                 return
-    let val = self.try_eval_const_int(value_node)
+    let val = self.try_eval_const_int_expected(value_node, const_binding_ty as i32)
     if val != CONST_EVAL_FAIL():
         if resolved_binding_ty != 0:
             let binding_kind = self.sema.get_type_kind(resolved_binding_ty)

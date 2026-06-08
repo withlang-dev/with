@@ -1,11 +1,14 @@
 // Compilation config mirrors Zig's `Compilation.Config` role:
 // a normalized, concrete set of driver options owned by `Compilation`.
 
+use Overflow
+
 type CompilationConfig {
     opt_level: i32,
     no_std: bool,
     alloc_mode: bool,
     runtime_available: bool,
+    overflow_mode: i32,
     emit_ir: bool,
     emit_bin: bool,
     is_test: bool,
@@ -46,6 +49,7 @@ fn compilation_config_default -> CompilationConfig:
         no_std: false,
         alloc_mode: false,
         runtime_available: true,
+        overflow_mode: -1,
         emit_ir: false,
         emit_bin: true,
         is_test: false,

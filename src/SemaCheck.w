@@ -4018,12 +4018,6 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
             self.emit_error("right operand of logical operator must be bool", node)
         return self.ty_bool as i32
 
-    // Arithmetic — unsigned types wrap by default (rewrite to wrapping ops)
-    if (op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL) and self.is_unsigned_int_type(lhs as i32) and self.is_unsigned_int_type(rhs as i32):
-        let wrap_op = if op == BinaryOp.OP_ADD: BinaryOp.OP_ADD_WRAP else if op == BinaryOp.OP_SUB: BinaryOp.OP_SUB_WRAP else: BinaryOp.OP_MUL_WRAP
-        self.ast.set_data0(node, wrap_op)
-        return self.arithmetic_result_type(lhs, rhs) as i32
-
     // @ matmul operator — always dispatches to method
     if op == BinaryOp.OP_MATMUL:
         let matmul_sym = self.pool_intern("matmul")
