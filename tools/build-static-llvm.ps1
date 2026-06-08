@@ -10,6 +10,7 @@ $HOST_TAG = if ($env:HOST_TAG) { $env:HOST_TAG } else { "windows-x86_64-msvc" }
 $SRC_DIR = Join-Path $ROOT "src"
 $BUILD_DIR = Join-Path $ROOT "build\llvm-$LLVM_VERSION-$HOST_TAG"
 $INSTALL_PREFIX = if ($env:INSTALL_PREFIX) { $env:INSTALL_PREFIX } else { Join-Path $ROOT "llvm-$LLVM_VERSION-$HOST_TAG" }
+$START_DIR = Get-Location
 
 function Require-Tool($name) {
   if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
@@ -118,3 +119,4 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "static LLVM SDK ready: $INSTALL_PREFIX"
 Write-Host "`$env:LLVM_PREFIX=`"$INSTALL_PREFIX`""
 Write-Host "`$env:WITH_LIBCLANG=`"$libclang`""
+Set-Location $START_DIR

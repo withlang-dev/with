@@ -57,7 +57,7 @@ if [ ! -d "$source_dir" ]; then
 fi
 
 cd "$BUILD_DIR"
-CC="$CMAKE_BOOTSTRAP_CC" CXX="$CMAKE_BOOTSTRAP_CXX" "$SRC_DIR/$source_dir/bootstrap" \
+MAKE="$SDK_NINJA" CC="$CMAKE_BOOTSTRAP_CC" CXX="$CMAKE_BOOTSTRAP_CXX" "$SRC_DIR/$source_dir/bootstrap" \
   --prefix="$INSTALL_PREFIX" \
   --parallel="${PARALLEL_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}" \
   --generator=Ninja \

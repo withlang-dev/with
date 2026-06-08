@@ -7,6 +7,7 @@ $HOST_TAG = if ($env:HOST_TAG) { $env:HOST_TAG } else { "windows-x86_64-msvc" }
 $SRC_DIR = Join-Path $ROOT "src"
 $BUILD_DIR = Join-Path $ROOT "build\cmake-$CMAKE_VERSION-$HOST_TAG"
 $INSTALL_PREFIX = if ($env:INSTALL_PREFIX) { $env:INSTALL_PREFIX } else { Join-Path $ROOT "llvm-22.1.6-$HOST_TAG" }
+$START_DIR = Get-Location
 
 function Require-Tool($name) {
   $cmd = Get-Command $name -ErrorAction SilentlyContinue
@@ -71,4 +72,5 @@ if (-not (Test-Path -PathType Leaf $cmakeTool)) {
   throw "CMake did not install to $cmakeTool"
 }
 
+Set-Location $START_DIR
 Write-Host "CMake ready: $cmakeTool"

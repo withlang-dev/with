@@ -6,6 +6,7 @@ $ROOT = if ($env:ROOT) { $env:ROOT } else { Join-Path (Get-Location) ".deps" }
 $HOST_TAG = if ($env:HOST_TAG) { $env:HOST_TAG } else { "windows-x86_64-msvc" }
 $SRC_DIR = Join-Path $ROOT "src"
 $INSTALL_PREFIX = if ($env:INSTALL_PREFIX) { $env:INSTALL_PREFIX } else { Join-Path $ROOT "llvm-22.1.6-$HOST_TAG" }
+$START_DIR = Get-Location
 
 function Require-Tool($name) {
   $cmd = Get-Command $name -ErrorAction SilentlyContinue
@@ -74,4 +75,5 @@ if (-not (Test-Path -PathType Leaf $ninjaTool)) {
   throw "Ninja did not install to $ninjaTool"
 }
 
+Set-Location $START_DIR
 Write-Host "Ninja ready: $ninjaTool"
