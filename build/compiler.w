@@ -191,7 +191,7 @@ fn comp_arg_value(args: Vec[str], prefix: str) -> str:
     ""
 
 fn comp_arg_allowed_for_compiler(arg: str) -> bool:
-    not arg.starts_with("compiler=")
+    not arg.starts_with("compiler=") and not arg.starts_with("overflow=")
 
 fn comp_resolve_seed_compiler(ctx: ActionCtx) -> str:
     let explicit = env("WITH")
@@ -238,6 +238,9 @@ fn comp_run_compiler_capture(ctx: ActionCtx, label: str, argv: Vec[str], stdout_
     let root = ctx.project_info().project_root()
     var process_env = process_env()
     process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
+    let overflow_mode = comp_arg_value(ctx.args(), "overflow=")
+    if overflow_mode.len() > 0:
+        process_env = process_env.set("WITH_INTERNAL_OVERFLOW_MODE", overflow_mode)
     let result = ctx.process_runner().run_capture_with_env(argv, comp_abs(root, stdout_path), comp_abs(root, stderr_path), timeout_ms, process_env)
     if result.rc == 124:
         return comp_fail(ctx, "step '" ++ label ++ "' timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
@@ -784,7 +787,7 @@ fn comp_fnv1a(s: str) -> i64:
     var h: i64 = -3750763034362895579
     for i in 0..s.len() as i32:
         h = h ^ (s.byte_at(i as i64) as i64)
-        h = h * 1099511628211
+        h = h *% 1099511628211
     h
 
 fn comp_last_colon_pos(line: str) -> i64:

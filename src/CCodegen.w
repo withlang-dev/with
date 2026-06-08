@@ -9,6 +9,7 @@ use Ast
 use InternPool
 use Sema
 use Source
+use Overflow
 
 extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
@@ -260,6 +261,7 @@ type CCodegen {
     ast: AstPool,
     intern: InternPool,
     sema: Sema,
+    overflow_mode: i32,
     had_error: i32,
     err_msg: str,
     source_path: str,
@@ -306,12 +308,13 @@ type CCodegen {
 fn CCodegen.intern_intern(self: CCodegen, s: str) -> i32:
     self.intern.intern(s)
 
-fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema, source_path: str, source_text: str) -> CEmitResult:
+fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema, source_path: str, source_text: str, overflow_mode: i32) -> CEmitResult:
     var cg = CCodegen {
         mir_mod,
         ast,
         intern,
         sema,
+        overflow_mode,
         had_error: 0,
         err_msg: "",
         source_path,
@@ -545,6 +548,90 @@ fn cc_name_matches(raw: str, wanted: str) -> i32:
     if raw == wanted:
         return 1
     cc_str_ends_with(raw, "." ++ wanted)
+
+fn cc_emit_checked_signed_helpers(c_type: str, suffix: str, min_expr: str) -> str:
+    var out = ""
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_add_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    " ++ c_type ++ " r;\n"
+    out = out ++ "    if (__builtin_add_overflow(a, b, &r)) __with_arith_overflow_panic();\n"
+    out = out ++ "    return r;\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_sub_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    " ++ c_type ++ " r;\n"
+    out = out ++ "    if (__builtin_sub_overflow(a, b, &r)) __with_arith_overflow_panic();\n"
+    out = out ++ "    return r;\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_mul_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    " ++ c_type ++ " r;\n"
+    out = out ++ "    if (__builtin_mul_overflow(a, b, &r)) __with_arith_overflow_panic();\n"
+    out = out ++ "    return r;\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_div_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    if (b == (" ++ c_type ++ ")0) __with_div_zero_panic();\n"
+    out = out ++ "    if (a == (" ++ c_type ++ ")(" ++ min_expr ++ ") && b == (" ++ c_type ++ ")-1) __with_arith_overflow_panic();\n"
+    out = out ++ "    return (" ++ c_type ++ ")(a / b);\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_mod_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    if (b == (" ++ c_type ++ ")0) __with_div_zero_panic();\n"
+    out = out ++ "    if (a == (" ++ c_type ++ ")(" ++ min_expr ++ ") && b == (" ++ c_type ++ ")-1) __with_arith_overflow_panic();\n"
+    out = out ++ "    return (" ++ c_type ++ ")(a % b);\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_neg_" ++ suffix ++ "(" ++ c_type ++ " a) {\n"
+    out = out ++ "    " ++ c_type ++ " r;\n"
+    out = out ++ "    if (__builtin_sub_overflow((" ++ c_type ++ ")0, a, &r)) __with_arith_overflow_panic();\n"
+    out = out ++ "    return r;\n"
+    out = out ++ "}\n"
+    out
+
+fn cc_emit_checked_unsigned_helpers(c_type: str, suffix: str) -> str:
+    var out = ""
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_add_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    " ++ c_type ++ " r;\n"
+    out = out ++ "    if (__builtin_add_overflow(a, b, &r)) __with_arith_overflow_panic();\n"
+    out = out ++ "    return r;\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_sub_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    " ++ c_type ++ " r;\n"
+    out = out ++ "    if (__builtin_sub_overflow(a, b, &r)) __with_arith_overflow_panic();\n"
+    out = out ++ "    return r;\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_mul_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    " ++ c_type ++ " r;\n"
+    out = out ++ "    if (__builtin_mul_overflow(a, b, &r)) __with_arith_overflow_panic();\n"
+    out = out ++ "    return r;\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_div_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    if (b == (" ++ c_type ++ ")0) __with_div_zero_panic();\n"
+    out = out ++ "    return (" ++ c_type ++ ")(a / b);\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline " ++ c_type ++ " __with_checked_mod_" ++ suffix ++ "(" ++ c_type ++ " a, " ++ c_type ++ " b) {\n"
+    out = out ++ "    if (b == (" ++ c_type ++ ")0) __with_div_zero_panic();\n"
+    out = out ++ "    return (" ++ c_type ++ ")(a % b);\n"
+    out = out ++ "}\n"
+    out
+
+fn cc_emit_checked_arith_helpers -> str:
+    var out = ""
+    out = out ++ "static inline void __with_arith_overflow_panic(void) {\n"
+    out = out ++ "    with_panic(WITH_STR_LIT(\"integer overflow\"), WITH_STR_LIT(\"\"), 0);\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline void __with_div_zero_panic(void) {\n"
+    out = out ++ "    with_panic(WITH_STR_LIT(\"division by zero\"), WITH_STR_LIT(\"\"), 0);\n"
+    out = out ++ "}\n"
+    out = out ++ "static inline __int128 __with_i128_min_value(void) {\n"
+    out = out ++ "    return -(((__int128)1) << 126) - (((__int128)1) << 126);\n"
+    out = out ++ "}\n"
+    out = out ++ cc_emit_checked_signed_helpers("int8_t", "i8", "INT8_MIN")
+    out = out ++ cc_emit_checked_unsigned_helpers("uint8_t", "u8")
+    out = out ++ cc_emit_checked_signed_helpers("int16_t", "i16", "INT16_MIN")
+    out = out ++ cc_emit_checked_unsigned_helpers("uint16_t", "u16")
+    out = out ++ cc_emit_checked_signed_helpers("int32_t", "i32", "INT32_MIN")
+    out = out ++ cc_emit_checked_unsigned_helpers("uint32_t", "u32")
+    out = out ++ cc_emit_checked_signed_helpers("int64_t", "i64", "INT64_MIN")
+    out = out ++ cc_emit_checked_unsigned_helpers("uint64_t", "u64")
+    out = out ++ cc_emit_checked_signed_helpers("__int128", "i128", "__with_i128_min_value()")
+    out = out ++ cc_emit_checked_unsigned_helpers("unsigned __int128", "u128")
+    out ++ "\n"
 
 fn cc_base_name(raw: str) -> str:
     let dot = cc_str_find_last_char(raw, 46)
@@ -1164,6 +1251,47 @@ fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
         return self.fn_type_c_name(resolved as i32)
     // Conservative fallback
     "int64_t"
+
+fn CCodegen.checked_int_helper_suffix(self: CCodegen, tid: i32) -> str:
+    let resolved = self.sema.resolve_alias(tid)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_INT:
+        return ""
+    let bits = self.sema.get_type_d0(resolved)
+    let signed = self.sema.get_type_d1(resolved) != 0
+    if bits != 8 and bits != 16 and bits != 32 and bits != 64 and bits != 128:
+        return ""
+    let prefix = if signed: "i" else: "u"
+    prefix ++ f"{bits}"
+
+fn CCodegen.checked_int_bin_op_text(self: CCodegen, op: i32, lhs: str, rhs: str, result_tid: i32) -> str:
+    let suffix = self.checked_int_helper_suffix(result_tid)
+    if suffix.len() == 0:
+        self.fail("C backend does not support checked integer arithmetic for this integer width yet")
+        return "0"
+    let c_ty = self.c_type(result_tid, 0)
+    var helper = ""
+    if op == BinaryOp.OP_ADD:
+        helper = "__with_checked_add_"
+    else if op == BinaryOp.OP_SUB:
+        helper = "__with_checked_sub_"
+    else if op == BinaryOp.OP_MUL:
+        helper = "__with_checked_mul_"
+    else if op == BinaryOp.OP_DIV:
+        helper = "__with_checked_div_"
+    else if op == BinaryOp.OP_MOD:
+        helper = "__with_checked_mod_"
+    else:
+        self.fail(f"unsupported checked integer binop {op}")
+        return "0"
+    helper ++ suffix ++ "((" ++ c_ty ++ ")(" ++ lhs ++ "), (" ++ c_ty ++ ")(" ++ rhs ++ "))"
+
+fn CCodegen.checked_int_neg_text(self: CCodegen, inner: str, result_tid: i32) -> str:
+    let suffix = self.checked_int_helper_suffix(result_tid)
+    if suffix.len() == 0 or suffix.byte_at(0) != 105:
+        self.fail("C backend does not support checked integer negation for this integer type yet")
+        return "0"
+    let c_ty = self.c_type(result_tid, 0)
+    "__with_checked_neg_" ++ suffix ++ "((" ++ c_ty ++ ")(" ++ inner ++ "))"
 
 fn CCodegen.c_decl(self: CCodegen, tid: i32, name: str) -> str:
     let resolved = self.sema.resolve_alias(tid)
@@ -2259,6 +2387,15 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
                 if d0 == BinaryOp.OP_EQ:
                     return eq_expr
                 return "(!(" ++ eq_expr ++ "))"
+        let result_bin_tid = self.sema.resolve_alias(self.rvalue_tid(body, rval_id))
+        let result_is_int_bin = self.sema.get_type_kind(result_bin_tid) == TypeKind.TY_INT
+        let is_checked_arith_bin = d0 == BinaryOp.OP_ADD or d0 == BinaryOp.OP_SUB or d0 == BinaryOp.OP_MUL or d0 == BinaryOp.OP_DIV or d0 == BinaryOp.OP_MOD
+        let is_saturating_arith_bin = d0 == BinaryOp.OP_ADD_SAT or d0 == BinaryOp.OP_SUB_SAT or d0 == BinaryOp.OP_MUL_SAT or (is_checked_arith_bin and self.overflow_mode == OVERFLOW_MODE_SATURATE())
+        if result_is_int_bin and is_saturating_arith_bin:
+            self.fail("C backend does not support saturating integer arithmetic yet")
+            return "0"
+        if result_is_int_bin and is_checked_arith_bin and self.overflow_mode != OVERFLOW_MODE_WRAP():
+            return self.checked_int_bin_op_text(d0, lhs, rhs, result_bin_tid)
         let tok = self.binop_token(d0)
         if tok.len() == 0:
             self.fail(f"unsupported binop {d0}")
@@ -2267,6 +2404,12 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
     if rk == RvalueKind.RK_UN_OP:
         let inner = self.operand_text(body, d1)
         if d0 == UnaryOp.UOP_NEGATE:
+            let inner_tid = self.sema.resolve_alias(self.operand_tid(body, d1))
+            if self.sema.get_type_kind(inner_tid) == TypeKind.TY_INT and self.overflow_mode != OVERFLOW_MODE_WRAP():
+                if self.overflow_mode == OVERFLOW_MODE_SATURATE():
+                    self.fail("C backend does not support saturating integer negation yet")
+                    return "0"
+                return self.checked_int_neg_text(inner, inner_tid)
             return "(-(" ++ inner ++ "))"
         if d0 == UnaryOp.UOP_NOT:
             return "(!(" ++ inner ++ "))"
@@ -7600,6 +7743,7 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out.write("#include <sys/resource.h>\n")
     out.write("#include <sys/stat.h>\n")
     out.write("#include \"with_runtime.h\"\n\n")
+    out.write(cc_emit_checked_arith_helpers())
     // Extra declarations for functions used by emitted C but not in with_runtime.h
     out.write("/* Extra runtime declarations */\n")
     out.write("#define fmt_buf_new with_fmt_buf_new\n")

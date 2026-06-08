@@ -1,4 +1,4 @@
-//! args: --emit-c
+//! args: --emit-c --overflow=wrap
 //! expect-build-fail: C backend is LLVM-only for Vec.get_disjoint by design
 
 fn main:

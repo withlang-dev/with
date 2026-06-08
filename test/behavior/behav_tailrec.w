@@ -3,7 +3,7 @@
 @[tailrec]
 fn sum_to(n: i32, acc: i32) -> i32:
     if n <= 0: acc
-    else: sum_to(n - 1, acc + n)
+    else: sum_to(n - 1, acc +% n)
 
 @[tailrec]
 fn factorial_acc(n: i32, acc: i32) -> i32:

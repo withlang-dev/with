@@ -10,6 +10,7 @@ fn main:
         no_std: false,
         alloc_mode: false,
         prelude_mode: PreludeMode.Full,
+        overflow_mode: OverflowMode.Default,
         deterministic: false,
         target: BuildTarget.native,
         include_paths: Vec.new(),

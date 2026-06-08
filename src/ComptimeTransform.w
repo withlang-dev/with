@@ -1032,7 +1032,19 @@ fn Sema.ct_transform_expr(mut self: Sema, source_ast: AstPool, pool: AstPool, in
         return node
 
     if kind == NodeKind.NK_LET_BINDING:
-        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
+        let value = pool.get_data1(node)
+        if value != 0:
+            if pool.kind(value) == NodeKind.NK_COMPTIME:
+                let flags = pool.get_data2(node)
+                let ann_extra = self.local_let_type_ann_extra(flags)
+                if ann_extra >= 0:
+                    let ann_type = self.resolve_type_expr(pool.get_extra(ann_extra))
+                    if ann_type != 0:
+                        self.typed_expr_types.insert(value, ann_type as i32)
+                        let inner = pool.get_data0(value)
+                        if inner != 0:
+                            self.typed_expr_types.insert(inner, ann_type as i32)
+            pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, value))
         return node
 
     if kind == NodeKind.NK_IF_EXPR:
@@ -2405,6 +2417,16 @@ fn Sema.ct_transform_decl(mut self: Sema, source_ast: AstPool, pool: AstPool, in
     if kind == NodeKind.NK_LET_DECL:
         let value = pool.get_data1(node)
         if value != 0:
+            if pool.kind(value) == NodeKind.NK_COMPTIME:
+                let flags = pool.get_data2(node)
+                let ann_extra = self.top_level_let_type_ann_extra(flags)
+                if ann_extra >= 0:
+                    let ann_type = self.resolve_type_expr(pool.get_extra(ann_extra))
+                    if ann_type != 0:
+                        self.typed_expr_types.insert(value, ann_type as i32)
+                        let inner = pool.get_data0(value)
+                        if inner != 0:
+                            self.typed_expr_types.insert(inner, ann_type as i32)
             pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, value))
         return
     if kind == NodeKind.NK_TYPE_DECL:
@@ -2568,6 +2590,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
     transform_sema.decl_source_paths = self.decl_source_paths
     transform_sema.decl_source_file_ids = self.decl_source_file_ids
     transform_sema.decl_is_c_import = self.decl_is_c_import
+    transform_sema.overflow_mode = self.overflow_mode
     transform_sema.module_paths = self.module_paths
     transform_sema.module_import_starts = self.module_import_starts
     transform_sema.module_import_counts = self.module_import_counts

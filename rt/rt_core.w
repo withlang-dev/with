@@ -1940,7 +1940,7 @@ fn fnv_hash(data: *const u8, len: i64) -> u64:
         let byte = unsafe data[i]
         h = h ^ (byte as u64)
         // FNV prime: 1099511628211
-        h = h * 1099511628211
+        h = h *% 1099511628211
         i = i + 1
     h
 
