@@ -59,6 +59,35 @@ policy where the object format supports it. If one platform's `.text` is much
 larger, investigate the SDK compiler, linker folding, and strip policy before
 publishing.
 
+If an SDK package script rejects the local SDK, stop before publishing that
+platform's SDK. Do not upload an older or stale SDK just because the compiler
+binary packaged cleanly. Refresh the SDK with the bootstrap toolchain flow, then
+rerun the package script with `LLVM_PREFIX` and `LLVM_BUILD_CACHE` pointed at
+the refreshed prefix/cache. On Darwin, clear ambient linker flags while
+bootstrapping the SDK tools and LLVM itself:
+
+```sh
+env -u LDFLAGS ROOT="$PWD/.deps" HOST_TAG=darwin-arm64 \
+  INSTALL_PREFIX="$PWD/.deps/llvm-22.1.6-darwin-arm64" \
+  NINJA_BOOTSTRAP_CXX=/usr/bin/clang++ \
+  tools/build-ninja.sh
+
+env -u LDFLAGS ROOT="$PWD/.deps" HOST_TAG=darwin-arm64 \
+  INSTALL_PREFIX="$PWD/.deps/llvm-22.1.6-darwin-arm64" \
+  CMAKE_BOOTSTRAP_CC=/usr/bin/clang \
+  CMAKE_BOOTSTRAP_CXX=/usr/bin/clang++ \
+  tools/build-cmake.sh
+
+env -u LDFLAGS ROOT="$PWD/.deps" HOST_TAG=darwin-arm64 \
+  INSTALL_PREFIX="$PWD/.deps/llvm-22.1.6-darwin-arm64" \
+  SDK_CMAKE="$PWD/.deps/llvm-22.1.6-darwin-arm64/bin/cmake" \
+  SDK_NINJA="$PWD/.deps/llvm-22.1.6-darwin-arm64/bin/ninja" \
+  LLVM_BOOTSTRAP_CC=/usr/bin/clang \
+  LLVM_BOOTSTRAP_CXX=/usr/bin/clang++ \
+  LLVM_BOOTSTRAP_LD=ld64.lld \
+  tools/build-static-llvm.sh
+```
+
 ## Release Asset
 
 Publish, per release:
@@ -182,6 +211,49 @@ binaries, `install.sh`, or platform SDK archives.
 work. Do not treat it as a normal release gate unless the release scope
 explicitly includes emit-C self-hosting changes.
 
+### Darwin Release Host
+
+The Darwin arm64 release host is the maintainer macOS checkout. Use a clean
+release commit or the release tag. If the release tag already exists, prefer a
+detached checkout of that tag for packaging so the asset bytes correspond to
+the published tag:
+
+```sh
+git fetch origin --tags
+git switch --detach "$WITH_VERSION"
+```
+
+Use the installed compiler as the first seed only for the first build, and
+point the build at the already-built With-owned Darwin SDK:
+
+```sh
+export RELEASE_SEED=${RELEASE_SEED:-$HOME/.local/bin/with}
+export LLVM_PREFIX=${LLVM_PREFIX:-$PWD/.deps/llvm-22.1.6-darwin-arm64}
+export WITH=$RELEASE_SEED
+
+WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build
+```
+
+After the first build creates `out/release/bin/with`, use that verified
+compiler for the remaining Darwin gates and packaging:
+
+```sh
+export WITH=$PWD/out/release/bin/with
+
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :fixpoint
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test-green
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :last-green
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with version
+WITH_VERSION=$WITH_VERSION scripts/package-darwin-aarch64.sh
+WITH_VERSION=$WITH_VERSION scripts/package-llvm-sdk.sh
+```
+
+The Darwin binary package script copies `out/release/bin/with`, verifies the
+reported version, checks that LLVM/Clang/support libraries are not dynamically
+loaded, confirms static libclang symbols before stripping, strips with the
+With-owned SDK `llvm-strip`, and rechecks dynamic dependencies after stripping.
+
 ### Linux Release Host
 
 The current Linux x86_64 release host is:
@@ -217,17 +289,17 @@ export WITH=$RELEASE_SEED
 WITH_VERSION=$WITH_VERSION $RELEASE_SEED build
 ```
 
-After the first build creates `out/bin/with` in the release worktree, use that
+After the first build creates `out/release/bin/with` in the release worktree, use that
 compiler for the remaining Linux gates and packaging:
 
 ```sh
-export WITH=$PWD/out/bin/with
+export WITH=$PWD/out/release/bin/with
 
-WITH_VERSION=$WITH_VERSION ./out/bin/with build :fixpoint
-WITH_VERSION=$WITH_VERSION ./out/bin/with build :test
-WITH_VERSION=$WITH_VERSION ./out/bin/with build :test-green
-WITH_VERSION=$WITH_VERSION ./out/bin/with build :last-green
-WITH_VERSION=$WITH_VERSION ./out/bin/with version
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :fixpoint
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test-green
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :last-green
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with version
 WITH_VERSION=$WITH_VERSION scripts/package-linux-x86_64.sh
 ```
 
@@ -241,7 +313,7 @@ scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-linux-x86
 Confirm the produced compiler reports the release version:
 
 ```sh
-out/bin/with version
+out/release/bin/with version
 ```
 
 Expected output:
@@ -252,14 +324,15 @@ with v0.14.3
 
 Finalize the local development seeds after the gates pass. This step is
 required: the release is not done until the compiler that this checkout will
-use for the next self-host build (`out/bin/with`), the local bootstrap seed
-(`src/main`), and the installed user compiler all report the released version.
+use for the next self-host build (`out/release/bin/with`), the local bootstrap
+seed (`src/main`), and the installed user compiler all report the released
+version.
 
 ```sh
 with build :update-seed
 with build :install-user
 src/main version
-out/bin/with version
+out/release/bin/with version
 ~/.local/bin/with version
 ```
 
@@ -313,12 +386,13 @@ scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-llvm-sdk-
 
 This produces platform assets under `out/release/` plus `install.sh`.
 Each public binary is the verified compiler copied under its platform asset
-name. It must not have dynamic LLVM, Clang, zlib, zstd, or libxml2 load
-commands, and it must contain static libclang symbols. Linux release binaries
-must also avoid dynamic `libstdc++` and `libgcc_s`; `libc`, `libm`, and the
-platform dynamic loader are the only expected Linux runtime libraries. The
-Darwin package script checks this with `otool -L` and `nm`; the Linux package
-script checks with `ldd` and `nm`.
+name and stripped with the With-owned SDK `llvm-strip`. It must not have dynamic
+LLVM, Clang, zlib, zstd, or libxml2 load commands, and it must contain static
+libclang symbols before stripping. Linux release binaries must also avoid
+dynamic `libstdc++` and `libgcc_s`; `libc`, `libm`, and the platform dynamic
+loader are the only expected Linux runtime libraries. The Darwin package script
+checks this with `otool -L` and `nm`; the Linux package script checks with `ldd`
+and `nm`.
 
 The bootstrap-C package produces
 `out/release/with-bootstrap-c-$WITH_VERSION.tar.zst`. It is an emitted-C source

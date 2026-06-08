@@ -60,6 +60,22 @@ if ! nm -g "$output" | grep '_clang_createIndex' >/dev/null 2>&1; then
     exit 1
 fi
 
+llvm_version="${LLVM_VERSION:-22.1.6}"
+llvm_prefix="${LLVM_PREFIX:-.deps/llvm-${llvm_version}-darwin-arm64}"
+llvm_strip="${LLVM_STRIP:-$llvm_prefix/bin/llvm-strip}"
+if [ ! -x "$llvm_strip" ]; then
+    echo "error: missing With-owned llvm-strip: $llvm_strip" >&2
+    echo "run with build :deps or build/package the static SDK first" >&2
+    exit 1
+fi
+"$llvm_strip" "$output"
+
+if otool -L "$output" | grep -E 'clang|LLVM|libz|libxml2|zstd' >/dev/null 2>&1; then
+    echo "error: stripped release binary has forbidden dynamic LLVM/Clang/support dependency" >&2
+    otool -L "$output" >&2
+    exit 1
+fi
+
 cp scripts/install.sh "$release_dir/install.sh"
 chmod +x "$release_dir/install.sh"
 
