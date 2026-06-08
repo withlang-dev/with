@@ -17,6 +17,7 @@ function Require-Tool($name) {
 
 $python = if ($env:NINJA_BOOTSTRAP_PYTHON) { $env:NINJA_BOOTSTRAP_PYTHON } else { Require-Tool "python.exe" }
 $clangCl = if ($env:NINJA_BOOTSTRAP_CLANG_CL) { $env:NINJA_BOOTSTRAP_CLANG_CL } else { Require-Tool "clang-cl.exe" }
+$lldLink = if ($env:NINJA_BOOTSTRAP_LLD_LINK) { $env:NINJA_BOOTSTRAP_LLD_LINK } else { Require-Tool "lld-link.exe" }
 Require-Tool "curl.exe" | Out-Null
 Require-Tool "tar.exe" | Out-Null
 
@@ -43,12 +44,19 @@ if (-not (Test-Path $sourceDir)) {
 Push-Location $sourceDir
 try {
   $oldCxx = $env:CXX
-  $env:CXX = $clangCl
+  $oldPath = $env:PATH
+  $shimDir = Join-Path $INSTALL_PREFIX "bootstrap-tools"
+  New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
+  Copy-Item -Path $clangCl -Destination (Join-Path $shimDir "cl.exe") -Force
+  Copy-Item -Path $lldLink -Destination (Join-Path $shimDir "link.exe") -Force
+  $env:CXX = "cl"
+  $env:PATH = "$shimDir;$oldPath"
   & $python configure.py --bootstrap
   if ($LASTEXITCODE -ne 0) { throw "Ninja bootstrap failed" }
 }
 finally {
   $env:CXX = $oldCxx
+  $env:PATH = $oldPath
   Pop-Location
 }
 
