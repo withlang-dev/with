@@ -2624,25 +2624,25 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: The body is introduced by `:` (colon form) or `{ }` (brace form) — see §29.13 for the full rules.
   - Source: `§9.1 L2794-L2800`
   - Related spec refs: §29.13
-- `9.1.1.7` **if supports four body forms.**
-  - Requirement: `if` supports four body forms.
-  - Source: `§9.1 L2814-L2815`
+- `9.1.1.7` **if supports the three normal body forms.**
+  - Requirement: `if` supports the three normal body forms.
+  - Source: `§9.1 L2815-L2816`
   - Related spec refs: none
 - `9.1.1.8` **else if is a two-token keyword pair that continues the chain; else without if ends it:**
   - Requirement: `else if` is a two-token keyword pair that continues the chain; `else` without `if` ends it:
-  - Source: `§9.1 L2814-L2815`
+  - Source: `§9.1 L2815-L2816`
   - Related spec refs: none
-- `9.1.1.9` **The then form is strictly an expression form: if cond then expr.**
-  - Requirement: The `then` form is strictly an expression form: `if cond then expr`.
-  - Source: `§9.1 L2839-L2843`
+- `9.1.1.9` **Every if, else if, and else arm uses a normal body introducer.**
+  - Requirement: Every `if`, `else if`, and `else` arm uses a normal body introducer: inline colon, indented colon, or braces.
+  - Source: `§9.1 L2840-L2842`
   - Related spec refs: none
-- `9.1.1.10` **The body after then is a single expression (not a block), and the else clause is el...**
-  - Requirement: The body after `then` is a single expression (not a block), and the `else` clause is `else expr` with no body introducer.
-  - Source: `§9.1 L2839-L2843`
+- `9.1.1.10` **There is no then body form.**
+  - Requirement: There is no `then` body form.
+  - Source: `§9.1 L2840-L2842`
   - Related spec refs: none
-- `9.1.1.11` **Colon and braced if chains use normal body introducers for every arm, including the...**
-  - Requirement: Colon and braced `if` chains use normal body introducers for every arm, including the final `else`:
-  - Source: `§9.1 L2839-L2843`
+- `9.1.1.11` **A naked else expr is not valid.**
+  - Requirement: A naked `else expr` is not valid; write `else: expr` or `else { expr }`.
+  - Source: `§9.1 L2840-L2842`
   - Related spec refs: none
 - `9.1.1.12` **else if is always parsed as a chain continuation — the parser consumes else, sees i...**
   - Requirement: `else if` is always parsed as a chain continuation — the parser consumes `else`, sees `if`, and continues the same chain rather than nesting an `if` inside the else body.
@@ -10575,9 +10575,9 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: `if`; Conditional
   - Source: `§29.11 L9773`
   - Related spec refs: none
-- `29.11.1.9` **then; Inline if body introducer (expression form)**
-  - Requirement: `then`; Inline `if` body introducer (expression form)
-  - Source: `§29.11 L9774`
+- `29.11.1.9` **then is not a reserved keyword and is not an if body introducer.**
+  - Requirement: `then` is not a reserved keyword and is not an `if` body introducer.
+  - Source: `§29.11 L9803`
   - Related spec refs: none
 - `29.11.1.10` **else if; Chained conditional continuation**
   - Requirement: `else if`; Chained conditional continuation
@@ -10749,8 +10749,8 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: `if`/`else if`/`else` support all three forms.
   - Source: `§29.13 L9830-L9831`
   - Related spec refs: none
-- `29.13.1.6` **if additionally supports the then expression shorthand; see §9.1 for the full if sy...**
-  - Requirement: `if` additionally supports the `then` expression shorthand; see §9.1 for the full `if` syntax.
+- `29.13.1.6` **if/else if/else do not support a separate then expression shorthand.**
+  - Requirement: `if`/`else if`/`else` do not support a separate `then` expression shorthand; see §9.1 for the full `if` syntax.
   - Source: `§29.13 L9830-L9831`
   - Related spec refs: §9.1
 - `29.13.1.7` **Form 1 — Inline colon.**
@@ -10813,14 +10813,14 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: **After a construct's header, a body introducer is required.**
   - Source: `§29.13 L9880-L9883`
   - Related spec refs: none
-- `29.13.1.22` **For all constructs except if, the introducer must be : or {; omitting it is a parse...**
-  - Requirement: For all constructs except `if`, the introducer must be `:` or `{`; omitting it is a parse error.
-  - Source: `§29.13 L9880-L9883`
+- `29.13.1.22` **For all constructs, including if, else if, and else, the introducer must be : or {...**
+  - Requirement: For all constructs, including `if`, `else if`, and `else`, the introducer must be `:` or `{`; omitting it is a parse error.
+  - Source: `§29.13 L9880-L9882`
   - Related spec refs: none
-- `29.13.1.23` **For if, then is also a valid body introducer (see §9.1).**
-  - Requirement: For `if`, `then` is also a valid body introducer (see §9.1).
-  - Source: `§29.13 L9880-L9883`
-  - Related spec refs: §9.1
+- `29.13.1.23` **then is not a body introducer.**
+  - Requirement: `then` is not a body introducer.
+  - Source: `§29.13 L9880-L9882`
+  - Related spec refs: none
 - `29.13.1.24` **Colon-then-brace: fn f: { body } — the { } is parsed as an inline body expression (...**
   - Requirement: Colon-then-brace: `fn f: { body }` — the `{ }` is parsed as an inline body expression (e.g. a record literal), not a braced body. This is valid only if `{ body }` is a meaningful expression.
   - Source: `§29.13 L9887-L9889`
@@ -11022,9 +11022,9 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: All three forms are interchangeable for every block-introducing construct: `fn`, `else`, `while`, `for`, `loop`, `with`, `defer`, `errdefer`, `comptime`, `unsafe`, labeled blocks, and match arms.
   - Source: `§30.8 L10230-L10234`
   - Related spec refs: none
-- `30.8.1.2` **if and else if additionally accept then EXPR.**
-  - Requirement: `if` and `else if` additionally accept `then EXPR`.
-  - Source: `§30.8 L10230-L10234`
+- `30.8.1.2` **then EXPR is not a body form.**
+  - Requirement: `then EXPR` is not a body form.
+  - Source: `§30.8 L10228-L10231`
   - Related spec refs: none
 - `30.8.1.3` **Missing body introducers are parse errors.**
   - Requirement: Missing body introducers are parse errors.
@@ -11037,4 +11037,3 @@ Generated coverage: 2567 requirements from 268 numbered spec sections.
   - Requirement: The following identifiers are reserved (§29.11):
   - Source: `§30.9 L10238`
   - Related spec refs: §29.11
-

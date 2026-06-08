@@ -8,11 +8,9 @@ semantics, stdin line bindings, `args`, semicolon splitting, and regex
 capture behavior (§18.5b).
 **Changelog v6.8:** Three universal body forms (§29.13) — inline colon,
 indented colon, and braced — now apply to every block-introducing construct
-including `defer`, `errdefer`, `comptime`, and `unsafe`. `if` additionally
-retains the `then` form as a pure expression shorthand (`if cond then expr
-else expr`). `else if` is a two-token keyword pair parsed as a chain
-continuation. Non-`then` `if` chains require a body introducer after every
-`if`, `else if`, and `else` arm.
+including `defer`, `errdefer`, `comptime`, and `unsafe`. `if`, `else if`,
+and `else` use those same body forms; every arm requires `:` or `{`.
+`else if` is a two-token keyword pair parsed as a chain continuation.
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
 roadmap to `docs/roadmap.md`, design rationale to `docs/design-rationale.md`,
 stdlib API tables to `docs/libstd-spec.md`. Added grammar appendix (§30).
@@ -2814,7 +2812,7 @@ fn log(msg: str): print(msg)           // args, returns Unit
 
 **Conditional syntax:**
 
-`if` supports four body forms. `else if` is a two-token keyword pair
+`if` supports the three normal body forms. `else if` is a two-token keyword pair
 that continues the chain; `else` without `if` ends it:
 
 ```
@@ -2823,9 +2821,9 @@ if x < 0: handle_negative()
 else if x == 0: handle_zero()
 else: handle_positive()
 
-// Inline then — body introducer is 'then'; else body needs no introducer
-let y = if x > 0 then x else if x == 0 then 0 else -x
-let clamped = if x < lo then lo else if x > hi then hi else x
+// Inline colon expression arms
+let y = if x > 0: x else if x == 0: 0 else: -x
+let clamped = if x < lo: lo else if x > hi: hi else: x
 
 // Indented colon
 if x < 0:
@@ -2839,11 +2837,9 @@ else:
 if x < 0 { handle_negative() } else if x == 0 { handle_zero() } else { handle_positive() }
 ```
 
-The `then` form is strictly an expression form: `if cond then expr`.
-The body after `then` is a single expression (not a block), and the
-`else` clause is `else expr` with no body introducer. Colon and braced
-`if` chains use normal body introducers for every arm, including the
-final `else`:
+Every `if`, `else if`, and `else` arm uses a normal body introducer:
+inline colon, indented colon, or braces. There is no `then` body form,
+and a naked `else expr` is not valid; write `else: expr` or `else { expr }`.
 
 ```
 let clamped =
@@ -9774,7 +9770,6 @@ The following keywords are reserved and cannot be used as identifiers:
 | `use` | Import |
 | `extern` | External function declaration |
 | `if` | Conditional |
-| `then` | Inline `if` body introducer (expression form) |
 | `else if` | Chained conditional continuation |
 | `else` | Conditional branch |
 | `match` | Pattern matching |
@@ -9805,6 +9800,8 @@ The following keywords are reserved and cannot be used as identifiers:
 | `unsafe` | Unsafe block |
 | `comptime` | Compile-time evaluation |
 
+`then` is not a reserved keyword and is not an `if` body introducer.
+
 ### 29.12 Error Codes
 
 | Code | Description |
@@ -9830,8 +9827,8 @@ construct unless that construct states a narrower syntax.
 block, `unsafe { ... }` is the inline block expression form, and
 `unsafe *p` / `unsafe p[i]` is the narrow raw-access prefix form.
 
-`if`/`else if`/`else` support all three forms. `if` additionally supports
-the `then` expression shorthand; see §9.1 for the full `if` syntax.
+`if`/`else if`/`else` support all three forms. They do not support a
+separate `then` expression shorthand; see §9.1 for the full `if` syntax.
 
 **Form 1 — Inline colon.** A colon immediately followed by content
 on the same line.
@@ -9881,9 +9878,8 @@ by newlines or semicolons. Empty brace body `{}` is legal (returns
 `Unit`).
 
 **After a construct's header, a body introducer is required.** For all
-constructs except `if`, the introducer must be `:` or `{`; omitting it
-is a parse error. For `if`, `then` is also a valid body introducer (see
-§9.1).
+constructs, including `if`, `else if`, and `else`, the introducer must be
+`:` or `{`; omitting it is a parse error. `then` is not a body introducer.
 
 **Illegal combinations:**
 
@@ -10139,7 +10135,6 @@ STMT        := LABEL_STMT | LET_STMT | VAR_STMT | IF_STMT | MATCH_STMT
               | DEFER_STMT | EXPR
 LABEL_STMT  := LABEL ( STMT | COLON_BODY | BRACE_BODY )
 IF_STMT     := 'if' EXPR BODY { 'else' 'if' EXPR BODY } [ 'else' BODY ]
-              | 'if' EXPR 'then' EXPR { 'else' 'if' EXPR 'then' EXPR } [ 'else' EXPR ]
               | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' BODY ]
 MATCH_STMT  := 'match' EXPR BODY_ARMS
 MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' EXPR
@@ -10231,10 +10226,9 @@ BRACE_BODY    := '{' [ STMT { ( NEWLINE | ';' ) STMT } ] '}'
 ```
 
 All three forms are interchangeable for every block-introducing
-construct: `fn`, `else`, `while`, `for`, `loop`, `with`, `defer`,
-`errdefer`, `comptime`, `unsafe`, labeled blocks, and match arms.
-`if` and `else if` additionally accept `then EXPR`. Missing body
-introducers are parse errors.
+construct: `fn`, `if`, `else if`, `else`, `while`, `for`, `loop`, `with`,
+`defer`, `errdefer`, `comptime`, `unsafe`, labeled blocks, and match arms.
+`then EXPR` is not a body form. Missing body introducers are parse errors.
 
 ### 30.9 Reserved Keywords
 
@@ -10246,9 +10240,9 @@ const     continue  defer     else      enum      errdefer
 false     fn        for       gen       goto      if
 impl      import    in        is        it        let
 match     mod       move      mut       not       or
-pub       return    self      sealed    struct    then
-todo      trait     true      type      unsafe    use
-var       where     while     with      yield
+pub       return    self      sealed    struct    todo
+trait     true      type      unsafe    use       var
+where     while     with      yield
 ```
 
 ---
