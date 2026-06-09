@@ -32,24 +32,24 @@ let FIBER_STATE_RUNNING: i32 = 1
 let FIBER_STATE_SUSPENDED: i32 = 2
 let FIBER_STATE_DONE: i32 = 3
 
-let FIBER_CTX_SIZE: i64 = 168
-let FIBER_SIZE: i64 = 280
-let FIBER_OFF_STATE: i64 = 168
-let FIBER_OFF_STACK: i64 = 176
-let FIBER_OFF_STACK_SIZE: i64 = 184
-let FIBER_OFF_RESULT: i64 = 192
-let FIBER_OFF_RESULT_BUF: i64 = 200
-let FIBER_OFF_RESULT_SIZE: i64 = 208
-let FIBER_OFF_CANCEL_REQUESTED: i64 = 212
-let FIBER_OFF_CANCELLED_RETURN: i64 = 216
-let FIBER_OFF_ENTRY: i64 = 224
-let FIBER_OFF_ARG: i64 = 232
-let FIBER_OFF_NEXT: i64 = 240
-let FIBER_OFF_ID: i64 = 248
-let FIBER_OFF_SLOT: i64 = 252
-let FIBER_OFF_HAS_PANIC: i64 = 256
-let FIBER_OFF_PANIC_MSG: i64 = 264
-let FIBER_OFF_PANIC_MSG_LEN: i64 = 272
+let FIBER_CTX_SIZE: i64 = 328
+let FIBER_SIZE: i64 = 440
+let FIBER_OFF_STATE: i64 = 328
+let FIBER_OFF_STACK: i64 = 336
+let FIBER_OFF_STACK_SIZE: i64 = 344
+let FIBER_OFF_RESULT: i64 = 352
+let FIBER_OFF_RESULT_BUF: i64 = 360
+let FIBER_OFF_RESULT_SIZE: i64 = 368
+let FIBER_OFF_CANCEL_REQUESTED: i64 = 372
+let FIBER_OFF_CANCELLED_RETURN: i64 = 376
+let FIBER_OFF_ENTRY: i64 = 384
+let FIBER_OFF_ARG: i64 = 392
+let FIBER_OFF_NEXT: i64 = 400
+let FIBER_OFF_ID: i64 = 408
+let FIBER_OFF_SLOT: i64 = 412
+let FIBER_OFF_HAS_PANIC: i64 = 416
+let FIBER_OFF_PANIC_MSG: i64 = 424
+let FIBER_OFF_PANIC_MSG_LEN: i64 = 432
 
 let PROT_NONE: i32 = 0
 let PROT_READ_WRITE: i32 = 3
@@ -61,7 +61,7 @@ let SIGSEGV: i32 = 11
 let FIBER_ALT_STACK_SIZE: i64 = 131072
 
 var current_fiber: i64 = 0
-var scheduler_ctx: [168]u8 = [0 as u8; 168]
+var scheduler_ctx: [328]u8 = [0 as u8; 328]
 var free_pool_head: i64 = 0
 var fiber_page_size: i64 = 0
 var fiber_pool_reuse_count: i64 = 0
@@ -85,7 +85,7 @@ var panicked_fiber_count: i32 = 0
 var fiber_alt_stack_buf: [131072]u8 = [0 as u8; 131072]
 
 fn scheduler_ctx_ptr() -> *mut u8:
-    (&raw mut scheduler_ctx) as *mut [168]u8 as *mut u8
+    (&raw mut scheduler_ctx) as *mut [328]u8 as *mut u8
 
 fn alt_stack_ptr() -> *mut u8:
     (&raw mut fiber_alt_stack_buf) as *mut [131072]u8 as *mut u8

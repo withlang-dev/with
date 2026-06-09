@@ -6639,6 +6639,21 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: MirBody, in
         let aa: Vec[i64] = Vec.new()
         aa.push(fid)
         wl_build_call(self.builder, await_ft, await_fn, vec_data_i64(&aa), 1)
+        var await_after_cancel_bb: i64 = 0
+        if intrinsic == MirIntrinsic.FIBER_AWAIT:
+            var ic_fn = wl_get_named_function(self.llmod, "with_runtime_current_cancel_requested")
+            if ic_fn == 0:
+                let icp: Vec[i64] = Vec.new()
+                let icft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&icp), 0, 0)
+                ic_fn = wl_add_function(self.llmod, "with_runtime_current_cancel_requested", icft)
+            let icft2 = wl_global_get_value_type(ic_fn)
+            let ic_args: Vec[i64] = Vec.new()
+            let is_cancelled = wl_build_call(self.builder, icft2, ic_fn, vec_data_i64(&ic_args), 0)
+            let is_cancelled_bool = wl_build_icmp(self.builder, wl_int_ne(), is_cancelled, wl_const_int(wl_i32_type(self.context), 0, 0))
+            let await_load_bb = wl_append_bb(self.context, self.current_function, "await.load_result")
+            await_after_cancel_bb = wl_append_bb(self.context, self.current_function, "await.after_cancel")
+            wl_build_cond_br(self.builder, is_cancelled_bool, await_after_cancel_bb, await_load_bb)
+            wl_position_at_end(self.builder, await_load_bb)
         // Load result from buffer unless MIR marked this await as cleanup-only.
         var ignore_result = false
         if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
@@ -6683,6 +6698,9 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: MirBody, in
             let fa: Vec[i64] = Vec.new()
             fa.push(rbuf)
             wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&fa), 1)
+        if await_after_cancel_bb != 0:
+            wl_build_br(self.builder, await_after_cancel_bb)
+            wl_position_at_end(self.builder, await_after_cancel_bb)
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
@@ -7312,17 +7330,39 @@ fn Codegen.mir_emit_ext_iter_intrinsic_call(self: Codegen, body: MirBody, intrin
         let vj_str_sym = self.intern.intern("str")
         let vj_str_ty = self.struct_llvm_types.get(self.struct_type_map.get(vj_str_sym).unwrap() as i64)
         let vj_ptr_ty = wl_ptr_type(self.context)
-        let vj_fn = self.ensure_c_fn("with_vec_str_join", vj_str_ty, 2)
+        var vj_fn = wl_get_named_function(self.llmod, "with_vec_str_join")
         let vj_alloca = self.create_entry_alloca(wl_type_of(vj_recv))
         wl_build_store(self.builder, vj_recv, vj_alloca)
-        let vj_params: Vec[i64] = Vec.new()
-        vj_params.push(vj_ptr_ty)
-        vj_params.push(vj_str_ty)
-        let vj_ft = wl_function_type(vj_str_ty, vec_data_i64(&vj_params), 2, 0)
-        let vj_args: Vec[i64] = Vec.new()
-        vj_args.push(vj_alloca)
-        vj_args.push(vj_sep)
-        result = wl_build_call(self.builder, vj_ft, vj_fn, vec_data_i64(&vj_args), 2)
+        if codegen_windows_x86_64():
+            let vj_ret = self.create_entry_alloca(vj_str_ty)
+            let vj_sep_alloca = self.create_entry_alloca(vj_str_ty)
+            wl_build_store(self.builder, vj_sep, vj_sep_alloca)
+            let vj_params: Vec[i64] = Vec.new()
+            vj_params.push(vj_ptr_ty)
+            vj_params.push(vj_ptr_ty)
+            vj_params.push(vj_ptr_ty)
+            let vj_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&vj_params), 3, 0)
+            if vj_fn == 0:
+                vj_fn = wl_add_function(self.llmod, "with_vec_str_join", vj_ft)
+                wl_add_sret_attr(self.context, vj_fn, 0, vj_str_ty)
+            let vj_args: Vec[i64] = Vec.new()
+            vj_args.push(vj_ret)
+            vj_args.push(vj_alloca)
+            vj_args.push(vj_sep_alloca)
+            let call = wl_build_call(self.builder, vj_ft, vj_fn, vec_data_i64(&vj_args), 3)
+            wl_add_call_sret_attr(self.context, call, 0, vj_str_ty)
+            result = wl_build_load(self.builder, vj_str_ty, vj_ret)
+        else:
+            if vj_fn == 0:
+                vj_fn = self.ensure_c_fn("with_vec_str_join", vj_str_ty, 2)
+            let vj_params: Vec[i64] = Vec.new()
+            vj_params.push(vj_ptr_ty)
+            vj_params.push(vj_str_ty)
+            let vj_ft = wl_function_type(vj_str_ty, vec_data_i64(&vj_params), 2, 0)
+            let vj_args: Vec[i64] = Vec.new()
+            vj_args.push(vj_alloca)
+            vj_args.push(vj_sep)
+            result = wl_build_call(self.builder, vj_ft, vj_fn, vec_data_i64(&vj_args), 2)
 
     else:
         return false

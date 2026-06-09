@@ -10,13 +10,11 @@ extern fn with_free(ptr: *mut u8) -> void
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> void
 extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
+extern fn rt_close(fd: i32) -> i32
 
 // ── libSystem extern fns ────────────────────────────────────────
 extern fn mkstemp(template_path: *mut u8) -> i32
-extern fn rename(old: *const u8, new_path: *const u8) -> i32
 extern fn unlink(path: *const u8) -> i32
-extern fn close(fd: i32) -> i32
-extern fn write(fd: i32, buf: *const u8, nbyte: u64) -> i64
 extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
@@ -26,6 +24,7 @@ extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, 
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
+extern fn with_sysinfo_os() -> str
 
 // ── libclang types ──────────────────────────────────────────────
 // Struct layouts match the C ABI exactly.
@@ -622,9 +621,10 @@ unsafe fn capture_command_stdout(argv: str, template_path: *mut u8, timeout_ms: 
     let fd = mkstemp(template_path)
     if fd < 0:
         return ""
-    let _ = close(fd)
+    let _ = rt_close(fd)
     let out_path = c_path_to_str(template_path)
-    let rc = with_exec_argv_capture(argv, out_path, "/dev/null", timeout_ms)
+    let err_path = if with_sysinfo_os() == "Windows": "NUL" else: "/dev/null"
+    let rc = with_exec_argv_capture(argv, out_path, err_path, timeout_ms)
     if rc != 0:
         let _remove_failed = with_fs_remove_file(out_path)
         return ""
@@ -648,16 +648,18 @@ unsafe fn append_cc_common_args(argv: str) -> str:
 // ── SDK path detection ──────────────────────────────────────────
 
 unsafe fn get_sdk_path() -> *const u8:
+    if with_sysinfo_os() != "Macos":
+        return 0 as *const u8
     if sdk_path_resolved == 0:
         sdk_path_resolved = 1
-        var out_template: [32]u8 = [0 as u8; 32]
+        var out_template: [4096]u8 = [0 as u8; 4096]
         let tmpl = "/tmp/with_xcrun_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
-        with_memcpy(&raw mut out_template as *mut [32]u8 as *mut u8, tp, 24)
+        with_memcpy(&raw mut out_template as *mut [4096]u8 as *mut u8, tp, 24)
         var argv = ""
         argv = append_argv_arg(argv, "xcrun")
         argv = append_argv_arg(argv, "--show-sdk-path")
-        let output = capture_command_stdout(argv, &raw mut out_template as *mut [32]u8 as *mut u8, 30000)
+        let output = capture_command_stdout(argv, &raw mut out_template as *mut [4096]u8 as *mut u8, 30000)
         let _copied = copy_first_line_to_buf(output, &raw mut sdk_path_buf as *mut [1024]u8 as *mut u8, 1024)
     if sdk_path_buf[0] != 0:
         return &sdk_path_buf as *const [1024]u8 as *const u8
@@ -1147,29 +1149,20 @@ pub fn with_cimport_parse(header_code: str) -> i64:
         with_memset(s as *mut u8, 0, size)
 
         // Create temp file
-        var template_path: [32]u8 = [0 as u8; 32]
+        var template_path: [4096]u8 = [0 as u8; 4096]
         let tmpl = "/tmp/with_cimport_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
-        with_memcpy(&raw mut template_path as *mut [32]u8 as *mut u8, tp, 25)
-        let fd = mkstemp(&raw mut template_path as *mut [32]u8 as *mut u8)
+        with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
+        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
         if fd < 0:
             (*s).err_msg = c_strdup("failed to create temp file\0" as *const u8)
             return s as i64
 
         let src_ptr = *(&header_code as *const *const u8)
-        let _ = write(fd, src_ptr, header_code.len() as u64)
-        let _ = write(fd, "\n\0" as *const u8, 1 as u64)
-        let _ = close(fd)
-
-        // Rename to .c
-        var c_path_buf: [64]u8 = [0 as u8; 64]
-        with_memcpy(&raw mut c_path_buf as *mut [64]u8 as *mut u8, &template_path as *const [32]u8 as *const u8, 32)
-        let tlen = c_strlen(&template_path as *const [32]u8 as *const u8)
-        *(((&raw mut c_path_buf) as i64 + tlen) as *mut u8) = 46  // '.'
-        *(((&raw mut c_path_buf) as i64 + tlen + 1) as *mut u8) = 99  // 'c'
-        *(((&raw mut c_path_buf) as i64 + tlen + 2) as *mut u8) = 0
-        let _ = rename(&template_path as *const [32]u8 as *const u8, &c_path_buf as *const [64]u8 as *const u8)
-        (*s).tmp_path = c_strdup(&c_path_buf as *const [64]u8 as *const u8)
+        let _ = rt_write(fd, src_ptr, header_code.len() as u64)
+        let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
+        let _ = rt_close(fd)
+        (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
         // Build compiler args
         var args: [64]*const u8 = [0 as *const u8; 64]
@@ -1186,6 +1179,10 @@ pub fn with_cimport_parse(header_code: str) -> i64:
             nargs = nargs + 1
             args[nargs as i64] = resdir
             nargs = nargs + 1
+        args[nargs as i64] = "-x\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = "c\0" as *const u8
+        nargs = nargs + 1
         var ip: i32 = 0
         while ip < g_cimport_include_count and nargs < 62:
             args[nargs as i64] = "-I\0" as *const u8
@@ -1908,6 +1905,20 @@ unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
         return 1
     if c_strstr(path, "/clang/\0" as *const u8) as i64 != 0:
         return 1
+    if c_strstr(path, "\\clang\\\0" as *const u8) as i64 != 0:
+        return 1
+    if c_strstr(path, "/lib/clang/\0" as *const u8) as i64 != 0:
+        return 1
+    if c_strstr(path, "\\lib\\clang\\\0" as *const u8) as i64 != 0:
+        return 1
+    if c_strstr(path, "/Windows Kits/\0" as *const u8) as i64 != 0:
+        return 1
+    if c_strstr(path, "\\Windows Kits\\\0" as *const u8) as i64 != 0:
+        return 1
+    if c_strstr(path, "/VC/Tools/MSVC/\0" as *const u8) as i64 != 0:
+        return 1
+    if c_strstr(path, "\\VC\\Tools\\MSVC\\\0" as *const u8) as i64 != 0:
+        return 1
     0
 
 unsafe fn macro_location_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
@@ -2155,27 +2166,19 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
         return 0
     with_memset(s as *mut u8, 0, size)
 
-    var template_path: [40]u8 = [0 as u8; 40]
+    var template_path: [4096]u8 = [0 as u8; 4096]
     let tmpl = "/tmp/with_cimport_macro_XXXXXX\0"
     let tp = *(&tmpl as *const *const u8)
-    with_memcpy(&raw mut template_path as *mut [40]u8 as *mut u8, tp, 31)
-    let fd = mkstemp(&raw mut template_path as *mut [40]u8 as *mut u8)
+    with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 31)
+    let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
     if fd < 0:
         with_cimport_dispose(s as i64)
         return 0
     let src_ptr = *(&header_code as *const *const u8)
-    let _ = write(fd, src_ptr, header_code.len() as u64)
-    let _ = write(fd, "\n\0" as *const u8, 1 as u64)
-    let _ = close(fd)
-
-    var c_path: [64]u8 = [0 as u8; 64]
-    with_memcpy(&raw mut c_path as *mut [64]u8 as *mut u8, &template_path as *const [40]u8 as *const u8, 40)
-    let tlen = c_strlen(&template_path as *const [40]u8 as *const u8)
-    *(((&raw mut c_path) as i64 + tlen) as *mut u8) = 46
-    *(((&raw mut c_path) as i64 + tlen + 1) as *mut u8) = 99
-    *(((&raw mut c_path) as i64 + tlen + 2) as *mut u8) = 0
-    let _ = rename(&template_path as *const [40]u8 as *const u8, &c_path as *const [64]u8 as *const u8)
-    (*s).tmp_path = c_strdup(&c_path as *const [64]u8 as *const u8)
+    let _ = rt_write(fd, src_ptr, header_code.len() as u64)
+    let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
+    let _ = rt_close(fd)
+    (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
     var args: [64]*const u8 = [0 as *const u8; 64]
     var nargs: i32 = 0
@@ -2191,6 +2194,10 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
         nargs = nargs + 1
         args[nargs as i64] = resdir
         nargs = nargs + 1
+    args[nargs as i64] = "-x\0" as *const u8
+    nargs = nargs + 1
+    args[nargs as i64] = "c\0" as *const u8
+    nargs = nargs + 1
     var ip: i32 = 0
     while ip < g_cimport_include_count and nargs < 62:
         args[nargs as i64] = "-I\0" as *const u8
@@ -2221,39 +2228,33 @@ pub fn with_cimport_parse_macros(header_code: str) -> i64:
             return ms as i64
 
         // Write header to temp file
-        var template_path: [40]u8 = [0 as u8; 40]
+        var template_path: [4096]u8 = [0 as u8; 4096]
         let tmpl = "/tmp/with_cimport_macro_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
-        with_memcpy(&raw mut template_path as *mut [40]u8 as *mut u8, tp, 31)
-        let fd = mkstemp(&raw mut template_path as *mut [40]u8 as *mut u8)
+        with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 31)
+        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
         if fd < 0: return ms as i64
         let src_ptr = *(&header_code as *const *const u8)
-        let _ = write(fd, src_ptr, header_code.len() as u64)
-        let _ = write(fd, "\n\0" as *const u8, 1 as u64)
-        let _ = close(fd)
-
-        var c_path: [64]u8 = [0 as u8; 64]
-        with_memcpy(&raw mut c_path as *mut [64]u8 as *mut u8, &template_path as *const [40]u8 as *const u8, 40)
-        let tlen = c_strlen(&template_path as *const [40]u8 as *const u8)
-        *(((&raw mut c_path) as i64 + tlen) as *mut u8) = 46
-        *(((&raw mut c_path) as i64 + tlen + 1) as *mut u8) = 99
-        *(((&raw mut c_path) as i64 + tlen + 2) as *mut u8) = 0
-        let _ = rename(&template_path as *const [40]u8 as *const u8, &c_path as *const [64]u8 as *const u8)
+        let _ = rt_write(fd, src_ptr, header_code.len() as u64)
+        let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
+        let _ = rt_close(fd)
 
         var argv = ""
         argv = append_argv_arg(argv, "cc")
         argv = append_cc_common_args(argv)
         argv = append_argv_arg(argv, "-E")
         argv = append_argv_arg(argv, "-dM")
-        argv = append_argv_arg(argv, make_str(&c_path as *const [64]u8 as *const u8))
+        argv = append_argv_arg(argv, "-x")
+        argv = append_argv_arg(argv, "c")
+        argv = append_argv_arg(argv, make_str(&template_path as *const [4096]u8 as *const u8))
 
-        var out_template: [40]u8 = [0 as u8; 40]
+        var out_template: [4096]u8 = [0 as u8; 4096]
         let out_tmpl = "/tmp/with_cimport_macros_XXXXXX\0"
         let out_tp = *(&out_tmpl as *const *const u8)
-        with_memcpy(&raw mut out_template as *mut [40]u8 as *mut u8, out_tp, 32)
-        let output = capture_command_stdout(argv, &raw mut out_template as *mut [40]u8 as *mut u8, 120000)
+        with_memcpy(&raw mut out_template as *mut [4096]u8 as *mut u8, out_tp, 32)
+        let output = capture_command_stdout(argv, &raw mut out_template as *mut [4096]u8 as *mut u8, 120000)
         if output.len() == 0:
-            let _ = unlink(&c_path as *const [64]u8 as *const u8)
+            let _ = unlink(&template_path as *const [4096]u8 as *const u8)
             return ms as i64
 
         let output_data = str_data_ptr(output)
@@ -2367,44 +2368,38 @@ pub fn with_cimport_parse_macros(header_code: str) -> i64:
             *(((*ms).param_counts as i64 + ci * 4) as *mut i32) = macro_param_count
             (*ms).count = (*ms).count + 1
 
-        let _ = unlink(&c_path as *const [64]u8 as *const u8)
+        let _ = unlink(&template_path as *const [4096]u8 as *const u8)
         ms as i64
 
 pub fn with_cimport_preprocess_text(source_code: str) -> str:
     unsafe:
-        var template_path: [40]u8 = [0 as u8; 40]
+        var template_path: [4096]u8 = [0 as u8; 4096]
         let tmpl = "/tmp/with_cimport_pp_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
-        with_memcpy(&raw mut template_path as *mut [40]u8 as *mut u8, tp, 28)
-        let fd = mkstemp(&raw mut template_path as *mut [40]u8 as *mut u8)
+        with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 28)
+        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
         if fd < 0:
             return ""
 
         let src_ptr = *(&source_code as *const *const u8)
-        let _ = write(fd, src_ptr, source_code.len() as u64)
-        let _ = write(fd, "\n\0" as *const u8, 1 as u64)
-        let _ = close(fd)
-
-        var c_path: [64]u8 = [0 as u8; 64]
-        with_memcpy(&raw mut c_path as *mut [64]u8 as *mut u8, &template_path as *const [40]u8 as *const u8, 40)
-        let tlen = c_strlen(&template_path as *const [40]u8 as *const u8)
-        *(((&raw mut c_path) as i64 + tlen) as *mut u8) = 46
-        *(((&raw mut c_path) as i64 + tlen + 1) as *mut u8) = 99
-        *(((&raw mut c_path) as i64 + tlen + 2) as *mut u8) = 0
-        let _ = rename(&template_path as *const [40]u8 as *const u8, &c_path as *const [64]u8 as *const u8)
+        let _ = rt_write(fd, src_ptr, source_code.len() as u64)
+        let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
+        let _ = rt_close(fd)
 
         var argv = ""
         argv = append_argv_arg(argv, "cc")
         argv = append_cc_common_args(argv)
         argv = append_argv_arg(argv, "-E")
-        argv = append_argv_arg(argv, make_str(&c_path as *const [64]u8 as *const u8))
+        argv = append_argv_arg(argv, "-x")
+        argv = append_argv_arg(argv, "c")
+        argv = append_argv_arg(argv, make_str(&template_path as *const [4096]u8 as *const u8))
 
-        var out_template: [40]u8 = [0 as u8; 40]
+        var out_template: [4096]u8 = [0 as u8; 4096]
         let out_tmpl = "/tmp/with_cimport_ppout_XXXXXX\0"
         let out_tp = *(&out_tmpl as *const *const u8)
-        with_memcpy(&raw mut out_template as *mut [40]u8 as *mut u8, out_tp, 31)
-        let result = capture_command_stdout(argv, &raw mut out_template as *mut [40]u8 as *mut u8, 120000)
-        let _ = unlink(&c_path as *const [64]u8 as *const u8)
+        with_memcpy(&raw mut out_template as *mut [4096]u8 as *mut u8, out_tp, 31)
+        let result = capture_command_stdout(argv, &raw mut out_template as *mut [4096]u8 as *mut u8, 120000)
+        let _ = unlink(&template_path as *const [4096]u8 as *const u8)
 
         result
 
@@ -2419,18 +2414,18 @@ pub fn with_cimport_collect_object_macro_types(header_code: str, macro_names: st
             return ""
         with_memset(s as *mut u8, 0, size)
 
-        var template_path: [32]u8 = [0 as u8; 32]
+        var template_path: [4096]u8 = [0 as u8; 4096]
         let tmpl = "/tmp/with_cimport_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
-        with_memcpy(&raw mut template_path as *mut [32]u8 as *mut u8, tp, 25)
-        let fd = mkstemp(&raw mut template_path as *mut [32]u8 as *mut u8)
+        with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
+        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
         if fd < 0:
             with_cimport_dispose(s as i64)
             return ""
 
         let src_ptr = *(&header_code as *const *const u8)
-        let _ = write(fd, src_ptr, header_code.len() as u64)
-        let _ = write(fd, "\n\0" as *const u8, 1 as u64)
+        let _ = rt_write(fd, src_ptr, header_code.len() as u64)
+        let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
 
         var pos: i32 = 0
         while pos < macro_names.len() as i32:
@@ -2443,17 +2438,9 @@ pub fn with_cimport_collect_object_macro_types(header_code: str, macro_names: st
                 let name = macro_names.slice(start as i64, pos as i64)
                 let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ ";\n"
                 let probe_ptr = *(&probe_line as *const *const u8)
-                let _ = write(fd, probe_ptr, probe_line.len() as u64)
-        let _ = close(fd)
-
-        var c_path_buf: [64]u8 = [0 as u8; 64]
-        with_memcpy(&raw mut c_path_buf as *mut [64]u8 as *mut u8, &template_path as *const [32]u8 as *const u8, 32)
-        let tlen = c_strlen(&template_path as *const [32]u8 as *const u8)
-        *(((&raw mut c_path_buf) as i64 + tlen) as *mut u8) = 46
-        *(((&raw mut c_path_buf) as i64 + tlen + 1) as *mut u8) = 99
-        *(((&raw mut c_path_buf) as i64 + tlen + 2) as *mut u8) = 0
-        let _ = rename(&template_path as *const [32]u8 as *const u8, &c_path_buf as *const [64]u8 as *const u8)
-        (*s).tmp_path = c_strdup(&c_path_buf as *const [64]u8 as *const u8)
+                let _ = rt_write(fd, probe_ptr, probe_line.len() as u64)
+        let _ = rt_close(fd)
+        (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
         var args: [64]*const u8 = [0 as *const u8; 64]
         var nargs: i32 = 0
@@ -2469,6 +2456,10 @@ pub fn with_cimport_collect_object_macro_types(header_code: str, macro_names: st
             nargs = nargs + 1
             args[nargs as i64] = resdir
             nargs = nargs + 1
+        args[nargs as i64] = "-x\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = "c\0" as *const u8
+        nargs = nargs + 1
         var ip: i32 = 0
         while ip < g_cimport_include_count and nargs < 62:
             args[nargs as i64] = "-I\0" as *const u8
@@ -2517,31 +2508,23 @@ pub fn with_cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64:
             return 0
         with_memset(s as *mut u8, 0, size)
 
-        var template_path: [32]u8 = [0 as u8; 32]
+        var template_path: [4096]u8 = [0 as u8; 4096]
         let tmpl = "/tmp/with_cimport_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
-        with_memcpy(&raw mut template_path as *mut [32]u8 as *mut u8, tp, 25)
-        let fd = mkstemp(&raw mut template_path as *mut [32]u8 as *mut u8)
+        with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
+        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
         if fd < 0:
             with_cimport_dispose(s as i64)
             return 0
 
         let src_ptr = *(&header_code as *const *const u8)
-        let _ = write(fd, src_ptr, header_code.len() as u64)
-        let _ = write(fd, "\n\0" as *const u8, 1 as u64)
+        let _ = rt_write(fd, src_ptr, header_code.len() as u64)
+        let _ = rt_write(fd, "\n\0" as *const u8, 1 as u64)
         let probe_line = "__typeof__(" ++ macro_name ++ ") __with_macro_probe_" ++ macro_name ++ " = " ++ macro_name ++ ";\n"
         let probe_ptr = *(&probe_line as *const *const u8)
-        let _ = write(fd, probe_ptr, probe_line.len() as u64)
-        let _ = close(fd)
-
-        var c_path_buf: [64]u8 = [0 as u8; 64]
-        with_memcpy(&raw mut c_path_buf as *mut [64]u8 as *mut u8, &template_path as *const [32]u8 as *const u8, 32)
-        let tlen = c_strlen(&template_path as *const [32]u8 as *const u8)
-        *(((&raw mut c_path_buf) as i64 + tlen) as *mut u8) = 46
-        *(((&raw mut c_path_buf) as i64 + tlen + 1) as *mut u8) = 99
-        *(((&raw mut c_path_buf) as i64 + tlen + 2) as *mut u8) = 0
-        let _ = rename(&template_path as *const [32]u8 as *const u8, &c_path_buf as *const [64]u8 as *const u8)
-        (*s).tmp_path = c_strdup(&c_path_buf as *const [64]u8 as *const u8)
+        let _ = rt_write(fd, probe_ptr, probe_line.len() as u64)
+        let _ = rt_close(fd)
+        (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
         var args: [64]*const u8 = [0 as *const u8; 64]
         var nargs: i32 = 0
@@ -2557,6 +2540,10 @@ pub fn with_cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64:
             nargs = nargs + 1
             args[nargs as i64] = resdir
             nargs = nargs + 1
+        args[nargs as i64] = "-x\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = "c\0" as *const u8
+        nargs = nargs + 1
         var ip: i32 = 0
         while ip < g_cimport_include_count and nargs < 62:
             args[nargs as i64] = "-I\0" as *const u8

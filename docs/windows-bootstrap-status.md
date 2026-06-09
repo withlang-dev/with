@@ -1,6 +1,51 @@
 # Windows Bootstrap Status
 
-Last updated: 2026-06-08 17:21 -0700.
+Last updated: 2026-06-08 22:10 -0700.
+
+## Current Issue Audit
+
+- #344: CLOSED. Release packaging/static-link evidence was already verified.
+- #343: CLOSED. Windows `c_import("limits.h")` focused smoke
+  now passes through `check` and `run` with both backslash and slash paths.
+- #341: CLOSED. The two issue-specific Windows async
+  cancellation tests now pass:
+  `behav_async_cancel_await_cleans_children.w` and
+  `behav_async_cancel_nested_unwind.w`.
+- #369: OPEN. This is the separate Windows custom-fiber stack-overflow
+  diagnostic bug. It is not a regression in #341 cancellation behavior.
+
+Latest #341 root-cause facts:
+
+- Focused depth-1 repro also crashes, so this is not deep queue pressure.
+- LLDB showed the crash in `with_runtime_current_set_cancelled_return` writing
+  `current_fiber + FIBER_OFF_CANCELLED_RETURN`.
+- Queue trace for depth-1 showed the crashing `current_fiber` was the first
+  slow fiber record (`0x...0050`) and had not been recycled before the write.
+- The Windows fiber assembly previously failed to preserve Windows x64
+  nonvolatile XMM6-XMM15. Source now saves/restores XMM6-XMM15 and expands
+  the Windows fiber context and scheduler context from 168 to 328 bytes.
+- A dedicated-`rt_mmap` fiber-record diagnostic did not fix #341 and was
+  backed out.
+- A MIR consumed-Task clearing experiment did not move the crash and was
+  backed out.
+- Final root cause: `with_fiber_await` intentionally returns early when the
+  current fiber is cancelled so MIR can cancel/join the awaited child and
+  unwind. `CodegenDispatch` still loaded and freed the Task result buffer
+  immediately after every raw `FIBER_AWAIT`, before MIR's self-cancel branch.
+  On a `select await` loser path this freed a still-owned child result buffer
+  and corrupted cancellation cleanup ownership. Source fix: raw `FIBER_AWAIT`
+  now checks `with_runtime_current_cancel_requested()` after the runtime await
+  call and skips result-buffer load/free when cancellation is pending;
+  `FIBER_CLEANUP_AWAIT` still drains and frees.
+
+Current next step:
+
+- Commit and push the closed-issue fixes after final local checks. #369 remains
+  open because `behav_async_stack_overflow.w` still exits with raw
+  `0xC0000005`; LLDB confirmed actual fiber stack exhaustion. A diagnostic
+  attempt showed `PAGE_NOACCESS` guard pages cannot dispatch a VEH handler
+  because Windows uses the current stack for VEH. That guard-handler attempt
+  was backed out.
 
 ## Anti-Loop Summary
 
@@ -19,6 +64,23 @@ Last known green:
   bytes.
 
 Current blocker:
+
+- No current blocker for #341, #343, or #344. All three GitHub issues are
+  closed.
+- 2026-06-08 verification after #341/#343 source fixes on merged
+  `origin/main`:
+  - Windows `build`, `:fixpoint`, and `:emit-c-fixpoint`: PASS.
+  - Windows issue-specific async cancellation tests: PASS.
+  - Windows c_import `limits.h` focused smoke through `check` and `run`: PASS.
+  - Windows stage2 stack reserve: PASS, `8388608`.
+  - Windows release compiler imports: PASS, Windows system DLLs only.
+  - Linux isolated worktree from current `origin/main` plus the source patch:
+    `build`, `:fixpoint`, and `:emit-c-fixpoint`: PASS.
+  - Linux published v0.15.1 seed still panics with the old build-cache
+    overflow after writing patched stage1; the freshly written patched
+    `out/bootstrap/bin/with-stage1` completes the verification chain.
+
+Resolved blocker history:
 
 - 2026-06-08 blocker recheck:
   - Windows normal build graph `with_exec_argv_capture rc -2` with empty logs:

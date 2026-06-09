@@ -11,6 +11,16 @@
 //   80  rbp
 //   88  rip
 //   96  rsp
+//   104 xmm6
+//   120 xmm7
+//   136 xmm8
+//   152 xmm9
+//   168 xmm10
+//   184 xmm11
+//   200 xmm12
+//   216 xmm13
+//   232 xmm14
+//   248 xmm15
 
         .text
         .globl with_fiber_switch
@@ -26,6 +36,16 @@ with_fiber_switch:
         movq %rdi, 40(%rcx)
         movq %rsi, 48(%rcx)
         movq %rbp, 80(%rcx)
+        movdqu %xmm6, 104(%rcx)
+        movdqu %xmm7, 120(%rcx)
+        movdqu %xmm8, 136(%rcx)
+        movdqu %xmm9, 152(%rcx)
+        movdqu %xmm10, 168(%rcx)
+        movdqu %xmm11, 184(%rcx)
+        movdqu %xmm12, 200(%rcx)
+        movdqu %xmm13, 216(%rcx)
+        movdqu %xmm14, 232(%rcx)
+        movdqu %xmm15, 248(%rcx)
 
         movq (%rsp), %rax
         movq %rax, 88(%rcx)
@@ -40,6 +60,16 @@ with_fiber_switch:
         movq 40(%rdx), %rdi
         movq 48(%rdx), %rsi
         movq 80(%rdx), %rbp
+        movdqu 104(%rdx), %xmm6
+        movdqu 120(%rdx), %xmm7
+        movdqu 136(%rdx), %xmm8
+        movdqu 152(%rdx), %xmm9
+        movdqu 168(%rdx), %xmm10
+        movdqu 184(%rdx), %xmm11
+        movdqu 200(%rdx), %xmm12
+        movdqu 216(%rdx), %xmm13
+        movdqu 232(%rdx), %xmm14
+        movdqu 248(%rdx), %xmm15
 
         movq 96(%rdx), %rsp
         movq 88(%rdx), %rax

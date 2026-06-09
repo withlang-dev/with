@@ -3541,14 +3541,12 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
             if direct_ret_abi_ty != 0:
                 direct_ret_ty = ret_ty
                 actual_ret_ty = direct_ret_abi_ty
-            else if self.c_abi_hfa_info(ret_ty) != 0:
+            else if codegen_c_abi_darwin_arm64() and self.c_abi_hfa_info(ret_ty) != 0:
                 actual_ret_ty = ret_ty
-            else:
-                let ret_size = self.abi_size_of(ret_ty)
-                if ret_size > 16:
-                    has_sret = 1
-                    sret_ty = ret_ty
-                    actual_ret_ty = wl_void_type(self.context)
+            else if self.c_abi_needs_sret(ret_ty):
+                has_sret = 1
+                sret_ty = ret_ty
+                actual_ret_ty = wl_void_type(self.context)
         if has_sret != 0:
             actual_param_types.push(ptr_ty)
         for abi_pi in 0..param_count:
@@ -3561,8 +3559,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
                     byval_types.push(0)
                     direct_types.push(source_ty)
                     continue
-                let p_size = self.abi_size_of(source_ty)
-                if p_size > 16:
+                if self.c_abi_needs_indirect_param(source_ty):
                     actual_param_types.push(ptr_ty)
                     byval_mask = byval_mask | ((1 as i64) << (abi_pi as u32))
                     byval_types.push(source_ty)
@@ -3874,6 +3871,24 @@ fn Codegen.internal_abi_needs_indirect_param(self: Codegen, param_ty: i64) -> bo
         return false
     self.abi_size_of(param_ty) > 8
 
+fn Codegen.c_abi_needs_sret(self: Codegen, ret_ty: i64) -> bool:
+    if ret_ty == 0:
+        return false
+    if wl_get_type_kind(ret_ty) != wl_struct_type_kind():
+        return false
+    if codegen_windows_x86_64():
+        return self.c_abi_direct_struct_return_type(ret_ty) == 0
+    self.abi_size_of(ret_ty) > 16
+
+fn Codegen.c_abi_needs_indirect_param(self: Codegen, param_ty: i64) -> bool:
+    if param_ty == 0:
+        return false
+    if wl_get_type_kind(param_ty) != wl_struct_type_kind():
+        return false
+    if codegen_windows_x86_64():
+        return self.c_abi_direct_struct_param_type(param_ty) == 0
+    self.abi_size_of(param_ty) > 16
+
 fn Codegen.c_abi_integer_aggregate_ok(self: Codegen, ty: i64) -> bool:
     if ty == 0:
         return false
@@ -3944,11 +3959,16 @@ fn Codegen.c_abi_hfa_type(self: Codegen, info: i32) -> i64:
     wl_array_type(elem_ty, count as i64)
 
 fn Codegen.c_abi_direct_struct_param_type(self: Codegen, ty: i64) -> i64:
-    if not codegen_c_abi_darwin_arm64():
-        return 0
     if ty == 0 or wl_get_type_kind(ty) != wl_struct_type_kind():
         return 0
     if self.is_str_type(ty):
+        return 0
+    if codegen_windows_x86_64():
+        let size = self.abi_size_of(ty)
+        if (size == 1 or size == 2 or size == 4 or size == 8) and self.c_abi_integer_aggregate_ok(ty):
+            return wl_int_type_n(self.context, (size * 8) as i32)
+        return 0
+    if not codegen_c_abi_darwin_arm64():
         return 0
     let hfa = self.c_abi_hfa_info(ty)
     if hfa != 0:
@@ -3963,11 +3983,16 @@ fn Codegen.c_abi_direct_struct_param_type(self: Codegen, ty: i64) -> i64:
     wl_array_type(wl_i64_type(self.context), 2)
 
 fn Codegen.c_abi_direct_struct_return_type(self: Codegen, ty: i64) -> i64:
-    if not codegen_c_abi_darwin_arm64():
-        return 0
     if ty == 0 or wl_get_type_kind(ty) != wl_struct_type_kind():
         return 0
     if self.is_str_type(ty):
+        return 0
+    if codegen_windows_x86_64():
+        let size = self.abi_size_of(ty)
+        if (size == 1 or size == 2 or size == 4 or size == 8) and self.c_abi_integer_aggregate_ok(ty):
+            return wl_int_type_n(self.context, (size * 8) as i32)
+        return 0
+    if not codegen_c_abi_darwin_arm64():
         return 0
     if self.c_abi_hfa_info(ty) != 0:
         return 0
@@ -4133,14 +4158,12 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
         if direct_ret_abi_ty != 0:
             direct_ret_ty = ret_ty
             actual_ret_ty = direct_ret_abi_ty
-        else if self.c_abi_hfa_info(ret_ty) != 0:
+        else if codegen_c_abi_darwin_arm64() and self.c_abi_hfa_info(ret_ty) != 0:
             actual_ret_ty = ret_ty
-        else:
-            let ret_size = self.abi_size_of(ret_ty)
-            if ret_size > 16:
-                has_sret = 1
-                sret_ty = ret_ty
-                actual_ret_ty = wl_void_type(self.context)
+        else if self.c_abi_needs_sret(ret_ty):
+            has_sret = 1
+            sret_ty = ret_ty
+            actual_ret_ty = wl_void_type(self.context)
 
     // Build final param list with ABI transformations
     let param_types: Vec[i64] = Vec.new()
@@ -4164,8 +4187,7 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
                 byval_types.push(0)
                 direct_types.push(orig_ty)
                 continue
-            let p_size = self.abi_size_of(orig_ty)
-            if p_size > 16:
+            if self.c_abi_needs_indirect_param(orig_ty):
                 param_types.push(ptr_ty)
                 byval_mask = byval_mask | ((1 as i64) << (pi as u32))
                 byval_types.push(orig_ty)

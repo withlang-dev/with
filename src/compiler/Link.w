@@ -767,7 +767,7 @@ fn link_stage_undefined_symbols_need_llvm_bridge(undef: str) -> bool:
 fn link_stage_dirname(path: str) -> str:
     var last_slash = -1
     for i in 0..path.len():
-        if path[i] == 47: // '/'
+        if path[i] == 47 or path[i] == 92: // '/' or '\'
             last_slash = i as i32
     if last_slash < 0:
         return "."
@@ -776,7 +776,7 @@ fn link_stage_dirname(path: str) -> str:
 fn link_stage_source_stem(source_path: str) -> str:
     var last_slash = -1
     for i in 0..source_path.len():
-        if source_path[i] == 47: // '/'
+        if source_path[i] == 47 or source_path[i] == 92: // '/' or '\'
             last_slash = i as i32
     let base = if last_slash >= 0:
         source_path.slice((last_slash + 1) as i64, source_path.len() as i64)
@@ -793,7 +793,7 @@ fn link_stage_sanitize_relative_dir(path: str) -> str:
     while i <= path.len():
         let at_end = i == path.len()
         let ch = if at_end: 47 else: path.byte_at(i as i64)
-        if ch == 47:
+        if ch == 47 or ch == 92:
             if i > segment_start:
                 let segment = path.slice(segment_start as i64, i as i64)
                 if segment != ".":
