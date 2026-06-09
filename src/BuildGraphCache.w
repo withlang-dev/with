@@ -43,11 +43,28 @@ pub fn build_cache_is_cacheable(kind: i32) -> bool:
     if kind == 23: return true
     false
 
-pub fn build_cache_fingerprint_file(path: str) -> i64:
+fn build_cache_fingerprint_regular_file(path: str) -> i64:
     if build_graph_rt_file_exists(path) == 0:
         return 0
     let contents = build_graph_rt_read_file(path)
     with_str_hash(contents)
+
+fn build_cache_fingerprint_directory(path: str) -> i64:
+    let listing = build_graph_rt_list_files(path)
+    let files = build_cache_sorted_strings(build_cache_split_lines(listing))
+    var combined = "dir\n"
+    for i in 0..files.len() as i32:
+        let file = files.get(i as i64)
+        if build_graph_rt_is_dir(file) == 0:
+            combined = combined ++ file ++ ":" ++ f"{build_cache_fingerprint_regular_file(file)}" ++ "\n"
+    with_str_hash(combined)
+
+pub fn build_cache_fingerprint_file(path: str) -> i64:
+    if build_graph_rt_file_exists(path) == 0:
+        return 0
+    if build_graph_rt_is_dir(path) != 0:
+        return build_cache_fingerprint_directory(path)
+    build_cache_fingerprint_regular_file(path)
 
 fn build_cache_str_contains_byte(text: str, target: i32) -> bool:
     for i in 0..text.len() as i32:

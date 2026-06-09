@@ -1,6 +1,6 @@
 # Windows Bootstrap Status
 
-Last updated: 2026-06-08 06:45 -0700.
+Last updated: 2026-06-08 17:21 -0700.
 
 ## Anti-Loop Summary
 
@@ -19,6 +19,26 @@ Last known green:
   bytes.
 
 Current blocker:
+
+- 2026-06-08 blocker recheck:
+  - Windows normal build graph `with_exec_argv_capture rc -2` with empty logs:
+    NOT REPRODUCIBLE on current `main` plus the current source patch.
+    `out/bin/with.exe build :stage1`, `:stage2`, `:fixpoint`,
+    `:emit-c-fixpoint`, and `build` all passed through the normal graph.
+  - Linux normal graph panic after writing stage1: ROOT-CAUSED. The build
+    cache treated target extra outputs as regular files. `stage1` declares
+    directory extra outputs such as `out/command/stage1`; cache recording
+    called `with_fs_read_file` on that directory, then Linux file-size/seek
+    behavior reached checked integer overflow in `with_fs_read_file`.
+    Source fix: output fingerprinting now detects directories and hashes the
+    recursive file list deterministically; `with_fs_read_file` also refuses
+    directory paths.
+  - Linux verification from clean worktree
+    `/home/lazarus/with-investigate-main`: old v0.15.1 seed still panics
+    after writing patched stage1 because the old seed contains the bug.
+    Freshly written patched `out/bootstrap/bin/with-stage1` then passed
+    `build :stage2`, `build`, `build :fixpoint`, and
+    `build :emit-c-fixpoint`.
 
 - Windows bootstrap/fixpoint frontier is green.
 - Windows `with build :emit-c-fixpoint`: PASS from rebuilt stage2 candidate.

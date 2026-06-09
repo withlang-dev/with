@@ -2211,6 +2211,8 @@ fn fs_mkdir_component(path: *const u8, mode: i32) -> i32:
 
 pub fn with_fs_read_file(path: str) -> str:
     let cpath = str_to_cstr(path)
+    if fs_path_is_dir_c(cpath):
+        return make_str("" as *const u8, 0)
     let fd = rt_open(cpath, 0, 0)  // O_RDONLY
     if fd < 0:
         return make_str("" as *const u8, 0)
