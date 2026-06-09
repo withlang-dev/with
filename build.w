@@ -438,6 +438,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_no_c_export = target_with_compiler_c_export_audit_inputs(compiler_no_c_export, ctx)
     out = out.add_target(compiler_no_c_export)
 
+    var requirements_informative = target_new(.Action, "requirements-informative-check", "").output("out/.build-state/requirements-informative-check.txt")
+    requirements_informative.action = run_check_requirements_informative_action
+    requirements_informative = requirements_informative.write_scope("out/.build-state")
+    requirements_informative = requirements_informative.write_scope("out/command/requirements-informative-check")
+    requirements_informative = requirements_informative.input("scripts/check-requirements-informative.py")
+    requirements_informative = requirements_informative.input("docs/requirements.md")
+    out = out.add_target(requirements_informative)
+
     out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "src/compiler/LlvmBridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O0", ""))
     out = out.add_target(with_object_target("bootstrap-clang-bridge-object", "seed", "src/compiler/ClangBridge.w", "out/bootstrap-lib/clang_bridge.o", "-O0", ""))
 
@@ -896,6 +904,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("emit-c-smoke")
+    tests = tests.dep("requirements-informative-check")
     tests = tests.dep("test-green")
     out = out.add_target(tests)
 
