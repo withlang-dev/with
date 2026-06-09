@@ -73,10 +73,26 @@ fn empty_file_target(name: str, output: str) -> Target:
     target
 
 fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
-    // Old seed compilers prefer out/lib before out/bootstrap-lib. Removing the
-    // probe object makes stage1 select the freshly generated bootstrap runtime.
+    // Old seed compilers may prefer out/lib before out/bootstrap-lib. Remove
+    // stale unversioned runtime probes so stage1 selects the freshly generated
+    // bootstrap runtime instead of yesterday's out/lib objects.
     let fs = ctx.fs()
-    let _remove_probe = fs.remove_file("out/lib/cimport_stubs.o")
+    let stale_runtime_objects: Vec[str] = Vec.new()
+    stale_runtime_objects.push("out/lib/cimport_stubs.o")
+    stale_runtime_objects.push("out/lib/rt_core.o")
+    stale_runtime_objects.push("out/lib/rt_darwin_aarch64.o")
+    stale_runtime_objects.push("out/lib/rt_linux_x86_64.o")
+    stale_runtime_objects.push("out/lib/rt_windows_x86_64.o")
+    stale_runtime_objects.push("out/lib/compat_runtime.o")
+    stale_runtime_objects.push("out/lib/panic_runtime.o")
+    stale_runtime_objects.push("out/lib/regex_runtime.o")
+    stale_runtime_objects.push("out/lib/channel_runtime.o")
+    stale_runtime_objects.push("out/lib/fiber_runtime.o")
+    stale_runtime_objects.push("out/lib/fiber.o")
+    stale_runtime_objects.push("out/lib/fiber_asm.o")
+    stale_runtime_objects.push("out/lib/fiber_stubs.o")
+    for i in 0..stale_runtime_objects.len() as i32:
+        let _remove_stale = fs.remove_file(stale_runtime_objects.get(i as i64))
     let output = ctx.output()
     if fs.mkdir_all(build_project_dirname(output)) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ build_project_dirname(output))

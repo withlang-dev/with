@@ -2719,6 +2719,18 @@ fn Sema.fn_symbol_is_manual_extern(self: Sema, fn_sym: i32) -> i32:
         return 0
     1
 
+fn Sema.fn_symbol_is_raw_c_import(self: Sema, fn_sym: i32) -> i32:
+    if not self.ci_syms.contains(fn_sym):
+        return 0
+    let fn_name = self.pool_resolve(fn_sym)
+    if sema_extern_is_compiler_implementation(fn_name, self.current_module_path) != 0:
+        return 0
+    if sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)) != 0:
+        return 0
+    if self.ci_raw_syms.contains(fn_sym):
+        return 1
+    0
+
 fn Sema.unsafe_prefix_has_raw_access(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -3480,8 +3492,16 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
         self.typed_expr_types.insert(node, variant_tid)
         return variant_tid
 
-    // Unknown identifier — suggest close matches
+    // Omitted c_import symbols should explain the import gap instead of
+    // pretending the user misspelled an ordinary local name.
     let target_name = self.pool_resolve(sym)
+    if self.ci_omitted_symbols.contains(target_name):
+        let reason = self.ci_omitted_symbols.get(target_name).unwrap()
+        let detail = if reason.len() > 0: reason else: "untranslated C construct"
+        self.emit_error(f"c_import symbol '{target_name}' was omitted: {detail}", node)
+        return 0
+
+    // Unknown identifier — suggest close matches
     let suggestion = self.suggest_name(target_name, node)
     self.emit_error_with_suggestion("undefined variable", node, suggestion)
     0
@@ -4511,24 +4531,6 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         self.record_view_binding_from_expr(name, value)
     else:
         self.clear_binding_view_deps(name)
-
-    // Auto-defer: if this is an immutable let binding of a c_import type with a
-    // destructor (e.g. let v = MyVec.new(...)), record it for auto-defer at scope exit.
-    if is_mut == 0 and self.ci_type_destructors.len() > 0:
-        let resolved_bt = self.resolve_alias(bind_type)
-        let bt_kind = self.get_type_kind(resolved_bt)
-        // For pointer types (*mut T), check the pointee type name
-        var type_name_sym = 0
-        if bt_kind == TypeKind.TY_PTR or bt_kind == TypeKind.TY_REF:
-            let pointee = self.get_type_d0(resolved_bt)
-            if pointee > 0:
-                let pt_resolved = self.resolve_alias(pointee as TypeId)
-                type_name_sym = self.get_type_d0(pt_resolved)
-        else if bt_kind == TypeKind.TY_STRUCT:
-            type_name_sym = self.get_type_d0(resolved_bt)
-        if type_name_sym != 0 and self.ci_type_destructors.contains(type_name_sym):
-            let dtor_sym = self.ci_type_destructors.get(type_name_sym).unwrap()
-            self.ci_auto_defer_bindings.insert(name, dtor_sym)
 
     // If this let binds a borrow, tie the newest active borrow to this binding.
     if self.ast.kind(value) == NodeKind.NK_UNARY:
@@ -8092,6 +8094,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         return 0
     if self.fn_symbol_is_unsafe(fn_sym) != 0:
         if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
+            return 0
+    else if self.fn_symbol_is_raw_c_import(fn_sym) != 0:
+        if self.require_unsafe_operation("raw c_import function call requires unsafe context", node) == 0:
             return 0
     else if self.fn_symbol_is_manual_extern(fn_sym) != 0:
         if self.require_unsafe_operation("manual extern function call requires unsafe context", node) == 0:

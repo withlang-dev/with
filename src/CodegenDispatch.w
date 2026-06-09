@@ -3091,6 +3091,13 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                 src_tk = self.mir_input.mir_get_type_kind(src_resolved)
                 if src_tk == 0 and src_resolved >= self.mir_input.sema_type_kinds.len() as i32 and src_resolved > 0:
                     src_tk = self.sema.get_type_kind(self.sema.resolve_alias(src_resolved as TypeId) as i32)
+            if src_tk == TypeKind.TY_STR:
+                let str_val = self.mir_eval_operand(body, d0, 0)
+                let str_ptr = self.extract_str_ptr(str_val)
+                if str_ptr != 0:
+                    if wl_type_of(str_ptr) != cast_ty:
+                        return wl_build_bitcast(self.builder, str_ptr, cast_ty)
+                    return str_ptr
             // Only aggregate/array place-to-pointer casts should use the
             // address of the operand place. Integer-to-pointer and
             // pointer-to-pointer casts must use the operand value.
@@ -3610,15 +3617,9 @@ fn Codegen.mir_eval_call_operand_info(self: Codegen, body: MirBody, operand_id: 
         let expected_kind = wl_get_type_kind(expected_ty)
         let actual_kind = wl_get_type_kind(wl_type_of(out))
         if expected_kind == wl_pointer_type_kind() and actual_kind == wl_struct_type_kind():
-            if self.is_str_type(wl_type_of(out)):
-                if is_c_abi_arg != 0 and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0:
-                    let cstr = self.copy_str_to_cstr_temp(out)
-                    let coerced_cstr = self.enforce_coerced_type(cstr, expected_ty, "wrong argument type")
-                    return CallArgValue { value: coerced_cstr, cleanup_ptr: cstr }
-            else:
-                let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
-                if place_ptr != 0:
-                    out = place_ptr
+            let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
+            if place_ptr != 0:
+                out = place_ptr
     let had_error_before = self.had_error
     let coerced = self.enforce_coerced_type(out, expected_ty, "wrong argument type")
     if self.had_error != had_error_before:

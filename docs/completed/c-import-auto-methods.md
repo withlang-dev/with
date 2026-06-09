@@ -23,16 +23,17 @@ let val: str = g_hash_table_lookup(table, "name")
 g_hash_table_destroy(table)
 ```
 
-**After (auto-method generation + auto-destroy):**
+**After (auto-method generation):**
 ```
 let table = GHashTable()
 table.insert("name", "Eric")
 let val: str = table.lookup("name")
-// table.destroy() called automatically at scope exit
+table.destroy()
 ```
 
 Both the flat C functions and the manual `.destroy()` still work.
-The auto-destroy is the default — not a requirement.
+Automatic cleanup is generated only by a proven owning wrapper with
+`Drop`, not by method-name detection alone.
 
 ## Spec
 
@@ -165,82 +166,25 @@ Only function pointer types are candidates, because they represent
 strategy/policy choices where the header often exports a single
 standard implementation.
 
-### Destructor Detection and Auto-Defer
+### Destructor Candidates and Ownership Wrappers
 
-Functions matching `prefix_destroy`, `prefix_free`, `prefix_close`,
-`prefix_unref`, or `prefix_release` that take `*S` / `*mut S` and
-return void are tagged as destructors.
+Name patterns such as `prefix_destroy`, `prefix_free`, `prefix_close`,
+`prefix_unref`, and `prefix_release` are only hints. They may appear in
+import manifests or diagnostics as likely cleanup candidates, but they
+do not prove ownership and must not cause generated cleanup by
+themselves.
 
-**Auto-defer rule:** When a constructor result is bound to a local
-`let` that doesn't escape the scope, the compiler automatically
-inserts `defer obj.destructor()` at the binding site.
+Automatic cleanup is valid only when `c_import` has real ownership
+evidence: explicit annotations, imported metadata, conservative source
+analysis, curated library-specific conventions, or a handwritten owning
+wrapper. When that evidence exists, cleanup is expressed as an owning
+With wrapper whose `Drop` calls the correct C destructor.
 
-```
-let table = GHashTable()
-// compiler silently inserts: defer table.destroy()
-
-table.insert("name", "Eric")
-print(table.lookup("name"))
-// table.destroy() runs automatically at scope exit
-```
-
-The user never writes `defer` or `.destroy()` for the common case.
-
-**When auto-defer does NOT apply:**
-
-- The value is returned from the function (ownership transfer):
-  ```
-  fn make_table() -> *mut GHashTable:
-      let table = GHashTable()   // NO auto-defer — it's returned
-      table.insert("default", "value")
-      table
-  ```
-
-- The value is stored in a struct field or collection (escapes scope):
-  ```
-  var tables: Vec[*mut GHashTable] = Vec.new()
-  let table = GHashTable()   // NO auto-defer — pushed into vec
-  tables.push(table)
-  ```
-
-- The value is bound to `var` and reassigned (ambiguous lifetime):
-  ```
-  var table = GHashTable()   // NO auto-defer — var can be reassigned
-  if condition:
-      table.destroy()
-      table = GHashTable()
-  table.destroy()            // user manages manually
-  ```
-
-- The value is passed to a function that takes ownership:
-  ```
-  let table = GHashTable()   // NO auto-defer — consumed by transfer
-  framework_take_ownership(table)
-  ```
-
-The rule is conservative: **auto-defer only when the compiler can
-prove the binding is local and non-escaping.** This is exactly the
-same information the compiler already tracks for move/borrow
-checking. When in doubt, no auto-defer — the user manages lifetime
-explicitly.
-
-**Explicit opt-out:** If the auto-defer fires but the user wants
-manual control:
-
-```
-let table = GHashTable() @[no_auto_destroy]
-// no defer inserted — user is responsible
-```
-
-**Explicit opt-in:** The user can always write `defer` manually,
-even when auto-defer would apply. The compiler detects the duplicate
-and suppresses the auto-inserted one:
-
-```
-let table = GHashTable()
-defer table.destroy()   // explicit — suppresses auto-defer
-// only one destroy call at scope exit
-```
+The old scope-local auto-defer rule has been removed. The compiler no
+longer inserts `defer obj.destroy()` from names alone, because that
+does not compose with moves, returns, storage in structs, or reference
+counting. Raw C handles remain raw until wrapped by a proven ownership
+model.
 
 ### Ambiguity Resolution
 
@@ -313,14 +257,13 @@ impl GHashTable:
     fn size(self: *mut GHashTable) -> c_uint:
         g_hash_table_size(self)
 
-    @[destructor]
     fn destroy(self: *mut GHashTable):
         g_hash_table_destroy(self)
 ```
 
-The `@[destructor]` annotation is emitted automatically. Sema uses
-it to trigger auto-defer when the type is constructed via `.new()`.
-The annotation is internal metadata — users don't write it.
+Destructor-looking wrappers remain ordinary raw methods unless
+ownership metadata proves an owning wrapper. Name matching alone does
+not emit cleanup metadata.
 
 This is regular With code. Sema type-checks it normally. Codegen
 inlines the wrapper bodies (trivial single-call forwards). LLVM
@@ -421,24 +364,23 @@ and methods are regenerated.
   else. If a library doesn't follow naming conventions, the
   user gets flat functions (which still work fine).
 
-- Do not auto-defer when the binding escapes. If the compiler
-  cannot prove the value stays local, do not insert defer.
-  A leaked handle is better than a double-free or use-after-free.
-  Conservative is correct.
+- Do not infer ownership from names. Name patterns may suggest likely
+  destructor candidates in metadata or diagnostics, but automatic
+  cleanup requires proven ownership and must be represented by a
+  `Drop`-owning wrapper.
 
 ### Implementation Order
 
 1. Prefix computation function (~30 lines)
 2. Function-to-struct matching loop (~40 lines)
 3. Constructor vs method classification (~20 lines)
-4. Destructor detection and tagging (~15 lines)
+4. Destructor candidate recording for manifests/diagnostics (~15 lines)
 5. Constructor default parameter inference (~30 lines)
 6. Callable type syntax (TypeName(...) → TypeName.new(...)) (~15 lines in Parser.w)
 7. With source text emission for matched methods (~60 lines)
-8. Auto-defer insertion for constructor+destructor pairs (~40 lines in Sema.w)
-9. Escape analysis integration (suppress auto-defer on return/store) (~30 lines in Sema.w)
-10. Integration into c_import output pipeline (~10 lines)
-11. Cache compatibility verification (~0 lines, already works)
+8. Proven ownership metadata and generated `Drop` wrapper support
+9. Integration into c_import output pipeline (~10 lines)
+10. Cache compatibility verification (~0 lines, already works)
 
 Total: ~290 lines across CImport.w, Parser.w, and Sema.w.
 
@@ -462,12 +404,11 @@ void unrelated_fn(int x, const MyVec* v);
 use c_import("test_auto_methods.h")
 
 fn main:
-    let v = MyVec(1.0, 2.0, 3.0)    // MyVec.new + auto-defer v.free()
+    let v = MyVec(1.0, 2.0, 3.0)    // MyVec.new method wrapper
     let len = v.length()
-    // v.free() called automatically at scope exit
+    // Raw handle cleanup remains explicit until an owning Drop wrapper exists.
 
-    // Manual control still works:
-    var v2 = my_vec_new(4.0, 5.0, 6.0)  // var binding — no auto-defer
+    var v2 = my_vec_new(4.0, 5.0, 6.0)
     my_vec_scale(&mut v2, 0.5)
     my_vec_free(&mut v2)                 // user manages manually
 ```
@@ -476,17 +417,17 @@ fn main:
 
 **glib:**
 ```
-let table = GHashTable()             // g_hash_table_new + auto-defer destroy
+let table = GHashTable()             // g_hash_table_new method wrapper
 table.insert("k", "v")              // g_hash_table_insert
 let v: str = table.lookup("k")      // g_hash_table_lookup
-// g_hash_table_destroy called at scope exit
+table.destroy()                      // explicit raw-handle cleanup
 ```
 
 **SQLite:**
 ```
-let db = sqlite3.open(":memory:")        // sqlite3_open + auto-defer close
+let db = sqlite3.open(":memory:")        // sqlite3_open method wrapper
 db.exec("CREATE TABLE ...")              // sqlite3_exec
-// sqlite3_close called at scope exit
+db.close()                               // explicit raw-handle cleanup
 ```
 
 **SDL2:**
@@ -495,15 +436,15 @@ let win = SDL_Window.create("Game", 0, 0, 800, 600, flags)
 // Note: SDL uses SDL_DestroyWindow not SDL_Window_destroy
 // The prefix detection handles this: SDL_Window → sdl_window_
 // SDL_DestroyWindow doesn't match the prefix pattern.
-// No auto-method, no auto-destroy. User calls it directly:
+// No auto-method. User calls it directly:
 defer SDL_DestroyWindow(win)
 ```
 
 SDL is an example where the naming convention doesn't perfectly
 match. The auto-method pass generates what it can and leaves the
-rest as flat functions. No auto-destroy is inserted because no
-destructor was detected. No harm done — the user writes `defer`
-explicitly for these libraries.
+rest as flat functions. No ownership wrapper is generated without
+ownership evidence, so the user writes explicit cleanup or uses a
+handwritten owning wrapper.
 
 **raylib:**
 ```

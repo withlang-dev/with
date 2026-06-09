@@ -1,10 +1,12 @@
 //! expect-stdout: ok
 
-use c_import("stdio.h")
+use c_import("stdlib.h")
 
-fn test_c_import_functions_callable_directly:
-    let rc = puts(c"ok".ptr)
-    assert(rc >= 0)
+fn test_modeled_value_c_import_functions_callable_directly:
+    assert(abs(-42) == 42)
+
+fn test_raw_c_import_functions_require_unsafe:
+    unsafe { free(null) }
 
 fn test_raw_pointer_operations_still_require_unsafe:
     var value = 0
@@ -13,5 +15,7 @@ fn test_raw_pointer_operations_still_require_unsafe:
     assert(value == 42)
 
 fn main:
-    test_c_import_functions_callable_directly()
+    test_modeled_value_c_import_functions_callable_directly()
+    test_raw_c_import_functions_require_unsafe()
     test_raw_pointer_operations_still_require_unsafe()
+    print("ok")

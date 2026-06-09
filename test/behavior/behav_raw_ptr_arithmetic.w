@@ -3,7 +3,7 @@
 use c_import("stdlib.h")
 
 fn main:
-    let raw = malloc(16)
+    let raw = unsafe { malloc(16) }
     let ptr = raw as *mut i32
     unsafe:
         let p1 = ptr + 1
@@ -13,5 +13,5 @@ fn main:
     assert(unsafe *ptr == 7)
     assert(unsafe *(ptr + 1) == 9)
     assert(unsafe *(ptr + 2) == 11)
-    let _ = realloc(raw, 0)
+    let _ = unsafe { realloc(raw, 0) }
     print("ok")

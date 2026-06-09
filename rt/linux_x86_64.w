@@ -589,10 +589,10 @@ pub fn rt_sysinfo(out: *mut RtSysInfo) -> i32:
     0
 
 pub fn rt_sysinfo_os() -> str:
-    with_str_from_cstr("Linux" as *const u8)
+    with_str_from_cstr(c"Linux".ptr)
 
 pub fn rt_sysinfo_arch() -> str:
-    with_str_from_cstr("x86_64" as *const u8)
+    with_str_from_cstr(c"x86_64".ptr)
 
 pub fn rt_getenv(name: *const u8) -> *const u8:
     getenv(name)
@@ -771,7 +771,7 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path
         if cwd as i64 != 0:
             if chdir(cwd) != 0:
                 _exit(127)
-            let _ = setenv("PWD" as *const u8, cwd, 1)
+            let _ = setenv(c"PWD".ptr, cwd, 1)
         var argv: [256]*const u8 = [0 as *const u8; 256]
         let _argc2 = posix_fill_argv(blob, len, (&raw mut argv) as *mut [256]*const u8 as *mut *const u8)
         let _ = execvp(argv[0], (&argv) as *const [256]*const u8 as *const *const u8)

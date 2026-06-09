@@ -221,11 +221,12 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     let ordered_ci: Vec[i32] = Vec.new()
     let base_count = out.decl_count()
     var has_c_import = 0
+    var c_import_count = 0
     for i in 0..base_count:
         let decl = out.get_decl(i)
         if out.kind(decl) == NodeKind.NK_C_IMPORT:
             has_c_import = 1
-            break
+            c_import_count = c_import_count + 1
     if has_c_import == 0:
         return out
 
@@ -277,8 +278,11 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                 runtime_eprint("c_import cache hit (memory) — skipping duplicate")
             continue
         else:
-            // Check file-system cache
-            let fs_cached = c_import_fs_cache_lookup(cache_key)
+            // CImport output is context-sensitive because generation deduplicates
+            // shared declarations across all c_imports in a compilation. A cached
+            // expansion is only reusable when this compilation has exactly one
+            // c_import; otherwise generate in-order so the dedup table is truthful.
+            let fs_cached = if c_import_count == 1: c_import_fs_cache_lookup(cache_key) else: ""
             if fs_cached.len() > 0:
                 if self.trace_c_import_cache != 0:
                     runtime_eprint("c_import cache hit (fs)")
@@ -294,10 +298,6 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                 if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
                     runtime_eprint("c_import generated:")
                     runtime_eprint(libclang_result)
-                let untranslated_macro = self.c_import_first_unallowed_untranslated_frontend(out, decl, c_import_untranslated_macros())
-                if untranslated_macro.len() > 0:
-                    self.c_import_emit_untranslated_error_frontend(out, decl, "macro", untranslated_macro)
-                    continue
                 if libclang_result.len() > 0:
                     synthetic = libclang_result
                 else:
@@ -310,12 +310,14 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                         if self.diagnostics.has_errors():
                             continue
                 self.c_import_cache_store(cache_key, synthetic)
-                // Store to file-system cache
-                if synthetic.len() > 0:
+                // Store to file-system cache only when the expansion is not shaped
+                // by another c_import's dedup state.
+                if synthetic.len() > 0 and c_import_count == 1:
                     c_import_fs_cache_store(cache_key, synthetic)
 
         if synthetic.len() == 0:
             continue
+        self.c_import_record_omissions_frontend(synthetic)
 
         let before = out.decl_count()
         var lexer = Lexer.init(synthetic, 0)
@@ -348,7 +350,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     out
 
 fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_spec: str) -> str:
-    var key = header_spec ++ "\n#format:cimport-v6\n#links:"
+    var key = header_spec ++ "\n#format:cimport-v10\n#links:"
     let link_start = pool.get_data1(decl)
     let packed_counts = pool.get_data2(decl)
     let link_count = c_import_link_count(packed_counts)
@@ -413,6 +415,34 @@ fn c_import_fs_cache_store(cache_key: str, value: str):
         hash_str = f"n{0 - h}"
     let path = f"{dir}/{hash_str}.w"
     runtime_write_file(path, value)
+
+fn Zcu.c_import_record_omissions_frontend(self: Zcu, synthetic: str):
+    let prefix = "// @with-cimport-omitted|"
+    var pos = 0
+    let total = synthetic.len() as i32
+    while pos <= total:
+        let line_start = pos
+        var line_end = pos
+        while line_end < total and synthetic.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        if line_end > line_start:
+            let line = synthetic.slice(line_start as i64, line_end as i64)
+            if c_import_starts_with(line, prefix):
+                let rest = line.slice(prefix.len(), line.len())
+                var sep = -1
+                for ri in 0..rest.len() as i32:
+                    if rest.byte_at(ri as i64) == 124:
+                        sep = ri
+                        break
+                if sep > 0:
+                    let name = rest.slice(0, sep as i64)
+                    let reason = rest.slice((sep + 1) as i64, rest.len())
+                    self.c_import_omitted_symbols.insert(name, reason)
+                else if rest.len() > 0:
+                    self.c_import_omitted_symbols.insert(rest, "untranslated C construct")
+        if line_end >= total:
+            break
+        pos = line_end + 1
 
 fn Zcu.c_import_emit_header_error_detail_frontend(self: Zcu, decl: i32, header_spec: str, detail: str):
     let _ = decl
@@ -498,9 +528,8 @@ fn Zcu.c_import_expand_header_spec_frontend(self: Zcu, header_spec_raw: str, poo
                         generated = generated ++ macro_decl
                     else:
                         let macro_name = c_import_define_name(line)
-                        if not self.c_import_decl_allows_untranslated_frontend(pool, decl, macro_name):
-                            self.c_import_emit_untranslated_error_frontend(pool, decl, "macro", macro_name)
-                            return ""
+                        if macro_name.len() > 0:
+                            self.c_import_omitted_symbols.insert(macro_name, "untranslated macro")
                 else:
                     body = body ++ line ++ "\n"
             line_start = i + 1
@@ -516,9 +545,8 @@ fn Zcu.c_import_expand_header_spec_frontend(self: Zcu, header_spec_raw: str, poo
                 let fn_decl = c_import_function_decl(stmt)
                 if fn_decl.len() == 0:
                     let decl_name = c_import_statement_name(stmt)
-                    if not self.c_import_decl_allows_untranslated_frontend(pool, decl, decl_name):
-                        self.c_import_emit_untranslated_error_frontend(pool, decl, "declaration", decl_name)
-                        return ""
+                    if decl_name.len() > 0:
+                        self.c_import_omitted_symbols.insert(decl_name, "untranslated declaration")
                 else:
                     generated = generated ++ fn_decl
             stmt_start = si + 1
@@ -1168,6 +1196,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         pre_sema.decl_source_paths = self.decl_source_paths
         pre_sema.decl_source_file_ids = self.decl_source_file_ids
         pre_sema.decl_is_c_import = self.decl_is_c_import
+        pre_sema.ci_omitted_symbols = self.c_import_omitted_symbols
         pre_sema.tool_mode_entry_path = self.tool_mode_entry_path
         pre_sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
         pre_sema.overflow_mode = self.project_config.overflow_mode
@@ -1182,6 +1211,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         self.decl_source_paths = pre_sema.decl_source_paths
         self.decl_source_file_ids = pre_sema.decl_source_file_ids
         self.decl_is_c_import = pre_sema.decl_is_c_import
+        self.c_import_omitted_symbols = pre_sema.ci_omitted_symbols
         if self.diagnostics.has_errors():
             self.render_all_diagnostics_frontend()
             self.set_typed_snapshot("", AstPool.new())
@@ -1203,6 +1233,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     sema.decl_source_paths = self.decl_source_paths
     sema.decl_source_file_ids = self.decl_source_file_ids
     sema.decl_is_c_import = self.decl_is_c_import
+    sema.ci_omitted_symbols = self.c_import_omitted_symbols
     sema.tool_mode_entry_path = self.tool_mode_entry_path
     sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
     sema.overflow_mode = self.project_config.overflow_mode

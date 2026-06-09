@@ -1987,7 +1987,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_228 {
-        if ((if _pcre2_strcmp_c8_8((&__local_name__goto_1061_17[0] as *mut u8), "\x4d\x41\x52\x4b") == 0: 1 else: 0) != 0) {
+        if ((if _pcre2_strcmp_c8_8((&__local_name__goto_1061_17[0] as *mut u8), c"\x4d\x41\x52\x4b".ptr) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_231
         } else {
             goto '__ci_bb_232

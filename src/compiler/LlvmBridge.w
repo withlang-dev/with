@@ -528,7 +528,7 @@ pub fn wl_init_target_machine(mod_ref: i64, level: i32) -> i64:
             LLVMDisposeMessage(triple)
             return 0
         let tm = LLVMCreateTargetMachine(target, triple as *const u8,
-            "generic" as *const u8, empty_cstr(),
+            c"generic".ptr, empty_cstr(),
             codegen_level(level), LLVM_RelocDefault, LLVM_CodeModelDefault)
         if tm as i64 == 0:
             let msg = "LLVM target machine creation failed\n"
@@ -1369,7 +1369,7 @@ pub fn wl_assemble_to_object(source_path: str, output_path: str) -> i32:
             LLVMDisposeModule(m)
             LLVMContextDispose(ctx)
             return 1
-        let tm = LLVMCreateTargetMachine(target, triple as *const u8, "generic" as *const u8, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
+        let tm = LLVMCreateTargetMachine(target, triple as *const u8, c"generic".ptr, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
         LLVMDisposeMessage(triple)
         var out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
@@ -1415,7 +1415,7 @@ pub fn wl_compile_ir_to_object(source_path: str, output_path: str) -> i32:
             LLVMDisposeModule(m)
             LLVMContextDispose(ctx)
             return 1
-        let tm = LLVMCreateTargetMachine(target, triple as *const u8, "generic" as *const u8, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
+        let tm = LLVMCreateTargetMachine(target, triple as *const u8, c"generic".ptr, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
         let layout = LLVMCreateTargetDataLayout(tm)
         LLVMSetModuleDataLayout(m, layout)
         LLVMDisposeTargetData(layout)

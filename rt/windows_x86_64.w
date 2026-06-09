@@ -562,10 +562,10 @@ pub unsafe fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
     0
 
 unsafe fn win_empty_str() -> str:
-    with_str_from_cstr("" as *const u8)
+    with_str_from_cstr(c"".ptr)
 
 unsafe fn win_newline_str() -> str:
-    with_str_from_cstr("\n" as *const u8)
+    with_str_from_cstr(c"\n".ptr)
 
 unsafe fn win_list_append(out: str, path: *const u8) -> str:
     with_str_concat(with_str_concat(out, with_str_from_cstr(path)), win_newline_str())
@@ -624,10 +624,10 @@ pub unsafe fn rt_sysinfo(out: *mut RtSysInfo) -> i32:
     0
 
 pub unsafe fn rt_sysinfo_os() -> str:
-    with_str_from_cstr("Windows" as *const u8)
+    with_str_from_cstr(c"Windows".ptr)
 
 pub unsafe fn rt_sysinfo_arch() -> str:
-    with_str_from_cstr("x86_64" as *const u8)
+    with_str_from_cstr(c"x86_64".ptr)
 
 pub unsafe fn rt_getenv(name: *const u8) -> *const u8:
     var wname: [1024]u16 = [0 as u16; 1024]

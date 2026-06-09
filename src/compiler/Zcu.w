@@ -44,6 +44,7 @@ type Zcu {
     decl_source_paths: Vec[str],
     decl_source_file_ids: Vec[i32],
     decl_is_c_import: Vec[i32],
+    c_import_omitted_symbols: HashMap[str, str],
     c_import_cache_keys: Vec[str],
     c_import_cache_values: Vec[str],
     source_dir: str,
@@ -97,6 +98,7 @@ fn Zcu.init -> Zcu:
         decl_source_paths: Vec.new(),
         decl_source_file_ids: Vec.new(),
         decl_is_c_import: Vec.new(),
+        c_import_omitted_symbols: HashMap.new(),
         c_import_cache_keys: Vec.new(),
         c_import_cache_values: Vec.new(),
         source_dir: ".",
@@ -138,6 +140,8 @@ fn Zcu.reset_import_state(self: Zcu):
     self.imported_paths = empty
     self.decl_source_paths = Vec.new()
     self.decl_source_file_ids = Vec.new()
+    self.decl_is_c_import = Vec.new()
+    self.c_import_omitted_symbols = HashMap.new()
     self.next_file_id = 1
 
 fn Zcu.has_imported_path(self: Zcu, path: str) -> i32:

@@ -436,10 +436,6 @@ fn MirBuilder.emit_cleanup_to_target(self: MirBuilder, target: LoopInfo):
         lowest_defer_start = defer_start
         self.emit_defers_for_range(defer_start, defer_end)
 
-        let bind_start = self.bind_scope_starts.get(scope_idx as i64)
-        let bind_end = if scope_idx + 1 < self.bind_scope_starts.len() as i32: self.bind_scope_starts.get((scope_idx + 1) as i64) else: self.bind_syms.len() as i32
-        self.emit_auto_defers_for_bind_range(bind_start, bind_end)
-
         let drop_start = self.drop_scope_starts.get(scope_idx as i64)
         let drop_end = if scope_idx + 1 < self.drop_scope_starts.len() as i32: self.drop_scope_starts.get((scope_idx + 1) as i64) else: self.drop_local_ids.len() as i32
         lowest_drop_start = drop_start
@@ -468,37 +464,6 @@ fn MirBuilder.emit_errdefers_for_return(self: MirBuilder):
         let errdefer_body = self.errdefer_nodes.get(i as i64)
         let _ = self.lower_expr(errdefer_body)
         i = i - 1
-
-fn MirBuilder.emit_auto_defers(self: MirBuilder):
-    // For each binding in the current scope that has a registered auto-defer
-    // destructor, emit a destructor call if the binding is still live (not moved).
-    if self.sema.ci_auto_defer_bindings.len() == 0:
-        return
-    let scope_start = if self.bind_scope_starts.len() > 0: self.bind_scope_starts.get(self.bind_scope_starts.len() - 1) else: 0
-    self.emit_auto_defers_for_bind_range(scope_start, self.bind_syms.len() as i32)
-
-fn MirBuilder.emit_auto_defers_for_bind_range(self: MirBuilder, start: i32, end: i32):
-    if self.sema.ci_auto_defer_bindings.len() == 0:
-        return
-    var bi = start
-    while bi < end:
-        let bind_sym = self.bind_syms.get(bi as i64)
-        if self.sema.ci_auto_defer_bindings.contains(bind_sym):
-            let local = self.bind_local_ids.get(bi as i64)
-            if local >= 0:
-                let dtor_sym = self.sema.ci_auto_defer_bindings.get(bind_sym).unwrap()
-                let fn_op = self.const_operand(ConstKind.CK_FN, dtor_sym, 0)
-                let self_place = self.place_for_local(local)
-                let self_op = self.body.new_operand(OperandKind.OK_COPY, self_place)
-                var args: Vec[i32] = Vec.new()
-                args.push(self_op)
-                let args_id = self.body.new_call_args(args)
-                let void_local = self.new_temp(self.sema.ty_void)
-                let void_place = self.place_for_local(void_local)
-                let next_bb = self.new_block()
-                self.terminate(TermKind.TK_CALL, fn_op, args_id, void_place, next_bb)
-                self.switch_to(next_bb)
-        bi = bi + 1
 
 fn MirBuilder.push_control_target(self: MirBuilder, label: i32, target_kind: i32, continue_bb: i32, break_bb: i32) -> void:
     self.loop_continue_bbs.push(continue_bb)
@@ -3586,10 +3551,6 @@ fn MirBuilder.lower_block_mode(self: MirBuilder, node: i32, want_result: i32) ->
         // Remove the block's defers from the stack
         while self.defer_nodes.len() as i32 > defer_start:
             self.defer_nodes.pop()
-
-    // Auto-defer: emit destructor calls for c_import bindings that are still
-    // live (not moved) and have registered destructors. Runs after user defers.
-    self.emit_auto_defers()
 
     self.pop_scope_inline()
     if block_label != 0:

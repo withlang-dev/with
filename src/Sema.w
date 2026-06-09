@@ -604,12 +604,11 @@ type Sema {
     named_type_candidate_paths: Vec[str],      // defining module path or "" for global
     // c_import scoping: tracks which symbols are c_import-origin
     ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
+    ci_raw_syms: HashMap[i32, i32],  // sym → 1 for c_import raw ABI calls
+    ci_omitted_symbols: HashMap[str, str], // C name → omission reason
     ci_modules: HashMap[i32, i32],   // module-path-sym → 1 for modules that have c_import
     scoping_active: i32,             // 1 when multi-module c_import scoping is active
     current_module_has_ci: i32,      // 1 if current module has c_import declarations
-    // Auto-defer: c_import constructor/destructor pairs
-    ci_type_destructors: HashMap[i32, i32],   // type_name_sym → destructor_fn_sym
-    ci_auto_defer_bindings: HashMap[i32, i32], // binding_sym → destructor_fn_sym
     // Reachable-comptime-error traversal accumulators (formerly free-fn
     // &mut HashMap params). Reset on each entry to check_reachable_comptime_errors.
     reachable_seen: HashMap[i32, i32],
@@ -1207,11 +1206,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         named_type_candidate_tids: Vec.new(),
         named_type_candidate_paths: Vec.new(),
         ci_syms: sema_new_map_i32_i32(),
+        ci_raw_syms: sema_new_map_i32_i32(),
+        ci_omitted_symbols: HashMap.new(),
         ci_modules: sema_new_map_i32_i32(),
         scoping_active: 0,
         current_module_has_ci: 0,
-        ci_type_destructors: sema_new_map_i32_i32(),
-        ci_auto_defer_bindings: sema_new_map_i32_i32(),
         reachable_seen: sema_new_map_i32_i32(),
         reachable_visiting: sema_new_map_i32_i32(),
         reachable_decl_indices: sema_new_map_i32_i32(),
@@ -2425,6 +2424,16 @@ fn Sema.is_c_void_like_type(self: Sema, tid: i32) -> i32:
         return 1
     0
 
+fn Sema.pointer_pointees_compatible(self: Sema, exp_r: i32, act_r: i32) -> i32:
+    let exp_mut = self.get_type_d1(exp_r)
+    let act_mut = self.get_type_d1(act_r)
+    if exp_mut != 0 and act_mut == 0:
+        return 0
+    let exp_pointee = self.get_type_d0(exp_r)
+    if self.is_c_void_like_type(exp_pointee) != 0:
+        return 1
+    self.types_compatible(exp_pointee, self.get_type_d0(act_r))
+
 // ── Scope management ─────────────────────────────────────────────
 
 fn Sema.push_scope(self: Sema) -> void:
@@ -2971,7 +2980,6 @@ fn Sema.prepare_for_comptime_transform(self: Sema):
     self.compute_method_origins()
     self.collect_declarations()
     self.build_ci_scoping()
-    self.build_ci_destructor_map()
     self.validate_copy_derives()
     self.validate_compiler_hooks()
     self.validate_generic_type_decls()
@@ -3122,10 +3130,6 @@ fn Sema.types_compatible_fast(self: Sema, expected: TypeId, actual: TypeId) -> i
         return 1
     if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_FLOAT:
         return 1
-    if (exp_k == TypeKind.TY_PTR or exp_k == TypeKind.TY_REF) and act_k == TypeKind.TY_STR:
-        return 1
-    if exp_k == TypeKind.TY_STR and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF):
-        return 1
     if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
         return 1
     if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
@@ -3187,37 +3191,13 @@ fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
 
     // Structural compatibility for non-interned compound types.
     if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_PTR:
-        let exp_mut = self.get_type_d1(exp_r)
-        let act_mut = self.get_type_d1(act_r)
-        if exp_mut != 0 and act_mut == 0:
-            return 0
-        if self.is_c_void_like_type(self.get_type_d0(exp_r)) != 0 or self.is_c_void_like_type(self.get_type_d0(act_r)) != 0:
-            return 1
-        return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
+        return self.pointer_pointees_compatible(exp_r, act_r)
     if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_REF:
-        let exp_mut = self.get_type_d1(exp_r)
-        let act_mut = self.get_type_d1(act_r)
-        if exp_mut != 0 and act_mut == 0:
-            return 0
-        if self.is_c_void_like_type(self.get_type_d0(exp_r)) != 0 or self.is_c_void_like_type(self.get_type_d0(act_r)) != 0:
-            return 1
-        return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
+        return self.pointer_pointees_compatible(exp_r, act_r)
     if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_REF:
-        let exp_mut = self.get_type_d1(exp_r)
-        let act_mut = self.get_type_d1(act_r)
-        if exp_mut != 0 and act_mut == 0:
-            return 0
-        if self.is_c_void_like_type(self.get_type_d0(exp_r)) != 0 or self.is_c_void_like_type(self.get_type_d0(act_r)) != 0:
-            return 1
-        return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
+        return self.pointer_pointees_compatible(exp_r, act_r)
     if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_PTR:
-        let exp_mut = self.get_type_d1(exp_r)
-        let act_mut = self.get_type_d1(act_r)
-        if exp_mut != 0 and act_mut == 0:
-            return 0
-        if self.is_c_void_like_type(self.get_type_d0(exp_r)) != 0 or self.is_c_void_like_type(self.get_type_d0(act_r)) != 0:
-            return 1
-        return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
+        return self.pointer_pointees_compatible(exp_r, act_r)
     if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
         return self.fn_types_compatible(exp_r, act_r)
     if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:

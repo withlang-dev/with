@@ -7,7 +7,7 @@ fn test_straight_line:
     xs.push(1)
     xs.push(2)
     let first = &xs[0]
-    print(first)
+    assert(*first == 1)
     // first is dead here — mutation allowed
     xs.push(3)
 
@@ -18,7 +18,7 @@ fn test_disjoint_fields:
     let rx = &p.x
     // p.y is a disjoint field — mutation allowed
     p.y = 10
-    print(rx)
+    assert(*rx == 1)
 
 fn main:
     test_straight_line()

@@ -1,6 +1,6 @@
-//! expect-error: c_import: untranslated macro 'BAD_OBJECT_MACRO'
+//! expect-error: c_import symbol 'BAD_OBJECT_MACRO' was omitted
 
 use c_import("err_c_import_untranslated_object_macro_requires_allow.h")
 
 fn main:
-    print("unreachable")
+    let _value = BAD_OBJECT_MACRO

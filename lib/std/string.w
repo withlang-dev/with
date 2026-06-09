@@ -159,8 +159,8 @@ pub fn string_to_int(s: str) -> i64:
 
 /// Split text into lines. Returns a Vec of strings, one per line.
 pub fn lines(s: str) -> Vec[str]:
-    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_lines_out(&out, s)
+    var out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
+    with_lines_out((&raw mut out) as *void, s)
     out
 
 /// Parse a string as an i32 integer.

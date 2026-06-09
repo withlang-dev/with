@@ -1,6 +1,7 @@
 //! expect-stdout: ok
 
 use c_import("stdio.h")
+use c_import("stdlib.h")
 use c_import("time.h")
 use c_import("limits.h")
 use c_import("math.h", link: "m")
@@ -11,26 +12,24 @@ use c_import("typedef int (*With299Callback)(int);\ntypedef struct With299Holder
 extern "C" fn atoi(s: *const u8) -> i32
 
 fn test_c_import_functions_callable_directly:
-    assert(printf(c"".ptr) == 0)
+    assert(abs(-42) == 42)
 
 fn test_c_import_link_directive:
     assert(cos(0.0) == 1.0)
 
 fn test_c_import_structs_are_usable:
     var t: time_t = 0
-    let result = time(&raw mut t)
+    let result = unsafe { time(&raw mut t) }
     assert(result != -1)
 
 fn test_manual_extern_c_declaration:
     assert(unsafe { atoi(c"42".ptr) } == 42)
 
-fn test_c_import_heap_str_to_const_char_ptr:
-    let s = f"hello{1}"
-    assert(strlen(s) == 6usize)
+fn test_c_import_raw_c_string_literal_to_const_char_ptr:
+    assert(unsafe { strlen(c"hello".ptr) } == 5usize)
 
-fn test_c_import_str_slice_to_const_char_ptr:
-    let s = "xxhelloyy".slice(2, 7)
-    assert(strlen(s) == 5usize)
+fn test_c_import_raw_pointer_calls_require_unsafe:
+    unsafe { free(null) }
 
 fn test_c_import_forward_typedef_definition_order:
     var hidden = Hidden279 { value: 42 }
@@ -50,8 +49,8 @@ fn main:
     test_c_import_link_directive()
     test_c_import_structs_are_usable()
     test_manual_extern_c_declaration()
-    test_c_import_heap_str_to_const_char_ptr()
-    test_c_import_str_slice_to_const_char_ptr()
+    test_c_import_raw_c_string_literal_to_const_char_ptr()
+    test_c_import_raw_pointer_calls_require_unsafe()
     test_c_import_forward_typedef_definition_order()
     test_c_import_constants_available()
     test_c_import_callback_field_uses_extern_fn_pointer()

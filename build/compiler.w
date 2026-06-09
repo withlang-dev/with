@@ -289,12 +289,6 @@ fn comp_resolve_seed_compiler(ctx: ActionCtx) -> str:
     if explicit.len() > 0:
         return explicit
     let fs = ctx.fs()
-    let local_compiler = "out/release/bin/with" ++ comp_host_exe_suffix()
-    if fs.exists(local_compiler):
-        return local_compiler
-    let legacy_compiler = "out/bin/with" ++ comp_host_exe_suffix()
-    if fs.exists(legacy_compiler):
-        return legacy_compiler
     let path_env = env("PATH")
     if path_env.len() > 0:
         var start = 0
@@ -310,6 +304,9 @@ fn comp_resolve_seed_compiler(ctx: ActionCtx) -> str:
                 start = i + 1
     if fs.exists("src/main"):
         return "src/main"
+    let legacy_compiler = "out/bin/with" ++ comp_host_exe_suffix()
+    if fs.exists(legacy_compiler):
+        return legacy_compiler
     "with"
 
 fn comp_compiler_path(ctx: ActionCtx, compiler: str) -> str:

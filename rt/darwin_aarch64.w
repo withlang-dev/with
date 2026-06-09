@@ -603,13 +603,13 @@ pub fn rt_sysinfo(out: *mut RtSysInfo) -> i32:
     // CPU cores: sysctl hw.logicalcpu
     var cores: i32 = 0
     var cores_len: i64 = 4
-    let _ = sysctlbyname("hw.logicalcpu" as *const u8, &cores as *mut u8, &raw mut cores_len, 0 as *const u8, 0)
+    let _ = sysctlbyname(c"hw.logicalcpu".ptr, &cores as *mut u8, &raw mut cores_len, 0 as *const u8, 0)
     (unsafe *out).cpu_cores = if cores > 0: cores else: 1
 
     // Total memory: sysctl hw.memsize
     var memsize: i64 = 0
     var memsize_len: i64 = 8
-    let _ = sysctlbyname("hw.memsize" as *const u8, &memsize as *mut u8, &raw mut memsize_len, 0 as *const u8, 0)
+    let _ = sysctlbyname(c"hw.memsize".ptr, &memsize as *mut u8, &raw mut memsize_len, 0 as *const u8, 0)
     (unsafe *out).memory_total = memsize
 
     // Page size: sysconf(_SC_PAGESIZE)
@@ -618,10 +618,10 @@ pub fn rt_sysinfo(out: *mut RtSysInfo) -> i32:
     0
 
 pub fn rt_sysinfo_os() -> str:
-    with_str_from_cstr("Macos" as *const u8)
+    with_str_from_cstr(c"Macos".ptr)
 
 pub fn rt_sysinfo_arch() -> str:
-    with_str_from_cstr("armv8" as *const u8)
+    with_str_from_cstr(c"armv8".ptr)
 
 // ── Environment ─────────────────────────────────────────────────
 
@@ -801,7 +801,7 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path
         if cwd as i64 != 0:
             if chdir(cwd) != 0:
                 _exit(127)
-            let _ = setenv("PWD" as *const u8, cwd, 1)
+            let _ = setenv(c"PWD".ptr, cwd, 1)
         var argv: [256]*const u8 = [0 as *const u8; 256]
         let _argc2 = posix_fill_argv(blob, len, (&raw mut argv) as *mut [256]*const u8 as *mut *const u8)
         let _ = execvp(argv[0], (&argv) as *const [256]*const u8 as *const *const u8)

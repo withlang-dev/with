@@ -15,7 +15,7 @@ type Raw {
 fn singleton() -> *mut Handle:
     if G != null:
         return G
-    let raw = malloc(32usize).unwrap()
+    let raw = unsafe { malloc(32usize) }.unwrap()
     let p = raw as *mut Raw
     unsafe:
         (*p).base = raw

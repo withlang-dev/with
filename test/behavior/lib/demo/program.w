@@ -29,7 +29,7 @@ fn program_rec(prog: Program) -> *mut ProgramRec:
     prog as *mut ProgramRec
 
 fn alloc_program(kind: i32) -> Result[Program, DemoError]:
-    let raw = malloc(size_of[ProgramRec]())
+    let raw = unsafe { malloc(size_of[ProgramRec]()) }
     if raw == None:
         return Err(.OutOfMemory)
     let rec = raw.unwrap() as *mut ProgramRec
@@ -63,7 +63,7 @@ pub fn program_kind(prog: Program) -> i32:
 pub fn program_destroy(prog: Program):
     if prog == 0:
         return
-    let _ = realloc(prog as *mut c_void, 0usize)
+    let _ = unsafe { realloc(prog as *mut c_void, 0usize) }
 
 pub fn ok(device: Device) -> bool:
     let pair = Pair { device }

@@ -17,6 +17,8 @@ var g_ci_realpath_cache_paths: Vec[str] = Vec.new()
 var g_ci_realpath_cache_values: Vec[str] = Vec.new()
 var g_cimport_last_error: str = ""
 var g_cimport_untranslated_macros: str = ""
+var g_cimport_omitted_symbols: str = ""
+var g_cimport_raw_function_names: str = ""
 var g_cimport_report_untranslated_macros: i32 = 0
 
 extern fn with_getenv_str(name: str) -> str
@@ -202,6 +204,79 @@ fn c_import_untranslated_macros_clear():
 fn c_import_untranslated_macros() -> str:
     g_cimport_untranslated_macros
 
+fn c_import_omitted_symbols_clear():
+    g_cimport_omitted_symbols = ""
+    return
+
+fn c_import_omitted_symbols() -> str:
+    g_cimport_omitted_symbols
+
+fn ci_record_raw_function_name(name: str):
+    if name.len() == 0:
+        return
+    let safe = ci_escape_reserved(name)
+    let needle = "|" ++ safe ++ "|"
+    if ci_str_contains(g_cimport_raw_function_names, needle):
+        return
+    g_cimport_raw_function_names = g_cimport_raw_function_names ++ needle
+
+fn ci_translation_calls_raw_function(translated: str) -> bool:
+    var pos = 0
+    let total = g_cimport_raw_function_names.len() as i32
+    while pos < total:
+        while pos < total and g_cimport_raw_function_names.byte_at(pos as i64) == 124:
+            pos = pos + 1
+        let name_start = pos
+        while pos < total and g_cimport_raw_function_names.byte_at(pos as i64) != 124:
+            pos = pos + 1
+        if pos > name_start:
+            let name = g_cimport_raw_function_names.slice(name_start as i64, pos as i64)
+            if ci_str_contains(translated, name ++ "("):
+                return true
+        pos = pos + 1
+    false
+
+fn ci_record_omitted_symbol(name: str, reason: str):
+    if name.len() == 0:
+        return
+    let needle = "|" ++ name ++ "|"
+    if ci_str_contains(g_cimport_omitted_symbols, needle):
+        return
+    g_cimport_omitted_symbols = g_cimport_omitted_symbols ++ needle ++ reason ++ "\n"
+
+fn ci_omitted_symbol_recorded(name: str) -> bool:
+    if name.len() == 0:
+        return false
+    ci_str_contains(g_cimport_omitted_symbols, "|" ++ name ++ "|")
+
+fn ci_omitted_manifest_comments() -> str:
+    if g_cimport_omitted_symbols.len() == 0:
+        return ""
+    var out = ""
+    var pos = 0
+    let total = g_cimport_omitted_symbols.len() as i32
+    while pos < total:
+        while pos < total and g_cimport_omitted_symbols.byte_at(pos as i64) == 10:
+            pos = pos + 1
+        if pos >= total:
+            break
+        if g_cimport_omitted_symbols.byte_at(pos as i64) == 124:
+            pos = pos + 1
+        let name_start = pos
+        while pos < total and g_cimport_omitted_symbols.byte_at(pos as i64) != 124:
+            pos = pos + 1
+        if pos >= total:
+            break
+        let name = g_cimport_omitted_symbols.slice(name_start as i64, pos as i64)
+        pos = pos + 1
+        let reason_start = pos
+        while pos < total and g_cimport_omitted_symbols.byte_at(pos as i64) != 10:
+            pos = pos + 1
+        let reason = g_cimport_omitted_symbols.slice(reason_start as i64, pos as i64)
+        if name.len() > 0:
+            out = out ++ "// @with-cimport-omitted|" ++ name ++ "|" ++ reason ++ "\n"
+    out
+
 fn ci_record_untranslated_macro(name: str):
     if g_cimport_report_untranslated_macros == 0:
         return
@@ -214,6 +289,7 @@ fn ci_record_untranslated_macro_always(name: str):
     if ci_str_contains(g_cimport_untranslated_macros, needle):
         return
     g_cimport_untranslated_macros = g_cimport_untranslated_macros ++ needle
+    ci_record_omitted_symbol(name, "untranslated macro")
     return
 
 fn ci_should_report_untranslated_macros(header_spec: str) -> i32:
@@ -306,6 +382,8 @@ fn process_c_import(header_spec: str) -> str:
 fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     c_import_last_error_clear()
     c_import_untranslated_macros_clear()
+    c_import_omitted_symbols_clear()
+    g_cimport_raw_function_names = ""
     ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
     if with_cimport_available() == 0:
@@ -478,7 +556,8 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     g_migrate_macro_values = ""
     g_migrate_macro_miss_names = Vec.new()
 
-    output.to_str()
+    let rendered = output.to_str()
+    ci_omitted_manifest_comments() ++ rendered
 
 // Mark all declaration names from cached text as emitted in the global dedup table.
 // This ensures that fs-cached c_import results don't conflict with subsequent c_imports.
@@ -1036,36 +1115,44 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     let storage = with_cimport_fn_storage_class(session, idx)
     let is_inline = with_cimport_fn_is_inline(session, idx)
     let needs_body_translation = (storage == CX_SC_STATIC and is_inline != 0) or (is_inline != 0 and storage != CX_SC_STATIC)
+    let safe_name = ci_escape_reserved(name)
     if needs_body_translation:
         // Static inline or always-inline — try to translate the body
         let body = ci_try_translate_fn_body(session, idx)
         if body.len() > 0:
-            let safe_name = ci_escape_reserved(name)
             with_cimport_mark_name_emitted(name)
             let si_param_count = with_cimport_fn_param_count(session, idx)
             var si_params = ""
+            var si_raw = false
             for spi in 0..si_param_count:
                 if spi > 0:
                     si_params = si_params ++ ", "
                 let spname = with_cimport_fn_param_name(session, idx, spi)
                 let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
+                if ci_cimport_type_is_raw_abi(sptype):
+                    si_raw = true
                 let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
                 si_params = si_params ++ actual_pname ++ ": " ++ sptype
             let si_ret = with_cimport_fn_return_type_translated(session, idx)
-            return ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret, body)
-        // Fallback: demote to extern declaration (matching Zig's graceful demotion)
-        // The function is still callable — just without the inline body.
-        // Fall through to the normal extern fn emission below.
+            if ci_cimport_type_is_raw_abi(si_ret):
+                si_raw = true
+            let fn_kw = if si_raw: "unsafe fn " else: "fn "
+            if si_raw:
+                ci_record_raw_function_name(name)
+            return ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret, body)
+        ci_record_omitted_symbol(name, "inline body translation failed")
+        return ""
     if storage == CX_SC_STATIC and is_inline == 0:
         return ""
 
-    let safe_name = ci_escape_reserved(name)
     let param_count = with_cimport_fn_param_count(session, idx)
     let is_variadic = with_cimport_fn_is_variadic(session, idx)
 
-    // Check for unsupported types — emit comptime_error stub if found
+    // Check for unsupported types — omitted declarations are recorded in the
+    // c_import manifest instead of emitted as callable failure stubs.
     var has_unsupported = false
     var unsupported_reason = ""
+    var raw_fn = is_variadic != 0
 
     var params = ""
     for pi in 0..param_count:
@@ -1075,6 +1162,8 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         let raw_ptype = with_cimport_fn_param_type_translated(session, idx, pi)
         let is_restrict = with_cimport_param_is_restrict(session, idx, pi)
         var ptype = ci_pointer_type_explicit_mut(raw_ptype)
+        if ci_cimport_type_is_raw_abi(ptype):
+            raw_fn = true
 
         if ci_starts_with(ptype, "__UNSUPPORTED:"):
             has_unsupported = true
@@ -1103,6 +1192,8 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     if ci_starts_with(ret, "__UNSUPPORTED:"):
         has_unsupported = true
         unsupported_reason = ret.slice(14, ret.len())
+    if ci_cimport_type_is_raw_abi(ret):
+        raw_fn = true
 
     // A bare opaque (`c_void`) return by value is likewise uncallable and not
     // first-class in the backend — stub it instead of emitting the extern.
@@ -1113,9 +1204,10 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     with_cimport_mark_name_emitted(name)
 
     if has_unsupported:
-        let fn_loc = ci_get_decl_location(session, name)
-        let fn_loc_comment = if fn_loc.len() > 0: "// " ++ fn_loc ++ "\n" else: ""
-        return fn_loc_comment ++ ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> Never", "    comptime_error(\"untranslatable: " ++ unsupported_reason ++ "\")") ++ "\n"
+        ci_record_omitted_symbol(name, "untranslatable: " ++ unsupported_reason)
+        return ""
+    if raw_fn:
+        ci_record_raw_function_name(name)
 
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
@@ -1151,7 +1243,7 @@ fn ci_detect_member_functions(session: i64, count: i32, known_structs: str) -> s
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_FUNCTION:
             let name = with_cimport_decl_name(session, i)
-            if name.len() > 0 and name.byte_at(0) != 95:
+            if name.len() > 0 and name.byte_at(0) != 95 and not ci_omitted_symbol_recorded(name):
                 let param_count = with_cimport_fn_param_count(session, i)
                 let ret_type = with_cimport_fn_return_type_translated(session, i)
                 // Try first-param-based matching (existing logic)
@@ -1322,19 +1414,23 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: str, method_na
 
     // Build parameter list: self + remaining params
     let self_type = ci_pointer_type_explicit_mut(first_param_type)
+    var raw_wrapper = ci_cimport_type_is_raw_abi(self_type) or ci_cimport_type_is_raw_abi(ret)
     var params = "self: " ++ self_type
     var call_args = "self"
     pi = 1
     while pi < param_count:
         let pname = with_cimport_fn_param_name(session, idx, pi)
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
+        if ci_cimport_type_is_raw_abi(ptype):
+            raw_wrapper = true
         let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
         params = params ++ ", " ++ actual_name ++ ": " ++ ptype
         call_args = call_args ++ ", " ++ actual_name
         pi = pi + 1
 
     let ret_prefix = if ret == "void": "" else: "return "
-    ci_render_generated_fn_body("fn " ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret, "    " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
+    let fn_kw = if raw_wrapper: "unsafe fn " else: "fn "
+    ci_render_generated_fn_body(fn_kw ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret, "    " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
 
 // Emit a constructor wrapper: fn StructName.new(params...) -> Ret: fn_name(params...)
 fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: str, method_name: str) -> str:
@@ -1356,10 +1452,13 @@ fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: str, method_
     // Build parameter list (no self — this is a static constructor)
     var params = ""
     var call_args = ""
+    var raw_wrapper = ci_cimport_type_is_raw_abi(ret)
     pi = 0
     while pi < param_count:
         let pname = with_cimport_fn_param_name(session, idx, pi)
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
+        if ci_cimport_type_is_raw_abi(ptype):
+            raw_wrapper = true
         let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
         if pi > 0:
             params = params ++ ", "
@@ -1367,7 +1466,22 @@ fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: str, method_
         params = params ++ actual_name ++ ": " ++ ptype
         call_args = call_args ++ actual_name
         pi = pi + 1
-    ci_render_generated_fn_body("fn " ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret, "    " ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
+    let fn_kw = if raw_wrapper: "unsafe fn " else: "fn "
+    ci_render_generated_fn_body(fn_kw ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret, "    " ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
+
+fn ci_cimport_type_is_raw_abi(ty: str) -> bool:
+    let t = ci_trim(ty)
+    if t.len() == 0:
+        return false
+    if ci_starts_with(t, "*"):
+        return true
+    if ci_starts_with(t, "Option[*"):
+        return true
+    if ci_starts_with(t, "fn(") or ci_starts_with(t, "extern \"C\" fn("):
+        return true
+    if ci_str_contains(t, "*mut ") or ci_str_contains(t, "*const "):
+        return true
+    false
 
 fn ci_pointer_type_explicit_mut(ty: str) -> str:
     if ci_starts_with(ty, "*const "):
@@ -1704,14 +1818,12 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
 
     let var_type = with_cimport_var_type_translated(session, idx)
 
-    // Unsupported type — emit comptime_error stub
+    // Unsupported type — omitted declarations are recorded in the c_import
+    // manifest instead of emitted as callable failure stubs.
     if ci_starts_with(var_type, "__UNSUPPORTED:"):
         let reason = var_type.slice(14, var_type.len())
-        let safe_name = ci_escape_reserved(name)
-        with_cimport_mark_name_emitted(name)
-        let var_loc = ci_get_decl_location(session, name)
-        let var_loc_comment = if var_loc.len() > 0: "// " ++ var_loc ++ "\n" else: ""
-        return var_loc_comment ++ ci_render_generated_fn_body("fn " ++ safe_name ++ "() -> Never", "    comptime_error(\"untranslatable: " ++ reason ++ "\")") ++ "\n"
+        ci_record_omitted_symbol(name, "untranslatable: " ++ reason)
+        return ""
 
     let is_const = with_cimport_var_is_const(session, idx)
     let is_threadlocal = with_cimport_var_is_threadlocal(session, idx)
@@ -2179,7 +2291,8 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
                             let cast_type = ci_infer_cast_return_type(translated)
                             if cast_type.len() > 0:
                                 inferred_ret = cast_type
-                        let r = ci_render_generated_fn_body("fn " ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ inferred_ret, "    " ++ translated)
+                        let fn_kw = if ci_translation_calls_raw_function(translated): "unsafe fn " else: "fn "
+                        let r = ci_render_generated_fn_body(fn_kw ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ inferred_ret, "    " ++ translated)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
                     else:
@@ -2921,7 +3034,7 @@ fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> s
         return "0"
 
     if name == "__builtin_types_compatible_p":
-        return "comptime_error(\"__builtin_types_compatible_p\")"
+        return ""
 
     if name == "__builtin_choose_expr":
         // __builtin_choose_expr(const_cond, true_val, false_val)
@@ -2939,13 +3052,13 @@ fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> s
         let f = ci_translate_c_expr(ce_false_val, params, known)
         if c.len() > 0 and t.len() > 0 and f.len() > 0:
             return "(if " ++ c ++ " != 0: " ++ t ++ " else: " ++ f ++ ")"
-        return "comptime_error(\"__builtin_choose_expr\")"
+        return ""
 
     if name == "__builtin_convertvector":
-        return "comptime_error(\"__builtin_convertvector\")"
+        return ""
 
     if name == "__builtin_shufflevector":
-        return "comptime_error(\"__builtin_shufflevector\")"
+        return ""
 
     // Tier 2: Bit manipulation — map to runtime wrappers
     if name == "__builtin_clz" or name == "__builtin_ctz" or name == "__builtin_popcount":
@@ -9661,7 +9774,7 @@ fn ci_indent_str(level: i32) -> str:
 
 // ── Function body translator ────────────────────────────────
 // Tries to translate a static inline function body using AST walking.
-// Returns "" on failure (caller falls back to comptime_error stub).
+// Returns "" on failure; callers must omit the generated surface or fail loudly.
 
 fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
     ci_clear_bail_location()
@@ -13695,9 +13808,10 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
         return "with_memset(" ++ ci_cast_memset_args(ci_strip_last_arg(args)) ++ ")"
     if callee == "__builtin_object_size":
         return "0"  // bounds check size — not needed in With
-    // Skip other __builtin functions — emit as 0 or comptime_error
+    // Skip other __builtin functions; callers must omit the surrounding
+    // generated surface or fail loudly.
     if ci_starts_with(callee, "__builtin"):
-        return "0 // " ++ callee ++ "(" ++ args ++ ")"
+        return ""
 
     // I/O (keep as extern — these truly need libc)
     // printf, fprintf, snprintf stay as-is (will need c_import for programs that use them)

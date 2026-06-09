@@ -2449,7 +2449,7 @@ fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const
     }
 
     '__ci_bb_254 {
-        ((unsafe *__param_match_data).subject = (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).malloc(((__local_length as c_ulong) *% (1 as c_ulong)), (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).memory_data))
+        ((unsafe *__param_match_data).subject = ((&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).malloc(((__local_length as c_ulong) *% (1 as c_ulong)), (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).memory_data) as *const u8))
         if ((if __param_match_data.subject == null: 1 else: 0) != 0) {
             goto '__ci_bb_257
         } else {

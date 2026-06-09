@@ -11,6 +11,28 @@ conversation context after compaction.
 
 ## Current Focus
 
+#347, #356, #358, and the first #357 safety slice are implemented.
+`c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:
+raw pointer/variadic C functions and function-like macro wrappers that call
+them are emitted as `unsafe fn`, while ordinary expression macro wrappers stay
+safe. Failed macro/inline/function translation no longer emits callable
+`comptime_error` placeholders, extern fallbacks, or silent stubs; inexpressible
+symbols are omitted, recorded in the generated import manifest comments, and
+diagnosed directionally if user code references them. Implicit broad
+`str`/pointer and `void*` coercions were removed; explicit `str as *const u8`
+still lowers to the string data pointer, runtime/compiler C-string boundaries
+now use `c"..."`, and `void*` only relabels in the safe direction supported by
+the raw pointer model. Heuristic C destructor auto-defer was removed; the
+completed design note now treats name-based destructor discovery as suggestions
+only, with future cleanup expressed through proven owning `Drop` wrappers. The
+C migrator now fails loudly on truly untranslated function bodies while still
+emitting honest `extern fn` declarations for declaration-only prototypes.
+During verification, the build seed resolver was also corrected so normal
+bootstrap builds no longer implicitly prefer stale `out/release/bin/with` over
+the configured seed/PATH compiler. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-09 for this
+checkpoint.
+
 #352 and the first raw-pointer safety cluster are implemented. Bitwise
 `& | ^` now use bit-pattern rules: untyped integer literals adopt the typed
 operand by width-fit, typed operands may widen only within the same signedness,

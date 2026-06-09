@@ -1046,8 +1046,6 @@ fn Codegen.coerce_value_to_type(self: Codegen, val: i64, target_ty: i64) -> i64:
     let vk = wl_get_type_kind(val_ty)
     let tk = wl_get_type_kind(target_ty)
 
-    if tk == wl_pointer_type_kind() and self.is_str_type(val_ty):
-        return self.extract_str_ptr(val)
     if vk == wl_integer_type_kind() and tk == wl_pointer_type_kind():
         if self.is_const_int_value(val) and wl_const_int_sext_val(val) == 0:
             return wl_const_null(target_ty)
@@ -1063,10 +1061,6 @@ fn Codegen.coerce_value_to_type(self: Codegen, val: i64, target_ty: i64) -> i64:
 
     if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and (tk == wl_float_type_kind() or tk == wl_double_type_kind()):
         return wl_build_fp_cast(self.builder, val, target_ty)
-
-    // c_import return coercion: pointer → str (null-safe)
-    if vk == wl_pointer_type_kind() and self.is_str_type(target_ty):
-        return self.coerce_ptr_to_str(val)
 
     // Function pointer → fat pointer coercion: create thunk wrapper
     // Regular fn(params...) → closure fn(ctx, params...) with ctx ignored

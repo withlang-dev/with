@@ -406,6 +406,9 @@ fn Sema.build_ci_scoping(self: Sema):
         if kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_EXTERN_VAR or kind == NodeKind.NK_LET_DECL:
             let sym = self.ast.get_data0(decl)
             self.ci_syms.insert(sym, 1)
+            if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_EXTERN_FN:
+                if self.ci_function_requires_raw_abi(sym) != 0:
+                    self.ci_raw_syms.insert(sym, 1)
         // For enum types, also record variant symbols.
         // Disc enums store [repr_type_node, variant_count, ...variants...],
         // so the variant walk must skip the repr node and respect variable
@@ -454,30 +457,42 @@ fn Sema.is_ci_visible(self: Sema, sym: i32) -> i32:
         di = di + 1
     0
 
-fn Sema.build_ci_destructor_map(self: Sema):
-    // Scan function signatures for c_import destructor patterns.
-    // A destructor is a method "Type.free" / "Type.destroy" / etc.
-    // where the function is c_import-origin.
-    for si in 0..self.sig_names.len() as i32:
-        let fn_sym = self.sig_names.get(si as i64)
-        if not self.ci_syms.contains(fn_sym):
-            continue
-        let fn_name = self.pool_resolve_symbol(fn_sym)
-        // Find dot position
-        var dot_pos = -1
-        for ci in 0..fn_name.len() as i32:
-            if fn_name.byte_at(ci as i64) == 46:
-                dot_pos = ci
-                break
-        if dot_pos <= 0:
-            continue
-        let method = fn_name.slice((dot_pos + 1) as i64, fn_name.len())
-        if method == "free" or method == "destroy" or method == "close" or method == "unref" or method == "release":
-            let type_name = fn_name.slice(0, dot_pos as i64)
-            let type_sym = self.pool_intern(type_name)
-            if self.type_decl_nodes.contains(type_sym):
-                if not self.ci_type_destructors.contains(type_sym):
-                    self.ci_type_destructors.insert(type_sym, fn_sym)
+fn Sema.ci_type_requires_raw_contract(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    let kind = self.get_type_kind(resolved)
+    if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF or kind == TypeKind.TY_SLICE:
+        return 1
+    if kind == TypeKind.TY_FN or kind == TypeKind.TY_EXTERN_FN:
+        return 1
+    if kind == TypeKind.TY_GENERIC_INST:
+        let arg_start = self.get_type_d1(resolved)
+        let arg_count = self.get_type_d2(resolved)
+        for ai in 0..arg_count:
+            if self.ci_type_requires_raw_contract(self.type_extra.get((arg_start + ai) as i64)) != 0:
+                return 1
+    0
+
+fn Sema.ci_function_requires_raw_abi(self: Sema, fn_sym: i32) -> i32:
+    let sig_idx = self.get_sig(fn_sym)
+    if sig_idx < 0:
+        let fn_node = self.fn_symbol_decl_node(fn_sym)
+        if fn_node == 0:
+            return 0
+        let body = self.ast.get_data1(fn_node)
+        if body != 0 and self.ast.kind(body) == NodeKind.NK_UNSAFE_BLOCK and self.ast.get_data2(body) == UNSAFE_ORIGIN_FN_BODY:
+            return 1
+        return 0
+    if self.sig_is_variadic(sig_idx) != 0:
+        return 1
+    if self.ci_type_requires_raw_contract(self.sig_return_type(sig_idx)) != 0:
+        return 1
+    let param_count = self.sig_get_param_count(sig_idx)
+    for pi in 0..param_count:
+        if self.ci_type_requires_raw_contract(self.sig_param_type(sig_idx, pi)) != 0:
+            return 1
+    0
 
 fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
