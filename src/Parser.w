@@ -2423,11 +2423,12 @@ fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     if name == 0:
         return self.poisoned_expr()
 
-    if self.peek() != TokenKind.TK_COLON:
-        self.emit_error("const declaration requires a type annotation")
-        return self.poisoned_expr()
-    self.advance()
-    let type_ann = self.parse_type_expr()
+    var type_ann: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_COLON:
+        self.advance()
+        type_ann = self.parse_type_expr()
+    else if is_pub == Visibility.Public:
+        self.emit_error("public const declarations require an explicit type annotation")
 
     if self.expect(TokenKind.TK_EQ) == 0:
         return self.poisoned_expr()
@@ -6059,11 +6060,10 @@ fn Parser.parse_const_binding(self: Parser) -> NodeId:
     if name_sym == 0:
         return self.poisoned_expr()
 
-    if self.peek() != TokenKind.TK_COLON:
-        self.emit_error("const declaration requires a type annotation")
-        return self.poisoned_expr()
-    self.advance()
-    let type_ann = self.parse_type_expr()
+    var type_ann: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_COLON:
+        self.advance()
+        type_ann = self.parse_type_expr()
 
     if self.expect(TokenKind.TK_EQ) == 0:
         return self.poisoned_expr()
