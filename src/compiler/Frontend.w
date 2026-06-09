@@ -348,7 +348,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     out
 
 fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_spec: str) -> str:
-    var key = header_spec ++ "\n#format:cimport-v4\n#links:"
+    var key = header_spec ++ "\n#format:cimport-v6\n#links:"
     let link_start = pool.get_data1(decl)
     let packed_counts = pool.get_data2(decl)
     let link_count = c_import_link_count(packed_counts)

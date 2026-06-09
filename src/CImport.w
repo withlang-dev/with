@@ -2173,7 +2173,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
                     if translated.len() > 0:
                         // Infer return type from cast expression: (x as c_int) → return c_int
                         var inferred_ret = ret_type
-                        if ci_starts_with(translated, "with_free("):
+                        if ci_translation_is_void_statement(translated):
                             inferred_ret = "void"
                         else if param_count > 0:
                             let cast_type = ci_infer_cast_return_type(translated)
@@ -3123,6 +3123,8 @@ fn ci_infer_cast_return_type(translated: str) -> str:
     let t = ci_trim(translated)
     if t.len() < 5:
         return ""
+    if t.byte_at(t.len() - 1) != 41:
+        return ""
     // Check for trailing " as TYPE)" pattern
     var i = t.len() as i32 - 2
     // Find last " as " in the string
@@ -3130,14 +3132,24 @@ fn ci_infer_cast_return_type(translated: str) -> str:
         if t.byte_at((i - 3) as i64) == 32 and t.byte_at((i - 2) as i64) == 97 and t.byte_at((i - 1) as i64) == 115 and t.byte_at(i as i64) == 32:
             // Found " as " at position i-3
             let type_start = (i + 1) as i64
-            let type_end = if t.byte_at(t.len() - 1) == 41: t.len() - 1 else: t.len()
+            let type_end = t.len() - 1
             let cast_type = ci_trim(t.slice(type_start, type_end))
+            if ci_str_contains(cast_type, ")") or ci_str_contains(cast_type, "{") or ci_str_contains(cast_type, "}"):
+                return ""
             // Verify it's a known type name
             if cast_type == "c_int" or cast_type == "c_uint" or cast_type == "c_long" or cast_type == "c_ulong" or cast_type == "c_longlong" or cast_type == "c_ulonglong" or cast_type == "c_short" or cast_type == "c_ushort" or cast_type == "c_char" or cast_type == "i8" or cast_type == "i16" or cast_type == "i32" or cast_type == "i64" or cast_type == "u8" or cast_type == "u16" or cast_type == "u32" or cast_type == "u64" or cast_type == "f32" or cast_type == "f64" or cast_type == "isize" or cast_type == "usize" or cast_type == "bool" or ci_starts_with(cast_type, "*"):
                 return cast_type
             return ""
         i = i - 1
     ""
+
+fn ci_translation_is_void_statement(translated: str) -> bool:
+    let t = ci_trim(translated)
+    if ci_starts_with(t, "with_free("):
+        return true
+    if ci_starts_with(t, "unsafe { with_free("):
+        return true
+    false
 
 // Check if a macro body contains # (stringification) of a parameter.
 // # followed by a param name (not ##) indicates stringification.
@@ -13630,21 +13642,21 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
     // of doing it as a post-process text rewrite (which can't
     // handle nested parens in the arg text).
     if callee == "malloc":
-        return "(unsafe { with_alloc((" ++ args ++ ") as i64) } as *mut c_void)"
+        return "(with_alloc((" ++ args ++ ") as i64) as *mut c_void)"
     if callee == "free":
-        return "unsafe { with_free((" ++ args ++ ") as *mut u8) }"
+        return "with_free((" ++ args ++ ") as *mut u8)"
     if callee == "calloc":
         let count_arg = ci_extract_first_arg(args)
         let size_arg = ci_after_first_arg(args)
         if count_arg.len() == 0 or size_arg.len() == 0:
             return ""
-        return "(unsafe { with_alloc_zeroed((" ++ count_arg ++ ") as i64, (" ++ size_arg ++ ") as i64) } as *mut c_void)"
+        return "(with_alloc_zeroed((" ++ count_arg ++ ") as i64, (" ++ size_arg ++ ") as i64) as *mut c_void)"
     if callee == "realloc":
         let ptr_arg = ci_extract_first_arg(args)
         let size_arg = ci_after_first_arg(args)
         if ptr_arg.len() == 0 or size_arg.len() == 0:
             return ""
-        return "(unsafe { with_realloc((" ++ ptr_arg ++ ") as *mut u8, 0, (" ++ size_arg ++ ") as i64) } as *mut c_void)"
+        return "(with_realloc((" ++ ptr_arg ++ ") as *mut u8, 0, (" ++ size_arg ++ ") as i64) as *mut c_void)"
 
     // Memory operations — cast pointer args to *mut u8 / *const u8
     if callee == "memcpy":
