@@ -4608,11 +4608,9 @@ fn is_first_on_line(source: str, pos: i32) -> i32:
         p = p - 1
     1
 
-fn Parser.parse_if_else_body(self: Parser, use_then: bool) -> NodeId:
+fn Parser.parse_if_else_body(self: Parser) -> NodeId:
     if self.peek() == TokenKind.TK_KW_IF:
         return self.parse_if_expr()
-    if use_then:
-        return self.parse_expr()
     self.parse_body()
 
 fn Parser.parse_if_expr(self: Parser) -> NodeId:
@@ -4630,14 +4628,7 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
 
     let if_col = column_of(self.source, start)
     let is_stmt_if = is_first_on_line(self.source, start) != 0
-    var use_then = false
-    var then_body: NodeId = 0 as NodeId
-    if self.peek() == TokenKind.TK_KW_THEN:
-        self.advance()
-        use_then = true
-        then_body = self.parse_expr()
-    else:
-        then_body = self.parse_body()
+    let then_body = self.parse_body()
     var else_body: NodeId = 0 as NodeId
     let save = self.pos
     self.skip_newlines()
@@ -4648,7 +4639,7 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
             self.pos = save
         else:
             self.advance()
-            else_body = self.parse_if_else_body(use_then)
+            else_body = self.parse_if_else_body()
     else:
         self.pos = save
 
@@ -4699,14 +4690,7 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
 
     let if_col = column_of(self.source, start)
     let is_stmt_if = is_first_on_line(self.source, start) != 0
-    var use_then = false
-    var then_body: NodeId = 0 as NodeId
-    if self.peek() == TokenKind.TK_KW_THEN:
-        self.advance()
-        use_then = true
-        then_body = self.parse_expr()
-    else:
-        then_body = self.parse_body()
+    let then_body = self.parse_body()
 
     var else_body: NodeId = 0 as NodeId
     let save = self.pos
@@ -4718,7 +4702,7 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
             self.pos = save
         else:
             self.advance()
-            else_body = self.parse_if_else_body(use_then)
+            else_body = self.parse_if_else_body()
     else:
         self.pos = save
     if else_body == 0:

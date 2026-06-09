@@ -81,10 +81,10 @@ Do **not** write:
 else: if x == 0: ...
 ```
 
-The `then` form is only for expression-style inline conditionals:
+Inline conditional expressions use the same body markers:
 
 ```with
-let abs = if x >= 0 then x else -x
+let abs = if x >= 0: x else: -x
 ```
 
 Comments use `//`.

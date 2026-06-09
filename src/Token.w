@@ -170,7 +170,6 @@ fn tag_from_keyword(s: str) -> i32:
     if s == "var": return TokenKind.TK_KW_VAR
     if s == "if": return TokenKind.TK_KW_IF
     if s == "else": return TokenKind.TK_KW_ELSE
-    if s == "then": return TokenKind.TK_KW_THEN
     if s == "match": return TokenKind.TK_KW_MATCH
     if s == "for": return TokenKind.TK_KW_FOR
     if s == "in": return TokenKind.TK_KW_IN
