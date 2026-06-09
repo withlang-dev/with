@@ -1,6 +1,6 @@
 # Windows Bootstrap Status
 
-Last updated: 2026-06-08 22:10 -0700.
+Last updated: 2026-06-09 14:48 -0700.
 
 ## Current Issue Audit
 
@@ -38,14 +38,43 @@ Latest #341 root-cause facts:
   call and skips result-buffer load/free when cancellation is pending;
   `FIBER_CLEANUP_AWAIT` still drains and frees.
 
+Latest #369 root-cause facts:
+
+- Reproduced on current `main` (`0030c685`) with
+  `out/bin/with.exe test test/behavior/behav_async_stack_overflow.w`:
+  exit `-1073741819` (`0xC0000005`), expected `134`.
+- Stable repro binary built with `-O0` and LLDB stops in `deep` at
+  `behav_async_stack_overflow.w:13` with an access violation writing
+  `RSP - 8`.
+- LLDB register/memory evidence: `rsp = 0x...9f40000`, page
+  `[rsp, rsp+0x10000)` is `rw-`, page `[rsp-0x1000, rsp)` is `---`.
+  This is real fiber-stack exhaustion on the custom With stack.
+- The Windows platform adapter still imports only `VirtualAlloc`/`VirtualFree`
+  for this path. There is no source/import use of `VirtualProtect`,
+  `AddVectoredExceptionHandler`, `SetThreadStackGuarantee`, `CreateFiberEx`,
+  `SwitchToFiber`, or `ConvertThreadToFiber`.
+- Deeper root cause: Linux/Darwin custom stacks work because POSIX
+  `sigaltstack` lets the signal handler run on a separate emergency stack.
+  The Windows adapter has no equivalent implemented. A Windows VEH/SEH handler
+  cannot be treated as a direct `sigaltstack` mirror, and the current custom
+  assembly fiber stack is not an OS-registered fiber stack.
+
+Current paper-over:
+
+- Until the async backend migration in `docs/async-proposal.md` replaces the
+  current Windows custom assembly fiber stack, the test runner supports a
+  narrow `//! skip-windows:` directive. Only
+  `test/behavior/behav_async_stack_overflow.w` uses it. The expected `134`
+  diagnostic remains in the test for non-Windows platforms, and #369 remains
+  open for the real Windows fix.
+
 Current next step:
 
-- Commit and push the closed-issue fixes after final local checks. #369 remains
-  open because `behav_async_stack_overflow.w` still exits with raw
-  `0xC0000005`; LLDB confirmed actual fiber stack exhaustion. A diagnostic
-  attempt showed `PAGE_NOACCESS` guard pages cannot dispatch a VEH handler
-  because Windows uses the current stack for VEH. That guard-handler attempt
-  was backed out.
+- Design the Windows-specific stack overflow strategy. The likely correct
+  directions are either a native Windows fiber backend (`CreateFiberEx` /
+  `SwitchToFiber`, with `SetThreadStackGuarantee`) or an explicit exception
+  trampoline that switches to the scheduler/emergency stack before running the
+  With diagnostic. Do not increase fiber stack size as the fix.
 
 ## Anti-Loop Summary
 
@@ -67,6 +96,7 @@ Current blocker:
 
 - No current blocker for #341, #343, or #344. All three GitHub issues are
   closed.
+- #369 remains open: Windows custom-fiber stack overflow diagnostic.
 - 2026-06-08 verification after #341/#343 source fixes on merged
   `origin/main`:
   - Windows `build`, `:fixpoint`, and `:emit-c-fixpoint`: PASS.

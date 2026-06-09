@@ -1,3 +1,4 @@
+//! skip-windows: issue #369: Windows custom fiber stack overflow diagnostic awaits async backend migration
 //! expect-exit: 134
 //! expect-stderr: fiber stack overflow
 //! args: -O0

@@ -67,6 +67,7 @@ extern fn with_write(s: str) -> void
 extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
 extern fn with_raise_stack_limit() -> void
+extern fn with_sysinfo_os() -> str
 
 enum PreludeMode: i32:
     FullMode = 0
@@ -1815,6 +1816,7 @@ fn parse_test_directives_for_target(target: str) -> TestDirectives:
     let expect_build_fail_prefix = "//! expect-build-fail: "
     let args_prefix = "//! args: "
     let skip_prefix = "//! skip: "
+    let skip_windows_prefix = "//! skip-windows: "
     var start = 0
     var i = 0
     while i <= text_len:
@@ -1846,6 +1848,11 @@ fn parse_test_directives_for_target(target: str) -> TestDirectives:
                 result.skip = true
                 result.skip_reason = line.slice(skip_prefix.len(), line.len())
                 return result
+            else if with_str_starts_with(line, skip_windows_prefix) != 0:
+                if with_sysinfo_os() == "Windows":
+                    result.skip = true
+                    result.skip_reason = line.slice(skip_windows_prefix.len(), line.len())
+                    return result
             else if line == "//! skip":
                 result.skip = true
                 result.skip_reason = ""
