@@ -3,13 +3,31 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-06-05.
+Last updated: 2026-06-09.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
 conversation context after compaction.
 
 ## Current Focus
+
+#352 and the first raw-pointer safety cluster are implemented. Bitwise
+`& | ^` now use bit-pattern rules: untyped integer literals adopt the typed
+operand by width-fit, typed operands may widen only within the same signedness,
+and mixed signedness requires an explicit `as`. Raw pointer arithmetic,
+comparison, and difference remain safe address computations, with LLVM and
+emit-C lowering using raw address operations rather than allocation-relative
+semantics. Raw pointer dereference/indexing and raw-pointer-to-reference/slice
+conversions require `unsafe`; safe functions that rely on caller-guaranteed raw
+pointer validity are rejected unless declared `unsafe fn` or wrapped into a
+modeled safe contract. The runtime/compiler-owned ABI surfaces touched by this
+rule were made explicitly unsafe where they take raw out-pointers. The C
+migrator now marks local raw-pointer-parameter functions unsafe and wraps calls
+so migrated C keeps the raw ABI contract loud instead of generating dishonest
+safe wrappers. A follow-up issue, #370, tracks the missing unsafe
+function-pointer/callback type surface found during the fixture audit. Full
+`with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-09 for this checkpoint.
 
 #299 is implemented. With now has a distinct `extern "C" fn(...) -> T` type
 node and `TY_EXTERN_FN` sema type for raw C ABI function pointers, while

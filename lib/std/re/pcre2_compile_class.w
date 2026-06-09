@@ -3521,7 +3521,7 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
                     }
 
                 } else {
-                    ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | ((4 as c_int) << (__local_tmp2 as c_uint)))
+                    ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | (((4 as c_ushort) << (__local_tmp2 as c_uint)) as c_ushort))
                 }
 
             }
@@ -3572,12 +3572,12 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
 
             }
 
-            ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | ((4 as c_int) << (__local_tmp2 as c_uint)))
+            ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | (((4 as c_ushort) << (__local_tmp2 as c_uint)) as c_ushort))
 
         }
 
         if ((if __local_tmp1 >= 3: 1 else: 0) != 0) {
-            ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | ((3 as c_int) << (__local_tmp2 as c_uint)))
+            ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | (((3 as c_ushort) << (__local_tmp2 as c_uint)) as c_ushort))
 
             (__local_next_char = __local_next_char - 1)
 

@@ -149,10 +149,10 @@ pub fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError
         }
         Err(err) => Err(err)
 
-pub fn Regex.__literal_code(slot: *mut *const i8, pattern: str, options: i32) -> *const i8:
+pub unsafe fn Regex.__literal_code(slot: *mut *const i8, pattern: str, options: i32) -> *const i8:
     if slot as i64 == 0:
         return null
-    let existing = unsafe *slot
+    let existing = *slot
     if existing as i64 != 0:
         return existing
     var err_code: i32 = 0
@@ -161,7 +161,7 @@ pub fn Regex.__literal_code(slot: *mut *const i8, pattern: str, options: i32) ->
     if compiled as i64 == 0:
         with_panic("invalid regex literal: " ++ regex_error_message(err_code), "", 0)
         return null
-    unsafe *slot = compiled
+    *slot = compiled
     compiled
 
 pub fn Regex.pattern(self: &Self) -> str:

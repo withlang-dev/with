@@ -235,6 +235,17 @@ pub fn ci_migrate_extern_fn_call_requires_unsafe(name: str) -> bool:
         return false
     ci_find_str(g_migrate_unsafe_extern_fn_names, "|" ++ name ++ "|") >= 0
 
+fn ci_migrate_type_is_raw_pointer(ty: str) -> bool:
+    let t = ci_trim(ci_pointer_type_explicit_mut(ty))
+    ci_starts_with(t, "*")
+
+fn ci_migrate_fn_has_raw_pointer_param(session: i64, idx: i32) -> bool:
+    let param_count = with_cimport_fn_param_count(session, idx)
+    for pi in 0..param_count:
+        if ci_migrate_type_is_raw_pointer(with_cimport_fn_param_type_translated(session, idx, pi)):
+            return true
+    false
+
 fn ci_migrate_insert_libc_use(output: str) -> str:
     if not ci_migrate_needs_libc():
         return output
@@ -1311,9 +1322,10 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         g_migrate_fn_translated = g_migrate_fn_translated + 1
         let ret_suffix = if ret == "void": "" else: " -> " ++ ret
         let body_for_emit = if ret == "void" and ci_migrate_text_is_blank(body): "    return\n" else: body
+        let fn_keyword = if ci_migrate_extern_fn_call_requires_unsafe(safe_name): "unsafe fn " else: "fn "
         if migrate_prefer_brace():
-            return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body_for_emit ++ "}\n\n"
-        return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body_for_emit ++ "\n"
+            return export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body_for_emit ++ "}\n\n"
+        return export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body_for_emit ++ "\n"
 
     // Body translation failed. Unsupported non-local/computed control flow is
     // a hard migration error; other legacy failure paths still render an
@@ -1420,11 +1432,13 @@ fn ci_migrate_collect_unsafe_extern_fns(session: i64, count: i32, primary_path: 
         if ci_migrate_is_width_family_name(name):
             i = i + 1
             continue
+        let owner_path = ci_migrate_project_fn_owner_path(project_active, project, name)
+        let local_def = ci_find_fn_cursor(session, name)
+        if local_def >= 0 and (owner_path.len() == 0 or owner_path == primary_path) and ci_migrate_fn_has_raw_pointer_param(session, i):
+            ci_migrate_note_unsafe_extern_fn(ci_escape_reserved(name))
         if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC:
             i = i + 1
             continue
-        let owner_path = ci_migrate_project_fn_owner_path(project_active, project, name)
-        let local_def = ci_find_fn_cursor(session, name)
         if (owner_path.len() > 0 and owner_path != primary_path) or local_def < 0:
             ci_migrate_note_unsafe_extern_fn(ci_escape_reserved(name))
         i = i + 1

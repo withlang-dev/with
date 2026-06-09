@@ -3121,7 +3121,7 @@ pub fn with_ci_eval_int_is_unsigned(session: i64, cursor_idx: i32) -> i32:
         clang_EvalResult_dispose(result)
         is_unsigned
 
-pub fn with_ci_eval_as_int(session: i64, cursor_idx: i32, out: *mut i64) -> i32:
+pub unsafe fn with_ci_eval_as_int(session: i64, cursor_idx: i32, out: *mut i64) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
@@ -3136,7 +3136,7 @@ pub fn with_ci_eval_as_int(session: i64, cursor_idx: i32, out: *mut i64) -> i32:
         clang_EvalResult_dispose(result)
         0
 
-pub fn with_ci_eval_as_float(session: i64, cursor_idx: i32, out: *mut f64) -> i32:
+pub unsafe fn with_ci_eval_as_float(session: i64, cursor_idx: i32, out: *mut f64) -> i32:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0

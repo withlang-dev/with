@@ -71,13 +71,13 @@ pub fn with_regex_error_message(code: i32) -> str:
     with_free(buf)
     text
 
-pub fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8:
+pub unsafe fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8:
     let gcontext = pcre2_general_context_create_8(regex_runtime_malloc, regex_runtime_free, null)
     if gcontext as i64 == 0:
         with_panic("with_regex_compile(): general context creation failed", "", 0)
         return null
     var ccontext = _pcre2_default_compile_context_8
-    ((unsafe *(&raw mut ccontext as *mut pcre2_memctl)) = (unsafe *(gcontext as *mut pcre2_memctl)))
+    ((*(&raw mut ccontext as *mut pcre2_memctl)) = (*(gcontext as *mut pcre2_memctl)))
     (ccontext.max_pattern_length = (0 -% 1) as c_ulong)
     (ccontext.max_pattern_compiled_length = (0 -% 1) as c_ulong)
     (ccontext.parens_nest_limit = 250)
@@ -101,9 +101,9 @@ pub fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_of
     with_free(c_pattern as *i8)
     pcre2_general_context_free_8(gcontext)
     if err_code as i64 != 0:
-        unsafe *err_code = raw_err_code
+        *err_code = raw_err_code
     if err_offset as i64 != 0:
-        unsafe *err_offset = raw_err_offset as i32
+        *err_offset = raw_err_offset as i32
     compiled as *const i8
 
 pub fn with_regex_code_copy(code: *const i8) -> *const i8:
@@ -129,12 +129,12 @@ pub fn with_regex_capture_count(code: *const i8) -> i32:
         return 0
     capture_count as i32
 
-pub fn with_regex_match_spans_alloc(code: *const i8, text: str, out_count: *mut i32) -> *const i32:
+pub unsafe fn with_regex_match_spans_alloc(code: *const i8, text: str, out_count: *mut i32) -> *const i32:
     with_regex_match_spans_alloc_at(code, text, 0, out_count)
 
-pub fn with_regex_match_spans_alloc_at(code: *const i8, text: str, start_offset: i32, out_count: *mut i32) -> *const i32:
+pub unsafe fn with_regex_match_spans_alloc_at(code: *const i8, text: str, start_offset: i32, out_count: *mut i32) -> *const i32:
     if out_count as i64 != 0:
-        unsafe *out_count = 0
+        *out_count = 0
     if code as i64 == 0 or start_offset < 0 or start_offset as i64 > text.len():
         return null
     let gcontext = pcre2_general_context_create_8(regex_runtime_malloc, regex_runtime_free, null)
@@ -170,15 +170,15 @@ pub fn with_regex_match_spans_alloc_at(code: *const i8, text: str, start_offset:
         return null
     var i: i32 = 0
     while i < count:
-        let start = unsafe *((ovector as i64 + i as i64 * 16) as *const c_ulong) as i32
-        let end = unsafe *((ovector as i64 + i as i64 * 16 + 8) as *const c_ulong) as i32
-        unsafe *((out as i64 + i as i64 * 8) as *mut i32) = start
-        unsafe *((out as i64 + i as i64 * 8 + 4) as *mut i32) = end
+        let start = *((ovector as i64 + i as i64 * 16) as *const c_ulong) as i32
+        let end = *((ovector as i64 + i as i64 * 16 + 8) as *const c_ulong) as i32
+        *((out as i64 + i as i64 * 8) as *mut i32) = start
+        *((out as i64 + i as i64 * 8 + 4) as *mut i32) = end
         i = i + 1
     pcre2_match_data_free_8(match_data)
     pcre2_general_context_free_8(gcontext)
     if out_count as i64 != 0:
-        unsafe *out_count = ints_count
+        *out_count = ints_count
     out as *const i32
 
 pub fn with_regex_capture_name_count(code: *const i8) -> i32:

@@ -21,10 +21,9 @@ fn Holder.promote(self: Holder) -> Pair:
     let next = self.value + 10
     Pair { left: self.value, right: next }
 
-fn read_plus(ptr: *const i32) -> i32:
-    unsafe:
-        let base = *ptr
-        base + 3
+unsafe fn read_plus(ptr: *const i32) -> i32:
+    let base = *ptr
+    base + 3
 
 fn main:
     let pair = pair_from_body(5)
@@ -38,6 +37,6 @@ fn main:
     assert(promoted.right == 14)
 
     let value = 8
-    assert(read_plus(&value) == 11)
+    assert(unsafe { read_plus(&value) } == 11)
 
     print("ok")

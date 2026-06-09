@@ -342,9 +342,9 @@ unsafe fn json_parse_impl(parser: *mut JsonParser, js: str, len: i32, tokens: *m
 
 /// Parse a JSON string into tokens. Returns token count on success,
 /// or a negative error code (JSON_ERROR_NOMEM, JSON_ERROR_INVAL, JSON_ERROR_PART).
-pub fn json_parse(parser: *mut JsonParser, js: str, tokens: *mut JsonToken, num_tokens: i32) -> i32:
+pub unsafe fn json_parse(parser: *mut JsonParser, js: str, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     let len = js.len() as i32
-    unsafe { json_parse_impl(parser, js, len, tokens, num_tokens) }
+    json_parse_impl(parser, js, len, tokens, num_tokens)
 
 fn json_panic(msg: str) -> void:
     with_panic(msg, "", 0)
@@ -358,7 +358,7 @@ pub fn JsonDocument.parse(js: str) -> JsonDocument:
     if tokens == null:
         json_panic("could not allocate JSON token buffer")
     var parser = JsonParser.new()
-    let count = json_parse(&raw mut parser as *mut JsonParser, js, tokens, 256)
+    let count = unsafe { json_parse(&raw mut parser as *mut JsonParser, js, tokens, 256) }
     if count < 0:
         json_panic("invalid JSON")
     JsonDocument { source: js, tokens, count }

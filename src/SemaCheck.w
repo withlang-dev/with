@@ -902,8 +902,10 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
         self.verify_tail_position(body, fn_name, 1)
 
     // Write accumulated per-param effects into sig_param_effects.
-    // For &T-typed params, clamp to {read, escape_view}: they cannot have
+    // For &T/*T-typed params, clamp to effects they can semantically carry:
+    // reads/views plus raw-pointer validity preconditions. They cannot have
     // consume or escape_value since you cannot own through a reference.
+    var raw_validity_param_sym = 0
     for pi in 0..self.current_fn_param_effs.len() as i32:
         var eff = self.current_fn_param_effs.get(pi as i64)
         if eff != 0:
@@ -912,12 +914,18 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
                 if p_tid > 0:
                     let p_tk = self.get_type_kind(self.resolve_alias(p_tid))
                     if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
-                        eff = eff & (EFF_READ | EFF_ESCAPE_VIEW)
+                        eff = eff & (EFF_READ | EFF_ESCAPE_VIEW | EFF_RAW_PTR_VALIDITY)
             self.set_sig_param_effect(sig_idx, pi, eff)
             if (eff & EFF_ESCAPE_VIEW) != 0:
                 self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins.get(pi as i64))
             else:
                 self.set_sig_param_view_origin(sig_idx, pi, 0)
+            if raw_validity_param_sym == 0 and (eff & EFF_RAW_PTR_VALIDITY) != 0 and pi < self.current_fn_param_syms.len() as i32:
+                raw_validity_param_sym = self.current_fn_param_syms.get(pi as i64)
+
+    if raw_validity_param_sym != 0 and self.fn_symbol_is_unsafe(fn_name) == 0:
+        let param_name = self.pool_resolve(raw_validity_param_sym)
+        self.emit_error(f"safe function relies on caller-guaranteed raw pointer validity for parameter '{param_name}'; declare it unsafe fn or model a safe pointer contract", node)
 
     // @[effect(param = bits)] pin enforcement: floor and ceiling checks
     if self.ast.state.fn_effect_pin_params.contains(node):
@@ -936,7 +944,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
             if merged != inferred:
                 self.set_sig_param_effect(sig_idx, pin_pi, merged)
             // Ceiling: inferred effects must not exceed pinned set
-            let excess = inferred & (pin_bits ^ 0x1f)  // bits inferred but not pinned (among EFF_*)
+            let excess = inferred & (pin_bits ^ 0x3f)  // bits inferred but not pinned (among EFF_*)
             if excess != 0:
                 let param_name = self.pool_resolve(pin_param_sym)
                 self.emit_error(f"function body uses effects on '{param_name}' not permitted by @[effect(...)] pin; remove or expand the pin", node)
@@ -2601,6 +2609,13 @@ fn Sema.cached_or_checked_expr_type(self: Sema, node: i32) -> i32:
     self.in_unsafe = saved_unsafe
     checked
 
+fn Sema.check_bitwise_literal_with_expected(self: Sema, node: i32, expected: TypeId) -> TypeId:
+    let saved = self.in_bitwise_literal_context
+    self.in_bitwise_literal_context = self.in_bitwise_literal_context + 1
+    let result = self.check_expr_with_expected(node, expected)
+    self.in_bitwise_literal_context = saved
+    result
+
 fn Sema.type_is_raw_pointer_value(self: Sema, ty: i32) -> i32:
     if ty == 0:
         return 0
@@ -2650,6 +2665,37 @@ fn Sema.require_unsafe_operation(self: Sema, msg: str, node: i32) -> i32:
     self.note_unsafe_operation()
     1
 
+fn Sema.note_raw_pointer_validity_param(self: Sema, sym: i32):
+    if self.current_fn_sig_idx < 0 or sym == 0:
+        return
+    let pi = self.param_index_for_sym(sym)
+    if pi < 0:
+        return
+    let p_tid = self.sig_param_type(self.current_fn_sig_idx, pi)
+    if self.type_is_raw_pointer_value(p_tid) != 0:
+        self.note_param_effect(sym, EFF_RAW_PTR_VALIDITY)
+
+fn Sema.note_raw_pointer_validity_precondition(self: Sema, expr_node: i32):
+    if self.current_fn_sig_idx < 0 or expr_node == 0:
+        return
+    if sema_path_is_runtime_implementation(self.current_module_path) != 0:
+        return
+    if sema_path_is_migrated_regex_implementation(self.current_module_path) != 0:
+        return
+    let root = self.place_root_sym(expr_node)
+    if root == 0:
+        return
+    self.note_raw_pointer_validity_param(root)
+    let dep_count = self.binding_view_dep_count(root)
+    for i in 0..dep_count:
+        self.note_raw_pointer_validity_param(self.binding_view_dep_at(root, i))
+    let origin_mask = self.binding_view_origin_mask(root)
+    if origin_mask != 0:
+        for pi in 0..self.current_fn_param_syms.len() as i32:
+            let bit = ((1 as i64) << (pi as u32)) as i32
+            if (origin_mask & bit) != 0:
+                self.note_raw_pointer_validity_param(self.current_fn_param_syms.get(pi as i64))
+
 fn Sema.fn_symbol_is_unsafe(self: Sema, fn_sym: i32) -> i32:
     let fn_node = self.fn_symbol_decl_node(fn_sym)
     if fn_node == 0:
@@ -2680,7 +2726,15 @@ fn Sema.unsafe_prefix_has_raw_access(self: Sema, node: i32) -> i32:
     if kind == NodeKind.NK_GROUPED:
         return self.unsafe_prefix_has_raw_access(self.ast.get_data0(node))
     if kind == NodeKind.NK_CAST:
-        return self.unsafe_prefix_has_raw_access(self.ast.get_data0(node))
+        let src = self.ast.get_data0(node)
+        let src_ty = self.cached_or_checked_expr_type(src)
+        let cast_ty = self.resolve_type_expr(self.ast.get_data1(node))
+        if src_ty != 0 and cast_ty != 0:
+            let src_kind = self.get_type_kind(self.resolve_alias(src_ty as TypeId))
+            let cast_kind = self.get_type_kind(self.resolve_alias(cast_ty as TypeId))
+            if src_kind == TypeKind.TY_PTR and (cast_kind == TypeKind.TY_REF or cast_kind == TypeKind.TY_SLICE):
+                return 1
+        return self.unsafe_prefix_has_raw_access(src)
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         return self.unsafe_prefix_has_raw_access(self.ast.get_data0(node))
     if kind == NodeKind.NK_CALL:
@@ -2988,6 +3042,10 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             if src_kind == TypeKind.TY_ARRAY and cast_kind == TypeKind.TY_PTR:
                 self.emit_error("arrays do not decay to pointers; use &array[0] as *T", node)
                 return 0 as TypeId
+            if src_kind == TypeKind.TY_PTR and (cast_kind == TypeKind.TY_REF or cast_kind == TypeKind.TY_SLICE):
+                self.note_raw_pointer_validity_precondition(self.ast.get_data0(node))
+                if self.require_unsafe_operation("raw pointer to safe memory abstraction conversion requires unsafe context", node) == 0:
+                    return 0 as TypeId
         return cast_tid
 
     if kind == NodeKind.NK_PIPELINE:
@@ -3951,10 +4009,31 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         lhs = self.check_expr(lhs_node)
         let shift_count_ty = if rhs_is_num_lit: self.shift_count_literal_type(rhs_node) else: 0
         rhs = self.check_expr_with_expected(rhs_node, shift_count_ty as TypeId)
+    else if op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR:
+        if lhs_is_num_lit and rhs_is_num_lit:
+            lhs = self.check_expr(lhs_node)
+            rhs = self.check_expr(rhs_node)
+        else:
+            if lhs_is_num_lit:
+                rhs = self.check_expr(rhs_node)
+                let rhs_num = self.numeric_operand_type(rhs as i32)
+                if self.get_type_kind(self.resolve_alias(rhs_num as TypeId)) == TypeKind.TY_INT:
+                    lhs = self.check_bitwise_literal_with_expected(lhs_node, rhs_num as TypeId)
+                else:
+                    lhs = self.check_expr(lhs_node)
+            else:
+                lhs = self.check_expr(lhs_node)
+            if rhs == 0:
+                let lhs_num = self.numeric_operand_type(lhs as i32)
+                if rhs_is_num_lit and self.get_type_kind(self.resolve_alias(lhs_num as TypeId)) == TypeKind.TY_INT:
+                    rhs = self.check_bitwise_literal_with_expected(rhs_node, lhs_num as TypeId)
+                else:
+                    rhs = self.check_expr(rhs_node)
+            if lhs == 0:
+                lhs = self.check_expr(lhs_node)
     else if op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL or op == BinaryOp.OP_DIV or op == BinaryOp.OP_MOD or
        op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP or
-       op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT or
-       op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR:
+       op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL_SAT:
         if lhs_is_num_lit and rhs_is_num_lit:
             lhs = self.check_expr(lhs_node)
             rhs = self.check_expr(rhs_node)
@@ -4088,7 +4167,22 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
     // Bitwise
     if op == BinaryOp.OP_BIT_AND or op == BinaryOp.OP_BIT_OR or op == BinaryOp.OP_BIT_XOR:
-        return lhs as i32
+        let lhs_numeric = self.numeric_operand_type(lhs as i32)
+        let rhs_numeric = self.numeric_operand_type(rhs as i32)
+        let lhs_resolved = self.resolve_alias(lhs_numeric as TypeId)
+        let rhs_resolved = self.resolve_alias(rhs_numeric as TypeId)
+        if self.get_type_kind(lhs_resolved) != TypeKind.TY_INT or self.get_type_kind(rhs_resolved) != TypeKind.TY_INT:
+            self.emit_error("bitwise operator requires integer operands", node)
+            return 0
+        if self.get_type_d1(lhs_resolved) != self.get_type_d1(rhs_resolved):
+            self.emit_error("bitwise operands with mixed signedness require explicit `as` cast", node)
+            return 0
+        let bitwise_result = self.bitwise_result_type(lhs, rhs)
+        if bitwise_result == 0:
+            self.emit_error("bitwise operator requires integer operands", node)
+            return 0
+        self.typed_expr_types.insert(node, bitwise_result as i32)
+        return bitwise_result as i32
 
     // Wrapping arithmetic
     if op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_MUL_WRAP:
@@ -4177,6 +4271,7 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         if tk == TypeKind.TY_REF:
             return self.get_type_d0(resolved)
         if tk == TypeKind.TY_PTR:
+            self.note_raw_pointer_validity_precondition(operand_node)
             self.require_unsafe_operation("raw pointer dereference requires unsafe context", node)
             return self.get_type_d0(resolved)
         // docs/mut.md Rev 8 §15.16 — deref-precedence diagnostic.
@@ -4860,6 +4955,31 @@ fn Sema.record_call_view_origins(self: Sema, call_node: i32, sig_idx: i32, param
     if union_mask != 0 or concrete_deps.len() > 0:
         self.set_expr_view_deps(call_node, union_mask, concrete_deps)
 
+fn Sema.propagate_call_param_effect(self: Sema, param_eff: i32, arg_node: i32):
+    if param_eff == 0 or arg_node <= 0:
+        return
+    let trans_bits = param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)
+    if trans_bits != 0:
+        let trans_sym = self.place_root_sym(arg_node)
+        if trans_sym != 0:
+            self.note_param_effect(trans_sym, trans_bits)
+    if (param_eff & EFF_RAW_PTR_VALIDITY) != 0:
+        self.note_raw_pointer_validity_precondition(arg_node)
+
+fn Sema.propagate_method_call_param_effects(self: Sema, call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
+    if sig_idx < 0:
+        return
+    let param_count = self.sig_get_param_count(sig_idx)
+    if recv_node != 0 and param_offset == 1 and param_count > 0:
+        self.propagate_call_param_effect(self.sig_param_effect(sig_idx, 0), recv_node)
+    for ai in 0..arg_count:
+        let param_i = ai + param_offset
+        if param_i >= param_count:
+            break
+        let arg_node = if has_resolved != 0: self.get_resolved_call_arg(call_node, ai) else: self.ast.get_extra(extra_start + ai)
+        if arg_node > 0:
+            self.propagate_call_param_effect(self.sig_param_effect(sig_idx, param_i), arg_node)
+
 fn Sema.check_return(self: Sema, node: i32) -> i32:
     if self.in_defer != 0:
         self.emit_error("return not allowed in defer", node)
@@ -5383,6 +5503,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
 
     let field_base = self.auto_deref_ref_ptr_type(obj_type)
     if self.type_is_raw_pointer_value(obj_type as i32) != 0:
+        self.note_raw_pointer_validity_precondition(expr)
         if self.type_is_compiler_handle_state_pointer(obj_type as i32) == 0 and sema_path_is_migrated_regex_implementation(self.current_module_path) == 0 and self.require_unsafe_operation("raw pointer field access requires unsafe context", node) == 0:
             return 0
 
@@ -5505,6 +5626,7 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_PTR:
         self.check_runtime_index_operand(index)
+        self.note_raw_pointer_validity_precondition(expr)
         if self.require_unsafe_operation("raw pointer indexing requires unsafe context", node) == 0:
             return 0
         let elem_ty = self.get_type_d0(resolved)
@@ -5517,6 +5639,7 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
         container_tk = self.get_type_kind(container_tid)
         if container_tk == TypeKind.TY_PTR:
             self.check_runtime_index_operand(index)
+            self.note_raw_pointer_validity_precondition(expr)
             if self.require_unsafe_operation("raw pointer indexing requires unsafe context", node) == 0:
                 return 0
             let elem_ty = self.get_type_d0(container_tid)
@@ -7607,7 +7730,7 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closu
         for ci in 0..capture_count:
             let cap_sym = self.closure_capture_summary_sym(closure_node, ci)
             let cap_eff = self.closure_capture_summary_eff(closure_node, ci)
-            let trans_bits = cap_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)
+            let trans_bits = cap_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW | EFF_RAW_PTR_VALIDITY)
             if trans_bits != 0:
                 self.note_param_effect(cap_sym, trans_bits)
             if (cap_eff & EFF_ESCAPE_VIEW) != 0:
@@ -8041,15 +8164,11 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             self.check_ephemeral_task_arg_escape(eph_arg_node, expected_ty, if self.extern_fn_names.contains(fn_sym): 1 else: 0)
             // Effect enforcement: if the callee may consume/escape this arg, it must be explicitly moved or copied
             let param_eff = self.sig_param_effect(sig_idx, param_i)
-            // Transitive effect propagation: if this arg is a param of the current function,
-            // propagate callee's consuming/escaping effects to the current function's effect set.
-            let trans_bits = param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)
-            if trans_bits != 0:
-                let trans_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
-                if trans_nd > 0:
-                    let trans_sym = self.place_root_sym(trans_nd)
-                    if trans_sym != 0:
-                        self.note_param_effect(trans_sym, trans_bits)
+            // Transitive effect propagation: if this arg is a param of the
+            // current function, propagate callee effects to the current
+            // function's effect set.
+            let trans_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+            self.propagate_call_param_effect(param_eff, trans_nd)
             if (param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
                 let eff_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                 if eff_arg_nd > 0:
@@ -10602,8 +10721,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                                     self.note_auto_ref_call_arg(exp_ty, arg_ty, mc_err_arg, node)
                 let mc_subst_ret = self.substitute_method_return_for_generic_inst(recv_type, type_name_sym, field, method_fn_sym, mc_ret)
                 if mc_subst_ret != 0:
+                    self.propagate_method_call_param_effects(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                     self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                     return mc_subst_ret
+            self.propagate_method_call_param_effects(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
             self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
             return mc_ret
 
@@ -11053,6 +11174,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return 0
             if method_fn_sym != 0:
                 self.comp_resolved.insert(node, method_fn_sym)
+            self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
             return self.sig_return_type(sig_idx)
 
     let builtin_recv_type = if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none:
@@ -11164,7 +11286,7 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
             self.emit_error("embed_file() argument must be str-compatible", self.ast.get_extra(args_start))
             return self.ty_str as i32
         let path_node = self.ast.get_extra(args_start)
-        let path_value = comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, path_node)
+        let path_value = unsafe { comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, path_node) }
         if comptime_value_is_valid(path_value) == 0 or path_value.kind != ComptimeValueKind.CV_STR:
             self.emit_error("embed_file() argument must be a comptime string", path_node)
             return self.ty_str as i32

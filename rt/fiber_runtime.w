@@ -136,12 +136,12 @@ fn fiber_clear_detached_buffers():
         i = i + 1
     detached_fiber_count = 0
 
-fn fiber_select_ready_index(fiber_ids: *const i32, count: i32, biased: i32) -> i32:
+unsafe fn fiber_select_ready_index(fiber_ids: *const i32, count: i32, biased: i32) -> i32:
     var chosen = -1
     var ready_seen = 0
     var i = 0
     while i < count:
-        let fid = unsafe *((fiber_ids as i64 + i as i64 * 4) as *const i32)
+        let fid = *((fiber_ids as i64 + i as i64 * 4) as *const i32)
         if with_runtime_fiber_is_completed(fid) != 0:
             if biased != 0:
                 return i
@@ -153,12 +153,11 @@ fn fiber_select_ready_index(fiber_ids: *const i32, count: i32, biased: i32) -> i
         i = i + 1
     chosen
 
-pub fn with_fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, result_index: *mut i32):
+pub unsafe fn with_fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, result_index: *mut i32):
     while true:
         let selected = fiber_select_ready_index(fiber_ids, count, biased)
         if selected >= 0:
-            unsafe:
-                *result_index = selected
+            *result_index = selected
             return
 
         if with_fiber_in_fiber() != 0:
@@ -166,11 +165,10 @@ pub fn with_fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, re
         else if with_runtime_core_has_fibers() != 0:
             with_runtime_core_run_one_step()
         else:
-            unsafe:
-                *result_index = -1
+            *result_index = -1
             return
 
-pub fn with_fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
+pub unsafe fn with_fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
     with_fiber_select_mode(fiber_ids, count, 0, result_index)
 
 pub fn with_fiber_await(fiber_id: i32):

@@ -52,6 +52,16 @@ fn test_bitwise_with_vars:
     let xor_result = a ^ b
     assert(xor_result == 0x66)
 
+fn test_bitwise_same_signedness_rules:
+    let small: u8 = 1
+    let wide: u32 = 0xff00
+    let combined = small | wide
+    assert(combined == 0xff01 as u32)
+
+    let byte: i8 = -1
+    let masked = byte & 0xff
+    assert(masked == -1)
+
 fn main:
     test_bit_and()
     test_bit_or()
@@ -59,4 +69,5 @@ fn main:
     test_combined_bitops()
     test_bitwise_identity()
     test_bitwise_with_vars()
+    test_bitwise_same_signedness_rules()
     print("ok")

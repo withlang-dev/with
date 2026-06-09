@@ -452,17 +452,15 @@ pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *m
 fn fiber_install_signal_handlers():
     rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_stack_overflow_handler as i64)
 
-pub fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64):
+pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64):
     if current_fiber == 0:
-        unsafe:
-            *entry_out = 0
-            *arg_out = 0
-            *result_out = 0
+        *entry_out = 0
+        *arg_out = 0
+        *result_out = 0
         return
-    unsafe:
-        *entry_out = fiber_entry_ptr(current_fiber)
-        *arg_out = fiber_arg_ptr(current_fiber)
-        *result_out = fiber_result_buf(current_fiber) as i64
+    *entry_out = fiber_entry_ptr(current_fiber)
+    *arg_out = fiber_arg_ptr(current_fiber)
+    *result_out = fiber_result_buf(current_fiber) as i64
 
 pub fn with_fiber_bootstrap_finish():
     if current_fiber == 0:
@@ -574,23 +572,20 @@ pub fn with_fiber_yield():
     fiber_set_state(current_fiber, FIBER_STATE_SUSPENDED)
     with_fiber_switch(current_fiber as *mut u8, scheduler_ctx_ptr())
 
-pub fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
-    unsafe:
-        *panic_msg_out = 0 as *const u8
-        *panic_msg_len_out = 0
-        *cancelled_return_out = 0
+pub unsafe fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
+    *panic_msg_out = 0 as *const u8
+    *panic_msg_len_out = 0
+    *cancelled_return_out = 0
 
     let f = fiber_lookup(fiber_id)
     if f == 0 or fiber_state(f) != FIBER_STATE_DONE:
         return 0
 
-    unsafe:
-        *cancelled_return_out = fiber_cancelled_return(f)
+    *cancelled_return_out = fiber_cancelled_return(f)
 
     if fiber_has_panic(f) != 0:
-        unsafe:
-            *panic_msg_out = fiber_panic_msg(f)
-            *panic_msg_len_out = fiber_panic_msg_len(f)
+        *panic_msg_out = fiber_panic_msg(f)
+        *panic_msg_len_out = fiber_panic_msg_len(f)
         fiber_set_panic_msg(f, 0 as *const u8)
         fiber_set_has_panic(f, 0)
 
@@ -598,11 +593,10 @@ pub fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *con
     recycle_fiber(f)
     1
 
-pub fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32:
-    unsafe:
-        *fiber_id_out = 0
-        *panic_msg_out = 0 as *const u8
-        *panic_msg_len_out = 0
+pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32:
+    *fiber_id_out = 0
+    *panic_msg_out = 0 as *const u8
+    *panic_msg_len_out = 0
 
     while panicked_fiber_count > 0:
         let queued_fiber_id = load_i32_index(panicked_fiber_ids_base(), panicked_fiber_head)
@@ -614,10 +608,9 @@ pub fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *
         if f == 0 or fiber_state(f) != FIBER_STATE_DONE or fiber_has_panic(f) == 0:
             continue
 
-        unsafe:
-            *fiber_id_out = fiber_id(f)
-            *panic_msg_out = fiber_panic_msg(f)
-            *panic_msg_len_out = fiber_panic_msg_len(f)
+        *fiber_id_out = fiber_id(f)
+        *panic_msg_out = fiber_panic_msg(f)
+        *panic_msg_len_out = fiber_panic_msg_len(f)
         fiber_set_panic_msg(f, 0 as *const u8)
         fiber_set_has_panic(f, 0)
         unregister_fiber(f)

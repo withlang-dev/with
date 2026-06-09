@@ -6609,7 +6609,7 @@ fn set_lookbehind_lengths(__param_pptrptr: *mut *mut c_uint, __param_errcodeptr:
             ((unsafe *__param_cb).max_lookbehind = __local_branchlength)
         }
 
-        ((unsafe *__local_bptr) = (unsafe *__local_bptr) | __local_branchlength)
+        ((unsafe *__local_bptr) = (unsafe *__local_bptr) | (__local_branchlength as c_uint))
 
         (__local_bptr = (unsafe *__param_pptrptr))
 

@@ -34,29 +34,29 @@ fn bool_cmp(a: bool, b: bool) -> bool:
 fn test_short_circuit_or:
     // `or` short-circuits: if LHS is true, RHS not evaluated
     var evaluated_rhs = false
-    let result = true or side_effect(&raw mut evaluated_rhs)
+    let result = true or unsafe { side_effect(&raw mut evaluated_rhs) }
     assert(result)
     assert(not evaluated_rhs)  // RHS was NOT evaluated
     // When LHS is false, RHS IS evaluated
     var evaluated_rhs2 = false
-    let result2 = false or side_effect(&raw mut evaluated_rhs2)
+    let result2 = false or unsafe { side_effect(&raw mut evaluated_rhs2) }
     assert(result2)
     assert(evaluated_rhs2)
 
 fn test_short_circuit_and:
     // `and` short-circuits: if LHS is false, RHS not evaluated
     var evaluated_rhs = false
-    let result = false and side_effect(&raw mut evaluated_rhs)
+    let result = false and unsafe { side_effect(&raw mut evaluated_rhs) }
     assert(not result)
     assert(not evaluated_rhs)  // RHS was NOT evaluated
     // When LHS is true, RHS IS evaluated
     var evaluated_rhs2 = false
-    let result2 = true and side_effect(&raw mut evaluated_rhs2)
+    let result2 = true and unsafe { side_effect(&raw mut evaluated_rhs2) }
     assert(result2)
     assert(evaluated_rhs2)
 
-fn side_effect(flag: *mut bool) -> bool:
-    unsafe *flag = true
+unsafe fn side_effect(flag: *mut bool) -> bool:
+    *flag = true
     true
 
 fn test_bool_not:

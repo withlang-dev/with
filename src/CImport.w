@@ -1487,8 +1487,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             field_str = ci_str_replace_last_field(field_str, ci_escape_reserved(accessor_name), "_" ++ ci_escape_reserved(accessor_name))
             // Emit accessor method
             let accessor_expr = "((&self._" ++ ci_escape_reserved(accessor_name) ++ ") as *" ++ elem_type ++ ")"
-            let accessor_body = "    unsafe { " ++ accessor_expr ++ " }"
-            flex_accessor = ci_render_generated_fn_body("fn " ++ ci_escape_reserved(accessor_name) ++ "(self: *" ++ safe_name ++ ") -> *" ++ elem_type, accessor_body) ++ "\n"
+            let accessor_body = "    " ++ accessor_expr
+            flex_accessor = ci_render_generated_fn_body("unsafe fn " ++ ci_escape_reserved(accessor_name) ++ "(self: *" ++ safe_name ++ ") -> *" ++ elem_type, accessor_body) ++ "\n"
 
     let packed_prefix = if is_really_packed: "@[packed]\n" else: ""
     let part1 = "type " ++ safe_name
@@ -7074,7 +7074,7 @@ fn CiExprPool.build_named_call_expr(self: CiExprPool, name: str, arg_ids: &Vec[i
         let _ = self.add_extra(arg_ids.get(i))
         i = i + 1
     var call = self.add(CiExprKind.CIE_CALL, callee_id as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
-    if ci_migrate_preamble_extern_call_requires_unsafe(name):
+    if ci_migrate_extern_fn_call_requires_unsafe(name) or ci_migrate_preamble_extern_call_requires_unsafe(name):
         call = self.unsafe_expr(call)
     call
 

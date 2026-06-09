@@ -845,7 +845,7 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
         with_eprint("error: action target '" ++ target.name ++ "' is missing an evaluator action function")
         return 1
     var action_sema = sema
-    let result = comptime_eval_tool_action_result(&raw mut action_sema as *mut Sema, action_sema.ast, action_sema.pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, target.inputs, target.output, target.extra_outputs, target.args, target.write_scopes, target.timeout_ms, target.cwd, target.env, target.network)
+    let result = unsafe { comptime_eval_tool_action_result(&raw mut action_sema as *mut Sema, action_sema.ast, action_sema.pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, target.inputs, target.output, target.extra_outputs, target.args, target.write_scopes, target.timeout_ms, target.cwd, target.env, target.network) }
     if result.runtime_exit_code != 0:
         if result.runtime_stderr.len() > 0:
             with_ewrite(result.runtime_stderr)
@@ -886,7 +886,7 @@ fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, options: BuildCo
     if entry_sym == 0:
         graph.error_msg = "build.w evaluation entry was not typechecked"
         return BuildGraphLoadResult { graph, sema }
-    let eval_result = comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root)
+    let eval_result = unsafe { comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root) }
     if eval_result.error_msg.len() > 0:
         graph.ok = false
         graph.error_msg = eval_result.error_msg

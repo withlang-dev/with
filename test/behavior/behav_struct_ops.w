@@ -81,14 +81,14 @@ fn test_struct_with_floats:
 
 type Counter { value: i32 }
 
-fn counter_inc(c: *mut Counter):
-    unsafe (*c).value = unsafe (*c).value + 1
+unsafe fn counter_inc(c: *mut Counter):
+    (*c).value = (*c).value + 1
 
 fn test_struct_pointer:
     var c = Counter { value: 0 }
-    counter_inc(&raw mut c)
-    counter_inc(&raw mut c)
-    counter_inc(&raw mut c)
+    unsafe { counter_inc(&raw mut c) }
+    unsafe { counter_inc(&raw mut c) }
+    unsafe { counter_inc(&raw mut c) }
     assert(c.value == 3)
 
 type Pair { first: i32, second: i32 }

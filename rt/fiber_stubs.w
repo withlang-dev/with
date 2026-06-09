@@ -24,19 +24,17 @@ pub fn with_runtime_fiber_is_live(fiber_id: i32) -> i32:
     let _ = fiber_id
     0
 
-pub fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
+pub unsafe fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
     let _ = fiber_id
-    unsafe:
-        *panic_msg_out = 0 as *const u8
-        *panic_msg_len_out = 0
-        *cancelled_return_out = 0
+    *panic_msg_out = 0 as *const u8
+    *panic_msg_len_out = 0
+    *cancelled_return_out = 0
     0
 
-pub fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32:
-    unsafe:
-        *fiber_id_out = 0
-        *panic_msg_out = 0 as *const u8
-        *panic_msg_len_out = 0
+pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32:
+    *fiber_id_out = 0
+    *panic_msg_out = 0 as *const u8
+    *panic_msg_len_out = 0
     0
 
 pub fn with_fiber_await(fiber_id: i32):

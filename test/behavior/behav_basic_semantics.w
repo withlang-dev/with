@@ -145,12 +145,12 @@ fn test_struct_mutation:
     assert(p.x == 10)
     assert(p.y == 20)
 
-fn inc(x: *mut i32):
-    unsafe *x = unsafe *x + 1
+unsafe fn inc(x: *mut i32):
+    *x = *x + 1
 
 fn test_pass_by_ptr:
     var val = 41
-    inc(&raw mut val)
+    unsafe { inc(&raw mut val) }
     assert(val == 42)
 
 fn test_multiple_returns:

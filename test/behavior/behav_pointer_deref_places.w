@@ -28,20 +28,20 @@ type PairDocument {
     tokens: [Pair; 4],
 }
 
-fn read_field(ptr: *const Pair) -> i32:
-    unsafe (*ptr).x
+unsafe fn read_field(ptr: *const Pair) -> i32:
+    (*ptr).x
 
-fn read_offset(ptr: *const Pair, idx: i64) -> i32:
-    unsafe (*(ptr + idx as u64)).y
+unsafe fn read_offset(ptr: *const Pair, idx: i64) -> i32:
+    (*(ptr + idx as u64)).y
 
-fn PairView.read_x(self: PairView) -> i32:
-    unsafe (*(self.tokens + self.index as u64)).x
+unsafe fn PairView.read_x(self: PairView) -> i32:
+    (*(self.tokens + self.index as u64)).x
 
-fn ForwardView.read_kind(self: ForwardView) -> i32:
-    unsafe (*(self.tokens + self.index as u64)).kind
+unsafe fn ForwardView.read_kind(self: ForwardView) -> i32:
+    (*(self.tokens + self.index as u64)).kind
 
-fn get_element_field(arr: *const Pair, idx: i64) -> i32:
-    unsafe (*(arr + idx as u64)).x
+unsafe fn get_element_field(arr: *const Pair, idx: i64) -> i32:
+    (*(arr + idx as u64)).x
 
 fn get_from_container(c: &Container) -> i32:
     let ptr = &raw const c.items[0] as *const Pair
@@ -53,8 +53,8 @@ fn PairDocument.first_ptr(self: &PairDocument) -> *const Pair:
 fn main:
     var p = Pair { x: 10, y: 20 }
     let ptr = &raw const p as *const Pair
-    assert(read_field(ptr) == 10)
-    assert(read_offset(ptr, 0) == 20)
+    assert(unsafe { read_field(ptr) } == 10)
+    assert(unsafe { read_offset(ptr, 0) } == 20)
 
     var container = Container {
         items: [
@@ -64,10 +64,10 @@ fn main:
             Pair { x: 7, y: 8 },
         ],
     }
-    assert(get_element_field(&raw const container.items[0] as *const Pair, 2) == 5)
+    assert(unsafe { get_element_field(&raw const container.items[0] as *const Pair, 2) } == 5)
     assert(get_from_container(&container) == 4)
     let view = PairView { tokens: &raw const container.items[0] as *const Pair, index: 2 }
-    assert(view.read_x() == 5)
+    assert(unsafe { view.read_x() } == 5)
     let doc = PairDocument {
         tokens: [
             Pair { x: 11, y: 12 },
@@ -83,5 +83,5 @@ fn main:
         ForwardToken { kind: 22, value: 2 },
     ]
     let fwd = ForwardView { tokens: &raw const tokens[0] as *const ForwardToken, index: 1 }
-    assert(fwd.read_kind() == 22)
+    assert(unsafe { fwd.read_kind() } == 22)
     print("ok")

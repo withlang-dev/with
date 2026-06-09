@@ -450,7 +450,7 @@ fn Sema.ct_build_value_tree(self: Sema, pool: AstPool, intern: InternPool, value
     0
 
 fn Sema.ct_eval_truthy(mut self: Sema, source_ast: AstPool, node: i32) -> i32:
-    let value = comptime_force_eval_expr(self as *mut Sema, source_ast, self.pool, node)
+    let value = unsafe { comptime_force_eval_expr(self as *mut Sema, source_ast, self.pool, node) }
     if comptime_value_is_valid(value) == 0:
         return -1
     let truthy = comptime_value_truthy(value)
@@ -544,7 +544,7 @@ fn Sema.ct_try_fold_type_call(mut self: Sema, pool: AstPool, intern: InternPool,
     let recv = pool.get_data0(callee)
     if self.static_receiver_type_is_known(recv) == 0:
         return node
-    let evald = comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, node)
+    let evald = unsafe { comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, node) }
     if comptime_value_is_valid(evald.value) == 0:
         return node
     let folded = self.ct_build_value_tree(pool, intern, evald.value, node, evald.extras)
@@ -891,7 +891,7 @@ fn AstPool.ct_clone_tree_with_subst(self: AstPool, node: i32, subst_sym: i32, su
 
 fn Sema.ct_rewrite_comptime_for(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, wrapper: i32, inner: i32) -> i32:
     let iterable_node = pool.get_data1(inner)
-    let evald = comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, iterable_node)
+    let evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, iterable_node) }
     let iterable = evald.value
     if comptime_value_is_valid(iterable) == 0:
         return wrapper
@@ -936,7 +936,7 @@ fn Sema.ct_rewrite_comptime(mut self: Sema, source_ast: AstPool, pool: AstPool, 
         return self.ct_rewrite_comptime_for(source_ast, pool, intern, node, inner)
 
     let diag_count_before = self.diags.count()
-    let evald = comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, inner)
+    let evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, inner) }
     let value = evald.value
     if comptime_value_is_valid(value) == 0:
         if evald.error_msg.len() > 0 and self.diags.count() == diag_count_before:
@@ -992,7 +992,7 @@ fn Sema.ct_transform_expr(mut self: Sema, source_ast: AstPool, pool: AstPool, in
         let field_expr = self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node))
         pool.set_data0(node, base)
         pool.set_data1(node, field_expr)
-        let evald = comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, field_expr)
+        let evald = unsafe { comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, field_expr) }
         if comptime_value_is_valid(evald.value) == 0:
             return node
         if evald.value.kind != ComptimeValueKind.CV_STR:

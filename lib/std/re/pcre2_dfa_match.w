@@ -391,7 +391,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_24 {
-        if ((if ((unsafe __param_workspace[0]) & -2) != 0: 1 else: 0) != 0) {
+        if ((if ((unsafe __param_workspace[0]) & (-2 as c_int)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_4 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_4 = (if (if (unsafe __param_workspace[1]) < 1: 1 else: 0) != 0: 1 else: 0))

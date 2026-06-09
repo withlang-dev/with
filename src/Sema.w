@@ -216,6 +216,7 @@ const EFF_WRITE: i32        = 2   // parameter place is mutated (implies read)
 const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
 const EFF_ESCAPE_VALUE: i32 = 8   // owned value escapes the call (return / global store)
 const EFF_ESCAPE_VIEW: i32  = 16  // view into parameter escapes (return &param.field)
+const EFF_RAW_PTR_VALIDITY: i32 = 32  // raw pointer parameter validity is caller-guaranteed
 
 enum WithFormKind: i32:
     Binding = 0
@@ -259,7 +260,8 @@ type Sema {
     sig_lookup: HashMap[i32, i32],
     // docs/mutability.md Phase 4 — per-parameter effect bitsets.
     // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
-    // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4, EFF_ESCAPE_VALUE=8, EFF_ESCAPE_VIEW=16.
+    // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4,
+    // EFF_ESCAPE_VALUE=8, EFF_ESCAPE_VIEW=16, EFF_RAW_PTR_VALIDITY=32.
     sig_param_effects: Vec[i32],
     // Parallel to sig_param_effects: bitmask of signature parameter indices that a returned
     // view may originate from when this parameter participates in escape_view.
@@ -542,6 +544,7 @@ type Sema {
     overflow_mode: i32,
     in_defer: i32,
     in_unsafe: i32,
+    in_bitwise_literal_context: i32,
     unsafe_scope_used: Vec[i32],
     break_value_type: TypeId,
     has_break_value_type: i32,
@@ -1167,6 +1170,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         overflow_mode: overflow_mode_default(),
         in_defer: 0,
         in_unsafe: 0,
+        in_bitwise_literal_context: 0,
         unsafe_scope_used: Vec.new(),
         break_value_type: 0,
         has_break_value_type: 0,
@@ -2198,13 +2202,29 @@ fn Sema.int_literal_fits_type(self: Sema, node: i32, tid: i32) -> bool:
         return value <= 4294967295
     true
 
+fn Sema.int_literal_bit_pattern_fits_type(self: Sema, node: i32, tid: i32) -> bool:
+    let resolved = self.numeric_operand_type(tid)
+    if self.get_type_kind(resolved) != TypeKind.TY_INT:
+        return false
+    let bits = self.get_type_d0(resolved)
+    let expr = self.ast.int_literal_exact_expr(node)
+    if expr.ok == 0 or expr.overflow != 0:
+        return false
+    let mag = ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }
+    if expr.negative != 0:
+        return exact_int_fits_signed_negative_bits(mag, bits)
+    exact_int_fits_unsigned_bits(mag, bits)
+
 fn Sema.numeric_literal_expected_type(self: Sema, node: i32) -> i32:
     if self.has_expected_type == 0 or self.expected_expr_type == 0:
         return 0
     let expected = self.numeric_operand_type(self.expected_expr_type as i32)
     if not self.is_numeric_type(expected):
         return 0
-    if not self.int_literal_fits_type(node, expected):
+    if self.in_bitwise_literal_context != 0:
+        if not self.int_literal_bit_pattern_fits_type(node, expected):
+            self.emit_error("integer literal bit pattern does not fit expected type", node)
+    else if not self.int_literal_fits_type(node, expected):
         self.emit_error("integer literal does not fit expected type", node)
     expected
 
@@ -3284,6 +3304,23 @@ fn Sema.arithmetic_result_type(self: Sema, lhs: TypeId, rhs: TypeId) -> TypeId:
             return lhs_numeric as TypeId
         return rhs_numeric as TypeId
     0 as TypeId
+
+fn Sema.bitwise_result_type(self: Sema, lhs: TypeId, rhs: TypeId) -> TypeId:
+    if lhs == 0 or rhs == 0:
+        return 0 as TypeId
+    let lhs_numeric = self.numeric_operand_type(lhs as i32)
+    let rhs_numeric = self.numeric_operand_type(rhs as i32)
+    let lhs_resolved = self.resolve_alias(lhs_numeric as TypeId)
+    let rhs_resolved = self.resolve_alias(rhs_numeric as TypeId)
+    if self.get_type_kind(lhs_resolved) != TypeKind.TY_INT or self.get_type_kind(rhs_resolved) != TypeKind.TY_INT:
+        return 0 as TypeId
+    if self.get_type_d1(lhs_resolved) != self.get_type_d1(rhs_resolved):
+        return 0 as TypeId
+    let lhs_bits = self.get_type_d0(lhs_resolved)
+    let rhs_bits = self.get_type_d0(rhs_resolved)
+    if lhs_bits >= rhs_bits:
+        return lhs_numeric as TypeId
+    rhs_numeric as TypeId
 
 fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
     if tid == 0:

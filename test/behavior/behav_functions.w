@@ -81,12 +81,12 @@ fn test_side_effects:
     let _ = side_effect_fn(3)
     assert(g_side_effect == 3)
 
-fn void_fn(x: *mut i32):
-    unsafe *x = 42
+unsafe fn void_fn(x: *mut i32):
+    *x = 42
 
 fn test_void_function:
     var val = 0
-    void_fn(&raw mut val)
+    unsafe { void_fn(&raw mut val) }
     assert(val == 42)
 
 fn gcd(a: i32, b: i32) -> i32:

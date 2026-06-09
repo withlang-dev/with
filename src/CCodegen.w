@@ -2680,6 +2680,39 @@ fn CCodegen.binop_token(self: CCodegen, op: i32) -> str:
     if op == BinaryOp.OP_SHR: return ">>"
     ""
 
+fn CCodegen.type_is_raw_pointer_tid(self: CCodegen, tid: i32) -> bool:
+    if tid == 0:
+        return false
+    let resolved = self.sema.resolve_alias(tid)
+    let kind = self.sema.get_type_kind(resolved)
+    kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF
+
+fn CCodegen.raw_pointer_elem_size_expr(self: CCodegen, tid: i32) -> str:
+    let resolved = self.sema.resolve_alias(tid)
+    let kind = self.sema.get_type_kind(resolved)
+    if kind != TypeKind.TY_PTR and kind != TypeKind.TY_REF:
+        return "1"
+    let inner = self.sema.get_type_d0(resolved)
+    let inner_resolved = self.sema.resolve_alias(inner as TypeId)
+    if self.sema.get_type_kind(inner_resolved) == TypeKind.TY_VOID or self.type_is_c_void(inner_resolved as i32) != 0:
+        return "1"
+    "sizeof(" ++ self.c_type(inner, 0) ++ ")"
+
+fn CCodegen.raw_pointer_binop_text(self: CCodegen, op: i32, lhs: str, rhs: str, lhs_tid: i32, rhs_tid: i32) -> str:
+    let lhs_ptr = self.type_is_raw_pointer_tid(lhs_tid)
+    let rhs_ptr = self.type_is_raw_pointer_tid(rhs_tid)
+    if lhs_ptr and rhs_ptr and op == BinaryOp.OP_SUB:
+        return "((intptr_t)((uintptr_t)(" ++ lhs ++ ") - (uintptr_t)(" ++ rhs ++ ")))"
+    if lhs_ptr and rhs_ptr and (op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE):
+        let tok = self.binop_token(op)
+        return "((uintptr_t)(" ++ lhs ++ ") " ++ tok ++ " (uintptr_t)(" ++ rhs ++ "))"
+    if lhs_ptr and (op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB):
+        let tok = self.binop_token(op)
+        return "((" ++ self.c_type(lhs_tid, 0) ++ ")((uintptr_t)(" ++ lhs ++ ") " ++ tok ++ " ((uintptr_t)(" ++ rhs ++ ") * " ++ self.raw_pointer_elem_size_expr(lhs_tid) ++ ")))"
+    if rhs_ptr and op == BinaryOp.OP_ADD:
+        return "((" ++ self.c_type(rhs_tid, 0) ++ ")(((uintptr_t)(" ++ lhs ++ ") * " ++ self.raw_pointer_elem_size_expr(rhs_tid) ++ ") + (uintptr_t)(" ++ rhs ++ ")))"
+    ""
+
 fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         self.fail(f"invalid rvalue id {rval_id}")
@@ -2698,6 +2731,11 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
     if rk == RvalueKind.RK_BIN_OP:
         let lhs = self.operand_text(body, d1)
         let rhs = self.operand_text(body, d2)
+        let lhs_tid_for_raw_ptr = self.operand_tid(body, d1)
+        let rhs_tid_for_raw_ptr = self.operand_tid(body, d2)
+        let raw_ptr_bin = self.raw_pointer_binop_text(d0, lhs, rhs, lhs_tid_for_raw_ptr, rhs_tid_for_raw_ptr)
+        if raw_ptr_bin.len() > 0:
+            return raw_ptr_bin
         if d0 == BinaryOp.OP_CONCAT:
             return "with_str_concat(" ++ lhs ++ ", " ++ rhs ++ ")"
         if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ:

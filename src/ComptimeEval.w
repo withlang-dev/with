@@ -665,13 +665,13 @@ fn ComptimeEvaluator.check_workspace_intercepts_finished(self: ComptimeEvaluator
         let _ = self.fail(0, "incomplete workspace interception for '" ++ record.name ++ "': " ++ reason)
         return
 
-fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    var sema = unsafe *sema_ptr
+unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
+    var sema = *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
     if evaluator.has_pending_diag != 0:
-        unsafe { sema_ptr.diags.emit(evaluator.pending_diag) }
+        sema_ptr.diags.emit(evaluator.pending_diag)
     ComptimeEvalResult {
         value,
         extras: evaluator.extra_values,
@@ -680,13 +680,13 @@ fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: Intern
         runtime_stderr: evaluator.runtime_stderr,
     }
 
-fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    var sema = unsafe *sema_ptr
+unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
+    var sema = *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
     if evaluator.has_pending_diag != 0:
-        unsafe { sema_ptr.diags.emit(evaluator.pending_diag) }
+        sema_ptr.diags.emit(evaluator.pending_diag)
     ComptimeEvalResult {
         value,
         extras: evaluator.extra_values,
@@ -695,14 +695,14 @@ fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
         runtime_stderr: evaluator.runtime_stderr,
     }
 
-fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     comptime_try_eval_expr_result(sema_ptr, ast, pool, node).value
 
-fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     comptime_force_eval_expr_result(sema_ptr, ast, pool, node).value
 
-fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str) -> ComptimeEvalResult:
-    var sema = unsafe *sema_ptr
+unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str) -> ComptimeEvalResult:
+    var sema = *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
@@ -720,7 +720,7 @@ fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
     evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
     if evaluator.has_pending_diag != 0:
-        unsafe { sema_ptr.diags.emit(evaluator.pending_diag) }
+        sema_ptr.diags.emit(evaluator.pending_diag)
     let value =
         if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
             signal.value
@@ -734,8 +734,8 @@ fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
         runtime_stderr: evaluator.runtime_stderr,
     }
 
-fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32) -> ComptimeEvalResult:
-    var sema = unsafe *sema_ptr
+unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32) -> ComptimeEvalResult:
+    var sema = *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
@@ -753,7 +753,7 @@ fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: Int
     evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
     if evaluator.has_pending_diag != 0:
-        unsafe { sema_ptr.diags.emit(evaluator.pending_diag) }
+        sema_ptr.diags.emit(evaluator.pending_diag)
     let value =
         if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
             signal.value
@@ -3126,10 +3126,10 @@ fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -
             return comptime_workspace_native_compile_invalid()
     comptime_workspace_native_compile_result(if success: 0 else: 1, artifact_path, comp, 0)
 
-fn comptime_workspace_thread_entry(arg: *mut u8) -> i32:
+unsafe fn comptime_workspace_thread_entry(arg: *mut u8) -> i32:
     let job = arg as *mut ComptimeWorkspaceThreadJob
-    let native = comptime_execute_workspace_compile_plan((unsafe *job).plan)
-    (unsafe *job).result = native
+    let native = comptime_execute_workspace_compile_plan((*job).plan)
+    (*job).result = native
     0
 
 fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32, want_messages: i32) -> ComptimeWorkspaceCompileResult:
@@ -5648,7 +5648,7 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, node: i32) -> ComptimeCo
     self.unsupported(node)
 
 fn Sema.force_eval_comptime_expr(mut self: Sema, node: i32) -> i32:
-    let value = comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, node)
+    let value = unsafe { comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, node) }
     comptime_value_is_valid(value)
 
 fn Sema.check_top_level_comptime_let_values(mut self: Sema):

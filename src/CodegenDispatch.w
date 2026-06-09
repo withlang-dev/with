@@ -1529,6 +1529,12 @@ fn Codegen.mir_sema_type_is_unsigned(self: Codegen, sema_ty: i32) -> bool:
         return self.mir_input.mir_get_type_d1(resolved) == 0
     false
 
+fn Codegen.mir_sema_type_is_raw_pointer_or_ref(self: Codegen, sema_ty: i32) -> bool:
+    if sema_ty <= 0: return false
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    let kind = self.mir_input.mir_get_type_kind(resolved)
+    kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF
+
 fn Codegen.mir_coerce_value_to_sema_type(self: Codegen, val: i64, target_ty: i64, target_sema_ty: i32, src_unsigned: bool) -> i64:
     if val == 0 or target_ty == 0:
         return val
@@ -1828,6 +1834,18 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
             if self.is_const_int_value(lhs) and wl_const_int_sext_val(lhs) == 0:
                 let cmp_lhs = wl_const_null(wl_type_of(rhs))
                 return wl_build_icmp(self.builder, if op == BinaryOp.OP_EQ: wl_int_eq() else: wl_int_ne(), cmp_lhs, rhs)
+
+    let pointer_compare = op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
+    if pointer_compare and lk == wl_pointer_type_kind() and rk == wl_pointer_type_kind() and self.mir_sema_type_is_raw_pointer_or_ref(lhs_sema) and self.mir_sema_type_is_raw_pointer_or_ref(rhs_sema):
+        let i64_ty = wl_i64_type(self.context)
+        let l_addr = wl_build_ptr_to_int(self.builder, lhs, i64_ty)
+        let r_addr = wl_build_ptr_to_int(self.builder, rhs, i64_ty)
+        if op == BinaryOp.OP_EQ: return wl_build_icmp(self.builder, wl_int_eq(), l_addr, r_addr)
+        if op == BinaryOp.OP_NEQ: return wl_build_icmp(self.builder, wl_int_ne(), l_addr, r_addr)
+        if op == BinaryOp.OP_LT: return wl_build_icmp(self.builder, wl_int_ult(), l_addr, r_addr)
+        if op == BinaryOp.OP_GT: return wl_build_icmp(self.builder, wl_int_ugt(), l_addr, r_addr)
+        if op == BinaryOp.OP_LTE: return wl_build_icmp(self.builder, wl_int_ule(), l_addr, r_addr)
+        if op == BinaryOp.OP_GTE: return wl_build_icmp(self.builder, wl_int_uge(), l_addr, r_addr)
 
     let is_float = lk == wl_float_type_kind() or lk == wl_double_type_kind() or rk == wl_float_type_kind() or rk == wl_double_type_kind()
     if is_float:
@@ -2809,14 +2827,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                 let i64_ty = wl_i64_type(self.context)
                 let lhs_i = wl_build_ptr_to_int(self.builder, lhs, i64_ty)
                 let rhs_i = wl_build_ptr_to_int(self.builder, rhs, i64_ty)
-                let byte_diff = wl_build_sub(self.builder, lhs_i, rhs_i)
-                let elem_ty = self.mir_pointer_elem_llvm_type(lhs_sema)
-                var elem_size: i64 = 1
-                if elem_ty != 0:
-                    let abi_size = self.abi_size_of(elem_ty)
-                    if abi_size > 0:
-                        elem_size = abi_size
-                return wl_build_sdiv(self.builder, byte_diff, wl_const_int(i64_ty, elem_size, 0))
+                return wl_build_sub(self.builder, lhs_i, rhs_i)
             if (lhs_tk == TypeKind.TY_PTR or lhs_tk == TypeKind.TY_REF) and lhs_llvm_tk == wl_pointer_type_kind() and rhs_llvm_tk == wl_integer_type_kind():
                 let elem_ty = self.mir_pointer_elem_llvm_type(lhs_sema)
                 let indices: Vec[i64] = Vec.new()
