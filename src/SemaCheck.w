@@ -2024,6 +2024,10 @@ fn Sema.classify_guarded_with(self: Sema, node: i32, source_ty: i32, is_mut: i32
     if trait_sym == 0:
         return WithFormKind.Binding
     if self.type_implements_trait(source_ty, trait_sym) == 0:
+        if is_mut != 0:
+            let scoped_sym = self.pool_lookup_symbol("Scoped")
+            if scoped_sym != 0 and self.type_implements_trait(source_ty, scoped_sym) != 0:
+                self.emit_error("mutable guarded with requires ScopedMut; this type only supports Scoped", node)
         return WithFormKind.Binding
     let payload_ty = self.with_trait_payload_type(source_ty, trait_sym)
     if payload_ty == 0:
