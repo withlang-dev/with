@@ -585,7 +585,7 @@ fn MirBuilder.collect_goto_label_depths(self: MirBuilder, node: i32, scope_depth
         self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
         self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
         return
-    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
         self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
         return
     if kind == NodeKind.NK_BINARY:
@@ -8426,13 +8426,6 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.lower_expr(inner)
         return self.unit_operand()
 
-    // spawn expr → evaluate (the async fn call already spawns a fiber),
-    // then discard the Task handle (fire-and-forget)
-    if kind == NodeKind.NK_SPAWN:
-        let inner = self.ast.get_data0(node)
-        let _ = self.lower_expr(inner)
-        return self.unit_operand()
-
     // expr.await → suspend until fiber completes, check cancellation,
     // emit unwind path with defers if cancelled, return result
     //
@@ -9527,7 +9520,7 @@ fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &Vec[i32], in_tai
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, 0, active_cleanup)
     if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_ASSIGN:
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, in_tail, active_cleanup)
     tailrec_no_violation()
 

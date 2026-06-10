@@ -1183,7 +1183,7 @@ fn Sema.collect_function_labels(self: Sema, node: i32):
         self.collect_function_labels(self.ast.get_data1(node))
         return
 
-    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
         self.collect_function_labels(self.ast.get_data0(node))
         return
 
@@ -1500,7 +1500,7 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
         self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
         return
 
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
         self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
         return
 
@@ -2077,7 +2077,7 @@ fn Sema.expr_may_suspend(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> 
         return 1
     if kind == NodeKind.NK_ASYNC_SCOPE:
         return 1
-    if kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN:
+    if kind == NodeKind.NK_ASYNC_BLOCK:
         return 0
     if kind == NodeKind.NK_CALL:
         if self.comp_resolved.contains(node):
@@ -3227,16 +3227,6 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             return ab_task_ty
         return ab_body_ty
 
-    if kind == NodeKind.NK_SPAWN:
-        self.require_async_runtime(node, "spawn")
-        if self.in_comptime_fn != 0:
-            self.emit_error("spawn is not allowed in comptime", node)
-        let inner = self.ast.get_data0(node)
-        self.check_expr(inner)
-        if self.expr_is_task_value(inner) == 0:
-            self.emit_error("spawn requires a Task value", node)
-        return self.ty_void
-
     if kind == NodeKind.NK_YIELD:
         if self.in_comptime_fn != 0:
             self.emit_error("yield is not allowed in comptime", node)
@@ -4382,7 +4372,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         if stmt_kind == NodeKind.NK_RETURN or stmt_kind == NodeKind.NK_BREAK or stmt_kind == NodeKind.NK_CONTINUE:
             block_diverged = 1
         let can_discard_task = stmt_kind == NodeKind.NK_CALL or stmt_kind == NodeKind.NK_IDENT or stmt_kind == NodeKind.NK_GROUPED or stmt_kind == NodeKind.NK_ASYNC_BLOCK or stmt_kind == NodeKind.NK_TUPLE or stmt_kind == NodeKind.NK_NO_SUSPEND
-        let is_discarded_task = can_discard_task and stmt_kind != NodeKind.NK_SPAWN and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
+        let is_discarded_task = can_discard_task and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
         if is_discarded_task:
             self.emit_error("E0801: unused Task value", stmt)
         self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
@@ -11884,7 +11874,7 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_UNARY:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
     if kind == NodeKind.NK_LABEL:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)

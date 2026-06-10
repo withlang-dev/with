@@ -3168,7 +3168,6 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
     if t == TokenKind.TK_KW_ASM: return self.parse_asm_expr()
     if t == TokenKind.TK_KW_DEFER: return self.parse_defer()
     if t == TokenKind.TK_KW_ERRDEFER: return self.parse_errdefer()
-    if t == TokenKind.TK_KW_SPAWN: return self.parse_spawn()
     if t == TokenKind.TK_KW_ASYNC: return self.parse_async_expr()
     if t == TokenKind.TK_KW_YIELD: return self.parse_yield()
     if t == TokenKind.TK_KW_COMPTIME: return self.parse_comptime_expr()
@@ -4926,12 +4925,6 @@ fn Parser.parse_no_suspend_expr(self: Parser) -> NodeId:
     self.advance()
     let body = self.parse_body()
     self.pool.add_node(NodeKind.NK_NO_SUSPEND, start, self.prev_end(), body, 0, 0)
-
-fn Parser.parse_spawn(self: Parser) -> NodeId:
-    let start = self.current_start()
-    self.advance()
-    let value = self.parse_expr()
-    self.pool.add_node(NodeKind.NK_SPAWN, start, self.prev_end(), value, 0, 0)
 
 fn Parser.is_scope_expr_start(self: Parser) -> bool:
     if not self.is_ident_named("scope"):

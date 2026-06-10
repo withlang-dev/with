@@ -20,6 +20,6 @@ fn test_discarded_task_cancels:
         steps = steps + 1
     assert(unsafe { with_fiber_live_fibers() } == baseline)
 
-fn main:
+async fn main:
     test_discarded_task_cancels()
-    spawn send_analytics("page_view")
+    send_analytics("page_view").await

@@ -1,14 +1,12 @@
-//! expect-exit: 1
+//! expect-exit: 134
 //! expect-stdout: done
 
-// Fire-and-forget spawn of a panicking fiber.
-// Main prints "done",: with_runtime_run drains and reports
-// the unhandled panic, exiting with code 1.
+// Awaiting a panicking task reports the failure through the async runtime.
 
 async fn bad() -> i32:
     assert(false)
     0
 
 async fn main:
-    spawn bad()
     print("done")
+    let _ = bad().await

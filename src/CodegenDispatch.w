@@ -12462,7 +12462,7 @@ fn Codegen.collect_captures(self: Codegen, node: i32):
     if kind == NodeKind.NK_RETURN:
         self.collect_captures(self.pool.get_data0(node))
         return
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT:
         self.collect_captures(self.pool.get_data0(node))
         return
     if kind == NodeKind.NK_FIELD_ACCESS:

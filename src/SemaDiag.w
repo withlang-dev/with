@@ -159,7 +159,6 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_VARIANT_SHORTHAND: return "variant_shorthand"
     if kind == NodeKind.NK_AWAIT: return "await_expr"
     if kind == NodeKind.NK_ASYNC_BLOCK: return "async_block"
-    if kind == NodeKind.NK_SPAWN: return "spawn_expr"
     if kind == NodeKind.NK_PIPELINE: return "pipeline"
     if kind == NodeKind.NK_GROUPED: return "grouped"
     if kind == NodeKind.NK_WHILE: return "while_expr"
@@ -742,7 +741,7 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return out
 
-    if kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME:
+    if kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return out
 
@@ -1014,7 +1013,7 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return
 
-    if kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME:
+    if kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return
 

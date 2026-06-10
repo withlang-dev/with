@@ -579,10 +579,6 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let body = pool.get_data0(node)
         return prefix ++ "async:\n" ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
 
-    if kind == NodeKind.NK_SPAWN:
-        let inner = pool.get_data0(node)
-        return prefix ++ "spawn " ++ render_expr(pool, intern, (inner) as NodeId, 0)
-
     if kind == NodeKind.NK_COMPTIME:
         let inner = pool.get_data0(node)
         return prefix ++ "comptime " ++ render_expr(pool, intern, (inner) as NodeId, 0)

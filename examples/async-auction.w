@@ -1,7 +1,7 @@
 // Concurrent Auction House
 //
 // A comprehensive async example exercising every fiber/async feature:
-//   async fn, .await, async blocks, Task[T], spawn, select await,
+//   async fn, .await, async blocks, Task[T], select await,
 //   select await biased, async scope, tuple await, channels,
 //   defer, errdefer, cancellation + unwind, @[stack_size],
 //   await_all, await_first, await_any, await_settled,
@@ -184,9 +184,11 @@ async fn run_auction() -> AuctionResult:
     assert(block_result == best.amount + 42)
     print("phase 5 done")
 
-    // --- Phase 6: Spawn fire-and-forget ---
-    print("phase 6: spawn")
-    spawn base_valuation(1)
+    // --- Phase 6: Explicit task observation ---
+    print("phase 6: task observation")
+    let warmup = base_valuation(1)
+    let warmup_result = warmup.await
+    assert(warmup_result == 100)
     print("phase 6 done")
 
     // --- Phase 7: Task from sync function + is_done / cancel ---

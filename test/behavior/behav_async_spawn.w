@@ -4,6 +4,5 @@ async fn side_effect() -> i32:
     0
 
 async fn main:
-    // spawn fire-and-forget: just ensure it doesn't crash
-    spawn side_effect()
+    assert(side_effect().await == 0)
     print("ok")

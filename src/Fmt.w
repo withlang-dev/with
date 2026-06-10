@@ -308,7 +308,7 @@ fn needs_space_before(cur: i32, prev: i32) -> bool:
     if prev == TokenKind.TK_KW_EXTEND or prev == TokenKind.TK_KW_USE: return true
     if prev == TokenKind.TK_KW_PUB or prev == TokenKind.TK_KW_EXTERN: return true
     if prev == TokenKind.TK_KW_ASYNC or prev == TokenKind.TK_KW_AWAIT: return true
-    if prev == TokenKind.TK_KW_SPAWN or prev == TokenKind.TK_KW_UNSAFE: return true
+    if prev == TokenKind.TK_KW_UNSAFE: return true
     if prev == TokenKind.TK_KW_COMPTIME or prev == TokenKind.TK_KW_DEFER: return true
     if prev == TokenKind.TK_KW_AS or prev == TokenKind.TK_KW_CONST: return true
     if prev == TokenKind.TK_KW_BREAK or prev == TokenKind.TK_KW_CONTINUE: return true

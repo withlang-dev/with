@@ -568,7 +568,7 @@ fn AstPool.ct_clone_tree_with_subst(self: AstPool, node: i32, subst_sym: i32, su
     if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT or kind == NodeKind.NK_BOOL_LIT or kind == NodeKind.NK_NULL_LIT or kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_INFERRED or kind == NodeKind.NK_COMPTIME_ERROR or kind == NodeKind.NK_PAT_WILDCARD or kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_INT or kind == NodeKind.NK_PAT_BOOL or kind == NodeKind.NK_PAT_STRING or kind == NodeKind.NK_PAT_TYPED_BIND:
         return self.ct_clone_leaf(node)
 
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_YIELD:
         let child = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
         return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), child, self.get_data1(node), self.get_data2(node), self.literal_suffix(node))
 
@@ -966,7 +966,7 @@ fn Sema.ct_transform_expr(mut self: Sema, source_ast: AstPool, pool: AstPool, in
         pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_YIELD:
         pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         return node
 

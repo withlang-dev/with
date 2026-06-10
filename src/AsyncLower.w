@@ -140,7 +140,7 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
     if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_BOOL_LIT or kind == NodeKind.NK_C_STRING_LIT:
         return
 
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_COMPTIME:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_COMPTIME:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 

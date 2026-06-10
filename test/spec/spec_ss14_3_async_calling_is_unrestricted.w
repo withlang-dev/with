@@ -37,8 +37,8 @@ fn test_task_values_can_be_passed_and_stored:
     tasks.push(fetch_data(2))
     assert(tasks.len() == 2)
 
-fn test_spawn_fire_and_forget:
-    spawn send_analytics(1)
+fn test_task_can_be_awaited:
+    send_analytics(1).await
 
 fn test_let_underscore_task_is_allowed_but_warns:
     let _ = send_analytics(2)
@@ -51,7 +51,7 @@ fn test_async_method_in_trait:
 fn main:
     test_regular_function_can_call_async()
     test_task_values_can_be_passed_and_stored()
-    test_spawn_fire_and_forget()
+    test_task_can_be_awaited()
     test_let_underscore_task_is_allowed_but_warns()
     test_async_method_in_trait()
     print("ok")

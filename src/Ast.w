@@ -69,7 +69,6 @@ enum NodeKind: i32:
     NK_OPTIONAL_CHAIN = 56
     NK_AWAIT = 57
     NK_ASYNC_BLOCK = 58
-    NK_SPAWN = 59
     NK_YIELD = 60
     NK_COMPTIME = 61
     NK_LET_ELSE = 62
@@ -1510,7 +1509,6 @@ fn AstPool.comprehension_binding_is_pattern(self: AstPool, node: NodeId, binding
 //                    extra: [has_call(0/1), arg_count, args...]
 // NodeKind.NK_AWAIT:         d0=expr(node), d1=0, d2=0
 // NodeKind.NK_ASYNC_BLOCK:   d0=body(node), d1=0, d2=0
-// NodeKind.NK_SPAWN:         d0=expr(node), d1=0, d2=0
 // NodeKind.NK_YIELD:         d0=expr(node), d1=0, d2=0
 // NodeKind.NK_COMPTIME:      d0=expr(node), d1=0, d2=0
 // NodeKind.NK_NO_SUSPEND:    d0=body(node), d1=0, d2=0

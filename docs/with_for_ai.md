@@ -880,17 +880,15 @@ scope s =>
     s.spawn(() => compute_chunk_b())
 ```
 
-### Fire-and-forget
+### Task disposition
 
 ```with
-spawn send_analytics(event)
+let result = send_analytics(event).await
 ```
 
-Do **not** write:
-
-```with
-let _ = send_analytics(event)  // cancels task; not fire-and-forget
-```
+Use `async scope` plus `s.track(task)` for structured concurrency, or
+bind the task and choose when to await it. `spawn` is reserved and has no
+standalone construct.
 
 ### Guarded await rule
 
@@ -1225,7 +1223,7 @@ type MatchIter = ephemeral { text: &str, pos: usize }
 ```with
 send_analytics(event)       // wrong: unused Task
 let _ = send_analytics(event)  // wrong: cancels task
-spawn send_analytics(event)    // right
+send_analytics(event).await    // right: observe completion
 ```
 
 ### Do not hold mutex/RwLock guards across await
