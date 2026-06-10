@@ -13,8 +13,8 @@ pub type JsonWriter {
     after_key: bool,
 }
 
-pub trait Serialize =
-    fn serialize(self: &Self, out: JsonWriter) -> JsonWriter
+pub trait Serialize:    fn serialize(self: &Self, out:
+    JsonWriter) -> JsonWriter
 
 pub type JsonView {
     source: str,
@@ -28,8 +28,8 @@ pub type JsonDocument {
     count: i32,
 }
 
-pub trait Deserialize =
-    fn deserialize(input: JsonView) -> Self
+pub trait Deserialize:    fn deserialize(input:
+    JsonView) -> Self
 
 pub fn JsonWriter.new() -> JsonWriter:
     JsonWriter { text: "", needs_comma: false, after_key: false }
@@ -94,20 +94,20 @@ pub fn JsonWriter.value_i64(self: JsonWriter, value: i64) -> JsonWriter:
 pub fn JsonWriter.value_bool(self: JsonWriter, value: bool) -> JsonWriter:
     self.value_raw(if value: "true" else: "false")
 
-impl Serialize for str =
-    fn serialize(self: &str, out: JsonWriter) -> JsonWriter:
+impl Serialize for str:    fn serialize(self: &str, out:
+    JsonWriter) -> JsonWriter:
         out.value_str(*self)
 
-impl Serialize for i32 =
-    fn serialize(self: &i32, out: JsonWriter) -> JsonWriter:
+impl Serialize for i32:    fn serialize(self: &i32, out:
+    JsonWriter) -> JsonWriter:
         out.value_i32(*self)
 
-impl Serialize for i64 =
-    fn serialize(self: &i64, out: JsonWriter) -> JsonWriter:
+impl Serialize for i64:    fn serialize(self: &i64, out:
+    JsonWriter) -> JsonWriter:
         out.value_i64(*self)
 
-impl Serialize for bool =
-    fn serialize(self: &bool, out: JsonWriter) -> JsonWriter:
+impl Serialize for bool:    fn serialize(self: &bool, out:
+    JsonWriter) -> JsonWriter:
         out.value_bool(*self)
 
 /// Token type: undefined/uninitialized.
@@ -519,26 +519,26 @@ fn json_unescape_string(value: str) -> str:
         i = i + 1
     out
 
-impl Deserialize for str =
-    fn deserialize(input: JsonView) -> str:
+impl Deserialize for str:    fn deserialize(input:
+    JsonView) -> str:
         if input.token_type() != JSON_STRING:
             json_panic("expected JSON string")
         json_unescape_string(input.raw())
 
-impl Deserialize for i32 =
-    fn deserialize(input: JsonView) -> i32:
+impl Deserialize for i32:    fn deserialize(input:
+    JsonView) -> i32:
         if input.token_type() != JSON_PRIMITIVE:
             json_panic("expected JSON integer")
         json_int(input.source, input.tokens, input.index)
 
-impl Deserialize for i64 =
-    fn deserialize(input: JsonView) -> i64:
+impl Deserialize for i64:    fn deserialize(input:
+    JsonView) -> i64:
         if input.token_type() != JSON_PRIMITIVE:
             json_panic("expected JSON integer")
         json_i64(input.source, input.tokens, input.index)
 
-impl Deserialize for bool =
-    fn deserialize(input: JsonView) -> bool:
+impl Deserialize for bool:    fn deserialize(input:
+    JsonView) -> bool:
         if input.token_type() != JSON_PRIMITIVE:
             json_panic("expected JSON bool")
         let raw = input.raw()

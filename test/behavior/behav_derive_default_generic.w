@@ -11,7 +11,7 @@ type Pair[T] {
 
 type Manual { value: i32 }
 
-impl Default for Manual =
+impl Default for Manual:
     fn default() -> Manual:
         Manual { value: 123 }
 

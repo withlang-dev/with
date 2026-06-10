@@ -87,8 +87,8 @@ fn test_hashset_membership:
 
 type Whitelist { allowed: HashSet[i32] }
 
-impl Contains[i32] for Whitelist =
-    fn contains(self: &Self, value: &i32) -> bool:
+impl Contains[i32] for Whitelist:    fn contains(self: &Self, value:
+    &i32) -> bool:
         *value in self.allowed
 
 fn test_user_defined_contains_membership:

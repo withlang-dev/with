@@ -21,8 +21,8 @@ extend RedisCache:
     fn prefixed_key(self: &RedisCache, key: str) -> str:
         f"{self.prefix}:{key}"
 
-impl CacheService for RedisCache =
-    async fn get_str(self: &RedisCache, key: str) -> Option[str]:
+impl CacheService for RedisCache:    async fn get_str(self: &RedisCache, key:
+    str) -> Option[str]:
         let _full_key = self.prefixed_key(key)
         // In production: query Redis for the key
         None

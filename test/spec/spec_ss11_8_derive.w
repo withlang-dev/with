@@ -14,8 +14,8 @@ type CopyPair { x: i32, y: i32 }
 
 type Leaf { value: i32 }
 
-impl Clone for Leaf =
-    fn clone(self: &Self) -> Leaf:
+impl Clone for Leaf:    fn clone(self:
+    &Self) -> Leaf:
         Leaf { value: self.value + 1 }
 
 @[derive(Clone)]

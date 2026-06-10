@@ -9,8 +9,8 @@ type CountUp { current: i32, limit: i32 }
 fn CountUp.new(limit: i32) -> CountUp:
     CountUp { current: 0, limit: limit }
 
-impl Iter[i32] for CountUp =
-    fn next(mut self: Self) -> Option[i32]:
+impl Iter[i32] for CountUp:    fn next(mut self:
+    Self) -> Option[i32]:
         if self.current >= self.limit:
             return .None
         let val = self.current

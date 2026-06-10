@@ -21,8 +21,8 @@ extend PgUserRepo:
     fn new(conn: str) -> PgUserRepo:
         PgUserRepo { connection_string: conn }
 
-impl UserRepository for PgUserRepo =
-    async fn find_by_id(self: &PgUserRepo, id: UserId) -> Option[User]:
+impl UserRepository for PgUserRepo:    async fn find_by_id(self: &PgUserRepo, id:
+    UserId) -> Option[User]:
         // In production: SELECT id, name, email, role, active FROM users WHERE id = $1
         None
 

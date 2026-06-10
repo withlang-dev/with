@@ -1,15 +1,15 @@
 //! expect-stdout: ok
 @[sealed]
-trait Shape =
-    fn area(self: &Self) -> i32
+trait Shape:    fn area(self:
+    &Self) -> i32
 
 type Circle { radius: i32 }
 type Rect { width: i32, height: i32 }
 
-impl Shape for Circle =
-    fn area(self: Circle) -> i32: self.radius * self.radius * 3
-impl Shape for Rect =
-    fn area(self: Rect) -> i32: self.width * self.height
+impl Shape for Circle:    fn area(self: Circle) -> i32:
+    self.radius * self.radius * 3
+impl Shape for Rect:    fn area(self: Rect) -> i32:
+    self.width * self.height
 
 fn describe(s: dyn Shape) -> i32:
     match s:

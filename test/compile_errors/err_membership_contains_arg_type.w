@@ -2,8 +2,8 @@
 
 type Whitelist { allowed: HashSet[i32] }
 
-impl Contains[i32] for Whitelist =
-    fn contains(self: &Self, value: &i32) -> bool:
+impl Contains[i32] for Whitelist:    fn contains(self: &Self, value:
+    &i32) -> bool:
         *value in self.allowed
 
 fn main:

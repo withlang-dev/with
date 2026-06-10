@@ -7,8 +7,8 @@ type Token { text: str }
 
 type TokenStream { index: i32 }
 
-impl Iter[Token] for TokenStream =
-    fn next(mut self: Self) -> Option[Token]:
+impl Iter[Token] for TokenStream:    fn next(mut self:
+    Self) -> Option[Token]:
         if self.index == 0:
             self.index = 1
             return .Some(Token { text: "let" })

@@ -2,11 +2,11 @@
 
 type NoEqType { x: i32 }
 
-trait Container =
+trait Container:
     type Item: Eq
     fn get(self: &Self) -> i32
 
-impl Container for NoEqType =
+impl Container for NoEqType:
     type Item = NoEqType
     fn get(self: NoEqType) -> i32:
         self.x

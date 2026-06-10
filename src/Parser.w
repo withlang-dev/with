@@ -2523,17 +2523,17 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
     let name = self.expect_ident()
     if name == 0:
         return
-    // Parse optional type parameters: trait Iter[T] = ...
+    // Parse optional type parameters: trait Iter[T]: ...
     let trait_tp_start = self.pool.extra_len()
     let trait_tp_count = self.parse_type_params()
     var trait_braced = false
     if self.peek() == TokenKind.TK_L_BRACE:
         trait_braced = true
         self.advance()
-    else if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
+    else if self.peek() == TokenKind.TK_COLON:
         self.advance()
     else:
-        self.emit_error("expected '=', ':' or '{'")
+        self.emit_error("expected ':' or '{'")
         return
     self.skip_newlines()
 
@@ -2774,8 +2774,11 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     if self.peek() == TokenKind.TK_L_BRACE:
         impl_braced = true
         self.advance()
-    else if self.peek() == TokenKind.TK_EQ or self.peek() == TokenKind.TK_COLON:
+    else if self.peek() == TokenKind.TK_COLON:
         self.advance()
+    else if self.peek() == TokenKind.TK_EQ:
+        self.emit_error("expected ':' or '{'")
+        return
     self.skip_newlines()
 
     var impl_assoc_names: Vec[i32] = Vec.new()

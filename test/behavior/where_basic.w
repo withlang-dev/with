@@ -1,12 +1,12 @@
 //! expect-stdout: ok
 
-trait Printable =
-    fn show(self: &Self) -> str
+trait Printable:    fn show(self:
+    &Self) -> str
 
 type Wrapper { value: i32 }
 
-impl Printable for Wrapper =
-    fn show(self: Wrapper) -> str:
+impl Printable for Wrapper:    fn show(self:
+    Wrapper) -> str:
         "wrapped"
 
 fn display[T](x: T) -> str where T: Printable:

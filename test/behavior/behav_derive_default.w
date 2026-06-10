@@ -8,7 +8,7 @@ type Widget { count: i32, origin: Point }
 
 type Manual { value: i32 }
 
-impl Default for Manual =
+impl Default for Manual:
     fn default() -> Manual:
         Manual { value: 99 }
 

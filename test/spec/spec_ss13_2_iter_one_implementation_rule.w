@@ -5,8 +5,8 @@ type CountUp { current: i32, limit: i32 }
 fn CountUp.new(limit: i32) -> CountUp:
     CountUp { current: 0, limit }
 
-impl Iter[i32] for CountUp =
-    fn next(mut self: Self) -> Option[i32]:
+impl Iter[i32] for CountUp:    fn next(mut self:
+    Self) -> Option[i32]:
         if self.current >= self.limit:
             return .None
         let value = self.current
@@ -15,8 +15,8 @@ impl Iter[i32] for CountUp =
 
 type WordIter { index: i32 }
 
-impl Iter[str] for WordIter =
-    fn next(mut self: Self) -> Option[str]:
+impl Iter[str] for WordIter:    fn next(mut self:
+    Self) -> Option[str]:
         if self.index == 0:
             self.index = 1
             return .Some("alpha")

@@ -229,7 +229,7 @@ fn render_decl(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         var out = prefix
         if vis == Visibility.Public:
             out = out ++ "pub "
-        out = out ++ "trait " ++ name ++ " =\n"
+        out = out ++ "trait " ++ name ++ ":\n"
 
         // Layout:
         // [assoc_count, (name, bound_count, bounds..., default_type)*, method_count, (name, flags, param_start, param_count, ret_type, default_body)*]

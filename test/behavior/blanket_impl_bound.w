@@ -6,7 +6,8 @@ trait Readable:
 trait Parseable:
     fn parse(self: &Self) -> str
 
-impl[T: Readable] Parseable for T:
+impl[T:
+    Readable] Parseable for T:
     fn parse(self: T) -> str:
         self.read()
 

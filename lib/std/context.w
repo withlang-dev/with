@@ -10,15 +10,15 @@ pub type CancellationToken: Copy {
     cancelled: bool,
 }
 
-pub trait Logger =
-    fn info(self: &Self, message: str) -> void
+pub trait Logger:    fn info(self: &Self, message:
+    str) -> void
     fn warn(self: &Self, message: str) -> void
     fn error(self: &Self, message: str) -> void
 
 pub type NoopLogger {}
 
-impl Logger for NoopLogger =
-    fn info(self: NoopLogger, message: str) -> void:
+impl Logger for NoopLogger:    fn info(self: NoopLogger, message:
+    str) -> void:
         let _ = self
         let _ = message
     fn warn(self: NoopLogger, message: str) -> void:

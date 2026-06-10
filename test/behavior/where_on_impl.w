@@ -1,20 +1,20 @@
 //! expect-stdout: ok
 
-trait Describable =
-    fn describe(self: &Self) -> str
+trait Describable:    fn describe(self:
+    &Self) -> str
 
-trait Showable =
-    fn show(self: &Self) -> str
+trait Showable:    fn show(self:
+    &Self) -> str
 
 type Pair { a: i32, b: i32 }
 
-impl Describable for Pair =
-    fn describe(self: Pair) -> str:
+impl Describable for Pair:    fn describe(self:
+    Pair) -> str:
         "pair"
 
 // where clause on impl (parsed, not yet enforced)
-impl Showable for Pair where Pair: Describable =
-    fn show(self: Pair) -> str:
+impl Showable for Pair where Pair: Describable:    fn show(self:
+    Pair) -> str:
         self.describe()
 
 fn main:

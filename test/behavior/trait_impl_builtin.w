@@ -7,15 +7,15 @@
 type MyInt { val: i32 }
 type MyStr { val: str }
 
-impl Eq for MyInt =
-    fn eq(self: MyInt, other: MyInt) -> bool:
+impl Eq for MyInt:    fn eq(self: MyInt, other:
+    MyInt) -> bool:
         self.val == other.val
 
-impl Debug for MyInt =
-    fn debug_str(self: MyInt) -> str:
+impl Debug for MyInt:    fn debug_str(self:
+    MyInt) -> str:
         "MyInt"
 
-impl Default for MyInt =
+impl Default for MyInt:
     fn default() -> MyInt:
         MyInt { val: 0 }
 

@@ -15,7 +15,8 @@ type Vec[T]  {
 }
 
 /// Clone for Vec[T]: produces a deep copy by cloning each element.
-impl[T: Clone] Clone for Vec[T]:
+impl[T:
+    Clone] Clone for Vec[T]:
     fn clone(self: &Self) -> Self:
         var out: Vec[T] = Vec.new()
         for item in *self:
@@ -43,12 +44,12 @@ pub type Handle[T] {
 
 impl[T] Copy for Handle[T]
 
-impl[T] Eq for Handle[T] =
-    fn eq(self: Handle[T], other: Handle[T]) -> bool:
+impl[T] Eq for Handle[T]:    fn eq(self: Handle[T], other:
+    Handle[T]) -> bool:
         self.index == other.index and self.generation == other.generation
 
-impl[T] Hash for Handle[T] =
-    fn hash_value(self: Handle[T]) -> i64:
+impl[T] Hash for Handle[T]:    fn hash_value(self:
+    Handle[T]) -> i64:
         ((self.index as i64) << 32) ^ (self.generation as i64)
 
 /// Generational dense-ish storage for long-lived relationships.
@@ -130,8 +131,8 @@ type FlatMapIter[I, C, J, T, U] {
     has_current: bool,
 }
 
-impl[T] Iter[T] for VecIter[T] =
-    fn next(mut self: Self) -> Option[T]:
+impl[T] Iter[T] for VecIter[T]:    fn next(mut self:
+    Self) -> Option[T]:
         self.next()
 
 /// Index specification for multi-dimensional indexing.

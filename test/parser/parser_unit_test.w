@@ -141,7 +141,7 @@ fn test_type_expr_slice_alt:
     assert(pool.kind(ret_type) == NodeKind.NK_TYPE_SLICE())
 
 fn test_trait_layout_contains_assoc_and_methods:
-    let src = "trait Maker =\n    type Item: Show = i32\n    fn make(x: i32) -> i32\n"
+    let src = "trait Maker:\n    type Item: Show = i32\n    fn make(x: i32) -> i32\n"
     let pool = parse_module(src)
     assert(pool.decl_count() == 1)
     let decl = pool.get_decl(0)

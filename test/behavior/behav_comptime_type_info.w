@@ -1,13 +1,13 @@
 //! expect-stdout: ok
 
-trait Named =
-    fn label(self: &Self) -> str
+trait Named:    fn label(self:
+    &Self) -> str
 
 type Point: Copy { x: i32, y: i32 }
 enum Val { Num(i32) | Empty }
 
-impl Named for Point =
-    fn label(self: Point) -> str:
+impl Named for Point:    fn label(self:
+    Point) -> str:
         let _ = self
         "Point"
 

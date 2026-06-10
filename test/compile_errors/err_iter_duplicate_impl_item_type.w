@@ -2,12 +2,12 @@
 
 type DualIter { index: i32 }
 
-impl Iter[i32] for DualIter =
-    fn next(mut self: Self) -> Option[i32]:
+impl Iter[i32] for DualIter:    fn next(mut self:
+    Self) -> Option[i32]:
         .None
 
-impl Iter[str] for DualIter =
-    fn next(mut self: Self) -> Option[str]:
+impl Iter[str] for DualIter:    fn next(mut self:
+    Self) -> Option[str]:
         .None
 
 fn main:

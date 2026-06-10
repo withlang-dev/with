@@ -88,27 +88,27 @@ pub fn drop[T](val: T) -> void:
 
 // ── ToString trait and impls ────────────────────────────────────
 
-pub trait ToString =
-    fn to_string(self: &Self) -> str
+pub trait ToString:    fn to_string(self:
+    &Self) -> str
 
-impl ToString for i32 =
-    fn to_string(self: &i32) -> str:
+impl ToString for i32:    fn to_string(self:
+    &i32) -> str:
         with_i64_to_str(*self as i64)
 
-impl ToString for i64 =
-    fn to_string(self: &i64) -> str:
+impl ToString for i64:    fn to_string(self:
+    &i64) -> str:
         with_i64_to_str(*self)
 
-impl ToString for u32 =
-    fn to_string(self: &u32) -> str:
+impl ToString for u32:    fn to_string(self:
+    &u32) -> str:
         with_fmt_u32(*self)
 
-impl ToString for u64 =
-    fn to_string(self: &u64) -> str:
+impl ToString for u64:    fn to_string(self:
+    &u64) -> str:
         with_fmt_u64(*self)
 
-impl ToString for bool =
-    fn to_string(self: &bool) -> str:
+impl ToString for bool:    fn to_string(self:
+    &bool) -> str:
         with_bool_to_str(*self)
 
 // Generic free function — call as int_to_string(x) for any numeric type.

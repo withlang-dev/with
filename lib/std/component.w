@@ -2,5 +2,5 @@
 
 /// Stable component identity. `@[derive(ComponentId)]` generates a
 /// `component_id() -> i64` method from the component type name.
-pub trait ComponentId =
+pub trait ComponentId:
     fn component_id() -> i64

@@ -25,8 +25,8 @@ extend EmailNotifier:
             from_addr: from,
         }
 
-impl NotificationService for EmailNotifier =
-    async fn send(self: &EmailNotifier, notif: Notification) -> bool:
+impl NotificationService for EmailNotifier:    async fn send(self: &EmailNotifier, notif:
+    Notification) -> bool:
         let priority_num = match notif.priority:
             .Urgent => 1
             .Normal => 3
