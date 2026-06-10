@@ -10959,8 +10959,8 @@ gen       global    goto      if        impl      in
 it        let       loop      match     module    move
 mut       no_suspend not      null      opaque    or
 pub       return    select    spawn     trait     true
-type      unsafe    use       var       where     while
-with      yield
+type      union     unsafe    use       var       where
+while     with      yield
 ```
 
 Notes:
