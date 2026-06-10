@@ -1,7 +1,55 @@
-# The With Programming Language — Specification v6.9
+# The With Programming Language — Specification v7.1
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
+**Changelog v7.1:** Global declarations specified (§9.1c): `global`
+(stable) / `global var` (rebindable), pre-`main` initialization, and
+the usage-based data-race rule — never-mutated and synchronized
+globals always safe; bare mutation safe iff the program is provably
+single-threaded, `unsafe` past the proof (E0921). §19.4 amended:
+proof-dependent operations inside `unsafe` warn (not error) when
+newly proven safe. **Integrated collections syntax** (Scala-inspired
+target polymorphism): one bracket comprehension family with
+expected-type-driven targets and `key: value` map form (§13.6);
+collection literals incl. map literals `[k: v]` and `[:]` (§4.3c);
+`vec![...]` examples replaced with collection literals; §30.5
+grammar updated. **`loop` specified** (§13.5d): expression-valued
+via `break expr`; §13.5a value-break text refined; §30.4 grammar.
+**Regular expressions promoted to language surface** (§15.8): regex
+literals `/pattern/flags`, `=~`/`!~` at precedence level 3,
+branch-scoped `$capture` bindings as a refutable-binding condition
+form; §18.5b.6 now defers to §15.8; `std.regex` added to §18.6.
+`@[effect]` declared-effect contracts for bodiless declarations
+(§16.3d). §14.19 `[runtime]` config honestly marked unimplemented.
+CLI table completed (§18.5); module map extended with
+regex/json/http/crypto + internal-modules note (§18.6); Attribute
+Index appendix (§29.14). Named arguments: `pub` parameter names are
+API surface (§9.1a). §18.7's `static` example corrected to `global`.
+**Changelog v7.0:** Parameter passing: the signature states the mode —
+`&T` borrows, plain `T` consumes; share-place call semantics removed
+(§3.8; §12.4 retains by-place capture for closures; §21.1 example
+fixed). Cancellation observation moved to the `Task` handle
+(`was_cancelled`); the `TaskCancelled`/`.is_cancelled()` error story
+removed — awaiting a cancelled task unwinds, never returns `Err`
+(§14.7). `Result` removed from `@[must_use]` match exhaustiveness
+(§9.7). `with ... as mut` always returns the binding (§7.2, §23.1).
+Iterator borrow-origin via `@[iter_of_self]` specified for all
+libraries (§13.2). `[]mut T` exclusivity rules and
+`split_at`/`split_at_mut` (§4.8a). Ephemeral diagnostic contract
+(§22.3). Fiber stack conforming baseline = fixed pooled stacks;
+growth and FFI stack switching are roadmap (§14.19). c_import
+contract metadata sources named, including the curated libc overlay
+(§16.3c). Implicit default return gated to bodies with no explicit
+value return (§4.10). Consuming-rebind shadowing exception (§29.8).
+String-literal elision is an optimization, not a guarantee (§15.3,
+§20). Hygiene: enum-only sum-type syntax swept (§10.1, §11.7, §30.3);
+keyword list synced to the lexer (§29.11, §30.9 now defers to it);
+`usize`/`isize` documented (§4.1, §4.2.1); duplicate §18.7 renumbered
+to §18.8; `let mut` removed from §30.4 grammar; §14.21 match arms
+fixed to `=>`; f-string examples fixed (§15.4.5, §15.4.7); generator
+return type wording fixed (§13.1, §13.4); select-await dead panic
+clause removed (§14.10); §22.1 Rule 6 distinguished from Rule 4;
+module resolution and `pub` enforcement stated (§18.1, §18.3).
 **Changelog v6.9:** CLI one-liners (`with -e`, `with -n`, `with -p`)
 are specified as normal compiled With entry sources with implicit-main
 semantics, stdin line bindings, `args`, semicolon splitting, and regex
@@ -238,8 +286,8 @@ With prioritizes joy. The common case should be effortless:
   wraps errors with human-readable messages (§10.6)
 - **Builder blocks** — `with Config.default() as mut c:` with
   flexible return values (§7.2)
-- **Cancellation just works** — no `From[TaskCancelled]` on every
-  error type. Cancellation unwinds cleanly. (§14.7)
+- **Cancellation just works** — no `Cancelled` variants or `From`
+  impls on your error types. Cancellation unwinds cleanly. (§14.7)
 - **Chained `if let`** — `if let Some(a) = x, let Some(b) = y:`
   kills the pyramid of doom (§9.7)
 - **Enum `_ref` accessors** — `.as_str_ref()`, `.as_num_mut()`
@@ -645,18 +693,29 @@ var alice = User { name: "Alice" }
 alice.update()              // mutates in place via mut self receiver
 ```
 
-When a call must use non-default ownership semantics, the caller
-writes them explicitly:
+**The parameter's declared type states the mode.** A `&T` parameter
+borrows: auto-ref erases the sigil at the call site, and the caller's
+binding remains valid afterward. A plain `T` parameter consumes: the
+argument is moved into the callee (copied, for `Copy` types), and the
+caller's binding is invalidated. No call-site annotation is ever
+required for either mode — a plain call `f(x)` is always legal and
+means whatever the signature says. `move x`, `copy x`, and `&x`
+remain available as explicit spellings of intent:
 
 ```with
-take(move alice)   // transfer ownership into the callee
-dup(copy xs)       // duplicate via Copy or Clone semantics
-peek(&alice)       // explicit shared borrow
+take(alice)        // signature take(a: User): consumes alice
+peek(alice)        // signature peek(a: &User): borrows alice
+take(move alice)   // explicit spelling of the same consume
+dup(copy xs)       // duplicate via Copy or Clone instead of consuming
 ```
 
-For non-`Copy` parameters, the default plain call `f(x)` is share-place:
-the callee operates on the caller's place unless the caller overrides
-that behavior with `move x`, `copy x`, or `&x`.
+The mode is declared exactly once, in the signature — the boundary
+where §4.6 already requires explicitness — and never at call sites.
+A function that only reads a by-value parameter, or returns a view
+derived from one, should take `&T` instead; when the compiler can see
+this mistake (for example, a view of a consumed parameter escaping
+through the return value), it emits a directed suggestion naming the
+parameter and the `&T` fix.
 
 **The vibe:** "The function just wants to look at the data. I
 shouldn't have to manually type `&`."
@@ -697,6 +756,7 @@ let logger: Box[dyn Logger] = Box.new(ConsoleLog {})  // auto-coerced
 
 Signed integers: `i8`, `i16`, `i32`, `i64`
 Unsigned integers: `u8`, `u16`, `u32`, `u64`
+Pointer-sized integers: `usize`, `isize` (64-bit on all supported targets)
 Floating point: `f32`, `f64`
 Boolean: `bool`
 Unit: `Unit` (zero-sized)
@@ -734,7 +794,7 @@ readability: `1_000_000`, `0xFF_FF`, `0b1111_0000`.
 Integer and float literals may carry a type suffix directly on the
 literal token:
 
-- Integer suffixes: `u8`, `u16`, `u32`, `u64`, `i8`, `i16`, `i32`, `i64`
+- Integer suffixes: `u8`, `u16`, `u32`, `u64`, `i8`, `i16`, `i32`, `i64`, `usize`, `isize`
 - Float suffixes: `f32`, `f64`
 
 Examples:
@@ -1509,7 +1569,49 @@ the next larger standard-width register (e.g., `u3` occupies an `i32`
 register with the upper bits zeroed). Arithmetic works normally; the
 result is masked to the type's range.
 
-### 4.4 Enums (Algebraic Data Types)
+### 4.3c Collection Literals
+
+Bracket literals are With's one collection-literal family. The
+element form builds sequences and sets; the `key: value` form builds
+maps. The concrete collection is selected by **expected type**, with
+sensible defaults — the same rule as numeric literals (§4.2.1) and
+enum variant shorthand (§4.4):
+
+```
+let a = [1, 2, 3]                      // [i32; 3] — fixed array (default)
+let v: Vec[i32] = [1, 2, 3]            // Vec via expected type
+let s: HashSet[str] = ["a", "b"]       // HashSet via expected type
+let o: BTreeSet[i32] = [3, 1, 2]       // BTreeSet via expected type
+
+let colors = ["red": 0xFF0000, "green": 0x00FF00]
+// HashMap[str, i32] — the map-literal default
+
+let ranks: BTreeMap[str, i32] = ["a": 1, "b": 2]
+
+let empty: HashMap[str, i32] = [:]     // the empty map literal
+let none: Vec[i32] = []                // empty sequence (type from context)
+```
+
+**Rules:**
+
+1. The element form `[a, b, c]` defaults to a fixed array `[T; N]`
+   (§4.3a). When the expected type is `Vec[T]`, `HashSet[T]`, or
+   `BTreeSet[T]`, the literal builds that collection instead.
+2. The map form `[k: v, ...]` defaults to `HashMap[K, V]`. When the
+   expected type is `BTreeMap[K, V]`, it builds that instead. `[:]`
+   is the empty map and requires an expected map type.
+3. Set and map construction from literals follows insertion order;
+   for duplicate keys/elements, later entries win (last-write,
+   matching repeated `insert`).
+4. Element and map forms cannot be mixed in one literal.
+5. The map form requires the target's key type to satisfy the
+   container's bound (`Hash + Eq` for `HashMap`, `Ord` for
+   `BTreeMap`), checked as for any construction.
+
+There are no brace-delimited collection literals; `{ }` remains
+blocks, struct literals, and record update. The colon key separator
+is unambiguous inside brackets (array types and repeats use `;`,
+§4.3a).
 
 Enums are declared with the `enum` keyword using either an indented
 block or inline braces:
@@ -1952,6 +2054,28 @@ Slices are ephemeral (§5) — they cannot be stored in structs or
 returned from functions (they borrow the underlying storage).
 Bounds-checked in debug mode.
 
+**Exclusivity rules for `[]mut T`:** a mutable slice is an exclusive
+view of its range. While a `[]mut T` is live (NLL: until its last
+use), the borrowed range may not be read or written through any other
+path — creating one invalidates outstanding `&T` and `[]T` views of
+the same place, and creating a second overlapping `[]mut T` is
+rejected (§21.1 Rule 1). Disjoint mutable views are obtained
+explicitly:
+
+```
+let (left, right) = data.split_at_mut(mid)
+// left: []mut T over [0, mid)   right: []mut T over [mid, len)
+```
+
+The standard library must provide `split_at(i)` and `split_at_mut(i)`
+on slices, arrays, and `Vec[T]`. As with array indices (§3.6), range
+disjointness is not inferred at compile time — `split_at_mut` is the
+safe primitive for simultaneous mutable access to disjoint ranges. In
+parameter position, `[]T` and `[]mut T` follow §3.8's borrow mode:
+the caller's collection coerces to the slice view, and the caller's
+binding remains valid after the call (for `[]mut T`, the exclusive
+borrow ends when the callee returns).
+
 ### 4.9 Implicit `Ok` Wrapping
 
 When a function's return type is `Result[T, E]`, the compiler
@@ -2072,6 +2196,13 @@ priority (returns `Ok(T.default())` if `T` implements `Default`, or
 
 **When implicit default return does NOT apply:**
 
+- If any path in the body explicitly returns a value (a `return expr`
+  or a non-Unit tail expression on another branch), implicit default
+  return does not apply — a function that demonstrably produces
+  values elsewhere but falls off the end is reported as a missing
+  return, not defaulted. The implicit default exists for functions
+  that never spell a return value (entry points, handlers); it never
+  papers over a forgotten one.
 - If the last expression has a non-Unit type, no default insertion
   occurs (the expression is the return value as usual).
 - If the return type does not implement `Default`, the compiler
@@ -2353,32 +2484,33 @@ let sprite = with Sprite.new() as mut s:
     s.layer = 5
 ```
 
-**Implicit return rule:** In `with expr as mut x:`, if the block's
-last statement evaluates to `Unit` (assignment, void method call),
-the block returns `x` (the builder). If the last expression is
-non-Unit, the block returns that expression's value.
+**Return rule:** `with expr as mut x:` **always returns `x`** (the
+builder), regardless of the type of the body's last expression. One
+construct, one meaning — the block's result never silently changes
+because a setter gained or lost a return value.
 
 ```
-// Builder: last statement is assignment → returns config
+// Builder: always returns c
 let config = with Config.default() as mut c:
     c.timeout = 30
-    c.retries = 3            // Unit → block returns c
+    c.retries = 3
 
-// Extract: last expression is non-Unit → returns length
-let len = with Vec.new() as mut v:
+// Methods that return values are fine — their results are
+// discarded, and the block still returns c:
+let config = with Config.default() as mut c:
+    c.headers.insert("Auth", tok)   // returns Option[V], discarded
+    c.timeout = 30
+
+// To extract a computed value, bind the builder, then compute:
+let v = with Vec.new() as mut v:
     v.push(1)
     v.push(2)
-    v.len()                  // usize → block returns 2
-
-// Builder with method that returns a value? Just add a trailing
-// statement or use let _ = :
-let config = with Config.default() as mut c:
-    c.headers.insert("Auth", tok)   // returns Option[V]...
-    c.timeout = 30                   // ...but this is Unit → returns c
+let len = v.len()
 ```
 
-This gives you both builder and extraction patterns from the same
-construct. The type system tells you what you're getting.
+For a scoped computation whose result is something other than the
+binding, use Form 3 (`with expr as name:`, §7.3), whose result is
+the body value.
 
 The value is bound as a mutable local inside the block.
 
@@ -2951,6 +3083,9 @@ with context(default_device()):
 **Rules:**
 
 - Positional arguments must come before named arguments.
+- Parameter names of `pub` functions are part of the API surface:
+  renaming a `pub` parameter is a breaking change for named call
+  sites.
 - A parameter may not be specified more than once.
 - Named arguments must match parameter names exactly.
 - Named arguments may appear in any order relative to one another.
@@ -3016,6 +3151,84 @@ cannot be mutated. They may appear at module scope or inside function bodies.
 **Difference from `let`:** `let` bindings are runtime values (even if initialized
 from a constant). `const` values are guaranteed to be compile-time constants and
 are always inlined.
+
+### 9.1c Global Declarations
+
+Module-level runtime state is declared with `global`:
+
+```
+global cache = Cache.new()        // stable binding: cannot be rebound
+global var current: Option[User] = None   // rebindable binding
+```
+
+`global` is the module-level analog of `let`; `global var` is the
+analog of `var`. A stable `global` cannot be reassigned, but its
+value may still mutate through `mut self` methods, field assignment,
+or `IndexPlace` writes if the type supports them. A `global var` may
+additionally be reassigned to a new value of the same type.
+
+**Initialization.** Global initializers are ordinary expressions.
+They run before `main`, on the initial thread, in declaration order
+within a module. Because concurrency in With can only be created by
+program code (§14, Invariant 3), initialization is race-free by
+construction.
+
+**Safety rule (data races).** Globals are places; §21.1's access
+rules apply. Cross-thread safety is usage-based — the compiler
+proves what it can, and asks for `unsafe` only past the proof:
+
+1. **Never-mutated globals are always safe.** If the program never
+   mutates a global after initialization (no reassignment, no
+   `mut self` call, no field or index write, no mutable borrow),
+   every read is race-free and requires nothing.
+2. **Synchronized globals are always safe.** Globals of `Sync`
+   synchronization types — `Atomic[T]`, `Mutex[T]`, `RwLock[T]`, and
+   other types whose mutation flows through their own thread-safe
+   APIs — are safe in all programs. This is the idiom for shared
+   mutable state (§12.3 of the mutability model: scoped
+   synchronization via `with`).
+3. **Bare mutation is safe iff the program is provably
+   single-threaded.** Mutating any other global (rebinding or
+   interior mutation), and reading a global that is mutated anywhere,
+   is safe when the compiler proves the program never gains
+   concurrency. The proof obligations are enumerable, because With
+   has exactly one concurrency source (§14, Invariant 3): the program
+   uses no `async` construct, never calls `thread.spawn_os`, exports
+   no `@[c_export]` symbols, and coerces no With function to an
+   `extern "C"` callback. When the proof fails, each such access
+   requires an `unsafe` context — the programmer is asserting the
+   absence of a data race the compiler cannot prove, exactly as with
+   raw pointers (§16.11).
+
+The diagnostic for a failed proof must name the construct that
+introduced concurrency and offer the remedies (wrap in `Atomic` /
+`Mutex`, or `unsafe`):
+
+```
+error[E0921]: mutation of global `counter` may race
+  --> src/serve.w:40:5
+   |
+40 |     counter += 1
+   |     ^^^^^^^^^^^^ global mutated here
+   |
+  ::: src/serve.w:12:9
+   |
+12 |     let task = handle(conn)     // program creates fibers here
+   |
+   = help: use Atomic[i32], wrap in Mutex, or assert with `unsafe`
+```
+
+The proof is a whole-program analysis and may be conservative; a
+conservative implementation may treat the proof as failed whenever it
+cannot establish all obligations. Improving its precision is compiler
+quality work (§22.3), never a semantic change: strengthening the
+proof only makes more programs safe.
+
+Migrated C globals (`with migrate`) translate to `global` /
+`global var` and land under these same rules — single-threaded C
+programs translate without ceremony; concurrent ones surface their
+shared state loudly, which is the raw-stays-explicit contract
+(§16.1).
 
 ### 9.2 Tail Call Optimization
 
@@ -3537,11 +3750,14 @@ Exhaustiveness depends on position:
 - **Expression-position match** (value is used/returned): must be exhaustive.
 - **Statement-position match** (value ignored): may be partial; unmatched
   variants are a no-op.
-- **`@[must_use]` types** (e.g. `Result`, `Task`): match must always be
+- **`@[must_use]` types** (e.g. `Task`): match must always be
   exhaustive or include an explicit `_ => ...` catch-all arm, regardless
-  of position. Partial match on `@[must_use]` types is a compile error.
-  This prevents silently ignoring `Err` arms, which would contradict
-  `@[must_use]` semantics.
+  of position. Partial match on a `@[must_use]` type is a compile error.
+  `Result` is **not** `@[must_use]`: discarding or partially matching a
+  `Result` carries no obligation (§10.1) — a statement-position match
+  on `Result` follows the ordinary partial-match rule. (An opt-in lint
+  may flag partial statement matches for projects that want
+  exhaustiveness everywhere.)
 
 Examples:
 
@@ -3557,11 +3773,10 @@ match event:
     KeyDown(k) => handle_key(k)
 // other variants are ignored
 
-// statement-position on @[must_use] type: catch-all required
+// statement-position on Result: partial match is allowed (§10.1)
 match result:
     Ok(v) => process(v)
-    _ => {}                  // explicit: "I'm intentionally ignoring errors"
-// without the _ arm, this would be a compile error
+// unmatched Err arms are a no-op — no catch-all required
 ```
 
 **Reference pattern ergonomics:** When a pattern is matched against
@@ -3570,7 +3785,7 @@ references to the inner fields. No explicit `&` is needed in the
 pattern:
 
 ```
-let items: Vec[(str, i32)] = vec![("alice", 1), ("bob", 2)]
+let items: Vec[(str, i32)] = [("alice", 1), ("bob", 2)]
 
 // .iter() yields &(str, i32)
 // Destructuring binds key: &str, val: &i32 automatically
@@ -3665,7 +3880,7 @@ see §4.2.7.
 |-------|-----------|---------------|
 | 1 | `or` | Left |
 | 2 | `and` | Left |
-| 3 | `==`, `!=`, `in`, `not in` | Non-associative |
+| 3 | `==`, `!=`, `in`, `not in`, `=~`, `!~` | Non-associative |
 | 4 | `<`, `>`, `<=`, `>=` | Chained |
 | 5 | `\|>` (pipeline) | Left |
 | 6 | `\|` | Left |
@@ -3883,8 +4098,8 @@ already a keyword. No new keywords needed.
 ### 10.1 Result and Option
 
 ```
-type Result[T, E] = Ok(T) | Err(E)
-type Option[T] = Some(T) | None
+enum Result[T, E] { Ok(T) | Err(E) }
+enum Option[T] { Some(T) | None }
 ```
 
 No exceptions. Errors are values.
@@ -4146,17 +4361,17 @@ a collection. If any element is `None` or `Err`, the whole result is:
 
 ```
 // Vec[Option[T]] → Option[Vec[T]]
-let inputs: Vec[Option[i32]] = vec![Some(1), Some(2), Some(3)]
-let result = inputs.sequence()       // Some(vec![1, 2, 3])
+let inputs: Vec[Option[i32]] = [Some(1), Some(2), Some(3)]
+let result = inputs.sequence()       // Some([1, 2, 3])
 
-let bad: Vec[Option[i32]] = vec![Some(1), None, Some(3)]
+let bad: Vec[Option[i32]] = [Some(1), None, Some(3)]
 let result = bad.sequence()          // None
 
 // Vec[Result[T, E]] → Result[Vec[T], E]
-let results: Vec[Result[i32, str]] = vec![Ok(1), Ok(2), Ok(3)]
-let all = results.sequence()         // Ok(vec![1, 2, 3])
+let results: Vec[Result[i32, str]] = [Ok(1), Ok(2), Ok(3)]
+let all = results.sequence()         // Ok([1, 2, 3])
 
-let mixed: Vec[Result[i32, str]] = vec![Ok(1), Err("bad"), Ok(3)]
+let mixed: Vec[Result[i32, str]] = [Ok(1), Err("bad"), Ok(3)]
 let all = mixed.sequence()           // Err("bad")
 ```
 
@@ -4166,13 +4381,13 @@ It is `map` + `sequence` fused into one pass:
 ```
 // Apply a fallible function to each element, collect successes
 // or fail on first error
-let names = vec!["1", "2", "three"]
+let names = ["1", "2", "three"]
 let parsed = names.traverse(s => s.parse_int())
 // Err(ParseError) — "three" fails
 
-let names = vec!["1", "2", "3"]
+let names = ["1", "2", "3"]
 let parsed = names.traverse(s => s.parse_int())
-// Ok(vec![1, 2, 3])
+// Ok([1, 2, 3])
 ```
 
 `traverse` is the workhorse of "apply a fallible operation to every
@@ -4525,8 +4740,9 @@ IndexSpec.NewAxis
 
 ```
 // A parser result that supports ? propagation
-type ParseResult[T] = ParseOk(T, remaining: str)
-                    | ParseErr(msg: str, pos: usize)
+enum ParseResult[T]:
+    ParseOk(T, remaining: str)
+    ParseErr(msg: str, pos: usize)
 
 impl Try[T, ParseError] for ParseResult[T]:
     fn branch(self: Self) -> ControlFlow[ParseError, T]:
@@ -4829,7 +5045,7 @@ Specifically, the following are all **escaping** in v1.0:
 
 ```
 let f = x => x + 1           // bound to a named variable: escaping
-let closures = vec![x => x]  // stored in a container: escaping
+let closures = [x => x]  // stored in a container: escaping
 return x => x + 1            // returned from function: escaping
 some_struct.callback = x => x // stored in a field: escaping
 ```
@@ -4850,11 +5066,13 @@ can be relaxed in future versions.
 
 ### 12.4 Capture Semantics and Effects
 
-Closure captures follow the same calling-convention model as ordinary
-function parameters:
+Closure captures are **by place**. Unlike function parameters
+(§3.8), whose mode is declared in the signature, a closure body sits
+lexically next to the variables it captures — by-place capture stays
+visible to the reader, so no signature is needed:
 
 - For `Copy` values, default capture copies the value.
-- For non-`Copy` values, default capture is share-place: the closure
+- For non-`Copy` values, default capture is by place: the closure
   observes or mutates the original place according to its body.
 - `move ||` captures transfer ownership into the closure.
 
@@ -4888,7 +5106,7 @@ used in pipelines within scope but not stored, returned, or captured by
 escaping closures.
 
 **What this means in practice:** You cannot return an *opaque* lazy
-iterator that borrows from its inputs (e.g., `-> impl Iter[StrView]`
+iterator that borrows from its inputs (e.g., `-> dyn Iter[StrView]`
 or `-> dyn Iter[StrView]`). However, you CAN return a *concrete
 ephemeral struct* that implements `Iter`:
 
@@ -4968,11 +5186,18 @@ in v1.0. A type that genuinely needs to yield different element
 types should provide named methods returning different iterator
 types (e.g., `.bytes() -> ByteIter`, `.lines() -> LineIter`).
 
-**Iterators just work.** The compiler has built-in knowledge of
-stdlib collection iterators (Vec, HashMap, Slice, etc.). When
-`next()` returns a reference, the compiler knows the reference
-borrows the *underlying collection*, not the iterator struct itself.
-This means normal iteration patterns work naturally:
+**Iterators just work — for every library, not just the stdlib.**
+The mechanism is the `@[iter_of_self]` attribute on an
+iterator-returning method: it declares that the returned iterator
+borrows the *receiver* (the underlying collection), not the iterator
+struct itself. The registered borrow on the receiver is shared, lives
+as long as the iterator, and is the origin of any references the
+iterator's `next()` yields. The stdlib applies it to `Vec.iter()`,
+`HashMap.iter()`, and the other collection iterators; any library may
+apply it to its own iterator constructors (tensor views, ECS queries,
+dataset readers). Future versions may infer this property from the
+constructor body; the semantics are normative either way. This means
+normal iteration patterns work naturally:
 
 ```
 let iter = names.iter()
@@ -4982,11 +5207,20 @@ process(a, b)         // both references live simultaneously
 ```
 
 `for` loops, `.zip()`, `.peekable()`, `.windows()` — all work as
-you'd expect. The compiler is smart. If you hit an edge case with a
-custom iterator, the worst that happens is a conservative borrow
-error with a clear message.
+you'd expect. A custom iterator constructor without `@[iter_of_self]`
+falls back to conservative borrowing (the iterator value itself is
+treated as holding the borrow), which is safe but may reject patterns
+the attribute would allow.
 
 ### 13.3 Collection Operations (Standard Library)
+
+The collection surface is one integrated design at three altitudes:
+literals (§4.3c) when the elements are known, comprehensions (§13.6)
+when iteration has a shape, and these pipeline operations for
+everything else. The operation set is deliberately lodash-grade —
+grouping, chunking, deduplication, and partitioning are standard
+vocabulary, not exotica — and everything funnels through the same
+`collect[C]` targets the literals and comprehensions use.
 
 **Transformations** (lazy, produce iterators):
 
@@ -5120,14 +5354,15 @@ iterators implementing `Iter[T]`.
 
 **Return type convention:** In `gen fn f -> T`, the `-> T`
 specifies the **yielded element type**, not the function's actual
-return type. The function actually returns an opaque iterator
-(`impl Iter[T]`). This is analogous to `async fn f -> T`
-meaning "returns `Task[T]`" — the keyword modifies the return
-type's meaning:
+return type. The function actually returns a **compiler-generated
+iterator type** implementing `Iter[T]` — the generator's state
+struct, whose name is not denotable in source. This is analogous to
+`async fn f -> T` meaning "returns `Task[T]`" — the keyword modifies
+the return type's meaning:
 
 ```
 gen fn fibonacci -> Int: ...
-// Actual type of fibonacci(): impl Iter[Int]
+// Actual type of fibonacci(): a generated iterator implementing Iter[Int]
 // Each yield produces an Int
 
 async fn fetch(url: str) -> String: ...
@@ -5324,8 +5559,12 @@ continue 'outer    // continues the loop labeled 'outer
 ```
 
 Labeled `break` and `continue` are statements and have no value.
-`break 'label value` is reserved for a future value-carrying
-labeled-block design and is invalid in this version.
+`break value` and `break 'label value` are valid when the targeted
+construct is a `loop` (§13.5d), where they supply the loop's result
+value. For `while`, `for`, `do`-`while`, and labeled blocks,
+value-carrying break remains reserved for a future design and is
+invalid in this version (those constructs can complete without
+`break`, so they have no value to guarantee).
 
 `break 'label` transfers control to the statement immediately after
 the construct labeled `'label`. The target label must be declared on
@@ -5711,19 +5950,70 @@ while { list = list + 1; (unsafe *list) != NOTACHAR }
 No `goto` required. `continue` correctly jumps to the `while`
 condition, which increments `list` and checks the terminator.
 
+### 13.5d The `loop` Construct
+
+`loop` is the infinite loop. It supports the three standard body
+forms (§29.13) and may be labeled (§13.5a):
+
+```
+loop:
+    tick()
+    if done(): break
+
+'outer loop { poll(); if quit(): break 'outer }
+```
+
+**`loop` is an expression.** `break expr` supplies its value; plain
+`break` supplies `Unit`. The loop's type is the unified type of its
+`break` values. A `loop` with no reachable `break` has type `Never`
+and may appear anywhere a diverging expression is valid:
+
+```
+let session = loop:
+    let attempt = try_connect(host)
+    if attempt.is_ok():
+        break attempt.unwrap()      // loop evaluates to Connection
+    sleep(backoff()).await
+
+fn serve -> Never:
+    loop:
+        accept_and_handle()         // no break: type is Never
+```
+
+`break 'label expr` targets a labeled `loop` the same way. All
+`break` values within one loop must unify to a single type (plain
+`break` contributes `Unit`); mixing valued and plain breaks where the
+type is not `Unit` is a compile error. `continue` behaves as in other
+loops. `while`, `for`, and `do`-`while` loops are statements and do
+not produce values (§13.5a, §13.5c).
+
 ### 13.6 Collection Comprehensions
 
-Comprehensions build collections from iteration with filtering:
+Comprehensions build collections from iteration with filtering.
+There is **one comprehension family, polymorphic over its target
+collection** (the Scala lesson: don't invent a syntax per container).
+The element form builds sequences and sets; the `key: value` form
+builds maps. The target is selected by expected type — the same
+inference rule as enum variant shorthand (§4.4) and numeric literals
+(§4.2.1) — with `Vec` and `HashMap` as the defaults:
 
 ```
 let squares = [x * x for x in 0..10]
-// [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+// Vec[i32]: [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
 
 let evens = [x for x in 0..100 if x % 2 == 0]
-// [0, 2, 4, ..., 98]
+// Vec[i32]: [0, 2, 4, ..., 98]
 
 let coords = [(x, y) for x in 0..3 for y in 0..3 if x != y]
-// [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)]
+// Vec[(i32, i32)]: [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)]
+
+// Expected type selects the target collection:
+let words: HashSet[str] = [w for w in tokens]
+let ordered: BTreeSet[i32] = [x for x in xs if x > 0]
+
+// Map form: key-colon-value builds a map (HashMap by default)
+let index = [w: i for (i, w) in vocab.enumerate()]
+let sorted_index: BTreeMap[str, i32] = [w: i for (i, w) in vocab.enumerate()]
 ```
 
 **Desugaring:**
@@ -5731,16 +6021,28 @@ let coords = [(x, y) for x in 0..3 for y in 0..3 if x != y]
 ```
 [expr for x in iter if cond]
 // →
-iter |> filter(x => cond) |> map(x => expr) |> collect[Vec]()
+iter |> filter(x => cond) |> map(x => expr) |> collect[C]()
+// where C is the expected collection type, defaulting to Vec
+
+[k_expr: v_expr for x in iter if cond]
+// →
+iter |> filter(x => cond) |> map(x => (k_expr, v_expr)) |> collect[M]()
+// where M is the expected map type, defaulting to HashMap
 ```
 
-Yes, this allocates a `Vec`. It's obvious from the syntax — you're
-building a list. This is the same philosophy as string interpolation:
+Yes, this allocates. It's obvious from the syntax — you're building
+a collection. This is the same philosophy as string interpolation:
 the allocation is inherent to what you're asking for, and the syntax
 makes it clear.
 
-Comprehensions are pure sugar. For lazy evaluation, use pipeline
+Comprehensions are pure sugar over the pipeline operations of §13.3
+and `collect[C]` — the same machinery, three altitudes: literals
+(§4.3c) for known elements, comprehensions for shaped iteration,
+pipelines for everything else. For lazy evaluation, use pipeline
 syntax with iterators directly.
+
+For duplicate keys in a map comprehension, later elements win
+(last-write semantics, matching repeated `insert`).
 
 **Disambiguation with `in` operator:** In comprehensions, `for x in`
 is always the iteration form (`Iter` trait). The `in` membership
@@ -6127,6 +6429,7 @@ type Task[T]       // opaque handle to a running fiber
 | `.await` | postfix keyword | Suspend fiber until complete |
 | `cancel` | `(Task[T]) -> Unit` | Cooperative cancellation |
 | `is_done` | `(&Task[T]) -> bool` | Check without blocking |
+| `was_cancelled` | `(&Task[T]) -> bool` | True if the task was cancelled before completing normally; never suspends |
 
 `Task[T]` has one type spelling. Storability and sendability are
 properties of the task value and binding, inferred from what the task
@@ -6230,35 +6533,41 @@ tasks. When `cancel()` is called or a non-ephemeral `Task` is dropped:
    any tasks it spawned via `async scope` are also cancelled.
 6. **Awaiting a cancelled task:** Awaiting a cancelled task triggers
    **cancellation unwinding** — similar to a panic, but structured
-   and catchable at `async scope` boundaries.
+   and absorbed at `async scope` boundaries. Awaiting a cancelled
+   task never produces an `Err` value of the task's error type:
+   cancellation is a control transfer, not an error value.
+   Destructors and `defer` blocks run during unwinding as usual.
 
    ```
    async scope s =>
-       let t1 = s.spawn(fetch_user(id))
-       let t2 = s.spawn(fetch_posts(id))
+       let t1 = s.track(fetch_user(id))
+       let t2 = s.track(fetch_posts(id))
        let user = t1.await?           // if this fails...
        // t2 is cancelled, unwinds, destructors run
-       let posts = t2.await?          // returns CancelledError
+       let posts = t2.await?          // cancellation unwinds through
+                                      // this await to the scope
    ```
 
-   `async scope` automatically catches cancellation unwinding from
-   its child tasks. No error types need to change. No `From` impls
-   needed. `IoError`, `DbError`, `ApiError` — they all work
-   unchanged.
+   `async scope` absorbs cancellation unwinding from its child
+   tasks. No error types change. No `From` impls are needed.
+   `IoError`, `DbError`, `ApiError` — they all work unchanged. There
+   is no `TaskCancelled` error type and no `.is_cancelled()` method
+   on errors; user error types never represent cancellation.
 
-   If you need to distinguish cancellation from real errors, match
-   on the scope's result:
+   To distinguish cancellation from completion or failure, observe
+   the **task handle**, not the error channel:
 
    ```
-   match task.await:
-       Ok(value) => use(value)
-       Err(e) if e.is_cancelled() => log("task was cancelled")
-       Err(e) => return Err(e)
+   cancel(task)
+   if task.was_cancelled():
+       log("task was cancelled before producing a result")
+   else:
+       let value = task.await
+       use(value)
    ```
 
-   `TaskCancelled` is a standard library error type that all error
-   types can be checked against via `.is_cancelled()`. But you
-   never need to add a `Cancelled` variant to your own types.
+   `was_cancelled(&Task[T]) -> bool` reports whether the task was
+   cancelled before completing normally. It never suspends.
 
 **Cancellation of ephemeral tasks:** If a `Task` is ephemeral
 (captures references), cancelling it or unwinding the scope that owns
@@ -6287,7 +6596,7 @@ that ephemeral task cleanup happens inside fibers (which can yield),
 not inside raw OS thread code.
 
 ```
-var data = vec![1, 2, 3]
+var data = [1, 2, 3]
 let task = process(data)
 cancel(task)                // runtime ensures fiber stops before
                             // proceeding (may yield)
@@ -6519,9 +6828,9 @@ loop:
 ```
 
 **Exhaustiveness:** `select await` does not require a default branch.
-At least one branch must be present. If all expressions complete
-with values that don't match their patterns, the select panics
-(same as a non-exhaustive match).
+At least one branch must be present. Branch patterns are irrefutable
+bindings; refutable handling belongs in the branch body via
+`let ... else` (above).
 
 ### 14.11 Concurrent Await
 
@@ -6557,8 +6866,8 @@ async scope s =>
     (user?, posts?)
 ```
 
-Tuple `.await` supports tuple sizes 2..12 (same as tuple arity limits
-in §4.6). For dynamic or larger sets, use collection combinators.
+Tuple `.await` supports tuple sizes 2..12. For dynamic or larger
+sets, use collection combinators.
 
 Desugaring (2-tuple):
 
@@ -6604,6 +6913,12 @@ Collection combinators follow deterministic semantics:
 - `await_first(Task[T]) -> T` returns the first completed result, then cancels and joins losers before returning.
 - `await_any(Task[Result[T, E]]) -> Result[T, Vec[E]]` returns first `Ok(T)` (then cancels + joins losers); if all fail, returns `Err(Vec[E])` in input order.
 - `await_settled(Task[Result[T, E]]) -> Vec[Result[T, E]]` never cancels, waits for all, and returns in input order.
+
+**Latency note:** "cancels and joins" means the combinator does not
+return until every losing task has actually stopped. Cancellation is
+cooperative (§14.7): a loser inside a long synchronous computation
+delays the combinator's return until that loser reaches its next
+suspension point.
 
 Empty-input behavior:
 
@@ -6673,9 +6988,10 @@ standard async functions compose freely.
 
 **Implementation note:** The language guarantees **semantic stack
 preservation** — safe references remain valid across `await` points.
-Implementations may relocate or segment physical stacks, but the
-compiler ensures safe references are updated or indirected
-transparently. Raw pointers (`*const T`, `*mut T`) obtained via
+The conforming baseline uses fixed, non-relocating pooled stacks
+(§14.19), where preservation is trivial. An implementation may
+relocate or segment physical stacks only if the compiler ensures safe
+references are updated or indirected transparently. Raw pointers (`*const T`, `*mut T`) obtained via
 `unsafe` are **not** updated — they are bare addresses. This is why
 §19.3 forbids raw pointers to stack locals across `await`. Safe code
 is never affected.
@@ -6879,30 +7195,34 @@ Each fiber has a dedicated stack. Stack memory is the primary resource
 cost of the fiber model and must be understood to use `async`
 effectively.
 
-**Default stack size:** 64 KB per fiber. Sufficient for typical
-I/O-bound code. Configurable per-application in `with.toml`:
+**Conforming baseline: fixed-size pooled stacks.** Each fiber gets a
+fixed-size stack (default 64 KB) with a guard page; stacks are
+recycled through a pool, so fiber creation is a pool grab, not an
+allocation. Stack overflow faults on the guard page — it never
+silently corrupts memory. This is the reference implementation's
+model and the behavior programs may rely on. Stack sizing is
+implementation-defined configuration; the reference implementation
+currently uses a fixed 64 KB and does not yet read a configuration
+key. (A `[runtime]` `with.toml` section — `fiber_stack_size`,
+`fiber_pool_size` — is the planned surface, tracked as a delta
+issue; it is not yet parsed.)
 
-```toml
-[runtime]
-fiber_stack_size = "64KB"     # default
-fiber_initial_stack = "8KB"   # initial allocation (growable)
-fiber_pool_size = 1024        # pre-allocated stack pool
-```
+**Growable stacks (roadmap, implementation-defined):** an
+implementation may start fibers on a smaller initial allocation and
+grow on demand, provided growth is detected safely (e.g. stack
+probes) and §14.13's semantic stack preservation holds. Growth is an
+optimization, never an observable semantic — programs must be
+correct under the fixed-size baseline.
 
-**Growable stacks:** The reference implementation uses growable
-stacks. A fiber starts with a small initial allocation (default
-8 KB) and grows on demand. Stack overflow does not silently corrupt
-memory — growth is detected at each function call's stack probe and
-handled by allocating a new segment (implementation-defined). This
-allows most fibers to use far less than 64 KB in practice while
-supporting deep call stacks when needed.
+**FFI stack headroom:** C code called via `c_import` has no knowledge
+of With's fiber stacks and may exceed remaining stack space. Under
+the fixed-size baseline, the 64 KB default provides the headroom for
+typical C calls; fibers driving deep C call trees should be sized via
+`fiber_stack_size`.
 
-**FFI stack switching:** C code called via `c_import` has no
-knowledge of With's segmented stacks and may exceed remaining stack
-space. The compiler statically determines which call paths
-transitively invoke C functions. Fibers that call FFI functions
-**automatically switch to an OS-thread-sized stack** at the FFI
-boundary:
+**FFI stack switching (roadmap, implementation-defined):** an
+implementation may instead switch to an OS-thread-sized stack at the
+FFI boundary:
 
 1. The compiler marks functions as `ffi_reachable` if they (directly
    or transitively) call any `c_import` function.
@@ -6913,30 +7233,12 @@ boundary:
 4. On return, the runtime restores the fiber stack pointer.
 
 The stack switch costs approximately 10–50 ns (save/restore a few
-registers). This is honest overhead — not zero-cost, but
-predictable and safe. Pure-With fibers that never call C code pay
-nothing.
-
-```
-// Pure With — stays on 8KB fiber stack, no switch
-async fn compute(x: i32) -> i32: x * x + 1
-
-// Calls C — auto-switches to OS stack at the boundary
-async fn query(db: &Database, sql: &str) -> Result[Row, DbError]:
-    sqlite3_step(db.handle)  // runs on OS-thread stack
-```
-
-For performance-critical paths that call C frequently, the `@[ffi_stack]`
-attribute forces an entire function to run on an OS-thread stack,
-avoiding per-call switching:
-
-```
-@[ffi_stack]
-fn process_image(data: &[u8]) -> Image:
-    // All C calls in this function run on the OS stack
-    // without per-call switching overhead
-    ...
-```
+registers) — honest overhead: not zero-cost, but predictable and
+safe. Pure-With fibers that never call C code pay nothing. The
+`@[ffi_stack]` attribute is reserved for this mode: it forces an
+entire function to run on an OS-thread stack, avoiding per-call
+switching. Neither the switching nor the attribute is part of the
+conforming baseline.
 
 **No suspension while C frames are on the stack.** If C code calls
 back into With (e.g., via a function pointer passed to `qsort`),
@@ -6973,13 +7275,14 @@ unsafe { c_on_event(event =>
 | Model | Per-task overhead | 100K concurrent tasks |
 |-------|------------------|----------------------|
 | Rust stackless futures | ~state machine size | ~state machine sizes |
-| With fibers (8 KB initial) | 8–64 KB (grows on demand) | ~800 MB worst case |
+| With fibers (64 KB pooled) | 64 KB virtual per fiber | ~6.4 GB virtual / resident scales with touched pages |
 | OS threads (8 MB typical) | ~8 MB | Not viable |
 
-The 800 MB worst case is pathological — it requires all 100K fibers
-to grow to the full 64 KB limit and remain active simultaneously.
-Realistic suspended fibers doing typical I/O work often use less
-than 2 KB of actual stack.
+The headline number is virtual address space, not resident memory —
+a fiber's resident cost is only the stack pages it has actually
+touched. Realistic suspended fibers doing typical I/O work often use
+less than 2 KB of actual stack. (A growable-stack implementation,
+§14.19 roadmap, reduces the virtual footprint too.)
 
 **Fiber stack pooling:** The runtime maintains a pool of
 pre-allocated fiber stacks. Creating a fiber grabs a stack from the
@@ -7048,12 +7351,12 @@ async fn handle_connection(conn: TcpStream):
     let req = http.parse_request(&conn).await
 
     let response = match req.path_str():
-        "/users" ->
+        "/users" =>
             let users = db.query("SELECT * FROM users").await
             http.json_response(200, users)
-        "/health" ->
+        "/health" =>
             http.text_response(200, "ok")
-        _ ->
+        _ =>
             http.text_response(404, "not found")
 
     conn.write_all(response.as_bytes()).await
@@ -7116,7 +7419,7 @@ fn store_globally(t: Task[i32]):
     GLOBAL_TASKS.push(t)            // ERROR: storing a value that
                                      // may be ephemeral at some call sites
 
-var v = vec![1, 2, 3]
+var v = [1, 2, 3]
 let task = process(&v)              // ephemeral task
 process_task(task)                   // OK: compiler sees task is consumed
 store_globally(task)                 // ERROR: compiler cannot prove the
@@ -7197,8 +7500,8 @@ fn get_name -> str: "Alice"            // return owned string
 
 **String literals** (`"hello"`) are `str` by default (owned). The
 compiler is smart about this — when it can prove the string is only
-read (never stored, never returned, never mutated), it silently
-optimizes away the allocation and uses a static reference internally.
+read (never stored, never returned, never mutated), it may optimize
+away the allocation and use a static reference internally.
 You don't think about this. You write strings, the compiler does the
 right thing:
 
@@ -7261,13 +7564,12 @@ let view: &str = "hello"                     // no allocation, static memory
 deterministically.
 
 - In `&str` context, the literal is a zero-cost static reference.
-- In owned `str` context, the literal produces an owned `str`. This may
-  allocate or copy unless the compiler applies a documented deterministic
-  elision rule.
-- Elision is allowed only when the compiler can prove the owned value is
-  equivalent to a static immutable string for all observable purposes.
-  The rule is deterministic and participates in no-allocation checking;
-  it is not an unstable optimizer guess.
+  This guarantee is unconditional.
+- In owned `str` context, the literal produces an owned `str` and may
+  allocate. The compiler may elide the allocation when the owned value
+  is observably equivalent to a static immutable string, but elision
+  is an optimization, never a guarantee — code that requires zero
+  allocation must use `&str` context.
 
 Performance-sensitive code that requires zero allocation should use an
 explicit `&str` annotation or pass to an `&str` parameter for guaranteed
@@ -7445,10 +7747,13 @@ Integer modes on floats are compile-time errors.
 Default (no spec): the string itself, unmodified.
 
 ```
-f"{'hello'}"           // "hello"
-f"{'hi':>10}"          // "        hi"  (right-align)
-f"{'hi':<10}"          // "hi        "  (left-align, default)
-f"{'hello world':.5}"  // "hello"       (truncation)
+let s = "hello"
+let t = "hi"
+let w = "hello world"
+f"{s}"        // "hello"
+f"{t:>10}"    // "        hi"  (right-align)
+f"{t:<10}"    // "hi        "  (left-align, default)
+f"{w:.5}"     // "hello"       (truncation)
 ```
 
 Numeric modes on strings are compile-time errors.
@@ -7472,7 +7777,7 @@ Available for all types. Prints a structural representation:
 
 ```
 f"{42:?}"        // "42"
-f"{'hi':?}"      // "\"hi\""
+f"{name:?}"      // "\"hi\""   (name = "hi")
 f"{point:?}"     // "Point { x: 1, y: 2 }"
 ```
 
@@ -7566,6 +7871,64 @@ newline is needed.
 - F-strings handle all formatting — no need for `sep`/`end` parameters
 - `write`/`ewrite` are the explicit opt-in for no-newline output
   (progress bars, prompts, terminal control)
+
+### 15.8 Regular Expressions
+
+Regular expressions are first-class language surface, not a
+CLI-only feature. (The one-liner behavior in §18.5b.6 is this
+section applied to generated entry sources.)
+
+**Regex literals.** `/pattern/flags` is a literal of type `Regex`
+(`std.regex`):
+
+```
+let r = /hello/i
+r.is_match("HELLO")                  // true
+let words = /\w+/g
+```
+
+Flags: `g` (global), `i` (case-insensitive), `m` (multi-line),
+`s` (dot matches newline), `x` (extended), `U` (ungreedy),
+`u` (Unicode). An unknown flag is a compile-time error. The pattern
+syntax is owned by `std.regex` (a PCRE2-derived engine; see
+`docs/libstd-spec.md` for the full `Regex`, `Match`, and `Captures`
+API: `compile`, `compile_flags`, `is_match`, `find`, `find_all`,
+`captures`, `replace`, ...).
+
+**Match operators.** `=~` (matches) and `!~` (does not match) test a
+`str` against a `Regex`:
+
+```
+if line =~ /error/: alert(line)
+if line !~ /debug/: keep(line)
+```
+
+Both produce `bool`. They sit at precedence level 3 with `==`/`in`
+(§9.9) and are non-associative. The right operand may be a regex
+literal or any `Regex` value.
+
+**Capture bindings.** When the condition of an `if` (or a clause of
+a chained `if let`, §9.7) is a **direct positive** match whose right
+side is a regex literal, the captures bind in the success branch:
+`$0` (whole match), `$1`..`$N` (numbered groups), and `$name` (named
+groups, declared `(?<name>...)`):
+
+```
+if line =~ /status=(\d+)/:
+    print($1)                         // scoped to this branch
+
+if line =~ /^\[(?<level>ERROR|WARN)\]\s+(?<msg>.*)$/:
+    log(f"{$level}: {$msg}")
+```
+
+This is a refutable-binding condition form, like `if let`: the
+bindings exist only where the match succeeded. The `$` sigil keeps
+captures in their own namespace — they can never collide with the
+no-shadowing rule (§29.8). `!~` and compound boolean conditions do
+not create capture bindings (nest the logic when combining capture
+use with other conditions). For everything else — iteration over
+matches, replacement, splitting — use the `std.regex` API
+explicitly.
 
 ---
 
@@ -7983,6 +8346,16 @@ conversion: sentinel, length or capacity, lifetime and retention,
 nullability, mutability, ownership, allocation, cleanup, and copy-back.
 If those facts are missing, the operation stays on the raw surface.
 
+**Contract metadata sources.** The facts that make a binding modeled
+come from, in priority order: explicit annotations in the importing
+project, curated contract overlays shipped with the toolchain, and
+package-supplied binding metadata (`with get c.*`). The toolchain
+maintains a **curated libc overlay** as a standard deliverable, so
+common calls such as `fopen`, `strlen`, and `write` present modeled
+surfaces out of the box; libraries without overlays import with raw
+surfaces until contracts are supplied. An overlay supplies evidence,
+never exemptions — it cannot weaken the rules below.
+
 ```
 // Modeled input C string contract:
 fopen(path, mode)        // compiler supplies call-scoped C strings
@@ -8061,6 +8434,38 @@ hidden caller-owned memory, pass a call-scoped temporary to an API that
 retains it, silently transcode string bytes, erase nullability, call
 `strlen` on an unproven pointer, or reinterpret a `void*` from expected
 type alone.
+
+### 16.3d `@[effect]` — Declared Effect Contracts
+
+Parameter effects (read, write, consume, escape) are normally
+**inferred** from function bodies (§3.8, §21.1). Some declarations
+have no body to infer from: `extern` functions, intrinsic-backed
+stdlib stubs, and raw ABI bindings. For these, `@[effect]` declares
+the contract explicitly:
+
+```
+@[effect(dst: write, src: read)]
+extern "C" fn memcpy(dst: *mut c_void, src: *const c_void, n: usize) -> *mut c_void
+
+@[effect(handle: consume)]
+extern "C" fn close_handle(handle: *mut c_void)
+```
+
+Recognized effect names: `read`, `write`, `consume`, `escape_value`,
+`escape_view`.
+
+**Scope rules:**
+
+1. `@[effect]` is **required information** only where no body exists
+   (extern, intrinsics). Bindings without it stay on the raw surface
+   for the affected parameters.
+2. On an ordinary function with a body, `@[effect]` may optionally
+   **pin** the inferred summary at a `pub` boundary (§4.6
+   explicitness): if inference disagrees with the pin, that is a
+   compile error — the pin is a checked contract, not an override.
+3. `@[effect]` is library-author surface (stdlib, FFI bindings,
+   contract overlays §16.3c). Ordinary application code never needs
+   it; requiring it there would be annotation ceremony (§1.7).
 
 ### 16.4 Layout Control
 
@@ -9138,6 +9543,12 @@ module math.vector
 use std.collections.HashMap
 ```
 
+The `module` header is optional; a file without one is addressed by
+its path. One file is one module; directories group modules into
+hierarchical paths. `use` resolution searches, in order: the embedded
+standard library, paths relative to the importing module's directory,
+the project's `lib/` roots, and the project root.
+
 ### 18.2 Imports
 
 Names are imported with `use`. Variant constructors, functions, and
@@ -9185,7 +9596,9 @@ for item in rx:          // drains remaining items
 
 ### 18.3 Visibility
 
-`pub` exports names. No `pub` = module-private.
+`pub` exports names. No `pub` = module-private. Cross-module access
+to a non-`pub` symbol is a compile error; this applies uniformly to
+functions, types, constants, and globals.
 
 ### 18.4 Packages
 
@@ -9197,16 +9610,26 @@ Dependencies hash-pinned in lockfile.
 A single binary provides all tools:
 
 ```
-with build [--release] [--target <triple>]
-with run <file>
-with test
-with fmt
-with doc [--open]
-with repl
-with -e <code>
-with -n <code>
-with -p <code>
+with build [--release] [--target <triple>]   # build the project
+with run <file>                              # compile and run
+with check <file>                            # typecheck only, no codegen
+with test                                    # run the test suite
+with fmt                                     # format source
+with doc [--open]                            # generate documentation
+with repl                                    # interactive session
+with init                                    # create a new project
+with migrate <c-sources>                     # translate C to With (§13.5b, §16)
+with version | with help
+with -e <code> | -n <code> | -p <code>      # one-liners (§18.5b)
 ```
+
+Additional flags: `--emit-c` (C source backend, used for
+bootstrapping new platforms), `--emit-obj`, `--overflow=<mode>`
+(§4.2.3), `--no-std` (§18.7), `-O0`..`-O3`. The `--dump-*` family
+(`tokens`, `ast`, `resolved`, `typed`, `mir`, `async-mir`,
+`project-info`) and the `ir`/`ast`/`tokens` subcommands are
+compiler-diagnostic surface: available, but implementation-internal
+and not covered by stability guarantees.
 
 Cross-compilation is a normal mode, not special.
 
@@ -9294,9 +9717,12 @@ cat names.txt | with -p 'line = line.upper()'
 One-liners are not interpreted and do not use a separate execution
 model. The CLI constructs a synthetic With entry source file, compiles
 it through the normal build/run pipeline, runs the resulting binary,
-and returns that binary's exit code. The generated source uses top-level
-executable statements and the normal implicit-main feature; the CLI
-does not generate an explicit `fn main` wrapper.
+and returns that binary's exit code. The generated source uses
+top-level executable statements — a form defined for CLI entry
+sources by this section; the CLI does not generate an explicit
+`fn main` wrapper. Ordinary module files require an explicit
+`fn main` (top-level executable statements are not a general module
+feature).
 
 Exactly one one-liner mode may be used in a single invocation:
 
@@ -9424,7 +9850,8 @@ with -e 'if true { print("yes"); print("also yes") }'
 
 #### 18.5b.6 Regex One-Liners
 
-Regex one-liners use the normal With regex syntax:
+Regex one-liners use the normal With regex syntax — this is §15.8
+applied to generated entry sources, not a one-liner-only feature:
 
 | Feature | Syntax |
 |---------|--------|
@@ -9531,6 +9958,13 @@ what users import.
 | `std.hash` | Hasher trait, DefaultHasher | — |
 | `std.fmt` | Debug trait, f-string internals | `stdio.h` (sprintf) |
 | `std.testing` | assert, require, check, assert_eq, assert_matches, panic, todo, unreachable | — |
+| `std.regex` | `Regex`, `Match`, `Captures`; engine behind §15.8 literals and `=~` | PCRE2 (migrated) |
+| `std.json` | JSON parse/serialize | — |
+| `std.http` | HTTP client | libcurl |
+| `std.crypto` | sha256, aes, chacha20, ecdsa, rsa, x509, endian, ... | OpenSSL (subset) |
+Modules under `std.internal` (and compiler-support modules such as
+`std.str_abi`) are compiler/runtime implementation surface, not user
+API; they may change without notice.
 
 All collection types provide `.len()` returning `usize`, plus
 convenience narrowing methods (`.len32()`, `.len64()`, `.ulen32()`)
@@ -9647,7 +10081,7 @@ alloc = true       # enables core + alloc (heap types, no OS)
 
 ```
 @[global_allocator]
-static ALLOC: BumpAllocator = BumpAllocator.new(
+global ALLOC: BumpAllocator = BumpAllocator.new(
     start: 0x2000_0000,
     size: 64 * 1024,    // 64KB SRAM
 )
@@ -9688,7 +10122,7 @@ Everything With gives you — ownership, borrow checking, `c_import`,
 `match`, `comptime`, type inference — works in freestanding mode.
 You're just writing With without a heap or an OS.
 
-### 18.7 Package Management
+### 18.8 Package Management
 
 With has two dependency sources managed through the same CLI and
 `with.toml`:
@@ -9850,6 +10284,15 @@ scrutinize. False positives dilute that signal. If the block contains
 no raw pointer dereference, no raw ABI call, and no `unsafe fn` call,
 the compiler rejects it.
 
+**Proof-dependent operations are the exception.** Some operations
+require `unsafe` only when a whole-program proof fails — e.g. bare
+global mutation under §9.1c's single-thread proof. When the compiler
+*can* prove such an operation safe, an `unsafe` block containing it
+produces a **warning** (not an error): otherwise, improving the
+compiler's proof precision would turn previously-required `unsafe`
+blocks into hard errors and break existing code. Categorically safe
+contents (plain arithmetic, safe calls) remain a hard error as above.
+
 ---
 
 ## 20. Performance Guarantees
@@ -9870,7 +10313,8 @@ the compiler rejects it.
    construct specifies what may allocate, which allocator or allocation
    policy is used, whether allocation may be elided, what happens on
    allocation failure, and what owns the result. String-literal
-   allocation elision must be deterministic and documented. Fiber
+   allocation guarantees live in §15.3: `&str` context is guaranteed
+   zero-allocation; owned-context elision is an optimization. Fiber
    allocation is legible through `Task` and compiler-visible allocation
    analysis, not call-site coloring.
 4. **No invisible allocation obligations.** An allocation must never
@@ -10102,7 +10546,7 @@ At every program point, the following must hold:
    dies before the view's last use, the program is rejected.
 
    ```
-   fn longest(a: String, b: String) -> &str:
+   fn longest(a: &String, b: &String) -> &str:
        if a.len() > b.len():
            a.as_str()
        else:
@@ -10191,7 +10635,7 @@ precision debt, not user ceremony.
 | 3 | Generic `F[T]` where `T` is ephemeral | Ephemeral |
 | 4 | Struct has ephemeral field but is not marked `ephemeral` | Reject definition |
 | 5 | `let x = expr` where expr is ephemeral | Bind `x` as ephemeral |
-| 6 | Struct field declared with ephemeral type | Reject |
+| 6 | Enum variant payload declared with ephemeral type | Reject unless the enum is marked `ephemeral` |
 | 7 | Ephemeral value inserted into heap container | Container becomes ephemeral |
 | 8 | Function returns ephemeral type | Callers inherit restriction |
 | 9 | Escaping closure captures ephemeral value | Reject |
@@ -10225,6 +10669,25 @@ guard's payload would dangle. Forms 2 and 3 desugar to plain
 A closure is non-escaping if and only if it appears as a direct
 argument to a function call. All other closures are escaping.
 
+### 22.3 Diagnostic Contract
+
+Because the programmer cannot annotate lifetimes or ephemerality, the
+diagnostic is the only interface to this analysis. Every rejection
+produced by the ephemeral/origin rules (§22.1) and the view-liveness
+rules (§21.1) must report, with source locations:
+
+1. where the borrowed/ephemeral value was created (the origin),
+2. where it escapes or is invalidated (the violation), and
+3. where it is later used, when a later use is what makes the program
+   unsafe.
+
+The diagnostic must also name at least one idiomatic remedy
+(clone/copy out, collect into owned data, use a handle, restructure
+into a `with` scope, or take `&T`). A single-location "value escapes"
+error does not satisfy this contract. False rejection of safe code is
+compiler precision debt; an unclear rejection is diagnostic debt.
+Both are compiler bugs, never user obligations.
+
 ---
 
 ## 23. `with` Block Semantics
@@ -10239,7 +10702,7 @@ record update, or the global `with` dispatch order.
 
 | Syntax | Desugaring |
 |--------|------------|
-| `with e as mut x: body` | `{ var x = e; body; x }` (if body is Unit) |
+| `with e as mut x: body` | `{ var x = e; body; x }` |
 | `with e as x: body` | `{ let x = e; body }` |
 
 The binding is scoped to the block and cannot escape. In the plain
@@ -10455,6 +10918,20 @@ These rules apply consistently to standard and C-string literal processing.
 
 Shadowing is disallowed for local bindings. Rebinding an existing visible name emits a diagnostic (for example, `shadowing is not allowed for 'x'`).
 
+**Consuming-rebind exception:** a new binding may reuse a visible
+local name when its initializer consumes that binding — i.e. the old
+binding's last use is inside the initializer expression:
+
+```
+let x = read_input()
+let x = parse(x)?        // OK: old x is consumed by the initializer
+```
+
+This removes the naming ceremony of pure narrowing chains (`s`,
+`s2`, `trimmed`) without permitting shadowing at a distance: if the
+old binding would still be live after the new declaration, the rebind
+is still an error.
+
 ### 29.9 Pipeline-first guidance
 
 Because rebinding/shadowing is disallowed, stepwise transformations should use pipelines (`|>`) and scoped `with` bindings instead of repeated `let name = ...` rebinding.
@@ -10469,48 +10946,35 @@ Because rebinding/shadowing is disallowed, stepwise transformations should use p
 
 ### 29.11 Reserved Keywords
 
-The following keywords are reserved and cannot be used as identifiers:
+The following keywords are reserved and cannot be used as
+identifiers. This list is normative and matches the implementation's
+lexer keyword table:
 
-| Keyword | Purpose |
-|---------|---------|
-| `fn` | Function declaration |
-| `let` | Variable binding |
-| `mut` | Mutable binding modifier |
-| `type` | Type declaration |
-| `use` | Import |
-| `extern` | External function declaration |
-| `if` | Conditional |
-| `else if` | Chained conditional continuation |
-| `else` | Conditional branch |
-| `match` | Pattern matching |
-| `for` | Loop over iterables |
-| `while` | Conditional loop |
-| `do` | Do-while loop |
-| `goto` | Unconditional jump to label |
-| `yield` | Generator / comprehension yield |
-| `return` | Early return |
-| `break` | Break from loop or labeled block |
-| `continue` | Continue to next loop iteration |
-| `true`, `false` | Boolean literals |
-| `and`, `or`, `not` | Logical operators |
-| `in` | Membership/iteration operator |
-| `as` | Type cast |
-| `defer` | Deferred execution |
-| `errdefer` | Error-path deferred execution |
-| `async`, `await` | Async function/await |
-| `spawn` | Fiber creation |
-| `trait`, `impl` | Trait definition/implementation |
-| `pub` | Visibility modifier |
-| `const` | Compile-time constant |
-| `implicit` | Implicit parameter modifier |
-| `newaxis` | Multi-index dimension insertion |
-| `it` | Implicit closure parameter |
-| `where` | Trait bound clauses |
-| `move` | Ownership-transfer annotation and move closure |
-| `unsafe` | Unsafe block |
-| `comptime` | Compile-time evaluation |
+```
+and       as        asm       async     await     break
+c_import  comptime  const     continue  copy      defer
+do        dyn       else      enum      ephemeral errdefer
+error     extend    extern    false     fn        for
+gen       global    goto      if        impl      in
+it        let       loop      match     module    move
+mut       no_suspend not      null      opaque    or
+pub       return    select    spawn     trait     true
+type      unsafe    use       var       where     while
+with      yield
+```
 
-`then` is not a reserved keyword and is not an `if` body introducer.
+Notes:
+
+- `then` is not a reserved keyword and is not an `if` body
+  introducer.
+- `newaxis` and `implicit` are **contextual**: they have special
+  meaning only in index lists (§11.7) and parameter declarations
+  (§9.1a) respectively, and remain usable as ordinary identifiers
+  elsewhere.
+- `else if` is a two-token keyword pair (§9.1), not a single
+  keyword.
+- `spawn` is reserved; it currently has no construct in §14 and its
+  surface is under review.
 
 ### 29.12 Error Codes
 
@@ -10712,6 +11176,37 @@ should use brace form to avoid indentation-sensitivity issues.
   when the body is a single expression. Multi-statement braced
   bodies convert to multi-line colon form. Lossless.
 
+### 29.14 Attribute Index
+
+All `@[...]` attributes, with their owning sections. This list is
+normative for the *user-facing* set; an attribute not listed here and
+not marked internal is invalid.
+
+| Attribute | Section | Purpose |
+|-----------|---------|---------|
+| `@[derive(...)]` | §11.8 | Generate trait implementations |
+| `@[must_use]` | §9.7, §14.7 | Match-exhaustiveness obligation |
+| `@[tailrec]` | §9.2 | Guaranteed tail-call elimination |
+| `@[inline]` / `@[noinline]` | §9.2 | Inlining hints |
+| `@[sealed]` | §11.6 | Closed trait implementor set |
+| `@[flags]` | §4.4a | Power-of-two enum auto-increment |
+| `@[specified]` | §4.4a | Require explicit discriminants |
+| `@[bitpacked]` | §4.3b | Bit-level struct packing |
+| `@[repr(C)]` / `@[repr(packed)]` | §16.4 | Layout control |
+| `@[align(N)]` | §16.4 | Custom alignment |
+| `@[c_export("name")]` | §16.5 | Export a C ABI symbol |
+| `@[effect(...)]` | §16.3d | Declared effect contracts (bodiless decls) |
+| `@[no_await_guard]` | §7.9 | Guard must not live across suspension |
+| `@[iter_of_self]` | §13.2 | Iterator borrows the receiver |
+| `@[ffi_stack]` | §14.19 | Reserved: OS-stack execution (roadmap) |
+| `@[panic_handler]` / `@[entry]` / `@[no_main]` / `@[global_allocator]` | §18.7 | Freestanding-mode hooks |
+| `@[target("arch")]` | §16.13 | Architecture-guarded items |
+
+**Implementation-internal (unstable):** `@[bench]`, `@[stack_size]`,
+`@[callconv]`, `@[compiler_hook]`. These exist for compiler and
+stdlib development, may change or vanish without notice, and are not
+part of the language.
+
 ---
 
 ## 30. Formal Grammar (Informative)
@@ -10806,9 +11301,11 @@ FIELD       := [ PUB ] IDENT ':' TYPE [ '=' EXPR ]
 **Enum declaration** (§4.4):
 
 ```
-ENUM_DECL   := [ PUB ] 'type' IDENT [ TYPE_PARAMS ] '=' VARIANTS
-VARIANTS    := VARIANT { '|' VARIANT }
-VARIANT     := IDENT [ '(' TYPES ')' ] [ '=' INT_LIT ]
+ENUM_DECL   := [ PUB ] 'enum' IDENT [ TYPE_PARAMS ] [ ':' REPR_TYPE ] ENUM_BODY
+ENUM_BODY   := '{' [ '|' ] VARIANT { ( '|' | ',' ) VARIANT } '}'
+             | ':' NEWLINE INDENT [ '|' ] VARIANT { NEWLINE [ '|' ] VARIANT } DEDENT
+VARIANT     := IDENT [ '(' VARIANT_FIELDS ')' ] [ '=' INT_LIT ]
+REPR_TYPE   := 'i8' | 'i16' | 'i32' | 'i64' | 'u8' | 'u16' | 'u32' | 'u64'
 ```
 
 **Trait and impl** (§11):
@@ -10836,7 +11333,7 @@ CONST_DECL  := 'const' IDENT [ ':' TYPE ] '=' EXPR
 **Variable binding** (§2):
 
 ```
-LET_STMT    := 'let' [ 'mut' ] PATTERN [ ':' TYPE ] '=' EXPR
+LET_STMT    := 'let' PATTERN [ ':' TYPE ] '=' EXPR
 VAR_STMT    := 'var' IDENT [ ':' TYPE ] '=' EXPR
 ```
 
@@ -10857,7 +11354,8 @@ WHILE_STMT  := 'while' EXPR BODY
 DO_WHILE_STMT := 'do' BODY 'while' EXPR
 WITH_STMT   := 'with' EXPR 'as' [ 'mut' ] IDENT BODY
 RETURN_STMT := 'return' [ EXPR ]
-BREAK_STMT  := 'break' [ LABEL ]
+BREAK_STMT  := 'break' [ LABEL ] [ EXPR ]   // EXPR only when targeting a loop (§13.5d)
+LOOP_EXPR   := 'loop' BODY
 CONTINUE_STMT := 'continue' [ LABEL ]
 GOTO_STMT   := 'goto' LABEL
 DEFER_STMT  := 'defer' BODY
@@ -10872,7 +11370,7 @@ ERRDEFER_STMT := 'errdefer' BODY
 |-------|-----------|---------------|
 | 1 | `or` | Left |
 | 2 | `and` | Left |
-| 3 | `==`, `!=`, `in`, `not in` | Non-associative |
+| 3 | `==`, `!=`, `in`, `not in`, `=~`, `!~` | Non-associative |
 | 4 | `<`, `>`, `<=`, `>=` | Chained |
 | 5 | `\|>` (pipeline) | Left |
 | 6 | `\|` | Left |
@@ -10887,9 +11385,10 @@ ERRDEFER_STMT := 'errdefer' BODY
 **Comprehensions** (§13.6):
 
 ```
-LIST_COMP   := '[' EXPR 'for' PATTERN 'in' EXPR [ 'if' EXPR ] ']'
-SET_COMP    := '{' EXPR 'for' PATTERN 'in' EXPR [ 'if' EXPR ] '}'
-MAP_COMP    := '{' EXPR ':' EXPR 'for' PATTERN 'in' EXPR [ 'if' EXPR ] '}'
+COMPREHENSION := '[' EXPR { 'for' PATTERN 'in' EXPR } [ 'if' EXPR ] ']'
+              | '[' EXPR ':' EXPR { 'for' PATTERN 'in' EXPR } [ 'if' EXPR ] ']'
+MAP_LIT       := '[' EXPR ':' EXPR { ',' EXPR ':' EXPR } [ ',' ] ']'
+              | '[' ':' ']'
 ```
 
 ### 30.6 Patterns
@@ -10946,18 +11445,8 @@ construct: `fn`, `if`, `else if`, `else`, `while`, `for`, `loop`, `with`,
 
 ### 30.9 Reserved Keywords
 
-The following identifiers are reserved (§29.11):
-
-```
-and       as        async     await     break     comptime
-const     continue  defer     else      enum      errdefer
-false     fn        for       gen       goto      if
-impl      import    in        is        it        let
-match     mod       move      mut       not       or
-pub       return    self      sealed    struct    todo
-trait     true      type      unsafe    use       var
-where     while     with      yield
-```
+The reserved keyword list is normative in §29.11. This appendix does
+not maintain a separate copy.
 
 ---
 

@@ -1,12 +1,39 @@
 # With Language Requirements
 
-This document is a requirements traceability matrix derived from `docs/with-specification.md` (Specification v6.9).
+This document is a requirements traceability matrix derived from `docs/with-specification.md` (Specification v7.1).
+
+**v7.1 amendment pass (2026-06-10):** the BDFL rulings recorded in
+`docs/completed/spec-impl-unalignment.md` §E produced spec v7.1. New normative
+sections pending regeneration (#386): §4.3c Collection Literals,
+§9.1c Global Declarations, §13.5d The `loop` Construct, §15.8
+Regular Expressions, §16.3d `@[effect]`, §29.14 Attribute Index.
+Amended sections: §9.1a (pub parameter names are API surface),
+§13.5a (loop-targeted value breaks valid), §13.6 (target-polymorphic
+comprehensions + map form), §13.3 (integrated-collections framing),
+§14.19 (`[runtime]` config marked unimplemented), §18.5 (CLI table
+completed), §18.6 (module map extended), §18.7 (`static` →
+`global`), §19.4 (proof-dependent unsafe warns), §9.9/§30.5
+precedence rows (`=~`/`!~`), §30.4 (BREAK/LOOP grammar), §18.5b.6
+(defers to §15.8), `vec![...]` examples replaced with collection
+literals. Entries below affected by v7.1 are amended inline where
+they contradicted; all line ranges remain v6.9-layout until #386.
+
+**v7.0 amendment pass (2026-06-09):** the spec rulings recorded in
+`docs/completed/spec-feedback.md` changed normative content in §3.8,
+§7.2, §9.7, §12.4, §13.2, §14.7, §14.10, §14.11, §14.19, §15.3,
+§18.1, §18.3, §18.5b, §20, §22.1, §23.1, §29.8, §29.11, §30.3, §30.4,
+§30.9, §4.1, §4.2.1, §4.8a, §4.10, §10.1, §11.7, §16.3c, §21.1, plus
+new §22.3, and renumbered the second §18.7 to §18.8. Entries below
+whose requirement text changed are marked `(amended v7.0)`; their
+`Source` line ranges still refer to the v6.9 layout. Other entries'
+line ranges are also stale where they fall after an edited region. A
+full regeneration against v7.0 is tracked as a follow-up issue.
 
 ## Traceability Model
 
 - Requirement IDs use four numeric components: `category.topic.subtopic.ordinal`. The first three components follow the spec chapter/topic grouping; the final component is stable within that group.
 - Lettered spec sections are normalized into numeric subtopics while preserving the exact source label in the `Source` field. For example, `§4.3a` is grouped under `4.3.2.x`, after base `§4.3` under `4.3.1.x`.
-- The spec currently contains a repeated `§18.7` heading. Requirement IDs remain unique by continuing the same `18.7.1.x` sequence across both source sections; the exact source line range distinguishes them.
+- The spec previously contained a repeated `§18.7` heading; v7.0 renumbered the second (Package Management) to `§18.8`. Requirement IDs in the `18.7.1.x` sequence that derive from the old second `§18.7` now trace to `§18.8`.
 - Each requirement records the exact spec section and line range that produced it. This is the sentence-to-requirement relationship. If a source sentence supports more than one requirement, repeat that source under each requirement when editing this file.
 - `Related spec refs` records explicit cross-references (`§...`) found in the source sentence. These are not exhaustive semantic dependencies; they are traceability hints.
 - Filler/meta sentences such as moved-document notices, appendix framing, and pure changelog prose are intentionally excluded. Examples and code blocks are usually represented through the surrounding normative prose, not as independent requirements.
@@ -396,9 +423,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: **Builder blocks** — `with Config.default() as mut c:` with flexible return values (§7.2)
   - Source: `§1.7 L239-L240`
   - Related spec refs: §7.2
-- `1.7.1.32` **Cancellation just works — no From[TaskCancelled] on every error type. Cancellation...**
-  - Requirement: **Cancellation just works** — no `From[TaskCancelled]` on every error type. Cancellation unwinds cleanly. (§14.7)
-  - Source: `§1.7 L241-L242`
+- `1.7.1.32` **Cancellation just works — no Cancelled variants or From impls on your error types.**
+  - Requirement: **Cancellation just works** — no `Cancelled` variants or `From` impls on your error types. Cancellation unwinds cleanly. (§14.7)
+  - Source: `§1.7 L241-L242` (amended v7.0)
   - Related spec refs: §14.7
 - `1.7.1.33` **Chained if let — if let Some(a) = x, let Some(b) = y: kills the pyramid of doom (§9.7)**
   - Requirement: **Chained `if let`** — `if let Some(a) = x, let Some(b) = y:` kills the pyramid of doom (§9.7)
@@ -824,9 +851,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: When a call must use non-default ownership semantics, the caller writes them explicitly:
   - Source: `§3.8 L648-L649`
   - Related spec refs: none
-- `3.8.1.6` **For non-Copy parameters, the default plain call f(x) is share-place: the callee ope...**
-  - Requirement: For non-`Copy` parameters, the default plain call `f(x)` is share-place: the callee operates on the caller's place unless the caller overrides that behavior with `move x`, `copy x`, or `&x`.
-  - Source: `§3.8 L657-L659`
+- `3.8.1.6` **The parameter's declared type states the call mode: &T borrows; plain T consumes.**
+  - Requirement: The parameter's declared type states the call mode. A `&T` parameter borrows (auto-ref erases the sigil; the caller's binding remains valid). A plain `T` parameter consumes (the argument is moved, or copied for `Copy` types; the caller's binding is invalidated). No call-site annotation is ever required for either mode; `move x`, `copy x`, and `&x` remain available as explicit spellings. A function that only reads a by-value parameter, or returns a view derived from one, should take `&T`; the compiler emits a directed suggestion when it can see this mistake.
+  - Source: `§3.8 L657-L659` (amended v7.0)
   - Related spec refs: none
 - `3.8.1.7` **The vibe: "The function just wants to look at the data.**
   - Requirement: **The vibe:** "The function just wants to look at the data.
@@ -2195,21 +2222,19 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: The value is owned and mutable inside the block, then returned as the block's result.
   - Source: `§7.2 L2335-L2336`
   - Related spec refs: none
-- `7.2.1.3` **Implicit return rule: In with expr as mut x:, if the block's last statement evaluat...**
-  - Requirement: **Implicit return rule:** In `with expr as mut x:`, if the block's last statement evaluates to `Unit` (assignment, void method call), the block returns `x` (the builder).
-  - Source: `§7.2 L2356-L2358`
+- `7.2.1.3` **Return rule: with expr as mut x: always returns x (the builder).**
+  - Requirement: **Return rule:** `with expr as mut x:` always returns `x` (the builder), regardless of the type of the body's last expression.
+  - Source: `§7.2 L2356-L2358` (amended v7.0)
   - Related spec refs: none
-- `7.2.1.4` **If the last expression is non-Unit, the block returns that expression's value.**
-  - Requirement: If the last expression is non-Unit, the block returns that expression's value.
-  - Source: `§7.2 L2358-L2359`
+- `7.2.1.4` **The block's result never changes because a setter gained or lost a return value.**
+  - Requirement: The block's result never silently changes because a setter gained or lost a return value; non-Unit results of body statements are discarded. For a scoped computation whose result is not the binding, use Form 3 (`with expr as name:`).
+  - Source: `§7.2 L2358-L2359` (amended v7.0)
+  - Related spec refs: §7.3
+- `7.2.1.5` **Withdrawn (v7.0).** The dual builder/extraction dispatch was removed; `as mut` always returns the binding (see `7.2.1.3`).
+  - Source: `§7.2 L2380-L2381` (withdrawn v7.0)
   - Related spec refs: none
-- `7.2.1.5` **This gives you both builder and extraction patterns from the same construct.**
-  - Requirement: This gives you both builder and extraction patterns from the same construct.
-  - Source: `§7.2 L2380-L2381`
-  - Related spec refs: none
-- `7.2.1.6` **The type system tells you what you're getting.**
-  - Requirement: The type system tells you what you're getting.
-  - Source: `§7.2 L2381`
+- `7.2.1.6` **Withdrawn (v7.0).** Superseded by the unconditional return rule (see `7.2.1.3`).
+  - Source: `§7.2 L2381` (withdrawn v7.0)
   - Related spec refs: none
 - `7.2.1.7` **The value is bound as a mutable local inside the block.**
   - Requirement: The value is bound as a mutable local inside the block.
@@ -3244,9 +3269,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: **Statement-position match** (value ignored): may be partial; unmatched variants are a no-op.
   - Source: `§9.7 L3538-L3539`
   - Related spec refs: none
-- `9.7.1.47` **@[must_use] types (e.g. Result, Task): match must always be exhaustive or include a...**
-  - Requirement: **`@[must_use]` types** (e.g. `Result`, `Task`): match must always be exhaustive or include an explicit `_ => ...` catch-all arm, regardless of position. Partial match on `@[must_use]` types is a compile error. This prevents silently ignoring `Err` arms, which would contradict `@[must_use]` semantics.
-  - Source: `§9.7 L3540-L3544`
+- `9.7.1.47` **@[must_use] types (e.g. Task): match must be exhaustive or include a catch-all; Result is NOT @[must_use].**
+  - Requirement: **`@[must_use]` types** (e.g. `Task`): match must always be exhaustive or include an explicit `_ => ...` catch-all arm, regardless of position. Partial match on a `@[must_use]` type is a compile error. `Result` is **not** `@[must_use]`: discarding or partially matching a `Result` carries no obligation (§10.1).
+  - Source: `§9.7 L3540-L3544` (amended v7.0)
   - Related spec refs: none
 - `9.7.1.48` **Examples:**
   - Requirement: Examples:
@@ -4582,9 +4607,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: For `Copy` values, default capture copies the value.
   - Source: `§12.4 L4856`
   - Related spec refs: none
-- `12.4.1.3` **For non-Copy values, default capture is share-place: the closure observes or mutate...**
-  - Requirement: For non-`Copy` values, default capture is share-place: the closure observes or mutates the original place according to its body.
-  - Source: `§12.4 L4857-L4858`
+- `12.4.1.3` **For non-Copy values, default capture is by place: the closure observes or mutates the original place.**
+  - Requirement: For non-`Copy` values, default capture is by place: the closure observes or mutates the original place according to its body. (By-place capture is a closure-only rule; function parameters follow §3.8's signature-stated modes.)
+  - Source: `§12.4 L4857-L4858` (amended v7.0)
   - Related spec refs: none
 - `12.4.1.4` **move || captures transfer ownership into the closure.**
   - Requirement: `move ||` captures transfer ownership into the closure.
@@ -5511,17 +5536,17 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
 
 ### §13.6 Collection Comprehensions
 
-- `13.6.1.1` **Comprehensions build collections from iteration with filtering:**
-  - Requirement: Comprehensions build collections from iteration with filtering:
-  - Source: `§13.6 L5716`
+- `13.6.1.1` **One bracket comprehension family, polymorphic over its target collection via expected type.**
+  - Requirement: Comprehensions are one bracket family, polymorphic over the target collection. The element form defaults to `Vec` and may target `HashSet`/`BTreeSet` via expected type; the `key: value` form defaults to `HashMap` and may target `BTreeMap`. Desugaring is to `collect[C]()` with `C` resolved from expected type. Duplicate map keys: later elements win.
+  - Source: `§13.6 L5716` (amended v7.1)
+  - Related spec refs: §4.3c, §4.2.1, §4.4
+- `13.6.1.2` **Yes, this allocates.**
+  - Requirement: Yes, this allocates.
+  - Source: `§13.6 L5737` (amended v7.1)
   - Related spec refs: none
-- `13.6.1.2` **Yes, this allocates a Vec.**
-  - Requirement: Yes, this allocates a `Vec`.
-  - Source: `§13.6 L5737`
-  - Related spec refs: none
-- `13.6.1.3` **It's obvious from the syntax — you're building a list.**
-  - Requirement: It's obvious from the syntax — you're building a list.
-  - Source: `§13.6 L5737-L5738`
+- `13.6.1.3` **It's obvious from the syntax — you're building a collection.**
+  - Requirement: It's obvious from the syntax — you're building a collection.
+  - Source: `§13.6 L5737-L5738` (amended v7.1)
   - Related spec refs: none
 - `13.6.1.4` **This is the same philosophy as string interpolation: the allocation is inherent to...**
   - Requirement: This is the same philosophy as string interpolation: the allocation is inherent to what you're asking for, and the syntax makes it clear.
@@ -6144,9 +6169,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: If you need to distinguish cancellation from real errors, match on the scope's result:
   - Source: `§14.7 L6249-L6250`
   - Related spec refs: none
-- `14.7.1.36` **TaskCancelled is a standard library error type that all error types can be checked...**
-  - Requirement: `TaskCancelled` is a standard library error type that all error types can be checked against via `.is_cancelled()`.
-  - Source: `§14.7 L6259-L6260`
+- `14.7.1.36` **There is no TaskCancelled error type; cancellation is observed on the Task handle via was_cancelled().**
+  - Requirement: Awaiting a cancelled task never produces an `Err` value of the task's error type; cancellation unwinds. There is no `TaskCancelled` error type and no `.is_cancelled()` method on errors. Cancellation is observed on the task handle: `was_cancelled(&Task[T]) -> bool` reports whether the task was cancelled before completing normally and never suspends.
+  - Source: `§14.7 L6259-L6260` (amended v7.0)
   - Related spec refs: none
 - `14.7.1.37` **But you never need to add a Cancelled variant to your own types.**
   - Requirement: But you never need to add a `Cancelled` variant to your own types.
@@ -6374,9 +6399,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: At least one branch must be present.
   - Source: `§14.10 L6522`
   - Related spec refs: none
-- `14.10.1.16` **If all expressions complete with values that don't match their patterns, the select...**
-  - Requirement: If all expressions complete with values that don't match their patterns, the select panics (same as a non-exhaustive match).
-  - Source: `§14.10 L6522-L6524`
+- `14.10.1.16` **Branch patterns are irrefutable bindings; refutable handling belongs in the branch body.**
+  - Requirement: `select await` branch patterns are irrefutable bindings; refutable handling belongs in the branch body via `let ... else`.
+  - Source: `§14.10 L6522-L6524` (amended v7.0)
   - Related spec refs: none
 
 ### §14.11 Concurrent Await
@@ -6409,10 +6434,10 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: Outside `async scope`, normal `Task` drop semantics apply (§14.7).
   - Source: `§14.11 L6548-L6549`
   - Related spec refs: §14.7
-- `14.11.1.8` **Tuple .await supports tuple sizes 2..12 (same as tuple arity limits in §4.6).**
-  - Requirement: Tuple `.await` supports tuple sizes 2..12 (same as tuple arity limits in §4.6).
-  - Source: `§14.11 L6560-L6561`
-  - Related spec refs: §4.6
+- `14.11.1.8` **Tuple .await supports tuple sizes 2..12.**
+  - Requirement: Tuple `.await` supports tuple sizes 2..12.
+  - Source: `§14.11 L6560-L6561` (amended v7.0)
+  - Related spec refs: none
 - `14.11.1.9` **For dynamic or larger sets, use collection combinators.**
   - Requirement: For dynamic or larger sets, use collection combinators.
   - Source: `§14.11 L6561`
@@ -6843,18 +6868,18 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: Sufficient for typical I/O-bound code.
   - Source: `§14.19 L6882-L6883`
   - Related spec refs: none
-- `14.19.1.5` **Configurable per-application in with.toml:**
-  - Requirement: Configurable per-application in `with.toml`:
-  - Source: `§14.19 L6883`
+- `14.19.1.5` **Stack sizing is implementation-defined configuration; the [runtime] with.toml section is planned, not yet parsed.**
+  - Requirement: Stack sizing is implementation-defined configuration; the reference implementation currently uses a fixed 64 KB and does not yet read a configuration key. The `[runtime]` `with.toml` section (`fiber_stack_size`, `fiber_pool_size`) is the planned surface, tracked as a delta issue.
+  - Source: `§14.19 L6883` (amended v7.1)
   - Related spec refs: none
-- `14.19.1.6` **Growable stacks: The reference implementation uses growable stacks.**
-  - Requirement: **Growable stacks:** The reference implementation uses growable stacks.
-  - Source: `§14.19 L6892-L6893`
+- `14.19.1.6` **Conforming baseline: fixed-size pooled fiber stacks with guard pages.**
+  - Requirement: The conforming baseline is fixed-size pooled fiber stacks (default 64 KB) with a guard page; stack overflow faults on the guard page and never silently corrupts memory. Programs must be correct under this baseline.
+  - Source: `§14.19 L6892-L6893` (amended v7.0)
   - Related spec refs: none
-- `14.19.1.7` **A fiber starts with a small initial allocation (default 8 KB) and grows on demand.**
-  - Requirement: A fiber starts with a small initial allocation (default 8 KB) and grows on demand.
-  - Source: `§14.19 L6893-L6894`
-  - Related spec refs: none
+- `14.19.1.7` **Growable stacks are roadmap and implementation-defined; growth is an optimization, never an observable semantic.**
+  - Requirement: An implementation may start fibers on a smaller initial allocation and grow on demand, provided growth is detected safely and §14.13's semantic stack preservation holds. Growth is an optimization, never an observable semantic.
+  - Source: `§14.19 L6893-L6894` (amended v7.0)
+  - Related spec refs: §14.13
 - `14.19.1.8` **Stack overflow does not silently corrupt memory — growth is detected at each functi...**
   - Requirement: Stack overflow does not silently corrupt memory — growth is detected at each function call's stack probe and handled by allocating a new segment (implementation-defined).
   - Source: `§14.19 L6894-L6896`
@@ -6927,9 +6952,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: Rust stackless futures; ~state machine size; ~state machine sizes
   - Source: `§14.19 L6975`
   - Related spec refs: none
-- `14.19.1.26` **With fibers (8 KB initial); 8–64 KB (grows on demand); ~800 MB worst case**
-  - Requirement: With fibers (8 KB initial); 8–64 KB (grows on demand); ~800 MB worst case
-  - Source: `§14.19 L6976`
+- `14.19.1.26` **With fibers (64 KB pooled); 64 KB virtual per fiber; resident scales with touched pages**
+  - Requirement: With fibers (64 KB pooled); 64 KB virtual per fiber; resident memory scales with touched stack pages.
+  - Source: `§14.19 L6976` (amended v7.0)
   - Related spec refs: none
 - `14.19.1.27` **OS threads (8 MB typical); ~8 MB; Not viable**
   - Requirement: OS threads (8 MB typical); ~8 MB; Not viable
@@ -7291,17 +7316,16 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: In owned `str` context, the literal produces an owned `str`.
   - Source: `§15.3 L7264`
   - Related spec refs: none
-- `15.3.1.6` **Owned string literals may allocate or copy unless deterministically elided.**
-  - Requirement: An owned `str` literal may allocate or copy unless the compiler applies a documented deterministic elision rule.
-  - Source: `§15.3 L7264-L7266`
+- `15.3.1.6` **Owned-context string literals may allocate; elision is an optimization, never a guarantee.**
+  - Requirement: In owned `str` context, a string literal produces an owned `str` and may allocate. The compiler may elide the allocation when the owned value is observably equivalent to a static immutable string, but elision is an optimization, never a guarantee.
+  - Source: `§15.3 L7264-L7266` (amended v7.0)
   - Related spec refs: none
-- `15.3.1.7` **Owned literal elision requires static immutable string equivalence.**
-  - Requirement: String-literal allocation elision is allowed only when the compiler can prove the owned value is equivalent to a static immutable string for all observable purposes.
-  - Source: `§15.3 L7267-L7272`
+- `15.3.1.7` **Code that requires zero allocation must use &str context.**
+  - Requirement: Code that requires zero allocation must use `&str` context; the `&str`-context static-reference guarantee is unconditional.
+  - Source: `§15.3 L7267-L7272` (amended v7.0)
   - Related spec refs: none
-- `15.3.1.8` **String-literal elision is deterministic and participates in no-allocation checking.**
-  - Requirement: String-literal elision is deterministic and participates in no-allocation checking; it is not an unstable optimizer guess.
-  - Source: `§15.3 L7267-L7270`
+- `15.3.1.8` **Withdrawn (v7.0).** The "deterministic elision rule participating in no-allocation checking" promise was removed; see `15.3.1.6`–`15.3.1.7`.
+  - Source: `§15.3 L7267-L7270` (withdrawn v7.0)
   - Related spec refs: none
 - `15.3.1.9` **Use &str context for guaranteed zero-allocation string literals.**
   - Requirement: Use an explicit `&str` annotation or pass to an `&str` parameter for guaranteed zero-cost static storage.
@@ -9788,9 +9812,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: The CLI constructs a synthetic With entry source file, compiles it through the normal build/run pipeline, runs the resulting binary, and returns that binary's exit code.
   - Source: `§18.5b L9295-L9297`
   - Related spec refs: none
-- `18.5.3.4` **The generated source uses top-level executable statements and the normal implicit-m...**
-  - Requirement: The generated source uses top-level executable statements and the normal implicit-main feature; the CLI does not generate an explicit `fn main` wrapper.
-  - Source: `§18.5b L9297-L9299`
+- `18.5.3.4` **CLI entry sources use top-level executable statements; ordinary modules require fn main.**
+  - Requirement: The generated source uses top-level executable statements — a form defined for CLI entry sources by §18.5b; the CLI does not generate an explicit `fn main` wrapper. Ordinary module files require an explicit `fn main`.
+  - Source: `§18.5b L9297-L9299` (amended v7.0)
   - Related spec refs: none
 - `18.5.3.5` **Exactly one one-liner mode may be used in a single invocation:**
   - Requirement: Exactly one one-liner mode may be used in a single invocation:
@@ -10487,9 +10511,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: Each allocation-producing construct specifies what may allocate, which allocator or allocation policy is used, whether allocation may be elided, what happens on allocation failure, and what owns the result.
   - Source: `§20 L9869-L9872`
   - Related spec refs: none
-- `20.1.1.13` **String-literal allocation elision must be deterministic and documented.**
-  - Requirement: String-literal allocation elision must be deterministic and documented.
-  - Source: `§20 L9872-L9873`
+- `20.1.1.13` **String-literal allocation guarantees live in §15.3.**
+  - Requirement: String-literal allocation guarantees live in §15.3: `&str` context is guaranteed zero-allocation; owned-context elision is an optimization.
+  - Source: `§20 L9872-L9873` (amended v7.0)
   - Related spec refs: none
 - `20.1.1.14` **Fiber allocation is Task-legible and compiler-visible, not call-site colored.**
   - Requirement: Fiber allocation is legible through `Task` and compiler-visible allocation analysis, not call-site coloring.
@@ -10868,9 +10892,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: 5; `let x = expr` where expr is ephemeral; Bind `x` as ephemeral
   - Source: `§22.1 L10193`
   - Related spec refs: none
-- `22.1.1.28` **6; Struct field declared with ephemeral type; Reject**
-  - Requirement: 6; Struct field declared with ephemeral type; Reject
-  - Source: `§22.1 L10194`
+- `22.1.1.28` **6; Enum variant payload declared with ephemeral type; Reject unless the enum is marked ephemeral**
+  - Requirement: 6; Enum variant payload declared with ephemeral type; Reject unless the enum is marked `ephemeral`
+  - Source: `§22.1 L10194` (amended v7.0)
   - Related spec refs: none
 - `22.1.1.29` **7; Ephemeral value inserted into heap container; Container becomes ephemeral**
   - Requirement: 7; Ephemeral value inserted into heap container; Container becomes ephemeral
@@ -10944,9 +10968,9 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: Section 23 does not define guarded access, implicit context, record update, or the global `with` dispatch order.
   - Source: `§23.1 L10234-L10238`
   - Related spec refs: `§7.5`
-- `23.1.1.4` **with e as mut x: body desugars to { var x = e; body; x } when the body is Unit.**
-  - Requirement: `with e as mut x: body` desugars to `{ var x = e; body; x }` when the body is `Unit`.
-  - Source: `§23.1 L10242-L10245`
+- `23.1.1.4` **with e as mut x: body desugars to { var x = e; body; x } unconditionally.**
+  - Requirement: `with e as mut x: body` desugars to `{ var x = e; body; x }` unconditionally.
+  - Source: `§23.1 L10242-L10245` (amended v7.0)
   - Related spec refs: none
 - `23.1.1.5` **with e as x: body desugars to { let x = e; body }.**
   - Requirement: `with e as x: body` desugars to `{ let x = e; body }`.
@@ -11447,8 +11471,8 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: `async`, `await`; Async function/await
   - Source: `§29.11 L10500`
   - Related spec refs: none
-- `29.11.1.28` **spawn; Fiber creation**
-  - Requirement: `spawn`; Fiber creation
+- `29.11.1.28` **spawn; reserved — no construct in §14; surface under review**
+  - Requirement: `spawn` is reserved; it currently has no construct in §14 and its surface is under review.
   - Source: `§29.11 L10501`
   - Related spec refs: none
 - `29.11.1.29` **trait, impl; Trait definition/implementation**
@@ -11463,14 +11487,14 @@ Generated coverage: 2735 normative requirements plus 31 informative Section 30 t
   - Requirement: `const`; Compile-time constant
   - Source: `§29.11 L10504`
   - Related spec refs: none
-- `29.11.1.32` **implicit; Implicit parameter modifier**
-  - Requirement: `implicit`; Implicit parameter modifier
-  - Source: `§29.11 L10505`
-  - Related spec refs: none
-- `29.11.1.33` **newaxis; Multi-index dimension insertion**
-  - Requirement: `newaxis`; Multi-index dimension insertion
-  - Source: `§29.11 L10506`
-  - Related spec refs: none
+- `29.11.1.32` **implicit is contextual, not reserved.**
+  - Requirement: `implicit` is contextual: it has special meaning only in parameter declarations (§9.1a) and remains usable as an ordinary identifier elsewhere.
+  - Source: `§29.11 L10505` (amended v7.0)
+  - Related spec refs: §9.1a
+- `29.11.1.33` **newaxis is contextual, not reserved.**
+  - Requirement: `newaxis` is contextual: it has special meaning only in index lists (§11.7) and remains usable as an ordinary identifier elsewhere.
+  - Source: `§29.11 L10506` (amended v7.0)
+  - Related spec refs: §11.7
 - `29.11.1.34` **it; Implicit closure parameter**
   - Requirement: `it`; Implicit closure parameter
   - Source: `§29.11 L10507`
