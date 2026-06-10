@@ -153,7 +153,7 @@ fn InternPool.intern_type(self: InternPool, key: TypeKey) -> TypeId:
     let canon = type_key_to_string(key)
     let existing = st.type_map.get(canon)
     if existing.is_some():
-        return existing.unwrap()
+        return existing.unwrap() as TypeId
 
     let id = st.type_keys.len() as i32
     st.type_keys.push(key)
@@ -171,7 +171,7 @@ fn InternPool.intern_value(self: InternPool, key: ValueKey) -> ValueId:
     let canon = value_key_to_string(key)
     let existing = st.value_map.get(canon)
     if existing.is_some():
-        return existing.unwrap()
+        return existing.unwrap() as ValueId
 
     let id = st.value_keys.len() as i32
     st.value_keys.push(key)

@@ -307,8 +307,14 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
                 return canonical_tid as TypeId
             if canonical_sym == self.syms.self_type:
                 return 0 as TypeId
+            if self.private_symbol_path_from_current(canonical_sym).len() > 0:
+                self.emit_private_symbol_error(canonical_sym, node)
+                return 0 as TypeId
         // Self is resolved at codegen time
         if sym == self.syms.self_type:
+            return 0 as TypeId
+        if self.private_symbol_path_from_current(sym).len() > 0:
+            self.emit_private_symbol_error(sym, node)
             return 0 as TypeId
         if self.collecting_types != 0:
             return 0 as TypeId
@@ -450,7 +456,10 @@ fn Sema.resolve_type_level_arg_expr(self: Sema, node: i32) -> i32:
         let subst = self.lookup_generic_subst(sym)
         if subst != 0:
             return subst as i32
-        return self.lookup_named_type_visible(sym)
+        let named = self.lookup_named_type_visible(sym)
+        if named == 0 and self.private_symbol_path_from_current(sym).len() > 0:
+            self.emit_private_symbol_error(sym, node)
+        return named
     if kind == NodeKind.NK_TYPE_GENERIC:
         return self.resolve_generic_type(node)
     if kind == NodeKind.NK_INDEX:
@@ -465,6 +474,8 @@ fn Sema.resolve_type_level_arg_expr(self: Sema, node: i32) -> i32:
                 base_sym = canonical_base
                 base_tid = self.lookup_named_type_visible(base_sym)
         if base_tid == 0:
+            if self.private_symbol_path_from_current(base_sym).len() > 0:
+                self.emit_private_symbol_error(base_sym, base)
             return 0
         let arg1_node = self.ast.get_data1(node)
         let arg1_ty = self.resolve_type_level_arg_expr(arg1_node)
@@ -731,6 +742,12 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let flags = self.ast.get_data2(node)
     if sig_idx < 0:
         return
+    let saved_body_file_id = self.local_file_id
+    let saved_body_module_path = self.current_module_path
+    let saved_body_module_has_ci = self.current_module_has_ci
+    let fn_di = self.find_decl_index(node)
+    if fn_di >= 0:
+        self.update_decl_source_context(fn_di)
 
     let ret_type = self.sig_return_type(sig_idx)
 
@@ -961,6 +978,9 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     self.in_comptime_fn = saved_comptime
     self.in_async_fn = saved_async
     self.pop_scope()
+    self.local_file_id = saved_body_file_id
+    self.current_module_path = saved_body_module_path
+    self.current_module_has_ci = saved_body_module_has_ci
 
 fn Sema.check_fn_body(self: Sema, node: i32):
     let fn_name = self.ast.get_data0(node)
@@ -3427,6 +3447,13 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     // Check local/param scope (always visible — local bindings are never c_import)
     let tid = self.scope_lookup(sym)
     if tid >= 0:
+        let binding_decl = self.binding_decl_node(sym)
+        if binding_decl != 0 and self.decl_node_visible_from_current(binding_decl) == 0 and self.has_extern_var_decl(sym) == 0:
+            self.emit_private_symbol_error(sym, node)
+            return 0
+        if binding_decl == 0 and self.global_value_decl_kind(sym) != 0 and self.has_extern_var_decl(sym) == 0 and self.symbol_visible_from_current(sym) == 0:
+            self.emit_private_symbol_error(sym, node)
+            return 0
         if self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
             self.emit_error("mutable global access is not allowed in comptime", node)
         let state = self.scope_lookup_state(sym)
@@ -3446,11 +3473,11 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
         return final_tid
 
     // Check function names
-    if self.generic_fn_nodes.contains(sym) and self.is_ci_visible(sym) != 0:
+    if self.generic_fn_nodes.contains(sym) and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
         return 0
 
     let sig_idx = self.get_sig(sym)
-    if sig_idx >= 0 and self.is_ci_visible(sym) != 0:
+    if sig_idx >= 0 and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
         let fn_tid = self.sig_type_ids.get(sig_idx as i64)
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected = self.resolve_alias(self.expected_expr_type)
@@ -3459,6 +3486,9 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
                 return expected as i32
         self.typed_expr_types.insert(node, fn_tid)
         return fn_tid
+    if (sig_idx >= 0 or self.generic_fn_nodes.contains(sym)) and self.symbol_visible_from_current(sym) == 0:
+        self.emit_private_symbol_error(sym, node)
+        return 0
 
     // Check type names
     let prim = self.primitive_type_by_sym(sym)
@@ -3469,6 +3499,9 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     if named_tid != 0 and self.is_ci_visible(sym) != 0:
         self.typed_expr_types.insert(node, named_tid)
         return named_tid
+    if named_tid == 0 and self.private_symbol_path_from_current(sym).len() > 0:
+        self.emit_private_symbol_error(sym, node)
+        return 0
 
     // Check enum variants
     if self.variant_lookup.contains(sym) and self.is_ci_visible(sym) != 0:
@@ -5878,6 +5911,9 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
 
     let tid = self.lookup_named_type_visible(name)
     if tid == 0:
+        if self.private_symbol_path_from_current(name).len() > 0:
+            self.emit_private_symbol_error(name, node)
+            return 0
         if self.pool_resolve(name) != "Self":
             self.emit_error("unknown type '" ++ self.pool_resolve(name) ++ "' in struct literal", node)
         return 0
@@ -7812,6 +7848,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             else:
                 fn_sym = self.syms.some
             self.comp_resolved.insert(node, fn_sym)
+        if self.symbol_visible_from_current(fn_sym) == 0:
+            self.emit_private_symbol_error(fn_sym, callee)
+            return 0
         local_tid = self.scope_lookup(fn_sym)
         if local_tid >= 0:
             callable_value_tid = self.callable_any_fn_type(local_tid as TypeId)

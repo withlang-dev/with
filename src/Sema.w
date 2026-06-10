@@ -602,6 +602,11 @@ type Sema {
     named_type_candidate_syms: Vec[i32],       // every registered named type symbol
     named_type_candidate_tids: Vec[i32],       // parallel type id for candidate
     named_type_candidate_paths: Vec[str],      // defining module path or "" for global
+    named_type_candidate_pub: Vec[i32],        // parallel public flag
+    decl_visibility_syms: Vec[i32],            // top-level symbol visibility candidates
+    decl_visibility_paths: Vec[str],           // parallel declaring module path
+    decl_visibility_pub: Vec[i32],             // parallel public flag
+    decl_visibility_nodes: Vec[i32],           // parallel declaration node
     // c_import scoping: tracks which symbols are c_import-origin
     ci_syms: HashMap[i32, i32],      // sym → 1 for c_import-origin symbols
     ci_raw_syms: HashMap[i32, i32],  // sym → 1 for c_import raw ABI calls
@@ -701,6 +706,31 @@ fn sema_tier_path_is_std_implementation(path: str) -> i32:
 
 fn Sema.current_module_is_std_implementation(self: Sema) -> i32:
     sema_tier_path_is_std_implementation(self.current_module_path)
+
+fn sema_path_is_compiler_owned_implementation(path: str) -> i32:
+    if path.starts_with("src/") or path.contains("/src/"):
+        return 1
+    if path.starts_with("build/") or path.contains("/build/"):
+        return 1
+    if path.starts_with("rt/") or path.contains("/rt/"):
+        return 1
+    if path.starts_with("out/gen/") or path.contains("/out/gen/"):
+        return 1
+    if sema_tier_path_is_std_implementation(path) != 0:
+        return 1
+    0
+
+fn sema_paths_share_internal_implementation_boundary(a: str, b: str) -> i32:
+    if sema_path_is_compiler_owned_implementation(a) == 0:
+        return 0
+    if sema_path_is_compiler_owned_implementation(b) == 0:
+        return 0
+    1
+
+fn sema_path_is_compiler_hook_runner(path: str) -> i32:
+    if path.contains("__with_compiler_hook_runner."):
+        return 1
+    0
 
 fn Sema.core_without_alloc(self: Sema) -> i32:
     if self.no_std == 0:
@@ -1205,6 +1235,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         named_type_candidate_syms: Vec.new(),
         named_type_candidate_tids: Vec.new(),
         named_type_candidate_paths: Vec.new(),
+        named_type_candidate_pub: Vec.new(),
+        decl_visibility_syms: Vec.new(),
+        decl_visibility_paths: Vec.new(),
+        decl_visibility_pub: Vec.new(),
+        decl_visibility_nodes: Vec.new(),
         ci_syms: sema_new_map_i32_i32(),
         ci_raw_syms: sema_new_map_i32_i32(),
         ci_omitted_symbols: HashMap.new(),
@@ -1301,11 +1336,100 @@ fn Sema.register_prim(mut self: Sema, name: str, tid: i32):
     self.record_named_type(sym, tid)
 
 fn Sema.record_named_type(mut self: Sema, sym: i32, tid: i32) -> void:
+    self.record_named_type_with_pub(sym, tid, 1)
+
+fn Sema.record_named_type_with_pub(mut self: Sema, sym: i32, tid: i32, is_pub: i32) -> void:
     self.named_types.insert(sym, tid)
     self.named_type_candidate_syms.push(sym)
     self.named_type_candidate_tids.push(tid)
     let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
     self.named_type_candidate_paths.push(sema_owned_text(path))
+    self.named_type_candidate_pub.push(is_pub)
+
+fn Sema.record_decl_visibility(self: Sema, sym: i32, node: i32, is_pub: i32) -> void:
+    if sym == 0:
+        return
+    self.decl_visibility_syms.push(sym)
+    let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
+    self.decl_visibility_paths.push(sema_owned_text(path))
+    self.decl_visibility_pub.push(is_pub)
+    self.decl_visibility_nodes.push(node)
+
+fn Sema.decl_visible_from_current(self: Sema, target_path: str, is_pub: i32) -> i32:
+    if target_path.len() == 0:
+        return 1
+    if self.current_module_path.len() == 0:
+        return 1
+    if target_path == self.current_module_path:
+        return 1
+    if sema_path_is_compiler_hook_runner(self.current_module_path) != 0:
+        return 1
+    if sema_paths_share_internal_implementation_boundary(self.current_module_path, target_path) != 0:
+        return 1
+    if is_pub == 0:
+        return 0
+    self.module_is_visible_from_current(target_path)
+
+fn Sema.symbol_visible_from_current(self: Sema, sym: i32) -> i32:
+    let symbol_name = self.pool_resolve(sym)
+    if symbol_name.starts_with("with_") or symbol_name.starts_with("rt_") or symbol_name.starts_with("wl_"):
+        return 1
+    if self.ci_syms.contains(sym) and self.is_ci_visible(sym) != 0:
+        return 1
+    var saw_candidate = 0
+    var i = self.decl_visibility_syms.len() as i32 - 1
+    while i >= 0:
+        if self.decl_visibility_syms.get(i as i64) == sym:
+            saw_candidate = 1
+            let path = self.decl_visibility_paths.get(i as i64)
+            let is_pub = self.decl_visibility_pub.get(i as i64)
+            if self.decl_visible_from_current(path, is_pub) != 0:
+                return 1
+        i = i - 1
+    if saw_candidate == 0:
+        return 1
+    0
+
+fn Sema.decl_node_visible_from_current(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 1
+    var i = self.decl_visibility_nodes.len() as i32 - 1
+    while i >= 0:
+        if self.decl_visibility_nodes.get(i as i64) == node:
+            return self.decl_visible_from_current(self.decl_visibility_paths.get(i as i64), self.decl_visibility_pub.get(i as i64))
+        i = i - 1
+    1
+
+fn Sema.has_extern_var_decl(self: Sema, sym: i32) -> i32:
+    let target_name = self.pool_resolve(sym)
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_EXTERN_VAR:
+            continue
+        let extern_sym = self.ast.get_data0(decl)
+        if extern_sym != sym and self.pool_resolve(extern_sym) != target_name:
+            continue
+        return 1
+    0
+
+fn Sema.private_symbol_path_from_current(self: Sema, sym: i32) -> str:
+    var i = self.decl_visibility_syms.len() as i32 - 1
+    while i >= 0:
+        if self.decl_visibility_syms.get(i as i64) == sym:
+            let path = self.decl_visibility_paths.get(i as i64)
+            let is_pub = self.decl_visibility_pub.get(i as i64)
+            if path.len() > 0 and path != self.current_module_path and is_pub == 0 and self.module_is_visible_from_current(path) != 0:
+                return path
+        i = i - 1
+    ""
+
+fn Sema.emit_private_symbol_error(self: Sema, sym: i32, node: i32) -> void:
+    let name = self.pool_resolve(sym)
+    let path = self.private_symbol_path_from_current(sym)
+    if path.len() > 0:
+        self.emit_error("symbol '" ++ name ++ "' is private to module '" ++ path ++ "'", node)
+    else:
+        self.emit_error("symbol '" ++ name ++ "' is not visible from this module", node)
 
 fn Sema.module_is_visible_from_current(self: Sema, target_path: str) -> i32:
     if target_path.len() == 0:
@@ -1360,12 +1484,13 @@ fn Sema.lookup_named_type_visible(self: Sema, sym: i32) -> i32:
             saw_recorded = 1
             let candidate_tid = self.named_type_candidate_tids.get(i as i64)
             let candidate_path = self.named_type_candidate_paths.get(i as i64)
+            let candidate_pub = self.named_type_candidate_pub.get(i as i64)
             if named_tid != 0 and candidate_tid == named_tid:
                 saw_named_tid = 1
             if candidate_path.len() == 0:
                 if global_tid == 0:
                     global_tid = candidate_tid
-            else if self.module_is_visible_from_current(candidate_path) != 0:
+            else if self.decl_visible_from_current(candidate_path, candidate_pub) != 0:
                 return candidate_tid
         i = i - 1
     if named_tid != 0 and (saw_recorded == 0 or saw_named_tid == 0):

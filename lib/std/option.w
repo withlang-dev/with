@@ -11,4 +11,4 @@
 /// `.unwrap_or(default)` for a safe fallback,
 /// `.is_some()` / `.is_none()` to check,
 /// `.map(fn)` to transform the inner value.
-enum Option[T] { Some(T) | None }
+pub enum Option[T] { Some(T) | None }

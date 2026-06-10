@@ -10,15 +10,15 @@
 /// Use `.unwrap()` to extract Ok (panics on Err),
 /// `.is_ok()` / `.is_err()` to check,
 /// `.map(fn)` / `.map_err(fn)` to transform.
-enum Result[T, E] { Ok(T) | Err(E) }
+pub enum Result[T, E] { Ok(T) | Err(E) }
 
 /// Error type returned by compiler-generated `@[derive(Builder)]`
 /// `.build()` methods when a required field has not been supplied.
-error BuilderError =
+pub error BuilderError =
     | MissingField(str)
 
 /// An error with a message and an underlying source error.
-type ContextError[E]  {
+pub type ContextError[E]  {
     message: str
     source: E
 }

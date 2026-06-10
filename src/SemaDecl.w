@@ -502,6 +502,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
     let extra_start = self.ast.get_data1(node)
     let packed_kind = self.ast.get_data2(node)
     let sub_kind = type_decl_sub_kind(packed_kind)
+    let decl_is_pub = if type_decl_is_pub(self.ast, extra_start, sub_kind): 1 else: 0
+    self.record_decl_visibility(name, node, decl_is_pub)
     let is_ephemeral = type_decl_is_ephemeral(packed_kind)
     let is_generic_decl = if self.type_decl_tp_count(node) != 0: 1 else: 0
     if is_ephemeral != 0:
@@ -547,7 +549,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         for fi in 0..field_count:
             self.type_extra.push(self.ast.get_extra(align_base + fi))
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
-        self.record_named_type(name, tid as i32)
+        self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
         self.type_decl_tids.insert(node, tid as i32)
         if type_decl_is_bitpacked(packed_kind) != 0:
             self.bitpacked_types.insert(tid as i32, 1)
@@ -584,7 +586,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                 self.type_extra.push(payload_tids.get(payload_cursor as i64))
                 payload_cursor = payload_cursor + 1
         let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
-        self.record_named_type(name, tid as i32)
+        self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
         self.type_decl_tids.insert(node, tid as i32)
         // Re-register variants with actual enum TypeId (bare + qualified names)
         let plain_type_name_str = self.pool_resolve(name)
@@ -648,7 +650,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                 self.type_extra.push(payload_tids.get(payload_cursor as i64))
                 payload_cursor = payload_cursor + 1
         let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
-        self.record_named_type(name, tid as i32)
+        self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
         self.type_decl_tids.insert(node, tid as i32)
         self.disc_repr_types.insert(tid as i32, repr_type_tid as i32)
         // Check if any variant has payloads
@@ -687,7 +689,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         let aliased_node = self.ast.get_extra(extra_start)
         let target = self.resolve_type_expr(aliased_node)
         let tid = self.add_type(TypeKind.TY_ALIAS, target as i32, 0, 0)
-        self.record_named_type(name, tid as i32)
+        self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
         self.type_decl_tids.insert(node, tid as i32)
 
     if sub_kind == TypeDeclKind.Distinct:
@@ -704,7 +706,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         self.type_extra.push(inner as i32)
         self.type_extra.push(0)
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, 1)
-        self.record_named_type(name, tid as i32)
+        self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
         self.type_decl_tids.insert(node, tid as i32)
         self.distinct_type_names.insert(name, tid as i32)
 
@@ -712,7 +714,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         // Opaque type: register as struct with 0 fields
         let te_start = self.type_extra.len() as i32
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, 0)
-        self.record_named_type(name, tid as i32)
+        self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
         self.type_decl_tids.insert(node, tid as i32)
 
     if sub_kind == TypeDeclKind.Union:
@@ -744,7 +746,7 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         for fi in 0..field_count:
             self.type_extra.push(self.ast.get_extra(align_base + fi))
         let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
-        self.record_named_type(name, tid as i32)
+        self.record_named_type_with_pub(name, tid as i32, decl_is_pub)
         self.type_decl_tids.insert(node, tid as i32)
 
     if self.ast.is_must_use_type_node(node) != 0:
@@ -1044,6 +1046,9 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let fn_name = self.ast.get_data0(node)
     if is_local != 0:
         self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
+    let fn_flags = self.ast.get_data2(node)
+    let decl_is_pub = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
+    self.record_decl_visibility(fn_name, node, decl_is_pub)
     if self.fn_decl_nodes.contains(fn_name):
         let existing_node = self.fn_decl_nodes.get(fn_name).unwrap()
         if existing_node != node:
@@ -1237,6 +1242,7 @@ fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
     if is_local != 0:
         self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
+    self.record_decl_visibility(name, node, 1)
     self.fn_decl_source_paths.insert(name, self.current_module_path)
 
     // Error if this extern fn shadows a regular function from the same file or
@@ -1307,6 +1313,7 @@ fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
 
 fn Sema.collect_extern_var(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
+    self.record_decl_visibility(name, node, 1)
     let type_node = self.ast.get_data1(node)
     let tid = self.resolve_type_expr(type_node)
     if self.is_opaque_value_type(tid) != 0:
@@ -1383,6 +1390,8 @@ fn Sema.collect_let_decl(self: Sema, node: i32, is_local: i32):
             bind_name = self.extract_decl_name_after(node, "var")
         self.set_pretty_symbol(name, bind_name)
     let flags = self.ast.get_data2(node)
+    let decl_is_pub = if (flags / 2) % 2 == 1: 1 else: 0
+    self.record_decl_visibility(name, node, decl_is_pub)
     let is_mut = flags % 2
     if is_mut != 0:
         self.mutable_global_syms.insert(name, 1)

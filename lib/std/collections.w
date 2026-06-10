@@ -7,7 +7,7 @@
 
 /// A growable array. Create with `Vec.new()`, add with `.push()`,
 /// read with `.get()`. Supports iteration via `.iter()`.
-type Vec[T]  {
+pub type Vec[T]  {
     ptr: *const T,
     len: i64,
     cap: i64,
@@ -25,12 +25,12 @@ impl[T:
 
 /// An unordered key-value map. Create with `HashMap.new()`,
 /// insert with `.insert(key, val)`, read with `.get(key)`.
-type HashMap[K, V]  {
+pub type HashMap[K, V]  {
     ptr: *const i8,
 }
 
 /// An unordered set of unique values. Create with `HashSet.new()`.
-type HashSet[T]  {
+pub type HashSet[T]  {
     ptr: *const i8,
 }
 

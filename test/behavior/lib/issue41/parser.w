@@ -1,6 +1,6 @@
 use issue41.ir
 
-error ParseError =
+pub error ParseError =
     Bad
 
 pub fn parse_text(text: str) -> Result[Program, ParseError]:

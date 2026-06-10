@@ -1014,9 +1014,9 @@ fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, 
     let user_src = bs_join(case_dir, "user.w")
     let main_src = bs_join(case_dir, "main.w")
     let bin = bs_join(case_dir, "whole_program_extern_var_redecl")
-    var rc = bs_write_fixture(ctx, defs_src, "var shared_counter: i32 = 41\n", "extern redecl defs")
+    var rc = bs_write_fixture(ctx, defs_src, "pub var shared_counter: i32 = 41\n", "extern redecl defs")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, user_src, "extern var shared_counter: i32\nfn read_counter() -> i32: shared_counter + 1\n", "extern redecl user")
+    rc = bs_write_fixture(ctx, user_src, "use defs\nextern var shared_counter: i32\npub fn read_counter() -> i32: shared_counter + 1\n", "extern redecl user")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, main_src, "use user\nuse defs\n\nfn main:\n    if read_counter() == 42:\n        print(\"ok\")\n    else:\n        print(\"bad\")\n", "extern redecl main")
     if rc != 0: return rc
@@ -4425,7 +4425,7 @@ fn bs_check_object_symbols(ctx: ActionCtx, compiler_path: str, nm_tool: str, cas
     let user_src = bs_join(case_dir, "user.w")
     let shared_obj = bs_join(case_dir, "shared.o")
     let user_obj = bs_join(case_dir, "user.o")
-    rc = bs_write_fixture(ctx, shared_src, "var shared_var: i32 = 42\nlet shared_let: i32 = 7\nfn shared_fn() -> i32: shared_var + shared_let\n", "emit_obj_import_owner")
+    rc = bs_write_fixture(ctx, shared_src, "pub var shared_var: i32 = 42\npub let shared_let: i32 = 7\npub fn shared_fn() -> i32: shared_var + shared_let\n", "emit_obj_import_owner")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, user_src, "use shared\n@[c_export(\"use_shared\")]\nfn use_shared() -> i32: shared_fn()\n@[c_export(\"shared_let_addr\")]\nfn shared_let_addr() -> *const i32: &shared_let\n@[c_export(\"shared_var_addr\")]\nfn shared_var_addr() -> *const i32: &shared_var\n", "emit_obj_import_user")
     if rc != 0: return rc
@@ -4459,7 +4459,7 @@ fn bs_check_object_symbols(ctx: ActionCtx, compiler_path: str, nm_tool: str, cas
     let wrapper_src = bs_join(case_dir, "wrapper.w")
     let redecl_user_src = bs_join(case_dir, "redecl_user.w")
     let redecl_obj = bs_join(case_dir, "redecl_user.o")
-    rc = bs_write_fixture(ctx, shared_src, "fn shared_fn() -> i32: 1\n", "imported_fn_owner")
+    rc = bs_write_fixture(ctx, shared_src, "pub fn shared_fn() -> i32: 1\n", "imported_fn_owner")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, wrapper_src, "extern fn shared_fn() -> i32\n", "imported_fn_wrapper")
     if rc != 0: return rc
@@ -4481,7 +4481,7 @@ fn bs_check_object_symbols(ctx: ActionCtx, compiler_path: str, nm_tool: str, cas
         let pcre_src = bs_join(case_dir, label ++ ".w")
         let pcre_obj = bs_join(case_dir, label ++ ".o")
         let imports = if pi == 0:
-            "use std.re.pcre2_compile\n"
+            "use std.re.defs\nuse std.re.pcre2_compile\n"
         else:
             "use std.re.defs\nuse std.re.pcre2_compile\nuse std.re.pcre2_match\n"
         let pcre_text = imports ++ "\n@[c_export(\"call_compile\")]\nfn call_compile() -> *mut pcre2_real_code_8:\n    pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8))\n"
