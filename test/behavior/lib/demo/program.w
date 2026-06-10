@@ -60,7 +60,7 @@ pub fn program_kind(prog: Program) -> i32:
         return 0
     unsafe (*program_rec(prog)).kind
 
-pub fn program_destroy(prog: Program):
+pub fn program_destroy(prog: Program) -> void:
     if prog == 0:
         return
     let _ = unsafe { realloc(prog as *mut c_void, 0usize) }

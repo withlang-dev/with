@@ -1220,7 +1220,7 @@ pub fn with_cimport_parse(header_code: str) -> i64:
 
 // ── Dispose ─────────────────────────────────────────────────
 
-pub fn with_cimport_dispose(session: i64):
+pub fn with_cimport_dispose(session: i64) -> void:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0: return
@@ -2601,7 +2601,7 @@ pub fn with_cimport_macro_is_fn_like(session: i64, idx: i32) -> i32:
         if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return 0
         *(((*ms).fn_like as i64 + idx as i64 * 4) as *const i32)
 
-pub fn with_cimport_dispose_macros(session: i64):
+pub fn with_cimport_dispose_macros(session: i64) -> void:
     unsafe:
         let ms = session as *mut MacroSession
         if ms as i64 == 0: return

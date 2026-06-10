@@ -16,5 +16,5 @@ pub unsafe fn str_copy_bytes(s: str) -> *mut u8:
     *((out as i64 + s.len()) as *mut u8) = 0
     out
 
-pub unsafe fn str_free_bytes(p: *mut u8):
+pub unsafe fn str_free_bytes(p: *mut u8) -> void:
     with_free(p)

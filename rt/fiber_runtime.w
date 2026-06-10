@@ -66,10 +66,10 @@ fn fiber_report_unhandled_panics() -> i32:
             with_ewrite("(null)")
         with_ewrite("\n")
 
-pub fn with_runtime_init():
+pub fn with_runtime_init() -> void:
     with_runtime_core_init()
 
-pub fn with_runtime_shutdown():
+pub fn with_runtime_shutdown() -> void:
     fiber_drain_detached_ready()
     fiber_clear_detached_buffers()
     with_runtime_core_shutdown()
@@ -77,11 +77,11 @@ pub fn with_runtime_shutdown():
 pub fn with_runtime_has_fibers() -> i32:
     with_runtime_core_has_fibers()
 
-pub fn with_runtime_run_one_step():
+pub fn with_runtime_run_one_step() -> void:
     with_runtime_core_run_one_step()
     fiber_drain_detached_ready()
 
-pub fn with_runtime_run():
+pub fn with_runtime_run() -> void:
     while with_runtime_core_has_fibers() != 0:
         with_runtime_core_run_one_step()
         fiber_drain_detached_ready()
@@ -153,7 +153,7 @@ unsafe fn fiber_select_ready_index(fiber_ids: *const i32, count: i32, biased: i3
         i = i + 1
     chosen
 
-pub unsafe fn with_fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, result_index: *mut i32):
+pub unsafe fn with_fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, result_index: *mut i32) -> void:
     while true:
         let selected = fiber_select_ready_index(fiber_ids, count, biased)
         if selected >= 0:
@@ -168,10 +168,10 @@ pub unsafe fn with_fiber_select_mode(fiber_ids: *const i32, count: i32, biased: 
             *result_index = -1
             return
 
-pub unsafe fn with_fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
+pub unsafe fn with_fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32) -> void:
     with_fiber_select_mode(fiber_ids, count, 0, result_index)
 
-pub fn with_fiber_await(fiber_id: i32):
+pub fn with_fiber_await(fiber_id: i32) -> void:
     while true:
         var panic_msg: *const u8 = 0 as *const u8
         var panic_msg_len: i32 = 0
@@ -202,7 +202,7 @@ pub fn with_fiber_await(fiber_id: i32):
             last_await_cancelled_return = 0
             return
 
-pub fn with_fiber_cleanup_await(fiber_id: i32):
+pub fn with_fiber_cleanup_await(fiber_id: i32) -> void:
     while true:
         var panic_msg: *const u8 = 0 as *const u8
         var panic_msg_len: i32 = 0
@@ -260,7 +260,7 @@ pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
 pub fn with_fiber_is_cancelled() -> i32:
     with_runtime_current_cancel_requested()
 
-pub fn with_fiber_set_cancelled_return():
+pub fn with_fiber_set_cancelled_return() -> void:
     with_runtime_current_set_cancelled_return()
 
 pub fn with_fiber_was_cancelled_return(fiber_id: i32) -> i32:
@@ -268,5 +268,5 @@ pub fn with_fiber_was_cancelled_return(fiber_id: i32) -> i32:
         return last_await_cancelled_return
     with_runtime_completed_cancelled_return(fiber_id)
 
-pub fn with_fiber_request_cancel_self():
+pub fn with_fiber_request_cancel_self() -> void:
     with_runtime_current_set_cancel_requested()

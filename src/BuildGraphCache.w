@@ -253,7 +253,7 @@ fn build_cache_test_success_manifest(root: str, target: BuildGraphTarget, test_f
         text = text ++ "file:" ++ path ++ "\n"
     text
 
-pub fn build_cache_record_test_success(root: str, target: BuildGraphTarget, test_files: Vec[str], test_compiler: str):
+pub fn build_cache_record_test_success(root: str, target: BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> void:
     let state_dir = build_cache_state_dir(root)
     let _mkdir = build_graph_rt_mkdir_p(state_dir)
     let marker_path = build_cache_test_success_path(root, target.name)
@@ -369,7 +369,7 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
             return false
     true
 
-pub fn build_cache_record(root: str, target: BuildGraphTarget):
+pub fn build_cache_record(root: str, target: BuildGraphTarget) -> void:
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)

@@ -1073,6 +1073,8 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     if self.peek() == TokenKind.TK_ARROW:
         self.advance()
         ret_type = self.parse_type_expr()
+    else if is_pub == Visibility.Public:
+        self.emit_error("public function declarations require an explicit return type")
 
     // Where clause
     self.parse_optional_where_clause()

@@ -92,7 +92,7 @@ pub fn SourceEmitter.__driver_new(token: str, output_path: str) -> SourceEmitter
     compiler_capability_require(token, "SourceEmitter")
     SourceEmitter { token, output_path }
 
-pub fn Diagnostics.error(self: &Self, location: SourceLocation, message: str):
+pub fn Diagnostics.error(self: &Self, location: SourceLocation, message: str) -> void:
     compiler_capability_require(self.token, "Diagnostics")
     if self.output_path.len() == 0:
         with_eprint("error: Diagnostics.error called without a driver diagnostic output")
@@ -108,7 +108,7 @@ pub fn Diagnostics.error(self: &Self, location: SourceLocation, message: str):
         with_eprint("error: failed to write compiler hook diagnostic")
         exit(1)
 
-pub fn SourceEmitter.emit_source(self: &Self, source: str):
+pub fn SourceEmitter.emit_source(self: &Self, source: str) -> void:
     compiler_capability_require(self.token, "SourceEmitter")
     if self.output_path.len() == 0:
         with_eprint("error: SourceEmitter.emit_source called without a driver emitted-source output")

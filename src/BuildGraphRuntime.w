@@ -99,8 +99,8 @@ pub fn build_graph_rt_getpid() -> i32:
 pub fn build_graph_rt_clock_nanos() -> i64:
     with_clock_nanos()
 
-pub fn build_graph_rt_write(s: str):
+pub fn build_graph_rt_write(s: str) -> void:
     with_write(s)
 
-pub fn build_graph_rt_eprint(s: str):
+pub fn build_graph_rt_eprint(s: str) -> void:
     with_eprint(s)

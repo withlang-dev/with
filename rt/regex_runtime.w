@@ -111,7 +111,7 @@ pub fn with_regex_code_copy(code: *const i8) -> *const i8:
         return null
     pcre2_code_copy_8(code as *const pcre2_real_code_8) as *const i8
 
-pub fn with_regex_code_free(code: *const i8):
+pub fn with_regex_code_free(code: *const i8) -> void:
     if code as i64 != 0:
         pcre2_code_free_8(code as *mut pcre2_real_code_8)
 

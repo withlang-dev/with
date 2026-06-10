@@ -9,7 +9,7 @@ pub fn alloc(device: Device, size: Size) -> Result[Memory, DemoError]:
         return Err(.OutOfMemory)
     Ok(raw.unwrap() as Memory)
 
-pub fn free(mem: Memory):
+pub fn free(mem: Memory) -> void:
     if mem == 0:
         return
     let _ = unsafe { realloc(mem as *mut c_void, 0usize) }

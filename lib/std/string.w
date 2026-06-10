@@ -45,18 +45,18 @@ pub fn StringBuilder.with_capacity(capacity: i64) -> Self:
     StringBuilder { bytes: Vec[u8].with_capacity(cap) }
 
 /// Append raw UTF-8 bytes from a string.
-pub fn StringBuilder.push_str(mut self: Self, s: str):
+pub fn StringBuilder.push_str(mut self: Self, s: str) -> void:
     for i in 0..s.len():
         self.bytes.push(s.byte_at(i) as u8)
     return
 
 /// Append one byte.
-pub fn StringBuilder.push_byte(mut self: Self, b: u8):
+pub fn StringBuilder.push_byte(mut self: Self, b: u8) -> void:
     self.bytes.push(b)
     return
 
 /// Append one byte from an integer code point.
-pub fn StringBuilder.push_char(mut self: Self, b: i32):
+pub fn StringBuilder.push_char(mut self: Self, b: i32) -> void:
     self.bytes.push(b as u8)
     return
 

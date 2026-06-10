@@ -4,16 +4,16 @@
 
 extern fn abort() -> void
 
-pub fn with_runtime_init():
+pub fn with_runtime_init() -> void:
     let _ = 0
 
-pub fn with_runtime_run():
+pub fn with_runtime_run() -> void:
     let _ = 0
 
-pub fn with_runtime_shutdown():
+pub fn with_runtime_shutdown() -> void:
     let _ = 0
 
-pub fn with_runtime_run_one_step():
+pub fn with_runtime_run_one_step() -> void:
     let _ = 0
 
 pub fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32:
@@ -37,10 +37,10 @@ pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg
     *panic_msg_len_out = 0
     0
 
-pub fn with_fiber_await(fiber_id: i32):
+pub fn with_fiber_await(fiber_id: i32) -> void:
     let _ = fiber_id
 
-pub fn with_fiber_cleanup_await(fiber_id: i32):
+pub fn with_fiber_cleanup_await(fiber_id: i32) -> void:
     let _ = fiber_id
 
 pub fn with_fiber_cancel(fiber_id: i32) -> i32:
@@ -59,17 +59,17 @@ pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
 pub fn with_runtime_current_cancel_requested() -> i32:
     0
 
-pub fn with_runtime_current_set_cancel_requested():
+pub fn with_runtime_current_set_cancel_requested() -> void:
     let _ = 0
 
-pub fn with_runtime_current_set_cancelled_return():
+pub fn with_runtime_current_set_cancelled_return() -> void:
     let _ = 0
 
 pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
     let _ = fiber_id
     0
 
-pub fn with_fiber_yield():
+pub fn with_fiber_yield() -> void:
     let _ = 0
 
 pub fn with_runtime_has_fibers() -> i32:
@@ -78,7 +78,7 @@ pub fn with_runtime_has_fibers() -> i32:
 pub fn with_fiber_in_fiber() -> i32:
     0
 
-pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32):
+pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> void:
     let _ = msg
     let _ = msg_len
     abort()

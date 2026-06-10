@@ -150,7 +150,7 @@ fn link_stage_cleanup_owned_temp_archives_in(dir: str, pid_text: str):
             let remove_path = if link_stage_str_contains(path, "/"): path else: dir ++ "/" ++ path
             let _remove = runtime_remove_file(remove_path)
 
-pub fn link_stage_cleanup_current_process_temp_archives():
+pub fn link_stage_cleanup_current_process_temp_archives() -> void:
     link_stage_cleanup_files(link_stage_temp_archives)
     link_stage_temp_archives = Vec.new()
     let root = link_stage_artifact_root()

@@ -21,7 +21,7 @@ extern fn with_fs_list_files(path: str) -> str
 // are pruned. Set via migrate_set_width_slice().
 var g_migrate_width_slice: i32 = 0
 
-pub fn migrate_set_width_slice(val: i32):
+pub fn migrate_set_width_slice(val: i32) -> void:
     g_migrate_width_slice = val
 
 // Check whether a C declaration name belongs to a width family
@@ -85,13 +85,13 @@ fn ci_migrate_text_is_blank(text: str) -> bool:
         i = i + 1
     true
 
-pub fn migrate_set_shared_defs(prefix: str):
+pub fn migrate_set_shared_defs(prefix: str) -> void:
     g_migrate_shared_defs_prefix = prefix
 
-pub fn migrate_set_directory_one_basename(basename: str):
+pub fn migrate_set_directory_one_basename(basename: str) -> void:
     g_migrate_directory_one_basename = basename
 
-pub fn migrate_set_shared_fragment_path(path: str):
+pub fn migrate_set_shared_fragment_path(path: str) -> void:
     g_migrate_shared_fragment_path = path
 
 pub fn migrate_add_include_path(path: str) -> void:
@@ -100,7 +100,7 @@ pub fn migrate_add_include_path(path: str) -> void:
 pub fn migrate_add_forced_include(path: str) -> void:
     g_migrate_forced_includes.push(path)
 
-pub fn migrate_reset_options():
+pub fn migrate_reset_options() -> void:
     g_migrate_width_slice = 0
     g_migrate_shared_defs_prefix = ""
     ci_migrate_shared_defs_reset()
@@ -523,7 +523,7 @@ fn ci_migrate_preamble_text() -> str:
     p
 
 // ── Migrate entry points (moved from CImport.w in D3) ─────────
-pub fn migrate_add_define(define: str):
+pub fn migrate_add_define(define: str) -> void:
     // define is "NAME=VALUE" or just "NAME"
     if ci_str_contains(define, "="):
         let eq_pos = ci_find_substr(define, "=")
@@ -1676,7 +1676,7 @@ var g_migrate_file_error: str = ""
 // Set via migrate_set_no_c_export().
 var g_migrate_no_c_export: i32 = 0
 
-pub fn migrate_set_no_c_export(val: i32):
+pub fn migrate_set_no_c_export(val: i32) -> void:
     g_migrate_no_c_export = val
 
 // Keep local-definition behavior for globals while preserving C ABI symbols
@@ -1684,14 +1684,14 @@ pub fn migrate_set_no_c_export(val: i32):
 // that are compiled as std modules but still expose C-compatible entrypoints.
 var g_migrate_export_function_defs: i32 = 0
 
-pub fn migrate_set_export_function_defs(val: i32):
+pub fn migrate_set_export_function_defs(val: i32) -> void:
     g_migrate_export_function_defs = val
 
 // Block style preference for migrated output.
 // 0 = colon-form (default), 2 = brace-form (--prefer-brace).
 var g_migrate_block_style: i32 = 0
 
-pub fn migrate_set_block_style(val: i32):
+pub fn migrate_set_block_style(val: i32) -> void:
     g_migrate_block_style = val
 
 pub fn migrate_prefer_brace() -> bool:
@@ -1699,7 +1699,7 @@ pub fn migrate_prefer_brace() -> bool:
 
 var g_migrate_convert_goto_to_structured: i32 = 0
 
-pub fn migrate_set_convert_goto_to_structured(val: i32):
+pub fn migrate_set_convert_goto_to_structured(val: i32) -> void:
     g_migrate_convert_goto_to_structured = val
 
 pub fn migrate_convert_goto_to_structured() -> bool:
