@@ -31,7 +31,7 @@ extern fn with_str_from_vec_u8(bytes: *const Vec[u8]) -> str
 /// copies the whole prefix on every append. StringBuilder stores bytes in a
 /// Vec[u8], so appending N total bytes grows geometrically and finishes with
 /// one materialized str.
-type StringBuilder {
+pub type StringBuilder {
     bytes: Vec[u8],
 }
 

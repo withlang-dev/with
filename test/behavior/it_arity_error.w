@@ -1,4 +1,4 @@
-//! expect-error: `it` used in context expecting 2 parameter(s)
+//! expect-error: `it` used in context expecting 2 parameter(s) [E0952]
 
 fn apply2(f: fn(i32, i32) -> i32) -> i32:
     f(1, 2)

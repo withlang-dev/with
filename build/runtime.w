@@ -112,18 +112,29 @@ fn br_raw_string_literal(text: str) -> str:
     "r" ++ hashes ++ "\"" ++ text ++ "\"" ++ hashes
 
 fn br_normalize_embedded_source(text: str) -> str:
-    var out = StringBuilder.with_capacity(text.len())
+    var has_cr = false
+    for ci in 0..text.len() as i32:
+        if text.byte_at(ci as i64) == 13:
+            has_cr = true
+            break
+    if not has_cr:
+        return text
+    var out = ""
+    var start = 0
     var i = 0
     while i < text.len() as i32:
         let ch = text.byte_at(i as i64)
         if ch == 13:
+            if i > start:
+                out = out ++ text.slice(start as i64, i as i64)
             if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
                 i = i + 1
-            out.push_byte(10 as u8)
-        else:
-            out.push_str(text.slice(i as i64, (i + 1) as i64))
+            out = out ++ "\n"
+            start = i + 1
         i = i + 1
-    out.to_str()
+    if start < text.len() as i32:
+        out = out ++ text.slice(start as i64, text.len())
+    out
 
 fn br_embedded_rel_path(path: str) -> str:
     if path.starts_with("lib/"):

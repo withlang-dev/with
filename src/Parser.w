@@ -282,6 +282,9 @@ fn Parser.expect(self: Parser, expected: i32) -> i32:
 
 fn Parser.expect_ident(self: Parser) -> i32:
     if self.peek() != TokenKind.TK_IDENT:
+        if self.peek() == TokenKind.TK_KW_IT:
+            self.emit_error_code("'it' is a reserved keyword and cannot be used as an identifier", "E0953")
+            return 0
         self.emit_error("expected identifier")
         return 0
     let sym = self.intern_current()
@@ -369,6 +372,12 @@ fn Parser.peek_past_separators(self: Parser) -> i32:
 fn Parser.emit_error(self: Parser, msg: str):
     let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
     self.diags.emit(Diagnostic.err(msg, span))
+
+fn Parser.emit_error_code(self: Parser, msg: str, code: str):
+    let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
+    var diag = Diagnostic.err(msg, span)
+    diag.set_code(code)
+    self.diags.emit(diag)
 
 fn Parser.poisoned_expr(self: Parser) -> NodeId:
     let start = self.current_start()
@@ -3124,7 +3133,9 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
         self.advance()
         if self.implicit_it_depth > 0:
             let err_span = Span { file: self.file_id, start: start, end: end_pos }
-            self.diags.emit(Diagnostic.err("nested implicit closure is ambiguous; use explicit parameter for inner closure", err_span))
+            var diag = Diagnostic.err("nested implicit closure is ambiguous; use explicit parameter for inner closure", err_span)
+            diag.set_code("E0951")
+            self.diags.emit(diag)
         self.saw_implicit_it = 1
         self.implicit_it_depth = self.implicit_it_depth + 1
         let sym = self.intern.intern("__it")
@@ -6375,7 +6386,7 @@ fn Parser.parse_fat_arrow_paren_closure(self: Parser) -> NodeId:
     var param_count = 0
     while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
         if self.peek() == TokenKind.TK_KW_IT:
-            self.emit_error("'it' is a reserved keyword and cannot be used as a parameter name")
+            self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
             self.advance()
             self.pool.add_extra(0)
             self.pool.add_extra(0)
@@ -6417,7 +6428,7 @@ fn Parser.parse_closure(self: Parser) -> NodeId:
     var param_count = 0
     while self.peek() != TokenKind.TK_PIPE and self.peek() != TokenKind.TK_EOF:
         if self.peek() == TokenKind.TK_KW_IT:
-            self.emit_error("'it' is a reserved keyword and cannot be used as a parameter name")
+            self.emit_error_code("'it' is a reserved keyword and cannot be used as a parameter name", "E0953")
             self.advance()
             self.pool.add_extra(0)
             self.pool.add_extra(0)

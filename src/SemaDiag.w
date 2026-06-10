@@ -101,6 +101,15 @@ fn Sema.emit_error(self: Sema, msg: str, node: i32):
     let end = self.ast.get_end(node)
     self.diags.emit(Diagnostic.err(msg, Span { file: self.local_file_id, start: start, end: end }))
 
+fn Sema.emit_error_code(self: Sema, msg: str, node: i32, code: str):
+    if self.suppress_errors != 0:
+        return
+    let start = self.ast.get_start(node)
+    let end = self.ast.get_end(node)
+    var diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: start, end: end })
+    diag.set_code(code)
+    self.diags.emit(diag)
+
 fn Sema.emit_warning(self: Sema, msg: str, node: i32):
     let start = self.ast.get_start(node)
     let end = self.ast.get_end(node)

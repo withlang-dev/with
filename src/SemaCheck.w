@@ -2899,7 +2899,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_GOTO:
         if self.in_defer != 0:
-            self.emit_error("goto not allowed in defer", node)
+            self.emit_error_code("goto not allowed in defer", node, "E0901")
         let label = self.ast.get_data0(node)
         if self.find_function_label(label) >= 0:
             self.mark_function_label_used(label)
@@ -2978,7 +2978,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_BREAK:
         if self.in_defer != 0:
-            self.emit_error("break not allowed in defer", node)
+            self.emit_error_code("break not allowed in defer", node, "E0901")
         let val = self.ast.get_data0(node)
         if val != 0:
             self.emit_error("break with a value is not supported", node)
@@ -2993,7 +2993,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_CONTINUE:
         if self.in_defer != 0:
-            self.emit_error("continue not allowed in defer", node)
+            self.emit_error_code("continue not allowed in defer", node, "E0901")
         let label = self.ast.get_data0(node)
         if label != 0:
             let target = self.resolve_labeled_control(label, node)
@@ -4305,7 +4305,7 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         return 0
     if op == UnaryOp.UOP_TRY:
         if self.in_defer != 0:
-            self.emit_error("? operator not allowed in defer", node)
+            self.emit_error_code("? operator not allowed in defer", node, "E0901")
             return 0
         let unwrapped = self.try_unwrapped_type(operand as i32)
         if unwrapped == 0:
@@ -4984,7 +4984,7 @@ fn Sema.propagate_method_call_param_effects(self: Sema, call_node: i32, sig_idx:
 
 fn Sema.check_return(self: Sema, node: i32) -> i32:
     if self.in_defer != 0:
-        self.emit_error("return not allowed in defer", node)
+        self.emit_error_code("return not allowed in defer", node, "E0901")
     let value = self.ast.get_data0(node)
     if value != 0:
         let val_type = if self.current_return_type != 0: self.check_expr_with_expected(value, self.current_return_type) else: self.check_expr(value)
@@ -6940,7 +6940,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         if p_name == "__it":
             let expected_params = self.get_type_d1(expected_fn_tid)
             if expected_params != 1:
-                self.emit_error(f"`it` used in context expecting {expected_params} parameter(s)", node)
+                self.emit_error_code(f"`it` used in context expecting {expected_params} parameter(s)", node, "E0952")
 
     // Save borrow state — closure body borrows are local to the closure.
     let saved_borrow_len = self.borrow_kinds.len() as i32

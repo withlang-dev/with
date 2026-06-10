@@ -1,4 +1,4 @@
-//! expect-error: duplicate implementation of trait for type
+//! expect-error: duplicate implementation of trait for type [E1102]
 
 type DualIter { index: i32 }
 

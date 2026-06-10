@@ -1525,7 +1525,7 @@ fn Sema.check_direct_overlap(self: Sema, type_name: i32, trait_sym: i32, node: i
                 all_ok = 0
         if all_ok != 0:
             let tn = self.pool_resolve(trait_sym)
-            self.emit_error("overlapping implementations of '" ++ tn ++ "'", node)
+            self.emit_error_code("overlapping implementations of '" ++ tn ++ "'", node, "E1201")
 
 // Check if a new blanket impl overlaps with any existing direct impl
 fn Sema.check_blanket_overlap(self: Sema, trait_sym: i32, bound_start: i32, bound_count: i32, target_base: i32, node: i32):
@@ -1552,7 +1552,7 @@ fn Sema.check_blanket_overlap(self: Sema, trait_sym: i32, bound_start: i32, boun
                 all_ok = 0
         if all_ok != 0:
             let tn = self.pool_resolve(trait_sym)
-            self.emit_error("overlapping implementations of '" ++ tn ++ "'", node)
+            self.emit_error_code("overlapping implementations of '" ++ tn ++ "'", node, "E1201")
 
 fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> void:
     let type_name = self.ast.get_data0(node)
@@ -1571,7 +1571,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> void:
         let trait_is_local = self.local_trait_names.contains(trait_sym) or is_lang_trait
         let type_is_local = self.local_type_names.contains(type_name)
         if not trait_is_local and not type_is_local:
-            self.emit_error("orphan rule violation: impl requires a local trait or local type", node)
+            self.emit_error_code("orphan rule violation: impl requires a local trait or local type", node, "E1101")
             return
 
     // Sealed trait check: only the defining module can impl
@@ -1713,7 +1713,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> void:
         let old_count = self.impl_counts.get(idx as i64)
         for i in 0..old_count:
             if self.impl_extra.get((old_start + i) as i64) == trait_sym:
-                self.emit_error("duplicate implementation of trait for type", node)
+                self.emit_error_code("duplicate implementation of trait for type", node, "E1102")
                 return
         // Copy existing entries to end for contiguity
         let new_start = self.impl_extra.len() as i32

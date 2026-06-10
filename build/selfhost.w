@@ -399,6 +399,7 @@ pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
     let directives_rc = bs_check_test_directives(ctx, compiler_path, test_dir)
     if directives_rc != 0:
         return directives_rc
+    0
 
 fn bs_one_liner_args(first: str, second: str) -> Vec[str]:
     let args: Vec[str] = Vec.new()

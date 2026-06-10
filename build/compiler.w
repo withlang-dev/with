@@ -154,18 +154,29 @@ fn comp_replace_all(text: str, needle: str, replacement: str) -> str:
     out
 
 fn comp_normalize_line_endings(text: str) -> str:
-    var out = StringBuilder.with_capacity(text.len())
+    var has_cr = false
+    for ci in 0..text.len() as i32:
+        if text.byte_at(ci as i64) == 13:
+            has_cr = true
+            break
+    if not has_cr:
+        return text
+    var out = ""
+    var start = 0
     var i = 0
     while i < text.len() as i32:
         let ch = text.byte_at(i as i64)
         if ch == 13:
+            if i > start:
+                out = out ++ text.slice(start as i64, i as i64)
             if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
                 i = i + 1
-            out.push_byte(10 as u8)
-        else:
-            out.push_byte(ch as u8)
+            out = out ++ "\n"
+            start = i + 1
         i = i + 1
-    out.to_str()
+    if start < text.len() as i32:
+        out = out ++ text.slice(start as i64, text.len())
+    out
 
 fn comp_tool_from_env(primary: str, legacy: str, fallback: str) -> str:
     let explicit = env(primary)

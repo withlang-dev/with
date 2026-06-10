@@ -1,4 +1,4 @@
-//! expect-check-fail: ? operator not allowed in defer
+//! expect-check-fail: ? operator not allowed in defer [E0901]
 
 fn bad_question -> Result[i32, str]:
     let cleanup: Result[i32, str] = Ok(1)

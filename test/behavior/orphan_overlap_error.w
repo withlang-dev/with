@@ -1,4 +1,4 @@
-//! expect-check-fail: overlapping implementations
+//! expect-check-fail: overlapping implementations of 'Renderable' [E1201]
 
 trait Renderable:
     fn render(self: &Self) -> str

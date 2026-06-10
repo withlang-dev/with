@@ -1,4 +1,4 @@
-//! expect-error: nested implicit closure
+//! expect-error: nested implicit closure is ambiguous; use explicit parameter for inner closure [E0951]
 
 fn apply(f: fn(i32) -> i32, x: i32) -> i32:
     f(x)
