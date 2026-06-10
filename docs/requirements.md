@@ -13103,13 +13103,13 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: `@[target("arch")]`; §16.13; Architecture-guarded items
   - Source: `§29.14 L11203`
   - Related spec refs: §16.13
-- [x] `29.14.1.21` **Implementation-internal (unstable): @[bench], @[stack_size], @[callconv], @...**
-  - Requirement: **Implementation-internal (unstable):** `@[bench]`, `@[stack_size]`, `@[callconv]`, `@[compiler_hook]`.
-  - Source: `§29.14 L11205-L11208`
+- [x] `29.14.1.21` **Implementation-internal (unstable): @[bench], @[test], @[before], @[after],...**
+  - Requirement: **Implementation-internal (unstable):** `@[bench]`, `@[test]`, `@[before]`, `@[after]`, `@[stack_size]`, `@[callconv]`, `@[compiler_hook]`, `@[packed]`, `@[weak]`.
+  - Source: `§29.14 L11205-L11209`
   - Related spec refs: none
-- [x] `29.14.1.22` **These exist for compiler and stdlib development, may change or vanish witho...**
-  - Requirement: These exist for compiler and stdlib development, may change or vanish without notice, and are not part of the language.
-  - Source: `§29.14 L11205-L11208`
+- [x] `29.14.1.22` **These exist for compiler, test harness, migrator/runtime, and stdlib develo...**
+  - Requirement: These exist for compiler, test harness, migrator/runtime, and stdlib development, may change or vanish without notice, and are not part of the language.
+  - Source: `§29.14 L11205-L11209`
   - Related spec refs: none
 
 ## 30. Formal Grammar (Informative)
@@ -13118,236 +13118,236 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
 
 - [x] `30.1.1.1` **This appendix collects syntactic productions from throughout the specificat...**
   - Informative trace: This appendix collects syntactic productions from throughout the specification into a unified reference.
-  - Source: `§30 L11214-L11220`
+  - Source: `§30 L11215-L11221`
   - Related spec refs: none
 - [x] `30.1.1.2` **The normative definitions remain in their respective sections; this is a co...**
   - Informative trace: The normative definitions remain in their respective sections; this is a convenience index.
-  - Source: `§30 L11214-L11220`
+  - Source: `§30 L11215-L11221`
   - Related spec refs: none
 - [x] `30.1.1.3` **If this appendix drifts from a normative section, the normative section wins.**
   - Informative trace: If this appendix drifts from a normative section, the normative section wins.
-  - Source: `§30 L11214-L11220`
+  - Source: `§30 L11215-L11221`
   - Related spec refs: none
 - [x] `30.1.1.4` **Requirements, conformance tests, and implementation work must cite the owni...**
   - Informative trace: Requirements, conformance tests, and implementation work must cite the owning normative section; this appendix may be cited only as related context.
-  - Source: `§30 L11214-L11220`
+  - Source: `§30 L11215-L11221`
   - Related spec refs: none
 
 ### §30.1 Notation
 
 - [x] `30.1.1.5` **Productions use EBNF-like notation:**
   - Informative trace: Productions use EBNF-like notation:
-  - Source: `§30.1 L11224`
+  - Source: `§30.1 L11225`
   - Related spec refs: none
 - [x] `30.1.1.6` **| alternatives**
   - Informative trace: `|` alternatives
-  - Source: `§30.1 L11226`
+  - Source: `§30.1 L11227`
   - Related spec refs: none
 - [x] `30.1.1.7` **[ ] optional**
   - Informative trace: `[ ]` optional
-  - Source: `§30.1 L11227`
+  - Source: `§30.1 L11228`
   - Related spec refs: none
 - [x] `30.1.1.8` **{ } zero or more repetitions**
   - Informative trace: `{ }` zero or more repetitions
-  - Source: `§30.1 L11228`
+  - Source: `§30.1 L11229`
   - Related spec refs: none
 - [x] `30.1.1.9` **( ) grouping**
   - Informative trace: `( )` grouping
-  - Source: `§30.1 L11229`
+  - Source: `§30.1 L11230`
   - Related spec refs: none
 - [x] `30.1.1.10` **'...' terminal tokens**
   - Informative trace: `'...'` terminal tokens
-  - Source: `§30.1 L11230`
+  - Source: `§30.1 L11231`
   - Related spec refs: none
 - [x] `30.1.1.11` **UPPER non-terminal symbols**
   - Informative trace: `UPPER` non-terminal symbols
-  - Source: `§30.1 L11231`
+  - Source: `§30.1 L11232`
   - Related spec refs: none
 
 ### §30.2 Lexical Grammar
 
 - [x] `30.2.1.1` **Identifiers (§29.11):**
   - Informative trace: **Identifiers** (§29.11):
-  - Source: `§30.2 L11235`
+  - Source: `§30.2 L11236`
   - Related spec refs: §29.11
 - [x] `30.2.1.2` **Numeric literals (§4.2.1, §29.1):**
   - Informative trace: **Numeric literals** (§4.2.1, §29.1):
-  - Source: `§30.2 L11243`
+  - Source: `§30.2 L11244`
   - Related spec refs: §4.2.1, §29.1
 - [x] `30.2.1.3` **String literals (§15.3, §29.3, §29.4):**
   - Informative trace: **String literals** (§15.3, §29.3, §29.4):
-  - Source: `§30.2 L11256`
+  - Source: `§30.2 L11257`
   - Related spec refs: §15.3, §29.3, §29.4
 - [x] `30.2.1.4` **When the lexer sees a bare apostrophe, it tries CHAR_LIT before LABEL.**
   - Informative trace: When the lexer sees a bare apostrophe, it tries `CHAR_LIT` before `LABEL`.
-  - Source: `§30.2 L11268-L11269`
+  - Source: `§30.2 L11269-L11270`
   - Related spec refs: none
 - [x] `30.2.1.5` **A label has no closing apostrophe.**
   - Informative trace: A label has no closing apostrophe.
-  - Source: `§30.2 L11268-L11269`
+  - Source: `§30.2 L11269-L11270`
   - Related spec refs: none
 - [x] `30.2.1.6` **Labels (§13.5a, §29.5a):**
   - Informative trace: **Labels** (§13.5a, §29.5a):
-  - Source: `§30.2 L11271`
+  - Source: `§30.2 L11272`
   - Related spec refs: §13.5a, §29.5a
 - [x] `30.2.1.7` **LABEL may appear as a statement prefix or as the target operand of goto, br...**
   - Informative trace: `LABEL` may appear as a statement prefix or as the target operand of `goto`, `break`, and `continue`.
-  - Source: `§30.2 L11277-L11279`
+  - Source: `§30.2 L11278-L11280`
   - Related spec refs: none
 - [x] `30.2.1.8` **As a statement prefix, it must be the first token of the statement and has...**
   - Informative trace: As a statement prefix, it must be the first token of the statement and has no trailing colon of its own.
-  - Source: `§30.2 L11277-L11279`
+  - Source: `§30.2 L11278-L11280`
   - Related spec refs: none
 
 ### §30.3 Declarations
 
 - [x] `30.3.1.1` **Function declaration (§9.1):**
   - Informative trace: **Function declaration** (§9.1):
-  - Source: `§30.3 L11283`
+  - Source: `§30.3 L11284`
   - Related spec refs: §9.1
 - [x] `30.3.1.2` **Struct declaration (§4.3):**
   - Informative trace: **Struct declaration** (§4.3):
-  - Source: `§30.3 L11293`
+  - Source: `§30.3 L11294`
   - Related spec refs: §4.3
 - [x] `30.3.1.3` **Enum declaration (§4.4):**
   - Informative trace: **Enum declaration** (§4.4):
-  - Source: `§30.3 L11301`
+  - Source: `§30.3 L11302`
   - Related spec refs: §4.4
 - [x] `30.3.1.4` **Trait and impl (§11):**
   - Informative trace: **Trait and impl** (§11):
-  - Source: `§30.3 L11311`
+  - Source: `§30.3 L11312`
   - Related spec refs: §11
 - [x] `30.3.1.5` **Import (§18.2):**
   - Informative trace: **Import** (§18.2):
-  - Source: `§30.3 L11318`
+  - Source: `§30.3 L11319`
   - Related spec refs: §18.2
 - [x] `30.3.1.6` **Const declaration (§9.1b):**
   - Informative trace: **Const declaration** (§9.1b):
-  - Source: `§30.3 L11325`
+  - Source: `§30.3 L11326`
   - Related spec refs: §9.1b
 
 ### §30.4 Statements
 
 - [x] `30.4.1.1` **Variable binding (§2):**
   - Informative trace: **Variable binding** (§2):
-  - Source: `§30.4 L11333`
+  - Source: `§30.4 L11334`
   - Related spec refs: §2
 - [x] `30.4.1.2` **Control flow (§9, §13.5a, §13.5b, §13.5c):**
   - Informative trace: **Control flow** (§9, §13.5a, §13.5b, §13.5c):
-  - Source: `§30.4 L11340`
+  - Source: `§30.4 L11341`
   - Related spec refs: §9, §13.5a, §13.5b, §13.5c
 
 ### §30.5 Expressions
 
 - [x] `30.5.1.1` **Operator precedence (§9.9) — low to high:**
   - Informative trace: **Operator precedence** (§9.9) — low to high:
-  - Source: `§30.5 L11367`
+  - Source: `§30.5 L11368`
   - Related spec refs: §9.9
 - [x] `30.5.1.2` **Level; Operators; Associativity**
   - Informative trace: Level; Operators; Associativity
-  - Source: `§30.5 L11369`
+  - Source: `§30.5 L11370`
   - Related spec refs: none
 - [x] `30.5.1.3` **1; or; Left**
   - Informative trace: 1; `or`; Left
-  - Source: `§30.5 L11371`
+  - Source: `§30.5 L11372`
   - Related spec refs: none
 - [x] `30.5.1.4` **2; and; Left**
   - Informative trace: 2; `and`; Left
-  - Source: `§30.5 L11372`
+  - Source: `§30.5 L11373`
   - Related spec refs: none
 - [x] `30.5.1.5` **3; ==, !=, in, not in, =~, !~; Non-associative**
   - Informative trace: 3; `==`, `!=`, `in`, `not in`, `=~`, `!~`; Non-associative
-  - Source: `§30.5 L11373`
+  - Source: `§30.5 L11374`
   - Related spec refs: none
 - [x] `30.5.1.6` **4; <, >, <=, >=; Chained**
   - Informative trace: 4; `<`, `>`, `<=`, `>=`; Chained
-  - Source: `§30.5 L11374`
+  - Source: `§30.5 L11375`
   - Related spec refs: none
 - [x] `30.5.1.7` **5; \; > (pipeline); Left**
   - Informative trace: 5; `\; >` (pipeline); Left
-  - Source: `§30.5 L11375`
+  - Source: `§30.5 L11376`
   - Related spec refs: none
 - [x] `30.5.1.8` **6; \; ; Left**
   - Informative trace: 6; `\; `; Left
-  - Source: `§30.5 L11376`
+  - Source: `§30.5 L11377`
   - Related spec refs: none
 - [x] `30.5.1.9` **7; ^; Left**
   - Informative trace: 7; `^`; Left
-  - Source: `§30.5 L11377`
+  - Source: `§30.5 L11378`
   - Related spec refs: none
 - [x] `30.5.1.10` **8; &; Left**
   - Informative trace: 8; `&`; Left
-  - Source: `§30.5 L11378`
+  - Source: `§30.5 L11379`
   - Related spec refs: none
 - [x] `30.5.1.11` **9; <<, >>; Left**
   - Informative trace: 9; `<<`, `>>`; Left
-  - Source: `§30.5 L11379`
+  - Source: `§30.5 L11380`
   - Related spec refs: none
 - [x] `30.5.1.12` **10; +, -, ++, ??; Left**
   - Informative trace: 10; `+`, `-`, `++`, `??`; Left
-  - Source: `§30.5 L11380`
+  - Source: `§30.5 L11381`
   - Related spec refs: none
 - [x] `30.5.1.13` **11; , /, %, @; Left**
   - Informative trace: 11; `*`, `/`, `%`, `@`; Left
-  - Source: `§30.5 L11381`
+  - Source: `§30.5 L11382`
   - Related spec refs: none
 - [x] `30.5.1.14` **12; Unary prefix (not, -, ~, &, &raw mut); —**
   - Informative trace: 12; Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`); —
-  - Source: `§30.5 L11382`
+  - Source: `§30.5 L11383`
   - Related spec refs: none
 - [x] `30.5.1.15` **13; Postfix (.await, ?, .field, [i], ()); Left**
   - Informative trace: 13; Postfix (`.await`, `?`, `.field`, `[i]`, `()`); Left
-  - Source: `§30.5 L11383`
+  - Source: `§30.5 L11384`
   - Related spec refs: none
 - [x] `30.5.1.16` **Comprehensions (§13.6):**
   - Informative trace: **Comprehensions** (§13.6):
-  - Source: `§30.5 L11385`
+  - Source: `§30.5 L11386`
   - Related spec refs: §13.6
 
 ### §30.6 Patterns
 
 - [x] `30.6.1.1` **Pattern syntax (§9.7):**
   - Informative trace: **Pattern syntax** (§9.7):
-  - Source: `§30.6 L11396`
+  - Source: `§30.6 L11397`
   - Related spec refs: §9.7
 
 ### §30.7 Format Specification
 
 - [x] `30.7.1.1` **Format spec grammar (§15.4.1):**
   - Informative trace: **Format spec grammar** (§15.4.1):
-  - Source: `§30.7 L11418`
+  - Source: `§30.7 L11419`
   - Related spec refs: §15.4.1
 
 ### §30.8 Block Syntax
 
 - [x] `30.8.1.1` **Body forms (§29.13):**
   - Informative trace: **Body forms** (§29.13):
-  - Source: `§30.8 L11432`
+  - Source: `§30.8 L11433`
   - Related spec refs: §29.13
 - [x] `30.8.1.2` **All three forms are interchangeable for every block-introducing construct:...**
   - Informative trace: All three forms are interchangeable for every block-introducing construct: `fn`, `if`, `else if`, `else`, `while`, `for`, `loop`, `with`, `defer`, `errdefer`, `comptime`, `unsafe`, labeled blocks, and match arms.
-  - Source: `§30.8 L11441-L11444`
+  - Source: `§30.8 L11442-L11445`
   - Related spec refs: none
 - [x] `30.8.1.3` **then EXPR is not a body form.**
   - Informative trace: `then EXPR` is not a body form.
-  - Source: `§30.8 L11441-L11444`
+  - Source: `§30.8 L11442-L11445`
   - Related spec refs: none
 - [x] `30.8.1.4` **Missing body introducers are parse errors.**
   - Informative trace: Missing body introducers are parse errors.
-  - Source: `§30.8 L11441-L11444`
+  - Source: `§30.8 L11442-L11445`
   - Related spec refs: none
 
 ### §30.9 Reserved Keywords
 
 - [x] `30.9.1.1` **The reserved keyword list is normative in §29.11.**
   - Informative trace: The reserved keyword list is normative in §29.11.
-  - Source: `§30.9 L11448-L11449`
+  - Source: `§30.9 L11449-L11450`
   - Related spec refs: §29.11
 - [x] `30.9.1.2` **This appendix does not maintain a separate copy.**
   - Informative trace: This appendix does not maintain a separate copy.
-  - Source: `§30.9 L11448-L11449`
+  - Source: `§30.9 L11449-L11450`
   - Related spec refs: none
 - [x] `30.9.1.3` **The With Programming Language — End of specification.**
   - Informative trace: *The With Programming Language — End of specification.*
-  - Source: `§30.9 L11453`
+  - Source: `§30.9 L11454`
   - Related spec refs: none

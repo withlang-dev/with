@@ -11202,10 +11202,11 @@ not marked internal is invalid.
 | `@[panic_handler]` / `@[entry]` / `@[no_main]` / `@[global_allocator]` | §18.7 | Freestanding-mode hooks |
 | `@[target("arch")]` | §16.13 | Architecture-guarded items |
 
-**Implementation-internal (unstable):** `@[bench]`, `@[stack_size]`,
-`@[callconv]`, `@[compiler_hook]`. These exist for compiler and
-stdlib development, may change or vanish without notice, and are not
-part of the language.
+**Implementation-internal (unstable):** `@[bench]`, `@[test]`,
+`@[before]`, `@[after]`, `@[stack_size]`, `@[callconv]`,
+`@[compiler_hook]`, `@[packed]`, `@[weak]`. These exist for compiler,
+test harness, migrator/runtime, and stdlib development, may change or
+vanish without notice, and are not part of the language.
 
 ---
 

@@ -512,6 +512,30 @@ pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
             return comp_fail(ctx, "could not write: " ++ output)
     0
 
+pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
+    let root = ctx.project_info().project_root()
+    let capture_dir = comp_join("out/command", ctx.target_name())
+    if ctx.fs().mkdir_all(capture_dir) != 0:
+        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    let argv: Vec[str] = Vec.new()
+    argv.push(if os() == "Windows": "python" else: "python3")
+    argv.push("scripts/check-spec-inventory.py")
+    let result = ctx.process_runner().run_capture(argv, comp_abs(root, comp_join(capture_dir, "stdout.txt")), comp_abs(root, comp_join(capture_dir, "stderr.txt")), 60000)
+    if result.rc != 0:
+        if result.stderr.len() > 0:
+            ctx.diagnostics().error(result.stderr)
+        else:
+            ctx.diagnostics().error("spec inventory check failed")
+        return result.rc
+    let output = ctx.output()
+    if output.len() > 0:
+        let dir = comp_dirname(output)
+        if ctx.fs().mkdir_all(dir) != 0:
+            return comp_fail(ctx, "could not create output directory: " ++ dir)
+        if ctx.fs().write_text(output, "ok\n") != 0:
+            return comp_fail(ctx, "could not write: " ++ output)
+    0
+
 fn comp_json_escape(text: str) -> str:
     var out = ""
     for i in 0..text.len() as i32:

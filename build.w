@@ -462,6 +462,19 @@ pub fn build(ctx: BuildCtx) -> Build:
     requirements_informative = requirements_informative.input("docs/requirements.md")
     out = out.add_target(requirements_informative)
 
+    var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
+    spec_inventory.action = run_check_spec_inventory_action
+    spec_inventory = spec_inventory.write_scope("out/.build-state")
+    spec_inventory = spec_inventory.write_scope("out/command/spec-inventory-check")
+    spec_inventory = spec_inventory.input("scripts/check-spec-inventory.py")
+    spec_inventory = spec_inventory.input("docs/with-specification.md")
+    spec_inventory = spec_inventory.input("src/Token.w")
+    spec_inventory = spec_inventory.input("src/Parser.w")
+    spec_inventory = spec_inventory.input("src/main.w")
+    spec_inventory = spec_inventory.input("src/compiler/DriverOptions.w")
+    spec_inventory = spec_inventory.input("lib/std")
+    out = out.add_target(spec_inventory)
+
     out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "src/compiler/LlvmBridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O0", ""))
     out = out.add_target(with_object_target("bootstrap-clang-bridge-object", "seed", "src/compiler/ClangBridge.w", "out/bootstrap-lib/clang_bridge.o", "-O0", ""))
 
@@ -921,6 +934,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("emit-c-smoke")
     tests = tests.dep("requirements-informative-check")
+    tests = tests.dep("spec-inventory-check")
     tests = tests.dep("test-green")
     out = out.add_target(tests)
 
