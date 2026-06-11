@@ -1,5 +1,5 @@
 //! expect-check-fail: break with a value is only valid for `loop`
 
 fn main:
-    while true:
-        break 1
+    'blk:
+        break 'blk 1

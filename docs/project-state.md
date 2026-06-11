@@ -24,14 +24,13 @@ argument cases. Full `with build`, `with build :fixpoint`, `with build :test`,
 `with build :release-uat` passed on 2026-06-11 for this release-gate slice.
 
 Phase 2 parser/control-flow work is in progress. #461, #443, #445, #448,
-#447, #462, and #375 are implemented, pushed, and closed. #382 is implemented
-locally and fully verified: implicit default return is rejected when the body
-has an explicit value-producing path, including `return expr`, branch tails,
-closures, and comptime functions, while effect-only bodies may still default.
-Full `with build`, `with build :fixpoint`, `with build :test`, and
-`with build :test-green` passed on 2026-06-11 for #382. Follow-up bug #549
-tracks value-position `if` branch type mismatches discovered during the #382
-audit.
+#447, #462, #375, #382, and #401 are implemented, pushed, and closed. `loop`
+is now expression-valued through `break expr`, plain `break` contributes Unit,
+break values unify per loop, non-loop value breaks are rejected, and no-break
+loops type as `Never`. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-11 for
+#401. Follow-up bug #549 tracks value-position `if` branch type mismatches
+discovered during the #382 audit.
 
 #347, #356, #358, and the first #357 safety slice are implemented.
 `c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:

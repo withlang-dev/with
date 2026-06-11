@@ -63,6 +63,7 @@ enum LabelFrameKind: i32:
     LFK_WHILE = 1
     LFK_FOR = 2
     LFK_BLOCK = 3
+    LFK_LOOP = 4
 
 type LabelRegistryState {
     label_syms: Vec[i32],
@@ -415,6 +416,7 @@ type Sema {
     label_syms: Vec[i32],
     label_kinds: Vec[i32],
     label_nodes: Vec[i32],
+    label_break_value_types: Vec[i32],
     fn_label_syms: Vec[i32],
     fn_label_nodes: Vec[i32],
     fn_label_paths: Vec[str],
@@ -1114,6 +1116,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         label_syms: Vec.new(),
         label_kinds: Vec.new(),
         label_nodes: Vec.new(),
+        label_break_value_types: Vec.new(),
         fn_label_syms: Vec.new(),
         fn_label_nodes: Vec.new(),
         fn_label_paths: Vec.new(),
