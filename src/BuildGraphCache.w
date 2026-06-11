@@ -2,6 +2,7 @@
 
 use BuildGraphModel
 use BuildGraphRuntime
+use compiler.TrackedInputs
 
 extern fn with_str_hash(s: str) -> i64
 
@@ -208,6 +209,24 @@ fn build_cache_sorted_strings(items: Vec[str]) -> Vec[str]:
         sorted = out
     sorted
 
+fn build_cache_sorted_unique_strings(items: Vec[str]) -> Vec[str]:
+    var sorted: Vec[str] = Vec.new()
+    for i in 0..items.len() as i32:
+        sorted = tracked_input_insert_unique(move sorted, items.get(i as i64))
+    sorted
+
+fn build_cache_last_colon(text: str) -> i32:
+    var last = -1
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 58:
+            last = i
+    last
+
+fn build_cache_dep_path(root: str, stored_path: str) -> str:
+    if stored_path.len() > 0 and stored_path.byte_at(0) == 47:
+        return stored_path
+    root ++ "/" ++ stored_path
+
 pub fn build_cache_hash_directory_w_files(root: str, dir: str) -> i64:
     let files = build_cache_list_w_files(root, dir)
     var combined = ""
@@ -320,6 +339,7 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
     let expected_sig = build_cache_compute_signature(target, root)
     var state_sig: i64 = 0
     var input_hashes: Vec[str] = Vec.new()
+    var dep_hashes: Vec[str] = Vec.new()
     var output_hashes: Vec[str] = Vec.new()
     var line_start = 0
     var i = 0
@@ -331,6 +351,8 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
                 state_sig = parse_i64_from_str(line.slice(4, line.len()))
             else if line.starts_with("in:"):
                 input_hashes.push(line.slice(3, line.len()))
+            else if line.starts_with("dep:"):
+                dep_hashes.push(line.slice(4, line.len()))
             else if line.starts_with("out:"):
                 output_hashes.push(line.slice(4, line.len()))
             line_start = i + 1
@@ -341,6 +363,8 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
             state_sig = parse_i64_from_str(line.slice(4, line.len()))
         else if line.starts_with("in:"):
             input_hashes.push(line.slice(3, line.len()))
+        else if line.starts_with("dep:"):
+            dep_hashes.push(line.slice(4, line.len()))
         else if line.starts_with("out:"):
             output_hashes.push(line.slice(4, line.len()))
     if state_sig != expected_sig:
@@ -353,6 +377,19 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
         let current_hash = build_cache_fingerprint_file(path)
         let stored = input_hashes.get(idx as i64)
         let expected_entry = path ++ ":" ++ f"{current_hash}"
+        if stored != expected_entry:
+            return false
+    for idx in 0..dep_hashes.len() as i32:
+        let stored = dep_hashes.get(idx as i64)
+        let split = build_cache_last_colon(stored)
+        if split < 0:
+            return false
+        let stored_path = stored.slice(0, split as i64)
+        let path = build_cache_dep_path(root, stored_path)
+        if build_graph_rt_file_exists(path) == 0:
+            return false
+        let current_hash = build_cache_fingerprint_file(path)
+        let expected_entry = stored_path ++ ":" ++ f"{current_hash}"
         if stored != expected_entry:
             return false
     let output_paths = build_cache_collect_output_paths(root, target)
@@ -369,7 +406,7 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
             return false
     true
 
-pub fn build_cache_record(root: str, target: BuildGraphTarget) -> void:
+pub fn build_cache_record(root: str, target: BuildGraphTarget, discovered_deps: Vec[str]) -> void:
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)
@@ -382,6 +419,12 @@ pub fn build_cache_record(root: str, target: BuildGraphTarget) -> void:
         let path = input_paths.get(idx as i64)
         let hash = build_cache_fingerprint_file(path)
         content = content ++ f"in:{path}:{hash}\n"
+    let dep_paths = build_cache_sorted_unique_strings(discovered_deps)
+    for idx in 0..dep_paths.len() as i32:
+        let path = dep_paths.get(idx as i64)
+        let hash = build_cache_fingerprint_file(path)
+        let rel_path = build_cache_project_relative(root, path)
+        content = content ++ f"dep:{rel_path}:{hash}\n"
     let output_paths = build_cache_collect_output_paths(root, target)
     for idx in 0..output_paths.len() as i32:
         let path = output_paths.get(idx as i64)

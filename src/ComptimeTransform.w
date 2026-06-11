@@ -2598,9 +2598,11 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
     transform_sema.module_index_by_path = self.module_index_by_path
     transform_sema.global_visible_module_paths = self.global_visible_module_paths
     transform_sema.module_visibility_cache = HashMap.new()
+    transform_sema.set_tracked_input_context(self.tracked_input_root, self.tracked_input_paths)
     transform_sema.prepare_for_comptime_transform()
     if transform_sema.diags.has_errors():
         self.diags = transform_sema.diags
+        self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
         return out
 
     for di in 0..out.decl_count():
@@ -2609,4 +2611,5 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
         let live_ast = out
         transform_sema.ct_transform_decl(live_ast, out, intern, decl as i32)
     self.diags = transform_sema.diags
+    self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
     out

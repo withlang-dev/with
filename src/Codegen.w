@@ -20,7 +20,6 @@ use Overflow
 
 extern fn exit(code: i32) -> void
 extern fn with_fs_read_file(path: str) -> str
-extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_parse_float(s: str) -> f64
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
@@ -408,6 +407,8 @@ type Codegen {
     // Source info
     source_file: str,
     source_text: str,
+    tracked_input_root: str,
+    tracked_input_paths: Vec[str],
 
     // Debug info (DWARF)
     debug_info: i32,
@@ -461,6 +462,11 @@ fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: In
     cg.intern = intern
     cg.sema = sema
     cg.overflow_mode = overflow_mode
+    cg.tracked_input_root = with_str_clone(cg.sema.tracked_input_root)
+    let tracked_paths: Vec[str] = Vec.new()
+    for tpi in 0..cg.sema.tracked_input_paths.len() as i32:
+        tracked_paths.push(cg.sema.tracked_input_paths.get(tpi as i64))
+    cg.tracked_input_paths = tracked_paths
     cg.capture_sema_symbol_texts()
     // Pre-intern dispatch symbols for O(1) comparisons
     cg.sym_vec = cg.intern.intern("Vec")
@@ -708,6 +714,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         fn_default_counts: HashMap.new(),
         source_file: "<unknown>",
         source_text: "",
+        tracked_input_root: "",
+        tracked_input_paths: Vec.new(),
         mir_dispatch_count: 0,
         mir_input: MirModule.init(),
         mir_local_ptrs: HashMap.new(),

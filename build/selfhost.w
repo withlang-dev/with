@@ -1232,6 +1232,41 @@ fn bs_check_build_cache_tracks_action_source(ctx: ActionCtx, compiler_path: str,
     if second.rc != 0: return second.rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "second", "build cache action source invalidation")
 
+fn bs_check_build_cache_tracks_embed_file(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "embedcache")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "const DATA: str = embed_file(\"data.txt\")\n\nfn main:\n    print(DATA)\n", "embed cache main")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/data.txt"), "first", "embed cache first data")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build().executable(\"embedcache\", \"src/main.w\")\n    out.default(\"embedcache\")\n", "embed cache build")
+    if rc != 0: return rc
+
+    var build_args: Vec[str] = Vec.new()
+    build_args |> push("build")
+    build_args |> push(":embedcache")
+    let first = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-embed-first", build_args)
+    if first.rc != 0: return first.rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/embedcache.state"), "dep:src/data.txt:", "build cache embed dep")
+    if rc != 0: return rc
+    let first_run = bs_run_binary_capture(ctx, bs_join(case_dir, "out/bin/embedcache"), "build-cache-embed-first-run", 120000)
+    if first_run.rc != 0:
+        return bs_fail(ctx, f"embed cache first binary failed with exit code {first_run.rc}: " ++ first_run.stderr)
+    rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(first_run.stdout), "first", "build_cache_embed_first", "stdout")
+    if rc != 0: return rc
+
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/data.txt"), "second", "embed cache second data")
+    if rc != 0: return rc
+    var rebuild_args: Vec[str] = Vec.new()
+    rebuild_args |> push("build")
+    rebuild_args |> push(":embedcache")
+    let second = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-embed-second", rebuild_args)
+    if second.rc != 0: return second.rc
+    let second_run = bs_run_binary_capture(ctx, bs_join(case_dir, "out/bin/embedcache"), "build-cache-embed-second-run", 120000)
+    if second_run.rc != 0:
+        return bs_fail(ctx, f"embed cache second binary failed with exit code {second_run.rc}: " ++ second_run.stderr)
+    bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(second_run.stdout), "second", "build_cache_embed_second", "stdout")
+
 pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -1278,6 +1313,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_cache_tracks_compiler(ctx, compiler_path, bs_join(output_dir, "build_cache_compiler_case"))
     if rc != 0: return rc
     rc = bs_check_build_cache_tracks_action_source(ctx, compiler_path, bs_join(output_dir, "build_cache_action_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_cache_tracks_embed_file(ctx, compiler_path, bs_join(output_dir, "build_cache_embed_case"))
     if rc != 0: return rc
     bs_check_run_project_targets(ctx, compiler_path, bs_join(output_dir, "run_project_case"))
 

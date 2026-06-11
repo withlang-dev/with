@@ -9,6 +9,7 @@ use AsyncMir
 use compiler.Compilation.Config
 use compiler.ProjectConfig
 use compiler.Runtime
+use compiler.TrackedInputs
 
 fn zcu_owned_text(text: str) -> str:
     if text.len() == 0:
@@ -73,6 +74,7 @@ type Zcu {
     last_async_mir_module: AsyncMirModule,
     last_async_mir_dump: str,
     last_link_lib_names: Vec[str],
+    tracked_input_paths: Vec[str],
     project_config: ProjectConfig,
     trace_c_import_cache: i32,
     prelude_mode: i32,
@@ -126,6 +128,7 @@ fn Zcu.init -> Zcu:
         last_async_mir_module: AsyncMirModule.init(),
         last_async_mir_dump: "",
         last_link_lib_names: Vec.new(),
+        tracked_input_paths: Vec.new(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,
         prelude_mode: PRELUDE_FULL(),
@@ -292,6 +295,15 @@ fn Zcu.set_current_source(self: Zcu, source_dir: str, path: str, text: str):
     self.current_source_path = path
     self.current_source_text = text
 
+fn Zcu.tracked_input_root(self: Zcu) -> str:
+    if self.project_config.root_dir.len() > 0:
+        return self.project_config.root_dir
+    self.source_dir
+
+fn Zcu.configure_tracked_input_sema(self: Zcu, sema: Sema) -> Sema:
+    sema.set_tracked_input_context(self.tracked_input_root(), self.tracked_input_paths)
+    sema
+
 fn Zcu.set_extra_sources(self: Zcu, names: Vec[str], texts: Vec[str]):
     self.extra_source_names = names
     self.extra_source_texts = texts
@@ -316,6 +328,7 @@ fn Zcu.clear_stage_outputs(self: Zcu):
     self.last_async_mir_module = AsyncMirModule.init()
     self.last_async_mir_dump = ""
     self.reset_last_link_lib_names()
+    self.tracked_input_paths = Vec.new()
     self.trace_c_import_cache = 0
     self.source_text_file_ids = Vec.new()
     self.source_text_names = Vec.new()
@@ -348,6 +361,8 @@ fn Zcu.sync_from_sema(self: Zcu, sema: Sema):
     self.typed_binding_types = sema.typed_binding_types
     self.typed_binding_names = sema.typed_binding_names
     self.typed_binding_muts = sema.typed_binding_muts
+    var tracked_paths = self.tracked_input_paths
+    self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &sema.tracked_input_paths)
     self.last_sema = sema
     if zcu_debug_pool_flow_enabled() != 0:
         runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.state.symbol_texts.len() as i32} last_sema.pool={self.last_sema.pool.state.symbol_texts.len() as i32} last_sema.ast.decls={self.last_sema.ast.decl_count()}")

@@ -9,6 +9,7 @@ use CapabilityRegistry
 use compiler.Compilation
 use compiler.Link
 use compiler.ProjectConfig
+use compiler.TrackedInputs
 use render
 use CiMigrate
 use Overflow
@@ -301,23 +302,6 @@ fn comptime_configured_string_budget(default_budget: i64) -> i64:
     if parsed > 0:
         return parsed
     default_budget
-
-fn comptime_dirname(path: str) -> str:
-    var last_slash = -1
-    for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
-            last_slash = i
-    if last_slash < 0:
-        return ""
-    path.slice(0, last_slash as i64)
-
-fn comptime_resolve_embed_file_path(source_path: str, raw_path: str) -> str:
-    if raw_path.len() > 0 and raw_path.byte_at(0) == 47:
-        return raw_path
-    let dir = comptime_dirname(source_path)
-    if dir.len() == 0:
-        return raw_path
-    dir ++ "/" ++ raw_path
 
 fn comptime_source_loc(text: str, offset: i32) -> ComptimeSourceLoc:
     var line = 1
@@ -670,6 +654,8 @@ unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool:
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
+    var tracked_paths = sema_ptr.tracked_input_paths
+    sema_ptr.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &evaluator.sema.tracked_input_paths)
     if evaluator.has_pending_diag != 0:
         sema_ptr.diags.emit(evaluator.pending_diag)
     ComptimeEvalResult {
@@ -685,6 +671,8 @@ unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, poo
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
+    var tracked_paths = sema_ptr.tracked_input_paths
+    sema_ptr.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &evaluator.sema.tracked_input_paths)
     if evaluator.has_pending_diag != 0:
         sema_ptr.diags.emit(evaluator.pending_diag)
     ComptimeEvalResult {
@@ -3149,6 +3137,10 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
                 self.workspace_success_messages(*native.comp, (*native.comp).zcu.last_sema.ast, node)
         else:
             Vec.new()
+    if native.rc == 0 and native.is_migrate == 0 and native.comp as i64 != 0:
+        unsafe:
+            let tracked_paths = (*native.comp).tracked_input_paths()
+            self.sema.merge_tracked_inputs(&tracked_paths)
     comptime_workspace_native_compile_result_free(native)
     if self.had_error != 0:
         return comptime_workspace_compile_invalid()
@@ -4173,10 +4165,10 @@ fn ComptimeEvaluator.eval_embed_file_call(self: ComptimeEvaluator, node: i32, ar
         return arg_signal
     if arg_signal.value.kind != ComptimeValueKind.CV_STR:
         return self.fail(node, "embed_file() argument must be a comptime string")
-    let path = comptime_resolve_embed_file_path(self.current_source_path(), arg_signal.value.text)
-    if with_fs_file_exists(path) == 0:
-        return self.fail(node, "embed_file: could not read '" ++ path ++ "'")
-    comptime_control_value(comptime_value_str(with_fs_read_file(path)))
+    let read_result = self.sema.read_tracked_embed_file(self.current_source_path(), arg_signal.value.text)
+    if not read_result.ok:
+        return self.fail(node, read_result.error_msg)
+    comptime_control_value(comptime_value_str(read_result.contents))
 
 fn ComptimeEvaluator.eval_array(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let extra_start = self.ast.get_data0(node)

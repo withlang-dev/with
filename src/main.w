@@ -1068,14 +1068,14 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
         if standard_result.handled:
             if standard_result.rc != 0:
                 return standard_result.rc
-            build_cache_record(root, target)
+            build_cache_record(root, target, Vec.new())
             completed_targets.push(target.name)
             continue
         if target.kind == 23:
             let action_rc = run_build_action_from_build_w(root, cfg, target, action_sema)
             if action_rc != 0:
                 return action_rc
-            build_cache_record(root, target)
+            build_cache_record(root, target, Vec.new())
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)
@@ -1118,7 +1118,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                 with_eprint("error: build.w library target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
-            build_cache_record(root, target)
+            build_cache_record(root, target, comp.tracked_input_paths())
             completed_targets.push(target.name)
             continue
         if target.kind == 3:
@@ -1133,7 +1133,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                 with_eprint("error: build.w object target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
-            build_cache_record(root, target)
+            build_cache_record(root, target, comp.tracked_input_paths())
             completed_targets.push(target.name)
             continue
         if target.kind == 4:
@@ -1148,7 +1148,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                 with_eprint("error: build.w archive target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
-            build_cache_record(root, target)
+            build_cache_record(root, target, comp.tracked_input_paths())
             completed_targets.push(target.name)
             continue
         let bin_path = build_graph_output_path(root, target, options.output_path, graph.targets.len() as i32)
@@ -1162,7 +1162,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             with_eprint("error: build.w target failed: " ++ target.name)
             return 1
         comp.print_warnings()
-        build_cache_record(root, target)
+        build_cache_record(root, target, comp.tracked_input_paths())
         completed_targets.push(target.name)
     0
 

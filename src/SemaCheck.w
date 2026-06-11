@@ -14,7 +14,6 @@ use render
 
 extern fn with_write(s: str) -> void
 extern fn with_eprint(s: str) -> void
-extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn str_from_byte(b: i32) -> str
 extern fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
@@ -77,23 +76,6 @@ fn sema_regex_compile_options(flags: str) -> i32:
             return -1
         i = i + 1
     options
-
-fn sema_dirname(path: str) -> str:
-    var last_slash = -1
-    for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
-            last_slash = i
-    if last_slash < 0:
-        return ""
-    path.slice(0, last_slash as i64)
-
-fn sema_resolve_embed_file_path(source_path: str, raw_path: str) -> str:
-    if raw_path.len() > 0 and raw_path.byte_at(0) == 47:
-        return raw_path
-    let dir = sema_dirname(source_path)
-    if dir.len() == 0:
-        return raw_path
-    dir ++ "/" ++ raw_path
 
 fn sema_path_is_std_implementation(path: str) -> i32:
     if path.starts_with("lib/std/") or path.starts_with("<embedded-std>/"):
@@ -11325,9 +11307,9 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
             self.emit_error("embed_file() argument must be a comptime string", path_node)
             return self.ty_str as i32
         let source_path = if self.current_module_path.len() > 0: self.current_module_path else: ""
-        let resolved_path = sema_resolve_embed_file_path(source_path, path_value.text)
-        if with_fs_file_exists(resolved_path) == 0:
-            self.emit_error("embed_file: could not read '" ++ resolved_path ++ "'", node)
+        let read_result = self.read_tracked_embed_file(source_path, path_value.text)
+        if not read_result.ok:
+            self.emit_error(read_result.error_msg, node)
         return self.ty_str as i32
     0
 

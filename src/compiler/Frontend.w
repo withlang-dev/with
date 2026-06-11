@@ -16,6 +16,7 @@ use compiler.EmbeddedStdlib
 use compiler.EmbeddedClangResource
 use compiler.ProjectConfig
 use compiler.Runtime
+use compiler.TrackedInputs
 use compiler.Zcu
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
@@ -1191,7 +1192,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     if pool.has_comptime_nodes() or pool.has_type_derives():
         if zcu_debug_init_enabled() != 0:
             runtime_eprint("[frontend] compile_source:comptime-transform")
-        var pre_sema = Sema.init(self.pool, self.diagnostics, pool)
+        var pre_sema = self.configure_tracked_input_sema(Sema.init(self.pool, self.diagnostics, pool))
         pre_sema.source_text = text
         pre_sema.decl_source_paths = self.decl_source_paths
         pre_sema.decl_source_file_ids = self.decl_source_file_ids
@@ -1212,6 +1213,8 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         self.decl_source_file_ids = pre_sema.decl_source_file_ids
         self.decl_is_c_import = pre_sema.decl_is_c_import
         self.c_import_omitted_symbols = pre_sema.ci_omitted_symbols
+        var tracked_paths = self.tracked_input_paths
+        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &pre_sema.tracked_input_paths)
         if self.diagnostics.has_errors():
             self.render_all_diagnostics_frontend()
             self.set_typed_snapshot("", AstPool.new())
@@ -1228,7 +1231,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     if zcu_debug_init_enabled() != 0:
         runtime_eprint("[frontend] compile_source:sema")
     let t_sema = runtime_clock_nanos()
-    var sema = Sema.init(self.pool, self.diagnostics, pool)
+    var sema = self.configure_tracked_input_sema(Sema.init(self.pool, self.diagnostics, pool))
     sema.source_text = text
     sema.decl_source_paths = self.decl_source_paths
     sema.decl_source_file_ids = self.decl_source_file_ids

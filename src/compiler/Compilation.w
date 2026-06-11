@@ -1119,7 +1119,7 @@ fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
         self.zcu = zcu
         return true
 
-    var sema = Sema.init(zcu.pool, zcu.diagnostics, typed_pool)
+    var sema = zcu.configure_tracked_input_sema(Sema.init(zcu.pool, zcu.diagnostics, typed_pool))
     sema.source_text = zcu.current_source_text
     sema.tool_mode_entry_path = zcu.tool_mode_entry_path
     sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
@@ -1181,6 +1181,12 @@ fn Compilation.dump_async_mir_file(self: Compilation, source_path: str) -> str:
 fn Compilation.print_warnings(self: Compilation):
     self.zcu.print_warnings()
 
+fn Compilation.tracked_input_paths(self: Compilation) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    for i in 0..self.zcu.tracked_input_paths.len() as i32:
+        out.push(self.zcu.tracked_input_paths.get(i as i64))
+    out
+
 fn Compilation.active_pool(self: Compilation, pool: AstPool) -> AstPool:
     if self.zcu.typed_pool_cache.decl_count() > 0:
         return self.zcu.typed_pool_cache
@@ -1190,7 +1196,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     let do_profile = profile_enabled()
     let active_pool = pool
     compilation_debug_pool_flow("run_mir_lower:start", self.zcu.pool, active_pool, self.zcu.last_sema)
-    var sema = Sema.init(self.zcu.pool, self.zcu.diagnostics, active_pool)
+    var sema = self.zcu.configure_tracked_input_sema(Sema.init(self.zcu.pool, self.zcu.diagnostics, active_pool))
     compilation_debug_pool_flow("run_mir_lower:after_init", self.zcu.pool, active_pool, sema)
     sema.source_text = self.zcu.current_source_text
     sema.decl_source_paths = self.zcu.decl_source_paths

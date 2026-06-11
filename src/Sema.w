@@ -12,6 +12,7 @@ use Diagnostic
 use InternPool
 use render
 use Overflow
+use compiler.TrackedInputs
 
 extern fn with_write(s: str) -> void
 extern fn with_eprint(s: str) -> void
@@ -531,6 +532,8 @@ type Sema {
 
     // Current state
     source_text: str,
+    tracked_input_root: str,
+    tracked_input_paths: Vec[str],
     current_return_type: TypeId,
     current_gen_yield_type: TypeId,
     has_gen_yield_type: i32,
@@ -1186,6 +1189,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         expr_view_dep_counts: sema_new_map_i32_i32(),
         expr_view_dep_data: Vec.new(),
         source_text: "",
+        tracked_input_root: "",
+        tracked_input_paths: Vec.new(),
         current_return_type: 0,
         current_gen_yield_type: 0,
         has_gen_yield_type: 0,
@@ -1330,6 +1335,24 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.scope_starts.push(0)
     s.init_intrinsic_symbols()
     s
+
+fn Sema.set_tracked_input_context(self: Sema, root: str, paths: Vec[str]):
+    self.tracked_input_root = root
+    self.tracked_input_paths = paths
+
+fn Sema.record_tracked_input(self: Sema, path: str):
+    var paths = self.tracked_input_paths
+    self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
+
+fn Sema.merge_tracked_inputs(self: Sema, paths: &Vec[str]):
+    var tracked_paths = self.tracked_input_paths
+    self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, paths)
+
+fn Sema.read_tracked_embed_file(self: Sema, source_path: str, raw_path: str) -> TrackedReadResult:
+    let result = tracked_embed_read(source_path, raw_path, self.tracked_input_root)
+    if result.ok:
+        self.record_tracked_input(result.resolved_path)
+    result
 
 fn Sema.register_prim(mut self: Sema, name: str, tid: i32):
     let sym = self.pool_intern(name)

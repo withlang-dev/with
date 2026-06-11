@@ -6,6 +6,7 @@ use InternPool
 use Diagnostic
 use Source
 use Overflow
+use compiler.TrackedInputs
 
 extern fn with_eprint(s: str) -> void
 
@@ -848,23 +849,15 @@ fn Codegen.find_module_let_decl_index(self: Codegen, sym: i32) -> i32:
             return di
     -1
 
-fn codegen_dirname(path: str) -> str:
-    var last_slash = -1
-    for di in 0..path.len() as i32:
-        if path.byte_at(di as i64) == 47:
-            last_slash = di
-    if last_slash < 0:
-        return ""
-    path.slice(0, last_slash as i64)
+fn Codegen.record_tracked_input(self: Codegen, path: str):
+    var paths = self.tracked_input_paths
+    self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
 
-fn Codegen.resolve_embed_file_path(self: Codegen, source_path: str, raw_path: str) -> str:
-    let _ = self
-    if raw_path.len() > 0 and raw_path.byte_at(0) == 47:
-        return raw_path
-    let dir = codegen_dirname(source_path)
-    if dir.len() == 0:
-        return raw_path
-    dir ++ "/" ++ raw_path
+fn Codegen.read_tracked_embed_file(self: Codegen, source_path: str, raw_path: str) -> TrackedReadResult:
+    let result = tracked_embed_read(source_path, raw_path, self.tracked_input_root)
+    if result.ok:
+        self.record_tracked_input(result.resolved_path)
+    result
 
 fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, depth: i32) -> ConstStringEval:
     if node == 0 or depth > 32:
@@ -919,12 +912,12 @@ fn Codegen.try_eval_const_string(self: Codegen, node: i32, source_path: str, dep
         let path_value = self.try_eval_const_string(self.pool.get_extra(args_start), source_path, depth + 1)
         if not path_value.ok:
             return path_value
-        let path = self.resolve_embed_file_path(source_path, path_value.text)
-        if with_fs_file_exists(path) == 0:
-            with_eprint("error: embed_file: could not read '" ++ path ++ "'")
+        let read_result = self.read_tracked_embed_file(source_path, path_value.text)
+        if not read_result.ok:
+            with_eprint("error: " ++ read_result.error_msg)
             self.had_error = 1
             return const_string_eval_fail()
-        return const_string_eval_ok(with_fs_read_file(path))
+        return const_string_eval_ok(read_result.contents)
 
     const_string_eval_fail()
 

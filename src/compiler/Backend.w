@@ -4,6 +4,7 @@ use CodegenDispatch
 use CodegenTraits
 use compiler.Zcu
 use compiler.Runtime
+use compiler.TrackedInputs
 
 fn backend_debug_pool_flow_enabled() -> i32:
     let raw = runtime_getenv("WITH_DEBUG_POOL_FLOW")
@@ -42,6 +43,8 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
     let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
     let t_codegen = runtime_clock_nanos()
     let result = cg.gen_module_from_mir(self.last_mir_module, backend_pool)
+    var tracked_paths = self.tracked_input_paths
+    self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &cg.tracked_input_paths)
     if result != 0:
         runtime_eprint("error: code generation failed")
         return 1
@@ -87,6 +90,8 @@ fn Zcu.emit_ir_backend(self: Zcu, pool: AstPool, opt_level: i32) -> bool:
     if self.pool.state.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.state.symbol_texts.len() as i32 <= 4 or cg.intern.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
         runtime_eprint(f"[backend] cg.intern symbols={cg.intern.state.symbol_texts.len() as i32}")
     let result = cg.gen_module_from_mir(self.last_mir_module, backend_pool)
+    var tracked_paths = self.tracked_input_paths
+    self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &cg.tracked_input_paths)
     if result != 0:
         runtime_eprint("error: code generation failed")
         return false
