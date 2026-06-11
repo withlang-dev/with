@@ -3153,8 +3153,41 @@ type GetCommandOptions {
 }
 
 fn get_command_usage():
-    with_eprint("usage: with get [--force-reinstall] c.<package>[@version]")
-    with_eprint("       with get")
+    with_eprint("usage: with get [--force-reinstall] [c.<package>[@version] | <package>[@version]]")
+    with_eprint("  c.<package>     C dependency via Conan Center")
+    with_eprint("  <package>       With package (registry not yet available)")
+    with_eprint("  (no arguments)  restore dependencies from lock file")
+
+fn get_command_registry_unavailable(name: str):
+    with_eprint("error: the With package registry is not available yet; cannot fetch With package '" ++ name ++ "'")
+    with_eprint("  With packages (spec §18.8) will come from the With package registry, which is not live yet.")
+    with_eprint("  For a C library, use the Conan source instead: with get c.<name>  (e.g. with get c.json-c)")
+    with_eprint("  Registry progress is tracked at: https://github.com/withlang-dev/with/issues/547")
+
+fn get_command_valid_pkg_start(ch: i32) -> bool:
+    (ch >= 97 and ch <= 122) or ch == 95
+
+fn get_command_valid_pkg_char(ch: i32) -> bool:
+    (ch >= 97 and ch <= 122) or (ch >= 48 and ch <= 57) or ch == 95 or ch == 45
+
+fn get_command_with_pkg_name(spec: str) -> str:
+    if spec.len() == 0:
+        return ""
+    var name_end = spec.len() as i32
+    for i in 0..spec.len() as i32:
+        if spec.byte_at(i as i64) == 64:
+            name_end = i
+            break
+    if name_end <= 0:
+        return ""
+    if not get_command_valid_pkg_start(spec.byte_at(0)):
+        return ""
+    for i in 0..name_end:
+        if not get_command_valid_pkg_char(spec.byte_at(i as i64)):
+            return ""
+    if name_end < spec.len() as i32 and name_end + 1 >= spec.len() as i32:
+        return ""
+    spec.slice(0, name_end as i64)
 
 fn parse_get_command_options(argc: i32) -> GetCommandOptions:
     var spec = ""
@@ -3185,7 +3218,12 @@ fn run_get_command(argc: i32) -> i32:
         return lock_restore(root)
     let spec = options.spec
     if not spec.starts_with("c."):
-        with_eprint("error: only C packages supported. Use c.<name> (e.g. c.sqlite3)")
+        let with_pkg_name = get_command_with_pkg_name(spec)
+        if with_pkg_name.len() > 0:
+            get_command_registry_unavailable(with_pkg_name)
+            return 1
+        with_eprint("error: invalid package spec '" ++ spec ++ "'")
+        get_command_usage()
         return 1
     // Parse name and version from spec
     let pkg_part = spec.slice(2, spec.len())
@@ -3197,7 +3235,8 @@ fn run_get_command(argc: i32) -> i32:
             pkg_version = pkg_part.slice((i + 1) as i64, pkg_part.len())
             break
     if pkg_name.len() == 0:
-        with_eprint("error: empty package name")
+        with_eprint("error: invalid package spec '" ++ spec ++ "'")
+        get_command_usage()
         return 1
 
     let resolved_version = conan_install(pkg_name, pkg_version, root, options.force_reinstall)

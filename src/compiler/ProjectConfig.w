@@ -102,7 +102,7 @@ fn project_config_load_for_source(source_path_raw: str) -> ProjectConfig:
                         pending_value = pending_value ++ " "
                     pending_value = pending_value ++ line
                     if project_config_value_complete(pending_value):
-                        cfg = project_config_apply_entry(cfg, section, pending_key, pending_value)
+                        cfg = project_config_apply_manifest_entry(cfg, section, pending_key, pending_value)
                         pending_key = ""
                         pending_value = ""
                 else if line.byte_at(0) == 91 and line.byte_at(line.len() as i64 - 1) == 93:
@@ -117,7 +117,7 @@ fn project_config_load_for_source(source_path_raw: str) -> ProjectConfig:
                             cfg.manifest_error = forbidden
                         if project_config_wants_key(section, key):
                             if project_config_value_complete(value):
-                                cfg = project_config_apply_entry(cfg, section, key, value)
+                                cfg = project_config_apply_manifest_entry(cfg, section, key, value)
                             else:
                                 pending_key = key
                                 pending_value = value
@@ -125,9 +125,15 @@ fn project_config_load_for_source(source_path_raw: str) -> ProjectConfig:
         i = i + 1
 
     if pending_key.len() > 0 and project_config_value_complete(pending_value):
-        cfg = project_config_apply_entry(cfg, section, pending_key, pending_value)
+        cfg = project_config_apply_manifest_entry(cfg, section, pending_key, pending_value)
 
     cfg
+
+fn project_config_apply_manifest_entry(cfg: ProjectConfig, section: str, key: str, value: str) -> ProjectConfig:
+    let manual_c_dep = project_config_manual_c_dep_name(section)
+    if manual_c_dep.len() > 0:
+        return project_config_apply_manual_c_dep_entry(cfg, manual_c_dep, key, value)
+    project_config_apply_entry(cfg, section, key, value)
 
 fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value: str) -> ProjectConfig:
     var out = cfg
@@ -198,44 +204,48 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
                         if not project_config_vec_contains(out.c_dep_metadata_names, pkg_name):
                             out.c_dep_metadata_names.push(pkg_name)
                         out = project_config_load_dep_metadata(out, pkg_name, constraint)
-    else if project_config_manual_c_dep_name(section).len() > 0:
-        let dep_name = project_config_manual_c_dep_name(section)
-        if project_config_vec_contains(out.c_dep_metadata_names, dep_name):
+            else if out.manifest_error.len() == 0:
+                out.manifest_error = "With package dependency '" ++ key ++ "' is declared in with.toml but the With package registry is not available yet; remove it or use a C package (c.<name>)"
+    out
+
+fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: str, key: str, value: str) -> ProjectConfig:
+    var out = cfg
+    if project_config_vec_contains(out.c_dep_metadata_names, dep_name):
+        if out.manifest_error.len() == 0:
+            out.manifest_error = "dependency c." ++ dep_name ++ " is declared both as a Conan dependency and a manual [deps.c." ++ dep_name ++ "] table"
+    if not project_config_vec_contains(out.manual_c_dep_names, dep_name):
+        // Manual C deps are local manifest inputs, not fetched artifacts.
+        out.manual_c_dep_names.push(dep_name)
+    if key == "include":
+        if not project_config_is_quoted_string_value(value):
             if out.manifest_error.len() == 0:
-                out.manifest_error = "dependency c." ++ dep_name ++ " is declared both as a Conan dependency and a manual [deps.c." ++ dep_name ++ "] table"
-        if not project_config_vec_contains(out.manual_c_dep_names, dep_name):
-            // Manual C deps are local manifest inputs, not fetched artifacts.
-            out.manual_c_dep_names.push(dep_name)
-        if key == "include":
-            if not project_config_is_quoted_string_value(value):
-                if out.manifest_error.len() == 0:
-                    out.manifest_error = "include in [deps.c." ++ dep_name ++ "] must be a string path"
-            else:
-                out.c_import_include_paths.push(project_config_resolve_path(out.root_dir, project_config_strip_quotes(project_config_trim(value))))
-        else if key == "lib":
-            if not project_config_is_quoted_string_value(value):
-                if out.manifest_error.len() == 0:
-                    out.manifest_error = "lib in [deps.c." ++ dep_name ++ "] must be a string path"
-            else:
-                out.link_search_paths.push(project_config_resolve_path(out.root_dir, project_config_strip_quotes(project_config_trim(value))))
-        else if key == "link":
-            if not project_config_is_string_array_value(value):
-                if out.manifest_error.len() == 0:
-                    out.manifest_error = "link in [deps.c." ++ dep_name ++ "] must be an array of library names"
-            else:
-                let libs = project_config_parse_string_array(value)
-                for li in 0..libs.len() as i32:
-                    out.dep_link_libs.push(libs.get(li as i64))
-        else if key == "defines":
-            if not project_config_is_string_array_value(value):
-                if out.manifest_error.len() == 0:
-                    out.manifest_error = "defines in [deps.c." ++ dep_name ++ "] must be an array of strings"
-            else:
-                let defines = project_config_parse_string_array(value)
-                for di in 0..defines.len() as i32:
-                    out.c_import_defines.push(defines.get(di as i64))
-        else if out.manifest_error.len() == 0:
-            out.manifest_error = "unknown key '" ++ key ++ "' in [deps.c." ++ dep_name ++ "]; expected include, lib, link, or defines"
+                out.manifest_error = "include in [deps.c." ++ dep_name ++ "] must be a string path"
+        else:
+            out.c_import_include_paths.push(project_config_resolve_path(out.root_dir, project_config_strip_quotes(project_config_trim(value))))
+    else if key == "lib":
+        if not project_config_is_quoted_string_value(value):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "lib in [deps.c." ++ dep_name ++ "] must be a string path"
+        else:
+            out.link_search_paths.push(project_config_resolve_path(out.root_dir, project_config_strip_quotes(project_config_trim(value))))
+    else if key == "link":
+        if not project_config_is_string_array_value(value):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "link in [deps.c." ++ dep_name ++ "] must be an array of library names"
+        else:
+            let libs = project_config_parse_string_array(value)
+            for li in 0..libs.len() as i32:
+                out.dep_link_libs.push(libs.get(li as i64))
+    else if key == "defines":
+        if not project_config_is_string_array_value(value):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "defines in [deps.c." ++ dep_name ++ "] must be an array of strings"
+        else:
+            let defines = project_config_parse_string_array(value)
+            for di in 0..defines.len() as i32:
+                out.c_import_defines.push(defines.get(di as i64))
+    else if out.manifest_error.len() == 0:
+        out.manifest_error = "unknown key '" ++ key ++ "' in [deps.c." ++ dep_name ++ "]; expected include, lib, link, or defines"
     out
 
 fn project_config_strip_quotes(value: str) -> str:
@@ -345,6 +355,7 @@ fn project_config_json_str_array(json: str, key: str) -> Vec[str]:
     result
 
 fn project_config_wants_key(section: str, key: str) -> bool:
+    let manual_c_dep = project_config_manual_c_dep_name(section)
     if (section == "project" or section == "package") and (key == "name" or key == "version"):
         return true
     if (section == "" or section == "project" or section == "package") and (key == "std" or key == "alloc" or key == "runtime"):
@@ -363,7 +374,7 @@ fn project_config_wants_key(section: str, key: str) -> bool:
         return true
     if section == "target" and key == "default":
         return true
-    if project_config_manual_c_dep_name(section).len() > 0:
+    if manual_c_dep.len() > 0:
         return true
     if section == "deps":
         return true

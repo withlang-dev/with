@@ -693,10 +693,12 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
         "[target]\n" ++
         "default = \"native\"\n\n" ++
         "[deps]\n" ++
-        "json = \"^1.0\"\n"
+        "c.fixture = \"1.0\"\n"
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), manifest, "declarative manifest")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, src, "fn main:\n    print(\"manifestcfg\")\n", "declarative manifest main")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, ".with/deps/c/fixture/1.0/metadata.json"), bs_lock_fixture_metadata("fixture", "1.0"), "declarative manifest dep metadata")
     if rc != 0: return rc
 
     var dump_args: Vec[str] = Vec.new()
@@ -715,9 +717,9 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, dump.stdout, "config feature_names=fast,trace", "declarative_manifest_features")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, dump.stdout, "config dep_names=json", "declarative_manifest_deps")
+    rc = bs_assert_contains(ctx, dump.stdout, "config dep_names=c.fixture", "declarative_manifest_deps")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, dump.stdout, "config dep_constraints=^1.0", "declarative_manifest_dep_constraints")
+    rc = bs_assert_contains(ctx, dump.stdout, "config dep_constraints=1.0", "declarative_manifest_dep_constraints")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, dump.stdout, "config target_default=native", "declarative_manifest_target_default")
     if rc != 0: return rc
@@ -1042,12 +1044,74 @@ fn bs_check_get_lock_restore(ctx: ActionCtx, compiler_path: str, case_dir: str) 
     let registry_dir = bs_join(case_dir, "registry")
     rc = bs_write_project_manifest(ctx, registry_dir, "getregistrylock")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(registry_dir, ".with/lock.json"), "{\n  \"version\": 1,\n  \"deps\": {\n    \"c.future\": {\n      \"source\": \"registry\",\n      \"version\": \"1.0\"\n    }\n  }\n}\n", "registry lock")
+    rc = bs_write_fixture(ctx, bs_join(registry_dir, ".with/lock.json"), "{\n  \"version\": 1,\n  \"deps\": {\n    \"future\": {\n      \"source\": \"registry\",\n      \"version\": \"1.0\"\n    }\n  }\n}\n", "registry lock")
     if rc != 0: return rc
     let registry = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-registry", bs_project_args("get"), 120000, registry_dir)
     if registry.rc == 0:
         return bs_fail(ctx, "registry lock restore unexpectedly succeeded")
-    bs_assert_contains(ctx, registry.stderr, "With package registry restore is not available yet", "get_lock_registry")
+    bs_assert_contains(ctx, registry.stderr, "registry is not available yet", "get_lock_registry")
+
+fn bs_check_with_package_registry_surface(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "withpkgsurface")
+    if rc != 0: return rc
+    let before = ctx.fs().read_text(bs_join(case_dir, "with.toml"))
+
+    var json_args: Vec[str] = Vec.new()
+    json_args |> push("get")
+    json_args |> push("json")
+    let json = bs_run_cli_capture_cwd(ctx, compiler_path, "get-with-package-json", json_args, 120000, case_dir)
+    if json.rc == 0:
+        return bs_fail(ctx, "with get json unexpectedly succeeded before registry exists")
+    rc = bs_assert_contains(ctx, json.stderr, "registry is not available yet", "get_with_package_json")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, json.stderr, "spec §18.8", "get_with_package_json_spec")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, json.stderr, "with get c.<name>", "get_with_package_json_c_hint")
+    if rc != 0: return rc
+    let after = ctx.fs().read_text(bs_join(case_dir, "with.toml"))
+    if after != before:
+        return bs_fail(ctx, "with get json mutated with.toml")
+    if ctx.fs().exists(bs_join(case_dir, ".with")):
+        return bs_fail(ctx, "with get json created .with before registry exists")
+
+    var http_args: Vec[str] = Vec.new()
+    http_args |> push("get")
+    http_args |> push("http@1.0")
+    let http = bs_run_cli_capture_cwd(ctx, compiler_path, "get-with-package-http", http_args, 120000, case_dir)
+    if http.rc == 0:
+        return bs_fail(ctx, "with get http@1.0 unexpectedly succeeded before registry exists")
+    rc = bs_assert_contains(ctx, http.stderr, "With package 'http'", "get_with_package_http")
+    if rc != 0: return rc
+
+    var empty_c_args: Vec[str] = Vec.new()
+    empty_c_args |> push("get")
+    empty_c_args |> push("c.")
+    let empty_c = bs_run_cli_capture_cwd(ctx, compiler_path, "get-invalid-empty-c", empty_c_args, 120000, case_dir)
+    if empty_c.rc == 0:
+        return bs_fail(ctx, "with get c. unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, empty_c.stderr, "invalid package spec 'c.'", "get_invalid_empty_c")
+    if rc != 0: return rc
+
+    var invalid_args: Vec[str] = Vec.new()
+    invalid_args |> push("get")
+    invalid_args |> push("Foo/Bar")
+    let invalid = bs_run_cli_capture_cwd(ctx, compiler_path, "get-invalid-with-package", invalid_args, 120000, case_dir)
+    if invalid.rc == 0:
+        return bs_fail(ctx, "with get Foo/Bar unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, invalid.stderr, "invalid package spec 'Foo/Bar'", "get_invalid_with_package")
+    if rc != 0: return rc
+
+    let manifest_dir = bs_join(case_dir, "manifest")
+    rc = bs_write_fixture(ctx, bs_join(manifest_dir, "with.toml"), "[package]\nname = \"manifestwithpkg\"\nversion = \"0.1.0\"\n\n[deps]\njson = \"1.0\"\n", "with package manifest dep")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(manifest_dir, "src/main.w"), "fn main:\n    print(\"manifestwithpkg\")\n", "with package manifest source")
+    if rc != 0: return rc
+    let manifest = bs_run_cli_capture_cwd(ctx, compiler_path, "with-package-manifest-dep", bs_project_args("build"), 120000, manifest_dir)
+    if manifest.rc == 0:
+        return bs_fail(ctx, "bare With package dependency in with.toml unexpectedly built")
+    rc = bs_assert_contains(ctx, manifest.stderr, "With package dependency 'json'", "with_package_manifest_dep")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, manifest.stderr, "registry is not available yet", "with_package_manifest_dep_registry")
 
 fn bs_check_remove_update_packages(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let remove_dir = bs_join(case_dir, "remove")
@@ -1200,6 +1264,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_link_libs_manifest_diagnostics(ctx, compiler_path, bs_join(output_dir, "link_libs_manifest_case"))
     if rc != 0: return rc
     rc = bs_check_manual_c_dep_manifest(ctx, compiler_path, bs_join(output_dir, "manual_c_dep_manifest_case"))
+    if rc != 0: return rc
+    rc = bs_check_with_package_registry_surface(ctx, compiler_path, bs_join(output_dir, "with_package_registry_case"))
     if rc != 0: return rc
     rc = bs_check_get_force_reinstall(ctx, compiler_path, bs_join(output_dir, "get_force_reinstall_case"))
     if rc != 0: return rc

@@ -188,8 +188,6 @@ fn lock_line_string_value(line: str, key: str) -> str:
 fn lock_line_entry_name(line: str) -> str:
     if lock_find_text(line, "\": {") < 0:
         return ""
-    if lock_find_text(line, "\"c.") < 0:
-        return ""
     var start = 0
     let n = line.len() as i32
     while start < n and line.byte_at(start as i64) != 34:
@@ -200,7 +198,10 @@ fn lock_line_entry_name(line: str) -> str:
     var end = start
     while end < n and line.byte_at(end as i64) != 34:
         end = end + 1
-    line.slice(start as i64, end as i64)
+    let name = line.slice(start as i64, end as i64)
+    if name == "deps":
+        return ""
+    name
 
 pub fn lock_load(project_root: str) -> LockFile:
     let path = lock_file_path(project_root)
@@ -388,12 +389,14 @@ fn lock_cached_archive_matches(entry: LockEntry, project_root: str, dep_dir: str
     actual.len() > 0 and actual == entry.sha256
 
 fn lock_restore_entry(project_root: str, entry: LockEntry) -> i32:
+    if entry.source == "registry":
+        runtime_eprint("error: the With package registry is not available yet; cannot restore With package '" ++ entry.name ++ "'")
+        runtime_eprint("  With packages (spec §18.8) will come from the With package registry, which is not live yet.")
+        runtime_eprint("  Registry progress is tracked at: https://github.com/withlang-dev/with/issues/547")
+        return 1
     let c_name = lock_c_name(entry.name)
     if c_name.len() == 0:
         runtime_eprint("error: unsupported lock entry '" ++ entry.name ++ "'")
-        return 1
-    if entry.source == "registry":
-        runtime_eprint("error: With package registry restore is not available yet for " ++ entry.name)
         return 1
     if entry.source == "system":
         if conan_write_known_system_package(c_name, entry.version, project_root):
