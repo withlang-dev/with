@@ -5,7 +5,7 @@
 
 use std.collections
 
-extern fn rt_exit(code: i32) -> void
+extern fn rt_exit(code: i32) -> Never
 extern fn with_getpid() -> i32
 extern fn with_exec_argv(args: str) -> i32
 extern fn with_arg_count() -> i32
@@ -17,7 +17,7 @@ extern fn with_vec_push_str(v: *void, val: str) -> void
 extern fn with_str_len(s: str) -> i64
 
 /// Exit the process with the given status code.
-pub fn exit_code(code: i32) -> void:
+pub fn exit_code(code: i32) -> Never:
     rt_exit(code)
 
 /// Get the current process ID.

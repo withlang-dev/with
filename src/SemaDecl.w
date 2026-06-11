@@ -1196,13 +1196,11 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
             implicit_type_ids.push(p_tid as i32)
         self.sig_params.push(p_tid as i32)
 
-    let ret_type = self.resolve_type_expr(ret_node)
+    var ret_type = self.resolve_type_expr(ret_node)
     if self.is_opaque_value_type(ret_type) != 0:
         self.emit_error("opaque types cannot be returned by value; use a pointer or reference", ret_node)
-    let actual_ret = ret_type
-    if actual_ret == 0 and ret_node == 0:
-        // no return type annotation → void
-        let _ = 0
+    if ret_node == 0:
+        ret_type = self.ty_void
 
     var sig_ret_type = ret_type
 

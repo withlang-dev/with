@@ -13,7 +13,6 @@ impl Drop for Guard:
 fn test_forward_goto:
     var x = 0
     goto 'set
-    x = 99
     'set:
         x = 1
     assert(x == 1)

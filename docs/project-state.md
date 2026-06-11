@@ -29,13 +29,18 @@ cases. Full `with build`, `with build :fixpoint`, `with build :test`,
 slice.
 
 Phase 2 parser/control-flow work is in progress. #461, #443, #445, #448,
-#447, #462, #375, #382, and #401 are implemented, pushed, and closed. `loop`
-is now expression-valued through `break expr`, plain `break` contributes Unit,
-break values unify per loop, non-loop value breaks are rejected, and no-break
-loops type as `Never`. Full `with build`, `with build :fixpoint`,
-`with build :test`, and `with build :test-green` passed on 2026-06-11 for
-#401. Follow-up bug #549 tracks value-position `if` branch type mismatches
-discovered during the #382 audit.
+#447, #462, #375, #382, #401, and #543 are implemented, pushed, and closed.
+`loop` is now expression-valued through `break expr`, plain `break`
+contributes Unit, break values unify per loop, non-loop value breaks are
+rejected, and no-break loops type as `Never`. Unreachable-code detection now
+covers `goto`, true `Never` calls/expressions, and std process-exit APIs while
+preserving goto target labels and labeled-block fallthrough through
+`break 'label`. Unannotated function return inference now distinguishes
+caller-visible provisional Unit signatures from body-local inferred
+`return expr` and bare `return` results. Full `with build`,
+`with build :fixpoint`, `with build :test`, and `with build :test-green`
+passed on 2026-06-11 for #543. Follow-up bug #549 tracks value-position `if`
+branch type mismatches discovered during the #382 audit.
 
 #347, #356, #358, and the first #357 safety slice are implemented.
 `c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:

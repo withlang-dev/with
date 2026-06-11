@@ -760,6 +760,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
 
     // Add parameters to scope
     let meta = self.ast.find_fn_meta(node)
+    let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
     if meta >= 0:
         let param_start = self.ast.fn_meta_param_start(meta)
         let param_count = self.ast.fn_meta_param_count(meta)
@@ -809,7 +810,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     else:
         // For async functions, the sig return type is Task[T] but the
         // body should type-check against the unwrapped T.
-        var body_ret_type = ret_type as TypeId
+        var body_ret_type = if has_ret_annotation: ret_type as TypeId else: 0 as TypeId
         if (flags / FnFlags.ASYNC) % 2 == 1:
             let resolved_ret = self.resolve_alias(ret_type as TypeId)
             if self.get_type_kind(resolved_ret) == TypeKind.TY_GENERIC_INST:
@@ -877,9 +878,8 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
         if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0:
             self.emit_error("return type mismatch", body)
-    let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
     if not has_ret_annotation:
-        let inferred_ret = if body_ty != 0: body_ty else: self.ty_void
+        let inferred_ret = self.infer_unannotated_function_return_type(body, body_ty)
         self.set_sig_return_type(sig_idx, inferred_ret)
     else if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
         let explicit_void_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
@@ -2796,6 +2796,114 @@ fn Sema.check_body_explicit_value_results(self: Sema, node: i32, value_path: i32
         return self.check_body_explicit_value_results(self.ast.get_data2(node), 0, expected, msg)
     1
 
+type BodyReturnTypeInfo {
+    saw_bare_return: i32,
+    saw_value_return: i32,
+    value_type: i32,
+    mismatch: i32,
+    mismatch_node: i32,
+}
+
+fn Sema.merge_body_return_type_info(self: Sema, info: BodyReturnTypeInfo, actual: i32, node: i32) -> BodyReturnTypeInfo:
+    var out = info
+    if actual == 0 or actual == self.ty_void:
+        out.saw_bare_return = 1
+        return out
+    if actual == self.ty_never:
+        return out
+    out.saw_value_return = 1
+    if out.value_type == 0 or out.value_type == self.ty_never:
+        out.value_type = actual
+        return out
+    if self.types_compatible(out.value_type as TypeId, actual as TypeId) != 0:
+        out.value_type = self.preferred_compatible_type(out.value_type as TypeId, actual as TypeId) as i32
+        return out
+    let arith = self.arithmetic_result_type(out.value_type as TypeId, actual as TypeId)
+    if arith != 0:
+        out.value_type = arith as i32
+        return out
+    out.mismatch = 1
+    out.mismatch_node = node
+    out
+
+fn Sema.combine_body_return_type_info(self: Sema, lhs: BodyReturnTypeInfo, rhs: BodyReturnTypeInfo) -> BodyReturnTypeInfo:
+    var out = lhs
+    if rhs.saw_bare_return != 0:
+        out.saw_bare_return = 1
+    if rhs.mismatch != 0 and out.mismatch == 0:
+        out.mismatch = rhs.mismatch
+        out.mismatch_node = rhs.mismatch_node
+    if rhs.saw_value_return != 0:
+        out = self.merge_body_return_type_info(out, rhs.value_type, rhs.mismatch_node)
+    out
+
+fn Sema.body_return_type_info(self: Sema, node: i32) -> BodyReturnTypeInfo:
+    var info = BodyReturnTypeInfo { 0, 0, 0, 0, node }
+    if node == 0:
+        return info
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_FN_DECL:
+        return info
+    if kind == NodeKind.NK_RETURN:
+        let value = self.ast.get_data0(node)
+        if value == 0:
+            info.saw_bare_return = 1
+            return info
+        return self.merge_body_return_type_info(info, self.recorded_expr_type_or_zero(value), node)
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            info = self.combine_body_return_type_info(info, self.body_return_type_info(self.ast.get_extra(extra_start + si)))
+        return self.combine_body_return_type_info(info, self.body_return_type_info(self.ast.get_data2(node)))
+    if kind == NodeKind.NK_IF_EXPR:
+        info = self.combine_body_return_type_info(info, self.body_return_type_info(self.ast.get_data1(node)))
+        return self.combine_body_return_type_info(info, self.body_return_type_info(self.ast.get_data2(node)))
+    if kind == NodeKind.NK_MATCH:
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            info = self.combine_body_return_type_info(info, self.body_return_type_info(self.ast.get_extra(arm_start + ai)))
+        return info
+    if kind == NodeKind.NK_MATCH_ARM:
+        return self.body_return_type_info(self.ast.get_data1(node))
+    if kind == NodeKind.NK_LOOP:
+        return self.body_return_type_info(self.ast.get_data0(node))
+    if kind == NodeKind.NK_WHILE:
+        return self.body_return_type_info(self.ast.get_data1(node))
+    if kind == NodeKind.NK_DO_WHILE:
+        return self.body_return_type_info(self.ast.get_data0(node))
+    if kind == NodeKind.NK_FOR:
+        return self.body_return_type_info(self.ast.get_data2(node))
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
+        return self.body_return_type_info(self.ast.get_data0(node))
+    info
+
+fn Sema.infer_unannotated_function_return_type(self: Sema, body: i32, body_ty: TypeId) -> i32:
+    let info = self.body_return_type_info(body)
+    if info.mismatch != 0:
+        self.emit_error("return type mismatch", info.mismatch_node)
+    if info.saw_bare_return != 0:
+        if info.saw_value_return != 0:
+            self.emit_error("return type mismatch", info.mismatch_node)
+        return self.ty_void as i32
+    if info.saw_value_return != 0:
+        return info.value_type
+    if body_ty != 0:
+        return body_ty as i32
+    self.ty_void as i32
+
+fn Sema.stmt_starts_reachable_region(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    if self.ast.kind(node) == NodeKind.NK_LABEL:
+        return 1
+    if self.ast.kind(node) == NodeKind.NK_BLOCK:
+        let meta = self.ast.find_block_meta(node)
+        if meta >= 0 and self.ast.block_meta_label(meta) != 0:
+            return 1
+    0
+
 fn Sema.body_contains_break(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -4705,15 +4813,17 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
 
     var last_stmt_ty: TypeId = 0 as TypeId
     // Unreachable-code detection: once a statement unconditionally transfers
-    // control out of the block (return / break / continue), the remaining
-    // statements and the tail can never execute. Detected by node kind rather
-    // than Never typing: a void function whose body ends in a bare `return`
-    // is itself typed Never, so a *call* to it is Never without diverging.
+    // control out of the block (return / break / continue / goto / Never),
+    // the remaining statements and the tail can never execute. A label can
+    // be a goto target, so it starts a fresh reachable region.
     var block_diverged = 0
     var reported_unreachable = 0
     for i in 0..stmt_count:
         self.current_block_stmt_index = i
         let stmt = self.ast.get_extra(extra_start + i)
+        let stmt_kind = self.ast.kind(stmt)
+        if self.stmt_starts_reachable_region(stmt) != 0:
+            block_diverged = 0
         if block_diverged != 0 and reported_unreachable == 0:
             self.emit_error("unreachable code", stmt)
             reported_unreachable = 1
@@ -4738,8 +4848,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         self.match_in_stmt_pos = saved_stmt_pos
         self.typed_expr_types.insert(stmt, stmt_ty as i32)
         last_stmt_ty = stmt_ty as TypeId
-        let stmt_kind = self.ast.kind(stmt)
-        if stmt_kind == NodeKind.NK_RETURN or stmt_kind == NodeKind.NK_BREAK or stmt_kind == NodeKind.NK_CONTINUE:
+        if stmt_kind == NodeKind.NK_RETURN or stmt_kind == NodeKind.NK_BREAK or stmt_kind == NodeKind.NK_CONTINUE or stmt_kind == NodeKind.NK_GOTO or (stmt_ty == self.ty_never and self.stmt_starts_reachable_region(stmt) == 0):
             block_diverged = 1
         let can_discard_task = stmt_kind == NodeKind.NK_CALL or stmt_kind == NodeKind.NK_IDENT or stmt_kind == NodeKind.NK_GROUPED or stmt_kind == NodeKind.NK_ASYNC_BLOCK or stmt_kind == NodeKind.NK_TUPLE or stmt_kind == NodeKind.NK_NO_SUSPEND
         let is_discarded_task = can_discard_task and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
@@ -4748,6 +4857,8 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
 
     var result: TypeId = if tail == 0 and last_stmt_ty == self.ty_never: self.ty_never else: self.ty_void
+    if tail != 0 and self.stmt_starts_reachable_region(tail) != 0:
+        block_diverged = 0
     if tail != 0 and block_diverged != 0 and reported_unreachable == 0:
         self.emit_error("unreachable code", tail)
         reported_unreachable = 1
@@ -6458,6 +6569,8 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
         if type_sym != 0 and self.must_use_types.contains(type_sym):
             require_exhaustive = 1
     self.check_match_exhaustiveness(node, subject_type as i32, extra_start, arm_count, require_exhaustive)
+    if not match_is_value and require_exhaustive == 0 and result_type == self.ty_never:
+        result_type = self.ty_void
 
     if result_type != 0:
         self.typed_expr_types.insert(node, result_type as i32)

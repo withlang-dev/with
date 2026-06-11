@@ -1819,7 +1819,6 @@ fn synthesize_test_main_source(text: str, test_names: Vec[str]) -> str:
         out.push_str("            return\n")
     out.push_str("        else:\n")
     out.push_str("            exit_code(1)\n")
-    out.push_str("            return\n")
     for ti in 0..test_names.len() as i32:
         out.push_str("    ")
         out.push_str(test_names.get(ti as i64))
