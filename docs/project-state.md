@@ -11,13 +11,12 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 2 parser/control-flow work is in progress. #461, #443, and #445 are
-implemented, pushed, and closed. #448 is implemented locally and verified:
-labeled colon-form `do`-`while` anchors its trailing `while` to the statement
-start instead of the `do` token, so same-line labels, label-on-own-line forms,
-nested labeled loops, and labeled `continue` to the condition check parse.
-Full build, fixpoint, test, and test-green passed on 2026-06-11 before
-commit.
+Phase 2 parser/control-flow work is in progress. #461, #443, #445, #448, and
+#447 are implemented, pushed, and closed. Label declarations now require a
+statement boundary (line start, `{`, `;`, or another label), while
+`goto`/`break`/`continue` label operands remain unaffected. Full `with build`,
+`with build :fixpoint`, `with build :test`, and `with build :test-green`
+passed on 2026-06-11 for #447.
 
 #347, #356, #358, and the first #357 safety slice are implemented.
 `c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:

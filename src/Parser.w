@@ -5378,9 +5378,25 @@ fn Parser.finish_labeled_block(self: Parser, start: i32, label_sym: i32, body: N
     self.pool.add_block_meta(block, label_sym)
     block
 
+fn Parser.label_declaration_starts_statement(self: Parser, start: i32) -> i32:
+    if is_first_on_line(self.source, start) != 0:
+        return 1
+    if self.pos <= 0:
+        return 1
+    let prev = self.tokens.get_tag(self.pos - 1)
+    if prev == TokenKind.TK_L_BRACE or prev == TokenKind.TK_SEMICOLON or prev == TokenKind.TK_LABEL:
+        return 1
+    0
+
 fn Parser.parse_labeled_statement(self: Parser) -> NodeId:
     let start = self.current_start()
     let label_end = self.current_end()
+    if self.label_declaration_starts_statement(start) == 0:
+        self.emit_error_span("label must start a statement", start, label_end)
+        self.advance()
+        if self.peek() == TokenKind.TK_EOF or self.peek() == TokenKind.TK_DEDENT or self.peek() == TokenKind.TK_R_BRACE:
+            return self.poisoned_expr()
+        return self.parse_expr()
     let label_text = self.source.slice((start + 1) as i64, label_end as i64)
     let label_sym = self.intern.intern(label_text)
     self.advance()

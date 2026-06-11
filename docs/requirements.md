@@ -5789,7 +5789,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: This is not valid:
   - Source: `§13.5a L5598`
   - Related spec refs: none
-- [x] `13.5.2.33` **A label token that is not the first token of a statement is a syntax error:** — impl: [#447](https://github.com/withlang-dev/with/issues/447)
+- [x] `13.5.2.33` **A label token that is not the first token of a statement is a syntax error:**
   - Requirement: A label token that is not the first token of a statement is a syntax error:
   - Source: `§13.5a L5605-L5606`
   - Related spec refs: none
@@ -5837,7 +5837,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: `continue` targeting a label that is not on an enclosing loop.
   - Source: `§13.5a L5630`
   - Related spec refs: none
-- [x] `13.5.2.45` **Label token not at the start of a statement.** — impl: [#447](https://github.com/withlang-dev/with/issues/447)
+- [x] `13.5.2.45` **Label token not at the start of a statement.**
   - Requirement: Label token not at the start of a statement.
   - Source: `§13.5a L5631`
   - Related spec refs: none
