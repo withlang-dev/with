@@ -26,6 +26,7 @@ type ProjectConfig {
     alloc_mode: bool,
     runtime_available: bool,
     overflow_mode: i32,
+    strict_effects: bool,
 }
 
 fn project_config_default -> ProjectConfig:
@@ -53,6 +54,7 @@ fn project_config_default -> ProjectConfig:
         alloc_mode: false,
         runtime_available: true,
         overflow_mode: overflow_mode_default(),
+        strict_effects: false,
     }
 
 fn project_config_file_exists(path: str) -> bool:
@@ -169,6 +171,13 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
                 out.manifest_error = "build.overflow must be panic, wrap, or saturate"
         else:
             out.overflow_mode = parsed_overflow
+    else if section == "build" and key == "strict_effects":
+        let parsed_strict = project_config_parse_bool(value)
+        if parsed_strict < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "build.strict_effects must be true or false"
+        else:
+            out.strict_effects = parsed_strict != 0
     else if section == "c_import" and key == "include_paths":
         out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
     else if section == "c_import" and key == "defines":
@@ -368,7 +377,7 @@ fn project_config_wants_key(section: str, key: str) -> bool:
         return true
     if section == "link" and key == "search_paths":
         return true
-    if section == "build" and key == "overflow":
+    if section == "build" and (key == "overflow" or key == "strict_effects"):
         return true
     if section == "features":
         return true
@@ -381,7 +390,7 @@ fn project_config_wants_key(section: str, key: str) -> bool:
     false
 
 fn project_config_forbidden_entry(section: str, key: str) -> str:
-    if section == "build" and key == "overflow":
+    if section == "build" and (key == "overflow" or key == "strict_effects"):
         return ""
     if section == "target" and key == "default":
         return ""

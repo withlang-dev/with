@@ -828,52 +828,63 @@ type BuildGraphLoadResult {
     sema: Sema,
 }
 
-fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGraphTarget, sema: Sema) -> i32:
+type BuildActionRunResult {
+    rc: i32,
+    effects: Vec[str],
+}
+
+fn build_action_run_result(rc: i32) -> BuildActionRunResult:
+    BuildActionRunResult { rc: rc, effects: Vec.new() }
+
+fn build_action_run_result_with_effects(rc: i32, effects: Vec[str]) -> BuildActionRunResult:
+    BuildActionRunResult { rc: rc, effects: effects }
+
+fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGraphTarget, sema: Sema, strict_effects: bool) -> BuildActionRunResult:
     if target.output.len() == 0:
         with_eprint("error: action target '" ++ target.name ++ "' requires a declared output")
-        return 1
+        return build_action_run_result(1)
     let arg_rc = build_graph_validate_process_args(target)
     if arg_rc != 0:
-        return arg_rc
+        return build_action_run_result(arg_rc)
     for ii in 0..target.inputs.len() as i32:
         let input_path = build_graph_resolve_project_path(root, target.inputs.get(ii as i64))
         if with_fs_file_exists(input_path) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' missing declared input: " ++ input_path)
-            return 1
+            return build_action_run_result(1)
     let output_path = build_graph_resolve_project_path(root, target.output)
     let output_dir = build_graph_dirname(output_path)
     if with_fs_mkdir_p(output_dir) != 0:
         with_eprint("error: action target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
-        return 1
+        return build_action_run_result(1)
     if target.action_fn == 0:
         with_eprint("error: action target '" ++ target.name ++ "' is missing an evaluator action function")
-        return 1
+        return build_action_run_result(1)
     var action_sema = sema
-    let result = unsafe { comptime_eval_tool_action_result(&raw mut action_sema as *mut Sema, action_sema.ast, action_sema.pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, target.inputs, target.output, target.extra_outputs, target.args, target.write_scopes, target.timeout_ms, target.cwd, target.env, target.network) }
+    let result = unsafe { comptime_eval_tool_action_result(&raw mut action_sema as *mut Sema, action_sema.ast, action_sema.pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, target.inputs, target.output, target.extra_outputs, target.args, target.write_scopes, target.timeout_ms, target.cwd, target.env, target.network, if strict_effects: 1 else: 0) }
     if result.runtime_exit_code != 0:
         if result.runtime_stderr.len() > 0:
             with_ewrite(result.runtime_stderr)
         with_eprint("error: action target '" ++ target.name ++ f"' failed with exit code {result.runtime_exit_code}")
-        return result.runtime_exit_code
+        return build_action_run_result_with_effects(result.runtime_exit_code, result.effect_records)
     if result.error_msg.len() > 0:
         with_eprint("error: action target '" ++ target.name ++ "' failed during comptime evaluation: " ++ result.error_msg ++ "\n")
-        return 1
+        return build_action_run_result_with_effects(1, result.effect_records)
     if result.value.kind != ComptimeValueKind.CV_INT and result.value.kind != ComptimeValueKind.CV_BOOL:
         with_eprint("error: action target '" ++ target.name ++ "' did not return an integer exit code")
-        return 1
+        return build_action_run_result_with_effects(1, result.effect_records)
     let rc = result.value.data0 as i32
     if rc != 0:
         with_eprint("error: action target '" ++ target.name ++ f"' failed with exit code {rc}")
-        return rc
+        return build_action_run_result_with_effects(rc, result.effect_records)
     if with_fs_file_exists(output_path) == 0:
         with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
-        return 1
+        return build_action_run_result_with_effects(1, result.effect_records)
     for oi in 0..target.extra_outputs.len() as i32:
         let extra_output = build_graph_resolve_project_path(root, target.extra_outputs.get(oi as i64))
         if with_fs_file_exists(extra_output) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ extra_output)
-            return 1
-    0
+            return build_action_run_result_with_effects(1, result.effect_records)
+    build_action_run_result_with_effects(0, result.effect_records)
 
 fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, options: BuildCommandOptions) -> BuildGraphLoadResult:
     var graph = empty_build_graph()
@@ -890,12 +901,13 @@ fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, options: BuildCo
     if entry_sym == 0:
         graph.error_msg = "build.w evaluation entry was not typechecked"
         return BuildGraphLoadResult { graph, sema }
-    let eval_result = unsafe { comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root) }
+    let eval_result = unsafe { comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root, if options.strict_effects: 1 else: 0) }
     if eval_result.error_msg.len() > 0:
         graph.ok = false
         graph.error_msg = eval_result.error_msg
         return BuildGraphLoadResult { graph, sema }
     graph = materialize_build_graph_from_comptime(sema, eval_result.value, eval_result.extras)
+    build_cache_record_build_effects(root, eval_result.effect_records)
     BuildGraphLoadResult { graph, sema }
 
 fn build_graph_find_build_root(start_dir: str) -> str:
@@ -1068,14 +1080,14 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
         if standard_result.handled:
             if standard_result.rc != 0:
                 return standard_result.rc
-            build_cache_record(root, target, Vec.new())
+            build_cache_record(root, target, Vec.new(), Vec.new())
             completed_targets.push(target.name)
             continue
         if target.kind == 23:
-            let action_rc = run_build_action_from_build_w(root, cfg, target, action_sema)
-            if action_rc != 0:
-                return action_rc
-            build_cache_record(root, target, Vec.new())
+            let action_result = run_build_action_from_build_w(root, cfg, target, action_sema, options.strict_effects)
+            if action_result.rc != 0:
+                return action_result.rc
+            build_cache_record(root, target, Vec.new(), action_result.effects)
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)
@@ -1118,7 +1130,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                 with_eprint("error: build.w library target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
-            build_cache_record(root, target, comp.tracked_input_paths())
+            build_cache_record(root, target, comp.tracked_input_paths(), Vec.new())
             completed_targets.push(target.name)
             continue
         if target.kind == 3:
@@ -1133,7 +1145,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                 with_eprint("error: build.w object target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
-            build_cache_record(root, target, comp.tracked_input_paths())
+            build_cache_record(root, target, comp.tracked_input_paths(), Vec.new())
             completed_targets.push(target.name)
             continue
         if target.kind == 4:
@@ -1148,7 +1160,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                 with_eprint("error: build.w archive target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
-            build_cache_record(root, target, comp.tracked_input_paths())
+            build_cache_record(root, target, comp.tracked_input_paths(), Vec.new())
             completed_targets.push(target.name)
             continue
         let bin_path = build_graph_output_path(root, target, options.output_path, graph.targets.len() as i32)
@@ -1162,7 +1174,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             with_eprint("error: build.w target failed: " ++ target.name)
             return 1
         comp.print_warnings()
-        build_cache_record(root, target, comp.tracked_input_paths())
+        build_cache_record(root, target, comp.tracked_input_paths(), Vec.new())
         completed_targets.push(target.name)
     0
 
@@ -1324,6 +1336,8 @@ fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg:
     var out = options
     if not out.target_explicit and cfg.target_default.len() > 0:
         out.target_kind = driver_target_triple_kind(cfg.target_default)
+    if cfg.strict_effects:
+        out.strict_effects = true
     out
 
 fn build_command_validate_target(options: BuildCommandOptions, cfg: ProjectConfig) -> i32:
@@ -1362,6 +1376,8 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
             if not graph.ok:
                 with_eprint("error: " ++ graph.error_msg)
                 return 1
+            if graph_options.selected_target == "effects":
+                return build_cache_print_effects(root, graph, "")
             var selected_target_name = graph_options.selected_target
             if selected_target_name.len() == 0 and graph.default_target.len() > 0:
                 selected_target_name = graph.default_target
@@ -2564,6 +2580,7 @@ fn print_usage:
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
     with_write("  --overflow=<mode>\n")
     with_write("                   Select overflow mode for builds: panic, wrap, saturate\n")
+    with_write("  --strict-effects Reject undeclared build-time effects\n")
     with_write("  --freestanding   Alias for --no-std --no-runtime --prelude=core\n")
 
 fn print_build_usage:
@@ -2591,6 +2608,8 @@ fn print_build_usage:
     with_write("  --dry-run        Print planned build actions without running them\n")
     with_write("  --no-deps        Build only the selected target\n")
     with_write("  --explain <name> Explain a build graph target\n")
+    with_write("  --strict-effects Reject undeclared build-time effects\n")
+    with_write("  :effects         Print recorded build effect ledgers\n")
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")

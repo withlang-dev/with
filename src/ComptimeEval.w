@@ -57,6 +57,7 @@ extern fn with_str_from_byte(byte: i32) -> str
 extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_ends_with(s: str, suffix: str) -> i32
 extern fn with_str_replace(s: str, old: str, new_s: str) -> str
+extern fn with_str_hash(s: str) -> i64
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 extern fn with_sysinfo_hostname() -> str
@@ -228,6 +229,8 @@ type ComptimeEvaluator {
     runtime_stderr: str,
     runtime_env_names: Vec[str],
     runtime_env_values: Vec[str],
+    effect_records: Vec[str],
+    strict_effects: i32,
     has_pending_diag: i32,
     pending_diag: Diagnostic,
 }
@@ -238,6 +241,7 @@ type ComptimeEvalResult {
     error_msg: str,
     runtime_exit_code: i32,
     runtime_stderr: str,
+    effect_records: Vec[str],
 }
 
 type ComptimeSourceLoc {
@@ -290,6 +294,8 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         runtime_stderr: "",
         runtime_env_names: Vec.new(),
         runtime_env_values: Vec.new(),
+        effect_records: Vec.new(),
+        strict_effects: 0,
         has_pending_diag: 0,
         pending_diag: Diagnostic.err("", Span { file: 0, start: 0, end: 0 }),
     }
@@ -563,6 +569,17 @@ fn comptime_eval_result_invalid() -> ComptimeEvalResult:
         error_msg: "",
         runtime_exit_code: 0,
         runtime_stderr: "",
+        effect_records: Vec.new(),
+    }
+
+fn comptime_eval_result_from_evaluator(evaluator: ComptimeEvaluator, value: ComptimeValue) -> ComptimeEvalResult:
+    ComptimeEvalResult {
+        value,
+        extras: evaluator.extra_values,
+        error_msg: evaluator.last_error_msg,
+        runtime_exit_code: evaluator.runtime_exit_code,
+        runtime_stderr: evaluator.runtime_stderr,
+        effect_records: evaluator.effect_records,
     }
 
 fn comptime_capability_record(kind: i32, package_name: str, package_version: str, project_root: str) -> ComptimeCapabilityRecord:
@@ -658,13 +675,7 @@ unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool:
     sema_ptr.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &evaluator.sema.tracked_input_paths)
     if evaluator.has_pending_diag != 0:
         sema_ptr.diags.emit(evaluator.pending_diag)
-    ComptimeEvalResult {
-        value,
-        extras: evaluator.extra_values,
-        error_msg: evaluator.last_error_msg,
-        runtime_exit_code: evaluator.runtime_exit_code,
-        runtime_stderr: evaluator.runtime_stderr,
-    }
+    comptime_eval_result_from_evaluator(evaluator, value)
 
 unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
@@ -675,13 +686,7 @@ unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, poo
     sema_ptr.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &evaluator.sema.tracked_input_paths)
     if evaluator.has_pending_diag != 0:
         sema_ptr.diags.emit(evaluator.pending_diag)
-    ComptimeEvalResult {
-        value,
-        extras: evaluator.extra_values,
-        error_msg: evaluator.last_error_msg,
-        runtime_exit_code: evaluator.runtime_exit_code,
-        runtime_stderr: evaluator.runtime_stderr,
-    }
+    comptime_eval_result_from_evaluator(evaluator, value)
 
 unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     comptime_try_eval_expr_result(sema_ptr, ast, pool, node).value
@@ -689,17 +694,18 @@ unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: Intern
 unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     comptime_force_eval_expr_result(sema_ptr, ast, pool, node).value
 
-unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str) -> ComptimeEvalResult:
+unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, strict_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
+    evaluator.strict_effects = strict_effects
     evaluator.step_budget = COMPTIME_TOOL_STEP_LIMIT
     evaluator.string_byte_budget = comptime_configured_string_budget(COMPTIME_TOOL_STRING_BYTE_BUDGET)
     let call_node = if ast.decl_count() > 0: ast.get_decl(0) else: 0
     let ctx_type = evaluator.capability_type_id(CapabilityKind.CK_BUILD_CTX, call_node)
     if ctx_type == 0:
-        return ComptimeEvalResult { value: comptime_value_invalid(), extras: evaluator.extra_values, error_msg: evaluator.last_error_msg, runtime_exit_code: evaluator.runtime_exit_code, runtime_stderr: evaluator.runtime_stderr }
+        return comptime_eval_result_from_evaluator(evaluator, comptime_value_invalid())
     let ctx_record = comptime_capability_record(CapabilityKind.CK_BUILD_CTX, package_name, package_version, project_root)
     let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
     let args: Vec[ComptimeValue] = Vec.new()
@@ -714,25 +720,20 @@ unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, poo
             signal.value
         else:
             comptime_value_invalid()
-    ComptimeEvalResult {
-        value,
-        extras: evaluator.extra_values,
-        error_msg: evaluator.last_error_msg,
-        runtime_exit_code: evaluator.runtime_exit_code,
-        runtime_stderr: evaluator.runtime_stderr,
-    }
+    comptime_eval_result_from_evaluator(evaluator, value)
 
-unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32) -> ComptimeEvalResult:
+unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
+    evaluator.strict_effects = strict_effects
     evaluator.step_budget = COMPTIME_TOOL_STEP_LIMIT
     evaluator.string_byte_budget = comptime_configured_string_budget(COMPTIME_TOOL_STRING_BYTE_BUDGET)
     let call_node = if ast.decl_count() > 0: ast.get_decl(0) else: 0
     let ctx_type = evaluator.capability_type_id(CapabilityKind.CK_BUILD_ACTION_CTX, call_node)
     if ctx_type == 0:
-        return ComptimeEvalResult { value: comptime_value_invalid(), extras: evaluator.extra_values, error_msg: evaluator.last_error_msg, runtime_exit_code: evaluator.runtime_exit_code, runtime_stderr: evaluator.runtime_stderr }
+        return comptime_eval_result_from_evaluator(evaluator, comptime_value_invalid())
     let ctx_record = comptime_action_capability_record(package_name, package_version, project_root, target_name, inputs, output, extra_outputs, args_values, write_scopes, timeout_ms, cwd, env, network)
     let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
     let args: Vec[ComptimeValue] = Vec.new()
@@ -747,13 +748,7 @@ unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, po
             signal.value
         else:
             comptime_value_invalid()
-    ComptimeEvalResult {
-        value,
-        extras: evaluator.extra_values,
-        error_msg: evaluator.last_error_msg,
-        runtime_exit_code: evaluator.runtime_exit_code,
-        runtime_stderr: evaluator.runtime_stderr,
-    }
+    comptime_eval_result_from_evaluator(evaluator, value)
 
 fn ComptimeEvaluator.eval_root(self: ComptimeEvaluator, node: i32) -> ComptimeValue:
     let signal = self.eval_expr(node)
@@ -1090,6 +1085,118 @@ fn ComptimeEvaluator.record_runtime_env_set(self: ComptimeEvaluator, name: str) 
 fn ComptimeEvaluator.restore_runtime_env(self: ComptimeEvaluator) -> void:
     for i in 0..self.runtime_env_names.len() as i32:
         let _restore = with_setenv_str(self.runtime_env_names.get(i as i64), self.runtime_env_values.get(i as i64))
+
+fn comptime_effect_escape(text: str) -> str:
+    var out = ""
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else:
+            out = out ++ text.slice(i as i64, (i + 1) as i64)
+    out
+
+fn ComptimeEvaluator.record_effect(self: ComptimeEvaluator, line: str):
+    var records = self.effect_records
+    self.effect_records = tracked_input_insert_unique(move records, line)
+
+fn ComptimeEvaluator.record_env_input_effect(self: ComptimeEvaluator, target_name: str, name: str):
+    let value = with_getenv_str(name)
+    self.record_effect("env\t" ++ comptime_effect_escape(target_name) ++ "\t" ++ comptime_effect_escape(name) ++ "\t" ++ f"{with_str_hash(value)}")
+
+fn comptime_effect_join_argv_parts(parts: Vec[str]) -> str:
+    var out = ""
+    for i in 0..parts.len() as i32:
+        if i > 0:
+            out = out ++ " "
+        out = out ++ comptime_effect_escape(parts.get(i as i64))
+    out
+
+fn ComptimeEvaluator.effect_argv_parts_from_value(self: ComptimeEvaluator, value: ComptimeValue) -> Vec[str]:
+    let parts: Vec[str] = Vec.new()
+    if value.kind != ComptimeValueKind.CV_VEC and value.kind != ComptimeValueKind.CV_ARRAY:
+        return parts
+    for i in 0..value.extra_count:
+        let item = self.extra_values.get((value.extra_start + i) as i64)
+        if item.kind == ComptimeValueKind.CV_STR:
+            parts.push(item.text)
+    parts
+
+fn comptime_effect_tool_identity(parts: Vec[str]) -> str:
+    if parts.len() == 0:
+        return ""
+    let exe = parts.get(0)
+    let resolved = comptime_effect_resolve_executable(exe)
+    if resolved.len() > 0:
+        return comptime_effect_escape(resolved) ++ ":" ++ f"{with_str_hash(with_fs_read_file(resolved))}"
+    comptime_effect_escape(exe) ++ ":unresolved"
+
+fn comptime_effect_contains_slash(text: str) -> bool:
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 47:
+            return true
+    false
+
+fn comptime_effect_resolve_executable(exe: str) -> str:
+    if exe.len() == 0:
+        return ""
+    if with_fs_file_exists(exe) != 0:
+        return exe
+    if comptime_effect_contains_slash(exe):
+        return ""
+    let path = with_getenv_str("PATH")
+    var start = 0
+    var i = 0
+    while i <= path.len() as i32:
+        if i == path.len() as i32 or path.byte_at(i as i64) == 58:
+            let dir = path.slice(start as i64, i as i64)
+            let candidate = if dir.len() == 0: exe else: dir ++ "/" ++ exe
+            if with_fs_file_exists(candidate) != 0:
+                return candidate
+            start = i + 1
+        i = i + 1
+    ""
+
+fn ComptimeEvaluator.effect_env_text_from_process_env_value(self: ComptimeEvaluator, value: ComptimeValue) -> str:
+    if value.kind != ComptimeValueKind.CV_STRUCT:
+        return ""
+    let vars = self.struct_field_value_by_name(value, "vars")
+    if vars.kind != ComptimeValueKind.CV_VEC and vars.kind != ComptimeValueKind.CV_ARRAY:
+        return ""
+    var out = ""
+    for i in 0..vars.extra_count:
+        let item = self.extra_values.get((vars.extra_start + i) as i64)
+        let name = self.struct_field_value_by_name(item, "name")
+        let env_value = self.struct_field_value_by_name(item, "value")
+        if name.kind == ComptimeValueKind.CV_STR and env_value.kind == ComptimeValueKind.CV_STR:
+            if out.len() > 0:
+                out = out ++ ","
+            out = out ++ comptime_effect_escape(name.text) ++ ":" ++ f"{with_str_hash(env_value.text)}"
+    out
+
+fn ComptimeEvaluator.record_process_effect(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, method: str, parts: Vec[str], cwd: str, timeout_ms: i32, stdin_path: str, stdout_path: str, stderr_path: str, env_text: str):
+    if self.strict_effects != 0 and record.inputs.len() == 0 and record.outputs.len() == 0:
+        let _ = self.fail(0, "ProcessRunner." ++ method ++ " affects build output but has no declared action inputs or outputs in strict mode")
+        return
+    let target = if record.target_name.len() > 0: record.target_name else: "<build>"
+    var line = "process"
+    line = line ++ "\ttarget=" ++ comptime_effect_escape(target)
+    line = line ++ "\tmethod=" ++ comptime_effect_escape(method)
+    line = line ++ "\targv=" ++ comptime_effect_join_argv_parts(parts)
+    line = line ++ "\tcwd=" ++ comptime_effect_escape(cwd)
+    line = line ++ "\ttimeout=" ++ f"{timeout_ms}"
+    line = line ++ "\tstdin=" ++ comptime_effect_escape(stdin_path)
+    line = line ++ "\tstdout=" ++ comptime_effect_escape(stdout_path)
+    line = line ++ "\tstderr=" ++ comptime_effect_escape(stderr_path)
+    line = line ++ "\tenv=" ++ env_text
+    line = line ++ "\ttool=" ++ comptime_effect_tool_identity(parts)
+    self.record_effect(line)
 
 fn ComptimeEvaluator.lookup_slot_index(self: ComptimeEvaluator, sym: i32) -> i32:
     var i = self.slot_syms.len() as i32 - 1
@@ -3286,6 +3393,18 @@ fn ComptimeEvaluator.current_workspace_for_capability(self: ComptimeEvaluator, p
     self.mint_workspace_capability(parent, self.current_workspace_id, node)
 
 fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
+    if method == "env_input":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
+        if handle < 0:
+            return comptime_control_error()
+        let args_signal = self.capability_args(self.ast.get_data1(node), arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let name = self.capability_arg_str(args_signal.value, 0, method, node)
+        self.record_env_input_effect("<build>", name)
+        return comptime_control_value(comptime_value_str(with_getenv_str(name)))
     if method == "create_workspace":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
             return comptime_control_error()
@@ -3681,7 +3800,7 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
     let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_PROCESS_RUNNER, method, node)
     if handle < 0:
         return comptime_control_error()
-    let _record = self.capability_records.get(handle as i64)
+    let record = self.capability_records.get(handle as i64)
     if method == "run_spec":
         if not self.capability_expect_arg_count(arg_count, 3, method, node):
             return comptime_control_error()
@@ -3715,6 +3834,10 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         let env_vars = if spec_env.kind == ComptimeValueKind.CV_STRUCT: self.struct_field_value_by_name(spec_env, "vars") else: comptime_value_invalid()
         let has_env = env_vars.kind == ComptimeValueKind.CV_VEC and env_vars.extra_count > 0
         let has_stdin = spec_stdin.text.len() > 0
+        let effect_env = if has_env: self.effect_env_text_from_process_env_value(spec_env) else: ""
+        self.record_process_effect(record, method, argv_parts, spec_cwd.text, timeout_ms, spec_stdin.text, stdout_path, stderr_path, effect_env)
+        if self.had_error != 0:
+            return comptime_control_error()
         if has_env:
             let saved_env = self.process_env_apply(spec_env, node)
             if self.had_error != 0:
@@ -3764,8 +3887,10 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
     let argv = self.vec_str_to_argv(argv_value, method, node)
     if self.had_error != 0:
         return comptime_control_error()
+    let argv_parts = self.effect_argv_parts_from_value(argv_value)
 
     if method == "run":
+        self.record_process_effect(record, method, argv_parts, "", 0, "", "", "", "")
         let saved_env = self.process_driver_env_clear(node)
         if self.had_error != 0:
             return comptime_control_error()
@@ -3778,6 +3903,7 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         let stderr_path = self.capability_arg_str(args_signal.value, 2, method, node)
         if self.had_error != 0:
             return comptime_control_error()
+        self.record_process_effect(record, method, argv_parts, "", 0, "", stdout_path, stderr_path, "")
         let saved_env = self.process_driver_env_clear(node)
         if self.had_error != 0:
             return comptime_control_error()
@@ -3792,6 +3918,7 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         return comptime_control_error()
 
     if method == "run_capture":
+        self.record_process_effect(record, method, argv_parts, "", timeout_ms, "", stdout_path, stderr_path, "")
         let saved_env = self.process_driver_env_clear(node)
         if self.had_error != 0:
             return comptime_control_error()
@@ -3802,6 +3929,7 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         let cwd = self.capability_arg_str(args_signal.value, 4, method, node)
         if self.had_error != 0:
             return comptime_control_error()
+        self.record_process_effect(record, method, argv_parts, cwd, timeout_ms, "", stdout_path, stderr_path, "")
         let saved_env = self.process_driver_env_clear(node)
         if self.had_error != 0:
             return comptime_control_error()
@@ -3812,6 +3940,7 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         let stdin_path = self.capability_arg_str(args_signal.value, 4, method, node)
         if self.had_error != 0:
             return comptime_control_error()
+        self.record_process_effect(record, method, argv_parts, "", timeout_ms, stdin_path, stdout_path, stderr_path, "")
         let saved_env = self.process_driver_env_clear(node)
         if self.had_error != 0:
             return comptime_control_error()
@@ -3819,7 +3948,9 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         self.process_env_restore(saved_env)
         return self.tool_process_result(rc, stdout_path, stderr_path, node)
     if method == "run_capture_with_env":
-        let saved_env = self.process_env_apply(self.extra_values.get((args_signal.value.extra_start + 4) as i64), node)
+        let process_env = self.extra_values.get((args_signal.value.extra_start + 4) as i64)
+        self.record_process_effect(record, method, argv_parts, "", timeout_ms, "", stdout_path, stderr_path, self.effect_env_text_from_process_env_value(process_env))
+        let saved_env = self.process_env_apply(process_env, node)
         if self.had_error != 0:
             return comptime_control_error()
         let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
@@ -3828,7 +3959,9 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
     let cwd = self.capability_arg_str(args_signal.value, 4, method, node)
     if self.had_error != 0:
         return comptime_control_error()
-    let saved_env = self.process_env_apply(self.extra_values.get((args_signal.value.extra_start + 5) as i64), node)
+    let process_env = self.extra_values.get((args_signal.value.extra_start + 5) as i64)
+    self.record_process_effect(record, method, argv_parts, cwd, timeout_ms, "", stdout_path, stderr_path, self.effect_env_text_from_process_env_value(process_env))
+    let saved_env = self.process_env_apply(process_env, node)
     if self.had_error != 0:
         return comptime_control_error()
     let rc = with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, cwd)
@@ -3840,6 +3973,15 @@ fn ComptimeEvaluator.eval_actionctx_capability_method(self: ComptimeEvaluator, r
     if handle < 0:
         return comptime_control_error()
     let record = self.capability_records.get(handle as i64)
+    if method == "env_input":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(self.ast.get_data1(node), arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let name = self.capability_arg_str(args_signal.value, 0, method, node)
+        self.record_env_input_effect(record.target_name, name)
+        return comptime_control_value(comptime_value_str(with_getenv_str(name)))
     if method == "create_workspace":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
             return comptime_control_error()
@@ -5202,6 +5344,8 @@ fn ComptimeEvaluator.eval_allowed_runtime_call(self: ComptimeEvaluator, fn_sym: 
         let name = arg_values.get(0)
         if name.kind != ComptimeValueKind.CV_STR:
             return self.fail(node, "with_getenv_str argument must be a string")
+        if self.strict_effects != 0:
+            return self.fail(node, "environment variable '" ++ name.text ++ "' affects build output but is not a declared build input; use ctx.env_input(\"" ++ name.text ++ "\")")
         return comptime_control_value(comptime_value_str(with_getenv_str(name.text)))
     if fn_name == "with_setenv_str":
         if arg_values.len() as i32 != 2:

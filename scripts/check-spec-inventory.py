@@ -195,7 +195,7 @@ def impl_attributes() -> set[str]:
 def spec_cli(spec: str) -> tuple[set[str], set[str]]:
     sec = subsection(spec, "### 18.5 Toolchain")
     commands = {"version", "help"}
-    flags = {"--release", "--target", "--emit-c", "--emit-obj", "--overflow", "--no-std", "-O0", "-O1", "-O2", "-O3", "--open", "-e", "-n", "-p"}
+    flags = {"--release", "--target", "--emit-c", "--emit-obj", "--overflow", "--no-std", "--strict-effects", "-O0", "-O1", "-O2", "-O3", "--open", "-e", "-n", "-p"}
     block = re.search(r"```\n(.*?)\n```", sec, re.S)
     if block:
         for line in block.group(1).splitlines():

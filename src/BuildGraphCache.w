@@ -15,6 +15,12 @@ pub fn build_cache_state_dir(root: str) -> str:
 fn build_cache_state_path(root: str, target_name: str) -> str:
     build_cache_state_dir(root) ++ "/" ++ target_name ++ ".state"
 
+fn build_cache_effects_path(root: str, target_name: str) -> str:
+    build_cache_state_dir(root) ++ "/" ++ target_name ++ ".effects"
+
+fn build_cache_build_effects_path(root: str) -> str:
+    build_cache_state_dir(root) ++ "/build.w.effects"
+
 fn build_cache_test_success_path(root: str, target_name: str) -> str:
     build_cache_state_dir(root) ++ "/" ++ target_name ++ ".test-pass"
 
@@ -227,6 +233,33 @@ fn build_cache_dep_path(root: str, stored_path: str) -> str:
         return stored_path
     root ++ "/" ++ stored_path
 
+fn build_cache_effect_env_state_line(effect_line: str) -> str:
+    if not effect_line.starts_with("env\t"):
+        return ""
+    var tab_count = 0
+    var second_tab = -1
+    var third_tab = -1
+    for i in 0..effect_line.len() as i32:
+        if effect_line.byte_at(i as i64) == 9:
+            tab_count = tab_count + 1
+            if tab_count == 2:
+                second_tab = i
+            else if tab_count == 3:
+                third_tab = i
+                break
+    if second_tab < 0 or third_tab < 0:
+        return ""
+    let name = effect_line.slice((second_tab + 1) as i64, third_tab as i64)
+    let hash = effect_line.slice((third_tab + 1) as i64, effect_line.len())
+    "env:" ++ name ++ ":" ++ hash
+
+fn build_cache_effects_text(effects: Vec[str]) -> str:
+    let sorted = build_cache_sorted_unique_strings(effects)
+    var out = ""
+    for i in 0..sorted.len() as i32:
+        out = out ++ sorted.get(i as i64) ++ "\n"
+    out
+
 pub fn build_cache_hash_directory_w_files(root: str, dir: str) -> i64:
     let files = build_cache_list_w_files(root, dir)
     var combined = ""
@@ -338,8 +371,10 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
         return false
     let expected_sig = build_cache_compute_signature(target, root)
     var state_sig: i64 = 0
+    var effect_hash: i64 = 0
     var input_hashes: Vec[str] = Vec.new()
     var dep_hashes: Vec[str] = Vec.new()
+    var env_hashes: Vec[str] = Vec.new()
     var output_hashes: Vec[str] = Vec.new()
     var line_start = 0
     var i = 0
@@ -349,10 +384,14 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
             let line = state_text.slice(line_start as i64, i as i64)
             if line.starts_with("sig:"):
                 state_sig = parse_i64_from_str(line.slice(4, line.len()))
+            else if line.starts_with("effects:"):
+                effect_hash = parse_i64_from_str(line.slice(8, line.len()))
             else if line.starts_with("in:"):
                 input_hashes.push(line.slice(3, line.len()))
             else if line.starts_with("dep:"):
                 dep_hashes.push(line.slice(4, line.len()))
+            else if line.starts_with("env:"):
+                env_hashes.push(line.slice(4, line.len()))
             else if line.starts_with("out:"):
                 output_hashes.push(line.slice(4, line.len()))
             line_start = i + 1
@@ -361,10 +400,14 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
         let line = state_text.slice(line_start as i64, state_text.len())
         if line.starts_with("sig:"):
             state_sig = parse_i64_from_str(line.slice(4, line.len()))
+        else if line.starts_with("effects:"):
+            effect_hash = parse_i64_from_str(line.slice(8, line.len()))
         else if line.starts_with("in:"):
             input_hashes.push(line.slice(3, line.len()))
         else if line.starts_with("dep:"):
             dep_hashes.push(line.slice(4, line.len()))
+        else if line.starts_with("env:"):
+            env_hashes.push(line.slice(4, line.len()))
         else if line.starts_with("out:"):
             output_hashes.push(line.slice(4, line.len()))
     if state_sig != expected_sig:
@@ -392,6 +435,22 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
         let expected_entry = stored_path ++ ":" ++ f"{current_hash}"
         if stored != expected_entry:
             return false
+    for idx in 0..env_hashes.len() as i32:
+        let stored = env_hashes.get(idx as i64)
+        let split = build_cache_last_colon(stored)
+        if split < 0:
+            return false
+        let name = stored.slice(0, split as i64)
+        let current_hash = with_str_hash(build_graph_rt_getenv(name))
+        let expected_entry = name ++ ":" ++ f"{current_hash}"
+        if stored != expected_entry:
+            return false
+    if effect_hash != 0:
+        let effects_path = build_cache_effects_path(root, target.name)
+        if build_graph_rt_file_exists(effects_path) == 0:
+            return false
+        if with_str_hash(build_graph_rt_read_file(effects_path)) != effect_hash:
+            return false
     let output_paths = build_cache_collect_output_paths(root, target)
     if output_paths.len() != output_hashes.len():
         return false
@@ -406,7 +465,7 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
             return false
     true
 
-pub fn build_cache_record(root: str, target: BuildGraphTarget, discovered_deps: Vec[str]) -> void:
+pub fn build_cache_record(root: str, target: BuildGraphTarget, discovered_deps: Vec[str], effects: Vec[str]) -> void:
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)
@@ -425,12 +484,72 @@ pub fn build_cache_record(root: str, target: BuildGraphTarget, discovered_deps: 
         let hash = build_cache_fingerprint_file(path)
         let rel_path = build_cache_project_relative(root, path)
         content = content ++ f"dep:{rel_path}:{hash}\n"
+    let effects_text = build_cache_effects_text(effects)
+    if effects_text.len() > 0:
+        let effects_path = build_cache_effects_path(root, target.name)
+        let _write_effects = build_graph_rt_write_file(effects_path, effects_text)
+        content = content ++ f"effects:{with_str_hash(effects_text)}\n"
+        let sorted_effects = build_cache_sorted_unique_strings(effects)
+        for idx in 0..sorted_effects.len() as i32:
+            let env_line = build_cache_effect_env_state_line(sorted_effects.get(idx as i64))
+            if env_line.len() > 0:
+                content = content ++ env_line ++ "\n"
+    else:
+        let _remove_effects = build_graph_rt_remove_file(build_cache_effects_path(root, target.name))
     let output_paths = build_cache_collect_output_paths(root, target)
     for idx in 0..output_paths.len() as i32:
         let path = output_paths.get(idx as i64)
         let hash = build_cache_fingerprint_file(path)
         content = content ++ f"out:{path}:{hash}\n"
     let _ = build_graph_rt_write_file(state_path, content)
+
+pub fn build_cache_record_build_effects(root: str, effects: Vec[str]) -> void:
+    let state_dir = build_cache_state_dir(root)
+    let _ = build_graph_rt_mkdir_p(state_dir)
+    let effects_text = build_cache_effects_text(effects)
+    let path = build_cache_build_effects_path(root)
+    if effects_text.len() > 0:
+        let _write = build_graph_rt_write_file(path, effects_text)
+    else:
+        let _remove = build_graph_rt_remove_file(path)
+
+pub fn build_cache_print_effects(root: str, graph: BuildGraph, target_filter: str) -> i32:
+    if target_filter.len() == 0 or target_filter == "build.w":
+        build_graph_rt_write("target build.w\n")
+        build_graph_rt_write("  capabilities: BuildCtx ProjectInfo Diagnostics SourceEmitter ToolFs ProcessRunner Workspace\n")
+        let build_effects_path = build_cache_build_effects_path(root)
+        if build_graph_rt_file_exists(build_effects_path) == 0:
+            build_graph_rt_write("  reproducible: yes\n")
+            build_graph_rt_write("  effects: none\n")
+        else:
+            let build_effects = build_graph_rt_read_file(build_effects_path)
+            build_graph_rt_write("  reproducible: yes\n")
+            if build_effects.len() == 0:
+                build_graph_rt_write("  effects: none\n")
+            else:
+                build_graph_rt_write(build_effects)
+    for ti in 0..graph.targets.len() as i32:
+        let target = graph.targets.get(ti as i64)
+        if target_filter.len() > 0 and target.name != target_filter:
+            continue
+        build_graph_rt_write("target " ++ target.name ++ "\n")
+        if target.kind == 23:
+            build_graph_rt_write("  capabilities: ActionCtx ProjectInfo Diagnostics ToolFs ProcessRunner Workspace\n")
+        else:
+            build_graph_rt_write("  capabilities: none\n")
+        let effects_path = build_cache_effects_path(root, target.name)
+        if build_graph_rt_file_exists(effects_path) == 0:
+            build_graph_rt_write("  reproducible: yes\n")
+            build_graph_rt_write("  effects: none\n")
+            continue
+        let effects = build_graph_rt_read_file(effects_path)
+        if effects.len() == 0:
+            build_graph_rt_write("  reproducible: yes\n")
+            build_graph_rt_write("  effects: none\n")
+        else:
+            build_graph_rt_write("  reproducible: yes\n")
+            build_graph_rt_write(effects)
+    0
 
 fn parse_i64_from_str(s: str) -> i64:
     var result: i64 = 0

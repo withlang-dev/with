@@ -428,6 +428,10 @@ pub fn BuildCtx.process_runner(self: &Self) -> ProcessRunner:
     tool_capability_require(self.token, "ProcessRunner")
     self.process_runner
 
+pub fn BuildCtx.env_input(self: &Self, name: str) -> str:
+    tool_capability_require(self.token, "BuildCtx")
+    with_getenv_str(name)
+
 pub fn BuildCtx.create_workspace(self: &Self, name: str) -> Workspace:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: BuildCtx.create_workspace requires compiler driver comptime evaluation\n")
@@ -1122,6 +1126,10 @@ pub fn ActionCtx.env(self: &Self) -> Vec[str]:
 pub fn ActionCtx.network(self: &Self) -> bool:
     tool_capability_require(self.token, "ActionCtx")
     self.network_value
+
+pub fn ActionCtx.env_input(self: &Self, name: str) -> str:
+    tool_capability_require(self.token, "ActionCtx")
+    with_getenv_str(name)
 
 fn build_graph_escape(value: str) -> str:
     var out = StringBuilder.with_capacity(value.len())

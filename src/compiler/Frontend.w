@@ -99,6 +99,25 @@ fn frontend_cimport_compiler_fingerprint_line() -> str:
     frontend_cimport_compiler_fingerprint = frontend_owned_text(f"\n#compiler-hash:{runtime_str_hash(compiler_image)}")
     frontend_cimport_compiler_fingerprint
 
+fn c_import_absolute_quoted_path(header_spec: str) -> str:
+    let decoded = c_import_trim(c_import_decode_escapes(header_spec))
+    if decoded.len() < 3:
+        return ""
+    if decoded.byte_at(0) != 34 or decoded.byte_at(decoded.len() as i64 - 1) != 34:
+        return ""
+    let path = decoded.slice(1, decoded.len() - 1)
+    if path.len() == 0 or path.byte_at(0) != 47:
+        return ""
+    path
+
+fn Zcu.record_frontend_tracked_input(self: Zcu, path: str):
+    if path.len() == 0:
+        return
+    if runtime_read_file(path).len() == 0:
+        return
+    var paths = self.tracked_input_paths
+    self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
+
 fn count_non_use_decls_frontend(pool: AstPool) -> i32:
     var count = 0
     for di in 0..pool.decl_count():
@@ -242,6 +261,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     // (Also keeps the materializer in the compile graph for the bridge's
     // with_ensure_clang_resource_dir extern.)
     let _resource_dir = ensure_clang_resource_dir()
+    self.record_frontend_tracked_input(ensure_clang_resource_identity_file())
 
     // Pass project config include paths to clang bridge
     if self.project_config.c_import_include_paths.len() > 0:
@@ -269,6 +289,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let header_spec = self.pool.resolve(header_sym)
         let decl_dir = self.decl_source_dir_frontend(i)
         let resolved_header_spec = project_config_resolve_c_import_header(self.project_config, decl_dir, header_spec)
+        self.record_frontend_tracked_input(c_import_absolute_quoted_path(resolved_header_spec))
         let cache_key = self.c_import_cache_key_frontend(out, decl, resolved_header_spec)
 
         var synthetic = ""

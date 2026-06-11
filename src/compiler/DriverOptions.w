@@ -34,6 +34,7 @@ pub type BuildCommandOptions {
     prelude_mode: i32,
     overflow_mode: i32,
     deterministic: bool,
+    strict_effects: bool,
     target_kind: i32,
     target_explicit: bool,
     include_paths: Vec[str],
@@ -103,6 +104,7 @@ pub fn build_command_options_default -> BuildCommandOptions:
         prelude_mode: DriverPreludeMode.Full,
         overflow_mode: driver_internal_overflow_mode(),
         deterministic: false,
+        strict_effects: false,
         target_kind: 0,
         target_explicit: false,
         include_paths: Vec.new(),
@@ -345,6 +347,7 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
     build.runtime_available = not driver_has_flag(argc, "--no-runtime") and not driver_has_flag(argc, "--freestanding")
     build.debug_info = not driver_has_flag(argc, "-g0") and not driver_has_flag(argc, "--release")
     build.deterministic = driver_has_flag(argc, "--deterministic")
+    build.strict_effects = driver_has_flag(argc, "--strict-effects")
     let prelude = driver_parse_prelude_mode(argc)
     if not prelude.ok:
         return BuildCommandParseResult {

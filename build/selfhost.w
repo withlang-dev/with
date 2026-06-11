@@ -142,6 +142,21 @@ fn bs_run_cli_capture_with_env(ctx: ActionCtx, compiler_path: str, label: str, a
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
+fn bs_run_cli_capture_cwd_with_env(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32, cwd: str, process_env: ProcessEnv) -> SelfhostRunResult:
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
+    let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
+    var argv: Vec[str] = Vec.new()
+    argv |> push(compiler_path)
+    for i in 0..args.len() as i32:
+        argv |> push(args.get(i as i64))
+    let result = ctx.process_runner().run_capture_cwd_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_abs(root, cwd), process_env)
+    if result.rc == 0:
+        let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
+        let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
+    SelfhostRunResult { result.rc, result.stdout, result.stderr }
+
 fn bs_run_cli_capture_input(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], stdin_text: str, timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
@@ -729,13 +744,20 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(c_define_dir, "with.toml"), "[package]\nname = \"cdefine\"\nversion = \"0.1.0\"\n\n[c_import]\ninclude_paths = [\"include\"]\ndefines = [\"WITH_CONFIG_TEST=1\"]\n", "c import define manifest")
     if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(c_define_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    ctx.new_build().executable(\"cdefine\", \"src/main.w\")\n", "c import define build")
+    if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(c_define_dir, "src/main.w"), "use c_import(\"defined_config.h\")\n\nfn main:\n    let x: i32 = WITH_CONFIG_VALUE\n    let _ = x\n", "c import define source")
     if rc != 0: return rc
     var c_define_args: Vec[str] = Vec.new()
-    c_define_args |> push("check")
-    c_define_args |> push(bs_abs(root, bs_join(c_define_dir, "src/main.w")))
+    c_define_args |> push("build")
+    c_define_args |> push("-o")
+    c_define_args |> push(bs_abs(root, bs_join(c_define_dir, "out/bin/cdefine")))
     let c_define = bs_project_expect_success(ctx, compiler_path, c_define_dir, "declarative-c-import-define", c_define_args)
     if c_define.rc != 0: return c_define.rc
+    rc = bs_expect_file_contains(ctx, bs_join(c_define_dir, "out/.build-state/cdefine.state"), "dep:include/defined_config.h:", "c_import_header_tracked_input")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(c_define_dir, "out/.build-state/cdefine.state"), ".with-resource-identity:", "c_import_toolchain_tracked_input")
+    if rc != 0: return rc
 
     let c_define_bad_dir = bs_join(case_dir, "c_define_bad")
     rc = bs_write_fixture(ctx, bs_join(c_define_bad_dir, "include/defined_config.h"), "#ifndef WITH_CONFIG_TEST\n#error missing WITH_CONFIG_TEST\n#endif\n#define WITH_CONFIG_VALUE 42\n", "c import missing define header")
@@ -1267,6 +1289,72 @@ fn bs_check_build_cache_tracks_embed_file(ctx: ActionCtx, compiler_path: str, ca
         return bs_fail(ctx, f"embed cache second binary failed with exit code {second_run.rc}: " ++ second_run.stderr)
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(second_run.stdout), "second", "build_cache_embed_second", "stdout")
 
+fn bs_check_build_effects_audit(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "effectaudit")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args().get(1)\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: Vec[str] = Vec.new()\n    argv.push(ctx.args().get(0))\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
+    if rc != 0: return rc
+
+    var env_one = ProcessEnv { vars: Vec.new() }
+    env_one.vars.push(ProcessEnvVar { name: "WITH_EFFECT_FLAG", value: "one" })
+    env_one.vars.push(ProcessEnvVar { name: "WITH_GRAPH_FLAG", value: "graph-one" })
+    let build_args: Vec[str] = Vec.new()
+    build_args |> push("build")
+    build_args |> push(":effect")
+    let first = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-first", build_args, 120000, case_dir, env_one)
+    if first.rc != 0:
+        return bs_fail(ctx, "effects first build failed: " ++ first.stderr)
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/effect.state"), "env:WITH_EFFECT_FLAG:", "effects env state")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/build.w.effects"), "WITH_GRAPH_FLAG", "effects build env ledger")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/effect.effects"), "process", "effects process ledger")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/effect.effects"), "env", "effects env ledger")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/effect.txt"), "one/graph-one", "effects first output")
+    if rc != 0: return rc
+
+    let audit_args: Vec[str] = Vec.new()
+    audit_args |> push("build")
+    audit_args |> push(":effects")
+    let audit = bs_run_cli_capture_cwd(ctx, compiler_path, "effects-audit", audit_args, 120000, case_dir)
+    if audit.rc != 0:
+        return bs_fail(ctx, "effects audit failed: " ++ audit.stderr)
+    rc = bs_assert_contains(ctx, audit.stdout, "target build.w", "effects_audit_build_target")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, audit.stdout, "WITH_GRAPH_FLAG", "effects_audit_build_env")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, audit.stdout, "target effect", "effects_audit_target")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, audit.stdout, "ProcessRunner", "effects_audit_capability")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, audit.stdout, "process", "effects_audit_process")
+    if rc != 0: return rc
+
+    var env_two = ProcessEnv { vars: Vec.new() }
+    env_two.vars.push(ProcessEnvVar { name: "WITH_EFFECT_FLAG", value: "two" })
+    env_two.vars.push(ProcessEnvVar { name: "WITH_GRAPH_FLAG", value: "graph-two" })
+    let second = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-second", build_args, 120000, case_dir, env_two)
+    if second.rc != 0:
+        return bs_fail(ctx, "effects second build failed: " ++ second.stderr)
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/effect.txt"), "two/graph-two", "effects env invalidation")
+    if rc != 0: return rc
+
+    let strict_dir = bs_join(case_dir, "strict")
+    rc = bs_write_project_manifest(ctx, strict_dir, "effectstrict")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(strict_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let argv: Vec[str] = Vec.new()\n    argv.push(\"" ++ compiler_path ++ "\")\n    argv.push(\"version\")\n    let _ = ctx.process_runner().run_capture(argv, \"out/strict.stdout\", \"out/strict.stderr\", 120000)\n    ctx.new_build()\n", "strict effects build")
+    if rc != 0: return rc
+    let strict_args: Vec[str] = Vec.new()
+    strict_args |> push("build")
+    strict_args |> push("--strict-effects")
+    strict_args |> push(":bad")
+    let strict = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-strict", strict_args, 120000, strict_dir, env_one)
+    if strict.rc == 0:
+        return bs_fail(ctx, "strict effects build unexpectedly succeeded")
+    bs_assert_contains(ctx, strict.stderr, "no declared action inputs or outputs in strict mode", "effects_strict_process")
+
 pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -1315,6 +1403,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_cache_tracks_action_source(ctx, compiler_path, bs_join(output_dir, "build_cache_action_case"))
     if rc != 0: return rc
     rc = bs_check_build_cache_tracks_embed_file(ctx, compiler_path, bs_join(output_dir, "build_cache_embed_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_effects_audit(ctx, compiler_path, bs_join(output_dir, "build_effects_case"))
     if rc != 0: return rc
     bs_check_run_project_targets(ctx, compiler_path, bs_join(output_dir, "run_project_case"))
 

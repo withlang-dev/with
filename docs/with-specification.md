@@ -9625,7 +9625,8 @@ with -e <code> | -n <code> | -p <code>      # one-liners (§18.5b)
 
 Additional flags: `--emit-c` (C source backend, used for
 bootstrapping new platforms), `--emit-obj`, `--overflow=<mode>`
-(§4.2.3), `--no-std` (§18.7), `-O0`..`-O3`. The `--dump-*` family
+(§4.2.3), `--no-std` (§18.7), `--strict-effects` (§17.1b),
+`-O0`..`-O3`. The `--dump-*` family
 (`tokens`, `ast`, `resolved`, `typed`, `mir`, `async-mir`,
 `project-info`) and the `ir`/`ast`/`tokens` subcommands are
 compiler-diagnostic surface: available, but implementation-internal
