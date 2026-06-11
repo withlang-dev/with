@@ -10872,7 +10872,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
 
 ### §18.5 Toolchain
 
-- [x] `18.5.1.1` **A single binary provides all tools:** — impl: [#537](https://github.com/withlang-dev/with/issues/537)
+- [x] `18.5.1.1` **A single binary provides all tools:**
   - Requirement: A single binary provides all tools:
   - Source: `§18.5 L9610`
   - Related spec refs: none

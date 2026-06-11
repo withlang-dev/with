@@ -3,7 +3,7 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-06-09.
+Last updated: 2026-06-11.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
@@ -11,15 +11,15 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 1 build/toolchain/configuration work is in progress. #403 is
-implemented locally: `[runtime] fiber_stack_size` and `fiber_pool_size`
-parse from `with.toml`, flow into sema/codegen, configure the async fiber
-runtime before initialization, preserve `@[stack_size]` priority, and carry
-positive/negative self-host coverage. The slice also fixed f-string escaped
-literal-brace lexing uncovered during review, and fixed the release
-embedded-runtime object dependency so refreshed runtime objects are actually
-baked into `out/release/bin/with`. Full build, fixpoint, test, and test-green
-passed on 2026-06-11 before committing this checkpoint.
+Phase 1 build/toolchain/configuration work is complete through #537. `with doc`
+now generates deterministic Markdown for public functions and types from
+compiler project metadata, and `with repl` is a line-oriented session that
+compiles each accepted snippet through the normal compiler pipeline while
+rejecting unsupported persistent declarations loudly. CLI self-host coverage
+checks help output, doc public/private filtering, doc missing-source
+diagnostics, REPL smoke execution, and REPL persistent-declaration diagnostics.
+Full build, fixpoint, test, and test-green passed on 2026-06-11 for this
+checkpoint before commit.
 
 #347, #356, #358, and the first #357 safety slice are implemented.
 `c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:

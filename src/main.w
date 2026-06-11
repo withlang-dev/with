@@ -65,6 +65,7 @@ extern fn with_getpid() -> i32
 extern fn with_process_alive(pid: i32) -> i32
 extern fn with_fs_mkdir(path: str) -> i32
 extern fn with_write(s: str) -> void
+extern fn with_read_line_stdin() -> str
 extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
 extern fn with_raise_stack_limit() -> void
@@ -732,11 +733,15 @@ fn run_cli(argc: i32) -> i32:
     if cli_command(argc) == "migrate":
         return run_migrate_command(argc)
     if cli_command(argc) == "repl":
-        with_eprint("error: REPL not yet available in self-hosted compiler")
-        return 1
+        if cli_has_flag(argc, "--help") or cli_has_flag(argc, "-h"):
+            print_repl_usage()
+            return 0
+        return run_repl_command(argc, no_std, alloc_mode, runtime_available, prelude_mode)
     if cli_command(argc) == "doc":
-        with_eprint("error: doc not yet available in self-hosted compiler")
-        return 1
+        if cli_has_flag(argc, "--help") or cli_has_flag(argc, "-h"):
+            print_doc_usage()
+            return 0
+        return run_doc_command(argc, source, output, no_std, alloc_mode, runtime_available, prelude_mode)
     if cli_command(argc) == "fmt":
         return run_fmt_command(argc)
     let command = cli_command(argc)
@@ -2464,6 +2469,334 @@ fn cli_read_all_stdin() -> str:
             return out.to_str()
     out.to_str()
 
+fn doc_field(line: str, key: str) -> str:
+    let needle = key ++ "="
+    var i = 0
+    while i + needle.len() as i32 <= line.len() as i32:
+        let at_field = i == 0 or line.byte_at((i - 1) as i64) == 32
+        if at_field and line.slice(i as i64, (i + needle.len() as i32) as i64) == needle:
+            let start = i + needle.len() as i32
+            var end = start
+            while end < line.len() as i32 and line.byte_at(end as i64) != 32:
+                end = end + 1
+            return line.slice(start as i64, end as i64)
+        i = i + 1
+    ""
+
+fn doc_parse_span_start(span: str) -> i32:
+    var value = 0
+    var i = 0
+    while i < span.len() as i32:
+        let ch = span.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return value
+        value = value * 10 + (ch - 48)
+        i = i + 1
+    value
+
+fn doc_path_matches(recorded: str, requested: str) -> bool:
+    if recorded == requested:
+        return true
+    if requested.ends_with("/" ++ recorded):
+        return true
+    if recorded.ends_with("/" ++ requested):
+        return true
+    false
+
+fn doc_path_is_project_source(path: str, root: str, requested: str) -> bool:
+    if path.starts_with("<"):
+        return false
+    if doc_path_matches(path, requested):
+        return true
+    let requested_dir = resolve_dirname(requested)
+    if requested_dir.len() > 0:
+        let requested_prefix = if requested_dir.ends_with("/"): requested_dir else: requested_dir ++ "/"
+        if path.starts_with(requested_prefix):
+            return true
+    if root.len() == 0:
+        return false
+    let prefix = if root.ends_with("/"): root else: root ++ "/"
+    path.starts_with(prefix)
+
+fn doc_source_line_at(text: str, offset: i32) -> str:
+    var start = offset
+    if start < 0:
+        start = 0
+    if start > text.len() as i32:
+        start = text.len() as i32
+    while start > 0 and text.byte_at((start - 1) as i64) != 10:
+        start = start - 1
+    var end = offset
+    if end < start:
+        end = start
+    while end < text.len() as i32 and text.byte_at(end as i64) != 10:
+        end = end + 1
+    text.slice(start as i64, end as i64).trim()
+
+fn doc_extract_comment(text: str, decl_start: i32) -> str:
+    var pos = decl_start - 1
+    while pos >= 0 and (text.byte_at(pos as i64) == 32 or text.byte_at(pos as i64) == 9 or text.byte_at(pos as i64) == 13 or text.byte_at(pos as i64) == 10):
+        pos = pos - 1
+    let lines: Vec[str] = Vec.new()
+    while pos >= 0:
+        var line_start = pos
+        while line_start > 0 and text.byte_at((line_start - 1) as i64) != 10:
+            line_start = line_start - 1
+        let line = text.slice(line_start as i64, (pos + 1) as i64).trim()
+        if not line.starts_with("///"):
+            break
+        lines.push(line.slice(3, line.len()).trim())
+        pos = line_start - 1
+        while pos >= 0 and (text.byte_at(pos as i64) == 32 or text.byte_at(pos as i64) == 9 or text.byte_at(pos as i64) == 13 or text.byte_at(pos as i64) == 10):
+            pos = pos - 1
+    var out = ""
+    var i = lines.len() as i32 - 1
+    while i >= 0:
+        if out.len() > 0:
+            out = out ++ "\n"
+        out = out ++ lines.get(i as i64)
+        i = i - 1
+    out
+
+fn doc_markdown_entry(kind: str, path: str, name: str, detail: str, source_text: str, span_start: i32) -> str:
+    var out = "### " ++ name ++ "\n\n"
+    out = out ++ "Module: `" ++ path ++ "`\n\n"
+    let docs = doc_extract_comment(source_text, span_start)
+    if docs.len() > 0:
+        out = out ++ docs ++ "\n\n"
+    else:
+        out = out ++ "_No documentation comment._\n\n"
+    let line = doc_source_line_at(source_text, span_start)
+    if line.len() > 0:
+        out = out ++ "```with\n" ++ line ++ "\n```\n\n"
+    if detail.len() > 0:
+        out = out ++ detail ++ "\n\n"
+    let _ = kind
+    out
+
+fn doc_project_root(info: str) -> str:
+    let lines = split_nonempty_lines(info)
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i as i64)
+        if line.starts_with("config root="):
+            return doc_field(line, "root")
+    ""
+
+fn doc_collect_modules(info: str, root: str, source_path: str) -> str:
+    let lines = split_nonempty_lines(info)
+    var out = ""
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i as i64)
+        if not line.starts_with("module "):
+            continue
+        let path = doc_field(line, "path")
+        if not doc_path_is_project_source(path, root, source_path):
+            continue
+        out = out ++ "- `" ++ path ++ "`\n"
+    out
+
+fn doc_path_seen(paths: Vec[str], path: str) -> bool:
+    for i in 0..paths.len() as i32:
+        if paths.get(i as i64) == path:
+            return true
+    false
+
+fn doc_module_paths(info: str, root: str, source_path: str) -> Vec[str]:
+    let paths: Vec[str] = Vec.new()
+    let lines = split_nonempty_lines(info)
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i as i64)
+        if not line.starts_with("module "):
+            continue
+        let path = doc_field(line, "path")
+        if not doc_path_is_project_source(path, root, source_path):
+            continue
+        if not doc_path_seen(paths, path):
+            paths.push(path)
+    if paths.len() == 0:
+        paths.push(source_path)
+    paths
+
+fn doc_collect_entries(info: str, root: str, source_path: str, fallback_source_text: str, wanted_kind: str) -> str:
+    let lines = split_nonempty_lines(info)
+    var out = ""
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i as i64)
+        if not line.starts_with(wanted_kind ++ " "):
+            continue
+        if doc_field(line, "pub") != "1":
+            continue
+        let path = doc_field(line, "path")
+        if not doc_path_is_project_source(path, root, source_path):
+            continue
+        var source_text = with_fs_read_file(path)
+        if source_text.len() == 0 and doc_path_matches(path, source_path):
+            source_text = fallback_source_text
+        if source_text.len() == 0:
+            continue
+        let name = doc_field(line, "name")
+        let span = doc_field(line, "span")
+        let start = doc_parse_span_start(span)
+        var detail = ""
+        if wanted_kind == "function":
+            detail = "Parameters: " ++ doc_field(line, "params") ++ "\n\nReturns: `" ++ doc_field(line, "return") ++ "`"
+        else:
+            detail = "Kind: `" ++ doc_field(line, "kind") ++ "`"
+        out = out ++ doc_markdown_entry(wanted_kind, path, name, detail, source_text, start)
+    out
+
+fn doc_default_source(source: str) -> str:
+    if source.len() > 0:
+        return source
+    let root = build_graph_find_build_root(".")
+    if root.len() > 0:
+        let project_main = resolve_join(root, "src/main.w")
+        if with_fs_file_exists(project_main) != 0:
+            return project_main
+    if with_fs_file_exists("src/main.w") != 0:
+        return "src/main.w"
+    ""
+
+fn doc_output_path(output: str) -> str:
+    if output.len() > 0:
+        return output
+    "out/doc/index.md"
+
+fn run_doc_command(argc: i32, source: str, output: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    let source_path = doc_default_source(source)
+    if source_path.len() == 0:
+        with_eprint("error: with doc requires a source file or a project with src/main.w")
+        return 1
+    if with_fs_file_exists(source_path) == 0:
+        with_eprint("error: with doc source file not found: " ++ source_path)
+        return 1
+    let source_text = with_fs_read_file(source_path)
+    if source_text.len() == 0:
+        with_eprint("error: with doc could not read source file: " ++ source_path)
+        return 1
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let pool = comp.compile_file(source_path)
+    if pool.decl_count() == 0:
+        with_eprint("error: with doc failed during compilation")
+        return 1
+    if not comp.check_pool(pool, source_path):
+        return 1
+    let info = comp.dump_project_info(pool)
+    let root = doc_project_root(info)
+    let module_paths = doc_module_paths(info, root, source_path)
+    var all_info = ""
+    for mi in 0..module_paths.len() as i32:
+        let module_path = module_paths.get(mi as i64)
+        var module_comp = Compilation.init()
+        module_comp.configure(0, no_std, alloc_mode, runtime_available)
+        module_comp.set_prelude_mode(prelude_mode)
+        let module_pool = module_comp.compile_file(module_path)
+        if module_pool.decl_count() == 0:
+            with_eprint("error: with doc failed while compiling module: " ++ module_path)
+            return 1
+        if not module_comp.check_pool(module_pool, module_path):
+            return 1
+        all_info = all_info ++ module_comp.dump_project_info(module_pool)
+    var markdown = "# With Documentation\n\n"
+    markdown = markdown ++ "Source: `" ++ source_path ++ "`\n\n"
+    let modules = doc_collect_modules(info, root, source_path)
+    if modules.len() > 0:
+        markdown = markdown ++ "## Modules\n\n" ++ modules ++ "\n"
+    let functions = doc_collect_entries(all_info, root, source_path, source_text, "function")
+    let types = doc_collect_entries(all_info, root, source_path, source_text, "type")
+    if functions.len() > 0:
+        markdown = markdown ++ "## Functions\n\n" ++ functions
+    if types.len() > 0:
+        markdown = markdown ++ "## Types\n\n" ++ types
+    if functions.len() == 0 and types.len() == 0:
+        markdown = markdown ++ "_No public functions or types found._\n"
+    let out_path = doc_output_path(output)
+    let out_dir = resolve_dirname(out_path)
+    if out_dir.len() > 0 and with_fs_mkdir_p(out_dir) != 0:
+        with_eprint("error: with doc could not create output directory: " ++ out_dir)
+        return 1
+    if with_fs_write_file(out_path, markdown) != 0:
+        with_eprint("error: with doc could not write " ++ out_path)
+        return 1
+    with_write("generated documentation at " ++ out_path ++ "\n")
+    if cli_has_flag(argc, "--open"):
+        with_eprint("warning: --open generated documentation but browser opening is not implemented in this compiler build")
+    0
+
+fn repl_source_for_line(line: str) -> str:
+    "use std.io\n" ++
+    "use std.str\n" ++
+    "use std.regex\n" ++
+    "use std.math\n" ++
+    "use std.collections\n" ++
+    "use std.builtins\n\n" ++
+    line ++ "\n"
+
+fn repl_line_requires_session_state(line: str) -> bool:
+    let text = line.trim()
+    text.starts_with("let ") or text.starts_with("var ") or text.starts_with("fn ") or text.starts_with("pub ") or text.starts_with("type ") or text.starts_with("trait ") or text.starts_with("impl ") or text.starts_with("extern ") or text.starts_with("use ")
+
+fn repl_bin_path -> str:
+    f"out/tmp/with-repl-{with_getpid()}-{with_clock_nanos()}"
+
+fn run_repl_line(line: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    if no_std:
+        with_eprint("error: repl requires the standard library")
+        return 1
+    let source = repl_source_for_line(line)
+    let bin_path = repl_bin_path()
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    comp.set_debug_info(false)
+    let built = comp.build_entry_binary_from_source_to_path("<repl>", source, bin_path)
+    if built == "":
+        return 1
+    comp.print_warnings()
+    let rc = build_graph_rt_exec_binary(built)
+    cleanup_binary_artifacts(built)
+    let _obj = build_graph_rt_remove_file(built ++ ".o")
+    rc
+
+fn print_repl_help:
+    with_write("Commands:\n")
+    with_write("  :help     Show REPL commands\n")
+    with_write("  :quit     Exit the REPL\n")
+    with_write("  :exit     Exit the REPL\n")
+    with_write("\n")
+    with_write("Each input line is compiled and run as normal With code. Persistent declarations are rejected until session state is implemented.\n")
+
+fn run_repl_command(argc: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    let _ = argc
+    with_write("With REPL\n")
+    print_repl_help()
+    while true:
+        with_write("with> ")
+        let line = with_read_line_stdin()
+        if line.len() == 0:
+            with_write("\n")
+            return 0
+        let trimmed = line.trim()
+        if trimmed.len() == 0:
+            continue
+        if trimmed == ":quit" or trimmed == ":exit":
+            return 0
+        if trimmed == ":help":
+            print_repl_help()
+            continue
+        if trimmed.starts_with(":"):
+            with_eprint("error: unknown repl command '" ++ trimmed ++ "'")
+            return 1
+        if repl_line_requires_session_state(trimmed):
+            with_eprint("error: repl persistent declarations are not implemented yet; use expression or statement snippets")
+            return 1
+        let rc = run_repl_line(trimmed, no_std, alloc_mode, runtime_available, prelude_mode)
+        if rc != 0:
+            return rc
+    0
+
 fn run_fmt_command(argc: i32) -> i32:
     let write_mode = cli_has_flag(argc, "-w")
     let list_mode = cli_has_flag(argc, "-l")
@@ -2541,6 +2874,8 @@ fn print_usage:
     with_write("  bench            Build and run benchmarks\n")
     with_write("\n")
     with_write("  fmt              Format With source\n")
+    with_write("  doc              Generate documentation\n")
+    with_write("  repl             Start an interactive session\n")
     with_write("  lsp              Start the language server\n")
     with_write("  migrate          Migrate C source to With\n")
     with_write("\n")
@@ -2582,6 +2917,36 @@ fn print_usage:
     with_write("                   Select overflow mode for builds: panic, wrap, saturate\n")
     with_write("  --strict-effects Reject undeclared build-time effects\n")
     with_write("  --freestanding   Alias for --no-std --no-runtime --prelude=core\n")
+
+fn print_doc_usage:
+    with_write("Usage: with doc [source.w] [options]\n")
+    with_write("\n")
+    with_write("Generates deterministic Markdown documentation for public declarations.\n")
+    with_write("With no source argument, uses src/main.w from the current project.\n")
+    with_write("\n")
+    with_write("Doc Options:\n")
+    with_write("\n")
+    with_write("  -h, --help       Print this help and exit\n")
+    with_write("  -o, --output     Write documentation to path (default: out/doc/index.md)\n")
+    with_write("  --open           Best-effort open after successful generation\n")
+    with_write("  --no-std         Disable standard library support while checking docs\n")
+    with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
+
+fn print_repl_usage:
+    with_write("Usage: with repl [options]\n")
+    with_write("\n")
+    with_write("Starts a line-oriented session. Each input line is compiled and run through the normal compiler pipeline.\n")
+    with_write("\n")
+    with_write("REPL Commands:\n")
+    with_write("\n")
+    with_write("  :help            Show REPL commands\n")
+    with_write("  :quit, :exit     Exit the REPL\n")
+    with_write("\n")
+    with_write("Persistent declarations are rejected until session state is implemented.\n")
+    with_write("\n")
+    with_write("REPL Options:\n")
+    with_write("\n")
+    with_write("  -h, --help       Print this help and exit\n")
 
 fn print_build_usage:
     with_write("Usage: with build [source.w|:target] [options]\n")

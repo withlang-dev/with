@@ -320,6 +320,8 @@ fn bs_check_help(ctx: ActionCtx, compiler_path: str) -> i32:
 
     let checks: Vec[str] = Vec.new()
     checks |> push("Usage: with [command] [options]")
+    checks |> push("  doc              Generate documentation")
+    checks |> push("  repl             Start an interactive session")
     checks |> push("  lsp              Start the language server")
     checks |> push("  -e <code>        Compile and run code as top-level statements")
     for i in 0..checks.len() as i32:
@@ -363,6 +365,101 @@ fn bs_check_help(ctx: ActionCtx, compiler_path: str) -> i32:
     if build_short_help.rc != 0:
         return build_short_help.rc
     bs_assert_contains(ctx, build_short_help.stdout, "Usage: with build [source.w|:target] [options]", "build_help_short")
+
+fn bs_check_doc_repl_cli(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var doc_help_args: Vec[str] = Vec.new()
+    doc_help_args |> push("doc")
+    doc_help_args |> push("--help")
+    let doc_help = bs_run_cli_expect_success(ctx, compiler_path, "doc-help", doc_help_args)
+    if doc_help.rc != 0:
+        return doc_help.rc
+    var rc = bs_assert_contains(ctx, doc_help.stdout, "Usage: with doc [source.w] [options]", "doc_help")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, doc_help.stdout, "--open", "doc_help")
+    if rc != 0: return rc
+
+    var repl_help_args: Vec[str] = Vec.new()
+    repl_help_args |> push("repl")
+    repl_help_args |> push("--help")
+    let repl_help = bs_run_cli_expect_success(ctx, compiler_path, "repl-help", repl_help_args)
+    if repl_help.rc != 0:
+        return repl_help.rc
+    rc = bs_assert_contains(ctx, repl_help.stdout, "Usage: with repl [options]", "repl_help")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, repl_help.stdout, ":quit", "repl_help")
+    if rc != 0: return rc
+
+    let doc_src = bs_join(case_dir, "doc_sample.w")
+    let helper_src = bs_join(case_dir, "Helper.w")
+    let doc_out = bs_join(case_dir, "api.md")
+    rc = bs_write_fixture(ctx, helper_src,
+        "/// Helper module public API.\n" ++
+        "pub fn helper_value() -> i32:\n" ++
+        "    42\n\n" ++
+        "fn helper_hidden() -> i32:\n" ++
+        "    0\n",
+        "doc helper sample")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, doc_src,
+        "use Helper\n\n" ++
+        "/// Adds one to the input.\n" ++
+        "pub fn add_one(x: i32) -> i32:\n" ++
+        "    x + 1\n\n" ++
+        "fn hidden_value() -> i32:\n" ++
+        "    0\n\n" ++
+        "/// Public documented data.\n" ++
+        "pub type PublicThing { value: i32 }\n",
+        "doc sample")
+    if rc != 0: return rc
+    var doc_args: Vec[str] = Vec.new()
+    doc_args |> push("doc")
+    doc_args |> push(bs_abs(ctx.project_info().project_root(), doc_src))
+    doc_args |> push("-o")
+    doc_args |> push(bs_abs(ctx.project_info().project_root(), doc_out))
+    let doc_run = bs_run_cli_expect_success(ctx, compiler_path, "doc-smoke", doc_args)
+    if doc_run.rc != 0:
+        return doc_run.rc
+    rc = bs_expect_file_contains(ctx, doc_out, "## Functions", "doc smoke functions")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, doc_out, "add_one", "doc smoke public fn")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, doc_out, "Adds one to the input.", "doc smoke fn docs")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, doc_out, "helper_value", "doc smoke imported public fn")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, doc_out, "Helper module public API.", "doc smoke imported docs")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, doc_out, "PublicThing", "doc smoke public type")
+    if rc != 0: return rc
+    let doc_text = ctx.fs().read_text(doc_out)
+    rc = bs_assert_not_contains(ctx, doc_text, "hidden_value", "doc smoke private fn")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, doc_text, "helper_hidden", "doc smoke imported private fn")
+    if rc != 0: return rc
+
+    let missing_dir = bs_join(case_dir, "missing-doc-source")
+    if ctx.fs().mkdir_all(missing_dir) != 0:
+        return bs_fail(ctx, "could not create missing doc source directory")
+    var missing_doc_args: Vec[str] = Vec.new()
+    missing_doc_args |> push("doc")
+    let missing_doc = bs_run_cli_capture_cwd(ctx, compiler_path, "doc-missing-source", missing_doc_args, 120000, missing_dir)
+    if missing_doc.rc == 0:
+        return bs_fail(ctx, "with doc without source unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, missing_doc.stderr, "with doc requires a source file or a project with src/main.w", "doc_missing_source")
+    if rc != 0: return rc
+
+    var repl_args: Vec[str] = Vec.new()
+    repl_args |> push("repl")
+    let repl_run = bs_run_cli_capture_input(ctx, compiler_path, "repl-smoke", repl_args, "print(\"repl-ok\")\n:quit\n", 120000)
+    if repl_run.rc != 0:
+        return bs_fail(ctx, "repl smoke failed with exit code " ++ f"{repl_run.rc}" ++ ": " ++ repl_run.stderr)
+    rc = bs_assert_contains(ctx, repl_run.stdout, "repl-ok", "repl_smoke")
+    if rc != 0: return rc
+
+    let repl_bad = bs_run_cli_capture_input(ctx, compiler_path, "repl-persistent-decl", repl_args, "let x = 1\n", 120000)
+    if repl_bad.rc == 0:
+        return bs_fail(ctx, "repl persistent declaration unexpectedly succeeded")
+    bs_assert_contains(ctx, repl_bad.stderr, "persistent declarations are not implemented", "repl_persistent_decl")
 
 fn bs_test_args(source_path: str) -> Vec[str]:
     let args: Vec[str] = Vec.new()
@@ -432,6 +529,10 @@ pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
     let help_rc = bs_check_help(ctx, compiler_path)
     if help_rc != 0:
         return help_rc
+
+    let doc_repl_rc = bs_check_doc_repl_cli(ctx, compiler_path, bs_join(output_dir, "doc-repl"))
+    if doc_repl_rc != 0:
+        return doc_repl_rc
 
     let test_dir = bs_join(output_dir, "test-directives")
     let directives_rc = bs_check_test_directives(ctx, compiler_path, test_dir)
