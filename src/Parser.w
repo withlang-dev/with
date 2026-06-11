@@ -3008,13 +3008,6 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
                 // the pool is still mutable; MIR runs after freeze (#234, §9.9).
                 self.pool.set_membership_arg(bin_node, self.pool.add_extra(lhs))
             lhs = bin_node
-            if parser_infix_op_is_non_associative(op_code):
-                let next_info = self.infix_op()
-                if next_info != 0:
-                    let follow_prec = next_info / 1000
-                    let next_op = next_info % 1000
-                    if follow_prec == prec and parser_infix_op_is_non_associative(next_op):
-                        self.emit_error("non-associative operator cannot be chained; add parentheses")
             // Chained comparisons: a < b < c → (a < b) and (b < c)
             if op_code >= BinaryOp.OP_LT and op_code <= BinaryOp.OP_GTE:
                 var last_cmp = lhs  // track the latest comparison node
@@ -3051,10 +3044,26 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
                         self.pool.add_extra(let_node)
                         lhs = self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(lhs), self.prev_end(), blk_extra, 1, lhs)
                     chain_info = self.infix_op()
+        if parser_infix_op_is_non_associative(op_code):
+            let next_info = self.infix_op()
+            if next_info != 0:
+                let follow_prec = next_info / 1000
+                let next_op = next_info % 1000
+                if follow_prec == prec and parser_infix_op_is_non_associative(next_op):
+                    self.emit_error("operator '" ++ parser_infix_op_text(op_code) ++ "' is non-associative; parenthesize the expression")
 
     lhs
 
 // Returns encoded info: prec * 1000 + op_code, or 0 if not infix
+fn parser_infix_op_text(op_code: i32) -> str:
+    if op_code == BinaryOp.OP_EQ: return "=="
+    if op_code == BinaryOp.OP_NEQ: return "!="
+    if op_code == BinaryOp.OP_IN: return "in"
+    if op_code == BinaryOp.OP_NOT_IN: return "not in"
+    if op_code == 506: return "=~"
+    if op_code == 507: return "!~"
+    "operator"
+
 fn parser_infix_op_is_non_associative(op_code: i32) -> bool:
     if op_code == BinaryOp.OP_EQ: return true
     if op_code == BinaryOp.OP_NEQ: return true

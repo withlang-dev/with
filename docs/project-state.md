@@ -11,14 +11,12 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 2 parser/control-flow work is in progress. #461 is implemented and
-pushed. #443 is implemented locally and verified: non-diverging
-value-position `if` expressions without `else` now fail with a targeted
-diagnostic, including binding initializers, function tail returns, call
-arguments, multiline initializers, and value-position `else if` chains.
-Statement-position `if` and `else if` remain accepted, and `Never`
-then-branches remain allowed in value position. Full build, fixpoint, test,
-and test-green passed on 2026-06-11 before commit.
+Phase 2 parser/control-flow work is in progress. #461 and #443 are
+implemented, pushed, and closed. #445 is implemented locally and verified:
+equality-level non-associative operators (`==`, `!=`, `in`, `not in`, `=~`,
+`!~`) now emit a parser diagnostic when chained, including regex match
+operators, while ordered comparison chains remain accepted. Full build,
+fixpoint, test, and test-green passed on 2026-06-11 before commit.
 
 #347, #356, #358, and the first #357 safety slice are implemented.
 `c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:

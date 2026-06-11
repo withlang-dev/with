@@ -3809,7 +3809,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: `in` is a binary operator at the same precedence level as equality operators (`==`, `!=`).
   - Source: `§9.9 L3872-L3875`
   - Related spec refs: none
-- [x] `9.9.1.6` **It is non-associative — a in b in c is a compile error.** — impl: [#445](https://github.com/withlang-dev/with/issues/445)
+- [x] `9.9.1.6` **It is non-associative — a in b in c is a compile error.**
   - Requirement: It is non-associative — `a in b in c` is a compile error.
   - Source: `§9.9 L3872-L3875`
   - Related spec refs: none
