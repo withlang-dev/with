@@ -707,6 +707,9 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
         "trace = [\"io\"]\n\n" ++
         "[target]\n" ++
         "default = \"native\"\n\n" ++
+        "[runtime]\n" ++
+        "fiber_stack_size = 131072\n" ++
+        "fiber_pool_size = 64\n\n" ++
         "[deps]\n" ++
         "c.fixture = \"1.0\"\n"
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), manifest, "declarative manifest")
@@ -737,6 +740,10 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
     rc = bs_assert_contains(ctx, dump.stdout, "config dep_constraints=1.0", "declarative_manifest_dep_constraints")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, dump.stdout, "config target_default=native", "declarative_manifest_target_default")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config runtime_fiber_stack_size=131072", "declarative_manifest_runtime_stack")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config runtime_fiber_pool_size=64", "declarative_manifest_runtime_pool")
     if rc != 0: return rc
 
     let c_define_dir = bs_join(case_dir, "c_define")
@@ -834,6 +841,83 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
     if imperative_target.rc == 0:
         return bs_fail(ctx, "imperative [target] manifest unexpectedly succeeded")
     bs_assert_contains(ctx, imperative_target.stderr, "imperative build configuration belongs in build.w", "declarative_target_imperative")
+
+fn bs_check_runtime_manifest_config(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let runtime_dir = bs_join(case_dir, "runtime_valid")
+    var rc = bs_write_fixture(ctx, bs_join(runtime_dir, "with.toml"), "[package]\nname = \"runtimecfg\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_stack_size = 98304\nfiber_pool_size = 1\n", "runtime config manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(runtime_dir, "src/main.w"),
+        "extern fn with_fiber_stack_size_bytes() -> i64\n" ++
+        "extern fn with_fiber_current_stack_size_bytes() -> i64\n" ++
+        "extern fn with_fiber_pool_allocs() -> i64\n" ++
+        "extern fn with_fiber_pool_reuses() -> i64\n" ++
+        "extern fn with_fiber_pool_free_count() -> i32\n" ++
+        "extern fn with_fiber_pool_size_limit() -> i32\n\n" ++
+        "async fn configured_default() -> i64:\n" ++
+        "    with_fiber_current_stack_size_bytes()\n\n" ++
+        "@[stack_size(131072)]\n" ++
+        "async fn explicit_stack() -> i64:\n" ++
+        "    with_fiber_current_stack_size_bytes()\n\n" ++
+        "async fn unit_task() -> i32:\n" ++
+        "    1\n\n" ++
+        "async fn main:\n" ++
+        "    assert(with_fiber_stack_size_bytes() == 98304)\n" ++
+        "    assert(with_fiber_pool_size_limit() == 1)\n" ++
+        "    let configured = configured_default()\n" ++
+        "    let configured_stack = configured.await\n" ++
+        "    assert(configured_stack == 98304)\n" ++
+        "    let explicit = explicit_stack()\n" ++
+        "    let explicit_stack_bytes = explicit.await\n" ++
+        "    assert(explicit_stack_bytes == 131072)\n" ++
+        "    let a = unit_task()\n" ++
+        "    let b = unit_task()\n" ++
+        "    let _ = a.await\n" ++
+        "    let _ = b.await\n" ++
+        "    assert(with_fiber_pool_free_count() == 1)\n" ++
+        "    assert(with_fiber_pool_allocs() > 0)\n" ++
+        "    assert(with_fiber_pool_reuses() > 0)\n" ++
+        "    print(\"runtimecfg\")\n",
+        "runtime config source")
+    if rc != 0: return rc
+    let built = bs_project_expect_success(ctx, compiler_path, runtime_dir, "runtime-manifest-build", bs_project_args("build"))
+    if built.rc != 0: return built.rc
+    let run = bs_run_binary_capture(ctx, bs_join(runtime_dir, "out/bin/runtimecfg"), "runtime-manifest-run", 120000)
+    if run.rc != 0:
+        return bs_fail(ctx, f"runtime manifest binary failed with exit code {run.rc}: " ++ run.stderr)
+    rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run.stdout), "runtimecfg", "runtime_manifest_config", "stdout")
+    if rc != 0: return rc
+
+    let bad_stack_dir = bs_join(case_dir, "bad_stack")
+    rc = bs_write_fixture(ctx, bs_join(bad_stack_dir, "with.toml"), "[package]\nname = \"badstack\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_stack_size = 0\n", "bad runtime stack manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(bad_stack_dir, "src/main.w"), "fn main:\n    print(\"badstack\")\n", "bad runtime stack source")
+    if rc != 0: return rc
+    let bad_stack = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-stack", bs_project_args("build"), 120000, bad_stack_dir)
+    if bad_stack.rc == 0:
+        return bs_fail(ctx, "zero runtime fiber stack size unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, bad_stack.stderr, "runtime.fiber_stack_size must be a positive integer", "runtime_manifest_bad_stack")
+    if rc != 0: return rc
+
+    let bad_pool_dir = bs_join(case_dir, "bad_pool")
+    rc = bs_write_fixture(ctx, bs_join(bad_pool_dir, "with.toml"), "[package]\nname = \"badpool\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_pool_size = -1\n", "bad runtime pool manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(bad_pool_dir, "src/main.w"), "fn main:\n    print(\"badpool\")\n", "bad runtime pool source")
+    if rc != 0: return rc
+    let bad_pool = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-pool", bs_project_args("build"), 120000, bad_pool_dir)
+    if bad_pool.rc == 0:
+        return bs_fail(ctx, "negative runtime fiber pool size unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, bad_pool.stderr, "runtime.fiber_pool_size must be a positive integer", "runtime_manifest_bad_pool")
+    if rc != 0: return rc
+
+    let unknown_dir = bs_join(case_dir, "unknown_runtime")
+    rc = bs_write_fixture(ctx, bs_join(unknown_dir, "with.toml"), "[package]\nname = \"runtimeunknown\"\nversion = \"0.1.0\"\n\n[runtime]\nexecutor = \"custom\"\n", "unknown runtime manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(unknown_dir, "src/main.w"), "fn main:\n    print(\"runtimeunknown\")\n", "unknown runtime source")
+    if rc != 0: return rc
+    let unknown = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-unknown", bs_project_args("build"), 120000, unknown_dir)
+    if unknown.rc == 0:
+        return bs_fail(ctx, "unknown [runtime] key unexpectedly succeeded")
+    bs_assert_contains(ctx, unknown.stderr, "unknown key 'executor' in [runtime]", "runtime_manifest_unknown")
 
 fn bs_check_link_libs_manifest_diagnostics(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), "[package]\nname = \"badlinklibs\"\nversion = \"0.1.0\"\n\n[link]\nlibs = \"sqlite3\"\n", "bad link libs manifest")
@@ -1383,6 +1467,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_rejects_imperative_manifest(ctx, compiler_path, bs_join(output_dir, "build_imperative_manifest_case"))
     if rc != 0: return rc
     rc = bs_check_declarative_manifest_config(ctx, compiler_path, bs_join(output_dir, "declarative_manifest_config_case"))
+    if rc != 0: return rc
+    rc = bs_check_runtime_manifest_config(ctx, compiler_path, bs_join(output_dir, "runtime_manifest_config_case"))
     if rc != 0: return rc
     rc = bs_check_link_libs_manifest_diagnostics(ctx, compiler_path, bs_join(output_dir, "link_libs_manifest_case"))
     if rc != 0: return rc

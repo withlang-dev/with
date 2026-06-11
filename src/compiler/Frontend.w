@@ -1221,6 +1221,8 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         pre_sema.ci_omitted_symbols = self.c_import_omitted_symbols
         pre_sema.tool_mode_entry_path = self.tool_mode_entry_path
         pre_sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
+        pre_sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
+        pre_sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
         pre_sema.overflow_mode = self.project_config.overflow_mode
         pre_sema.init_module_graph(&self.last_resolved)
         pre_sema.prepare_for_comptime_transform()
@@ -1260,6 +1262,8 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     sema.ci_omitted_symbols = self.c_import_omitted_symbols
     sema.tool_mode_entry_path = self.tool_mode_entry_path
     sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
+    sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
+    sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
     sema.overflow_mode = self.project_config.overflow_mode
     if self.project_config.no_std:
         sema.no_std = 1

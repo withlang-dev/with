@@ -738,6 +738,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(embedded_objects)
 
     var embedded_objects_obj = target_new(.CompileAsmObject, "embedded-objects-object", "out/lib/embedded_objects.s").output("out/lib/embedded_objects.o")
+    embedded_objects_obj = embedded_objects_obj.dep("embedded-objects-asm")
     out = out.add_target(embedded_objects_obj)
 
     var runtime = target_new(.Group, "runtime", "")

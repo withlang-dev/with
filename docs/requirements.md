@@ -7689,12 +7689,12 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: This is the reference implementation's model and the behavior programs may rely on.
   - Source: `§14.19 L7198-L7208`
   - Related spec refs: none
-- [x] `14.19.1.6` **Stack sizing is implementation-defined configuration; the reference impleme...**
-  - Requirement: Stack sizing is implementation-defined configuration; the reference implementation currently uses a fixed 64 KB and does not yet read a configuration key.
+- [x] `14.19.1.6` **Stack sizing is implementation-defined configuration.**
+  - Requirement: Stack sizing is implementation-defined configuration.
   - Source: `§14.19 L7198-L7208`
   - Related spec refs: none
-- [x] `14.19.1.7` **(A [runtime] with.toml section — fiber_stack_size, fiber_pool_size — is the...**
-  - Requirement: (A `[runtime]` `with.toml` section — `fiber_stack_size`, `fiber_pool_size` — is the planned surface, tracked as a delta issue; it is not yet parsed.)
+- [x] `14.19.1.7` **The reference implementation reads the optional [runtime] with.toml section...**
+  - Requirement: The reference implementation reads the optional `[runtime]` `with.toml` section: `fiber_stack_size` and `fiber_pool_size`.
   - Source: `§14.19 L7198-L7208`
   - Related spec refs: none
 - [x] `14.19.1.8` **Growable stacks (roadmap, implementation-defined): an implementation may st...**
@@ -7817,7 +7817,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: The cost is a pool grab + context switch, not a heap allocation.
   - Source: `§14.19 L7294-L7298`
   - Related spec refs: none
-- [x] `14.19.1.38` **Pool size is configurable.** — impl: [#403](https://github.com/withlang-dev/with/issues/403)
+- [x] `14.19.1.38` **Pool size is configurable.**
   - Requirement: Pool size is configurable.
   - Source: `§14.19 L7300-L7301`
   - Related spec refs: none

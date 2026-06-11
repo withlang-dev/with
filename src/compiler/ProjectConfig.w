@@ -22,6 +22,8 @@ type ProjectConfig {
     feature_names: Vec[str],
     feature_values: Vec[str],
     target_default: str,
+    runtime_fiber_stack_size: i64,
+    runtime_fiber_pool_size: i32,
     no_std: bool,
     alloc_mode: bool,
     runtime_available: bool,
@@ -50,6 +52,8 @@ fn project_config_default -> ProjectConfig:
         feature_names: Vec.new(),
         feature_values: Vec.new(),
         target_default: "",
+        runtime_fiber_stack_size: 0,
+        runtime_fiber_pool_size: 0,
         no_std: false,
         alloc_mode: false,
         runtime_available: true,
@@ -178,6 +182,20 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
                 out.manifest_error = "build.strict_effects must be true or false"
         else:
             out.strict_effects = parsed_strict != 0
+    else if section == "runtime" and key == "fiber_stack_size":
+        let parsed_stack = project_config_parse_positive_i64(value)
+        if parsed_stack <= 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "runtime.fiber_stack_size must be a positive integer"
+        else:
+            out.runtime_fiber_stack_size = parsed_stack
+    else if section == "runtime" and key == "fiber_pool_size":
+        let parsed_pool = project_config_parse_positive_i64(value)
+        if parsed_pool <= 0 or parsed_pool > 2147483647:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "runtime.fiber_pool_size must be a positive integer"
+        else:
+            out.runtime_fiber_pool_size = parsed_pool as i32
     else if section == "c_import" and key == "include_paths":
         out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
     else if section == "c_import" and key == "defines":
@@ -270,6 +288,20 @@ fn project_config_parse_bool(value: str) -> i32:
     if text == "false":
         return 0
     -1
+
+fn project_config_parse_positive_i64(value: str) -> i64:
+    let text = project_config_strip_quotes(project_config_trim(value))
+    if text.len() == 0:
+        return -1
+    var out: i64 = 0
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        out = out * 10 + (ch - 48) as i64
+        if out <= 0:
+            return -1
+    out
 
 fn project_config_vec_contains(values: Vec[str], needle: str) -> bool:
     for i in 0..values.len() as i32:
@@ -379,6 +411,8 @@ fn project_config_wants_key(section: str, key: str) -> bool:
         return true
     if section == "build" and (key == "overflow" or key == "strict_effects"):
         return true
+    if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size"):
+        return true
     if section == "features":
         return true
     if section == "target" and key == "default":
@@ -392,6 +426,10 @@ fn project_config_wants_key(section: str, key: str) -> bool:
 fn project_config_forbidden_entry(section: str, key: str) -> str:
     if section == "build" and (key == "overflow" or key == "strict_effects"):
         return ""
+    if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size"):
+        return ""
+    if section == "runtime":
+        return "unknown key '" ++ key ++ "' in [runtime]; expected fiber_stack_size or fiber_pool_size"
     if section == "target" and key == "default":
         return ""
     if section == "build" or section == "commands" or section == "scripts" or section == "targets" or section == "target":

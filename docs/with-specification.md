@@ -20,7 +20,7 @@ literals `/pattern/flags`, `=~`/`!~` at precedence level 3,
 branch-scoped `$capture` bindings as a refutable-binding condition
 form; §18.5b.6 now defers to §15.8; `std.regex` added to §18.6.
 `@[effect]` declared-effect contracts for bodiless declarations
-(§16.3d). §14.19 `[runtime]` config honestly marked unimplemented.
+(§16.3d). §14.19 `[runtime]` config for fiber stack and pool sizing.
 CLI table completed (§18.5); module map extended with
 regex/json/http/crypto + internal-modules note (§18.6); Attribute
 Index appendix (§29.14). Named arguments: `pub` parameter names are
@@ -7196,16 +7196,28 @@ cost of the fiber model and must be understood to use `async`
 effectively.
 
 **Conforming baseline: fixed-size pooled stacks.** Each fiber gets a
-fixed-size stack (default 64 KB) with a guard page; stacks are
+fixed-size stack (default 64 KB unless configured) with a guard page; stacks are
 recycled through a pool, so fiber creation is a pool grab, not an
 allocation. Stack overflow faults on the guard page — it never
 silently corrupts memory. This is the reference implementation's
 model and the behavior programs may rely on. Stack sizing is
-implementation-defined configuration; the reference implementation
-currently uses a fixed 64 KB and does not yet read a configuration
-key. (A `[runtime]` `with.toml` section — `fiber_stack_size`,
-`fiber_pool_size` — is the planned surface, tracked as a delta
-issue; it is not yet parsed.)
+implementation-defined configuration. The reference implementation
+reads the optional `[runtime]` `with.toml` section:
+
+```toml
+[runtime]
+fiber_stack_size = 131072
+fiber_pool_size = 64
+```
+
+Both values are positive integers. Missing keys use implementation
+defaults. `fiber_stack_size` sets the default stack size for fibers
+whose call site does not provide an explicit stack size; an explicit
+`@[stack_size(N)]` on an async function has higher priority.
+`fiber_pool_size` caps the number of completed fiber stacks retained
+for reuse; stacks completed beyond the cap are released instead of
+cached. Runtime configuration is applied before the runtime is
+initialized and before the first fiber spawn.
 
 **Growable stacks (roadmap, implementation-defined):** an
 implementation may start fibers on a smaller initial allocation and

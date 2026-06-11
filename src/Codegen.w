@@ -5270,6 +5270,44 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
 // ── Wrap main for exit ────────────────────────────────────────────
 
+fn Codegen.emit_runtime_fiber_config(self: Codegen, wrapper: i64) -> void:
+    if not self.uses_async:
+        return
+    let stack_size = self.sema.runtime_fiber_stack_size
+    let pool_size = self.sema.runtime_fiber_pool_size
+    if stack_size <= 0 and pool_size <= 0:
+        return
+
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+    var config_fn = wl_get_named_function(self.llmod, "with_runtime_configure_fibers")
+    if config_fn == 0:
+        let params: Vec[i64] = Vec.new()
+        params.push(i64_ty)
+        params.push(i32_ty)
+        let ft = wl_function_type(i32_ty, vec_data_i64(&params), 2, 0)
+        config_fn = wl_add_function(self.llmod, "with_runtime_configure_fibers", ft)
+    let config_ft = wl_global_get_value_type(config_fn)
+    let args: Vec[i64] = Vec.new()
+    args.push(wl_const_int(i64_ty, stack_size, 0))
+    args.push(wl_const_int(i32_ty, pool_size as i64, 0))
+    let rc = wl_build_call(self.builder, config_ft, config_fn, vec_data_i64(&args), 2)
+    let failed = wl_build_icmp(self.builder, wl_int_ne(), rc, wl_const_int(i32_ty, 0, 0))
+    let panic_bb = wl_append_bb(self.context, wrapper, "runtime.config.panic")
+    let ok_bb = wl_append_bb(self.context, wrapper, "runtime.config.ok")
+    wl_build_cond_br(self.builder, failed, panic_bb, ok_bb)
+    wl_position_at_end(self.builder, panic_bb)
+    let panic_msg = "runtime fiber configuration cannot change after fibers exist"
+    let panic_fn = self.ensure_c_fn("with_panic", wl_void_type(self.context), 3)
+    let panic_ty = self.get_runtime_fn_type("with_panic", wl_void_type(self.context), 3)
+    let panic_args: Vec[i64] = Vec.new()
+    panic_args.push(self.build_str_value(wl_build_global_string_ptr(self.builder, panic_msg), wl_const_int(i64_ty, panic_msg.len(), 0)))
+    panic_args.push(self.build_str_value(wl_build_global_string_ptr(self.builder, ""), wl_const_int(i64_ty, 0, 0)))
+    panic_args.push(wl_const_int(i32_ty, 0, 0))
+    wl_build_call(self.builder, panic_ty, panic_fn, vec_data_i64(&panic_args), 3)
+    wl_build_unreachable(self.builder)
+    wl_position_at_end(self.builder, ok_bb)
+
 fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
     if self.sema.no_std != 0:
         return
@@ -5307,6 +5345,8 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
     set_argv_args.push(argc_val)
     set_argv_args.push(argv_val)
     wl_build_call(self.builder, set_argv_ft, set_argv_fn, vec_data_i64(&set_argv_args), 2)
+
+    self.emit_runtime_fiber_config(wrapper)
 
     var runtime_init_fn = wl_get_named_function(self.llmod, "with_runtime_init")
     if runtime_init_fn == 0:

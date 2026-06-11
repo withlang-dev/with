@@ -8220,6 +8220,24 @@ fn CCodegen.find_main_sym(self: CCodegen) -> i32:
             return sym
     0
 
+fn CCodegen.uses_async_runtime(self: CCodegen) -> bool:
+    for i in 0..self.mir_mod.body_fn_syms.len() as i32:
+        let sym = self.mir_mod.body_fn_syms.get(i as i64)
+        if self.sema.task_fns.contains(sym):
+            return true
+    false
+
+fn CCodegen.emit_runtime_fiber_config_call(self: CCodegen) -> str:
+    if not self.uses_async_runtime():
+        return ""
+    let stack_size = self.sema.runtime_fiber_stack_size
+    let pool_size = self.sema.runtime_fiber_pool_size
+    if stack_size <= 0 and pool_size <= 0:
+        return ""
+    "    if (with_runtime_configure_fibers(" ++ with_i64_to_str(stack_size) ++ "LL, " ++ with_i64_to_str(pool_size as i64) ++ ") != 0) {\n" ++
+    "        with_panic(WITH_STR_LIT(\"runtime fiber configuration cannot change after fibers exist\"), WITH_STR_LIT(\"\"), 0);\n" ++
+    "    }\n"
+
 fn CCodegen.emit_main_wrapper(self: CCodegen) -> str:
     let main_sym = self.find_main_sym()
     if main_sym == 0:
@@ -8229,6 +8247,7 @@ fn CCodegen.emit_main_wrapper(self: CCodegen) -> str:
     let ret_tid = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else: self.sema.ty_void
     var out = "int main(int argc, char** argv) " ++ cc_lbrace() ++ "\n"
     out = out ++ "    with_runtime_set_argv(argc, argv);\n"
+    out = out ++ self.emit_runtime_fiber_config_call()
     out = out ++ "    with_runtime_init();\n"
     if self.is_void_tid(ret_tid) != 0:
         out = out ++ "    " ++ main_name ++ "();\n"
@@ -8325,6 +8344,7 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out.write("extern void with_println_bool(int32_t);\n")
     out.write("extern void with_ewrite(with_str);\n")
     out.write("extern void with_panic(with_str, with_str, int32_t);\n")
+    out.write("extern int32_t with_runtime_configure_fibers(int64_t, int32_t);\n")
     out.write("extern int32_t with_fiber_in_fiber(void);\n")
     out.write("extern void with_fiber_await(int32_t);\n")
     out.write("extern void with_fiber_cleanup_await(int32_t);\n")

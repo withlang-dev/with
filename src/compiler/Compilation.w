@@ -495,6 +495,8 @@ fn Compilation.dump_project_info(self: Compilation, pool: AstPool) -> str:
     out = out ++ "config feature_names=" ++ compilation_join_strings(cfg.feature_names, ",") ++ "\n"
     out = out ++ "config feature_values=" ++ compilation_join_strings(cfg.feature_values, ",") ++ "\n"
     out = out ++ "config target_default=" ++ cfg.target_default ++ "\n"
+    out = out ++ f"config runtime_fiber_stack_size={cfg.runtime_fiber_stack_size}\n"
+    out = out ++ f"config runtime_fiber_pool_size={cfg.runtime_fiber_pool_size}\n"
     for mi in 0..zcu.last_resolved.modules.len() as i32:
         let mod = zcu.last_resolved.modules.get(mi as i64)
         out = out ++ f"module path={mod.path} file={mod.file_id} decls={mod.decl_count}\n"
@@ -1123,6 +1125,8 @@ fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
     sema.source_text = zcu.current_source_text
     sema.tool_mode_entry_path = zcu.tool_mode_entry_path
     sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
+    sema.runtime_fiber_stack_size = zcu.project_config.runtime_fiber_stack_size
+    sema.runtime_fiber_pool_size = zcu.project_config.runtime_fiber_pool_size
     sema.overflow_mode = zcu.project_config.overflow_mode
     if zcu.project_config.no_std or self.config.no_std:
         sema.no_std = 1
@@ -1204,6 +1208,8 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     sema.decl_is_c_import = self.zcu.decl_is_c_import
     sema.tool_mode_entry_path = self.zcu.tool_mode_entry_path
     sema.runtime_available = if self.zcu.project_config.runtime_available: 1 else: 0
+    sema.runtime_fiber_stack_size = self.zcu.project_config.runtime_fiber_stack_size
+    sema.runtime_fiber_pool_size = self.zcu.project_config.runtime_fiber_pool_size
     sema.overflow_mode = self.zcu.project_config.overflow_mode
     sema.init_module_graph(&self.zcu.last_resolved)
     if self.zcu.project_config.no_std or self.config.no_std:

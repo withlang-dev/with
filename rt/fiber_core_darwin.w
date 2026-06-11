@@ -67,6 +67,9 @@ var free_pool_head: i64 = 0
 var fiber_page_size: i64 = 0
 var fiber_pool_reuse_count: i64 = 0
 var fiber_pool_alloc_count: i64 = 0
+var fiber_pool_free_count: i32 = 0
+var fiber_default_stack_size: i64 = 0
+var fiber_pool_limit: i32 = 0
 var live_fiber_count: i32 = 0
 var fiber_steal_events: i64 = 0
 var scheduler_round: i64 = 0
@@ -342,6 +345,12 @@ fn guard_page_size() -> i64:
         abort()
     fiber_page_size
 
+fn fiber_effective_stack_size() -> i64:
+    if fiber_default_stack_size > 0: fiber_default_stack_size else: FIBER_STACK_SIZE
+
+fn fiber_effective_pool_limit() -> i32:
+    if fiber_pool_limit > 0: fiber_pool_limit else: MAX_FIBERS
+
 fn allocate_stack_region(size: i64) -> *mut u8:
     let page_sz = guard_page_size()
     let total = page_sz + size
@@ -355,6 +364,8 @@ fn acquire_fiber() -> i64:
     if free_pool_head != 0:
         let f = free_pool_head
         free_pool_head = fiber_next(f)
+        if fiber_pool_free_count > 0:
+            fiber_pool_free_count = fiber_pool_free_count - 1
         let stack = fiber_stack(f)
         let stack_size = fiber_stack_size(f)
         with_memset(f as *mut u8, 0, FIBER_SIZE)
@@ -369,9 +380,10 @@ fn acquire_fiber() -> i64:
     if f == 0:
         return 0
     with_memset(f as *mut u8, 0, FIBER_SIZE)
-    fiber_set_stack_size(f, FIBER_STACK_SIZE)
+    let default_stack_size = fiber_effective_stack_size()
+    fiber_set_stack_size(f, default_stack_size)
     fiber_set_slot(f, -1)
-    let stack = allocate_stack_region(FIBER_STACK_SIZE)
+    let stack = allocate_stack_region(default_stack_size)
     if stack as i64 == 0:
         with_free(f as *mut u8)
         return 0
@@ -403,8 +415,13 @@ fn recycle_fiber(f: i64):
     fiber_set_stack_size(f, stack_size)
     fiber_set_state(f, FIBER_STATE_DONE)
     fiber_set_slot(f, -1)
+    if fiber_pool_free_count >= fiber_effective_pool_limit():
+        free_fiber_stack(f)
+        with_free(f as *mut u8)
+        return
     fiber_set_next(f, free_pool_head)
     free_pool_head = f
+    fiber_pool_free_count = fiber_pool_free_count + 1
 
 fn free_fiber_pool():
     while free_pool_head != 0:
@@ -412,6 +429,7 @@ fn free_fiber_pool():
         free_pool_head = fiber_next(f)
         free_fiber_stack(f)
         with_free(f as *mut u8)
+    fiber_pool_free_count = 0
 
 fn fiber_write_i32(fd: i32, n: i32):
     var value = n
@@ -498,6 +516,7 @@ pub fn with_runtime_core_init() -> void:
     fiber_page_size = guard_page_size()
     fiber_pool_reuse_count = 0
     fiber_pool_alloc_count = 0
+    free_fiber_pool()
     live_fiber_count = 0
     fiber_steal_events = 0
     scheduler_round = 0
@@ -519,6 +538,17 @@ pub fn with_runtime_core_init() -> void:
         i = i + 1
     fiber_install_signal_handlers()
 
+pub fn with_runtime_configure_fibers(stack_size: i64, pool_size: i32) -> i32:
+    let next_stack = if stack_size > 0: stack_size else: FIBER_STACK_SIZE
+    let next_pool = if pool_size > 0: pool_size else: MAX_FIBERS
+    if live_fiber_count != 0 or free_pool_head != 0:
+        if next_stack == fiber_effective_stack_size() and next_pool == fiber_effective_pool_limit():
+            return 0
+        return -1
+    fiber_default_stack_size = next_stack
+    fiber_pool_limit = next_pool
+    0
+
 pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, result_size: i32, stack_size: i32) -> i32:
     if live_fiber_count >= MAX_FIBERS:
         return -1
@@ -530,7 +560,7 @@ pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, 
         release_fiber_slot(slot)
         return -1
 
-    let wanted_stack_size = if stack_size > 0: stack_size as i64 else: FIBER_STACK_SIZE
+    let wanted_stack_size = if stack_size > 0: stack_size as i64 else: fiber_effective_stack_size()
     if wanted_stack_size > 0 and fiber_stack_size(f) != wanted_stack_size:
         free_fiber_stack(f)
         fiber_set_stack_size(f, wanted_stack_size)
@@ -705,7 +735,18 @@ pub fn with_fiber_pool_allocs() -> i64:
     fiber_pool_alloc_count
 
 pub fn with_fiber_stack_size_bytes() -> i64:
-    FIBER_STACK_SIZE
+    fiber_effective_stack_size()
+
+pub fn with_fiber_current_stack_size_bytes() -> i64:
+    if current_fiber == 0:
+        return 0
+    fiber_stack_size(current_fiber)
+
+pub fn with_fiber_pool_free_count() -> i32:
+    fiber_pool_free_count
+
+pub fn with_fiber_pool_size_limit() -> i32:
+    fiber_effective_pool_limit()
 
 pub fn with_fiber_max_fibers() -> i32:
     MAX_FIBERS
