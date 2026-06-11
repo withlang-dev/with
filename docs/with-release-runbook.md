@@ -170,8 +170,8 @@ git add src/version
 git commit -m "release: $WITH_VERSION"
 ```
 
-Run the release gates with the primary build interface on every release
-platform:
+Run the deterministic release gates with the primary build interface on every
+release platform:
 
 ```sh
 with build
@@ -211,6 +211,31 @@ binaries, `install.sh`, or platform SDK archives.
 work. Do not treat it as a normal release gate unless the release scope
 explicitly includes emit-C self-hosting changes.
 
+Run the release UAT gate before publishing any release assets:
+
+```sh
+with build :release-uat
+```
+
+`:release-uat` is mandatory for every release. It includes:
+
+- `:release-raylib-spiral-uat`, which must run on a GUI-capable Darwin release
+  host. It validates the user-facing C interop happy path end to end:
+  `with init`, `with get c.raylib`, writing the spiral program to the
+  initialized project's `src/main.w`, and `with run`. The generated raylib app
+  renders a deterministic spiral, reads back the rendered framebuffer, counts
+  bright non-background samples in the spiral annulus, and exits non-zero if the
+  visual check fails.
+- `:release-one-liner-uat`, which validates real shell one-liner workflows:
+  `seq 100 | with -n 'if line =~ /^[0-9]$/: print(line)'`,
+  `cat names.txt | with -p 'line = line.upper()'`, regex captures, numbered
+  pipeline transforms, semicolon-separated transforms, and `--` argument
+  passing.
+
+If any UAT target fails, if the raylib window cannot be created, if the
+framebuffer check does not see the spiral, or if any one-liner prints different
+stdout than expected, the release fails and must not be published.
+
 ### Darwin Release Host
 
 The Darwin arm64 release host is the maintainer macOS checkout. Use a clean
@@ -244,6 +269,7 @@ WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :fixpoint
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test-green
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :last-green
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :release-uat
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with version
 WITH_VERSION=$WITH_VERSION scripts/package-darwin-aarch64.sh
 WITH_VERSION=$WITH_VERSION scripts/package-llvm-sdk.sh
@@ -425,6 +451,7 @@ WITH_VERSION=v0.14.3 with build :fixpoint
 WITH_VERSION=v0.14.3 with build :test
 WITH_VERSION=v0.14.3 with build :test-green
 WITH_VERSION=v0.14.3 with build :last-green
+WITH_VERSION=v0.14.3 with build :release-uat
 ```
 
 Do not list Make compatibility wrapper commands on the release page.

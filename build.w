@@ -7,6 +7,7 @@ use build.emit_c
 use build.compiler
 use build.clang_resource
 use build.retention
+use build.release_uat
 use std.sysinfo
 
 fn build_project_dirname(path: str) -> str:
@@ -958,6 +959,26 @@ pub fn build(ctx: BuildCtx) -> Build:
     require_last_green.action = run_require_last_green_action
     require_last_green = require_last_green.write_scope("out/command/require-last-green")
     out = out.add_target(require_last_green)
+
+    var release_raylib_spiral_uat = target_new(.Action, "release-raylib-spiral-uat", "").output("out/release-uat/raylib-spiral.passed")
+    release_raylib_spiral_uat.action = run_release_raylib_spiral_uat_action
+    release_raylib_spiral_uat = release_raylib_spiral_uat.input(release_compiler_bin("with"))
+    release_raylib_spiral_uat = release_raylib_spiral_uat.write_scope("out/release-uat")
+    release_raylib_spiral_uat = release_raylib_spiral_uat.allow_network()
+    release_raylib_spiral_uat = release_raylib_spiral_uat.dep("require-last-green")
+    out = out.add_target(release_raylib_spiral_uat)
+
+    var release_one_liner_uat = target_new(.Action, "release-one-liner-uat", "").output("out/release-uat/one-liners.passed")
+    release_one_liner_uat.action = run_release_one_liner_uat_action
+    release_one_liner_uat = release_one_liner_uat.input(release_compiler_bin("with"))
+    release_one_liner_uat = release_one_liner_uat.write_scope("out/release-uat")
+    release_one_liner_uat = release_one_liner_uat.dep("require-last-green")
+    out = out.add_target(release_one_liner_uat)
+
+    var release_uat = target_new(.Group, "release-uat", "")
+    release_uat = release_uat.dep("release-raylib-spiral-uat")
+    release_uat = release_uat.dep("release-one-liner-uat")
+    out = out.add_target(release_uat)
 
     var check_committed = target_new(.Action, "check-committed-state", "").output("out/command/check-committed-state/ok")
     check_committed.action = run_check_committed_state_action
