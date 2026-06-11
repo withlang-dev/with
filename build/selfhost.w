@@ -1834,6 +1834,43 @@ fn bs_check_loop_string_concat_warning(ctx: ActionCtx, compiler_path: str, case_
     if result.rc != 0: return result.rc
     bs_assert_contains(ctx, result.stderr, "warning: string concatenation with ++ inside a loop repeatedly copies the accumulator", "loop_string_concat_warning")
 
+fn bs_check_not_in_lint(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let warn_src = bs_join(case_dir, "not_in_lint_warning.w")
+    let warn_source =
+        "fn main:\n" ++
+        "    assert(not (4 in 1..3))\n" ++
+        "    assert(not 4 in 1..3)\n" ++
+        "    assert(4 not in 1..3)\n" ++
+        "    assert(not (true and false))\n"
+    var rc = bs_write_fixture(ctx, warn_src, warn_source, "not-in lint warning source")
+    if rc != 0: return rc
+    var warn_args: Vec[str] = Vec.new()
+    warn_args |> push("check")
+    warn_args |> push(bs_abs(root, warn_src))
+    let warned = bs_edge_expect_success(ctx, compiler_path, case_dir, "not-in-lint-warning", warn_args)
+    if warned.rc != 0: return warned.rc
+    rc = bs_assert_contains(ctx, warned.stderr, "warning: prefer 'x not in y' over 'not (x in y)' [prefer-not-in]", "not_in_lint_warning")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, warned.stderr, "not_in_lint_warning.w:2:12", "not_in_lint_warning_grouped")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, warned.stderr, "not_in_lint_warning.w:3:12", "not_in_lint_warning_bare")
+    if rc != 0: return rc
+
+    let clean_src = bs_join(case_dir, "not_in_lint_clean.w")
+    let clean_source =
+        "fn main:\n" ++
+        "    assert(4 not in 1..3)\n" ++
+        "    assert(not (true and false))\n"
+    rc = bs_write_fixture(ctx, clean_src, clean_source, "not-in lint clean source")
+    if rc != 0: return rc
+    var clean_args: Vec[str] = Vec.new()
+    clean_args |> push("check")
+    clean_args |> push(bs_abs(root, clean_src))
+    let clean = bs_edge_expect_success(ctx, compiler_path, case_dir, "not-in-lint-clean", clean_args)
+    if clean.rc != 0: return clean.rc
+    bs_assert_not_contains(ctx, clean.stderr, "prefer 'x not in y'", "not_in_lint_clean")
+
 fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "hello_build_options.w")
@@ -2438,6 +2475,8 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     rc = bs_check_unsafe_prefix_redundant_warning(ctx, compiler_path, bs_join(output_dir, "unsafe_prefix_redundant_warning_case"))
     if rc != 0: return rc
     rc = bs_check_loop_string_concat_warning(ctx, compiler_path, bs_join(output_dir, "loop_string_concat_warning_case"))
+    if rc != 0: return rc
+    rc = bs_check_not_in_lint(ctx, compiler_path, bs_join(output_dir, "not_in_lint_case"))
     if rc != 0: return rc
     rc = bs_check_build_options_cli(ctx, compiler_path, bs_join(output_dir, "build_options_cli_case"))
     if rc != 0: return rc

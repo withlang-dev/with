@@ -4694,6 +4694,24 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
     0
 
+fn Sema.unwrap_lint_grouped_expr(self: Sema, node: i32) -> i32:
+    var cur = node
+    while cur != 0 and self.ast.kind(cur) == NodeKind.NK_GROUPED:
+        cur = self.ast.get_data0(cur)
+    cur
+
+fn Sema.warn_negated_membership_lint(self: Sema, node: i32, operand_node: i32):
+    if sema_path_is_user_lint_source(self.current_module_path) == 0:
+        return
+    let inner = self.unwrap_lint_grouped_expr(operand_node)
+    if inner == 0 or self.ast.kind(inner) != NodeKind.NK_BINARY:
+        return
+    if self.ast.get_data0(inner) != BinaryOp.OP_IN:
+        return
+    var diag = Diagnostic.warn("prefer 'x not in y' over 'not (x in y)'", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+    diag.set_code("prefer-not-in")
+    self.diags.emit(diag)
+
 fn Sema.check_unary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
     let operand_node = self.ast.get_data1(node)
@@ -4714,6 +4732,7 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     if op == UnaryOp.UOP_BIT_NOT:
         return operand as i32
     if op == UnaryOp.UOP_NOT:
+        self.warn_negated_membership_lint(node, operand_node)
         return self.ty_bool as i32
     if op == UnaryOp.UOP_MUT_REF:
         self.emit_error("`&mut` is not part of safe With (§15.1); use `&raw mut` for FFI or mutating receiver methods", node)

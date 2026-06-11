@@ -3002,12 +3002,17 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
         else if op_code == 503:  // range ..=
             lhs = self.pool.add_node(NodeKind.NK_RANGE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 1)
         else:
-            let bin_node = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(lhs), self.prev_end(), op_code, lhs, rhs)
+            var bin_lhs = lhs
+            var not_wrapper = 0 as NodeId
+            if op_code == BinaryOp.OP_IN and self.pool.kind(lhs) == NodeKind.NK_UNARY and self.pool.get_data0(lhs) == UnaryOp.UOP_NOT:
+                not_wrapper = lhs
+                bin_lhs = self.pool.get_data1(lhs) as NodeId
+            let bin_node = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(bin_lhs), self.prev_end(), op_code, bin_lhs as i32, rhs as i32)
             if op_code == BinaryOp.OP_IN or op_code == BinaryOp.OP_NOT_IN:
                 // Pre-reserve the desugared `rhs.contains(lhs)` argument slot while
                 // the pool is still mutable; MIR runs after freeze (#234, §9.9).
-                self.pool.set_membership_arg(bin_node, self.pool.add_extra(lhs))
-            lhs = bin_node
+                self.pool.set_membership_arg(bin_node, self.pool.add_extra(bin_lhs as i32))
+            lhs = if not_wrapper != 0 as NodeId: self.pool.add_node(NodeKind.NK_UNARY, self.pool.get_start(not_wrapper), self.prev_end(), UnaryOp.UOP_NOT, bin_node as i32, 0) else: bin_node
             // Chained comparisons: a < b < c → (a < b) and (b < c)
             if op_code >= BinaryOp.OP_LT and op_code <= BinaryOp.OP_GTE:
                 var last_cmp = lhs  // track the latest comparison node
