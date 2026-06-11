@@ -647,6 +647,9 @@ fn Lexer.lex_ident(mut self: Lexer) -> i32:
                     self.pos = self.pos + 1
                     continue
             if fch == CharCode.Lbrace and f_brace_depth == 0:
+                if self.pos + 1 < slen and src.byte_at((self.pos + 1) as i64) == CharCode.Lbrace:
+                    self.pos = self.pos + 2
+                    continue
                 var fbs = 0
                 while fbs < self.pos and src.byte_at((self.pos - 1 - fbs) as i64) == CharCode.Backslash:
                     fbs = fbs + 1
@@ -661,6 +664,9 @@ fn Lexer.lex_ident(mut self: Lexer) -> i32:
             if fch == CharCode.Rbrace and f_brace_depth > 0:
                 f_brace_depth = f_brace_depth - 1
                 self.pos = self.pos + 1
+                continue
+            if fch == CharCode.Rbrace and f_brace_depth == 0 and self.pos + 1 < slen and src.byte_at((self.pos + 1) as i64) == CharCode.Rbrace:
+                self.pos = self.pos + 2
                 continue
             if fch == CharCode.Dquote and f_brace_depth == 0:
                 self.pos = self.pos + 1

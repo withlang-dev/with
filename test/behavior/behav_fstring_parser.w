@@ -38,6 +38,13 @@ fn test_empty_fstring:
 fn test_literal_only_fstring:
     assert(f"hello" == "hello")
 
+fn test_escaped_literal_braces:
+    let x = 7
+    assert(f"{{" == "{")
+    assert(f"}}" == "}")
+    assert(f"{x} {{" == "7 {")
+    assert(f"{{{x}}}" == "{7}")
+
 fn test_adjacent_holes:
     let a = 1
     let b = 2
@@ -64,6 +71,7 @@ fn main:
     test_array_index_in_hole()
     test_empty_fstring()
     test_literal_only_fstring()
+    test_escaped_literal_braces()
     test_adjacent_holes()
     test_negative_in_hole()
     test_bool_in_hole()
