@@ -874,17 +874,24 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
                 self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body))
             if body_kind == TypeKind.TY_REF:
                 self.check_returned_view_origins(body, body)
+    if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
+        if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0:
+            self.emit_error("return type mismatch", body)
     let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
     if not has_ret_annotation:
         let inferred_ret = if body_ty != 0: body_ty else: self.ty_void
         self.set_sig_return_type(sig_idx, inferred_ret)
     else if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
-        if self.type_has_default_value(body_expected_ret as i32) == 0:
+        let explicit_void_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
+        if explicit_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) != 0 and self.body_can_fall_through(body) != 0:
+            self.emit_error("missing return", body)
+        else if self.type_has_default_value(body_expected_ret as i32) == 0:
             self.emit_error("return type does not implement Default", body)
     else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_expected_ret != self.ty_void:
+        let explicit_tail_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
         // Check tail expression type against body's expected return type
         let compat = self.types_compatible(body_expected_ret as i32, body_ty as i32)
-        if compat == 0:
+        if explicit_tail_results_ok != 0 and compat == 0:
             let arith = self.arithmetic_result_type(body_expected_ret as i32, body_ty as i32)
             if arith == 0:
                 // Implicit Ok wrapping: if body_expected_ret is Result[T, E] and body_ty is compatible with T
@@ -2614,6 +2621,273 @@ fn Sema.cached_or_checked_expr_type(self: Sema, node: i32) -> i32:
     self.in_unsafe = saved_unsafe
     checked
 
+fn Sema.checked_expr_is_non_unit_value(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    if not self.typed_expr_types.contains(node):
+        return 0
+    let ty = self.typed_expr_types.get(node).unwrap()
+    if ty == 0 or ty == self.ty_void or ty == self.ty_never:
+        return 0
+    1
+
+fn Sema.expr_mutates_any_current_binding(self: Sema, node: i32) -> i32:
+    for bi in 0..self.bind_names.len() as i32:
+        if self.expr_mutates_place(node, self.bind_names.get(bi as i64)) != 0:
+            return 1
+    0
+
+fn Sema.body_has_explicit_value_result(self: Sema, node: i32, value_path: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_FN_DECL:
+        return 0
+    if kind == NodeKind.NK_RETURN:
+        return self.checked_expr_is_non_unit_value(self.ast.get_data0(node))
+    if value_path != 0 and self.checked_expr_is_non_unit_value(node) != 0:
+        if self.expr_mutates_any_current_binding(node) != 0:
+            return 0
+        return 1
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            if self.body_has_explicit_value_result(self.ast.get_extra(extra_start + si), 0) != 0:
+                return 1
+        return self.body_has_explicit_value_result(self.ast.get_data2(node), value_path)
+    if kind == NodeKind.NK_IF_EXPR:
+        if self.body_has_explicit_value_result(self.ast.get_data1(node), value_path) != 0:
+            return 1
+        return self.body_has_explicit_value_result(self.ast.get_data2(node), value_path)
+    if kind == NodeKind.NK_MATCH:
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            if self.body_has_explicit_value_result(self.ast.get_extra(arm_start + ai), value_path) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_MATCH_ARM:
+        return self.body_has_explicit_value_result(self.ast.get_data1(node), value_path)
+    if kind == NodeKind.NK_LOOP:
+        return self.body_has_explicit_value_result(self.ast.get_data0(node), 0)
+    if kind == NodeKind.NK_WHILE:
+        return self.body_has_explicit_value_result(self.ast.get_data1(node), 0)
+    if kind == NodeKind.NK_DO_WHILE:
+        return self.body_has_explicit_value_result(self.ast.get_data0(node), 0)
+    if kind == NodeKind.NK_FOR:
+        return self.body_has_explicit_value_result(self.ast.get_data2(node), 0)
+    0
+
+fn Sema.return_value_type_compatible(self: Sema, expected: i32, actual: i32) -> i32:
+    if expected == 0 or actual == 0:
+        return 1
+    if self.types_compatible(expected, actual) != 0:
+        return 1
+    if self.arithmetic_result_type(expected as TypeId, actual as TypeId) != 0:
+        return 1
+    let expected_resolved = self.resolve_alias(expected as TypeId)
+    if self.get_type_kind(expected_resolved) == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(expected_resolved as i32)
+        if base_sym == self.syms.result and self.get_generic_inst_arg_count(expected_resolved as i32) == 2:
+            let ok_type = self.get_generic_inst_arg(expected_resolved as i32, 0)
+            if self.types_compatible(ok_type, actual) != 0:
+                return 1
+            if self.arithmetic_result_type(ok_type as TypeId, actual as TypeId) != 0:
+                return 1
+    0
+
+fn Sema.recorded_expr_type_or_zero(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    if self.typed_expr_types.contains(node):
+        return self.typed_expr_types.get(node).unwrap()
+    0
+
+fn Sema.check_body_explicit_value_results(self: Sema, node: i32, value_path: i32, expected: i32, msg: str) -> i32:
+    if node == 0:
+        return 1
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_FN_DECL:
+        return 1
+    if kind == NodeKind.NK_RETURN:
+        let value = self.ast.get_data0(node)
+        if value == 0:
+            return 1
+        let actual = self.recorded_expr_type_or_zero(value)
+        if actual != 0 and actual != self.ty_void and actual != self.ty_never:
+            if self.return_value_type_compatible(expected, actual) == 0:
+                self.emit_error(msg, node)
+                return 0
+        return 1
+    if value_path != 0:
+        let actual = self.recorded_expr_type_or_zero(node)
+        if actual != 0 and actual != self.ty_void and actual != self.ty_never:
+            if self.expr_mutates_any_current_binding(node) != 0:
+                return 1
+            if self.return_value_type_compatible(expected, actual) == 0:
+                self.emit_error(msg, node)
+                return 0
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            if self.check_body_explicit_value_results(self.ast.get_extra(extra_start + si), 0, expected, msg) == 0:
+                return 0
+        return self.check_body_explicit_value_results(self.ast.get_data2(node), value_path, expected, msg)
+    if kind == NodeKind.NK_IF_EXPR:
+        if self.check_body_explicit_value_results(self.ast.get_data1(node), value_path, expected, msg) == 0:
+            return 0
+        return self.check_body_explicit_value_results(self.ast.get_data2(node), value_path, expected, msg)
+    if kind == NodeKind.NK_MATCH:
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            if self.check_body_explicit_value_results(self.ast.get_extra(arm_start + ai), value_path, expected, msg) == 0:
+                return 0
+        return 1
+    if kind == NodeKind.NK_MATCH_ARM:
+        return self.check_body_explicit_value_results(self.ast.get_data1(node), value_path, expected, msg)
+    if kind == NodeKind.NK_LOOP:
+        return self.check_body_explicit_value_results(self.ast.get_data0(node), 0, expected, msg)
+    if kind == NodeKind.NK_WHILE:
+        return self.check_body_explicit_value_results(self.ast.get_data1(node), 0, expected, msg)
+    if kind == NodeKind.NK_DO_WHILE:
+        return self.check_body_explicit_value_results(self.ast.get_data0(node), 0, expected, msg)
+    if kind == NodeKind.NK_FOR:
+        return self.check_body_explicit_value_results(self.ast.get_data2(node), 0, expected, msg)
+    1
+
+fn Sema.body_contains_break(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_FN_DECL:
+        return 0
+    if kind == NodeKind.NK_BREAK:
+        return 1
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            if self.body_contains_break(self.ast.get_extra(extra_start + si)) != 0:
+                return 1
+        return self.body_contains_break(self.ast.get_data2(node))
+    if kind == NodeKind.NK_IF_EXPR:
+        if self.body_contains_break(self.ast.get_data1(node)) != 0:
+            return 1
+        return self.body_contains_break(self.ast.get_data2(node))
+    if kind == NodeKind.NK_MATCH:
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            if self.body_contains_break(self.ast.get_extra(arm_start + ai)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_MATCH_ARM:
+        return self.body_contains_break(self.ast.get_data1(node))
+    if kind == NodeKind.NK_LOOP:
+        return 0
+    if kind == NodeKind.NK_WHILE:
+        return 0
+    if kind == NodeKind.NK_DO_WHILE:
+        return 0
+    if kind == NodeKind.NK_FOR:
+        return 0
+    0
+
+fn Sema.bool_literal_is_true(self: Sema, node: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_BOOL_LIT:
+        return 0
+    self.ast.get_data0(node)
+
+type SemaIntLiteralValue {
+    ok: i32,
+    value: i64,
+}
+
+fn Sema.int_literal_i64_value(self: Sema, node: i32) -> SemaIntLiteralValue:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_INT_LIT:
+        return SemaIntLiteralValue { 0, 0 }
+    let fast = self.ast.int_literal_fast_i64(node as NodeId)
+    if fast.ok == 0:
+        return SemaIntLiteralValue { 0, 0 }
+    SemaIntLiteralValue { 1, fast.value }
+
+fn Sema.condition_is_static_true(self: Sema, node: i32) -> i32:
+    if node != 0 and (self.ast.kind(node) == NodeKind.NK_GROUPED or self.ast.kind(node) == NodeKind.NK_NO_SUSPEND):
+        return self.condition_is_static_true(self.ast.get_data0(node))
+    if self.bool_literal_is_true(node) != 0:
+        return 1
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_BINARY:
+        return 0
+    let op = self.ast.get_data0(node)
+    if op != BinaryOp.OP_EQ and op != BinaryOp.OP_NEQ:
+        return 0
+    let lhs = self.int_literal_i64_value(self.ast.get_data1(node))
+    if lhs.ok == 0:
+        return 0
+    let rhs = self.int_literal_i64_value(self.ast.get_data2(node))
+    if rhs.ok == 0:
+        return 0
+    if op == BinaryOp.OP_EQ:
+        return if lhs.value == rhs.value: 1 else: 0
+    if lhs.value != rhs.value: 1 else: 0
+
+fn Sema.body_can_fall_through(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 1
+    if self.typed_expr_types.contains(node):
+        let ty = self.typed_expr_types.get(node).unwrap()
+        if ty == self.ty_never:
+            return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_FN_DECL:
+        return 1
+    if kind == NodeKind.NK_RETURN:
+        return 0
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            if self.body_can_fall_through(self.ast.get_extra(extra_start + si)) == 0:
+                return 0
+        let tail = self.ast.get_data2(node)
+        if tail != 0:
+            return self.body_can_fall_through(tail)
+        return 1
+    if kind == NodeKind.NK_IF_EXPR:
+        let else_body = self.ast.get_data2(node)
+        if else_body == 0:
+            return 1
+        if self.body_can_fall_through(self.ast.get_data1(node)) != 0:
+            return 1
+        return self.body_can_fall_through(else_body)
+    if kind == NodeKind.NK_MATCH:
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        if arm_count == 0:
+            return 1
+        for ai in 0..arm_count:
+            if self.body_can_fall_through(self.ast.get_extra(arm_start + ai)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_MATCH_ARM:
+        return self.body_can_fall_through(self.ast.get_data1(node))
+    if kind == NodeKind.NK_LOOP:
+        if self.body_contains_break(self.ast.get_data0(node)) == 0:
+            return 0
+        return 1
+    if kind == NodeKind.NK_WHILE:
+        if self.condition_is_static_true(self.ast.get_data0(node)) != 0 and self.body_contains_break(self.ast.get_data1(node)) == 0:
+            return 0
+        return 1
+    if kind == NodeKind.NK_DO_WHILE:
+        if self.condition_is_static_true(self.ast.get_data1(node)) != 0 and self.body_contains_break(self.ast.get_data0(node)) == 0:
+            return 0
+        return 1
+    1
+
 fn Sema.check_bitwise_literal_with_expected(self: Sema, node: i32, expected: TypeId) -> TypeId:
     let saved = self.in_bitwise_literal_context
     self.in_bitwise_literal_context = self.in_bitwise_literal_context + 1
@@ -2869,6 +3143,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         if self.core_without_alloc() != 0 and self.current_module_is_std_implementation() == 0:
             self.typed_expr_types.insert(node, self.ty_str_view as i32)
             return self.ty_str_view
+        self.typed_expr_types.insert(node, self.ty_str as i32)
         return self.ty_str
 
     if kind == NodeKind.NK_REGEX_LIT:
@@ -4443,7 +4718,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         let ret_is_void = self.current_return_type == self.ty_void or self.current_return_type == 0
         if ret_is_void and self.ast.kind(tail) == NodeKind.NK_MATCH:
             self.match_in_stmt_pos = 1
-        let tail_is_value = self.current_value_expr_root == node
+        let tail_is_value = self.current_value_expr_root == node or (self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void)
         if tail_is_value:
             self.current_value_expr_root = tail
         let tail_type = if tail_is_value: self.check_expr(tail) else: self.check_expr_statement_context(tail)
@@ -7060,11 +7335,17 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         let callback_task_visiting: HashMap[i32, i32] = HashMap.new()
         if self.callable_expr_creates_ephemeral_task(body, callback_task_visiting) != 0:
             self.emit_error("ephemeral Task cannot be created in extern C callback", body)
+    if expected_ret_ty != 0 and expected_ret_ty != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
+        if self.return_value_type_compatible(expected_ret_ty, body_ty as i32) == 0:
+            self.emit_error("closure return type mismatch", body)
     if expected_ret_ty != 0 and expected_ret_ty != self.ty_void and body_ty != 0 and body_ty != self.ty_never:
         if body_ty == self.ty_void:
-            if self.type_has_default_value(expected_ret_ty) == 0:
+            let closure_void_results_ok = self.check_body_explicit_value_results(body, 1, expected_ret_ty, "closure return type mismatch")
+            if closure_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) != 0 and self.body_can_fall_through(body) != 0:
+                self.emit_error("missing return", body)
+            else if self.type_has_default_value(expected_ret_ty) == 0:
                 self.emit_error("closure return type mismatch", body)
-        else if self.types_compatible(expected_ret_ty, body_ty as i32) == 0 and self.arithmetic_result_type(expected_ret_ty, body_ty) == 0:
+        else if self.check_body_explicit_value_results(body, 1, expected_ret_ty, "closure return type mismatch") != 0 and self.types_compatible(expected_ret_ty, body_ty as i32) == 0 and self.arithmetic_result_type(expected_ret_ty, body_ty) == 0:
             var closure_ok_wrapped = false
             let closure_ret_resolved = self.resolve_alias(expected_ret_ty as TypeId)
             if self.get_type_kind(closure_ret_resolved) == TypeKind.TY_GENERIC_INST:

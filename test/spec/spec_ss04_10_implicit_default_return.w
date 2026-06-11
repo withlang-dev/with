@@ -28,6 +28,10 @@ fn explicit_return_value -> i32:
     default_return_side_effect()
     42
 
+fn explicit_return_in_nonfallthrough_loop -> i32:
+    while true:
+        return 7
+
 fn test_implicit_default_return_for_builtin_and_option:
     assert(default_i32() == 0)
     assert(default_bool() == false)
@@ -46,3 +50,6 @@ fn test_implicit_default_return_composes_with_result:
 
 fn test_explicit_return_is_not_overridden:
     assert(explicit_return_value() == 42)
+
+fn test_explicit_return_in_nonfallthrough_loop:
+    assert(explicit_return_in_nonfallthrough_loop() == 7)

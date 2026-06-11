@@ -890,6 +890,9 @@ fn ComptimeEvaluator.apply_implicit_default_return(self: ComptimeEvaluator, fn_n
         if signal.value.kind == ComptimeValueKind.CV_VOID and ret_type != 0:
             let resolved = self.sema.resolve_alias(ret_type as TypeId)
             if self.sema.get_type_kind(resolved) != TypeKind.TY_VOID:
+                let body = self.ast.get_data1(fn_node)
+                if self.sema.body_has_explicit_value_result(body, 1) != 0 and self.sema.body_can_fall_through(body) != 0:
+                    return self.fail(fn_node, "missing return")
                 let default_value = self.default_value_for_type(ret_type, fn_node)
                 if default_value.kind == ComptimeValueKind.CV_INVALID:
                     return comptime_control_error()

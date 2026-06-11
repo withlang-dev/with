@@ -1979,6 +1979,7 @@ fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str)
         return bs_fail(ctx, "missing --target value unexpectedly succeeded")
     rc = bs_assert_contains(ctx, missing_target.stderr, "--target requires a target triple argument", "build_options_target_missing")
     if rc != 0: return rc
+    return 0
 
 fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
