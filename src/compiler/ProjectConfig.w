@@ -16,6 +16,8 @@ type ProjectConfig {
     dep_link_args: Vec[str],
     dep_names: Vec[str],
     dep_constraints: Vec[str],
+    c_dep_metadata_names: Vec[str],
+    manual_c_dep_names: Vec[str],
     feature_default: Vec[str],
     feature_names: Vec[str],
     feature_values: Vec[str],
@@ -41,6 +43,8 @@ fn project_config_default -> ProjectConfig:
         dep_link_args: Vec.new(),
         dep_names: Vec.new(),
         dep_constraints: Vec.new(),
+        c_dep_metadata_names: Vec.new(),
+        manual_c_dep_names: Vec.new(),
         feature_default: Vec.new(),
         feature_names: Vec.new(),
         feature_values: Vec.new(),
@@ -187,7 +191,51 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
                 // C package dependency: c.sqlite3 = "3.45"
                 let pkg_name = key.slice(2, key.len())
                 if pkg_name.len() > 0:
-                    out = project_config_load_dep_metadata(out, pkg_name, constraint)
+                    if project_config_vec_contains(out.manual_c_dep_names, pkg_name):
+                        if out.manifest_error.len() == 0:
+                            out.manifest_error = "dependency c." ++ pkg_name ++ " is declared both as a Conan dependency and a manual [deps.c." ++ pkg_name ++ "] table"
+                    else:
+                        if not project_config_vec_contains(out.c_dep_metadata_names, pkg_name):
+                            out.c_dep_metadata_names.push(pkg_name)
+                        out = project_config_load_dep_metadata(out, pkg_name, constraint)
+    else if project_config_manual_c_dep_name(section).len() > 0:
+        let dep_name = project_config_manual_c_dep_name(section)
+        if project_config_vec_contains(out.c_dep_metadata_names, dep_name):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "dependency c." ++ dep_name ++ " is declared both as a Conan dependency and a manual [deps.c." ++ dep_name ++ "] table"
+        if not project_config_vec_contains(out.manual_c_dep_names, dep_name):
+            // Manual C deps are local manifest inputs, not fetched artifacts.
+            out.manual_c_dep_names.push(dep_name)
+        if key == "include":
+            if not project_config_is_quoted_string_value(value):
+                if out.manifest_error.len() == 0:
+                    out.manifest_error = "include in [deps.c." ++ dep_name ++ "] must be a string path"
+            else:
+                out.c_import_include_paths.push(project_config_resolve_path(out.root_dir, project_config_strip_quotes(project_config_trim(value))))
+        else if key == "lib":
+            if not project_config_is_quoted_string_value(value):
+                if out.manifest_error.len() == 0:
+                    out.manifest_error = "lib in [deps.c." ++ dep_name ++ "] must be a string path"
+            else:
+                out.link_search_paths.push(project_config_resolve_path(out.root_dir, project_config_strip_quotes(project_config_trim(value))))
+        else if key == "link":
+            if not project_config_is_string_array_value(value):
+                if out.manifest_error.len() == 0:
+                    out.manifest_error = "link in [deps.c." ++ dep_name ++ "] must be an array of library names"
+            else:
+                let libs = project_config_parse_string_array(value)
+                for li in 0..libs.len() as i32:
+                    out.dep_link_libs.push(libs.get(li as i64))
+        else if key == "defines":
+            if not project_config_is_string_array_value(value):
+                if out.manifest_error.len() == 0:
+                    out.manifest_error = "defines in [deps.c." ++ dep_name ++ "] must be an array of strings"
+            else:
+                let defines = project_config_parse_string_array(value)
+                for di in 0..defines.len() as i32:
+                    out.c_import_defines.push(defines.get(di as i64))
+        else if out.manifest_error.len() == 0:
+            out.manifest_error = "unknown key '" ++ key ++ "' in [deps.c." ++ dep_name ++ "]; expected include, lib, link, or defines"
     out
 
 fn project_config_strip_quotes(value: str) -> str:
@@ -203,6 +251,23 @@ fn project_config_parse_bool(value: str) -> i32:
     if text == "false":
         return 0
     -1
+
+fn project_config_vec_contains(values: Vec[str], needle: str) -> bool:
+    for i in 0..values.len() as i32:
+        if values.get(i as i64) == needle:
+            return true
+    false
+
+fn project_config_manual_c_dep_name(section: str) -> str:
+    if not section.starts_with("deps.c."):
+        return ""
+    if section.len() <= 7:
+        return ""
+    section.slice(7, section.len())
+
+fn project_config_is_quoted_string_value(value: str) -> bool:
+    let text = project_config_trim(value)
+    text.len() >= 2 and text.byte_at(0) == 34 and text.byte_at(text.len() as i64 - 1) == 34
 
 fn project_config_load_dep_metadata(cfg: ProjectConfig, name: str, version: str) -> ProjectConfig:
     var out = cfg
@@ -297,6 +362,8 @@ fn project_config_wants_key(section: str, key: str) -> bool:
     if section == "features":
         return true
     if section == "target" and key == "default":
+        return true
+    if project_config_manual_c_dep_name(section).len() > 0:
         return true
     if section == "deps":
         return true

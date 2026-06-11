@@ -809,6 +809,71 @@ fn bs_check_link_libs_manifest_diagnostics(ctx: ActionCtx, compiler_path: str, c
         return bs_fail(ctx, "malformed [link].libs unexpectedly succeeded")
     bs_assert_contains(ctx, result.stderr, "link.libs must be an array of strings", "link_libs_malformed")
 
+fn bs_check_manual_c_dep_manifest(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let manifest =
+        "[package]\n" ++
+        "name = \"manualcdep\"\n" ++
+        "version = \"0.1.0\"\n\n" ++
+        "[deps.c.fixture]\n" ++
+        "include = \"vendor/include\"\n" ++
+        "lib = \"vendor/lib\"\n" ++
+        "link = [\"fixture\"]\n" ++
+        "defines = [\"WITH_MANUAL_C_DEP=1\"]\n"
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), manifest, "manual c dep manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "vendor/include/fixture.h"), "#ifndef WITH_MANUAL_C_DEP\n#error missing WITH_MANUAL_C_DEP\n#endif\n#define MANUAL_C_DEP_VALUE 77\n", "manual c dep header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "use c_import(\"fixture.h\")\n\nfn main:\n    let x: i32 = MANUAL_C_DEP_VALUE\n    let _ = x\n", "manual c dep source")
+    if rc != 0: return rc
+
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(bs_abs(root, bs_join(case_dir, "src/main.w")))
+    args |> push("--dump-project-info")
+    let result = bs_project_expect_success(ctx, compiler_path, case_dir, "manual-c-dep", args)
+    if result.rc != 0: return result.rc
+    rc = bs_assert_contains(ctx, result.stdout, "config c_import_include_paths=" ++ bs_abs(root, bs_join(case_dir, "vendor/include")), "manual_c_dep_include")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stdout, "config c_import_defines=WITH_MANUAL_C_DEP=1", "manual_c_dep_defines")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stdout, "config link_search_paths=" ++ bs_abs(root, bs_join(case_dir, "vendor/lib")), "manual_c_dep_lib")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stdout, "config dep_link_libs=fixture", "manual_c_dep_link")
+    if rc != 0: return rc
+
+    let unknown_dir = bs_join(case_dir, "unknown")
+    rc = bs_write_fixture(ctx, bs_join(unknown_dir, "with.toml"), "[package]\nname = \"manualunknown\"\nversion = \"0.1.0\"\n\n[deps.c.fixture]\nincludes = \"vendor/include\"\n", "manual c dep unknown manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(unknown_dir, "src/main.w"), "fn main:\n    print(\"manualunknown\")\n", "manual c dep unknown source")
+    if rc != 0: return rc
+    let unknown = bs_run_cli_capture_cwd(ctx, compiler_path, "manual-c-dep-unknown", bs_project_args("build"), 120000, unknown_dir)
+    if unknown.rc == 0:
+        return bs_fail(ctx, "manual C dep unknown key unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, unknown.stderr, "unknown key 'includes' in [deps.c.fixture]", "manual_c_dep_unknown")
+    if rc != 0: return rc
+
+    let wrong_shape_dir = bs_join(case_dir, "wrong_shape")
+    rc = bs_write_fixture(ctx, bs_join(wrong_shape_dir, "with.toml"), "[package]\nname = \"manualwrongshape\"\nversion = \"0.1.0\"\n\n[deps.c.fixture]\nlink = \"fixture\"\n", "manual c dep wrong shape manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(wrong_shape_dir, "src/main.w"), "fn main:\n    print(\"manualwrongshape\")\n", "manual c dep wrong shape source")
+    if rc != 0: return rc
+    let wrong_shape = bs_run_cli_capture_cwd(ctx, compiler_path, "manual-c-dep-wrong-shape", bs_project_args("build"), 120000, wrong_shape_dir)
+    if wrong_shape.rc == 0:
+        return bs_fail(ctx, "manual C dep wrong link shape unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, wrong_shape.stderr, "link in [deps.c.fixture] must be an array of library names", "manual_c_dep_wrong_shape")
+    if rc != 0: return rc
+
+    let collision_dir = bs_join(case_dir, "collision")
+    rc = bs_write_fixture(ctx, bs_join(collision_dir, "with.toml"), "[package]\nname = \"manualcollision\"\nversion = \"0.1.0\"\n\n[deps.c.fixture]\ninclude = \"vendor/include\"\n\n[deps]\nc.fixture = \"1.0\"\n", "manual c dep collision manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(collision_dir, "src/main.w"), "fn main:\n    print(\"manualcollision\")\n", "manual c dep collision source")
+    if rc != 0: return rc
+    let collision = bs_run_cli_capture_cwd(ctx, compiler_path, "manual-c-dep-collision", bs_project_args("build"), 120000, collision_dir)
+    if collision.rc == 0:
+        return bs_fail(ctx, "manual C dep collision unexpectedly succeeded")
+    bs_assert_contains(ctx, collision.stderr, "declared both as a Conan dependency and a manual", "manual_c_dep_collision")
+
 fn bs_check_run_project_targets(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "rundemo")
     if rc != 0: return rc
@@ -975,6 +1040,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_declarative_manifest_config(ctx, compiler_path, bs_join(output_dir, "declarative_manifest_config_case"))
     if rc != 0: return rc
     rc = bs_check_link_libs_manifest_diagnostics(ctx, compiler_path, bs_join(output_dir, "link_libs_manifest_case"))
+    if rc != 0: return rc
+    rc = bs_check_manual_c_dep_manifest(ctx, compiler_path, bs_join(output_dir, "manual_c_dep_manifest_case"))
     if rc != 0: return rc
     rc = bs_check_get_force_reinstall(ctx, compiler_path, bs_join(output_dir, "get_force_reinstall_case"))
     if rc != 0: return rc
