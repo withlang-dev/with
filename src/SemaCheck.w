@@ -2722,7 +2722,37 @@ fn Sema.fn_symbol_is_manual_extern(self: Sema, fn_sym: i32) -> i32:
         return 0
     if sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)) != 0:
         return 0
+    if self.manual_extern_requires_unsafe(fn_sym) == 0:
+        return 0
     1
+
+fn Sema.fn_symbol_is_manual_extern_value_abi(self: Sema, fn_sym: i32) -> i32:
+    if not self.extern_fn_names.contains(fn_sym):
+        return 0
+    if self.ci_syms.contains(fn_sym):
+        return 0
+    let fn_name = self.pool_resolve(fn_sym)
+    if sema_extern_is_compiler_implementation(fn_name, self.current_module_path) != 0:
+        return 0
+    if sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)) != 0:
+        return 0
+    if self.manual_extern_requires_unsafe(fn_sym) != 0:
+        return 0
+    1
+
+fn Sema.manual_extern_requires_unsafe(self: Sema, fn_sym: i32) -> i32:
+    let sig_idx = self.get_sig(fn_sym)
+    if sig_idx < 0:
+        return 1
+    if self.sig_is_variadic(sig_idx) != 0:
+        return 1
+    if self.ci_type_requires_raw_contract(self.sig_return_type(sig_idx)) != 0:
+        return 1
+    let param_count = self.sig_get_param_count(sig_idx)
+    for pi in 0..param_count:
+        if self.ci_type_requires_raw_contract(self.sig_param_type(sig_idx, pi)) != 0:
+            return 1
+    0
 
 fn Sema.fn_symbol_is_raw_c_import(self: Sema, fn_sym: i32) -> i32:
     if not self.ci_syms.contains(fn_sym):
@@ -8124,6 +8154,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     else if self.fn_symbol_is_manual_extern(fn_sym) != 0:
         if self.require_unsafe_operation("manual extern function call requires unsafe context", node) == 0:
             return 0
+    else if self.fn_symbol_is_manual_extern_value_abi(fn_sym) != 0:
+        if self.in_unsafe != 0:
+            self.note_unsafe_operation()
 
     // std.builtins.drop is a prelude-resolved builtin: it consumes its single
     // argument without requiring call-site `move`, then lowers to an immediate

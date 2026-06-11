@@ -1129,7 +1129,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
                     si_params = si_params ++ ", "
                 let spname = with_cimport_fn_param_name(session, idx, spi)
                 let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
-                if ci_cimport_type_is_raw_abi(sptype):
+                if ci_cimport_param_type_requires_raw_abi(sptype):
                     si_raw = true
                 let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
                 si_params = si_params ++ actual_pname ++ ": " ++ sptype
@@ -1162,7 +1162,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         let raw_ptype = with_cimport_fn_param_type_translated(session, idx, pi)
         let is_restrict = with_cimport_param_is_restrict(session, idx, pi)
         var ptype = ci_pointer_type_explicit_mut(raw_ptype)
-        if ci_cimport_type_is_raw_abi(ptype):
+        if ci_cimport_param_type_requires_raw_abi(ptype):
             raw_fn = true
 
         if ci_starts_with(ptype, "__UNSUPPORTED:"):
@@ -1421,7 +1421,7 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: str, method_na
     while pi < param_count:
         let pname = with_cimport_fn_param_name(session, idx, pi)
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
-        if ci_cimport_type_is_raw_abi(ptype):
+        if ci_cimport_param_type_requires_raw_abi(ptype):
             raw_wrapper = true
         let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
         params = params ++ ", " ++ actual_name ++ ": " ++ ptype
@@ -1457,7 +1457,7 @@ fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: str, method_
     while pi < param_count:
         let pname = with_cimport_fn_param_name(session, idx, pi)
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
-        if ci_cimport_type_is_raw_abi(ptype):
+        if ci_cimport_param_type_requires_raw_abi(ptype):
             raw_wrapper = true
         let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
         if pi > 0:
@@ -1482,6 +1482,15 @@ fn ci_cimport_type_is_raw_abi(ty: str) -> bool:
     if ci_str_contains(t, "*mut ") or ci_str_contains(t, "*const "):
         return true
     false
+
+fn ci_cimport_type_is_const_c_string_input(ty: str) -> bool:
+    let t = ci_trim(ty)
+    t == "*const i8" or t == "*const c_char"
+
+fn ci_cimport_param_type_requires_raw_abi(ty: str) -> bool:
+    if ci_cimport_type_is_const_c_string_input(ty):
+        return false
+    ci_cimport_type_is_raw_abi(ty)
 
 fn ci_pointer_type_explicit_mut(ty: str) -> str:
     if ci_starts_with(ty, "*const "):

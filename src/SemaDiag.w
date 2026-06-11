@@ -40,10 +40,18 @@ fn Sema.argument_literal_default_help(self: Sema, arg_node: i32, expr_text: str,
 
 fn Sema.try_ci_coercion(self: Sema, arg_ty: i32, param_ty: i32) -> i32:
     // c_import auto-coercion: allow bool → integer at ABI boundary
-    let arg_k = self.get_type_kind(self.resolve_alias(arg_ty))
+    let arg_resolved = self.resolve_alias(arg_ty as TypeId)
+    let arg_k = self.get_type_kind(arg_resolved)
     let par_k = self.get_type_kind(self.resolve_alias(param_ty))
     if arg_k == TypeKind.TY_BOOL and par_k == TypeKind.TY_INT:
         return 1
+    if self.ci_type_is_const_c_string_input(param_ty) != 0:
+        if arg_k == TypeKind.TY_STR:
+            return 1
+        if arg_k == TypeKind.TY_REF:
+            let inner = self.resolve_alias(self.get_type_d0(arg_resolved) as TypeId)
+            if self.get_type_kind(inner) == TypeKind.TY_STR:
+                return 1
     0
 
 fn Sema.emit_argument_type_mismatch(self: Sema, call_name: str, fn_sym: i32, arg_index: i32, param_i: i32, expected_ty: i32, actual_ty: i32, arg_node: i32):

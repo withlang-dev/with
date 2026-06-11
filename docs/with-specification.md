@@ -8311,10 +8311,14 @@ extern "C" {
 }
 ```
 
-Manual `extern "C"` declarations are raw ABI declarations. Calls to
-manual `extern "C"` functions require `unsafe` unless they are wrapped
-by a safe With API that models the memory, ownership, and lifetime
-contract.
+Manual `extern "C"` declarations are raw ABI declarations. A call to a
+value-only manual extern function is safe when the signature carries no
+raw pointer, slice, callback, variadic, ownership, lifetime, or other
+unmodeled safety contract. A manual extern call that does carry such a
+contract requires `unsafe` unless it is wrapped by a safe With API that
+models the memory, ownership, and lifetime contract. An `unsafe` block
+around a value-only manual extern call is still permitted as an explicit
+raw-ABI-boundary acknowledgement; it is not required.
 
 ### 16.3b External Variables
 
@@ -8693,7 +8697,8 @@ The operations that require an unsafe context are:
 - Pointer-domain casts not specified as safe validity-less raw
   conversions by the target model
 - Calls to `unsafe fn`
-- Calls to manual `extern` functions or raw/unmodeled ABI bindings
+- Calls to manual `extern` functions with raw/unmodeled safety
+  contracts, or raw/unmodeled ABI bindings
 - Any operation whose correctness depends on the pointer being valid,
   live, aligned, initialized, in bounds, dereferenceable, owned,
   uniquely writable, carrying the required permissions, or carrying the

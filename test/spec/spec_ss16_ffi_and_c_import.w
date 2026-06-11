@@ -26,7 +26,9 @@ fn test_manual_extern_c_declaration:
     assert(unsafe { atoi(c"42".ptr) } == 42)
 
 fn test_c_import_raw_c_string_literal_to_const_char_ptr:
-    assert(unsafe { strlen(c"hello".ptr) } == 5usize)
+    assert(strlen("hello") == 5usize)
+    let s = f"abc{1}"
+    assert(strlen(s) == 4usize)
 
 fn test_c_import_raw_pointer_calls_require_unsafe:
     unsafe { free(null) }

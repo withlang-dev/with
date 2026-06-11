@@ -474,6 +474,24 @@ fn Sema.ci_type_requires_raw_contract(self: Sema, tid: i32) -> i32:
                 return 1
     0
 
+fn Sema.ci_type_is_const_c_string_input(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_PTR:
+        return 0
+    if self.get_type_d1(resolved) != 0:
+        return 0
+    let pointee = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    if pointee == self.ty_i8:
+        return 1
+    0
+
+fn Sema.ci_param_type_requires_raw_contract(self: Sema, tid: i32) -> i32:
+    if self.ci_type_is_const_c_string_input(tid) != 0:
+        return 0
+    self.ci_type_requires_raw_contract(tid)
+
 fn Sema.ci_function_requires_raw_abi(self: Sema, fn_sym: i32) -> i32:
     let sig_idx = self.get_sig(fn_sym)
     if sig_idx < 0:
@@ -490,7 +508,7 @@ fn Sema.ci_function_requires_raw_abi(self: Sema, fn_sym: i32) -> i32:
         return 1
     let param_count = self.sig_get_param_count(sig_idx)
     for pi in 0..param_count:
-        if self.ci_type_requires_raw_contract(self.sig_param_type(sig_idx, pi)) != 0:
+        if self.ci_param_type_requires_raw_contract(self.sig_param_type(sig_idx, pi)) != 0:
             return 1
     0
 

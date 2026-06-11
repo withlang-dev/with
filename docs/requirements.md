@@ -9122,8 +9122,8 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: Manual `extern "C"` declarations are raw ABI declarations.
   - Source: `§16.3 L8302-L8305`
   - Related spec refs: none
-- [x] `16.3.1.3` **Calls to manual extern "C" functions require unsafe unless they are wrapped...**
-  - Requirement: Calls to manual `extern "C"` functions require `unsafe` unless they are wrapped by a safe With API that models the memory, ownership, and lifetime contract.
+- [x] `16.3.1.3` **Manual extern calls require unsafe only when the signature carries an unmodeled safety contract.**
+  - Requirement: A call to a value-only manual extern function is safe when the signature carries no raw pointer, slice, callback, variadic, ownership, lifetime, or other unmodeled safety contract. A manual extern call that does carry such a contract requires `unsafe` unless it is wrapped by a safe With API that models the memory, ownership, and lifetime contract. An `unsafe` block around a value-only manual extern call is permitted as an explicit raw-ABI-boundary acknowledgement; it is not required.
   - Source: `§16.3 L8302-L8305`
   - Related spec refs: none
 
@@ -9643,8 +9643,8 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: Calls to `unsafe fn`
   - Source: `§16.11 L8683`
   - Related spec refs: none
-- [x] `16.11.1.21` **Calls to manual extern functions or raw/unmodeled ABI bindings**
-  - Requirement: Calls to manual `extern` functions or raw/unmodeled ABI bindings
+- [x] `16.11.1.21` **Calls to manual extern functions with raw/unmodeled safety contracts or raw/unmodeled ABI bindings**
+  - Requirement: Calls to manual `extern` functions with raw/unmodeled safety contracts, or raw/unmodeled ABI bindings
   - Source: `§16.11 L8684`
   - Related spec refs: none
 - [x] `16.11.1.22` **Any operation whose correctness depends on the pointer being valid, live, a...**

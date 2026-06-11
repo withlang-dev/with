@@ -3566,11 +3566,26 @@ fn Codegen.sema_type_is_c_char_pointer(self: Codegen, sema_ty: i32) -> i32:
         return 0
     let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
     let tk = self.sema.get_type_kind(resolved)
-    if tk != TypeKind.TY_PTR and tk != TypeKind.TY_REF:
+    if tk != TypeKind.TY_PTR:
+        return 0
+    if self.sema.get_type_d1(resolved) != 0:
         return 0
     let pointee = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId) as i32
     if pointee == self.sema.ty_i8 as i32:
         return 1
+    0
+
+fn Codegen.sema_type_is_str_value_or_view(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TypeKind.TY_STR:
+        return 1
+    if tk == TypeKind.TY_REF:
+        let inner = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId) as i32
+        if self.sema.get_type_kind(inner) == TypeKind.TY_STR:
+            return 1
     0
 
 fn Codegen.copy_str_to_cstr_temp(self: Codegen, str_val: i64) -> i64:
@@ -3616,6 +3631,15 @@ fn Codegen.mir_eval_call_operand_info(self: Codegen, body: MirBody, operand_id: 
     if out != 0 and expected_ty != 0:
         let expected_kind = wl_get_type_kind(expected_ty)
         let actual_kind = wl_get_type_kind(wl_type_of(out))
+        if is_c_abi_arg != 0 and expected_kind == wl_pointer_type_kind() and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0 and self.sema_type_is_str_value_or_view(self.mir_operand_sema_type(body, operand_id)) != 0:
+            var str_out = out
+            if actual_kind == wl_pointer_type_kind():
+                let str_ty = self.mir_sema_type_to_llvm(self.sema.ty_str as i32)
+                if str_ty != 0:
+                    str_out = wl_build_load(self.builder, str_ty, out)
+            let temp = self.copy_str_to_cstr_temp(str_out)
+            let coerced_temp = self.enforce_coerced_type(temp, expected_ty, "wrong argument type")
+            return CallArgValue { value: coerced_temp, cleanup_ptr: temp }
         if expected_kind == wl_pointer_type_kind() and actual_kind == wl_struct_type_kind():
             let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
             if place_ptr != 0:
