@@ -461,7 +461,7 @@ fn conan_json_escape(value: str) -> str:
         out = out ++ value.slice(i as i64, (i + 1) as i64)
     out
 
-fn conan_json_array(values: Vec[str]) -> str:
+fn conan_json_array(values: &Vec[str]) -> str:
     let q = "\x22"
     var out = "["
     for i in 0..values.len() as i32:
@@ -479,12 +479,12 @@ fn conan_write_metadata(dest_dir: str, name: str, version: str, recipe_rev: str,
     meta = meta ++ "  " ++ q ++ "recipe_revision" ++ q ++ ": " ++ q ++ conan_json_escape(recipe_rev) ++ q ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "package_id" ++ q ++ ": " ++ q ++ conan_json_escape(package_id) ++ q ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "package_revision" ++ q ++ ": " ++ q ++ conan_json_escape(package_rev) ++ q ++ "," ++ nl
-    meta = meta ++ "  " ++ q ++ "include_paths" ++ q ++ ": " ++ conan_json_array(include_paths) ++ "," ++ nl
-    meta = meta ++ "  " ++ q ++ "lib_paths" ++ q ++ ": " ++ conan_json_array(lib_paths) ++ "," ++ nl
-    meta = meta ++ "  " ++ q ++ "libs" ++ q ++ ": " ++ conan_json_array(libs) ++ "," ++ nl
-    meta = meta ++ "  " ++ q ++ "defines" ++ q ++ ": " ++ conan_json_array(defines) ++ "," ++ nl
-    meta = meta ++ "  " ++ q ++ "link_args" ++ q ++ ": " ++ conan_json_array(link_args) ++ "," ++ nl
-    meta = meta ++ "  " ++ q ++ "requires" ++ q ++ ": " ++ conan_json_array(requires) ++ nl
+    meta = meta ++ "  " ++ q ++ "include_paths" ++ q ++ ": " ++ conan_json_array(&include_paths) ++ "," ++ nl
+    meta = meta ++ "  " ++ q ++ "lib_paths" ++ q ++ ": " ++ conan_json_array(&lib_paths) ++ "," ++ nl
+    meta = meta ++ "  " ++ q ++ "libs" ++ q ++ ": " ++ conan_json_array(&libs) ++ "," ++ nl
+    meta = meta ++ "  " ++ q ++ "defines" ++ q ++ ": " ++ conan_json_array(&defines) ++ "," ++ nl
+    meta = meta ++ "  " ++ q ++ "link_args" ++ q ++ ": " ++ conan_json_array(&link_args) ++ "," ++ nl
+    meta = meta ++ "  " ++ q ++ "requires" ++ q ++ ": " ++ conan_json_array(&requires) ++ nl
     meta = meta ++ "}" ++ nl
     runtime_write_file(dest_dir ++ "/metadata.json", meta)
 
@@ -531,11 +531,10 @@ fn conan_scan_libraries(dep_dir: str) -> ConanLibraryScan:
                 lib_paths = conan_sorted_insert_unique(move lib_paths, conan_relative_path(dep_dir, conan_path_dirname(path)))
     ConanLibraryScan { lib_paths, libs }
 
-fn conan_known_link_metadata(name: str, version: str, libs: Vec[str], defines: Vec[str], link_args: Vec[str]) -> ConanLibraryScan:
+fn conan_known_link_metadata(name: str, version: str, libs: Vec[str], link_args: Vec[str]) -> ConanLibraryScan:
     let os = conan_detect_os()
     var out_libs = libs
     var out_args = link_args
-    let _ = defines
     if name == "opengl" and version == "system":
         if os == "Macos":
             out_args.push("-framework")
@@ -623,11 +622,11 @@ pub fn conan_write_known_system_package(name: str, version: str, project_root: s
     var link_args: Vec[str] = Vec.new()
     if name == "opengl" and conan_detect_os() == "Macos":
         defines = conan_sorted_insert_unique(move defines, "GL_SILENCE_DEPRECATION=1")
-    let known = conan_known_link_metadata(name, version, libs, defines, link_args)
-    libs = known.libs
-    link_args = known.lib_paths
+    let known = conan_known_link_metadata(name, version, libs, link_args)
+    let known_libs = known.libs
+    let known_link_args = known.lib_paths
     let requires: Vec[str] = Vec.new()
-    conan_write_metadata(dep_dir, name, version, "system", "system", "system", include_paths, lib_paths, libs, defines, link_args, requires) == 0
+    conan_write_metadata(dep_dir, name, version, "system", "system", "system", include_paths, lib_paths, known_libs, defines, known_link_args, requires) == 0
 
 fn conan_resolve_and_install_requirements(requirements: Vec[str], project_root: str, depth: i32, force_reinstall: bool) -> Vec[str]:
     let resolved: Vec[str] = Vec.new()
@@ -657,10 +656,8 @@ fn conan_write_binary_metadata(name: str, version: str, recipe_rev: str, package
             lib_paths.push("lib")
     let defines: Vec[str] = Vec.new()
     let link_args: Vec[str] = Vec.new()
-    let known = conan_known_link_metadata(name, version, libs, defines, link_args)
-    libs = known.libs
-    let final_link_args = known.lib_paths
-    conan_write_metadata(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, final_link_args, requirements)
+    let known = conan_known_link_metadata(name, version, libs, link_args)
+    conan_write_metadata(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, known.libs, defines, known.lib_paths, requirements)
 
 pub fn conan_restore_locked_binary_package(name: str, version: str, recipe_rev: str, package_id: str, package_rev: str, expected_sha256: str, project_root: str) -> bool:
     let dep_dir = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version
@@ -895,10 +892,9 @@ fn conan_install_source_fallback(name: str, version: str, project_root: str) -> 
     libs.push(name)
     let defines: Vec[str] = Vec.new()
     let link_args: Vec[str] = Vec.new()
-    let known = conan_known_link_metadata(name, version, libs, defines, link_args)
-    libs = known.libs
+    let known = conan_known_link_metadata(name, version, libs, link_args)
     let requires: Vec[str] = Vec.new()
-    if conan_write_metadata(dep_dir, name, version, "source", "source", "source", include_paths, lib_paths, libs, defines, known.lib_paths, requires) != 0:
+    if conan_write_metadata(dep_dir, name, version, "source", "source", "source", include_paths, lib_paths, known.libs, defines, known.lib_paths, requires) != 0:
         runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return ""

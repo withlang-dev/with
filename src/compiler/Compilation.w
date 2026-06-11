@@ -1242,15 +1242,15 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     if tailrec_syms.len() > 0:
         let tailrec_violations = mir_mod.verify_tailrec_contracts(&sema, active_pool, tailrec_syms)
         if tailrec_violations.len() > 0:
-            self.zcu.sync_from_sema(sema)
-            compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
             for vi in 0..tailrec_violations.len() as i32:
                 let violation = tailrec_violations.get(vi as i64)
                 let start = active_pool.get_start(violation.node)
                 let end_raw = active_pool.get_end(violation.node)
                 let end = if end_raw > start: end_raw else: start + 1
                 let span = Span { file: sema.local_file_id, start, end }
-                self.zcu.diagnostics.emit(Diagnostic.err(violation.message, span))
+                sema.diags.emit(Diagnostic.err(violation.message, span))
+            self.zcu.sync_from_sema(sema)
+            compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
             self.zcu.render_all_diagnostics_frontend()
             self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
             return self.zcu.last_mir_module
@@ -1272,7 +1272,6 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
         self.zcu.render_all_diagnostics_frontend()
         self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
         return self.zcu.last_mir_module
-    self.zcu.sync_from_sema(sema)
     let t_mir_validate = profile_now()
     let mir_err = validate_typed_mir_module(mir_mod)
     if do_profile:

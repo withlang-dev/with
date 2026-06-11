@@ -9025,19 +9025,19 @@ fn MirBody.gen_restore_generator_fields(mut self: MirBody, bb: i32, sema: Sema, 
         let op = self.new_operand(OperandKind.OK_COPY, src)
         self.gen_assign_operand(bb, dst, op, span)
 
-fn mir_gen_remap_local(local_map: Vec[i32], local_id: i32) -> i32:
+fn mir_gen_remap_local(local_map: &Vec[i32], local_id: i32) -> i32:
     if local_id < 0 or local_id >= local_map.len() as i32:
         return local_id
     local_map.get(local_id as i64)
 
-fn mir_gen_remap_place_projection_data(source: MirBody, local_map: Vec[i32], proj_i: i32) -> i32:
+fn mir_gen_remap_place_projection_data(source: &MirBody, local_map: &Vec[i32], proj_i: i32) -> i32:
     let kind = source.proj_kinds.get(proj_i as i64)
     let data = source.proj_d0.get(proj_i as i64)
     if kind == ProjKind.PK_INDEX:
         return mir_gen_remap_local(local_map, data)
     data
 
-fn mir_gen_remap_rvalue(source: MirBody, local_map: Vec[i32], rv_id: i32, d_index: i32) -> i32:
+fn mir_gen_remap_rvalue(source: &MirBody, local_map: &Vec[i32], rv_id: i32, d_index: i32) -> i32:
     let rk = source.rval_kinds.get(rv_id as i64)
     let raw =
         if d_index == 0: source.rval_d0.get(rv_id as i64)
@@ -9122,14 +9122,14 @@ fn lower_generator_next_body(sema: Sema, source: MirBody, fn_node: i32) -> MirBo
         out.const_types.push(source.const_types.get(ci as i64))
 
     for pi in 0..source.place_locals.len() as i32:
-        let base_local = mir_gen_remap_local(local_map, source.place_locals.get(pi as i64))
+        let base_local = mir_gen_remap_local(&local_map, source.place_locals.get(pi as i64))
         let proj_start = source.place_proj_starts.get(pi as i64)
         let proj_count = source.place_proj_counts.get(pi as i64)
         let new_proj_start = out.proj_kinds.len() as i32
         for ppi in 0..proj_count:
             let src_proj = proj_start + ppi
             out.proj_kinds.push(source.proj_kinds.get(src_proj as i64))
-            out.proj_d0.push(mir_gen_remap_place_projection_data(source, local_map, src_proj))
+            out.proj_d0.push(mir_gen_remap_place_projection_data(&source, &local_map, src_proj))
         out.place_locals.push(base_local)
         out.place_sema_types.push(source.place_sema_types.get(pi as i64))
         out.place_proj_starts.push(new_proj_start)
@@ -9161,9 +9161,9 @@ fn lower_generator_next_body(sema: Sema, source: MirBody, fn_node: i32) -> MirBo
 
     for ri in 0..source.rval_kinds.len() as i32:
         out.rval_kinds.push(source.rval_kinds.get(ri as i64))
-        out.rval_d0.push(mir_gen_remap_rvalue(source, local_map, ri, 0))
-        out.rval_d1.push(mir_gen_remap_rvalue(source, local_map, ri, 1))
-        out.rval_d2.push(mir_gen_remap_rvalue(source, local_map, ri, 2))
+        out.rval_d0.push(mir_gen_remap_rvalue(&source, &local_map, ri, 0))
+        out.rval_d1.push(mir_gen_remap_rvalue(&source, &local_map, ri, 1))
+        out.rval_d2.push(mir_gen_remap_rvalue(&source, &local_map, ri, 2))
 
     for bb in 0..source.block_count():
         let _ = out.new_block()
@@ -9183,7 +9183,7 @@ fn lower_generator_next_body(sema: Sema, source: MirBody, fn_node: i32) -> MirBo
             var sd0 = source.stmt_d0.get(stmt_id as i64)
             let sd1 = source.stmt_d1.get(stmt_id as i64)
             if sk == StmtKind.StorageLive or sk == StmtKind.StorageDead or sk == StmtKind.Drop:
-                sd0 = mir_gen_remap_local(local_map, sd0)
+                sd0 = mir_gen_remap_local(&local_map, sd0)
             out.push_stmt(new_bb, sk, sd0, sd1, source.stmt_spans.get(stmt_id as i64))
 
         let tk = source.term_kind(bb)
@@ -9244,10 +9244,10 @@ fn lower_generator_next_body(sema: Sema, source: MirBody, fn_node: i32) -> MirBo
 
     out
 
-fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
+fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
     var mir_mod = MirModule.init()
     // Snapshot sema type tables before any MirBuilder copy can realloc/free the buffer
-    mir_mod.snapshot_sema_types(sema)
+    mir_mod.snapshot_sema_types(&sema)
 
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
@@ -9259,22 +9259,21 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
         if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
             continue
 
-        var fn_sema = sema
-        fn_sema.update_decl_source_context(di)
+        sema.update_decl_source_context(di)
         let fn_flags = ast_pool.get_data2(decl)
         if (fn_flags / FnFlags.GEN) % 2 == 1:
-            let sig_idx = fn_sema.get_sig(fn_sym)
+            let sig_idx = sema.get_sig(fn_sym)
             if sig_idx < 0:
                 continue
-            var source_builder = MirBuilder.init(&fn_sema, ast_pool, pool, fn_sym)
+            var source_builder = MirBuilder.init(&sema, ast_pool, pool, fn_sym)
             source_builder.in_generator = 1
             let source_body = lower_fn_with_sig(source_builder, decl as i32, sig_idx)
-            let ctor_body = lower_generator_constructor(fn_sema, ast_pool, pool, decl as i32, sig_idx)
-            let next_body = lower_generator_next_body(fn_sema, source_body, decl as i32)
+            let ctor_body = lower_generator_constructor(sema, ast_pool, pool, decl as i32, sig_idx)
+            let next_body = lower_generator_next_body(sema, source_body, decl as i32)
             mir_mod.add_body(ctor_body)
             mir_mod.add_body(next_body)
             continue
-        var builder = MirBuilder.init(&fn_sema, ast_pool, pool, fn_sym)
+        var builder = MirBuilder.init(&sema, ast_pool, pool, fn_sym)
         let body = lower_fn(builder, decl as i32)
         mir_mod.add_body(body)
 

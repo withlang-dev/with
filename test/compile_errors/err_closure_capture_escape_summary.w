@@ -1,4 +1,4 @@
-//! expect-check-fail: non-Copy argument passed to a function that consumes or escapes it
+//! expect-check-fail: use of moved value
 
 type Resource { id: i32 }
 impl Resource:
@@ -11,3 +11,4 @@ fn consume_capture(r: Resource) -> Resource:
 fn main:
     let r = Resource { id: 7 }
     let _ = consume_capture(r)
+    let _ = r.id

@@ -3,12 +3,13 @@
 use Resolve
 use BuildGraphModel
 use BuildGraphRuntime
+use compiler.Runtime
 
 pub fn build_graph_output_path(root: str, target: BuildGraphTarget, output_path: str, target_count: i32) -> str:
     if output_path.len() > 0:
         if target_count != 1:
             return ""
-        return output_path
+        return runtime_str_clone(output_path)
     if target.output.len() > 0:
         return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/bin"), target.name)
@@ -17,7 +18,7 @@ pub fn build_graph_library_output_path(root: str, target: BuildGraphTarget, outp
     if output_path.len() > 0:
         if target_count != 1:
             return ""
-        return output_path
+        return runtime_str_clone(output_path)
     if target.output.len() > 0:
         return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/lib"), "lib" ++ target.name ++ ".a")
@@ -26,7 +27,7 @@ pub fn build_graph_object_output_path(root: str, target: BuildGraphTarget, outpu
     if output_path.len() > 0:
         if target_count != 1:
             return ""
-        return output_path
+        return runtime_str_clone(output_path)
     if target.output.len() > 0:
         return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/obj"), target.name ++ ".o")
@@ -40,6 +41,12 @@ pub fn build_graph_resolve_paths(root: str, paths: Vec[str]) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     for i in 0..paths.len() as i32:
         out.push(build_graph_resolve_project_path(root, paths.get(i as i64)))
+    out
+
+pub fn build_graph_clone_strings(values: &Vec[str]) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    for i in 0..values.len() as i32:
+        out.push(runtime_str_clone(values.get(i as i64)))
     out
 
 pub fn build_graph_dirname(path: str) -> str:

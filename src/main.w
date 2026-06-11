@@ -899,13 +899,14 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
             return build_action_run_result_with_effects(1, result.effect_records)
     build_action_run_result_with_effects(0, result.effect_records)
 
-fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, options: BuildCommandOptions) -> BuildGraphLoadResult:
+fn load_build_graph_from_build_w(root: str, cfg: &ProjectConfig, options: &BuildCommandOptions) -> BuildGraphLoadResult:
     var graph = empty_build_graph()
     let entry_path = resolve_join(root, "__with_build_eval.w")
     var comp = Compilation.init()
-    comp.configure_options(options)
+    comp.configure_options(build_command_options_clone(options))
     comp.set_tool_mode_entry_path(entry_path)
-    let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), cfg)
+    let compile_cfg = project_config_clone(cfg)
+    let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), compile_cfg)
     var sema = comp.zcu.last_sema
     if pool.decl_count() == 0 or comp.has_errors():
         graph.error_msg = "build.w evaluation wrapper compilation failed"
@@ -1022,14 +1023,14 @@ fn build_graph_trim_space_and_newlines(text: str) -> str:
         end = end - 1
     text.slice(start as i64, end as i64)
 
-fn build_options_for_graph_target(root: str, base: BuildCommandOptions, target: BuildGraphTarget) -> BuildCommandOptions:
-    var options = base
+fn build_options_for_graph_target(root: str, base: &BuildCommandOptions, target: &BuildGraphTarget) -> BuildCommandOptions:
+    var options = build_command_options_clone(base)
     if target.optimize_mode == 1 and options.opt_level < 2:
         options.opt_level = 2
     options.target_kind = target.target_kind
     options.include_paths = build_graph_resolve_paths(root, target.include_paths)
-    options.defines = target.defines
-    options.link_libs = target.system_libs
+    options.defines = build_graph_clone_strings(&target.defines)
+    options.link_libs = build_graph_clone_strings(&target.system_libs)
     if target.kind == 1 or target.kind == 4:
         options.output_kind = BuildOutputKind.Archive
     else if target.kind == 3:
@@ -1104,7 +1105,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)
-        let target_options = build_options_for_graph_target(root, options, target)
+        let target_options = build_options_for_graph_target(root, &options, &target)
         if target.kind == 2:
             if options.output_path.len() > 0:
                 with_eprint("error: -o cannot be used with build.w test target '" ++ target.name ++ "'")
@@ -1384,7 +1385,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
             if actual_options.output_kind != BuildOutputKind.Binary:
                 with_eprint("error: build.w tool-mode only supports binary builds")
                 return 1
-            let load_result = load_build_graph_from_build_w(root, cfg, actual_options)
+            let load_result = load_build_graph_from_build_w(root, &cfg, &actual_options)
             let graph = load_result.graph
             if not graph.ok:
                 with_eprint("error: " ++ graph.error_msg)
@@ -1484,7 +1485,7 @@ fn run_run_project_command(selected_target_hint: str, opt_level: i32, no_std: bo
     options.runtime_available = runtime_available
     options.prelude_mode = prelude_mode
     options.debug_info = debug_info
-    let load_result = load_build_graph_from_build_w(root, cfg, options)
+    let load_result = load_build_graph_from_build_w(root, &cfg, &options)
     let graph = load_result.graph
     if not graph.ok:
         with_eprint("error: " ++ graph.error_msg)

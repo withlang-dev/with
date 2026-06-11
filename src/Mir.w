@@ -438,7 +438,7 @@ fn MirModule.init -> MirModule:
         sema_bitpacked_types: HashMap.new(),
     }
 
-fn MirModule.snapshot_sema_types(self: MirModule, sema: Sema):
+fn MirModule.snapshot_sema_types(self: MirModule, sema: &Sema):
     for i in 0..sema.type_kinds.len() as i32:
         self.sema_type_kinds.push(sema.type_kinds.get(i as i64))
     for i in 0..sema.type_d0.len() as i32:

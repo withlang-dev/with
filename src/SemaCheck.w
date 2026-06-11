@@ -7702,6 +7702,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                 let cap_ty = self.bind_types.get(ci as i64)
                 if self.is_copy(cap_ty as TypeId) == 0:
                     self.scope_set_state(cap_sym, VarState.MOVED)
+                    self.note_param_effect(cap_sym, EFF_CONSUME)
                 if emitted_escape_warn == 0 and self.ast.is_move_closure(node) == 0 and self.expr_mutates_place(body, cap_sym) != 0:
                     self.emit_error("closure that mutates captured place cannot escape its defining scope (§15.9)", node)
                     emitted_escape_warn = 1
@@ -8746,11 +8747,6 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 if eff_arg_nd > 0:
                     // Mark the arg as consumed so subsequent uses are caught.
                     self.mark_moved_if_consumed(eff_arg_nd)
-                    let anode_kind = self.ast.kind(eff_arg_nd)
-                    if anode_kind != NodeKind.NK_COPY_ARG and anode_kind != NodeKind.NK_MOVE_ARG:
-                        let eff_ty = if arg_ty != 0: arg_ty else: expected_ty
-                        if self.is_copy(eff_ty) == 0:
-                            self.emit_error("non-Copy argument passed to a function that consumes or escapes it; use 'move x' or 'copy x'", eff_arg_nd)
             // escape_view: move/copy is forbidden because they invalidate the view's origin
             if (param_eff & EFF_ESCAPE_VIEW) != 0:
                 let ev_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
@@ -11222,6 +11218,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 let recv_sym = self.ast.get_data0(expr)
                 if self.scope_has(recv_sym) != 0:
                     self.scope_set_state(recv_sym, VarState.MOVED)
+                    self.note_param_effect(recv_sym, EFF_CONSUME)
         else if type_name_sym != 0 and self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:
             // §15.6 — view-liveness for builtin mutating methods (push, pop,
             // insert, etc.). The earlier hardcoded path already rejected
@@ -13567,6 +13564,7 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
                         f"[move] sym={name} tid={tid} resolved={resolved as i32} kind={self.get_type_kind(resolved)}"
                     )
                 self.scope_set_state(sym, VarState.MOVED)
+                self.note_param_effect(sym, EFF_CONSUME)
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         self.mark_moved_if_consumed(self.ast.get_data0(node))
     // copy: source remains valid — do not mark as consumed.

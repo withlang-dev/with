@@ -63,6 +63,48 @@ fn project_config_default -> ProjectConfig:
         strict_effects: false,
     }
 
+fn project_config_clone_str(s: str) -> str:
+    if s.len() == 0:
+        return ""
+    runtime_str_clone(s)
+
+fn project_config_clone_str_vec(values: &Vec[str]) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    for i in 0..values.len() as i32:
+        out.push(project_config_clone_str(values.get(i as i64)))
+    out
+
+pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
+    ProjectConfig {
+        root_dir: project_config_clone_str(cfg.root_dir),
+        manifest_path: project_config_clone_str(cfg.manifest_path),
+        manifest_error: project_config_clone_str(cfg.manifest_error),
+        package_name: project_config_clone_str(cfg.package_name),
+        package_version: project_config_clone_str(cfg.package_version),
+        c_import_include_paths: project_config_clone_str_vec(&cfg.c_import_include_paths),
+        c_import_defines: project_config_clone_str_vec(&cfg.c_import_defines),
+        link_libs: project_config_clone_str_vec(&cfg.link_libs),
+        link_search_paths: project_config_clone_str_vec(&cfg.link_search_paths),
+        dep_link_libs: project_config_clone_str_vec(&cfg.dep_link_libs),
+        dep_link_args: project_config_clone_str_vec(&cfg.dep_link_args),
+        dep_names: project_config_clone_str_vec(&cfg.dep_names),
+        dep_constraints: project_config_clone_str_vec(&cfg.dep_constraints),
+        c_dep_metadata_names: project_config_clone_str_vec(&cfg.c_dep_metadata_names),
+        manual_c_dep_names: project_config_clone_str_vec(&cfg.manual_c_dep_names),
+        feature_default: project_config_clone_str_vec(&cfg.feature_default),
+        feature_names: project_config_clone_str_vec(&cfg.feature_names),
+        feature_values: project_config_clone_str_vec(&cfg.feature_values),
+        target_default: project_config_clone_str(cfg.target_default),
+        runtime_fiber_stack_size: cfg.runtime_fiber_stack_size,
+        runtime_fiber_pool_size: cfg.runtime_fiber_pool_size,
+        copy_warn_threshold: cfg.copy_warn_threshold,
+        no_std: cfg.no_std,
+        alloc_mode: cfg.alloc_mode,
+        runtime_available: cfg.runtime_available,
+        overflow_mode: cfg.overflow_mode,
+        strict_effects: cfg.strict_effects,
+    }
+
 fn project_config_file_exists(path: str) -> bool:
     runtime_read_file(path).len() > 0
 

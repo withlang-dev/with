@@ -6,6 +6,7 @@ extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_len(s: str) -> i64
 extern fn with_str_byte_at(s: str, index: i64) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
+extern fn with_str_clone(s: str) -> str
 
 use Overflow
 
@@ -111,6 +112,39 @@ pub fn build_command_options_default -> BuildCommandOptions:
         defines: Vec.new(),
         link_libs: Vec.new(),
         compiler_hooks_enabled: true,
+    }
+
+pub fn driver_clone_str(s: str) -> str:
+    if s.len() == 0:
+        return ""
+    with_str_clone(s)
+
+pub fn driver_clone_str_vec(values: &Vec[str]) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    for i in 0..values.len() as i32:
+        out.push(driver_clone_str(values.get(i as i64)))
+    out
+
+pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOptions:
+    BuildCommandOptions {
+        source_path: driver_clone_str(base.source_path),
+        output_path: driver_clone_str(base.output_path),
+        output_kind: base.output_kind,
+        opt_level: base.opt_level,
+        debug_info: base.debug_info,
+        no_std: base.no_std,
+        alloc_mode: base.alloc_mode,
+        runtime_available: base.runtime_available,
+        prelude_mode: base.prelude_mode,
+        overflow_mode: base.overflow_mode,
+        deterministic: base.deterministic,
+        strict_effects: base.strict_effects,
+        target_kind: base.target_kind,
+        target_explicit: base.target_explicit,
+        include_paths: driver_clone_str_vec(&base.include_paths),
+        defines: driver_clone_str_vec(&base.defines),
+        link_libs: driver_clone_str_vec(&base.link_libs),
+        compiler_hooks_enabled: base.compiler_hooks_enabled,
     }
 
 pub fn build_graph_command_options_default -> BuildGraphCommandOptions:
