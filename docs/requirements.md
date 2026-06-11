@@ -11269,7 +11269,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
 
 ### §18.6 Standard Library Design
 
-- [x] `18.6.1.1` **The standard library is layered.** — impl: [#476](https://github.com/withlang-dev/with/issues/476)
+- [x] `18.6.1.1` **The standard library is layered.**
   - Requirement: The standard library is layered.
   - Source: `§18.6 L9924-L9926`
   - Related spec refs: none
@@ -11289,11 +11289,11 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: The mechanism by which the standard library itself accesses platform APIs.
   - Source: `§18.6 L9928-L9929`
   - Related spec refs: none
-- [x] `18.6.1.6` **Layer 1: std.os — thin safe wrappers around platform APIs (libc, POSIX, Win...** — impl: [#476](https://github.com/withlang-dev/with/issues/476)
+- [x] `18.6.1.6` **Layer 1: std.os — thin safe wrappers around platform APIs (libc, POSIX, Win...**
   - Requirement: **Layer 1: `std.os`** — thin safe wrappers around platform APIs (libc, POSIX, Win32).
   - Source: `§18.6 L9931-L9933`
   - Related spec refs: none
-- [x] `18.6.1.7` **Written using c_import internally.** — impl: [#476](https://github.com/withlang-dev/with/issues/476)
+- [x] `18.6.1.7` **Written using c_import internally.**
   - Requirement: Written using `c_import` internally.
   - Source: `§18.6 L9931-L9933`
   - Related spec refs: none

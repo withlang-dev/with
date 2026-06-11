@@ -832,6 +832,20 @@ WITH=$PWD/out/bin/with ./out/release/bin/with build :test
 WITH=$PWD/out/bin/with ./out/release/bin/with build :test-green
 ```
 
+Issue #476 is implemented locally after #424: `lib/std/os.w` now provides the
+Layer 1 platform wrapper boundary, including portable wrappers over the
+compiler-owned platform ABI plus explicit POSIX c_import wrappers. Focused
+and full verification passed with:
+
+```sh
+WITH=$PWD/out/bin/with ./out/bin/with build
+WITH=$PWD/out/bin/with ./out/release/bin/with test test/behavior/behav_std_os.w
+python3 scripts/check-spec-inventory.py
+WITH=$PWD/out/bin/with ./out/release/bin/with build :fixpoint
+WITH=$PWD/out/bin/with ./out/release/bin/with build :test
+WITH=$PWD/out/bin/with ./out/release/bin/with build :test-green
+```
+
 At the time of this update, Phase F is complete. The Phase F code changes
 passed the standard verification sequence:
 

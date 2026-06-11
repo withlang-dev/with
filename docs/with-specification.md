@@ -9952,6 +9952,7 @@ what users import.
 
 | Module | Purpose | Replaces |
 |--------|---------|----------|
+| `std.os` | Layer-1 thin safe platform wrappers | libc, POSIX, Win32 |
 | `std.io` | I/O primitives, Reader/Writer traits, buffered streams | `stdio.h` |
 | `std.fs` | File system operations | `unistd.h`, `dirent.h`, `sys/stat.h` |
 | `std.time` | Clocks, durations, sleep | `time.h`, `sys/time.h` |

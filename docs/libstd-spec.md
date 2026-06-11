@@ -45,6 +45,7 @@ spec does not redefine them.
 | `process` | args, env, set_env, exit_code, pid, run, Command |
 | `sys` | cpu_count, total_memory, page_size, memory_bandwidth |
 | `sysinfo` | os, arch, hostname |
+| `os` | Layer-1 platform wrapper boundary: os, arch, hostname, process_id, env, set_env, path_exists |
 | `signal` | sigint, sigterm, sigkill, raise_signal |
 | `random` | xorshift64 PRNG — seed, next_i32, range_i32, chance |
 | `time` | Duration, now, now_ns, sleep_secs, async sleep |
