@@ -11,12 +11,12 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 2 parser/control-flow work is in progress. #461, #443, #445, #448, and
-#447 are implemented, pushed, and closed. Label declarations now require a
-statement boundary (line start, `{`, `;`, or another label), while
-`goto`/`break`/`continue` label operands remain unaffected. Full `with build`,
-`with build :fixpoint`, `with build :test`, and `with build :test-green`
-passed on 2026-06-11 for #447.
+Phase 2 parser/control-flow work is in progress. #461, #443, #445, #448,
+#447, and #462 are implemented, pushed, and closed. The one-liner semicolon
+rewrite now preserves semicolons inside lexer tokens and balanced delimiter
+groups while rewriting only top-level one-liner statement separators. Full
+`with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-11 for #462.
 
 #347, #356, #358, and the first #357 safety slice are implemented.
 `c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:

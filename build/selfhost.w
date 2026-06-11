@@ -584,6 +584,15 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-semicolon-string", bs_one_liner_args("-e", "print(\"a;b\")"), "a;b")
     if rc != 0: return rc
 
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-semicolon-array", bs_one_liner_args("-e", "let xs: [i32; 4] = [7; 4]; print(f\"{xs[2]}\")"), "7")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-semicolon-char", bs_one_liner_args("-e", "print(f\"{';'}\")"), "59")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-semicolon-brace", bs_one_liner_args("-e", "if true { print(\"yes\"); print(\"also\") }"), "yes\nalso")
+    if rc != 0: return rc
+
     args = Vec.new()
     args |> push("-e")
     args |> push("for a in args: print(a)")
@@ -596,10 +605,19 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-n", bs_one_liner_args("-n", "print(f\"{nr}: {line}\")"), "a\nb\n", "1: a\n2: b")
     if rc != 0: return rc
 
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-n-semicolon", bs_one_liner_args("-n", "let upper = line.upper(); print(upper)"), "a\nb\n", "A\nB")
+    if rc != 0: return rc
+
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p", bs_one_liner_args("-p", "line = line.upper()"), "a\r\nb\n", "A\nB")
     if rc != 0: return rc
 
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p-semicolon", bs_one_liner_args("-p", "line = line.upper(); line = line ++ \"!\""), "a\n", "A!")
+    if rc != 0: return rc
+
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-regex-numbered", bs_one_liner_args("-n", "if line =~ /error (\\d+)/: print($1)"), "error 42\n", "42")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-regex-semicolon", bs_one_liner_args("-n", "if line =~ /a;b/: print(\"hit\")"), "a;b\nab\n", "hit")
     if rc != 0: return rc
 
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-regex-named", bs_one_liner_args("-n", "if line =~ /email=(?<email>\\S+)/: print($email)"), "email=a@b\n", "a@b")
@@ -638,6 +656,12 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     if diag_e.rc == 0:
         return bs_fail(ctx, "one-liner malformed -e unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_e.stderr, "<cli -e #1>:1:9", "one_liners")
+    if rc != 0: return rc
+
+    let diag_semicolon = bs_run_cli_capture(ctx, compiler_path, "one-liner-diag-preserved-semicolon", bs_one_liner_args("-e", "let xs: [i32; 2] = [1; 2]; let bad = "), 120000)
+    if diag_semicolon.rc == 0:
+        return bs_fail(ctx, "one-liner malformed semicolon mapping unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, diag_semicolon.stderr, "<cli -e #1>:2:", "one_liners")
     if rc != 0: return rc
 
     let diag_n = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n", bs_one_liner_args("-n", "if line =~ /x/: print($1)"), "x\n", 120000)

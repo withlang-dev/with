@@ -456,11 +456,19 @@ fn cli_rewrite_semicolons(code: str) -> str:
     let tokens = lexer.tokenize()
     var out = StringBuilder.with_capacity(code.len())
     var cursor = 0
+    var depth = 0
     for i in 0..tokens.len():
         let tag = tokens.get_tag(i)
         if tag == TokenKind.TK_EOF:
             break
-        if tag != TokenKind.TK_SEMICOLON:
+        if tag == TokenKind.TK_L_PAREN or tag == TokenKind.TK_L_BRACKET or tag == TokenKind.TK_L_BRACE:
+            depth = depth + 1
+            continue
+        if tag == TokenKind.TK_R_PAREN or tag == TokenKind.TK_R_BRACKET or tag == TokenKind.TK_R_BRACE:
+            if depth > 0:
+                depth = depth - 1
+            continue
+        if tag != TokenKind.TK_SEMICOLON or depth != 0:
             continue
         let start = tokens.get_start(i)
         let end = tokens.get_end(i)

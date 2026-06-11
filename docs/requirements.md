@@ -11165,7 +11165,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: The semicolon pass is lexical.
   - Source: `§18.5b.5 L9842-L9845`
   - Related spec refs: none
-- [x] `18.5.3.34` **It must not split semicolons inside string literals, regex literals, charac...** — impl: [#462](https://github.com/withlang-dev/with/issues/462)
+- [x] `18.5.3.34` **It must not split semicolons inside string literals, regex literals, charac...**
   - Requirement: It must not split semicolons inside string literals, regex literals, character literals, or balanced delimiter groups.
   - Source: `§18.5b.5 L9842-L9845`
   - Related spec refs: none
