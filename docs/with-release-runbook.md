@@ -211,7 +211,8 @@ binaries, `install.sh`, or platform SDK archives.
 work. Do not treat it as a normal release gate unless the release scope
 explicitly includes emit-C self-hosting changes.
 
-Run the release UAT gate before publishing any release assets:
+After packaging the platform binary asset locally, run the release UAT gate
+before uploading or publishing any release assets:
 
 ```sh
 with build :release-uat
@@ -219,6 +220,18 @@ with build :release-uat
 
 `:release-uat` is mandatory for every release. It includes:
 
+- `:release-artifact-smoke-uat`, which runs the platform-named release binary
+  asset (`out/release/with-darwin-aarch64`, `with-linux-x86_64`, or
+  `with-windows-x86_64.exe`) through `version`, `-e`, and `run file.w`.
+- `:release-fresh-project-uat`, which validates a clean `with init` project can
+  run with the release asset.
+- `:release-migrate-uat`, which validates a small C source migrates, checks,
+  and runs.
+- `:release-zlib-uat`, which validates the non-GUI C package path:
+  `with init`, `with get c.zlib`, `use c_import("zlib.h")`, zlib symbol use,
+  and `with run`.
+- `:release-install-layout-uat`, which copies the platform asset into a
+  local install-style `bin/with` layout and runs it from there.
 - `:release-raylib-spiral-uat`, which must run on a GUI-capable Darwin release
   host. It validates the user-facing C interop happy path end to end:
   `with init`, `with get c.raylib`, writing the spiral program to the
@@ -233,8 +246,9 @@ with build :release-uat
   passing.
 
 If any UAT target fails, if the raylib window cannot be created, if the
-framebuffer check does not see the spiral, or if any one-liner prints different
-stdout than expected, the release fails and must not be published.
+framebuffer check does not see the spiral, if zlib does not import/link/run, or
+if any one-liner prints different stdout than expected, the release fails and
+must not be published.
 
 ### Darwin Release Host
 
@@ -269,9 +283,9 @@ WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :fixpoint
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test-green
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :last-green
-WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :release-uat
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with version
 WITH_VERSION=$WITH_VERSION scripts/package-darwin-aarch64.sh
+WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :release-uat
 WITH_VERSION=$WITH_VERSION scripts/package-llvm-sdk.sh
 ```
 

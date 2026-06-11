@@ -1107,6 +1107,10 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     if name.byte_at(0) == 95:
         return ""
 
+    if ci_is_system_prelude_collision_decl(session, idx, name):
+        ci_record_omitted_symbol(name, "system declaration collides with With prelude")
+        return ""
+
     // Skip already-emitted names (dedup across c_import calls)
     if with_cimport_is_name_emitted(name) != 0:
         return ""
@@ -4560,49 +4564,67 @@ fn ci_map_base_type(name: str) -> str:
 // ── Reserved word escaping ──────────────────────────────────
 
 fn ci_escape_reserved(name: str) -> str:
-    if name == "fn": return "fn_"
-    if name == "type": return "type_"
-    if name == "let": return "let_"
-    if name == "use": return "use_"
-    if name == "match": return "match_"
-    if name == "for": return "for_"
-    if name == "while": return "while_"
-    if name == "if": return "if_"
-    if name == "else": return "else_"
-    if name == "return": return "return_"
-    if name == "true": return "true_"
-    if name == "false": return "false_"
-    if name == "mut": return "mut_"
-    if name == "pub": return "pub_"
-    if name == "in": return "in_"
-    if name == "self": return "self_"
-    if name == "extern": return "extern_"
-    if name == "const": return "const_"
-    if name == "select": return "select_"
-    if name == "import": return "import_"
-    if name == "as": return "as_"
-    if name == "is": return "is_"
-    if name == "not": return "not_"
     if name == "and": return "and_"
-    if name == "or": return "or_"
-    if name == "break": return "break_"
-    if name == "continue": return "continue_"
-    if name == "var": return "var_"
-    if name == "comptime": return "comptime_"
-    if name == "where": return "where_"
-    if name == "trait": return "trait_"
-    if name == "impl": return "impl_"
-    if name == "enum": return "enum_"
-    if name == "struct": return "struct_"
-    if name == "defer": return "defer_"
+    if name == "as": return "as_"
+    if name == "asm": return "asm_"
     if name == "async": return "async_"
     if name == "await": return "await_"
-    if name == "spawn": return "spawn_"
-    if name == "move": return "move_"
-    if name == "yield": return "yield_"
-    if name == "gen": return "gen_"
-    if name == "with": return "with_"
+    if name == "break": return "break_"
+    if name == "c_import": return "c_import_"
+    if name == "comptime": return "comptime_"
+    if name == "const": return "const_"
+    if name == "continue": return "continue_"
+    if name == "copy": return "copy_"
+    if name == "defer": return "defer_"
+    if name == "do": return "do_"
+    if name == "dyn": return "dyn_"
+    if name == "else": return "else_"
+    if name == "enum": return "enum_"
+    if name == "ephemeral": return "ephemeral_"
+    if name == "errdefer": return "errdefer_"
     if name == "error": return "error_"
+    if name == "extend": return "extend_"
+    if name == "extern": return "extern_"
+    if name == "false": return "false_"
+    if name == "fn": return "fn_"
+    if name == "for": return "for_"
+    if name == "gen": return "gen_"
+    if name == "global": return "global_"
+    if name == "goto": return "goto_"
+    if name == "if": return "if_"
+    if name == "impl": return "impl_"
+    if name == "in": return "in_"
+    if name == "import": return "import_"
+    if name == "is": return "is_"
+    if name == "it": return "it_"
+    if name == "let": return "let_"
+    if name == "loop": return "loop_"
+    if name == "match": return "match_"
+    if name == "module": return "module_"
+    if name == "move": return "move_"
+    if name == "mut": return "mut_"
+    if name == "no_suspend": return "no_suspend_"
+    if name == "not": return "not_"
+    if name == "null": return "null_"
+    if name == "opaque": return "opaque_"
+    if name == "or": return "or_"
+    if name == "pub": return "pub_"
+    if name == "return": return "return_"
+    if name == "select": return "select_"
+    if name == "self": return "self_"
+    if name == "spawn": return "spawn_"
+    if name == "struct": return "struct_"
+    if name == "trait": return "trait_"
+    if name == "true": return "true_"
+    if name == "type": return "type_"
+    if name == "union": return "union_"
+    if name == "unsafe": return "unsafe_"
+    if name == "use": return "use_"
+    if name == "var": return "var_"
+    if name == "where": return "where_"
+    if name == "while": return "while_"
+    if name == "with": return "with_"
+    if name == "yield": return "yield_"
     name
 
 // ── String helpers ──────────────────────────────────────────
@@ -13537,6 +13559,23 @@ fn ci_libc_kind_name(kind: i32) -> str:
     if kind == CI_LIBC_KIND_VAR: return "variable"
     if kind == CI_LIBC_KIND_TYPE: return "type"
     "symbol"
+
+fn ci_is_prelude_surface_name(name: str) -> bool:
+    if name == "c_void": return true
+    if name == "print" or name == "eprint": return true
+    if name == "write" or name == "ewrite": return true
+    if name == "print_i32" or name == "print_i64" or name == "print_bool": return true
+    if name == "assert" or name == "require" or name == "check": return true
+    if name == "assert_eq" or name == "assert_ne" or name == "assert_matches_failed": return true
+    if name == "drop" or name == "int_to_string": return true
+    false
+
+fn ci_is_system_prelude_collision_decl(session: i64, idx: i32, name: str) -> bool:
+    if not ci_is_prelude_surface_name(name):
+        return false
+    let cursor = with_cimport_decl_cursor(session, idx)
+    let loc = with_ci_cursor_location(session, cursor)
+    loc.len() > 0 and ci_is_system_path(loc)
 
 fn ci_note_filtered_system_symbol_ref(session: i64, name: str, kind: i32) -> bool:
     if name.len() == 0:

@@ -219,6 +219,17 @@ fn stage_compiler_obj(name: str) -> str:
 fn release_compiler_bin(name: str) -> str:
     host_bin("out/release/bin/" ++ name)
 
+fn release_platform_asset_bin() -> str:
+    let host_os = os()
+    let host_arch = arch()
+    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "out/release/with-darwin-aarch64"
+    if host_os == "Linux" and host_arch == "x86_64":
+        return "out/release/with-linux-x86_64"
+    if host_os == "Windows" and host_arch == "x86_64":
+        return "out/release/with-windows-x86_64.exe"
+    release_compiler_bin("with")
+
 fn host_runtime_spec() -> HostRuntimeSpec:
     if os() == "Linux" and arch() == "x86_64":
         return HostRuntimeSpec {
@@ -960,9 +971,45 @@ pub fn build(ctx: BuildCtx) -> Build:
     require_last_green = require_last_green.write_scope("out/command/require-last-green")
     out = out.add_target(require_last_green)
 
+    var release_artifact_smoke_uat = target_new(.Action, "release-artifact-smoke-uat", "").output("out/release-uat/artifact-smoke.passed")
+    release_artifact_smoke_uat.action = run_release_artifact_smoke_uat_action
+    release_artifact_smoke_uat = release_artifact_smoke_uat.input(release_platform_asset_bin())
+    release_artifact_smoke_uat = release_artifact_smoke_uat.write_scope("out/release-uat")
+    release_artifact_smoke_uat = release_artifact_smoke_uat.dep("require-last-green")
+    out = out.add_target(release_artifact_smoke_uat)
+
+    var release_fresh_project_uat = target_new(.Action, "release-fresh-project-uat", "").output("out/release-uat/fresh-project.passed")
+    release_fresh_project_uat.action = run_release_fresh_project_uat_action
+    release_fresh_project_uat = release_fresh_project_uat.input(release_platform_asset_bin())
+    release_fresh_project_uat = release_fresh_project_uat.write_scope("out/release-uat")
+    release_fresh_project_uat = release_fresh_project_uat.dep("require-last-green")
+    out = out.add_target(release_fresh_project_uat)
+
+    var release_migrate_uat = target_new(.Action, "release-migrate-uat", "").output("out/release-uat/migrate.passed")
+    release_migrate_uat.action = run_release_migrate_uat_action
+    release_migrate_uat = release_migrate_uat.input(release_platform_asset_bin())
+    release_migrate_uat = release_migrate_uat.write_scope("out/release-uat")
+    release_migrate_uat = release_migrate_uat.dep("require-last-green")
+    out = out.add_target(release_migrate_uat)
+
+    var release_zlib_uat = target_new(.Action, "release-zlib-uat", "").output("out/release-uat/zlib.passed")
+    release_zlib_uat.action = run_release_zlib_uat_action
+    release_zlib_uat = release_zlib_uat.input(release_platform_asset_bin())
+    release_zlib_uat = release_zlib_uat.write_scope("out/release-uat")
+    release_zlib_uat = release_zlib_uat.allow_network()
+    release_zlib_uat = release_zlib_uat.dep("require-last-green")
+    out = out.add_target(release_zlib_uat)
+
+    var release_install_layout_uat = target_new(.Action, "release-install-layout-uat", "").output("out/release-uat/install-layout.passed")
+    release_install_layout_uat.action = run_release_install_layout_uat_action
+    release_install_layout_uat = release_install_layout_uat.input(release_platform_asset_bin())
+    release_install_layout_uat = release_install_layout_uat.write_scope("out/release-uat")
+    release_install_layout_uat = release_install_layout_uat.dep("require-last-green")
+    out = out.add_target(release_install_layout_uat)
+
     var release_raylib_spiral_uat = target_new(.Action, "release-raylib-spiral-uat", "").output("out/release-uat/raylib-spiral.passed")
     release_raylib_spiral_uat.action = run_release_raylib_spiral_uat_action
-    release_raylib_spiral_uat = release_raylib_spiral_uat.input(release_compiler_bin("with"))
+    release_raylib_spiral_uat = release_raylib_spiral_uat.input(release_platform_asset_bin())
     release_raylib_spiral_uat = release_raylib_spiral_uat.write_scope("out/release-uat")
     release_raylib_spiral_uat = release_raylib_spiral_uat.allow_network()
     release_raylib_spiral_uat = release_raylib_spiral_uat.dep("require-last-green")
@@ -970,12 +1017,17 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var release_one_liner_uat = target_new(.Action, "release-one-liner-uat", "").output("out/release-uat/one-liners.passed")
     release_one_liner_uat.action = run_release_one_liner_uat_action
-    release_one_liner_uat = release_one_liner_uat.input(release_compiler_bin("with"))
+    release_one_liner_uat = release_one_liner_uat.input(release_platform_asset_bin())
     release_one_liner_uat = release_one_liner_uat.write_scope("out/release-uat")
     release_one_liner_uat = release_one_liner_uat.dep("require-last-green")
     out = out.add_target(release_one_liner_uat)
 
     var release_uat = target_new(.Group, "release-uat", "")
+    release_uat = release_uat.dep("release-artifact-smoke-uat")
+    release_uat = release_uat.dep("release-fresh-project-uat")
+    release_uat = release_uat.dep("release-migrate-uat")
+    release_uat = release_uat.dep("release-zlib-uat")
+    release_uat = release_uat.dep("release-install-layout-uat")
     release_uat = release_uat.dep("release-raylib-spiral-uat")
     release_uat = release_uat.dep("release-one-liner-uat")
     out = out.add_target(release_uat)

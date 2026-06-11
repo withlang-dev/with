@@ -85,6 +85,17 @@ fn ruat_compiler_input(ctx: ActionCtx) -> str:
         return ""
     ruat_abs(ctx.project_info().project_root(), inputs.get(0))
 
+fn ruat_compiler_input_rel(ctx: ActionCtx) -> str:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return ""
+    inputs.get(0)
+
+fn ruat_host_exe_suffix() -> str:
+    if os() == "Windows":
+        return ".exe"
+    ""
+
 fn ruat_argv1(compiler: str, a: str) -> Vec[str]:
     let args: Vec[str] = Vec.new()
     args.push(compiler)
@@ -96,6 +107,11 @@ fn ruat_argv2(compiler: str, a: str, b: str) -> Vec[str]:
     args.push(compiler)
     args.push(a)
     args.push(b)
+    args
+
+fn ruat_argv3(compiler: str, a: str, b: str, c: str) -> Vec[str]:
+    let args = ruat_argv2(compiler, a, b)
+    args.push(c)
     args
 
 fn ruat_capture_path(root: str, dir: str, label: str, suffix: str) -> str:
@@ -140,11 +156,196 @@ fn ruat_expect_stdout(ctx: ActionCtx, result: UatRunResult, expected: str, label
         return 0
     ruat_fail(ctx, "stdout mismatch for " ++ label ++ "\nexpected:\n" ++ expected ++ "\nactual:\n" ++ actual)
 
+fn ruat_expect_stdout_contains(ctx: ActionCtx, result: UatRunResult, expected: str, label: str) -> i32:
+    let rc = ruat_expect_success(ctx, result, label)
+    if rc != 0:
+        return rc
+    if result.stdout.contains(expected):
+        return 0
+    ruat_fail(ctx, "stdout for " ++ label ++ " did not contain '" ++ expected ++ "'\nstdout:\n" ++ result.stdout ++ "\nstderr:\n" ++ result.stderr)
+
+fn ruat_expect_file_contains(ctx: ActionCtx, path: str, expected: str, label: str) -> i32:
+    if not ctx.fs().exists(path):
+        return ruat_fail(ctx, label ++ " did not create " ++ path)
+    let text = ctx.fs().read_text(path)
+    if text.contains(expected):
+        return 0
+    ruat_fail(ctx, label ++ " output did not contain '" ++ expected ++ "'\nfile:\n" ++ text)
+
 fn ruat_sequence_1_to_100() -> str:
     var out = ""
     for i in 1..101:
         out = out ++ f"{i}\n"
     out
+
+fn ruat_tiny_c_source() -> str:
+    "#define SCALE 2\n\n" ++
+    "struct Pair { int a; int b; };\n\n" ++
+    "int add_pair(struct Pair p) {\n" ++
+    "    return (p.a + p.b) * SCALE;\n" ++
+    "}\n\n" ++
+    "int main(void) {\n" ++
+    "    struct Pair p = { 20, 1 };\n" ++
+    "    return add_pair(p) == 42 ? 0 : 1;\n" ++
+    "}\n"
+
+fn ruat_zlib_program() -> str:
+    "use c_import(\"zlib.h\")\n\n" ++
+    "fn main:\n" ++
+    "    let bound = compressBound(12 as uLong)\n" ++
+    "    if bound <= 12 as uLong:\n" ++
+    "        print(\"zlib UAT failed\")\n" ++
+    "        return 1\n" ++
+    "    write(\"zlib UAT passed\\n\")\n"
+
+pub fn run_release_artifact_smoke_uat_action(ctx: ActionCtx) -> i32:
+    let compiler = ruat_compiler_input(ctx)
+    if compiler.len() == 0:
+        return ruat_fail(ctx, "missing compiler input")
+
+    let workdir = "out/release-uat/artifact-smoke"
+    var rc = ruat_prepare_clean_dir(ctx, workdir)
+    if rc != 0:
+        return rc
+
+    rc = ruat_expect_stdout_contains(ctx, ruat_run_capture(ctx, workdir, "version", ruat_argv1(compiler, "version"), 120000), "with ", "release artifact version")
+    if rc != 0:
+        return rc
+
+    rc = ruat_expect_stdout(ctx, ruat_run_capture(ctx, workdir, "eval", ruat_argv2(compiler, "-e", "print(\"artifact smoke\")"), 120000), "artifact smoke", "release artifact -e")
+    if rc != 0:
+        return rc
+
+    if ctx.fs().write_text(ruat_join(workdir, "smoke.w"), "fn main:\n    print(\"artifact run\")\n") != 0:
+        return ruat_fail(ctx, "could not write artifact smoke source")
+    rc = ruat_expect_stdout(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "run-file", ruat_argv2(compiler, "run", "smoke.w"), 120000), "artifact run", "release artifact run file")
+    if rc != 0:
+        return rc
+
+    ruat_write_stamp(ctx)
+
+pub fn run_release_fresh_project_uat_action(ctx: ActionCtx) -> i32:
+    let compiler = ruat_compiler_input(ctx)
+    if compiler.len() == 0:
+        return ruat_fail(ctx, "missing compiler input")
+
+    let workdir = "out/release-uat/fresh-project"
+    var rc = ruat_prepare_clean_dir(ctx, workdir)
+    if rc != 0:
+        return rc
+
+    let init_args: Vec[str] = Vec.new()
+    init_args.push(compiler)
+    init_args.push("init")
+    init_args.push(".")
+    init_args.push("--name")
+    init_args.push("fresh_project_uat")
+    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "init", init_args, 120000), "with init fresh project")
+    if rc != 0:
+        return rc
+
+    let source = "fn main:\n    print(\"fresh project UAT passed\")\n"
+    if ctx.fs().write_text(ruat_join(workdir, "src/main.w"), source) != 0:
+        return ruat_fail(ctx, "could not write fresh project source")
+
+    rc = ruat_expect_stdout(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "run", ruat_argv1(compiler, "run"), 120000), "fresh project UAT passed", "fresh project with run")
+    if rc != 0:
+        return rc
+
+    ruat_write_stamp(ctx)
+
+pub fn run_release_migrate_uat_action(ctx: ActionCtx) -> i32:
+    let compiler = ruat_compiler_input(ctx)
+    if compiler.len() == 0:
+        return ruat_fail(ctx, "missing compiler input")
+
+    let workdir = "out/release-uat/migrate"
+    var rc = ruat_prepare_clean_dir(ctx, workdir)
+    if rc != 0:
+        return rc
+
+    let c_path = ruat_join(workdir, "tiny.c")
+    let w_path = ruat_join(workdir, "tiny.w")
+    if ctx.fs().write_text(c_path, ruat_tiny_c_source()) != 0:
+        return ruat_fail(ctx, "could not write C migration fixture")
+
+    let migrate_args: Vec[str] = Vec.new()
+    migrate_args.push(compiler)
+    migrate_args.push("migrate")
+    migrate_args.push("tiny.c")
+    migrate_args.push("-o")
+    migrate_args.push("tiny.w")
+    migrate_args.push("--no-c-export")
+    migrate_args.push("--prefer-colon")
+    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "migrate", migrate_args, 120000), "with migrate tiny.c")
+    if rc != 0:
+        return rc
+
+    rc = ruat_expect_file_contains(ctx, w_path, "fn add_pair", "with migrate tiny.c")
+    if rc != 0:
+        return rc
+    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "check", ruat_argv2(compiler, "check", "tiny.w"), 120000), "with check migrated tiny.w")
+    if rc != 0:
+        return rc
+    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "run", ruat_argv2(compiler, "run", "tiny.w"), 120000), "with run migrated tiny.w")
+    if rc != 0:
+        return rc
+
+    ruat_write_stamp(ctx)
+
+pub fn run_release_zlib_uat_action(ctx: ActionCtx) -> i32:
+    let compiler = ruat_compiler_input(ctx)
+    if compiler.len() == 0:
+        return ruat_fail(ctx, "missing compiler input")
+
+    let workdir = "out/release-uat/zlib-project"
+    var rc = ruat_prepare_clean_dir(ctx, workdir)
+    if rc != 0:
+        return rc
+
+    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "init", ruat_argv2(compiler, "init", "."), 120000), "with init zlib project")
+    if rc != 0:
+        return rc
+
+    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "get-zlib", ruat_argv2(compiler, "get", "c.zlib"), 600000), "with get c.zlib")
+    if rc != 0:
+        return rc
+
+    if ctx.fs().write_text(ruat_join(workdir, "src/main.w"), ruat_zlib_program()) != 0:
+        return ruat_fail(ctx, "could not write zlib UAT source")
+
+    rc = ruat_expect_stdout(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "run", ruat_argv1(compiler, "run"), 120000), "zlib UAT passed", "with run zlib")
+    if rc != 0:
+        return rc
+
+    ruat_write_stamp(ctx)
+
+pub fn run_release_install_layout_uat_action(ctx: ActionCtx) -> i32:
+    let compiler = ruat_compiler_input(ctx)
+    let compiler_rel = ruat_compiler_input_rel(ctx)
+    if compiler.len() == 0 or compiler_rel.len() == 0:
+        return ruat_fail(ctx, "missing compiler input")
+
+    let workdir = "out/release-uat/install-layout"
+    var rc = ruat_prepare_clean_dir(ctx, workdir)
+    if rc != 0:
+        return rc
+
+    let installed_rel = ruat_join(workdir, "bin/with" ++ ruat_host_exe_suffix())
+    if ctx.fs().copy_file(compiler_rel, installed_rel) != 0:
+        return ruat_fail(ctx, "could not copy compiler into install-layout bin")
+    if os() != "Windows" and ctx.fs().chmod(installed_rel, 0o755) != 0:
+        return ruat_fail(ctx, "could not chmod install-layout compiler")
+
+    let installed = ruat_abs(ctx.project_info().project_root(), installed_rel)
+    rc = ruat_expect_stdout_contains(ctx, ruat_run_capture(ctx, workdir, "version", ruat_argv1(installed, "version"), 120000), "with ", "installed compiler version")
+    if rc != 0:
+        return rc
+    rc = ruat_expect_stdout(ctx, ruat_run_capture(ctx, workdir, "eval", ruat_argv2(installed, "-e", "print(\"installed UAT passed\")"), 120000), "installed UAT passed", "installed compiler -e")
+    if rc != 0:
+        return rc
+
+    ruat_write_stamp(ctx)
 
 fn ruat_spiral_program() -> str:
     "use c_import(\"raylib.h\")\n\n" ++
