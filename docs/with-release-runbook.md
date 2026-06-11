@@ -227,9 +227,21 @@ with build :release-uat
   run with the release asset.
 - `:release-migrate-uat`, which validates a small C source migrates, checks,
   and runs.
-- `:release-zlib-uat`, which validates the non-GUI C package path:
-  `with init`, `with get c.zlib`, `use c_import("zlib.h")`, zlib symbol use,
-  and `with run`.
+- `:release-zlib-uat`, which validates the universal non-GUI C package path:
+  `with init`, `with get c.zlib`, `use c_import("zlib.h")`, an in-memory
+  `compress`/`uncompress` round trip, `zlibVersion`, and `with run`.
+- `:release-bzip2-uat`, which validates `with get c.bzip2`,
+  `use c_import("bzlib.h")`, and an in-memory
+  `BZ2_bzBuffToBuffCompress`/`BZ2_bzBuffToBuffDecompress` round trip.
+- `:release-sqlite3-uat`, which validates `with get c.sqlite3`,
+  `use c_import("sqlite3.h")`, and an in-memory `:memory:` database
+  `CREATE TABLE`/`INSERT`/`SELECT` round trip.
+- `:release-openssl-uat`, which validates `with get c.openssl`,
+  `use c_import("openssl/evp.h")`, and SHA-256 of `"abc"` through the EVP API
+  against the standard digest bytes.
+- `:release-libcurl-uat`, which validates `with get c.libcurl`,
+  `use c_import("curl/curl.h")`, `curl_global_init`, `curl_easy_init`,
+  `curl_easy_setopt`, `curl_version_info`, and cleanup without network access.
 - `:release-install-layout-uat`, which copies the platform asset into a
   local install-style `bin/with` layout and runs it from there.
 - `:release-raylib-spiral-uat`, which must run on a GUI-capable Darwin release
@@ -246,9 +258,9 @@ with build :release-uat
   passing.
 
 If any UAT target fails, if the raylib window cannot be created, if the
-framebuffer check does not see the spiral, if zlib does not import/link/run, or
-if any one-liner prints different stdout than expected, the release fails and
-must not be published.
+framebuffer check does not see the spiral, if any required C package UAT does
+not import/link/run, or if any one-liner prints different stdout than expected,
+the release fails and must not be published.
 
 ### Darwin Release Host
 

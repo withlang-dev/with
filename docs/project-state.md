@@ -13,20 +13,25 @@ conversation context after compaction.
 
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
-C migration, zlib non-GUI C package, install-layout, raylib spiral, and
-one-liner gates. The zlib gate creates a fresh initialized project, runs
-`with get c.zlib`, writes `use c_import("zlib.h")`, calls `compressBound`, and
-also exercises the With prelude `write` after zlib's transitive POSIX headers
-are imported. The raylib gate creates a fresh initialized project, runs
-`with get c.raylib`, writes the spiral app to `src/main.w`, runs it, and fails
-if raylib framebuffer readback does not find the rendered spiral. The one-liner
-gate feeds stdin fixtures directly through `ProcessRunner` and checks exact
-stdout for the `seq 100 | with -n ...` and `cat names.txt | with -p ...` flows
-plus regex capture, numbered transform, semicolon transform, and `--` argument
-cases. Full `with build`, `with build :fixpoint`, `with build :test`,
-`with build :test-green`, `with build :last-green`, and
-`with build :release-uat` passed on 2026-06-11 for the expanded release-gate
-slice.
+C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib
+spiral, and one-liner gates. The zlib and bzip2 gates do in-memory
+compress/decompress round trips. The sqlite3 gate opens an in-memory database
+and verifies `CREATE TABLE`/`INSERT`/`SELECT`. The OpenSSL gate computes
+SHA-256 of `"abc"` through the EVP API. The libcurl gate initializes curl,
+sets an option, checks version metadata, and cleans up without network access.
+Adding these gates also fixed root c_import/package issues: Conan metadata now
+ignores OpenSSL provider modules that are not `-l` libraries, libcurl metadata
+adds its Darwin framework link requirements, and c_import now keeps C tag/type
+emission separate from value names so `struct timezone` is not hidden by the
+global `timezone` variable. The raylib gate creates a fresh initialized project,
+runs `with get c.raylib`, writes the spiral app to `src/main.w`, runs it, and
+fails if raylib framebuffer readback does not find the rendered spiral. The
+one-liner gate feeds stdin fixtures directly through `ProcessRunner` and checks
+exact stdout for the `seq 100 | with -n ...` and `cat names.txt | with -p ...`
+flows plus regex capture, numbered transform, semicolon transform, and `--`
+argument cases. Full `with build`, `with build :fixpoint`, `with build :test`,
+`with build :test-green`, `with build :last-green`, and `with build :release-uat`
+passed on 2026-06-11 for the expanded C-package gate slice.
 
 Phase 2 parser/control-flow work is in progress. #461, #443, #445, #448,
 #447, #462, #375, #382, #401, #543, and #459 are implemented, pushed, and

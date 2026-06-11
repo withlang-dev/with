@@ -506,6 +506,17 @@ fn conan_library_name_from_path(path: str) -> str:
         return name.slice(3, name.len())
     name
 
+fn conan_is_link_library_path(path: str) -> bool:
+    let base = conan_path_basename(path)
+    if base.ends_with(".lib"):
+        return true
+    if base.starts_with("lib") and base.len() > 3:
+        if base.ends_with(".a") or base.ends_with(".dylib"):
+            return true
+        if conan_find_text(base, ".so") > 0:
+            return true
+    false
+
 fn conan_scan_libraries(dep_dir: str) -> ConanLibraryScan:
     var lib_paths: Vec[str] = Vec.new()
     var libs: Vec[str] = Vec.new()
@@ -513,7 +524,7 @@ fn conan_scan_libraries(dep_dir: str) -> ConanLibraryScan:
     let files = conan_split_nonempty_lines(listing)
     for i in 0..files.len() as i32:
         let path = files.get(i as i64)
-        if path.ends_with(".a") or path.ends_with(".lib") or path.ends_with(".dylib") or conan_find_text(conan_path_basename(path), ".so") > 0:
+        if conan_is_link_library_path(path):
             let lib = conan_library_name_from_path(path)
             if lib.len() > 0:
                 libs = conan_sorted_insert_unique(move libs, lib)
@@ -563,6 +574,22 @@ fn conan_known_link_metadata(name: str, version: str, libs: Vec[str], defines: V
             out_libs = conan_sorted_insert_unique(move out_libs, "pthread")
         else if os == "Windows":
             out_libs = conan_sorted_insert_unique(move out_libs, "winmm")
+        return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
+
+    if name == "libcurl":
+        if os == "Macos":
+            out_args.push("-framework")
+            out_args.push("CoreFoundation")
+            out_args.push("-framework")
+            out_args.push("SystemConfiguration")
+        else if os == "Linux":
+            out_libs = conan_sorted_insert_unique(move out_libs, "pthread")
+            out_libs = conan_sorted_insert_unique(move out_libs, "dl")
+        else if os == "Windows":
+            out_libs = conan_sorted_insert_unique(move out_libs, "ws2_32")
+            out_libs = conan_sorted_insert_unique(move out_libs, "crypt32")
+            out_libs = conan_sorted_insert_unique(move out_libs, "wldap32")
+            out_libs = conan_sorted_insert_unique(move out_libs, "advapi32")
         return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
     if name == "xorg" and version == "system" and os == "Linux":

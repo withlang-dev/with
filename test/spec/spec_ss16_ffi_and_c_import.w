@@ -10,6 +10,10 @@ use c_import("typedef struct Hidden279 Hidden279;\nstruct Hidden279 { int value;
 use c_import("typedef int (*With299Callback)(int);\ntypedef struct With299Holder { With299Callback cb; } With299Holder;\n")
 use c_import("typedef struct WithKeywordFields { int opaque; int no_suspend; int c_import; int null; } WithKeywordFields;\n")
 use c_import("#line 1 \"/usr/include/with_fake_unistd.h\"\nlong write(int fd, const void *buf, unsigned long nbyte);\n")
+use c_import("#define WITH_U64_TOP_BIT 0x8000000000000000ULL\n")
+use c_import("typedef struct WithMacroObj WithMacroObj;\nint with_macro_ret(WithMacroObj *p);\nvoid with_macro_drop(WithMacroObj *p);\n#define WITH_MACRO_RET(p) with_macro_ret(p)\n#define WITH_MACRO_DROP(p) with_macro_drop(p)\n#define WITH_MACRO_RET_ALIAS with_macro_ret\n#define WITH_MACRO_ZERO(x) 0\n")
+use c_import("typedef int (*WithInlineCb)(int);\ntypedef struct WithInlineHolder { WithInlineCb function; } WithInlineHolder;\nstatic inline WithInlineCb with_inline_cb(const WithInlineHolder *h) { return (WithInlineCb)h->function; }\n")
+use c_import("struct WithTimeval { long tv_sec; int tv_usec; };\nextern long with_timezone;\nint with_settimeofday(const struct WithTimeval *tv, const struct with_timezone *tz);\n")
 
 extern "C" fn atoi(s: *const u8) -> i32
 
@@ -58,6 +62,13 @@ fn test_c_import_escapes_with_keyword_fields:
 fn test_c_import_system_prelude_collision_is_omitted:
     write("")
 
+fn test_c_import_unsigned_macro_top_bit_does_not_overflow_importer:
+    let value: u64 = WITH_U64_TOP_BIT
+    assert(value == 0x8000000000000000u64)
+
+fn test_c_import_function_macro_return_inference:
+    assert(WITH_MACRO_ZERO(123) == 0)
+
 fn main:
     test_c_import_functions_callable_directly()
     test_c_import_link_directive()
@@ -70,4 +81,6 @@ fn main:
     test_c_import_callback_field_uses_extern_fn_pointer()
     test_c_import_escapes_with_keyword_fields()
     test_c_import_system_prelude_collision_is_omitted()
+    test_c_import_unsigned_macro_top_bit_does_not_overflow_importer()
+    test_c_import_function_macro_return_inference()
     print("ok")

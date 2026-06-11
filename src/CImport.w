@@ -236,6 +236,59 @@ fn ci_translation_calls_raw_function(translated: str) -> bool:
         pos = pos + 1
     false
 
+fn ci_direct_call_name(translated: str) -> str:
+    let t = ci_trim(translated)
+    if t.len() == 0:
+        return ""
+    if not ci_is_c_ident_prefix(t):
+        return ""
+    let call_paren = ci_find_call_paren(t)
+    if call_paren <= 0:
+        return ""
+    let close = ci_find_matching_paren(t, call_paren)
+    if close != t.len() as i32 - 1:
+        return ""
+    t.slice(0, call_paren as i64)
+
+fn ci_lookup_c_function_return_type(session: i64, name: str) -> str:
+    if session == 0 or name.len() == 0:
+        return ""
+    let count = with_cimport_decl_count(session)
+    var i = 0
+    while i < count:
+        if with_cimport_decl_kind(session, i) == CK_FUNCTION and with_cimport_decl_name(session, i) == name:
+            if with_cimport_fn_is_noreturn(session, i) != 0:
+                return "Never"
+            let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, i))
+            if ci_starts_with(ret, "__UNSUPPORTED:"):
+                return ""
+            return ret
+        i = i + 1
+    ""
+
+fn ci_infer_macro_return_type_from_expr(type_session: i64, translated: str, known_macro_returns: str, fallback: str) -> str:
+    let cast_type = ci_infer_cast_return_type(translated)
+    if cast_type.len() > 0:
+        return cast_type
+    let call_name = ci_direct_call_name(translated)
+    if call_name.len() > 0:
+        let call_ret = ci_lookup_c_function_return_type(type_session, call_name)
+        if call_ret.len() > 0:
+            return call_ret
+        let macro_ret = ci_lookup_known(call_name, known_macro_returns)
+        if macro_ret.len() > 0:
+            return macro_ret
+    let stripped = ci_strip_parens(ci_trim(translated))
+    if ci_is_int_literal(stripped):
+        return "c_int"
+    fallback
+
+fn ci_object_macro_is_function_alias(type_session: i64, value: str) -> bool:
+    let t = ci_strip_parens(ci_trim(value))
+    if not ci_is_c_ident(t):
+        return false
+    ci_lookup_c_function_return_type(type_session, t).len() > 0
+
 fn ci_record_omitted_symbol(name: str, reason: str):
     if name.len() == 0:
         return
@@ -409,6 +462,7 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     if with_cimport_is_name_emitted("c_void") == 0:
         output.push_str("type c_void = opaque\n")
         with_cimport_mark_name_emitted("c_void")
+        ci_mark_type_name_emitted("c_void")
 
     // Emit platform-specific C type aliases (matching Zig's c_int, c_long, etc.)
     if with_cimport_is_name_emitted("c_char") == 0:
@@ -433,6 +487,16 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
         with_cimport_mark_name_emitted("c_longlong")
         with_cimport_mark_name_emitted("c_ulonglong")
         with_cimport_mark_name_emitted("c_longdouble")
+        ci_mark_type_name_emitted("c_char")
+        ci_mark_type_name_emitted("c_short")
+        ci_mark_type_name_emitted("c_ushort")
+        ci_mark_type_name_emitted("c_int")
+        ci_mark_type_name_emitted("c_uint")
+        ci_mark_type_name_emitted("c_long")
+        ci_mark_type_name_emitted("c_ulong")
+        ci_mark_type_name_emitted("c_longlong")
+        ci_mark_type_name_emitted("c_ulonglong")
+        ci_mark_type_name_emitted("c_longdouble")
 
     // Emit Complex32/Complex64 for _Complex float/double
     if with_cimport_is_name_emitted("Complex32") == 0:
@@ -440,6 +504,8 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
         output.push_str("type Complex64 \{ real: f64, imag: f64 }\n")
         with_cimport_mark_name_emitted("Complex32")
         with_cimport_mark_name_emitted("Complex64")
+        ci_mark_type_name_emitted("Complex32")
+        ci_mark_type_name_emitted("Complex64")
 
     // Emit runtime wrappers for __builtin_* bit manipulation
     if with_cimport_is_name_emitted("with_clz") == 0:
@@ -522,8 +588,8 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
                     // Emit struct_Foo alias when Foo has a typedef twin
                     if ci_str_contains(typedef_shadowed, "|" ++ sname ++ "|"):
                         let alias_name = "struct_" ++ sname
-                        if with_cimport_is_name_emitted(alias_name) == 0:
-                            with_cimport_mark_name_emitted(alias_name)
+                        if not ci_type_name_is_emitted(alias_name):
+                            ci_mark_type_name_emitted(alias_name)
                             output.push_str("type " ++ alias_name ++ " = " ++ ci_escape_reserved(sname) ++ "\n")
         else if kind == CK_ENUM:
             output.push_str(ci_translate_enum(session, i))
@@ -715,6 +781,28 @@ fn ci_decl_name_exists(session: i64, name: str, count: i32) -> bool:
         i = i + 1
     false
 
+fn ci_type_emitted_key(name: str) -> str:
+    "__cimport_type:" ++ name
+
+fn ci_type_name_is_emitted(name: str) -> bool:
+    with_cimport_is_name_emitted(ci_type_emitted_key(name)) != 0
+
+fn ci_mark_type_name_emitted(name: str):
+    with_cimport_mark_name_emitted(ci_type_emitted_key(name))
+
+fn ci_type_decl_name_exists(session: i64, name: str, count: i32) -> bool:
+    if name.len() == 0:
+        return false
+    var i = 0
+    while i < count:
+        let kind = with_cimport_decl_kind(session, i)
+        if kind == CK_STRUCT or kind == CK_UNION or kind == CK_ENUM or kind == CK_TYPEDEF:
+            let decl_name = with_cimport_decl_name(session, i)
+            if decl_name == name or ci_escape_reserved(decl_name) == name:
+                return true
+        i = i + 1
+    false
+
 fn ci_translated_builtin_type_name(name: str) -> bool:
     if name == "c_void": return true
     if name == "c_char": return true
@@ -763,7 +851,7 @@ fn ci_missing_pointer_opaque_add(session: i64, count: i32, names: str, translate
     let name = ci_pointer_pointee_name(translated_type)
     if name.len() == 0:
         return names
-    if ci_decl_name_exists(session, name, count):
+    if ci_type_decl_name_exists(session, name, count):
         return names
     if ci_str_contains(names, "|" ++ name ++ "|"):
         return names
@@ -803,8 +891,8 @@ fn ci_render_missing_pointer_opaques(session: i64, count: i32) -> str:
         if i == names.len() as i32 or names.byte_at(i as i64) == 124:
             if i > start:
                 let name = names.slice(start as i64, i as i64)
-                if name.len() > 0 and with_cimport_is_name_emitted(name) == 0:
-                    with_cimport_mark_name_emitted(name)
+                if name.len() > 0 and not ci_type_name_is_emitted(name):
+                    ci_mark_type_name_emitted(name)
                     out = out ++ "type " ++ ci_escape_reserved(name) ++ " = opaque\n"
             start = i + 1
         i = i + 1
@@ -1138,6 +1226,9 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
                 let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
                 si_params = si_params ++ actual_pname ++ ": " ++ sptype
             let si_ret = with_cimport_fn_return_type_translated(session, idx)
+            if ci_starts_with(si_ret, "extern \"C\" fn(") or ci_starts_with(si_ret, "fn("):
+                ci_record_omitted_symbol(name, "inline function returning function pointer not modeled")
+                return ""
             if ci_cimport_type_is_raw_abi(si_ret):
                 si_raw = true
             let fn_kw = if si_raw: "unsafe fn " else: "fn "
@@ -1520,10 +1611,10 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         if second == 95 or (second >= 65 and second <= 90):
             return ""
 
-    // Skip already-emitted names
-    // Note: structs shadowed by typedefs (typedef struct Foo {} Foo;) are NOT skipped.
-    // The struct emits normally; the typedef detects the self-reference and skips.
-    if with_cimport_is_name_emitted(name) != 0:
+    // Skip already-emitted type names. C struct/union tags live in a separate
+    // namespace from variables, and With can represent a type and value with
+    // the same spelling, so do not use the value emission table here.
+    if ci_type_name_is_emitted(name):
         return ""
 
     // Skip forward declarations that have a definition elsewhere in the TU —
@@ -1534,7 +1625,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     // Check if pre-scan marked this type as demoted (bitfield, forward decl,
     // unsupported field, or cascaded from a field whose type was demoted)
     if ci_str_contains(demoted_types, "|" ++ name ++ "|"):
-        with_cimport_mark_name_emitted(name)
+        ci_mark_type_name_emitted(name)
         let safe_name = ci_escape_reserved(name)
         let loc = ci_get_decl_location(session, name)
         let loc_comment = if loc.len() > 0: "// " ++ loc ++ ": demoted to opaque\n" else: ""
@@ -1546,14 +1637,14 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     let field_count = with_cimport_struct_field_count(session, idx)
     if field_count == 0:
         // Empty struct definition → emit with padding byte for ABI compatibility
-        with_cimport_mark_name_emitted(name)
+        ci_mark_type_name_emitted(name)
         let safe_name = ci_escape_reserved(name)
         let empty_rendered = if is_union: "type " ++ safe_name ++ " = union \{ __pad0: u8 = 0 }\n" else: "type " ++ safe_name ++ " \{ __pad0: u8 = 0 }\n"
         if ci_migrate_shared_decl_add("type", name, empty_rendered):
             return ""
         return empty_rendered
 
-    with_cimport_mark_name_emitted(name)
+    ci_mark_type_name_emitted(name)
     let safe_name = ci_escape_reserved(name)
     let decl_cursor = ci_find_decl_cursor_for_idx(session, idx)
 
@@ -1768,8 +1859,8 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
         // Forward-declared enum with no constants → emit as opaque
         let fwd_name = with_cimport_decl_name(session, idx)
         if fwd_name.len() > 0 and fwd_name.byte_at(0) != 95 and not ci_str_contains(fwd_name, "(unnamed") and not ci_str_contains(fwd_name, "(anonymous"):
-            if with_cimport_is_name_emitted(fwd_name) == 0:
-                with_cimport_mark_name_emitted(fwd_name)
+            if not ci_type_name_is_emitted(fwd_name):
+                ci_mark_type_name_emitted(fwd_name)
                 let enum_loc = ci_get_decl_location(session, fwd_name)
                 let enum_loc_comment = if enum_loc.len() > 0: "// " ++ enum_loc ++ ": forward-declared enum\n" else: ""
                 let fwd_rendered = enum_loc_comment ++ "type " ++ ci_escape_reserved(fwd_name) ++ " = opaque\n"
@@ -1788,9 +1879,9 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
     let enum_name = with_cimport_decl_name(session, idx)
     let is_anonymous = enum_name.len() == 0 or enum_name.byte_at(0) == 95 or ci_str_contains(enum_name, "(unnamed") or ci_str_contains(enum_name, "(anonymous")
     if not is_anonymous:
-        if with_cimport_is_name_emitted(enum_name) == 0:
+        if not ci_type_name_is_emitted(enum_name):
             let safe_enum_name = ci_escape_reserved(enum_name)
-            with_cimport_mark_name_emitted(enum_name)
+            ci_mark_type_name_emitted(enum_name)
             let type_line = "type " ++ safe_enum_name ++ " = " ++ int_type ++ "\n"
             if not ci_migrate_shared_decl_add("type", enum_name, type_line):
                 output = output ++ type_line
@@ -1928,6 +2019,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
     if mapped.len() > 0:
         let safe_name = ci_escape_reserved(name)
         with_cimport_mark_name_emitted(name)
+        ci_mark_type_name_emitted(name)
         let rendered = "type " ++ safe_name ++ " = " ++ mapped ++ "\n"
         if ci_migrate_shared_decl_add("type", name, rendered):
             return ""
@@ -1950,6 +2042,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
             afi = afi + 1
         if anon_has_bitfield or anon_has_unsupported:
             with_cimport_mark_name_emitted(name)
+            ci_mark_type_name_emitted(name)
             let opaque_rendered = "type " ++ anon_safe_name ++ " = opaque\n"
             if ci_migrate_shared_decl_add("type", name, opaque_rendered):
                 return ""
@@ -1970,6 +2063,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
                 fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype
             afi = afi + 1
         with_cimport_mark_name_emitted(name)
+        ci_mark_type_name_emitted(name)
         let anon_rendered = if with_cimport_typedef_anon_is_union(session, idx) != 0:
             "type " ++ anon_safe_name ++ " = union \{ " ++ fields ++ " }\n"
         else:
@@ -2003,6 +2097,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
             if not ci_record_definition_exists(session, name, is_forward_union, count):
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
+                ci_mark_type_name_emitted(name)
                 let rendered = "type " ++ safe_name ++ " = opaque\n"
                 if ci_migrate_shared_decl_add("type", name, rendered):
                     return ""
@@ -2016,10 +2111,12 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
         // resolved spelling. Mark it claimed so no later weak declaration takes
         // the same public name.
         with_cimport_mark_name_emitted(name)
+        ci_mark_type_name_emitted(name)
         return ""
 
     let safe_name = ci_escape_reserved(name)
     with_cimport_mark_name_emitted(name)
+    ci_mark_type_name_emitted(name)
     let rendered = "type " ++ safe_name ++ " = " ++ translated ++ "\n"
     if ci_migrate_shared_decl_add("type", name, rendered):
         return ""
@@ -2168,6 +2265,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
     let count = with_cimport_macro_count(session)
     var output = ""
     var known_values = ""
+    var known_macro_returns = ""
     var blank_macros = ""
     let object_macro_types = ci_collect_object_macro_type_map(session, macro_source)
     g_migrate_macro_session = session
@@ -2301,13 +2399,18 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
                         if ci_translation_is_void_statement(translated):
                             inferred_ret = "void"
                         else if param_count > 0:
-                            let cast_type = ci_infer_cast_return_type(translated)
-                            if cast_type.len() > 0:
-                                inferred_ret = cast_type
+                            inferred_ret = ci_infer_macro_return_type_from_expr(type_session, translated, known_macro_returns, ret_type)
+                        if ci_strip_parens(ci_trim(translated)) == "NULL" and ci_infer_cast_return_type(translated).len() == 0:
+                            ci_record_untranslated_macro(name)
+                            continue
+                        if ci_starts_with(inferred_ret, "extern \"C\" fn(") or ci_starts_with(inferred_ret, "fn("):
+                            ci_record_untranslated_macro(name)
+                            continue
                         let fn_kw = if ci_translation_calls_raw_function(translated): "unsafe fn " else: "fn "
                         let r = ci_render_generated_fn_body(fn_kw ++ safe_name ++ type_params ++ "(" ++ param_decl ++ ") -> " ++ inferred_ret, "    " ++ translated)
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
+                        known_macro_returns = known_macro_returns ++ safe_name ++ "=" ++ inferred_ret ++ "|"
                     else:
                         ci_record_untranslated_macro(name)
             continue
@@ -2338,6 +2441,10 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
             obj_value = ci_trim(obj_value.slice(13, obj_value.len()))
         // Strip outer parentheses for macro values like (-1)
         let stripped = ci_strip_parens(obj_value)
+
+        if ci_object_macro_is_function_alias(type_session, stripped):
+            ci_record_untranslated_object_macro(name, macro_is_system)
+            continue
 
         if ci_is_int_literal(stripped):
             let safe_name = ci_escape_reserved(name)
@@ -3260,6 +3367,8 @@ fn ci_infer_cast_return_type(translated: str) -> str:
             let type_start = (i + 1) as i64
             let type_end = t.len() - 1
             let cast_type = ci_trim(t.slice(type_start, type_end))
+            if ci_starts_with(cast_type, "extern \"C\" fn(") or ci_starts_with(cast_type, "fn("):
+                return cast_type
             if ci_str_contains(cast_type, ")") or ci_str_contains(cast_type, "{") or ci_str_contains(cast_type, "}"):
                 return ""
             // Verify it's a known type name
@@ -10024,6 +10133,10 @@ fn ci_eval_int_text(session: i64, cursor: i32) -> str:
     let val = with_ci_eval_int_value(session, cursor)
     if val < 0 and with_ci_eval_int_is_unsigned(session, cursor) != 0:
         let ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+        if val == -9223372036854775807 - 1:
+            if ty.len() > 0:
+                return "((0 as " ++ ty ++ ") -% ((9223372036854775807 as " ++ ty ++ ") +% (1 as " ++ ty ++ ")))"
+            return "(0 -% 9223372036854775807 -% 1)"
         if ty.len() > 0:
             return "((0 as " ++ ty ++ ") -% " ++ i64_to_string(0 - val) ++ ")"
         return "(0 -% " ++ i64_to_string(0 - val) ++ ")"

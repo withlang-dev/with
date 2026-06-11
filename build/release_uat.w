@@ -191,12 +191,173 @@ fn ruat_tiny_c_source() -> str:
 
 fn ruat_zlib_program() -> str:
     "use c_import(\"zlib.h\")\n\n" ++
+    "unsafe fn same_prefix(a: *const u8, b: *const u8, n: i32) -> bool:\n" ++
+    "    var i = 0\n" ++
+    "    while i < n:\n" ++
+    "        if a[i] != b[i]:\n" ++
+    "            return false\n" ++
+    "        i = i + 1\n" ++
+    "    true\n\n" ++
     "fn main:\n" ++
-    "    let bound = compressBound(12 as uLong)\n" ++
-    "    if bound <= 12 as uLong:\n" ++
-    "        print(\"zlib UAT failed\")\n" ++
+    "    let input = \"with zlib roundtrip\"\n" ++
+    "    var compressed: [u8; 256] = [0 as u8; 256]\n" ++
+    "    var compressed_len: uLongf = compressed.len() as uLongf\n" ++
+    "    var output: [u8; 128] = [0 as u8; 128]\n" ++
+    "    var output_len: uLongf = output.len() as uLongf\n\n" ++
+    "    let rc1 = unsafe { compress(&raw mut compressed[0] as *mut Bytef, &raw mut compressed_len as *mut uLongf, input as *const Bytef, input.len() as uLong) }\n" ++
+    "    if rc1 != Z_OK:\n" ++
+    "        print(\"zlib compress failed\")\n" ++
+    "        return 1\n\n" ++
+    "    let rc2 = unsafe { uncompress(&raw mut output[0] as *mut Bytef, &raw mut output_len as *mut uLongf, &raw const compressed[0] as *const Bytef, compressed_len as uLong) }\n" ++
+    "    if rc2 != Z_OK:\n" ++
+    "        print(\"zlib uncompress failed\")\n" ++
+    "        return 1\n\n" ++
+    "    if output_len != input.len() as uLongf:\n" ++
+    "        print(\"zlib length mismatch\")\n" ++
+    "        return 1\n" ++
+    "    if not unsafe { same_prefix(&raw const output[0] as *const u8, input as *const u8, input.len() as i32) }:\n" ++
+    "        print(\"zlib content mismatch\")\n" ++
+    "        return 1\n" ++
+    "    if unsafe { zlibVersion() } == null:\n" ++
+    "        print(\"zlib version missing\")\n" ++
     "        return 1\n" ++
     "    write(\"zlib UAT passed\\n\")\n"
+
+fn ruat_bzip2_program() -> str:
+    "use c_import(\"bzlib.h\")\n\n" ++
+    "unsafe fn same_prefix(a: *const u8, b: *const u8, n: i32) -> bool:\n" ++
+    "    var i = 0\n" ++
+    "    while i < n:\n" ++
+    "        if a[i] != b[i]:\n" ++
+    "            return false\n" ++
+    "        i = i + 1\n" ++
+    "    true\n\n" ++
+    "fn main:\n" ++
+    "    let input = \"with bzip2 roundtrip\"\n" ++
+    "    var compressed: [u8; 512] = [0 as u8; 512]\n" ++
+    "    var compressed_len: c_uint = compressed.len() as c_uint\n" ++
+    "    var output: [u8; 128] = [0 as u8; 128]\n" ++
+    "    var output_len: c_uint = output.len() as c_uint\n\n" ++
+    "    let rc1 = unsafe { BZ2_bzBuffToBuffCompress(&raw mut compressed[0] as *mut c_char, &raw mut compressed_len as *mut c_uint, input as *mut c_char, input.len() as c_uint, 9, 0, 30) }\n" ++
+    "    if rc1 != BZ_OK:\n" ++
+    "        print(\"bzip2 compress failed\")\n" ++
+    "        return 1\n\n" ++
+    "    let rc2 = unsafe { BZ2_bzBuffToBuffDecompress(&raw mut output[0] as *mut c_char, &raw mut output_len as *mut c_uint, &raw mut compressed[0] as *mut c_char, compressed_len, 0, 0) }\n" ++
+    "    if rc2 != BZ_OK:\n" ++
+    "        print(\"bzip2 decompress failed\")\n" ++
+    "        return 1\n\n" ++
+    "    if output_len != input.len() as c_uint:\n" ++
+    "        print(\"bzip2 length mismatch\")\n" ++
+    "        return 1\n" ++
+    "    if not unsafe { same_prefix(&raw const output[0] as *const u8, input as *const u8, input.len() as i32) }:\n" ++
+    "        print(\"bzip2 content mismatch\")\n" ++
+    "        return 1\n" ++
+    "    write(\"bzip2 UAT passed\\n\")\n"
+
+fn ruat_sqlite3_program() -> str:
+    "use c_import(\"sqlite3.h\")\n\n" ++
+    "fn main:\n" ++
+    "    var db: *mut sqlite3 = null\n" ++
+    "    var stmt: *mut sqlite3_stmt = null\n\n" ++
+    "    let open_rc = unsafe { sqlite3_open(c\":memory:\".ptr, &raw mut db as *mut *mut sqlite3) }\n" ++
+    "    if open_rc != SQLITE_OK:\n" ++
+    "        print(\"sqlite3 open failed\")\n" ++
+    "        return 1\n\n" ++
+    "    let create_rc = unsafe { sqlite3_exec(db, c\"CREATE TABLE t(value INTEGER); INSERT INTO t(value) VALUES (42);\".ptr, null, null, null) }\n" ++
+    "    if create_rc != SQLITE_OK:\n" ++
+    "        print(\"sqlite3 exec failed\")\n" ++
+    "        unsafe { sqlite3_close(db) }\n" ++
+    "        return 1\n\n" ++
+    "    let prep_rc = unsafe { sqlite3_prepare_v2(db, c\"SELECT value FROM t\".ptr, -1, &raw mut stmt as *mut *mut sqlite3_stmt, null) }\n" ++
+    "    if prep_rc != SQLITE_OK:\n" ++
+    "        print(\"sqlite3 prepare failed\")\n" ++
+    "        unsafe { sqlite3_close(db) }\n" ++
+    "        return 1\n\n" ++
+    "    let step_rc = unsafe { sqlite3_step(stmt) }\n" ++
+    "    if step_rc != SQLITE_ROW:\n" ++
+    "        print(\"sqlite3 step failed\")\n" ++
+    "        unsafe { sqlite3_finalize(stmt) }\n" ++
+    "        unsafe { sqlite3_close(db) }\n" ++
+    "        return 1\n\n" ++
+    "    let value = unsafe { sqlite3_column_int(stmt, 0) }\n" ++
+    "    unsafe { sqlite3_finalize(stmt) }\n" ++
+    "    unsafe { sqlite3_close(db) }\n\n" ++
+    "    if value != 42:\n" ++
+    "        print(\"sqlite3 value mismatch\")\n" ++
+    "        return 1\n" ++
+    "    write(\"sqlite3 UAT passed\\n\")\n"
+
+fn ruat_openssl_program() -> str:
+    "use c_import(\"openssl/evp.h\")\n\n" ++
+    "fn main:\n" ++
+    "    let input = \"abc\"\n" ++
+    "    var digest: [u8; 32] = [0 as u8; 32]\n" ++
+    "    var digest_len: c_uint = 0 as c_uint\n\n" ++
+    "    let ctx = unsafe { EVP_MD_CTX_new() }\n" ++
+    "    if ctx == null:\n" ++
+    "        print(\"openssl ctx failed\")\n" ++
+    "        return 1\n\n" ++
+    "    let md = unsafe { EVP_sha256() }\n" ++
+    "    if md == null:\n" ++
+    "        print(\"openssl sha256 failed\")\n" ++
+    "        unsafe { EVP_MD_CTX_free(ctx) }\n" ++
+    "        return 1\n\n" ++
+    "    if unsafe { EVP_DigestInit_ex(ctx, md, null) } != 1:\n" ++
+    "        print(\"openssl digest init failed\")\n" ++
+    "        unsafe { EVP_MD_CTX_free(ctx) }\n" ++
+    "        return 1\n" ++
+    "    if unsafe { EVP_DigestUpdate(ctx, input as *const c_void, input.len() as c_ulong) } != 1:\n" ++
+    "        print(\"openssl digest update failed\")\n" ++
+    "        unsafe { EVP_MD_CTX_free(ctx) }\n" ++
+    "        return 1\n" ++
+    "    if unsafe { EVP_DigestFinal_ex(ctx, &raw mut digest[0] as *mut u8, &raw mut digest_len as *mut c_uint) } != 1:\n" ++
+    "        print(\"openssl digest final failed\")\n" ++
+    "        unsafe { EVP_MD_CTX_free(ctx) }\n" ++
+    "        return 1\n" ++
+    "    unsafe { EVP_MD_CTX_free(ctx) }\n\n" ++
+    "    if digest_len != 32 as c_uint:\n" ++
+    "        print(\"openssl digest length mismatch\")\n" ++
+    "        return 1\n" ++
+    "    if digest[0] != 0xba as u8 or digest[1] != 0x78 as u8 or digest[2] != 0x16 as u8 or digest[3] != 0xbf as u8:\n" ++
+    "        print(\"openssl digest prefix mismatch\")\n" ++
+    "        return 1\n" ++
+    "    if digest[28] != 0xf2 as u8 or digest[29] != 0x00 as u8 or digest[30] != 0x15 as u8 or digest[31] != 0xad as u8:\n" ++
+    "        print(\"openssl digest suffix mismatch\")\n" ++
+    "        return 1\n" ++
+    "    write(\"openssl UAT passed\\n\")\n"
+
+fn ruat_libcurl_program() -> str:
+    "use c_import(\"curl/curl.h\")\n\n" ++
+    "fn main:\n" ++
+    "    let init_rc = curl_global_init(CURL_GLOBAL_DEFAULT)\n" ++
+    "    if init_rc != CURLE_OK:\n" ++
+    "        print(\"libcurl global init failed\")\n" ++
+    "        return 1\n\n" ++
+    "    let easy = unsafe { curl_easy_init() }\n" ++
+    "    if easy == null:\n" ++
+    "        print(\"libcurl easy init failed\")\n" ++
+    "        curl_global_cleanup()\n" ++
+    "        return 1\n\n" ++
+    "    let opt_rc = unsafe { curl_easy_setopt(easy, CURLOPT_NOSIGNAL, 1 as c_long) }\n" ++
+    "    if opt_rc != CURLE_OK:\n" ++
+    "        print(\"libcurl setopt failed\")\n" ++
+    "        unsafe { curl_easy_cleanup(easy) }\n" ++
+    "        curl_global_cleanup()\n" ++
+    "        return 1\n\n" ++
+    "    let info = unsafe { curl_version_info(CURLVERSION_NOW) }\n" ++
+    "    if info == null:\n" ++
+    "        print(\"libcurl version info failed\")\n" ++
+    "        unsafe { curl_easy_cleanup(easy) }\n" ++
+    "        curl_global_cleanup()\n" ++
+    "        return 1\n" ++
+    "    if unsafe { info.version } == null:\n" ++
+    "        print(\"libcurl version missing\")\n" ++
+    "        unsafe { curl_easy_cleanup(easy) }\n" ++
+    "        curl_global_cleanup()\n" ++
+    "        return 1\n\n" ++
+    "    unsafe { curl_easy_cleanup(easy) }\n" ++
+    "    curl_global_cleanup()\n" ++
+    "    write(\"libcurl UAT passed\\n\")\n"
 
 pub fn run_release_artifact_smoke_uat_action(ctx: ActionCtx) -> i32:
     let compiler = ruat_compiler_input(ctx)
@@ -293,32 +454,47 @@ pub fn run_release_migrate_uat_action(ctx: ActionCtx) -> i32:
 
     ruat_write_stamp(ctx)
 
-pub fn run_release_zlib_uat_action(ctx: ActionCtx) -> i32:
+fn ruat_run_c_package_uat(ctx: ActionCtx, package: str, label: str, source: str, expected_stdout: str) -> i32:
     let compiler = ruat_compiler_input(ctx)
     if compiler.len() == 0:
         return ruat_fail(ctx, "missing compiler input")
 
-    let workdir = "out/release-uat/zlib-project"
+    let workdir = "out/release-uat/" ++ label ++ "-project"
     var rc = ruat_prepare_clean_dir(ctx, workdir)
     if rc != 0:
         return rc
 
-    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "init", ruat_argv2(compiler, "init", "."), 120000), "with init zlib project")
+    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "init", ruat_argv2(compiler, "init", "."), 120000), "with init " ++ label ++ " project")
     if rc != 0:
         return rc
 
-    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "get-zlib", ruat_argv2(compiler, "get", "c.zlib"), 600000), "with get c.zlib")
+    rc = ruat_expect_success(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "get-" ++ label, ruat_argv2(compiler, "get", package), 600000), "with get " ++ package)
     if rc != 0:
         return rc
 
-    if ctx.fs().write_text(ruat_join(workdir, "src/main.w"), ruat_zlib_program()) != 0:
-        return ruat_fail(ctx, "could not write zlib UAT source")
+    if ctx.fs().write_text(ruat_join(workdir, "src/main.w"), source) != 0:
+        return ruat_fail(ctx, "could not write " ++ label ++ " UAT source")
 
-    rc = ruat_expect_stdout(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "run", ruat_argv1(compiler, "run"), 120000), "zlib UAT passed", "with run zlib")
+    rc = ruat_expect_stdout(ctx, ruat_run_capture_cwd(ctx, compiler, workdir, "run", ruat_argv1(compiler, "run"), 180000), expected_stdout, "with run " ++ label)
     if rc != 0:
         return rc
 
     ruat_write_stamp(ctx)
+
+pub fn run_release_zlib_uat_action(ctx: ActionCtx) -> i32:
+    ruat_run_c_package_uat(ctx, "c.zlib", "zlib", ruat_zlib_program(), "zlib UAT passed")
+
+pub fn run_release_bzip2_uat_action(ctx: ActionCtx) -> i32:
+    ruat_run_c_package_uat(ctx, "c.bzip2", "bzip2", ruat_bzip2_program(), "bzip2 UAT passed")
+
+pub fn run_release_sqlite3_uat_action(ctx: ActionCtx) -> i32:
+    ruat_run_c_package_uat(ctx, "c.sqlite3", "sqlite3", ruat_sqlite3_program(), "sqlite3 UAT passed")
+
+pub fn run_release_openssl_uat_action(ctx: ActionCtx) -> i32:
+    ruat_run_c_package_uat(ctx, "c.openssl", "openssl", ruat_openssl_program(), "openssl UAT passed")
+
+pub fn run_release_libcurl_uat_action(ctx: ActionCtx) -> i32:
+    ruat_run_c_package_uat(ctx, "c.libcurl", "libcurl", ruat_libcurl_program(), "libcurl UAT passed")
 
 pub fn run_release_install_layout_uat_action(ctx: ActionCtx) -> i32:
     let compiler = ruat_compiler_input(ctx)
