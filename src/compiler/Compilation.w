@@ -152,6 +152,14 @@ fn compilation_mir_error_span(zcu: Zcu, pool: AstPool, fn_sym: i32, raw_span: i3
 fn compilation_bool_digit(value: bool) -> str:
     if value: "1" else: "0"
 
+fn compilation_join_strings(values: Vec[str], separator: str) -> str:
+    var out = ""
+    for i in 0..values.len() as i32:
+        if i > 0:
+            out = out ++ separator
+        out = out ++ values.get(i as i64)
+    out
+
 fn compilation_escape_with_string(value: str) -> str:
     var out = ""
     for i in 0..value.len() as i32:
@@ -473,6 +481,20 @@ fn Compilation.dump_project_info(self: Compilation, pool: AstPool) -> str:
             type_count = type_count + 1
 
     var out = f"project_info modules={zcu.last_resolved.modules.len() as i32} functions={function_count} types={type_count}\n"
+    let cfg = zcu.project_config
+    out = out ++ "config root=" ++ cfg.root_dir ++ "\n"
+    out = out ++ "config package=" ++ cfg.package_name ++ " version=" ++ cfg.package_version ++ "\n"
+    out = out ++ "config c_import_include_paths=" ++ compilation_join_strings(cfg.c_import_include_paths, ",") ++ "\n"
+    out = out ++ "config c_import_defines=" ++ compilation_join_strings(cfg.c_import_defines, ",") ++ "\n"
+    out = out ++ "config link_libs=" ++ compilation_join_strings(cfg.link_libs, ",") ++ "\n"
+    out = out ++ "config link_search_paths=" ++ compilation_join_strings(cfg.link_search_paths, ",") ++ "\n"
+    out = out ++ "config dep_link_libs=" ++ compilation_join_strings(cfg.dep_link_libs, ",") ++ "\n"
+    out = out ++ "config dep_names=" ++ compilation_join_strings(cfg.dep_names, ",") ++ "\n"
+    out = out ++ "config dep_constraints=" ++ compilation_join_strings(cfg.dep_constraints, ",") ++ "\n"
+    out = out ++ "config feature_default=" ++ compilation_join_strings(cfg.feature_default, ",") ++ "\n"
+    out = out ++ "config feature_names=" ++ compilation_join_strings(cfg.feature_names, ",") ++ "\n"
+    out = out ++ "config feature_values=" ++ compilation_join_strings(cfg.feature_values, ",") ++ "\n"
+    out = out ++ "config target_default=" ++ cfg.target_default ++ "\n"
     for mi in 0..zcu.last_resolved.modules.len() as i32:
         let mod = zcu.last_resolved.modules.get(mi as i64)
         out = out ++ f"module path={mod.path} file={mod.file_id} decls={mod.decl_count}\n"
@@ -816,7 +838,7 @@ fn Compilation.check_file_with_build_settings(self: Compilation, source_path: st
     for di in 0..defines.len() as i32:
         cfg.c_import_defines.push(defines.get(di as i64))
     for li in 0..link_libs.len() as i32:
-        cfg.dep_link_libs.push(link_libs.get(li as i64))
+        cfg.link_libs.push(link_libs.get(li as i64))
     let pool = self.compile_file_with_config(source_path, cfg)
     self.check_pool(pool, source_path)
 
@@ -852,8 +874,10 @@ fn Compilation.prepare_binary_link_from_pool(self: Compilation, pool: AstPool, s
         compilation_cleanup_build_products(obj_path, bin_path)
         return compilation_binary_link_plan_fail()
     compilation_debug_init("build_binary_to_path:linking")
-    // Merge dep_link_libs from project config into link libs
+    // Merge direct and dependency link libraries from project config.
     var all_link_libs = self.zcu.last_link_lib_names
+    for lli in 0..self.zcu.project_config.link_libs.len() as i32:
+        all_link_libs.push(self.zcu.project_config.link_libs.get(lli as i64))
     for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
         all_link_libs.push(self.zcu.project_config.dep_link_libs.get(dli as i64))
     let link_plan = link_stage_link_object_to_binary_plan(obj_path, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, self.zcu.project_config.dep_link_args, requires_async_runtime)
@@ -933,7 +957,7 @@ fn Compilation.emit_object_to_path_with_build_settings(self: Compilation, source
     for di in 0..defines.len() as i32:
         cfg.c_import_defines.push(defines.get(di as i64))
     for li in 0..link_libs.len() as i32:
-        cfg.dep_link_libs.push(link_libs.get(li as i64))
+        cfg.link_libs.push(link_libs.get(li as i64))
     let pool = self.compile_file_with_config(source_path, cfg)
     if pool.decl_count() == 0:
         return ""
@@ -988,7 +1012,7 @@ fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, sourc
     for di in 0..defines.len() as i32:
         cfg.c_import_defines.push(defines.get(di as i64))
     for li in 0..link_libs.len() as i32:
-        cfg.dep_link_libs.push(link_libs.get(li as i64))
+        cfg.link_libs.push(link_libs.get(li as i64))
     let pool = self.compile_entry_file_with_config(source_path, cfg)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
@@ -1024,7 +1048,7 @@ fn Compilation.build_binary_from_source_to_path_with_build_settings(self: Compil
     for di in 0..defines.len() as i32:
         cfg.c_import_defines.push(defines.get(di as i64))
     for li in 0..link_libs.len() as i32:
-        cfg.dep_link_libs.push(link_libs.get(li as i64))
+        cfg.link_libs.push(link_libs.get(li as i64))
     let pool = self.compile_source_text_with_config(source_path, source_text, cfg)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 

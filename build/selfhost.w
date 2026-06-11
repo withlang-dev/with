@@ -661,6 +661,144 @@ fn bs_check_build_rejects_imperative_manifest(ctx: ActionCtx, compiler_path: str
         return bs_fail(ctx, "imperative manifest explicit source unexpectedly succeeded")
     bs_assert_contains(ctx, explicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", "imperative manifest explicit source diagnostic")
 
+fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "src/main.w")
+    let manifest =
+        "[package]\n" ++
+        "name = \"manifestcfg\"\n" ++
+        "version = \"0.2.0\"\n\n" ++
+        "[c_import]\n" ++
+        "include_paths = [\"include\"]\n" ++
+        "defines = [\"WITH_CONFIG_TEST=1\", \"WITH_EXTRA\"]\n\n" ++
+        "[link]\n" ++
+        "libs = [\"sqlite3\", \"z\"]\n" ++
+        "search_paths = [\"native/lib\"]\n\n" ++
+        "[features]\n" ++
+        "default = [\"fast\"]\n" ++
+        "fast = true\n" ++
+        "trace = [\"io\"]\n\n" ++
+        "[target]\n" ++
+        "default = \"native\"\n\n" ++
+        "[deps]\n" ++
+        "json = \"^1.0\"\n"
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), manifest, "declarative manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, src, "fn main:\n    print(\"manifestcfg\")\n", "declarative manifest main")
+    if rc != 0: return rc
+
+    var dump_args: Vec[str] = Vec.new()
+    dump_args |> push("check")
+    dump_args |> push(bs_abs(root, src))
+    dump_args |> push("--dump-project-info")
+    let dump = bs_project_expect_success(ctx, compiler_path, case_dir, "declarative-manifest-dump", dump_args)
+    if dump.rc != 0: return dump.rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config package=manifestcfg version=0.2.0", "declarative_manifest_package")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config c_import_defines=WITH_CONFIG_TEST=1,WITH_EXTRA", "declarative_manifest_defines")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config link_libs=sqlite3,z", "declarative_manifest_link_libs")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config feature_default=fast", "declarative_manifest_features_default")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config feature_names=fast,trace", "declarative_manifest_features")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config dep_names=json", "declarative_manifest_deps")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config dep_constraints=^1.0", "declarative_manifest_dep_constraints")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config target_default=native", "declarative_manifest_target_default")
+    if rc != 0: return rc
+
+    let c_define_dir = bs_join(case_dir, "c_define")
+    rc = bs_write_fixture(ctx, bs_join(c_define_dir, "include/defined_config.h"), "#ifndef WITH_CONFIG_TEST\n#error missing WITH_CONFIG_TEST\n#endif\n#define WITH_CONFIG_VALUE 42\n", "c import define header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(c_define_dir, "with.toml"), "[package]\nname = \"cdefine\"\nversion = \"0.1.0\"\n\n[c_import]\ninclude_paths = [\"include\"]\ndefines = [\"WITH_CONFIG_TEST=1\"]\n", "c import define manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(c_define_dir, "src/main.w"), "use c_import(\"defined_config.h\")\n\nfn main:\n    let x: i32 = WITH_CONFIG_VALUE\n    let _ = x\n", "c import define source")
+    if rc != 0: return rc
+    var c_define_args: Vec[str] = Vec.new()
+    c_define_args |> push("check")
+    c_define_args |> push(bs_abs(root, bs_join(c_define_dir, "src/main.w")))
+    let c_define = bs_project_expect_success(ctx, compiler_path, c_define_dir, "declarative-c-import-define", c_define_args)
+    if c_define.rc != 0: return c_define.rc
+
+    let c_define_bad_dir = bs_join(case_dir, "c_define_bad")
+    rc = bs_write_fixture(ctx, bs_join(c_define_bad_dir, "include/defined_config.h"), "#ifndef WITH_CONFIG_TEST\n#error missing WITH_CONFIG_TEST\n#endif\n#define WITH_CONFIG_VALUE 42\n", "c import missing define header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(c_define_bad_dir, "with.toml"), "[package]\nname = \"cdefinebad\"\nversion = \"0.1.0\"\n\n[c_import]\ninclude_paths = [\"include\"]\n", "c import missing define manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(c_define_bad_dir, "src/main.w"), "use c_import(\"defined_config.h\")\n\nfn main:\n    let x: i32 = WITH_CONFIG_VALUE\n    let _ = x\n", "c import missing define source")
+    if rc != 0: return rc
+    var c_define_bad_args: Vec[str] = Vec.new()
+    c_define_bad_args |> push("check")
+    c_define_bad_args |> push(bs_abs(root, bs_join(c_define_bad_dir, "src/main.w")))
+    let c_define_bad = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-c-import-define-missing", c_define_bad_args, 120000, c_define_bad_dir)
+    if c_define_bad.rc == 0:
+        return bs_fail(ctx, "c_import define omission unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, c_define_bad.stderr, "WITH_CONFIG_TEST", "declarative_c_import_define_missing")
+    if rc != 0: return rc
+
+    let link_bad_dir = bs_join(case_dir, "link_bad")
+    rc = bs_write_fixture(ctx, bs_join(link_bad_dir, "with.toml"), "[package]\nname = \"linkbad\"\nversion = \"0.1.0\"\n\n[link]\nlibs = [\"with_phase1_missing_lib\"]\n", "missing link lib manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(link_bad_dir, "src/main.w"), "fn main:\n    print(\"linkbad\")\n", "missing link lib source")
+    if rc != 0: return rc
+    var link_bad_args: Vec[str] = Vec.new()
+    link_bad_args |> push("build")
+    link_bad_args |> push(bs_abs(root, bs_join(link_bad_dir, "src/main.w")))
+    link_bad_args |> push("-o")
+    link_bad_args |> push(bs_abs(root, bs_join(link_bad_dir, "out/bin/linkbad")))
+    let link_bad = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-link-lib-missing", link_bad_args, 120000, link_bad_dir)
+    if link_bad.rc == 0:
+        return bs_fail(ctx, "missing [link].libs library unexpectedly linked")
+    rc = bs_assert_contains(ctx, link_bad.stderr, "with_phase1_missing_lib", "declarative_link_lib_missing")
+    if rc != 0: return rc
+
+    let native_target_dir = bs_join(case_dir, "target_native")
+    rc = bs_write_fixture(ctx, bs_join(native_target_dir, "with.toml"), "[package]\nname = \"targetnative\"\nversion = \"0.1.0\"\n\n[target]\ndefault = \"native\"\n", "native target default manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(native_target_dir, "src/main.w"), "fn main:\n    print(\"targetnative\")\n", "native target default source")
+    if rc != 0: return rc
+    let native_target = bs_project_expect_success(ctx, compiler_path, native_target_dir, "declarative-target-default-native", bs_project_args("build"))
+    if native_target.rc != 0: return native_target.rc
+    rc = bs_expect_file(ctx, bs_join(native_target_dir, "out/bin/targetnative"), "native target default output")
+    if rc != 0: return rc
+
+    let cross_target_dir = bs_join(case_dir, "target_cross")
+    rc = bs_write_fixture(ctx, bs_join(cross_target_dir, "with.toml"), "[package]\nname = \"targetcross\"\nversion = \"0.1.0\"\n\n[target]\ndefault = \"" ++ bs_cross_target_triple() ++ "\"\n", "cross target default manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(cross_target_dir, "src/main.w"), "fn main:\n    print(\"targetcross\")\n", "cross target default source")
+    if rc != 0: return rc
+    let cross_target = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-target-default-cross", bs_project_args("build"), 120000, cross_target_dir)
+    if cross_target.rc == 0:
+        return bs_fail(ctx, "cross-target manifest default unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, cross_target.stderr, "not implemented yet", "declarative_target_default_cross")
+    if rc != 0: return rc
+    if ctx.fs().exists(bs_join(cross_target_dir, "out/bin/targetcross")):
+        return bs_fail(ctx, "cross-target manifest default produced native output")
+
+    let invalid_target_dir = bs_join(case_dir, "target_invalid")
+    rc = bs_write_fixture(ctx, bs_join(invalid_target_dir, "with.toml"), "[package]\nname = \"targetinvalid\"\nversion = \"0.1.0\"\n\n[target]\ndefault = \"thumbv7em-none-eabi\"\n", "invalid target default manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(invalid_target_dir, "src/main.w"), "fn main:\n    print(\"targetinvalid\")\n", "invalid target default source")
+    if rc != 0: return rc
+    let invalid_target = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-target-default-invalid", bs_project_args("build"), 120000, invalid_target_dir)
+    if invalid_target.rc == 0:
+        return bs_fail(ctx, "invalid target manifest default unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, invalid_target.stderr, "unsupported target.default 'thumbv7em-none-eabi'", "declarative_target_default_invalid")
+    if rc != 0: return rc
+
+    let imperative_target_dir = bs_join(case_dir, "target_imperative")
+    rc = bs_write_fixture(ctx, bs_join(imperative_target_dir, "with.toml"), "[package]\nname = \"targetimperative\"\nversion = \"0.1.0\"\n\n[target]\nbinary = \"app\"\n", "imperative target manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(imperative_target_dir, "src/main.w"), "fn main:\n    print(\"targetimperative\")\n", "imperative target source")
+    if rc != 0: return rc
+    let imperative_target = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-target-imperative", bs_project_args("build"), 120000, imperative_target_dir)
+    if imperative_target.rc == 0:
+        return bs_fail(ctx, "imperative [target] manifest unexpectedly succeeded")
+    bs_assert_contains(ctx, imperative_target.stderr, "imperative build configuration belongs in build.w", "declarative_target_imperative")
+
 fn bs_check_run_project_targets(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "rundemo")
     if rc != 0: return rc
@@ -823,6 +961,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_uses_package_section_name(ctx, compiler_path, bs_join(output_dir, "build_package_section_case"))
     if rc != 0: return rc
     rc = bs_check_build_rejects_imperative_manifest(ctx, compiler_path, bs_join(output_dir, "build_imperative_manifest_case"))
+    if rc != 0: return rc
+    rc = bs_check_declarative_manifest_config(ctx, compiler_path, bs_join(output_dir, "declarative_manifest_config_case"))
     if rc != 0: return rc
     rc = bs_check_get_force_reinstall(ctx, compiler_path, bs_join(output_dir, "get_force_reinstall_case"))
     if rc != 0: return rc

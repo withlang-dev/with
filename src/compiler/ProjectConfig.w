@@ -10,9 +10,16 @@ type ProjectConfig {
     package_version: str,
     c_import_include_paths: Vec[str],
     c_import_defines: Vec[str],
+    link_libs: Vec[str],
     link_search_paths: Vec[str],
     dep_link_libs: Vec[str],
     dep_link_args: Vec[str],
+    dep_names: Vec[str],
+    dep_constraints: Vec[str],
+    feature_default: Vec[str],
+    feature_names: Vec[str],
+    feature_values: Vec[str],
+    target_default: str,
     no_std: bool,
     alloc_mode: bool,
     runtime_available: bool,
@@ -28,9 +35,16 @@ fn project_config_default -> ProjectConfig:
         package_version: "",
         c_import_include_paths: Vec.new(),
         c_import_defines: Vec.new(),
+        link_libs: Vec.new(),
         link_search_paths: Vec.new(),
         dep_link_libs: Vec.new(),
         dep_link_args: Vec.new(),
+        dep_names: Vec.new(),
+        dep_constraints: Vec.new(),
+        feature_default: Vec.new(),
+        feature_names: Vec.new(),
+        feature_values: Vec.new(),
+        target_default: "",
         no_std: false,
         alloc_mode: false,
         runtime_available: true,
@@ -147,14 +161,29 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
             out.overflow_mode = parsed_overflow
     else if section == "c_import" and key == "include_paths":
         out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
+    else if section == "c_import" and key == "defines":
+        out.c_import_defines = project_config_parse_string_array(value)
+    else if section == "link" and key == "libs":
+        out.link_libs = project_config_parse_string_array(value)
     else if section == "link" and key == "search_paths":
         out.link_search_paths = project_config_parse_path_array(value, out.root_dir)
-    else if section == "deps" and key.starts_with("c."):
-        // C package dependency: c.sqlite3 = "3.45"
-        let pkg_name = key.slice(2, key.len())
-        let version = project_config_strip_quotes(value)
-        if pkg_name.len() > 0 and version.len() > 0:
-            out = project_config_load_dep_metadata(out, pkg_name, version)
+    else if section == "features" and key == "default":
+        out.feature_default = project_config_parse_string_array(value)
+    else if section == "features":
+        out.feature_names.push(key)
+        out.feature_values.push(project_config_trim(value))
+    else if section == "target" and key == "default":
+        out.target_default = project_config_strip_quotes(project_config_trim(value))
+    else if section == "deps":
+        let constraint = project_config_strip_quotes(project_config_trim(value))
+        if key.len() > 0 and constraint.len() > 0:
+            out.dep_names.push(key)
+            out.dep_constraints.push(constraint)
+            if key.starts_with("c."):
+                // C package dependency: c.sqlite3 = "3.45"
+                let pkg_name = key.slice(2, key.len())
+                if pkg_name.len() > 0:
+                    out = project_config_load_dep_metadata(out, pkg_name, constraint)
     out
 
 fn project_config_strip_quotes(value: str) -> str:
@@ -253,16 +282,26 @@ fn project_config_wants_key(section: str, key: str) -> bool:
         return true
     if section == "c_import" and key == "include_paths":
         return true
+    if section == "c_import" and key == "defines":
+        return true
+    if section == "link" and key == "libs":
+        return true
     if section == "link" and key == "search_paths":
         return true
     if section == "build" and key == "overflow":
         return true
-    if section == "deps" and key.starts_with("c."):
+    if section == "features":
+        return true
+    if section == "target" and key == "default":
+        return true
+    if section == "deps":
         return true
     false
 
 fn project_config_forbidden_entry(section: str, key: str) -> str:
     if section == "build" and key == "overflow":
+        return ""
+    if section == "target" and key == "default":
         return ""
     if section == "build" or section == "commands" or section == "scripts" or section == "targets" or section == "target":
         return "imperative build configuration belongs in build.w, not with.toml: [" ++ section ++ "]"
@@ -289,6 +328,13 @@ fn project_config_value_complete(value: str) -> bool:
     true
 
 fn project_config_parse_path_array(value: str, root_dir: str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let entries = project_config_parse_string_array(value)
+    for i in 0..entries.len() as i32:
+        out.push(project_config_resolve_path(root_dir, entries.get(i as i64)))
+    out
+
+fn project_config_parse_string_array(value: str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     var i = 0
     let total = value.len() as i32
@@ -317,7 +363,7 @@ fn project_config_parse_path_array(value: str, root_dir: str) -> Vec[str]:
                     entry = entry ++ value.slice(i as i64, (i + 1) as i64)
                 i = i + 1
             if entry.len() > 0:
-                out.push(project_config_resolve_path(root_dir, entry))
+                out.push(entry)
         i = i + 1
     out
 

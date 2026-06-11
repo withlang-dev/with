@@ -1317,12 +1317,24 @@ fn repo_lock_release():
         if owner_pid == with_getpid():
             let _ = with_fs_remove_tree(lock_dir)
 
-fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphCommandOptions) -> i32:
+fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg: ProjectConfig) -> BuildCommandOptions:
+    var out = options
+    if not out.target_explicit and cfg.target_default.len() > 0:
+        out.target_kind = driver_target_triple_kind(cfg.target_default)
+    out
+
+fn build_command_validate_target(options: BuildCommandOptions, cfg: ProjectConfig) -> i32:
+    if options.target_kind < 0:
+        with_eprint("error: invalid with.toml: unsupported target.default '" ++ cfg.target_default ++ "'")
+        return 1
     // §18.5: non-native target selections must fail loudly until
     // cross-target codegen/linking exists; never fall back to native.
     if not build_graph_target_is_host(options.target_kind):
         with_eprint("error: cross-target build for '" ++ build_graph_target_name(options.target_kind) ++ "' is not implemented yet; host is " ++ build_graph_target_name(build_graph_host_target_kind()))
         return 1
+    0
+
+fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphCommandOptions) -> i32:
     var actual_options = options
     var actual_source = actual_options.source_path
     if actual_source == "":
@@ -1334,6 +1346,9 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
         let cfg = project_config_load_for_source(root ++ "/src/main.w")
         if cfg.manifest_error.len() > 0:
             with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
+            return 1
+        actual_options = build_command_apply_project_target_default(actual_options, cfg)
+        if build_command_validate_target(actual_options, cfg) != 0:
             return 1
         if project_config_file_exists(build_path):
             if actual_options.output_kind != BuildOutputKind.Binary:
@@ -1371,6 +1386,14 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
         actual_options.source_path = actual_source
         if actual_options.output_path == "" and cfg.package_name.len() > 0:
             actual_options.output_path = "out/bin/" ++ cfg.package_name
+    else:
+        let cfg = project_config_load_for_source(actual_source)
+        if cfg.manifest_error.len() > 0:
+            with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
+            return 1
+        actual_options = build_command_apply_project_target_default(actual_options, cfg)
+        if build_command_validate_target(actual_options, cfg) != 0:
+            return 1
     if graph_options.no_deps:
         with_eprint("error: --no-deps is only supported for build.w action targets")
         return 1

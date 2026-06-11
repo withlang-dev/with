@@ -35,6 +35,7 @@ pub type BuildCommandOptions {
     overflow_mode: i32,
     deterministic: bool,
     target_kind: i32,
+    target_explicit: bool,
     include_paths: Vec[str],
     defines: Vec[str],
     link_libs: Vec[str],
@@ -103,6 +104,7 @@ pub fn build_command_options_default -> BuildCommandOptions:
         overflow_mode: driver_internal_overflow_mode(),
         deterministic: false,
         target_kind: 0,
+        target_explicit: false,
         include_paths: Vec.new(),
         defines: Vec.new(),
         link_libs: Vec.new(),
@@ -222,11 +224,13 @@ pub fn driver_target_triple_kind(triple: str) -> i32:
 type DriverTargetParseResult {
     ok: bool,
     kind: i32,
+    explicit: bool,
     error_msg: str,
 }
 
 fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
     var kind = 0
+    var explicit = false
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
@@ -234,7 +238,7 @@ fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
         var seen = false
         if arg == "--target":
             if i + 1 >= argc:
-                return DriverTargetParseResult { false, 0, "--target requires a target triple argument" }
+                return DriverTargetParseResult { false, 0, true, "--target requires a target triple argument" }
             value = with_arg_at(i + 1)
             seen = true
             i = i + 2
@@ -247,9 +251,10 @@ fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
         if seen:
             let parsed = driver_target_triple_kind(value)
             if parsed < 0:
-                return DriverTargetParseResult { false, 0, "unsupported target triple '" ++ value ++ "'; cross-target codegen/linking is not implemented yet" }
+                return DriverTargetParseResult { false, 0, true, "unsupported target triple '" ++ value ++ "'; cross-target codegen/linking is not implemented yet" }
             kind = parsed
-    DriverTargetParseResult { true, kind, "" }
+            explicit = true
+    DriverTargetParseResult { true, kind, explicit, "" }
 
 fn driver_build_target_arg(argc: i32) -> str:
     var i = 2
@@ -367,8 +372,9 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
             error_msg: target.error_msg,
             build,
             graph,
-        }
+    }
     build.target_kind = target.kind
+    build.target_explicit = target.explicit
 
     let emit_c = driver_has_flag(argc, "--emit-c")
     let emit_obj = driver_has_flag(argc, "--emit-obj")
