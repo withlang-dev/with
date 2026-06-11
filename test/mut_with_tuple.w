@@ -30,10 +30,11 @@ fn test_wildcard:
         assert(a == 1)
         assert(c == 3)
 
-// Mutable with non-Unit body returns body value
+// Mutable with non-Unit body returns the mutated tuple binding
 fn test_mutable_non_unit:
     let p = make_pair()
     let result = with p as mut (a, b):
         a = a + 10
         a + b
-    assert(result == 13)
+    assert(result.0 == 11)
+    assert(result.1 == 2)

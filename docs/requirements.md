@@ -2483,7 +2483,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: The value is owned and mutable inside the block, then returned as the block's result.
   - Source: `§7.2 L2465-L2467`
   - Related spec refs: none
-- [x] `7.2.1.3` **Return rule: with expr as mut x: always returns x (the builder), regardless...** — impl: [#375](https://github.com/withlang-dev/with/issues/375)
+- [x] `7.2.1.3` **Return rule: with expr as mut x: always returns x (the builder), regardless...**
   - Requirement: **Return rule:** `with expr as mut x:` **always returns `x`** (the builder), regardless of the type of the body's last expression.
   - Source: `§7.2 L2487-L2490`
   - Related spec refs: none

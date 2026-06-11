@@ -24,19 +24,28 @@ fn test_unit_call_tail_returns_builder:
     assert(v.get(0) == 1)
     assert(v.get(2) == 3)
 
-fn test_non_unit_tail_returns_tail_value:
-    let len = with Vec.new() as mut v:
+fn test_non_unit_tail_returns_builder:
+    let v = with Vec.new() as mut v:
         v.push(1)
         v.push(2)
         v.len()
-    assert(len == 2)
+    assert(v.len() == 2)
+    assert(v.get(0) == 1)
+    assert(v.get(1) == 2)
 
-fn test_non_unit_hashmap_tail_returns_tail_value:
-    let len = with HashMap[str, i32].new() as mut m:
+fn test_non_unit_hashmap_tail_returns_builder:
+    let m = with HashMap[str, i32].new() as mut m:
         m.insert("a", 1)
         m.insert("b", 2)
         m.len()
-    assert(len == 2)
+    assert(m.len() == 2)
+    assert(m.get("a").unwrap() == 1)
+    assert(m.get("b").unwrap() == 2)
+
+fn test_form3_still_returns_body_value:
+    let len = with Vec[i32].new() as v:
+        v.len()
+    assert(len == 0)
 
 fn test_builder_expression_as_return_value() -> Config:
     with Config.default() as mut c:

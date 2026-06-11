@@ -547,7 +547,7 @@ let config = with Config.default() as mut c:
     c.retries = 3
 ```
 
-If the last statement is `Unit`, the block returns the mutated binding.
+The block always returns the mutated binding.
 
 ### 3. Scoped binding
 

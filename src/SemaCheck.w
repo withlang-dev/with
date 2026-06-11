@@ -7417,23 +7417,10 @@ fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
     if final_source_ty >= 0:
         source_ty = final_source_ty as TypeId
     self.pop_scope()
-    // Form 2 builder rule: `with <expr> as mut x:` returns `x` when body
-    // ends in Unit; otherwise returns the final expression value.
-    if is_mut != 0 and self.with_body_is_unit(body, body_ty):
+    // Form 2 builder rule: `with <expr> as mut x:` always returns x.
+    if is_mut != 0:
         return source_ty as i32
     body_ty as i32
-
-fn Sema.with_body_is_unit(self: Sema, body: i32, body_ty: TypeId) -> bool:
-    if body_ty == self.ty_void:
-        return true
-    let bk = self.ast.kind(body)
-    if bk == NodeKind.NK_ASSIGN:
-        return true
-    if bk == NodeKind.NK_BLOCK:
-        let tail = self.ast.get_data2(body)
-        if tail != 0 and self.ast.kind(tail) == NodeKind.NK_ASSIGN:
-            return true
-    false
 
 fn Sema.check_with_tuple(self: Sema, node: i32) -> i32:
     let source = self.ast.get_data0(node)
@@ -7460,7 +7447,7 @@ fn Sema.check_with_tuple(self: Sema, node: i32) -> i32:
             self.scope_put(sym, elem_ty, is_mut)
     let body_ty = self.check_expr(body)
     self.pop_scope()
-    if is_mut != 0 and self.with_body_is_unit(body, body_ty as TypeId):
+    if is_mut != 0:
         return source_ty as i32
     body_ty as i32
 

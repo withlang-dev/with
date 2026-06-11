@@ -283,17 +283,11 @@ happens to be `Unit`. Consequences:
 extraction is signaled explicitly (a plain block / Form 3, or an
 explicit final keyword). One construct, one meaning.
 
-**Implementation status (2026-06-09):** The Unit-dispatch rule is
-implemented as spec'd: `lower_with_binding` returns the binding when
-`is_mut` is set and `with_body_is_unit(body)` holds
-(`src/MirLower.w:7285-7289`); the Unit test checks body type void or an
-assignment tail (`:7293-7304`), and the tuple form applies the same
-rule (`:7324-7328`). Guarded dispatch via `Scoped`/`ScopedMut` with
-`with_enter`/`with_exit` validation is also implemented
-(`src/SemaCheck.w:2030-2056`), including the "mutable guarded with
-requires ScopedMut" error (commit 13e34656). So changing the builder
-rule is a spec decision plus a small change in `lower_with_binding` —
-much cheaper now than after Smallhold/Crux code starts depending on
+**Implementation status (2026-06-11):** Superseded by #375. Mutable
+plain and tuple `with` builder forms always return the binding;
+guarded dispatch via `Scoped`/`ScopedMut` with `with_enter`/`with_exit`
+validation remains the body-value path. This was much cheaper to fix
+before Smallhold/Crux code started depending on
 extraction-mode behavior.
 
 **Calibration note (2026-06-09, second pass):** the silent-flip risk

@@ -2642,7 +2642,7 @@ Full `with` dispatch is syntax-first, type/protocol-driven, and
 ```
 // Plain binding path
 with expr as name:                 →  { let name = expr; body }
-with expr as mut name:             →  { var name = expr; body }
+with expr as mut name:             →  { var name = expr; body; name }
 ```
 
 In the guarded path, the guard protocol supplies acquire/release

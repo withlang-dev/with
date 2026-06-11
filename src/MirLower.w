@@ -7302,27 +7302,15 @@ fn MirBuilder.lower_with_binding(self: MirBuilder, sym: i32, rhs_expr: i32, body
         self.schedule_drop(local, DropKind.DK_VALUE)
     let rhs = self.lower_expr(rhs_expr)
     self.assign_operand_to_place(self.place_for_local(local), rhs, self.ast.get_start(rhs_expr))
-    let result = self.lower_expr(body_expr)
-    // Form 2 builder rule: when mut and body is unit, return the binding
-    if is_mut != 0 and self.with_body_is_unit(body_expr):
+    // Form 2 builder rule: `with <expr> as mut x:` always returns x.
+    if is_mut != 0:
+        let _ = self.lower_expr_discard(body_expr)
         let local_place = self.place_for_local(local)
         self.pop_scope_inline()
         return self.body.new_operand(OperandKind.OK_COPY, local_place)
+    let result = self.lower_expr(body_expr)
     self.pop_scope_inline()
     result
-
-fn MirBuilder.with_body_is_unit(self: MirBuilder, body_expr: i32) -> bool:
-    let body_ty = self.expr_type(body_expr)
-    if body_ty == 0 or body_ty == self.sema.ty_void:
-        return true
-    let bk = self.ast.kind(body_expr)
-    if bk == NodeKind.NK_ASSIGN:
-        return true
-    if bk == NodeKind.NK_BLOCK:
-        let tail = self.ast.get_data2(body_expr)
-        if tail != 0 and self.ast.kind(tail) == NodeKind.NK_ASSIGN:
-            return true
-    false
 
 fn MirBuilder.lower_with_tuple(self: MirBuilder, node: i32) -> i32:
     let source = self.ast.get_data0(node)
@@ -7342,11 +7330,9 @@ fn MirBuilder.lower_with_tuple(self: MirBuilder, node: i32) -> i32:
             let elem_ty = self.tuple_elem_type(rhs_ty, ni)
             let field_place = self.body.new_field_place(rhs_place, ni, elem_ty)
             self.bind_alias_place(n_sym, field_place, elem_ty)
-        let body_result = self.lower_expr(body)
+        let _ = self.lower_expr_discard(body)
         self.pop_scope_inline()
-        if self.with_body_is_unit(body):
-            return self.body.new_operand(OperandKind.OK_COPY, rhs_place)
-        return body_result
+        return self.body.new_operand(OperandKind.OK_COPY, rhs_place)
     for ni in 0..name_count:
         let n_sym = self.ast.get_extra(extra_start + 2 + ni)
         if n_sym == 0:
