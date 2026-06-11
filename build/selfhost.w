@@ -694,7 +694,8 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
     let manifest =
         "[package]\n" ++
         "name = \"manifestcfg\"\n" ++
-        "version = \"0.2.0\"\n\n" ++
+        "version = \"0.2.0\"\n" ++
+        "copy_warn_threshold = 96\n\n" ++
         "[c_import]\n" ++
         "include_paths = [\"include\"]\n" ++
         "defines = [\"WITH_CONFIG_TEST=1\", \"WITH_EXTRA\"]\n\n" ++
@@ -744,6 +745,8 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
     rc = bs_assert_contains(ctx, dump.stdout, "config runtime_fiber_stack_size=131072", "declarative_manifest_runtime_stack")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, dump.stdout, "config runtime_fiber_pool_size=64", "declarative_manifest_runtime_pool")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config copy_warn_threshold=96", "declarative_manifest_copy_warn_threshold")
     if rc != 0: return rc
 
     let c_define_dir = bs_join(case_dir, "c_define")
@@ -918,6 +921,95 @@ fn bs_check_runtime_manifest_config(ctx: ActionCtx, compiler_path: str, case_dir
     if unknown.rc == 0:
         return bs_fail(ctx, "unknown [runtime] key unexpectedly succeeded")
     bs_assert_contains(ctx, unknown.stderr, "unknown key 'executor' in [runtime]", "runtime_manifest_unknown")
+
+fn bs_check_copy_warning_manifest_config(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let default_dir = bs_join(case_dir, "default_warn")
+    var rc = bs_write_project_manifest(ctx, default_dir, "copydefault")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(default_dir, "src/main.w"),
+        "type BigDefault:\n" ++
+        "    words: [u64; 17]\n\n" ++
+        "impl Copy for BigDefault\n\n" ++
+        "fn main:\n" ++
+        "    let a = BigDefault { words: [1 as u64; 17] }\n" ++
+        "    let b = a\n" ++
+        "    assert(a.words[0] == b.words[0])\n" ++
+        "    print(\"copydefault\")\n",
+        "default copy warning source")
+    if rc != 0: return rc
+    let default_build = bs_project_expect_success(ctx, compiler_path, default_dir, "copy-warning-default", bs_project_args("build"))
+    if default_build.rc != 0: return default_build.rc
+    rc = bs_assert_contains(ctx, default_build.stderr, "warning: large Copy type 'BigDefault' is 136 bytes; implicit copies may be expensive (copy_warn_threshold=128)", "copy_warning_default")
+    if rc != 0: return rc
+    let default_run = bs_run_binary_capture(ctx, bs_join(default_dir, "out/bin/copydefault"), "copy-warning-default-run", 120000)
+    if default_run.rc != 0:
+        return bs_fail(ctx, f"default copy warning binary failed with exit code {default_run.rc}: " ++ default_run.stderr)
+    rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(default_run.stdout), "copydefault", "copy_warning_default_semantics", "stdout")
+    if rc != 0: return rc
+
+    let derive_dir = bs_join(case_dir, "configured_derive_warn")
+    rc = bs_write_fixture(ctx, bs_join(derive_dir, "with.toml"), "[package]\nname = \"copyderive\"\nversion = \"0.1.0\"\ncopy_warn_threshold = 64\n", "configured derive copy manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(derive_dir, "src/main.w"),
+        "@[derive(Copy)]\n" ++
+        "type BigDerive:\n" ++
+        "    words: [u64; 9]\n\n" ++
+        "fn main:\n" ++
+        "    let a = BigDerive { words: [2 as u64; 9] }\n" ++
+        "    let b = a\n" ++
+        "    assert(a.words[0] == b.words[0])\n" ++
+        "    print(\"copyderive\")\n",
+        "configured derive copy warning source")
+    if rc != 0: return rc
+    let derive_build = bs_project_expect_success(ctx, compiler_path, derive_dir, "copy-warning-configured-derive", bs_project_args("build"))
+    if derive_build.rc != 0: return derive_build.rc
+    rc = bs_assert_contains(ctx, derive_build.stderr, "warning: large Copy type 'BigDerive' is 72 bytes; implicit copies may be expensive (copy_warn_threshold=64)", "copy_warning_configured_derive")
+    if rc != 0: return rc
+
+    let exact_dir = bs_join(case_dir, "exact_threshold")
+    rc = bs_write_project_manifest(ctx, exact_dir, "copyexact")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(exact_dir, "src/main.w"),
+        "type ExactCopy:\n" ++
+        "    words: [u64; 16]\n\n" ++
+        "impl Copy for ExactCopy\n\n" ++
+        "fn main:\n" ++
+        "    let a = ExactCopy { words: [3 as u64; 16] }\n" ++
+        "    let b = a\n" ++
+        "    assert(a.words[0] == b.words[0])\n",
+        "exact threshold copy source")
+    if rc != 0: return rc
+    let exact_build = bs_project_expect_success(ctx, compiler_path, exact_dir, "copy-warning-exact-threshold", bs_project_args("build"))
+    if exact_build.rc != 0: return exact_build.rc
+    rc = bs_assert_not_contains(ctx, exact_build.stderr, "large Copy type", "copy_warning_exact_threshold")
+    if rc != 0: return rc
+
+    let disabled_dir = bs_join(case_dir, "disabled")
+    rc = bs_write_fixture(ctx, bs_join(disabled_dir, "with.toml"), "[package]\nname = \"copydisabled\"\nversion = \"0.1.0\"\ncopy_warn_threshold = 0\n", "disabled copy warning manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(disabled_dir, "src/main.w"),
+        "type BigDisabled: Copy\n" ++
+        "    words: [u64; 32]\n\n" ++
+        "fn main:\n" ++
+        "    let a = BigDisabled { words: [4 as u64; 32] }\n" ++
+        "    let b = a\n" ++
+        "    assert(a.words[0] == b.words[0])\n",
+        "disabled copy warning source")
+    if rc != 0: return rc
+    let disabled_build = bs_project_expect_success(ctx, compiler_path, disabled_dir, "copy-warning-disabled", bs_project_args("build"))
+    if disabled_build.rc != 0: return disabled_build.rc
+    rc = bs_assert_not_contains(ctx, disabled_build.stderr, "large Copy type", "copy_warning_disabled")
+    if rc != 0: return rc
+
+    let invalid_dir = bs_join(case_dir, "invalid")
+    rc = bs_write_fixture(ctx, bs_join(invalid_dir, "with.toml"), "[package]\nname = \"copyinvalid\"\nversion = \"0.1.0\"\ncopy_warn_threshold = -1\n", "invalid copy warning manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(invalid_dir, "src/main.w"), "fn main:\n    print(\"copyinvalid\")\n", "invalid copy warning source")
+    if rc != 0: return rc
+    let invalid = bs_run_cli_capture_cwd(ctx, compiler_path, "copy-warning-invalid-threshold", bs_project_args("build"), 120000, invalid_dir)
+    if invalid.rc == 0:
+        return bs_fail(ctx, "negative copy_warn_threshold unexpectedly succeeded")
+    bs_assert_contains(ctx, invalid.stderr, "copy_warn_threshold must be a non-negative integer", "copy_warning_invalid_threshold")
 
 fn bs_check_link_libs_manifest_diagnostics(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), "[package]\nname = \"badlinklibs\"\nversion = \"0.1.0\"\n\n[link]\nlibs = \"sqlite3\"\n", "bad link libs manifest")
@@ -1469,6 +1561,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_declarative_manifest_config(ctx, compiler_path, bs_join(output_dir, "declarative_manifest_config_case"))
     if rc != 0: return rc
     rc = bs_check_runtime_manifest_config(ctx, compiler_path, bs_join(output_dir, "runtime_manifest_config_case"))
+    if rc != 0: return rc
+    rc = bs_check_copy_warning_manifest_config(ctx, compiler_path, bs_join(output_dir, "copy_warning_manifest_case"))
     if rc != 0: return rc
     rc = bs_check_link_libs_manifest_diagnostics(ctx, compiler_path, bs_join(output_dir, "link_libs_manifest_case"))
     if rc != 0: return rc

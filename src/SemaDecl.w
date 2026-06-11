@@ -1563,6 +1563,17 @@ fn Sema.check_blanket_overlap(self: Sema, trait_sym: i32, bound_start: i32, boun
             let tn = self.pool_resolve(trait_sym)
             self.emit_error_code("overlapping implementations of '" ++ tn ++ "'", node, "E1201")
 
+fn Sema.warn_large_copy_type(self: Sema, type_name: i32, type_tid: i32, node: i32):
+    if self.emit_config_warnings == 0:
+        return
+    let threshold = self.copy_warn_threshold
+    if threshold <= 0 or type_tid <= 0:
+        return
+    let size = self.type_layout_size_of(type_tid)
+    if size > threshold:
+        let name = self.pool_resolve(type_name)
+        self.emit_warning(f"large Copy type '{name}' is {size} bytes; implicit copies may be expensive (copy_warn_threshold={threshold})", node)
+
 fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> void:
     let type_name = self.ast.get_data0(node)
     let trait_sym = self.ast.get_data2(node)
@@ -1615,6 +1626,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> void:
                         let field_name = self.type_extra.get((te_start + fi * 3) as i64)
                         self.emit_error("type '" ++ self.pool_resolve(type_name) ++ "' cannot implement Copy: field '" ++ self.pool_resolve(field_name) ++ "' is not Copy", node)
                         return
+                self.warn_large_copy_type(type_name, type_tid, node)
 
     if trait_name == "Drop":
         if self.select_trait_impl(type_name, self.syms.copy_trait) != 0:
@@ -2067,6 +2079,8 @@ fn Sema.validate_copy_derives(self: Sema):
                 break
         if has_noncopy_field != 0:
             self.emit_error("cannot derive Copy for a type with non-Copy fields", decl)
+        else:
+            self.warn_large_copy_type(type_name, tid, decl)
 
 fn Sema.validate_compiler_hooks(self: Sema):
     for hi in 0..self.ast.compiler_hook_count():

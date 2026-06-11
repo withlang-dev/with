@@ -819,6 +819,19 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
+Phase 1 build/configuration work is in progress. Issue #424 is implemented
+locally in the current worktree: `copy_warn_threshold` is parsed from
+`with.toml`, propagated into sema, and used to emit a non-fatal large-`Copy`
+warning after Copy safety validation. Verification passed with:
+
+```sh
+WITH=$PWD/out/bin/with ./out/bin/with build
+WITH=$PWD/out/bin/with ./out/release/bin/with build :cli-selfhost-project-tests
+WITH=$PWD/out/bin/with ./out/release/bin/with build :fixpoint
+WITH=$PWD/out/bin/with ./out/release/bin/with build :test
+WITH=$PWD/out/bin/with ./out/release/bin/with build :test-green
+```
+
 At the time of this update, Phase F is complete. The Phase F code changes
 passed the standard verification sequence:
 

@@ -24,6 +24,7 @@ type ProjectConfig {
     target_default: str,
     runtime_fiber_stack_size: i64,
     runtime_fiber_pool_size: i32,
+    copy_warn_threshold: i64,
     no_std: bool,
     alloc_mode: bool,
     runtime_available: bool,
@@ -54,6 +55,7 @@ fn project_config_default -> ProjectConfig:
         target_default: "",
         runtime_fiber_stack_size: 0,
         runtime_fiber_pool_size: 0,
+        copy_warn_threshold: 128,
         no_std: false,
         alloc_mode: false,
         runtime_available: true,
@@ -168,6 +170,13 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
                 out.manifest_error = "runtime must be true or false"
         else:
             out.runtime_available = parsed_runtime != 0
+    else if (section == "" or section == "project" or section == "package") and key == "copy_warn_threshold":
+        let parsed_copy_threshold = project_config_parse_nonnegative_i64(value)
+        if parsed_copy_threshold < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "copy_warn_threshold must be a non-negative integer"
+        else:
+            out.copy_warn_threshold = parsed_copy_threshold
     else if section == "build" and key == "overflow":
         let parsed_overflow = overflow_mode_parse(project_config_strip_quotes(project_config_trim(value)))
         if parsed_overflow < 0:
@@ -303,6 +312,18 @@ fn project_config_parse_positive_i64(value: str) -> i64:
             return -1
     out
 
+fn project_config_parse_nonnegative_i64(value: str) -> i64:
+    let text = project_config_strip_quotes(project_config_trim(value))
+    if text.len() == 0:
+        return -1
+    var out: i64 = 0
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        out = out * 10 + (ch - 48) as i64
+    out
+
 fn project_config_vec_contains(values: Vec[str], needle: str) -> bool:
     for i in 0..values.len() as i32:
         if values.get(i as i64) == needle:
@@ -399,7 +420,7 @@ fn project_config_wants_key(section: str, key: str) -> bool:
     let manual_c_dep = project_config_manual_c_dep_name(section)
     if (section == "project" or section == "package") and (key == "name" or key == "version"):
         return true
-    if (section == "" or section == "project" or section == "package") and (key == "std" or key == "alloc" or key == "runtime"):
+    if (section == "" or section == "project" or section == "package") and (key == "std" or key == "alloc" or key == "runtime" or key == "copy_warn_threshold"):
         return true
     if section == "c_import" and key == "include_paths":
         return true

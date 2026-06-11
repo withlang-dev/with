@@ -523,19 +523,19 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: These rules guarantee that `Copy` is always safe in safe code — it cannot cause double-free, use-after-free, or resource leaks.
   - Source: `§2.3 L369-L370`
   - Related spec refs: none
-- [x] `2.3.1.8` **Size warning: The compiler emits a warning (not an error) when Copy is impl...** — impl: [#424](https://github.com/withlang-dev/with/issues/424)
+- [x] `2.3.1.8` **Size warning: The compiler emits a warning (not an error) when Copy is impl...**
   - Requirement: **Size warning:** The compiler emits a **warning** (not an error) when `Copy` is implemented for types exceeding a size threshold.
   - Source: `§2.3 L372-L376`
   - Related spec refs: none
-- [x] `2.3.1.9` **The default threshold is 128 bytes.** — impl: [#424](https://github.com/withlang-dev/with/issues/424)
+- [x] `2.3.1.9` **The default threshold is 128 bytes.**
   - Requirement: The default threshold is 128 bytes.
   - Source: `§2.3 L372-L376`
   - Related spec refs: none
-- [x] `2.3.1.10` **It is configurable via with.toml (copy_warn_threshold).** — impl: [#424](https://github.com/withlang-dev/with/issues/424)
+- [x] `2.3.1.10` **It is configurable via with.toml (copy_warn_threshold).**
   - Requirement: It is configurable via `with.toml` (`copy_warn_threshold`).
   - Source: `§2.3 L372-L376`
   - Related spec refs: none
-- [x] `2.3.1.11` **The warning does not affect semantics — the type is still Copy.** — impl: [#424](https://github.com/withlang-dev/with/issues/424)
+- [x] `2.3.1.11` **The warning does not affect semantics — the type is still Copy.**
   - Requirement: The warning does not affect semantics — the type is still `Copy`.
   - Source: `§2.3 L372-L376`
   - Related spec refs: none
