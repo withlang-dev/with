@@ -211,12 +211,20 @@ binaries, `install.sh`, or platform SDK archives.
 work. Do not treat it as a normal release gate unless the release scope
 explicitly includes emit-C self-hosting changes.
 
-After packaging the platform binary asset locally, run the release UAT gate
-before uploading or publishing any release assets:
+Run the release UAT gate before uploading or publishing any release assets:
 
 ```sh
 with build :release-uat
 ```
+
+The platform-named asset the gates consume (`out/release/with-darwin-aarch64`
+on Darwin arm64) is produced by the `:release-platform-asset` target, an
+in-graph copy of `out/release/bin/with` that every UAT target depends on. Do
+not copy it by hand; the build graph keeps it current with the verified build.
+Note that the packaging script later overwrites this asset with the stripped
+publishable binary, so run packaging after the final `:release-uat`; if UAT is
+re-run afterwards, the asset is regenerated unstripped and packaging must be
+redone before upload.
 
 `:release-uat` is mandatory for every release. It includes:
 

@@ -359,6 +359,21 @@ fn ruat_libcurl_program() -> str:
     "    curl_global_cleanup()\n" ++
     "    write(\"libcurl UAT passed\\n\")\n"
 
+// Produce the platform-named release asset from the verified release
+// compiler. Every release UAT consumes this asset; producing it in the
+// build graph guarantees the gates always test the current build instead
+// of a stale hand-copied binary (#551).
+pub fn run_release_platform_asset_action(ctx: ActionCtx) -> i32:
+    let compiler_rel = ruat_compiler_input_rel(ctx)
+    if compiler_rel.len() == 0:
+        return ruat_fail(ctx, "missing release compiler input")
+    let asset = ctx.output()
+    if ctx.fs().copy_file(compiler_rel, asset) != 0:
+        return ruat_fail(ctx, "could not copy release compiler to platform asset: " ++ asset)
+    if os() != "Windows" and ctx.fs().chmod(asset, 0o755) != 0:
+        return ruat_fail(ctx, "could not chmod platform asset: " ++ asset)
+    0
+
 pub fn run_release_artifact_smoke_uat_action(ctx: ActionCtx) -> i32:
     let compiler = ruat_compiler_input(ctx)
     if compiler.len() == 0:
