@@ -165,7 +165,7 @@ fn driver_build_source_arg(argc: i32) -> str:
         if arg == "-o":
             step = 2
             skip = true
-        if not skip and (arg == "--output" or arg == "--filter" or arg == "-f" or arg == "--explain"):
+        if not skip and (arg == "--output" or arg == "--filter" or arg == "-f" or arg == "--explain" or arg == "--target"):
             step = 2
             skip = true
         if not skip and driver_has_output_prefix(arg):
@@ -200,6 +200,56 @@ fn driver_explain_arg(argc: i32) -> str:
             return ""
         i = i + 1
     ""
+
+// Target triples accepted by --target (§18.5). Returns the
+// std.build.BuildTarget kind, or -1 for a triple this compiler
+// cannot represent.
+pub fn driver_target_triple_kind(triple: str) -> i32:
+    if triple == "native":
+        return 0
+    if triple == "x86_64-unknown-linux-gnu" or triple == "x86_64-linux-gnu" or triple == "linux_x86_64":
+        return 1
+    if triple == "aarch64-unknown-linux-gnu" or triple == "aarch64-linux-gnu" or triple == "linux_aarch64":
+        return 2
+    if triple == "x86_64-apple-darwin" or triple == "darwin_x86_64":
+        return 3
+    if triple == "aarch64-apple-darwin" or triple == "arm64-apple-darwin" or triple == "darwin_aarch64":
+        return 4
+    if triple == "x86_64-pc-windows-msvc" or triple == "windows_x86_64":
+        return 5
+    -1
+
+type DriverTargetParseResult {
+    ok: bool,
+    kind: i32,
+    error_msg: str,
+}
+
+fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
+    var kind = 0
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        var value = ""
+        var seen = false
+        if arg == "--target":
+            if i + 1 >= argc:
+                return DriverTargetParseResult { false, 0, "--target requires a target triple argument" }
+            value = with_arg_at(i + 1)
+            seen = true
+            i = i + 2
+        else if with_str_starts_with(arg, "--target=") != 0:
+            value = with_str_slice(arg, 9, with_str_len(arg))
+            seen = true
+            i = i + 1
+        else:
+            i = i + 1
+        if seen:
+            let parsed = driver_target_triple_kind(value)
+            if parsed < 0:
+                return DriverTargetParseResult { false, 0, "unsupported target triple '" ++ value ++ "'; cross-target codegen/linking is not implemented yet" }
+            kind = parsed
+    DriverTargetParseResult { true, kind, "" }
 
 fn driver_build_target_arg(argc: i32) -> str:
     var i = 2
@@ -309,6 +359,16 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
             graph,
         }
     build.overflow_mode = overflow.mode
+
+    let target = driver_parse_build_target(argc)
+    if not target.ok:
+        return BuildCommandParseResult {
+            ok: false,
+            error_msg: target.error_msg,
+            build,
+            graph,
+        }
+    build.target_kind = target.kind
 
     let emit_c = driver_has_flag(argc, "--emit-c")
     let emit_obj = driver_has_flag(argc, "--emit-obj")

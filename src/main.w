@@ -359,7 +359,7 @@ fn cli_one_liner_mode_name(mode: i32) -> str:
     ""
 
 fn cli_one_liner_known_value_option(arg: str) -> bool:
-    arg == "-o" or arg == "--output"
+    arg == "-o" or arg == "--output" or arg == "--target"
 
 fn cli_one_liner_known_flag(arg: str) -> bool:
     arg == "-O0" or arg == "-O1" or arg == "-O2" or arg == "-O3" or
@@ -1318,6 +1318,11 @@ fn repo_lock_release():
             let _ = with_fs_remove_tree(lock_dir)
 
 fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphCommandOptions) -> i32:
+    // §18.5: non-native target selections must fail loudly until
+    // cross-target codegen/linking exists; never fall back to native.
+    if not build_graph_target_is_host(options.target_kind):
+        with_eprint("error: cross-target build for '" ++ build_graph_target_name(options.target_kind) ++ "' is not implemented yet; host is " ++ build_graph_target_name(build_graph_host_target_kind()))
+        return 1
     var actual_options = options
     var actual_source = actual_options.source_path
     if actual_source == "":
@@ -2520,6 +2525,8 @@ fn print_usage:
     with_write("  -O0|-O1|-O2|-O3  Set optimization level\n")
     with_write("  -o <path>        Write output to path\n")
     with_write("  --release        Enable release defaults\n")
+    with_write("  --target <triple>\n")
+    with_write("                   Build for a target triple (cross-targets not implemented yet)\n")
     with_write("  --emit-c         Emit C instead of a binary\n")
     with_write("  --emit-obj       Emit an object file instead of a binary\n")
     with_write("  --dump-project-info\n")
@@ -2549,6 +2556,8 @@ fn print_build_usage:
     with_write("  -O0|-O1|-O2|-O3  Set optimization level\n")
     with_write("  -o, --output     Write output to path\n")
     with_write("  --release        Enable release defaults\n")
+    with_write("  --target <triple>\n")
+    with_write("                   Build for a target triple (cross-targets not implemented yet)\n")
     with_write("  --emit-c         Emit C instead of a binary\n")
     with_write("  --emit-obj       Emit an object file instead of a binary\n")
     with_write("  --graph          Print the build graph and exit\n")

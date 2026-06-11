@@ -90,6 +90,28 @@ fn bs_host_platform_runtime_object() -> str:
         return "rt_windows_x86_64.o"
     ""
 
+fn bs_host_target_triple() -> str:
+    let host_os = os()
+    let host_arch = arch()
+    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "aarch64-apple-darwin"
+    if host_os == "Macos" and host_arch == "x86_64":
+        return "x86_64-apple-darwin"
+    if host_os == "Linux" and host_arch == "x86_64":
+        return "x86_64-unknown-linux-gnu"
+    if host_os == "Linux" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "aarch64-unknown-linux-gnu"
+    if host_os == "Windows" and host_arch == "x86_64":
+        return "x86_64-pc-windows-msvc"
+    ""
+
+// A representable triple that is never the host: darwin for Linux
+// hosts, linux for everything else.
+fn bs_cross_target_triple() -> str:
+    if os() == "Linux":
+        return "aarch64-apple-darwin"
+    "x86_64-unknown-linux-gnu"
+
 fn bs_run_cli_capture(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
@@ -309,6 +331,7 @@ fn bs_check_help(ctx: ActionCtx, compiler_path: str) -> i32:
     let build_checks: Vec[str] = Vec.new()
     build_checks |> push("Usage: with build [source.w|:target] [options]")
     build_checks |> push("  --graph          Print the build graph and exit")
+    build_checks |> push("  --target <triple>")
     build_checks |> push("  --emit-c         Emit C instead of a binary")
     for bi in 0..build_checks.len() as i32:
         let brc = bs_assert_contains(ctx, build_help.stdout, build_checks.get(bi as i64), "build_help")
@@ -1006,7 +1029,77 @@ fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str)
     let bad_prelude = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-bad-prelude", bad_prelude_args, 120000, case_dir)
     if bad_prelude.rc == 0:
         return bs_fail(ctx, "build options bad prelude unexpectedly succeeded")
-    bs_assert_contains(ctx, bad_prelude.stderr, "invalid --prelude value 'bogus' (expected full|alloc|core|none)", "build_options_bad_prelude")
+    rc = bs_assert_contains(ctx, bad_prelude.stderr, "invalid --prelude value 'bogus' (expected full|alloc|core|none)", "build_options_bad_prelude")
+    if rc != 0: return rc
+
+    // --target native (space form) builds and runs (§18.5)
+    let target_native_bin = bs_join(case_dir, "hello_target_native")
+    var target_native_args: Vec[str] = Vec.new()
+    target_native_args |> push("build")
+    target_native_args |> push(bs_abs(root, src))
+    target_native_args |> push("--target")
+    target_native_args |> push("native")
+    target_native_args |> push("-o")
+    target_native_args |> push(bs_abs(root, target_native_bin))
+    let target_native = bs_edge_expect_success(ctx, compiler_path, case_dir, "build-options-target-native", target_native_args)
+    if target_native.rc != 0: return target_native.rc
+    let target_native_run = bs_run_binary_capture(ctx, target_native_bin, "build-options-target-native-run", 120000)
+    if target_native_run.rc != 0:
+        return bs_fail(ctx, f"--target native binary failed with exit code {target_native_run.rc}: " ++ target_native_run.stderr)
+    rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(target_native_run.stdout), "build-options", "build_options_target_native", "stdout")
+    if rc != 0: return rc
+
+    // --target=<host triple> (= form) is accepted as the native selection
+    let host_triple = bs_host_target_triple()
+    if host_triple.len() > 0:
+        var target_host_args: Vec[str] = Vec.new()
+        target_host_args |> push("build")
+        target_host_args |> push(bs_abs(root, src))
+        target_host_args |> push("--target=" ++ host_triple)
+        target_host_args |> push("-o")
+        target_host_args |> push(bs_abs(root, bs_join(case_dir, "hello_target_host")))
+        let target_host = bs_edge_expect_success(ctx, compiler_path, case_dir, "build-options-target-host", target_host_args)
+        if target_host.rc != 0: return target_host.rc
+
+    // Representable non-native target must fail loudly and leave no artifact
+    let cross_bin = bs_join(case_dir, "hello_target_cross")
+    var cross_args: Vec[str] = Vec.new()
+    cross_args |> push("build")
+    cross_args |> push(bs_abs(root, src))
+    cross_args |> push("--target")
+    cross_args |> push(bs_cross_target_triple())
+    cross_args |> push("-o")
+    cross_args |> push(bs_abs(root, cross_bin))
+    let cross = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-target-cross", cross_args, 120000, case_dir)
+    if cross.rc == 0:
+        return bs_fail(ctx, "cross-target build unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, cross.stderr, "not implemented yet", "build_options_target_cross")
+    if rc != 0: return rc
+    if ctx.fs().exists(cross_bin):
+        return bs_fail(ctx, "cross-target build produced a native artifact: " ++ cross_bin)
+
+    // Unrepresentable triple must fail loudly, never fall back to native
+    var unknown_target_args: Vec[str] = Vec.new()
+    unknown_target_args |> push("build")
+    unknown_target_args |> push(bs_abs(root, src))
+    unknown_target_args |> push("--target")
+    unknown_target_args |> push("thumbv7em-none-eabi")
+    let unknown_target = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-target-unknown", unknown_target_args, 120000, case_dir)
+    if unknown_target.rc == 0:
+        return bs_fail(ctx, "unknown target triple unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, unknown_target.stderr, "unsupported target triple 'thumbv7em-none-eabi'", "build_options_target_unknown")
+    if rc != 0: return rc
+
+    // --target with no value must fail loudly
+    var missing_target_args: Vec[str] = Vec.new()
+    missing_target_args |> push("build")
+    missing_target_args |> push(bs_abs(root, src))
+    missing_target_args |> push("--target")
+    let missing_target = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-target-missing", missing_target_args, 120000, case_dir)
+    if missing_target.rc == 0:
+        return bs_fail(ctx, "missing --target value unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, missing_target.stderr, "--target requires a target triple argument", "build_options_target_missing")
+    if rc != 0: return rc
 
 fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
