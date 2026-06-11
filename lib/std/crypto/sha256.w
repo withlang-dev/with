@@ -139,21 +139,21 @@ unsafe fn sha256_finish(ctx: *mut Sha256, out: *mut u8):
         u32_to_be(out, i * 4, ctx.state[i])
 
 // Convenience: hash a byte buffer and return 32-byte digest
-fn sha256_hash(data: *const u8, len: i32, out: *mut u8):
+pub fn sha256_hash(data: *const u8, len: i32, out: *mut u8) -> void:
     var ctx = Sha256.new()
     let p = &raw mut ctx as *mut Sha256
     unsafe { sha256_update(p, data, len) }
     unsafe { sha256_finish(p, out) }
 
 // Convenience: hash a string
-fn sha256_hash_str(s: str, out: *mut u8):
+pub fn sha256_hash_str(s: str, out: *mut u8) -> void:
     unsafe:
         let bytes = str_copy_bytes(s)
         sha256_hash(bytes as *const u8, s.len() as i32, out)
         str_free_bytes(bytes)
 
 // Format digest as hex string
-fn sha256_hex(digest: *const u8) -> str:
+pub fn sha256_hex(digest: *const u8) -> str:
     let hex_chars = "0123456789abcdef"
     var result = ""
     for i in 0..32:

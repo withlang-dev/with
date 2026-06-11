@@ -14,6 +14,7 @@ use Compilation
 use ComptimeEval
 use ComptimeValue
 use ConanClient
+use LockFile
 use Fmt
 use Lsp
 use CiPrint
@@ -2940,7 +2941,7 @@ fn cli_init_readme_template(name: str, is_lib: bool) -> str:
     "```\n"
 
 fn cli_init_gitignore_template() -> str:
-    "out/\n"
+    "out/\n.with/\n!.with/lock.json\n"
 
 fn cli_init_main_template(name: str) -> str:
     "fn main:\n" ++
@@ -3073,6 +3074,7 @@ type GetCommandOptions {
 
 fn get_command_usage():
     with_eprint("usage: with get [--force-reinstall] c.<package>[@version]")
+    with_eprint("       with get")
 
 fn parse_get_command_options(argc: i32) -> GetCommandOptions:
     var spec = ""
@@ -3095,9 +3097,12 @@ fn parse_get_command_options(argc: i32) -> GetCommandOptions:
 
 fn run_get_command(argc: i32) -> i32:
     let options = parse_get_command_options(argc)
-    if options.spec.len() == 0:
-        get_command_usage()
+    let root = project_config_find_root(".")
+    if root.len() == 0:
+        with_eprint("error: no with.toml found. Run 'with init' first.")
         return 1
+    if options.spec.len() == 0:
+        return lock_restore(root)
     let spec = options.spec
     if not spec.starts_with("c."):
         with_eprint("error: only C packages supported. Use c.<name> (e.g. c.sqlite3)")
@@ -3115,12 +3120,14 @@ fn run_get_command(argc: i32) -> i32:
         with_eprint("error: empty package name")
         return 1
 
-    let root = project_config_find_root(".")
-    if root.len() == 0:
-        with_eprint("error: no with.toml found. Run 'with init' first.")
-        return 1
     let resolved_version = conan_install(pkg_name, pkg_version, root, options.force_reinstall)
     if resolved_version.len() == 0:
+        return 1
+    let loaded_lock = lock_load(root)
+    let updated_lock = lock_upsert_installed_c_dep_tree(move loaded_lock, root, pkg_name, resolved_version)
+    if updated_lock.entries.len() == 0:
+        return 1
+    if lock_write(root, updated_lock) != 0:
         return 1
     let manifest_path = root ++ "/with.toml"
     let toml = with_fs_read_file(manifest_path)

@@ -583,6 +583,10 @@ fn bs_check_init_common_files(ctx: ActionCtx, project_dir: str, package_name: st
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(project_dir, ".gitignore"), "out/", label ++ " gitignore out")
     if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(project_dir, ".gitignore"), ".with/", label ++ " gitignore with dir")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(project_dir, ".gitignore"), "!.with/lock.json", label ++ " gitignore lock")
+    if rc != 0: return rc
     bs_check_init_ai_docs(ctx, project_dir, label)
 
 fn bs_check_init_in_cwd(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
@@ -914,6 +918,10 @@ fn bs_check_get_force_reinstall(ctx: ActionCtx, compiler_path: str, case_dir: st
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "with.toml"), "c.opengl = \"system\"", "get force manifest dep")
     if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, ".with/lock.json"), "\"c.opengl\"", "get force lock dep")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, ".with/lock.json"), "\"source\": \"system\"", "get force lock system")
+    if rc != 0: return rc
 
     let sentinel = bs_join(dep_dir, "sentinel.txt")
     rc = bs_write_fixture(ctx, sentinel, "cached", "get force sentinel")
@@ -936,6 +944,91 @@ fn bs_check_get_force_reinstall(ctx: ActionCtx, compiler_path: str, case_dir: st
     if ctx.fs().exists(sentinel):
         return bs_fail(ctx, "force reinstall did not recreate dependency directory")
     bs_expect_file(ctx, metadata, "get force metadata after reinstall")
+
+fn bs_lock_fixture_metadata(name: str, version: str) -> str:
+    "{\n" ++
+    "  \"name\": \"" ++ name ++ "\",\n" ++
+    "  \"version\": \"" ++ version ++ "\",\n" ++
+    "  \"recipe_revision\": \"recipe-rev\",\n" ++
+    "  \"package_id\": \"package-id\",\n" ++
+    "  \"package_revision\": \"package-rev\",\n" ++
+    "  \"include_paths\": [],\n" ++
+    "  \"lib_paths\": [],\n" ++
+    "  \"libs\": [],\n" ++
+    "  \"defines\": [],\n" ++
+    "  \"link_args\": [],\n" ++
+    "  \"requires\": []\n" ++
+    "}\n"
+
+fn bs_lock_json_conan(dep: str, version: str, sha: str) -> str:
+    "{\n" ++
+    "  \"version\": 1,\n" ++
+    "  \"deps\": {\n" ++
+    "    \"c." ++ dep ++ "\": {\n" ++
+    "      \"source\": \"conan\",\n" ++
+    "      \"version\": \"" ++ version ++ "\",\n" ++
+    "      \"recipe_rev\": \"recipe-rev\",\n" ++
+    "      \"package_id\": \"package-id\",\n" ++
+    "      \"package_rev\": \"package-rev\",\n" ++
+    "      \"sha256\": \"" ++ sha ++ "\"\n" ++
+    "    }\n" ++
+    "  }\n" ++
+    "}\n"
+
+fn bs_check_get_lock_restore(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let fixture_sha = "b82d14bd3717287c78a2e1351107a49a925192cae59c0f844437eed8a0d6caef"
+
+    let no_lock_dir = bs_join(case_dir, "no_lock")
+    var rc = bs_write_project_manifest(ctx, no_lock_dir, "getnolock")
+    if rc != 0: return rc
+    let no_lock = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-no-lock", bs_project_args("get"), 120000, no_lock_dir)
+    if no_lock.rc == 0:
+        return bs_fail(ctx, "with get without lock unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, no_lock.stderr, "no lock file at .with/lock.json", "get_lock_no_lock")
+    if rc != 0: return rc
+
+    let cached_dir = bs_join(case_dir, "cached")
+    rc = bs_write_project_manifest(ctx, cached_dir, "getcachedlock")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(cached_dir, ".with/lock.json"), bs_lock_json_conan("fixture", "1.0", fixture_sha), "cached lock")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(cached_dir, ".with/deps/c/fixture/1.0/metadata.json"), bs_lock_fixture_metadata("fixture", "1.0"), "cached metadata")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(cached_dir, ".with/deps/c/fixture/1.0/conan_package.tgz"), "fixture archive\n", "cached archive")
+    if rc != 0: return rc
+    let cached = bs_project_expect_success(ctx, compiler_path, cached_dir, "get-lock-cached", bs_project_args("get"))
+    if cached.rc != 0: return cached.rc
+    rc = bs_assert_contains(ctx, cached.stderr, "restored c.fixture@1.0 (cached)", "get_lock_cached")
+    if rc != 0: return rc
+
+    let mismatch_dir = bs_join(case_dir, "mismatch")
+    rc = bs_write_project_manifest(ctx, mismatch_dir, "getbadlock")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(mismatch_dir, ".with/lock.json"), bs_lock_json_conan("fixture", "1.0", "0000000000000000000000000000000000000000000000000000000000000000"), "mismatch lock")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(mismatch_dir, ".with/deps/c/fixture/1.0/metadata.json"), bs_lock_fixture_metadata("fixture", "1.0"), "mismatch metadata")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(mismatch_dir, ".with/deps/c/fixture/1.0/conan_package.tgz"), "fixture archive\n", "mismatch archive")
+    if rc != 0: return rc
+    let mismatch = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-mismatch", bs_project_args("get"), 120000, mismatch_dir)
+    if mismatch.rc == 0:
+        return bs_fail(ctx, "hash-mismatched lock restore unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, mismatch.stderr, "hash mismatch for c.fixture@1.0", "get_lock_mismatch")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, mismatch.stderr, fixture_sha, "get_lock_mismatch_actual")
+    if rc != 0: return rc
+    if ctx.fs().exists(bs_join(mismatch_dir, ".with/deps/c/fixture/1.0")):
+        return bs_fail(ctx, "hash-mismatched restore left partial dependency directory")
+
+    let registry_dir = bs_join(case_dir, "registry")
+    rc = bs_write_project_manifest(ctx, registry_dir, "getregistrylock")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(registry_dir, ".with/lock.json"), "{\n  \"version\": 1,\n  \"deps\": {\n    \"c.future\": {\n      \"source\": \"registry\",\n      \"version\": \"1.0\"\n    }\n  }\n}\n", "registry lock")
+    if rc != 0: return rc
+    let registry = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-registry", bs_project_args("get"), 120000, registry_dir)
+    if registry.rc == 0:
+        return bs_fail(ctx, "registry lock restore unexpectedly succeeded")
+    bs_assert_contains(ctx, registry.stderr, "With package registry restore is not available yet", "get_lock_registry")
 
 fn bs_check_get_raylib_versions(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let latest_dir = bs_join(case_dir, "latest")
@@ -1044,6 +1137,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_manual_c_dep_manifest(ctx, compiler_path, bs_join(output_dir, "manual_c_dep_manifest_case"))
     if rc != 0: return rc
     rc = bs_check_get_force_reinstall(ctx, compiler_path, bs_join(output_dir, "get_force_reinstall_case"))
+    if rc != 0: return rc
+    rc = bs_check_get_lock_restore(ctx, compiler_path, bs_join(output_dir, "get_lock_restore_case"))
     if rc != 0: return rc
     rc = bs_check_get_raylib_versions(ctx, compiler_path, bs_join(output_dir, "get_raylib_versions_case"))
     if rc != 0: return rc

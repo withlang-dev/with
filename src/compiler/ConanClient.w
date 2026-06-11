@@ -4,6 +4,7 @@
 
 use Archive
 use compiler.Runtime
+use std.crypto.sha256
 
 fn CONAN_CENTER_URL -> str: "https://center2.conan.io"
 fn CONAN_INDEX_RAW -> str: "https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes"
@@ -31,6 +32,13 @@ fn conan_http_get(url: str) -> str:
 
 fn conan_http_download(url: str, path: str) -> i32:
     conan_curl_to_file(url, path, 300000)
+
+fn conan_sha256_file(path: str) -> str:
+    if runtime_file_exists(path) == 0:
+        return ""
+    var digest: [32]u8 = [0 as u8; 32]
+    sha256_hash_str(runtime_read_file(path), &raw mut digest[0] as *mut u8)
+    sha256_hex(&digest[0] as *const u8)
 
 fn conan_argv_append(argv: str, arg: str) -> str:
     argv ++ arg ++ "\0"
@@ -571,7 +579,7 @@ fn conan_known_link_metadata(name: str, version: str, libs: Vec[str], defines: V
         return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
     ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
-fn conan_write_known_system_package(name: str, version: str, project_root: str) -> bool:
+pub fn conan_write_known_system_package(name: str, version: str, project_root: str) -> bool:
     if version != "system":
         return false
     if name != "opengl" and name != "xorg":
@@ -626,6 +634,42 @@ fn conan_write_binary_metadata(name: str, version: str, recipe_rev: str, package
     libs = known.libs
     let final_link_args = known.lib_paths
     conan_write_metadata(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, final_link_args, requirements)
+
+pub fn conan_restore_locked_binary_package(name: str, version: str, recipe_rev: str, package_id: str, package_rev: str, expected_sha256: str, project_root: str) -> bool:
+    let dep_dir = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version
+    let _clean = runtime_remove_tree(dep_dir)
+    if runtime_mkdir_p(dep_dir) != 0:
+        runtime_eprint("error: failed to create dependency directory for " ++ name ++ "/" ++ version)
+        return false
+    let info_url = conan_package_file_url(name, version, recipe_rev, package_id, package_rev, "conaninfo.txt")
+    let info = conan_http_get(info_url)
+    if info.len() == 0:
+        runtime_eprint("error: failed to download pinned conaninfo.txt for " ++ name ++ "/" ++ version)
+        let _remove = runtime_remove_tree(dep_dir)
+        return false
+    let tgz_url = conan_package_file_url(name, version, recipe_rev, package_id, package_rev, "conan_package.tgz")
+    let tgz_path = dep_dir ++ "/conan_package.tgz"
+    runtime_eprint("  restoring pinned " ++ name ++ "/" ++ version ++ "...")
+    if conan_http_download(tgz_url, tgz_path) != 0:
+        runtime_eprint("error: failed to download pinned package for " ++ name ++ "/" ++ version)
+        let _remove = runtime_remove_tree(dep_dir)
+        return false
+    let actual_sha256 = conan_sha256_file(tgz_path)
+    if actual_sha256 != expected_sha256:
+        runtime_eprint("error: hash mismatch for c." ++ name ++ "@" ++ version ++ ": expected " ++ expected_sha256 ++ ", got " ++ actual_sha256)
+        let _remove = runtime_remove_tree(dep_dir)
+        return false
+    runtime_eprint("  extracting...")
+    if conan_extract_tgz(tgz_path, dep_dir) != 0:
+        runtime_eprint("error: failed to extract pinned package for " ++ name ++ "/" ++ version)
+        let _remove = runtime_remove_tree(dep_dir)
+        return false
+    let requirements = conan_parse_requires_from_info(info)
+    if conan_write_binary_metadata(name, version, recipe_rev, package_id, package_rev, dep_dir, requirements) != 0:
+        runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
+        let _remove = runtime_remove_tree(dep_dir)
+        return false
+    true
 
 fn conan_install_binary(name: str, version: str, recipe_rev: str, project_root: str, depth: i32, force_reinstall: bool) -> str:
     let pick = conan_find_matching_package(name, version, recipe_rev)
