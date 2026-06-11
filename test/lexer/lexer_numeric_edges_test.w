@@ -26,6 +26,8 @@ fn main:
     assert(t1.get_tag(0) == TokenKind.TK_INT_LIT())
     assert(t1.get_tag(1) == TokenKind.TK_EOF())
 
+    // Kept as one token for span/recovery; parser rejects the
+    // separator-before-suffix form per §29.1.
     var l2 = Lexer.init("3.14_f32", 0)
     let t2 = l2.tokenize()
     assert(t2.get_tag(0) == TokenKind.TK_FLOAT_LIT())

@@ -510,9 +510,7 @@ fn Lexer.lex_number(mut self: Lexer) -> i32:
                     self.pos = self.pos + 1
 
     // Check for type suffix: 100i64, 3.14f32, 0xFFu32.
-    var suffix_pos = self.pos
-    if suffix_pos < slen and src.byte_at(suffix_pos as i64) == CharCode.Underscore:
-        suffix_pos = suffix_pos + 1
+    let suffix_pos = self.pos
     let suffix_len = numeric_suffix_len(src, suffix_pos, slen)
     if suffix_len > 0:
         let suffix_head = src.byte_at(suffix_pos as i64)

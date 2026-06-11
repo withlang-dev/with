@@ -12545,7 +12545,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: Valid: `1_000u64`, `0xFF_FFu32`, `3.25f32`
   - Source: `§29.1 L10817`
   - Related spec refs: none
-- [x] `29.1.1.10` **Invalid: 1_000_u64, 0xFF_FF_u32** — impl: [#461](https://github.com/withlang-dev/with/issues/461)
+- [x] `29.1.1.10` **Invalid: 1_000_u64, 0xFF_FF_u32**
   - Requirement: Invalid: `1_000_u64`, `0xFF_FF_u32`
   - Source: `§29.1 L10818`
   - Related spec refs: none

@@ -373,6 +373,10 @@ fn Parser.emit_error(self: Parser, msg: str):
     let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
     self.diags.emit(Diagnostic.err(msg, span))
 
+fn Parser.emit_error_span(self: Parser, msg: str, start: i32, end: i32):
+    let span = Span { file: self.file_id, start, end }
+    self.diags.emit(Diagnostic.err(msg, span))
+
 fn Parser.emit_error_code(self: Parser, msg: str, code: str):
     let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
     var diag = Diagnostic.err(msg, span)
@@ -3245,11 +3249,43 @@ fn numeric_literal_suffix_start(text: str, suffix: str) -> i32:
     let direct_start = len - slen
     if text.slice(direct_start as i64, len as i64) == suffix:
         return direct_start
-    if len > slen + 1 and text.byte_at((len - slen - 1) as i64) == 95:
-        let legacy_start = len - slen - 1
-        if text.slice((legacy_start + 1) as i64, len as i64) == suffix:
-            return legacy_start
     -1
+
+fn numeric_literal_suffix_start_any(text: str) -> i32:
+    var start = numeric_literal_suffix_start(text, "usize")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "isize")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "u128")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "i128")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "u64")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "i64")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "u32")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "i32")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "u16")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "i16")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "u8")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "i8")
+    if start >= 0: return start
+    start = numeric_literal_suffix_start(text, "f64")
+    if start >= 0: return start
+    numeric_literal_suffix_start(text, "f32")
+
+fn numeric_literal_suffix_is_separated(text: str) -> bool:
+    let start = numeric_literal_suffix_start_any(text)
+    start > 0 and text.byte_at((start - 1) as i64) == 95
+
+fn Parser.emit_numeric_suffix_separator_error(self: Parser, start: i32, end: i32):
+    self.emit_error_span("numeric separator '_' may not precede the type suffix; write 1_000u64 not 1_000_u64", start, end)
 
 fn numeric_literal_suffix_code(text: str) -> i32:
     if numeric_literal_suffix_start(text, "usize") >= 0: return LiteralSuffix.Usize
@@ -3334,6 +3370,8 @@ fn int_literal_fast_i64(core: str) -> ExactIntI64:
     exact_int_try_i64(exact_int_parse_digits(digits, int_literal_core_radix(core)))
 
 fn Parser.build_int_literal_node(self: Parser, start: i32, end: i32, text: str) -> NodeId:
+    if numeric_literal_suffix_is_separated(text):
+        self.emit_numeric_suffix_separator_error(start, end)
     let suffix = numeric_literal_suffix_code(text)
     let core = numeric_literal_core(text)
     let digits = normalize_int_literal_digits(core)
@@ -3362,6 +3400,8 @@ fn Parser.parse_float_literal(self: Parser) -> NodeId:
     let start = self.current_start()
     let end = self.current_end()
     let text = self.source.slice(start as i64, end as i64)
+    if numeric_literal_suffix_is_separated(text):
+        self.emit_numeric_suffix_separator_error(start, end)
     let suffix = numeric_literal_suffix_code(text)
     let core = numeric_literal_core(text)
     self.advance()

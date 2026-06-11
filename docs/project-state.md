@@ -11,15 +11,12 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 1 build/toolchain/configuration work is complete through #537. `with doc`
-now generates deterministic Markdown for public functions and types from
-compiler project metadata, and `with repl` is a line-oriented session that
-compiles each accepted snippet through the normal compiler pipeline while
-rejecting unsupported persistent declarations loudly. CLI self-host coverage
-checks help output, doc public/private filtering, doc missing-source
-diagnostics, REPL smoke execution, and REPL persistent-declaration diagnostics.
-Full build, fixpoint, test, and test-green passed on 2026-06-11 for this
-checkpoint before commit.
+Phase 2 parser/control-flow work is in progress. #461 is implemented locally:
+numeric literals with a separator immediately before a type suffix, such as
+`1_000_u64`, `0xFF_FF_u32`, and `3.14_f32`, now remain single tokens for
+recovery but are rejected by the parser with a literal-span diagnostic. Focused
+positive and negative tests pass. Full build, fixpoint, test, and test-green
+passed on 2026-06-11 before commit.
 
 #347, #356, #358, and the first #357 safety slice are implemented.
 `c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:
