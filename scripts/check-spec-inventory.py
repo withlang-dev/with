@@ -210,6 +210,11 @@ def spec_cli(spec: str) -> tuple[set[str], set[str]]:
                 token = part.split()[0] if part else ""
                 if token and not token.startswith("[") and not token.startswith("-"):
                     commands.add(token)
+    package_sec = subsection(spec, "### 18.8 Package Management")
+    for command in re.findall(r"`with\s+([^`|]+)`", package_sec):
+        token = command.strip().split()[0] if command.strip() else ""
+        if token and not token.startswith("-"):
+            commands.add(token)
     return commands, flags
 
 

@@ -597,17 +597,21 @@ fn bs_check_init_in_cwd(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i3
     if result.rc != 0: return result.rc
     var rc = bs_expect_file(ctx, bs_join(case_dir, "with.toml"), "init_in_cwd manifest")
     if rc != 0: return rc
-    rc = bs_expect_file(ctx, bs_join(case_dir, "main.w"), "init_in_cwd main")
+    rc = bs_expect_file(ctx, bs_join(case_dir, "src/main.w"), "init_in_cwd main")
     if rc != 0: return rc
     rc = bs_check_init_common_files(ctx, case_dir, expected_name, "init_in_cwd")
     if rc != 0: return rc
     rc = bs_expect_absent(ctx, bs_join(bs_join(case_dir, expected_name), "with.toml"), "init_in_cwd nested manifest")
     if rc != 0: return rc
-    rc = bs_expect_absent(ctx, bs_join(bs_join(case_dir, expected_name), "main.w"), "init_in_cwd nested main")
+    rc = bs_expect_absent(ctx, bs_join(case_dir, "main.w"), "init_in_cwd root main")
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "with.toml"), "name = \"" ++ expected_name ++ "\"", "init_in_cwd manifest name")
     if rc != 0: return rc
-    bs_assert_contains(ctx, result.stderr, "created " ++ expected_name, "init_in_cwd stderr")
+    rc = bs_assert_contains(ctx, result.stderr, "created " ++ expected_name, "init_in_cwd stderr")
+    if rc != 0: return rc
+    let build = bs_project_expect_success(ctx, compiler_path, case_dir, "init-in-cwd-build", bs_project_args("build"))
+    if build.rc != 0: return build.rc
+    bs_expect_file(ctx, bs_join(case_dir, "out/bin/" ++ expected_name), "init_in_cwd build output")
 
 fn bs_check_init_named_dir(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     if ctx.fs().mkdir_all(case_dir) != 0:
@@ -621,13 +625,13 @@ fn bs_check_init_named_dir(ctx: ActionCtx, compiler_path: str, case_dir: str) ->
     let project_dir = bs_join(case_dir, project_name)
     var rc = bs_expect_file(ctx, bs_join(project_dir, "with.toml"), "init_named_dir manifest")
     if rc != 0: return rc
-    rc = bs_expect_file(ctx, bs_join(project_dir, "main.w"), "init_named_dir main")
+    rc = bs_expect_file(ctx, bs_join(project_dir, "src/main.w"), "init_named_dir main")
     if rc != 0: return rc
     rc = bs_check_init_common_files(ctx, project_dir, project_name, "init_named_dir")
     if rc != 0: return rc
     rc = bs_expect_absent(ctx, bs_join(case_dir, "with.toml"), "init_named_dir root manifest")
     if rc != 0: return rc
-    rc = bs_expect_absent(ctx, bs_join(case_dir, "main.w"), "init_named_dir root main")
+    rc = bs_expect_absent(ctx, bs_join(project_dir, "main.w"), "init_named_dir root main")
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(project_dir, "with.toml"), "name = \"" ++ project_name ++ "\"", "init_named_dir manifest name")
     if rc != 0: return rc
@@ -635,7 +639,11 @@ fn bs_check_init_named_dir(ctx: ActionCtx, compiler_path: str, case_dir: str) ->
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "  " ++ project_name ++ "/with.toml", "init_named_dir manifest path")
     if rc != 0: return rc
-    bs_assert_contains(ctx, result.stderr, "  " ++ project_name ++ "/main.w", "init_named_dir main path")
+    rc = bs_assert_contains(ctx, result.stderr, "  " ++ project_name ++ "/src/main.w", "init_named_dir main path")
+    if rc != 0: return rc
+    let build = bs_project_expect_success(ctx, compiler_path, project_dir, "init-named-dir-build", bs_project_args("build"))
+    if build.rc != 0: return build.rc
+    bs_expect_file(ctx, bs_join(project_dir, "out/bin/" ++ project_name), "init_named_dir build output")
 
 fn bs_check_build_uses_package_section_name(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "pkgdemo")
@@ -975,6 +983,17 @@ fn bs_lock_json_conan(dep: str, version: str, sha: str) -> str:
     "  }\n" ++
     "}\n"
 
+fn bs_lock_json_system(dep: str) -> str:
+    "{\n" ++
+    "  \"version\": 1,\n" ++
+    "  \"deps\": {\n" ++
+    "    \"c." ++ dep ++ "\": {\n" ++
+    "      \"source\": \"system\",\n" ++
+    "      \"version\": \"system\"\n" ++
+    "    }\n" ++
+    "  }\n" ++
+    "}\n"
+
 fn bs_check_get_lock_restore(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let fixture_sha = "b82d14bd3717287c78a2e1351107a49a925192cae59c0f844437eed8a0d6caef"
 
@@ -1029,6 +1048,52 @@ fn bs_check_get_lock_restore(ctx: ActionCtx, compiler_path: str, case_dir: str) 
     if registry.rc == 0:
         return bs_fail(ctx, "registry lock restore unexpectedly succeeded")
     bs_assert_contains(ctx, registry.stderr, "With package registry restore is not available yet", "get_lock_registry")
+
+fn bs_check_remove_update_packages(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let remove_dir = bs_join(case_dir, "remove")
+    var rc = bs_write_fixture(ctx, bs_join(remove_dir, "with.toml"), "[package]\nname = \"removepkg\"\nversion = \"0.1.0\"\n\n[deps]\nc.opengl = \"system\"\n", "remove package manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(remove_dir, ".with/deps/c/opengl/system/metadata.json"), bs_lock_fixture_metadata("opengl", "system"), "remove package metadata")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(remove_dir, ".with/lock.json"), bs_lock_json_system("opengl"), "remove package lock")
+    if rc != 0: return rc
+    var remove_args: Vec[str] = Vec.new()
+    remove_args |> push("remove")
+    remove_args |> push("c.opengl")
+    let removed = bs_project_expect_success(ctx, compiler_path, remove_dir, "remove-c-package", remove_args)
+    if removed.rc != 0: return removed.rc
+    rc = bs_assert_contains(ctx, removed.stderr, "removed c.opengl", "remove_c_package")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, bs_join(remove_dir, "with.toml"), "c.opengl", "remove package manifest")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, bs_join(remove_dir, ".with/lock.json"), "c.opengl", "remove package lock")
+    if rc != 0: return rc
+    rc = bs_expect_absent(ctx, bs_join(remove_dir, ".with/deps/c/opengl"), "remove package dep dir")
+    if rc != 0: return rc
+    let missing = bs_run_cli_capture_cwd(ctx, compiler_path, "remove-c-package-missing", remove_args, 120000, remove_dir)
+    if missing.rc == 0:
+        return bs_fail(ctx, "removing missing C package unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, missing.stderr, "dependency c.opengl is not in with.toml", "remove_c_package_missing")
+    if rc != 0: return rc
+
+    let update_dir = bs_join(case_dir, "update")
+    rc = bs_write_fixture(ctx, bs_join(update_dir, "with.toml"), "[package]\nname = \"updatepkg\"\nversion = \"0.1.0\"\n\n[deps]\nc.opengl = \"system\"\n", "update package manifest")
+    if rc != 0: return rc
+    let updated = bs_project_expect_success(ctx, compiler_path, update_dir, "update-c-packages", bs_project_args("update"))
+    if updated.rc != 0: return updated.rc
+    rc = bs_assert_contains(ctx, updated.stderr, "updated c.opengl@system", "update_c_packages")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(update_dir, ".with/deps/c/opengl/system/metadata.json"), "update package metadata")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(update_dir, ".with/lock.json"), "\"c.opengl\"", "update package lock")
+    if rc != 0: return rc
+
+    let no_deps_dir = bs_join(case_dir, "update_no_deps")
+    rc = bs_write_project_manifest(ctx, no_deps_dir, "updatenone")
+    if rc != 0: return rc
+    let no_deps = bs_project_expect_success(ctx, compiler_path, no_deps_dir, "update-no-deps", bs_project_args("update"))
+    if no_deps.rc != 0: return no_deps.rc
+    bs_assert_contains(ctx, no_deps.stderr, "no C dependencies to update", "update_no_deps")
 
 fn bs_check_get_raylib_versions(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let latest_dir = bs_join(case_dir, "latest")
@@ -1139,6 +1204,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_get_force_reinstall(ctx, compiler_path, bs_join(output_dir, "get_force_reinstall_case"))
     if rc != 0: return rc
     rc = bs_check_get_lock_restore(ctx, compiler_path, bs_join(output_dir, "get_lock_restore_case"))
+    if rc != 0: return rc
+    rc = bs_check_remove_update_packages(ctx, compiler_path, bs_join(output_dir, "remove_update_packages_case"))
     if rc != 0: return rc
     rc = bs_check_get_raylib_versions(ctx, compiler_path, bs_join(output_dir, "get_raylib_versions_case"))
     if rc != 0: return rc

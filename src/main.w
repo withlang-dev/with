@@ -725,6 +725,8 @@ fn run_cli(argc: i32) -> i32:
         return run_get_command(argc)
     if cli_command(argc) == "remove":
         return run_remove_command(argc)
+    if cli_command(argc) == "update":
+        return run_update_command(argc)
     if cli_command(argc) == "lsp":
         return run_lsp()
     if cli_command(argc) == "migrate":
@@ -2529,6 +2531,7 @@ fn print_usage:
     with_write("  init             Initialize a With project\n")
     with_write("  get              Add or reinstall a package dependency\n")
     with_write("  remove           Remove a package dependency\n")
+    with_write("  update           Update package dependencies\n")
     with_write("  clean            Delete build artifacts\n")
     with_write("  install-user     Install compiler to ~/.local/bin\n")
     with_write("\n")
@@ -2807,6 +2810,22 @@ fn cli_line_is_section(line: str) -> bool:
     let trimmed = cli_trim_line(line)
     trimmed.len() >= 2 and trimmed.byte_at(0) == 91 and trimmed.byte_at(trimmed.len() - 1) == 93
 
+fn cli_strip_quotes(value: str) -> str:
+    let trimmed = cli_trim_line(value)
+    if trimmed.len() >= 2 and trimmed.byte_at(0) == 34 and trimmed.byte_at(trimmed.len() - 1) == 34:
+        return trimmed.slice(1, trimmed.len() - 1)
+    trimmed
+
+type CliManifestRemoveResult {
+    ok: bool,
+    text: str,
+}
+
+type CliManifestDep {
+    name: str,
+    constraint: str,
+}
+
 fn cli_update_manifest_dep(toml: str, pkg_name: str, pkg_version: str) -> str:
     let dep_line = "c." ++ pkg_name ++ " = \"" ++ pkg_version ++ "\""
     var out = ""
@@ -2846,6 +2865,63 @@ fn cli_update_manifest_dep(toml: str, pkg_name: str, pkg_version: str) -> str:
             out = out ++ "\n"
         out = out ++ "\n[deps]\n"
     out ++ dep_line ++ "\n"
+
+fn cli_remove_manifest_dep(toml: str, pkg_name: str) -> CliManifestRemoveResult:
+    var out = ""
+    var removed = false
+    var in_deps = false
+    var start = 0
+    var i = 0
+    let n = toml.len() as i32
+    while i <= n:
+        let at_end = i == n
+        let ch = if at_end: 10 else: toml.byte_at(i as i64)
+        if ch == 10:
+            let line = toml.slice(start as i64, i as i64)
+            let trimmed = cli_trim_line(line)
+            if trimmed == "[deps]":
+                in_deps = true
+            else if cli_line_is_section(line):
+                in_deps = false
+            if in_deps and cli_dep_line_matches(line, pkg_name):
+                removed = true
+            else:
+                out = out ++ line
+                if not at_end or line.len() > 0:
+                    out = out ++ "\n"
+            start = i + 1
+        i = i + 1
+    CliManifestRemoveResult { ok: removed, text: out }
+
+fn cli_manifest_c_deps(toml: str) -> Vec[CliManifestDep]:
+    let deps: Vec[CliManifestDep] = Vec.new()
+    var in_deps = false
+    var start = 0
+    var i = 0
+    let n = toml.len() as i32
+    while i <= n:
+        let at_end = i == n
+        let ch = if at_end: 10 else: toml.byte_at(i as i64)
+        if ch == 10:
+            let line = toml.slice(start as i64, i as i64)
+            let trimmed = cli_trim_line(line)
+            if trimmed == "[deps]":
+                in_deps = true
+            else if cli_line_is_section(line):
+                in_deps = false
+            else if in_deps:
+                var eq = -1
+                for j in 0..trimmed.len() as i32:
+                    if trimmed.byte_at(j as i64) == 61:
+                        eq = j
+                        break
+                if eq > 0:
+                    let key = cli_trim_line(trimmed.slice(0, eq as i64))
+                    if key.starts_with("c.") and key.len() > 2:
+                        deps.push(CliManifestDep { name: key.slice(2, key.len()), constraint: cli_strip_quotes(trimmed.slice((eq + 1) as i64, trimmed.len())) })
+            start = i + 1
+        i = i + 1
+    deps
 
 fn cli_flag_value(argc: i32, flag: str) -> str:
     var i = 2
@@ -2916,7 +2992,7 @@ fn cli_init_manifest_template(name: str) -> str:
 
 fn cli_init_build_template(name: str, is_lib: bool) -> str:
     let product_kind = if is_lib: "library" else: "executable"
-    let entry = if is_lib: "lib.w" else: "main.w"
+    let entry = if is_lib: "src/lib.w" else: "src/main.w"
     "use std.build\n\n" ++
     "comptime with BuildCtx as ctx:\n" ++
     "pub fn build -> Build:\n" ++
@@ -2925,7 +3001,7 @@ fn cli_init_build_template(name: str, is_lib: bool) -> str:
     "    out.default(\"" ++ name ++ "\")\n"
 
 fn cli_init_readme_template(name: str, is_lib: bool) -> str:
-    let run_line = if is_lib: "with build" else: "with run main.w"
+    let run_line = if is_lib: "with build" else: "with run"
     "# " ++ name ++ "\n\n" ++
     "## Build\n\n" ++
     "```sh\n" ++
@@ -2990,9 +3066,10 @@ fn run_init_command(argc: i32) -> i32:
     let gitignore_path = resolve_join(target_dir, ".gitignore")
     let agents_path = resolve_join(target_dir, "AGENTS.md")
     let claude_path = resolve_join(target_dir, "CLAUDE.md")
+    let src_dir = resolve_join(target_dir, "src")
     let test_dir = resolve_join(target_dir, "test")
-    let lib_path = resolve_join(target_dir, "lib.w")
-    let main_path = resolve_join(target_dir, "main.w")
+    let lib_path = resolve_join(src_dir, "lib.w")
+    let main_path = resolve_join(src_dir, "main.w")
     let test_path = resolve_join(test_dir, "test_main.w")
     var created_path = target_dir
     if target_dir == ".":
@@ -3023,6 +3100,9 @@ fn run_init_command(argc: i32) -> i32:
 
     if with_fs_mkdir_p(target_dir) != 0:
         with_eprint("error: failed to create " ++ target_dir ++ " directory")
+        return 1
+    if with_fs_mkdir_p(src_dir) != 0:
+        with_eprint("error: failed to create " ++ src_dir ++ " directory")
         return 1
     if with_fs_mkdir_p(test_dir) != 0:
         with_eprint("error: failed to create " ++ test_dir ++ " directory")
@@ -3138,13 +3218,70 @@ fn run_get_command(argc: i32) -> i32:
     0
 
 fn run_remove_command(argc: i32) -> i32:
-    if argc < 3:
+    if argc != 3:
         with_eprint("usage: with remove c.<package>")
         return 1
     let spec = with_arg_at(2)
     if not spec.starts_with("c."):
         with_eprint("error: only C packages supported. Use c.<name>")
         return 1
-    // TODO: remove dep from with.toml and clean .with/deps/c/<name>/
-    with_eprint("error: remove not yet implemented")
-    1
+    let pkg_name = spec.slice(2, spec.len())
+    if pkg_name.len() == 0:
+        with_eprint("error: empty package name")
+        return 1
+    let root = project_config_find_root(".")
+    if root.len() == 0:
+        with_eprint("error: no with.toml found. Run 'with init' first.")
+        return 1
+    let manifest_path = root ++ "/with.toml"
+    let toml = with_fs_read_file(manifest_path)
+    let removed = cli_remove_manifest_dep(toml, pkg_name)
+    if not removed.ok:
+        with_eprint("error: dependency c." ++ pkg_name ++ " is not in with.toml")
+        return 1
+    if with_fs_write_file(manifest_path, removed.text) != 0:
+        with_eprint("error: failed to update with.toml")
+        return 1
+    let dep_root = root ++ "/.with/deps/c/" ++ pkg_name
+    if with_fs_file_exists(dep_root) != 0:
+        let rm_rc = with_fs_remove_tree(dep_root)
+        if rm_rc != 0 and with_fs_file_exists(dep_root) != 0:
+            with_eprint("error: failed to remove " ++ dep_root)
+            return 1
+    if with_fs_file_exists(lock_file_path(root)) != 0:
+        let existing_lock = lock_load(root)
+        let next_lock = lock_remove(move existing_lock, "c." ++ pkg_name)
+        if lock_write(root, next_lock) != 0:
+            return 1
+    with_eprint("removed c." ++ pkg_name)
+    0
+
+fn run_update_command(argc: i32) -> i32:
+    if argc != 2:
+        with_eprint("usage: with update")
+        return 1
+    let root = project_config_find_root(".")
+    if root.len() == 0:
+        with_eprint("error: no with.toml found. Run 'with init' first.")
+        return 1
+    let manifest_path = root ++ "/with.toml"
+    var toml = with_fs_read_file(manifest_path)
+    let deps = cli_manifest_c_deps(toml)
+    if deps.len() == 0:
+        with_eprint("no C dependencies to update")
+        return 0
+    var next_lock = lock_load(root)
+    for i in 0..deps.len() as i32:
+        let dep = deps.get(i as i64)
+        let resolved_version = conan_install(dep.name, dep.constraint, root, true)
+        if resolved_version.len() == 0:
+            return 1
+        next_lock = lock_upsert_installed_c_dep_tree(move next_lock, root, dep.name, resolved_version)
+        if next_lock.entries.len() == 0:
+            return 1
+        toml = cli_update_manifest_dep(toml, dep.name, resolved_version)
+        with_eprint("updated c." ++ dep.name ++ "@" ++ resolved_version)
+    if with_fs_write_file(manifest_path, toml) != 0:
+        with_eprint("error: failed to update with.toml")
+        return 1
+    lock_write(root, next_lock)
