@@ -799,6 +799,16 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
         return bs_fail(ctx, "imperative [target] manifest unexpectedly succeeded")
     bs_assert_contains(ctx, imperative_target.stderr, "imperative build configuration belongs in build.w", "declarative_target_imperative")
 
+fn bs_check_link_libs_manifest_diagnostics(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), "[package]\nname = \"badlinklibs\"\nversion = \"0.1.0\"\n\n[link]\nlibs = \"sqlite3\"\n", "bad link libs manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"badlinklibs\")\n", "bad link libs source")
+    if rc != 0: return rc
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "link-libs-malformed", bs_project_args("build"), 120000, case_dir)
+    if result.rc == 0:
+        return bs_fail(ctx, "malformed [link].libs unexpectedly succeeded")
+    bs_assert_contains(ctx, result.stderr, "link.libs must be an array of strings", "link_libs_malformed")
+
 fn bs_check_run_project_targets(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "rundemo")
     if rc != 0: return rc
@@ -963,6 +973,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_rejects_imperative_manifest(ctx, compiler_path, bs_join(output_dir, "build_imperative_manifest_case"))
     if rc != 0: return rc
     rc = bs_check_declarative_manifest_config(ctx, compiler_path, bs_join(output_dir, "declarative_manifest_config_case"))
+    if rc != 0: return rc
+    rc = bs_check_link_libs_manifest_diagnostics(ctx, compiler_path, bs_join(output_dir, "link_libs_manifest_case"))
     if rc != 0: return rc
     rc = bs_check_get_force_reinstall(ctx, compiler_path, bs_join(output_dir, "get_force_reinstall_case"))
     if rc != 0: return rc

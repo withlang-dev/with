@@ -164,7 +164,11 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
     else if section == "c_import" and key == "defines":
         out.c_import_defines = project_config_parse_string_array(value)
     else if section == "link" and key == "libs":
-        out.link_libs = project_config_parse_string_array(value)
+        if not project_config_is_string_array_value(value):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "link.libs must be an array of strings"
+        else:
+            out.link_libs = project_config_parse_string_array(value)
     else if section == "link" and key == "search_paths":
         out.link_search_paths = project_config_parse_path_array(value, out.root_dir)
     else if section == "features" and key == "default":
@@ -366,6 +370,48 @@ fn project_config_parse_string_array(value: str) -> Vec[str]:
                 out.push(entry)
         i = i + 1
     out
+
+fn project_config_is_string_array_value(value: str) -> bool:
+    let text = project_config_trim(value)
+    if text.len() < 2:
+        return false
+    if text.byte_at(0) != 91 or text.byte_at(text.len() as i64 - 1) != 93:
+        return false
+    var i = 1
+    let total = text.len() as i32
+    var expect_value = true
+    while i < total - 1:
+        let ch = text.byte_at(i as i64)
+        if project_config_is_space(ch):
+            i = i + 1
+        else if expect_value:
+            if ch == 44:
+                return false
+            if ch != 34:
+                return false
+            i = i + 1
+            var escaped = 0
+            var closed = false
+            while i < total - 1:
+                let inner = text.byte_at(i as i64)
+                if escaped != 0:
+                    escaped = 0
+                else if inner == 92:
+                    escaped = 1
+                else if inner == 34:
+                    closed = true
+                    break
+                i = i + 1
+            if not closed:
+                return false
+            i = i + 1
+            expect_value = false
+        else if ch == 44:
+            expect_value = true
+            i = i + 1
+        else:
+            return false
+    not expect_value or project_config_trim(text.slice(1, text.len() - 1)).len() == 0
 
 fn project_config_resolve_c_import_header(cfg: ProjectConfig, decl_dir: str, header_spec_raw: str) -> str:
     let header_spec = project_config_trim(header_spec_raw)
