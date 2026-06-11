@@ -11,12 +11,14 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 2 parser/control-flow work is in progress. #461 is implemented locally:
-numeric literals with a separator immediately before a type suffix, such as
-`1_000_u64`, `0xFF_FF_u32`, and `3.14_f32`, now remain single tokens for
-recovery but are rejected by the parser with a literal-span diagnostic. Focused
-positive and negative tests pass. Full build, fixpoint, test, and test-green
-passed on 2026-06-11 before commit.
+Phase 2 parser/control-flow work is in progress. #461 is implemented and
+pushed. #443 is implemented locally and verified: non-diverging
+value-position `if` expressions without `else` now fail with a targeted
+diagnostic, including binding initializers, function tail returns, call
+arguments, multiline initializers, and value-position `else if` chains.
+Statement-position `if` and `else if` remain accepted, and `Never`
+then-branches remain allowed in value position. Full build, fixpoint, test,
+and test-green passed on 2026-06-11 before commit.
 
 #347, #356, #358, and the first #357 safety slice are implemented.
 `c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:

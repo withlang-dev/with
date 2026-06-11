@@ -831,6 +831,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let body_expected_ret = self.current_return_type
     let saved_expected_et = self.expected_expr_type
     let saved_has_et = self.has_expected_type
+    let saved_body_value_root = self.current_value_expr_root
     let saved_loop_depth = self.loop_depth
     self.loop_depth = 0
     let saved_label_registry = self.save_label_registry()
@@ -845,6 +846,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     if body_expected_ret != 0 and body_expected_ret != self.ty_void:
         self.expected_expr_type = body_expected_ret
         self.has_expected_type = 1
+        self.current_value_expr_root = body
     let body_ty = self.check_expr(body)
     self.current_drop_type_sym = saved_drop_type_sym
     self.drop_control_flow_depth = saved_drop_control_flow_depth
@@ -852,6 +854,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     self.emit_unused_label_warnings()
     self.restore_label_registry(saved_label_registry)
     self.loop_depth = saved_loop_depth
+    self.current_value_expr_root = saved_body_value_root
     self.expected_expr_type = saved_expected_et
     self.has_expected_type = saved_has_et
     self.typed_expr_types.insert(body, body_ty as i32)
@@ -2939,7 +2942,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         let saved_drop_cf = self.drop_control_flow_depth
         if self.current_drop_type_sym != 0:
             self.drop_control_flow_depth = self.drop_control_flow_depth + 1
-        self.check_expr(body)
+        self.check_expr_statement_context(body)
         self.drop_control_flow_depth = saved_drop_cf
         if pushed_regex_capture_scope != 0:
             self.pop_scope()
@@ -2956,7 +2959,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         let saved_drop_cf_dw = self.drop_control_flow_depth
         if self.current_drop_type_sym != 0:
             self.drop_control_flow_depth = self.drop_control_flow_depth + 1
-        self.check_expr(body)
+        self.check_expr_statement_context(body)
         self.drop_control_flow_depth = saved_drop_cf_dw
         self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
@@ -2969,7 +2972,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         let saved_drop_cf_loop = self.drop_control_flow_depth
         if self.current_drop_type_sym != 0:
             self.drop_control_flow_depth = self.drop_control_flow_depth + 1
-        self.check_expr(self.ast.get_data0(node))
+        self.check_expr_statement_context(self.ast.get_data0(node))
         self.drop_control_flow_depth = saved_drop_cf_loop
         self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
@@ -4372,11 +4375,17 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         let saved_label_stmt_pos = self.stmt_pos_depth
         let saved_expected = self.expected_expr_type
         let saved_has_expected = self.has_expected_type
+        let saved_statement_root = self.current_statement_expr_root
+        let saved_value_root = self.current_value_expr_root
         self.match_in_stmt_pos = 1
         self.stmt_pos_depth = self.stmt_pos_depth + 1
+        self.current_statement_expr_root = stmt
+        self.current_value_expr_root = 0
         self.expected_expr_type = 0 as TypeId
         self.has_expected_type = 0
         let stmt_ty = self.check_expr(stmt)
+        self.current_statement_expr_root = saved_statement_root
+        self.current_value_expr_root = saved_value_root
         self.expected_expr_type = saved_expected
         self.has_expected_type = saved_has_expected
         self.stmt_pos_depth = saved_label_stmt_pos
@@ -4400,10 +4409,15 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         // If the tail is a match in a void/unspecified-return context, treat as statement
         // position so partial enum match is allowed (value is not used).
         let saved_stmt_pos = self.match_in_stmt_pos
+        let saved_tail_value_root = self.current_value_expr_root
         let ret_is_void = self.current_return_type == self.ty_void or self.current_return_type == 0
         if ret_is_void and self.ast.kind(tail) == NodeKind.NK_MATCH:
             self.match_in_stmt_pos = 1
-        let tail_type = self.check_expr(tail)
+        let tail_is_value = self.current_value_expr_root == node
+        if tail_is_value:
+            self.current_value_expr_root = tail
+        let tail_type = if tail_is_value: self.check_expr(tail) else: self.check_expr_statement_context(tail)
+        self.current_value_expr_root = saved_tail_value_root
         self.match_in_stmt_pos = saved_stmt_pos
         if tail_type as TypeId != self.ty_void and tail_type != 0:
             result = tail_type
@@ -4483,7 +4497,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     // Let binding value is expression position — match inside must be exhaustive.
     let saved_match_stmt = self.match_in_stmt_pos
     self.match_in_stmt_pos = 0
-    let val_type = if ann_type != 0: self.check_expr_with_expected(value, ann_type) else: self.check_expr(value)
+    let val_type = if ann_type != 0: self.check_expr_with_expected(value, ann_type) else: self.check_expr_value_context(value)
     self.match_in_stmt_pos = saved_match_stmt
     var bind_type: TypeId = val_type
     if ann_type != 0:
@@ -4559,7 +4573,8 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
     self.check_expr(cond)
     self.expected_expr_type = saved_expected
     self.has_expected_type = saved_has_expected
-    let outer_expected: TypeId = if self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
+    let in_value_context = self.stmt_pos_depth == 0 and self.if_chain_contains_node(self.current_value_expr_root, node) != 0
+    let outer_expected: TypeId = if in_value_context and self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
     // Save scope states before then branch so early-return branches don't
     // permanently mark outer variables as MOVED when control continues past the if.
     let pre_then_states = self.save_scope_states()
@@ -4585,7 +4600,7 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
     if else_body != 0:
         // Don't propagate ty_never as else_expected; use outer_expected instead.
         let then_is_never = self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER
-        let else_expected: TypeId = if then_type != 0 and then_type != self.ty_void and then_is_never == 0: then_type else: outer_expected
+        let else_expected: TypeId = if in_value_context and then_type != 0 and then_type != self.ty_void and then_is_never == 0: then_type else: outer_expected
         let pre_else_states = self.save_scope_states()
         let saved_drop_cf_else = self.drop_control_flow_depth
         if self.current_drop_type_sym != 0:
@@ -4610,6 +4625,10 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
             result_type = then_type
         else:
             result_type = else_type
+    else:
+        let then_is_never = self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER
+        if in_value_context and self.current_statement_expr_root == 0 and then_is_never == 0:
+            self.emit_error("if expression requires an else branch unless the then branch diverges", node)
     if result_type != 0 and result_type != self.ty_void:
         self.typed_expr_types.insert(node, result_type as i32)
     result_type as i32
@@ -5261,7 +5280,7 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     let saved_drop_cf_for = self.drop_control_flow_depth
     if self.current_drop_type_sym != 0:
         self.drop_control_flow_depth = self.drop_control_flow_depth + 1
-    self.check_expr(body)
+    self.check_expr_statement_context(body)
     self.drop_control_flow_depth = saved_drop_cf_for
     self.pop_label_frame()
     self.loop_depth = self.loop_depth - 1
@@ -6040,7 +6059,8 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
 
     let subject_type = self.check_expr(subject)
     var result_type: TypeId = 0 as TypeId
-    let match_expected: TypeId = if self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
+    let match_is_value = self.match_in_stmt_pos == 0
+    let match_expected: TypeId = if match_is_value and self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
 
     for ai in 0..arm_count:
         let arm_node = self.ast.get_extra(extra_start + ai)
@@ -6058,11 +6078,16 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
                 self.drop_control_flow_depth = self.drop_control_flow_depth + 1
             self.check_expr(guard)
             self.drop_control_flow_depth = saved_drop_cf_guard
-        let arm_expected: TypeId = if result_type != 0: result_type else: match_expected
+        let arm_expected: TypeId = if match_is_value and result_type != 0: result_type else: match_expected
         let saved_drop_cf_arm = self.drop_control_flow_depth
         if self.current_drop_type_sym != 0:
             self.drop_control_flow_depth = self.drop_control_flow_depth + 1
-        let arm_type = if arm_expected != 0: self.check_expr_with_expected(arm_body, arm_expected) else: self.check_expr(arm_body)
+        let arm_type = if not match_is_value:
+            self.check_expr_statement_context(arm_body)
+        else if arm_expected != 0:
+            self.check_expr_with_expected(arm_body, arm_expected)
+        else:
+            self.check_expr(arm_body)
         self.drop_control_flow_depth = saved_drop_cf_arm
         self.pop_scope()
 
@@ -7798,7 +7823,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             for cai in 0..arg_count:
                 let arg_node = self.ast.get_extra(extra_start + cai)
                 let expected_ty = self.fn_type_param_type(callable_tid, cai)
-                let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) else: self.check_expr(arg_node)
+                let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) else: self.check_expr_value_context(arg_node)
                 arg_types_for_callable.push(arg_ty as i32)
             for cai2 in 0..arg_count:
                 self.mark_moved_if_consumed(self.ast.get_extra(extra_start + cai2))
@@ -8060,7 +8085,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         if is_closure_arg:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
             self.closure_direct_arg_escape_flags.push(closure_arg_escapes)
-        let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) else: self.check_expr(arg_node)
+        let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) else: self.check_expr_value_context(arg_node)
         if is_closure_arg:
             self.closure_direct_arg_escape_flags.pop()
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
@@ -8446,12 +8471,75 @@ fn Sema.fn_min_expected_arg_count(self: Sema, fn_sym: i32, fallback_expected: i3
         return fallback_expected
     required
 
+fn Sema.if_chain_contains_node(self: Sema, root: i32, needle: i32) -> i32:
+    if root == 0 or needle == 0:
+        return 0
+    if root == needle:
+        return 1
+    if self.ast.kind(root) != NodeKind.NK_IF_EXPR:
+        return 0
+    let else_body = self.ast.get_data2(root)
+    if else_body == 0:
+        return 0
+    self.if_chain_contains_node(else_body, needle)
+
 fn Sema.check_expr_with_expected(self: Sema, node: i32, expected: TypeId) -> TypeId:
     let saved_expected = self.expected_expr_type
     let saved_has = self.has_expected_type
+    let saved_statement_root = self.current_statement_expr_root
+    let saved_value_root = self.current_value_expr_root
+    let saved_match_stmt = self.match_in_stmt_pos
+    let saved_stmt_depth = self.stmt_pos_depth
     self.expected_expr_type = expected
     self.has_expected_type = if expected != 0: 1 else: 0
+    if expected != 0 and expected != self.ty_void:
+        self.current_statement_expr_root = 0
+        self.current_value_expr_root = node
+        self.match_in_stmt_pos = 0
+        self.stmt_pos_depth = 0
     let out = self.check_expr(node)
+    self.stmt_pos_depth = saved_stmt_depth
+    self.match_in_stmt_pos = saved_match_stmt
+    self.current_value_expr_root = saved_value_root
+    self.current_statement_expr_root = saved_statement_root
+    self.expected_expr_type = saved_expected
+    self.has_expected_type = saved_has
+    out
+
+fn Sema.check_expr_value_context(self: Sema, node: i32) -> TypeId:
+    let saved_statement_root = self.current_statement_expr_root
+    let saved_value_root = self.current_value_expr_root
+    let saved_match_stmt = self.match_in_stmt_pos
+    let saved_stmt_depth = self.stmt_pos_depth
+    self.current_statement_expr_root = 0
+    self.current_value_expr_root = node
+    self.match_in_stmt_pos = 0
+    self.stmt_pos_depth = 0
+    let out = self.check_expr(node)
+    self.stmt_pos_depth = saved_stmt_depth
+    self.match_in_stmt_pos = saved_match_stmt
+    self.current_value_expr_root = saved_value_root
+    self.current_statement_expr_root = saved_statement_root
+    out
+
+fn Sema.check_expr_statement_context(self: Sema, node: i32) -> TypeId:
+    let saved_expected = self.expected_expr_type
+    let saved_has = self.has_expected_type
+    let saved_statement_root = self.current_statement_expr_root
+    let saved_value_root = self.current_value_expr_root
+    let saved_match_stmt = self.match_in_stmt_pos
+    let saved_stmt_depth = self.stmt_pos_depth
+    self.expected_expr_type = 0 as TypeId
+    self.has_expected_type = 0
+    self.current_statement_expr_root = node
+    self.current_value_expr_root = 0
+    self.match_in_stmt_pos = 1
+    self.stmt_pos_depth = self.stmt_pos_depth + 1
+    let out = self.check_expr(node)
+    self.stmt_pos_depth = saved_stmt_depth
+    self.match_in_stmt_pos = saved_match_stmt
+    self.current_value_expr_root = saved_value_root
+    self.current_statement_expr_root = saved_statement_root
     self.expected_expr_type = saved_expected
     self.has_expected_type = saved_has
     out

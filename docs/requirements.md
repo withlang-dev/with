@@ -2997,7 +2997,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: The forms may be mixed freely within a single chain.
   - Source: `§9.1 L3057-L3061`
   - Related spec refs: none
-- [x] `9.1.1.15` **else is required in expression position unless the if-branch is Never-typed.** — impl: [#443](https://github.com/withlang-dev/with/issues/443)
+- [x] `9.1.1.15` **else is required in expression position unless the if-branch is Never-typed.**
   - Requirement: `else` is required in expression position unless the if-branch is `Never`-typed.
   - Source: `§9.1 L3057-L3061`
   - Related spec refs: none

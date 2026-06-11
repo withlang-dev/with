@@ -1433,7 +1433,9 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
                 if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                     return self.sema.get_type_d0(resolved)
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
-        let vs_sym = self.ast.get_data0(node)
+        var vs_sym = self.ast.get_data0(node)
+        if self.sema.comp_resolved.contains(node):
+            vs_sym = self.sema.comp_resolved.get(node).unwrap()
         if self.sema.variant_lookup.contains(vs_sym):
             return self.sema.variant_type_ids.get(vs_sym).unwrap() as i32
     if kind == NodeKind.NK_RANGE:
@@ -1532,6 +1534,21 @@ fn MirBuilder.resolve_variant_sym(self: MirBuilder, node: i32) -> i32:
     if self.sema.comp_resolved.contains(node):
         return self.sema.comp_resolved.get(node).unwrap()
     sym
+
+fn MirBuilder.resolve_comprehension_marker_variant(self: MirBuilder, variant_sym: i32, enum_ty: i32) -> i32:
+    let text = self.pool.resolve(variant_sym)
+    if text != "_Payload" and text != "_Empty":
+        return variant_sym
+    if enum_ty == 0:
+        return variant_sym
+    let success = text == "_Payload"
+    let option_variant = if success: self.sema.syms.some else: self.sema.syms.none
+    if self.sema.enum_has_variant(enum_ty, option_variant) != 0:
+        return option_variant
+    let result_variant = if success: self.sema.syms.ok else: self.sema.syms.err
+    if self.sema.enum_has_variant(enum_ty, result_variant) != 0:
+        return result_variant
+    variant_sym
 
 fn MirBuilder.success_variant_index(self: MirBuilder) -> i32:
     let some_sym = self.pool.intern("Some")
@@ -5530,7 +5547,11 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
         if result_is_void != 0:
             let _ = self.lower_expr_discard(body_node)
         else:
+            let saved_arm_expected = self.expected_type
+            if result_ty != 0:
+                self.expected_type = result_ty
             let arm_value = self.lower_expr(body_node)
+            self.expected_type = saved_arm_expected
             self.assign_operand_to_place(result_place, arm_value, self.ast.get_start(body_node))
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -8350,12 +8371,13 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.body.new_operand(OperandKind.OK_COPY, arr_place)
 
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
-        let vs_name_sym = self.resolve_variant_sym(node)
+        var vs_name_sym = self.resolve_variant_sym(node)
         let vs_args_start = self.ast.get_data1(node)
         let vs_arg_count = self.ast.get_data2(node)
         var vs_result_ty = self.expr_type(node)
-        if vs_result_ty == 0 and self.expected_type != 0:
+        if (vs_result_ty == 0 or vs_result_ty == self.sema.ty_void as i32) and self.expected_type != 0:
             vs_result_ty = self.expected_type
+        vs_name_sym = self.resolve_comprehension_marker_variant(vs_name_sym, vs_result_ty)
         var vs_variant_idx = self.enum_variant_discriminant_for_type(vs_result_ty, vs_name_sym)
         if vs_variant_idx < 0:
             vs_variant_idx = self.variant_index(vs_name_sym)
