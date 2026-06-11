@@ -3167,7 +3167,7 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
     if t == TokenKind.TK_AMPERSAND: return self.parse_ref_of()
     if t == TokenKind.TK_STAR: return self.parse_deref_expr()
     if t == TokenKind.TK_KW_IF: return self.parse_if_expr()
-    if t == TokenKind.TK_KW_DO: return self.parse_do_while(0)
+    if t == TokenKind.TK_KW_DO: return self.parse_do_while(0, self.current_start())
     if t == TokenKind.TK_KW_WHILE: return self.parse_while(0)
     if t == TokenKind.TK_KW_LOOP: return self.parse_loop(0)
     if t == TokenKind.TK_KW_FOR: return self.parse_for(0)
@@ -5130,9 +5130,9 @@ fn Parser.parse_while(self: Parser, label: i32) -> NodeId:
     let body = self.parse_body()
     self.pool.add_node(NodeKind.NK_WHILE, start, self.prev_end(), cond, body, label)
 
-fn Parser.parse_do_while(self: Parser, label: i32) -> NodeId:
+fn Parser.parse_do_while(self: Parser, label: i32, stmt_start: i32) -> NodeId:
     let start = self.current_start()
-    let do_col = column_of(self.source, start)
+    let do_col = column_of(self.source, stmt_start)
     self.advance()
     let body = self.parse_body()
 
@@ -5395,7 +5395,9 @@ fn Parser.parse_labeled_statement(self: Parser) -> NodeId:
         stmt = self.parse_while(label_sym)
         return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
     if t == TokenKind.TK_KW_DO:
-        stmt = self.parse_do_while(label_sym)
+        let do_start = self.current_start()
+        let stmt_start = if is_first_on_line(self.source, do_start) != 0: do_start else: start
+        stmt = self.parse_do_while(label_sym, stmt_start)
         return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
     if t == TokenKind.TK_KW_LOOP:
         stmt = self.parse_loop(label_sym)

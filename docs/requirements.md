@@ -5761,7 +5761,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: For a `for` loop, this means the iterator-advance or next-element step.
   - Source: `§13.5a L5574-L5580`
   - Related spec refs: none
-- [x] `13.5.2.26` **For a do-while loop, this means the trailing condition check (§13.5c).** — impl: [#448](https://github.com/withlang-dev/with/issues/448)
+- [x] `13.5.2.26` **For a do-while loop, this means the trailing condition check (§13.5c).**
   - Requirement: For a `do`-`while` loop, this means the trailing condition check (§13.5c).
   - Source: `§13.5a L5574-L5580`
   - Related spec refs: §13.5c
@@ -6035,7 +6035,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: **Labeled form:**
   - Source: `§13.5c L5794`
   - Related spec refs: none
-- [x] `13.5.4.15` **do loops may be labeled for use with break and continue:** — impl: [#448](https://github.com/withlang-dev/with/issues/448)
+- [x] `13.5.4.15` **do loops may be labeled for use with break and continue:**
   - Requirement: `do` loops may be labeled for use with `break` and `continue`:
   - Source: `§13.5c L5796`
   - Related spec refs: none
