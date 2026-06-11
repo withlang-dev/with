@@ -132,6 +132,7 @@ extern fn clang_getEnumConstantDeclValue(cursor: CXCursor) -> i64
 
 // Visitor
 extern fn clang_visitChildren(parent: CXCursor, visitor: *const u8, data: *mut u8) -> u32
+extern fn clang_getInclusions(tu: *mut u8, visitor: *const u8, data: *mut u8)
 
 // libclang CX_StorageClass values.
 let CB_CX_SC_EXTERN: i32 = 2
@@ -1278,6 +1279,41 @@ pub fn with_cimport_error(session: i64) -> str:
         if (*s).err_msg as i64 != 0:
             return make_str((*s).err_msg as *const u8)
         ""
+
+// ── Included files ──────────────────────────────────────────
+
+var g_bridge_inclusion_files: str = ""
+
+@[callconv("c")]
+unsafe fn collect_inclusion(included_file: *mut u8, inclusion_stack: *mut u8, include_len: u32, data: *mut u8):
+    let _ = inclusion_stack
+    let _ = include_len
+    if included_file as i64 == 0:
+        return
+    let s = data as *mut CImportSession
+    let path = clang_str_to_with(s, clang_getFileName(included_file))
+    if path.len() == 0:
+        return
+    // The synthetic main file is a throwaway temp; it is not a dependency.
+    if path.starts_with("/tmp/with_cimport_") or path.starts_with("/private/tmp/with_cimport_"):
+        return
+    g_bridge_inclusion_files = g_bridge_inclusion_files ++ path ++ "\n"
+
+/// Newline-joined absolute paths of every file the translation unit read,
+/// excluding the synthetic main file. Used to validate cached translations
+/// against transitive header changes (#553).
+pub fn with_cimport_included_files(session: i64) -> str:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0:
+            return ""
+        if (*s).tu as i64 == 0:
+            return ""
+        g_bridge_inclusion_files = ""
+        clang_getInclusions((*s).tu, collect_inclusion as *const u8, s as *mut u8)
+        let out = g_bridge_inclusion_files
+        g_bridge_inclusion_files = ""
+        out
 
 // ── Declaration queries ─────────────────────────────────────
 

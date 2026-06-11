@@ -18,6 +18,7 @@ var g_ci_realpath_cache_values: Vec[str] = Vec.new()
 var g_cimport_last_error: str = ""
 var g_cimport_untranslated_macros: str = ""
 var g_cimport_omitted_symbols: str = ""
+var g_cimport_included_files: str = ""
 var g_cimport_raw_function_names: str = ""
 var g_cimport_report_untranslated_macros: i32 = 0
 
@@ -210,6 +211,16 @@ fn c_import_omitted_symbols_clear():
 
 fn c_import_omitted_symbols() -> str:
     g_cimport_omitted_symbols
+
+fn c_import_included_files_clear():
+    g_cimport_included_files = ""
+    return
+
+/// Newline-joined absolute paths of every header file the last successful
+/// libclang parse read. Consumed by the frontend cache to build and validate
+/// the dependency manifest stored beside each cached translation (#553).
+fn c_import_included_files() -> str:
+    g_cimport_included_files
 
 fn ci_record_raw_function_name(name: str):
     if name.len() == 0:
@@ -436,6 +447,7 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     c_import_last_error_clear()
     c_import_untranslated_macros_clear()
     c_import_omitted_symbols_clear()
+    c_import_included_files_clear()
     g_cimport_raw_function_names = ""
     ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
@@ -454,6 +466,8 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
         g_cimport_last_error = err_msg
         with_cimport_dispose(session)
         return ""
+
+    g_cimport_included_files = with_cimport_included_files(session)
 
     var output = StringBuilder.new()
     let count = with_cimport_decl_count(session)

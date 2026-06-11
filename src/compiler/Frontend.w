@@ -312,6 +312,11 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                 self.c_import_cache_store(cache_key, synthetic)
                 // Populate dedup table so subsequent c_imports don't re-emit these names
                 ci_mark_cached_names(synthetic)
+                // The cached translation depends on every header in its manifest;
+                // track them so incremental builds re-translate on header changes.
+                let hit_dep_paths = c_import_deps_manifest_paths(c_import_fs_cache_deps_manifest(cache_key))
+                for dpi in 0..hit_dep_paths.len() as i32:
+                    self.record_frontend_tracked_input(hit_dep_paths.get(dpi as i64))
             else:
                 if self.trace_c_import_cache != 0:
                     runtime_eprint("c_import cache miss")
@@ -322,6 +327,9 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                     runtime_eprint(libclang_result)
                 if libclang_result.len() > 0:
                     synthetic = libclang_result
+                    let gen_dep_paths = cimport_deps_sorted_unique_paths(c_import_included_files())
+                    for dpi in 0..gen_dep_paths.len() as i32:
+                        self.record_frontend_tracked_input(gen_dep_paths.get(dpi as i64))
                 else:
                     let libclang_error = c_import_last_error()
                     if libclang_error.len() > 0:
@@ -372,7 +380,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     out
 
 fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_spec: str) -> str:
-    var key = header_spec ++ "\n#format:cimport-v10\n#links:"
+    var key = header_spec ++ "\n#format:cimport-v11\n#links:"
     let link_start = pool.get_data1(decl)
     let packed_counts = pool.get_data2(decl)
     let link_count = c_import_link_count(packed_counts)
@@ -414,7 +422,7 @@ fn c_import_fs_cache_dir() -> str:
         return ""
     home ++ "/.cache/with/c_import"
 
-fn c_import_fs_cache_lookup(cache_key: str) -> str:
+fn c_import_fs_cache_entry_path(cache_key: str, ext: str) -> str:
     let dir = c_import_fs_cache_dir()
     if dir.len() == 0:
         return ""
@@ -423,7 +431,136 @@ fn c_import_fs_cache_lookup(cache_key: str) -> str:
     var hash_str = f"{h}"
     if h < 0:
         hash_str = f"n{0 - h}"
-    let path = f"{dir}/{hash_str}.w"
+    f"{dir}/{hash_str}{ext}"
+
+fn cimport_deps_str_compare(a: str, b: str) -> i32:
+    let al = a.len()
+    let bl = b.len()
+    var i: i64 = 0
+    while i < al and i < bl:
+        let ab = a.byte_at(i) as i32
+        let bb = b.byte_at(i) as i32
+        if ab != bb:
+            return ab - bb
+        i = i + 1
+    (al - bl) as i32
+
+fn cimport_deps_sorted_unique_paths(files: str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    var pos = 0
+    let total = files.len() as i32
+    while pos < total:
+        var line_end = pos
+        while line_end < total and files.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        if line_end > pos:
+            let path = files.slice(pos as i64, line_end as i64)
+            var exists = false
+            for i in 0..out.len() as i32:
+                if out.get(i as i64) == path:
+                    exists = true
+            if not exists:
+                var inserted = false
+                let next: Vec[str] = Vec.new()
+                for i in 0..out.len() as i32:
+                    let existing = out.get(i as i64)
+                    if not inserted and cimport_deps_str_compare(path, existing) < 0:
+                        next.push(path)
+                        inserted = true
+                    next.push(existing)
+                if not inserted:
+                    next.push(path)
+                out = next
+        pos = line_end + 1
+    out
+
+// Dependency manifest stored beside each cached translation (#553). The set
+// of transitively included headers is only known after parsing, so it cannot
+// live in the cache key; instead the manifest records each file's length and
+// content hash, and lookup re-validates them. Any mismatch is a cache miss.
+let CIMPORT_DEPS_MANIFEST_HEADER: str = "cimport-deps-v1"
+
+fn c_import_build_deps_manifest(files: str) -> str:
+    var manifest = CIMPORT_DEPS_MANIFEST_HEADER ++ "\n"
+    let paths = cimport_deps_sorted_unique_paths(files)
+    for i in 0..paths.len() as i32:
+        let path = paths.get(i as i64)
+        let text = runtime_read_file(path)
+        manifest = manifest ++ f"{text.len()}|{runtime_str_hash(text)}|{path}\n"
+    manifest
+
+fn c_import_deps_manifest_entries_valid(manifest: str) -> bool:
+    var pos = 0
+    let total = manifest.len() as i32
+    var saw_header = false
+    while pos < total:
+        var line_end = pos
+        while line_end < total and manifest.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        if line_end > pos:
+            let line = manifest.slice(pos as i64, line_end as i64)
+            if not saw_header:
+                if line != CIMPORT_DEPS_MANIFEST_HEADER:
+                    return false
+                saw_header = true
+            else:
+                var sep1 = -1
+                var sep2 = -1
+                for i in 0..line.len() as i32:
+                    if line.byte_at(i as i64) == 124:
+                        if sep1 < 0:
+                            sep1 = i
+                        else if sep2 < 0:
+                            sep2 = i
+                if sep1 <= 0 or sep2 <= sep1 or sep2 as i64 + 1 >= line.len():
+                    return false
+                let want_len = line.slice(0, sep1 as i64)
+                let want_hash = line.slice(sep1 as i64 + 1, sep2 as i64)
+                let path = line.slice(sep2 as i64 + 1, line.len())
+                let text = runtime_read_file(path)
+                if f"{text.len()}" != want_len:
+                    return false
+                if f"{runtime_str_hash(text)}" != want_hash:
+                    return false
+        pos = line_end + 1
+    saw_header
+
+fn c_import_deps_manifest_paths(manifest: str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    var pos = 0
+    let total = manifest.len() as i32
+    while pos < total:
+        var line_end = pos
+        while line_end < total and manifest.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        if line_end > pos:
+            let line = manifest.slice(pos as i64, line_end as i64)
+            var sep2 = -1
+            var seen = 0
+            for i in 0..line.len() as i32:
+                if line.byte_at(i as i64) == 124:
+                    seen = seen + 1
+                    if seen == 2:
+                        sep2 = i
+            if sep2 > 0 and (sep2 as i64) + 1 < line.len():
+                out.push(line.slice(sep2 as i64 + 1, line.len()))
+        pos = line_end + 1
+    out
+
+fn c_import_fs_cache_deps_manifest(cache_key: str) -> str:
+    let path = c_import_fs_cache_entry_path(cache_key, ".deps")
+    if path.len() == 0:
+        return ""
+    runtime_read_file(path)
+
+fn c_import_fs_cache_lookup(cache_key: str) -> str:
+    let path = c_import_fs_cache_entry_path(cache_key, ".w")
+    if path.len() == 0:
+        return ""
+    // A cached translation is only valid while every header it read is
+    // unchanged. No manifest means an unverifiable entry: treat as a miss.
+    if not c_import_deps_manifest_entries_valid(c_import_fs_cache_deps_manifest(cache_key)):
+        return ""
     runtime_read_file(path)
 
 fn c_import_fs_cache_store(cache_key: str, value: str):
@@ -431,12 +568,10 @@ fn c_import_fs_cache_store(cache_key: str, value: str):
     if dir.len() == 0:
         return
     runtime_mkdir_p(dir)
-    let h = runtime_str_hash(cache_key)
-    var hash_str = f"{h}"
-    if h < 0:
-        hash_str = f"n{0 - h}"
-    let path = f"{dir}/{hash_str}.w"
-    runtime_write_file(path, value)
+    // Write the manifest before the content: a partial entry then lacks the
+    // content and reads as a plain miss instead of an unvalidated hit.
+    runtime_write_file(c_import_fs_cache_entry_path(cache_key, ".deps"), c_import_build_deps_manifest(c_import_included_files()))
+    runtime_write_file(c_import_fs_cache_entry_path(cache_key, ".w"), value)
 
 fn Zcu.c_import_record_omissions_frontend(self: Zcu, synthetic: str):
     let prefix = "// @with-cimport-omitted|"
