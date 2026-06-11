@@ -6534,9 +6534,15 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
     let arm_count = self.ast.get_data2(node)
 
     let subject_type = self.check_expr(subject)
+    let comprehension_carrier = if self.match_is_for_comprehension_lowering(extra_start, arm_count) != 0: self.option_result_carrier_family(subject_type as i32) else: 0
+    if comprehension_carrier != 0 and self.current_for_comprehension_carrier != 0 and comprehension_carrier != self.current_for_comprehension_carrier:
+        self.emit_error("for-comprehension clauses must use the same carrier family", node)
     var result_type: TypeId = 0 as TypeId
     let match_is_value = self.match_in_stmt_pos == 0
     let match_expected: TypeId = if match_is_value and self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
+    let saved_for_comprehension_carrier = self.current_for_comprehension_carrier
+    if comprehension_carrier != 0 and saved_for_comprehension_carrier == 0:
+        self.current_for_comprehension_carrier = comprehension_carrier
 
     for ai in 0..arm_count:
         let arm_node = self.ast.get_extra(extra_start + ai)
@@ -6575,10 +6581,12 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
         else if arm_type != 0 and self.types_compatible(result_type, arm_type) != 0:
             result_type = self.preferred_compatible_type(result_type, arm_type)
 
+    self.current_for_comprehension_carrier = saved_for_comprehension_carrier
+
     // Exhaustiveness checking for enum and bool subjects.
     // Expression-position match always requires exhaustiveness.
     // Statement-position match allows partial match (unmatched variants are no-op),
-    // UNLESS the subject type is @[must_use] (Result, Task).
+    // unless the subject type is @[must_use].
     var require_exhaustive = 0
     if self.match_in_stmt_pos == 0:
         require_exhaustive = 1
@@ -6595,11 +6603,58 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
         self.typed_expr_types.insert(node, result_type as i32)
     result_type as i32
 
+fn Sema.option_result_carrier_family(self: Sema, tid: i32) -> i32:
+    let resolved = self.resolve_alias(tid as TypeId)
+    let tk = self.get_type_kind(resolved)
+    let base = if tk == TypeKind.TY_GENERIC_INST:
+        self.get_generic_inst_base(resolved as i32)
+    else:
+        self.get_type_d0(resolved)
+    if base == self.syms.option:
+        return 1
+    if base == self.syms.result:
+        return 2
+    0
+
+fn Sema.pattern_is_for_comprehension_marker(self: Sema, pat: i32) -> i32:
+    if pat == 0:
+        return 0
+    let kind = self.ast.kind(pat)
+    if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
+        let name = self.pool_resolve(self.ast.get_data0(pat))
+        if name == "_Payload" or name == "_Empty":
+            return 1
+    if kind == NodeKind.NK_PAT_AT_BINDING:
+        return self.pattern_is_for_comprehension_marker(self.ast.get_data1(pat))
+    if kind == NodeKind.NK_PAT_OR:
+        let or_start = self.ast.get_data0(pat)
+        let or_count = self.ast.get_data1(pat)
+        for oi in 0..or_count:
+            if self.pattern_is_for_comprehension_marker(self.ast.get_extra(or_start + oi)) != 0:
+                return 1
+    0
+
+fn Sema.match_is_for_comprehension_lowering(self: Sema, extra_start: i32, arm_count: i32) -> i32:
+    for ai in 0..arm_count:
+        let arm_node = self.ast.get_extra(extra_start + ai)
+        if self.pattern_is_for_comprehension_marker(self.ast.get_data0(arm_node)) != 0:
+            return 1
+    0
+
 fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32):
     if subject_type == 0:
         return
     let resolved = self.resolve_alias(subject_type)
-    let tk = self.get_type_kind(resolved)
+    var tk = self.get_type_kind(resolved)
+    var enum_resolved = resolved
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        let base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid != 0:
+            let base_resolved = self.resolve_alias(base_tid as TypeId)
+            if self.get_type_kind(base_resolved) == TypeKind.TY_ENUM:
+                enum_resolved = base_resolved
+                tk = TypeKind.TY_ENUM
 
     // Check if any arm is a catch-all (wildcard or binding pattern without guard)
     var has_catchall = 0
@@ -6670,8 +6725,8 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
         return
     if require_exhaustive == 0:
         return
-    let te_start = self.get_type_d1(resolved)
-    let variant_count = self.get_type_d2(resolved)
+    let te_start = self.get_type_d1(enum_resolved)
+    let variant_count = self.get_type_d2(enum_resolved)
     // Collect all variant name syms
     var pos = te_start
     for vi in 0..variant_count:
@@ -6703,6 +6758,8 @@ fn sema_pattern_is_catchall(ast: AstPool, pat: i32) -> bool:
         return true
     if kind == NodeKind.NK_PAT_IDENT:
         return true
+    if kind == NodeKind.NK_PAT_AT_BINDING:
+        return sema_pattern_is_catchall(ast, ast.get_data1(pat))
     false
 
 fn sema_pattern_covers_variant(ast: AstPool, pat: i32, variant_sym: i32) -> bool:

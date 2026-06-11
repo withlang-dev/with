@@ -1,4 +1,4 @@
-//! expect-check-fail: non-exhaustive match: missing variant 'Ok'
+//! expect-check-fail: for-comprehension clauses must use the same carrier family
 
 fn main:
     let result = for a in Some(2); b in Ok(3):

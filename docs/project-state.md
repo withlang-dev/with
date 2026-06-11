@@ -34,8 +34,8 @@ argument cases. Full `with build`, `with build :fixpoint`, `with build :test`,
 passed on 2026-06-11 for the expanded C-package gate slice.
 
 Phase 2 parser/control-flow work is in progress. #461, #443, #445, #448,
-#447, #462, #375, #382, #401, #543, and #459 are implemented, pushed, and
-closed.
+#447, #462, #375, #382, #401, #543, #459, and #371 are implemented, pushed,
+and closed.
 `loop` is now expression-valued through `break expr`, plain `break`
 contributes Unit, break values unify per loop, non-loop value breaks are
 rejected, and no-break loops type as `Never`. Unreachable-code detection now
@@ -46,9 +46,13 @@ caller-visible provisional Unit signatures from body-local inferred
 `return expr` and bare `return` results. Negated membership now follows
 §9.9: `not x in y` parses as `not (x in y)`, both non-idiomatic negated
 membership spellings emit the non-fatal `prefer-not-in` lint, and
-idiomatic `x not in y` stays clean. Full `with build`,
+idiomatic `x not in y` stays clean. `Result` is no longer hardcoded as
+`@[must_use]`, so partial statement-position matches on `Result` are legal
+no-ops for unmatched variants; user `@[must_use]` types and `Task` keep the
+exhaustiveness rule. Generic enum instantiations such as `Result[T, E]` still
+use their enum base for expression-position exhaustiveness. Full `with build`,
 `with build :fixpoint`, `with build :test`, and `with build :test-green`
-passed on 2026-06-11 for #543 and #459. Follow-up bug #549 tracks
+passed on 2026-06-11 for #543, #459, and #371. Follow-up bug #549 tracks
 value-position `if` branch type mismatches discovered during the #382 audit.
 
 #347, #356, #358, and the first #357 safety slice are implemented.

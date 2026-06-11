@@ -113,11 +113,9 @@ fn Sema.collect_declarations(self: Sema):
         if kind == NodeKind.NK_LET_DECL:
             self.collect_let_decl(decl, is_local)
 
-    // Hardcode Result and Task as must_use types
-    let sym_result = self.pool_intern("Result")
+    // Task discard cancels work, so statement-position matches must
+    // force an explicit disposition. Result discard is side-effect free.
     let sym_task = self.pool_intern("Task")
-    if sym_result != 0:
-        self.must_use_types.insert(sym_result, 1)
     if sym_task != 0:
         self.must_use_types.insert(sym_task, 1)
 
