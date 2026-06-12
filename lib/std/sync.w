@@ -9,13 +9,13 @@ type Mutex  {
 
 /// Immutable guard from `Mutex.enter()`. Provides read access.
 @[no_await_guard]
-type MutexGuard  {
+type MutexGuard ephemeral {
     value: i64
 }
 
 /// Mutable guard from `Mutex.enter_mut()`. Provides write access.
 @[no_await_guard]
-type MutexGuardMut  {
+type MutexGuardMut ephemeral {
     value: i64
 }
 
@@ -26,13 +26,13 @@ type RwLock  {
 
 /// Read guard from `RwLock.enter()`.
 @[no_await_guard]
-type RwReadGuard  {
+type RwReadGuard ephemeral {
     value: i64
 }
 
 /// Write guard from `RwLock.enter_mut()`.
 @[no_await_guard]
-type RwWriteGuard  {
+type RwWriteGuard ephemeral {
     value: i64
 }
 

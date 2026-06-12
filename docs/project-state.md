@@ -40,6 +40,19 @@ existing returned-local-reference and two-origin view tests.
 Full `with build`, `with build :fixpoint`, `with build :test`, and
 `with build :test-green` passed on 2026-06-12 for #378.
 
+#477 is implemented locally. Stdlib synchronization guards
+(`MutexGuard`, `MutexGuardMut`, `RwReadGuard`, `RwWriteGuard`), borrowed-data
+iterators (`VecIter`, `VecIterPlace`, `MapIter`, `FilterIter`, `TakeIter`,
+`ZipIter`, `FlatMapIter`), and scoped borrowed handles (`VecSlot`,
+`SlotMapSlot`, `HashMapEntry`) are now declared `ephemeral`. Focused coverage
+rejects guard/iterator/handle storage in non-ephemeral structs and escaping
+closure capture of a live iterator, while positive tests keep guard locals,
+guarded `with` blocks, concrete iterator returns, iterator parameters, and
+pipeline adapters working. Existing `with` slot/entry, iterator borrowing, and
+§7 `with` block regressions pass. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-12 for
+#477.
+
 #444 is implemented and verified.
 Drop-implementing bindings now record concrete view dependencies from their
 initializers and reassignments, including references stored inside struct

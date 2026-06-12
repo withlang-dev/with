@@ -60,7 +60,7 @@ pub type SlotMap[T] {
 
 /// Scoped mutable slot handle returned by SlotMap.slot/get_disjoint.
 /// Use `.get()` / `.set(value)` inside the `with` block, matching VecSlot.
-pub type SlotMapSlot[T] {
+pub type SlotMapSlot[T] ephemeral {
     map_ptr: i64,
     index: u32,
     generation: u32,
@@ -93,38 +93,38 @@ type Atomic[T]  {
 ///   with xs.slot(i) as mut s:
 ///       let v = s.get()
 ///       s.set(v + 1)
-type VecSlot[T]  { data_ptr: i64, index: i64 }
+type VecSlot[T] ephemeral { data_ptr: i64, index: i64 }
 
 /// Iterator yielding VecSlot[T] handles for in-place element mutation (§19.5).
 /// Obtain via `vec.iter_place()`. Each `.next()` returns `Option[VecSlot[T]]`.
-type VecIterPlace[T]  { data_ptr: i64, len: i64, idx: i64 }
+type VecIterPlace[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
 
 /// Scoped handle to a HashMap entry (docs/mut.md Rev 8 §10).
 /// Obtain via `map.entry(key)`. Use with `with`:
 ///   with map.entry(k) as mut e:
 ///       e.or_insert(default)
-type HashMapEntry[K, V]  { map_ptr: i64, key: K }
+type HashMapEntry[K, V] ephemeral { map_ptr: i64, key: K }
 
 // ── Iterators ─────────────────────────────────────────────────────
 
 /// Iterator over Vec[T]. Obtain via `vec.iter()`.
 /// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
-type VecIter[T]  { data_ptr: i64, len: i64, idx: i64 }
+type VecIter[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
 
 /// Lazy iterator adapter produced by `.map(f)`.
-type MapIter[I, T, U] { iter: I, f: fn(T) -> U }
+type MapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> U }
 
 /// Lazy iterator adapter produced by `.filter(pred)`.
-type FilterIter[I, T] { iter: I, pred: fn(T) -> bool }
+type FilterIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool }
 
 /// Lazy iterator adapter produced by `.take(n)`.
-type TakeIter[I, T] { iter: I, remaining: i64 }
+type TakeIter[I, T] ephemeral { iter: I, remaining: i64 }
 
 /// Lazy iterator adapter produced by `.zip(other)`.
-type ZipIter[A, B, T, U] { left: A, right: B }
+type ZipIter[A, B, T, U] ephemeral { left: A, right: B }
 
 /// Lazy iterator adapter produced by `.flat_map(f)`.
-type FlatMapIter[I, C, J, T, U] {
+type FlatMapIter[I, C, J, T, U] ephemeral {
     iter: I,
     f: fn(T) -> C,
     current: J,
