@@ -11,7 +11,22 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 4 is in progress. #444 is implemented locally and focused tests pass.
+Phase 4 is in progress. #362 substrate work is implemented locally and
+focused tests pass. Binding-level provenance is now carried in a single
+`BindingProvenance` record per scope binding, replacing the previous split
+task-ephemerality vector and binding-view maps while preserving the existing
+query helpers. Let/var bindings and assignments now propagate value-level
+ephemerality explicitly, Drop-bearing values record view provenance through
+struct literals, and focused coverage pins local `Vec[ephemeral]` use,
+nested generic field rejection (`Option[Ephemeral]`), and ephemeral Task
+assignment propagation into generic-container storage. Full verification is
+complete: `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-12. The first full-suite run hit a
+transient Conan/raylib package download failure; `cli-selfhost-project-tests`
+passed on rerun before the final clean full-suite pass. #362 remains open until
+its named Phase 4 consumers (#378 and #355) land on top of this substrate.
+
+#444 is implemented and verified.
 Drop-implementing bindings now record concrete view dependencies from their
 initializers and reassignments, including references stored inside struct
 literals. Scope exit treats the implicit destructor call as a use under §21.1

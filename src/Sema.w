@@ -54,6 +54,18 @@ enum VarState: i32:
     LIVE = 0
     MOVED = 1
 
+type BindingProvenance {
+    view_origin_mask: i32,
+    view_dep_start: i32,
+    view_dep_count: i32,
+    is_ephemeral_value: i32,
+    is_ephemeral_task: i32,
+}
+impl Copy for BindingProvenance
+
+fn binding_provenance_empty -> BindingProvenance:
+    BindingProvenance { view_origin_mask: 0, view_dep_start: 0, view_dep_count: 0, is_ephemeral_value: 0, is_ephemeral_task: 0 }
+
 enum BorrowKind: i32:
     SHARED = 0
     EXCLUSIVE = 1
@@ -404,8 +416,8 @@ type Sema {
     bind_states: Vec[i32],
     bind_is_task: Vec[i32],
     bind_is_scoped_task: Vec[i32],
-    bind_is_ephemeral_task: Vec[i32],
     bind_is_view_bound: Vec[i32],
+    bind_provenance: Vec[BindingProvenance],
     binding_decl_nodes: HashMap[i32, i32],
     binding_value_nodes: HashMap[i32, i32],
     scope_starts: Vec[i32],
@@ -522,11 +534,6 @@ type Sema {
     closure_capture_summary_data: Vec[i32],
     // Binding -> originating closure node when initialized directly from a closure literal.
     binding_closure_nodes: HashMap[i32, i32],
-    // Binding -> param-origin mask for live view values in the current function.
-    binding_view_param_origins: HashMap[i32, i32],
-    // Binding -> flat list of concrete origin symbols whose lifetime this binding depends on.
-    binding_view_dep_starts: HashMap[i32, i32],
-    binding_view_dep_counts: HashMap[i32, i32],
     binding_view_dep_data: Vec[i32],
     // Expression-level view metadata for call expressions and view-producing nodes.
     expr_view_param_origins: HashMap[i32, i32],
@@ -1108,8 +1115,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bind_states: Vec.new(),
         bind_is_task: Vec.new(),
         bind_is_scoped_task: Vec.new(),
-        bind_is_ephemeral_task: Vec.new(),
         bind_is_view_bound: Vec.new(),
+        bind_provenance: Vec.new(),
         binding_decl_nodes: sema_new_map_i32_i32(),
         binding_value_nodes: sema_new_map_i32_i32(),
         scope_starts: Vec.new(),
@@ -1195,9 +1202,6 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         closure_capture_summary_counts: sema_new_map_i32_i32(),
         closure_capture_summary_data: Vec.new(),
         binding_closure_nodes: sema_new_map_i32_i32(),
-        binding_view_param_origins: sema_new_map_i32_i32(),
-        binding_view_dep_starts: sema_new_map_i32_i32(),
-        binding_view_dep_counts: sema_new_map_i32_i32(),
         binding_view_dep_data: Vec.new(),
         expr_view_param_origins: sema_new_map_i32_i32(),
         expr_view_dep_starts: sema_new_map_i32_i32(),
@@ -2667,8 +2671,8 @@ fn Sema.pop_scope(self: Sema):
         self.bind_states.pop()
         self.bind_is_task.pop()
         self.bind_is_scoped_task.pop()
-        self.bind_is_ephemeral_task.pop()
         self.bind_is_view_bound.pop()
+        self.bind_provenance.pop()
         self.binding_decl_nodes.remove(removed_sym)
         self.binding_value_nodes.remove(removed_sym)
         self.binding_closure_nodes.remove(removed_sym)
@@ -2693,8 +2697,8 @@ fn Sema.scope_insert_at(self: Sema, sym: i32, tid: i32, is_mut: i32):
     self.bind_states.push(VarState.LIVE)
     self.bind_is_task.push(0)
     self.bind_is_scoped_task.push(0)
-    self.bind_is_ephemeral_task.push(0)
     self.bind_is_view_bound.push(0)
+    self.bind_provenance.push(binding_provenance_empty())
     self.scope_name_map.insert(sym, idx)
 
 fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
@@ -2811,13 +2815,34 @@ fn Sema.scope_set_is_scoped_task(self: Sema, sym: i32, is_scoped_task: i32):
 fn Sema.scope_lookup_is_ephemeral_task(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)
     if opt.is_some():
-        return self.bind_is_ephemeral_task.get(opt.unwrap() as i64)
+        return self.bind_provenance.get(opt.unwrap() as i64).is_ephemeral_task
     0
 
 fn Sema.scope_set_is_ephemeral_task(self: Sema, sym: i32, is_ephemeral_task: i32):
     let opt = self.scope_name_map.get(sym)
     if opt.is_some():
-        self.bind_is_ephemeral_task.set_i32(opt.unwrap() as i64, is_ephemeral_task)
+        let idx = opt.unwrap()
+        let slot_idx = idx as i64
+        with self.bind_provenance.slot(slot_idx) as mut slot:
+            var provenance = slot.get()
+            provenance.is_ephemeral_task = is_ephemeral_task
+            slot.set(provenance)
+
+fn Sema.scope_lookup_is_ephemeral_value(self: Sema, sym: i32) -> i32:
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_provenance.get(opt.unwrap() as i64).is_ephemeral_value
+    0
+
+fn Sema.scope_set_is_ephemeral_value(self: Sema, sym: i32, is_ephemeral_value: i32):
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        let idx = opt.unwrap()
+        let slot_idx = idx as i64
+        with self.bind_provenance.slot(slot_idx) as mut slot:
+            var provenance = slot.get()
+            provenance.is_ephemeral_value = is_ephemeral_value
+            slot.set(provenance)
 
 fn Sema.scope_is_view_bound(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)
@@ -2856,9 +2881,16 @@ fn Sema.restore_scope_states(self: Sema, snapshot: Vec[i32]):
         self.bind_states.set_i32(i as i64, snapshot.get(i as i64))
 
 fn Sema.clear_binding_view_deps(self: Sema, sym: i32):
-    self.binding_view_param_origins.remove(sym)
-    self.binding_view_dep_starts.remove(sym)
-    self.binding_view_dep_counts.remove(sym)
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        let idx = opt.unwrap()
+        let slot_idx = idx as i64
+        with self.bind_provenance.slot(slot_idx) as mut slot:
+            var provenance = slot.get()
+            provenance.view_origin_mask = 0
+            provenance.view_dep_start = 0
+            provenance.view_dep_count = 0
+            slot.set(provenance)
 
 fn Sema.set_binding_view_deps(self: Sema, sym: i32, param_mask: i32, deps: Vec[i32]):
     if sym == 0:
@@ -2866,32 +2898,41 @@ fn Sema.set_binding_view_deps(self: Sema, sym: i32, param_mask: i32, deps: Vec[i
     if param_mask == 0 and deps.len() == 0:
         self.clear_binding_view_deps(sym)
         return
-    self.binding_view_param_origins.insert(sym, param_mask)
     let start = self.binding_view_dep_data.len() as i32
     for i in 0..deps.len() as i32:
         self.binding_view_dep_data.push(deps.get(i as i64))
-    self.binding_view_dep_starts.insert(sym, start)
-    self.binding_view_dep_counts.insert(sym, deps.len() as i32)
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        let idx = opt.unwrap()
+        let slot_idx = idx as i64
+        with self.bind_provenance.slot(slot_idx) as mut slot:
+            var provenance = slot.get()
+            provenance.view_origin_mask = param_mask
+            provenance.view_dep_start = start
+            provenance.view_dep_count = deps.len() as i32
+            slot.set(provenance)
 
 fn Sema.binding_view_origin_mask(self: Sema, sym: i32) -> i32:
-    if self.binding_view_param_origins.contains(sym):
-        return self.binding_view_param_origins.get(sym).unwrap()
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_provenance.get(opt.unwrap() as i64).view_origin_mask
     0
 
 fn Sema.binding_view_dep_count(self: Sema, sym: i32) -> i32:
-    if self.binding_view_dep_counts.contains(sym):
-        return self.binding_view_dep_counts.get(sym).unwrap()
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_provenance.get(opt.unwrap() as i64).view_dep_count
     0
 
 fn Sema.binding_view_dep_at(self: Sema, sym: i32, idx: i32) -> i32:
-    if not self.binding_view_dep_starts.contains(sym):
+    let opt = self.scope_name_map.get(sym)
+    if not opt.is_some():
         return 0
-    if not self.binding_view_dep_counts.contains(sym):
-        return 0
-    let count = self.binding_view_dep_counts.get(sym).unwrap()
+    let provenance = self.bind_provenance.get(opt.unwrap() as i64)
+    let count = provenance.view_dep_count
     if idx < 0 or idx >= count:
         return 0
-    let start = self.binding_view_dep_starts.get(sym).unwrap()
+    let start = provenance.view_dep_start
     self.binding_view_dep_data.get((start + idx) as i64)
 
 fn Sema.binding_depends_on_origin(self: Sema, sym: i32, origin_sym: i32) -> i32:

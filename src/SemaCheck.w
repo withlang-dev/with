@@ -1812,7 +1812,7 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     let saved_bind_states = self.bind_states
     let saved_bind_is_task = self.bind_is_task
     let saved_bind_is_scoped_task = self.bind_is_scoped_task
-    let saved_bind_is_ephemeral_task = self.bind_is_ephemeral_task
+    let saved_bind_provenance = self.bind_provenance
     let saved_scope_starts = self.scope_starts
     let saved_scope_name_map = self.scope_name_map
     let saved_pending_generic_binding_base = self.pending_generic_binding_base
@@ -1824,7 +1824,7 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     self.bind_states = Vec.new()
     self.bind_is_task = Vec.new()
     self.bind_is_scoped_task = Vec.new()
-    self.bind_is_ephemeral_task = Vec.new()
+    self.bind_provenance = Vec.new()
     self.scope_starts = Vec.new()
     self.scope_starts.push(0)
     self.scope_name_map = HashMap.new()
@@ -1843,7 +1843,7 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     self.bind_states = saved_bind_states
     self.bind_is_task = saved_bind_is_task
     self.bind_is_scoped_task = saved_bind_is_scoped_task
-    self.bind_is_ephemeral_task = saved_bind_is_ephemeral_task
+    self.bind_provenance = saved_bind_provenance
     self.scope_starts = saved_scope_starts
     self.scope_name_map = saved_scope_name_map
     self.pending_generic_binding_base = saved_pending_generic_binding_base
@@ -2632,6 +2632,8 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
         return self.expr_is_ephemeral_value(self.ast.get_data0(node))
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
+        if self.scope_lookup_is_ephemeral_value(sym) != 0:
+            return 1
         if self.scope_lookup_is_ephemeral_task(sym) != 0:
             return 1
         let tid = self.scope_lookup(sym)
@@ -5030,6 +5032,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         self.binding_decl_nodes.insert(name, node)
         self.binding_value_nodes.remove(name)
         self.typed_binding_types.insert(node, ann_type as i32)
+        self.scope_set_is_ephemeral_value(name, self.type_is_ephemeral_value(ann_type as i32))
         return self.ty_void as i32
 
     // Let binding value is expression position — match inside must be exhaustive.
@@ -5075,6 +5078,8 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     self.scope_set_is_scoped_task(name, is_scoped_task_val)
     let is_ephemeral_task = self.expr_is_ephemeral_task(value)
     self.scope_set_is_ephemeral_task(name, is_ephemeral_task)
+    let is_ephemeral_value = if self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0: 1 else: 0
+    self.scope_set_is_ephemeral_value(name, is_ephemeral_value)
     if is_task_val != 0 and is_ephemeral_task != 0:
         self.ephemeral_task_binding_nodes.insert(node, 1)
     if self.ast.kind(value) == NodeKind.NK_CLOSURE:
@@ -5774,6 +5779,8 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         self.scope_set_is_task(target_sym, self.expr_is_task_value(value))
         self.scope_set_is_scoped_task(target_sym, self.expr_is_scoped_task_value(value))
         self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
+        let assigned_ephemeral_value = if self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(target_type as i32) != 0: 1 else: 0
+        self.scope_set_is_ephemeral_value(target_sym, assigned_ephemeral_value)
         if self.ast.kind(value) == NodeKind.NK_CLOSURE:
             self.binding_closure_nodes.insert(target_sym, value)
         else:
