@@ -531,6 +531,248 @@ fn conan_scan_libraries(dep_dir: str) -> ConanLibraryScan:
                 lib_paths = conan_sorted_insert_unique(move lib_paths, conan_relative_path(dep_dir, conan_path_dirname(path)))
     ConanLibraryScan { lib_paths, libs }
 
+// ── Recipe package_info extraction (#550) ────────────────────────────
+//
+// Conan recipes declare system link requirements in package_info() as
+// cpp_info system_libs / frameworks assignments. The compiler cannot run
+// Python, but the common declarations are simple enough to read directly:
+// indentation-scoped if/elif/else on self.settings.os (or is_apple_os),
+// and = / append / extend with string-literal lists. Anything the reader
+// cannot resolve — option-dependent conditions, computed values,
+// multi-line lists — is skipped, never guessed: under-linking fails
+// loudly at link time, and conan_known_link_metadata remains the
+// override for packages whose recipes are too dynamic to read.
+
+fn conan_recipe_line_indent(line: str) -> i32:
+    var i = 0
+    while i < line.len() as i32 and line.byte_at(i as i64) == 32:
+        i = i + 1
+    i
+
+fn conan_recipe_extract_quoted(text: str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    var i = 0
+    let n = text.len() as i32
+    while i < n:
+        let ch = text.byte_at(i as i64)
+        if ch == 34 or ch == 39:
+            var j = i + 1
+            while j < n and text.byte_at(j as i64) != ch:
+                j = j + 1
+            if j < n:
+                out.push(text.slice((i + 1) as i64, j as i64))
+                i = j
+        i = i + 1
+    out
+
+// Evaluate a package_info condition against the target OS.
+// Returns 1 (true), 0 (false), or -1 (unresolvable).
+fn conan_recipe_eval_condition(cond_raw: str, target_os: str) -> i32:
+    var cond = conan_trim(cond_raw)
+    while cond.len() >= 2 and cond.byte_at(0) == 40 and cond.byte_at(cond.len() - 1) == 41:
+        cond = conan_trim(cond.slice(1, cond.len() - 1))
+    if conan_find_text(cond, " and ") >= 0 or conan_find_text(cond, " or ") >= 0:
+        return -1
+    if cond == "is_apple_os(self)":
+        return if target_os == "Macos": 1 else: 0
+    if conan_find_text(cond, "self.settings.os") < 0:
+        return -1
+    let quoted = conan_recipe_extract_quoted(cond)
+    if quoted.len() == 0:
+        return -1
+    if conan_find_text(cond, " not in ") >= 0:
+        return if conan_vec_contains(quoted, target_os): 0 else: 1
+    if conan_find_text(cond, " in ") >= 0 or conan_find_text(cond, " in[") >= 0:
+        return if conan_vec_contains(quoted, target_os): 1 else: 0
+    if conan_find_text(cond, "!=") >= 0:
+        if quoted.len() as i32 != 1:
+            return -1
+        return if quoted.get(0) == target_os: 0 else: 1
+    if conan_find_text(cond, "==") >= 0:
+        if quoted.len() as i32 != 1:
+            return -1
+        return if quoted.get(0) == target_os: 1 else: 0
+    -1
+
+// Pull the string values out of an attribute line:
+//   ... .system_libs = ["a", "b"]
+//   ... .frameworks.append("X")
+//   ... .system_libs.extend(["a", "b"])
+// Returns an empty Vec when the right-hand side cannot be read safely.
+fn conan_recipe_attr_values(line: str, attr_pos: i32) -> Vec[str]:
+    let rhs = line.slice(attr_pos as i64, line.len())
+    // Python conditional expressions and multi-line lists are unresolvable.
+    if conan_find_text(rhs, " if ") >= 0:
+        return Vec.new()
+    var opens = 0
+    var closes = 0
+    for i in 0..rhs.len() as i32:
+        let ch = rhs.byte_at(i as i64)
+        if ch == 91: opens = opens + 1
+        if ch == 93: closes = closes + 1
+    if opens != closes:
+        return Vec.new()
+    conan_recipe_extract_quoted(rhs)
+
+// Read system_libs and frameworks for target_os from a recipe's
+// package_info(). Frameworks are returned as ("-framework", name) link
+// argument pairs in lib_paths, matching conan_known_link_metadata.
+pub fn conan_extract_recipe_link_metadata(recipe: str, target_os: str) -> ConanLibraryScan:
+    var sys_libs: Vec[str] = Vec.new()
+    var fw_args: Vec[str] = Vec.new()
+    var fw_seen: Vec[str] = Vec.new()
+
+    // Parallel frames for nested if/elif/else blocks. Indents are stored
+    // as i32; chain_* carry whether an earlier branch of the same chain
+    // was taken or unresolvable.
+    var frame_indent: Vec[i64] = Vec.new()
+    var frame_active: Vec[i64] = Vec.new()
+    var frame_unknown: Vec[i64] = Vec.new()
+    var frame_chain_taken: Vec[i64] = Vec.new()
+    var frame_chain_unknown: Vec[i64] = Vec.new()
+
+    var in_body = false
+    var def_indent = 0
+
+    var pos = 0
+    let total = recipe.len() as i32
+    while pos < total:
+        var line_end = pos
+        while line_end < total and recipe.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        let raw_line = recipe.slice(pos as i64, line_end as i64)
+        pos = line_end + 1
+
+        let stripped = conan_trim(raw_line)
+        if stripped.len() == 0 or stripped.byte_at(0) == 35:
+            continue
+        let indent = conan_recipe_line_indent(raw_line)
+
+        if not in_body:
+            if stripped.starts_with("def package_info("):
+                in_body = true
+                def_indent = indent
+            continue
+        if indent <= def_indent:
+            break
+
+        // Close blocks this line is no longer inside; remember the chain
+        // state of a same-indent frame for elif/else continuation.
+        var popped_same_indent = false
+        var prev_chain_taken = false
+        var prev_chain_unknown = false
+        while frame_indent.len() > 0:
+            let top = frame_indent.len() - 1
+            let top_indent = frame_indent.get(top)
+            if top_indent < indent as i64:
+                break
+            if top_indent == indent as i64:
+                popped_same_indent = true
+                prev_chain_taken = frame_chain_taken.get(top) != 0
+                prev_chain_unknown = frame_chain_unknown.get(top) != 0
+            let _a = frame_indent.pop()
+            let _b = frame_active.pop()
+            let _c = frame_unknown.pop()
+            let _d = frame_chain_taken.pop()
+            let _e = frame_chain_unknown.pop()
+
+        if stripped.starts_with("if ") and stripped.ends_with(":"):
+            let r = conan_recipe_eval_condition(stripped.slice(3, stripped.len() - 1), target_os)
+            frame_indent.push(indent as i64)
+            frame_active.push(if r == 1: 1 else: 0)
+            frame_unknown.push(if r == -1: 1 else: 0)
+            frame_chain_taken.push(if r == 1: 1 else: 0)
+            frame_chain_unknown.push(if r == -1: 1 else: 0)
+            continue
+        if stripped.starts_with("elif ") and stripped.ends_with(":"):
+            if not popped_same_indent:
+                // Malformed chain: treat the rest of it as unresolvable.
+                prev_chain_taken = false
+                prev_chain_unknown = true
+            let r = conan_recipe_eval_condition(stripped.slice(5, stripped.len() - 1), target_os)
+            let active = r == 1 and not prev_chain_taken and not prev_chain_unknown
+            let unknown = not prev_chain_taken and (prev_chain_unknown or r == -1)
+            frame_indent.push(indent as i64)
+            frame_active.push(if active: 1 else: 0)
+            frame_unknown.push(if unknown: 1 else: 0)
+            frame_chain_taken.push(if prev_chain_taken or r == 1: 1 else: 0)
+            frame_chain_unknown.push(if prev_chain_unknown or r == -1: 1 else: 0)
+            continue
+        if stripped == "else:":
+            if not popped_same_indent:
+                prev_chain_taken = false
+                prev_chain_unknown = true
+            let active = not prev_chain_taken and not prev_chain_unknown
+            let unknown = not prev_chain_taken and prev_chain_unknown
+            frame_indent.push(indent as i64)
+            frame_active.push(if active: 1 else: 0)
+            frame_unknown.push(if unknown: 1 else: 0)
+            frame_chain_taken.push(1)
+            frame_chain_unknown.push(if prev_chain_unknown: 1 else: 0)
+            continue
+
+        // Statement line: collect only when every enclosing branch is
+        // known-taken.
+        var collectible = true
+        for i in 0..frame_indent.len() as i32:
+            if frame_active.get(i as i64) == 0 or frame_unknown.get(i as i64) != 0:
+                collectible = false
+        if not collectible:
+            continue
+        if conan_find_text(stripped, "cpp_info") < 0:
+            continue
+        let sys_pos = conan_find_text(stripped, ".system_libs")
+        let fw_pos = conan_find_text(stripped, ".frameworks")
+        if sys_pos >= 0:
+            let values = conan_recipe_attr_values(stripped, sys_pos + 12)
+            for i in 0..values.len() as i32:
+                sys_libs = conan_sorted_insert_unique(move sys_libs, values.get(i as i64))
+        else if fw_pos >= 0:
+            let values = conan_recipe_attr_values(stripped, fw_pos + 11)
+            for i in 0..values.len() as i32:
+                let fw = values.get(i as i64)
+                if not conan_vec_contains(fw_seen, fw):
+                    fw_seen.push(fw)
+                    fw_args.push("-framework")
+                    fw_args.push(fw)
+
+    ConanLibraryScan { lib_paths: fw_args, libs: sys_libs }
+
+fn conan_fetch_recipe_text(name: str, version: str) -> str:
+    let folder = conan_recipe_folder(name, version)
+    if folder.len() == 0:
+        return ""
+    conan_http_get(conan_recipe_file_url(name, folder, "conanfile.py"))
+
+// Packages whose link metadata is still hand-maintained. The table wins
+// over recipe extraction for these; the goal is to shrink this list as
+// extraction proves itself per package (#550).
+fn conan_package_has_table_link_metadata(name: str, version: str) -> bool:
+    if name == "opengl" and version == "system":
+        return true
+    if name == "glfw":
+        return true
+    if name == "raylib":
+        return true
+    if name == "xorg" and version == "system":
+        return true
+    false
+
+fn conan_link_metadata_with_recipe(name: str, version: str, libs: Vec[str], link_args: Vec[str], recipe: str) -> ConanLibraryScan:
+    if conan_package_has_table_link_metadata(name, version):
+        return conan_known_link_metadata(name, version, libs, link_args)
+    if recipe.len() == 0:
+        runtime_eprint("warning: no recipe metadata for " ++ name ++ "/" ++ version ++ "; system link requirements may be incomplete")
+        return conan_known_link_metadata(name, version, libs, link_args)
+    let extracted = conan_extract_recipe_link_metadata(recipe, conan_detect_os())
+    var out_libs = libs
+    var out_args = link_args
+    for i in 0..extracted.libs.len() as i32:
+        out_libs = conan_sorted_insert_unique(move out_libs, extracted.libs.get(i as i64))
+    for i in 0..extracted.lib_paths.len() as i32:
+        out_args.push(extracted.lib_paths.get(i as i64))
+    ConanLibraryScan { lib_paths: out_args, libs: out_libs }
+
 fn conan_known_link_metadata(name: str, version: str, libs: Vec[str], link_args: Vec[str]) -> ConanLibraryScan:
     let os = conan_detect_os()
     var out_libs = libs
@@ -573,22 +815,6 @@ fn conan_known_link_metadata(name: str, version: str, libs: Vec[str], link_args:
             out_libs = conan_sorted_insert_unique(move out_libs, "pthread")
         else if os == "Windows":
             out_libs = conan_sorted_insert_unique(move out_libs, "winmm")
-        return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
-
-    if name == "libcurl":
-        if os == "Macos":
-            out_args.push("-framework")
-            out_args.push("CoreFoundation")
-            out_args.push("-framework")
-            out_args.push("SystemConfiguration")
-        else if os == "Linux":
-            out_libs = conan_sorted_insert_unique(move out_libs, "pthread")
-            out_libs = conan_sorted_insert_unique(move out_libs, "dl")
-        else if os == "Windows":
-            out_libs = conan_sorted_insert_unique(move out_libs, "ws2_32")
-            out_libs = conan_sorted_insert_unique(move out_libs, "crypt32")
-            out_libs = conan_sorted_insert_unique(move out_libs, "wldap32")
-            out_libs = conan_sorted_insert_unique(move out_libs, "advapi32")
         return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
     if name == "xorg" and version == "system" and os == "Linux":
@@ -656,7 +882,7 @@ fn conan_write_binary_metadata(name: str, version: str, recipe_rev: str, package
             lib_paths.push("lib")
     let defines: Vec[str] = Vec.new()
     let link_args: Vec[str] = Vec.new()
-    let known = conan_known_link_metadata(name, version, libs, link_args)
+    let known = conan_link_metadata_with_recipe(name, version, libs, link_args, conan_fetch_recipe_text(name, version))
     conan_write_metadata(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, known.libs, defines, known.lib_paths, requirements)
 
 pub fn conan_restore_locked_binary_package(name: str, version: str, recipe_rev: str, package_id: str, package_rev: str, expected_sha256: str, project_root: str) -> bool:
@@ -892,7 +1118,7 @@ fn conan_install_source_fallback(name: str, version: str, project_root: str) -> 
     libs.push(name)
     let defines: Vec[str] = Vec.new()
     let link_args: Vec[str] = Vec.new()
-    let known = conan_known_link_metadata(name, version, libs, link_args)
+    let known = conan_link_metadata_with_recipe(name, version, libs, link_args, recipe)
     let requires: Vec[str] = Vec.new()
     if conan_write_metadata(dep_dir, name, version, "source", "source", "source", include_paths, lib_paths, known.libs, defines, known.lib_paths, requires) != 0:
         runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
