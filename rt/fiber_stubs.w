@@ -51,6 +51,11 @@ pub fn with_runtime_request_cancel(fiber_id: i32) -> i32:
     let _ = fiber_id
     0
 
+pub fn with_fiber_detach(fiber_id: i32, result_buf: *mut u8) -> i32:
+    let _ = fiber_id
+    let _ = result_buf
+    0
+
 pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
     let _ = fiber_id
     let _ = result_buf

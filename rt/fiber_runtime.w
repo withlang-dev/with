@@ -234,6 +234,26 @@ pub fn with_fiber_cancel(fiber_id: i32) -> i32:
         return 1
     with_runtime_request_cancel(fiber_id)
 
+pub fn with_fiber_detach(fiber_id: i32, result_buf: *mut u8) -> i32:
+    if fiber_id <= 0:
+        if result_buf as i64 != 0:
+            with_free(result_buf)
+        return 0
+    if fiber_take_detached_completed(fiber_id, result_buf) != 0:
+        return 1
+    if with_runtime_fiber_is_live(fiber_id) == 0:
+        if result_buf as i64 != 0:
+            with_free(result_buf)
+        return 0
+    fiber_drain_detached_ready()
+    if detached_fiber_count >= MAX_DETACHED_FIBERS:
+        with_ewrite("fatal: too many detached fibers\n")
+        abort()
+    detached_fiber_ids[detached_fiber_count as i64] = fiber_id
+    detached_result_bufs[detached_fiber_count as i64] = result_buf as i64
+    detached_fiber_count = detached_fiber_count + 1
+    1
+
 pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
     if fiber_id <= 0:
         if result_buf as i64 != 0:
