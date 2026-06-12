@@ -9536,7 +9536,7 @@ fn mir_gen_state_field_type(sema: Sema, state_tid: i32, field_i: i32) -> i32:
     let start = mir_gen_state_field_start(sema, state_tid)
     sema.type_extra.get((start + field_i * 3 + 1) as i64)
 
-fn mir_gen_find_local_by_sym(body: MirBody, sym: i32) -> i32:
+fn mir_gen_find_local_by_sym(body: &MirBody, sym: i32) -> i32:
     if sym == 0:
         return -1
     for li in 1..body.local_names.len() as i32:

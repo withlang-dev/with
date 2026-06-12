@@ -356,7 +356,7 @@ fn async_fn_flavor(ast: AstPool, fn_decl: NodeId) -> i32:
         return AsyncBodyKind.Async
     AsyncBodyKind.Sync
 
-fn async_snapshot_for_span(body: MirBody, span_start: i32) -> AsyncSnapshot:
+fn async_snapshot_for_span(body: &MirBody, span_start: i32) -> AsyncSnapshot:
     var storage_live = 0
     var storage_dead = 0
     var drop_count = 0
@@ -390,7 +390,7 @@ fn async_snapshot_for_span(body: MirBody, span_start: i32) -> AsyncSnapshot:
         resume_bb: async_resume_bb_for_span(body, span_start),
     }
 
-fn async_resume_bb_for_span(body: MirBody, span_start: i32) -> i32:
+fn async_resume_bb_for_span(body: &MirBody, span_start: i32) -> i32:
     for bb in 0..body.bb_stmt_starts.len() as i32:
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
         let stmt_count = body.bb_stmt_counts.get(bb as i64)
