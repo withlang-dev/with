@@ -543,6 +543,10 @@ type Sema {
     typed_binding_names: HashMap[i32, i32],
     typed_binding_muts: HashMap[i32, i32],
     ephemeral_task_binding_nodes: HashMap[i32, i32],
+    // Cycle-detection state for the may_suspend / ephemeral-task walkers
+    // (reset at each outer query; same pattern as reachable_visiting).
+    suspend_visiting: HashMap[i32, i32],
+    eph_task_visiting: HashMap[i32, i32],
     typed_dump_seen_nodes: HashMap[i32, i32],
     typed_dump_visit_budget: i32,
     // Generic substitution map + specialization cache
@@ -1238,6 +1242,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         typed_binding_names,
         typed_binding_muts,
         ephemeral_task_binding_nodes,
+        suspend_visiting: sema_new_map_i32_i32(),
+        eph_task_visiting: sema_new_map_i32_i32(),
         typed_dump_seen_nodes,
         typed_dump_visit_budget: 0,
         generic_subst_param_syms: Vec.new(),

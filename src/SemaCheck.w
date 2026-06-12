@@ -2182,21 +2182,21 @@ fn Sema.classify_guarded_with(self: Sema, node: i32, source_ty: i32, is_mut: i32
     self.with_exit_methods.insert(node, exit_fn)
     form
 
-fn Sema.fn_symbol_may_suspend(self: Sema, fn_sym: i32, visiting: HashMap[i32, i32]) -> i32:
+fn Sema.fn_symbol_may_suspend(self: Sema, fn_sym: i32) -> i32:
     if fn_sym == 0:
         return 0
-    if visiting.contains(fn_sym):
+    if self.suspend_visiting.contains(fn_sym):
         return 0
     if not self.fn_decl_nodes.contains(fn_sym):
         return 0
-    visiting.insert(fn_sym, 1)
+    self.suspend_visiting.insert(fn_sym, 1)
     let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
     let body = self.ast.get_data1(fn_node)
-    let result = self.expr_may_suspend(body, visiting)
-    visiting.remove(fn_sym)
+    let result = self.expr_may_suspend(body)
+    self.suspend_visiting.remove(fn_sym)
     result
 
-fn Sema.expr_may_suspend(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> i32:
+fn Sema.expr_may_suspend(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
@@ -2208,105 +2208,105 @@ fn Sema.expr_may_suspend(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> 
         return 0
     if kind == NodeKind.NK_CALL:
         if self.comp_resolved.contains(node):
-            if self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap(), visiting) != 0:
+            if self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()) != 0:
                 return 1
         let callee = self.ast.get_data0(node)
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
-            if self.fn_symbol_may_suspend(self.ast.get_data0(callee), visiting) != 0:
+            if self.fn_symbol_may_suspend(self.ast.get_data0(callee)) != 0:
                 return 1
-        else if self.expr_may_suspend(callee, visiting) != 0:
+        else if self.expr_may_suspend(callee) != 0:
             return 1
         let args_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         for ai in 0..arg_count:
-            if self.expr_may_suspend(self.ast.get_extra(args_start + ai), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(args_start + ai)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_BLOCK:
         let extra_start = self.ast.get_data0(node)
         let stmt_count = self.ast.get_data1(node)
         for si in 0..stmt_count:
-            if self.expr_may_suspend(self.ast.get_extra(extra_start + si), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(extra_start + si)) != 0:
                 return 1
-        return self.expr_may_suspend(self.ast.get_data2(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data2(node))
     if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
-        return self.expr_may_suspend(self.ast.get_data0(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data0(node))
     if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_RETURN:
-        return self.expr_may_suspend(self.ast.get_data1(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data1(node))
     if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
-        if self.expr_may_suspend(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data2(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data2(node))
     if kind == NodeKind.NK_FIELD_ACCESS:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
         return 0
     if kind == NodeKind.NK_INDEX:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data1(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data1(node))
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
         let extra_start = self.ast.get_data2(node)
         let arg_count = self.ast.optional_chain_arg_count(extra_start)
         let arg_start = self.ast.optional_chain_arg_start(extra_start)
         for ai in 0..arg_count:
-            if self.expr_may_suspend(self.ast.get_extra(arg_start + ai), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(arg_start + ai)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_MULTI_INDEX:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
         let spec_start = self.ast.get_data1(node)
         let spec_count = self.ast.get_data2(node)
         for mi in 0..spec_count:
-            if self.expr_may_suspend(self.ast.get_extra(spec_start + mi), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(spec_start + mi)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_INDEX_SPEC:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
-        if self.expr_may_suspend(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data2(node) % INDEX_KIND_SHIFT, visiting)
+        return self.expr_may_suspend(self.ast.get_data2(node) % INDEX_KIND_SHIFT)
     if kind == NodeKind.NK_IF_EXPR:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
-        if self.expr_may_suspend(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data2(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data2(node))
     if kind == NodeKind.NK_WHILE:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data1(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data1(node))
     if kind == NodeKind.NK_FOR:
-        if self.expr_may_suspend(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data2(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data2(node))
     if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
-        return self.expr_may_suspend(self.ast.get_data1(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data1(node))
     if kind == NodeKind.NK_LET_ELSE:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data2(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data2(node))
     if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
-        if self.expr_may_suspend(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data2(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data2(node))
     if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data1(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data1(node))
     if kind == NodeKind.NK_WITH_TUPLE:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data1(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data1(node))
     if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
         let extra_start = self.ast.get_data0(node)
         let count = self.ast.get_data1(node)
         for ai in 0..count:
-            if self.expr_may_suspend(self.ast.get_extra(extra_start + ai), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(extra_start + ai)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
@@ -2314,25 +2314,25 @@ fn Sema.expr_may_suspend(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> 
         let clause_count = self.ast.get_data2(node)
         for ci in 0..clause_count:
             let base = comp_start + ci * 3
-            if self.expr_may_suspend(self.ast.get_extra(base + 1), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0:
                 return 1
-            if self.expr_may_suspend(self.ast.get_extra(base + 2), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(base + 2)) != 0:
                 return 1
-        return self.expr_may_suspend(self.ast.get_data0(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data0(node))
     if kind == NodeKind.NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         for fi in 0..field_count:
-            if self.expr_may_suspend(self.ast.get_extra(extra_start + fi * 2 + 1), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(extra_start + fi * 2 + 1)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_RECORD_UPDATE:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         for fi in 0..field_count:
-            if self.expr_may_suspend(self.ast.get_extra(extra_start + fi * 2 + 1), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(extra_start + fi * 2 + 1)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_ENUM_VARIANT:
@@ -2341,22 +2341,22 @@ fn Sema.expr_may_suspend(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> 
             return 0
         let arg_count = self.ast.get_extra(extra_start)
         for ai in 0..arg_count:
-            if self.expr_may_suspend(self.ast.get_extra(extra_start + 1 + ai), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(extra_start + 1 + ai)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_MATCH:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
             return 1
         let arm_start = self.ast.get_data1(node)
         let arm_count = self.ast.get_data2(node)
         for ai in 0..arm_count:
-            if self.expr_may_suspend(self.ast.get_extra(arm_start + ai), visiting) != 0:
+            if self.expr_may_suspend(self.ast.get_extra(arm_start + ai)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_MATCH_ARM:
-        if self.expr_may_suspend(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_may_suspend(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_may_suspend(self.ast.get_data2(node), visiting)
+        return self.expr_may_suspend(self.ast.get_data2(node))
     if kind == NodeKind.NK_FSTRING:
         let seg_count = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
@@ -2364,7 +2364,7 @@ fn Sema.expr_may_suspend(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> 
         for si in 0..seg_count:
             let seg_kind = self.ast.get_extra(pos)
             let seg_data = self.ast.get_extra(pos + 1)
-            if seg_kind == 1 and self.expr_may_suspend(seg_data, visiting) != 0:
+            if seg_kind == 1 and self.expr_may_suspend(seg_data) != 0:
                 return 1
             pos = pos + 2
         return 0
@@ -2424,38 +2424,38 @@ fn Sema.type_is_fn_value(self: Sema, tid: i32) -> i32:
         return 1
     0
 
-fn Sema.fn_symbol_creates_ephemeral_task(self: Sema, fn_sym: i32, visiting: HashMap[i32, i32]) -> i32:
+fn Sema.fn_symbol_creates_ephemeral_task(self: Sema, fn_sym: i32) -> i32:
     if fn_sym == 0:
         return 0
-    if visiting.contains(fn_sym):
+    if self.eph_task_visiting.contains(fn_sym):
         return 0
     let fn_node = self.fn_symbol_decl_node(fn_sym)
     if fn_node == 0:
         return 0
-    visiting.insert(fn_sym, 1)
+    self.eph_task_visiting.insert(fn_sym, 1)
     let body = self.ast.get_data1(fn_node)
-    let result = self.expr_creates_ephemeral_task(body, visiting)
-    visiting.remove(fn_sym)
+    let result = self.expr_creates_ephemeral_task(body)
+    self.eph_task_visiting.remove(fn_sym)
     result
 
-fn Sema.callable_expr_creates_ephemeral_task(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> i32:
+fn Sema.callable_expr_creates_ephemeral_task(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
-        return self.callable_expr_creates_ephemeral_task(self.ast.get_data0(node), visiting)
+        return self.callable_expr_creates_ephemeral_task(self.ast.get_data0(node))
     if kind == NodeKind.NK_CLOSURE:
-        return self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data0(node))
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
-        if self.fn_symbol_creates_ephemeral_task(sym, visiting) != 0:
+        if self.fn_symbol_creates_ephemeral_task(sym) != 0:
             return 1
         if self.binding_closure_nodes.contains(sym):
-            return self.callable_expr_creates_ephemeral_task(self.binding_closure_nodes.get(sym).unwrap(), visiting)
+            return self.callable_expr_creates_ephemeral_task(self.binding_closure_nodes.get(sym).unwrap())
         return 0
-    self.expr_creates_ephemeral_task(node, visiting)
+    self.expr_creates_ephemeral_task(node)
 
-fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> i32:
+fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
@@ -2482,112 +2482,112 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32, visiting: HashMap[i32
                 if cai < param_count:
                     let expected_ty = self.sig_param_type(sig_idx, cai)
                     if self.type_is_fn_value(expected_ty) != 0:
-                        if self.callable_expr_creates_ephemeral_task(self.ast.get_extra(args_start + cai), visiting) != 0:
+                        if self.callable_expr_creates_ephemeral_task(self.ast.get_extra(args_start + cai)) != 0:
                             return 1
         if resolved_fn_sym != 0 and not self.task_fns.contains(resolved_fn_sym):
-            if self.fn_symbol_creates_ephemeral_task(resolved_fn_sym, visiting) != 0:
+            if self.fn_symbol_creates_ephemeral_task(resolved_fn_sym) != 0:
                 return 1
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let callee_sym = self.ast.get_data0(callee)
             if self.binding_closure_nodes.contains(callee_sym):
-                if self.callable_expr_creates_ephemeral_task(self.binding_closure_nodes.get(callee_sym).unwrap(), visiting) != 0:
+                if self.callable_expr_creates_ephemeral_task(self.binding_closure_nodes.get(callee_sym).unwrap()) != 0:
                     return 1
         else if self.ast.kind(callee) == NodeKind.NK_CLOSURE:
-            if self.callable_expr_creates_ephemeral_task(callee, visiting) != 0:
+            if self.callable_expr_creates_ephemeral_task(callee) != 0:
                 return 1
-        else if self.expr_creates_ephemeral_task(callee, visiting) != 0:
+        else if self.expr_creates_ephemeral_task(callee) != 0:
             return 1
         for ai in 0..arg_count:
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(args_start + ai), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(args_start + ai)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_BLOCK:
         let extra_start = self.ast.get_data0(node)
         let stmt_count = self.ast.get_data1(node)
         for si in 0..stmt_count:
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + si), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + si)) != 0:
                 return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data2(node))
     if kind == NodeKind.NK_CLOSURE:
         return 0
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
-        return self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data0(node))
     if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_RETURN:
-        return self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data1(node))
     if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
-        if self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data2(node))
     if kind == NodeKind.NK_FIELD_ACCESS:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
         return 0
     if kind == NodeKind.NK_INDEX:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data1(node))
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
         let extra_start2 = self.ast.get_data2(node)
         let arg_count2 = self.ast.optional_chain_arg_count(extra_start2)
         let arg_start2 = self.ast.optional_chain_arg_start(extra_start2)
         for ai2 in 0..arg_count2:
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(arg_start2 + ai2), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(arg_start2 + ai2)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_MULTI_INDEX:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
         let spec_start = self.ast.get_data1(node)
         let spec_count = self.ast.get_data2(node)
         for mi in 0..spec_count:
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(spec_start + mi), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(spec_start + mi)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_INDEX_SPEC:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
-        if self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data2(node) % INDEX_KIND_SHIFT, visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data2(node) % INDEX_KIND_SHIFT)
     if kind == NodeKind.NK_IF_EXPR:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
-        if self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data2(node))
     if kind == NodeKind.NK_WHILE:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data1(node))
     if kind == NodeKind.NK_FOR:
-        if self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data2(node))
     if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
-        return self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data1(node))
     if kind == NodeKind.NK_LET_ELSE:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data2(node))
     if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
-        if self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data2(node))
     if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data1(node))
     if kind == NodeKind.NK_WITH_TUPLE:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data1(node))
     if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
         let extra_start = self.ast.get_data0(node)
         let count = self.ast.get_data1(node)
         for ai in 0..count:
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + ai), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + ai)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
@@ -2595,25 +2595,25 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32, visiting: HashMap[i32
         let clause_count = self.ast.get_data2(node)
         for ci in 0..clause_count:
             let base = comp_start + ci * 3
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(base + 1), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(base + 1)) != 0:
                 return 1
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(base + 2), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(base + 2)) != 0:
                 return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data0(node))
     if kind == NodeKind.NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         for fi in 0..field_count:
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + fi * 2 + 1), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + fi * 2 + 1)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_RECORD_UPDATE:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         for fi in 0..field_count:
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + fi * 2 + 1), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + fi * 2 + 1)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_ENUM_VARIANT:
@@ -2622,22 +2622,22 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32, visiting: HashMap[i32
             return 0
         let arg_count = self.ast.get_extra(extra_start)
         for ai in 0..arg_count:
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + 1 + ai), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + 1 + ai)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_MATCH:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node)) != 0:
             return 1
         let arm_start = self.ast.get_data1(node)
         let arm_count = self.ast.get_data2(node)
         for ai in 0..arm_count:
-            if self.expr_creates_ephemeral_task(self.ast.get_extra(arm_start + ai), visiting) != 0:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(arm_start + ai)) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_MATCH_ARM:
-        if self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting) != 0:
+        if self.expr_creates_ephemeral_task(self.ast.get_data1(node)) != 0:
             return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
+        return self.expr_creates_ephemeral_task(self.ast.get_data2(node))
     if kind == NodeKind.NK_FSTRING:
         let seg_count = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
@@ -2645,7 +2645,7 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32, visiting: HashMap[i32
         for si in 0..seg_count:
             let seg_kind = self.ast.get_extra(pos)
             let seg_data = self.ast.get_extra(pos + 1)
-            if seg_kind == 1 and self.expr_creates_ephemeral_task(seg_data, visiting) != 0:
+            if seg_kind == 1 and self.expr_creates_ephemeral_task(seg_data) != 0:
                 return 1
             pos = pos + 2
         return 0
@@ -5332,8 +5332,8 @@ fn Sema.check_task_statement_disposition(self: Sema, stmt: i32):
     if self.task_statement_is_must_observe(stmt) != 0:
         self.emit_task_must_observe_error(stmt)
         return
-    let visiting: HashMap[i32, i32] = HashMap.new()
-    if self.expr_is_ephemeral_task(stmt) != 0 or self.expr_creates_ephemeral_task(stmt, visiting) != 0:
+    self.eph_task_visiting = sema_new_map_i32_i32()
+    if self.expr_is_ephemeral_task(stmt) != 0 or self.expr_creates_ephemeral_task(stmt) != 0:
         self.emit_task_detach_safety_error(stmt)
         return
     self.detached_task_stmt_nodes.insert(stmt, 1)
@@ -8148,11 +8148,11 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     if expected_extern_fn != 0:
         if closure_capture_syms.len() as i32 > 0:
             self.emit_error("capturing closure cannot coerce to extern \"C\" fn pointer", node)
-        let callback_visiting: HashMap[i32, i32] = HashMap.new()
-        if self.expr_may_suspend(body, callback_visiting) != 0:
+        self.suspend_visiting = sema_new_map_i32_i32()
+        if self.expr_may_suspend(body) != 0:
             self.emit_error("may_suspend in extern C callback", body)
-        let callback_task_visiting: HashMap[i32, i32] = HashMap.new()
-        if self.callable_expr_creates_ephemeral_task(body, callback_task_visiting) != 0:
+        self.eph_task_visiting = sema_new_map_i32_i32()
+        if self.callable_expr_creates_ephemeral_task(body) != 0:
             self.emit_error("ephemeral Task cannot be created in extern C callback", body)
     if expected_ret_ty != 0 and expected_ret_ty != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
         if self.return_value_type_compatible(expected_ret_ty, body_ty as i32) == 0:
@@ -9280,16 +9280,16 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         if sig_idx >= 0 and self.extern_fn_names.contains(fn_sym) and expected_ty != 0:
             let callback_expected = self.resolve_alias(expected_ty as TypeId)
             if self.get_type_kind(callback_expected) == TypeKind.TY_EXTERN_FN:
-                let callback_visiting: HashMap[i32, i32] = HashMap.new()
-                if self.expr_may_suspend(arg_node, callback_visiting) != 0:
+                self.suspend_visiting = sema_new_map_i32_i32()
+                if self.expr_may_suspend(arg_node) != 0:
                     self.emit_error("may_suspend in extern C callback", arg_node)
-                let callback_task_visiting: HashMap[i32, i32] = HashMap.new()
-                if self.callable_expr_creates_ephemeral_task(arg_node, callback_task_visiting) != 0:
+                self.eph_task_visiting = sema_new_map_i32_i32()
+                if self.callable_expr_creates_ephemeral_task(arg_node) != 0:
                     self.emit_error("ephemeral Task cannot be created in extern C callback", arg_node)
         if sig_idx >= 0 and self.fn_symbol_is_std_thread_spawn_os(fn_sym) != 0 and expected_ty != 0:
             if self.type_is_fn_value(expected_ty) != 0:
-                let worker_task_visiting: HashMap[i32, i32] = HashMap.new()
-                if self.callable_expr_creates_ephemeral_task(arg_node, worker_task_visiting) != 0:
+                self.eph_task_visiting = sema_new_map_i32_i32()
+                if self.callable_expr_creates_ephemeral_task(arg_node) != 0:
                     self.emit_error("ephemeral Task cannot be created on OS thread", arg_node)
         arg_types.push(arg_ty as i32)
         let iter_idx = self.maybe_register_iter_of_self_borrow(arg_node)
