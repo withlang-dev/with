@@ -196,9 +196,9 @@ pub fn StackifyGraph.add_param(mut self: StackifyGraph, block: i32, value: i32) 
         b.params_start = self.block_params.len() as i32
     self.block_params.push(value)
     b.params_count = b.params_count + 1
-    stackify_graph_update_block(self, block, b)
+    self.update_block(block, b)
 
-fn stackify_graph_add_target(mut self: StackifyGraph, block: i32, args: Vec[i32]) -> i32:
+fn StackifyGraph.add_target(mut self: StackifyGraph, block: i32, args: Vec[i32]) -> i32:
     let start = self.target_args.len() as i32
     var i: i64 = 0
     while i < args.len():
@@ -213,15 +213,15 @@ fn stackify_graph_add_target(mut self: StackifyGraph, block: i32, args: Vec[i32]
     id
 
 pub fn StackifyGraph.add_branch_target(mut self: StackifyGraph, block: i32, args: Vec[i32]) -> i32:
-    stackify_graph_add_target(self, block, args)
+    self.add_target(block, args)
 
-fn stackify_graph_update_block(mut self: StackifyGraph, block: i32, replacement: StackifyBlock):
+fn StackifyGraph.update_block(mut self: StackifyGraph, block: i32, replacement: StackifyBlock):
     if block < 0 or block >= self.blocks.len() as i32:
         return
     unsafe:
         *((self.blocks.ptr as *mut StackifyBlock) + (block as usize)) = replacement
 
-fn stackify_graph_set_succs(mut self: StackifyGraph, block: i32, succs: Vec[i32]):
+fn StackifyGraph.set_succs(mut self: StackifyGraph, block: i32, succs: Vec[i32]):
     var b = self.blocks.get(block as i64)
     b.succs_start = self.succs.len() as i32
     b.succs_count = succs.len() as i32
@@ -229,37 +229,37 @@ fn stackify_graph_set_succs(mut self: StackifyGraph, block: i32, succs: Vec[i32]
     while i < succs.len():
         self.succs.push(succs.get(i))
         i = i + 1
-    stackify_graph_update_block(self, block, b)
+    self.update_block(block, b)
 
 pub fn StackifyGraph.set_br(mut self: StackifyGraph, block: i32, target_block: i32, args: Vec[i32]) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
-    let target = stackify_graph_add_target(self, target_block, args)
+    let target = self.add_target(target_block, args)
     var b = self.blocks.get(block as i64)
     b.term_kind = StackifyTermKind.Br
     b.targets_start = target
     b.targets_count = 1
-    stackify_graph_update_block(self, block, b)
+    self.update_block(block, b)
     let succs: Vec[i32] = Vec.new()
     succs.push(target_block)
-    stackify_graph_set_succs(self, block, succs)
+    self.set_succs(block, succs)
 
 pub fn StackifyGraph.set_cond_br(mut self: StackifyGraph, block: i32, cond: i32, true_block: i32, true_args: Vec[i32], false_block: i32, false_args: Vec[i32]) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
     let first_target = self.targets.len() as i32
-    let _ = stackify_graph_add_target(self, true_block, true_args)
-    let _ = stackify_graph_add_target(self, false_block, false_args)
+    let _ = self.add_target(true_block, true_args)
+    let _ = self.add_target(false_block, false_args)
     var b = self.blocks.get(block as i64)
     b.term_kind = StackifyTermKind.CondBr
     b.cond_value = cond
     b.targets_start = first_target
     b.targets_count = 2
-    stackify_graph_update_block(self, block, b)
+    self.update_block(block, b)
     let succs: Vec[i32] = Vec.new()
     succs.push(true_block)
     succs.push(false_block)
-    stackify_graph_set_succs(self, block, succs)
+    self.set_succs(block, succs)
 
 pub fn StackifyGraph.set_select(mut self: StackifyGraph, block: i32, selector: i32, target_blocks: Vec[i32], default_block: i32) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
@@ -268,24 +268,24 @@ pub fn StackifyGraph.set_select(mut self: StackifyGraph, block: i32, selector: i
     var i: i64 = 0
     while i < target_blocks.len():
         let empty: Vec[i32] = Vec.new()
-        let _ = stackify_graph_add_target(self, target_blocks.get(i), empty)
+        let _ = self.add_target(target_blocks.get(i), empty)
         i = i + 1
     let default_empty: Vec[i32] = Vec.new()
-    let default_target = stackify_graph_add_target(self, default_block, default_empty)
+    let default_target = self.add_target(default_block, default_empty)
     var b = self.blocks.get(block as i64)
     b.term_kind = StackifyTermKind.Select
     b.selector_value = selector
     b.targets_start = first_target
     b.targets_count = target_blocks.len() as i32
     b.default_target = default_target
-    stackify_graph_update_block(self, block, b)
+    self.update_block(block, b)
     let succs: Vec[i32] = Vec.new()
     var si: i64 = 0
     while si < target_blocks.len():
         succs.push(target_blocks.get(si))
         si = si + 1
     succs.push(default_block)
-    stackify_graph_set_succs(self, block, succs)
+    self.set_succs(block, succs)
 
 pub fn StackifyGraph.set_select_targets(mut self: StackifyGraph, block: i32, selector: i32, targets_start: i32, targets_count: i32, default_target: i32) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
@@ -296,7 +296,7 @@ pub fn StackifyGraph.set_select_targets(mut self: StackifyGraph, block: i32, sel
     b.targets_start = targets_start
     b.targets_count = targets_count
     b.default_target = default_target
-    stackify_graph_update_block(self, block, b)
+    self.update_block(block, b)
     let succs: Vec[i32] = Vec.new()
     var i = 0
     while i < targets_count:
@@ -305,7 +305,7 @@ pub fn StackifyGraph.set_select_targets(mut self: StackifyGraph, block: i32, sel
         i = i + 1
     if default_target >= 0 and default_target < self.targets.len() as i32:
         succs.push(self.targets.get(default_target as i64).block)
-    stackify_graph_set_succs(self, block, succs)
+    self.set_succs(block, succs)
 
 pub fn StackifyGraph.set_return(mut self: StackifyGraph, block: i32, values: Vec[i32]) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
@@ -318,18 +318,18 @@ pub fn StackifyGraph.set_return(mut self: StackifyGraph, block: i32, values: Vec
     while i < values.len():
         self.return_values.push(values.get(i))
         i = i + 1
-    stackify_graph_update_block(self, block, b)
+    self.update_block(block, b)
     let no_succs: Vec[i32] = Vec.new()
-    stackify_graph_set_succs(self, block, no_succs)
+    self.set_succs(block, no_succs)
 
 pub fn StackifyGraph.set_unreachable(mut self: StackifyGraph, block: i32) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
     var b = self.blocks.get(block as i64)
     b.term_kind = StackifyTermKind.Unreachable
-    stackify_graph_update_block(self, block, b)
+    self.update_block(block, b)
     let no_succs: Vec[i32] = Vec.new()
-    stackify_graph_set_succs(self, block, no_succs)
+    self.set_succs(block, no_succs)
 
 fn stackify_tree_empty -> StackifyTree:
     StackifyTree {
@@ -363,7 +363,7 @@ fn stackify_bool_vec(count: i32, value: i32) -> Vec[i32]:
         i = i + 1
     out
 
-fn stackify_validate_graph(graph: StackifyGraph) -> str:
+fn stackify_validate_graph(graph: &StackifyGraph) -> str:
     let n = graph.blocks.len() as i32
     if n <= 0:
         return "stackify: graph has no blocks"
@@ -404,7 +404,7 @@ type StackifyDfsState {
     out: Vec[i32],
 }
 
-fn StackifyDfsState.dfs_post(mut self: StackifyDfsState, graph: StackifyGraph, start: i32):
+fn StackifyDfsState.dfs_post(mut self: StackifyDfsState, graph: &StackifyGraph, start: i32):
     if start < 0 or start >= graph.blocks.len() as i32:
         return
     if self.visited.get(start as i64) != 0:
@@ -432,7 +432,7 @@ fn StackifyDfsState.dfs_post(mut self: StackifyDfsState, graph: StackifyGraph, s
             let _ = stack_block.pop()
             let _ = stack_idx.pop()
 
-fn stackify_compute_preds(graph: StackifyGraph) -> StackifyPreds:
+fn stackify_compute_preds(graph: &StackifyGraph) -> StackifyPreds:
     let n = graph.blocks.len() as i32
     let starts = stackify_bool_vec(n, 0)
     let counts = stackify_bool_vec(n, 0)
@@ -466,10 +466,10 @@ fn stackify_compute_preds(graph: StackifyGraph) -> StackifyPreds:
         b2 = b2 + 1
     StackifyPreds { starts, counts, data: pred_data }
 
-fn stackify_pred_count(preds: StackifyPreds, block: i32) -> i32:
+fn stackify_pred_count(preds: &StackifyPreds, block: i32) -> i32:
     preds.counts.get(block as i64)
 
-fn stackify_pred_get(preds: StackifyPreds, block: i32, idx: i32) -> i32:
+fn stackify_pred_get(preds: &StackifyPreds, block: i32, idx: i32) -> i32:
     preds.data.get((preds.starts.get(block as i64) + idx) as i64)
 
 fn stackify_domtree_merge(idom: Vec[i32], rpo_pos: Vec[i32], a: i32, b: i32) -> i32:
@@ -487,7 +487,7 @@ fn stackify_domtree_merge(idom: Vec[i32], rpo_pos: Vec[i32], a: i32, b: i32) -> 
                 n2 = idom.get(n2 as i64)
     n1
 
-fn stackify_compute_idom(graph: StackifyGraph, post_ord: Vec[i32], rpo_pos: Vec[i32], preds: StackifyPreds) -> Vec[i32]:
+fn stackify_compute_idom(graph: &StackifyGraph, post_ord: Vec[i32], rpo_pos: Vec[i32], preds: &StackifyPreds) -> Vec[i32]:
     let n = graph.blocks.len() as i32
     var idom = stackify_bool_vec(n, stackify_invalid())
     idom.set_i32(graph.entry as i64, graph.entry)
@@ -533,7 +533,7 @@ fn stackify_dominates(idom: Vec[i32], a: i32, b: i32) -> bool:
         cur = idom.get(cur as i64)
     false
 
-fn stackify_compute_analysis(graph: StackifyGraph) -> StackifyAnalysis:
+fn stackify_compute_analysis(graph: &StackifyGraph) -> StackifyAnalysis:
     let err = stackify_validate_graph(graph)
     if err.len() > 0:
         return StackifyAnalysis {
