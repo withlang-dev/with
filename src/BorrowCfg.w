@@ -50,43 +50,81 @@ type CfgEdge {
     to: i32,
 }
 
-type CfgGraph {
+// Heap-indirected handle: copies share state by design (AstPool
+// pattern, truthfully Copy) so the build_* walkers can grow the graph
+// through plain parameters under spec §3.8.
+type CfgGraphState {
     nodes: Vec[CfgNode],
     edges: Vec[CfgEdge],
     entry: i32,
     exit: i32,
 }
 
+type CfgGraph {
+    state: *mut CfgGraphState,
+}
+impl Copy for CfgGraph
+
+extern fn with_alloc(size: i64) -> *mut u8
+
 fn CfgGraph.init -> CfgGraph:
-    CfgGraph {
+    // Two Vec headers plus two i32s; allocate generously like the other
+    // handle states.
+    let ptr = with_alloc(128) as *mut CfgGraphState
+    unsafe *ptr = CfgGraphState {
         nodes: Vec.new(),
         edges: Vec.new(),
         entry: 0,
         exit: 0,
     }
+    CfgGraph { state: ptr }
 
 // No-op: reserved for future manual memory management.
 fn CfgGraph.deinit(self: CfgGraph):
     return
 
+fn CfgGraph.entry_node(self: CfgGraph) -> i32:
+    let st = self.state
+    unsafe { st.entry }
+
+fn CfgGraph.exit_node(self: CfgGraph) -> i32:
+    let st = self.state
+    unsafe { st.exit }
+
+fn CfgGraph.set_entry(self: CfgGraph, node_id: i32):
+    let st = self.state
+    unsafe st.entry = node_id
+
+fn CfgGraph.set_exit(self: CfgGraph, node_id: i32):
+    let st = self.state
+    unsafe st.exit = node_id
+
+fn CfgGraph.node_count(self: CfgGraph) -> i32:
+    let st = self.state
+    unsafe { st.nodes.len() as i32 }
+
 fn CfgGraph.add_node(self: CfgGraph, kind: i32, span_start: i32, span_end: i32) -> i32:
-    let id = self.nodes.len() as i32
-    self.nodes.push(CfgNode { kind, span_start, span_end })
+    let st = self.state
+    let id = unsafe { st.nodes.len() as i32 }
+    unsafe { st.nodes.push(CfgNode { kind, span_start, span_end }) }
     id
 
 fn CfgGraph.add_edge(self: CfgGraph, from: i32, to: i32) -> Unit:
-    self.edges.push(CfgEdge { from, to })
+    let st = self.state
+    unsafe { st.edges.push(CfgEdge { from, to }) }
 
 fn CfgGraph.out_degree(self: CfgGraph, node_id: i32) -> i32:
+    let st = self.state
     var n = 0
-    for i in 0..self.edges.len() as i32:
-        if self.edges.get(i as i64).from == node_id:
+    for i in 0..unsafe { st.edges.len() as i32 }:
+        if unsafe { st.edges.get(i as i64) }.from == node_id:
             n = n + 1
     n
 
 fn CfgGraph.has_edge(self: CfgGraph, from: i32, to: i32) -> bool:
-    for i in 0..self.edges.len() as i32:
-        let e = self.edges.get(i as i64)
+    let st = self.state
+    for i in 0..unsafe { st.edges.len() as i32 }:
+        let e = unsafe { st.edges.get(i as i64) }
         if e.from == from and e.to == to:
             return true
     false
@@ -100,16 +138,16 @@ fn build_cfg(pool: AstPool, expr_node: i32) -> CfgGraph:
     let start = pool.get_start(expr_node)
     let end = pool.get_end(expr_node)
 
-    graph.entry = graph.add_node(CfgNodeKind.Entry, start, end)
-    graph.exit = graph.add_node(CfgNodeKind.Exit, start, end)
+    graph.set_entry(graph.add_node(CfgNodeKind.Entry, start, end))
+    graph.set_exit(graph.add_node(CfgNodeKind.Exit, start, end))
 
     let result = build_expr(graph, pool, expr_node)
-    graph.add_edge(graph.entry, result)
+    graph.add_edge(graph.entry_node(), result)
 
     // Connect to exit
     let kind = pool.kind(expr_node)
     if kind != NodeKind.NK_RETURN and kind != NodeKind.NK_BREAK and kind != NodeKind.NK_GOTO:
-        graph.add_edge(result, graph.exit)
+        graph.add_edge(result, graph.exit_node())
 
     graph
 
@@ -138,7 +176,7 @@ fn build_expr(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
 
     if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_BREAK or kind == NodeKind.NK_GOTO:
         let n = graph.add_node(CfgNodeKind.Expr, start, end)
-        graph.add_edge(n, graph.exit)
+        graph.add_edge(n, graph.exit_node())
         return n
 
     // Default: simple expression node
