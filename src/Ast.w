@@ -412,6 +412,7 @@ type AstPoolState {
     block_meta: Vec[i32],
     must_use_type_nodes: Vec[i32],
     no_await_guard_type_nodes: Vec[i32],
+    no_alloc_fn_nodes: Vec[i32],
     iter_of_self_fn_nodes: Vec[i32],
     sealed_trait_nodes: Vec[i32],
     comptime_decl_nodes: Vec[i32],
@@ -441,6 +442,7 @@ type AstPoolState {
     fn_param_defaults: HashMap[i32, i32],
     must_use_type_set: HashMap[i32, i32],
     no_await_guard_type_set: HashMap[i32, i32],
+    no_alloc_fn_set: HashMap[i32, i32],
     iter_of_self_fn_set: HashMap[i32, i32],
     sealed_trait_set: HashMap[i32, i32],
     comptime_decl_set: HashMap[i32, i32],
@@ -491,6 +493,7 @@ fn AstPool.new -> AstPool:
             block_meta: Vec.new(),
             must_use_type_nodes: Vec.new(),
             no_await_guard_type_nodes: Vec.new(),
+            no_alloc_fn_nodes: Vec.new(),
             iter_of_self_fn_nodes: Vec.new(),
             sealed_trait_nodes: Vec.new(),
             comptime_decl_nodes: Vec.new(),
@@ -517,6 +520,7 @@ fn AstPool.new -> AstPool:
             fn_param_defaults: HashMap.new(),
             must_use_type_set: HashMap.new(),
             no_await_guard_type_set: HashMap.new(),
+            no_alloc_fn_set: HashMap.new(),
             iter_of_self_fn_set: HashMap.new(),
             sealed_trait_set: HashMap.new(),
             comptime_decl_set: HashMap.new(),
@@ -1223,6 +1227,14 @@ fn AstPool.mark_no_await_guard_type(self: AstPool, node: NodeId):
 
 fn AstPool.is_no_await_guard_type_node(self: AstPool, node: NodeId) -> i32:
     if self.state.no_await_guard_type_set.contains(node as i32): return 1
+    0
+
+fn AstPool.mark_no_alloc_fn(self: AstPool, node: NodeId):
+    self.state.no_alloc_fn_nodes.push(node as i32)
+    self.state.no_alloc_fn_set.insert(node as i32, 1)
+
+fn AstPool.is_no_alloc_fn_node(self: AstPool, node: NodeId) -> i32:
+    if self.state.no_alloc_fn_set.contains(node as i32): return 1
     0
 
 fn AstPool.mark_iter_of_self_fn(self: AstPool, node: NodeId):

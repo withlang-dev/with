@@ -730,6 +730,13 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let fn_di = self.find_decl_index(node)
     if fn_di >= 0:
         self.update_decl_source_context(fn_di)
+    let saved_no_alloc_depth = self.current_no_alloc_depth
+    let saved_fn_may_alloc = self.current_fn_may_alloc
+    let saved_current_fn_symbol = self.current_fn_symbol
+    self.current_fn_may_alloc = 0
+    self.current_fn_symbol = fn_name
+    if self.no_alloc_fns.contains(fn_name):
+        self.current_no_alloc_depth = self.current_no_alloc_depth + 1
 
     let ret_type = self.sig_return_type(sig_idx)
 
@@ -935,6 +942,10 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     if raw_validity_param_sym != 0 and self.fn_symbol_is_unsafe(fn_name) == 0:
         let param_name = self.pool_resolve(raw_validity_param_sym)
         self.emit_error(f"safe function relies on caller-guaranteed raw pointer validity for parameter '{param_name}'; declare it unsafe fn or model a safe pointer contract", node)
+    if self.current_fn_may_alloc != 0:
+        self.fn_may_alloc.insert(fn_name, 1)
+    else:
+        self.fn_may_alloc.insert(fn_name, 0)
 
     // @[effect(param = bits)] pin enforcement: floor and ceiling checks
     if self.ast.state.fn_effect_pin_params.contains(node):
@@ -969,6 +980,9 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     self.has_gen_yield_type = saved_has_gen_yield_type
     self.in_comptime_fn = saved_comptime
     self.in_async_fn = saved_async
+    self.current_no_alloc_depth = saved_no_alloc_depth
+    self.current_fn_may_alloc = saved_fn_may_alloc
+    self.current_fn_symbol = saved_current_fn_symbol
     self.pop_scope()
     self.local_file_id = saved_body_file_id
     self.current_module_path = saved_body_module_path
@@ -2035,6 +2049,60 @@ fn Sema.emit_no_await_guard_may_suspend_expr(self: Sema, node: i32, expr: i32):
     // Precise `@[no_await_guard]` suspension checks run after MIR lowering,
     // where NLL liveness at the actual suspension point is available.
     return
+
+fn Sema.alloc_construct_label(self: Sema, kind: AllocConstructKind) -> str:
+    if kind == AllocConstructKind.EXPLICIT_API: return "explicit allocation API"
+    if kind == AllocConstructKind.VEC_NEW: return "Vec.new"
+    if kind == AllocConstructKind.TO_OWNED: return ".to_owned"
+    if kind == AllocConstructKind.OWNED_LITERAL: return "owned string literal"
+    if kind == AllocConstructKind.FSTRING: return "f-string"
+    if kind == AllocConstructKind.COMPREHENSION: return "comprehension"
+    if kind == AllocConstructKind.ASYNC_FIBER: return "async fiber/task creation"
+    if kind == AllocConstructKind.FFI_TEMPORARY: return "FFI temporary"
+    "allocating callee"
+
+fn Sema.note_allocation_site(self: Sema, node: i32, kind: AllocConstructKind, elided: i32, allowed_capability: i32):
+    self.alloc_site_nodes.push(node)
+    self.alloc_site_kinds.push(kind as i32)
+    self.alloc_site_fn_syms.push(self.current_fn_symbol)
+    self.alloc_site_elided.push(elided)
+    if elided == 0 and allowed_capability == 0:
+        self.current_fn_may_alloc = 1
+    if self.current_no_alloc_depth != 0 and elided == 0 and allowed_capability == 0:
+        let label = self.alloc_construct_label(kind)
+        self.emit_error(f"{label} allocates here; @[no_alloc] context forbids it", node)
+
+fn Sema.note_allocating_callee(self: Sema, node: i32, fn_sym: i32):
+    if fn_sym == 0:
+        return
+    if self.fn_may_alloc.contains(fn_sym) and self.fn_may_alloc.get(fn_sym).unwrap() != 0:
+        self.note_allocation_site(node, AllocConstructKind.CALLEE, 0, 0)
+
+fn Sema.no_alloc_allows_method_allocation(self: Sema, type_name_sym: i32, field: i32) -> i32:
+    let type_name = self.pool_resolve(type_name_sym)
+    let method_name = self.pool_resolve(field)
+    if type_name == "ArenaScope" and (method_name == "alloc" or method_name == "alloc_zeroed"):
+        return 1
+    if type_name == "TempArena" and (method_name == "alloc" or method_name == "alloc_zeroed"):
+        return 1
+    0
+
+fn Sema.fn_symbol_is_explicit_alloc_api(self: Sema, fn_sym: i32) -> i32:
+    let name = self.pool_resolve(fn_sym)
+    if name == "alloc" or name == "alloc_zeroed":
+        return 1
+    if name == "with_alloc" or name == "with_alloc_zeroed":
+        return 1
+    0
+
+fn Sema.no_alloc_string_literal_elided(self: Sema, node: i32) -> i32:
+    if self.current_no_alloc_depth == 0:
+        return 0
+    if self.current_fn_symbol != 0 and self.fn_decl_nodes.contains(self.current_fn_symbol):
+        let fn_node = self.fn_decl_nodes.get(self.current_fn_symbol).unwrap()
+        if self.ast.get_data1(fn_node) == node:
+            return 1
+    0
 
 fn Sema.with_trait_payload_type(self: Sema, source_ty: i32, trait_sym: i32) -> i32:
     if source_ty == 0 or trait_sym == 0:
@@ -3629,6 +3697,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         if self.core_without_alloc() != 0 and self.current_module_is_std_implementation() == 0:
             self.typed_expr_types.insert(node, self.ty_str_view as i32)
             return self.ty_str_view
+        if self.current_no_alloc_depth != 0:
+            self.note_allocation_site(node, AllocConstructKind.OWNED_LITERAL, self.no_alloc_string_literal_elided(node), 0)
         self.typed_expr_types.insert(node, self.ty_str as i32)
         return self.ty_str
 
@@ -4025,6 +4095,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_ASYNC_BLOCK:
         self.require_async_runtime(node, "async")
+        self.note_allocation_site(node, AllocConstructKind.ASYNC_FIBER, 0, 0)
         if self.in_comptime_fn != 0:
             self.emit_error("async is not allowed in comptime", node)
         let ab_saved_label_registry = self.save_label_registry()
@@ -4190,6 +4261,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return result
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+        self.note_allocation_site(node, AllocConstructKind.COMPREHENSION, 0, 0)
         let expr = self.ast.get_data0(node)
         let comp_start = self.ast.get_data1(node)
         let clause_count = self.ast.get_data2(node)
@@ -4445,6 +4517,7 @@ fn Sema.regex_bind_capture_scope(self: Sema, regex_node: i32):
 
 fn Sema.check_fstring(self: Sema, node: i32) -> i32:
     // Type-check each expression segment. Result type is always str.
+    self.note_allocation_site(node, AllocConstructKind.FSTRING, 0, 0)
     let seg_count = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
     var pos = extra_start
@@ -9274,6 +9347,11 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     if sig_idx >= 0:
         self.comp_resolved.insert(node, fn_sym)
         self.emit_no_await_guard_may_suspend_call(node, fn_sym)
+        if self.task_fns.contains(fn_sym):
+            self.note_allocation_site(node, AllocConstructKind.ASYNC_FIBER, 0, 0)
+        if self.fn_symbol_is_explicit_alloc_api(fn_sym) != 0:
+            self.note_allocation_site(node, AllocConstructKind.EXPLICIT_API, 0, 0)
+        self.note_allocating_callee(node, fn_sym)
         let ret = self.sig_return_type(sig_idx) as i32
         // Check arg count (supports default parameters via required-count
         // metadata packed into fn_meta flags by the parser).
@@ -9376,6 +9454,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     if self.generic_fn_nodes.contains(fn_sym):
         let fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
         self.emit_no_await_guard_may_suspend_call(node, fn_sym)
+        self.note_allocating_callee(node, fn_sym)
         let ret = self.check_generic_call(fn_sym, fn_node, arg_types, resolved_arg_count, node)
         self.comp_resolved.insert(node, fn_sym)
         self.typed_expr_types.insert(node, ret)
@@ -10583,6 +10662,7 @@ fn Sema.register_pending_generic_binding(self: Sema, sym: i32, decl_node: i32, v
     let call_node = self.pending_generic_constructor_call_node(value)
     if call_node != 0:
         self.pending_generic_binding_call.insert(sym, call_node)
+        self.note_allocation_site(call_node, AllocConstructKind.VEC_NEW, 0, 0)
     if decl_node != 0:
         self.pending_generic_binding_decl.insert(sym, decl_node)
 
@@ -11539,6 +11619,9 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
 fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
     var obj_type = self.check_expr(expr)
     let static_type_sym = self.static_receiver_base_sym(expr)
+    let early_method_name = self.pool_resolve(field)
+    if static_type_sym != 0 and self.is_pending_generic_collection_base(static_type_sym) != 0 and (field == self.syms.new or (static_type_sym == self.syms.vec and early_method_name == "with_capacity")):
+        self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
     let static_expr_kind = self.ast.kind(expr)
     if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0 and (static_expr_kind == NodeKind.NK_IDENT or static_expr_kind == NodeKind.NK_TYPE_NAMED):
         let static_prim = self.primitive_type_by_sym(static_type_sym)
@@ -11930,6 +12013,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
                     return 0
             self.emit_no_await_guard_may_suspend_call(node, generic_method_fn)
+            if self.pool_resolve(field) == "to_owned":
+                self.note_allocation_site(node, AllocConstructKind.TO_OWNED, 0, 0)
+            else:
+                self.note_allocating_callee(node, generic_method_fn)
             let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, arg_types, extra_start, mc_resolved_arg_count, node)
             return generic_ret
 
@@ -11945,6 +12032,12 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                         return 0
                 self.comp_resolved.insert(node, method_fn_sym)
                 self.emit_no_await_guard_may_suspend_call(node, method_fn_sym)
+                if self.no_alloc_allows_method_allocation(type_name_sym, field) != 0:
+                    self.note_allocation_site(node, AllocConstructKind.EXPLICIT_API, 0, 1)
+                else if self.pool_resolve(field) == "to_owned":
+                    self.note_allocation_site(node, AllocConstructKind.TO_OWNED, 0, 0)
+                else:
+                    self.note_allocating_callee(node, method_fn_sym)
             let mc_ret = self.sig_return_type(sig_idx)
             // For TypeKind.TY_GENERIC_INST receivers, check arg types and substitute return type
             let mc_resolved_tk = self.get_type_kind(recv_type)
@@ -11989,8 +12082,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         let mc_call_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
         let mc_method_name_raw = self.pool_resolve(field)
         if (type_name_sym == self.syms.vec or type_name_sym == self.syms.hashmap or type_name_sym == self.syms.hashset or type_name_sym == self.syms.slotmap or self.pool_resolve(type_name_sym) == "Atomic") and field == self.syms.new:
+            self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
             return recv_type as i32
         if type_name_sym == self.syms.vec and mc_method_name_raw == "with_capacity":
+            self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
             return recv_type as i32
         if field == self.syms.push:
             // Vec.push(value: T) / HashSet.insert(value: T) — arg[0] must be T

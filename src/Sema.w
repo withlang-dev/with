@@ -257,6 +257,17 @@ enum WithFormKind: i32:
     Guarded = 1
     GuardedMut = 2
 
+enum AllocConstructKind: i32:
+    EXPLICIT_API = 1
+    VEC_NEW = 2
+    TO_OWNED = 3
+    OWNED_LITERAL = 4
+    FSTRING = 5
+    COMPREHENSION = 6
+    ASYNC_FIBER = 7
+    FFI_TEMPORARY = 8
+    CALLEE = 9
+
 // ── Sema state ───────────────────────────────────────────────────
 
 type Sema {
@@ -395,6 +406,8 @@ type Sema {
     must_use_fns: HashMap[i32, i32],
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
+    no_alloc_fns: HashMap[i32, i32],
+    fn_may_alloc: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     // Generator metadata. A `gen fn f(...) -> T` semantically returns an
     // internal state struct and exposes an internal `next(mut self)` method
@@ -565,6 +578,13 @@ type Sema {
     expr_view_dep_starts: HashMap[i32, i32],
     expr_view_dep_counts: HashMap[i32, i32],
     expr_view_dep_data: Vec[i32],
+    alloc_site_nodes: Vec[i32],
+    alloc_site_kinds: Vec[i32],
+    alloc_site_fn_syms: Vec[i32],
+    alloc_site_elided: Vec[i32],
+    current_no_alloc_depth: i32,
+    current_fn_may_alloc: i32,
+    current_fn_symbol: i32,
 
     // Current state
     source_text: str,
@@ -998,6 +1018,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let must_use_fns = sema_new_map_i32_i32()
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
+    let no_alloc_fns = sema_new_map_i32_i32()
+    let fn_may_alloc = sema_new_map_i32_i32()
     let fn_stack_sizes = sema_new_map_i32_i32()
     let generator_fn_yield_types = sema_new_map_i32_i32()
     let generator_fn_state_types = sema_new_map_i32_i32()
@@ -1111,6 +1133,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         must_use_fns,
         result_option_fns,
         task_fns,
+        no_alloc_fns,
+        fn_may_alloc,
         fn_stack_sizes,
         generator_fn_yield_types,
         generator_fn_state_types,
@@ -1236,6 +1260,13 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         expr_view_dep_starts: sema_new_map_i32_i32(),
         expr_view_dep_counts: sema_new_map_i32_i32(),
         expr_view_dep_data: Vec.new(),
+        alloc_site_nodes: Vec.new(),
+        alloc_site_kinds: Vec.new(),
+        alloc_site_fn_syms: Vec.new(),
+        alloc_site_elided: Vec.new(),
+        current_no_alloc_depth: 0,
+        current_fn_may_alloc: 0,
+        current_fn_symbol: 0,
         source_text: "",
         tracked_input_root: "",
         tracked_input_paths: Vec.new(),

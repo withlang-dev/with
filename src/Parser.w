@@ -27,6 +27,7 @@ pub type Parser {
     pending_noinline: i32,
     pending_must_use: i32,
     pending_no_await_guard: i32,
+    pending_no_alloc: i32,
     pending_panic_handler: i32,
     pending_entry: i32,
     pending_no_main: i32,
@@ -99,6 +100,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_noinline: 0,
         pending_must_use: 0,
         pending_no_await_guard: 0,
+        pending_no_alloc: 0,
         pending_panic_handler: 0,
         pending_entry: 0,
         pending_no_main: 0,
@@ -457,6 +459,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_noinline = 0
     self.pending_must_use = 0
     self.pending_no_await_guard = 0
+    self.pending_no_alloc = 0
     self.pending_panic_handler = 0
     self.pending_entry = 0
     self.pending_no_main = 0
@@ -496,6 +499,8 @@ fn Parser.skip_attributes(self: Parser):
                 self.pending_must_use = 1
             if attr_text == "no_await_guard":
                 self.pending_no_await_guard = 1
+            if attr_text == "no_alloc":
+                self.pending_no_alloc = 1
             if attr_text == "flags":
                 self.pending_flags = 1
             if attr_text == "specified":
@@ -541,6 +546,9 @@ fn Parser.skip_attributes(self: Parser):
             // Already handled by standalone check above
             self.advance()
         else if self.is_ident_named("no_await_guard"):
+            // Already handled by standalone check above
+            self.advance()
+        else if self.is_ident_named("no_alloc"):
             // Already handled by standalone check above
             self.advance()
         else if self.is_ident_named("panic_handler"):
@@ -1148,6 +1156,9 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     if self.pending_iter_of_self != 0:
         self.pool.mark_iter_of_self_fn(fn_node)
         self.pending_iter_of_self = 0
+    if self.pending_no_alloc != 0:
+        self.pool.mark_no_alloc_fn(fn_node)
+        self.pending_no_alloc = 0
     if self.pending_effect_param != 0:
         self.pool.state.fn_effect_pin_params.insert(fn_node as i32, self.pending_effect_param)
         self.pool.state.fn_effect_pin_bits.insert(fn_node as i32, self.pending_effect_bits)
@@ -1543,6 +1554,7 @@ fn Parser.finish_type_decl(self: Parser, node: NodeId) -> NodeId:
     if self.pending_no_await_guard != 0:
         self.pool.mark_no_await_guard_type(node)
     self.pending_no_await_guard = 0
+    self.pending_no_alloc = 0
     node
 
 fn Parser.parse_struct_body(self: Parser) -> i32:

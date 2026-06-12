@@ -11223,6 +11223,7 @@ not marked internal is invalid.
 | `@[c_export("name")]` | §16.5 | Export a C ABI symbol |
 | `@[effect(...)]` | §16.3d | Declared effect contracts (bodiless decls) |
 | `@[no_await_guard]` | §7.9 | Guard must not live across suspension |
+| `@[no_alloc]` | §20 | Reject hidden/ambient allocation in the function body |
 | `@[iter_of_self]` | §13.2 | Iterator borrows the receiver |
 | `@[ffi_stack]` | §14.19 | Reserved: OS-stack execution (roadmap) |
 | `@[panic_handler]` / `@[entry]` / `@[no_main]` / `@[global_allocator]` | §18.7 | Freestanding-mode hooks |

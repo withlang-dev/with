@@ -1070,6 +1070,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
                 return
     self.fn_decl_nodes.insert(fn_name, node)
     self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
+    if self.ast.is_no_alloc_fn_node(node as NodeId) != 0:
+        self.no_alloc_fns.insert(fn_name, 1)
 
     // Look up fn_meta for parameter info
     let meta = self.ast.find_fn_meta(node)

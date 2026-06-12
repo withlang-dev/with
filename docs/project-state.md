@@ -36,6 +36,22 @@ bindings, may-suspend calls, and `with` blocks that hold an ArenaScope across
 suspension. Full verification passed on 2026-06-12: `with build`,
 `with build :fixpoint`, `with build :test`, and `with build :test-green`.
 
+#361 is implemented and verified. `@[no_alloc]` is now a
+function attribute recorded in AST metadata and registered by Sema. Sema keeps
+deterministic allocation-site metadata (AST node, construct kind, enclosing
+function symbol, and elision bit), propagates a per-function may-allocate
+summary, and rejects hidden/ambient allocation in `@[no_alloc]` contexts with
+construct-specific diagnostics. Current attribution covers f-strings,
+comprehensions, owned string literals unless deterministically elided, async
+task/fiber creation, `Vec.new()`/`with_capacity`, direct allocator APIs,
+allocating callees, and explicit `ArenaScope`/`TempArena` capability methods.
+Focused coverage includes negative f-string, comprehension, owned literal,
+async fn, async block, Vec constructor, and allocating-callee cases, plus
+positive `&str` static literal, direct-return owned-literal elision, and
+explicit arena-approved allocation cases. Full verification passed on
+2026-06-12: `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green`.
+
 #362 substrate work is implemented locally and
 focused tests pass. Binding-level provenance is now carried in a single
 `BindingProvenance` record per scope binding, replacing the previous split
