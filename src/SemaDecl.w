@@ -113,12 +113,6 @@ fn Sema.collect_declarations(self: Sema):
         if kind == NodeKind.NK_LET_DECL:
             self.collect_let_decl(decl, is_local)
 
-    // Task discard cancels work, so statement-position matches must
-    // force an explicit disposition. Result discard is side-effect free.
-    let sym_task = self.pool_intern("Task")
-    if sym_task != 0:
-        self.must_use_types.insert(sym_task, 1)
-
 fn Sema.collect_enum_constructor_imports(self: Sema):
     for di in 0..self.ast.decl_count():
         self.update_decl_source_context(di)

@@ -1811,6 +1811,7 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     let saved_bind_muts = self.bind_muts
     let saved_bind_states = self.bind_states
     let saved_bind_is_task = self.bind_is_task
+    let saved_bind_task_used = self.bind_task_used
     let saved_bind_is_scoped_task = self.bind_is_scoped_task
     let saved_bind_provenance = self.bind_provenance
     let saved_scope_starts = self.scope_starts
@@ -1823,6 +1824,7 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     self.bind_muts = Vec.new()
     self.bind_states = Vec.new()
     self.bind_is_task = Vec.new()
+    self.bind_task_used = Vec.new()
     self.bind_is_scoped_task = Vec.new()
     self.bind_provenance = Vec.new()
     self.scope_starts = Vec.new()
@@ -1842,6 +1844,7 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     self.bind_muts = saved_bind_muts
     self.bind_states = saved_bind_states
     self.bind_is_task = saved_bind_is_task
+    self.bind_task_used = saved_bind_task_used
     self.bind_is_scoped_task = saved_bind_is_scoped_task
     self.bind_provenance = saved_bind_provenance
     self.scope_starts = saved_scope_starts
@@ -4261,6 +4264,8 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
         if self.binding_poisoned_origin_sym(sym) != 0:
             self.emit_returned_view_origin_use_error(sym, node)
             return 0
+        if self.scope_lookup_is_task(sym) != 0 and node != self.current_statement_expr_root:
+            self.scope_mark_task_used(sym)
         let state = self.scope_lookup_state(sym)
         if state == VarState.MOVED:
             if sema_debug_move_enabled() != 0:
@@ -5183,6 +5188,96 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
 
     0
 
+fn Sema.task_statement_callee_sym(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        return self.task_statement_callee_sym(self.ast.get_data0(node))
+    if kind != NodeKind.NK_CALL:
+        return 0
+    if self.comp_resolved.contains(node):
+        return self.comp_resolved.get(node).unwrap()
+    let callee = self.ast.get_data0(node)
+    if self.ast.kind(callee) == NodeKind.NK_IDENT:
+        return self.ast.get_data0(callee)
+    0
+
+fn Sema.task_statement_is_creation(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        return self.task_statement_is_creation(self.ast.get_data0(node))
+    if kind == NodeKind.NK_ASYNC_BLOCK:
+        return 1
+    if kind == NodeKind.NK_CALL:
+        return 1
+    0
+
+fn Sema.task_statement_is_must_observe(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        return self.task_statement_is_must_observe(self.ast.get_data0(node))
+    if kind != NodeKind.NK_CALL:
+        return 0
+    if self.comp_resolved.contains(node) and self.must_use_fns.contains(self.comp_resolved.get(node).unwrap()):
+        return 1
+    let callee = self.ast.get_data0(node)
+    if self.ast.kind(callee) == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(callee)
+        if self.must_use_fns.contains(sym):
+            return 1
+    0
+
+fn Sema.emit_task_must_observe_error(self: Sema, node: i32):
+    var diag = Diagnostic.err("E0801: task result must be observed", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+    diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) }, "this task is marked must-observe")
+    diag.add_help("await, cancel, return, store, or otherwise handle the task")
+    self.diags.emit(diag)
+
+fn Sema.emit_task_detach_safety_error(self: Sema, node: i32):
+    var diag = Diagnostic.err("E0802: task cannot be detached safely", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+    diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) }, "task captures data owned by this scope")
+    diag.add_help("await, cancel, return, or restructure so the task no longer carries scope-bound state out of scope")
+    self.diags.emit(diag)
+
+fn Sema.emit_task_handle_statement_error(self: Sema, node: i32):
+    var diag = Diagnostic.err("E0801: task result must be observed", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+    diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) }, "a bound Task handle is not detached by mentioning it")
+    diag.add_help("await, cancel, return, store, or otherwise handle the task")
+    self.diags.emit(diag)
+
+fn Sema.check_task_statement_disposition(self: Sema, stmt: i32):
+    if self.expr_is_task_value(stmt) == 0 or self.expr_is_scoped_task_value(stmt) != 0:
+        return
+    if self.task_statement_is_creation(stmt) == 0:
+        self.emit_task_handle_statement_error(stmt)
+        return
+    if self.task_statement_is_must_observe(stmt) != 0:
+        self.emit_task_must_observe_error(stmt)
+        return
+    let visiting: HashMap[i32, i32] = HashMap.new()
+    if self.expr_is_ephemeral_task(stmt) != 0 or self.expr_creates_ephemeral_task(stmt, visiting) != 0:
+        self.emit_task_detach_safety_error(stmt)
+        return
+    self.detached_task_stmt_nodes.insert(stmt, 1)
+
+fn Sema.check_unused_task_bindings_since(self: Sema, start: i32):
+    var i = start
+    while i < self.bind_names.len() as i32:
+        let sym = self.bind_names.get(i as i64)
+        let decl = self.binding_decl_node(sym)
+        if decl != 0 and self.ast.kind(decl) == NodeKind.NK_LET_BINDING and self.bind_is_task.get(i as i64) != 0 and self.bind_is_scoped_task.get(i as i64) == 0 and self.bind_task_used.get(i as i64) == 0:
+            let name = self.pool_resolve(sym)
+            var diag = Diagnostic.err("unused Task handle `" ++ name ++ "`", Span { file: self.local_file_id, start: self.ast.get_start(decl), end: self.ast.get_end(decl) })
+            diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(decl), end: self.ast.get_end(decl) }, "binding a task declares intent to observe it")
+            diag.add_help("await, cancel, return, store, track, or otherwise handle the task before the handle is lost")
+            self.diags.emit(diag)
+        i = i + 1
+
 fn Sema.check_block(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)
     let stmt_count = self.ast.get_data1(node)
@@ -5191,6 +5286,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
     let block_label = if block_meta >= 0: self.ast.block_meta_label(block_meta) else: 0
 
     self.push_scope()
+    let block_scope_start = self.bind_names.len() as i32
     if block_label != 0:
         self.push_label_frame(block_label, LabelFrameKind.LFK_BLOCK, node)
 
@@ -5241,10 +5337,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         last_stmt_ty = stmt_ty as TypeId
         if stmt_kind == NodeKind.NK_RETURN or stmt_kind == NodeKind.NK_BREAK or stmt_kind == NodeKind.NK_CONTINUE or stmt_kind == NodeKind.NK_GOTO or (stmt_ty == self.ty_never and self.stmt_starts_reachable_region(stmt) == 0):
             block_diverged = 1
-        let can_discard_task = stmt_kind == NodeKind.NK_CALL or stmt_kind == NodeKind.NK_IDENT or stmt_kind == NodeKind.NK_GROUPED or stmt_kind == NodeKind.NK_ASYNC_BLOCK or stmt_kind == NodeKind.NK_TUPLE or stmt_kind == NodeKind.NK_NO_SUSPEND
-        let is_discarded_task = can_discard_task and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
-        if is_discarded_task:
-            self.emit_error("E0801: unused Task value", stmt)
+        self.check_task_statement_disposition(stmt)
         self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
 
     var result: TypeId = if tail == 0 and last_stmt_ty == self.ty_never: self.ty_never else: self.ty_void
@@ -5265,6 +5358,8 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         if tail_is_value:
             self.current_value_expr_root = tail
         let tail_type = if tail_is_value: self.check_expr(tail) else: self.check_expr_statement_context(tail)
+        if not tail_is_value:
+            self.check_task_statement_disposition(tail)
         self.current_value_expr_root = saved_tail_value_root
         self.match_in_stmt_pos = saved_stmt_pos
         if tail_type as TypeId != self.ty_void and tail_type != 0:
@@ -5282,6 +5377,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
 
     if block_label != 0:
         self.pop_label_frame()
+    self.check_unused_task_bindings_since(block_scope_start)
     self.pop_scope()
     if result != 0 and result != self.ty_void:
         self.typed_expr_types.insert(node, result as i32)
@@ -5366,7 +5462,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         self.emit_error("ephemeral references cannot be stored in generic containers", node)
     let _ = self.reject_opaque_value_type(bind_type as i32, if ann_type_node != 0: ann_type_node else: value, "create")
     if self.pool_resolve(name) == "_" and self.expr_is_task_value(value) != 0 and self.expr_is_scoped_task_value(value) == 0:
-        self.emit_warning("`let _ = ...` on a Task immediately cancels it", node)
+        self.emit_error("`let _ = ...` is not the detach spelling for Task values; use statement position to detach, or bind and cancel(task)", node)
 
     let had_binding = self.scope_has(name)
     self.scope_put_at(name, bind_type as i32, is_mut, node)

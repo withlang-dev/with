@@ -317,6 +317,7 @@ type Sema {
     // key(fn_sym,param_i) -> 1 when the parameter is proven consumed in scope.
     task_param_consumed_memo: HashMap[i64, i32],
     task_param_consumed_visiting: HashMap[i64, i32],
+    detached_task_stmt_nodes: HashMap[i32, i32],
     // Generic function node indices by name
     generic_fn_nodes: HashMap[i32, i32],
 
@@ -438,6 +439,7 @@ type Sema {
     bind_muts: Vec[i32],
     bind_states: Vec[i32],
     bind_is_task: Vec[i32],
+    bind_task_used: Vec[i32],
     bind_is_scoped_task: Vec[i32],
     bind_is_view_bound: Vec[i32],
     bind_provenance: Vec[BindingProvenance],
@@ -1055,6 +1057,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         fn_decl_source_paths,
         task_param_consumed_memo: sema_new_map_i64_i32(),
         task_param_consumed_visiting: sema_new_map_i64_i32(),
+        detached_task_stmt_nodes: sema_new_map_i32_i32(),
         generic_fn_nodes,
         variant_lookup,
         variant_type_ids,
@@ -1139,6 +1142,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bind_muts: Vec.new(),
         bind_states: Vec.new(),
         bind_is_task: Vec.new(),
+        bind_task_used: Vec.new(),
         bind_is_scoped_task: Vec.new(),
         bind_is_view_bound: Vec.new(),
         bind_provenance: Vec.new(),
@@ -2697,6 +2701,7 @@ fn Sema.pop_scope(self: Sema):
         self.bind_muts.pop()
         self.bind_states.pop()
         self.bind_is_task.pop()
+        self.bind_task_used.pop()
         self.bind_is_scoped_task.pop()
         self.bind_is_view_bound.pop()
         self.bind_provenance.pop()
@@ -2723,6 +2728,7 @@ fn Sema.scope_insert_at(self: Sema, sym: i32, tid: i32, is_mut: i32):
     self.bind_muts.push(is_mut)
     self.bind_states.push(VarState.LIVE)
     self.bind_is_task.push(0)
+    self.bind_task_used.push(0)
     self.bind_is_scoped_task.push(0)
     self.bind_is_view_bound.push(0)
     self.bind_provenance.push(binding_provenance_empty())
@@ -2821,6 +2827,17 @@ fn Sema.scope_lookup_is_task(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)
     if opt.is_some():
         return self.bind_is_task.get(opt.unwrap() as i64)
+    0
+
+fn Sema.scope_mark_task_used(self: Sema, sym: i32):
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        self.bind_task_used.set_i32(opt.unwrap() as i64, 1)
+
+fn Sema.scope_lookup_task_used(self: Sema, sym: i32) -> i32:
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_task_used.get(opt.unwrap() as i64)
     0
 
 fn Sema.scope_set_is_task(self: Sema, sym: i32, is_task: i32):

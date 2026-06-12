@@ -11,7 +11,21 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 4 is in progress. #362 substrate work is implemented locally and
+Phase 4 is in progress. #350 is implemented and verified. Task values now
+follow the §14.7 position-based disposition contract: statement-position task
+creation detaches only after must-observe and detach-safety gates pass, bound
+task handles must be used before scope exit, `let _ = <Task>` is rejected as a
+discard spelling, and mentioning an existing task handle as a statement is not
+detachment. MIR lowering records accepted detached task statements and emits a
+non-canceling `with_fiber_detach` runtime handoff; explicit `Task.cancel()`
+continues to lower through the canceling handoff. Focused coverage includes
+positive detach behavior, must-observe rejection, detach-safety rejection,
+`let _` rejection, unused bound handles, explicit cancellation, no_suspend task
+cleanup, and the unsafe ephemeral-task assertion path. Full verification
+passed on 2026-06-12: `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green`.
+
+#362 substrate work is implemented locally and
 focused tests pass. Binding-level provenance is now carried in a single
 `BindingProvenance` record per scope binding, replacing the previous split
 task-ephemerality vector and binding-view maps while preserving the existing

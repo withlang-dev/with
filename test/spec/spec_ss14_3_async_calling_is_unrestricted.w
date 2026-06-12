@@ -40,8 +40,8 @@ fn test_task_values_can_be_passed_and_stored:
 fn test_task_can_be_awaited:
     send_analytics(1).await
 
-fn test_let_underscore_task_is_allowed_but_warns:
-    let _ = send_analytics(2)
+fn test_statement_task_detaches:
+    send_analytics(2)
 
 fn test_async_method_in_trait:
     let db = RemoteDb { base: 40 }
@@ -52,6 +52,6 @@ fn main:
     test_regular_function_can_call_async()
     test_task_values_can_be_passed_and_stored()
     test_task_can_be_awaited()
-    test_let_underscore_task_is_allowed_but_warns()
+    test_statement_task_detaches()
     test_async_method_in_trait()
     print("ok")

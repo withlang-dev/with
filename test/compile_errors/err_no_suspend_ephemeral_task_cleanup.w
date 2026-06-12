@@ -7,4 +7,5 @@ fn main:
     let value = 42
     no_suspend:
         let task = borrow_value(&value)
+        task.cancel()
         assert(value == 42)

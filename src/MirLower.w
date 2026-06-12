@@ -3984,6 +3984,10 @@ fn MirBuilder.lower_let_else(self: MirBuilder, node: i32):
 fn MirBuilder.lower_expr_discard(self: MirBuilder, node: i32) -> i32:
     if node == 0:
         return self.unit_operand()
+    if self.sema.detached_task_stmt_nodes.contains(node):
+        let task_op = self.lower_expr(node)
+        self.emit_task_cancel_call(task_op, MirIntrinsic.FIBER_DETACH, node)
+        return self.unit_operand()
     let saved_expected = self.expected_type
     let kind = self.ast.kind(node)
     let result = if kind == NodeKind.NK_BLOCK:
@@ -6500,6 +6504,9 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     if type_name_sym == 0:
         return MirIntrinsic.NONE
     let type_name = self.pool.resolve_symbol(type_name_sym)
+    if type_name == "Task" or type_name == "ScopedTask":
+        if method_name == "cancel": return MirIntrinsic.FIBER_CANCEL
+        return MirIntrinsic.NONE
     if type_name == "Vec":
         if method_name == "new": return MirIntrinsic.VEC_NEW
         if method_name == "with_capacity": return MirIntrinsic.VEC_WITH_CAPACITY

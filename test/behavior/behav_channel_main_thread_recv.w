@@ -8,7 +8,7 @@ async fn producer(tx: Sender[i32]) -> i32:
 
 fn main:
     let (tx, rx) = chan[i32](1)
-    let _ = producer(tx)
+    producer(tx)
     let value = rx.recv()
     assert(value == 42)
     print("ok")

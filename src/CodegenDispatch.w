@@ -7018,10 +7018,10 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: &MirBody, i
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
-    else if intrinsic == MirIntrinsic.FIBER_DETACH_CANCEL:
-        // Detached cancel: transfer an unawaited Task handle to the runtime.
-        // The runtime requests cancellation, drains completion later, and frees
-        // the result buffer once no awaiter owns it.
+    else if intrinsic == MirIntrinsic.FIBER_DETACH or intrinsic == MirIntrinsic.FIBER_DETACH_CANCEL:
+        // Detached handoff: transfer an unawaited Task handle to the runtime.
+        // FIBER_DETACH keeps the fiber running; FIBER_DETACH_CANCEL requests
+        // cooperative cancellation before later draining completion.
         let task_op = self.mir_intrinsic_arg(body, args_id, 0)
         let task_ty = wl_type_of(task_op)
         let task_alloca = self.create_entry_alloca(task_ty)
@@ -7031,7 +7031,7 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: &MirBody, i
         let rbuf_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 1)
         let rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), rbuf_ptr)
 
-        let detach_fn_name = "with_fiber_detach_cancel"
+        let detach_fn_name = if intrinsic == MirIntrinsic.FIBER_DETACH: "with_fiber_detach" else: "with_fiber_detach_cancel"
         var detach_fn = wl_get_named_function(self.llmod, detach_fn_name)
         if detach_fn == 0:
             let dp: Vec[i64] = Vec.new()

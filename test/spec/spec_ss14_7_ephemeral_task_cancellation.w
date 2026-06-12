@@ -32,12 +32,16 @@ fn return_task_from_statement -> Task[i32]:
 async fn test_ephemeral_task_drop_joins:
     let baseline = unsafe { with_fiber_live_fibers() }
     let value = 41
-    let _ = borrow_until_cancel(&value)
+    if true:
+        let task = borrow_until_cancel(&value)
+        task.cancel()
     assert(unsafe { with_fiber_live_fibers() } == baseline)
 
 fn test_non_ephemeral_task_drop_cancels:
     let baseline = unsafe { with_fiber_live_fibers() }
-    let _ = owned_until_cancel(42)
+    if true:
+        let task = owned_until_cancel(42)
+        task.cancel()
     var steps = 0
     while unsafe { with_fiber_live_fibers() } > baseline and steps < 32:
         unsafe { with_runtime_run_one_step() }
