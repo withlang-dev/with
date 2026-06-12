@@ -31,6 +31,7 @@ type ComptimeValue {
     extra_start: i32,
     extra_count: i32,
 }
+impl Copy for ComptimeValue
 
 fn comptime_value_invalid() -> ComptimeValue:
     ComptimeValue {

@@ -31,6 +31,7 @@ type LoopInfo {
     break_defer_depth: i32,
     break_scope_depth: i32,
 }
+impl Copy for LoopInfo
 
 enum ControlTargetKind: i32:
     CT_LOOP = 1

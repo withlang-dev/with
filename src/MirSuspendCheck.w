@@ -627,6 +627,7 @@ type SuspendSiteSpan {
     start: i32,
     end: i32,
 }
+impl Copy for SuspendSiteSpan
 
 fn suspend_site_span(ast: AstPool, body: &MirBody, bb: i32) -> SuspendSiteSpan:
     let call_id = body.term_data1(bb)

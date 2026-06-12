@@ -14,6 +14,7 @@ pub type ValueKey {
     text_value: str,
     type_ref: i32,
 }
+impl Copy for ValueKey
 
 pub fn value_key_invalid -> ValueKey:
     ValueKey {

@@ -4760,6 +4760,7 @@ type CiValueExprIR {
     setup_stmt: CiStmtId = 0 as CiStmtId,
     value_expr: CiExprId = 0 as CiExprId,
 }
+impl Copy for CiValueExprIR
 
 type CiScope {
     ptr: *mut CiScopeState,

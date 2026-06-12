@@ -28,6 +28,7 @@ pub type TypeKey {
     arg1: i32,
     flags: i32,
 }
+impl Copy for TypeKey
 
 pub fn type_key_invalid -> TypeKey:
     TypeKey {

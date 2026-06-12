@@ -16,6 +16,7 @@ type LockEntry {
     package_rev: str,
     sha256: str,
 }
+impl Copy for LockEntry
 
 type LockFile {
     entries: Vec[LockEntry],

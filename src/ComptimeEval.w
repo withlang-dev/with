@@ -83,6 +83,7 @@ type ComptimeControl {
     value: ComptimeValue,
     label: i32,
 }
+impl Copy for ComptimeControl
 
 type ComptimeCapabilityRecord {
     kind: i32,

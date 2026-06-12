@@ -833,6 +833,7 @@ type CiProjectSymbol {
     owner_rank: i32,
     owner_definition_kind: i32,
 }
+impl Copy for CiProjectSymbol
 
 fn CiProjectSymbol.new(name: str, kind: i32) -> CiProjectSymbol:
     CiProjectSymbol {

@@ -46,6 +46,7 @@ pub type StackifyTarget {
     args_start: i32,
     args_count: i32,
 }
+impl Copy for StackifyTarget
 
 pub type StackifyBlock {
     desc: str,

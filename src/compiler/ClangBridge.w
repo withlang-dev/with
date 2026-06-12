@@ -33,21 +33,25 @@ type CXCursor:
     kind: i32
     xdata: i32
     data: [3]i64
+impl Copy for CXCursor
 
 type CXType:
     kind: i32
     pad0: i32
     data: [2]i64
+impl Copy for CXType
 
 type CXString:
     data: i64
     private_flags: u32
     pad0: u32
+impl Copy for CXString
 
 type CXSourceLocation:
     ptr_data: [2]i64
     int_data: u32
     pad0: u32
+impl Copy for CXSourceLocation
 
 type CXSourceRange:
     ptr_data: [2]i64
