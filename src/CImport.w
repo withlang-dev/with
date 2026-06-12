@@ -17,7 +17,8 @@ var g_ci_realpath_cache_paths: Vec[str] = Vec.new()
 var g_ci_realpath_cache_values: Vec[str] = Vec.new()
 var g_cimport_last_error: str = ""
 var g_cimport_untranslated_macros: str = ""
-var g_cimport_omitted_symbols: str = ""
+var g_cimport_omitted_symbol_names: Vec[str] = Vec.new()
+var g_cimport_omitted_symbol_reasons: Vec[str] = Vec.new()
 var g_cimport_included_files: str = ""
 var g_cimport_raw_function_names: str = ""
 var g_cimport_report_untranslated_macros: i32 = 0
@@ -206,11 +207,20 @@ fn c_import_untranslated_macros() -> str:
     g_cimport_untranslated_macros
 
 fn c_import_omitted_symbols_clear():
-    g_cimport_omitted_symbols = ""
+    g_cimport_omitted_symbol_names = Vec.new()
+    g_cimport_omitted_symbol_reasons = Vec.new()
     return
 
 fn c_import_omitted_symbols() -> str:
-    g_cimport_omitted_symbols
+    var out = StringBuilder.new()
+    let count = g_cimport_omitted_symbol_names.len() as i32
+    for i in 0..count:
+        out.push_str("|")
+        out.push_str(g_cimport_omitted_symbol_names.get(i as i64))
+        out.push_str("|")
+        out.push_str(g_cimport_omitted_symbol_reasons.get(i as i64))
+        out.push_str("\n")
+    out.to_str()
 
 fn c_import_included_files_clear():
     g_cimport_included_files = ""
@@ -303,43 +313,32 @@ fn ci_object_macro_is_function_alias(type_session: i64, value: str) -> bool:
 fn ci_record_omitted_symbol(name: str, reason: str):
     if name.len() == 0:
         return
-    let needle = "|" ++ name ++ "|"
-    if ci_str_contains(g_cimport_omitted_symbols, needle):
-        return
-    g_cimport_omitted_symbols = g_cimport_omitted_symbols ++ needle ++ reason ++ "\n"
+    for i in 0..g_cimport_omitted_symbol_names.len() as i32:
+        if g_cimport_omitted_symbol_names.get(i as i64) == name:
+            return
+    g_cimport_omitted_symbol_names.push(name)
+    g_cimport_omitted_symbol_reasons.push(reason)
 
 fn ci_omitted_symbol_recorded(name: str) -> bool:
     if name.len() == 0:
         return false
-    ci_str_contains(g_cimport_omitted_symbols, "|" ++ name ++ "|")
+    for i in 0..g_cimport_omitted_symbol_names.len() as i32:
+        if g_cimport_omitted_symbol_names.get(i as i64) == name:
+            return true
+    false
 
 fn ci_omitted_manifest_comments() -> str:
-    if g_cimport_omitted_symbols.len() == 0:
+    if g_cimport_omitted_symbol_names.len() == 0:
         return ""
-    var out = ""
-    var pos = 0
-    let total = g_cimport_omitted_symbols.len() as i32
-    while pos < total:
-        while pos < total and g_cimport_omitted_symbols.byte_at(pos as i64) == 10:
-            pos = pos + 1
-        if pos >= total:
-            break
-        if g_cimport_omitted_symbols.byte_at(pos as i64) == 124:
-            pos = pos + 1
-        let name_start = pos
-        while pos < total and g_cimport_omitted_symbols.byte_at(pos as i64) != 124:
-            pos = pos + 1
-        if pos >= total:
-            break
-        let name = g_cimport_omitted_symbols.slice(name_start as i64, pos as i64)
-        pos = pos + 1
-        let reason_start = pos
-        while pos < total and g_cimport_omitted_symbols.byte_at(pos as i64) != 10:
-            pos = pos + 1
-        let reason = g_cimport_omitted_symbols.slice(reason_start as i64, pos as i64)
-        if name.len() > 0:
-            out = out ++ "// @with-cimport-omitted|" ++ name ++ "|" ++ reason ++ "\n"
-    out
+    var out = StringBuilder.new()
+    let count = g_cimport_omitted_symbol_names.len() as i32
+    for i in 0..count:
+        out.push_str("// @with-cimport-omitted|")
+        out.push_str(g_cimport_omitted_symbol_names.get(i as i64))
+        out.push_str("|")
+        out.push_str(g_cimport_omitted_symbol_reasons.get(i as i64))
+        out.push_str("\n")
+    out.to_str()
 
 fn ci_record_untranslated_macro(name: str):
     if g_cimport_report_untranslated_macros == 0:

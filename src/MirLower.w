@@ -94,6 +94,11 @@ type MirBuilder = ephemeral {
 
     string_alias_local_ids: Vec[i32],
     string_alias_flags: Vec[i32],
+    string_field_alias_base_locals: Vec[i32],
+    string_field_alias_path_starts: Vec[i32],
+    string_field_alias_path_counts: Vec[i32],
+    string_field_alias_path_syms: Vec[i32],
+    string_field_alias_flags: Vec[i32],
     no_suspend_nodes: Vec[i32],
 
     sema: &Sema,
@@ -147,6 +152,11 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         regex_capture_opt_places: Vec.new(),
         string_alias_local_ids: Vec.new(),
         string_alias_flags: Vec.new(),
+        string_field_alias_base_locals: Vec.new(),
+        string_field_alias_path_starts: Vec.new(),
+        string_field_alias_path_counts: Vec.new(),
+        string_field_alias_path_syms: Vec.new(),
+        string_field_alias_flags: Vec.new(),
         no_suspend_nodes: Vec.new(),
         sema,
         ast,
@@ -2355,10 +2365,16 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32, node_id: i32) 
         if self.sema.is_copy(type_id) != 0:
             if self.local_type_is_str(local) != 0:
                 self.mark_string_local_copied(local)
+            else:
+                self.mark_string_base_fields_may_alias(local)
             return self.body.new_operand(OperandKind.OK_COPY, place)
         return self.body.new_operand(OperandKind.OK_MOVE, place)
     let alias_place = self.lookup_alias_place(sym)
     if alias_place >= 0:
+        if self.place_type_is_str(alias_place) != 0:
+            self.mark_string_place_copied(alias_place)
+        else:
+            self.mark_string_base_fields_may_alias(self.place_base_local(alias_place))
         return self.body.new_operand(OperandKind.OK_COPY, alias_place)
 
     let sig_idx = self.sema.get_sig(sym)
@@ -2448,7 +2464,7 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32, node_id: i32) 
     self.unit_operand()
 
 fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: i32, span: i32):
-    self.update_string_local_alias_after_assignment(place, operand_id)
+    self.update_string_alias_after_assignment(place, operand_id)
     let rval = self.body.new_rvalue(RvalueKind.RK_USE, operand_id, 0, 0)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rval, span)
 
@@ -2464,6 +2480,16 @@ fn MirBuilder.local_type_is_str(self: MirBuilder, local_id: i32) -> i32:
         return 0
     let tid = self.body.local_type_ids.get(local_id as i64)
     self.type_id_is_str(tid)
+
+fn MirBuilder.place_type_is_str(self: MirBuilder, place: i32) -> i32:
+    if place < 0 or place >= self.body.place_locals.len() as i32:
+        return 0
+    if place < self.body.place_sema_types.len() as i32:
+        let tid = self.body.place_sema_types.get(place as i64)
+        if self.type_id_is_str(tid) != 0:
+            return 1
+    let local_id = self.body.place_locals.get(place as i64)
+    self.local_type_is_str(local_id)
 
 fn MirBuilder.type_id_is_str(self: MirBuilder, tid: i32) -> i32:
     if tid == 0:
@@ -2509,32 +2535,229 @@ fn MirBuilder.string_local_owned(self: MirBuilder, local_id: i32) -> i32:
 fn MirBuilder.mark_string_local_copied(self: MirBuilder, local_id: i32):
     self.set_string_local_may_alias(local_id, 1)
 
+fn MirBuilder.place_field_projection_count(self: MirBuilder, place: i32) -> i32:
+    if place < 0 or place >= self.body.place_locals.len() as i32:
+        return -1
+    let proj_start = self.body.place_proj_starts.get(place as i64)
+    let proj_count = self.body.place_proj_counts.get(place as i64)
+    if proj_count == 0:
+        return 0
+    for i in 0..proj_count:
+        if self.body.proj_kinds.get((proj_start + i) as i64) != ProjKind.PK_FIELD:
+            return -1
+    proj_count
+
+fn MirBuilder.place_base_local(self: MirBuilder, place: i32) -> i32:
+    if place < 0 or place >= self.body.place_locals.len() as i32:
+        return -1
+    self.body.place_locals.get(place as i64)
+
+fn MirBuilder.string_field_alias_path_matches(self: MirBuilder, idx: i32, place: i32) -> i32:
+    if idx < 0 or idx >= self.string_field_alias_base_locals.len() as i32:
+        return 0
+    let field_count = self.place_field_projection_count(place)
+    if field_count <= 0:
+        return 0
+    let base_local = self.place_base_local(place)
+    if self.string_field_alias_base_locals.get(idx as i64) != base_local:
+        return 0
+    let stored_count = self.string_field_alias_path_counts.get(idx as i64)
+    if stored_count != field_count:
+        return 0
+    let stored_start = self.string_field_alias_path_starts.get(idx as i64)
+    let proj_start = self.body.place_proj_starts.get(place as i64)
+    for i in 0..field_count:
+        let stored_field = self.string_field_alias_path_syms.get((stored_start + i) as i64)
+        let place_field = self.body.proj_d0.get((proj_start + i) as i64)
+        if stored_field != place_field:
+            return 0
+    1
+
+fn MirBuilder.string_field_alias_index(self: MirBuilder, place: i32) -> i32:
+    if self.place_type_is_str(place) == 0:
+        return -1
+    if self.place_field_projection_count(place) <= 0:
+        return -1
+    for i in 0..self.string_field_alias_base_locals.len() as i32:
+        if self.string_field_alias_path_matches(i, place) != 0:
+            return i
+    -1
+
+fn MirBuilder.set_string_field_path_flags(self: MirBuilder, base_local: i32, path_start: i32, path_count: i32, flags: i32):
+    if base_local < 0 or path_count <= 0:
+        return
+    for i in 0..self.string_field_alias_base_locals.len() as i32:
+        if self.string_field_alias_base_locals.get(i as i64) != base_local:
+            continue
+        let stored_count = self.string_field_alias_path_counts.get(i as i64)
+        if stored_count != path_count:
+            continue
+        let stored_start = self.string_field_alias_path_starts.get(i as i64)
+        var same = 1
+        for pi in 0..path_count:
+            if self.string_field_alias_path_syms.get((stored_start + pi) as i64) != self.string_field_alias_path_syms.get((path_start + pi) as i64):
+                same = 0
+                break
+        if same != 0:
+            self.string_field_alias_flags.set_i32(i as i64, flags)
+            return
+    self.string_field_alias_base_locals.push(base_local)
+    self.string_field_alias_path_starts.push(path_start)
+    self.string_field_alias_path_counts.push(path_count)
+    self.string_field_alias_flags.push(flags)
+
+fn MirBuilder.set_string_field_flags(self: MirBuilder, place: i32, flags: i32):
+    if self.place_type_is_str(place) == 0:
+        return
+    let field_count = self.place_field_projection_count(place)
+    if field_count <= 0:
+        return
+    let idx = self.string_field_alias_index(place)
+    if idx >= 0:
+        self.string_field_alias_flags.set_i32(idx as i64, flags)
+        return
+    let path_start = self.string_field_alias_path_syms.len() as i32
+    let proj_start = self.body.place_proj_starts.get(place as i64)
+    for i in 0..field_count:
+        self.string_field_alias_path_syms.push(self.body.proj_d0.get((proj_start + i) as i64))
+    self.string_field_alias_base_locals.push(self.place_base_local(place))
+    self.string_field_alias_path_starts.push(path_start)
+    self.string_field_alias_path_counts.push(field_count)
+    self.string_field_alias_flags.push(flags)
+
+fn MirBuilder.string_field_flags(self: MirBuilder, place: i32) -> i32:
+    if self.place_type_is_str(place) == 0:
+        return 1
+    if self.place_field_projection_count(place) <= 0:
+        return 1
+    let idx = self.string_field_alias_index(place)
+    if idx < 0:
+        return 1
+    self.string_field_alias_flags.get(idx as i64)
+
+fn MirBuilder.string_place_flags(self: MirBuilder, place: i32) -> i32:
+    let local = self.direct_place_local(place)
+    if local >= 0:
+        return self.string_local_flags(local)
+    self.string_field_flags(place)
+
+fn MirBuilder.set_string_place_flags(self: MirBuilder, place: i32, flags: i32):
+    let local = self.direct_place_local(place)
+    if local >= 0:
+        self.set_string_local_flags(local, flags)
+        return
+    self.set_string_field_flags(place, flags)
+
+fn MirBuilder.set_string_place_may_alias(self: MirBuilder, place: i32, flag: i32):
+    let old = self.string_place_flags(place)
+    let owned = old & 2
+    self.set_string_place_flags(place, owned | (if flag != 0: 1 else: 0))
+
+fn MirBuilder.string_place_may_alias(self: MirBuilder, place: i32) -> i32:
+    self.string_place_flags(place) & 1
+
+fn MirBuilder.string_place_owned(self: MirBuilder, place: i32) -> i32:
+    if (self.string_place_flags(place) & 2) != 0: 1 else: 0
+
+fn MirBuilder.mark_string_place_copied(self: MirBuilder, place: i32):
+    self.set_string_place_may_alias(place, 1)
+
+fn MirBuilder.mark_string_base_fields_may_alias(self: MirBuilder, base_local: i32):
+    if base_local < 0:
+        return
+    for i in 0..self.string_field_alias_flags.len() as i32:
+        if self.string_field_alias_base_locals.get(i as i64) == base_local:
+            self.string_field_alias_flags.set_i32(i as i64, self.string_field_alias_flags.get(i as i64) | 1)
+
 fn MirBuilder.forget_string_flow_facts(self: MirBuilder):
     for i in 0..self.string_alias_flags.len() as i32:
         self.string_alias_flags.set_i32(i as i64, 1)
+    for i in 0..self.string_field_alias_flags.len() as i32:
+        self.string_field_alias_flags.set_i32(i as i64, 1)
 
-fn MirBuilder.operand_string_source_local(self: MirBuilder, operand_id: i32) -> i32:
+fn MirBuilder.operand_string_source_place(self: MirBuilder, operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= self.body.operand_kinds.len() as i32:
         return -1
     if self.body.operand_kinds.get(operand_id as i64) != OperandKind.OK_COPY:
         return -1
     let place = self.body.operand_d0.get(operand_id as i64)
-    let local = self.direct_place_local(place)
-    if local < 0 or self.local_type_is_str(local) == 0:
+    if self.place_type_is_str(place) == 0:
         return -1
-    local
+    place
 
-fn MirBuilder.update_string_local_alias_after_assignment(self: MirBuilder, dest_place: i32, operand_id: i32):
+fn MirBuilder.operand_direct_place(self: MirBuilder, operand_id: i32) -> i32:
+    if operand_id < 0 or operand_id >= self.body.operand_kinds.len() as i32:
+        return -1
+    let kind = self.body.operand_kinds.get(operand_id as i64)
+    if kind != OperandKind.OK_COPY and kind != OperandKind.OK_MOVE:
+        return -1
+    self.body.operand_d0.get(operand_id as i64)
+
+fn MirBuilder.place_source_is_named(self: MirBuilder, place: i32) -> i32:
+    let base_local = self.place_base_local(place)
+    if base_local < 0 or base_local >= self.body.local_names.len() as i32:
+        return 0
+    if self.body.local_names.get(base_local as i64) != 0: 1 else: 0
+
+fn MirBuilder.transfer_string_field_facts_between_bases(self: MirBuilder, source_base: i32, dest_base: i32, force_alias: i32):
+    if source_base < 0 or dest_base < 0:
+        return
+    let original_count = self.string_field_alias_base_locals.len() as i32
+    for i in 0..original_count:
+        if self.string_field_alias_base_locals.get(i as i64) != source_base:
+            continue
+        let old_flags = self.string_field_alias_flags.get(i as i64)
+        let flags = if force_alias != 0: (old_flags | 1) else: old_flags
+        self.set_string_field_path_flags(dest_base, self.string_field_alias_path_starts.get(i as i64), self.string_field_alias_path_counts.get(i as i64), flags)
+
+fn MirBuilder.update_string_aggregate_alias_after_assignment(self: MirBuilder, dest_place: i32, operand_id: i32):
+    let dest_base = self.direct_place_local(dest_place)
+    if dest_base < 0:
+        return
+    self.mark_string_base_fields_may_alias(dest_base)
+    let source_place = self.operand_direct_place(operand_id)
+    if source_place < 0:
+        return
+    let source_base = self.direct_place_local(source_place)
+    if source_base < 0:
+        return
+    let is_copy = if self.body.operand_kinds.get(operand_id as i64) == OperandKind.OK_COPY: 1 else: 0
+    let source_named = if is_copy != 0: self.place_source_is_named(source_place) else: 0
+    self.transfer_string_field_facts_between_bases(source_base, dest_base, source_named)
+    if is_copy != 0:
+        self.mark_string_base_fields_may_alias(source_base)
+
+fn MirBuilder.update_string_alias_after_assignment(self: MirBuilder, dest_place: i32, operand_id: i32):
     let dest_local = self.direct_place_local(dest_place)
-    if dest_local < 0 or self.local_type_is_str(dest_local) == 0:
+    if dest_local >= 0:
+        self.update_string_aggregate_alias_after_assignment(dest_place, operand_id)
+    if self.place_type_is_str(dest_place) == 0:
         return
-    let source_local = self.operand_string_source_local(operand_id)
-    if source_local >= 0:
-        let source_is_named = if source_local < self.body.local_names.len() as i32 and self.body.local_names.get(source_local as i64) != 0: 1 else: 0
-        let source_may_alias = if source_is_named != 0: 1 else: self.string_local_may_alias(source_local)
-        self.set_string_local_flags(dest_local, source_may_alias | (if self.string_local_owned(source_local) != 0: 2 else: 0))
+    let source_place = self.operand_string_source_place(operand_id)
+    if source_place >= 0:
+        let source_is_named = self.place_source_is_named(source_place)
+        let source_may_alias = if source_is_named != 0: 1 else: self.string_place_may_alias(source_place)
+        self.set_string_place_flags(dest_place, source_may_alias | (if self.string_place_owned(source_place) != 0: 2 else: 0))
+        self.mark_string_place_copied(source_place)
         return
-    self.set_string_local_flags(dest_local, 0)
+    self.set_string_place_flags(dest_place, 0)
+
+fn MirBuilder.update_string_fields_after_aggregate(self: MirBuilder, aggregate_place: i32, fields_id: i32):
+    if aggregate_place < 0 or fields_id < 0 or fields_id >= self.body.agg_field_starts.len() as i32:
+        return
+    let start = self.body.agg_field_starts.get(fields_id as i64)
+    let count = self.body.agg_field_counts.get(fields_id as i64)
+    for i in 0..count:
+        let field_sym = self.body.agg_field_name_syms.get((start + i) as i64)
+        if field_sym == 0:
+            continue
+        let operand_id = self.body.agg_field_operands.get((start + i) as i64)
+        var field_ty = 0
+        let aggregate_ty = if aggregate_place < self.body.place_sema_types.len() as i32: self.body.place_sema_types.get(aggregate_place as i64) else: 0
+        if aggregate_ty != 0:
+            field_ty = self.struct_field_type(aggregate_ty, field_sym)
+        let field_place = self.body.new_field_place(aggregate_place, field_sym, field_ty)
+        self.update_string_alias_after_assignment(field_place, operand_id)
 
 fn MirBuilder.is_string_concat_node(self: MirBuilder, node: i32) -> bool:
     if node == 0:
@@ -2619,6 +2842,167 @@ fn MirBuilder.same_ident_symbol(self: MirBuilder, lhs: i32, rhs: i32) -> i32:
         return 0
     if self.ast.get_data0(lhs) == self.ast.get_data0(rhs): 1 else: 0
 
+fn MirBuilder.unwrap_place_expr(self: MirBuilder, node: i32) -> i32:
+    var cur = node
+    while cur != 0:
+        let kind = self.ast.kind(cur)
+        if kind != NodeKind.NK_GROUPED and kind != NodeKind.NK_NO_SUSPEND:
+            break
+        cur = self.ast.get_data0(cur)
+    cur
+
+fn MirBuilder.same_string_place_expr(self: MirBuilder, lhs: i32, rhs: i32) -> i32:
+    let l = self.unwrap_place_expr(lhs)
+    let r = self.unwrap_place_expr(rhs)
+    if l == 0 or r == 0:
+        return 0
+    let lk = self.ast.kind(l)
+    let rk = self.ast.kind(r)
+    if lk == NodeKind.NK_IDENT and rk == NodeKind.NK_IDENT:
+        if self.ast.get_data0(l) == self.ast.get_data0(r): 1 else: 0
+    else if lk == NodeKind.NK_FIELD_ACCESS and rk == NodeKind.NK_FIELD_ACCESS:
+        if self.ast.get_data1(l) != self.ast.get_data1(r):
+            return 0
+        self.same_string_place_expr(self.ast.get_data0(l), self.ast.get_data0(r))
+    else:
+        0
+
+fn MirBuilder.place_expr_root_symbol(self: MirBuilder, node: i32) -> i32:
+    let cur = self.unwrap_place_expr(node)
+    if cur == 0:
+        return 0
+    let kind = self.ast.kind(cur)
+    if kind == NodeKind.NK_IDENT:
+        return self.ast.get_data0(cur)
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        return self.place_expr_root_symbol(self.ast.get_data0(cur))
+    0
+
+fn MirBuilder.expr_mentions_symbol(self: MirBuilder, node: i32, sym: i32) -> i32:
+    if node == 0 or sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        if self.ast.get_data0(node) == sym: 1 else: 0
+    else if kind == NodeKind.NK_LABEL:
+        self.expr_mentions_symbol(self.ast.get_data1(node), sym)
+    else if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE or kind == NodeKind.NK_SCOPE:
+        0
+    else if kind == NodeKind.NK_BLOCK:
+        let stmt_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            if self.expr_mentions_symbol(self.ast.get_extra(stmt_start + si), sym) != 0:
+                return 1
+        self.expr_mentions_symbol(self.ast.get_data2(node), sym)
+    else if kind == NodeKind.NK_IF_EXPR:
+        if self.expr_mentions_symbol(self.ast.get_data0(node), sym) != 0: return 1
+        if self.expr_mentions_symbol(self.ast.get_data1(node), sym) != 0: return 1
+        self.expr_mentions_symbol(self.ast.get_data2(node), sym)
+    else if kind == NodeKind.NK_WHILE or kind == NodeKind.NK_DO_WHILE:
+        if self.expr_mentions_symbol(self.ast.get_data0(node), sym) != 0: return 1
+        self.expr_mentions_symbol(self.ast.get_data1(node), sym)
+    else if kind == NodeKind.NK_LOOP:
+        self.expr_mentions_symbol(self.ast.get_data0(node), sym)
+    else if kind == NodeKind.NK_FOR:
+        if self.expr_mentions_symbol(self.ast.get_data1(node), sym) != 0: return 1
+        self.expr_mentions_symbol(self.ast.get_data2(node), sym)
+    else if kind == NodeKind.NK_MATCH:
+        if self.expr_mentions_symbol(self.ast.get_data0(node), sym) != 0: return 1
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            if self.expr_mentions_symbol(self.ast.get_extra(arm_start + ai), sym) != 0:
+                return 1
+        0
+    else if kind == NodeKind.NK_MATCH_ARM:
+        if self.expr_mentions_symbol(self.ast.get_data2(node), sym) != 0: return 1
+        self.expr_mentions_symbol(self.ast.get_data1(node), sym)
+    else if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
+        self.expr_mentions_symbol(self.ast.get_data0(node), sym)
+    else if kind == NodeKind.NK_BINARY:
+        if self.expr_mentions_symbol(self.ast.get_data1(node), sym) != 0: return 1
+        self.expr_mentions_symbol(self.ast.get_data2(node), sym)
+    else if kind == NodeKind.NK_UNARY:
+        self.expr_mentions_symbol(self.ast.get_data1(node), sym)
+    else if kind == NodeKind.NK_LET_BINDING:
+        self.expr_mentions_symbol(self.ast.get_data1(node), sym)
+    else if kind == NodeKind.NK_LET_ELSE:
+        if self.expr_mentions_symbol(self.ast.get_data1(node), sym) != 0: return 1
+        self.expr_mentions_symbol(self.ast.get_data2(node), sym)
+    else if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
+        self.expr_mentions_symbol(self.ast.get_data2(node), sym)
+    else if kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE:
+        if self.expr_mentions_symbol(self.ast.get_data0(node), sym) != 0: return 1
+        self.expr_mentions_symbol(self.ast.get_data1(node), sym)
+    else if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_CAST:
+        self.expr_mentions_symbol(self.ast.get_data0(node), sym)
+    else if kind == NodeKind.NK_SLICE:
+        if self.expr_mentions_symbol(self.ast.get_data0(node), sym) != 0: return 1
+        if self.expr_mentions_symbol(self.ast.get_data1(node), sym) != 0: return 1
+        self.expr_mentions_symbol(self.ast.get_data2(node), sym)
+    else if kind == NodeKind.NK_CALL:
+        if self.expr_mentions_symbol(self.ast.get_data0(node), sym) != 0: return 1
+        let arg_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai2 in 0..arg_count:
+            if self.expr_mentions_symbol(self.ast.get_extra(arg_start + ai2), sym) != 0:
+                return 1
+        0
+    else if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
+        let elem_start = self.ast.get_data0(node)
+        let elem_count = self.ast.get_data1(node)
+        for ei in 0..elem_count:
+            if self.expr_mentions_symbol(self.ast.get_extra(elem_start + ei), sym) != 0:
+                return 1
+        0
+    else if kind == NodeKind.NK_STRUCT_LIT:
+        let field_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            if self.expr_mentions_symbol(self.ast.get_extra(field_start + fi * 2 + 1), sym) != 0:
+                return 1
+        0
+    else if kind == NodeKind.NK_RECORD_UPDATE:
+        if self.expr_mentions_symbol(self.ast.get_data0(node), sym) != 0: return 1
+        let field_start2 = self.ast.get_data1(node)
+        let field_count2 = self.ast.get_data2(node)
+        for fi2 in 0..field_count2:
+            if self.expr_mentions_symbol(self.ast.get_extra(field_start2 + fi2 * 2 + 1), sym) != 0:
+                return 1
+        0
+    else if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT or kind == NodeKind.NK_WITH_TUPLE:
+        if self.expr_mentions_symbol(self.ast.get_data0(node), sym) != 0: return 1
+        self.expr_mentions_symbol(self.ast.get_data1(node), sym)
+    else:
+        0
+
+fn MirBuilder.string_move_first_place_eligible(self: MirBuilder, place: i32) -> i32:
+    if self.place_type_is_str(place) == 0:
+        return 0
+    let direct = self.direct_place_local(place)
+    if direct >= 0:
+        return 1
+    if self.place_field_projection_count(place) <= 0:
+        return 0
+    let base_local = self.place_base_local(place)
+    if base_local <= 0 or base_local <= self.body.n_params:
+        return 0
+    if base_local < self.body.local_names.len() as i32 and self.body.local_names.get(base_local as i64) == 0:
+        return 0
+    1
+
+fn MirBuilder.symbol_is_module_storage(self: MirBuilder, sym: i32) -> i32:
+    if sym == 0:
+        return 0
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        let kind = self.ast.kind(decl)
+        if kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_EXTERN_VAR:
+            if self.ast.get_data0(decl) == sym:
+                return 1
+    0
+
 fn MirBuilder.try_lower_string_self_concat_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32) -> i32:
     if place_expr == 0 or rhs_expr == 0:
         return -1
@@ -2630,13 +3014,18 @@ fn MirBuilder.try_lower_string_self_concat_assign(self: MirBuilder, place_expr: 
     let parts = self.collect_left_string_concat_parts(rhs_expr)
     if parts.len() as i32 < 2:
         return -1
-    if self.same_ident_symbol(place_expr, parts.get(0)) == 0:
+    if self.same_string_place_expr(place_expr, parts.get(0)) == 0:
         return -1
 
     let dest_place = self.lower_expr_place(place_expr)
-    let dest_local = self.direct_place_local(dest_place)
-    if dest_local < 0 or self.string_local_may_alias(dest_local) != 0:
+    if self.string_move_first_place_eligible(dest_place) == 0 or self.string_place_may_alias(dest_place) != 0:
         return -1
+    let root_sym = self.place_expr_root_symbol(place_expr)
+    if self.symbol_is_module_storage(root_sym) != 0:
+        return -1
+    for i in 1..parts.len() as i32:
+        if self.expr_mentions_symbol(parts.get(i as i64), root_sym) != 0:
+            return -1
 
     let saved_expected = self.expected_type
     self.expected_type = self.sema.ty_str as i32
@@ -2649,7 +3038,7 @@ fn MirBuilder.try_lower_string_self_concat_assign(self: MirBuilder, place_expr: 
     let args_id = self.body.new_call_args(operands)
     let rv = self.body.new_rvalue(RvalueKind.RK_STR_CONCAT_N, args_id, operands.len() as i32, 1)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, dest_place, rv, self.ast.get_start(place_expr))
-    self.set_string_local_flags(dest_local, 2)
+    self.set_string_place_flags(dest_place, 2)
     dest_place
 
 fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
@@ -3057,6 +3446,10 @@ fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i3
         if fn_addr >= 0:
             return fn_addr
         let place = self.lower_expr_place(expr)
+        if self.place_type_is_str(place) != 0:
+            self.mark_string_place_copied(place)
+        else:
+            self.mark_string_base_fields_may_alias(self.place_base_local(place))
         let is_exclusive = op == UnaryOp.UOP_RAW_REF_MUT
         let rv = self.body.new_rvalue(RvalueKind.RK_REF, if is_exclusive: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED, place, 0)
         let ty = self.expr_type(node)
@@ -5825,6 +6218,10 @@ fn MirBuilder.lower_auto_ref_call_arg(self: MirBuilder, arg_node: i32, expected_
     if self.sema.can_auto_ref_arg(expected_ty, actual_ty) == 0:
         return -1
     let place = self.lower_expr_place(arg_node)
+    if self.place_type_is_str(place) != 0:
+        self.mark_string_place_copied(place)
+    else:
+        self.mark_string_base_fields_may_alias(self.place_base_local(place))
     let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
     let temp = self.new_temp(expected_ty)
     let temp_place = self.place_for_local(temp)
@@ -7520,6 +7917,7 @@ fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_update
     let tmp = self.new_temp(ty)
     let result_place = self.place_for_local(tmp)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, result_rv, self.ast.get_start(node))
+    self.update_string_fields_after_aggregate(result_place, result_fid)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
 fn MirBuilder.lower_implicit_ok(self: MirBuilder, expr: i32, ok_type_id: i32) -> i32:
@@ -7952,6 +8350,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                                 return self.body.new_operand(OperandKind.OK_COPY, fa_place2)
                             return self.int_const_operand(fa_disc_tag2 as i64, fa_base_ty)
         let place = self.lower_field_access(node)
+        self.mark_string_place_copied(place)
         return self.body.new_operand(OperandKind.OK_COPY, place)
 
     if kind == NodeKind.NK_INDEX:
@@ -8031,9 +8430,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let rhs_node = self.ast.get_data1(node)
         let append_place = self.try_lower_string_self_concat_assign(target, rhs_node)
         if append_place >= 0:
-            let append_local = self.direct_place_local(append_place)
-            if append_local >= 0:
-                self.mark_string_local_copied(append_local)
+            self.mark_string_place_copied(append_place)
             return self.body.new_operand(OperandKind.OK_COPY, append_place)
         // Lower the RHS first so we have its value available, then perform the
         // assignment. The expression value of `lhs = rhs` is `rhs` per C/With
@@ -8355,6 +8752,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let sl_tmp = self.new_temp(sl_ty)
         let sl_place = self.place_for_local(sl_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, sl_place, sl_rv, self.ast.get_start(node))
+        self.update_string_fields_after_aggregate(sl_place, sl_fid)
         return self.body.new_operand(OperandKind.OK_COPY, sl_place)
 
     if kind == NodeKind.NK_RECORD_UPDATE:
@@ -8845,6 +9243,8 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
             let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
             builder.bind_local(p_name, local_id)
             builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, builder.ast.get_start(fn_node))
+            if builder.local_type_is_str(local_id) != 0:
+                builder.set_string_local_flags(local_id, 1)
             if builder.sema.is_copy(p_ty) == 0:
                 builder.schedule_drop(local_id, DropKind.DK_VALUE)
             param_locals.push(local_id)
@@ -9142,6 +9542,8 @@ fn lower_generator_constructor(sema: Sema, ast_pool: AstPool, pool: InternPool, 
             let p_ty = sema.sig_param_type(sig_idx, pi)
             let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
             builder.bind_local(p_name, local_id)
+            if builder.local_type_is_str(local_id) != 0:
+                builder.set_string_local_flags(local_id, 1)
         builder.body.n_params = param_count
 
     let fields: Vec[i32] = Vec.new()
