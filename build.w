@@ -1017,6 +1017,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_zlib_uat = target_new(.Action, "release-zlib-uat", "").output("out/release-uat/zlib.passed")
     release_zlib_uat.action = run_release_zlib_uat_action
     release_zlib_uat = release_zlib_uat.input(release_platform_asset_bin())
+    release_zlib_uat = release_zlib_uat.input("build/release_uat_fixtures/zlib_main.w")
     release_zlib_uat = release_zlib_uat.write_scope("out/release-uat")
     release_zlib_uat = release_zlib_uat.allow_network()
     release_zlib_uat = release_zlib_uat.dep("require-last-green")
@@ -1026,6 +1027,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_bzip2_uat = target_new(.Action, "release-bzip2-uat", "").output("out/release-uat/bzip2.passed")
     release_bzip2_uat.action = run_release_bzip2_uat_action
     release_bzip2_uat = release_bzip2_uat.input(release_platform_asset_bin())
+    release_bzip2_uat = release_bzip2_uat.input("build/release_uat_fixtures/bzip2_main.w")
     release_bzip2_uat = release_bzip2_uat.write_scope("out/release-uat")
     release_bzip2_uat = release_bzip2_uat.allow_network()
     release_bzip2_uat = release_bzip2_uat.dep("require-last-green")
@@ -1035,6 +1037,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_sqlite3_uat = target_new(.Action, "release-sqlite3-uat", "").output("out/release-uat/sqlite3.passed")
     release_sqlite3_uat.action = run_release_sqlite3_uat_action
     release_sqlite3_uat = release_sqlite3_uat.input(release_platform_asset_bin())
+    release_sqlite3_uat = release_sqlite3_uat.input("build/release_uat_fixtures/sqlite3_main.w")
     release_sqlite3_uat = release_sqlite3_uat.write_scope("out/release-uat")
     release_sqlite3_uat = release_sqlite3_uat.allow_network()
     release_sqlite3_uat = release_sqlite3_uat.dep("require-last-green")
@@ -1044,6 +1047,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_openssl_uat = target_new(.Action, "release-openssl-uat", "").output("out/release-uat/openssl.passed")
     release_openssl_uat.action = run_release_openssl_uat_action
     release_openssl_uat = release_openssl_uat.input(release_platform_asset_bin())
+    release_openssl_uat = release_openssl_uat.input("build/release_uat_fixtures/openssl_main.w")
     release_openssl_uat = release_openssl_uat.write_scope("out/release-uat")
     release_openssl_uat = release_openssl_uat.allow_network()
     release_openssl_uat = release_openssl_uat.dep("require-last-green")
@@ -1053,6 +1057,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_libcurl_uat = target_new(.Action, "release-libcurl-uat", "").output("out/release-uat/libcurl.passed")
     release_libcurl_uat.action = run_release_libcurl_uat_action
     release_libcurl_uat = release_libcurl_uat.input(release_platform_asset_bin())
+    release_libcurl_uat = release_libcurl_uat.input("build/release_uat_fixtures/libcurl_main.w")
     release_libcurl_uat = release_libcurl_uat.write_scope("out/release-uat")
     release_libcurl_uat = release_libcurl_uat.allow_network()
     release_libcurl_uat = release_libcurl_uat.dep("require-last-green")
@@ -1070,6 +1075,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var release_raylib_spiral_uat = target_new(.Action, "release-raylib-spiral-uat", "").output("out/release-uat/raylib-spiral.passed")
     release_raylib_spiral_uat.action = run_release_raylib_spiral_uat_action
     release_raylib_spiral_uat = release_raylib_spiral_uat.input(release_platform_asset_bin())
+    release_raylib_spiral_uat = release_raylib_spiral_uat.input("build/release_uat_fixtures/raylib_spiral_main.w")
     release_raylib_spiral_uat = release_raylib_spiral_uat.write_scope("out/release-uat")
     release_raylib_spiral_uat = release_raylib_spiral_uat.allow_network()
     release_raylib_spiral_uat = release_raylib_spiral_uat.dep("require-last-green")
