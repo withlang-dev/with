@@ -2,20 +2,20 @@
 
 use compiler.foundation.Ids
 
-fn VALUE_KEY_INVALID -> i32: 0
-fn VALUE_KEY_INT -> i32: 1
-fn VALUE_KEY_BOOL -> i32: 2
-fn VALUE_KEY_STRING -> i32: 3
-fn VALUE_KEY_TYPE_MARKER -> i32: 4
+pub fn VALUE_KEY_INVALID -> i32: 0
+pub fn VALUE_KEY_INT -> i32: 1
+pub fn VALUE_KEY_BOOL -> i32: 2
+pub fn VALUE_KEY_STRING -> i32: 3
+pub fn VALUE_KEY_TYPE_MARKER -> i32: 4
 
-type ValueKey {
+pub type ValueKey {
     tag: i32,
     int_value: i32,
     text_value: str,
     type_ref: i32,
 }
 
-fn value_key_invalid -> ValueKey:
+pub fn value_key_invalid -> ValueKey:
     ValueKey {
         tag: VALUE_KEY_INVALID(),
         int_value: 0,
@@ -23,7 +23,7 @@ fn value_key_invalid -> ValueKey:
         type_ref: -1,
     }
 
-fn value_key_int(v: i32) -> ValueKey:
+pub fn value_key_int(v: i32) -> ValueKey:
     ValueKey {
         tag: VALUE_KEY_INT(),
         int_value: v,
@@ -31,7 +31,7 @@ fn value_key_int(v: i32) -> ValueKey:
         type_ref: -1,
     }
 
-fn value_key_bool(v: bool) -> ValueKey:
+pub fn value_key_bool(v: bool) -> ValueKey:
     ValueKey {
         tag: VALUE_KEY_BOOL(),
         int_value: if v: 1 else: 0,
@@ -39,7 +39,7 @@ fn value_key_bool(v: bool) -> ValueKey:
         type_ref: -1,
     }
 
-fn value_key_string(v: str) -> ValueKey:
+pub fn value_key_string(v: str) -> ValueKey:
     ValueKey {
         tag: VALUE_KEY_STRING(),
         int_value: 0,
@@ -47,7 +47,7 @@ fn value_key_string(v: str) -> ValueKey:
         type_ref: -1,
     }
 
-fn value_key_type_marker(ty: TypeId) -> ValueKey:
+pub fn value_key_type_marker(ty: TypeId) -> ValueKey:
     ValueKey {
         tag: VALUE_KEY_TYPE_MARKER(),
         int_value: 0,
@@ -55,7 +55,7 @@ fn value_key_type_marker(ty: TypeId) -> ValueKey:
         type_ref: type_id_raw(ty),
     }
 
-fn value_key_to_string(key: ValueKey) -> str:
+pub fn value_key_to_string(key: ValueKey) -> str:
     if key.tag == VALUE_KEY_INT():
         return f"int:{key.int_value}"
     if key.tag == VALUE_KEY_BOOL():

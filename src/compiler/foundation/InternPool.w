@@ -7,13 +7,12 @@ use compiler.foundation.Ids
 use compiler.foundation.Types
 use compiler.foundation.Values
 
-extern fn with_hashmap_new_at(base: &T, offset: i64, key_size: i64, val_size: i64) -> void
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
 extern fn with_alloc(size: i64) -> *mut u8
 
 let FND_INTERN_PAGE_SIZE: i64 = 1048576
 
-type FndInternStringArena {
+pub type FndInternStringArena {
     pages: Vec[*mut u8],
     offset: i64,
 }
@@ -24,10 +23,10 @@ fn FndInternStringArena.new() -> FndInternStringArena:
     arena.pages.push(first)
     arena
 
-fn FndInternStringArena.store(self: FndInternStringArena, s: str) -> str:
+fn FndInternStringArena.store(mut self: FndInternStringArena, s: str) -> str:
     if s.len() == 0:
         return ""
-    let src = *(&s as *const *const u8)
+    let src = unsafe *(&s as *const *const u8)
     let len = s.len()
     let need = len + 1
     if self.offset + need > FND_INTERN_PAGE_SIZE:
@@ -38,13 +37,13 @@ fn FndInternStringArena.store(self: FndInternStringArena, s: str) -> str:
     let page = self.pages.get(self.pages.len() - 1)
     let dest = (page as i64 + self.offset) as *mut u8
     with_memcpy(dest, src, len)
-    *((dest as i64 + len) as *mut u8) = 0
+    unsafe *((dest as i64 + len) as *mut u8) = 0
     self.offset = self.offset + need
     var raw: [2]i64 = [dest as i64, len]
     let p = &raw as *const str
-    *p
+    unsafe *p
 
-type InternPoolState {
+pub type InternPoolState {
     symbol_texts: Vec[str],
     symbol_map: HashMap[str, i32],
     strings: FndInternStringArena,
@@ -54,7 +53,7 @@ type InternPoolState {
     value_map: HashMap[str, i32],
 }
 
-type InternPool {
+pub type InternPool {
     state: *mut InternPoolState,
 }
 
@@ -72,9 +71,9 @@ fn foundation_intern_text_eq(a: str, b: str) -> bool:
         i = i + 1
     true
 
-fn InternPool.init -> InternPool:
+pub fn InternPool.init -> InternPool:
     let ptr = with_alloc(256) as *mut InternPoolState
-    *ptr = InternPoolState {
+    unsafe *ptr = InternPoolState {
         symbol_texts: Vec.new(),
         symbol_map: foundation_new_map_str_i32(),
         strings: FndInternStringArena.new(),
@@ -88,7 +87,7 @@ fn InternPool.init -> InternPool:
     ptr.value_keys.push(value_key_invalid())
     InternPool { state: ptr }
 
-fn InternPool.intern_str(self: InternPool, s: str) -> Symbol:
+pub fn InternPool.intern_str(self: InternPool, s: str) -> Symbol:
     let st = self.state
     let existing = st.symbol_map.get(s)
     if existing.is_some():
@@ -108,7 +107,7 @@ fn InternPool.intern_str(self: InternPool, s: str) -> Symbol:
     st.symbol_map.insert(owned, id)
     symbol_from_raw(id)
 
-fn InternPool.resolve_symbol(self: InternPool, sym: Symbol) -> str:
+pub fn InternPool.resolve_symbol(self: InternPool, sym: Symbol) -> str:
     if not symbol_is_valid(sym):
         return ""
     let raw = symbol_raw(sym)
@@ -116,7 +115,7 @@ fn InternPool.resolve_symbol(self: InternPool, sym: Symbol) -> str:
         return ""
     self.state.symbol_texts.get(raw as i64)
 
-fn InternPool.intern_type(self: InternPool, key: TypeKey) -> TypeId:
+pub fn InternPool.intern_type(self: InternPool, key: TypeKey) -> TypeId:
     let st = self.state
     let canon = type_key_to_string(key)
     let existing = st.type_map.get(canon)
@@ -128,7 +127,7 @@ fn InternPool.intern_type(self: InternPool, key: TypeKey) -> TypeId:
     st.type_map.insert(st.strings.store(canon), id)
     type_id_from_raw(id)
 
-fn InternPool.resolve_type(self: InternPool, id: TypeId) -> TypeKey:
+pub fn InternPool.resolve_type(self: InternPool, id: TypeId) -> TypeKey:
     if not type_id_is_valid(id):
         return type_key_invalid()
     let raw = type_id_raw(id)
@@ -136,7 +135,7 @@ fn InternPool.resolve_type(self: InternPool, id: TypeId) -> TypeKey:
         return type_key_invalid()
     self.state.type_keys.get(raw as i64)
 
-fn InternPool.intern_value(self: InternPool, key: ValueKey) -> ValueId:
+pub fn InternPool.intern_value(self: InternPool, key: ValueKey) -> ValueId:
     let st = self.state
     let canon = value_key_to_string(key)
     let existing = st.value_map.get(canon)
@@ -148,7 +147,7 @@ fn InternPool.intern_value(self: InternPool, key: ValueKey) -> ValueId:
     st.value_map.insert(st.strings.store(canon), id)
     value_id_from_raw(id)
 
-fn InternPool.resolve_value(self: InternPool, id: ValueId) -> ValueKey:
+pub fn InternPool.resolve_value(self: InternPool, id: ValueId) -> ValueKey:
     if not value_id_is_valid(id):
         return value_key_invalid()
     let raw = value_id_raw(id)
@@ -156,11 +155,11 @@ fn InternPool.resolve_value(self: InternPool, id: ValueId) -> ValueKey:
         return value_key_invalid()
     self.state.value_keys.get(raw as i64)
 
-fn InternPool.symbol_count(self: InternPool) -> i32:
+pub fn InternPool.symbol_count(self: InternPool) -> i32:
     (self.state.symbol_texts.len() as i32) - 1
 
-fn InternPool.type_count(self: InternPool) -> i32:
+pub fn InternPool.type_count(self: InternPool) -> i32:
     (self.state.type_keys.len() as i32) - 1
 
-fn InternPool.value_count(self: InternPool) -> i32:
+pub fn InternPool.value_count(self: InternPool) -> i32:
     (self.state.value_keys.len() as i32) - 1

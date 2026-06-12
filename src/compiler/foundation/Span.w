@@ -2,26 +2,26 @@
 
 use compiler.foundation.Ids
 
-type Span {
+pub type Span {
     file: FileId,
     start: i32,
     end: i32,
 }
 
-fn span_zero -> Span:
+pub fn span_zero -> Span:
     Span {
         file: file_id_from_raw(0),
         start: 0,
         end: 0,
     }
 
-fn Span.len(self: Span) -> i32:
+pub fn Span.len(self: Span) -> i32:
     self.end - self.start
 
-fn Span.is_valid(self: Span) -> bool:
+pub fn Span.is_valid(self: Span) -> bool:
     file_id_is_valid(self.file) and self.start >= 0 and self.end >= self.start
 
-fn Span.merge(self: Span, other: Span) -> Span:
+pub fn Span.merge(self: Span, other: Span) -> Span:
     Span {
         file: self.file,
         start: span_min_i32(self.start, other.start),

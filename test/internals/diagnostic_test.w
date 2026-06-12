@@ -27,8 +27,8 @@ fn main:
     store.emit(diagnostic_warning("unused binding", sp))
 
     assert(store.count() == 2)
-    assert(store.count_by_severity(DIAG_SEVERITY_ERROR()) == 1)
-    assert(store.count_by_severity(DIAG_SEVERITY_WARNING()) == 1)
+    assert(store.count_by_severity(DiagSeverity.Error as i32) == 1)
+    assert(store.count_by_severity(DiagSeverity.Warning as i32) == 1)
     assert(store.has_errors())
 
     let rendered = render_all_diagnostics(store, sm)
