@@ -1710,7 +1710,7 @@ fn Codegen.build_call_fn_value(self: Codegen, fn_sym: i32, fn_val: i64, fn_ty: i
         return wl_build_load(self.builder, sret_ty, sret_buf)
     call_val
 
-fn Codegen.mir_call_context(self: Codegen, body: MirBody, callee_operand: i32) -> str:
+fn Codegen.mir_call_context(self: Codegen, body: &MirBody, callee_operand: i32) -> str:
     var out = "mir " ++ self.function_symbol_name(body.fn_sym) ++ " -> "
     if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
         return out ++ "<callee?>"
