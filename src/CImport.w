@@ -26,7 +26,7 @@ var g_cimport_report_untranslated_macros: i32 = 0
 extern fn with_getenv_str(name: str) -> str
 
 extern fn i64_to_string(n: i64) -> str
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
@@ -167,7 +167,7 @@ let UO_POST_DEC: i32 = 10
 
 // Process a c_import header spec and return synthetic .w source text.
 // Returns "" if the bridge is unavailable or parsing fails.
-pub fn ci_prepare_clang_resource_dir() -> void:
+pub fn ci_prepare_clang_resource_dir() -> Unit:
     let dir = ensure_clang_resource_dir()
     if dir.len() > 0:
         with_cimport_set_resource_dir(dir)
@@ -549,7 +549,7 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
         output.push_str("extern fn with_alloc(size: i64) -> *mut u8\n")
         output.push_str("extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8\n")
         output.push_str("extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8\n")
-        output.push_str("extern fn with_free(ptr: *mut u8) -> void\n")
+        output.push_str("extern fn with_free(ptr: *mut u8) -> Unit\n")
         with_cimport_mark_name_emitted("with_alloc")
         with_cimport_mark_name_emitted("with_alloc_zeroed")
         with_cimport_mark_name_emitted("with_realloc")
@@ -1536,7 +1536,7 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: str, method_na
         call_args = call_args ++ ", " ++ actual_name
         pi = pi + 1
 
-    let ret_prefix = if ret == "void": "" else: "return "
+    let ret_prefix = if ret == "Unit": "" else: "return "
     let fn_kw = if raw_wrapper: "unsafe fn " else: "fn "
     ci_render_generated_fn_body(fn_kw ++ safe_struct ++ "." ++ safe_method ++ "(" ++ params ++ ") -> " ++ ret, "    " ++ ret_prefix ++ safe_fn_name ++ "(" ++ call_args ++ ")") ++ "\n"
 
@@ -2339,7 +2339,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
                             let epname = ci_escape_reserved(with_cimport_macro_param_name(session, i, epi))
                             empty_params = empty_params ++ epname ++ ": i32"
                             epi = epi + 1
-                        let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ empty_params ++ ") -> void", "    return")
+                        let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ empty_params ++ ") -> Unit", "    return")
                         if not ci_migrate_shared_decl_add("fn", safe_name, r):
                             output = output ++ r ++ "\n"
                         continue
@@ -2410,7 +2410,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
                         // Infer return type from cast expression: (x as c_int) → return c_int
                         var inferred_ret = ret_type
                         if ci_translation_is_void_statement(translated):
-                            inferred_ret = "void"
+                            inferred_ret = "Unit"
                         else if param_count > 0:
                             inferred_ret = ci_infer_macro_return_type_from_expr(type_session, translated, known_macro_returns, ret_type)
                         if ci_strip_parens(ci_trim(translated)) == "NULL" and ci_infer_cast_return_type(translated).len() == 0:
@@ -4656,7 +4656,7 @@ fn ci_map_base_type(name: str) -> str:
     if builtin_typedef.len() > 0: return builtin_typedef
     let translated_typedef = ci_lookup_known(name, g_macro_type_aliases)
     if translated_typedef.len() > 0: return ci_normalize_translated_type_name(translated_typedef)
-    if name == "void": return "void"
+    if name == "void": return "Unit"
     if name == "_Bool": return "bool"
     if name == "char": return "c_char"
     if name == "signed char": return "c_char"
@@ -5703,7 +5703,7 @@ fn CiTypePool.type_from_libclang(self: CiTypePool, session: i64, cxtype: i32) ->
 fn CiTypePool.type_from_translated_text(self: CiTypePool, ty: str) -> CiTypeId:
     if ty.len() == 0:
         return 0 as CiTypeId
-    if ty == "void":
+    if ty == "void" or ty == "Unit":
         return self.ty_void()
     if ci_starts_with(ty, "*const "):
         let pointee = self.type_from_translated_text(ty.slice(7, ty.len()))
@@ -5929,7 +5929,7 @@ fn ci_record_count_cache_lookup(key: str) -> i32:
         i = i + 1
     -1
 
-fn ci_record_count_cache_store(key: str, value: i32) -> void:
+fn ci_record_count_cache_store(key: str, value: i32) -> Unit:
     g_ci_record_count_cache_keys.push(key)
     g_ci_record_count_cache_values.push(value)
 
@@ -5941,7 +5941,7 @@ fn ci_record_field_cache_lookup_index(key: str) -> i32:
         i = i + 1
     -1
 
-fn ci_record_field_cache_store(key: str, name: str, ty: str) -> void:
+fn ci_record_field_cache_store(key: str, name: str, ty: str) -> Unit:
     g_ci_record_field_cache_keys.push(key)
     g_ci_record_field_name_cache_values.push(name)
     g_ci_record_field_type_cache_values.push(ty)
@@ -11955,7 +11955,7 @@ pub fn ci_get_bail_kind() -> i32:
 pub fn ci_get_bail_message() -> str:
     g_ci_bail_message
 
-pub fn ci_clear_bail_location() -> void:
+pub fn ci_clear_bail_location() -> Unit:
     g_ci_bail_location = ""
     g_ci_bail_kind = 0
     g_ci_bail_message = ""
@@ -12043,11 +12043,11 @@ fn ci_trace_port(tag: str):
     if ci_trace_port_enabled():
         with_eprint(tag)
 
-fn ci_record_raw_expr_kind(kind: i32) -> void:
+fn ci_record_raw_expr_kind(kind: i32) -> Unit:
     if ci_raw_stats_enabled():
         g_ci_raw_expr_kinds.push(kind)
 
-fn ci_record_raw_stmt_kind(kind: i32) -> void:
+fn ci_record_raw_stmt_kind(kind: i32) -> Unit:
     if ci_raw_stats_enabled():
         g_ci_raw_stmt_kinds.push(kind)
 
@@ -12091,7 +12091,7 @@ fn ci_aggregate_kind_vec(v: &Vec[i32], label: str):
         eprint(f"  kind={k} count={c}")
         u = u + 1
 
-pub fn ci_dump_raw_fallback_stats() -> void:
+pub fn ci_dump_raw_fallback_stats() -> Unit:
     if not ci_raw_stats_enabled():
         return
     ci_aggregate_kind_vec(&g_ci_raw_expr_kinds, "migrate: raw-expr fallback by cursor kind:")
@@ -12332,7 +12332,7 @@ fn CiGotoCfgContext.set_current(self: CiGotoCfgContext, block: i32):
         return
     self.state.current = block
 
-fn CiGotoCfgContext.append_stmt(self: CiGotoCfgContext, stmts: CiStmtPool, stmt_id: CiStmtId) -> void:
+fn CiGotoCfgContext.append_stmt(self: CiGotoCfgContext, stmts: CiStmtPool, stmt_id: CiStmtId) -> Unit:
     if not self.state.ok or self.state.current < 0 or (stmt_id as i32) == 0:
         return
     let kind = stmts.kind(stmt_id)
@@ -12420,14 +12420,14 @@ fn ci_goto_cfg_target_label_from_goto(session: i64, cursor: i32) -> str:
             return child_name
     with_ci_cursor_spelling(session, cursor)
 
-fn CiGotoCfgContext.push_break_target(self: CiGotoCfgContext, target: i32) -> void:
+fn CiGotoCfgContext.push_break_target(self: CiGotoCfgContext, target: i32) -> Unit:
     self.state.break_targets.push(target)
 
 fn CiGotoCfgContext.pop_break_target(self: CiGotoCfgContext):
     if self.state.break_targets.len() > 0:
         let _ = self.state.break_targets.pop()
 
-fn CiGotoCfgContext.push_continue_target(self: CiGotoCfgContext, target: i32) -> void:
+fn CiGotoCfgContext.push_continue_target(self: CiGotoCfgContext, target: i32) -> Unit:
     self.state.continue_targets.push(target)
 
 fn CiGotoCfgContext.pop_continue_target(self: CiGotoCfgContext):
@@ -12683,7 +12683,7 @@ fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
         }
     CiGotoSwitchCase { state: ptr }
 
-fn CiGotoSwitchCase.record_case(self: CiGotoSwitchCase, value: CiExprId, block: i32) -> void:
+fn CiGotoSwitchCase.record_case(self: CiGotoSwitchCase, value: CiExprId, block: i32) -> Unit:
     self.state.values.push(value as i32)
     self.state.blocks.push(block)
 

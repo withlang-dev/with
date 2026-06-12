@@ -48,16 +48,16 @@ pub fn diagnostic_warning(message: str, primary: Span) -> Diagnostic:
         helps: Vec.new(),
     }
 
-pub fn Diagnostic.set_code(self: Diagnostic, code: str) -> void:
+pub fn Diagnostic.set_code(self: Diagnostic, code: str) -> Unit:
     self.code = code
 
-pub fn Diagnostic.add_label(self: Diagnostic, span: Span, message: str) -> void:
+pub fn Diagnostic.add_label(self: Diagnostic, span: Span, message: str) -> Unit:
     self.labels.push(DiagnosticLabel { span, message })
 
-pub fn Diagnostic.add_note(self: Diagnostic, message: str) -> void:
+pub fn Diagnostic.add_note(self: Diagnostic, message: str) -> Unit:
     self.notes.push(message)
 
-pub fn Diagnostic.add_help(self: Diagnostic, message: str) -> void:
+pub fn Diagnostic.add_help(self: Diagnostic, message: str) -> Unit:
     self.helps.push(message)
 
 pub fn DiagnosticStore.init -> DiagnosticStore:
@@ -65,7 +65,7 @@ pub fn DiagnosticStore.init -> DiagnosticStore:
         items: Vec.new(),
     }
 
-pub fn DiagnosticStore.emit(self: DiagnosticStore, diag: Diagnostic) -> void:
+pub fn DiagnosticStore.emit(self: DiagnosticStore, diag: Diagnostic) -> Unit:
     self.items.push(diag)
 
 pub fn DiagnosticStore.count(self: DiagnosticStore) -> i32:

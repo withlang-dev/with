@@ -65,14 +65,14 @@ impl Scoped[i64] for MutexGuard:    fn with_enter(self:
     &Self) -> i64:
         self.value
 
-    fn with_exit(self: &Self) -> void:
+    fn with_exit(self: &Self) -> Unit:
         ()
 
 impl ScopedMut[i64] for MutexGuardMut:    fn with_enter_mut(self:
     &Self) -> i64:
         self.value
 
-    fn with_exit_mut(mut self: Self, value: i64) -> void:
+    fn with_exit_mut(mut self: Self, value: i64) -> Unit:
         self.value = value
 
 /// Read the value inside a Mutex.
@@ -80,7 +80,7 @@ pub fn mutex_get(m: Mutex) -> i64:
     m.value
 
 /// Set the value inside a Mutex (mutating receiver).
-pub fn Mutex.set(mut self: Mutex, value: i64) -> void:
+pub fn Mutex.set(mut self: Mutex, value: i64) -> Unit:
     self.value = value
 
 /// Create a new RwLock with the given initial value.
@@ -108,7 +108,7 @@ pub fn rwlock_read(rw: RwLock) -> i64:
     rw.value
 
 /// Write a new value inside a RwLock (mutating receiver).
-pub fn RwLock.write(mut self: RwLock, value: i64) -> void:
+pub fn RwLock.write(mut self: RwLock, value: i64) -> Unit:
     self.value = value
 
 /// Create a new AtomicI64 with the given initial value.
@@ -120,7 +120,7 @@ pub fn atomic_load(a: AtomicI64) -> i64:
     a.value
 
 /// Store a new value atomically (mutating receiver).
-pub fn AtomicI64.store(mut self: AtomicI64, value: i64) -> void:
+pub fn AtomicI64.store(mut self: AtomicI64, value: i64) -> Unit:
     self.value = value
 
 /// Add `delta` atomically and return the new value (mutating receiver).

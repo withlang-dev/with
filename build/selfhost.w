@@ -1772,7 +1772,7 @@ fn bs_check_unit_tail_value_not_returned(ctx: ActionCtx, compiler_path: str, cas
         "    kind: i32,\n" ++
         "    label: i32,\n" ++
         "}\n\n" ++
-        "fn callee -> void:\n" ++
+        "fn callee -> Unit:\n" ++
         "    var v: Vec[Frame] = Vec.new()\n" ++
         "    v.push(Frame { kind: 1, label: 2 })\n" ++
         "    v.pop()\n\n" ++
@@ -2175,7 +2175,7 @@ fn bs_check_emit_c_receiver_abi(ctx: ActionCtx, compiler_path: str, case_dir: st
     let src = bs_join(case_dir, "receiver_abi.w")
     let c_path = bs_join(case_dir, "receiver_abi.c")
     let bin = bs_join(case_dir, "receiver_abi")
-    let source = "extern fn with_print_str(s: str) -> void\n\n" ++
+    let source = "extern fn with_print_str(s: str) -> Unit\n\n" ++
         "type Counter {\n" ++
         "    value: i32,\n" ++
         "}\n\n" ++
@@ -2214,7 +2214,7 @@ fn bs_check_emit_c_hashmap_new_field(ctx: ActionCtx, compiler_path: str, case_di
     let c_path = bs_join(case_dir, "hashmap_new_field.c")
     let bin = bs_join(case_dir, "hashmap_new_field")
     let source = "use std.prelude_alloc\n\n" ++
-        "extern fn with_print_str(s: str) -> void\n\n" ++
+        "extern fn with_print_str(s: str) -> Unit\n\n" ++
         "type Registry {\n" ++
         "    names: HashMap[str, i32],\n" ++
         "}\n\n" ++
@@ -2268,7 +2268,7 @@ fn bs_check_emit_c_array_fill_rvalue(ctx: ActionCtx, compiler_path: str, case_di
     let src = bs_join(case_dir, "array_fill_rvalue.w")
     let c_path = bs_join(case_dir, "array_fill_rvalue.c")
     let bin = bs_join(case_dir, "array_fill_rvalue")
-    let source = "extern fn with_print_str(s: str) -> void\n\n" ++
+    let source = "extern fn with_print_str(s: str) -> Unit\n\n" ++
         "fn main() -> i32:\n" ++
         "    var buf: [u8; 128] = [7u8; 128]\n" ++
         "    if buf[0] != 7u8:\n" ++
@@ -5115,7 +5115,7 @@ fn bs_check_pcre2_defs_prune_ebcdic_tables(ctx: ActionCtx) -> i32:
 fn bs_check_pcre2_prepare_shared_externs(ctx: ActionCtx, base_dir: str) -> i32:
     let raw_dir = bs_join(base_dir, "raw")
     let generated_dir = bs_join(base_dir, "generated")
-    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nextern fn preamble_helper() -> void\n", "shared externs defs")
+    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nextern fn preamble_helper() -> Unit\n", "shared externs defs")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_tables.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nvar _pcre2_utf8_table1: *c_int\nvar _pcre2_OP_lengths_8: *u8\n", "shared externs tables")
     if rc != 0: return rc

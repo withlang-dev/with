@@ -3,7 +3,7 @@
 type CopySafetyHandle { fd: i32 }
 
 impl Drop for CopySafetyHandle:
-    fn drop(self) -> void:
+    fn drop(self) -> Unit:
         let _ = self.fd
 
 impl Copy for CopySafetyHandle

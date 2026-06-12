@@ -208,7 +208,7 @@ fn Parser.top_level_starts_decl(self: Parser) -> i32:
         return 1
     0
 
-fn Parser.record_top_level_stmt(self: Parser, stmt: NodeId) -> void:
+fn Parser.record_top_level_stmt(self: Parser, stmt: NodeId) -> Unit:
     if stmt != 0:
         self.top_level_stmts.push(stmt as i32)
 
@@ -1391,7 +1391,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     self.emit_error("expected type body")
     0 as NodeId
 
-fn Parser.queue_synthetic_copy_impl(self: Parser, type_name: i32, tp_start: i32, tp_count: i32, start: i32, end: i32) -> void:
+fn Parser.queue_synthetic_copy_impl(self: Parser, type_name: i32, tp_start: i32, tp_count: i32, start: i32, end: i32) -> Unit:
     let copy_trait = self.intern.intern("Copy")
     let impl_extra = self.pool.extra_len()
     self.pool.add_extra(0)

@@ -1,7 +1,7 @@
 //! expect-stdout: page_view
 
 extern fn with_fiber_live_fibers() -> i32
-extern fn with_runtime_run_one_step() -> void
+extern fn with_runtime_run_one_step() -> Unit
 
 async fn tick() -> i32:
     1

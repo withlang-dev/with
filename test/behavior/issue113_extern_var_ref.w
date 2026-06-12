@@ -6,5 +6,5 @@ extern var issue113_shared_counter: i32
 pub fn issue113_read_shared() -> i32:
     issue113_shared_counter
 
-pub fn issue113_write_shared(value: i32) -> void:
+pub fn issue113_write_shared(value: i32) -> Unit:
     issue113_shared_counter = value

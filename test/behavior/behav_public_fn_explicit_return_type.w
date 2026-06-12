@@ -1,7 +1,7 @@
 pub fn exported_value -> i32:
     41 + 1
 
-pub fn exported_unit -> void:
+pub fn exported_unit -> Unit:
     print("")
 
 fn helper:

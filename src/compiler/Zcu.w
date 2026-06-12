@@ -153,10 +153,10 @@ fn Zcu.has_imported_path(self: Zcu, path: str) -> i32:
             return 1
     0
 
-fn Zcu.add_imported_path(self: Zcu, path: str) -> void:
+fn Zcu.add_imported_path(self: Zcu, path: str) -> Unit:
     self.imported_paths.push(zcu_owned_text(path))
 
-fn Zcu.seed_decl_source_paths(self: Zcu, pool: AstPool, path: str, file_id: i32) -> void:
+fn Zcu.seed_decl_source_paths(self: Zcu, pool: AstPool, path: str, file_id: i32) -> Unit:
     self.decl_source_paths = Vec.new()
     self.decl_source_file_ids = Vec.new()
     self.decl_is_c_import = Vec.new()
@@ -166,14 +166,14 @@ fn Zcu.seed_decl_source_paths(self: Zcu, pool: AstPool, path: str, file_id: i32)
         self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(0)
 
-fn Zcu.append_decl_source_paths(self: Zcu, count: i32, path: str, file_id: i32) -> void:
+fn Zcu.append_decl_source_paths(self: Zcu, count: i32, path: str, file_id: i32) -> Unit:
     let owned = zcu_owned_text(path)
     for _ in 0..count:
         self.decl_source_paths.push(owned)
         self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(0)
 
-fn Zcu.append_c_import_decl_paths(self: Zcu, count: i32, path: str, file_id: i32) -> void:
+fn Zcu.append_c_import_decl_paths(self: Zcu, count: i32, path: str, file_id: i32) -> Unit:
     let owned = zcu_owned_text(path)
     for _ in 0..count:
         self.decl_source_paths.push(owned)
@@ -202,7 +202,7 @@ fn Zcu.c_import_cache_lookup(self: Zcu, key: str) -> str:
             return self.c_import_cache_values.get(i as i64)
     ""
 
-fn Zcu.c_import_cache_store(self: Zcu, key: str, value: str) -> void:
+fn Zcu.c_import_cache_store(self: Zcu, key: str, value: str) -> Unit:
     self.c_import_cache_keys.push(key)
     self.c_import_cache_values.push(value)
 
@@ -215,7 +215,7 @@ fn Zcu.clear_cli_diag_mappings(self: Zcu):
     self.cli_diag_source_names = Vec.new()
     self.cli_diag_source_texts = Vec.new()
 
-fn Zcu.add_cli_diag_mapping(self: Zcu, gen_start: i32, gen_end: i32, source_name: str, source_text: str) -> void:
+fn Zcu.add_cli_diag_mapping(self: Zcu, gen_start: i32, gen_end: i32, source_name: str, source_text: str) -> Unit:
     self.cli_diag_gen_starts.push(gen_start)
     self.cli_diag_gen_ends.push(gen_end)
     self.cli_diag_source_names.push(source_name)
@@ -388,7 +388,7 @@ fn Zcu.reset_last_link_lib_names(self: Zcu):
     let empty: Vec[str] = Vec.new()
     self.last_link_lib_names = empty
 
-fn Zcu.capture_last_link_lib_names(self: Zcu, pool: InternPool, result: ResolveResult) -> void:
+fn Zcu.capture_last_link_lib_names(self: Zcu, pool: InternPool, result: ResolveResult) -> Unit:
     self.reset_last_link_lib_names()
     for li in 0..result.link_libs.len() as i32:
         let lib_sym = result.link_libs.get(li as i64)

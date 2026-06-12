@@ -14,7 +14,7 @@ use render
 use CiMigrate
 use Overflow
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_fs_is_dir(path: str) -> i32
@@ -36,14 +36,14 @@ extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
 extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
-extern fn with_println_str(s: str) -> void
-extern fn with_println_i32(n: i32) -> void
-extern fn with_println_i64(n: i64) -> void
-extern fn with_println_bool(v: bool) -> void
-extern fn with_print_str(s: str) -> void
-extern fn with_write(s: str) -> void
-extern fn with_ewrite(s: str) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_println_str(s: str) -> Unit
+extern fn with_println_i32(n: i32) -> Unit
+extern fn with_println_i64(n: i64) -> Unit
+extern fn with_println_bool(v: bool) -> Unit
+extern fn with_print_str(s: str) -> Unit
+extern fn with_write(s: str) -> Unit
+extern fn with_ewrite(s: str) -> Unit
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
 extern fn with_parse_i64(s: str) -> i64
@@ -1055,7 +1055,7 @@ fn ComptimeEvaluator.step(self: ComptimeEvaluator, node: i32) -> i32:
         return 0
     1
 
-fn ComptimeEvaluator.push_scope(self: ComptimeEvaluator) -> void:
+fn ComptimeEvaluator.push_scope(self: ComptimeEvaluator) -> Unit:
     self.scope_starts.push(self.slot_syms.len() as i32)
 
 fn ComptimeEvaluator.pop_scope(self: ComptimeEvaluator):
@@ -1068,24 +1068,24 @@ fn ComptimeEvaluator.pop_scope(self: ComptimeEvaluator):
         self.slot_muts.pop()
     self.scope_starts.pop()
 
-fn ComptimeEvaluator.bind_value(self: ComptimeEvaluator, sym: i32, value: ComptimeValue, is_mut: i32) -> void:
+fn ComptimeEvaluator.bind_value(self: ComptimeEvaluator, sym: i32, value: ComptimeValue, is_mut: i32) -> Unit:
     self.slot_syms.push(sym)
     self.slot_values.push(value)
     self.slot_muts.push(is_mut)
 
-fn ComptimeEvaluator.update_slot_value(self: ComptimeEvaluator, idx: i32, value: ComptimeValue) -> void:
+fn ComptimeEvaluator.update_slot_value(self: ComptimeEvaluator, idx: i32, value: ComptimeValue) -> Unit:
     let slot_index = idx as i64
     with self.slot_values.slot(slot_index) as mut slot:
         slot.set(value)
 
-fn ComptimeEvaluator.record_runtime_env_set(self: ComptimeEvaluator, name: str) -> void:
+fn ComptimeEvaluator.record_runtime_env_set(self: ComptimeEvaluator, name: str) -> Unit:
     for i in 0..self.runtime_env_names.len() as i32:
         if self.runtime_env_names.get(i as i64) == name:
             return
     self.runtime_env_names.push(name)
     self.runtime_env_values.push(with_getenv_str(name) ++ "")
 
-fn ComptimeEvaluator.restore_runtime_env(self: ComptimeEvaluator) -> void:
+fn ComptimeEvaluator.restore_runtime_env(self: ComptimeEvaluator) -> Unit:
     for i in 0..self.runtime_env_names.len() as i32:
         let _restore = with_setenv_str(self.runtime_env_names.get(i as i64), self.runtime_env_values.get(i as i64))
 
@@ -1324,7 +1324,7 @@ fn ComptimeEvaluator.current_source_text(self: ComptimeEvaluator) -> str:
             return text
     self.sema.source_text
 
-fn ComptimeEvaluator.push_extra_value(self: ComptimeEvaluator, value: ComptimeValue) -> void:
+fn ComptimeEvaluator.push_extra_value(self: ComptimeEvaluator, value: ComptimeValue) -> Unit:
     self.extra_values.push(value)
 
 fn ComptimeEvaluator.binding_sym(self: ComptimeEvaluator, node: i32) -> i32:

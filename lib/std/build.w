@@ -3,8 +3,8 @@
 // The compiler driver is responsible for executing build.w in tool mode and
 // turning this graph into concrete compiler/linker actions.
 
-extern fn with_eprint(s: str) -> void
-extern fn exit(code: i32) -> void
+extern fn with_eprint(s: str) -> Unit
+extern fn exit(code: i32) -> Unit
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
 extern fn with_fs_file_exists(path: str) -> i32
@@ -462,12 +462,12 @@ pub fn Workspace.name(self: &Self) -> str:
     exit(1)
     ""
 
-pub fn Workspace.add_file(self: &Self, path: str) -> void:
+pub fn Workspace.add_file(self: &Self, path: str) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.add_file requires compiler driver comptime evaluation\n")
     exit(1)
 
-pub fn Workspace.add_string(self: &Self, name: str, source: str) -> void:
+pub fn Workspace.add_string(self: &Self, name: str, source: str) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.add_string requires compiler driver comptime evaluation\n")
     exit(1)
@@ -494,12 +494,12 @@ pub fn Workspace.options(self: &Self) -> BuildOptions:
         compiler_hooks_enabled: true,
     }
 
-pub fn Workspace.set_options(self: &Self, options: BuildOptions) -> void:
+pub fn Workspace.set_options(self: &Self, options: BuildOptions) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.set_options requires compiler driver comptime evaluation\n")
     exit(1)
 
-pub fn Workspace.set_migrate_options(self: &Self, options: MigrateOptions) -> void:
+pub fn Workspace.set_migrate_options(self: &Self, options: MigrateOptions) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.set_migrate_options requires compiler driver comptime evaluation\n")
     exit(1)
@@ -516,7 +516,7 @@ pub fn Workspace.compile(self: &Self) -> BuildResult:
         diagnostics: Vec.new(),
     }
 
-pub fn Workspace.begin_intercept(self: &Self) -> void:
+pub fn Workspace.begin_intercept(self: &Self) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.begin_intercept requires compiler driver comptime evaluation\n")
     exit(1)
@@ -531,12 +531,12 @@ pub fn Workspace.wait_for_message(self: &Self) -> CompilerMessageEnvelope:
         message: CompilerMessage.Error(1, "Workspace.wait_for_message requires compiler driver comptime evaluation", SourceSpan { file: "", start: -1, end: -1, line: -1, column: -1 }),
     }
 
-pub fn Workspace.end_intercept(self: &Self) -> void:
+pub fn Workspace.end_intercept(self: &Self) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.end_intercept requires compiler driver comptime evaluation\n")
     exit(1)
 
-pub fn Workspace.set_link_command(self: &Self, command: LinkCommand) -> void:
+pub fn Workspace.set_link_command(self: &Self, command: LinkCommand) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.set_link_command requires compiler driver comptime evaluation\n")
     exit(1)
@@ -563,11 +563,11 @@ pub fn ProjectInfo.package_version(self: &Self) -> str:
 pub fn ProjectInfo.project_root(self: &Self) -> str:
     self.root
 
-pub fn Diagnostics.warn(self: &Self, message: str) -> void:
+pub fn Diagnostics.warn(self: &Self, message: str) -> Unit:
     tool_capability_require(self.token, "Diagnostics")
     with_eprint("warning: " ++ message ++ "\n")
 
-pub fn Diagnostics.error(self: &Self, message: str) -> void:
+pub fn Diagnostics.error(self: &Self, message: str) -> Unit:
     tool_capability_require(self.token, "Diagnostics")
     with_eprint("error: " ++ message ++ "\n")
     exit(1)
@@ -1565,7 +1565,7 @@ pub fn Build.__driver_run_action(self: Build, ctx: BuildCtx, action_name: str) -
 pub fn __driver_action_name() -> str:
     with_getenv_str("WITH_BUILD_ACTION_NAME")
 
-pub fn __driver_exit(code: i32) -> void:
+pub fn __driver_exit(code: i32) -> Unit:
     exit(code)
 
 pub fn Build.emit_graph(self: Build) -> str:

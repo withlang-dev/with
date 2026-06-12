@@ -24,10 +24,10 @@
 // Unsupported constructs fail by returning the null sentinel from
 // lowering, rather than escaping through verbatim raw-string nodes.
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn with_str_clone(s: str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
 
 fn ci_ir_owned_text(text: str) -> str:
     if text.len() == 0:
@@ -800,7 +800,7 @@ fn CiModule.new(name: str, source_path: str) -> CiModule:
         imports: Vec.new(),
     }
 
-fn CiModule.add_decl(mut self: CiModule, decl: CiDeclId) -> void:
+fn CiModule.add_decl(mut self: CiModule, decl: CiDeclId) -> Unit:
     self.top_level_decls.push(decl as i32)
 
 fn CiModule.add_import(mut self: CiModule, path: str):

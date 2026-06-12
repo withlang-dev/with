@@ -187,7 +187,7 @@ pub fn StackifyGraph.add_block(mut self: StackifyGraph, desc: str) -> i32:
     self.blocks.push(stackify_empty_block(desc))
     id
 
-pub fn StackifyGraph.add_param(mut self: StackifyGraph, block: i32, value: i32) -> void:
+pub fn StackifyGraph.add_param(mut self: StackifyGraph, block: i32, value: i32) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
     var b = self.blocks.get(block as i64)
@@ -230,7 +230,7 @@ fn stackify_graph_set_succs(mut self: StackifyGraph, block: i32, succs: Vec[i32]
         i = i + 1
     stackify_graph_update_block(self, block, b)
 
-pub fn StackifyGraph.set_br(mut self: StackifyGraph, block: i32, target_block: i32, args: Vec[i32]) -> void:
+pub fn StackifyGraph.set_br(mut self: StackifyGraph, block: i32, target_block: i32, args: Vec[i32]) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
     let target = stackify_graph_add_target(self, target_block, args)
@@ -243,7 +243,7 @@ pub fn StackifyGraph.set_br(mut self: StackifyGraph, block: i32, target_block: i
     succs.push(target_block)
     stackify_graph_set_succs(self, block, succs)
 
-pub fn StackifyGraph.set_cond_br(mut self: StackifyGraph, block: i32, cond: i32, true_block: i32, true_args: Vec[i32], false_block: i32, false_args: Vec[i32]) -> void:
+pub fn StackifyGraph.set_cond_br(mut self: StackifyGraph, block: i32, cond: i32, true_block: i32, true_args: Vec[i32], false_block: i32, false_args: Vec[i32]) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
     let first_target = self.targets.len() as i32
@@ -260,7 +260,7 @@ pub fn StackifyGraph.set_cond_br(mut self: StackifyGraph, block: i32, cond: i32,
     succs.push(false_block)
     stackify_graph_set_succs(self, block, succs)
 
-pub fn StackifyGraph.set_select(mut self: StackifyGraph, block: i32, selector: i32, target_blocks: Vec[i32], default_block: i32) -> void:
+pub fn StackifyGraph.set_select(mut self: StackifyGraph, block: i32, selector: i32, target_blocks: Vec[i32], default_block: i32) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
     let first_target = self.targets.len() as i32
@@ -286,7 +286,7 @@ pub fn StackifyGraph.set_select(mut self: StackifyGraph, block: i32, selector: i
     succs.push(default_block)
     stackify_graph_set_succs(self, block, succs)
 
-pub fn StackifyGraph.set_select_targets(mut self: StackifyGraph, block: i32, selector: i32, targets_start: i32, targets_count: i32, default_target: i32) -> void:
+pub fn StackifyGraph.set_select_targets(mut self: StackifyGraph, block: i32, selector: i32, targets_start: i32, targets_count: i32, default_target: i32) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
     var b = self.blocks.get(block as i64)
@@ -306,7 +306,7 @@ pub fn StackifyGraph.set_select_targets(mut self: StackifyGraph, block: i32, sel
         succs.push(self.targets.get(default_target as i64).block)
     stackify_graph_set_succs(self, block, succs)
 
-pub fn StackifyGraph.set_return(mut self: StackifyGraph, block: i32, values: Vec[i32]) -> void:
+pub fn StackifyGraph.set_return(mut self: StackifyGraph, block: i32, values: Vec[i32]) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
     var b = self.blocks.get(block as i64)
@@ -321,7 +321,7 @@ pub fn StackifyGraph.set_return(mut self: StackifyGraph, block: i32, values: Vec
     let no_succs: Vec[i32] = Vec.new()
     stackify_graph_set_succs(self, block, no_succs)
 
-pub fn StackifyGraph.set_unreachable(mut self: StackifyGraph, block: i32) -> void:
+pub fn StackifyGraph.set_unreachable(mut self: StackifyGraph, block: i32) -> Unit:
     if block < 0 or block >= self.blocks.len() as i32:
         return
     var b = self.blocks.get(block as i64)

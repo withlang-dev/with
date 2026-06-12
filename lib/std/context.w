@@ -11,20 +11,20 @@ pub type CancellationToken: Copy {
 }
 
 pub trait Logger:    fn info(self: &Self, message:
-    str) -> void
-    fn warn(self: &Self, message: str) -> void
-    fn error(self: &Self, message: str) -> void
+    str) -> Unit
+    fn warn(self: &Self, message: str) -> Unit
+    fn error(self: &Self, message: str) -> Unit
 
 pub type NoopLogger {}
 
 impl Logger for NoopLogger:    fn info(self: NoopLogger, message:
-    str) -> void:
+    str) -> Unit:
         let _ = self
         let _ = message
-    fn warn(self: NoopLogger, message: str) -> void:
+    fn warn(self: NoopLogger, message: str) -> Unit:
         let _ = self
         let _ = message
-    fn error(self: NoopLogger, message: str) -> void:
+    fn error(self: NoopLogger, message: str) -> Unit:
         let _ = self
         let _ = message
 

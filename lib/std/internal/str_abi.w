@@ -5,7 +5,7 @@
 // the aggregate, not at the payload.
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
 
 pub unsafe fn str_copy_bytes(s: str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
@@ -16,5 +16,5 @@ pub unsafe fn str_copy_bytes(s: str) -> *mut u8:
     *((out as i64 + s.len()) as *mut u8) = 0
     out
 
-pub unsafe fn str_free_bytes(p: *mut u8) -> void:
+pub unsafe fn str_free_bytes(p: *mut u8) -> Unit:
     with_free(p)

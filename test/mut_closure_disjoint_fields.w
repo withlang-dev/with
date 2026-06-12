@@ -2,14 +2,14 @@
 
 type Point { x: i32, y: i32 }
 
-fn call_mutator(f: fn() -> void):
+fn call_mutator(f: fn() -> Unit):
     f()
 
-fn apply_two(a: fn() -> void, b: fn() -> void):
+fn apply_two(a: fn() -> Unit, b: fn() -> Unit):
     a()
     b()
 
-fn use_ref_and_closure(r: &i32, f: fn() -> void):
+fn use_ref_and_closure(r: &i32, f: fn() -> Unit):
     let _ = *r
     f()
 

@@ -7,11 +7,11 @@
 extern fn with_alloc(size: i64) -> *i8
 extern fn with_alloc_zeroed(count: i64, size: i64) -> *i8
 extern fn with_realloc(ptr: *i8, old_size: i64, new_size: i64) -> *i8
-extern fn with_free(ptr: *i8) -> void
-extern fn with_free_sized(ptr: *i8, size: i64) -> void
-extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> void
-extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> void
-extern fn with_memset(ptr: *i8, c: i32, n: i64) -> void
+extern fn with_free(ptr: *i8) -> Unit
+extern fn with_free_sized(ptr: *i8, size: i64) -> Unit
+extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> Unit
+extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> Unit
+extern fn with_memset(ptr: *i8, c: i32, n: i64) -> Unit
 extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32
 
 /// Allocate `size` bytes on the heap. Returns pointer (0 on failure).
@@ -28,7 +28,7 @@ pub fn realloc_mem(ptr: *i8, new_size: i32) -> *i8:
     with_realloc(ptr, 0, new_size as i64)
 
 /// Free a heap allocation.
-pub fn free_mem(ptr: *i8) -> void:
+pub fn free_mem(ptr: *i8) -> Unit:
     with_free(ptr)
 
 /// Copy `n` bytes from `src` to `dst` (must not overlap).

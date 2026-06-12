@@ -7,7 +7,7 @@ use compiler.foundation.Ids
 use compiler.foundation.Types
 use compiler.foundation.Values
 
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
 extern fn with_alloc(size: i64) -> *mut u8
 
 let FND_INTERN_PAGE_SIZE: i64 = 1048576

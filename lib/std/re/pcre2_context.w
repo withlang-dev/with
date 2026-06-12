@@ -14,7 +14,7 @@ fn pcre2_general_context_copy_8(__param_gcontext: *mut pcre2_real_general_contex
 
 }
 
-fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mut c_void) -> *mut c_void, __param_private_free: *const fn(*mut c_void, *mut c_void) -> void, __param_memory_data: *mut c_void) -> *mut pcre2_real_general_context_8 {
+fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mut c_void) -> *mut c_void, __param_private_free: *const fn(*mut c_void, *mut c_void) -> Unit, __param_memory_data: *mut c_void) -> *mut pcre2_real_general_context_8 {
     var __local_private_malloc = __param_private_malloc
     var __local_private_free = __param_private_free
     var __local_gcontext: *mut pcre2_real_general_context_8
@@ -24,7 +24,7 @@ fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mu
     }
 
     if ((if __local_private_free == null: 1 else: 0) != 0) {
-        (__local_private_free = ((default_free as *mut fn(*mut c_void, *mut c_void) -> void)))
+        (__local_private_free = ((default_free as *mut fn(*mut c_void, *mut c_void) -> Unit)))
     }
 
     (__local_gcontext = ((__local_private_malloc(sizeof[pcre2_real_general_context_8](), __param_memory_data) as *mut pcre2_real_general_context_8)))
@@ -35,7 +35,7 @@ fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mu
 
     ((unsafe *__local_gcontext).memctl.malloc = ((__local_private_malloc as *mut fn(c_ulong, *mut c_void) -> *mut c_void)))
 
-    ((unsafe *__local_gcontext).memctl.free = ((__local_private_free as *mut fn(*mut c_void, *mut c_void) -> void)))
+    ((unsafe *__local_gcontext).memctl.free = ((__local_private_free as *mut fn(*mut c_void, *mut c_void) -> Unit)))
 
     ((unsafe *__local_gcontext).memctl.memory_data = __param_memory_data)
 
@@ -434,7 +434,7 @@ fn pcre2_set_recursion_limit_8(__param_mcontext: *mut pcre2_real_match_context_8
 
 }
 
-fn pcre2_set_recursion_memory_management_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_mymalloc: *const fn(c_ulong, *mut c_void) -> *mut c_void, __param_myfree: *const fn(*mut c_void, *mut c_void) -> void, __param_mydata: *mut c_void) -> c_int {
+fn pcre2_set_recursion_memory_management_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_mymalloc: *const fn(c_ulong, *mut c_void) -> *mut c_void, __param_myfree: *const fn(*mut c_void, *mut c_void) -> Unit, __param_mydata: *mut c_void) -> c_int {
     __param_mcontext
 
     __param_mymalloc
@@ -469,7 +469,7 @@ fn _pcre2_memctl_malloc_8(__param_size: c_ulong, __param_memctl: *mut pcre2_memc
     if ((if __param_memctl == null: 1 else: 0) != 0) {
         ((unsafe *__local_newmemctl).malloc = ((default_malloc as *mut fn(c_ulong, *mut c_void) -> *mut c_void)))
 
-        ((unsafe *__local_newmemctl).free = ((default_free as *mut fn(*mut c_void, *mut c_void) -> void)))
+        ((unsafe *__local_newmemctl).free = ((default_free as *mut fn(*mut c_void, *mut c_void) -> Unit)))
 
         ((unsafe *__local_newmemctl).memory_data = null)
 

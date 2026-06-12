@@ -187,7 +187,7 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
         let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
         runtime_eprint(msg)
 
-fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult) -> void:
+fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult) -> Unit:
     self.module_paths = Vec.new()
     self.module_import_starts = Vec.new()
     self.module_import_counts = Vec.new()
@@ -746,12 +746,12 @@ fn Zcu.c_import_include_decls_frontend(self: Zcu, line: str, decl: i32, header_s
                "extern fn memcmp(p0: *const i8, p1: *const i8, p2: i64) -> i32\n"
     if header_name == "stdlib.h":
         return "extern fn malloc(p0: i64) -> *const i8\n" ++
-               "extern fn free(p0: *const i8) -> void\n" ++
+               "extern fn free(p0: *const i8) -> Unit\n" ++
                "extern fn calloc(p0: i64, p1: i64) -> *const i8\n" ++
                "extern fn realloc(p0: *const i8, p1: i64) -> *const i8\n" ++
                "extern fn atol(p0: *const i8) -> i64\n" ++
                "extern fn rand() -> i32\n" ++
-               "extern fn srand(p0: i32) -> void\n"
+               "extern fn srand(p0: i32) -> Unit\n"
     if header_name == "unistd.h":
         return "extern fn access(p0: *const i8, p1: i32) -> i32\n" ++
                "extern fn rmdir(p0: *const i8) -> i32\n"
@@ -1824,7 +1824,7 @@ type ReorderedTier {
     file_ids: Vec[i32],
 }
 
-fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_paths: HashMap[str, i32], seen_paths: HashMap[str, i32], accum: DepOrderAccum) -> void:
+fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_paths: HashMap[str, i32], seen_paths: HashMap[str, i32], accum: DepOrderAccum) -> Unit:
     if path.len() == 0:
         return
     if seen_paths.contains(path):

@@ -3,7 +3,7 @@
 // No c_import — uses a xorshift64 PRNG seeded from the runtime's
 // cryptographic random source (arc4random_buf on macOS).
 
-extern fn with_fill_random(buf: *mut u8, len: i64) -> void
+extern fn with_fill_random(buf: *mut u8, len: i64) -> Unit
 extern fn with_clock_nanos() -> i64
 
 var rng_state: i64 = 0
@@ -26,13 +26,13 @@ fn xorshift64() -> i64:
     x
 
 /// Seed the random number generator with a specific value (for reproducibility).
-pub fn seed(seed_value: i32) -> void:
+pub fn seed(seed_value: i32) -> Unit:
     rng_state = seed_value as i64
     if rng_state == 0:
         rng_state = 1
 
 /// Seed the random number generator from the current time.
-pub fn seed_now -> void:
+pub fn seed_now -> Unit:
     with_fill_random(&rng_state as *mut u8, 8)
     if rng_state == 0:
         rng_state = with_clock_nanos()

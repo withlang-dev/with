@@ -7,7 +7,7 @@ use InternPool
 use Mir
 use Sema
 use Overflow
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn with_fs_read_file(path: str) -> str
 
 // ── Builder state ────────────────────────────────────────────────
@@ -189,18 +189,18 @@ fn MirBuilder.terminate_with_span(self: MirBuilder, kind: i32, d0: i32, d1: i32,
     self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
     self.mark_no_suspend_terminator()
 
-fn MirBuilder.push_scope(self: MirBuilder) -> void:
+fn MirBuilder.push_scope(self: MirBuilder) -> Unit:
     self.drop_scope_starts.push(self.drop_local_ids.len() as i32)
     self.bind_scope_starts.push(self.bind_syms.len() as i32)
     self.alias_scope_starts.push(self.alias_syms.len() as i32)
     self.defer_scope_starts.push(self.defer_nodes.len() as i32)
     self.errdefer_scope_starts.push(self.errdefer_nodes.len() as i32)
 
-fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32) -> void:
+fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32) -> Unit:
     self.drop_local_ids.push(local_id)
     self.drop_kinds.push(drop_kind)
 
-fn MirBuilder.schedule_with_guard_cleanup(self: MirBuilder, guard_local: i32, payload_local: i32, method_sym: i32, drop_kind: i32) -> void:
+fn MirBuilder.schedule_with_guard_cleanup(self: MirBuilder, guard_local: i32, payload_local: i32, method_sym: i32, drop_kind: i32) -> Unit:
     self.with_cleanup_guard_locals.push(guard_local)
     self.with_cleanup_payload_locals.push(payload_local)
     self.with_cleanup_method_syms.push(method_sym)
@@ -242,8 +242,11 @@ fn MirBuilder.emit_with_guard_cleanup(self: MirBuilder, guard_local: i32, drop_k
         args.push(self.operand_for_place_arg(payload_place, payload_ty, payload_expected, 0))
     let args_id = self.body.new_call_args(args)
     let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void as i32)
+    let cleanup_ret_ty = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else: self.sema.ty_void as i32
+    let cleanup_ret_local = self.new_temp(cleanup_ret_ty)
+    let cleanup_ret_place = self.place_for_local(cleanup_ret_local)
     let next_bb = self.new_block()
-    self.terminate(TermKind.TK_CALL, fn_op, args_id, self.place_for_local(0), next_bb)
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, cleanup_ret_place, next_bb)
     self.switch_to(next_bb)
     if payload_local > 0:
         self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, payload_local, 0, 0)
@@ -255,7 +258,7 @@ fn MirBuilder.drop_kind_owns_value(self: MirBuilder, drop_kind: i32) -> i32:
         return 1
     0
 
-fn MirBuilder.cancel_scheduled_value_drop_for_local(self: MirBuilder, local_id: i32) -> void:
+fn MirBuilder.cancel_scheduled_value_drop_for_local(self: MirBuilder, local_id: i32) -> Unit:
     var i = self.drop_local_ids.len() as i32 - 1
     while i >= 0:
         if self.drop_local_ids.get(i as i64) == local_id and self.drop_kind_owns_value(self.drop_kinds.get(i as i64)) != 0:
@@ -478,7 +481,7 @@ fn MirBuilder.emit_errdefers_for_return(self: MirBuilder):
         let _ = self.lower_expr(errdefer_body)
         i = i - 1
 
-fn MirBuilder.push_control_target(self: MirBuilder, label: i32, target_kind: i32, continue_bb: i32, break_bb: i32, result_place: i32) -> void:
+fn MirBuilder.push_control_target(self: MirBuilder, label: i32, target_kind: i32, continue_bb: i32, break_bb: i32, result_place: i32) -> Unit:
     self.loop_continue_bbs.push(continue_bb)
     self.loop_break_bbs.push(break_bb)
     self.loop_result_places.push(result_place)
@@ -717,11 +720,11 @@ fn MirBuilder.goto_target_info(self: MirBuilder, label: i32) -> LoopInfo:
         break_scope_depth: scope_depth,
     }
 
-fn MirBuilder.bind_local(self: MirBuilder, sym: i32, local_id: i32) -> void:
+fn MirBuilder.bind_local(self: MirBuilder, sym: i32, local_id: i32) -> Unit:
     self.bind_syms.push(sym)
     self.bind_local_ids.push(local_id)
 
-fn MirBuilder.bind_alias_place(self: MirBuilder, sym: i32, place: i32, ty: i32) -> void:
+fn MirBuilder.bind_alias_place(self: MirBuilder, sym: i32, place: i32, ty: i32) -> Unit:
     self.alias_syms.push(sym)
     self.alias_places.push(place)
     self.alias_types.push(ty)
@@ -2079,7 +2082,7 @@ fn MirBuilder.lower_regex_capture_bindings_from_option(self: MirBuilder, regex_n
     let captures_place = self.lower_option_unwrap_place(captures_opt_place, self.regex_captures_option_type(), self.regex_captures_type())
     self.lower_regex_capture_bindings_from_captures(regex_node, captures_place)
 
-fn MirBuilder.remember_regex_pattern_captures(self: MirBuilder, pat_node: i32, captures_opt_place: i32) -> void:
+fn MirBuilder.remember_regex_pattern_captures(self: MirBuilder, pat_node: i32, captures_opt_place: i32) -> Unit:
     for i in 0..self.regex_capture_pat_nodes.len() as i32:
         if self.regex_capture_pat_nodes.get(i as i64) == pat_node:
             self.regex_capture_opt_places.set_i32(i as i64, captures_opt_place)
@@ -9859,7 +9862,7 @@ fn mir_vec_contains_i32(v: &Vec[i32], value: i32) -> bool:
             return true
     false
 
-fn mir_push_unique_i32(v: Vec[i32], value: i32) -> void:
+fn mir_push_unique_i32(v: Vec[i32], value: i32) -> Unit:
     if not mir_vec_contains_i32(&v, value):
         v.push(value)
 

@@ -346,7 +346,7 @@ pub unsafe fn json_parse(parser: *mut JsonParser, js: str, tokens: *mut JsonToke
     let len = js.len() as i32
     json_parse_impl(parser, js, len, tokens, num_tokens)
 
-fn json_panic(msg: str) -> void:
+fn json_panic(msg: str) -> Unit:
     with_panic(msg, "", 0)
 
 fn JsonToken.empty() -> JsonToken:

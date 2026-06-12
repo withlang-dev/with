@@ -12,7 +12,7 @@ impl Copy for BlockId
 
 extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
-extern fn with_write(s: str) -> void
+extern fn with_write(s: str) -> Unit
 
 fn lbrace -> str:
     str_from_byte(123)

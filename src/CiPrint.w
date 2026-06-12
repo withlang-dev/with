@@ -16,8 +16,8 @@
 use CiIR
 use CiMigrate
 
-extern fn with_write(s: str) -> void
-extern fn with_eprint(s: str) -> void
+extern fn with_write(s: str) -> Unit
+extern fn with_eprint(s: str) -> Unit
 
 // ── Helpers ────────────────────────────────────────────────────
 

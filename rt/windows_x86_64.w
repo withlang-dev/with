@@ -11,10 +11,10 @@ extern fn GetCurrentDirectoryW(size: u32, buf: *mut u16) -> u32
 extern fn SetCurrentDirectoryW(path: *const u16) -> i32
 extern fn VirtualAlloc(addr: *mut u8, size: u64, alloc_type: u32, protect: u32) -> *mut u8
 extern fn VirtualFree(addr: *mut u8, size: u64, free_type: u32) -> i32
-extern fn ExitProcess(code: i32) -> void
+extern fn ExitProcess(code: i32) -> Unit
 extern fn QueryPerformanceCounter(value: *mut i64) -> i32
 extern fn QueryPerformanceFrequency(value: *mut i64) -> i32
-extern fn Sleep(ms: u32) -> void
+extern fn Sleep(ms: u32) -> Unit
 extern fn GetCurrentProcessId() -> i32
 extern fn OpenProcess(access: u32, inherit: i32, pid: i32) -> i64
 extern fn TerminateProcess(handle: i64, code: u32) -> i32
@@ -35,7 +35,7 @@ extern fn FindFirstFileW(pattern: *const u16, data: *mut u8) -> i64
 extern fn FindNextFileW(handle: i64, data: *mut u8) -> i32
 extern fn FindClose(handle: i64) -> i32
 extern fn CreateSymbolicLinkW(link_path: *const u16, target: *const u16, flags: u32) -> i8
-extern fn GetSystemInfo(info: *mut u8) -> void
+extern fn GetSystemInfo(info: *mut u8) -> Unit
 extern fn GlobalMemoryStatusEx(info: *mut u8) -> i32
 extern fn GetComputerNameW(buf: *mut u16, size: *mut u32) -> i32
 extern fn SystemFunction036(buf: *mut u8, len: u32) -> i32
@@ -46,8 +46,8 @@ extern fn GetFullPathNameA(path: *const u8, size: u32, buf: *mut u8, file_part: 
 extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn with_str_concat(a: str, b: str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
 
 let INVALID_HANDLE_VALUE: i64 = -1
 let STD_INPUT_HANDLE: i32 = -10
@@ -173,7 +173,7 @@ unsafe fn win_alloc_fd(handle: i64) -> i32:
     let _ = CloseHandle(handle)
     -24
 
-pub unsafe fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> void:
+pub unsafe fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
 
@@ -283,11 +283,11 @@ pub unsafe fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
 pub unsafe fn rt_mmap(size: i64) -> *mut u8:
     VirtualAlloc(0 as *mut u8, size as u64, MEM_COMMIT_RESERVE, PAGE_READWRITE)
 
-pub unsafe fn rt_munmap(ptr: *mut u8, size: i64) -> void:
+pub unsafe fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
     let _ = size
     let _free = VirtualFree(ptr, 0, MEM_RELEASE)
 
-pub unsafe fn rt_exit(code: i32) -> void:
+pub unsafe fn rt_exit(code: i32) -> Unit:
     ExitProcess(code)
 
 pub unsafe fn rt_clock_ns() -> i64:
@@ -337,7 +337,7 @@ pub unsafe fn rt_thread_join(handle: i64) -> i32:
         return win_neg_error()
     0
 
-pub unsafe fn rt_fill_random(buf: *mut u8, len: u64) -> void:
+pub unsafe fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
     if SystemFunction036(buf, len as u32) == 0:
         ExitProcess(1)
 
@@ -360,10 +360,10 @@ pub unsafe fn rt_fiber_fault_addr(info: *const u8) -> i64:
     let _ = info
     0
 
-pub unsafe fn rt_fiber_reset_signal_handler(sig: i32) -> void:
+pub unsafe fn rt_fiber_reset_signal_handler(sig: i32) -> Unit:
     let _ = sig
 
-pub unsafe fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> void:
+pub unsafe fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit:
     let _ = alt_stack
     let _ = alt_stack_size
     let _ = handler
@@ -877,10 +877,10 @@ unsafe fn win_spawn_argv(args: str, stdout_path: str, stderr_path: str, stdin_pa
 pub unsafe fn rt_compat_setenv_str(name: str, value: str) -> i32:
     win_setenv(name, value)
 
-pub unsafe fn rt_compat_install_interrupt_handlers() -> void:
+pub unsafe fn rt_compat_install_interrupt_handlers() -> Unit:
     let _ = 0
 
-pub unsafe fn rt_compat_raise_stack_limit() -> void:
+pub unsafe fn rt_compat_raise_stack_limit() -> Unit:
     let _ = 0
 
 pub unsafe fn rt_compat_interrupt_requested() -> i32:

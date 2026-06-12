@@ -31,7 +31,7 @@ pub fn Arena.init -> Arena:
     })
     a
 
-pub fn Arena.reset(self: Arena) -> void:
+pub fn Arena.reset(self: Arena) -> Unit:
     while self.slots.len() > 1:
         self.slots.pop()
 

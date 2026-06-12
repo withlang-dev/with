@@ -8,14 +8,14 @@
 // Provided here so c_import users don't depend on symbol scoping.
 pub type c_void = opaque
 
-extern fn with_println_str(s: str) -> void
-extern fn with_println_i32(n: i32) -> void
-extern fn with_println_i64(n: i64) -> void
-extern fn with_println_bool(v: bool) -> void
-extern fn with_print_str(s: str) -> void
-extern fn with_eprint(s: str) -> void
-extern fn with_write(s: str) -> void
-extern fn with_ewrite(s: str) -> void
+extern fn with_println_str(s: str) -> Unit
+extern fn with_println_i32(n: i32) -> Unit
+extern fn with_println_i64(n: i64) -> Unit
+extern fn with_println_bool(v: bool) -> Unit
+extern fn with_print_str(s: str) -> Unit
+extern fn with_eprint(s: str) -> Unit
+extern fn with_write(s: str) -> Unit
+extern fn with_ewrite(s: str) -> Unit
 extern fn with_panic(msg: str, file: str, line: i32) -> Never
 extern fn with_i32_to_str(n: i32) -> str
 extern fn with_i64_to_str(n: i64) -> str
@@ -24,62 +24,62 @@ extern fn with_fmt_u64(n: u64) -> str
 extern fn with_bool_to_str(b: bool) -> str
 
 /// Print a string to stdout followed by a newline.
-pub fn print(s: str) -> void:
+pub fn print(s: str) -> Unit:
     with_println_str(s)
 
 /// Print a string to stderr followed by a newline.
-pub fn eprint(s: str) -> void:
+pub fn eprint(s: str) -> Unit:
     with_eprint(s)
 
 /// Write a string to stdout without a trailing newline.
-pub fn write(s: str) -> void:
+pub fn write(s: str) -> Unit:
     with_write(s)
 
 /// Write a string to stderr without a trailing newline.
-pub fn ewrite(s: str) -> void:
+pub fn ewrite(s: str) -> Unit:
     with_ewrite(s)
 
 /// Print an i32 to stdout followed by a newline.
-pub fn print_i32(n: i32) -> void:
+pub fn print_i32(n: i32) -> Unit:
     with_println_i32(n)
 
 /// Print an i64 to stdout followed by a newline.
-pub fn print_i64(n: i64) -> void:
+pub fn print_i64(n: i64) -> Unit:
     with_println_i64(n)
 
 /// Print a bool to stdout followed by a newline.
-pub fn print_bool(v: bool) -> void:
+pub fn print_bool(v: bool) -> Unit:
     with_println_bool(v)
 
 /// Assert that a condition is true. Panics with `msg` if false.
-pub fn assert(cond: bool, msg: str = "assertion failed", loc: str = src()) -> void:
+pub fn assert(cond: bool, msg: str = "assertion failed", loc: str = src()) -> Unit:
     if not cond:
         with_panic(msg, loc, 0)
 
 /// Assert that a condition is true. Panics with `msg` if false.
-pub fn require(cond: bool, msg: str, loc: str = src()) -> void:
+pub fn require(cond: bool, msg: str, loc: str = src()) -> Unit:
     if not cond:
         with_panic(msg, loc, 0)
 
 /// Assert that a condition is true. Panics with `msg` if false.
-pub fn check(cond: bool, msg: str, loc: str = src()) -> void:
+pub fn check(cond: bool, msg: str, loc: str = src()) -> Unit:
     if not cond:
         with_panic(msg, loc, 0)
 
 /// Assert that two values are equal. Panics showing both values if not.
 /// (No location parameter: generic functions cannot yet take default args.)
-pub fn assert_eq[T: Eq + Debug](left: T, right: T) -> void:
+pub fn assert_eq[T: Eq + Debug](left: T, right: T) -> Unit:
     if left != right:
         with_panic(f"assertion failed: {left:?} != {right:?}", "", 0)
 
 /// Assert that two values are not equal. Panics showing both values if they are.
-pub fn assert_ne[T: Eq + Debug](left: T, right: T) -> void:
+pub fn assert_ne[T: Eq + Debug](left: T, right: T) -> Unit:
     if left == right:
         with_panic(f"assertion failed: {left:?} == {right:?}", "", 0)
 
 /// Panic helper invoked by the `assert_matches` desugaring when the value does
 /// not match the expected pattern.
-pub fn assert_matches_failed() -> void:
+pub fn assert_matches_failed() -> Unit:
     with_panic("assertion failed: value did not match the expected pattern", "", 0)
 
 /// Panic immediately with `msg`.
@@ -95,7 +95,7 @@ pub fn unreachable(msg: str = "unreachable", loc: str = src()) -> Never:
     return with_panic(msg, loc, 0)
 
 /// Explicitly drop a value at this point in the current scope.
-pub fn drop[T](val: T) -> void:
+pub fn drop[T](val: T) -> Unit:
     ()
 
 // ── ToString trait and impls ────────────────────────────────────

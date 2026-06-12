@@ -7,7 +7,7 @@ use Diagnostic
 use InternPool
 use render
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 
 // ── Diagnostics ──────────────────────────────────────────────────
 
@@ -92,6 +92,8 @@ fn Sema.unknown_type_message(self: Sema, sym: i32) -> str:
         return "unknown type"
     if name == "string":
         return "unknown type 'string'; use 'str' or 'String'"
+    if name == "void":
+        return "unknown type 'void'; With uses Unit for no value and c_void for C void pointers"
     "unknown type '" ++ name ++ "'"
 
 fn Sema.emit_unknown_type_error(self: Sema, sym: i32, node: i32):
@@ -1185,7 +1187,7 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
     if tk == TypeKind.TY_BOOL:
         return "bool"
     if tk == TypeKind.TY_VOID:
-        return "void"
+        return "Unit"
     if tk == TypeKind.TY_NEVER:
         return "Never"
     if tk == TypeKind.TY_STR:

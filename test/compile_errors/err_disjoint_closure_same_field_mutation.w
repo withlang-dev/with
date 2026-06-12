@@ -5,7 +5,7 @@ type ClosureCaptureWorld {
     velocities: i32,
 }
 
-fn apply_two(a: fn() -> void, b: fn() -> void):
+fn apply_two(a: fn() -> Unit, b: fn() -> Unit):
     a()
     b()
 

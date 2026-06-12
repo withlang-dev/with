@@ -110,6 +110,22 @@ i32 return type. Full `with build`, `with build :fixpoint`,
 lookup failure; the project self-host target passed on rerun before the final
 clean full-suite pass.
 
+#546 is implemented and verified. `Unit` is now the only user-facing unit type:
+the `"void"` primitive registration and fallback lookup were removed, unknown
+source `void` now diagnoses with guidance to use `Unit` or `c_void`, and all
+compiler/runtime/stdlib/test With source annotations were converted to `Unit`.
+C interop keeps `c_void` for C `void*`; `c_import` and C migration translate C
+`void` returns to source `Unit` instead of emitting With `void`. The migration
+printer now keeps explicit `-> Unit` on translated C `void` definitions so
+discard-only C statements cannot become inferred value returns. During this
+cleanup, a native MIR cleanup bug was found and fixed: `with` guard cleanup
+calls now write their Unit result to a fresh temporary instead of overwriting
+the enclosing function return slot on early returns. Focused coverage includes
+Unit/c_void public-surface behavior, rejection of source `void`, and a
+Unit-returning guarded-with early-return regression. Full `with build`,
+`with build :fixpoint`, `with build :test`, and `with build :test-green` passed
+on 2026-06-11 for #546.
+
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
 C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib

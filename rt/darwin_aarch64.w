@@ -24,7 +24,7 @@ extern fn getenv(name: *const u8) -> *const u8
 extern fn sysconf(name: i32) -> i64
 extern fn stat(path: *const u8, buf: *mut u8) -> i32
 extern fn chmod(path: *const u8, mode: i32) -> i32
-extern fn _exit(code: i32) -> void
+extern fn _exit(code: i32) -> Unit
 extern fn mach_absolute_time() -> u64
 extern fn __error() -> *mut i32
 extern fn arc4random_buf(buf: *mut u8, len: u64)
@@ -59,11 +59,11 @@ type RtStatBuf:
 var rt_argc: i32 = 0
 var rt_argv_raw: i64 = 0
 
-pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> void:
+pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
 
-pub fn rt_fill_random(buf: *mut u8, len: u64) -> void:
+pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
     arc4random_buf(buf, len)
 
 pub fn rt_libc_stdin() -> *mut u8:
@@ -104,10 +104,10 @@ fn darwin_zero_sigaction(sig: i32):
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     let _ = sigaction(sig, sa_base as *const u8, 0 as *mut u8)
 
-pub fn rt_fiber_reset_signal_handler(sig: i32) -> void:
+pub fn rt_fiber_reset_signal_handler(sig: i32) -> Unit:
     darwin_zero_sigaction(sig)
 
-pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> void:
+pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit:
     var ss: [24]u8 = [0 as u8; 24]
     let ss_base = (&raw mut ss) as *mut [24]u8 as i64
     darwin_store_i64(ss_base, 0, alt_stack as i64)
@@ -217,12 +217,12 @@ pub fn rt_mmap(size: i64) -> *mut u8:
         return 0 as *mut u8
     p
 
-pub fn rt_munmap(ptr: *mut u8, size: i64) -> void:
+pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
     let _ = munmap(ptr, size as u64)
 
 // ── Process ─────────────────────────────────────────────────────
 
-pub fn rt_exit(code: i32) -> void:
+pub fn rt_exit(code: i32) -> Unit:
     _exit(code)
 
 pub fn rt_args() -> (*const *const u8, i32):
@@ -631,9 +631,9 @@ pub fn rt_getenv(name: *const u8) -> *const u8:
 // ---- Compiler compatibility process/env adapter ----
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
-extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
+extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> Unit
 extern fn setenv(name: *const u8, value: *const u8, overwrite: i32) -> i32
 extern fn sigprocmask(how: i32, set: *const u32, old: *mut u32) -> i32
 extern fn fork() -> i32
@@ -842,7 +842,7 @@ pub fn rt_compat_setenv_str(name: str, value: str) -> i32:
     with_free(value_buf)
     rc
 
-pub fn rt_compat_install_interrupt_handlers() -> void:
+pub fn rt_compat_install_interrupt_handlers() -> Unit:
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, POSIX_SIGACTION_SIZE)
@@ -851,7 +851,7 @@ pub fn rt_compat_install_interrupt_handlers() -> void:
     let _ = sigaction(POSIX_SIGTERM, sa_base as *const u8, 0 as *mut u8)
     let _ = sigaction(POSIX_SIGHUP, sa_base as *const u8, 0 as *mut u8)
 
-pub fn rt_compat_raise_stack_limit() -> void:
+pub fn rt_compat_raise_stack_limit() -> Unit:
     var lim: [16]u8 = [0 as u8; 16]
     let lim_base = (&raw mut lim) as *mut [16]u8 as i64
     if getrlimit(POSIX_RLIMIT_STACK, lim_base as *mut u8) != 0:

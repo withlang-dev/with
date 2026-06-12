@@ -3,8 +3,8 @@
 extern fn with_getenv_str(name: str) -> str
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
-extern fn with_eprint(s: str) -> void
-extern fn exit(code: i32) -> void
+extern fn with_eprint(s: str) -> Unit
+extern fn exit(code: i32) -> Unit
 
 pub enum CompilerHookPhase: i32:
     after_typecheck = 0
@@ -92,7 +92,7 @@ pub fn SourceEmitter.__driver_new(token: str, output_path: str) -> SourceEmitter
     compiler_capability_require(token, "SourceEmitter")
     SourceEmitter { token, output_path }
 
-pub fn Diagnostics.error(self: &Self, location: SourceLocation, message: str) -> void:
+pub fn Diagnostics.error(self: &Self, location: SourceLocation, message: str) -> Unit:
     compiler_capability_require(self.token, "Diagnostics")
     if self.output_path.len() == 0:
         with_eprint("error: Diagnostics.error called without a driver diagnostic output")
@@ -108,7 +108,7 @@ pub fn Diagnostics.error(self: &Self, location: SourceLocation, message: str) ->
         with_eprint("error: failed to write compiler hook diagnostic")
         exit(1)
 
-pub fn SourceEmitter.emit_source(self: &Self, source: str) -> void:
+pub fn SourceEmitter.emit_source(self: &Self, source: str) -> Unit:
     compiler_capability_require(self.token, "SourceEmitter")
     if self.output_path.len() == 0:
         with_eprint("error: SourceEmitter.emit_source called without a driver emitted-source output")

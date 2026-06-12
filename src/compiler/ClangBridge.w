@@ -6,9 +6,9 @@
 
 // ── Runtime helpers (from rt_core.w) ────────────────────────────
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
-extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
+extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> Unit
 extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn rt_close(fd: i32) -> i32
 
@@ -737,7 +737,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
     let canonical = clang_getCanonicalType(ty)
     let kind = canonical.kind
 
-    if kind == CXType_Void: return session_strdup(s, "void\0" as *const u8)
+    if kind == CXType_Void: return session_strdup(s, "Unit\0" as *const u8)
     if kind == CXType_Bool: return session_strdup(s, "bool\0" as *const u8)
     if kind == CXType_Char_S or kind == CXType_SChar: return session_strdup(s, "c_char\0" as *const u8)
     if kind == CXType_Char_U or kind == CXType_UChar: return session_strdup(s, "u8\0" as *const u8)
@@ -923,7 +923,7 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
     let ret_type = clang_getResultType(fn_type)
     var ret_str = translate_type_recursive(s, ret_type, depth + 1, 0)
     if ret_str as i64 == 0:
-        ret_str = session_strdup(s, "void\0" as *const u8)
+        ret_str = session_strdup(s, "Unit\0" as *const u8)
     let num_args = clang_getNumArgTypes(fn_type)
     let is_variadic = if clang_isFunctionTypeVariadic(fn_type) != 0 and fn_type.kind != CXType_FunctionNoProto: 1 else: 0
     var params: [4096]u8 = [0 as u8; 4096]
@@ -1129,7 +1129,7 @@ pub fn with_cimport_clear_include_paths() -> i32:
     g_cimport_include_count = 0
     0
 
-pub fn with_cimport_set_resource_dir(path: str) -> void:
+pub fn with_cimport_set_resource_dir(path: str) -> Unit:
     unsafe:
         resource_dir_resolved = 1
         if path.len() <= 0:
@@ -1221,7 +1221,7 @@ pub fn with_cimport_parse(header_code: str) -> i64:
 
 // ── Dispose ─────────────────────────────────────────────────
 
-pub fn with_cimport_dispose(session: i64) -> void:
+pub fn with_cimport_dispose(session: i64) -> Unit:
     unsafe:
         let s = session as *mut CImportSession
         if s as i64 == 0: return
@@ -2637,7 +2637,7 @@ pub fn with_cimport_macro_is_fn_like(session: i64, idx: i32) -> i32:
         if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return 0
         *(((*ms).fn_like as i64 + idx as i64 * 4) as *const i32)
 
-pub fn with_cimport_dispose_macros(session: i64) -> void:
+pub fn with_cimport_dispose_macros(session: i64) -> Unit:
     unsafe:
         let ms = session as *mut MacroSession
         if ms as i64 == 0: return

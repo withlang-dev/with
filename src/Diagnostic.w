@@ -4,7 +4,7 @@ use Span
 use Source
 use DiagnosticRender
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 
 enum DiagSeverity: i32:
     Error = 1
@@ -64,13 +64,13 @@ fn Diagnostic.warn(message: str, span: Span) -> Diagnostic:
 fn Diagnostic.set_code(mut self: Diagnostic, code: str):
     self.code = code
 
-fn Diagnostic.add_label(mut self: Diagnostic, span: Span, message: str) -> void:
+fn Diagnostic.add_label(mut self: Diagnostic, span: Span, message: str) -> Unit:
     self.labels.push(DiagnosticLabel { span, message })
 
-fn Diagnostic.add_note(mut self: Diagnostic, message: str) -> void:
+fn Diagnostic.add_note(mut self: Diagnostic, message: str) -> Unit:
     self.notes.push(message)
 
-fn Diagnostic.add_help(mut self: Diagnostic, message: str) -> void:
+fn Diagnostic.add_help(mut self: Diagnostic, message: str) -> Unit:
     self.helps.push(message)
 
 fn Diagnostic.render(self: Diagnostic, source: Source):
@@ -112,7 +112,7 @@ fn DiagnosticList.init -> DiagnosticList:
 fn DiagnosticList.deinit(self: DiagnosticList):
     return
 
-fn DiagnosticList.emit(mut self: DiagnosticList, diag: Diagnostic) -> void:
+fn DiagnosticList.emit(mut self: DiagnosticList, diag: Diagnostic) -> Unit:
     self.items.push(diag)
 
 fn DiagnosticList.count(self: DiagnosticList) -> i32:

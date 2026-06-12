@@ -35,7 +35,7 @@ use std.re.pcre2_serialize
 use std.re.pcre2_convert
 use std.re.pcre2_script_run
 
-extern fn with_panic(msg: str, file: str, line: i32) -> void
+extern fn with_panic(msg: str, file: str, line: i32) -> Unit
 extern fn with_str_clone(s: str) -> str
 extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
@@ -111,7 +111,7 @@ pub fn with_regex_code_copy(code: *const i8) -> *const i8:
         return null
     pcre2_code_copy_8(code as *const pcre2_real_code_8) as *const i8
 
-pub fn with_regex_code_free(code: *const i8) -> void:
+pub fn with_regex_code_free(code: *const i8) -> Unit:
     if code as i64 != 0:
         pcre2_code_free_8(code as *mut pcre2_real_code_8)
 

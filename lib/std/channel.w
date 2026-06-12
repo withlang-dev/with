@@ -10,10 +10,10 @@
 // Sender and Receiver enforce directionality at compile time.
 
 extern fn with_channel_create(capacity: i32, elem_size: i32) -> i64
-extern fn with_channel_send(ch: i64, value_ptr: *u8) -> void
+extern fn with_channel_send(ch: i64, value_ptr: *u8) -> Unit
 extern fn with_channel_recv(ch: i64, out_ptr: *mut u8) -> i32
-extern fn with_channel_close(ch: i64) -> void
-extern fn with_channel_destroy(ch: i64) -> void
+extern fn with_channel_close(ch: i64) -> Unit
+extern fn with_channel_destroy(ch: i64) -> Unit
 
 // chan[T](capacity) is a compiler builtin — defined in CodegenDispatch.w.
 // It returns (Sender[T], Receiver[T]).

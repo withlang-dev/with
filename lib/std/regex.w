@@ -10,7 +10,7 @@ extern fn str_from_byte(b: i32) -> str
 extern fn with_regex_error_message(code: i32) -> str
 extern fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
 extern fn with_regex_code_copy(code: *const i8) -> *const i8
-extern fn with_regex_code_free(code: *const i8) -> void
+extern fn with_regex_code_free(code: *const i8) -> Unit
 extern fn with_regex_capture_count(code: *const i8) -> i32
 extern fn with_regex_match_spans_alloc(code: *const i8, text: str, out_count: *mut i32) -> *const i32
 extern fn with_regex_match_spans_alloc_at(code: *const i8, text: str, start_offset: i32, out_count: *mut i32) -> *const i32
@@ -18,7 +18,7 @@ extern fn with_regex_capture_name_count(code: *const i8) -> i32
 extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 extern fn with_regex_group_name_to_index(code: *const i8, name: str) -> i32
 extern fn with_regex_substitute(code: *const i8, text: str, repl: str, replace_all: i32) -> str
-extern fn with_free(ptr: *mut u8) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
 
 const REGEX_FLAG_GLOBAL: i32 = 1
 

@@ -9,8 +9,8 @@ extern fn pcre2_compile_8(pattern: *const u8, patlen: u64, options: u32, errorpt
 extern fn pcre2_match_8(code: *const pcre2_real_code_8, subject: *const u8, length: u64, start_offset: u64, options: u32, match_data: *mut pcre2_real_match_data_8, mcontext: *mut pcre2_real_match_context_8) -> i32
 extern fn pcre2_match_data_create_from_pattern_8(code: *const pcre2_real_code_8, gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8
 extern fn pcre2_get_ovector_pointer_8(match_data: *mut pcre2_real_match_data_8) -> *mut u64
-extern fn pcre2_code_free_8(code: *mut pcre2_real_code_8) -> void
-extern fn pcre2_match_data_free_8(match_data: *mut pcre2_real_match_data_8) -> void
+extern fn pcre2_code_free_8(code: *mut pcre2_real_code_8) -> Unit
+extern fn pcre2_match_data_free_8(match_data: *mut pcre2_real_match_data_8) -> Unit
 
 fn main():
     let pattern = "hello, (\\w+)!"

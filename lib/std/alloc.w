@@ -28,10 +28,10 @@ pub fn arena_alloc_zeroed(arena: Arena, count: i32, size: i32) -> *i8:
     let _ = arena
     alloc_zeroed(count, size)
 
-pub fn arena_free(arena: Arena, ptr: *i8) -> void:
+pub fn arena_free(arena: Arena, ptr: *i8) -> Unit:
     free_mem(ptr)
 
-pub fn arena_reset(arena: Arena) -> void:
+pub fn arena_reset(arena: Arena) -> Unit:
     free_mem(alloc(if arena.block_size > 0: arena.block_size else: 1))
 
 pub fn scratch_arena() -> TempArena:
@@ -47,13 +47,13 @@ pub fn TempArena.alloc_zeroed(mut self: TempArena, count: i32, size: i32) -> *i8
     self.allocations.push(ptr as i64)
     ptr
 
-pub fn TempArena.reset(mut self: TempArena) -> void:
+pub fn TempArena.reset(mut self: TempArena) -> Unit:
     for raw in self.allocations:
         if raw != 0:
             free_mem(raw as *i8)
     self.allocations = Vec.new()
 
-pub fn TempArena.drop(mut self: TempArena) -> void:
+pub fn TempArena.drop(mut self: TempArena) -> Unit:
     self.reset()
 
 pub fn pool_new(item_size: i32, capacity: i32) -> Pool:
@@ -62,5 +62,5 @@ pub fn pool_new(item_size: i32, capacity: i32) -> Pool:
 pub fn pool_alloc(pool: Pool) -> *i8:
     alloc(if pool.item_size > 0: pool.item_size else: 1)
 
-pub fn pool_free(pool: Pool, ptr: *i8) -> void:
+pub fn pool_free(pool: Pool, ptr: *i8) -> Unit:
     free_mem(ptr)

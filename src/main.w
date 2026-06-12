@@ -47,8 +47,8 @@ extern fn with_str_byte_at(s: str, index: i64) -> i32
 extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_contains(s: str, needle: str) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
-extern fn with_eprint(s: str) -> void
-extern fn with_ewrite(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
+extern fn with_ewrite(s: str) -> Unit
 extern fn with_exec_argv(args: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
@@ -64,11 +64,11 @@ extern fn with_clock_nanos() -> i64
 extern fn with_getpid() -> i32
 extern fn with_process_alive(pid: i32) -> i32
 extern fn with_fs_mkdir(path: str) -> i32
-extern fn with_write(s: str) -> void
+extern fn with_write(s: str) -> Unit
 extern fn with_read_line_stdin() -> str
-extern fn exit(code: i32) -> void
-extern fn with_install_interrupt_handlers() -> void
-extern fn with_raise_stack_limit() -> void
+extern fn exit(code: i32) -> Unit
+extern fn with_install_interrupt_handlers() -> Unit
+extern fn with_raise_stack_limit() -> Unit
 extern fn with_sysinfo_os() -> str
 
 enum PreludeMode: i32:
@@ -759,7 +759,7 @@ fn run_cli(argc: i32) -> i32:
     print_usage()
     1
 
-fn main -> void:
+fn main -> Unit:
     with_raise_stack_limit()
     with_install_interrupt_handlers()
     let argc = with_arg_count()

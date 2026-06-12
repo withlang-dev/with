@@ -9,7 +9,7 @@
 use Span
 use Token
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn with_alloc(size: i64) -> *mut u8
 
 // ── Node kinds ───────────────────────────────────────────────────
@@ -1058,7 +1058,7 @@ fn AstPool.get_end(self: AstPool, idx: NodeId) -> i32:
 fn AstPool.node_count(self: AstPool) -> i32:
     self.state.kinds.len() as i32
 
-fn AstPool.add_decl(self: AstPool, node_idx: NodeId) -> void:
+fn AstPool.add_decl(self: AstPool, node_idx: NodeId) -> Unit:
     if self.state.frozen != 0:
         with_eprint("BUG: AstPool.add_decl called after freeze")
     self.state.decls.push(node_idx as i32)
@@ -1323,7 +1323,7 @@ fn AstPool.find_impl_trait_type_args(self: AstPool, impl_node: NodeId) -> i32:
 fn AstPool.fn_param_patterns_len(self: AstPool) -> i32:
     self.state.fn_param_patterns.len() as i32
 
-fn AstPool.add_fn_param_pattern_value(self: AstPool, node: NodeId) -> void:
+fn AstPool.add_fn_param_pattern_value(self: AstPool, node: NodeId) -> Unit:
     self.state.fn_param_patterns.push(node as i32)
 
 fn AstPool.fn_param_pattern_value(self: AstPool, idx: i32) -> NodeId:

@@ -4,8 +4,8 @@
 // signal, and stack-limit behavior lives in the platform runtime backend.
 
 extern fn rt_compat_setenv_str(name: str, value: str) -> i32
-extern fn rt_compat_install_interrupt_handlers() -> void
-extern fn rt_compat_raise_stack_limit() -> void
+extern fn rt_compat_install_interrupt_handlers() -> Unit
+extern fn rt_compat_raise_stack_limit() -> Unit
 extern fn rt_compat_interrupt_requested() -> i32
 extern fn rt_compat_exec_binary(path: str) -> i32
 extern fn rt_compat_exec_argv(args: str) -> i32
@@ -19,10 +19,10 @@ extern fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32
 pub fn with_setenv_str(name: str, value: str) -> i32:
     rt_compat_setenv_str(name, value)
 
-pub fn with_install_interrupt_handlers() -> void:
+pub fn with_install_interrupt_handlers() -> Unit:
     rt_compat_install_interrupt_handlers()
 
-pub fn with_raise_stack_limit() -> void:
+pub fn with_raise_stack_limit() -> Unit:
     rt_compat_raise_stack_limit()
 
 pub fn with_interrupt_requested() -> i32:

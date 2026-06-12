@@ -19,7 +19,7 @@
 // No c_import — uses with_* runtime functions.
 
 use std.collections
-extern fn with_lines_out(out: *void, s: str) -> void
+extern fn with_lines_out(out: *mut c_void, s: str) -> Unit
 extern fn with_parse_i64(s: str) -> i64
 extern fn with_str_len(s: str) -> i64
 extern fn with_str_eq(a: str, b: str) -> i32
@@ -45,18 +45,18 @@ pub fn StringBuilder.with_capacity(capacity: i64) -> Self:
     StringBuilder { bytes: Vec[u8].with_capacity(cap) }
 
 /// Append raw UTF-8 bytes from a string.
-pub fn StringBuilder.push_str(mut self: Self, s: str) -> void:
+pub fn StringBuilder.push_str(mut self: Self, s: str) -> Unit:
     for i in 0..s.len():
         self.bytes.push(s.byte_at(i) as u8)
     return
 
 /// Append one byte.
-pub fn StringBuilder.push_byte(mut self: Self, b: u8) -> void:
+pub fn StringBuilder.push_byte(mut self: Self, b: u8) -> Unit:
     self.bytes.push(b)
     return
 
 /// Append one byte from an integer code point.
-pub fn StringBuilder.push_char(mut self: Self, b: i32) -> void:
+pub fn StringBuilder.push_char(mut self: Self, b: i32) -> Unit:
     self.bytes.push(b as u8)
     return
 
@@ -160,7 +160,7 @@ pub fn string_to_int(s: str) -> i64:
 /// Split text into lines. Returns a Vec of strings, one per line.
 pub fn lines(s: str) -> Vec[str]:
     var out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_lines_out((&raw mut out) as *void, s)
+    with_lines_out((&raw mut out) as *mut c_void, s)
     out
 
 /// Parse a string as an i32 integer.

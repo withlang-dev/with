@@ -1,7 +1,7 @@
 // Compiler runtime boundary. Raw runtime exports are declared here; compiler
 // modules should depend on these typed wrappers instead of redeclaring externs.
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn with_exec_binary(path: str) -> i32
 extern fn with_exec_argv(args: str) -> i32
 extern fn with_exec_argv_cwd(args: str, cwd: str) -> i32
@@ -26,7 +26,7 @@ extern fn with_nanosleep(ns: i64) -> i32
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
-pub fn runtime_eprint(s: str) -> void:
+pub fn runtime_eprint(s: str) -> Unit:
     with_eprint(s)
 
 pub fn runtime_exec_binary(path: str) -> i32:

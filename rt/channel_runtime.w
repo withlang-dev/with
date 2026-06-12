@@ -5,13 +5,13 @@
 // native compiler runtime and embedded runtime payload.
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
-extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> void
-extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> Unit
+extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> Unit
 extern fn with_fiber_in_fiber() -> i32
-extern fn with_fiber_yield() -> void
+extern fn with_fiber_yield() -> Unit
 extern fn with_runtime_has_fibers() -> i32
-extern fn with_runtime_run_one_step() -> void
+extern fn with_runtime_run_one_step() -> Unit
 
 let CHAN_INITIAL_CAPACITY: i32 = 16
 
@@ -111,7 +111,7 @@ pub fn with_channel_create(capacity: i32, elem_size: i32) -> i64:
     chan_set_i32(ch as i64, CHAN_OFF_BOUNDED_CAPACITY, if capacity > 0: capacity else: 0)
     ch as i64
 
-pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8) -> void:
+pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8) -> Unit:
     if ch_handle == 0:
         return
     let buffer = chan_buffer(ch_handle)
@@ -178,12 +178,12 @@ pub fn with_channel_try_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     chan_set_i32(ch_handle, CHAN_OFF_COUNT, chan_field_i32(ch_handle, CHAN_OFF_COUNT) - 1)
     1
 
-pub fn with_channel_close(ch_handle: i64) -> void:
+pub fn with_channel_close(ch_handle: i64) -> Unit:
     if ch_handle == 0:
         return
     chan_set_i32(ch_handle, CHAN_OFF_CLOSED, 1)
 
-pub fn with_channel_destroy(ch_handle: i64) -> void:
+pub fn with_channel_destroy(ch_handle: i64) -> Unit:
     if ch_handle == 0:
         return
     let buffer = chan_buffer(ch_handle)

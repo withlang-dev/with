@@ -4,23 +4,23 @@
 // ABI declarations instead of c_import so the runtime stays self-contained.
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
-extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> void
-extern fn abort() -> void
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
+extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> Unit
+extern fn abort() -> Unit
 extern fn rt_mmap(size: i64) -> *mut u8
-extern fn rt_munmap(ptr: *mut u8, size: i64) -> void
+extern fn rt_munmap(ptr: *mut u8, size: i64) -> Unit
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
-extern fn rt_exit(code: i32) -> void
+extern fn rt_exit(code: i32) -> Unit
 extern fn rt_raise(sig: i32) -> i32
 extern fn rt_fiber_page_size() -> i64
 extern fn rt_fiber_mmap_flags() -> i32
-extern fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> void
-extern fn rt_fiber_reset_signal_handler(sig: i32) -> void
+extern fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit
+extern fn rt_fiber_reset_signal_handler(sig: i32) -> Unit
 extern fn rt_fiber_fault_addr(info: *const u8) -> i64
 
-extern fn with_fiber_switch(save: *mut u8, restore: *mut u8) -> void
-extern fn with_fiber_prepare_initial_context(ctx: *mut u8, stack: *mut u8, stack_size: i64) -> void
+extern fn with_fiber_switch(save: *mut u8, restore: *mut u8) -> Unit
+extern fn with_fiber_prepare_initial_context(ctx: *mut u8, stack: *mut u8, stack_size: i64) -> Unit
 
 let MAX_FIBERS: i32 = 1024
 let FIBER_STACK_SIZE: i64 = 65536
@@ -449,7 +449,7 @@ fn fiber_write_i32(fd: i32, n: i32):
         let _ = rt_write(fd, (&buf as i64 + j as i64) as *const u8, 1)
         j = j - 1
 
-pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8) -> void:
+pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8) -> Unit:
     let _ = ucontext
     let fault_addr = rt_fiber_fault_addr(info)
     if current_fiber != 0:
@@ -470,7 +470,7 @@ pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *m
 fn fiber_install_signal_handlers():
     rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_stack_overflow_handler as i64)
 
-pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64) -> void:
+pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64) -> Unit:
     if current_fiber == 0:
         *entry_out = 0
         *arg_out = 0
@@ -480,7 +480,7 @@ pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, 
     *arg_out = fiber_arg_ptr(current_fiber)
     *result_out = fiber_result_buf(current_fiber) as i64
 
-pub fn with_fiber_bootstrap_finish() -> void:
+pub fn with_fiber_bootstrap_finish() -> Unit:
     if current_fiber == 0:
         abort()
     fiber_set_state(current_fiber, FIBER_STATE_DONE)
@@ -510,7 +510,7 @@ pub fn with_runtime_current_cancel_requested() -> i32:
         return 0
     if fiber_cancel_requested(current_fiber) != 0: 1 else: 0
 
-pub fn with_runtime_core_init() -> void:
+pub fn with_runtime_core_init() -> Unit:
     current_fiber = 0
     fiber_page_size = guard_page_size()
     fiber_pool_reuse_count = 0
@@ -596,7 +596,7 @@ pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, 
         enqueue(f)
     return fiber_id
 
-pub fn with_fiber_yield() -> void:
+pub fn with_fiber_yield() -> Unit:
     if current_fiber == 0:
         return
     fiber_set_state(current_fiber, FIBER_STATE_SUSPENDED)
@@ -655,11 +655,11 @@ pub fn with_runtime_request_cancel(fiber_id: i32) -> i32:
     fiber_set_cancel_requested(f, 1)
     1
 
-pub fn with_fiber_set_result(value: i64) -> void:
+pub fn with_fiber_set_result(value: i64) -> Unit:
     if current_fiber != 0:
         store_i64(current_fiber, FIBER_OFF_RESULT, value)
 
-pub fn with_runtime_current_set_cancelled_return() -> void:
+pub fn with_runtime_current_set_cancelled_return() -> Unit:
     if current_fiber != 0:
         fiber_set_cancelled_return_flag(current_fiber, 1)
 
@@ -669,11 +669,11 @@ pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
         return 0
     fiber_cancelled_return(f)
 
-pub fn with_runtime_current_set_cancel_requested() -> void:
+pub fn with_runtime_current_set_cancel_requested() -> Unit:
     if current_fiber != 0:
         fiber_set_cancel_requested(current_fiber, 1)
 
-pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> void:
+pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit:
     if current_fiber == 0:
         return
     fiber_set_has_panic(current_fiber, 1)
@@ -691,7 +691,7 @@ pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> void:
     with_fiber_switch(current_fiber as *mut u8, scheduler_ctx_ptr())
     abort()
 
-pub fn with_runtime_core_shutdown() -> void:
+pub fn with_runtime_core_shutdown() -> Unit:
     var i = 0
     while i < MAX_FIBERS:
         let f = load_i64_index(fibers_by_slot_base(), i)
@@ -711,7 +711,7 @@ pub fn with_runtime_core_shutdown() -> void:
 pub fn with_runtime_core_has_fibers() -> i32:
     if ready_queue_count > 0 or steal_queue_count > 0: 1 else: 0
 
-pub fn with_runtime_core_run_one_step() -> void:
+pub fn with_runtime_core_run_one_step() -> Unit:
     if ready_queue_count > 0 or steal_queue_count > 0:
         run_one_fiber()
 

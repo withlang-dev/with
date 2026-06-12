@@ -20,7 +20,7 @@ impl Matrix:
             return self.a10
         self.a11
 
-    fn set_at(mut self: Self, row: i64, col: i64, value: i32) -> void:
+    fn set_at(mut self: Self, row: i64, col: i64, value: i32) -> Unit:
         if row == 0 and col == 0:
             self.a00 = value
             return
@@ -42,7 +42,7 @@ impl Matrix:
         assert(col.has_start)
         self.at(row.start, col.start)
 
-    fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, value: i32) -> void:
+    fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, value: i32) -> Unit:
         assert(count == 2)
         let row = specs[0]
         let col = specs[1]

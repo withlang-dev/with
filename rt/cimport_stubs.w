@@ -16,7 +16,7 @@ fn str_c() -> str: "c"
     let _ = h
     0
 
-@[weak] pub fn with_cimport_dispose(s: i64) -> void:
+@[weak] pub fn with_cimport_dispose(s: i64) -> Unit:
     let _ = s
 
 @[weak] pub fn with_cimport_error(s: i64) -> str:
@@ -420,17 +420,17 @@ fn str_c() -> str: "c"
     let _ = i
     0
 
-@[weak] pub fn with_cimport_dispose_macros(s: i64) -> void:
+@[weak] pub fn with_cimport_dispose_macros(s: i64) -> Unit:
     let _ = s
 
 @[weak] pub fn with_cimport_is_name_emitted(n: str) -> i32:
     let _ = n
     0
 
-@[weak] pub fn with_cimport_mark_name_emitted(n: str) -> void:
+@[weak] pub fn with_cimport_mark_name_emitted(n: str) -> Unit:
     let _ = n
 
-@[weak] pub fn with_cimport_reset_names() -> void:
+@[weak] pub fn with_cimport_reset_names() -> Unit:
     let _ = 0
 
 @[weak] pub fn with_cimport_struct_field_is_bitfield(s: i64, i: i32, f: i32) -> i32:
@@ -567,10 +567,10 @@ fn str_c() -> str: "c"
     let _ = i
     str_c()
 
-@[weak] pub fn with_cimport_add_include_path(path: str) -> void:
+@[weak] pub fn with_cimport_add_include_path(path: str) -> Unit:
     let _ = path
 
-@[weak] pub fn with_cimport_clear_include_paths() -> void:
+@[weak] pub fn with_cimport_clear_include_paths() -> Unit:
     let _ = 0
 
 @[weak] pub fn with_cimport_typedef_anon_record_field_count(s: i64, i: i32) -> i32:

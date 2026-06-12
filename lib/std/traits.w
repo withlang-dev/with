@@ -36,7 +36,7 @@ pub trait Clone:    fn clone(self:
 
 /// Destructor. Called automatically when a value goes out of scope.
 pub trait Drop:
-    fn drop(self) -> void
+    fn drop(self) -> Unit
 
 /// Iterator protocol. Call `.next()` to advance the iterator and return
 /// `Option[T]` — `Some(val)` or `None`. The receiver is `mut self: Self`
@@ -60,12 +60,12 @@ pub trait Contains[T]:    fn contains(self: &Self, value:
 /// Scoped read access protocol used by guarded `with` blocks.
 pub trait Scoped[T]:    fn with_enter(self:
     &Self) -> T
-    fn with_exit(self: &Self) -> void
+    fn with_exit(self: &Self) -> Unit
 
 /// Scoped mutable access protocol used by guarded `with ... as mut`.
 pub trait ScopedMut[T]:    fn with_enter_mut(self:
     &Self) -> T
-    fn with_exit_mut(mut self: Self, value: T) -> void
+    fn with_exit_mut(mut self: Self, value: T) -> Unit
 
 // IntoIter for Vec — enables `for x in vec.iter()` via trait dispatch.
 // docs/mut.md Rev 8 §15.8 — `@[iter_of_self]` registers a SHARED borrow on

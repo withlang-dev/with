@@ -55,7 +55,7 @@ pub fn p7_prepare_case(name: str, package_name: str) -> str:
     assert(write_file(p7_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n") == 0)
     case_dir
 
-pub fn p7_write(case_dir: str, rel_path: str, contents: str) -> void:
+pub fn p7_write(case_dir: str, rel_path: str, contents: str) -> Unit:
     let full = p7_join(case_dir, rel_path)
     let dir = p7_dirname(full)
     assert(mkdir_p(dir) == 0)
@@ -94,17 +94,17 @@ pub fn p7_build_target_args(target: str) -> str:
 pub fn p7_build_target_no_deps_args(target: str) -> str:
     p7_argv_append(p7_argv_append(p7_argv_append("", "build"), target), "--no-deps")
 
-pub fn p7_assert_success(result: P7Run, label: str) -> void:
+pub fn p7_assert_success(result: P7Run, label: str) -> Unit:
     if result.rc != 0:
         print("stdout:\n" ++ result.stdout)
         print("stderr:\n" ++ result.stderr)
     assert(result.rc == 0)
 
-pub fn p7_assert_failure_contains(result: P7Run, needle: str, label: str) -> void:
+pub fn p7_assert_failure_contains(result: P7Run, needle: str, label: str) -> Unit:
     let _ = label
     assert(result.rc != 0)
     assert(result.stderr.contains(needle) or result.stdout.contains(needle))
 
-pub fn p7_assert_file_contains(case_dir: str, rel_path: str, needle: str) -> void:
+pub fn p7_assert_file_contains(case_dir: str, rel_path: str, needle: str) -> Unit:
     let text = read_file(p7_join(case_dir, rel_path))
     assert(text.contains(needle))

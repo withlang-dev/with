@@ -98,7 +98,7 @@ extern fn with_ctzll(x: i64) -> i32
 extern fn with_abs(x: i32) -> i32
 extern fn with_alloc(size: i64) -> *i8
 extern fn with_realloc(ptr: *i8, old_size: i64, new_size: i64) -> *i8
-extern fn with_free(ptr: *i8) -> void
+extern fn with_free(ptr: *i8) -> Unit
 extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> *i8
 extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> *i8
 extern fn with_memset(ptr: *i8, c: i32, n: i64) -> *i8
@@ -143,15 +143,15 @@ extern fn pcre2_config_8(p0: c_uint, p1: *mut c_void) -> c_int
 
 extern fn pcre2_general_context_copy_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_general_context_8
 
-extern fn pcre2_general_context_create_8(p0: *const fn(c_ulong, *mut c_void) -> *mut c_void, p1: *const fn(*mut c_void, *mut c_void) -> void, p2: *mut c_void) -> *mut pcre2_real_general_context_8
+extern fn pcre2_general_context_create_8(p0: *const fn(c_ulong, *mut c_void) -> *mut c_void, p1: *const fn(*mut c_void, *mut c_void) -> Unit, p2: *mut c_void) -> *mut pcre2_real_general_context_8
 
-extern fn pcre2_general_context_free_8(p0: *mut pcre2_real_general_context_8) -> void
+extern fn pcre2_general_context_free_8(p0: *mut pcre2_real_general_context_8) -> Unit
 
 extern fn pcre2_compile_context_copy_8(p0: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_compile_context_8
 
 extern fn pcre2_compile_context_create_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_compile_context_8
 
-extern fn pcre2_compile_context_free_8(p0: *mut pcre2_real_compile_context_8) -> void
+extern fn pcre2_compile_context_free_8(p0: *mut pcre2_real_compile_context_8) -> Unit
 
 extern fn pcre2_set_bsr_8(p0: *mut pcre2_real_compile_context_8, p1: c_uint) -> c_int
 
@@ -177,7 +177,7 @@ extern fn pcre2_convert_context_copy_8(p0: *mut pcre2_real_convert_context_8) ->
 
 extern fn pcre2_convert_context_create_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_convert_context_8
 
-extern fn pcre2_convert_context_free_8(p0: *mut pcre2_real_convert_context_8) -> void
+extern fn pcre2_convert_context_free_8(p0: *mut pcre2_real_convert_context_8) -> Unit
 
 extern fn pcre2_set_glob_escape_8(p0: *mut pcre2_real_convert_context_8, p1: c_uint) -> c_int
 
@@ -185,13 +185,13 @@ extern fn pcre2_set_glob_separator_8(p0: *mut pcre2_real_convert_context_8, p1: 
 
 extern fn pcre2_pattern_convert_8(p0: *const u8, p1: c_ulong, p2: c_uint, p3: *mut *mut u8, p4: *mut c_ulong, p5: *mut pcre2_real_convert_context_8) -> c_int
 
-extern fn pcre2_converted_pattern_free_8(p0: *mut u8) -> void
+extern fn pcre2_converted_pattern_free_8(p0: *mut u8) -> Unit
 
 extern fn pcre2_match_context_copy_8(p0: *mut pcre2_real_match_context_8) -> *mut pcre2_real_match_context_8
 
 extern fn pcre2_match_context_create_8(p0: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_context_8
 
-extern fn pcre2_match_context_free_8(p0: *mut pcre2_real_match_context_8) -> void
+extern fn pcre2_match_context_free_8(p0: *mut pcre2_real_match_context_8) -> Unit
 
 extern fn pcre2_set_callout_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int, p2: *mut c_void) -> c_int
 
@@ -209,11 +209,11 @@ extern fn pcre2_set_offset_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_ul
 
 extern fn pcre2_set_recursion_limit_8(p0: *mut pcre2_real_match_context_8, p1: c_uint) -> c_int
 
-extern fn pcre2_set_recursion_memory_management_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(c_ulong, *mut c_void) -> *mut c_void, p2: *const fn(*mut c_void, *mut c_void) -> void, p3: *mut c_void) -> c_int
+extern fn pcre2_set_recursion_memory_management_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(c_ulong, *mut c_void) -> *mut c_void, p2: *const fn(*mut c_void, *mut c_void) -> Unit, p3: *mut c_void) -> c_int
 
 extern fn pcre2_compile_8(p0: *const u8, p1: c_ulong, p2: c_uint, p3: *mut c_int, p4: *mut c_ulong, p5: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8
 
-extern fn pcre2_code_free_8(p0: *mut pcre2_real_code_8) -> void
+extern fn pcre2_code_free_8(p0: *mut pcre2_real_code_8) -> Unit
 
 extern fn pcre2_code_copy_8(p0: *const pcre2_real_code_8) -> *mut pcre2_real_code_8
 
@@ -227,7 +227,7 @@ extern fn pcre2_match_data_create_8(p0: c_uint, p1: *mut pcre2_real_general_cont
 
 extern fn pcre2_match_data_create_from_pattern_8(p0: *const pcre2_real_code_8, p1: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8
 
-extern fn pcre2_match_data_free_8(p0: *mut pcre2_real_match_data_8) -> void
+extern fn pcre2_match_data_free_8(p0: *mut pcre2_real_match_data_8) -> Unit
 
 extern fn pcre2_dfa_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8, p7: *mut c_int, p8: c_ulong) -> c_int
 
@@ -251,7 +251,7 @@ extern fn pcre2_substring_copy_byname_8(p0: *mut pcre2_real_match_data_8, p1: *c
 
 extern fn pcre2_substring_copy_bynumber_8(p0: *mut pcre2_real_match_data_8, p1: c_uint, p2: *mut u8, p3: *mut c_ulong) -> c_int
 
-extern fn pcre2_substring_free_8(p0: *mut u8) -> void
+extern fn pcre2_substring_free_8(p0: *mut u8) -> Unit
 
 extern fn pcre2_substring_get_byname_8(p0: *mut pcre2_real_match_data_8, p1: *const u8, p2: *mut *mut u8, p3: *mut c_ulong) -> c_int
 
@@ -265,7 +265,7 @@ extern fn pcre2_substring_nametable_scan_8(p0: *const pcre2_real_code_8, p1: *co
 
 extern fn pcre2_substring_number_from_name_8(p0: *const pcre2_real_code_8, p1: *const u8) -> c_int
 
-extern fn pcre2_substring_list_free_8(p0: *mut *mut u8) -> void
+extern fn pcre2_substring_list_free_8(p0: *mut *mut u8) -> Unit
 
 extern fn pcre2_substring_list_get_8(p0: *mut pcre2_real_match_data_8, p1: *mut *mut *mut u8, p2: *mut *mut c_ulong) -> c_int
 
@@ -275,7 +275,7 @@ extern fn pcre2_serialize_decode_8(p0: *mut *mut pcre2_real_code_8, p1: c_int, p
 
 extern fn pcre2_serialize_get_number_of_codes_8(p0: *const u8) -> c_int
 
-extern fn pcre2_serialize_free_8(p0: *mut u8) -> void
+extern fn pcre2_serialize_free_8(p0: *mut u8) -> Unit
 
 extern fn pcre2_substitute_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8, p7: *const u8, p8: c_ulong, p9: *mut u8, p10: *mut c_ulong) -> c_int
 
@@ -283,19 +283,19 @@ extern fn pcre2_jit_compile_8(p0: *mut pcre2_real_code_8, p1: c_uint) -> c_int
 
 extern fn pcre2_jit_match_8(p0: *const pcre2_real_code_8, p1: *const u8, p2: c_ulong, p3: c_ulong, p4: c_uint, p5: *mut pcre2_real_match_data_8, p6: *mut pcre2_real_match_context_8) -> c_int
 
-extern fn pcre2_jit_free_unused_memory_8(p0: *mut pcre2_real_general_context_8) -> void
+extern fn pcre2_jit_free_unused_memory_8(p0: *mut pcre2_real_general_context_8) -> Unit
 
 extern fn pcre2_jit_stack_create_8(p0: c_ulong, p1: c_ulong, p2: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8
 
-extern fn pcre2_jit_stack_assign_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, p2: *mut c_void) -> void
+extern fn pcre2_jit_stack_assign_8(p0: *mut pcre2_real_match_context_8, p1: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, p2: *mut c_void) -> Unit
 
-extern fn pcre2_jit_stack_free_8(p0: *mut pcre2_real_jit_stack_8) -> void
+extern fn pcre2_jit_stack_free_8(p0: *mut pcre2_real_jit_stack_8) -> Unit
 
 extern fn pcre2_get_error_message_8(p0: c_int, p1: *mut u8, p2: c_ulong) -> c_int
 
 extern fn pcre2_maketables_8(p0: *mut pcre2_real_general_context_8) -> *const u8
 
-extern fn pcre2_maketables_free_8(p0: *mut pcre2_real_general_context_8, p1: *const u8) -> void
+extern fn pcre2_maketables_free_8(p0: *mut pcre2_real_general_context_8, p1: *const u8) -> Unit
 
 let ucp_C: c_uint = 0
 let ucp_L: c_uint = 1
@@ -808,7 +808,7 @@ let OP_DEFINE: c_uint = 170
 let OP_NOT_UCP_WORD_BOUNDARY: c_uint = 171
 let OP_UCP_WORD_BOUNDARY: c_uint = 172
 let OP_TABLE_LENGTH: c_uint = 173
-type pcre2_memctl { malloc: *const fn(c_ulong, *mut c_void) -> *mut c_void = null, free: *const fn(*mut c_void, *mut c_void) -> void = null, memory_data: *mut c_void = null }
+type pcre2_memctl { malloc: *const fn(c_ulong, *mut c_void) -> *mut c_void = null, free: *const fn(*mut c_void, *mut c_void) -> Unit = null, memory_data: *mut c_void = null }
 
 type open_capitem { next: *mut open_capitem = null, number: c_ushort = 0, assert_depth: c_ushort = 0 }
 
@@ -874,9 +874,9 @@ extern fn _pcre2_find_bracket_8(p0: *const u8, p1: c_int, p2: c_int) -> *const u
 
 extern fn _pcre2_is_newline_8(p0: *const u8, p1: c_uint, p2: *const u8, p3: *mut c_uint, p4: c_int) -> c_int
 
-extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> void
+extern fn _pcre2_jit_free_rodata_8(p0: *mut c_void, p1: *mut c_void) -> Unit
 
-extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> void
+extern fn _pcre2_jit_free_8(p0: *mut c_void, p1: *mut pcre2_memctl) -> Unit
 
 extern fn _pcre2_jit_get_size_8(p0: *mut c_void) -> c_ulong
 
@@ -2700,7 +2700,7 @@ let ERR119: c_uint = 219
 let ERR120: c_uint = 220
 type eclass_op_info { code_start: *mut u8 = null, length: c_ulong = 0, op_single_type: u8 = 0, bits: class_bits_storage }
 
-extern fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __param_negated: c_int, __param_classbits: *mut u8) -> void
+extern fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __param_negated: c_int, __param_classbits: *mut u8) -> Unit
 
 extern fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: c_uint, __param_start_ptr: *mut c_uint, __param_pcode: *mut *mut u8, __param_negate_class: c_int, __param_has_bitmap: *mut c_int, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> *mut c_uint
 
@@ -3191,7 +3191,7 @@ extern fn pcre2_regexec(p0: *const regex_t, p1: *const i8, p2: c_ulong, p3: *mut
 
 extern fn pcre2_regerror(p0: c_int, p1: *const regex_t, p2: *mut i8, p3: c_ulong) -> c_ulong
 
-extern fn pcre2_regfree(p0: *mut regex_t) -> void
+extern fn pcre2_regfree(p0: *mut regex_t) -> Unit
 
 type static_assertion_OP_names = [1]c_int
 

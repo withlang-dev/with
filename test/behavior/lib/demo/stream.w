@@ -61,7 +61,7 @@ fn run_relu(bindings: Bindings):
 pub fn stream_create(device: Device) -> Stream:
     device + 1
 
-pub fn stream_destroy(stream: Stream) -> void:
+pub fn stream_destroy(stream: Stream) -> Unit:
     let _ = stream
 
 pub fn dispatch(stream: Stream, prog: Program, bindings: Bindings) -> Result[Event, DemoError]:
@@ -80,7 +80,7 @@ pub fn event_is_done(event: Event) -> bool:
         return false
     unsafe (*event_rec(event)).done
 
-pub fn event_destroy(event: Event) -> void:
+pub fn event_destroy(event: Event) -> Unit:
     if event == 0:
         return
     let _ = unsafe { realloc(event as *mut c_void, 0usize) }

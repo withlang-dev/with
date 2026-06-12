@@ -8,10 +8,10 @@
 use compiler.foundation.Types
 use compiler.foundation.Values
 
-extern fn with_hashmap_new_at(base: &i8, offset: i64, key_size: i64, val_size: i64) -> void
+extern fn with_hashmap_new_at(base: &i8, offset: i64, key_size: i64, val_size: i64) -> Unit
 extern fn with_getenv_str(name: str) -> str
-extern fn with_eprint(s: str) -> void
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
+extern fn with_eprint(s: str) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
 extern fn with_alloc(size: i64) -> *mut u8
 
 fn intern_debug_init_enabled() -> i32:

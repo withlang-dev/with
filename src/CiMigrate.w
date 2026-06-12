@@ -11,8 +11,8 @@ use CiIR
 use CiPrint
 use CImport
 
-extern fn with_write_stdout(s: str) -> void
-extern fn with_flush_stdout() -> void
+extern fn with_write_stdout(s: str) -> Unit
+extern fn with_flush_stdout() -> Unit
 extern fn with_fs_list_files(path: str) -> str
 
 // Width-slice mode: when > 0, skip declarations belonging to
@@ -21,7 +21,7 @@ extern fn with_fs_list_files(path: str) -> str
 // are pruned. Set via migrate_set_width_slice().
 var g_migrate_width_slice: i32 = 0
 
-pub fn migrate_set_width_slice(val: i32) -> void:
+pub fn migrate_set_width_slice(val: i32) -> Unit:
     g_migrate_width_slice = val
 
 // Check whether a C declaration name belongs to a width family
@@ -85,22 +85,22 @@ fn ci_migrate_text_is_blank(text: str) -> bool:
         i = i + 1
     true
 
-pub fn migrate_set_shared_defs(prefix: str) -> void:
+pub fn migrate_set_shared_defs(prefix: str) -> Unit:
     g_migrate_shared_defs_prefix = prefix
 
-pub fn migrate_set_directory_one_basename(basename: str) -> void:
+pub fn migrate_set_directory_one_basename(basename: str) -> Unit:
     g_migrate_directory_one_basename = basename
 
-pub fn migrate_set_shared_fragment_path(path: str) -> void:
+pub fn migrate_set_shared_fragment_path(path: str) -> Unit:
     g_migrate_shared_fragment_path = path
 
-pub fn migrate_add_include_path(path: str) -> void:
+pub fn migrate_add_include_path(path: str) -> Unit:
     g_migrate_include_paths.push(path)
 
-pub fn migrate_add_forced_include(path: str) -> void:
+pub fn migrate_add_forced_include(path: str) -> Unit:
     g_migrate_forced_includes.push(path)
 
-pub fn migrate_reset_options() -> void:
+pub fn migrate_reset_options() -> Unit:
     g_migrate_width_slice = 0
     g_migrate_shared_defs_prefix = ""
     ci_migrate_shared_defs_reset()
@@ -515,7 +515,7 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn with_abs(x: i32) -> i32\n"
     p = p ++ "extern fn with_alloc(size: i64) -> *i8\n"
     p = p ++ "extern fn with_realloc(ptr: *i8, old_size: i64, new_size: i64) -> *i8\n"
-    p = p ++ "extern fn with_free(ptr: *i8) -> void\n"
+    p = p ++ "extern fn with_free(ptr: *i8) -> Unit\n"
     p = p ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> *i8\n"
     p = p ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> *i8\n"
     p = p ++ "extern fn with_memset(ptr: *i8, c: i32, n: i64) -> *i8\n"
@@ -523,7 +523,7 @@ fn ci_migrate_preamble_text() -> str:
     p
 
 // ── Migrate entry points (moved from CImport.w in D3) ─────────
-pub fn migrate_add_define(define: str) -> void:
+pub fn migrate_add_define(define: str) -> Unit:
     // define is "NAME=VALUE" or just "NAME"
     if ci_str_contains(define, "="):
         let eq_pos = ci_find_substr(define, "=")
@@ -1327,8 +1327,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     let body = ci_try_translate_fn_body(session, idx)
     if body.len() > 0:
         g_migrate_fn_translated = g_migrate_fn_translated + 1
-        let ret_suffix = if ret == "void": "" else: " -> " ++ ret
-        let body_for_emit = if ret == "void" and ci_migrate_text_is_blank(body): "    return\n" else: body
+        let ret_suffix = " -> " ++ ret
+        let body_for_emit = if ret == "Unit" and ci_migrate_text_is_blank(body): "    return\n" else: body
         let fn_keyword = if ci_migrate_extern_fn_call_requires_unsafe(safe_name): "unsafe fn " else: "fn "
         if migrate_prefer_brace():
             return export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body_for_emit ++ "}\n\n"
@@ -1676,7 +1676,7 @@ var g_migrate_file_error: str = ""
 // Set via migrate_set_no_c_export().
 var g_migrate_no_c_export: i32 = 0
 
-pub fn migrate_set_no_c_export(val: i32) -> void:
+pub fn migrate_set_no_c_export(val: i32) -> Unit:
     g_migrate_no_c_export = val
 
 // Keep local-definition behavior for globals while preserving C ABI symbols
@@ -1684,14 +1684,14 @@ pub fn migrate_set_no_c_export(val: i32) -> void:
 // that are compiled as std modules but still expose C-compatible entrypoints.
 var g_migrate_export_function_defs: i32 = 0
 
-pub fn migrate_set_export_function_defs(val: i32) -> void:
+pub fn migrate_set_export_function_defs(val: i32) -> Unit:
     g_migrate_export_function_defs = val
 
 // Block style preference for migrated output.
 // 0 = colon-form (default), 2 = brace-form (--prefer-brace).
 var g_migrate_block_style: i32 = 0
 
-pub fn migrate_set_block_style(val: i32) -> void:
+pub fn migrate_set_block_style(val: i32) -> Unit:
     g_migrate_block_style = val
 
 pub fn migrate_prefer_brace() -> bool:
@@ -1699,7 +1699,7 @@ pub fn migrate_prefer_brace() -> bool:
 
 var g_migrate_convert_goto_to_structured: i32 = 0
 
-pub fn migrate_set_convert_goto_to_structured(val: i32) -> void:
+pub fn migrate_set_convert_goto_to_structured(val: i32) -> Unit:
     g_migrate_convert_goto_to_structured = val
 
 pub fn migrate_convert_goto_to_structured() -> bool:

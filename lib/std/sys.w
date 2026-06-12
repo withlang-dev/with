@@ -7,7 +7,7 @@
 extern fn with_sysinfo(out: *mut u8) -> i32
 extern fn with_clock_nanos() -> i64
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
 
 type SysInfo {
     cpu_cores: i32,

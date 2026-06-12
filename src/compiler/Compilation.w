@@ -22,7 +22,7 @@ use compiler.Runtime
 use Overflow
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> void
+extern fn with_free(ptr: *mut u8) -> Unit
 
 fn profile_enabled() -> bool:
     runtime_getenv("WITH_PROFILE").len() > 0
@@ -408,7 +408,7 @@ fn Compilation.set_tool_mode_entry_path(self: Compilation, path: str):
     zcu.tool_mode_entry_path = path
     self.zcu = zcu
 
-fn Compilation.add_cli_diag_mapping(self: Compilation, gen_start: i32, gen_end: i32, source_name: str, source_text: str) -> void:
+fn Compilation.add_cli_diag_mapping(self: Compilation, gen_start: i32, gen_end: i32, source_name: str, source_text: str) -> Unit:
     self.cli_diag_gen_starts.push(gen_start)
     self.cli_diag_gen_ends.push(gen_end)
     self.cli_diag_source_names.push(source_name)

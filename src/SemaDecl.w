@@ -8,7 +8,7 @@ use InternPool
 use CapabilityRegistry
 use render
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn with_str_eq(a: str, b: str) -> i32
 
 // ── Pass 1: Declaration collection ───────────────────────────────
@@ -1588,7 +1588,7 @@ fn Sema.warn_large_copy_type(self: Sema, type_name: i32, type_tid: i32, node: i3
         let name = self.pool_resolve(type_name)
         self.emit_warning(f"large Copy type '{name}' is {size} bytes; implicit copies may be expensive (copy_warn_threshold={threshold})", node)
 
-fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> void:
+fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> Unit:
     let type_name = self.ast.get_data0(node)
     let trait_sym = self.ast.get_data2(node)
     if trait_sym == 0:
@@ -2261,7 +2261,6 @@ fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
     if with_str_eq(name, "f32") != 0: return self.ty_f32 as i32
     if with_str_eq(name, "f64") != 0: return self.ty_f64 as i32
     if with_str_eq(name, "bool") != 0: return self.ty_bool as i32
-    if with_str_eq(name, "void") != 0: return self.ty_void as i32
     if with_str_eq(name, "Unit") != 0: return self.ty_void as i32
     if with_str_eq(name, "Never") != 0: return self.ty_never as i32
     if with_str_eq(name, "str") != 0: return self.ty_str as i32

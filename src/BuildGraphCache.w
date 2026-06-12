@@ -305,7 +305,7 @@ fn build_cache_test_success_manifest(root: str, target: BuildGraphTarget, test_f
         text = text ++ "file:" ++ path ++ "\n"
     text
 
-pub fn build_cache_record_test_success(root: str, target: BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> void:
+pub fn build_cache_record_test_success(root: str, target: BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> Unit:
     let state_dir = build_cache_state_dir(root)
     let _mkdir = build_graph_rt_mkdir_p(state_dir)
     let marker_path = build_cache_test_success_path(root, target.name)
@@ -465,7 +465,7 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
             return false
     true
 
-pub fn build_cache_record(root: str, target: BuildGraphTarget, discovered_deps: Vec[str], effects: Vec[str]) -> void:
+pub fn build_cache_record(root: str, target: BuildGraphTarget, discovered_deps: Vec[str], effects: Vec[str]) -> Unit:
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)
@@ -503,7 +503,7 @@ pub fn build_cache_record(root: str, target: BuildGraphTarget, discovered_deps: 
         content = content ++ f"out:{path}:{hash}\n"
     let _ = build_graph_rt_write_file(state_path, content)
 
-pub fn build_cache_record_build_effects(root: str, effects: Vec[str]) -> void:
+pub fn build_cache_record_build_effects(root: str, effects: Vec[str]) -> Unit:
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)
     let effects_text = build_cache_effects_text(effects)

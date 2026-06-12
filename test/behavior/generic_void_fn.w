@@ -1,4 +1,4 @@
-// Regression for #319: void-returning generic functions monomorphize as void.
+// Regression for #319: Unit-returning generic functions monomorphize as void.
 
 fn sink[T](x: T):
     let _ = x

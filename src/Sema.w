@@ -14,8 +14,8 @@ use render
 use Overflow
 use compiler.TrackedInputs
 
-extern fn with_write(s: str) -> void
-extern fn with_eprint(s: str) -> void
+extern fn with_write(s: str) -> Unit
+extern fn with_eprint(s: str) -> Unit
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_str_clone(s: str) -> str
@@ -1342,7 +1342,6 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("f32", s.ty_f32)
     s.register_prim("f64", s.ty_f64)
     s.register_prim("bool", s.ty_bool)
-    s.register_prim("void", s.ty_void)
     s.register_prim("Unit", s.ty_void)
     s.register_prim("Never", s.ty_never)
     s.register_prim("str", s.ty_str)
@@ -1381,10 +1380,10 @@ fn Sema.register_prim(mut self: Sema, name: str, tid: i32):
     let sym = self.pool_intern(name)
     self.record_named_type(sym, tid)
 
-fn Sema.record_named_type(mut self: Sema, sym: i32, tid: i32) -> void:
+fn Sema.record_named_type(mut self: Sema, sym: i32, tid: i32) -> Unit:
     self.record_named_type_with_pub(sym, tid, 1)
 
-fn Sema.record_named_type_with_pub(mut self: Sema, sym: i32, tid: i32, is_pub: i32) -> void:
+fn Sema.record_named_type_with_pub(mut self: Sema, sym: i32, tid: i32, is_pub: i32) -> Unit:
     self.named_types.insert(sym, tid)
     self.named_type_candidate_syms.push(sym)
     self.named_type_candidate_tids.push(tid)
@@ -1392,7 +1391,7 @@ fn Sema.record_named_type_with_pub(mut self: Sema, sym: i32, tid: i32, is_pub: i
     self.named_type_candidate_paths.push(sema_owned_text(path))
     self.named_type_candidate_pub.push(is_pub)
 
-fn Sema.record_decl_visibility(self: Sema, sym: i32, node: i32, is_pub: i32) -> void:
+fn Sema.record_decl_visibility(self: Sema, sym: i32, node: i32, is_pub: i32) -> Unit:
     if sym == 0:
         return
     self.decl_visibility_syms.push(sym)
@@ -1469,7 +1468,7 @@ fn Sema.private_symbol_path_from_current(self: Sema, sym: i32) -> str:
         i = i - 1
     ""
 
-fn Sema.emit_private_symbol_error(self: Sema, sym: i32, node: i32) -> void:
+fn Sema.emit_private_symbol_error(self: Sema, sym: i32, node: i32) -> Unit:
     let name = self.pool_resolve(sym)
     let path = self.private_symbol_path_from_current(sym)
     if path.len() > 0:
@@ -2608,7 +2607,7 @@ fn Sema.pointer_pointees_compatible(self: Sema, exp_r: i32, act_r: i32) -> i32:
 
 // ── Scope management ─────────────────────────────────────────────
 
-fn Sema.push_scope(self: Sema) -> void:
+fn Sema.push_scope(self: Sema) -> Unit:
     self.scope_starts.push(self.bind_names.len() as i32)
 
 fn Sema.emit_pending_generic_binding_error(self: Sema, sym: i32):

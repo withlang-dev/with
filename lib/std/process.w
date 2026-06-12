@@ -12,8 +12,8 @@ extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
-extern fn with_vec_new_out(v: *void, elem_size: i64) -> void
-extern fn with_vec_push_str(v: *void, val: str) -> void
+extern fn with_vec_new_out(v: *mut c_void, elem_size: i64) -> Unit
+extern fn with_vec_push_str(v: *mut c_void, val: str) -> Unit
 extern fn with_str_len(s: str) -> i64
 
 /// Exit the process with the given status code.
@@ -28,10 +28,10 @@ pub fn pid -> i32:
 pub fn args -> Vec[str]:
     let n = with_arg_count()
     let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out(&out, 16)
+    with_vec_new_out((&raw mut out) as *mut c_void, 16)
     var i = 0
     while i < n:
-        with_vec_push_str(&out, with_arg_at(i))
+        with_vec_push_str((&raw mut out) as *mut c_void, with_arg_at(i))
         i = i + 1
     out
 

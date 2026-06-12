@@ -5,7 +5,7 @@ use std.tls
 use std.net
 use std.internal.str_abi
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn with_i32_to_str(n: i32) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 

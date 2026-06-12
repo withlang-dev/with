@@ -22,8 +22,8 @@ extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_getpid() -> i32
 extern fn with_clock_nanos() -> i64
-extern fn with_write(s: str) -> void
-extern fn with_eprint(s: str) -> void
+extern fn with_write(s: str) -> Unit
+extern fn with_eprint(s: str) -> Unit
 extern fn wl_assemble_to_object(source_path: str, output_path: str) -> i32
 extern fn wl_compile_ir_to_object(source_path: str, output_path: str) -> i32
 
@@ -99,8 +99,8 @@ pub fn build_graph_rt_getpid() -> i32:
 pub fn build_graph_rt_clock_nanos() -> i64:
     with_clock_nanos()
 
-pub fn build_graph_rt_write(s: str) -> void:
+pub fn build_graph_rt_write(s: str) -> Unit:
     with_write(s)
 
-pub fn build_graph_rt_eprint(s: str) -> void:
+pub fn build_graph_rt_eprint(s: str) -> Unit:
     with_eprint(s)

@@ -2,7 +2,7 @@
 
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn str_from_byte(b: i32) -> str
 
 fn ar_u32_le(v: i32) -> str:

@@ -6,11 +6,11 @@ type ClosureCaptureWorld {
     sprites: i32,
 }
 
-fn apply_two(a: fn() -> void, b: fn() -> void):
+fn apply_two(a: fn() -> Unit, b: fn() -> Unit):
     a()
     b()
 
-fn write_then_read(writer: fn() -> void, reader: fn() -> i32) -> i32:
+fn write_then_read(writer: fn() -> Unit, reader: fn() -> i32) -> i32:
     writer()
     reader()
 

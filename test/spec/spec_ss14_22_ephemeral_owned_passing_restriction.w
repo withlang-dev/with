@@ -1,6 +1,6 @@
 //! check-only
 
-extern fn inspect_task(task: &Task[i32]) -> void
+extern fn inspect_task(task: &Task[i32]) -> Unit
 
 async fn process(value: &i32) -> i32:
     *value

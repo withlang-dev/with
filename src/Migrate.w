@@ -4,7 +4,7 @@
 // requires file system traversal and language-specific parsing.
 // Direct port of bootstrap/src/Migrate.zig to With.
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 
 enum MigrateLang: i32:
     Rust = 0

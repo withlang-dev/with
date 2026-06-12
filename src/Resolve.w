@@ -12,7 +12,7 @@ use Span
 use compiler.EmbeddedStdlib
 
 extern fn with_fs_read_file(path: str) -> str
-extern fn with_write(s: str) -> void
+extern fn with_write(s: str) -> Unit
 
 enum ImportKind: i32:
     IK_USE = 1
@@ -365,7 +365,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
         let fn_def = pending_fn_defs.get(fi as i64)
         self.resolve_fn_body(pool, module_id, module_scope, fn_node, fn_def, walk_bodies)
 
-fn ResolveState.record_link_lib(self: ResolveState, lib_sym: i32) -> void:
+fn ResolveState.record_link_lib(self: ResolveState, lib_sym: i32) -> Unit:
     if lib_sym <= 0:
         return
     if self.link_lib_set.contains(lib_sym):

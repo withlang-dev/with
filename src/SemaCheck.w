@@ -12,13 +12,13 @@ use InternPool
 use TypeLayout
 use render
 
-extern fn with_write(s: str) -> void
-extern fn with_eprint(s: str) -> void
+extern fn with_write(s: str) -> Unit
+extern fn with_eprint(s: str) -> Unit
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn str_from_byte(b: i32) -> str
 extern fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
 extern fn with_regex_error_message(code: i32) -> str
-extern fn with_regex_code_free(code: *const i8) -> void
+extern fn with_regex_code_free(code: *const i8) -> Unit
 extern fn with_regex_capture_count(code: *const i8) -> i32
 extern fn with_regex_capture_name_count(code: *const i8) -> i32
 extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
@@ -1018,7 +1018,7 @@ fn Sema.restore_label_registry(self: Sema, state: LabelRegistryState):
     self.fn_label_next_scope_id = state.next_scope_id
     self.fn_label_order_counter = state.order_counter
 
-fn Sema.reset_label_registry(self: Sema) -> void:
+fn Sema.reset_label_registry(self: Sema) -> Unit:
     self.fn_label_syms = Vec.new()
     self.fn_label_nodes = Vec.new()
     self.fn_label_paths = Vec.new()
@@ -1051,7 +1051,7 @@ fn sema_label_path_is_prefix(prefix: str, path: str) -> bool:
         return false
     path.slice(0, prefix.len()) == prefix
 
-fn Sema.label_registry_enter_scope(self: Sema) -> void:
+fn Sema.label_registry_enter_scope(self: Sema) -> Unit:
     self.fn_label_next_scope_id = self.fn_label_next_scope_id + 1
     self.fn_label_scope_stack.push(self.fn_label_next_scope_id)
 
@@ -1070,7 +1070,7 @@ fn Sema.mark_function_label_used(self: Sema, sym: i32):
     if idx >= 0:
         self.fn_label_used.set_i32(idx as i64, 1)
 
-fn Sema.register_function_label(self: Sema, sym: i32, node: i32, order: i32) -> void:
+fn Sema.register_function_label(self: Sema, sym: i32, node: i32, order: i32) -> Unit:
     if sym == 0:
         return
     let existing = self.find_function_label(sym)
@@ -1083,13 +1083,13 @@ fn Sema.register_function_label(self: Sema, sym: i32, node: i32, order: i32) -> 
     self.fn_label_orders.push(order)
     self.fn_label_used.push(0)
 
-fn Sema.register_goto_site(self: Sema, sym: i32, node: i32, order: i32) -> void:
+fn Sema.register_goto_site(self: Sema, sym: i32, node: i32, order: i32) -> Unit:
     self.fn_goto_syms.push(sym)
     self.fn_goto_nodes.push(node)
     self.fn_goto_paths.push(self.label_registry_path())
     self.fn_goto_orders.push(order)
 
-fn Sema.register_init_barrier(self: Sema, node: i32, order: i32) -> void:
+fn Sema.register_init_barrier(self: Sema, node: i32, order: i32) -> Unit:
     self.fn_init_nodes.push(node)
     self.fn_init_paths.push(self.label_registry_path())
     self.fn_init_orders.push(order)
@@ -1313,13 +1313,13 @@ fn Sema.emit_unused_label_warnings(self: Sema):
         diag.set_code("unused-label")
         self.diags.emit(diag)
 
-fn Sema.push_label_boundary(self: Sema) -> void:
+fn Sema.push_label_boundary(self: Sema) -> Unit:
     self.label_syms.push(0)
     self.label_kinds.push(LabelFrameKind.LFK_BOUNDARY)
     self.label_nodes.push(0)
     self.label_break_value_types.push(0)
 
-fn Sema.push_label_frame(self: Sema, sym: i32, kind: i32, node: i32) -> void:
+fn Sema.push_label_frame(self: Sema, sym: i32, kind: i32, node: i32) -> Unit:
     if sym != 0:
         var i = self.label_syms.len() as i32 - 1
         while i >= 0:
@@ -5221,7 +5221,7 @@ fn Sema.check_comptime_method_restriction(self: Sema, method_sym: i32, node: i32
         return 1
     0
 
-fn Sema.push_unique_i32(self: Sema, xs: Vec[i32], value: i32) -> void:
+fn Sema.push_unique_i32(self: Sema, xs: Vec[i32], value: i32) -> Unit:
     if value == 0:
         return
     for i in 0..xs.len() as i32:
@@ -9267,7 +9267,7 @@ fn Sema.try_mark_value_pattern(self: Sema, node: i32, subject_type: i32, value_s
     self.pattern_value_syms.insert(node, value_sym)
     1
 
-fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i32, arg_types: Vec[i32], arg_count: i32, param_offset: i32) -> void:
+fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i32, arg_types: Vec[i32], arg_count: i32, param_offset: i32) -> Unit:
     if not self.fn_decl_nodes.contains(fn_sym):
         return
     let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
@@ -9386,7 +9386,7 @@ fn Sema.lookup_generic_subst(self: Sema, param_sym: i32) -> i32:
         i = i - 1
     0
 
-fn Sema.put_generic_subst(self: Sema, param_sym: i32, tid: i32, node: i32) -> void:
+fn Sema.put_generic_subst(self: Sema, param_sym: i32, tid: i32, node: i32) -> Unit:
     if tid == 0:
         return
     let existing = self.lookup_generic_subst(param_sym)
@@ -12416,7 +12416,7 @@ fn Sema.are_borrows_disjoint(self: Sema, new_field: i32, existing_field: i32) ->
         return 1
     0
 
-fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: i32) -> void:
+fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: i32) -> Unit:
     let place = self.borrow_root_place(operand_node)
     if place == 0:
         return
@@ -12523,7 +12523,7 @@ fn Sema.check_mutation_against_views(self: Sema, place_node: i32, err_node: i32)
 
 // Register a borrow with pre-computed place/kind/field/path.
 // Used by closure capture registration.
-fn Sema.check_borrow_create_direct(self: Sema, place: i32, kind: i32, field: i32, path_start: i32, path_count: i32, err_node: i32) -> void:
+fn Sema.check_borrow_create_direct(self: Sema, place: i32, kind: i32, field: i32, path_start: i32, path_count: i32, err_node: i32) -> Unit:
     var i = 0
     while i < self.borrow_kinds.len() as i32:
         let existing_place = self.borrow_places.get(i as i64)

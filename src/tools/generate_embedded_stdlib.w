@@ -2,8 +2,8 @@ extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
-extern fn with_eprint(s: str) -> void
-extern fn exit(code: i32) -> void
+extern fn with_eprint(s: str) -> Unit
+extern fn exit(code: i32) -> Unit
 
 fn contains_delimiter(text: str, hashes: str) -> bool:
     let needle = "\"" ++ hashes
@@ -53,10 +53,10 @@ fn embedded_rel_path(root: str, path: str) -> str:
         return path.slice(4, path.len())
     path
 
-fn usage() -> void:
+fn usage() -> Unit:
     with_eprint("usage: generate_embedded_stdlib <repo-root> <output-file> <stdlib-files...>")
 
-fn main -> void:
+fn main -> Unit:
     let argc = with_arg_count()
     if argc < 4:
         usage()

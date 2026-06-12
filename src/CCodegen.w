@@ -3737,7 +3737,7 @@ fn CCodegen.method_infer_active(self: CCodegen, method_sym: i32, args_id: i32, d
         return 1
     0
 
-fn CCodegen.method_infer_push(self: CCodegen, method_sym: i32, args_id: i32, dest_place: i32) -> void:
+fn CCodegen.method_infer_push(self: CCodegen, method_sym: i32, args_id: i32, dest_place: i32) -> Unit:
     self.active_method_syms.push(method_sym)
     self.active_method_args.push(args_id)
     self.active_method_dests.push(dest_place)
@@ -3758,7 +3758,7 @@ fn CCodegen.direct_infer_active(self: CCodegen, args_id: i32, dest_place: i32) -
         return 1
     0
 
-fn CCodegen.direct_infer_push(self: CCodegen, args_id: i32, dest_place: i32) -> void:
+fn CCodegen.direct_infer_push(self: CCodegen, args_id: i32, dest_place: i32) -> Unit:
     self.active_direct_args.push(args_id)
     self.active_direct_dests.push(dest_place)
 
@@ -3777,7 +3777,7 @@ fn CCodegen.call_infer_cache_lookup(self: CCodegen, kind: str, body_fn_sym: i32,
         return cached.unwrap()
     -1234567
 
-fn CCodegen.call_infer_cache_store(self: CCodegen, kind: str, body_fn_sym: i32, callee_sym: i32, args_id: i32, dest_place: i32, value: i32) -> void:
+fn CCodegen.call_infer_cache_store(self: CCodegen, kind: str, body_fn_sym: i32, callee_sym: i32, args_id: i32, dest_place: i32, value: i32) -> Unit:
     self.call_infer_cache.insert(cc_call_infer_cache_key(kind, body_fn_sym, callee_sym, args_id, dest_place), value)
 
 fn CCodegen.field_cache_lookup(self: CCodegen, struct_tid: i32, field_sym: i32) -> i32:
@@ -3789,7 +3789,7 @@ fn CCodegen.field_cache_lookup(self: CCodegen, struct_tid: i32, field_sym: i32) 
         return self.field_cache_tids.get(i as i64)
     -1234567
 
-fn CCodegen.field_cache_store(self: CCodegen, struct_tid: i32, field_sym: i32, tid: i32) -> void:
+fn CCodegen.field_cache_store(self: CCodegen, struct_tid: i32, field_sym: i32, tid: i32) -> Unit:
     self.field_cache_struct_tids.push(struct_tid)
     self.field_cache_syms.push(field_sym)
     self.field_cache_tids.push(tid)

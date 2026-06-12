@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-extern fn with_runtime_run_one_step() -> void
+extern fn with_runtime_run_one_step() -> Unit
 
 async fn value(n: i32) -> i32:
     n

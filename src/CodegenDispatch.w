@@ -7,7 +7,7 @@ use Diagnostic
 use Source
 use Overflow
 
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 
 // ── gen_function_dispatch: MIR-first, AST fallback for unsupported patterns ──
 
@@ -3276,7 +3276,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
 
     wl_get_undef(fallback_ty)
 
-fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym: i32) -> void:
+fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym: i32) -> Unit:
     if ptr == 0 or ty == 0:
         return
     if wl_get_type_kind(ty) != wl_struct_type_kind():
@@ -3301,7 +3301,7 @@ fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym:
         self.mir_emit_drop_ptr(field_ptr, field_ty)
         fi = fi - 1
 
-fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> void:
+fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> Unit:
     if ptr == 0 or ty == 0:
         return
 
@@ -12986,10 +12986,10 @@ fn Codegen.get_runtime_fn_type(self: Codegen, name: str, ret_ty: i64, param_coun
             params.push(i64_ty)
     wl_function_type(ret_ty, vec_data_i64(&params), param_count, 0)
 
-fn Codegen.emit_runtime_panic(self: Codegen, msg: str) -> void:
+fn Codegen.emit_runtime_panic(self: Codegen, msg: str) -> Unit:
     self.emit_runtime_panic_value(self.gen_string_literal_raw(msg), self.gen_string_literal_raw(""))
 
-fn Codegen.emit_runtime_panic_value(self: Codegen, msg: i64, loc: i64) -> void:
+fn Codegen.emit_runtime_panic_value(self: Codegen, msg: i64, loc: i64) -> Unit:
     let panic_fn = self.ensure_c_fn("with_panic", wl_void_type(self.context), 3)
     let panic_ty = self.get_runtime_fn_type("with_panic", wl_void_type(self.context), 3)
     let args: Vec[i64] = Vec.new()
@@ -13236,7 +13236,7 @@ fn Codegen.generate_async_trampoline(self: Codegen, fn_sym: i32, callee: i64, ca
         ret_ty = actual_ret_opt.unwrap() as i64
     let param_count = arg_types.len() as i32
 
-    // Trampoline signature: void(i8* env, i8* result_buf)
+    // Trampoline signature: Unit(i8* env, i8* result_buf)
     let tramp_params: Vec[i64] = Vec.new()
     tramp_params.push(ptr_ty)
     tramp_params.push(ptr_ty)
@@ -13345,7 +13345,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     if ret_ty == 0:
         ret_ty = i32_ty
 
-    // 3. Create anonymous trampoline: void(ptr env, ptr result_buf)
+    // 3. Create anonymous trampoline: Unit(ptr env, ptr result_buf)
     self.async_block_counter = self.async_block_counter + 1
     let tramp_name = "__async_block_" ++ int_to_string(self.async_block_counter)
     let tramp_params: Vec[i64] = Vec.new()

@@ -18,17 +18,17 @@ use Resolve
 use compiler.LlvmBridge.*
 use Overflow
 
-extern fn exit(code: i32) -> void
+extern fn exit(code: i32) -> Unit
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_parse_float(s: str) -> f64
-extern fn with_eprint(s: str) -> void
+extern fn with_eprint(s: str) -> Unit
 extern fn with_getenv_str(name: str) -> str
 extern fn with_str_hash(s: str) -> i64
 extern fn with_str_clone(s: str) -> str
 extern fn str_from_byte(b: i32) -> str
-extern fn with_codegen_loop_set_break(idx: i32, bb: i64) -> void
-extern fn with_codegen_loop_set_continue(idx: i32, bb: i64) -> void
-extern fn with_codegen_loop_set_result(idx: i32, value: i64) -> void
+extern fn with_codegen_loop_set_break(idx: i32, bb: i64) -> Unit
+extern fn with_codegen_loop_set_continue(idx: i32, bb: i64) -> Unit
+extern fn with_codegen_loop_set_result(idx: i32, value: i64) -> Unit
 extern fn with_codegen_loop_get_break(idx: i32) -> i64
 extern fn with_codegen_loop_get_continue(idx: i32) -> i64
 extern fn with_codegen_loop_get_result(idx: i32) -> i64
@@ -71,7 +71,7 @@ enum AtomicOrdering: i32:
 // Runtime helpers
 extern fn with_str_concat(a: str, b: str) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
-extern fn with_write(s: str) -> void
+extern fn with_write(s: str) -> Unit
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
@@ -1259,7 +1259,7 @@ fn Codegen.loop_continue_target(self: Codegen, idx: i32) -> i64:
 fn Codegen.loop_result_alloca_at(self: Codegen, idx: i32) -> i64:
     with_codegen_loop_get_result(idx)
 
-fn Codegen.debug_call_coerce_failure(self: Codegen, context: str, call_node: i32, arg_index: i32, arg_node: i32, actual_val: i64, expected_ty: i64) -> void:
+fn Codegen.debug_call_coerce_failure(self: Codegen, context: str, call_node: i32, arg_index: i32, arg_node: i32, actual_val: i64, expected_ty: i64) -> Unit:
     if not self.debug_call_coerce_enabled():
         return
     var msg = "[call-coerce] " ++ context
@@ -5270,7 +5270,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
 // ── Wrap main for exit ────────────────────────────────────────────
 
-fn Codegen.emit_runtime_fiber_config(self: Codegen, wrapper: i64) -> void:
+fn Codegen.emit_runtime_fiber_config(self: Codegen, wrapper: i64) -> Unit:
     if not self.uses_async:
         return
     let stack_size = self.sema.runtime_fiber_stack_size
@@ -5308,7 +5308,7 @@ fn Codegen.emit_runtime_fiber_config(self: Codegen, wrapper: i64) -> void:
     wl_build_unreachable(self.builder)
     wl_position_at_end(self.builder, ok_bb)
 
-fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
+fn Codegen.wrap_main_for_exit(self: Codegen) -> Unit:
     if self.sema.no_std != 0:
         return
     // Create an OS-facing wrapper that preserves argv/runtime setup before

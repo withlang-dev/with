@@ -4,7 +4,7 @@ use compiler.foundation.Ids
 
 extern fn with_fs_read_file(path: str) -> str
 
-extern fn with_vec_push_i32(v: &Vec[i32], val: i32) -> void
+extern fn with_vec_push_i32(v: &Vec[i32], val: i32) -> Unit
 
 pub type Source {
     path: str,

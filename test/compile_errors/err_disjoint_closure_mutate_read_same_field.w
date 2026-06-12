@@ -5,7 +5,7 @@ type ClosureCaptureWorld {
     velocities: i32,
 }
 
-fn write_then_read(writer: fn() -> void, reader: fn() -> i32) -> i32:
+fn write_then_read(writer: fn() -> Unit, reader: fn() -> i32) -> i32:
     writer()
     reader()
 
