@@ -11459,6 +11459,24 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                             self.emit_error("nested mutating calls on the same place; bind the inner result to a local first (§5.4)", node)
                             break
                         ai = ai + 1
+                    // §3.2 — a mut self receiver is exclusive for the call:
+                    // no argument may retain access to the receiver's place
+                    // (reference, iterator/view, or a shared-representation
+                    // str/slice value read from its fields).
+                    var xai = 0
+                    while xai < arg_count:
+                        let x_arg = self.ast.get_extra(extra_start + xai)
+                        var x_conflict = self.arg_retains_access_to(x_arg, recv_root)
+                        if x_conflict == 0 and self.ast.kind(x_arg) == NodeKind.NK_FIELD_ACCESS and self.place_root_sym(x_arg) == recv_root:
+                            let x_ty_opt = self.typed_expr_types.get(x_arg)
+                            if x_ty_opt.is_some():
+                                let x_tk = self.get_type_kind(self.resolve_alias(x_ty_opt.unwrap() as TypeId))
+                                if x_tk == TypeKind.TY_STR or x_tk == TypeKind.TY_SLICE:
+                                    x_conflict = 1
+                        if x_conflict != 0:
+                            self.emit_error("argument retains access to the mutable receiver in the same call; bind it to a local first (§3.2)", node)
+                            break
+                        xai = xai + 1
 
     // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
     if mc_is_static_enum_variant:

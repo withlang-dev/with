@@ -524,6 +524,12 @@ place is mutated. Mutation occurs through:
 
 Enforced at compile time via view-liveness analysis.
 
+A `mut self` receiver is **exclusive** for the duration of the call:
+an argument to the same call may not retain access to the receiver's
+place — a reference to it or one of its fields, an iterator or view
+over it, or a shared-representation value (`str`, slice) read from
+its fields. Bind such values to a local before the call.
+
 ### 3.3 Second-Class Restriction
 
 References are **ephemeral** (Section 5). They may appear as:
