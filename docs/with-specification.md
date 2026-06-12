@@ -3757,7 +3757,8 @@ Exhaustiveness depends on position:
   `Result` carries no obligation (§10.1) — a statement-position match
   on `Result` follows the ordinary partial-match rule. (An opt-in lint
   may flag partial statement matches for projects that want
-  exhaustiveness everywhere.)
+  exhaustiveness everywhere: `[lint] partial_statement_match = true` in
+  `with.toml`.)
 
 Examples:
 

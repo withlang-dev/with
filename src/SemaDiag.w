@@ -123,6 +123,13 @@ fn Sema.emit_warning(self: Sema, msg: str, node: i32):
     let end = self.ast.get_end(node)
     self.diags.emit(Diagnostic.warn(msg, Span { file: self.local_file_id, start: start, end: end }))
 
+fn Sema.emit_warning_code(self: Sema, msg: str, node: i32, code: str):
+    let start = self.ast.get_start(node)
+    let end = self.ast.get_end(node)
+    var diag = Diagnostic.warn(msg, Span { file: self.local_file_id, start: start, end: end })
+    diag.set_code(code)
+    self.diags.emit(diag)
+
 // ── Typed dump rendering ────────────────────────────────────────
 
 fn typed_decl_kind_name(kind: i32) -> str:

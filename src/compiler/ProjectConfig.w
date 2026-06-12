@@ -30,6 +30,7 @@ type ProjectConfig {
     runtime_available: bool,
     overflow_mode: i32,
     strict_effects: bool,
+    lint_partial_statement_match: bool,
 }
 
 fn project_config_default -> ProjectConfig:
@@ -61,6 +62,7 @@ fn project_config_default -> ProjectConfig:
         runtime_available: true,
         overflow_mode: overflow_mode_default(),
         strict_effects: false,
+        lint_partial_statement_match: false,
     }
 
 fn project_config_clone_str(s: str) -> str:
@@ -103,6 +105,7 @@ pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         runtime_available: cfg.runtime_available,
         overflow_mode: cfg.overflow_mode,
         strict_effects: cfg.strict_effects,
+        lint_partial_statement_match: cfg.lint_partial_statement_match,
     }
 
 fn project_config_file_exists(path: str) -> bool:
@@ -233,6 +236,13 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
                 out.manifest_error = "build.strict_effects must be true or false"
         else:
             out.strict_effects = parsed_strict != 0
+    else if section == "lint" and key == "partial_statement_match":
+        let parsed_lint = project_config_parse_bool(value)
+        if parsed_lint < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "lint.partial_statement_match must be true or false"
+        else:
+            out.lint_partial_statement_match = parsed_lint != 0
     else if section == "runtime" and key == "fiber_stack_size":
         let parsed_stack = project_config_parse_positive_i64(value)
         if parsed_stack <= 0:
@@ -474,6 +484,8 @@ fn project_config_wants_key(section: str, key: str) -> bool:
         return true
     if section == "build" and (key == "overflow" or key == "strict_effects"):
         return true
+    if section == "lint" and key == "partial_statement_match":
+        return true
     if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size"):
         return true
     if section == "features":
@@ -489,6 +501,10 @@ fn project_config_wants_key(section: str, key: str) -> bool:
 fn project_config_forbidden_entry(section: str, key: str) -> str:
     if section == "build" and (key == "overflow" or key == "strict_effects"):
         return ""
+    if section == "lint" and key == "partial_statement_match":
+        return ""
+    if section == "lint":
+        return "unknown key '" ++ key ++ "' in [lint]; expected partial_statement_match"
     if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size"):
         return ""
     if section == "runtime":

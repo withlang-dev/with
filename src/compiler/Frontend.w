@@ -1359,6 +1359,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         pre_sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
         pre_sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
         pre_sema.copy_warn_threshold = self.project_config.copy_warn_threshold
+        pre_sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
         pre_sema.overflow_mode = self.project_config.overflow_mode
         pre_sema.init_module_graph(&self.last_resolved)
         pre_sema.prepare_for_comptime_transform()
@@ -1401,6 +1402,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
     sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
     sema.copy_warn_threshold = self.project_config.copy_warn_threshold
+    sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
     sema.emit_config_warnings = 1
     sema.overflow_mode = self.project_config.overflow_mode
     if self.project_config.no_std:

@@ -1871,6 +1871,55 @@ fn bs_check_not_in_lint(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i3
     if clean.rc != 0: return clean.rc
     bs_assert_not_contains(ctx, clean.stderr, "prefer 'x not in y'", "not_in_lint_clean")
 
+fn bs_partial_statement_match_source() -> str:
+    "enum State { Ready | Busy | Done }\n\n" ++
+    "fn main:\n" ++
+    "    let s: State = .Ready\n" ++
+    "    match s:\n" ++
+    "        .Ready => print(\"ready\")\n"
+
+fn bs_check_partial_statement_match_lint(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let default_dir = bs_join(case_dir, "default")
+    var rc = bs_write_project_manifest(ctx, default_dir, "partialmatchdefault")
+    if rc != 0: return rc
+    let default_src = bs_join(default_dir, "src/main.w")
+    rc = bs_write_fixture(ctx, default_src, bs_partial_statement_match_source(), "partial statement match default source")
+    if rc != 0: return rc
+    var default_args: Vec[str] = Vec.new()
+    default_args |> push("check")
+    default_args |> push(bs_abs(root, default_src))
+    let default_result = bs_project_expect_success(ctx, compiler_path, default_dir, "partial-statement-match-default", default_args)
+    if default_result.rc != 0: return default_result.rc
+    rc = bs_assert_not_contains(ctx, default_result.stderr, "partial statement-position match", "partial_statement_match_default")
+    if rc != 0: return rc
+
+    let lint_dir = bs_join(case_dir, "lint")
+    rc = bs_write_fixture(ctx, bs_join(lint_dir, "with.toml"), "[package]\nname = \"partialmatchlint\"\nversion = \"0.1.0\"\n\n[lint]\npartial_statement_match = true\n", "partial statement match lint manifest")
+    if rc != 0: return rc
+    let lint_src = bs_join(lint_dir, "src/main.w")
+    rc = bs_write_fixture(ctx, lint_src, bs_partial_statement_match_source(), "partial statement match lint source")
+    if rc != 0: return rc
+    var lint_args: Vec[str] = Vec.new()
+    lint_args |> push("check")
+    lint_args |> push(bs_abs(root, lint_src))
+    let lint_result = bs_project_expect_success(ctx, compiler_path, lint_dir, "partial-statement-match-lint", lint_args)
+    if lint_result.rc != 0: return lint_result.rc
+    rc = bs_assert_contains(ctx, lint_result.stderr, "warning: partial statement-position match: missing variant 'Busy' [partial-statement-match]", "partial_statement_match_warning")
+    if rc != 0: return rc
+
+    let invalid_dir = bs_join(case_dir, "invalid")
+    rc = bs_write_fixture(ctx, bs_join(invalid_dir, "with.toml"), "[package]\nname = \"partialmatchinvalid\"\nversion = \"0.1.0\"\n\n[lint]\npartial_statement_match = sometimes\n", "partial statement match invalid manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(invalid_dir, "src/main.w"), "fn main:\n    print(\"invalid\")\n", "partial statement match invalid source")
+    if rc != 0: return rc
+    var invalid_args = bs_project_args("check")
+    invalid_args |> push(bs_abs(root, bs_join(invalid_dir, "src/main.w")))
+    let invalid_result = bs_run_cli_capture_cwd(ctx, compiler_path, "partial-statement-match-invalid", invalid_args, 120000, invalid_dir)
+    if invalid_result.rc == 0:
+        return bs_fail(ctx, "invalid partial_statement_match lint setting unexpectedly succeeded")
+    bs_assert_contains(ctx, invalid_result.stderr, "lint.partial_statement_match must be true or false", "partial_statement_match_invalid")
+
 fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "hello_build_options.w")
@@ -2477,6 +2526,8 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     rc = bs_check_loop_string_concat_warning(ctx, compiler_path, bs_join(output_dir, "loop_string_concat_warning_case"))
     if rc != 0: return rc
     rc = bs_check_not_in_lint(ctx, compiler_path, bs_join(output_dir, "not_in_lint_case"))
+    if rc != 0: return rc
+    rc = bs_check_partial_statement_match_lint(ctx, compiler_path, bs_join(output_dir, "partial_statement_match_lint_case"))
     if rc != 0: return rc
     rc = bs_check_build_options_cli(ctx, compiler_path, bs_join(output_dir, "build_options_cli_case"))
     if rc != 0: return rc

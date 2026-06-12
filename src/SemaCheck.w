@@ -6595,7 +6595,8 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
         let type_sym = self.get_type_d0(self.resolve_alias(subject_type))
         if type_sym != 0 and self.must_use_types.contains(type_sym):
             require_exhaustive = 1
-    self.check_match_exhaustiveness(node, subject_type as i32, extra_start, arm_count, require_exhaustive)
+    let warn_partial_statement_match = if require_exhaustive == 0 and self.lint_partial_statement_match != 0: 1 else: 0
+    self.check_match_exhaustiveness(node, subject_type as i32, extra_start, arm_count, require_exhaustive, warn_partial_statement_match)
     if not match_is_value and require_exhaustive == 0 and result_type == self.ty_never:
         result_type = self.ty_void
 
@@ -6641,7 +6642,10 @@ fn Sema.match_is_for_comprehension_lowering(self: Sema, extra_start: i32, arm_co
             return 1
     0
 
-fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32):
+fn Sema.emit_partial_statement_match_warning(self: Sema, message: str, node: i32):
+    self.emit_warning_code(message, node, "partial-statement-match")
+
+fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, extra_start: i32, arm_count: i32, require_exhaustive: i32, warn_partial_statement_match: i32):
     if subject_type == 0:
         return
     let resolved = self.resolve_alias(subject_type)
@@ -6672,7 +6676,7 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
 
     // Bool exhaustiveness
     if tk == TypeKind.TY_BOOL:
-        if require_exhaustive == 0:
+        if require_exhaustive == 0 and warn_partial_statement_match == 0:
             return
         var has_true = 0
         var has_false = 0
@@ -6692,11 +6696,16 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
         if has_true == 0 or has_false == 0:
             // §9.7: a match that requires exhaustiveness (expression position, or
             // a @[must_use] subject) is a compile error when not exhaustive.
-            self.emit_error("non-exhaustive match on bool", node)
+            if require_exhaustive != 0:
+                self.emit_error("non-exhaustive match on bool", node)
+            else:
+                self.emit_partial_statement_match_warning("partial statement-position match on bool", node)
         return
 
     // Sealed trait object exhaustiveness
     if tk == TypeKind.TY_TRAIT_OBJ:
+        if require_exhaustive == 0 and warn_partial_statement_match == 0:
+            return
         let trait_sym = self.get_type_d0(resolved)
         if self.sealed_traits.contains(trait_sym) and self.sealed_impl_counts.contains(trait_sym):
             let si_count = self.sealed_impl_counts.get(trait_sym).unwrap()
@@ -6716,14 +6725,17 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
                         break
                 if covered == 0:
                     let impl_name = self.pool_resolve(impl_sym)
-                    self.emit_error("non-exhaustive match on sealed trait: missing implementor '" ++ impl_name ++ "'", node)
+                    if require_exhaustive != 0:
+                        self.emit_error("non-exhaustive match on sealed trait: missing implementor '" ++ impl_name ++ "'", node)
+                    else:
+                        self.emit_partial_statement_match_warning("partial statement-position match on sealed trait: missing implementor '" ++ impl_name ++ "'", node)
                     return
         return
 
     // Enum exhaustiveness
     if tk != TypeKind.TY_ENUM:
         return
-    if require_exhaustive == 0:
+    if require_exhaustive == 0 and warn_partial_statement_match == 0:
         return
     let te_start = self.get_type_d1(enum_resolved)
     let variant_count = self.get_type_d2(enum_resolved)
@@ -6746,7 +6758,11 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
         if covered == 0:
             // §9.7: expression-position (and @[must_use]) matches must be
             // exhaustive — a missing variant is a compile error, not a warning.
-            self.emit_error("non-exhaustive match: missing variant '" ++ self.pool_resolve(v_name_sym) ++ "'", node)
+            let variant_name = self.pool_resolve(v_name_sym)
+            if require_exhaustive != 0:
+                self.emit_error("non-exhaustive match: missing variant '" ++ variant_name ++ "'", node)
+            else:
+                self.emit_partial_statement_match_warning("partial statement-position match: missing variant '" ++ variant_name ++ "'", node)
             return
         pos = pos + 2 + pc
 

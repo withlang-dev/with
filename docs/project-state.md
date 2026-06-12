@@ -33,9 +33,9 @@ argument cases. Full `with build`, `with build :fixpoint`, `with build :test`,
 `with build :test-green`, `with build :last-green`, and `with build :release-uat`
 passed on 2026-06-11 for the expanded C-package gate slice.
 
-Phase 2 parser/control-flow work is in progress. #461, #443, #445, #448,
-#447, #462, #375, #382, #401, #543, #459, #371, and #372 are implemented,
-pushed, and closed.
+Phase 2 parser/control-flow work is complete. #461, #443, #445, #448,
+#447, #462, #375, #382, #401, #543, #459, #371, #372, and #384 are
+implemented, pushed, and closed.
 `loop` is now expression-valued through `break expr`, plain `break`
 contributes Unit, break values unify per loop, non-loop value breaks are
 rejected, and no-break loops type as `Never`. Unreachable-code detection now
@@ -52,13 +52,18 @@ no-ops for unmatched variants; user `@[must_use]` types and `Task` keep the
 exhaustiveness rule. Generic enum instantiations such as `Result[T, E]` still
 use their enum base for expression-position exhaustiveness. Full `with build`,
 `with build :fixpoint`, `with build :test`, and `with build :test-green`
-passed on 2026-06-11 for #543, #459, #371, and #372. The `move x`/`copy x`
+passed on 2026-06-11 for #543, #459, #371, #372, and #384. The `move x`/`copy x`
 acknowledgment gate for consuming arguments is removed: plain `f(x)` is legal
 when the signature consumes `x`, later uses still error, and `move`/`copy`
 remain optional explicit spellings. The implementation also records consume
 effects for plain parameter moves and fixed compiler/build helper APIs whose
-signatures were accidentally owning read-only state. Follow-up bug #549 tracks
-value-position `if` branch type mismatches discovered during the #382 audit.
+signatures were accidentally owning read-only state. #384 adds the opt-in
+`[lint] partial_statement_match = true` project setting, which emits a coded
+`partial-statement-match` warning for non-exhaustive statement-position
+bool/enum/sealed-trait matches while keeping the default partial-match behavior
+silent and preserving expression-position and `@[must_use]` hard errors.
+Follow-up bug #549 tracks value-position `if` branch type mismatches discovered
+during the #382 audit.
 
 #347, #356, #358, and the first #357 safety slice are implemented.
 `c_import` now separates modeled-safe bindings from raw ABI-shaped bindings:
