@@ -850,9 +850,26 @@ pub fn wl_build_struct_gep(b: i64, ty: i64, ptr: i64, idx: i32) -> i64:
     unsafe:
         LLVMBuildStructGEP2(b as *mut u8, ty as *mut u8, ptr as *mut u8, idx as u32, empty_cstr()) as i64
 
+// Length-aware replacement for LLVMBuildGlobalStringPtr: the data must not
+// go through to_cstr, whose fixed 4096-byte slot silently truncates longer
+// strings (and a C-string API would stop at embedded nulls). Emits a private
+// null-terminated constant array global and returns it (opaque pointer).
 pub fn wl_build_global_string_ptr(b: i64, s: str) -> i64:
     unsafe:
-        LLVMBuildGlobalStringPtr(b as *mut u8, to_cstr(s), empty_cstr()) as i64
+        let bb = LLVMGetInsertBlock(b as *mut u8)
+        let func = LLVMGetBasicBlockParent(bb)
+        let mod = LLVMGetGlobalParent(func)
+        let ctx = LLVMGetModuleContext(mod)
+        var sp = *(&s as *const *const u8)
+        if sp as i64 == 0:
+            sp = empty_cstr()
+        // dont_null = 0: LLVM appends the trailing terminator itself.
+        let const_str = LLVMConstStringInContext(ctx, sp, s.len() as u32, 0)
+        let g = LLVMAddGlobal(mod, LLVMTypeOf(const_str), to_cstr("str"))
+        LLVMSetInitializer(g, const_str)
+        LLVMSetGlobalConstant(g, 1)
+        LLVMSetLinkage(g, LLVM_PrivateLinkage)
+        g as i64
 
 // ── Builder: globals ────────────────────────────────────────────
 
