@@ -10,10 +10,13 @@ fn test_unwrap_ok:
     let r: Result[i32, str] = Ok(10)
     assert(r.unwrap() == 10)
 
-// blocked: .expect() not implemented
-// fn test_expect_some:
-//     let x = Some("hello")
-//     assert(x.expect("must have value") == "hello")
+fn test_expect_some:
+    let x: Option[str] = Some("hello")
+    assert(x.expect("must have value") == "hello")
+
+fn test_expect_ok:
+    let r: Result[str, str] = Ok("ready")
+    assert(r.expect("operation should succeed") == "ready")
 
 // blocked: panic tests need runtime panic test infrastructure
 // fn test_unwrap_none_panics:
@@ -23,3 +26,9 @@ fn test_unwrap_ok:
 // fn test_expect_err_panics:
 //     let r: Result[i32, str] = Err("bad")
 //     r.expect("operation failed")    // PANICS
+
+fn main:
+    test_unwrap_some()
+    test_unwrap_ok()
+    test_expect_some()
+    test_expect_ok()

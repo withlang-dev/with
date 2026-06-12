@@ -103,6 +103,7 @@ enum MirIntrinsic: i32:
     MAP_REMOVE
     OPT_IS_SOME
     OPT_UNWRAP
+    OPT_EXPECT
     STR_LEN
     STR_BYTE_AT
     STR_SLICE

@@ -11,18 +11,31 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 3 has started. #544 is implemented locally: `panic`, `todo`, and
-`unreachable` are ordinary `std.builtins` functions returning `Never`, user
-calls no longer lower to raw LLVM `unreachable`, and backend-generated
+Phase 3 is in progress. #544 is implemented and pushed: `panic`, `todo`,
+and `unreachable` are ordinary `std.builtins` functions returning `Never`,
+user calls no longer lower to raw LLVM `unreachable`, and backend-generated
 unreachable terminators now call the runtime panic path before ending the
 block. LLVM and emit-C type lowering both treat `Never` as a void ABI type.
 Focused behavior and compile-error tests cover explicit panic, default/custom
 `todo` and `unreachable` messages, `Never` use in value positions, argument
-arity, named-argument rejection, and non-string messages. Full `with build`,
+arity, named-argument rejection, and non-string messages. Direct
+`await_first([])` behavior coverage is blocked by newly filed #558, where the
+existing `impl IntoIter[Task[T]]` generic signature leaks unresolved `T`
+during std.task checking.
+
+#545 is implemented locally and verified. `Option.unwrap`, `Result.unwrap`,
+`Option.expect`, and `Result.expect` now carry call-site locations through MIR
+and guard their success discriminants before extracting payloads. Failure paths
+panic through `with_panic` with source location, `None` messages, and
+Debug-formatted `Err` payloads. The emit-C backend mirrors the guard for
+payload enums, nullable pointers, and legacy encoded option values; aggregate
+Err debug formatting fails loudly instead of emitting an unchecked extraction.
+Focused behavior tests cover `None`/`Err` runtime panics and source locations,
+compile-error tests cover bad `expect`/`unwrap` arity and message types, the
+§10.6 spec test now covers successful `expect`, and `emit-c-smoke` compiles and
+runs a generated-C `Result.expect` panic case. Full `with build`,
 `with build :fixpoint`, `with build :test`, and `with build :test-green`
-passed on 2026-06-11 for #544. Direct `await_first([])` behavior coverage is
-blocked by newly filed #558, where the existing `impl IntoIter[Task[T]]`
-generic signature leaks unresolved `T` during std.task checking.
+passed on 2026-06-11 for #545.
 
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,

@@ -4823,6 +4823,7 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         return MirIntrinsic.NONE
     if type_name == "Option":
         if method_name == "unwrap": return MirIntrinsic.OPT_UNWRAP
+        if method_name == "expect": return MirIntrinsic.OPT_EXPECT
         if method_name == "is_some": return MirIntrinsic.OPT_IS_SOME
         if method_name == "is_none": return MirIntrinsic.OPT_IS_NONE
         return MirIntrinsic.NONE
@@ -5868,10 +5869,15 @@ fn Codegen.mir_emit_scalar_vec_intrinsic_call(self: Codegen, body: MirBody, intr
             // Non-struct Option (e.g., raw value) — treat as always Some
             result = wl_const_int(wl_i1_type(self.context), 1, 0)
 
-    else if intrinsic == MirIntrinsic.OPT_UNWRAP:
+    else if intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT:
         let recv_op = body.call_arg_operands.get(arg_start as i64)
         let recv_sema = self.mir_operand_sema_type(body, recv_op)
         let recv_resolved = if recv_sema > 0: self.mir_input.mir_resolve_alias(recv_sema) else: 0
+        let arg_count = body.call_arg_counts.get(args_id as i64)
+        let loc_arg_idx = arg_count - 1
+        let loc = if loc_arg_idx > 0: self.mir_intrinsic_arg(body, args_id, loc_arg_idx) else: self.gen_string_literal_raw("")
+        let user_msg = if intrinsic == MirIntrinsic.OPT_EXPECT and arg_count >= 3: self.mir_intrinsic_arg(body, args_id, 1) else: self.gen_string_literal_raw("")
+        let is_expect = intrinsic == MirIntrinsic.OPT_EXPECT
         var recv_is_result = false
         if recv_resolved > 0 and self.mir_input.mir_get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
             let recv_name_sym = self.mir_input.mir_get_type_d0(recv_resolved)
@@ -5881,6 +5887,27 @@ fn Codegen.mir_emit_scalar_vec_intrinsic_call(self: Codegen, body: MirBody, intr
         let recv_ty = wl_type_of(recv)
         let recv_tk = wl_get_type_kind(recv_ty)
         if recv_tk == wl_struct_type_kind():
+            let disc = wl_build_extract_value(self.builder, recv, 0)
+            let is_ok = wl_build_icmp(self.builder, wl_int_eq(), disc, wl_const_int(wl_type_of(disc), 0, 0))
+            let panic_bb = wl_append_bb(self.context, self.current_function, "unwrap.panic")
+            let ok_bb = wl_append_bb(self.context, self.current_function, "unwrap.ok")
+            wl_build_cond_br(self.builder, is_ok, ok_bb, panic_bb)
+            wl_position_at_end(self.builder, panic_bb)
+            if recv_is_result:
+                let err_sema = self.mir_builtin_variant_payload_sema_type(recv_sema, 1)
+                var err_ty = if err_sema > 0: self.mir_sema_type_to_llvm(err_sema) else: 0
+                if err_ty == 0:
+                    err_ty = self.mir_builtin_variant_payload_llvm_type(recv_sema, 1)
+                let err_val = self.extract_result_payload(recv, err_ty)
+                let str_ty = self.resolve_named_type(self.intern.intern("str"))
+                let err_dbg = self.gen_debug_format(err_val, err_sema, str_ty)
+                let prefix = if is_expect: user_msg else: self.gen_string_literal_raw("called unwrap on Err")
+                let msg = self.mir_str_concat(self.mir_str_concat(prefix, self.gen_string_literal_raw(": ")), err_dbg)
+                self.emit_runtime_panic_value(msg, loc)
+            else:
+                let msg = if is_expect: self.mir_str_concat(user_msg, self.gen_string_literal_raw(": None")) else: self.gen_string_literal_raw("called unwrap on None")
+                self.emit_runtime_panic_value(msg, loc)
+            wl_position_at_end(self.builder, ok_bb)
             if recv_is_result:
                 let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
                 var payload_ty = self.mir_sema_type_to_llvm(dest_sema)
@@ -5894,9 +5921,18 @@ fn Codegen.mir_emit_scalar_vec_intrinsic_call(self: Codegen, body: MirBody, intr
             else:
                 result = wl_build_extract_value(self.builder, recv, 1)
         else if recv_tk == wl_pointer_type_kind():
+            let non_null = wl_build_icmp(self.builder, wl_int_ne(), recv, wl_const_null(recv_ty))
+            let ptr_panic_bb = wl_append_bb(self.context, self.current_function, "unwrap.ptr.panic")
+            let ptr_ok_bb = wl_append_bb(self.context, self.current_function, "unwrap.ptr.ok")
+            wl_build_cond_br(self.builder, non_null, ptr_ok_bb, ptr_panic_bb)
+            wl_position_at_end(self.builder, ptr_panic_bb)
+            let ptr_msg = if is_expect: self.mir_str_concat(user_msg, self.gen_string_literal_raw(": None")) else: self.gen_string_literal_raw("called unwrap on None")
+            self.emit_runtime_panic_value(ptr_msg, loc)
+            wl_position_at_end(self.builder, ptr_ok_bb)
             result = recv
         else:
-            // Non-struct Option — return the raw value
+            // Legacy encoded-option intrinsics such as HashMap.get may reach
+            // here with the payload's static type. There is no tag to inspect.
             result = recv
 
     else if intrinsic == MirIntrinsic.STR_LEN:
@@ -12789,11 +12825,14 @@ fn Codegen.get_runtime_fn_type(self: Codegen, name: str, ret_ty: i64, param_coun
     wl_function_type(ret_ty, vec_data_i64(&params), param_count, 0)
 
 fn Codegen.emit_runtime_panic(self: Codegen, msg: str) -> void:
+    self.emit_runtime_panic_value(self.gen_string_literal_raw(msg), self.gen_string_literal_raw(""))
+
+fn Codegen.emit_runtime_panic_value(self: Codegen, msg: i64, loc: i64) -> void:
     let panic_fn = self.ensure_c_fn("with_panic", wl_void_type(self.context), 3)
     let panic_ty = self.get_runtime_fn_type("with_panic", wl_void_type(self.context), 3)
     let args: Vec[i64] = Vec.new()
-    args.push(self.gen_string_literal_raw(msg))
-    args.push(self.gen_string_literal_raw(""))
+    args.push(msg)
+    args.push(loc)
     args.push(wl_const_int(wl_i32_type(self.context), 0, 0))
     let _call = wl_build_call(self.builder, panic_ty, panic_fn, vec_data_i64(&args), 3)
     let _unreachable = wl_build_unreachable(self.builder)

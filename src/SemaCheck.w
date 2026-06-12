@@ -10634,6 +10634,8 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
     if owner_name == "Sender" and method_name == "send" and arg_index == 0:
         return self.get_generic_inst_arg(resolved as i32, 0)
     if owner_sym == self.syms.option:
+        if field == self.syms.expect and arg_index == 0:
+            return self.ty_str as i32
         if (field == self.syms.map or method_name == "and_then") and arg_index == 0:
             let option_elem = self.get_generic_inst_arg(resolved as i32, 0)
             let params: Vec[i32] = Vec.new()
@@ -10645,6 +10647,8 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
             params2.push(option_elem2)
             return self.ensure_fn_type(params2, 1, self.ty_bool) as i32
     if owner_sym == self.syms.result:
+        if field == self.syms.expect and arg_index == 0:
+            return self.ty_str as i32
         if (field == self.syms.map or method_name == "map_err") and arg_index == 0:
             let result_arg = if field == self.syms.map: self.get_generic_inst_arg(resolved as i32, 0) else: self.get_generic_inst_arg(resolved as i32, 1)
             let result_params: Vec[i32] = Vec.new()
@@ -11795,6 +11799,18 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.ty_void as i32
         if type_name_sym == self.syms.option:
             if field == self.syms.unwrap:
+                if mc_resolved_arg_count != 0:
+                    self.emit_error("Option.unwrap() expects no arguments", node)
+                    return 0
+                return self.get_generic_inst_arg(recv_type, 0)
+            if field == self.syms.expect:
+                if mc_resolved_arg_count != 1:
+                    self.emit_error("Option.expect() expects exactly one argument", node)
+                    return 0
+                let msg_ty = arg_types.get(0)
+                if msg_ty != 0 and self.builtin_arg_type_compatible(self.ty_str as i32, msg_ty) == 0:
+                    self.emit_argument_type_mismatch("Option.expect", 0, 0, 0, self.ty_str as i32, msg_ty, self.ast.get_extra(extra_start))
+                    return 0
                 return self.get_generic_inst_arg(recv_type, 0)
             let option_combinator_ret = self.option_combinator_return_type(recv_type, mc_method_name_raw, arg_types, mc_resolved_arg_count, node)
             if option_combinator_ret != 0:
@@ -11813,6 +11829,18 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return recv_type as i32
         if type_name_sym == self.syms.result:
             if field == self.syms.unwrap:
+                if mc_resolved_arg_count != 0:
+                    self.emit_error("Result.unwrap() expects no arguments", node)
+                    return 0
+                return self.get_generic_inst_arg(recv_type, 0)
+            if field == self.syms.expect:
+                if mc_resolved_arg_count != 1:
+                    self.emit_error("Result.expect() expects exactly one argument", node)
+                    return 0
+                let res_msg_ty = arg_types.get(0)
+                if res_msg_ty != 0 and self.builtin_arg_type_compatible(self.ty_str as i32, res_msg_ty) == 0:
+                    self.emit_argument_type_mismatch("Result.expect", 0, 0, 0, self.ty_str as i32, res_msg_ty, self.ast.get_extra(extra_start))
+                    return 0
                 return self.get_generic_inst_arg(recv_type, 0)
             let result_combinator_ret = self.result_combinator_return_type(recv_type, mc_method_name_raw, arg_types, mc_resolved_arg_count, node)
             if result_combinator_ret != 0:

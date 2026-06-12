@@ -73,6 +73,7 @@ enum CcBuiltin: i32:
     MAP_REMOVE
     OPT_IS_SOME
     OPT_UNWRAP
+    OPT_EXPECT
     VEC_POP
     STR_LEN
     STR_BYTE_AT
@@ -177,6 +178,7 @@ fn cc_builtin_uses_option_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.OPT_IS_SOME: return true
     if kind == CcBuiltin.OPT_IS_NONE: return true
     if kind == CcBuiltin.OPT_UNWRAP: return true
+    if kind == CcBuiltin.OPT_EXPECT: return true
     if kind == CcBuiltin.OPT_FILTER: return true
     false
 
@@ -755,7 +757,7 @@ fn cc_is_hashmap_method_name(name: str) -> i32:
     0
 
 fn cc_is_option_method_name(name: str) -> i32:
-    if name == "is_some" or name == "unwrap":
+    if name == "is_some" or name == "unwrap" or name == "expect":
         return 1
     0
 
@@ -1125,6 +1127,19 @@ fn CCodegen.payload_enum_variant_field(self: CCodegen, variant_index: i32) -> st
     let _ = self
     f"payload{variant_index}"
 
+fn CCodegen.payload_enum_named_variant(self: CCodegen, enum_tid: i32, variant_sym: i32) -> i32:
+    if self.type_is_payload_enum(enum_tid) == 0 or variant_sym == 0:
+        return -1
+    let variant_count = self.sema.type_reflection_variant_count(enum_tid)
+    let target = self.sema.pool_resolve(variant_sym)
+    for vi in 0..variant_count:
+        let name_sym = self.sema.type_reflection_variant_name(enum_tid, vi)
+        if name_sym == variant_sym:
+            return vi
+        if target.len() > 0 and self.sema.pool_resolve(name_sym) == target:
+            return vi
+    -1
+
 fn CCodegen.payload_enum_variant_for_payload_tid(self: CCodegen, enum_tid: i32, payload_tid: i32) -> i32:
     if self.type_is_payload_enum(enum_tid) == 0 or payload_tid == 0:
         return -1
@@ -1175,6 +1190,22 @@ fn CCodegen.payload_enum_literal(self: CCodegen, enum_tid: i32, variant_index: i
     if payload_text.len() > 0:
         out = out ++ ", ." ++ self.payload_enum_variant_field(variant_index) ++ " = " ++ payload_text
     out ++ cc_rbrace()
+
+fn CCodegen.debug_format_expr(self: CCodegen, tid: i32, expr: str, context: str) -> str:
+    let resolved = self.sema.resolve_alias(tid as TypeId)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TypeKind.TY_STR:
+        return "with_fmt_str_debug(" ++ expr ++ ")"
+    if tk == TypeKind.TY_BOOL:
+        return "with_fmt_bool((int32_t)(" ++ expr ++ "))"
+    if tk == TypeKind.TY_FLOAT:
+        return "with_fmt_f64((double)(" ++ expr ++ "))"
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        return "with_fmt_i64((int64_t)(intptr_t)(" ++ expr ++ "))"
+    if tk == TypeKind.TY_INT:
+        return "with_fmt_i64((int64_t)(" ++ expr ++ "))"
+    self.fail("emit-c does not yet support Debug formatting for aggregate " ++ context ++ " payloads")
+    "WITH_STR_LIT(\"<unsupported>\")"
 
 fn CCodegen.fn_type_c_name(self: CCodegen, tid: i32) -> str:
     let resolved = self.sema.resolve_alias(tid)
@@ -3190,7 +3221,7 @@ fn CCodegen.callee_field_hint(self: CCodegen, fn_sym: i32) -> CcCalleeHint:
             if base == "push" or base == "get" or cc_is_len_method(base) or base == "set_i32" or base == "remove" or base == "clear" or base == "pop":
                 out = CcCalleeHint.VEC_RECV
         else if cc_str_contains(owner, "Option") != 0:
-            if base == "is_some" or base == "unwrap":
+            if base == "is_some" or base == "unwrap" or base == "expect":
                 out = CcCalleeHint.OPT_RECV
 
     self.callee_hint_cache_store(fn_sym, out)
@@ -3220,7 +3251,7 @@ fn CCodegen.infer_place_kind_impl(self: CCodegen, body: MirBody, place_id: i32) 
         if method == "insert":
             map_score = map_score + 3
             continue
-        if method == "is_some" or method == "unwrap":
+        if method == "is_some" or method == "unwrap" or method == "expect":
             opt_score = opt_score + 3
             continue
         if method == "get" or cc_is_len_method(method):
@@ -3276,7 +3307,7 @@ fn CCodegen.local_place_kind_depth(self: CCodegen, body: MirBody, local_id: i32,
         if method == "insert" or method == "contains":
             map_score = map_score + 4
             continue
-        if method == "is_some" or method == "unwrap":
+        if method == "is_some" or method == "unwrap" or method == "expect":
             opt_score = opt_score + 4
             continue
         if method == "get" or cc_is_len_method(method):
@@ -4384,6 +4415,10 @@ fn CCodegen.call_builtin_kind(self: CCodegen, body: MirBody, callee_operand: i32
         if recv_kind_is_opt != 0:
             return CcBuiltin.OPT_UNWRAP
         return CcBuiltin.NONE
+    if method == "expect":
+        if recv_kind_is_opt != 0:
+            return CcBuiltin.OPT_EXPECT
+        return CcBuiltin.NONE
 
     if method == "set":
         if recv_is_vecslot != 0:
@@ -4574,7 +4609,7 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         return self.sema.ty_bool as i32
     if kind == CcBuiltin.OPT_IS_NONE:
         return self.sema.ty_bool as i32
-    if kind == CcBuiltin.OPT_UNWRAP:
+    if kind == CcBuiltin.OPT_UNWRAP or kind == CcBuiltin.OPT_EXPECT:
         let hinted = self.call_dest_expected_tid(body, dest_place)
         if hinted != 0 and self.is_void_tid(hinted) == 0:
             return hinted
@@ -4890,7 +4925,7 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                 if kind == CcBuiltin.MAP_NEW or kind == CcBuiltin.MAP_INSERT or kind == CcBuiltin.MAP_GET or kind == CcBuiltin.MAP_CONTAINS or kind == CcBuiltin.MAP_LEN or kind == CcBuiltin.MAP_REMOVE:
                     if recv_hint == 0:
                         recv_hint = self.sema.ty_i64 as i32
-                if kind == CcBuiltin.OPT_IS_SOME or kind == CcBuiltin.OPT_UNWRAP:
+                if kind == CcBuiltin.OPT_IS_SOME or kind == CcBuiltin.OPT_UNWRAP or kind == CcBuiltin.OPT_EXPECT:
                     if recv_hint == 0:
                         recv_hint = self.sema.ty_i64 as i32
             if self.place_is_direct_local(body, dest_place, local_id) != 0:
@@ -5179,6 +5214,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.MAP_REMOVE: return CcBuiltin.MAP_REMOVE
     if intrinsic == MirIntrinsic.OPT_IS_SOME: return CcBuiltin.OPT_IS_SOME
     if intrinsic == MirIntrinsic.OPT_UNWRAP: return CcBuiltin.OPT_UNWRAP
+    if intrinsic == MirIntrinsic.OPT_EXPECT: return CcBuiltin.OPT_EXPECT
     if intrinsic == MirIntrinsic.ATOMIC_LOAD: return CcBuiltin.ATOMIC_LOAD
     if intrinsic == MirIntrinsic.ATOMIC_STORE: return CcBuiltin.ATOMIC_STORE
     if intrinsic == MirIntrinsic.ATOMIC_SWAP: return CcBuiltin.ATOMIC_SWAP
@@ -5610,24 +5646,65 @@ fn CCodegen.emit_builtin_option_call_term(self: CCodegen, body: MirBody, kind: C
         out = out ++ f"    goto bb{next_bb};"
         return out
 
-    if kind == CcBuiltin.OPT_UNWRAP:
-        if argc < 1:
-            self.fail("Option.unwrap expects one argument")
+    if kind == CcBuiltin.OPT_UNWRAP or kind == CcBuiltin.OPT_EXPECT:
+        let is_expect = kind == CcBuiltin.OPT_EXPECT
+        let expected_argc = if is_expect: 3 else: 2
+        if argc < expected_argc:
+            self.fail(if is_expect: "Option.expect expects receiver, message, and location" else: "Option.unwrap expects receiver and location")
             return "    abort();"
         let opt_operand = self.call_arg_operand(body, args_id, 0)
         let opt_text = self.operand_text(body, opt_operand)
         let opt_tid = self.operand_tid(body, opt_operand)
+        let loc_text = self.operand_text(body, self.call_arg_operand(body, args_id, argc - 1))
+        let user_msg = if is_expect: self.operand_text(body, self.call_arg_operand(body, args_id, 1)) else: "WITH_STR_LIT(\"\")"
         let dst = self.place_text(body, dest_place)
         if self.type_is_payload_enum(opt_tid) != 0:
-            let some_variant = self.payload_enum_single_payload_variant(opt_tid)
-            if some_variant < 0:
-                self.fail("Option.unwrap expects an enum with one payload-bearing variant")
+            let opt_resolved = self.sema.resolve_alias(opt_tid as TypeId)
+            let is_result = self.sema.get_type_kind(opt_resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_base(opt_resolved as i32) == self.sema.syms.result
+            let ok_variant = if is_result: self.payload_enum_named_variant(opt_tid, self.sema.syms.ok) else: self.payload_enum_named_variant(opt_tid, self.sema.syms.some)
+            let payload_variant = if ok_variant >= 0: ok_variant else: self.payload_enum_single_payload_variant(opt_tid)
+            if payload_variant < 0:
+                self.fail("Option.unwrap/expect expects an enum with a payload-bearing success variant")
                 return "    abort();"
-            var out = "    " ++ dst ++ " = " ++ opt_text ++ "." ++ self.payload_enum_variant_field(some_variant) ++ ";\n"
+            let ok_tag = self.sema.type_reflection_variant_discriminant(opt_tid, payload_variant)
+            var panic_msg = if is_expect: "with_str_concat(" ++ user_msg ++ ", WITH_STR_LIT(\": None\"))" else: "WITH_STR_LIT(\"called unwrap on None\")"
+            if is_result:
+                let err_variant = self.payload_enum_named_variant(opt_tid, self.sema.syms.err)
+                if err_variant < 0:
+                    self.fail("Result.unwrap/expect expects an Err variant")
+                    return "    abort();"
+                let err_payload_count = self.sema.type_reflection_variant_payload_count(opt_tid, err_variant)
+                if err_payload_count > 0:
+                    let err_field = self.payload_enum_variant_field(err_variant)
+                    let err_tid = self.sema.type_reflection_variant_payload_type(opt_tid, err_variant, 0)
+                    let err_debug = self.debug_format_expr(err_tid, opt_text ++ "." ++ err_field, "Result.unwrap/expect")
+                    let prefix = if is_expect: user_msg else: "WITH_STR_LIT(\"called unwrap on Err\")"
+                    panic_msg = "with_str_concat(with_str_concat(" ++ prefix ++ ", WITH_STR_LIT(\": \")), " ++ err_debug ++ ")"
+                else:
+                    panic_msg = if is_expect: user_msg else: "WITH_STR_LIT(\"called unwrap on Err\")"
+            var out = "    if ((" ++ opt_text ++ ").tag != " ++ f"{ok_tag}" ++ ") with_panic(" ++ panic_msg ++ ", " ++ loc_text ++ ", 0);\n"
+            if has_ret != 0:
+                out = out ++ "    " ++ dst ++ " = " ++ opt_text ++ "." ++ self.payload_enum_variant_field(payload_variant) ++ ";\n"
+            else:
+                out = out ++ "    (void)" ++ opt_text ++ "." ++ self.payload_enum_variant_field(payload_variant) ++ ";\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
+        if self.type_is_raw_pointer_tid(opt_tid):
+            let panic_msg2 = if is_expect: "with_str_concat(" ++ user_msg ++ ", WITH_STR_LIT(\": None\"))" else: "WITH_STR_LIT(\"called unwrap on None\")"
+            var out2 = "    if ((" ++ opt_text ++ ") == NULL) with_panic(" ++ panic_msg2 ++ ", " ++ loc_text ++ ", 0);\n"
+            if has_ret != 0:
+                out2 = out2 ++ "    " ++ dst ++ " = " ++ opt_text ++ ";\n"
+            else:
+                out2 = out2 ++ "    (void)" ++ opt_text ++ ";\n"
+            out2 = out2 ++ f"    goto bb{next_bb};"
+            return out2
         // Option unwrap: value = encoded - 1. Use memcpy to handle with_str/with_vec destinations.
-        var out = "    " ++ cc_lbrace() ++ " int64_t __uw = ((" ++ opt_text ++ ") - 1); memcpy(&(" ++ dst ++ "), &__uw, sizeof(" ++ dst ++ ") < sizeof(__uw) ? sizeof(" ++ dst ++ ") : sizeof(__uw)); " ++ cc_rbrace() ++ "\n"
+        let panic_msg3 = if is_expect: "with_str_concat(" ++ user_msg ++ ", WITH_STR_LIT(\": None\"))" else: "WITH_STR_LIT(\"called unwrap on None\")"
+        var out = "    if ((" ++ opt_text ++ ") == 0) with_panic(" ++ panic_msg3 ++ ", " ++ loc_text ++ ", 0);\n"
+        if has_ret != 0:
+            out = out ++ "    " ++ cc_lbrace() ++ " int64_t __uw = ((" ++ opt_text ++ ") - 1); memcpy(&(" ++ dst ++ "), &__uw, sizeof(" ++ dst ++ ") < sizeof(__uw) ? sizeof(" ++ dst ++ ") : sizeof(__uw)); " ++ cc_rbrace() ++ "\n"
+        else:
+            out = out ++ "    (void)((" ++ opt_text ++ ") - 1);\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 

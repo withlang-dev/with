@@ -2491,6 +2491,31 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     if prelude_output != "hello":
         return bs_fail(ctx, "prelude emitted C binary output mismatch: " ++ prelude_output)
 
+    let expect_src = bs_join(output_dir, "emit_c_expect_panic.w")
+    let expect_c_path = bs_join(output_dir, "emit_c_expect_panic.c")
+    let expect_bin_path = bs_join(output_dir, "emit_c_expect_panic")
+    rc = bs_write_fixture(ctx, expect_src, "fn main:\n    let r: Result[i32, str] = Err(\"emit-c bad\")\n    let _ = r.expect(\"emit-c expect failed\")\n", "emit-c expect panic source")
+    if rc != 0: return rc
+    var expect_emit_args: Vec[str] = Vec.new()
+    expect_emit_args |> push("build")
+    expect_emit_args |> push(bs_abs(root, expect_src))
+    expect_emit_args |> push("--emit-c")
+    expect_emit_args |> push("-o")
+    expect_emit_args |> push(bs_abs(root, expect_c_path))
+    let expect_emit_result = bs_edge_expect_success(ctx, compiler_path, output_dir, "emit-c-expect-panic", expect_emit_args)
+    if expect_emit_result.rc != 0: return expect_emit_result.rc
+    if not fs.exists(expect_c_path):
+        return bs_fail(ctx, "expect-panic emit-c did not produce " ++ expect_c_path)
+    rc = bs_compile_emit_c_output(ctx, root, output_dir, expect_c_path, expect_bin_path, "emit-c-expect-panic")
+    if rc != 0: return rc
+    let expect_run_result = bs_run_binary_capture(ctx, expect_bin_path, "emit-c-expect-panic-run", 120000)
+    if expect_run_result.rc != 134:
+        return bs_fail(ctx, f"emit-c expect panic exited {expect_run_result.rc}, expected 134: " ++ expect_run_result.stderr)
+    rc = bs_assert_contains(ctx, expect_run_result.stderr, "emit-c expect failed", "emit_c_expect_panic_message")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, expect_run_result.stderr, "\"emit-c bad\"", "emit_c_expect_panic_debug")
+    if rc != 0: return rc
+
     rc = bs_check_emit_c_hashmap_new_field(ctx, compiler_path, bs_join(output_dir, "emit_c_hashmap_new_field_case"))
     if rc != 0: return rc
     print("EMIT-C SMOKE OK")

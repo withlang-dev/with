@@ -931,7 +931,7 @@ fn MirBuilder.call_return_type(self: MirBuilder, callee: i32) -> i32:
             // (e.g. HashMap.get returns str, not Option[str]). When .unwrap()
             // is chained, intrinsic_return_type can't match "unwrap" on str.
             // The unwrap just returns the same type sema already reports.
-            if method_name == "unwrap":
+            if method_name == "unwrap" or method_name == "expect":
                 return base_ty
             if method_name == "is_some" or method_name == "is_none":
                 return self.sema.ty_bool as i32
@@ -1104,7 +1104,7 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
             return self.sema.ty_void as i32
         if type_name == "Option":
             if method_name == "is_some" or method_name == "is_none": return self.sema.ty_bool as i32
-            if method_name == "unwrap":
+            if method_name == "unwrap" or method_name == "expect":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
             if method_name == "filter":
@@ -1120,7 +1120,7 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
             return self.sema.ty_void as i32
         if type_name == "Result":
             if method_name == "is_ok": return self.sema.ty_bool as i32
-            if method_name == "unwrap":
+            if method_name == "unwrap" or method_name == "expect":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
             return self.sema.ty_void as i32
@@ -1983,6 +1983,7 @@ fn MirBuilder.lower_option_unwrap_place(self: MirBuilder, opt_place: i32, opt_ty
     let fn_op = self.const_operand(ConstKind.CK_FN, self.sema.pool_lookup_symbol("unwrap"), self.sema.ty_void)
     let args: Vec[i32] = Vec.new()
     args.push(self.body.new_operand(OperandKind.OK_COPY, opt_place))
+    args.push(self.lower_str_lit(self.pool.intern("")))
     let args_id = self.body.new_call_args(args)
     self.body.set_call_intrinsic(args_id, MirIntrinsic.OPT_UNWRAP)
     let result_local = self.new_temp(result_ty)
@@ -6085,11 +6086,13 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "is_some": return MirIntrinsic.OPT_IS_SOME
         if method_name == "is_none": return MirIntrinsic.OPT_IS_NONE
         if method_name == "unwrap": return MirIntrinsic.OPT_UNWRAP
+        if method_name == "expect": return MirIntrinsic.OPT_EXPECT
         if method_name == "filter": return MirIntrinsic.OPT_FILTER
         return MirIntrinsic.NONE
     if type_name == "Result":
         if method_name == "is_ok": return MirIntrinsic.OPT_IS_SOME
         if method_name == "unwrap": return MirIntrinsic.OPT_UNWRAP
+        if method_name == "expect": return MirIntrinsic.OPT_EXPECT
         return MirIntrinsic.NONE
     if type_name == "Atomic":
         if method_name == "load": return MirIntrinsic.ATOMIC_LOAD
@@ -6191,25 +6194,27 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
 
     var intrinsic = self.classify_intrinsic(recv_type, method_name)
 
-    // When classify_intrinsic fails for "unwrap"/"is_some", handle as Option
+    // When classify_intrinsic fails for "unwrap"/"expect"/"is_some", handle as Option
     // intrinsic. Sema's type system returns the raw value type for HashMap.get
     // (e.g., i32 instead of Option[i32]), so classify_intrinsic can't match Option.
     // Two fallbacks:
     // 1. Receiver is a direct call to HashMap.get/Vec.get (chained: map.get(k).unwrap())
     // 2. No sig exists for this method on the receiver type (let x = map.get(k); x.unwrap())
     if intrinsic == MirIntrinsic.NONE:
-        if method_name == "unwrap" or method_name == "is_some" or method_name == "is_none":
+        if method_name == "unwrap" or method_name == "expect" or method_name == "is_some" or method_name == "is_none":
             var is_option_method = false
             let recv_intr = self.receiver_option_intrinsic(self_expr)
             if recv_intr != MirIntrinsic.NONE:
                 is_option_method = true
             else if callee_sym == method_sym:
-                // Unresolved method — no sig found for unwrap/is_some/is_none on the receiver type.
+                // Unresolved method — no sig found for unwrap/expect/is_some/is_none on the receiver type.
                 // User-defined types with these names would have a sig. This is an Option intrinsic.
                 is_option_method = true
             if is_option_method:
                 if method_name == "unwrap":
                     intrinsic = MirIntrinsic.OPT_UNWRAP
+                else if method_name == "expect":
+                    intrinsic = MirIntrinsic.OPT_EXPECT
                 else if method_name == "is_none":
                     intrinsic = MirIntrinsic.OPT_IS_NONE
                 else:
@@ -6324,7 +6329,7 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
         recv_type_for_args = recv_ty
         let recv_resolved = if recv_ty != 0: self.sema.resolve_alias(recv_ty as TypeId) else: 0
         let recv_kind = self.sema.get_type_kind(recv_resolved)
-        let raw_pointer_option_receiver = recv_kind == TypeKind.TY_PTR and (intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_IS_SOME or intrinsic == MirIntrinsic.OPT_IS_NONE or intrinsic == MirIntrinsic.OPT_FILTER)
+        let raw_pointer_option_receiver = recv_kind == TypeKind.TY_PTR and (intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT or intrinsic == MirIntrinsic.OPT_IS_SOME or intrinsic == MirIntrinsic.OPT_IS_NONE or intrinsic == MirIntrinsic.OPT_FILTER)
         if raw_pointer_option_receiver:
             call_args.push(self.lower_expr(self_expr))
         else:
@@ -6332,6 +6337,8 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
     for i in 0..arg_count:
         let arg_node = self.ast.get_extra(arg_start + i)
         call_args.push(self.lower_method_arg_with_expected(recv_type_for_args, method_sym, arg_node, i))
+    if intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT:
+        call_args.push(self.source_location_operand(node))
 
     let args_id = self.body.new_call_args(call_args)
     var ret_type = self.expr_type(node)
