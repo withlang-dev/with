@@ -1076,6 +1076,9 @@ fn CCodegen.struct_c_name(self: CCodegen, tid: i32) -> str:
     if self.check_interrupted() != 0:
         return "with_interrupted"
     let resolved = self.sema.resolve_alias(tid)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_SLICE:
+        let elem_tid = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId)
+        return f"with_slice_{elem_tid as i32}"
     if self.sema.get_type_kind(resolved) == TypeKind.TY_TUPLE:
         return f"with_tuple_{resolved as i32}"
     if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
@@ -1574,6 +1577,8 @@ fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
     if tk == TypeKind.TY_ARRAY:
         let elem_tid = self.sema.get_type_d0(resolved)
         return self.c_type(elem_tid, 0) ++ "*"
+    if tk == TypeKind.TY_SLICE:
+        return self.struct_c_name(resolved as i32)
     if tk == TypeKind.TY_TUPLE:
         return self.struct_c_name(resolved as i32)
     if tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN:
@@ -2274,6 +2279,12 @@ fn CCodegen.rvalue_uses_local(self: CCodegen, body: MirBody, rval_id: i32, local
         return self.operand_uses_local(body, d1, local_id)
     if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
         return self.place_uses_local(body, d0, local_id)
+    if rk == RvalueKind.RK_SLICE:
+        if self.place_uses_local(body, d0, local_id) != 0:
+            return 1
+        if self.operand_uses_local(body, d1, local_id) != 0:
+            return 1
+        return self.operand_uses_local(body, d2, local_id)
     if rk == RvalueKind.RK_CAST:
         return self.operand_uses_local(body, d0, local_id)
     if rk == RvalueKind.RK_AGGREGATE:
@@ -2331,6 +2342,11 @@ fn CCodegen.local_value_use_mark_rvalue(self: CCodegen, body: MirBody, rval_id: 
         return
     if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
         self.local_value_use_mark_place(body, d0)
+        return
+    if rk == RvalueKind.RK_SLICE:
+        self.local_value_use_mark_place(body, d0)
+        self.local_value_use_mark_operand(body, d1)
+        self.local_value_use_mark_operand(body, d2)
         return
     if rk == RvalueKind.RK_CAST:
         self.local_value_use_mark_operand(body, d0)
@@ -2459,8 +2475,12 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
                 out = f"{out}.ptr[_{pd}]"
                 current_tid = self.sema.ty_i32 as i32
                 continue
-            if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+            if tk == TypeKind.TY_ARRAY:
                 out = f"{out}[_{pd}]"
+                current_tid = self.sema.get_type_d0(resolved)
+                continue
+            if tk == TypeKind.TY_SLICE:
+                out = f"({out}).ptr[_{pd}]"
                 current_tid = self.sema.get_type_d0(resolved)
                 continue
             // Vec or other generic container: use with_vec_get_ptr runtime call
@@ -2689,6 +2709,15 @@ fn CCodegen.rvalue_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
         return self.sema.ty_str as i32
     if rk == RvalueKind.RK_UN_OP:
         return self.operand_tid(body, d1)
+    if rk == RvalueKind.RK_SLICE:
+        let base_tid = self.place_tid(body, d0)
+        let resolved = self.sema.resolve_alias(base_tid)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk == TypeKind.TY_ARRAY:
+            return self.sema.ensure_exact_type(TypeKind.TY_SLICE, self.sema.get_type_d0(resolved), 0, 0) as i32
+        if tk == TypeKind.TY_SLICE:
+            return resolved as i32
+        return 0
     0
 
 fn CCodegen.binop_token(self: CCodegen, op: i32) -> str:
@@ -2812,6 +2841,24 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
         return "(&" ++ self.place_text(body, d1) ++ ")"
     if rk == RvalueKind.RK_ADDR_OF:
         return "(&" ++ self.place_text(body, d0) ++ ")"
+    if rk == RvalueKind.RK_SLICE:
+        let base = self.place_text(body, d0)
+        let start = self.operand_text(body, d1)
+        let end_ = self.operand_text(body, d2)
+        let base_tid = self.sema.resolve_alias(self.place_tid(body, d0))
+        let base_tk = self.sema.get_type_kind(base_tid)
+        let slice_tid = self.rvalue_tid(body, rval_id)
+        let slice_c = self.c_type(slice_tid, 0)
+        var ptr_expr = ""
+        if base_tk == TypeKind.TY_ARRAY:
+            ptr_expr = "&((" ++ base ++ ")[(int64_t)(" ++ start ++ ")])"
+        else if base_tk == TypeKind.TY_SLICE:
+            ptr_expr = "((" ++ base ++ ").ptr + (int64_t)(" ++ start ++ "))"
+        else:
+            self.fail("C backend slice rvalue requires array or slice base")
+            return "0"
+        let len_expr = "((int64_t)(" ++ end_ ++ ") - (int64_t)(" ++ start ++ "))"
+        return "((" ++ slice_c ++ ") " ++ cc_lbrace() ++ " .ptr = " ++ ptr_expr ++ ", .len = " ++ len_expr ++ " " ++ cc_rbrace() ++ ")"
     if rk == RvalueKind.RK_CAST:
         let dst_c = self.c_type(d1, 0)
         let src = self.operand_text(body, d0)
@@ -2832,6 +2879,11 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
         let pt = self.place_tid(body, d0)
         if pt == CC_PSEUDO_TID_VEC:
             return "with_vec_len(&(" ++ p ++ "))"
+        let resolved_pt = self.sema.resolve_alias(pt)
+        if self.sema.get_type_kind(resolved_pt) == TypeKind.TY_ARRAY:
+            return "((int64_t)(sizeof(" ++ p ++ ") / sizeof((" ++ p ++ ")[0])))"
+        if self.sema.get_type_kind(resolved_pt) == TypeKind.TY_SLICE:
+            return "((" ++ p ++ ").len)"
         return "with_len(" ++ p ++ ")"
     if rk == RvalueKind.RK_AGGREGATE:
         if d1 < 0 or d1 >= body.agg_field_starts.len() as i32:
@@ -4993,6 +5045,14 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                 return self.sema.ty_i32 as i32
             if rk == RvalueKind.RK_LEN:
                 return self.sema.ty_i64 as i32
+            if rk == RvalueKind.RK_SLICE:
+                let base_tid = self.place_tid(body, d0)
+                let base_resolved = self.sema.resolve_alias(base_tid)
+                let base_kind = self.sema.get_type_kind(base_resolved)
+                if base_kind == TypeKind.TY_ARRAY:
+                    return self.sema.ensure_exact_type(TypeKind.TY_SLICE, self.sema.get_type_d0(base_resolved), 0, 0) as i32
+                if base_kind == TypeKind.TY_SLICE:
+                    return base_resolved as i32
 
     if recv_hint != 0 and self.is_void_tid(recv_hint) == 0:
         return recv_hint
@@ -6101,8 +6161,13 @@ fn CCodegen.emit_builtin_vec_extra_call_term(self: CCodegen, body: MirBody, kind
         if argc < 1:
             self.fail("arr.len expects one argument")
             return "    abort();"
-        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
-        let raw = "(int64_t)(sizeof(" ++ recv ++ ") / sizeof((" ++ recv ++ ")[0]))"
+        let recv_operand = self.call_arg_operand(body, args_id, 0)
+        let recv = self.operand_text(body, recv_operand)
+        let recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand) as TypeId)
+        let raw = if self.sema.get_type_kind(recv_tid) == TypeKind.TY_SLICE:
+            "((" ++ recv ++ ").len)"
+        else:
+            "(int64_t)(sizeof(" ++ recv ++ ") / sizeof((" ++ recv ++ ")[0]))"
         var out = self.emit_len_result(body, dest_place, raw, kind, has_ret)
         out = out ++ f"    goto bb{next_bb};"
         return out
@@ -7256,7 +7321,14 @@ fn CCodegen.collect_struct_types_from_tid(self: CCodegen, mut acc: CollectStruct
             return generic_acc
         if base_name == "Vec" or base_name == "HashMap" or base_name == "HashSet":
             return acc
-    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+    if tk == TypeKind.TY_SLICE:
+        let cname = self.struct_c_name(resolved as i32)
+        if not acc.seen_names.contains(resolved as i32) and not acc.seen_c_names.contains(cname):
+            acc.seen_names.insert(resolved as i32, 1)
+            acc.seen_c_names.insert(cname, 1)
+            acc.out.push(resolved as i32)
+        return self.collect_struct_types_from_tid(acc, self.sema.get_type_d0(resolved))
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_ARRAY:
         let inner_tid = self.sema.get_type_d0(resolved)
         return self.collect_struct_types_from_tid(acc, inner_tid)
     acc
@@ -7540,6 +7612,10 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
             return ""
         let tid = ordered.get(i as i64)
         let resolved = self.sema.resolve_alias(tid)
+        if self.sema.get_type_kind(resolved) == TypeKind.TY_SLICE:
+            let name = self.struct_c_name(tid)
+            out = out ++ "typedef struct " ++ name ++ " " ++ name ++ ";\n"
+            continue
         if self.sema.get_type_kind(resolved) == TypeKind.TY_TUPLE:
             let name = self.struct_c_name(tid)
             out = out ++ "typedef struct " ++ name ++ " " ++ name ++ ";\n"
@@ -7559,6 +7635,13 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
         let tid = ordered.get(i as i64)
         let resolved = self.sema.resolve_alias(tid)
         let name = self.struct_c_name(resolved)
+        if self.sema.get_type_kind(resolved) == TypeKind.TY_SLICE:
+            let elem_tid = self.sema.get_type_d0(resolved)
+            out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
+            out = out ++ "    " ++ self.c_type(elem_tid, 0) ++ "* ptr;\n"
+            out = out ++ "    int64_t len;\n"
+            out = out ++ cc_rbrace() ++ ";\n\n"
+            continue
         if self.sema.get_type_kind(resolved) == TypeKind.TY_TUPLE:
             let start = self.sema.get_type_d0(resolved)
             let count = self.sema.get_type_d1(resolved)

@@ -1160,15 +1160,17 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     idx_val = wl_build_zext(self.builder, idx_val, i64_ty)
                 else:
                     idx_val = wl_build_sext(self.builder, idx_val, i64_ty)
-            let elem_llvm = self.mir_index_elem_llvm_type(cur_sema_ty, cur_ty)
-            let elem_sema = self.mir_index_elem_sema_type(cur_sema_ty)
-            if elem_sema > 0:
-                cur_sema_ty = elem_sema
+            let index_base_sema_ty = cur_sema_ty
+            let elem_llvm = self.mir_index_elem_llvm_type(index_base_sema_ty, cur_ty)
+            let elem_sema = self.mir_index_elem_sema_type(index_base_sema_ty)
             if wl_get_type_kind(cur_ty) == wl_array_type_kind():
+                self.mir_emit_debug_index_bounds_check(idx_val, idx_sema_ty, self.mir_index_len_value(index_base_sema_ty, cur_ty, cur_ptr))
                 let indices: Vec[i64] = Vec.new()
                 indices.push(idx_val)
                 cur_ptr = wl_build_gep(self.builder, elem_llvm, cur_ptr, vec_data_i64(&indices), 1)
                 cur_ty = elem_llvm
+                if elem_sema > 0:
+                    cur_sema_ty = elem_sema
             else if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
                 // Raw pointer indexing: load the pointer, then GEP.
                 if elem_llvm == 0:
@@ -1178,16 +1180,21 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 indices.push(idx_val)
                 cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, vec_data_i64(&indices), 1)
                 cur_ty = elem_llvm
+                if elem_sema > 0:
+                    cur_sema_ty = elem_sema
             else:
                 // Vec, str, and slices all store their data pointer in field 0.
                 if elem_llvm == 0:
                     return 0
+                self.mir_emit_debug_index_bounds_check(idx_val, idx_sema_ty, self.mir_index_len_value(index_base_sema_ty, cur_ty, cur_ptr))
                 let data_gep = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 0)
                 let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), data_gep)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(idx_val)
                 cur_ptr = wl_build_gep(self.builder, elem_llvm, raw_ptr, vec_data_i64(&indices), 1)
                 cur_ty = elem_llvm
+                if elem_sema > 0:
+                    cur_sema_ty = elem_sema
             active_variant_idx = -1
         else if pk == 3: // ProjKind.PK_DOWNCAST
             // GEP to field 1 of enum/option/result struct for payload access.
@@ -3162,6 +3169,63 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return wl_build_extract_value(self.builder, loaded, 1)
         return wl_const_int(wl_i64_type(self.context), 0, 0)
 
+    if rk == RvalueKind.RK_SLICE:
+        let base_ptr = self.mir_place_ptr(body, d0, false, 0)
+        if base_ptr == 0:
+            return wl_get_undef(fallback_ty)
+        var base_ty = self.mir_place_projected_type(body, d0)
+        if base_ty == 0:
+            let base_local = body.place_locals.get(d0 as i64)
+            let base_ty_opt = self.mir_local_types.get(base_local)
+            if base_ty_opt.is_some():
+                base_ty = base_ty_opt.unwrap() as i64
+        let base_sema_ty = self.mir_place_sema_type(body, d0)
+        let i64_ty = wl_i64_type(self.context)
+        let start_val = self.coerce_int(self.mir_eval_operand(body, d1, i64_ty), i64_ty)
+        let end_val = self.coerce_int(self.mir_eval_operand(body, d2, i64_ty), i64_ty)
+        let base_len = self.mir_index_len_value(base_sema_ty, base_ty, base_ptr)
+        self.mir_emit_debug_slice_bounds_check(start_val, end_val, base_len)
+
+        let slice_len = wl_build_sub(self.builder, end_val, start_val)
+        let elem_ty = self.mir_index_elem_llvm_type(base_sema_ty, base_ty)
+        if elem_ty == 0:
+            self.had_error = 1
+            self.codegen_error_detail = "slice base has no element type"
+            return wl_get_undef(fallback_ty)
+        var data_ptr = wl_const_null(wl_ptr_type(self.context))
+        if base_ty != 0 and wl_get_type_kind(base_ty) == wl_array_type_kind():
+            let indices: Vec[i64] = Vec.new()
+            indices.push(start_val)
+            data_ptr = wl_build_gep(self.builder, elem_ty, base_ptr, vec_data_i64(&indices), 1)
+        else if base_ty != 0 and wl_get_type_kind(base_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(base_ty) > 0:
+            let data_gep = wl_build_struct_gep(self.builder, base_ty, base_ptr, 0)
+            let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), data_gep)
+            let indices: Vec[i64] = Vec.new()
+            indices.push(start_val)
+            data_ptr = wl_build_gep(self.builder, elem_ty, raw_ptr, vec_data_i64(&indices), 1)
+        else:
+            self.had_error = 1
+            self.codegen_error_detail = "slice base has no bounds metadata"
+            return wl_get_undef(fallback_ty)
+
+        var slice_ty = dest_ty
+        if slice_ty == 0 and dest_sema_ty > 0:
+            slice_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
+        if slice_ty == 0 or wl_get_type_kind(slice_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(slice_ty) < 2:
+            self.had_error = 1
+            self.codegen_error_detail = "slice rvalue missing destination slice type"
+            return wl_get_undef(fallback_ty)
+        let slice_alloca = self.create_entry_alloca(slice_ty)
+        wl_build_store(self.builder, self.build_default_value(slice_ty), slice_alloca)
+        let data_field = wl_build_struct_gep(self.builder, slice_ty, slice_alloca, 0)
+        let data_field_ty = wl_struct_get_type_at(slice_ty, 0)
+        let stored_data = if wl_type_of(data_ptr) != data_field_ty: wl_build_bitcast(self.builder, data_ptr, data_field_ty) else: data_ptr
+        wl_build_store(self.builder, stored_data, data_field)
+        let len_field = wl_build_struct_gep(self.builder, slice_ty, slice_alloca, 1)
+        let len_field_ty = wl_struct_get_type_at(slice_ty, 1)
+        wl_build_store(self.builder, self.coerce_int(slice_len, len_field_ty), len_field)
+        return wl_build_load(self.builder, slice_ty, slice_alloca)
+
     if rk == RvalueKind.RK_ARRAY_FILL:
         let fill_operand = d0
         let fill_count = d1
@@ -3924,6 +3988,94 @@ fn Codegen.mir_vec_elem_size(self: Codegen, body: MirBody, dest_place: i32) -> i
                     if elem_llvm != 0:
                         return self.abi_size_of(elem_llvm)
     8 // default — safe for pointers, i64, str
+
+fn Codegen.mir_type_kind_from_snapshot(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        tk = self.sema.get_type_kind(self.sema.resolve_alias(resolved))
+    tk
+
+fn Codegen.mir_type_d0_from_snapshot(self: Codegen, sema_ty: i32) -> i32:
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        return self.sema.get_type_d0(resolved)
+    self.mir_input.mir_get_type_d0(resolved)
+
+fn Codegen.mir_type_d1_from_snapshot(self: Codegen, sema_ty: i32) -> i32:
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        return self.sema.get_type_d1(resolved)
+    self.mir_input.mir_get_type_d1(resolved)
+
+fn Codegen.mir_index_len_value(self: Codegen, sema_ty: i32, llvm_ty: i64, ptr: i64) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    if llvm_ty != 0 and wl_get_type_kind(llvm_ty) == wl_array_type_kind():
+        return wl_const_int(i64_ty, wl_get_array_length(llvm_ty), 0)
+    if sema_ty <= 0 or llvm_ty == 0:
+        return 0
+
+    var bounded_ty = sema_ty
+    var tk = self.mir_type_kind_from_snapshot(bounded_ty)
+    if tk == TypeKind.TY_REF:
+        bounded_ty = self.mir_type_d0_from_snapshot(bounded_ty)
+        tk = self.mir_type_kind_from_snapshot(bounded_ty)
+
+    if tk == TypeKind.TY_ARRAY:
+        return wl_const_int(i64_ty, self.mir_type_d1_from_snapshot(bounded_ty) as i64, 0)
+
+    var has_dynamic_len = tk == TypeKind.TY_SLICE or tk == TypeKind.TY_STR
+    if not has_dynamic_len and tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.sema_sym_to_codegen_sym(self.mir_type_d0_from_snapshot(bounded_ty))
+        has_dynamic_len = base_sym == self.sym_vec
+    if not has_dynamic_len:
+        return 0
+    if wl_get_type_kind(llvm_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(llvm_ty) < 2:
+        return 0
+
+    let len_gep = wl_build_struct_gep(self.builder, llvm_ty, ptr, 1)
+    let len_ty = wl_struct_get_type_at(llvm_ty, 1)
+    var len_val = wl_build_load(self.builder, len_ty, len_gep)
+    if wl_type_of(len_val) != i64_ty:
+        len_val = self.coerce_int(len_val, i64_ty)
+    len_val
+
+fn Codegen.mir_emit_debug_index_bounds_check(self: Codegen, idx_val: i64, idx_sema_ty: i32, len_val: i64):
+    if self.debug_info == 0 or len_val == 0:
+        return
+    let i64_ty = wl_i64_type(self.context)
+    let zero = wl_const_int(i64_ty, 0, 0)
+    let is_unsigned = idx_sema_ty != 0 and self.sema.is_unsigned_int_type(idx_sema_ty)
+    var bad = if is_unsigned:
+        wl_build_icmp(self.builder, wl_int_uge(), idx_val, len_val)
+    else:
+        let neg = wl_build_icmp(self.builder, wl_int_slt(), idx_val, zero)
+        let too_big = wl_build_icmp(self.builder, wl_int_sge(), idx_val, len_val)
+        wl_build_or(self.builder, neg, too_big)
+    let panic_bb = wl_append_bb(self.context, self.current_function, "index.bounds.panic")
+    let ok_bb = wl_append_bb(self.context, self.current_function, "index.bounds.ok")
+    wl_build_cond_br(self.builder, bad, panic_bb, ok_bb)
+    wl_position_at_end(self.builder, panic_bb)
+    self.emit_runtime_panic("index out of bounds")
+    wl_position_at_end(self.builder, ok_bb)
+
+fn Codegen.mir_emit_debug_slice_bounds_check(self: Codegen, start_val: i64, end_val: i64, len_val: i64):
+    if self.debug_info == 0 or len_val == 0:
+        return
+    let i64_ty = wl_i64_type(self.context)
+    let zero = wl_const_int(i64_ty, 0, 0)
+    let bad_start = wl_build_icmp(self.builder, wl_int_slt(), start_val, zero)
+    let bad_order = wl_build_icmp(self.builder, wl_int_sgt(), start_val, end_val)
+    let bad_end = wl_build_icmp(self.builder, wl_int_sgt(), end_val, len_val)
+    let bad = wl_build_or(self.builder, wl_build_or(self.builder, bad_start, bad_order), bad_end)
+    let panic_bb = wl_append_bb(self.context, self.current_function, "slice.bounds.panic")
+    let ok_bb = wl_append_bb(self.context, self.current_function, "slice.bounds.ok")
+    wl_build_cond_br(self.builder, bad, panic_bb, ok_bb)
+    wl_position_at_end(self.builder, panic_bb)
+    self.emit_runtime_panic("slice index out of bounds")
+    wl_position_at_end(self.builder, ok_bb)
 
 fn Codegen.mir_index_elem_sema_type(self: Codegen, sema_ty: i32) -> i32:
     if sema_ty <= 0:
@@ -7110,21 +7262,29 @@ fn Codegen.mir_emit_ext_numeric_intrinsic_call(self: Codegen, body: MirBody, int
     let i64_ty = wl_i64_type(self.context)
     var result: i64 = 0
     if intrinsic == MirIntrinsic.ARR_LEN:
-        // Array.len() returns the compile-time length of the array type
+        // Array.len() returns the compile-time length. Slice.len() reads the
+        // fat-slice length field through the same intrinsic family.
         let al_recv = self.mir_intrinsic_arg(body, args_id, 0)
         let al_ty = wl_type_of(al_recv)
         var al_len = 0
         if wl_get_type_kind(al_ty) == wl_array_type_kind():
             al_len = wl_get_array_length(al_ty) as i32
-        result = wl_const_int(i64_ty, al_len as i64, 0)
+            result = wl_const_int(i64_ty, al_len as i64, 0)
+        else if wl_get_type_kind(al_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(al_ty) > 1:
+            result = wl_build_extract_value(self.builder, al_recv, 1)
+        else:
+            result = wl_const_int(i64_ty, 0, 0)
 
     else if intrinsic == MirIntrinsic.ARR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN64 or intrinsic == MirIntrinsic.ARR_ULEN32:
         let al_recv = self.mir_intrinsic_arg(body, args_id, 0)
         let al_ty = wl_type_of(al_recv)
         var al_len = 0
+        var raw_len = wl_const_int(i64_ty, 0, 0)
         if wl_get_type_kind(al_ty) == wl_array_type_kind():
             al_len = wl_get_array_length(al_ty) as i32
-        let raw_len = wl_const_int(i64_ty, al_len as i64, 0)
+            raw_len = wl_const_int(i64_ty, al_len as i64, 0)
+        else if wl_get_type_kind(al_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(al_ty) > 1:
+            raw_len = wl_build_extract_value(self.builder, al_recv, 1)
         result = self.mir_convert_len_method_result(raw_len, intrinsic)
 
     else if intrinsic == MirIntrinsic.ROTATE_LEFT or intrinsic == MirIntrinsic.ROTATE_RIGHT:

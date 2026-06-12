@@ -6361,8 +6361,11 @@ fn Sema.check_slice(self: Sema, node: i32) -> i32:
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_ARRAY:
         let elem = self.get_type_d0(resolved)
-        return self.add_type(TypeKind.TY_SLICE, elem, 0, 0) as i32
+        let result = self.add_type(TypeKind.TY_SLICE, elem, 0, 0) as i32
+        self.typed_expr_types.insert(node, result)
+        return result
     if tk == TypeKind.TY_SLICE:
+        self.typed_expr_types.insert(node, resolved as i32)
         return resolved as i32
     0
 
@@ -11862,7 +11865,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         let str_builtin_ret = self.builtin_intrinsic_method_return_type(recv_type as i32, type_name_sym, field)
         if str_builtin_ret != 0:
             return str_builtin_ret
-    if resolved_tk == TypeKind.TY_ARRAY:
+    if resolved_tk == TypeKind.TY_ARRAY or resolved_tk == TypeKind.TY_SLICE:
         if primitive_len_ret != 0:
             return primitive_len_ret
 

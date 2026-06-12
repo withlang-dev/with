@@ -56,6 +56,7 @@ enum RvalueKind: i32:
     RK_LEN = 8
     RK_ARRAY_FILL = 9
     RK_STR_CONCAT_N = 10
+    RK_SLICE = 11
 
 // ── Operand kinds ────────────────────────────────────────────────
 
@@ -1102,6 +1103,9 @@ fn mir_rvalue_text(body: MirBody, rval_id: i32, pool: InternPool, sema: Sema) ->
     if k == RvalueKind.RK_STR_CONCAT_N:
         return f"str_concat_n([{mir_call_args_text(body, d0, pool, sema)}])"
 
+    if k == RvalueKind.RK_SLICE:
+        return "slice(" ++ mir_place_text(body, d0) ++ ", " ++ mir_operand_text(body, d1, pool, sema) ++ ", " ++ mir_operand_text(body, d2, pool, sema) ++ ")"
+
     return f"rvalue<{k}>({d0}, {d1}, {d2})"
 
 fn mir_operand_text(body: MirBody, operand_id: i32, pool: InternPool, sema: Sema) -> str:
@@ -1559,6 +1563,12 @@ fn validate_mir_body(body: MirBody) -> str:
             if not mir_index_in_range(d0, call_args_count):
                 return f"rvalue{ri}: str_concat_n args out of range"
             continue
+        if rv_kind == RvalueKind.RK_SLICE:
+            if not mir_index_in_range(d0, place_count):
+                return f"rvalue{ri}: slice base place out of range"
+            if not mir_index_in_range(d1, operand_count) or not mir_index_in_range(d2, operand_count):
+                return f"rvalue{ri}: slice bounds operand out of range"
+            continue
 
         return f"rvalue{ri}: unknown rvalue kind {rv_kind}"
 
@@ -1987,6 +1997,11 @@ fn validate_typed_mir_body(mir_mod: MirModule, body: MirBody) -> MirValidationEr
             else if rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
                 if mir_validate_place_type(mir_mod, body, rv_d0) == 0:
                     return mir_validation_fail(body.fn_sym, span, "place-based rvalue does not resolve to a concrete place type")
+            else if rk == RvalueKind.RK_SLICE:
+                if mir_validate_place_type(mir_mod, body, rv_d0) == 0:
+                    return mir_validation_fail(body.fn_sym, span, "slice base does not resolve to a concrete place type")
+                if mir_validate_operand_type(mir_mod, body, rv_d1) == 0 or mir_validate_operand_type(mir_mod, body, rv_d2) == 0:
+                    return mir_validation_fail(body.fn_sym, span, "slice bounds do not resolve to concrete MIR types")
 
             if rk == RvalueKind.RK_BIN_OP and (rv_d0 == BinaryOp.OP_IN or rv_d0 == BinaryOp.OP_NOT_IN):
                 return mir_validation_fail(body.fn_sym, span, "membership operator must be lowered before MIR codegen")

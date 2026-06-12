@@ -1345,6 +1345,16 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         if target_ty != 0:
             return target_ty
         return self.sema.ty_void as i32
+    if kind == NodeKind.NK_SLICE:
+        let base_ty = self.expr_type(self.ast.get_data0(node))
+        if base_ty != 0:
+            let resolved = self.sema.resolve_alias(base_ty as TypeId)
+            let tk = self.sema.get_type_kind(resolved)
+            if tk == TypeKind.TY_ARRAY:
+                return self.sema.ensure_exact_type(TypeKind.TY_SLICE, self.sema.get_type_d0(resolved), 0, 0) as i32
+            if tk == TypeKind.TY_SLICE:
+                return resolved as i32
+        return self.sema.ty_void as i32
     if kind == NodeKind.NK_STRUCT_LIT:
         let st_name = self.ast.get_data0(node)
         if self.sema.named_types.contains(st_name):
@@ -3219,6 +3229,32 @@ fn MirBuilder.lower_ref(self: MirBuilder, expr: i32, borrow_kind: i32, node: i32
     let temp_place = self.place_for_local(temp)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(node))
     self.body.new_operand(OperandKind.OK_COPY, temp_place)
+
+fn MirBuilder.lower_slice_expr(self: MirBuilder, node: i32) -> i32:
+    let base_node = self.ast.get_data0(node)
+    let start_node = self.ast.get_data1(node)
+    let end_node = self.ast.get_data2(node)
+    let base_place = self.lower_expr_place(base_node)
+    let start_op = if start_node != 0:
+        self.lower_expr(start_node)
+    else:
+        self.int_const_operand(0, self.sema.ty_i64)
+    var end_op = 0
+    if end_node != 0:
+        end_op = self.lower_expr(end_node)
+    else:
+        let len_local = self.new_temp(self.sema.ty_i64)
+        let len_place = self.place_for_local(len_local)
+        let len_rv = self.body.new_rvalue(RvalueKind.RK_LEN, base_place, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(node))
+        end_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
+
+    let slice_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, base_place, start_op, end_op)
+    let slice_ty = self.expr_type(node)
+    let slice_local = self.new_temp(slice_ty)
+    let slice_place = self.place_for_local(slice_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, slice_place, slice_rv, self.ast.get_start(node))
+    self.body.new_operand(OperandKind.OK_COPY, slice_place)
 
 fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
     // Multi-index assignment: a[i, j] = value → call multi_index_set
@@ -5942,7 +5978,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "index_of": return MirIntrinsic.STR_INDEX_OF
         if method_name == "repeat": return MirIntrinsic.STR_REPEAT
         return MirIntrinsic.NONE
-    if tk == TypeKind.TY_ARRAY:
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
         let arr_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.ARR_LEN, method_name)
         if arr_len_intrinsic != MirIntrinsic.NONE: return arr_len_intrinsic
         return MirIntrinsic.NONE
@@ -7953,6 +7989,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_MULTI_INDEX:
         let mi_place = self.lower_multi_index_read(node)
         return self.body.new_operand(OperandKind.OK_COPY, mi_place)
+
+    if kind == NodeKind.NK_SLICE:
+        return self.lower_slice_expr(node)
 
     if kind == NodeKind.NK_BLOCK:
         return self.lower_block(node)

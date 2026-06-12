@@ -61,6 +61,22 @@ compile-error tests cover invalid float/integer mode combinations. Full
 `with build :test`, and `with build :test-green` passed on 2026-06-11 for
 #440.
 
+#428 is implemented and verified. Native MIR codegen now emits debug-mode
+bounds checks for fixed arrays, slices, strings, and Vec indexing while leaving
+raw pointer indexing unchecked. Array and slice range expressions lower through
+an explicit `RK_SLICE` MIR rvalue, with debug checks for negative starts,
+end-before-start, and end beyond length before constructing the `{ptr, len}`
+slice value. The parser now accepts leading-open ranges such as `arr[..]`,
+slice `.len()` is recognized in Sema/MIR/C lowering, and the emit-C backend
+emits first-class slice structs plus `slice.ptr[i]`/`slice.len` operations
+instead of treating slices as arrays or integers. Behavior coverage includes
+in-bounds array/slice/Vec use, array load/store out-of-bounds panics, negative
+array indexes, slice element out-of-bounds panics, and slice-range
+out-of-bounds panics. Generated C for the in-bounds slice test emits and
+compiles to an object. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-11 for
+#428.
+
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
 C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib

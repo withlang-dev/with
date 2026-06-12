@@ -4311,6 +4311,16 @@ fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> NodeId:
     if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_DOT_DOT_DOT:
         return self.parse_multi_index(lhs)
 
+    if self.peek() == TokenKind.TK_DOT_DOT:
+        self.advance()
+        self.skip_newlines()
+        var end_expr: NodeId = 0 as NodeId
+        if self.peek() != TokenKind.TK_R_BRACKET:
+            end_expr = self.parse_expr()
+            self.skip_newlines()
+        self.expect(TokenKind.TK_R_BRACKET)
+        return self.pool.add_node(NodeKind.NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, 0, end_expr)
+
     let index = self.parse_index_expr()
     self.skip_newlines()
 
