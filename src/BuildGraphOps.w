@@ -7,7 +7,7 @@ use BuildGraphModel
 use BuildGraphSupport
 use BuildGraphRuntime
 
-fn build_graph_target_input_path(root: str, target: BuildGraphTarget, index: i32) -> str:
+fn build_graph_target_input_path(root: str, target: &BuildGraphTarget, index: i32) -> str:
     if index == 0:
         if target.entry.len() == 0:
             return ""
@@ -17,7 +17,7 @@ fn build_graph_target_input_path(root: str, target: BuildGraphTarget, index: i32
         return ""
     build_graph_resolve_project_path(root, target.inputs.get(input_index as i64))
 
-pub fn build_graph_compare_files(root: str, target: BuildGraphTarget, operation_name: str) -> i32:
+pub fn build_graph_compare_files(root: str, target: &BuildGraphTarget, operation_name: str) -> i32:
     let left_path = build_graph_target_input_path(root, target, 0)
     let right_path = if target.args.len() > 0:
         build_graph_resolve_project_path(root, target.args.get(0))
@@ -49,7 +49,7 @@ pub fn build_graph_compare_files(root: str, target: BuildGraphTarget, operation_
         return 1
     0
 
-pub fn build_graph_run_clean(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_run_clean(root: str, target: &BuildGraphTarget) -> i32:
     var removed = 0
     for ai in 0..target.args.len() as i32:
         let rel = target.args.get(ai as i64)
@@ -88,7 +88,7 @@ fn build_graph_quote_response_arg(arg: str) -> str:
         out = out ++ arg.slice(i as i64, (i + 1) as i64)
     out ++ "\""
 
-pub fn build_graph_write_response_file(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_write_response_file(root: str, target: &BuildGraphTarget) -> i32:
     if target.output.len() == 0:
         build_graph_rt_eprint("error: generate_response_file target '" ++ target.name ++ "' requires an output path")
         return 1
@@ -109,7 +109,7 @@ pub fn build_graph_write_response_file(root: str, target: BuildGraphTarget) -> i
         return 1
     0
 
-fn build_graph_append_common_compile_args(root: str, target: BuildGraphTarget, argv_blob: str) -> str:
+fn build_graph_append_common_compile_args(root: str, target: &BuildGraphTarget, argv_blob: str) -> str:
     var out = argv_blob
     for ii in 0..target.include_paths.len() as i32:
         out = build_graph_argv_append(out, "-I" ++ build_graph_resolve_project_path(root, target.include_paths.get(ii as i64)))
@@ -119,7 +119,7 @@ fn build_graph_append_common_compile_args(root: str, target: BuildGraphTarget, a
         out = build_graph_argv_append(out, target.args.get(ai as i64))
     out
 
-pub fn build_graph_compile_object(root: str, target: BuildGraphTarget, operation_name: str, compiler: str) -> i32:
+pub fn build_graph_compile_object(root: str, target: &BuildGraphTarget, operation_name: str, compiler: str) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires source and output paths")
         return 1
@@ -144,7 +144,7 @@ pub fn build_graph_compile_object(root: str, target: BuildGraphTarget, operation
     argv = build_graph_argv_append(argv, output_path)
     build_graph_exec_argv(target, operation_name, argv)
 
-pub fn build_graph_assemble_to_object(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_assemble_to_object(root: str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' requires source and output paths")
         return 1
@@ -162,7 +162,7 @@ pub fn build_graph_assemble_to_object(root: str, target: BuildGraphTarget) -> i3
         build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' failed")
     rc
 
-pub fn build_graph_compile_ir_to_object(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_compile_ir_to_object(root: str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' requires source and output paths")
         return 1
@@ -186,7 +186,7 @@ fn build_graph_archive_member_seen(inputs: Vec[str], count: i32, basename: str) 
             return true
     false
 
-pub fn build_graph_create_archive(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_create_archive(root: str, target: &BuildGraphTarget) -> i32:
     if target.output.len() == 0:
         build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' requires an output path")
         return 1
@@ -265,7 +265,7 @@ fn build_graph_emit_empty_embedded_blob(sym: str) -> str:
     "_with_embedded_" ++ sym ++ "_end:\n" ++
     "with_embedded_" ++ sym ++ "_end:\n\n"
 
-pub fn build_graph_embed_object_files(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_embed_object_files(root: str, target: &BuildGraphTarget) -> i32:
     if target.output.len() == 0:
         build_graph_rt_eprint("error: embed_object_files target '" ++ target.name ++ "' requires an output path")
         return 1
@@ -318,7 +318,7 @@ pub fn build_graph_embed_object_files(root: str, target: BuildGraphTarget) -> i3
         return 1
     0
 
-pub fn build_graph_copy_manifest_files(root: str, target: BuildGraphTarget, operation_name: str) -> i32:
+pub fn build_graph_copy_manifest_files(root: str, target: &BuildGraphTarget, operation_name: str) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires source and output directories")
         return 1
@@ -347,7 +347,7 @@ pub fn build_graph_copy_manifest_files(root: str, target: BuildGraphTarget, oper
             return 1
     0
 
-pub fn build_graph_promote_tree_if_verified(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_promote_tree_if_verified(root: str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' requires source and output directories")
         return 1
@@ -396,7 +396,7 @@ pub fn build_graph_promote_tree_if_verified(root: str, target: BuildGraphTarget)
         build_graph_rt_eprint("promote: all " ++ f"{fresh_count}" ++ " files in " ++ target.output ++ " are up to date")
     0
 
-pub fn build_graph_run_corpus_test(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_run_corpus_test(root: str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0:
         build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ "' requires a runner")
         return 1
@@ -435,7 +435,7 @@ pub fn build_graph_run_corpus_test(root: str, target: BuildGraphTarget) -> i32:
         return rc
     0
 
-pub fn build_graph_run_command(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_run_command(root: str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0:
         build_graph_rt_eprint("error: command target '" ++ target.name ++ "' requires an executable")
         return 1
@@ -499,7 +499,7 @@ pub fn build_graph_copy_file_to_path(source_path: str, dest_path: str, mode: i32
         return 1
     0
 
-pub fn build_graph_copy_file(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_copy_file(root: str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: copy_file target '" ++ target.name ++ "' requires source and destination paths")
         return 1
@@ -557,7 +557,7 @@ pub fn build_graph_parse_octal_mode(text: str) -> i32:
         mode = mode * 8 + (ch - 48)
     mode
 
-pub fn build_graph_install_file(root: str, target: BuildGraphTarget) -> i32:
+pub fn build_graph_install_file(root: str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' requires source and destination paths")
         return 1

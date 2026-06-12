@@ -854,7 +854,7 @@ fn build_action_run_result(rc: i32) -> BuildActionRunResult:
 fn build_action_run_result_with_effects(rc: i32, effects: Vec[str]) -> BuildActionRunResult:
     BuildActionRunResult { rc: rc, effects: effects }
 
-fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGraphTarget, sema: Sema, strict_effects: bool) -> BuildActionRunResult:
+fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: &BuildGraphTarget, sema: Sema, strict_effects: bool) -> BuildActionRunResult:
     if target.output.len() == 0:
         with_eprint("error: action target '" ++ target.name ++ "' requires a declared output")
         return build_action_run_result(1)
@@ -973,7 +973,7 @@ fn build_graph_replace_once(text: str, needle: str, replacement: str) -> str:
         return ""
     text.slice(0, at as i64) ++ replacement ++ text.slice((at + needle.len() as i32) as i64, text.len())
 
-fn build_graph_run_tool_capture(root: str, target: BuildGraphTarget, tool_name: str, argv: str, timeout_ms: i32) -> i32:
+fn build_graph_run_tool_capture(root: str, target: &BuildGraphTarget, tool_name: str, argv: str, timeout_ms: i32) -> i32:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     if with_fs_mkdir_p(capture_dir) != 0:
         with_eprint("error: could not create tool capture directory for target '" ++ target.name ++ "': " ++ capture_dir)
@@ -992,7 +992,7 @@ fn build_graph_run_tool_capture(root: str, target: BuildGraphTarget, tool_name: 
     let _remove_stderr = with_fs_remove_file(stderr_path)
     0
 
-fn build_graph_run_cli_capture(root: str, target: BuildGraphTarget, compiler_path: str, label: str, argv_tail: str, timeout_ms: i32) -> TestRunResult:
+fn build_graph_run_cli_capture(root: str, target: &BuildGraphTarget, compiler_path: str, label: str, argv_tail: str, timeout_ms: i32) -> TestRunResult:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     let _mkdir = with_fs_mkdir_p(capture_dir)
     let stamp = f"{with_getpid()}.{with_clock_nanos()}"
@@ -1041,7 +1041,7 @@ fn build_options_for_graph_target(root: str, base: &BuildCommandOptions, target:
         options.output_kind = BuildOutputKind.Binary
     options
 
-fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema: Sema, options: BuildCommandOptions) -> i32:
+fn run_build_graph(root: str, cfg: ProjectConfig, graph: &BuildGraph, action_sema: Sema, options: &BuildCommandOptions) -> i32:
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
         return 1
@@ -1107,7 +1107,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)
-        let target_options = build_options_for_graph_target(root, &options, &target)
+        let target_options = build_options_for_graph_target(root, options, &target)
         if target.kind == 2:
             if options.output_path.len() > 0:
                 with_eprint("error: -o cannot be used with build.w test target '" ++ target.name ++ "'")
@@ -1356,7 +1356,7 @@ fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg:
         out.strict_effects = true
     out
 
-fn build_command_validate_target(options: BuildCommandOptions, cfg: ProjectConfig) -> i32:
+fn build_command_validate_target(options: &BuildCommandOptions, cfg: ProjectConfig) -> i32:
     if options.target_kind < 0:
         with_eprint("error: invalid with.toml: unsupported target.default '" ++ cfg.target_default ++ "'")
         return 1

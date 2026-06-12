@@ -148,7 +148,7 @@ fn build_graph_escape(value: str) -> str:
             out = out ++ value.slice(i as i64, (i + 1) as i64)
     out
 
-pub fn build_graph_emit(graph: BuildGraph) -> str:
+pub fn build_graph_emit(graph: &BuildGraph) -> str:
     var out = "WITH_BUILD_GRAPH\t2\n"
     out = out ++ "package\t" ++ build_graph_escape(graph.package_name) ++ "\t" ++ build_graph_escape(graph.package_version) ++ "\n"
     if graph.default_target.len() > 0:

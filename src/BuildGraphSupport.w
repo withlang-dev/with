@@ -5,7 +5,7 @@ use BuildGraphModel
 use BuildGraphRuntime
 use compiler.Runtime
 
-pub fn build_graph_output_path(root: str, target: BuildGraphTarget, output_path: str, target_count: i32) -> str:
+pub fn build_graph_output_path(root: str, target: &BuildGraphTarget, output_path: str, target_count: i32) -> str:
     if output_path.len() > 0:
         if target_count != 1:
             return ""
@@ -14,7 +14,7 @@ pub fn build_graph_output_path(root: str, target: BuildGraphTarget, output_path:
         return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/bin"), target.name)
 
-pub fn build_graph_library_output_path(root: str, target: BuildGraphTarget, output_path: str, target_count: i32) -> str:
+pub fn build_graph_library_output_path(root: str, target: &BuildGraphTarget, output_path: str, target_count: i32) -> str:
     if output_path.len() > 0:
         if target_count != 1:
             return ""
@@ -23,7 +23,7 @@ pub fn build_graph_library_output_path(root: str, target: BuildGraphTarget, outp
         return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/lib"), "lib" ++ target.name ++ ".a")
 
-pub fn build_graph_object_output_path(root: str, target: BuildGraphTarget, output_path: str, target_count: i32) -> str:
+pub fn build_graph_object_output_path(root: str, target: &BuildGraphTarget, output_path: str, target_count: i32) -> str:
     if output_path.len() > 0:
         if target_count != 1:
             return ""
@@ -161,7 +161,7 @@ pub fn build_graph_path_project_contained(path: str) -> bool:
 pub fn build_graph_path_is_install_dest(path: str) -> bool:
     path.starts_with("$HOME/") or path.starts_with("$INSTALL_BINDIR/") or path.starts_with("$INSTALL_LIBDIR/")
 
-pub fn build_graph_validate_target_containment(target: BuildGraphTarget) -> i32:
+pub fn build_graph_validate_target_containment(target: &BuildGraphTarget) -> i32:
     let kind = target.kind
     let is_install = kind == 8
     let is_promote = kind == 20
@@ -199,14 +199,14 @@ pub fn build_graph_validate_target_containment(target: BuildGraphTarget) -> i32:
 pub fn build_graph_argv_append(argv_blob: str, arg: str) -> str:
     argv_blob ++ arg ++ "\0"
 
-pub fn build_graph_exec_argv(target: BuildGraphTarget, operation_name: str, argv_blob: str) -> i32:
+pub fn build_graph_exec_argv(target: &BuildGraphTarget, operation_name: str, argv_blob: str) -> i32:
     let rc = build_graph_rt_exec_argv(argv_blob)
     if rc != 0:
         build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ f"' failed with exit code {rc}")
         return rc
     0
 
-pub fn build_graph_validate_process_args(target: BuildGraphTarget) -> i32:
+pub fn build_graph_validate_process_args(target: &BuildGraphTarget) -> i32:
     if not build_graph_process_arg_valid(target.entry):
         build_graph_rt_eprint("error: target '" ++ target.name ++ "' field 'entry' contains a NUL byte: " ++ target.entry)
         return 1

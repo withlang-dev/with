@@ -115,7 +115,7 @@ fn build_cache_current_compiler_fingerprint() -> i64:
     build_cache_compiler_fingerprint = build_cache_fingerprint_file(compiler_path)
     build_cache_compiler_fingerprint
 
-fn build_cache_target_uses_current_compiler(target: BuildGraphTarget) -> bool:
+fn build_cache_target_uses_current_compiler(target: &BuildGraphTarget) -> bool:
     if target.kind == 0: return true
     if target.kind == 1: return true
     if target.kind == 3: return true
@@ -123,13 +123,13 @@ fn build_cache_target_uses_current_compiler(target: BuildGraphTarget) -> bool:
     if target.kind == 23: return true
     false
 
-fn build_cache_target_has_arg(target: BuildGraphTarget, needle: str) -> bool:
+fn build_cache_target_has_arg(target: &BuildGraphTarget, needle: str) -> bool:
     for i in 0..target.args.len() as i32:
         if target.args.get(i as i64) == needle:
             return true
     false
 
-fn build_cache_target_compiler_path(root: str, target: BuildGraphTarget) -> str:
+fn build_cache_target_compiler_path(root: str, target: &BuildGraphTarget) -> str:
     for i in 0..target.args.len() as i32:
         let arg = target.args.get(i as i64)
         if arg.starts_with("compiler="):
@@ -139,7 +139,7 @@ fn build_cache_target_compiler_path(root: str, target: BuildGraphTarget) -> str:
             return root ++ "/" ++ path
     ""
 
-fn build_cache_is_stage_target(target: BuildGraphTarget) -> bool:
+fn build_cache_is_stage_target(target: &BuildGraphTarget) -> bool:
     if target.kind != 23:
         return false
     var has_compiler = false
@@ -275,7 +275,7 @@ fn build_cache_hash_build_graph_sources(root: str) -> i64:
     combined = combined ++ "std.build:" ++ f"{build_cache_fingerprint_file(root ++ "/lib/std/build.w")}" ++ "\n"
     with_str_hash(combined)
 
-fn build_cache_test_success_manifest(root: str, target: BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> str:
+fn build_cache_test_success_manifest(root: str, target: &BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> str:
     var text = "v1\n"
     text = text ++ "target:" ++ target.name ++ "\n"
     text = text ++ f"kind:{target.kind}\n"
@@ -305,14 +305,14 @@ fn build_cache_test_success_manifest(root: str, target: BuildGraphTarget, test_f
         text = text ++ "file:" ++ path ++ "\n"
     text
 
-pub fn build_cache_record_test_success(root: str, target: BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> Unit:
+pub fn build_cache_record_test_success(root: str, target: &BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> Unit:
     let state_dir = build_cache_state_dir(root)
     let _mkdir = build_graph_rt_mkdir_p(state_dir)
     let marker_path = build_cache_test_success_path(root, target.name)
     let marker = build_cache_test_success_manifest(root, target, test_files, test_compiler)
     let _write = build_graph_rt_write_file(marker_path, marker)
 
-fn build_cache_compute_signature(target: BuildGraphTarget, root: str) -> i64:
+fn build_cache_compute_signature(target: &BuildGraphTarget, root: str) -> i64:
     var sig = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
     sig = sig ++ f":{target.optimize_mode}:{target.target_kind}"
     for i in 0..target.args.len() as i32:
@@ -336,7 +336,7 @@ fn build_cache_compute_signature(target: BuildGraphTarget, root: str) -> i64:
             sig = sig ++ f":COMPILER:{compiler_hash}"
     with_str_hash(sig)
 
-fn build_cache_collect_input_paths(root: str, target: BuildGraphTarget) -> Vec[str]:
+fn build_cache_collect_input_paths(root: str, target: &BuildGraphTarget) -> Vec[str]:
     var paths: Vec[str] = Vec.new()
     if target.entry.len() > 0:
         paths.push(root ++ "/" ++ target.entry)
@@ -346,7 +346,7 @@ fn build_cache_collect_input_paths(root: str, target: BuildGraphTarget) -> Vec[s
             paths.push(root ++ "/" ++ input)
     paths
 
-fn build_cache_collect_output_paths(root: str, target: BuildGraphTarget) -> Vec[str]:
+fn build_cache_collect_output_paths(root: str, target: &BuildGraphTarget) -> Vec[str]:
     var paths: Vec[str] = Vec.new()
     if target.output.len() > 0:
         paths.push(root ++ "/" ++ target.output)
@@ -356,7 +356,7 @@ fn build_cache_collect_output_paths(root: str, target: BuildGraphTarget) -> Vec[
             paths.push(root ++ "/" ++ extra)
     paths
 
-pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt: bool) -> bool:
+pub fn build_cache_check_fresh(root: str, target: &BuildGraphTarget, dep_rebuilt: bool) -> bool:
     if target.name == "prune" or target.name == "prune-apply":
         return false
     if target.name == "last-green" or target.name == "test-green" or target.name == "require-last-green" or target.name == "check-committed-state":
@@ -465,7 +465,7 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
             return false
     true
 
-pub fn build_cache_record(root: str, target: BuildGraphTarget, discovered_deps: Vec[str], effects: Vec[str]) -> Unit:
+pub fn build_cache_record(root: str, target: &BuildGraphTarget, discovered_deps: Vec[str], effects: Vec[str]) -> Unit:
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)
@@ -513,7 +513,7 @@ pub fn build_cache_record_build_effects(root: str, effects: Vec[str]) -> Unit:
     else:
         let _remove = build_graph_rt_remove_file(path)
 
-pub fn build_cache_print_effects(root: str, graph: BuildGraph, target_filter: str) -> i32:
+pub fn build_cache_print_effects(root: str, graph: &BuildGraph, target_filter: str) -> i32:
     if target_filter.len() == 0 or target_filter == "build.w":
         build_graph_rt_write("target build.w\n")
         build_graph_rt_write("  capabilities: BuildCtx ProjectInfo Diagnostics SourceEmitter ToolFs ProcessRunner Workspace\n")

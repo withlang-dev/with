@@ -29,7 +29,7 @@ fn build_graph_register_output(outputs: Vec[str], path: str) -> bool:
     outputs.push(path)
     true
 
-pub fn build_graph_validate_outputs(root: str, graph: BuildGraph, output_path: str) -> i32:
+pub fn build_graph_validate_outputs(root: str, graph: &BuildGraph, output_path: str) -> i32:
     let outputs: Vec[str] = Vec.new()
     for gi in 0..graph.generated_sources.len() as i32:
         let generated = graph.generated_sources.get(gi as i64)
@@ -61,7 +61,7 @@ pub fn build_graph_validate_outputs(root: str, graph: BuildGraph, output_path: s
                 return 1
     0
 
-pub fn build_graph_write_generated_sources(root: str, graph: BuildGraph) -> i32:
+pub fn build_graph_write_generated_sources(root: str, graph: &BuildGraph) -> i32:
     for gi in 0..graph.generated_sources.len() as i32:
         let generated = graph.generated_sources.get(gi as i64)
         if not build_graph_generated_path_valid(generated.path):
@@ -83,7 +83,7 @@ fn build_graph_target_completed(completed: Vec[str], name: str) -> bool:
             return true
     false
 
-fn build_graph_verify_completed_deps(target: BuildGraphTarget, completed: Vec[str], operation_name: str, require_deps: bool) -> i32:
+fn build_graph_verify_completed_deps(target: &BuildGraphTarget, completed: Vec[str], operation_name: str, require_deps: bool) -> i32:
     if require_deps and target.deps.len() == 0:
         build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires verification dependencies")
         return 1
@@ -94,7 +94,7 @@ fn build_graph_verify_completed_deps(target: BuildGraphTarget, completed: Vec[st
             return 1
     0
 
-pub fn build_graph_dispatch_standard_target(root: str, target: BuildGraphTarget, completed_targets: Vec[str]) -> BuildGraphDispatchResult:
+pub fn build_graph_dispatch_standard_target(root: str, target: &BuildGraphTarget, completed_targets: Vec[str]) -> BuildGraphDispatchResult:
     let containment_rc = build_graph_validate_target_containment(target)
     if containment_rc != 0:
         return build_graph_dispatch_result(true, containment_rc)
