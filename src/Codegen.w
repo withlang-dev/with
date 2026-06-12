@@ -2499,7 +2499,7 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
     if tk == TypeKind.TY_STR:
         let str_sym = self.intern.intern("str")
         return self.resolve_named_type(str_sym)
-    if tk == TypeKind.TY_VOID:
+    if tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER:
         return wl_void_type(self.context)
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
         let sym = self.sema.get_type_d0(resolved_tid)

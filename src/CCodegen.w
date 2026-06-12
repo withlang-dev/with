@@ -1065,7 +1065,8 @@ fn CCodegen.is_void_tid(self: CCodegen, tid: i32) -> i32:
     let resolved = self.sema.resolve_alias(tid)
     if resolved == 0:
         return 0
-    if self.sema.get_type_kind(resolved) == TypeKind.TY_VOID:
+    let kind = self.sema.get_type_kind(resolved)
+    if kind == TypeKind.TY_VOID or kind == TypeKind.TY_NEVER:
         return 1
     0
 
@@ -1469,7 +1470,7 @@ fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
     if resolved == CC_PSEUDO_TID_FMT_BUF:
         return "uint8_t*"
     let tk = self.sema.get_type_kind(resolved)
-    if tk == TypeKind.TY_VOID:
+    if tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER:
         if as_return != 0:
             return "void"
         return "int32_t"
@@ -7076,7 +7077,7 @@ fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
             return "    return;"
         return "    return _0;"
     if tk == TermKind.TK_UNREACHABLE:
-        return "    abort();"
+        return "    with_panic(WITH_STR_LIT(\"reached unreachable code\"), WITH_STR_LIT(\"\"), 0);\n    abort();"
     if tk == TermKind.TK_SWITCH_INT:
         return self.emit_switch_term(body, d0, d1, d2)
     if tk == TermKind.TK_CALL:

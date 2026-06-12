@@ -1,6 +1,6 @@
 // std.testing — stable testing helpers.
 
-extern fn with_panic(msg: str, file: str, line: i32) -> void
+extern fn with_panic(msg: str, file: str, line: i32) -> Never
 
 pub fn assert(cond: bool, msg: str = "assertion failed", loc: str = src()) -> void:
     if not cond:

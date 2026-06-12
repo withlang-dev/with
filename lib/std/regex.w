@@ -160,7 +160,6 @@ pub unsafe fn Regex.__literal_code(slot: *mut *const i8, pattern: str, options: 
     let compiled = with_regex_compile(pattern, options, &raw mut err_code, &raw mut err_offset)
     if compiled as i64 == 0:
         with_panic("invalid regex literal: " ++ regex_error_message(err_code), "", 0)
-        return null
     *slot = compiled
     compiled
 

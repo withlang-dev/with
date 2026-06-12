@@ -101,7 +101,7 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     if tk == TypeKind.TY_STR:
         let str_sym = self.intern.intern("str")
         return self.resolve_named_type(str_sym)
-    if tk == TypeKind.TY_VOID:
+    if tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER:
         return wl_void_type(self.context)
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
         let name_sym = self.mir_input.mir_get_type_d0(resolved)
@@ -8988,9 +8988,6 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
             // Handle builtins directly (no gen_expr needed)
             if gc_callee_sym > 0:
                 let gc_arg_count = self.pool.get_data2(gc_node)
-                if gc_callee_sym == self.sym_todo or gc_callee_sym == self.sym_unreachable:
-                    let _ = wl_build_unreachable(self.builder)
-                    return true
                 if gc_callee_sym == self.sym_src and gc_arg_count == 0:
                     let gc_result = self.gen_src_intrinsic(gc_node)
                     if dest_place >= 0 and gc_result != 0:
@@ -10241,7 +10238,7 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
         return true
 
     if tk == TermKind.TK_UNREACHABLE:
-        wl_build_unreachable(self.builder)
+        self.emit_runtime_panic("reached unreachable code")
         return true
 
     if tk == TermKind.TK_SWITCH_INT:

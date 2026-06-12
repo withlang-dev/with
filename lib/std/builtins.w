@@ -16,7 +16,7 @@ extern fn with_print_str(s: str) -> void
 extern fn with_eprint(s: str) -> void
 extern fn with_write(s: str) -> void
 extern fn with_ewrite(s: str) -> void
-extern fn with_panic(msg: str, file: str, line: i32) -> void
+extern fn with_panic(msg: str, file: str, line: i32) -> Never
 extern fn with_i32_to_str(n: i32) -> str
 extern fn with_i64_to_str(n: i64) -> str
 extern fn with_fmt_u32(n: u32) -> str
@@ -81,6 +81,18 @@ pub fn assert_ne[T: Eq + Debug](left: T, right: T) -> void:
 /// not match the expected pattern.
 pub fn assert_matches_failed() -> void:
     with_panic("assertion failed: value did not match the expected pattern", "", 0)
+
+/// Panic immediately with `msg`.
+pub fn panic(msg: str, loc: str = src()) -> Never:
+    return with_panic(msg, loc, 0)
+
+/// Mark unfinished code. If reached, panic with `msg`.
+pub fn todo(msg: str = "not implemented", loc: str = src()) -> Never:
+    return with_panic(msg, loc, 0)
+
+/// Mark an impossible path. If reached, panic with `msg`.
+pub fn unreachable(msg: str = "unreachable", loc: str = src()) -> Never:
+    return with_panic(msg, loc, 0)
 
 /// Explicitly drop a value at this point in the current scope.
 pub fn drop[T](val: T) -> void:

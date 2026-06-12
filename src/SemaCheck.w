@@ -2305,8 +2305,8 @@ fn Sema.fn_symbol_is_std_thread_spawn_os(self: Sema, fn_sym: i32) -> i32:
         return 1
     0
 
-fn Sema.fn_symbol_is_std_builtins_drop(self: Sema, fn_sym: i32) -> i32:
-    if self.pool_resolve(fn_sym) != "drop":
+fn Sema.fn_symbol_is_std_builtins_named(self: Sema, fn_sym: i32, name: str) -> i32:
+    if self.pool_resolve(fn_sym) != name:
         return 0
     let source_path = self.fn_symbol_source_path(fn_sym)
     if source_path == "lib/std/builtins.w":
@@ -2314,6 +2314,28 @@ fn Sema.fn_symbol_is_std_builtins_drop(self: Sema, fn_sym: i32) -> i32:
     if source_path == "<embedded-std>/std/builtins.w":
         return 1
     if source_path.ends_with("/lib/std/builtins.w"):
+        return 1
+    0
+
+fn Sema.fn_symbol_is_std_builtins_drop(self: Sema, fn_sym: i32) -> i32:
+    self.fn_symbol_is_std_builtins_named(fn_sym, "drop")
+
+fn Sema.check_std_builtins_diverging_call_surface(self: Sema, fn_sym: i32, node: i32, arg_count: i32) -> i32:
+    let name = self.pool_resolve(fn_sym)
+    if name != "panic" and name != "todo" and name != "unreachable":
+        return 0
+    if self.fn_symbol_is_std_builtins_named(fn_sym, name) == 0:
+        return 0
+    if self.ast.has_call_named_args(node) != 0:
+        self.emit_error(f"{name}() does not accept named arguments", node)
+        return 1
+    if name == "panic":
+        if arg_count != 1:
+            self.emit_error(f"panic() expects exactly one message argument, found {arg_count}", node)
+            return 1
+        return 0
+    if arg_count > 1:
+        self.emit_error(f"{name}() expects zero or one message argument, found {arg_count}", node)
         return 1
     0
 
@@ -5173,7 +5195,7 @@ fn Sema.check_comptime_call_restriction(self: Sema, fn_sym: i32, node: i32) -> i
         self.emit_error("comptime call of extern function", node)
         return 1
     if self.is_intrinsic_fn_sym(fn_sym) != 0:
-        if fn_sym == self.syms.src or fn_sym == self.syms.embed_file or fn_sym == self.syms.todo or fn_sym == self.syms.unreachable:
+        if fn_sym == self.syms.src or fn_sym == self.syms.embed_file:
             return 0
         self.emit_error("runtime intrinsic is not allowed in comptime", node)
         return 1
@@ -8432,6 +8454,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     else:
         0
     let variant_payload_tys = if variant_payload_owner != 0: self.enum_variant_payload_types(variant_payload_owner, fn_sym) else: Vec.new()
+
+    if self.check_std_builtins_diverging_call_surface(fn_sym, node, arg_count) != 0:
+        return 0
 
     // Resolve named arguments: reorder args to match parameter order, fill defaults
     var resolved_extra_start = extra_start
@@ -11842,8 +11867,6 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
 fn Sema.is_intrinsic_fn_sym(self: Sema, fn_sym: i32) -> i32:
     if fn_sym == self.syms.channel or fn_sym == self.syms.send or fn_sym == self.syms.recv or fn_sym == self.syms.close:
         return 1
-    if fn_sym == self.syms.todo or fn_sym == self.syms.unreachable:
-        return 1
     if fn_sym == self.syms.src:
         return 1
     if fn_sym == self.syms.embed_file:
@@ -11907,17 +11930,6 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
                 self.emit_error("close() expects channel handle as integer value", self.ast.get_extra(args_start))
                 return 0
         return self.ty_void as i32
-    if fn_sym == self.syms.todo or fn_sym == self.syms.unreachable:
-        if arg_count > 1:
-            self.emit_error("todo()/unreachable() expect zero or one message argument", node)
-            return 0
-        if arg_count == 1:
-            let msg_ty = arg_types.get(0)
-            if msg_ty != 0:
-                if self.types_compatible(self.ty_str as i32, msg_ty) == 0:
-                    self.emit_error("todo()/unreachable() message must be str-compatible", self.ast.get_extra(self.ast.get_data1(node)))
-                    return 0
-        return self.ty_never as i32
     if fn_sym == self.syms.src:
         if arg_count != 0:
             self.emit_error("src() takes no arguments", node)

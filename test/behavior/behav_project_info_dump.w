@@ -12,7 +12,9 @@ fn hidden -> i32:
     0
 
 @[panic_handler]
-fn on_panic -> Never: unreachable()
+fn on_panic -> Never:
+    loop:
+        ()
 
 @[entry]
 fn start -> i32:
