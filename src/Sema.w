@@ -313,6 +313,10 @@ type Sema {
     fn_decl_nodes: HashMap[i32, i32],
     // Function declaration source path by name
     fn_decl_source_paths: HashMap[i32, str],
+    // Memoized §14.22 by-value Task parameter disposition:
+    // key(fn_sym,param_i) -> 1 when the parameter is proven consumed in scope.
+    task_param_consumed_memo: HashMap[i64, i32],
+    task_param_consumed_visiting: HashMap[i64, i32],
     // Generic function node indices by name
     generic_fn_nodes: HashMap[i32, i32],
 
@@ -1049,6 +1053,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         extern_fn_names,
         fn_decl_nodes,
         fn_decl_source_paths,
+        task_param_consumed_memo: sema_new_map_i64_i32(),
+        task_param_consumed_visiting: sema_new_map_i64_i32(),
         generic_fn_nodes,
         variant_lookup,
         variant_type_ids,

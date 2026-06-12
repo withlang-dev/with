@@ -1899,7 +1899,13 @@ fn Sema.expr_is_task_value(self: Sema, node: i32) -> i32:
     if kind == NodeKind.NK_CALL:
         return self.is_call_expr_task(node)
     if kind == NodeKind.NK_IDENT:
-        return self.scope_lookup_is_task(self.ast.get_data0(node))
+        let sym = self.ast.get_data0(node)
+        if self.scope_lookup_is_task(sym) != 0:
+            return 1
+        let tid = self.scope_lookup(sym)
+        if tid >= 0:
+            return self.type_is_task(tid)
+        return 0
     if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_OPTIONAL_CHAIN:
         // Check the actual result type rather than assuming a task container —
         // a field/index/`?.` result is only a Task if its type says so. Blindly
@@ -2583,6 +2589,292 @@ fn Sema.param_is_by_reference(self: Sema, tid: i32) -> i32:
         return 1
     0
 
+fn Sema.task_param_expr_is_target(self: Sema, node: i32, target_sym: i32) -> i32:
+    if node == 0 or target_sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
+        return self.task_param_expr_is_target(self.ast.get_data0(node), target_sym)
+    if kind == NodeKind.NK_IDENT:
+        if self.ast.get_data0(node) == target_sym:
+            return 1
+    0
+
+// Return values for task-param disposition walkers:
+//   0: target parameter is not relevant here
+//   1: target parameter is definitely consumed in this expression
+//  -1: target parameter is used in an unproven/escaping way
+fn Sema.task_param_expr_disposition(self: Sema, node: i32, target_sym: i32) -> i32:
+    if node == 0 or target_sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        if self.ast.get_data0(node) == target_sym:
+            return -1
+        return 0
+    if kind == NodeKind.NK_AWAIT:
+        let inner = self.ast.get_data0(node)
+        if self.task_param_expr_mentions(inner, target_sym) != 0:
+            return 1
+        return 0
+    if kind == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let recv = self.ast.get_data0(callee)
+            let method = self.ast.get_data1(callee)
+            if self.task_param_expr_is_target(recv, target_sym) != 0:
+                if method == self.syms.cancel:
+                    return 1
+                if method == self.syms.is_done:
+                    return 0
+                return -1
+        var resolved_fn_sym = 0
+        if self.comp_resolved.contains(node):
+            resolved_fn_sym = self.comp_resolved.get(node).unwrap()
+        else if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            resolved_fn_sym = self.ast.get_data0(callee)
+        let sig_idx = if resolved_fn_sym != 0: self.get_sig(resolved_fn_sym) else: -1
+        let args_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai in 0..arg_count:
+            let arg_node = self.ast.get_extra(args_start + ai)
+            if self.task_param_expr_is_target(arg_node, target_sym) != 0:
+                if sig_idx >= 0 and ai < self.sig_get_param_count(sig_idx):
+                    let expected_ty = self.sig_param_type(sig_idx, ai)
+                    if self.param_is_by_reference(expected_ty) == 0 and self.type_is_task(expected_ty) != 0 and self.task_param_consumed_summary(resolved_fn_sym, ai) != 0:
+                        return 1
+                return -1
+            let arg_disp = self.task_param_expr_disposition(arg_node, target_sym)
+            if arg_disp != 0:
+                return arg_disp
+        if self.task_param_expr_disposition(callee, target_sym) != 0:
+            return -1
+        return 0
+    if kind == NodeKind.NK_BLOCK:
+        return self.task_param_block_disposition(node, target_sym)
+    if kind == NodeKind.NK_IF_EXPR:
+        let cond_disp = self.task_param_expr_disposition(self.ast.get_data0(node), target_sym)
+        if cond_disp != 0:
+            return cond_disp
+        let then_disp = self.task_param_expr_disposition(self.ast.get_data1(node), target_sym)
+        let else_node = self.ast.get_data2(node)
+        if else_node == 0:
+            if then_disp != 0:
+                return -1
+            return 0
+        let else_disp = self.task_param_expr_disposition(else_node, target_sym)
+        if then_disp == 1 and else_disp == 1:
+            return 1
+        if then_disp == 0 and else_disp == 0:
+            return 0
+        return -1
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
+        let inner_disp = self.task_param_expr_disposition(self.ast.get_data0(node), target_sym)
+        if inner_disp != 0:
+            return inner_disp
+        return 0
+    if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
+        return self.task_param_expr_disposition(self.ast.get_data1(node), target_sym)
+    if kind == NodeKind.NK_ASSIGN:
+        let value_disp = self.task_param_expr_disposition(self.ast.get_data1(node), target_sym)
+        if value_disp != 0:
+            return value_disp
+        if self.task_param_expr_mentions(self.ast.get_data0(node), target_sym) != 0:
+            return -1
+        return 0
+    if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        let left_disp = self.task_param_expr_disposition(self.ast.get_data1(node), target_sym)
+        if left_disp != 0:
+            return left_disp
+        return self.task_param_expr_disposition(self.ast.get_data2(node), target_sym)
+    if kind == NodeKind.NK_UNARY:
+        let operand_disp = self.task_param_expr_disposition(self.ast.get_data1(node), target_sym)
+        if operand_disp != 0:
+            return operand_disp
+        return 0
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        if self.task_param_expr_mentions(self.ast.get_data0(node), target_sym) != 0:
+            return -1
+        return 0
+    if kind == NodeKind.NK_INDEX:
+        let base_disp = self.task_param_expr_disposition(self.ast.get_data0(node), target_sym)
+        if base_disp != 0:
+            return base_disp
+        return self.task_param_expr_disposition(self.ast.get_data1(node), target_sym)
+    if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
+        let extra_start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        for ai in 0..count:
+            let elem_disp = self.task_param_expr_disposition(self.ast.get_extra(extra_start + ai), target_sym)
+            if elem_disp != 0:
+                return elem_disp
+        return 0
+    if kind == NodeKind.NK_STRUCT_LIT:
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            let field_disp = self.task_param_expr_disposition(self.ast.get_extra(extra_start + fi * 2 + 1), target_sym)
+            if field_disp != 0:
+                return field_disp
+        return 0
+    if kind == NodeKind.NK_ENUM_VARIANT:
+        let extra_start = self.ast.get_data2(node)
+        if extra_start == 0:
+            return 0
+        let arg_count = self.ast.get_extra(extra_start)
+        for ai in 0..arg_count:
+            let arg_disp = self.task_param_expr_disposition(self.ast.get_extra(extra_start + 1 + ai), target_sym)
+            if arg_disp != 0:
+                return arg_disp
+        return 0
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK:
+        if self.task_param_expr_mentions(self.ast.get_data0(node), target_sym) != 0:
+            return -1
+        return 0
+    if self.task_param_expr_mentions(node, target_sym) != 0:
+        return -1
+    0
+
+fn Sema.task_param_block_disposition(self: Sema, node: i32, target_sym: i32) -> i32:
+    let extra_start = self.ast.get_data0(node)
+    let stmt_count = self.ast.get_data1(node)
+    var shadowed = false
+    for si in 0..stmt_count:
+        let stmt = self.ast.get_extra(extra_start + si)
+        if not shadowed:
+            let disp = self.task_param_expr_disposition(stmt, target_sym)
+            if disp != 0:
+                return disp
+        let stmt_kind = self.ast.kind(stmt)
+        if stmt_kind == NodeKind.NK_LET_BINDING or stmt_kind == NodeKind.NK_LET_DECL:
+            if self.ast.get_data0(stmt) == target_sym:
+                shadowed = true
+    if shadowed:
+        return 0
+    self.task_param_expr_disposition(self.ast.get_data2(node), target_sym)
+
+fn Sema.task_param_expr_mentions(self: Sema, node: i32, target_sym: i32) -> i32:
+    if node == 0 or target_sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        if self.ast.get_data0(node) == target_sym:
+            return 1
+        return 0
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_CLOSURE:
+        return self.task_param_expr_mentions(self.ast.get_data0(node), target_sym)
+    if kind == NodeKind.NK_CALL:
+        if self.task_param_expr_mentions(self.ast.get_data0(node), target_sym) != 0:
+            return 1
+        let args_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai in 0..arg_count:
+            if self.task_param_expr_mentions(self.ast.get_extra(args_start + ai), target_sym) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        var shadowed = false
+        for si in 0..stmt_count:
+            let stmt = self.ast.get_extra(extra_start + si)
+            if not shadowed and self.task_param_expr_mentions(stmt, target_sym) != 0:
+                return 1
+            let stmt_kind = self.ast.kind(stmt)
+            if stmt_kind == NodeKind.NK_LET_BINDING or stmt_kind == NodeKind.NK_LET_DECL:
+                if self.ast.get_data0(stmt) == target_sym:
+                    shadowed = true
+        if shadowed:
+            return 0
+        return self.task_param_expr_mentions(self.ast.get_data2(node), target_sym)
+    if kind == NodeKind.NK_IF_EXPR:
+        if self.task_param_expr_mentions(self.ast.get_data0(node), target_sym) != 0:
+            return 1
+        if self.task_param_expr_mentions(self.ast.get_data1(node), target_sym) != 0:
+            return 1
+        return self.task_param_expr_mentions(self.ast.get_data2(node), target_sym)
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_UNARY or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL:
+        if self.task_param_expr_mentions(self.ast.get_data0(node), target_sym) != 0:
+            return 1
+        return self.task_param_expr_mentions(self.ast.get_data1(node), target_sym)
+    if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
+        return self.task_param_expr_mentions(self.ast.get_data1(node), target_sym)
+    if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP or kind == NodeKind.NK_INDEX:
+        if self.task_param_expr_mentions(self.ast.get_data0(node), target_sym) != 0:
+            return 1
+        if self.task_param_expr_mentions(self.ast.get_data1(node), target_sym) != 0:
+            return 1
+        return self.task_param_expr_mentions(self.ast.get_data2(node), target_sym)
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        return self.task_param_expr_mentions(self.ast.get_data0(node), target_sym)
+    if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
+        let extra_start2 = self.ast.get_data0(node)
+        let count2 = self.ast.get_data1(node)
+        for ei in 0..count2:
+            if self.task_param_expr_mentions(self.ast.get_extra(extra_start2 + ei), target_sym) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_STRUCT_LIT:
+        let extra_start3 = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            if self.task_param_expr_mentions(self.ast.get_extra(extra_start3 + fi * 2 + 1), target_sym) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_ENUM_VARIANT:
+        let extra_start4 = self.ast.get_data2(node)
+        if extra_start4 == 0:
+            return 0
+        let arg_count4 = self.ast.get_extra(extra_start4)
+        for ai4 in 0..arg_count4:
+            if self.task_param_expr_mentions(self.ast.get_extra(extra_start4 + 1 + ai4), target_sym) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_WHILE:
+        if self.task_param_expr_mentions(self.ast.get_data0(node), target_sym) != 0:
+            return 1
+        return self.task_param_expr_mentions(self.ast.get_data1(node), target_sym)
+    if kind == NodeKind.NK_FOR:
+        if self.task_param_expr_mentions(self.ast.get_data1(node), target_sym) != 0:
+            return 1
+        return self.task_param_expr_mentions(self.ast.get_data2(node), target_sym)
+    1
+
+fn Sema.task_param_consumed_summary(self: Sema, fn_sym: i32, param_i: i32) -> i32:
+    if fn_sym == 0 or param_i < 0:
+        return 0
+    let key = sema_pair_key(fn_sym, param_i)
+    if self.task_param_consumed_memo.contains(key):
+        return self.task_param_consumed_memo.get(key).unwrap()
+    if self.task_param_consumed_visiting.contains(key):
+        return 0
+    if self.extern_fn_names.contains(fn_sym):
+        self.task_param_consumed_memo.insert(key, 0)
+        return 0
+    let fn_node = self.fn_symbol_decl_node(fn_sym)
+    if fn_node == 0:
+        self.task_param_consumed_memo.insert(key, 0)
+        return 0
+    let sig_idx = self.get_sig(fn_sym)
+    if sig_idx < 0 or param_i >= self.sig_get_param_count(sig_idx):
+        self.task_param_consumed_memo.insert(key, 0)
+        return 0
+    let param_ty = self.sig_param_type(sig_idx, param_i)
+    if self.param_is_by_reference(param_ty) != 0 or self.type_is_task(param_ty) == 0:
+        self.task_param_consumed_memo.insert(key, 0)
+        return 0
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0 or param_i >= self.ast.fn_meta_param_count(meta):
+        self.task_param_consumed_memo.insert(key, 0)
+        return 0
+    let target_sym = self.ast.fn_param_name(self.ast.fn_meta_param_start(meta), param_i)
+    self.task_param_consumed_visiting.insert(key, 1)
+    let disp = self.task_param_expr_disposition(self.ast.get_data1(fn_node), target_sym)
+    self.task_param_consumed_visiting.remove(key)
+    let result = if disp == 1: 1 else: 0
+    self.task_param_consumed_memo.insert(key, result)
+    result
+
 fn Sema.expr_is_ephemeral_task(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -2606,7 +2898,7 @@ fn Sema.expr_is_ephemeral_task(self: Sema, node: i32) -> i32:
         return 0
     0
 
-fn Sema.check_ephemeral_task_arg_escape(self: Sema, arg_node: i32, expected_ty: i32, is_extern_call: i32):
+fn Sema.check_ephemeral_task_arg_escape(self: Sema, arg_node: i32, expected_ty: i32, is_extern_call: i32, callee_sym: i32, param_i: i32):
     if arg_node <= 0:
         return
     if self.expr_is_ephemeral_task(arg_node) == 0:
@@ -2616,7 +2908,13 @@ fn Sema.check_ephemeral_task_arg_escape(self: Sema, arg_node: i32, expected_ty: 
     if is_extern_call != 0:
         self.emit_error("ephemeral Task cannot be passed by value to extern function", arg_node)
         return
-    self.emit_warning("ephemeral Task passed by value may escape", arg_node)
+    if self.task_param_consumed_summary(callee_sym, param_i) != 0:
+        return
+    if self.in_unsafe != 0:
+        self.note_unsafe_operation()
+        return
+    let callee_name = if callee_sym != 0: self.safe_symbol_text(callee_sym) else: "callable value"
+    self.emit_error("ephemeral Task may escape: callee '" ++ callee_name ++ "' is not proven to consume it; await it in scope, pass by reference, or make the callee consume it", arg_node)
 
 fn Sema.check_ephemeral_task_storage(self: Sema, value_node: i32, context: str):
     if value_node <= 0:
@@ -8466,7 +8764,7 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closu
                 else:
                     self.note_auto_ref_call_arg(expected_ty, arg_ty, err_arg_node, node)
         let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
-        self.check_ephemeral_task_arg_escape(eph_arg_node, expected_ty, 0)
+        self.check_ephemeral_task_arg_escape(eph_arg_node, expected_ty, 0, 0, param_i)
 
     if closure_node > 0:
         let capture_count = self.closure_capture_summary_count(closure_node)
@@ -8926,7 +9224,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                     else:
                         self.note_auto_ref_call_arg(expected_ty, arg_ty, err_arg_node, node)
             let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
-            self.check_ephemeral_task_arg_escape(eph_arg_node, expected_ty, if self.extern_fn_names.contains(fn_sym): 1 else: 0)
+            self.check_ephemeral_task_arg_escape(eph_arg_node, expected_ty, if self.extern_fn_names.contains(fn_sym): 1 else: 0, fn_sym, param_i)
             // Effect enforcement: if the callee may consume/escape this arg, it must be explicitly moved or copied
             let param_eff = self.sig_param_effect(sig_idx, param_i)
             // Transitive effect propagation: if this arg is a param of the

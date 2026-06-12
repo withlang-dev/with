@@ -53,6 +53,22 @@ pipeline adapters working. Existing `with` slot/entry, iterator borrowing, and
 `with build :test`, and `with build :test-green` passed on 2026-06-12 for
 #477.
 
+#355 is implemented locally. By-value ephemeral `Task` arguments now require
+proof that the callee consumes the task in scope; unproven ordinary callees are
+hard errors instead of warnings, extern callees remain hard errors even inside
+`unsafe`, and explicit `unsafe` on ordinary unproven callees records the
+operation as the programmer's assertion. The narrow deterministic summary is
+memoized per function/parameter, cycle-conservative, and proves direct
+`await`, direct `cancel`, and forwarding to another proven-consuming callee.
+Task parameters are also recognized by type for `.await`, fixing the existing
+gap where `fn consume(t: Task[T]): t.await` was rejected. Focused coverage
+includes consuming and transitive-consuming callees, by-reference passing,
+unsafe assertion, ignored/returned/unproven-forwarded escapes, and the existing
+extern/container storage errors. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-12 for
+#355. During the work, #569 was filed for the separate backend failure where
+`Task.is_done()` on a `Task` parameter reaches an unhandled generic-call path.
+
 #444 is implemented and verified.
 Drop-implementing bindings now record concrete view dependencies from their
 initializers and reassignments, including references stored inside struct
