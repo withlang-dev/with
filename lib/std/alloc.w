@@ -4,11 +4,16 @@
 
 use std.mem
 
-type Arena  {
+pub type Arena  {
     block_size: i32
 }
 
 type TempArena {
+    allocations: Vec[i64],
+}
+
+@[no_await_guard]
+pub type ArenaScope ephemeral {
     allocations: Vec[i64],
 }
 
@@ -28,7 +33,34 @@ pub fn arena_alloc_zeroed(arena: Arena, count: i32, size: i32) -> *i8:
     let _ = arena
     alloc_zeroed(count, size)
 
+pub fn Arena.scope(self: Arena) -> ArenaScope:
+    let _ = self
+    ArenaScope { allocations: Vec.new() }
+
+pub fn ArenaScope.alloc(mut self: ArenaScope, size: i32) -> *i8:
+    let ptr = alloc(if size > 0: size else: 1)
+    self.allocations.push(ptr as i64)
+    ptr
+
+pub fn ArenaScope.alloc_zeroed(mut self: ArenaScope, count: i32, size: i32) -> *i8:
+    let ptr = alloc_zeroed(count, size)
+    self.allocations.push(ptr as i64)
+    ptr
+
+pub fn ArenaScope.reset(mut self: ArenaScope) -> Unit:
+    for raw in self.allocations:
+        if raw != 0:
+            free_mem(raw as *i8)
+    self.allocations = Vec.new()
+
+pub fn ArenaScope.drop(mut self: ArenaScope) -> Unit:
+    self.reset()
+
+pub fn ArenaScope.allocation_count(self: &ArenaScope) -> i32:
+    self.allocations.len()
+
 pub fn arena_free(arena: Arena, ptr: *i8) -> Unit:
+    let _ = arena
     free_mem(ptr)
 
 pub fn arena_reset(arena: Arena) -> Unit:

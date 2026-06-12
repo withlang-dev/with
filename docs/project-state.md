@@ -25,6 +25,17 @@ cleanup, and the unsafe ephemeral-task assertion path. Full verification
 passed on 2026-06-12: `with build`, `with build :fixpoint`,
 `with build :test`, and `with build :test-green`.
 
+#411 is implemented and verified. `std.alloc` now exposes public `Arena` and
+`ArenaScope`; `Arena.scope()` creates a `@[no_await_guard]` ephemeral scope
+that records allocations, frees them on `reset()`/drop, and supports
+`alloc`, `alloc_zeroed`, and `allocation_count` for the interim TempArena-style
+semantics until #437 replaces the internals with real region allocation.
+Focused coverage pins allocation smoke behavior, explicit drop before await,
+`with arena.scope() as mut` ending before await, and E0701 rejection for plain
+bindings, may-suspend calls, and `with` blocks that hold an ArenaScope across
+suspension. Full verification passed on 2026-06-12: `with build`,
+`with build :fixpoint`, `with build :test`, and `with build :test-green`.
+
 #362 substrate work is implemented locally and
 focused tests pass. Binding-level provenance is now carried in a single
 `BindingProvenance` record per scope binding, replacing the previous split
