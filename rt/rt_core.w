@@ -1222,7 +1222,27 @@ pub fn with_str_concat_n_move_first(parts: *const str, count: i64) -> str:
         unsafe *((first_ptr as i64 + total) as *mut u8) = 0
         return make_str(first_ptr, total)
 
-    let result = str_concat_n_copy(parts, count, total)
+    // Reallocate with geometric headroom: below RT_LARGE_THRESHOLD the size
+    // classes already double, but large allocations are exact-size, so an
+    // exact reallocation here would copy the whole string on every append.
+    // Only this loop-shaped self-append path over-allocates; one-shot concats
+    // (with_str_concat_n) stay exact.
+    var new_size = total + 1
+    if first_owned != 0:
+        let doubled = (first_cap + 1) * 2
+        if doubled > new_size:
+            new_size = doubled
+    let out = rt_alloc(new_size)
+    var offset: i64 = 0
+    for i in 0..count:
+        let part = unsafe parts[i]
+        let part_len = str_length(part)
+        let part_data = str_data(part)
+        if part_data as i64 != 0 and part_len > 0:
+            rt_memcpy((out as i64 + offset) as *mut u8, part_data, part_len)
+        offset = offset + part_len
+    unsafe *((out as i64 + total) as *mut u8) = 0
+    let result = make_str(out as *const u8, total)
     if first_owned != 0 and first_ptr as i64 != 0:
         rt_free(first_ptr as *mut u8)
     result
