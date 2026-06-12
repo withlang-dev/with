@@ -37,6 +37,17 @@ runs a generated-C `Result.expect` panic case. Full `with build`,
 `with build :fixpoint`, `with build :test`, and `with build :test-green`
 passed on 2026-06-11 for #545.
 
+#438 is implemented and verified. Runtime f64 formatting now classifies
+NaN/inf/signed zero from IEEE-754 bits instead of numeric thresholds, formats
+finite default-display values through the shared deterministic decimal path,
+and preserves special values as `nan`, `inf`, and `-inf`. Exponent float
+literals are parsed by the runtime parser so large/small finite regression
+tests exercise the intended values. New behavior coverage pins ordinary
+default display (`3.14`, `10`, `1.5`, `0.5`, `0.001`), debug-display parity,
+`1e308`, `1e-308`, signed zero, and NaN/+/-inf handling. Full `with build`,
+`with build :fixpoint`, `with build :test`, and `with build :test-green`
+passed on 2026-06-11 for #438.
+
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
 C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib

@@ -48,141 +48,181 @@ extern fn rt_chmod(path: *const u8, mode: i32) -> i32
 extern fn rt_stat(path: *const u8, out: *mut u8) -> i32
 
 // ── Float formatting ────────────────────────────────────────────
-// Implements f64-to-decimal conversion without libc.
-// Locale-independent. NaN→"nan", inf→"inf"/"-inf". Deterministic.
+// Implements deterministic f64-to-decimal conversion without libc.
+// Locale-independent. NaN→"nan", inf→"inf"/"-inf".
 
-fn f64_is_nan(v: f64) -> bool:
-    v != v
+fn f64_bits(v: f64) -> u64:
+    unsafe *((&v as *const f64) as *const u64)
 
-fn f64_is_neg(v: f64) -> bool:
-    v < 0.0
+fn f64_exp_bits(bits: u64) -> u64:
+    (bits >> 52) & 0x7ffu64
 
-fn f64_is_zero(v: f64) -> bool:
-    v == 0.0 and not f64_is_neg(v)
+fn f64_frac_bits(bits: u64) -> u64:
+    bits & 0x000fffffffffffffu64
 
-// Format f64 to buffer, shortest representation. Returns length.
-fn rt_f64_to_buf(val: f64, buf: *mut u8, bufsize: i64) -> i64:
+fn f64_is_negative_bits(bits: u64) -> bool:
+    (bits & 0x8000000000000000u64) != 0u64
+
+fn f64_is_nan_bits(bits: u64) -> bool:
+    f64_exp_bits(bits) == 0x7ffu64 and f64_frac_bits(bits) != 0u64
+
+fn f64_is_inf_bits(bits: u64) -> bool:
+    f64_exp_bits(bits) == 0x7ffu64 and f64_frac_bits(bits) == 0u64
+
+fn rt_buf_put(buf: *mut u8, bufsize: i64, pos: i64, ch: u8) -> i64:
+    if pos < bufsize:
+        unsafe *((buf as i64 + pos) as *mut u8) = ch
+    pos + 1
+
+fn rt_buf_write_ascii(buf: *mut u8, bufsize: i64, pos_arg: i64, text: *const u8, len: i64) -> i64:
+    var pos = pos_arg
+    var i: i64 = 0
+    while i < len:
+        if pos < bufsize:
+            unsafe *((buf as i64 + pos) as *mut u8) = unsafe text[i]
+        pos = pos + 1
+        i = i + 1
+    pos
+
+fn rt_pow10_u64(precision: i32) -> u64:
+    var out: u64 = 1
+    var i: i32 = 0
+    while i < precision:
+        out = out * 10u64
+        i = i + 1
+    out
+
+fn rt_pow10_f64(precision: i32) -> f64:
+    var out: f64 = 1.0
+    var i: i32 = 0
+    while i < precision:
+        out = out * 10.0
+        i = i + 1
+    out
+
+fn u64_decimal_digits(n_arg: u64) -> i32:
+    var n = n_arg
+    var digits: i32 = 1
+    while n >= 10u64:
+        n = n / 10u64
+        digits = digits + 1
+    digits
+
+fn rt_f64_write_special(bits: u64, buf: *mut u8, bufsize: i64) -> i64:
+    if f64_is_nan_bits(bits):
+        return rt_buf_write_ascii(buf, bufsize, 0, "nan" as *const u8, 3)
     var pos: i64 = 0
-    if f64_is_nan(val):
-        if bufsize >= 3:
-            unsafe *((buf as i64 + 0) as *mut u8) = 110  // 'n'
-            unsafe *((buf as i64 + 1) as *mut u8) = 97   // 'a'
-            unsafe *((buf as i64 + 2) as *mut u8) = 110  // 'n'
-        return 3
-    if val > 1.7e308:
-        if bufsize >= 3:
-            unsafe *((buf as i64 + 0) as *mut u8) = 105  // 'i'
-            unsafe *((buf as i64 + 1) as *mut u8) = 110  // 'n'
-            unsafe *((buf as i64 + 2) as *mut u8) = 102  // 'f'
-        return 3
-    if val < -1.7e308:
-        if bufsize >= 4:
-            unsafe *((buf as i64 + 0) as *mut u8) = 45   // '-'
-            unsafe *((buf as i64 + 1) as *mut u8) = 105  // 'i'
-            unsafe *((buf as i64 + 2) as *mut u8) = 110  // 'n'
-            unsafe *((buf as i64 + 3) as *mut u8) = 102  // 'f'
-        return 4
-    var v = val
-    if v < 0.0:
-        if pos < bufsize:
-            unsafe *((buf as i64 + pos) as *mut u8) = 45  // '-'
-            pos = pos + 1
-        v = 0.0 - v
-    if v == 0.0:
-        if pos < bufsize:
-            unsafe *((buf as i64 + pos) as *mut u8) = 48  // '0'
-            pos = pos + 1
-        return pos
-    // Integer part
-    let int_part = v as u64
-    let frac = v - (int_part as f64)
+    if f64_is_negative_bits(bits):
+        pos = rt_buf_put(buf, bufsize, pos, 45)  // '-'
+    rt_buf_write_ascii(buf, bufsize, pos, "inf" as *const u8, 3)
+
+fn rt_f64_abs_value(val: f64, bits: u64) -> f64:
+    if f64_is_negative_bits(bits):
+        return 0.0 - val
+    val
+
+fn rt_f64_write_fixed_abs(val: f64, precision_arg: i32, trim: bool, buf: *mut u8, bufsize: i64, pos_arg: i64) -> i64:
+    var precision = precision_arg
+    if precision < 0:
+        precision = 0
+    if precision > 18:
+        precision = 18
+    var pos = pos_arg
+    var int_part = val as u64
+    var frac = val - (int_part as f64)
+    if precision == 0:
+        if frac >= 0.5:
+            int_part = int_part + 1u64
+        var ibuf: [24]u8 = [0 as u8; 24]
+        let ilen = u64_to_buf_internal(int_part, &ibuf as *mut u8)
+        return rt_buf_write_ascii(buf, bufsize, pos, &ibuf as *const u8, ilen)
+    let scale_u = rt_pow10_u64(precision)
+    let scale_f = rt_pow10_f64(precision)
+    var frac_int = (frac * scale_f + 0.5) as u64
+    if frac_int >= scale_u:
+        int_part = int_part + 1u64
+        frac_int = frac_int - scale_u
     var ibuf: [24]u8 = [0 as u8; 24]
     let ilen = u64_to_buf_internal(int_part, &ibuf as *mut u8)
-    var ii: i64 = 0
-    while ii < ilen and pos < bufsize:
-        unsafe *((buf as i64 + pos) as *mut u8) = ibuf[ii]
-        pos = pos + 1
-        ii = ii + 1
-    // Fractional part: multiply by 10^6 once to get all digits as integer,
-    // avoiding repeated multiply-by-10 drift.
-    if frac > 0.000000001:
-        if pos < bufsize:
-            unsafe *((buf as i64 + pos) as *mut u8) = 46  // '.'
-            pos = pos + 1
-        // Round to 6 decimal places: frac_int = round(frac * 1000000)
-        let frac_int = (frac * 1000000.0 + 0.5) as u64
-        let frac_start = pos
-        // Write exactly 6 digits (with leading zeros)
-        var fv = frac_int
-        var fdigits: [6]u8 = [0 as u8; 6]
-        var fdi: i32 = 5
-        while fdi >= 0:
-            fdigits[fdi as i64] = (48 + (fv % 10) as i32) as u8
-            fv = fv / 10
-            fdi = fdi - 1
-        var fwi: i32 = 0
-        while fwi < 6 and pos < bufsize:
-            unsafe *((buf as i64 + pos) as *mut u8) = fdigits[fwi as i64]
-            pos = pos + 1
-            fwi = fwi + 1
-        // Trim trailing zeros
+    pos = rt_buf_write_ascii(buf, bufsize, pos, &ibuf as *const u8, ilen)
+    pos = rt_buf_put(buf, bufsize, pos, 46)  // '.'
+    let frac_start = pos
+    var fdigits: [18]u8 = [0 as u8; 18]
+    var fv = frac_int
+    var fdi = precision - 1
+    while fdi >= 0:
+        fdigits[fdi as i64] = (48 + (fv % 10u64) as i32) as u8
+        fv = fv / 10u64
+        fdi = fdi - 1
+    var fwi: i32 = 0
+    while fwi < precision:
+        pos = rt_buf_put(buf, bufsize, pos, fdigits[fwi as i64])
+        fwi = fwi + 1
+    if trim:
         while pos > frac_start and unsafe *((buf as i64 + pos - 1) as *const u8) == 48:
             pos = pos - 1
-        // If all fractional digits were zero, remove the dot
         if pos == frac_start:
             pos = pos - 1
     pos
 
+fn rt_f64_write_exponent(exp: i32, buf: *mut u8, bufsize: i64, pos_arg: i64) -> i64:
+    var pos = rt_buf_put(buf, bufsize, pos_arg, 101)  // 'e'
+    var e = exp
+    if e < 0:
+        pos = rt_buf_put(buf, bufsize, pos, 45)
+        e = 0 - e
+    else:
+        pos = rt_buf_put(buf, bufsize, pos, 43)
+    if e < 10:
+        pos = rt_buf_put(buf, bufsize, pos, 48)
+        return rt_buf_put(buf, bufsize, pos, (48 + e) as u8)
+    var eb: [8]u8 = [0 as u8; 8]
+    let elen = u64_to_buf_internal(e as u64, &eb as *mut u8)
+    rt_buf_write_ascii(buf, bufsize, pos, &eb as *const u8, elen)
+
+fn rt_f64_write_scientific_abs(val: f64, precision: i32, trim: bool, buf: *mut u8, bufsize: i64, pos_arg: i64) -> i64:
+    var scaled = val
+    var exp: i32 = 0
+    while scaled >= 10.0:
+        scaled = scaled / 10.0
+        exp = exp + 1
+    while scaled < 1.0:
+        scaled = scaled * 10.0
+        exp = exp - 1
+    var pos = rt_f64_write_fixed_abs(scaled, precision, trim, buf, bufsize, pos_arg)
+    rt_f64_write_exponent(exp, buf, bufsize, pos)
+
+// Format f64 to buffer in general display mode. Returns length.
+fn rt_f64_to_buf(val: f64, buf: *mut u8, bufsize: i64) -> i64:
+    let bits = f64_bits(val)
+    if f64_is_nan_bits(bits) or f64_is_inf_bits(bits):
+        return rt_f64_write_special(bits, buf, bufsize)
+    var pos: i64 = 0
+    if f64_is_negative_bits(bits):
+        pos = rt_buf_put(buf, bufsize, pos, 45)
+    let v = rt_f64_abs_value(val, bits)
+    if v == 0.0:
+        return rt_buf_put(buf, bufsize, pos, 48)
+    if v >= 1000000000000000.0 or v < 0.000001:
+        return rt_f64_write_scientific_abs(v, 14, true, buf, bufsize, pos)
+    let int_digits = u64_decimal_digits(v as u64)
+    var precision = 15 - int_digits
+    if precision < 0:
+        precision = 0
+    if precision > 15:
+        precision = 15
+    rt_f64_write_fixed_abs(v, precision, true, buf, bufsize, pos)
+
 // Format f64 with fixed precision. Returns length.
 fn rt_f64_to_fixed_buf(val: f64, precision: i32, buf: *mut u8, bufsize: i64) -> i64:
+    let bits = f64_bits(val)
+    if f64_is_nan_bits(bits) or f64_is_inf_bits(bits):
+        return rt_f64_write_special(bits, buf, bufsize)
     var pos: i64 = 0
-    if f64_is_nan(val):
-        if bufsize >= 3:
-            unsafe *((buf as i64 + 0) as *mut u8) = 110
-            unsafe *((buf as i64 + 1) as *mut u8) = 97
-            unsafe *((buf as i64 + 2) as *mut u8) = 110
-        return 3
-    var v = val
-    if v < 0.0:
-        if pos < bufsize:
-            unsafe *((buf as i64 + pos) as *mut u8) = 45
-            pos = pos + 1
-        v = 0.0 - v
-    let int_part = v as u64
-    let frac = v - (int_part as f64)
-    var ibuf: [24]u8 = [0 as u8; 24]
-    let ilen = u64_to_buf_internal(int_part, &ibuf as *mut u8)
-    var ii: i64 = 0
-    while ii < ilen and pos < bufsize:
-        unsafe *((buf as i64 + pos) as *mut u8) = ibuf[ii]
-        pos = pos + 1
-        ii = ii + 1
-    if precision > 0:
-        if pos < bufsize:
-            unsafe *((buf as i64 + pos) as *mut u8) = 46
-            pos = pos + 1
-        // Compute scale = 10^precision, then frac_int = round(frac * scale)
-        var scale: f64 = 1.0
-        var si: i32 = 0
-        while si < precision:
-            scale = scale * 10.0
-            si = si + 1
-        let frac_int = (frac * scale + 0.5) as u64
-        // Extract digits from frac_int (right to left)
-        var fdigits: [20]u8 = [0 as u8; 20]
-        var fv = frac_int
-        var fdi: i32 = precision - 1
-        while fdi >= 0:
-            fdigits[fdi as i64] = (48 + (fv % 10) as i32) as u8
-            fv = fv / 10
-            fdi = fdi - 1
-        // Write digits left to right
-        var fwi: i32 = 0
-        while fwi < precision and pos < bufsize:
-            unsafe *((buf as i64 + pos) as *mut u8) = fdigits[fwi as i64]
-            pos = pos + 1
-            fwi = fwi + 1
-    pos
+    if f64_is_negative_bits(bits):
+        pos = rt_buf_put(buf, bufsize, pos, 45)
+    let v = rt_f64_abs_value(val, bits)
+    rt_f64_write_fixed_abs(v, precision, false, buf, bufsize, pos)
 
 // Internal helper for u64-to-decimal (used by float formatting)
 fn u64_to_buf_internal(n: u64, buf: *mut u8) -> i64:
@@ -1546,6 +1586,35 @@ pub fn with_parse_float(s: str) -> f64:
             result = result + (c - 48) as f64 * frac
             frac = frac * 0.1
             i = i + 1
+    // Exponent part
+    if i < slen:
+        let exp_head = unsafe sp[i]
+        if exp_head == 101 or exp_head == 69:  // e/E
+            i = i + 1
+            var exp_neg: i32 = 0
+            if i < slen:
+                let sign = unsafe sp[i]
+                if sign == 45:
+                    exp_neg = 1
+                    i = i + 1
+                else if sign == 43:
+                    i = i + 1
+            var exp: i32 = 0
+            while i < slen:
+                let c = unsafe sp[i]
+                if c < 48 or c > 57:
+                    break
+                exp = exp * 10 + (c - 48) as i32
+                i = i + 1
+            var scale: f64 = 1.0
+            var ei: i32 = 0
+            while ei < exp:
+                scale = scale * 10.0
+                ei = ei + 1
+            if exp_neg != 0:
+                result = result / scale
+            else:
+                result = result * scale
     if neg != 0: 0.0 - result else: result
 
 // ── Args and environment ───────────────────────────────────────────
