@@ -2691,6 +2691,21 @@ fn Sema.checked_expr_is_non_unit_value(self: Sema, node: i32) -> i32:
         return 0
     1
 
+fn Sema.reject_opaque_value_type(self: Sema, tid: i32, node: i32, operation: str) -> i32:
+    if self.is_opaque_value_type(tid) == 0:
+        return 0
+    if operation == "sizeof":
+        self.emit_error("sizeof requires a type with known layout", node)
+    else if operation == "alignof":
+        self.emit_error("alignof requires a type with known layout", node)
+    else if operation == "field":
+        self.emit_error("field access requires a concrete struct or union type; this type is opaque", node)
+    else if operation == "copy":
+        self.emit_error("cannot copy opaque type; use a pointer or reference", node)
+    else:
+        self.emit_error("cannot create value of opaque type; use a pointer or reference", node)
+    1
+
 fn Sema.expr_mutates_any_current_binding(self: Sema, node: i32) -> i32:
     for bi in 0..self.bind_names.len() as i32:
         if self.expr_mutates_place(node, self.bind_names.get(bi as i64)) != 0:
@@ -5001,6 +5016,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         if ann_type == 0:
             self.emit_error("var without initializer requires type annotation", node)
             return self.ty_void as i32
+        let _ = self.reject_opaque_value_type(ann_type as i32, ann_type_node, "create")
         self.scope_put_at(name, ann_type as i32, is_mut, node)
         self.binding_decl_nodes.insert(name, node)
         self.binding_value_nodes.remove(name)
@@ -5027,9 +5043,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
 
     if ann_type_node != 0 and self.type_expr_is_collection_with_ref(ann_type_node) != 0:
         self.emit_error("ephemeral references cannot be stored in generic containers", node)
-    if self.is_opaque_value_type(bind_type as i32) != 0:
-        let opaque_node = if ann_type_node != 0: ann_type_node else: value
-        self.emit_error("opaque values cannot be stored by value; use a pointer or reference", opaque_node)
+    let _ = self.reject_opaque_value_type(bind_type as i32, if ann_type_node != 0: ann_type_node else: value, "create")
     if self.pool_resolve(name) == "_" and self.expr_is_task_value(value) != 0 and self.expr_is_scoped_task_value(value) == 0:
         self.emit_warning("`let _ = ...` on a Task immediately cancels it", node)
 
@@ -6066,8 +6080,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
 
     let ftk = self.get_type_kind(field_base)
 
-    if self.is_opaque_value_type(field_base as i32) != 0:
-        self.emit_error("field access requires a concrete struct or union type; this type is opaque", node)
+    if self.reject_opaque_value_type(field_base as i32, node, "field") != 0:
         return 0
 
     if ftk == TypeKind.TY_STRUCT:
@@ -8212,6 +8225,27 @@ fn Sema.is_sizeof_or_alignof(self: Sema, callee: i32) -> i32:
         return 1
     0
 
+fn Sema.sizeof_alignof_type_arg_node(self: Sema, callee: i32) -> i32:
+    let kind = self.ast.kind(callee)
+    if kind == NodeKind.NK_TYPE_GENERIC:
+        let type_arg_start = self.ast.get_data1(callee)
+        let type_arg_count = self.ast.get_data2(callee)
+        if type_arg_count != 1:
+            return 0
+        return self.ast.get_extra(type_arg_start)
+    if kind == NodeKind.NK_INDEX:
+        return self.ast.get_data1(callee)
+    0
+
+fn Sema.sizeof_alignof_name(self: Sema, callee: i32) -> str:
+    let gi_base = self.ast.get_data0(callee)
+    if self.ast.kind(gi_base) != NodeKind.NK_IDENT:
+        return "sizeof"
+    let name = self.pool_resolve(self.ast.get_data0(gi_base))
+    if name == "alignof" or name == "align_of":
+        return "alignof"
+    "sizeof"
+
 fn Sema.is_chan_call(self: Sema, callee: i32) -> i32:
     let kind = self.ast.kind(callee)
     if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
@@ -8402,6 +8436,16 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // sizeof[T]() / alignof[T]() / transmute[T]() / nameof[T]() builtins
     if self.is_sizeof_or_alignof(callee) != 0:
+        let type_arg_node = self.sizeof_alignof_type_arg_node(callee)
+        if type_arg_node == 0:
+            self.emit_error(self.sizeof_alignof_name(callee) ++ " expects exactly one type argument", callee)
+            return 0
+        let layout_ty = self.resolve_type_level_arg_expr(type_arg_node)
+        if layout_ty == 0:
+            self.emit_error(self.sizeof_alignof_name(callee) ++ " type argument could not be resolved", type_arg_node)
+            return 0
+        if self.reject_opaque_value_type(layout_ty, type_arg_node, self.sizeof_alignof_name(callee)) != 0:
+            return 0
         return self.ty_i64 as i32
     if self.is_nameof_call(callee) != 0:
         return self.ty_str as i32

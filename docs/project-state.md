@@ -141,6 +141,17 @@ reference binding. Full `with build`, `with build :fixpoint`,
 fetch failure; `cli-selfhost-project-tests` passed on rerun before the final
 clean full-suite pass.
 
+#463 is implemented and verified. Opaque layout/value misuse now fails in Sema
+before MIR/codegen: `sizeof[Opaque]()` and
+`alignof[Opaque]()` reject unknown layout, local opaque value declarations
+reject zero-initialized by-value storage, field access uses the shared opaque
+diagnostic path, and existing function parameter/return checks are covered by
+regressions. Pointer-to-opaque remains valid, including null initialization and
+calls through unsafe pointer-taking functions; `c_void` remains pointer-only
+and cannot be declared by value. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-11 for
+#463.
+
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
 C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib
