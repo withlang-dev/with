@@ -5082,7 +5082,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     else:
         self.binding_closure_nodes.remove(name)
     let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
-    if bind_kind == TypeKind.TY_REF or bind_kind == TypeKind.TY_PTR:
+    if bind_kind == TypeKind.TY_REF or bind_kind == TypeKind.TY_PTR or self.type_has_drop_impl(bind_type as i32) != 0:
         self.record_view_binding_from_expr(name, value)
     else:
         self.clear_binding_view_deps(name)
@@ -5309,6 +5309,12 @@ fn Sema.collect_expr_view_deps(self: Sema, node: i32, out: Vec[i32]):
     if kind == NodeKind.NK_IF_EXPR:
         self.collect_expr_view_deps(self.ast.get_data1(node), out)
         self.collect_expr_view_deps(self.ast.get_data2(node), out)
+        return
+    if kind == NodeKind.NK_STRUCT_LIT:
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            self.collect_expr_view_deps(self.ast.get_extra(extra_start + fi * 2 + 1), out)
         return
     let dep_count = self.expr_view_dep_count(node)
     if dep_count > 0:
@@ -5773,7 +5779,7 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         else:
             self.binding_closure_nodes.remove(target_sym)
         let tgt_kind = self.get_type_kind(self.resolve_alias(target_type as TypeId))
-        if tgt_kind == TypeKind.TY_REF or tgt_kind == TypeKind.TY_PTR:
+        if tgt_kind == TypeKind.TY_REF or tgt_kind == TypeKind.TY_PTR or self.type_has_drop_impl(target_type as i32) != 0:
             self.record_view_binding_from_expr(target_sym, value)
         else:
             self.clear_binding_view_deps(target_sym)

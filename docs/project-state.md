@@ -3,7 +3,7 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-06-11.
+Last updated: 2026-06-12.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
@@ -11,7 +11,19 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 4 is in progress. #478 is implemented locally and focused tests pass.
+Phase 4 is in progress. #444 is implemented locally and focused tests pass.
+Drop-implementing bindings now record concrete view dependencies from their
+initializers and reassignments, including references stored inside struct
+literals. Scope exit treats the implicit destructor call as a use under §21.1
+Rule 7: if a Drop value still retains a borrow of a binding that is being
+destroyed first, Sema emits a dedicated diagnostic with labels for the Drop
+value and the destroyed origin. Focused coverage includes a negative
+`err_implicit_drop_use_after_origin.w`, a positive same-scope declaration-order
+case, and the existing Drop prelude use-after tests. Full verification is
+complete: `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-12 for #444.
+
+#478 is implemented and verified.
 The MIR tailrec contract verifier now carries a small Drop-local liveness
 state alongside the existing syntactic tail-position and active-defer checks.
 Recursive edges in a `@[tailrec]` SCC now reject when a Drop-implementing local

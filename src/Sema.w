@@ -2901,6 +2901,75 @@ fn Sema.binding_depends_on_origin(self: Sema, sym: i32, origin_sym: i32) -> i32:
             return 1
     0
 
+fn Sema.expr_view_depends_on_origin(self: Sema, node: i32, origin_sym: i32) -> i32:
+    if node == 0 or origin_sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        return self.binding_depends_on_origin(self.ast.get_data0(node), origin_sym)
+    if kind == NodeKind.NK_UNARY:
+        let op = self.ast.get_data0(node)
+        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+            if self.place_root_sym(self.ast.get_data1(node)) == origin_sym:
+                return 1
+        return self.expr_view_depends_on_origin(self.ast.get_data1(node), origin_sym)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
+        return self.expr_view_depends_on_origin(self.ast.get_data0(node), origin_sym)
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
+        return self.expr_view_depends_on_origin(self.ast.get_data0(node), origin_sym)
+    if kind == NodeKind.NK_BLOCK:
+        return self.expr_view_depends_on_origin(self.ast.get_data2(node), origin_sym)
+    if kind == NodeKind.NK_IF_EXPR:
+        if self.expr_view_depends_on_origin(self.ast.get_data1(node), origin_sym) != 0:
+            return 1
+        return self.expr_view_depends_on_origin(self.ast.get_data2(node), origin_sym)
+    if kind == NodeKind.NK_STRUCT_LIT:
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            if self.expr_view_depends_on_origin(self.ast.get_extra(extra_start + fi * 2 + 1), origin_sym) != 0:
+                return 1
+        return 0
+    0
+
+fn Sema.binding_value_depends_on_origin(self: Sema, sym: i32, origin_sym: i32) -> i32:
+    if not self.binding_value_nodes.contains(sym):
+        return 0
+    self.expr_view_depends_on_origin(self.binding_value_nodes.get(sym).unwrap(), origin_sym)
+
+fn Sema.type_has_drop_impl(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    var owner_sym = self.get_type_name(resolved)
+    if owner_sym == 0 and self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        owner_sym = self.get_generic_inst_base(resolved as i32)
+    if owner_sym != 0 and self.has_drop_method(owner_sym) != 0:
+        return 1
+    if owner_sym != 0 and self.impl_lookup.contains(owner_sym):
+        let idx = self.impl_lookup.get(owner_sym).unwrap()
+        let start = self.impl_starts.get(idx as i64)
+        let count = self.impl_counts.get(idx as i64)
+        for i in 0..count:
+            if self.impl_extra.get((start + i) as i64) == self.syms.drop:
+                return 1
+    0
+
+fn Sema.emit_implicit_drop_view_use_error(self: Sema, view_sym: i32, origin_sym: i32, origin_node: i32):
+    let view_name = self.pool_resolve(view_sym)
+    let origin_name = self.pool_resolve(origin_sym)
+    let view_node = self.binding_decl_node(view_sym)
+    let primary_node = if view_node != 0: view_node else: origin_node
+    let primary_start = if primary_node != 0: self.ast.get_start(primary_node) else: 0
+    let primary_end = if primary_node != 0: self.ast.get_end(primary_node) else: 0
+    var diag = Diagnostic.err("implicit drop of `" ++ view_name ++ "` uses `&" ++ origin_name ++ "` after `" ++ origin_name ++ "` is destroyed (§21.1 Rule 7)", Span { file: self.local_file_id, start: primary_start, end: primary_end })
+    if view_node != 0:
+        diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(view_node), end: self.ast.get_end(view_node) }, "Drop value retaining the borrow is declared here")
+    if origin_node != 0:
+        diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(origin_node), end: self.ast.get_end(origin_node) }, "`" ++ origin_name ++ "` is destroyed before `" ++ view_name ++ "` drops")
+    diag.add_help("declare `" ++ view_name ++ "` after `" ++ origin_name ++ "`, or clear/drop `" ++ view_name ++ "` before `" ++ origin_name ++ "` goes out of scope")
+    self.diags.emit(diag)
+
 fn Sema.binding_decl_node(self: Sema, sym: i32) -> i32:
     if self.binding_decl_nodes.contains(sym):
         return self.binding_decl_nodes.get(sym).unwrap()
@@ -2915,10 +2984,15 @@ fn Sema.check_live_views_for_origin(self: Sema, origin_sym: i32, node: i32):
             continue
         if self.bind_states.get(bi as i64) != VarState.LIVE:
             continue
-        if self.binding_depends_on_origin(view_sym, origin_sym) != 0:
+        let view_ty = self.bind_types.get(bi as i64)
+        let view_has_drop = self.type_has_drop_impl(view_ty)
+        if self.binding_depends_on_origin(view_sym, origin_sym) != 0 or (view_has_drop != 0 and self.binding_value_depends_on_origin(view_sym, origin_sym) != 0):
+            let err_node = if node != 0: node else: self.binding_decl_node(view_sym)
+            if view_has_drop != 0:
+                self.emit_implicit_drop_view_use_error(view_sym, origin_sym, err_node)
+                return
             let view_name = self.pool_resolve(view_sym)
             let origin_name = self.pool_resolve(origin_sym)
-            let err_node = if node != 0: node else: self.binding_decl_node(view_sym)
             self.emit_error("view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'", err_node)
             return
 
