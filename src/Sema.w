@@ -2448,6 +2448,20 @@ fn Sema.option_pointer_payload_type(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
     self.get_generic_inst_arg(resolved, 0)
 
+fn Sema.null_literal_target_type(self: Sema, tid: TypeId) -> TypeId:
+    if tid == 0:
+        return 0 as TypeId
+    let resolved = self.resolve_alias(tid)
+    let kind = self.get_type_kind(resolved)
+    if kind == TypeKind.TY_PTR or kind == TypeKind.TY_EXTERN_FN or self.is_option_pointer_type(resolved) != 0:
+        return resolved
+    0 as TypeId
+
+fn Sema.type_allows_null_literal(self: Sema, tid: TypeId) -> i32:
+    if self.null_literal_target_type(tid) != 0:
+        return 1
+    0
+
 fn Sema.try_unwrapped_type(self: Sema, tid: i32) -> i32:
     if tid <= 0:
         return 0

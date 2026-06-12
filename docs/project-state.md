@@ -126,6 +126,21 @@ Unit-returning guarded-with early-return regression. Full `with build`,
 `with build :fixpoint`, `with build :test`, and `with build :test-green` passed
 on 2026-06-11 for #546.
 
+#460 is implemented and verified. `null` no longer defaults to `*const i8`;
+it requires a contextual pointer-like target type. Raw
+pointers, extern function pointers, and nullable pointer `Option` types remain
+accepted, explicit `null as *T` casts now supply the cast target as context,
+and safe references/integer contexts are rejected with directional diagnostics.
+Comparison checking now types `p == null` and `null == p` from the non-null
+operand while rejecting `null == 0`. Focused coverage includes §16.10 positive
+pointer, optional-pointer, extern-function-pointer, argument, and comparison
+cases plus negative tests for bare null, integer binding, `null == 0`, and
+reference binding. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-11 for
+#460. The first full-suite run hit a transient Conan Center/raylib dependency
+fetch failure; `cli-selfhost-project-tests` passed on rerun before the final
+clean full-suite pass.
+
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
 C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib

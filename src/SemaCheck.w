@@ -3334,11 +3334,16 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_NULL_LIT:
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            let target = self.null_literal_target_type(self.expected_expr_type)
+            if target != 0:
+                self.typed_expr_types.insert(node, target as i32)
+                return target
             let expected = self.resolve_alias(self.expected_expr_type)
-            let expected_kind = self.get_type_kind(expected)
-            if expected_kind == TypeKind.TY_PTR or expected_kind == TypeKind.TY_REF or expected_kind == TypeKind.TY_EXTERN_FN or self.is_option_pointer_type(expected) != 0:
-                return expected
-        return self.ty_const_i8_ptr
+            if self.get_type_kind(expected) == TypeKind.TY_INT:
+                self.emit_error("null is not an integer; use a typed pointer context", node)
+                return 0 as TypeId
+        self.emit_error("null requires pointer type context", node)
+        return 0 as TypeId
 
     if kind == NodeKind.NK_IDENT:
         return self.check_ident(self.ast.get_data0(node), node) as TypeId
@@ -3522,8 +3527,12 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_closure(node) as TypeId
 
     if kind == NodeKind.NK_CAST:
-        let src_tid = self.check_expr_with_expected(self.ast.get_data0(node), 0 as TypeId)
         let cast_tid = self.resolve_type_expr(self.ast.get_data1(node))
+        let src_node = self.ast.get_data0(node)
+        let src_tid = if self.ast.kind(src_node) == NodeKind.NK_NULL_LIT and self.type_allows_null_literal(cast_tid) != 0:
+            self.check_expr_with_expected(src_node, cast_tid)
+        else:
+            self.check_expr_with_expected(src_node, 0 as TypeId)
         // Store resolved cast type so MIR lowering can read it without
         // calling resolve_type_expr (which would add_type on a shallow-copied Sema).
         self.typed_expr_types.insert(node, cast_tid as i32)
@@ -4493,6 +4502,12 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         if self.ast.kind(lhs_node) == NodeKind.NK_VARIANT_SHORTHAND:
             rhs = self.check_expr(rhs_node)
             lhs = self.check_expr_with_expected(lhs_node, rhs)
+        else if self.ast.kind(lhs_node) == NodeKind.NK_NULL_LIT:
+            rhs = self.check_expr(rhs_node)
+            lhs = self.check_expr_with_expected(lhs_node, rhs)
+        else if self.ast.kind(rhs_node) == NodeKind.NK_NULL_LIT:
+            lhs = self.check_expr(lhs_node)
+            rhs = self.check_expr_with_expected(rhs_node, lhs)
         else:
             if lhs_is_num_lit and rhs_is_num_lit:
                 lhs = self.check_expr(lhs_node)
