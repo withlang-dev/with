@@ -703,12 +703,12 @@ unsafe fn mark_name_emitted(name: *const u8):
     if is_name_emitted(name) != 0: return
     if g_emitted_count >= g_emitted_cap:
         g_emitted_cap = if g_emitted_cap > 0: g_emitted_cap * 2 else: 256
-        let new_buf = with_alloc(g_emitted_cap as i64 * 8)
-        if g_emitted_names as i64 != 0 and g_emitted_count > 0:
-            with_memcpy(new_buf, g_emitted_names as *const u8, g_emitted_count as i64 * 8)
-        if g_emitted_names as i64 != 0:
-            with_free(g_emitted_names as *mut u8)
-        g_emitted_names = new_buf as *mut *mut u8
+        let old_names = g_emitted_names
+        g_emitted_names = with_alloc(g_emitted_cap as i64 * 8) as *mut *mut u8
+        if old_names as i64 != 0 and g_emitted_count > 0:
+            with_memcpy(g_emitted_names as *mut u8, old_names as *const u8, g_emitted_count as i64 * 8)
+        if old_names as i64 != 0:
+            with_free(old_names as *mut u8)
     *((g_emitted_names as i64 + g_emitted_count as i64 * 8) as *mut *mut u8) = c_strdup(name)
     g_emitted_count = g_emitted_count + 1
 
@@ -976,12 +976,12 @@ unsafe fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32
     // Grow decl array
     if (*s).decl_count >= (*s).decl_cap:
         (*s).decl_cap = if (*s).decl_cap > 0: (*s).decl_cap * 2 else: 256
-        let new_buf = with_alloc((*s).decl_cap as i64 * 32)  // sizeof(CXCursor) = 32
-        if (*s).decls as i64 != 0 and (*s).decl_count > 0:
-            with_memcpy(new_buf, (*s).decls as *const u8, (*s).decl_count as i64 * 32)
-        if (*s).decls as i64 != 0:
-            with_free((*s).decls as *mut u8)
-        (*s).decls = new_buf as *mut CXCursor
+        let old_decls = (*s).decls
+        (*s).decls = with_alloc((*s).decl_cap as i64 * 32) as *mut CXCursor  // sizeof(CXCursor) = 32
+        if old_decls as i64 != 0 and (*s).decl_count > 0:
+            with_memcpy((*s).decls as *mut u8, old_decls as *const u8, (*s).decl_count as i64 * 32)
+        if old_decls as i64 != 0:
+            with_free(old_decls as *mut u8)
     let dst = (((*s).decls as i64) + ((*s).decl_count as i64 * 32)) as *mut CXCursor
     *dst = cursor
     (*s).decl_count = (*s).decl_count + 1
@@ -1038,14 +1038,14 @@ unsafe fn collect_enum_const(cursor: CXCursor, parent: CXCursor, data: *mut u8) 
         return CXChildVisit_Continue
     if (*ec).count >= (*ec).cap:
         (*ec).cap = if (*ec).cap > 0: (*ec).cap * 2 else: 16
-        let new_buf = with_alloc((*ec).cap as i64 * 16)  // sizeof(EnumConstInfo) = 16
-        if new_buf as i64 != 0:
-            with_memset(new_buf, 0, (*ec).cap as i64 * 16)
-            if (*ec).consts as i64 != 0 and (*ec).count > 0:
-                with_memcpy(new_buf, (*ec).consts as *const u8, (*ec).count as i64 * 16)
-            if (*ec).consts as i64 != 0:
-                with_free((*ec).consts as *mut u8)
-        (*ec).consts = new_buf as *mut EnumConstInfo
+        let old_consts = (*ec).consts
+        (*ec).consts = with_alloc((*ec).cap as i64 * 16) as *mut EnumConstInfo  // sizeof(EnumConstInfo) = 16
+        if (*ec).consts as i64 != 0:
+            with_memset((*ec).consts as *mut u8, 0, (*ec).cap as i64 * 16)
+            if old_consts as i64 != 0 and (*ec).count > 0:
+                with_memcpy((*ec).consts as *mut u8, old_consts as *const u8, (*ec).count as i64 * 16)
+            if old_consts as i64 != 0:
+                with_free(old_consts as *mut u8)
     let name = clang_getCursorSpelling(cursor)
     let ci = ((*ec).consts as i64 + (*ec).count as i64 * 16) as *mut EnumConstInfo
     (*ci).name = c_strdup(clang_getCString(name))
@@ -2137,10 +2137,10 @@ unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *c
                 if pp as i64 > tok as i64:
                     if macro_param_count >= pcap:
                         pcap = pcap * 2
-                        let new_p = with_alloc(pcap as i64 * 8)
-                        with_memcpy(new_p, macro_params as *const u8, macro_param_count as i64 * 8)
-                        with_free(macro_params as *mut u8)
-                        macro_params = new_p as *mut *mut u8
+                        let old_p = macro_params
+                        macro_params = with_alloc(pcap as i64 * 8) as *mut *mut u8
+                        with_memcpy(macro_params as *mut u8, old_p as *const u8, macro_param_count as i64 * 8)
+                        with_free(old_p as *mut u8)
                     let tlen2 = pp as i64 - tok as i64
                     let pname = with_alloc(tlen2 + 1)
                     with_memcpy(pname, tok, tlen2)
@@ -2350,10 +2350,10 @@ pub fn with_cimport_parse_macros(header_code: str) -> i64:
                         if pp as i64 > tok as i64:
                             if macro_param_count >= pcap:
                                 pcap = pcap * 2
-                                let new_p = with_alloc(pcap as i64 * 8)
-                                with_memcpy(new_p, macro_params as *const u8, macro_param_count as i64 * 8)
-                                with_free(macro_params as *mut u8)
-                                macro_params = new_p as *mut *mut u8
+                                let old_p = macro_params
+                                macro_params = with_alloc(pcap as i64 * 8) as *mut *mut u8
+                                with_memcpy(macro_params as *mut u8, old_p as *const u8, macro_param_count as i64 * 8)
+                                with_free(old_p as *mut u8)
                             let tlen2 = pp as i64 - tok as i64
                             let pname = with_alloc(tlen2 + 1)
                             with_memcpy(pname, tok, tlen2)
@@ -3381,12 +3381,12 @@ pub fn with_ci_cursor_spelling_location(session: i64, cursor_idx: i32) -> str:
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         let loc = clang_getCursorLocation(cursor)
+        var expansion_file: *mut u8 = 0 as *mut u8
         var file: *mut u8 = 0 as *mut u8
         var line_val: u32 = 0
         var col_val: u32 = 0
         clang_getSpellingLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
         if file as i64 == 0:
-            var expansion_file: *mut u8 = 0 as *mut u8
             clang_getExpansionLocation(loc, &raw mut expansion_file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
             file = expansion_file
         if file as i64 == 0:

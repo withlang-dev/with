@@ -56,7 +56,7 @@ fn compilation_debug_pool_flow_enabled() -> i32:
         return 0
     1
 
-fn compilation_debug_pool_flow(label: str, pool: InternPool, typed_pool: AstPool, sema: Sema):
+fn compilation_debug_pool_flow(label: str, pool: InternPool, typed_pool: AstPool, sema: &Sema):
     if compilation_debug_pool_flow_enabled() == 0:
         return
     runtime_eprint(f"[comp] {label} pool.symbols={pool.state.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
@@ -136,7 +136,7 @@ fn compilation_find_fn_decl_index(pool: AstPool, fn_sym: i32) -> i32:
             return di
     -1
 
-fn compilation_mir_error_span(zcu: Zcu, pool: AstPool, fn_sym: i32, raw_span: i32) -> Span:
+fn compilation_mir_error_span(zcu: &Zcu, pool: AstPool, fn_sym: i32, raw_span: i32) -> Span:
     let decl_index = compilation_find_fn_decl_index(pool, fn_sym)
     if decl_index >= 0:
         let decl = pool.get_decl(decl_index)
@@ -258,7 +258,7 @@ fn compilation_module_import_name(root: str, path: str) -> str:
             out = out ++ rel.slice(i as i64, (i + 1) as i64)
     out
 
-fn compilation_span_file_id_for_path(zcu: Zcu, path: str) -> i32:
+fn compilation_span_file_id_for_path(zcu: &Zcu, path: str) -> i32:
     if path == zcu.current_source_path:
         return 0
     for di in 0..zcu.last_sema.ast.decl_count():
@@ -353,7 +353,7 @@ fn Compilation.configure(self: Compilation, opt_level: i32, no_std: bool, alloc_
     zcu.set_prelude_mode(self.config.prelude_mode)
     self.zcu = zcu
 
-fn Compilation.configure_options(self: Compilation, options: BuildCommandOptions):
+fn Compilation.configure_options(self: Compilation, options: &BuildCommandOptions):
     self.configure(options.opt_level, options.no_std, options.alloc_mode, options.runtime_available)
     self.set_prelude_mode(options.prelude_mode)
     self.set_overflow_mode(options.overflow_mode)
@@ -800,7 +800,7 @@ fn Compilation.compile_entry_source_text(self: Compilation, source_path: str, so
     source_texts.push(source_text)
     self.compile_entry_source_texts(source_paths, source_texts)
 
-fn Compilation.compile_entry_source_texts(self: Compilation, source_paths: Vec[str], source_texts: Vec[str]) -> AstPool:
+fn Compilation.compile_entry_source_texts(self: Compilation, source_paths: &Vec[str], source_texts: &Vec[str]) -> AstPool:
     if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
         runtime_eprint("error: compile_entry_source_texts requires matching non-empty source paths and texts")
         return AstPool.new()
@@ -835,7 +835,7 @@ fn Compilation.check_pool(self: Compilation, pool: AstPool, source_path: str) ->
     let _ = self.run_mir_lower(prepared_pool)
     not self.has_errors()
 
-fn Compilation.check_file_with_build_settings(self: Compilation, source_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> bool:
+fn Compilation.check_file_with_build_settings(self: Compilation, source_path: str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> bool:
     var cfg = self.project_config_for_source(source_path)
     for ii in 0..include_paths.len() as i32:
         cfg.c_import_include_paths.push(include_paths.get(ii as i64))
@@ -898,13 +898,14 @@ fn Compilation.prepare_binary_link_from_pool(self: Compilation, pool: AstPool, s
 fn Compilation.execute_binary_link_plan(self: Compilation, plan: CompilationBinaryLinkPlan) -> str:
     if not plan.ok:
         return ""
+    let bin_path = plan.bin_path
     let link_result = compilation_execute_binary_link_plan(self.config.debug_info, plan)
     self.last_link_command_available = 1
     self.last_link_command = link_result.command
     self.last_link_rc = link_result.rc
     if not link_result.ok:
         return ""
-    plan.bin_path
+    bin_path
 
 fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
     if not plan.ok:
@@ -950,7 +951,7 @@ fn Compilation.emit_object_to_path(self: Compilation, source_path: str, obj_path
         return ""
     obj_path
 
-fn Compilation.emit_object_to_path_with_build_settings(self: Compilation, source_path: str, obj_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> str:
+fn Compilation.emit_object_to_path_with_build_settings(self: Compilation, source_path: str, obj_path: str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> str:
     let output_dir = link_stage_dirname(obj_path)
     if not compilation_ensure_output_dir(output_dir):
         return ""
@@ -975,7 +976,7 @@ fn Compilation.emit_object_to_path_with_build_settings(self: Compilation, source
         return ""
     obj_path
 
-fn Compilation.emit_archive_to_path_with_build_settings(self: Compilation, source_path: str, ar_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> str:
+fn Compilation.emit_archive_to_path_with_build_settings(self: Compilation, source_path: str, ar_path: str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> str:
     if ar_path.len() == 0:
         return ""
     let output_dir = link_stage_dirname(ar_path)
@@ -1001,7 +1002,7 @@ fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_pat
     let pool = self.compile_entry_file(source_path)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
-fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, source_path: str, bin_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> str:
+fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, source_path: str, bin_path: str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> str:
     if bin_path.len() == 0:
         return self.build_binary_to_path(source_path, bin_path)
     let obj_path = bin_path ++ ".o"
@@ -1037,7 +1038,7 @@ fn Compilation.build_binary_from_source_to_path(self: Compilation, source_path: 
     let pool = self.compile_source_text(source_path, source_text)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
-fn Compilation.build_binary_from_source_to_path_with_build_settings(self: Compilation, source_path: str, source_text: str, bin_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> str:
+fn Compilation.build_binary_from_source_to_path_with_build_settings(self: Compilation, source_path: str, source_text: str, bin_path: str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> str:
     if bin_path.len() == 0:
         return self.build_binary_from_source_to_path(source_path, source_text, bin_path)
     let obj_path = bin_path ++ ".o"

@@ -603,7 +603,7 @@ fn comptime_capability_record(kind: i32, package_name: str, package_version: str
         network: 0,
     }
 
-fn comptime_action_outputs(output: str, extra_outputs: Vec[str]) -> Vec[str]:
+fn comptime_action_outputs(output: str, extra_outputs: &Vec[str]) -> Vec[str]:
     let outputs: Vec[str] = Vec.new()
     if output.len() > 0:
         outputs.push(output)
@@ -877,14 +877,21 @@ fn ComptimeEvaluator.default_value_for_type(self: ComptimeEvaluator, type_id: i3
             return comptime_value_enum(resolved as i32, self.sema.syms.ok, start, 1)
     self.unsupported_default_value(resolved as i32, node)
 
-fn ComptimeEvaluator.comptime_fn_return_type(self: ComptimeEvaluator, fn_sym: i32, tp_syms: Vec[i32], tp_tys: Vec[i32]) -> i32:
+fn ComptimeEvaluator.comptime_fn_return_type(self: ComptimeEvaluator, fn_sym: i32, tp_syms: &Vec[i32], tp_tys: &Vec[i32]) -> i32:
     let sig_idx = self.sema.get_sig(fn_sym)
     if sig_idx < 0:
         return 0
     let ret_type = self.sema.sig_return_type(sig_idx)
     if tp_syms.len() as i32 == 0:
         return ret_type
-    self.sema.substitute_type(ret_type, tp_syms, tp_tys, tp_syms.len() as i32)
+    // Local copies: Sema.substitute_type takes its substitution vectors by
+    // value, and the borrowed params must stay usable at the call sites.
+    let subst_syms: Vec[i32] = Vec.new()
+    let subst_tys: Vec[i32] = Vec.new()
+    for i in 0..tp_syms.len() as i32:
+        subst_syms.push(tp_syms.get(i as i64))
+        subst_tys.push(tp_tys.get(i as i64))
+    self.sema.substitute_type(ret_type, subst_syms, subst_tys, tp_syms.len() as i32)
 
 fn ComptimeEvaluator.apply_implicit_default_return(self: ComptimeEvaluator, fn_node: i32, ret_type: i32, signal: ComptimeControl) -> ComptimeControl:
     if signal.kind == ComptimeControlKind.CTL_RETURN or signal.kind == ComptimeControlKind.CTL_VALUE:
@@ -1114,7 +1121,7 @@ fn ComptimeEvaluator.record_env_input_effect(self: ComptimeEvaluator, target_nam
     let value = with_getenv_str(name)
     self.record_effect("env\t" ++ comptime_effect_escape(target_name) ++ "\t" ++ comptime_effect_escape(name) ++ "\t" ++ f"{with_str_hash(value)}")
 
-fn comptime_effect_join_argv_parts(parts: Vec[str]) -> str:
+fn comptime_effect_join_argv_parts(parts: &Vec[str]) -> str:
     var out = ""
     for i in 0..parts.len() as i32:
         if i > 0:
@@ -1132,7 +1139,7 @@ fn ComptimeEvaluator.effect_argv_parts_from_value(self: ComptimeEvaluator, value
             parts.push(item.text)
     parts
 
-fn comptime_effect_tool_identity(parts: Vec[str]) -> str:
+fn comptime_effect_tool_identity(parts: &Vec[str]) -> str:
     if parts.len() == 0:
         return ""
     let exe = parts.get(0)
@@ -1184,7 +1191,7 @@ fn ComptimeEvaluator.effect_env_text_from_process_env_value(self: ComptimeEvalua
             out = out ++ comptime_effect_escape(name.text) ++ ":" ++ f"{with_str_hash(env_value.text)}"
     out
 
-fn ComptimeEvaluator.record_process_effect(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, method: str, parts: Vec[str], cwd: str, timeout_ms: i32, stdin_path: str, stdout_path: str, stderr_path: str, env_text: str):
+fn ComptimeEvaluator.record_process_effect(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, method: str, parts: &Vec[str], cwd: str, timeout_ms: i32, stdin_path: str, stdout_path: str, stderr_path: str, env_text: str):
     if self.strict_effects != 0 and record.inputs.len() == 0 and record.outputs.len() == 0:
         let _ = self.fail(0, "ProcessRunner." ++ method ++ " affects build output but has no declared action inputs or outputs in strict mode")
         return
@@ -2355,13 +2362,13 @@ fn ComptimeEvaluator.capability_arg_i32(self: ComptimeEvaluator, args: ComptimeV
         return 0
     comptime_value_intlike(value) as i32
 
-fn ComptimeEvaluator.capability_resolve_project_path(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str, method: str, node: i32) -> str:
+fn ComptimeEvaluator.capability_resolve_project_path(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, path: str, method: str, node: i32) -> str:
     if not comptime_tool_path_is_project_relative(path):
         let _ = self.fail(node, "ToolFs path escapes project root in " ++ method ++ ": " ++ path)
         return ""
     comptime_tool_join(record.project_root, path)
 
-fn ComptimeEvaluator.capability_write_file_allowed(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str) -> bool:
+fn ComptimeEvaluator.capability_write_file_allowed(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, path: str) -> bool:
     if record.write_scoped == 0:
         return true
     for i in 0..record.write_scope.len() as i32:
@@ -2369,7 +2376,7 @@ fn ComptimeEvaluator.capability_write_file_allowed(self: ComptimeEvaluator, reco
             return true
     false
 
-fn ComptimeEvaluator.capability_mkdir_allowed(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str) -> bool:
+fn ComptimeEvaluator.capability_mkdir_allowed(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, path: str) -> bool:
     if record.write_scoped == 0:
         return true
     for i in 0..record.write_scope.len() as i32:
@@ -2378,7 +2385,7 @@ fn ComptimeEvaluator.capability_mkdir_allowed(self: ComptimeEvaluator, record: C
             return true
     false
 
-fn ComptimeEvaluator.capability_require_write_file_allowed(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str, method: str, node: i32) -> bool:
+fn ComptimeEvaluator.capability_require_write_file_allowed(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, path: str, method: str, node: i32) -> bool:
     if not comptime_tool_path_is_project_relative(path):
         let _ = self.fail(node, "ToolFs path escapes project root in " ++ method ++ ": " ++ path)
         return false
@@ -2387,7 +2394,7 @@ fn ComptimeEvaluator.capability_require_write_file_allowed(self: ComptimeEvaluat
         return false
     true
 
-fn ComptimeEvaluator.capability_require_mkdir_allowed(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str, method: str, node: i32) -> bool:
+fn ComptimeEvaluator.capability_require_mkdir_allowed(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, path: str, method: str, node: i32) -> bool:
     if not comptime_tool_path_is_project_relative(path):
         let _ = self.fail(node, "ToolFs path escapes project root in " ++ method ++ ": " ++ path)
         return false
@@ -2396,7 +2403,7 @@ fn ComptimeEvaluator.capability_require_mkdir_allowed(self: ComptimeEvaluator, r
         return false
     true
 
-fn ComptimeEvaluator.capability_project_relative_path(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str) -> str:
+fn ComptimeEvaluator.capability_project_relative_path(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, path: str) -> str:
     let normalized = comptime_tool_path_normalize(path)
     if record.project_root.len() == 0 or record.project_root == ".":
         return normalized
@@ -2416,7 +2423,7 @@ fn ComptimeEvaluator.str_vec_value(self: ComptimeEvaluator, values: Vec[str], no
         self.extra_values.push(comptime_value_str(values.get(i as i64)))
     comptime_value_vec(vec_type, start, values.len() as i32)
 
-fn ComptimeEvaluator.str_vec_value_with_type(self: ComptimeEvaluator, vec_type: i32, values: Vec[str]) -> ComptimeValue:
+fn ComptimeEvaluator.str_vec_value_with_type(self: ComptimeEvaluator, vec_type: i32, values: &Vec[str]) -> ComptimeValue:
     let start = self.extra_values.len() as i32
     for i in 0..values.len() as i32:
         self.extra_values.push(comptime_value_str(values.get(i as i64)))
@@ -2444,7 +2451,7 @@ fn ComptimeEvaluator.vec_str_to_argv(self: ComptimeEvaluator, value: ComptimeVal
         out = out ++ item.text ++ "\0"
     out
 
-fn ComptimeEvaluator.vec_str_to_argv_from_parts(self: ComptimeEvaluator, parts: Vec[str], method: str, node: i32) -> str:
+fn ComptimeEvaluator.vec_str_to_argv_from_parts(self: ComptimeEvaluator, parts: &Vec[str], method: str, node: i32) -> str:
     var out = ""
     for i in 0..parts.len() as i32:
         out = out ++ parts.get(i as i64) ++ "\0"
@@ -2695,7 +2702,7 @@ fn comptime_decl_kind_for_function(name: str) -> i32:
         return 3
     0
 
-fn ComptimeEvaluator.function_decl_summary_value(self: ComptimeEvaluator, comp: Compilation, pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
+fn ComptimeEvaluator.function_decl_summary_value(self: ComptimeEvaluator, comp: &Compilation, pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
     let decl_type = self.named_type_id("DeclSummary", node)
     let kind_type = self.named_type_id("DeclKind", node)
     if decl_type == 0 or kind_type == 0:
@@ -2740,7 +2747,7 @@ fn ComptimeEvaluator.function_decl_summary_value(self: ComptimeEvaluator, comp: 
     self.extra_values.push(notes)
     comptime_value_struct(decl_type, start, 14)
 
-fn ComptimeEvaluator.type_decl_summary_value(self: ComptimeEvaluator, comp: Compilation, pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
+fn ComptimeEvaluator.type_decl_summary_value(self: ComptimeEvaluator, comp: &Compilation, pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
     let decl_type = self.named_type_id("DeclSummary", node)
     let kind_type = self.named_type_id("DeclKind", node)
     if decl_type == 0 or kind_type == 0:
@@ -2785,7 +2792,7 @@ fn ComptimeEvaluator.type_decl_summary_value(self: ComptimeEvaluator, comp: Comp
     self.extra_values.push(notes)
     comptime_value_struct(decl_type, start, 14)
 
-fn ComptimeEvaluator.typechecked_message_value(self: ComptimeEvaluator, comp: Compilation, pool: AstPool, node: i32) -> ComptimeValue:
+fn ComptimeEvaluator.typechecked_message_value(self: ComptimeEvaluator, comp: &Compilation, pool: AstPool, node: i32) -> ComptimeValue:
     let vec_type = self.decl_summary_vec_type(node)
     if vec_type == 0:
         return comptime_value_invalid()
@@ -2811,7 +2818,7 @@ fn ComptimeEvaluator.typechecked_message_value(self: ComptimeEvaluator, comp: Co
     payloads.push(decls)
     self.compiler_message_value("Typechecked", payloads, node)
 
-fn ComptimeEvaluator.workspace_typechecked_messages(self: ComptimeEvaluator, comp: Compilation, pool: AstPool, node: i32) -> Vec[ComptimeValue]:
+fn ComptimeEvaluator.workspace_typechecked_messages(self: ComptimeEvaluator, comp: &Compilation, pool: AstPool, node: i32) -> Vec[ComptimeValue]:
     let messages: Vec[ComptimeValue] = Vec.new()
     if pool.decl_count() == 0:
         return messages
@@ -2889,7 +2896,7 @@ fn ComptimeEvaluator.compiler_message_artifact_value(self: ComptimeEvaluator, ar
     payloads.push(artifact)
     self.compiler_message_value("Artifact", payloads, node)
 
-fn ComptimeEvaluator.link_command_value(self: ComptimeEvaluator, command: LinkStageCommand, node: i32) -> ComptimeValue:
+fn ComptimeEvaluator.link_command_value(self: ComptimeEvaluator, command: &LinkStageCommand, node: i32) -> ComptimeValue:
     let command_type = self.named_type_id("LinkCommand", node)
     if command_type == 0:
         return comptime_value_invalid()
@@ -2914,7 +2921,7 @@ fn ComptimeEvaluator.link_command_value(self: ComptimeEvaluator, command: LinkSt
     self.extra_values.push(outputs_value)
     comptime_value_struct(command_type, start, 6)
 
-fn ComptimeEvaluator.link_command_env_value_with_type(self: ComptimeEvaluator, vec_type: i32, values: Vec[LinkStageEnvVar], node: i32) -> ComptimeValue:
+fn ComptimeEvaluator.link_command_env_value_with_type(self: ComptimeEvaluator, vec_type: i32, values: &Vec[LinkStageEnvVar], node: i32) -> ComptimeValue:
     let env_type = self.named_type_id("EnvVar", node)
     if env_type == 0:
         return comptime_value_invalid()
@@ -2979,7 +2986,7 @@ fn ComptimeEvaluator.link_command_from_value(self: ComptimeEvaluator, value: Com
     let outputs = self.link_command_str_vec_field(value, "outputs", node)
     LinkStageCommand { linker, args, cwd, env, inputs, outputs, cleanup_files: Vec.new() }
 
-fn link_command_outputs_superset(replacement: LinkStageCommand, original: LinkStageCommand) -> bool:
+fn link_command_outputs_superset(replacement: &LinkStageCommand, original: &LinkStageCommand) -> bool:
     for oi in 0..original.outputs.len() as i32:
         let output = original.outputs.get(oi as i64)
         var found = false
@@ -2990,7 +2997,7 @@ fn link_command_outputs_superset(replacement: LinkStageCommand, original: LinkSt
             return false
     true
 
-fn ComptimeEvaluator.compiler_message_prelink_value(self: ComptimeEvaluator, command: LinkStageCommand, node: i32) -> ComptimeValue:
+fn ComptimeEvaluator.compiler_message_prelink_value(self: ComptimeEvaluator, command: &LinkStageCommand, node: i32) -> ComptimeValue:
     let command_value = self.link_command_value(command, node)
     if command_value.kind == ComptimeValueKind.CV_INVALID:
         return command_value
@@ -2998,7 +3005,7 @@ fn ComptimeEvaluator.compiler_message_prelink_value(self: ComptimeEvaluator, com
     payloads.push(command_value)
     self.compiler_message_value("PreLink", payloads, node)
 
-fn ComptimeEvaluator.compiler_message_linked_value(self: ComptimeEvaluator, command: LinkStageCommand, rc: i32, node: i32) -> ComptimeValue:
+fn ComptimeEvaluator.compiler_message_linked_value(self: ComptimeEvaluator, command: &LinkStageCommand, rc: i32, node: i32) -> ComptimeValue:
     let command_value = self.link_command_value(command, node)
     if command_value.kind == ComptimeValueKind.CV_INVALID:
         return command_value
@@ -3142,7 +3149,7 @@ fn comptime_workspace_native_compile_result_free(native: ComptimeWorkspaceNative
 fn comptime_workspace_output_kind_supported(kind: i32) -> bool:
     kind == 0 or kind == 1 or kind == 2 or kind == 4 or kind == 5
 
-fn comptime_execute_workspace_migrate_plan(plan: ComptimeWorkspaceCompilePlan) -> i32:
+fn comptime_execute_workspace_migrate_plan(plan: &ComptimeWorkspaceCompilePlan) -> i32:
     migrate_reset_options()
     for i in 0..plan.migrate_include_paths.len() as i32:
         migrate_add_include_path(plan.migrate_include_paths.get(i as i64))
@@ -3168,7 +3175,7 @@ fn comptime_execute_workspace_migrate_plan(plan: ComptimeWorkspaceCompilePlan) -
         return migrate_c_directory(plan.migrate_source, plan.absolute_output, plan.migrate_exclude_basenames)
     migrate_c_file(plan.migrate_source, plan.absolute_output)
 
-fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceCompilePlan:
+fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: &ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceCompilePlan:
     let options = record.options
     let migrate_options = record.migrate_options
     let migrate_source_option = self.workspace_str_option(migrate_options, "source_path")
@@ -3357,14 +3364,15 @@ unsafe fn comptime_workspace_thread_entry(arg: *mut u8) -> i32:
     (*job).result = native
     0
 
-fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32, want_messages: i32) -> ComptimeWorkspaceCompileResult:
+fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: &ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32, want_messages: i32) -> ComptimeWorkspaceCompileResult:
     let plan = self.workspace_compile_plan(record, capability, node)
     if plan.valid == 0:
         return comptime_workspace_compile_invalid()
-    let native = comptime_execute_workspace_compile_plan(plan)
     let artifact_kind = if plan.is_migrate != 0: 7 else: self.workspace_artifact_kind_for_output(plan.output_kind)
     let result_artifact_path = if plan.output_kind == 5 and plan.is_migrate == 0: "" else: plan.final_output
-    let result = self.workspace_build_result_value(plan.name, native.rc, artifact_kind, result_artifact_path, node)
+    let plan_name = plan.name
+    let native = comptime_execute_workspace_compile_plan(plan)
+    let result = self.workspace_build_result_value(plan_name, native.rc, artifact_kind, result_artifact_path, node)
     if result.kind == ComptimeValueKind.CV_INVALID:
         comptime_workspace_native_compile_result_free(native)
         return comptime_workspace_compile_invalid()
@@ -3583,13 +3591,13 @@ fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, re
             return comptime_control_error()
         let child_kind =
             if method == "diagnostics":
-                CapabilityKind.CK_BUILD_DIAGNOSTICS
+                CapabilityKind.CK_BUILD_DIAGNOSTICS as i32
             else if method == "source_emitter":
-                CapabilityKind.CK_BUILD_SOURCE_EMITTER
+                CapabilityKind.CK_BUILD_SOURCE_EMITTER as i32
             else if method == "fs":
-                CapabilityKind.CK_BUILD_TOOL_FS
+                CapabilityKind.CK_BUILD_TOOL_FS as i32
             else:
-                CapabilityKind.CK_BUILD_PROCESS_RUNNER
+                CapabilityKind.CK_BUILD_PROCESS_RUNNER as i32
         let child_type = self.capability_type_id(child_kind, node)
         if child_type == 0:
             return comptime_control_error()
@@ -4265,14 +4273,17 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
             if self.had_error != 0:
                 return comptime_control_error()
             self.store_workspace_record(workspace_id, record)
+            record = self.workspace_records.get(workspace_id as i64)
         if record.message_cursor < record.messages.len() as i32:
             let message = record.messages.get(record.message_cursor as i64)
             let phase = self.compiler_message_phase_id(message)
             if phase >= 0:
                 record.intercept_phase = phase
             record.message_cursor = record.message_cursor + 1
+            let record_name = record.name
+            let record_generation = record.generation
             self.store_workspace_record(workspace_id, record)
-            let envelope = self.compiler_message_envelope_value(record.name, record.generation, message, node)
+            let envelope = self.compiler_message_envelope_value(record_name, record_generation, message, node)
             if envelope.kind == ComptimeValueKind.CV_INVALID:
                 return comptime_control_error()
             return comptime_control_value(envelope)
@@ -5231,15 +5242,17 @@ fn ComptimeEvaluator.generic_callee_type_arg_node(self: ComptimeEvaluator, calle
             return self.ast.get_data2(callee)
     0
 
-fn ComptimeEvaluator.install_generic_substitutions(self: ComptimeEvaluator, tp_syms: Vec[i32], tp_tys: Vec[i32], node: i32) -> ComptimeGenericSubstSnapshot:
+fn ComptimeEvaluator.install_generic_substitutions(self: ComptimeEvaluator, tp_syms: &Vec[i32], tp_tys: &Vec[i32], node: i32) -> ComptimeGenericSubstSnapshot:
     let saved_named_had: Vec[i32] = Vec.new()
     let saved_named_tys: Vec[i32] = Vec.new()
+    let snapshot_tp_syms: Vec[i32] = Vec.new()
     let saved_subst_syms = self.sema.generic_subst_param_syms
     let saved_subst_tys = self.sema.generic_subst_type_ids
     self.sema.generic_subst_param_syms = Vec.new()
     self.sema.generic_subst_type_ids = Vec.new()
     for i in 0..tp_syms.len() as i32:
         let tp_sym = tp_syms.get(i as i64)
+        snapshot_tp_syms.push(tp_sym)
         if self.sema.named_types.contains(tp_sym):
             saved_named_had.push(1)
             saved_named_tys.push(self.sema.named_types.get(tp_sym).unwrap())
@@ -5254,7 +5267,7 @@ fn ComptimeEvaluator.install_generic_substitutions(self: ComptimeEvaluator, tp_s
         if canonical != 0 and canonical != tp_sym:
             self.sema.put_generic_subst(canonical, tp_ty, node)
     ComptimeGenericSubstSnapshot {
-        tp_syms: tp_syms,
+        tp_syms: snapshot_tp_syms,
         saved_named_had: saved_named_had,
         saved_named_tys: saved_named_tys,
         saved_subst_syms: saved_subst_syms,
@@ -5414,7 +5427,7 @@ fn ComptimeEvaluator.eval_fn_symbol_call(self: ComptimeEvaluator, fn_sym: i32, e
         arg_values.push(arg_signal.value)
     self.eval_fn_symbol_call_values(fn_sym, arg_values, node)
 
-fn ComptimeEvaluator.eval_allowed_runtime_call(self: ComptimeEvaluator, fn_sym: i32, arg_values: Vec[ComptimeValue], node: i32) -> ComptimeControl:
+fn ComptimeEvaluator.eval_allowed_runtime_call(self: ComptimeEvaluator, fn_sym: i32, arg_values: &Vec[ComptimeValue], node: i32) -> ComptimeControl:
     let fn_name = self.pool.resolve(fn_sym)
     if fn_name == "with_panic":
         if arg_values.len() as i32 != 3:

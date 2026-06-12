@@ -180,7 +180,7 @@ pub fn build_graph_compile_ir_to_object(root: str, target: &BuildGraphTarget) ->
         build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' failed")
     rc
 
-fn build_graph_archive_member_seen(inputs: Vec[str], count: i32, basename: str) -> bool:
+fn build_graph_archive_member_seen(inputs: &Vec[str], count: i32, basename: str) -> bool:
     for i in 0..count:
         if build_graph_path_basename(inputs.get(i as i64)) == basename:
             return true

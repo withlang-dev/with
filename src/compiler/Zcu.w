@@ -262,16 +262,16 @@ fn Zcu.source_for_file_id_frontend(self: Zcu, file_id: i32) -> Source:
     Source.from_string(self.current_source_path, self.current_source_text, 0)
 
 fn Zcu.render_all_diagnostics_frontend(self: Zcu):
-    for i in 0..self.diagnostics.items.len() as i32:
-        let diag = self.diagnostics.items.get(i as i64)
+    for i in 0..self.diagnostics.count():
+        let diag = self.diagnostics.item_at(i as i64)
         self.render_diag_frontend(diag)
-        if i + 1 < self.diagnostics.items.len() as i32:
+        if i + 1 < self.diagnostics.count():
             runtime_eprint("")
 
 fn Zcu.render_warnings_frontend(self: Zcu):
     var printed = 0
-    for i in 0..self.diagnostics.items.len() as i32:
-        let diag = self.diagnostics.items.get(i as i64)
+    for i in 0..self.diagnostics.count():
+        let diag = self.diagnostics.item_at(i as i64)
         if diag.severity != DiagSeverity.Warning:
             continue
         if printed != 0:

@@ -215,7 +215,7 @@ fn build_cache_sorted_strings(items: Vec[str]) -> Vec[str]:
         sorted = out
     sorted
 
-fn build_cache_sorted_unique_strings(items: Vec[str]) -> Vec[str]:
+fn build_cache_sorted_unique_strings(items: &Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for i in 0..items.len() as i32:
         sorted = tracked_input_insert_unique(move sorted, items.get(i as i64))
@@ -253,7 +253,7 @@ fn build_cache_effect_env_state_line(effect_line: str) -> str:
     let hash = effect_line.slice((third_tab + 1) as i64, effect_line.len())
     "env:" ++ name ++ ":" ++ hash
 
-fn build_cache_effects_text(effects: Vec[str]) -> str:
+fn build_cache_effects_text(effects: &Vec[str]) -> str:
     let sorted = build_cache_sorted_unique_strings(effects)
     var out = ""
     for i in 0..sorted.len() as i32:
@@ -275,7 +275,7 @@ fn build_cache_hash_build_graph_sources(root: str) -> i64:
     combined = combined ++ "std.build:" ++ f"{build_cache_fingerprint_file(root ++ "/lib/std/build.w")}" ++ "\n"
     with_str_hash(combined)
 
-fn build_cache_test_success_manifest(root: str, target: &BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> str:
+fn build_cache_test_success_manifest(root: str, target: &BuildGraphTarget, test_files: &Vec[str], test_compiler: str) -> str:
     var text = "v1\n"
     text = text ++ "target:" ++ target.name ++ "\n"
     text = text ++ f"kind:{target.kind}\n"
@@ -305,7 +305,7 @@ fn build_cache_test_success_manifest(root: str, target: &BuildGraphTarget, test_
         text = text ++ "file:" ++ path ++ "\n"
     text
 
-pub fn build_cache_record_test_success(root: str, target: &BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> Unit:
+pub fn build_cache_record_test_success(root: str, target: &BuildGraphTarget, test_files: &Vec[str], test_compiler: str) -> Unit:
     let state_dir = build_cache_state_dir(root)
     let _mkdir = build_graph_rt_mkdir_p(state_dir)
     let marker_path = build_cache_test_success_path(root, target.name)

@@ -12186,7 +12186,7 @@ fn ci_find_substr(haystack: str, needle: str) -> i32:
 // Collect all variable declarations in a goto-lowered function body.
 // Names are made unique at the declaration site because all locals are hoisted
 // into one With function scope.
-fn ci_find_hoisted_var_decl_index(decls: Vec[CiHoistedVarDecl], name: str) -> i32:
+fn ci_find_hoisted_var_decl_index(decls: &Vec[CiHoistedVarDecl], name: str) -> i32:
     var i = 0
     while i < decls.len() as i32:
         if decls.get(i as i64).name == name:
@@ -12990,7 +12990,7 @@ fn CiStackEmitContext.leaf(mut self: CiStackEmitContext, stmts: CiStmtPool, bloc
         i = i + 1
     stmts.stack_emit_stmt_block(&ids)
 
-fn CiStackEmitContext.children(mut self: CiStackEmitContext, tree: StackifyTree, start: i32, count: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
+fn CiStackEmitContext.children(mut self: CiStackEmitContext, tree: &StackifyTree, start: i32, count: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
     let ids: Vec[i32] = Vec.new()
     var i = 0
     while i < count and self.ok:
@@ -13001,7 +13001,7 @@ fn CiStackEmitContext.children(mut self: CiStackEmitContext, tree: StackifyTree,
         i = i + 1
     stmts.stack_emit_stmt_block(&ids)
 
-fn CiStackEmitContext.param_transfer(mut self: CiStackEmitContext, tree: StackifyTree, node: StackifyNode, stmts: CiStmtPool) -> CiStmtId:
+fn CiStackEmitContext.param_transfer(mut self: CiStackEmitContext, tree: &StackifyTree, node: StackifyNode, stmts: CiStmtPool) -> CiStmtId:
     if node.values_count == 0 and node.to_values_count == 0:
         return 0 as CiStmtId
     if node.values_count != node.to_values_count:
@@ -13016,7 +13016,7 @@ fn CiStackEmitContext.param_transfer(mut self: CiStackEmitContext, tree: Stackif
         i = i + 1
     stmts.stack_emit_stmt_block(&ids)
 
-fn CiStackEmitContext.emit_return(mut self: CiStackEmitContext, tree: StackifyTree, node: StackifyNode, stmts: CiStmtPool) -> CiStmtId:
+fn CiStackEmitContext.emit_return(mut self: CiStackEmitContext, tree: &StackifyTree, node: StackifyNode, stmts: CiStmtPool) -> CiStmtId:
     if node.values_count == 0:
         return stmts.return_(0 as CiExprId)
     if node.values_count == 1:
@@ -13024,7 +13024,7 @@ fn CiStackEmitContext.emit_return(mut self: CiStackEmitContext, tree: StackifyTr
     self.fail("stackify emitter: multiple return values are not supported")
     0 as CiStmtId
 
-fn CiStackEmitContext.node(mut self: CiStackEmitContext, tree: StackifyTree, node_id: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
+fn CiStackEmitContext.node(mut self: CiStackEmitContext, tree: &StackifyTree, node_id: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
     if not self.ok:
         return 0 as CiStmtId
     let node = tree.nodes.get(node_id as i64)
@@ -13074,7 +13074,7 @@ fn CiStackEmitContext.node(mut self: CiStackEmitContext, tree: StackifyTree, nod
     self.fail("stackify emitter: unsupported stackify node")
     0 as CiStmtId
 
-fn CiStmtPool.stack_emit_tree(self: CiStmtPool, tree: StackifyTree, cfg: CiGotoCfg, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
+fn CiStmtPool.stack_emit_tree(self: CiStmtPool, tree: &StackifyTree, cfg: CiGotoCfg, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
     var ctx = CiStackEmitContext {
         cfg,
         frames: Vec.new(),
@@ -13098,7 +13098,7 @@ fn ci_native_goto_fail(msg: str) -> CiStmtId:
     g_ci_bail_message = msg
     0 as CiStmtId
 
-fn CiStmtPool.native_goto_label_syms(self: CiStmtPool, cfg: CiGotoCfg) -> Vec[i32]:
+fn CiStmtPool.native_goto_label_syms(self: CiStmtPool, cfg: &CiGotoCfg) -> Vec[i32]:
     let labels: Vec[i32] = Vec.new()
     var block: i32 = 0
     while block < cfg.graph.blocks.len() as i32:
@@ -13106,7 +13106,7 @@ fn CiStmtPool.native_goto_label_syms(self: CiStmtPool, cfg: CiGotoCfg) -> Vec[i3
         block = block + 1
     labels
 
-fn ci_native_goto_collect_leaf_ids(cfg: CiGotoCfg, block: i32) -> Vec[i32]:
+fn ci_native_goto_collect_leaf_ids(cfg: &CiGotoCfg, block: i32) -> Vec[i32]:
     var out: Vec[i32] = Vec.new()
     var i: i64 = 0
     while i < cfg.stmt_ids.len():
@@ -13115,7 +13115,7 @@ fn ci_native_goto_collect_leaf_ids(cfg: CiGotoCfg, block: i32) -> Vec[i32]:
         i = i + 1
     out
 
-fn ci_goto_cfg_reachable_blocks(cfg: CiGotoCfg) -> Vec[i32]:
+fn ci_goto_cfg_reachable_blocks(cfg: &CiGotoCfg) -> Vec[i32]:
     let reachable: Vec[i32] = Vec.new()
     let worklist: Vec[i32] = Vec.new()
     let block_count = cfg.graph.blocks.len() as i32
@@ -13158,7 +13158,7 @@ fn CiStmtPool.native_goto_unreachable_stmt(self: CiStmtPool, exprs: CiExprPool) 
 fn CiStmtPool.native_goto_single_goto(self: CiStmtPool, label_sym: i32) -> CiStmtId:
     self.goto_label(label_sym)
 
-fn CiStmtPool.native_goto_emit_terminator(self: CiStmtPool, cfg: CiGotoCfg, block: i32, labels: &Vec[i32], exprs: CiExprPool) -> CiStmtId:
+fn CiStmtPool.native_goto_emit_terminator(self: CiStmtPool, cfg: &CiGotoCfg, block: i32, labels: &Vec[i32], exprs: CiExprPool) -> CiStmtId:
     if block < 0 or block >= cfg.graph.blocks.len() as i32:
         return ci_native_goto_fail("native goto emitter: block out of range")
     let b = cfg.graph.blocks.get(block as i64)

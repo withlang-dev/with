@@ -2867,7 +2867,7 @@ fn mir_str_payload_is_raw_marked(text: str) -> bool:
 // concatenating raw texts is exact. Chains mixing raw-marked (pre-decoded)
 // and unmarked payloads are left to the runtime path. Returns -1 when the
 // chain is not foldable.
-fn MirBuilder.try_fold_literal_str_concat(self: MirBuilder, node: i32, parts: Vec[i32]) -> i32:
+fn MirBuilder.try_fold_literal_str_concat(self: MirBuilder, node: i32, parts: &Vec[i32]) -> i32:
     for i in 0..parts.len() as i32:
         if self.ast.kind(parts.get(i as i64)) != NodeKind.NK_STRING_LIT:
             return -1
@@ -2886,7 +2886,7 @@ fn MirBuilder.try_fold_literal_str_concat(self: MirBuilder, node: i32, parts: Ve
             folded = folded ++ payload
     self.lower_str_lit_as(self.pool.intern(folded), self.expr_type(node))
 
-fn MirBuilder.lower_str_concat_chain(self: MirBuilder, node: i32, parts: Vec[i32]) -> i32:
+fn MirBuilder.lower_str_concat_chain(self: MirBuilder, node: i32, parts: &Vec[i32]) -> i32:
     let saved_expected = self.expected_type
     self.expected_type = self.sema.ty_str as i32
     let operands: Vec[i32] = Vec.new()
@@ -9503,16 +9503,16 @@ fn MirBody.optimize_self_tail_calls(mut self: MirBody):
         self.set_terminator(bb, TermKind.TK_GOTO, 0, 0, 0, 0, span)
         bb = bb + 1
 
-fn mir_gen_resume_field_sym(sema: Sema) -> i32:
+fn mir_gen_resume_field_sym(sema: &Sema) -> i32:
     sema.pool_lookup_symbol("__with_generator_resume")
 
-fn mir_gen_state_field_start(sema: Sema, state_tid: i32) -> i32:
+fn mir_gen_state_field_start(sema: &Sema, state_tid: i32) -> i32:
     let resolved = sema.resolve_alias(state_tid as TypeId) as i32
     if resolved <= 0 or resolved >= sema.type_d1.len() as i32:
         return 0
     sema.type_d1.get(resolved as i64)
 
-fn mir_gen_state_field_count(sema: Sema, state_tid: i32) -> i32:
+fn mir_gen_state_field_count(sema: &Sema, state_tid: i32) -> i32:
     let resolved = sema.resolve_alias(state_tid as TypeId) as i32
     if sema.generator_state_field_counts.contains(resolved):
         return sema.generator_state_field_counts.get(resolved).unwrap()
@@ -9520,7 +9520,7 @@ fn mir_gen_state_field_count(sema: Sema, state_tid: i32) -> i32:
         return 0
     sema.type_d2.get(resolved as i64)
 
-fn mir_gen_state_field_sym(sema: Sema, state_tid: i32, field_i: i32) -> i32:
+fn mir_gen_state_field_sym(sema: &Sema, state_tid: i32, field_i: i32) -> i32:
     let resolved = sema.resolve_alias(state_tid as TypeId) as i32
     let key = sema_pair_key(resolved, field_i)
     if sema.generator_state_field_names.contains(key):
@@ -9528,7 +9528,7 @@ fn mir_gen_state_field_sym(sema: Sema, state_tid: i32, field_i: i32) -> i32:
     let start = mir_gen_state_field_start(sema, state_tid)
     sema.type_extra.get((start + field_i * 3) as i64)
 
-fn mir_gen_state_field_type(sema: Sema, state_tid: i32, field_i: i32) -> i32:
+fn mir_gen_state_field_type(sema: &Sema, state_tid: i32, field_i: i32) -> i32:
     let resolved = sema.resolve_alias(state_tid as TypeId) as i32
     let key = sema_pair_key(resolved, field_i)
     if sema.generator_state_field_types.contains(key):
@@ -9576,14 +9576,14 @@ fn MirBody.gen_assign_option_none(mut self: MirBody, bb: i32, opt_ty: i32, span:
     let _ = opt_ty
     self.push_stmt(bb, StmtKind.Assign, ret_place, rv, span)
 
-fn MirBody.gen_store_resume_state(mut self: MirBody, bb: i32, sema: Sema, state_tid: i32, value: i64, span: i32):
+fn MirBody.gen_store_resume_state(mut self: MirBody, bb: i32, sema: &Sema, state_tid: i32, value: i64, span: i32):
     let resume_sym = mir_gen_resume_field_sym(sema)
     let resume_place = self.gen_self_field_place(resume_sym, sema.ty_i32 as i32)
     let c = self.new_const(ConstKind.CK_INT, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value), sema.ty_i32 as i32)
     let op = self.new_operand(OperandKind.OK_CONSTANT, c)
     self.gen_assign_operand(bb, resume_place, op, span)
 
-fn MirBody.gen_save_generator_fields(mut self: MirBody, bb: i32, sema: Sema, state_tid: i32, span: i32):
+fn MirBody.gen_save_generator_fields(mut self: MirBody, bb: i32, sema: &Sema, state_tid: i32, span: i32):
     let resume_sym = mir_gen_resume_field_sym(sema)
     let field_count = mir_gen_state_field_count(sema, state_tid)
     for fi in 0..field_count:
@@ -9599,7 +9599,7 @@ fn MirBody.gen_save_generator_fields(mut self: MirBody, bb: i32, sema: Sema, sta
         let op = self.new_operand(OperandKind.OK_COPY, src_place)
         self.gen_assign_operand(bb, dst, op, span)
 
-fn MirBody.gen_restore_generator_fields(mut self: MirBody, bb: i32, sema: Sema, state_tid: i32, span: i32):
+fn MirBody.gen_restore_generator_fields(mut self: MirBody, bb: i32, sema: &Sema, state_tid: i32, span: i32):
     let resume_sym = mir_gen_resume_field_sym(sema)
     let field_count = mir_gen_state_field_count(sema, state_tid)
     for fi in 0..field_count:
@@ -9639,10 +9639,10 @@ fn mir_gen_remap_rvalue(source: &MirBody, local_map: &Vec[i32], rv_id: i32, d_in
     let _ = local_map
     raw
 
-fn lower_generator_constructor(sema: Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, sig_idx: i32) -> MirBody:
+fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, sig_idx: i32) -> MirBody:
     let fn_sym = ast_pool.get_data0(fn_node)
     let state_tid = sema.generator_fn_state_types.get(fn_sym).unwrap()
-    var builder = MirBuilder.init(&sema, ast_pool, pool, fn_sym)
+    var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
     builder.body.local_type_ids.set_i32(0, state_tid)
     builder.push_scope()
 
@@ -9682,13 +9682,13 @@ fn lower_generator_constructor(sema: Sema, ast_pool: AstPool, pool: InternPool, 
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     builder.body
 
-fn lower_generator_next_body(sema: Sema, source: MirBody, fn_node: i32) -> MirBody:
+fn lower_generator_next_body(sema: &Sema, source: MirBody, fn_node: i32) -> MirBody:
     let fn_sym = source.fn_sym
     let next_sym = sema.generator_fn_next_syms.get(fn_sym).unwrap()
     let state_tid = sema.generator_fn_state_types.get(fn_sym).unwrap()
     let yield_ty = sema.generator_fn_yield_types.get(fn_sym).unwrap()
     let opt_ty = sema.ensure_option_type_for(yield_ty)
-    var out = MirBody.init(next_sym, &sema)
+    var out = MirBody.init(next_sym, sema)
     out.local_type_ids.set_i32(0, opt_ty)
     let entry_bb = out.new_block()
     let self_sym = sema.pool_lookup_symbol("self")

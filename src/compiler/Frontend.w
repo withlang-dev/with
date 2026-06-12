@@ -1688,7 +1688,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     self.decl_source_file_ids = rebuilt_file_ids
     merged_pool
 
-fn frontend_name_shadowed_by_extern(tier: Vec[i32], pool: AstPool, name: i32) -> bool:
+fn frontend_name_shadowed_by_extern(tier: &Vec[i32], pool: AstPool, name: i32) -> bool:
     for i in 0..tier.len() as i32:
         let d = tier.get(i as i64)
         if pool.kind(d) == NodeKind.NK_EXTERN_FN and pool.get_data0(d) == name:
@@ -1702,7 +1702,7 @@ fn frontend_fn_decl_rank(kind: i32) -> i32:
         return 1
     0
 
-fn frontend_fn_shadowed_in_tier(tier: Vec[i32], pool: AstPool, idx: i32, higher_names: Vec[i32]) -> bool:
+fn frontend_fn_shadowed_in_tier(tier: &Vec[i32], pool: AstPool, idx: i32, higher_names: &Vec[i32]) -> bool:
     // Check if this fn is shadowed by a higher-priority tier.
     let current = tier.get(idx as i64)
     let current_kind = pool.kind(current)
@@ -1768,13 +1768,13 @@ fn frontend_extern_var_matches_decl(pool: AstPool, intern: InternPool, decl: i32
         return false
     other_type == decl_type
 
-fn frontend_extern_var_shadowed_by_tier(tier: Vec[i32], pool: AstPool, intern: InternPool, decl: i32) -> bool:
+fn frontend_extern_var_shadowed_by_tier(tier: &Vec[i32], pool: AstPool, intern: InternPool, decl: i32) -> bool:
     for i in 0..tier.len() as i32:
         if frontend_extern_var_matches_decl(pool, intern, decl, tier.get(i as i64)):
             return true
     false
 
-fn frontend_extern_var_shadowed_in_tier(tier: Vec[i32], pool: AstPool, intern: InternPool, idx: i32) -> bool:
+fn frontend_extern_var_shadowed_in_tier(tier: &Vec[i32], pool: AstPool, intern: InternPool, idx: i32) -> bool:
     let decl = tier.get(idx as i64)
     for j in 0..tier.len() as i32:
         if j == idx:
@@ -1791,7 +1791,7 @@ fn frontend_extern_var_shadowed_in_tier(tier: Vec[i32], pool: AstPool, intern: I
         j = j + 1
     false
 
-fn frontend_vec_contains_i32(v: Vec[i32], target: i32) -> bool:
+fn frontend_vec_contains_i32(v: &Vec[i32], target: i32) -> bool:
     for i in 0..v.len() as i32:
         if v.get(i as i64) == target:
             return true
@@ -1843,7 +1843,7 @@ fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_pat
                 self.collect_module_dependency_order_frontend(dep.path, wanted_paths, seen_paths, accum)
     accum.state.order.push(frontend_owned_text(path))
 
-fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: Vec[i32], paths: Vec[str], file_ids: Vec[i32]) -> ReorderedTier:
+fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: &Vec[i32], paths: &Vec[str], file_ids: &Vec[i32]) -> ReorderedTier:
     let wanted_paths: HashMap[str, i32] = HashMap.new()
     let first_seen_paths: Vec[str] = Vec.new()
     for i in 0..paths.len() as i32:

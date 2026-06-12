@@ -498,7 +498,7 @@ fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
         return "<cli " ++ name ++ " #1>"
     "<cli " ++ name ++ ">"
 
-fn cli_build_args_binding(args: Vec[str]) -> str:
+fn cli_build_args_binding(args: &Vec[str]) -> str:
     var out = StringBuilder.new()
     out.push_str("let args: Vec[str] = Vec.new()\n")
     for i in 0..args.len() as i32:
@@ -524,7 +524,7 @@ fn cli_synthetic_add_mapping(mut syn: CliSyntheticSource, start: i32, text: str,
     syn.source_texts.push(text)
     syn
 
-fn cli_build_synthetic_source(one: CliOneLiner) -> CliSyntheticSource:
+fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     var syn = cli_synthetic_source_new()
     var source = StringBuilder.new()
     source.push_str("use std.io\n")
@@ -922,9 +922,9 @@ fn load_build_graph_from_build_w(root: str, cfg: &ProjectConfig, options: &Build
         graph.ok = false
         graph.error_msg = eval_result.error_msg
         return BuildGraphLoadResult { graph, sema }
-    graph = materialize_build_graph_from_comptime(sema, eval_result.value, eval_result.extras)
+    let materialized = materialize_build_graph_from_comptime(sema, eval_result.value, eval_result.extras)
     build_cache_record_build_effects(root, eval_result.effect_records)
-    BuildGraphLoadResult { graph, sema }
+    BuildGraphLoadResult { graph: materialized.graph, sema: materialized.sema }
 
 fn build_graph_find_build_root(start_dir: str) -> str:
     var cur = if start_dir.len() > 0: start_dir else: "."
@@ -1348,7 +1348,7 @@ fn repo_lock_release():
         if owner_pid == with_getpid():
             let _ = with_fs_remove_tree(lock_dir)
 
-fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg: ProjectConfig) -> BuildCommandOptions:
+fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg: &ProjectConfig) -> BuildCommandOptions:
     var out = options
     if not out.target_explicit and cfg.target_default.len() > 0:
         out.target_kind = driver_target_triple_kind(cfg.target_default)
@@ -1356,7 +1356,7 @@ fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg:
         out.strict_effects = true
     out
 
-fn build_command_validate_target(options: &BuildCommandOptions, cfg: ProjectConfig) -> i32:
+fn build_command_validate_target(options: &BuildCommandOptions, cfg: &ProjectConfig) -> i32:
     if options.target_kind < 0:
         with_eprint("error: invalid with.toml: unsupported target.default '" ++ cfg.target_default ++ "'")
         return 1
@@ -1932,7 +1932,7 @@ fn parse_test_directives_for_target(target: str) -> TestDirectives:
         i = i + 1
     result
 
-fn test_directives_have_run_expectations(directives: TestDirectives) -> bool:
+fn test_directives_have_run_expectations(directives: &TestDirectives) -> bool:
     directives.has_expect_exit or directives.expect_stdout.len() > 0 or directives.expect_stderr.len() > 0
 
 fn test_append_extra_args(argv: str, extra_args: str) -> str:
@@ -1954,7 +1954,7 @@ fn test_capture_dir(target: str, suffix: str) -> str:
     let stem = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
     "out/test-native/" ++ stem ++ "." ++ suffix ++ "." ++ f"{with_getpid()}.{with_clock_nanos()}"
 
-fn run_test_compiler_command(target: str, command_name: str, directives: TestDirectives) -> TestRunResult:
+fn run_test_compiler_command(target: str, command_name: str, directives: &TestDirectives) -> TestRunResult:
     let capture_dir = test_capture_dir(target, command_name)
     let _mkdir = with_fs_mkdir_p(capture_dir)
     let stdout_path = capture_dir ++ "/stdout.txt"
@@ -1982,7 +1982,7 @@ fn run_test_compiler_command(target: str, command_name: str, directives: TestDir
 fn test_output_contains_expected(actual: str, expected: str) -> bool:
     expected.len() == 0 or with_str_contains(actual, expected) != 0
 
-fn run_test_directive_command(target: str, directives: TestDirectives, quiet: bool) -> i32:
+fn run_test_directive_command(target: str, directives: &TestDirectives, quiet: bool) -> i32:
     if directives.skip:
         if directives.skip_reason.len() == 0:
             emit_test_stage_error("skip missing reason", target, "directives", "")
@@ -2145,7 +2145,7 @@ fn test_validate_output(stream_name: str, actual: str, expected_values: Vec[str]
             return false
     true
 
-fn validate_test_run(result: TestRunResult, directives: TestDirectives, target: str, test_name: str) -> bool:
+fn validate_test_run(result: TestRunResult, directives: &TestDirectives, target: str, test_name: str) -> bool:
     if directives.has_expect_exit:
         if result.rc != directives.expect_exit:
             emit_test_stage_error(f"exit code {result.rc}, expected {directives.expect_exit}", target, "run", test_name)
@@ -2159,13 +2159,13 @@ fn validate_test_run(result: TestRunResult, directives: TestDirectives, target: 
         return false
     true
 
-fn run_test_binary_checked(bin_path: str, target: str, test_name: str, quiet: bool, directives: TestDirectives) -> i32:
+fn run_test_binary_checked(bin_path: str, target: str, test_name: str, quiet: bool, directives: &TestDirectives) -> i32:
     let result = run_test_process(bin_path, test_name, quiet)
     if validate_test_run(result, directives, target, test_name):
         return 0
     1
 
-fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> i32:
+fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
     let directives = parse_test_directives_for_target(target)
     let directive_rc = run_test_directive_command(target, directives, quiet)
     if directive_rc >= 0:
@@ -2613,7 +2613,7 @@ fn doc_collect_modules(info: str, root: str, source_path: str) -> str:
         out = out ++ "- `" ++ path ++ "`\n"
     out
 
-fn doc_path_seen(paths: Vec[str], path: str) -> bool:
+fn doc_path_seen(paths: &Vec[str], path: str) -> bool:
     for i in 0..paths.len() as i32:
         if paths.get(i as i64) == path:
             return true

@@ -2027,7 +2027,7 @@ fn Sema.add_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
 fn Sema.freeze_types(self: Sema):
     self.types_frozen = 1
 
-fn Sema.type_extra_matches(self: Sema, extra_start: i32, values: Vec[i32], count: i32) -> i32:
+fn Sema.type_extra_matches(self: Sema, extra_start: i32, values: &Vec[i32], count: i32) -> i32:
     for i in 0..count:
         if self.type_extra.get((extra_start + i) as i64) != values.get(i as i64):
             return 0
@@ -2055,7 +2055,7 @@ fn Sema.ensure_exact_type(self: Sema, kind: i32, d0: i32, d1: i32, d2: i32) -> T
         return 0 as TypeId
     self.add_type(kind, d0, d1, d2)
 
-fn Sema.find_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> TypeId:
+fn Sema.find_tuple_type(self: Sema, elems: &Vec[i32], elem_count: i32) -> TypeId:
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) != TypeKind.TY_TUPLE:
@@ -2078,7 +2078,7 @@ fn Sema.ensure_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> TypeI
         self.type_extra.push(elems.get(ei as i64))
     self.add_type(TypeKind.TY_TUPLE, te_start, elem_count, 0)
 
-fn Sema.find_fn_type_of_kind(self: Sema, kind: i32, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+fn Sema.find_fn_type_of_kind(self: Sema, kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) != kind:
@@ -2092,10 +2092,10 @@ fn Sema.find_fn_type_of_kind(self: Sema, kind: i32, params: Vec[i32], param_coun
             return ti as TypeId
     0 as TypeId
 
-fn Sema.find_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+fn Sema.find_fn_type(self: Sema, params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
     self.find_fn_type_of_kind(TypeKind.TY_FN, params, param_count, ret)
 
-fn Sema.find_extern_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+fn Sema.find_extern_fn_type(self: Sema, params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
     self.find_fn_type_of_kind(TypeKind.TY_EXTERN_FN, params, param_count, ret)
 
 fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
@@ -2172,13 +2172,13 @@ fn Sema.fn_types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
             return 0
     self.types_compatible(self.get_type_d2(expected), self.get_type_d2(actual))
 
-fn sema_generic_inst_hash(base_sym: i32, args: Vec[i32], arg_count: i32) -> i64:
+fn sema_generic_inst_hash(base_sym: i32, args: &Vec[i32], arg_count: i32) -> i64:
     var h: i64 = base_sym as i64
     for ai in 0..arg_count:
         h = (h *% 31) +% (args.get(ai as i64) as i64)
     h
 
-fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> TypeId:
+fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: &Vec[i32], arg_count: i32) -> TypeId:
     let key = sema_generic_inst_hash(base_sym, args, arg_count)
     if self.generic_inst_cache.contains(key):
         let cached = self.generic_inst_cache.get(key).unwrap()
@@ -3259,7 +3259,7 @@ fn Sema.expr_view_dep_at(self: Sema, expr_node: i32, idx: i32) -> i32:
     let start = self.expr_view_dep_starts.get(expr_node).unwrap()
     self.expr_view_dep_data.get((start + idx) as i64)
 
-fn Sema.set_closure_capture_summary(self: Sema, closure_node: i32, capture_syms: Vec[i32], capture_effs: Vec[i32]):
+fn Sema.set_closure_capture_summary(self: Sema, closure_node: i32, capture_syms: &Vec[i32], capture_effs: &Vec[i32]):
     if closure_node == 0:
         return
     let start = self.closure_capture_summary_data.len() as i32

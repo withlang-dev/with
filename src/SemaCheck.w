@@ -1765,7 +1765,7 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
 // populating typed_expr_types so MirLower has type information.
 // Returns the sig index for the concrete signature.
 
-fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_sema_tys: Vec[i32], mono_sym: i32) -> i32:
+fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], mono_sym: i32) -> i32:
     let fn_name = self.ast.get_data0(fn_node)
     let body = self.ast.get_data1(fn_node)
     let meta = self.ast.find_fn_meta(fn_node)
@@ -5748,61 +5748,64 @@ fn Sema.check_comptime_method_restriction(self: Sema, method_sym: i32, node: i32
         return 1
     0
 
-fn Sema.push_unique_i32(self: Sema, xs: Vec[i32], value: i32) -> Unit:
+fn Sema.push_unique_i32(self: Sema, xs: Vec[i32], value: i32) -> Vec[i32]:
     if value == 0:
-        return
+        return xs
     for i in 0..xs.len() as i32:
         if xs.get(i as i64) == value:
-            return
+            return xs
     xs.push(value)
+    xs
 
-fn Sema.collect_expr_view_deps(self: Sema, node: i32, out: Vec[i32]):
+fn Sema.collect_expr_view_deps(self: Sema, node: i32, out0: Vec[i32]) -> Vec[i32]:
+    var out = out0
     if node == 0:
-        return
+        return out
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
         let dep_count = self.binding_view_dep_count(sym)
         if dep_count > 0:
             for i in 0..dep_count:
-                self.push_unique_i32(out, self.binding_view_dep_at(sym, i))
-            return
+                out = self.push_unique_i32(out, self.binding_view_dep_at(sym, i))
+            return out
         let ty = self.scope_lookup(sym)
         if ty > 0:
             let tk = self.get_type_kind(self.resolve_alias(ty as TypeId))
             if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
-                self.push_unique_i32(out, sym)
-        return
+                out = self.push_unique_i32(out, sym)
+        return out
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
-        self.collect_expr_view_deps(self.ast.get_data0(node), out)
-        return
+        out = self.collect_expr_view_deps(self.ast.get_data0(node), out)
+        return out
     if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
-        self.collect_expr_view_deps(self.ast.get_data0(node), out)
-        return
+        out = self.collect_expr_view_deps(self.ast.get_data0(node), out)
+        return out
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
         if op == UnaryOp.UOP_REF:
-            self.push_unique_i32(out, self.place_root_sym(self.ast.get_data1(node)))
+            out = self.push_unique_i32(out, self.place_root_sym(self.ast.get_data1(node)))
         else:
-            self.collect_expr_view_deps(self.ast.get_data1(node), out)
-        return
+            out = self.collect_expr_view_deps(self.ast.get_data1(node), out)
+        return out
     if kind == NodeKind.NK_BLOCK:
-        self.collect_expr_view_deps(self.ast.get_data2(node), out)
-        return
+        out = self.collect_expr_view_deps(self.ast.get_data2(node), out)
+        return out
     if kind == NodeKind.NK_IF_EXPR:
-        self.collect_expr_view_deps(self.ast.get_data1(node), out)
-        self.collect_expr_view_deps(self.ast.get_data2(node), out)
-        return
+        out = self.collect_expr_view_deps(self.ast.get_data1(node), out)
+        out = self.collect_expr_view_deps(self.ast.get_data2(node), out)
+        return out
     if kind == NodeKind.NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
         for fi in 0..field_count:
-            self.collect_expr_view_deps(self.ast.get_extra(extra_start + fi * 2 + 1), out)
-        return
+            out = self.collect_expr_view_deps(self.ast.get_extra(extra_start + fi * 2 + 1), out)
+        return out
     let dep_count = self.expr_view_dep_count(node)
     if dep_count > 0:
         for i in 0..dep_count:
-            self.push_unique_i32(out, self.expr_view_dep_at(node, i))
+            out = self.push_unique_i32(out, self.expr_view_dep_at(node, i))
+    out
 
 fn Sema.compute_expr_view_origin_mask(self: Sema, node: i32) -> i32:
     if node == 0:
@@ -5834,8 +5837,8 @@ fn Sema.record_view_binding_from_expr(self: Sema, sym: i32, expr_node: i32):
     if sym == 0 or expr_node == 0:
         return
     let param_mask = self.compute_expr_view_origin_mask(expr_node)
-    let deps: Vec[i32] = Vec.new()
-    self.collect_expr_view_deps(expr_node, deps)
+    var deps: Vec[i32] = Vec.new()
+    deps = self.collect_expr_view_deps(expr_node, deps)
     self.set_binding_view_deps(sym, param_mask, deps)
 
 fn Sema.view_origin_is_stack_local(self: Sema, sym: i32) -> i32:
@@ -5905,8 +5908,8 @@ fn Sema.check_yielded_view_origins(self: Sema, expr_node: i32, report_node: i32)
                         let view_name = self.pool_resolve(view_sym)
                         self.emit_error("yielded view may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
                         return
-    let deps: Vec[i32] = Vec.new()
-    self.collect_expr_view_deps(expr_node, deps)
+    var deps: Vec[i32] = Vec.new()
+    deps = self.collect_expr_view_deps(expr_node, deps)
     for i in 0..deps.len() as i32:
         let origin_sym = deps.get(i as i64)
         if origin_sym == 0:
@@ -5972,8 +5975,8 @@ fn Sema.check_returned_view_origins(self: Sema, expr_node: i32, report_node: i32
                         let view_name = self.pool_resolve(view_sym)
                         self.emit_error("returned view may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
                         return
-    let deps: Vec[i32] = Vec.new()
-    self.collect_expr_view_deps(expr_node, deps)
+    var deps: Vec[i32] = Vec.new()
+    deps = self.collect_expr_view_deps(expr_node, deps)
     for i in 0..deps.len() as i32:
         let origin_sym = deps.get(i as i64)
         if origin_sym == 0:
@@ -5988,7 +5991,7 @@ fn Sema.record_call_view_origins(self: Sema, call_node: i32, sig_idx: i32, param
         return
     let param_count = self.sig_get_param_count(sig_idx)
     var union_mask = 0
-    let concrete_deps: Vec[i32] = Vec.new()
+    var concrete_deps: Vec[i32] = Vec.new()
     for pi in 0..param_count:
         if (self.sig_param_effect(sig_idx, pi) & EFF_ESCAPE_VIEW) == 0:
             continue
@@ -6006,9 +6009,9 @@ fn Sema.record_call_view_origins(self: Sema, call_node: i32, sig_idx: i32, param
             if origin_arg > 0:
                 union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
                 let dep_len_before = concrete_deps.len() as i32
-                self.collect_expr_view_deps(origin_arg, concrete_deps)
+                concrete_deps = self.collect_expr_view_deps(origin_arg, concrete_deps)
                 if concrete_deps.len() as i32 == dep_len_before:
-                    self.push_unique_i32(concrete_deps, self.place_root_sym(origin_arg))
+                    concrete_deps = self.push_unique_i32(concrete_deps, self.place_root_sym(origin_arg))
     if union_mask != 0 or concrete_deps.len() > 0:
         self.set_expr_view_deps(call_node, union_mask, concrete_deps)
 
@@ -7381,7 +7384,7 @@ fn Sema.generic_type_param_index(self: Sema, tp_start: i32, tp_count: i32, param
 
 // Infer a concrete generic enum type for direct variant constructor calls like
 // Some(7) when the payload directly names the enum's type parameter.
-fn Sema.infer_generic_enum_variant_type(self: Sema, variant_sym: i32, arg_types: Vec[i32], arg_count: i32) -> i32:
+fn Sema.infer_generic_enum_variant_type(self: Sema, variant_sym: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
     if not self.variant_type_ids.contains(variant_sym):
         return 0
     let enum_tid = self.resolve_alias(self.variant_type_ids.get(variant_sym).unwrap() as TypeId) as i32
@@ -8906,7 +8909,7 @@ fn Sema.try_unit_elide_call_arg(self: Sema, call_node: i32, arg_count: i32, expe
     self.store_unit_elided_call_arg(call_node)
     1
 
-fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closure_node: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: Vec[i32]) -> i32:
+fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closure_node: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: &Vec[i32]) -> i32:
     if closure_node > 0:
         self.emit_no_await_guard_may_suspend_expr(node, closure_node)
     let expected = self.get_type_d1(fn_tid)
@@ -8937,7 +8940,7 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closu
 
     if closure_node > 0:
         let capture_count = self.closure_capture_summary_count(closure_node)
-        let closure_view_deps: Vec[i32] = Vec.new()
+        var closure_view_deps: Vec[i32] = Vec.new()
         var closure_view_mask = 0
         for ci in 0..capture_count:
             let cap_sym = self.closure_capture_summary_sym(closure_node, ci)
@@ -8954,13 +8957,13 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closu
                 let dep_count = self.binding_view_dep_count(cap_sym)
                 if dep_count > 0:
                     for di in 0..dep_count:
-                        self.push_unique_i32(closure_view_deps, self.binding_view_dep_at(cap_sym, di))
+                        closure_view_deps = self.push_unique_i32(closure_view_deps, self.binding_view_dep_at(cap_sym, di))
                 else:
                     let cap_tid = self.scope_lookup(cap_sym)
                     if cap_tid > 0:
                         let cap_tk = self.get_type_kind(self.resolve_alias(cap_tid as TypeId))
                         if cap_tk == TypeKind.TY_REF or cap_tk == TypeKind.TY_PTR:
-                            self.push_unique_i32(closure_view_deps, cap_sym)
+                            closure_view_deps = self.push_unique_i32(closure_view_deps, cap_sym)
             if (cap_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0 and self.scope_has(cap_sym) != 0:
                 let cap_tid = self.scope_lookup(cap_sym)
                 if self.is_copy(cap_tid as TypeId) == 0:
@@ -9528,7 +9531,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         self.emit_error("value is not callable", callee)
     0
 
-fn Sema.store_resolved_call_args(self: Sema, call_node: i32, args: Vec[i32]):
+fn Sema.store_resolved_call_args(self: Sema, call_node: i32, args: &Vec[i32]):
     let start = self.call_resolved_args_data.len() as i32
     let count = args.len() as i32
     for i in 0..count:
@@ -9874,7 +9877,7 @@ fn Sema.try_mark_value_pattern(self: Sema, node: i32, subject_type: i32, value_s
     self.pattern_value_syms.insert(node, value_sym)
     1
 
-fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i32, arg_types: Vec[i32], arg_count: i32, param_offset: i32) -> Unit:
+fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i32, arg_types: &Vec[i32], arg_count: i32, param_offset: i32) -> Unit:
     if not self.fn_decl_nodes.contains(fn_sym):
         return
     let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
@@ -9910,7 +9913,7 @@ fn Sema.check_dyn_trait_call_compat(self: Sema, fn_sym: i32, call_extra_start: i
         self.obligation_type_syms.push(concrete_sym)
         self.obligation_nodes.push(self.ast.get_extra(call_extra_start + ai))
 
-fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: Vec[i32], arg_count: i32, call_node: i32) -> i32:
+fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: &Vec[i32], arg_count: i32, call_node: i32) -> i32:
     let meta = self.ast.find_fn_meta(fn_node)
     if meta < 0:
         if arg_count > 0:
@@ -10501,7 +10504,7 @@ fn Sema.generic_method_bind_owner_from_expected(self: Sema, owner_sym: i32) -> i
         return 0
     self.setup_generic_inst_substitution(expected as i32, owner_sym)
 
-fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, method_fn_sym: i32, is_static: i32, arg_types: Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
+fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, method_fn_sym: i32, is_static: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
     if method_fn_sym == 0 or not self.generic_fn_nodes.contains(method_fn_sym):
         return 0
     let fn_node = self.generic_fn_nodes.get(method_fn_sym).unwrap()
@@ -10725,7 +10728,7 @@ fn Sema.settle_pending_generic_binding_from_expected(self: Sema, sym: i32, expec
         return 0
     self.settle_pending_generic_binding(sym, concrete, expr_node)
 
-fn Sema.infer_pending_generic_method_receiver(self: Sema, expr: i32, field: i32, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+fn Sema.infer_pending_generic_method_receiver(self: Sema, expr: i32, field: i32, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
     let _ = node
     if expr == 0 or self.ast.kind(expr) != NodeKind.NK_IDENT:
         return 0
@@ -10950,7 +10953,7 @@ fn Sema.vec_sequence_return_type(self: Sema, recv_type: i32, arg_count: i32, nod
     self.emit_error("Vec.sequence() requires Vec[Option[T]] or Vec[Result[T, E]]", node)
     0
 
-fn Sema.vec_traverse_return_type(self: Sema, recv_type: i32, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+fn Sema.vec_traverse_return_type(self: Sema, recv_type: i32, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
     if arg_count != 1:
         self.emit_error("Vec.traverse() expects exactly one argument", node)
         return 0
@@ -10973,7 +10976,7 @@ fn Sema.vec_traverse_return_type(self: Sema, recv_type: i32, arg_types: Vec[i32]
     self.emit_error("Vec.traverse() function must return Option or Result", node)
     0
 
-fn Sema.option_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+fn Sema.option_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
     if method_name == "transpose":
         if arg_count != 0:
             self.emit_error("Option.transpose() expects no arguments", node)
@@ -11010,7 +11013,7 @@ fn Sema.option_combinator_return_type(self: Sema, recv_type: i32, method_name: s
         return chained_ty
     0
 
-fn Sema.result_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+fn Sema.result_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
     if method_name == "transpose":
         if arg_count != 0:
             self.emit_error("Result.transpose() expects no arguments", node)
@@ -11422,7 +11425,7 @@ fn Sema.find_dyn_trait_method_info(self: Sema, trait_sym: i32, method_sym: i32) 
 
     sema_dyn_trait_method_missing()
 
-fn Sema.check_dyn_trait_method_call(self: Sema, trait_sym: i32, method_sym: i32, arg_types: Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
+fn Sema.check_dyn_trait_method_call(self: Sema, trait_sym: i32, method_sym: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
     let info = self.find_dyn_trait_method_info(trait_sym, method_sym)
     if info.ok == 0:
         self.emit_error("unknown method '" ++ self.pool_resolve(method_sym) ++ "' for dyn trait '" ++ self.pool_resolve(trait_sym) ++ "'", node)
@@ -12607,7 +12610,7 @@ fn Sema.is_intrinsic_fn_sym(self: Sema, fn_sym: i32) -> i32:
         return 1
     0
 
-fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[i32], arg_count: i32) -> i32:
+fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: &Vec[i32], arg_count: i32) -> i32:
     let args_start = self.ast.get_data1(node)
     if fn_sym == self.syms.channel:
         if arg_count > 1:

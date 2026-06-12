@@ -322,6 +322,9 @@ enum DropKind: i32:
     DK_ASYNC_SCOPE = 6
     DK_THREAD_SCOPE = 7
 
+// Copy: DropKind is a lightweight integer tag passed by value.
+impl Copy for DropKind
+
 // ── Data records ─────────────────────────────────────────────────
 
 type MirLocalInfo {
@@ -454,35 +457,35 @@ fn MirModule.snapshot_sema_types(self: MirModule, sema: &Sema):
         self.sema_type_extra.push(sema.type_extra.get(i as i64))
     self.sema_bitpacked_types = sema.bitpacked_types
 
-fn MirModule.mir_is_bitpacked(self: MirModule, tid: i32) -> bool:
+fn MirModule.mir_is_bitpacked(self: &MirModule, tid: i32) -> bool:
     self.sema_bitpacked_types.contains(tid)
 
-fn MirModule.mir_get_type_kind(self: MirModule, tid: i32) -> i32:
+fn MirModule.mir_get_type_kind(self: &MirModule, tid: i32) -> i32:
     if tid < 0 or tid >= self.sema_type_kinds.len() as i32:
         return 0
     self.sema_type_kinds.get(tid as i64)
 
-fn MirModule.mir_get_type_d0(self: MirModule, tid: i32) -> i32:
+fn MirModule.mir_get_type_d0(self: &MirModule, tid: i32) -> i32:
     if tid < 0 or tid >= self.sema_type_d0.len() as i32:
         return 0
     self.sema_type_d0.get(tid as i64)
 
-fn MirModule.mir_get_type_d1(self: MirModule, tid: i32) -> i32:
+fn MirModule.mir_get_type_d1(self: &MirModule, tid: i32) -> i32:
     if tid < 0 or tid >= self.sema_type_d1.len() as i32:
         return 0
     self.sema_type_d1.get(tid as i64)
 
-fn MirModule.mir_get_type_d2(self: MirModule, tid: i32) -> i32:
+fn MirModule.mir_get_type_d2(self: &MirModule, tid: i32) -> i32:
     if tid < 0 or tid >= self.sema_type_d2.len() as i32:
         return 0
     self.sema_type_d2.get(tid as i64)
 
-fn MirModule.mir_get_type_extra(self: MirModule, idx: i32) -> i32:
+fn MirModule.mir_get_type_extra(self: &MirModule, idx: i32) -> i32:
     if idx < 0 or idx >= self.sema_type_extra.len() as i32:
         return 0
     self.sema_type_extra.get(idx as i64)
 
-fn MirModule.mir_resolve_alias(self: MirModule, tid: i32) -> i32:
+fn MirModule.mir_resolve_alias(self: &MirModule, tid: i32) -> i32:
     var cur = tid
     var depth = 0
     while depth < 20:
@@ -496,7 +499,7 @@ fn MirModule.mir_resolve_alias(self: MirModule, tid: i32) -> i32:
         depth = depth + 1
     cur
 
-fn MirModule.mir_get_type_name(self: MirModule, tid: i32) -> i32:
+fn MirModule.mir_get_type_name(self: &MirModule, tid: i32) -> i32:
     let resolved = self.mir_resolve_alias(tid)
     let tk = self.mir_get_type_kind(resolved)
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
@@ -731,7 +734,7 @@ fn mir_const_int_value(body: &MirBody, const_id: i32) -> i64:
         body.const_d2.get(const_id as i64),
     )
 
-fn MirBody.new_switch_table(mut self: MirBody, vals: Vec[i32], targets: Vec[i32]) -> i32:
+fn MirBody.new_switch_table(mut self: MirBody, vals: &Vec[i32], targets: &Vec[i32]) -> i32:
     let id = self.switch_table_starts.len() as i32
     let start = self.switch_table_vals.len() as i32
     let count = vals.len() as i32
@@ -747,7 +750,7 @@ fn MirBody.new_switch_table(mut self: MirBody, vals: Vec[i32], targets: Vec[i32]
 
     id
 
-fn MirBody.new_agg_fields(mut self: MirBody, operands: Vec[i32], name_syms: Vec[i32]) -> i32:
+fn MirBody.new_agg_fields(mut self: MirBody, operands: &Vec[i32], name_syms: &Vec[i32]) -> i32:
     let id = self.agg_field_starts.len() as i32
     let start = self.agg_field_operands.len() as i32
     let count = operands.len() as i32
@@ -758,7 +761,7 @@ fn MirBody.new_agg_fields(mut self: MirBody, operands: Vec[i32], name_syms: Vec[
         self.agg_field_name_syms.push(name_syms.get(i as i64))
     id
 
-fn MirBody.new_call_args(mut self: MirBody, operands: Vec[i32]) -> i32:
+fn MirBody.new_call_args(mut self: MirBody, operands: &Vec[i32]) -> i32:
     let id = self.call_arg_starts.len() as i32
     let start = self.call_arg_operands.len() as i32
     let count = operands.len() as i32
@@ -858,7 +861,7 @@ fn MirBody.term_no_suspend_node(self: &MirBody, bb: i32) -> i32:
 
 // ── Deterministic dump rendering ─────────────────────────────────
 
-fn dump_mir_module(mir_mod: MirModule, pool: InternPool, sema: Sema) -> str:
+fn dump_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
     var out = ""
     out = out ++ f"mir module functions={mir_mod.bodies.len() as i32}\n"
     for i in 0..mir_mod.bodies.len() as i32:
@@ -870,7 +873,7 @@ fn dump_mir_module(mir_mod: MirModule, pool: InternPool, sema: Sema) -> str:
 
 // Streaming variant of dump_mir_module to avoid quadratic whole-module
 // concatenation when dumping large MIR corpora.
-fn print_mir_module(mir_mod: MirModule, pool: InternPool, sema: Sema):
+fn print_mir_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema):
     with_write(f"mir module functions={mir_mod.bodies.len() as i32}\n")
     for i in 0..mir_mod.bodies.len() as i32:
         if i > 0:
@@ -887,7 +890,7 @@ fn mir_clip_text(s: str, max_len: i32) -> str:
         return s.slice(0, max_len as i64)
     s.slice(0, (max_len - 3) as i64) ++ "..."
 
-fn dump_mir_body(body: &MirBody, pool: InternPool, sema: Sema) -> str:
+fn dump_mir_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
     var out = ""
     let fn_name = if body.fn_sym != 0:
         f"sym{body.fn_sym}({pool.resolve(body.fn_sym)})"
@@ -953,7 +956,7 @@ fn dump_mir_body(body: &MirBody, pool: InternPool, sema: Sema) -> str:
     out = out ++ rbrace() ++ "\n"
     out
 
-fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: &InternPool, sema: &Sema) -> str:
     let kind = body.stmt_kind(stmt_id)
     let d0 = body.stmt_data0(stmt_id)
     let d1 = body.stmt_data1(stmt_id)
@@ -971,7 +974,7 @@ fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: InternPool, sema: Sema) -> 
 
     f"stmt<{kind}>({d0}, {d1});"
 
-fn mir_term_text(body: &MirBody, bb: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_term_text(body: &MirBody, bb: i32, pool: &InternPool, sema: &Sema) -> str:
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
     let d1 = body.term_data1(bb)
@@ -1060,7 +1063,7 @@ fn mir_place_text(body: &MirBody, place_id: i32) -> str:
 
     out
 
-fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: &InternPool, sema: &Sema) -> str:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return "<rvalue?>"
 
@@ -1109,7 +1112,7 @@ fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: InternPool, sema: Sema) -
 
     return f"rvalue<{k}>({d0}, {d1}, {d2})"
 
-fn mir_operand_text(body: &MirBody, operand_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_operand_text(body: &MirBody, operand_id: i32, pool: &InternPool, sema: &Sema) -> str:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return "<op?>"
 
@@ -1125,7 +1128,7 @@ fn mir_operand_text(body: &MirBody, operand_id: i32, pool: InternPool, sema: Sem
 
     f"op<{k}>({d0})"
 
-fn mir_exact_int_text(ast: AstPool, node: i32) -> str:
+fn mir_exact_int_text(ast: &AstPool, node: i32) -> str:
     if node == 0:
         return "<exact-int>"
     let kind = ast.kind(node)
@@ -1147,7 +1150,7 @@ fn mir_exact_int_text(ast: AstPool, node: i32) -> str:
         return with_i64_to_str(ast.int_lit_value(node as NodeId))
     "<exact-int>"
 
-fn mir_const_text(body: &MirBody, const_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_const_text(body: &MirBody, const_id: i32, pool: &InternPool, sema: &Sema) -> str:
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
         return "const<?>"
 
@@ -1204,7 +1207,7 @@ fn mir_const_text(body: &MirBody, const_id: i32, pool: InternPool, sema: Sema) -
 
     f"const<{k}>({d0})"
 
-fn mir_agg_fields_text(body: &MirBody, fields_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_agg_fields_text(body: &MirBody, fields_id: i32, pool: &InternPool, sema: &Sema) -> str:
     if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
         return ""
 
@@ -1226,7 +1229,7 @@ fn mir_agg_fields_text(body: &MirBody, fields_id: i32, pool: InternPool, sema: S
         out = out ++ "..."
     out
 
-fn mir_call_args_text(body: &MirBody, args_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Sema) -> str:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         return ""
 
@@ -1294,7 +1297,7 @@ fn mir_index_in_range(idx: i32, len: i32) -> bool:
 fn mir_span_in_range(start: i32, count: i32, len: i32) -> bool:
     start >= 0 and count >= 0 and start + count <= len
 
-fn validate_mir_module(mir_mod: MirModule) -> str:
+fn validate_mir_module(mir_mod: &MirModule) -> str:
     let body_count = mir_mod.bodies.len() as i32
     if body_count != mir_mod.body_fn_syms.len() as i32:
         return "bodies/body_fn_syms length mismatch"
@@ -1637,7 +1640,7 @@ fn mir_validation_fail(fn_sym: i32, span: i32, message: str) -> MirValidationErr
 fn mir_validation_has_error(err: MirValidationError) -> bool:
     err.message.len() > 0
 
-fn mir_validate_find_named_type(mir_mod: MirModule, type_sym: i32) -> i32:
+fn mir_validate_find_named_type(mir_mod: &MirModule, type_sym: i32) -> i32:
     for ti in 0..mir_mod.sema_type_kinds.len() as i32:
         let tk = mir_mod.sema_type_kinds.get(ti as i64)
         // Only match TY_STRUCT and TY_ENUM — their d0 stores the name symbol.
@@ -1648,7 +1651,7 @@ fn mir_validate_find_named_type(mir_mod: MirModule, type_sym: i32) -> i32:
             return ti
     0
 
-fn mir_validate_find_int_type(mir_mod: MirModule, bits: i32, signed: i32) -> i32:
+fn mir_validate_find_int_type(mir_mod: &MirModule, bits: i32, signed: i32) -> i32:
     for ti in 0..mir_mod.sema_type_kinds.len() as i32:
         if mir_mod.sema_type_kinds.get(ti as i64) != TypeKind.TY_INT:
             continue
@@ -1656,14 +1659,14 @@ fn mir_validate_find_int_type(mir_mod: MirModule, bits: i32, signed: i32) -> i32
             return ti
     0
 
-fn mir_validate_get_generic_inst_arg_count(mir_mod: MirModule, tid: i32) -> i32:
+fn mir_validate_get_generic_inst_arg_count(mir_mod: &MirModule, tid: i32) -> i32:
     mir_mod.mir_get_type_d2(tid)
 
-fn mir_validate_get_generic_inst_arg(mir_mod: MirModule, tid: i32, index: i32) -> i32:
+fn mir_validate_get_generic_inst_arg(mir_mod: &MirModule, tid: i32, index: i32) -> i32:
     let extra_start = mir_mod.mir_get_type_d1(tid)
     mir_mod.mir_get_type_extra(extra_start + index)
 
-fn mir_validate_struct_field_type(mir_mod: MirModule, struct_tid: i32, field_sym: i32) -> i32:
+fn mir_validate_struct_field_type(mir_mod: &MirModule, struct_tid: i32, field_sym: i32) -> i32:
     let resolved = mir_mod.mir_resolve_alias(struct_tid)
     let tk = mir_mod.mir_get_type_kind(resolved)
     if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
@@ -1685,7 +1688,7 @@ fn mir_validate_struct_field_type(mir_mod: MirModule, struct_tid: i32, field_sym
             return mir_mod.mir_get_type_extra(extra_start + fi * 3 + 1)
     0
 
-fn mir_validate_tuple_elem_type(mir_mod: MirModule, tuple_tid: i32, field_idx: i32) -> i32:
+fn mir_validate_tuple_elem_type(mir_mod: &MirModule, tuple_tid: i32, field_idx: i32) -> i32:
     let resolved = mir_mod.mir_resolve_alias(tuple_tid)
     if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_TUPLE:
         return 0
@@ -1695,7 +1698,7 @@ fn mir_validate_tuple_elem_type(mir_mod: MirModule, tuple_tid: i32, field_idx: i
         return 0
     mir_mod.mir_get_type_extra(elem_start + field_idx)
 
-fn mir_validate_indexed_element_type(mir_mod: MirModule, collection_tid: i32) -> i32:
+fn mir_validate_indexed_element_type(mir_mod: &MirModule, collection_tid: i32) -> i32:
     let resolved = mir_mod.mir_resolve_alias(collection_tid)
     let tk = mir_mod.mir_get_type_kind(resolved)
     if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
@@ -1710,7 +1713,7 @@ fn mir_validate_indexed_element_type(mir_mod: MirModule, collection_tid: i32) ->
             return mir_validate_get_generic_inst_arg(mir_mod, resolved, 0)
     0
 
-fn mir_validate_variant_exists(mir_mod: MirModule, enum_tid: i32, variant_idx: i32) -> bool:
+fn mir_validate_variant_exists(mir_mod: &MirModule, enum_tid: i32, variant_idx: i32) -> bool:
     if variant_idx < 0:
         return false
     let resolved = mir_mod.mir_resolve_alias(enum_tid)
@@ -1724,7 +1727,7 @@ fn mir_validate_variant_exists(mir_mod: MirModule, enum_tid: i32, variant_idx: i
             return variant_idx < mir_mod.mir_get_type_d2(base_tid)
     false
 
-fn mir_validate_enum_payload_type(mir_mod: MirModule, enum_tid: i32, variant_idx: i32, field_idx: i32) -> i32:
+fn mir_validate_enum_payload_type(mir_mod: &MirModule, enum_tid: i32, variant_idx: i32, field_idx: i32) -> i32:
     let resolved = mir_mod.mir_resolve_alias(enum_tid)
     let tk = mir_mod.mir_get_type_kind(resolved)
     if variant_idx < 0 or field_idx < 0:
@@ -1772,7 +1775,7 @@ fn mir_validate_enum_payload_type(mir_mod: MirModule, enum_tid: i32, variant_idx
         return mir_validate_enum_payload_type(mir_mod, base_tid, variant_idx, field_idx)
     0
 
-fn mir_validate_type_compatible_fast(mir_mod: MirModule, expected: i32, actual: i32) -> i32:
+fn mir_validate_type_compatible_fast(mir_mod: &MirModule, expected: i32, actual: i32) -> i32:
     if expected <= 0 or actual <= 0:
         return 0
     if expected == actual:
@@ -1840,7 +1843,7 @@ fn mir_validate_type_compatible_fast(mir_mod: MirModule, expected: i32, actual: 
             return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
     0
 
-fn mir_validate_single_field_inner(mir_mod: MirModule, tid: i32) -> i32:
+fn mir_validate_single_field_inner(mir_mod: &MirModule, tid: i32) -> i32:
     let resolved = mir_mod.mir_resolve_alias(tid)
     if mir_mod.mir_get_type_kind(resolved) != TypeKind.TY_STRUCT:
         return 0
@@ -1849,7 +1852,7 @@ fn mir_validate_single_field_inner(mir_mod: MirModule, tid: i32) -> i32:
     let extra_start = mir_mod.mir_get_type_d1(resolved)
     mir_mod.mir_get_type_extra(extra_start + 1)
 
-fn mir_validate_place_type(mir_mod: MirModule, body: &MirBody, place_id: i32) -> i32:
+fn mir_validate_place_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
     if place_id < body.place_sema_types.len() as i32:
@@ -1911,7 +1914,7 @@ fn mir_validate_place_type(mir_mod: MirModule, body: &MirBody, place_id: i32) ->
 
     current_ty
 
-fn mir_validate_operand_type(mir_mod: MirModule, body: &MirBody, operand_id: i32) -> i32:
+fn mir_validate_operand_type(mir_mod: &MirModule, body: &MirBody, operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return 0
     let op_kind = body.operand_kinds.get(operand_id as i64)
@@ -1927,14 +1930,14 @@ fn mir_validate_operand_type(mir_mod: MirModule, body: &MirBody, operand_id: i32
 fn mir_validate_is_compare_op(op: i32) -> bool:
     op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE
 
-fn mir_validate_compare_sensitive_type(mir_mod: MirModule, tid: i32) -> bool:
+fn mir_validate_compare_sensitive_type(mir_mod: &MirModule, tid: i32) -> bool:
     if tid <= 0:
         return false
     let resolved = mir_mod.mir_resolve_alias(tid)
     let tk = mir_mod.mir_get_type_kind(resolved)
     tk == TypeKind.TY_STR or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_TUPLE
 
-fn mir_validate_cast_supported(mir_mod: MirModule, src_ty: i32, dst_ty: i32) -> bool:
+fn mir_validate_cast_supported(mir_mod: &MirModule, src_ty: i32, dst_ty: i32) -> bool:
     if src_ty <= 0 or dst_ty <= 0:
         return true
     let src_inner = mir_validate_single_field_inner(mir_mod, src_ty)
@@ -1973,7 +1976,7 @@ fn mir_validate_cast_supported(mir_mod: MirModule, src_ty: i32, dst_ty: i32) -> 
         return false
     true
 
-fn validate_typed_mir_body(mir_mod: MirModule, body: &MirBody) -> MirValidationError:
+fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidationError:
     let stmt_count = body.stmt_count()
     for si in 0..stmt_count:
         let stmt_kind = body.stmt_kinds.get(si as i64)
@@ -2045,7 +2048,7 @@ fn validate_typed_mir_body(mir_mod: MirModule, body: &MirBody) -> MirValidationE
 
     mir_validation_ok()
 
-fn validate_typed_mir_module(mir_mod: MirModule) -> MirValidationError:
+fn validate_typed_mir_module(mir_mod: &MirModule) -> MirValidationError:
     let shape_err = validate_mir_module(mir_mod)
     if shape_err.len() > 0:
         return mir_validation_fail(0, 0, shape_err)

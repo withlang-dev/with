@@ -635,7 +635,7 @@ fn lsp_line_col_to_offset(text: str, line: i32, col: i32) -> i32:
 
 // ── Diagnostics ──────────────────────────────────────────────
 
-fn lsp_publish_diagnostics(state: LspState, uri: str, text: str):
+fn lsp_publish_diagnostics(state: &LspState, uri: str, text: str):
     let idx = state.find_doc(uri)
     if idx >= 0:
         state.documents.get(idx as i64).ensure_analyzed()
@@ -653,7 +653,7 @@ fn lsp_publish_diagnostics(state: LspState, uri: str, text: str):
     var diags = jarr_start()
     var first = true
     for i in 0..dl.count():
-        let d = dl.items.get(i as i64)
+        let d = dl.item_at(i as i64)
         let severity = d.severity
         let sl = lsp_offset_to_line(text, d.primary.start)
         let sc = lsp_offset_to_col(text, d.primary.start)
@@ -674,7 +674,7 @@ fn lsp_publish_diagnostics(state: LspState, uri: str, text: str):
 
 // ── Go to definition ─────────────────────────────────────────
 
-fn lsp_definition(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
+fn lsp_definition(id: i32, state: &LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     var lexer = Lexer.init(text, 0)
@@ -781,7 +781,7 @@ fn lsp_extract_doc_comment(text: str, decl_start: i32) -> str:
         i = i - 1
     result
 
-fn lsp_hover(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
+fn lsp_hover(id: i32, state: &LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     var lexer = Lexer.init(text, 0)
@@ -852,7 +852,7 @@ fn lsp_hover(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32)
 
 // ── Dot completion ───────────────────────────────────────────
 
-fn lsp_dot_completion(id: i32, state: LspState, uri: str, text: str, offset: i32, dot_pos: i32):
+fn lsp_dot_completion(id: i32, state: &LspState, uri: str, text: str, offset: i32, dot_pos: i32):
     // Find the receiver identifier before the dot
     var recv_end = dot_pos
     var recv_start = recv_end - 1
@@ -1108,7 +1108,7 @@ fn lsp_type_node_to_name(pool: AstPool, intern: InternPool, type_node: i32) -> s
 
 // ── Completion ───────────────────────────────────────────────
 
-fn lsp_completion(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
+fn lsp_completion(id: i32, state: &LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     // Find the line text up to cursor to detect context
@@ -1412,97 +1412,6 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
 
     empty
 
-fn lsp_collect_bindings(pool: AstPool, intern: InternPool, node: i32, offset: i32, names: Vec[str], seen: Vec[str]):
-    if node == 0:
-        return
-    let nid = node as NodeId
-    let kind = pool.kind(nid)
-    let node_start = pool.get_start(nid)
-
-    if kind == NodeKind.NK_LET_BINDING:
-        if node_start < offset:
-            let sym = pool.get_data0(nid)
-            if sym != 0:
-                let name = intern.resolve(sym)
-                if name.len() > 0 and lsp_vec_str_contains(seen, name) == 0:
-                    names.push(name)
-                    seen.push(name)
-        return
-
-    if kind == NodeKind.NK_LABEL:
-        lsp_collect_bindings(pool, intern, pool.get_data1(nid), offset, names, seen)
-        return
-
-    if kind == NodeKind.NK_GOTO:
-        return
-
-    if kind == NodeKind.NK_FOR:
-        if node_start < offset and not pool.for_binding_is_pattern(nid):
-            let sym = pool.get_data0(nid)
-            if sym != 0:
-                let name = intern.resolve(sym)
-                if name.len() > 0 and name != "_" and lsp_vec_str_contains(seen, name) == 0:
-                    names.push(name)
-                    seen.push(name)
-        let for_body = pool.get_data2(nid)
-        if for_body != 0:
-            lsp_collect_bindings(pool, intern, for_body, offset, names, seen)
-        return
-
-    if kind == NodeKind.NK_BLOCK:
-        let extra_start = pool.get_data0(nid)
-        let stmt_count = pool.get_data1(nid)
-        let tail = pool.get_data2(nid)
-        for i in 0..stmt_count:
-            lsp_collect_bindings(pool, intern, pool.get_extra(extra_start + i), offset, names, seen)
-        if tail != 0:
-            lsp_collect_bindings(pool, intern, tail, offset, names, seen)
-        return
-
-    if kind == NodeKind.NK_IF_EXPR:
-        let then_body = pool.get_data1(nid)
-        let else_body = pool.get_data2(nid)
-        if then_body != 0:
-            lsp_collect_bindings(pool, intern, then_body, offset, names, seen)
-        if else_body != 0:
-            lsp_collect_bindings(pool, intern, else_body, offset, names, seen)
-        return
-
-    if kind == NodeKind.NK_WHILE:
-        let body = pool.get_data1(nid)
-        if body != 0:
-            lsp_collect_bindings(pool, intern, body, offset, names, seen)
-        return
-
-    if kind == NodeKind.NK_DO_WHILE:
-        let body = pool.get_data0(nid)
-        if body != 0:
-            lsp_collect_bindings(pool, intern, body, offset, names, seen)
-        return
-
-    if kind == NodeKind.NK_MATCH:
-        let arms_start = pool.get_data1(nid)
-        let arms_count = pool.get_data2(nid)
-        for ai in 0..arms_count:
-            let arm = pool.get_extra(arms_start + ai)
-            if arm != 0:
-                let arm_body = pool.get_data1(arm as NodeId)
-                if arm_body != 0:
-                    lsp_collect_bindings(pool, intern, arm_body, offset, names, seen)
-        return
-
-    if kind == NodeKind.NK_LOOP:
-        let body = pool.get_data0(nid)
-        if body != 0:
-            lsp_collect_bindings(pool, intern, body, offset, names, seen)
-        return
-
-fn lsp_vec_str_contains(v: Vec[str], s: str) -> i32:
-    for i in 0..v.len() as i32:
-        if v.get(i as i64) == s:
-            return 1
-    0
-
 fn lsp_list_embedded_modules(prefix: str) -> Vec[str]:
     // Query the embedded stdlib listing and filter by prefix.
     // Returns module names without prefix or .w extension.
@@ -1564,7 +1473,7 @@ fn lsp_keywords() -> Vec[str]:
 
 // ── Signature help ───────────────────────────────────────────
 
-fn lsp_signature_help(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
+fn lsp_signature_help(id: i32, state: &LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     // Walk tokens backward from cursor to find the opening ( and function name.
@@ -1665,7 +1574,7 @@ fn lsp_signature_help(id: i32, state: LspState, uri: str, text: str, line: i32, 
 
 // ── Find references ──────────────────────────────────────────
 
-fn lsp_find_references(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32):
+fn lsp_find_references(id: i32, state: &LspState, uri: str, text: str, line: i32, col: i32):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     // Find the identifier at cursor
@@ -1779,7 +1688,7 @@ fn lsp_find_references(id: i32, state: LspState, uri: str, text: str, line: i32,
 
 // ── Document symbols ─────────────────────────────────────────
 
-fn lsp_document_symbols(id: i32, state: LspState, uri: str, text: str):
+fn lsp_document_symbols(id: i32, state: &LspState, uri: str, text: str):
     let idx = state.find_doc(uri)
     if idx >= 0:
         state.documents.get(idx as i64).ensure_analyzed()
@@ -1845,7 +1754,7 @@ fn lsp_is_valid_ident(name: str) -> bool:
             return false
     true
 
-fn lsp_rename(id: i32, state: LspState, uri: str, text: str, line: i32, col: i32, new_name: str):
+fn lsp_rename(id: i32, state: &LspState, uri: str, text: str, line: i32, col: i32, new_name: str):
     let offset = lsp_line_col_to_offset(text, line, col)
 
     // Find the identifier at cursor

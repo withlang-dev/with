@@ -91,7 +91,7 @@ fn is_block_keyword(tag: i32) -> bool:
     if tag == TokenKind.TK_KW_UNSAFE: return true
     false
 
-fn next_is_newline_or_eof(tokens: TokenList, pos: i32, count: i32) -> bool:
+fn next_is_newline_or_eof(tokens: &TokenList, pos: i32, count: i32) -> bool:
     var j = pos + 1
     while j < count:
         let t = tokens.get_tag(j)

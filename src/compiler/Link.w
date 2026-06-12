@@ -110,7 +110,7 @@ fn link_stage_collect_cleanup_files(extras: Vec[str]) -> Vec[str]:
             cleanup.push(extra)
     cleanup
 
-fn link_stage_cleanup_files(files: Vec[str]):
+fn link_stage_cleanup_files(files: &Vec[str]):
     for i in 0..files.len() as i32:
         let _remove = runtime_remove_file(files.get(i as i64))
 

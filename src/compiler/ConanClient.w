@@ -92,7 +92,7 @@ fn conan_str_compare(a: str, b: str) -> i32:
         return 1
     0
 
-fn conan_vec_contains(values: Vec[str], value: str) -> bool:
+fn conan_vec_contains(values: &Vec[str], value: str) -> bool:
     for i in 0..values.len() as i32:
         if values.get(i as i64) == value:
             return true
@@ -854,7 +854,7 @@ pub fn conan_write_known_system_package(name: str, version: str, project_root: s
     let requires: Vec[str] = Vec.new()
     conan_write_metadata(dep_dir, name, version, "system", "system", "system", include_paths, lib_paths, known_libs, defines, known_link_args, requires) == 0
 
-fn conan_resolve_and_install_requirements(requirements: Vec[str], project_root: str, depth: i32, force_reinstall: bool) -> Vec[str]:
+fn conan_resolve_and_install_requirements(requirements: &Vec[str], project_root: str, depth: i32, force_reinstall: bool) -> Vec[str]:
     let resolved: Vec[str] = Vec.new()
     for i in 0..requirements.len() as i32:
         let req = requirements.get(i as i64)

@@ -426,6 +426,121 @@ fn Codegen.mir_i32_vec_fill(self: Codegen, count: i32, value: i32) -> Vec[i32]:
         out.push(value)
     out
 
+fn mir_scan_vec_fill(count: i32, value: i32) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    for _ in 0..count:
+        out.push(value)
+    out
+
+extern fn with_alloc(size: i64) -> *mut u8
+
+// Worklist handle for the block-reachability walk: copies share state by
+// design (AstPool pattern, truthfully Copy) so the successor helpers can
+// push through plain parameters under spec §3.8.
+type MirBlockStackState {
+    xs: Vec[i32],
+}
+
+type MirBlockStack {
+    state: *mut MirBlockStackState,
+}
+impl Copy for MirBlockStack
+
+fn MirBlockStack.new -> MirBlockStack:
+    // One Vec header; allocate generously like the other handle states.
+    let ptr = with_alloc(64) as *mut MirBlockStackState
+    unsafe *ptr = MirBlockStackState { xs: Vec.new() }
+    MirBlockStack { state: ptr }
+
+fn MirBlockStack.push(self: MirBlockStack, value: i32):
+    let st = self.state
+    unsafe { st.xs.push(value) }
+
+fn MirBlockStack.len(self: MirBlockStack) -> i64:
+    let st = self.state
+    unsafe { st.xs.len() }
+
+fn MirBlockStack.pop_top(self: MirBlockStack) -> i32:
+    let st = self.state
+    unsafe {
+        let top = st.xs.get(st.xs.len() - 1)
+        let _ = st.xs.pop()
+        top
+    }
+
+// Value-local scan state handle: copies share state by design (AstPool
+// pattern, truthfully Copy) so the scan helpers can mutate the per-local
+// tables through plain parameters under spec §3.8.
+type MirValueScanState {
+    blockers: Vec[i32],
+    read_counts: Vec[i32],
+    first_read_bb: Vec[i32],
+    first_read_order: Vec[i32],
+    second_read_bb: Vec[i32],
+    second_read_order: Vec[i32],
+}
+
+type MirValueScan {
+    state: *mut MirValueScanState,
+}
+impl Copy for MirValueScan
+
+fn MirValueScan.new(local_count: i32) -> MirValueScan:
+    // Six Vec headers; allocate generously like the other handle states
+    // (InternPool uses 256 for a 7-field state).
+    let ptr = with_alloc(256) as *mut MirValueScanState
+    unsafe *ptr = MirValueScanState {
+        blockers: mir_scan_vec_fill(local_count, 0),
+        read_counts: mir_scan_vec_fill(local_count, 0),
+        first_read_bb: mir_scan_vec_fill(local_count, -1),
+        first_read_order: mir_scan_vec_fill(local_count, -1),
+        second_read_bb: mir_scan_vec_fill(local_count, -1),
+        second_read_order: mir_scan_vec_fill(local_count, -1),
+    }
+    MirValueScan { state: ptr }
+
+fn MirValueScan.local_limit(self: MirValueScan) -> i32:
+    let st = self.state
+    unsafe { st.blockers.len() as i32 }
+
+fn MirValueScan.block_local(self: MirValueScan, local_id: i32):
+    let st = self.state
+    unsafe { st.blockers.set_i32(local_id, 1) }
+
+fn MirValueScan.local_blocked(self: MirValueScan, local_id: i32) -> i32:
+    let st = self.state
+    unsafe { st.blockers.get(local_id as i64) }
+
+fn MirValueScan.read_count(self: MirValueScan, local_id: i32) -> i32:
+    let st = self.state
+    unsafe { st.read_counts.get(local_id as i64) }
+
+fn MirValueScan.set_read_count(self: MirValueScan, local_id: i32, value: i32):
+    let st = self.state
+    unsafe { st.read_counts.set_i32(local_id, value) }
+
+fn MirValueScan.set_first_read(self: MirValueScan, local_id: i32, use_bb: i32, use_order: i32):
+    let st = self.state
+    unsafe {
+        st.first_read_bb.set_i32(local_id, use_bb)
+        st.first_read_order.set_i32(local_id, use_order)
+    }
+
+fn MirValueScan.set_second_read(self: MirValueScan, local_id: i32, use_bb: i32, use_order: i32):
+    let st = self.state
+    unsafe {
+        st.second_read_bb.set_i32(local_id, use_bb)
+        st.second_read_order.set_i32(local_id, use_order)
+    }
+
+fn MirValueScan.first_read_bb_of(self: MirValueScan, local_id: i32) -> i32:
+    let st = self.state
+    unsafe { st.first_read_bb.get(local_id as i64) }
+
+fn MirValueScan.first_read_order_of(self: MirValueScan, local_id: i32) -> i32:
+    let st = self.state
+    unsafe { st.first_read_order.get(local_id as i64) }
+
 fn Codegen.mir_place_direct_local(self: Codegen, body: &MirBody, place_id: i32) -> i32:
     let _ = self
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
@@ -449,7 +564,7 @@ fn Codegen.mir_stmt_order_in_block(self: Codegen, body: &MirBody, stmt_id: i32) 
         return -1
     stmt_id - body.bb_stmt_starts.get(bb as i64)
 
-fn Codegen.mir_add_successor(self: Codegen, body: &MirBody, stack: Vec[i32], visited: Vec[i32], succ: i32):
+fn Codegen.mir_add_successor(self: Codegen, body: &MirBody, stack: MirBlockStack, visited: &Vec[i32], succ: i32):
     let _ = self
     if succ < 0 or succ >= body.block_count():
         return
@@ -457,7 +572,7 @@ fn Codegen.mir_add_successor(self: Codegen, body: &MirBody, stack: Vec[i32], vis
         return
     stack.push(succ)
 
-fn Codegen.mir_push_successors(self: Codegen, body: &MirBody, bb: i32, stack: Vec[i32], visited: Vec[i32]):
+fn Codegen.mir_push_successors(self: Codegen, body: &MirBody, bb: i32, stack: MirBlockStack, visited: &Vec[i32]):
     if bb < 0 or bb >= body.block_count():
         return
     let kind = body.term_kind(bb)
@@ -488,11 +603,10 @@ fn Codegen.mir_reaches_block_avoiding(self: Codegen, body: &MirBody, target_bb: 
     if avoid_bb == 0:
         return false
     let visited = self.mir_i32_vec_fill(body.block_count(), 0)
-    var stack: Vec[i32] = Vec.new()
+    let stack = MirBlockStack.new()
     stack.push(0)
     while stack.len() > 0:
-        let cur = stack.get(stack.len() - 1)
-        let _ = stack.pop()
+        let cur = stack.pop_top()
         if cur < 0 or cur >= body.block_count():
             continue
         if cur == avoid_bb:
@@ -514,20 +628,18 @@ fn Codegen.mir_local_def_dominates_use(self: Codegen, body: &MirBody, def_stmt: 
         return def_order >= 0 and def_order < use_order
     not self.mir_reaches_block_avoiding(body, use_bb, def_bb)
 
-fn Codegen.mir_record_value_local_read(self: Codegen, body: &MirBody, local_id: i32, use_bb: i32, use_order: i32, read_counts: Vec[i32], first_read_bb: Vec[i32], first_read_order: Vec[i32], second_read_bb: Vec[i32], second_read_order: Vec[i32]):
+fn Codegen.mir_record_value_local_read(self: Codegen, body: &MirBody, local_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
     let _ = self
-    if local_id < 0 or local_id >= read_counts.len() as i32:
+    if local_id < 0 or local_id >= scan.local_limit():
         return
-    let count = read_counts.get(local_id as i64)
+    let count = scan.read_count(local_id)
     if count == 0:
-        first_read_bb.set_i32(local_id, use_bb)
-        first_read_order.set_i32(local_id, use_order)
+        scan.set_first_read(local_id, use_bb, use_order)
     else if count == 1:
-        second_read_bb.set_i32(local_id, use_bb)
-        second_read_order.set_i32(local_id, use_order)
-    read_counts.set_i32(local_id, count + 1)
+        scan.set_second_read(local_id, use_bb, use_order)
+    scan.set_read_count(local_id, count + 1)
 
-fn Codegen.mir_scan_operand_for_value_local(self: Codegen, body: &MirBody, operand_id: i32, use_bb: i32, use_order: i32, blockers: Vec[i32], read_counts: Vec[i32], first_read_bb: Vec[i32], first_read_order: Vec[i32], second_read_bb: Vec[i32], second_read_order: Vec[i32]):
+fn Codegen.mir_scan_operand_for_value_local(self: Codegen, body: &MirBody, operand_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return
     let kind = body.operand_kinds.get(operand_id as i64)
@@ -538,28 +650,28 @@ fn Codegen.mir_scan_operand_for_value_local(self: Codegen, body: &MirBody, opera
         return
     let local_id = body.place_locals.get(place_id as i64)
     if body.place_proj_counts.get(place_id as i64) != 0:
-        if local_id >= 0 and local_id < blockers.len() as i32:
-            blockers.set_i32(local_id, 1)
+        if local_id >= 0 and local_id < scan.local_limit():
+            scan.block_local(local_id)
         return
-    self.mir_record_value_local_read(body, local_id, use_bb, use_order, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+    self.mir_record_value_local_read(body, local_id, use_bb, use_order, scan)
 
-fn Codegen.mir_scan_call_args_for_value_local(self: Codegen, body: &MirBody, args_id: i32, use_bb: i32, use_order: i32, blockers: Vec[i32], read_counts: Vec[i32], first_read_bb: Vec[i32], first_read_order: Vec[i32], second_read_bb: Vec[i32], second_read_order: Vec[i32]):
+fn Codegen.mir_scan_call_args_for_value_local(self: Codegen, body: &MirBody, args_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         return
     let start = body.call_arg_starts.get(args_id as i64)
     let count = body.call_arg_counts.get(args_id as i64)
     for ai in 0..count:
-        self.mir_scan_operand_for_value_local(body, body.call_arg_operands.get((start + ai) as i64), use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+        self.mir_scan_operand_for_value_local(body, body.call_arg_operands.get((start + ai) as i64), use_bb, use_order, scan)
 
-fn Codegen.mir_scan_aggregate_for_value_local(self: Codegen, body: &MirBody, field_id: i32, use_bb: i32, use_order: i32, blockers: Vec[i32], read_counts: Vec[i32], first_read_bb: Vec[i32], first_read_order: Vec[i32], second_read_bb: Vec[i32], second_read_order: Vec[i32]):
+fn Codegen.mir_scan_aggregate_for_value_local(self: Codegen, body: &MirBody, field_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
     if field_id < 0 or field_id >= body.agg_field_starts.len() as i32:
         return
     let start = body.agg_field_starts.get(field_id as i64)
     let count = body.agg_field_counts.get(field_id as i64)
     for fi in 0..count:
-        self.mir_scan_operand_for_value_local(body, body.agg_field_operands.get((start + fi) as i64), use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+        self.mir_scan_operand_for_value_local(body, body.agg_field_operands.get((start + fi) as i64), use_bb, use_order, scan)
 
-fn Codegen.mir_scan_rvalue_for_value_local(self: Codegen, body: &MirBody, rval_id: i32, use_bb: i32, use_order: i32, blockers: Vec[i32], read_counts: Vec[i32], first_read_bb: Vec[i32], first_read_order: Vec[i32], second_read_bb: Vec[i32], second_read_order: Vec[i32]):
+fn Codegen.mir_scan_rvalue_for_value_local(self: Codegen, body: &MirBody, rval_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return
     let kind = body.rval_kinds.get(rval_id as i64)
@@ -567,14 +679,14 @@ fn Codegen.mir_scan_rvalue_for_value_local(self: Codegen, body: &MirBody, rval_i
     let d1 = body.rval_d1.get(rval_id as i64)
     let d2 = body.rval_d2.get(rval_id as i64)
     if kind == RvalueKind.RK_USE:
-        self.mir_scan_operand_for_value_local(body, d0, use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+        self.mir_scan_operand_for_value_local(body, d0, use_bb, use_order, scan)
         return
     if kind == RvalueKind.RK_BIN_OP:
-        self.mir_scan_operand_for_value_local(body, d1, use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
-        self.mir_scan_operand_for_value_local(body, d2, use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+        self.mir_scan_operand_for_value_local(body, d1, use_bb, use_order, scan)
+        self.mir_scan_operand_for_value_local(body, d2, use_bb, use_order, scan)
         return
     if kind == RvalueKind.RK_UN_OP:
-        self.mir_scan_operand_for_value_local(body, d1, use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+        self.mir_scan_operand_for_value_local(body, d1, use_bb, use_order, scan)
         return
     if kind == RvalueKind.RK_CAST:
         if d1 > 0:
@@ -588,25 +700,25 @@ fn Codegen.mir_scan_rvalue_for_value_local(self: Codegen, body: &MirBody, rval_i
                         self.mir_mark_memory_local_for_place(body, cast_place)
                         if cast_place >= 0 and cast_place < body.place_locals.len() as i32:
                             let cast_local = body.place_locals.get(cast_place as i64)
-                            if cast_local >= 0 and cast_local < blockers.len() as i32:
-                                blockers.set_i32(cast_local, 1)
+                            if cast_local >= 0 and cast_local < scan.local_limit():
+                                scan.block_local(cast_local)
                         return
-        self.mir_scan_operand_for_value_local(body, d0, use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+        self.mir_scan_operand_for_value_local(body, d0, use_bb, use_order, scan)
         return
     if kind == RvalueKind.RK_AGGREGATE:
-        self.mir_scan_aggregate_for_value_local(body, d1, use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+        self.mir_scan_aggregate_for_value_local(body, d1, use_bb, use_order, scan)
         return
     if kind == RvalueKind.RK_ARRAY_FILL:
-        self.mir_scan_operand_for_value_local(body, d0, use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+        self.mir_scan_operand_for_value_local(body, d0, use_bb, use_order, scan)
         return
     if kind == RvalueKind.RK_STR_CONCAT_N:
-        self.mir_scan_call_args_for_value_local(body, d0, use_bb, use_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+        self.mir_scan_call_args_for_value_local(body, d0, use_bb, use_order, scan)
         return
     if kind == RvalueKind.RK_REF or kind == RvalueKind.RK_ADDR_OF or kind == RvalueKind.RK_DISCRIMINANT or kind == RvalueKind.RK_LEN:
         self.mir_mark_memory_local_for_place(body, d0)
         let local_id = if d0 >= 0 and d0 < body.place_locals.len() as i32: body.place_locals.get(d0 as i64) else: -1
-        if local_id >= 0 and local_id < blockers.len() as i32:
-            blockers.set_i32(local_id, 1)
+        if local_id >= 0 and local_id < scan.local_limit():
+            scan.block_local(local_id)
 
 fn Codegen.mir_scan_memory_locals(self: Codegen, body: &MirBody):
     let local_count = body.local_count()
@@ -615,24 +727,19 @@ fn Codegen.mir_scan_memory_locals(self: Codegen, body: &MirBody):
         for all_li in 0..local_count:
             self.mir_memory_locals.insert(all_li, 1)
         return
-    let blockers = self.mir_i32_vec_fill(local_count, 0)
+    let scan = MirValueScan.new(local_count)
     let def_counts = self.mir_i32_vec_fill(local_count, 0)
     let def_stmts = self.mir_i32_vec_fill(local_count, -1)
-    let read_counts = self.mir_i32_vec_fill(local_count, 0)
-    let first_read_bb = self.mir_i32_vec_fill(local_count, -1)
-    let first_read_order = self.mir_i32_vec_fill(local_count, -1)
-    let second_read_bb = self.mir_i32_vec_fill(local_count, -1)
-    let second_read_order = self.mir_i32_vec_fill(local_count, -1)
 
     if local_count > 0:
-        blockers.set_i32(0, 1)
+        scan.block_local(0)
 
     for pi in 0..body.place_locals.len() as i32:
         if body.place_proj_counts.get(pi as i64) > 0:
             self.mir_mark_memory_local_for_place(body, pi)
             let local_id = body.place_locals.get(pi as i64)
             if local_id >= 0 and local_id < local_count:
-                blockers.set_i32(local_id, 1)
+                scan.block_local(local_id)
     for ri in 0..body.rval_kinds.len() as i32:
         let rk = body.rval_kinds.get(ri as i64)
         if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
@@ -641,7 +748,7 @@ fn Codegen.mir_scan_memory_locals(self: Codegen, body: &MirBody):
             if place_id >= 0 and place_id < body.place_locals.len() as i32:
                 let local_id = body.place_locals.get(place_id as i64)
                 if local_id >= 0 and local_id < local_count:
-                    blockers.set_i32(local_id, 1)
+                    scan.block_local(local_id)
     for bb in 0..body.block_count():
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
         let stmt_count = body.bb_stmt_counts.get(bb as i64)
@@ -657,10 +764,10 @@ fn Codegen.mir_scan_memory_locals(self: Codegen, body: &MirBody):
                 else:
                     def_counts.set_i32(dst_local, def_counts.get(dst_local as i64) + 1)
                     def_stmts.set_i32(dst_local, stmt_id)
-                self.mir_scan_rvalue_for_value_local(body, d1, bb, si, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+                self.mir_scan_rvalue_for_value_local(body, d1, bb, si, scan)
             else if sk == StmtKind.Drop or sk == StmtKind.StorageLive or sk == StmtKind.StorageDead:
                 if d0 >= 0 and d0 < local_count:
-                    blockers.set_i32(d0, 1)
+                    scan.block_local(d0)
                     self.mir_memory_locals.insert(d0, 1)
     for oi in 0..body.operand_kinds.len() as i32:
         let ok = body.operand_kinds.get(oi as i64)
@@ -670,7 +777,7 @@ fn Codegen.mir_scan_memory_locals(self: Codegen, body: &MirBody):
                 self.mir_mark_memory_local_for_place(body, place_id)
                 let local_id = body.place_locals.get(place_id as i64)
                 if local_id >= 0 and local_id < local_count:
-                    blockers.set_i32(local_id, 1)
+                    scan.block_local(local_id)
     for bb2 in 0..body.block_count():
         let tk = body.term_kind(bb2)
         let d0 = body.term_data0(bb2)
@@ -678,24 +785,24 @@ fn Codegen.mir_scan_memory_locals(self: Codegen, body: &MirBody):
         let d2 = body.term_data2(bb2)
         let term_order = body.bb_stmt_counts.get(bb2 as i64)
         if tk == TermKind.TK_SWITCH_INT:
-            self.mir_scan_operand_for_value_local(body, d0, bb2, term_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+            self.mir_scan_operand_for_value_local(body, d0, bb2, term_order, scan)
         else if tk == TermKind.TK_CALL:
-            self.mir_scan_operand_for_value_local(body, d0, bb2, term_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
-            self.mir_scan_call_args_for_value_local(body, d1, bb2, term_order, blockers, read_counts, first_read_bb, first_read_order, second_read_bb, second_read_order)
+            self.mir_scan_operand_for_value_local(body, d0, bb2, term_order, scan)
+            self.mir_scan_call_args_for_value_local(body, d1, bb2, term_order, scan)
             self.mir_mark_memory_local_for_place(body, d2)
             if d2 >= 0 and d2 < body.place_locals.len() as i32:
                 let dst_local = body.place_locals.get(d2 as i64)
                 if dst_local >= 0 and dst_local < local_count:
-                    blockers.set_i32(dst_local, 1)
+                    scan.block_local(dst_local)
         else if tk == TermKind.TK_DROP_AND_GOTO:
             self.mir_mark_memory_local_for_place(body, d0)
             if d0 >= 0 and d0 < body.place_locals.len() as i32:
                 let drop_local = body.place_locals.get(d0 as i64)
                 if drop_local >= 0 and drop_local < local_count:
-                    blockers.set_i32(drop_local, 1)
+                    scan.block_local(drop_local)
 
     for li in 0..local_count:
-        var force_memory = blockers.get(li as i64) != 0
+        var force_memory = scan.local_blocked(li) != 0
         let sema_ty = body.local_type_ids.get(li as i64)
         if not self.mir_sema_type_can_live_in_value(sema_ty):
             force_memory = true
@@ -709,14 +816,14 @@ fn Codegen.mir_scan_memory_locals(self: Codegen, body: &MirBody):
             force_memory = true
         if not force_memory:
             let def_stmt = def_stmts.get(li as i64)
-            let reads = read_counts.get(li as i64)
+            let reads = scan.read_count(li)
             let def_bb = self.mir_stmt_block(body, def_stmt)
             let def_order = self.mir_stmt_order_in_block(body, def_stmt)
             if reads != 1:
                 force_memory = true
-            else if def_bb != first_read_bb.get(li as i64):
+            else if def_bb != scan.first_read_bb_of(li):
                 force_memory = true
-            else if def_order < 0 or def_order >= first_read_order.get(li as i64):
+            else if def_order < 0 or def_order >= scan.first_read_order_of(li):
                 force_memory = true
         if force_memory:
             self.mir_memory_locals.insert(li, 1)
@@ -2569,7 +2676,7 @@ fn Codegen.gen_fmt_with_spec(self: Codegen, val: i64, flags: i32, width: i32, pr
 // compiles to hardware instructions where available (fsqrt on ARM64)
 // and eliminates the libm dependency for these functions.
 
-fn Codegen.try_emit_llvm_math_intrinsic(self: Codegen, fn_sym: i32, args: Vec[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
+fn Codegen.try_emit_llvm_math_intrinsic(self: Codegen, fn_sym: i32, args: &Vec[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
     if fn_sym == 0 or args.len() == 0:
         return false
     let name = self.intern.resolve(fn_sym)
@@ -11427,7 +11534,7 @@ fn Codegen.find_field_index(self: Codegen, type_sym: i32, field_sym: i32) -> i32
             return i
     self.find_field_index_from_ast(type_sym, field_sym)
 
-fn Codegen.find_binding_type(self: Codegen, syms: Vec[i32], tys: Vec[i64], sym: i32) -> i64:
+fn Codegen.find_binding_type(self: Codegen, syms: &Vec[i32], tys: &Vec[i64], sym: i32) -> i64:
     for i in 0..syms.len() as i32:
         if syms.get(i as i64) == sym:
             return tys.get(i as i64)
@@ -13235,7 +13342,7 @@ fn Codegen.gen_nameof(self: Codegen, node: i32) -> i64:
 
 // ── Async function spawn codegen ──────────────────────────────────
 
-fn Codegen.emit_async_fn_spawn(self: Codegen, fn_sym: i32, callee: i64, call_ft: i64, args: Vec[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
+fn Codegen.emit_async_fn_spawn(self: Codegen, fn_sym: i32, callee: i64, call_ft: i64, args: &Vec[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
     let ctx = self.context
     let ptr_ty = wl_ptr_type(ctx)
     let i32_ty = wl_i32_type(ctx)

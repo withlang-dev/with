@@ -2080,7 +2080,7 @@ fn cc_zero_i32_vec(count: i32) -> Vec[i32]:
         out.push(0)
     out
 
-fn cc_vec_tid_at(values: Vec[i32], local_id: i32) -> i32:
+fn cc_vec_tid_at(values: &Vec[i32], local_id: i32) -> i32:
     if local_id < 0 or local_id >= values.len() as i32:
         return 0
     let value = values.get(local_id as i64)
@@ -2088,22 +2088,23 @@ fn cc_vec_tid_at(values: Vec[i32], local_id: i32) -> i32:
         return 0
     value
 
-fn CCodegen.record_local_tid(self: CCodegen, values: Vec[i32], local_id: i32, tid: i32):
+fn CCodegen.record_local_tid(self: CCodegen, values: Vec[i32], local_id: i32, tid: i32) -> Vec[i32]:
     if local_id < 0 or local_id >= values.len() as i32:
-        return
+        return values
     if tid == 0 or self.is_void_tid(tid) != 0:
-        return
+        return values
     let current = values.get(local_id as i64)
     if current < 0:
-        return
+        return values
     if current == 0:
         values.set_i32(local_id, tid)
-        return
+        return values
     if self.strict_type_match(current, tid) == 0:
         values.set_i32(local_id, -1)
+    values
 
 fn CCodegen.body_downcast_option_tids(self: CCodegen, body: &MirBody) -> Vec[i32]:
-    let out = cc_zero_i32_vec(body.local_count())
+    var out = cc_zero_i32_vec(body.local_count())
     for bb in 0..body.block_count():
         let start = body.bb_stmt_starts.get(bb as i64)
         let count = body.bb_stmt_counts.get(bb as i64)
@@ -2130,11 +2131,11 @@ fn CCodegen.body_downcast_option_tids(self: CCodegen, body: &MirBody) -> Vec[i32
                 continue
             let dst_tid = self.place_tid(body, body.stmt_d0.get(stmt_id as i64))
             let opt_tid = self.option_tid_for_payload(dst_tid)
-            self.record_local_tid(out, src_local, opt_tid)
+            out = self.record_local_tid(out, src_local, opt_tid)
     out
 
-fn CCodegen.body_copied_payload_enum_tids(self: CCodegen, body: &MirBody, downcast_option_tids: Vec[i32]) -> Vec[i32]:
-    let out = cc_zero_i32_vec(body.local_count())
+fn CCodegen.body_copied_payload_enum_tids(self: CCodegen, body: &MirBody, downcast_option_tids: &Vec[i32]) -> Vec[i32]:
+    var out = cc_zero_i32_vec(body.local_count())
     for bb in 0..body.block_count():
         let start = body.bb_stmt_starts.get(bb as i64)
         let count = body.bb_stmt_counts.get(bb as i64)
@@ -2166,11 +2167,11 @@ fn CCodegen.body_copied_payload_enum_tids(self: CCodegen, body: &MirBody, downca
                 src_tid = cc_vec_tid_at(downcast_option_tids, src_local)
             if self.type_is_payload_enum(src_tid) == 0:
                 continue
-            self.record_local_tid(out, dst_local, src_tid)
+            out = self.record_local_tid(out, dst_local, src_tid)
     out
 
 fn CCodegen.body_ref_target_tids(self: CCodegen, body: &MirBody) -> Vec[i32]:
-    let out = cc_zero_i32_vec(body.local_count())
+    var out = cc_zero_i32_vec(body.local_count())
     for bb in 0..body.block_count():
         let start = body.bb_stmt_starts.get(bb as i64)
         let count = body.bb_stmt_counts.get(bb as i64)
@@ -2194,7 +2195,7 @@ fn CCodegen.body_ref_target_tids(self: CCodegen, body: &MirBody) -> Vec[i32]:
             else:
                 continue
             let src_tid = self.place_ref_target_tid(body, src_place)
-            self.record_local_tid(out, dst_local, src_tid)
+            out = self.record_local_tid(out, dst_local, src_tid)
     out
 
 fn CCodegen.place_local_tid(self: CCodegen, body: &MirBody, place_id: i32) -> i32:

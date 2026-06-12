@@ -1537,8 +1537,9 @@ fn Parser.parse_enum_named_decl(self: Parser, start: i32, name: i32, is_pub: i32
     self.pool.add_extra(is_pub)
     self.pool.add_extra(tp_start)
     self.pool.add_extra(tp_count)
+    let is_disc_enum = sub_kind == TypeDeclKind.DiscEnum
     var packed_kind = pack_type_decl_kind(sub_kind, is_ephemeral)
-    if sub_kind == TypeDeclKind.DiscEnum and self.pending_specified != 0:
+    if is_disc_enum and self.pending_specified != 0:
         packed_kind = packed_kind + TDK_FLAG_SPECIFIED
     let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, packed_kind)
     return self.finish_type_decl(node)

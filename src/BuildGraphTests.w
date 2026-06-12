@@ -115,7 +115,7 @@ fn build_graph_wait_external_test_job(target: &BuildGraphTarget, job: BuildGraph
     let _remove_stderr = build_graph_rt_remove_file(job.stderr_path)
     0
 
-pub fn build_graph_run_external_test_files(root: str, target: &BuildGraphTarget, compiler_path: str, test_files: Vec[str]) -> i32:
+pub fn build_graph_run_external_test_files(root: str, target: &BuildGraphTarget, compiler_path: str, test_files: &Vec[str]) -> i32:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     if build_graph_rt_mkdir_p(capture_dir) != 0:
         build_graph_rt_eprint("error: could not create test output directory for target '" ++ target.name ++ "': " ++ capture_dir)

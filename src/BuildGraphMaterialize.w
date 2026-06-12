@@ -82,7 +82,7 @@ fn build_graph_materialized_target(kind: i32, name: str, entry: str, target_kind
         network: 0,
     }
 
-fn BuildGraphMaterializer.target_name_exists(self: BuildGraphMaterializer, graph: BuildGraph, name: str) -> bool:
+fn BuildGraphMaterializer.target_name_exists(self: BuildGraphMaterializer, graph: &BuildGraph, name: str) -> bool:
     for i in 0..graph.targets.len() as i32:
         if graph.targets.get(i as i64).name == name:
             return true
@@ -168,38 +168,50 @@ fn BuildGraphMaterializer.materialize_generated_source(self: BuildGraphMateriali
     out.generated_sources.push(BuildGraphGeneratedSource { path: path.text, contents: contents.text })
     out
 
-pub fn materialize_build_graph_from_comptime(sema: Sema, value: ComptimeValue, extras: Vec[ComptimeValue]) -> BuildGraph:
-    let mat = build_graph_materializer(sema, extras)
+pub type BuildGraphMaterializeResult {
+    graph: BuildGraph,
+    sema: Sema,
+}
+
+fn BuildGraphMaterializer.materialize_build(self: BuildGraphMaterializer, value: ComptimeValue) -> BuildGraph:
     if value.kind != ComptimeValueKind.CV_STRUCT:
-        return mat.error("build(ctx) did not return a Build value")
+        return self.error("build(ctx) did not return a Build value")
     var graph = empty_build_graph()
-    let package = mat.field_value(value, "package")
+    let package = self.field_value(value, "package")
     if package.kind != ComptimeValueKind.CV_STRUCT:
-        return mat.error("Build.package is not a Package value")
-    let package_name = mat.expect_str_field(package, "name")
-    let package_version = mat.expect_str_field(package, "version")
-    let default_target = mat.expect_str_field(value, "default_target")
+        return self.error("Build.package is not a Package value")
+    let package_name = self.expect_str_field(package, "name")
+    let package_version = self.expect_str_field(package, "version")
+    let default_target = self.expect_str_field(value, "default_target")
     if package_name.kind == ComptimeValueKind.CV_INVALID or package_version.kind == ComptimeValueKind.CV_INVALID or default_target.kind == ComptimeValueKind.CV_INVALID:
-        return mat.error("Build has a field with the wrong comptime value type")
+        return self.error("Build has a field with the wrong comptime value type")
     graph.package_name = package_name.text
     graph.package_version = package_version.text
     graph.default_target = default_target.text
 
-    let generated_sources = mat.field_value(value, "generated_sources")
+    let generated_sources = self.field_value(value, "generated_sources")
     if generated_sources.kind != ComptimeValueKind.CV_VEC and generated_sources.kind != ComptimeValueKind.CV_ARRAY:
-        return mat.error("Build.generated_sources is not a vector")
+        return self.error("Build.generated_sources is not a vector")
     for i in 0..generated_sources.extra_count:
-        graph = mat.materialize_generated_source(extras.get((generated_sources.extra_start + i) as i64), graph)
+        graph = self.materialize_generated_source(self.extras.get((generated_sources.extra_start + i) as i64), graph)
         if graph.error_msg.len() > 0:
             return graph
 
-    let targets = mat.field_value(value, "targets")
+    let targets = self.field_value(value, "targets")
     if targets.kind != ComptimeValueKind.CV_VEC and targets.kind != ComptimeValueKind.CV_ARRAY:
-        return mat.error("Build.targets is not a vector")
+        return self.error("Build.targets is not a vector")
     for i in 0..targets.extra_count:
-        graph = mat.materialize_target(extras.get((targets.extra_start + i) as i64), graph)
+        graph = self.materialize_target(self.extras.get((targets.extra_start + i) as i64), graph)
         if graph.error_msg.len() > 0:
             return graph
     graph.ok = true
     graph.raw_text = build_graph_emit(graph)
     graph
+
+// Returns the materialized graph alongside the Sema handed in: the
+// materializer stores the Sema (refs cannot be struct fields), so the
+// caller gets it back instead of reusing a moved value (§3.8).
+pub fn materialize_build_graph_from_comptime(sema: Sema, value: ComptimeValue, extras: Vec[ComptimeValue]) -> BuildGraphMaterializeResult:
+    let mat = build_graph_materializer(sema, extras)
+    let graph = mat.materialize_build(value)
+    BuildGraphMaterializeResult { graph, sema: mat.sema }

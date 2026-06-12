@@ -259,7 +259,7 @@ fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_STRING_CHUNK: return "string chunk"
     "invalid"
 
-fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema: Sema) -> str:
+fn comptime_value_format(value: ComptimeValue, extras: &Vec[ComptimeValue], sema: &Sema) -> str:
     if value.kind == ComptimeValueKind.CV_VOID:
         return "void"
     if value.kind == ComptimeValueKind.CV_INT:
@@ -336,7 +336,7 @@ fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
 
-fn comptime_values_equal(lhs: ComptimeValue, rhs: ComptimeValue, extras: Vec[ComptimeValue]) -> i32:
+fn comptime_values_equal(lhs: ComptimeValue, rhs: ComptimeValue, extras: &Vec[ComptimeValue]) -> i32:
     if lhs.kind != rhs.kind:
         return 0
     if lhs.kind == ComptimeValueKind.CV_INVALID:

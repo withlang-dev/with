@@ -99,29 +99,47 @@ fn Diagnostic.render(self: Diagnostic, source: Source):
         let help: str = self.helps.get(i as i64)
         with_eprint(render_diag_help_line(help))
 
-pub type DiagnosticList {
+// Heap-indirected handle: copies share state by design (AstPool
+// pattern, truthfully Copy). The list is the shared diagnostics sink —
+// Parser, Sema, and Compilation all hold copies and must observe each
+// other's emissions.
+type DiagnosticListState {
     items: Vec[Diagnostic],
 }
 
+pub type DiagnosticList {
+    state: *mut DiagnosticListState,
+}
+impl Copy for DiagnosticList
+
+extern fn with_alloc(size: i64) -> *mut u8
+
 fn DiagnosticList.init -> DiagnosticList:
-    DiagnosticList {
-        items: Vec.new(),
-    }
+    // One Vec header; allocate generously like the other handle states.
+    let ptr = with_alloc(64) as *mut DiagnosticListState
+    unsafe *ptr = DiagnosticListState { items: Vec.new() }
+    DiagnosticList { state: ptr }
+
+fn DiagnosticList.item_at(self: DiagnosticList, idx: i64) -> Diagnostic:
+    let st = self.state
+    unsafe { st.items.get(idx) }
 
 // No-op: reserved for future manual memory management.
 fn DiagnosticList.deinit(self: DiagnosticList):
     return
 
 fn DiagnosticList.emit(mut self: DiagnosticList, diag: Diagnostic) -> Unit:
-    self.items.push(diag)
+    let st = self.state
+    unsafe { st.items.push(diag) }
 
 fn DiagnosticList.count(self: DiagnosticList) -> i32:
-    self.items.len() as i32
+    let st = self.state
+    unsafe { st.items.len() as i32 }
 
 fn DiagnosticList.count_by_severity(self: DiagnosticList, severity: i32) -> i32:
     var n = 0
-    for i in 0..self.items.len() as i32:
-        if self.items.get(i as i64).severity == severity:
+    for i in 0..self.count():
+        if self.item_at(i as i64).severity == severity:
             n = n + 1
     n
 
@@ -129,17 +147,17 @@ fn DiagnosticList.has_errors(self: DiagnosticList) -> bool:
     self.count_by_severity(DiagSeverity.Error) > 0
 
 fn DiagnosticList.render_all(self: DiagnosticList, source: Source):
-    for i in 0..self.items.len() as i32:
-        self.items.get(i as i64).render(source)
-        if i + 1 < self.items.len() as i32:
+    for i in 0..self.count():
+        self.item_at(i as i64).render(source)
+        if i + 1 < self.count():
             with_eprint("")
 
 fn DiagnosticList.render_warnings(self: DiagnosticList, source: Source):
     var printed = 0
-    for i in 0..self.items.len() as i32:
-        if self.items.get(i as i64).severity != DiagSeverity.Warning:
+    for i in 0..self.count():
+        if self.item_at(i as i64).severity != DiagSeverity.Warning:
             continue
         if printed != 0:
             with_eprint("")
-        self.items.get(i as i64).render(source)
+        self.item_at(i as i64).render(source)
         printed = printed + 1

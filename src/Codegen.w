@@ -1802,7 +1802,7 @@ fn Codegen.get_llvm_field_index(self: Codegen, llvm_ty: i64, source_fi: i32) -> 
         return source_fi
     self.struct_llvm_field_indices.get(map_idx)
 
-fn Codegen.vec_contains_i32(self: Codegen, values: Vec[i32], needle: i32) -> bool:
+fn Codegen.vec_contains_i32(self: Codegen, values: &Vec[i32], needle: i32) -> bool:
     for i in 0..values.len() as i32:
         if values.get(i as i64) == needle:
             return true
@@ -2024,6 +2024,14 @@ fn Codegen.create_entry_alloca(self: Codegen, ty: i64) -> i64:
 
 fn vec_data_i64(v: &Vec[i64]) -> i64:
     wl_vec_data_ptr(v as i64)
+
+// Element-wise copy so a caller can hand an owned vector to a consuming
+// sink (e.g. record_c_abi_transform) more than once under spec §3.8.
+fn vec_copy_i64(src: &Vec[i64]) -> Vec[i64]:
+    let out: Vec[i64] = Vec.new()
+    for i in 0..src.len() as i32:
+        out.push(src.get(i as i64))
+    out
 
 fn codegen_owned_text(text: str) -> str:
     if text.len() == 0:
@@ -3656,9 +3664,9 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         wl_add_fn_attr(self.context, function, "noinline")
 
     if has_sret != 0 or byval_mask != 0 or direct_mask != 0 or direct_ret_ty != 0:
-        self.record_c_abi_transform(name_sym, has_sret, sret_ty, byval_mask, byval_types, direct_mask, direct_types, direct_ret_ty)
+        self.record_c_abi_transform(name_sym, has_sret, sret_ty, byval_mask, vec_copy_i64(&byval_types), direct_mask, vec_copy_i64(&direct_types), direct_ret_ty)
         if alias_sym != 0:
-            self.record_c_abi_transform(alias_sym, has_sret, sret_ty, byval_mask, byval_types, direct_mask, direct_types, direct_ret_ty)
+            self.record_c_abi_transform(alias_sym, has_sret, sret_ty, byval_mask, vec_copy_i64(&byval_types), direct_mask, vec_copy_i64(&direct_types), direct_ret_ty)
         if method_key_sym != 0:
             self.record_c_abi_transform(method_key_sym, has_sret, sret_ty, byval_mask, byval_types, direct_mask, direct_types, direct_ret_ty)
 
@@ -3735,7 +3743,7 @@ fn Codegen.declare_function_from_sig(self: Codegen, fn_sym: i32, sig_idx: i32, f
     if has_sret != 0:
         wl_add_sret_attr(self.context, function, 0, sret_ty)
     if has_sret != 0 or byval_mask != 0:
-        self.record_c_abi_transform(cg_sym, has_sret, sret_ty, byval_mask, byval_types, 0, direct_types, 0)
+        self.record_c_abi_transform(cg_sym, has_sret, sret_ty, byval_mask, vec_copy_i64(&byval_types), 0, vec_copy_i64(&direct_types), 0)
         if cg_sym != fn_sym:
             self.record_c_abi_transform(fn_sym, has_sret, sret_ty, byval_mask, byval_types, 0, direct_types, 0)
     if force_internal != 0:
@@ -4074,7 +4082,7 @@ fn Codegen.record_c_abi_transform(self: Codegen, fn_sym: i32, has_sret: i32, sre
     if direct_ret_ty != 0:
         self.extern_fn_direct_ret_type.insert(fn_sym, direct_ret_ty)
 
-fn Codegen.apply_c_abi_byval_attrs(self: Codegen, function: i64, byval_mask: i64, byval_types: Vec[i64], param_count: i32, param_offset: i32):
+fn Codegen.apply_c_abi_byval_attrs(self: Codegen, function: i64, byval_mask: i64, byval_types: &Vec[i64], param_count: i32, param_offset: i32):
     if function == 0 or byval_mask == 0:
         return
     if not codegen_c_abi_needs_byval_attr():
@@ -4089,7 +4097,7 @@ fn Codegen.apply_c_abi_byval_attrs(self: Codegen, function: i64, byval_mask: i64
             continue
         wl_add_param_byval_attr(self.context, function, pi + param_offset, byval_ty)
 
-fn Codegen.apply_c_abi_call_attrs(self: Codegen, call_val: i64, has_sret: i32, sret_ty: i64, byval_mask: i64, byval_types: Vec[i64], original_arg_count: i32, arg_prefix_count: i32):
+fn Codegen.apply_c_abi_call_attrs(self: Codegen, call_val: i64, has_sret: i32, sret_ty: i64, byval_mask: i64, byval_types: &Vec[i64], original_arg_count: i32, arg_prefix_count: i32):
     if call_val == 0:
         return
     var byval_offset = arg_prefix_count
@@ -4216,7 +4224,7 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
 
     // Record ABI transformations for call sites
     if has_sret != 0 or byval_mask != 0 or direct_mask != 0 or direct_ret_ty != 0:
-        self.record_c_abi_transform(name_sym, has_sret, sret_ty, byval_mask, byval_types, direct_mask, direct_types, direct_ret_ty)
+        self.record_c_abi_transform(name_sym, has_sret, sret_ty, byval_mask, vec_copy_i64(&byval_types), direct_mask, vec_copy_i64(&direct_types), direct_ret_ty)
 
     self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
 

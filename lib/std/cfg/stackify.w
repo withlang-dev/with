@@ -472,7 +472,7 @@ fn stackify_pred_count(preds: &StackifyPreds, block: i32) -> i32:
 fn stackify_pred_get(preds: &StackifyPreds, block: i32, idx: i32) -> i32:
     preds.data.get((preds.starts.get(block as i64) + idx) as i64)
 
-fn stackify_domtree_merge(idom: Vec[i32], rpo_pos: Vec[i32], a: i32, b: i32) -> i32:
+fn stackify_domtree_merge(idom: &Vec[i32], rpo_pos: &Vec[i32], a: i32, b: i32) -> i32:
     var n1 = a
     var n2 = b
     while n1 != n2:
@@ -487,7 +487,7 @@ fn stackify_domtree_merge(idom: Vec[i32], rpo_pos: Vec[i32], a: i32, b: i32) -> 
                 n2 = idom.get(n2 as i64)
     n1
 
-fn stackify_compute_idom(graph: &StackifyGraph, post_ord: Vec[i32], rpo_pos: Vec[i32], preds: &StackifyPreds) -> Vec[i32]:
+fn stackify_compute_idom(graph: &StackifyGraph, post_ord: &Vec[i32], rpo_pos: &Vec[i32], preds: &StackifyPreds) -> Vec[i32]:
     let n = graph.blocks.len() as i32
     var idom = stackify_bool_vec(n, stackify_invalid())
     idom.set_i32(graph.entry as i64, graph.entry)
@@ -523,7 +523,7 @@ fn stackify_compute_idom(graph: &StackifyGraph, post_ord: Vec[i32], rpo_pos: Vec
     idom.set_i32(graph.entry as i64, stackify_invalid())
     idom
 
-fn stackify_dominates(idom: Vec[i32], a: i32, b: i32) -> bool:
+fn stackify_dominates(idom: &Vec[i32], a: i32, b: i32) -> bool:
     var cur = b
     while true:
         if a == cur:
@@ -652,7 +652,7 @@ fn StackifyContext.tree_add_child_range(mut self: StackifyContext, start: i32, c
         i = i + 1
     child_start
 
-fn StackifyContext.tree_add_child_vec(mut self: StackifyContext, children: Vec[i32]) -> i32:
+fn StackifyContext.tree_add_child_vec(mut self: StackifyContext, children: &Vec[i32]) -> i32:
     let child_start = self.tree.children.len() as i32
     var i: i64 = 0
     while i < children.len():
