@@ -886,7 +886,7 @@ fn mir_clip_text(s: str, max_len: i32) -> str:
         return s.slice(0, max_len as i64)
     s.slice(0, (max_len - 3) as i64) ++ "..."
 
-fn dump_mir_body(body: MirBody, pool: InternPool, sema: Sema) -> str:
+fn dump_mir_body(body: &MirBody, pool: InternPool, sema: Sema) -> str:
     var out = ""
     let fn_name = if body.fn_sym != 0:
         f"sym{body.fn_sym}({pool.resolve(body.fn_sym)})"
@@ -952,7 +952,7 @@ fn dump_mir_body(body: MirBody, pool: InternPool, sema: Sema) -> str:
     out = out ++ rbrace() ++ "\n"
     out
 
-fn mir_stmt_text(body: MirBody, stmt_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: InternPool, sema: Sema) -> str:
     let kind = body.stmt_kind(stmt_id)
     let d0 = body.stmt_data0(stmt_id)
     let d1 = body.stmt_data1(stmt_id)
@@ -970,7 +970,7 @@ fn mir_stmt_text(body: MirBody, stmt_id: i32, pool: InternPool, sema: Sema) -> s
 
     f"stmt<{kind}>({d0}, {d1});"
 
-fn mir_term_text(body: MirBody, bb: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_term_text(body: &MirBody, bb: i32, pool: InternPool, sema: Sema) -> str:
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
     let d1 = body.term_data1(bb)
@@ -1030,7 +1030,7 @@ fn mir_term_text(body: MirBody, bb: i32, pool: InternPool, sema: Sema) -> str:
 
     f"term<{kind}>({d0}, {d1}, {d2}, {d3});"
 
-fn mir_place_text(body: MirBody, place_id: i32) -> str:
+fn mir_place_text(body: &MirBody, place_id: i32) -> str:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return "_?"
 
@@ -1059,7 +1059,7 @@ fn mir_place_text(body: MirBody, place_id: i32) -> str:
 
     out
 
-fn mir_rvalue_text(body: MirBody, rval_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: InternPool, sema: Sema) -> str:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return "<rvalue?>"
 
@@ -1108,7 +1108,7 @@ fn mir_rvalue_text(body: MirBody, rval_id: i32, pool: InternPool, sema: Sema) ->
 
     return f"rvalue<{k}>({d0}, {d1}, {d2})"
 
-fn mir_operand_text(body: MirBody, operand_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_operand_text(body: &MirBody, operand_id: i32, pool: InternPool, sema: Sema) -> str:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return "<op?>"
 
@@ -1146,7 +1146,7 @@ fn mir_exact_int_text(ast: AstPool, node: i32) -> str:
         return with_i64_to_str(ast.int_lit_value(node as NodeId))
     "<exact-int>"
 
-fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_const_text(body: &MirBody, const_id: i32, pool: InternPool, sema: Sema) -> str:
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
         return "const<?>"
 
@@ -1203,7 +1203,7 @@ fn mir_const_text(body: MirBody, const_id: i32, pool: InternPool, sema: Sema) ->
 
     f"const<{k}>({d0})"
 
-fn mir_agg_fields_text(body: MirBody, fields_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_agg_fields_text(body: &MirBody, fields_id: i32, pool: InternPool, sema: Sema) -> str:
     if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
         return ""
 
@@ -1225,7 +1225,7 @@ fn mir_agg_fields_text(body: MirBody, fields_id: i32, pool: InternPool, sema: Se
         out = out ++ "..."
     out
 
-fn mir_call_args_text(body: MirBody, args_id: i32, pool: InternPool, sema: Sema) -> str:
+fn mir_call_args_text(body: &MirBody, args_id: i32, pool: InternPool, sema: Sema) -> str:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         return ""
 
@@ -1320,7 +1320,7 @@ fn validate_mir_module(mir_mod: MirModule) -> str:
 
     ""
 
-fn validate_mir_body(body: MirBody) -> str:
+fn validate_mir_body(body: &MirBody) -> str:
     let local_count = body.local_type_ids.len() as i32
     if local_count <= 0:
         return "missing return local"
@@ -1848,7 +1848,7 @@ fn mir_validate_single_field_inner(mir_mod: MirModule, tid: i32) -> i32:
     let extra_start = mir_mod.mir_get_type_d1(resolved)
     mir_mod.mir_get_type_extra(extra_start + 1)
 
-fn mir_validate_place_type(mir_mod: MirModule, body: MirBody, place_id: i32) -> i32:
+fn mir_validate_place_type(mir_mod: MirModule, body: &MirBody, place_id: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
     if place_id < body.place_sema_types.len() as i32:
@@ -1910,7 +1910,7 @@ fn mir_validate_place_type(mir_mod: MirModule, body: MirBody, place_id: i32) -> 
 
     current_ty
 
-fn mir_validate_operand_type(mir_mod: MirModule, body: MirBody, operand_id: i32) -> i32:
+fn mir_validate_operand_type(mir_mod: MirModule, body: &MirBody, operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return 0
     let op_kind = body.operand_kinds.get(operand_id as i64)
@@ -1972,7 +1972,7 @@ fn mir_validate_cast_supported(mir_mod: MirModule, src_ty: i32, dst_ty: i32) -> 
         return false
     true
 
-fn validate_typed_mir_body(mir_mod: MirModule, body: MirBody) -> MirValidationError:
+fn validate_typed_mir_body(mir_mod: MirModule, body: &MirBody) -> MirValidationError:
     let stmt_count = body.stmt_count()
     for si in 0..stmt_count:
         let stmt_kind = body.stmt_kinds.get(si as i64)
