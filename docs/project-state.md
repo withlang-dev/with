@@ -11,7 +11,18 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 4 is in progress. #430 is implemented and verified. Expression
+Phase 4 is in progress. #478 is implemented locally and focused tests pass.
+The MIR tailrec contract verifier now carries a small Drop-local liveness
+state alongside the existing syntactic tail-position and active-defer checks.
+Recursive edges in a `@[tailrec]` SCC now reject when a Drop-implementing local
+is still live across the call, while explicit `drop(local)` and `let _ = local`
+end that local before the edge. Focused coverage includes a new negative
+`err_tailrec_drop_local_live.w`, a positive explicit-drop tailrec spec test,
+and the existing self, mutual, non-tail, and defer-cleanup tailrec regressions.
+Full `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-12 for #478.
+
+#430 is implemented and verified. Expression
 temporaries that own non-Copy values are now registered in deterministic
 statement frames and dropped at the end of the enclosing statement, with
 condition temporaries flushed before branch dispatch. Ownership handoff through

@@ -10041,10 +10041,107 @@ type TailrecViolation {
     message: str,
 }
 
+type TailrecDropState {
+    count: i32,
+    first_sym: i32,
+}
+impl Copy for TailrecDropState
+
 fn tailrec_no_violation -> TailrecViolation:
     TailrecViolation { node: 0, message: "" }
 
-fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &Vec[i32], in_tail: i32, active_cleanup: i32) -> TailrecViolation:
+fn tailrec_no_drop_state -> TailrecDropState:
+    TailrecDropState { count: 0, first_sym: 0 }
+
+fn tailrec_drop_state_add(state: TailrecDropState, sym: i32) -> TailrecDropState:
+    if sym == 0:
+        return state
+    if state.count == 0:
+        return TailrecDropState { count: 1, first_sym: sym }
+    TailrecDropState { count: state.count + 1, first_sym: state.first_sym }
+
+fn tailrec_drop_state_remove(state: TailrecDropState, sym: i32) -> TailrecDropState:
+    if state.count == 0 or sym == 0:
+        return state
+    if state.count == 1:
+        if state.first_sym == sym:
+            return tailrec_no_drop_state()
+        return state
+    if state.first_sym == sym:
+        return TailrecDropState { count: state.count - 1, first_sym: 0 }
+    state
+
+fn tailrec_drop_state_message(sema: &Sema, state: TailrecDropState) -> str:
+    if state.first_sym != 0:
+        return "recursive call is not in tail position (Drop local '" ++ sema.pool_resolve(state.first_sym) ++ "' is live across the call)"
+    "recursive call is not in tail position (a Drop local is live across the call)"
+
+fn tailrec_drop_binding_sym(sema: &Sema, node: i32) -> i32:
+    let kind = sema.ast.kind(node)
+    if kind != NodeKind.NK_LET_BINDING and kind != NodeKind.NK_LET_DECL:
+        return 0
+    let bind_sym = sema.ast.get_data0(node)
+    if bind_sym == 0 or sema.pool_resolve(bind_sym) == "_":
+        return 0
+    var bind_ty = 0
+    if sema.typed_binding_types.contains(node):
+        bind_ty = sema.typed_binding_types.get(node).unwrap()
+    if bind_ty == 0:
+        return 0
+    if sema.is_copy(bind_ty as TypeId) != 0:
+        return 0
+    let owner_sym = sema.method_owner_symbol_for_type(sema.resolve_alias(bind_ty as TypeId) as i32)
+    if owner_sym != 0 and sema.has_drop_method(owner_sym) != 0:
+        return bind_sym
+    0
+
+fn tailrec_consumed_ident_sym(sema: &Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = sema.ast.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        return sema.ast.get_data0(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
+        return tailrec_consumed_ident_sym(sema, sema.ast.get_data0(node))
+    0
+
+fn tailrec_call_consumes_active_drop(sema: &Sema, node: i32, callee_sym: i32, state: TailrecDropState) -> bool:
+    if state.count != 1 or state.first_sym == 0:
+        return false
+    let sig_idx = sema.get_sig(callee_sym)
+    if sig_idx < 0:
+        return false
+    let has_resolved = sema.has_resolved_call_args(node)
+    let arg_count = if has_resolved != 0: sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
+    let extra_start = sema.ast.get_data1(node)
+    for ai in 0..arg_count:
+        let arg = if has_resolved != 0: sema.get_resolved_call_arg(node, ai) else: sema.ast.get_extra(extra_start + ai)
+        if tailrec_consumed_ident_sym(sema, arg) != state.first_sym:
+            continue
+        let param_ty = sema.sig_param_type(sig_idx, ai)
+        if param_ty != 0 and sema.is_copy(param_ty as TypeId) == 0:
+            return true
+    false
+
+fn tailrec_stmt_ends_drop_sym(sema: &Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = sema.ast.kind(node)
+    if kind == NodeKind.NK_CALL:
+        let callee = sema.ast.get_data0(node)
+        if sema.ast.kind(callee) == NodeKind.NK_IDENT:
+            let callee_sym = sema.ast.get_data0(callee)
+            if sema.fn_symbol_is_std_builtins_drop(callee_sym) != 0 and sema.ast.get_data2(node) == 1:
+                let has_resolved = sema.has_resolved_call_args(node)
+                let arg = if has_resolved != 0: sema.get_resolved_call_arg(node, 0) else: sema.ast.get_extra(sema.ast.get_data1(node))
+                return tailrec_consumed_ident_sym(sema, arg)
+    if kind == NodeKind.NK_LET_BINDING:
+        let bind_sym = sema.ast.get_data0(node)
+        if bind_sym != 0 and sema.pool_resolve(bind_sym) == "_":
+            return tailrec_consumed_ident_sym(sema, sema.ast.get_data1(node))
+    0
+
+fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &Vec[i32], in_tail: i32, active_cleanup: i32, active_drop: TailrecDropState) -> TailrecViolation:
     if node == 0:
         return tailrec_no_violation()
     let kind = sema.ast.kind(node)
@@ -10057,13 +10154,15 @@ fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &Vec[i32], in_tai
                     return TailrecViolation { node, message: "recursive call is not in tail position (function is @[tailrec])" }
                 else if active_cleanup != 0:
                     return TailrecViolation { node, message: "recursive call cannot be lowered stack-constantly for @[tailrec]: active defer/errdefer cleanup remains" }
-        let callee_violation = tailrec_verify_recursive_edges(sema, callee, scc, 0, active_cleanup)
+                else if active_drop.count != 0 and not tailrec_call_consumes_active_drop(sema, node, callee_sym, active_drop):
+                    return TailrecViolation { node, message: tailrec_drop_state_message(sema, active_drop) }
+        let callee_violation = tailrec_verify_recursive_edges(sema, callee, scc, 0, active_cleanup, active_drop)
         if callee_violation.node != 0:
             return callee_violation
         let extra_start = sema.ast.get_data1(node)
         let arg_count = sema.ast.get_data2(node)
         for ai in 0..arg_count:
-            let arg_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_extra(extra_start + ai), scc, 0, active_cleanup)
+            let arg_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_extra(extra_start + ai), scc, 0, active_cleanup, active_drop)
             if arg_violation.node != 0:
                 return arg_violation
         return tailrec_no_violation()
@@ -10072,64 +10171,67 @@ fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &Vec[i32], in_tai
         let stmt_count = sema.ast.get_data1(node)
         let tail = sema.ast.get_data2(node)
         var cleanup_depth = active_cleanup
+        var drop_state = active_drop
         for si in 0..stmt_count:
             let stmt = sema.ast.get_extra(extra_start + si)
             let stmt_kind = sema.ast.kind(stmt)
             if stmt_kind == NodeKind.NK_DEFER or stmt_kind == NodeKind.NK_ERRDEFER:
-                let defer_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(stmt), scc, 0, cleanup_depth)
+                let defer_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(stmt), scc, 0, cleanup_depth, drop_state)
                 if defer_violation.node != 0:
                     return defer_violation
                 cleanup_depth = cleanup_depth + 1
             else:
-                let stmt_violation = tailrec_verify_recursive_edges(sema, stmt, scc, 0, cleanup_depth)
+                let stmt_violation = tailrec_verify_recursive_edges(sema, stmt, scc, 0, cleanup_depth, drop_state)
                 if stmt_violation.node != 0:
                     return stmt_violation
-        return tailrec_verify_recursive_edges(sema, tail, scc, in_tail, cleanup_depth)
+                drop_state = tailrec_drop_state_remove(drop_state, tailrec_stmt_ends_drop_sym(sema, stmt))
+                drop_state = tailrec_drop_state_add(drop_state, tailrec_drop_binding_sym(sema, stmt))
+        return tailrec_verify_recursive_edges(sema, tail, scc, in_tail, cleanup_depth, drop_state)
     if kind == NodeKind.NK_IF_EXPR:
-        let cond_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup)
+        let cond_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup, active_drop)
         if cond_violation.node != 0:
             return cond_violation
-        let then_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, in_tail, active_cleanup)
+        let then_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, in_tail, active_cleanup, active_drop)
         if then_violation.node != 0:
             return then_violation
-        return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, in_tail, active_cleanup)
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, in_tail, active_cleanup, active_drop)
     if kind == NodeKind.NK_MATCH:
-        let subject_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup)
+        let subject_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup, active_drop)
         if subject_violation.node != 0:
             return subject_violation
         let arm_start = sema.ast.get_data1(node)
         let arm_count = sema.ast.get_data2(node)
         for ai in 0..arm_count:
             let arm = sema.ast.get_extra(arm_start + ai)
-            let guard_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data2(arm), scc, 0, active_cleanup)
+            let guard_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data2(arm), scc, 0, active_cleanup, active_drop)
             if guard_violation.node != 0:
                 return guard_violation
-            let body_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data1(arm), scc, in_tail, active_cleanup)
+            let body_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data1(arm), scc, in_tail, active_cleanup, active_drop)
             if body_violation.node != 0:
                 return body_violation
         return tailrec_no_violation()
     if kind == NodeKind.NK_RETURN:
-        return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 1, active_cleanup)
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 1, active_cleanup, active_drop)
     if kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER:
-        return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup)
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup, active_drop)
     if kind == NodeKind.NK_DO_WHILE:
-        let body_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup)
+        let body_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup, active_drop)
         if body_violation.node != 0:
             return body_violation
-        return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup, active_drop)
     if kind == NodeKind.NK_FOR or kind == NodeKind.NK_WHILE or kind == NodeKind.NK_LOOP:
-        return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, 0, active_cleanup)
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, 0, active_cleanup, active_drop)
     if kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_LET_BINDING:
-        return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup, active_drop)
     if kind == NodeKind.NK_BINARY:
-        let lhs_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
+        let lhs_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup, active_drop)
         if lhs_violation.node != 0:
             return lhs_violation
-        return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, 0, active_cleanup)
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, 0, active_cleanup, active_drop)
     if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_ASSIGN:
-        return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup, active_drop)
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
-        return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, in_tail, active_cleanup)
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, in_tail, active_cleanup, active_drop)
     tailrec_no_violation()
 
 fn MirModule.body_reaches(self: &MirModule, start_idx: i32, target_idx: i32) -> bool:
@@ -10223,7 +10325,7 @@ fn MirModule.verify_tailrec_contracts(self: &MirModule, sema: &Sema, ast_pool: A
             continue
 
         if scc.len() == 1:
-            let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(decl_node), &scc_syms, 1, 0)
+            let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(decl_node), &scc_syms, 1, 0, tailrec_no_drop_state())
             if recursive_violation.node != 0:
                 violations.push(recursive_violation)
             continue
@@ -10243,7 +10345,7 @@ fn MirModule.verify_tailrec_contracts(self: &MirModule, sema: &Sema, ast_pool: A
             let member_sym = scc_syms.get(si as i64)
             let member_decl = tailrec_find_decl(ast_pool, member_sym)
             if member_decl != 0:
-                let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(member_decl), &scc_syms, 1, 0)
+                let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(member_decl), &scc_syms, 1, 0, tailrec_no_drop_state())
                 if recursive_violation.node != 0:
                     violations.push(recursive_violation)
                     recursive_violation_found = 1
