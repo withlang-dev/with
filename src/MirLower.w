@@ -2554,6 +2554,34 @@ fn MirBuilder.collect_left_string_concat_parts(self: MirBuilder, node: i32) -> V
         i = i - 1
     out
 
+fn mir_str_payload_is_raw_marked(text: str) -> bool:
+    text.len() >= 5 and text.byte_at(0) == 1 and text.byte_at(1) == 114 and text.byte_at(2) == 97 and text.byte_at(3) == 119 and text.byte_at(4) == 1
+
+// Fold a ++ chain whose parts are all plain string literals into a single
+// literal constant. Unmarked payloads are raw source text whose escapes
+// codegen decodes, and escape sequences never span literal boundaries, so
+// concatenating raw texts is exact. Chains mixing raw-marked (pre-decoded)
+// and unmarked payloads are left to the runtime path. Returns -1 when the
+// chain is not foldable.
+fn MirBuilder.try_fold_literal_str_concat(self: MirBuilder, node: i32, parts: Vec[i32]) -> i32:
+    for i in 0..parts.len() as i32:
+        if self.ast.kind(parts.get(i as i64)) != NodeKind.NK_STRING_LIT:
+            return -1
+    var marked_count = 0
+    for i in 0..parts.len() as i32:
+        if mir_str_payload_is_raw_marked(self.pool.resolve(self.ast.get_data0(parts.get(i as i64)))):
+            marked_count = marked_count + 1
+    if marked_count != 0 and marked_count != parts.len() as i32:
+        return -1
+    var folded = ""
+    for i in 0..parts.len() as i32:
+        let payload = self.pool.resolve(self.ast.get_data0(parts.get(i as i64)))
+        if marked_count != 0 and i > 0:
+            folded = folded ++ payload.slice(5, payload.len())
+        else:
+            folded = folded ++ payload
+    self.lower_str_lit_as(self.pool.intern(folded), self.expr_type(node))
+
 fn MirBuilder.lower_str_concat_chain(self: MirBuilder, node: i32, parts: Vec[i32]) -> i32:
     let saved_expected = self.expected_type
     self.expected_type = self.sema.ty_str as i32
@@ -2655,6 +2683,9 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
                         return self.lower_method_bin_op(rhs_expr, lhs_expr, rhs_method_sym, node)
     if op == BinaryOp.OP_CONCAT and self.is_string_concat_node(node):
         let parts = self.collect_left_string_concat_parts(node)
+        let folded = self.try_fold_literal_str_concat(node, parts)
+        if folded >= 0:
+            return folded
         if parts.len() as i32 > 2:
             return self.lower_str_concat_chain(node, parts)
     let saved_expected = self.expected_type
