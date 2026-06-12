@@ -3791,6 +3791,14 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             self.emit_error("'move' must be applied to a binding identifier", node)
             return self.check_expr(inner)
         let ty = self.check_expr(inner)
+        // An explicit `move` inside a conditional has the same drop-state
+        // problem as an implicit conditional consume: MirLower cancels the
+        // scheduled drop path-insensitively, so the not-taken path would
+        // leak. Same rule as mark_moved_if_consumed's NK_IDENT arm.
+        if self.move_control_flow_depth != 0:
+            let move_owner = self.method_owner_symbol_for_type(self.resolve_alias(ty as TypeId) as i32)
+            if move_owner != 0 and self.has_drop_method(move_owner) != 0:
+                self.emit_error("conditional move of Drop value requires drop-state tracking", node)
         // Explicitly mark the inner binding as moved, even for Copy types.
         let sym = self.ast.get_data0(inner)
         if self.scope_has(sym) != 0:

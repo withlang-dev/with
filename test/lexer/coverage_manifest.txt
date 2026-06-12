@@ -1,6 +1,0 @@
-# Wave 2 coverage manifest
-# Format: <stage0_script>|<status>|<evidence_csv>|<note>
-
-run_phase0_harness_tests.sh|covered|test/wave2/lexer_keywords_test.w,test/wave2/lexer_operators_test.w|core lexer token classes are covered.
-run_phase0_snapshot_tests.sh|covered|bootstrap/test/cases/hex_bin_oct.w,bootstrap/test/cases/string_interp.w|numeric/string lexing snapshot-style paths are covered.
-run_phase0_golden_dumps_tests.sh|covered|test/wave2/lexer_literals_test.w,test/wave2/lexer_structure_test.w|literal/structure token dump stability is covered.
