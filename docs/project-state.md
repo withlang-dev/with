@@ -94,6 +94,22 @@ on 2026-06-11 for #422. Follow-up #565 tracks the separate bug where pipeline
 syntax for primitive intrinsic methods works at runtime but is rejected inside
 `comptime`.
 
+#446 is implemented and verified. `Int` and `UInt` are registered as prelude
+primitive aliases for the canonical `i64` and `u64` TypeIds in both primitive
+name registration and string-to-primitive fallback resolution; diagnostic type
+names remain canonical (`i64`/`u64`). Focused behavior coverage exercises the
+aliases in annotations, casts, generic type arguments (`Vec[Int]` and
+`HashMap[str, UInt]`), and integer method dispatch. A negative compile-error
+test proves `Int` uses the i64 literal range rather than u64 or pointer-width
+rules. The alias behavior test also exposed and fixed a native LLVM verifier
+bug for 64-bit `popcount`/`clz`/`ctz` results: count intrinsics now zext
+sub-32-bit results, keep i32 as-is, and truncate i64 results to their specified
+i32 return type. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-11 for
+#446. The first full-suite run hit a transient Conan Center/raylib package
+lookup failure; the project self-host target passed on rerun before the final
+clean full-suite pass.
+
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
 C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib

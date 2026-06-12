@@ -2250,11 +2250,13 @@ fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
     if with_str_eq(name, "i16") != 0: return self.ty_i16 as i32
     if with_str_eq(name, "i32") != 0: return self.ty_i32 as i32
     if with_str_eq(name, "i64") != 0: return self.ty_i64 as i32
+    if with_str_eq(name, "Int") != 0: return self.ty_i64 as i32
     if with_str_eq(name, "i128") != 0: return self.ty_i128 as i32
     if with_str_eq(name, "u8") != 0: return self.ty_u8 as i32
     if with_str_eq(name, "u16") != 0: return self.ty_u16 as i32
     if with_str_eq(name, "u32") != 0: return self.ty_u32 as i32
     if with_str_eq(name, "u64") != 0: return self.ty_u64 as i32
+    if with_str_eq(name, "UInt") != 0: return self.ty_u64 as i32
     if with_str_eq(name, "u128") != 0: return self.ty_u128 as i32
     if with_str_eq(name, "f32") != 0: return self.ty_f32 as i32
     if with_str_eq(name, "f64") != 0: return self.ty_f64 as i32

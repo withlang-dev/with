@@ -7340,6 +7340,7 @@ fn Codegen.mir_emit_ext_numeric_intrinsic_call(self: Codegen, body: MirBody, int
         let pc_val = self.mir_intrinsic_arg(body, args_id, 0)
         let pc_ty = wl_type_of(pc_val)
         let pc_width = wl_get_int_type_width(pc_ty)
+        let pc_i32_ty = wl_i32_type(self.context)
         let pc_fn_name = if pc_width == 8: "llvm.ctpop.i8" else if pc_width == 16: "llvm.ctpop.i16" else if pc_width == 32: "llvm.ctpop.i32" else: "llvm.ctpop.i64"
         let pc_sym = self.intern.intern(pc_fn_name)
         let pc_fv = self.fn_values.get(pc_sym)
@@ -7348,7 +7349,7 @@ fn Codegen.mir_emit_ext_numeric_intrinsic_call(self: Codegen, body: MirBody, int
             let pc_args: Vec[i64] = Vec.new()
             pc_args.push(pc_val)
             let pc_raw = wl_build_call(self.builder, pc_ft.unwrap() as i64, pc_fv.unwrap() as i64, vec_data_i64(&pc_args), 1)
-            result = if pc_width == 32: pc_raw else: wl_build_zext(self.builder, pc_raw, wl_i32_type(self.context))
+            result = if pc_width < 32: wl_build_zext(self.builder, pc_raw, pc_i32_ty) else if pc_width > 32: wl_build_trunc(self.builder, pc_raw, pc_i32_ty) else: pc_raw
         else:
             let pc_pts: Vec[i64] = Vec.new()
             pc_pts.push(pc_ty)
@@ -7359,7 +7360,7 @@ fn Codegen.mir_emit_ext_numeric_intrinsic_call(self: Codegen, body: MirBody, int
             let pc_args: Vec[i64] = Vec.new()
             pc_args.push(pc_val)
             let pc_raw = wl_build_call(self.builder, pc_fnt, pc_func, vec_data_i64(&pc_args), 1)
-            result = if pc_width == 32: pc_raw else: wl_build_zext(self.builder, pc_raw, wl_i32_type(self.context))
+            result = if pc_width < 32: wl_build_zext(self.builder, pc_raw, pc_i32_ty) else if pc_width > 32: wl_build_trunc(self.builder, pc_raw, pc_i32_ty) else: pc_raw
 
     else if intrinsic == MirIntrinsic.CLZ or intrinsic == MirIntrinsic.CTZ:
         let ct_val = self.mir_intrinsic_arg(body, args_id, 0)
@@ -7370,6 +7371,7 @@ fn Codegen.mir_emit_ext_numeric_intrinsic_call(self: Codegen, body: MirBody, int
         let ct_sym = self.intern.intern(ct_fn_name)
         let ct_fv = self.fn_values.get(ct_sym)
         let ct_ft = self.fn_fn_types.get(ct_sym)
+        let ct_i32_ty = wl_i32_type(self.context)
         let ct_i1_ty = wl_i1_type(self.context)
         let ct_false = wl_const_int(ct_i1_ty, 0, 0)
         if ct_fv.is_some() and ct_ft.is_some():
@@ -7377,7 +7379,7 @@ fn Codegen.mir_emit_ext_numeric_intrinsic_call(self: Codegen, body: MirBody, int
             ct_args.push(ct_val)
             ct_args.push(ct_false)
             let ct_raw = wl_build_call(self.builder, ct_ft.unwrap() as i64, ct_fv.unwrap() as i64, vec_data_i64(&ct_args), 2)
-            result = if ct_width == 32: ct_raw else: wl_build_zext(self.builder, ct_raw, wl_i32_type(self.context))
+            result = if ct_width < 32: wl_build_zext(self.builder, ct_raw, ct_i32_ty) else if ct_width > 32: wl_build_trunc(self.builder, ct_raw, ct_i32_ty) else: ct_raw
         else:
             let ct_pts: Vec[i64] = Vec.new()
             ct_pts.push(ct_ty)
@@ -7390,7 +7392,7 @@ fn Codegen.mir_emit_ext_numeric_intrinsic_call(self: Codegen, body: MirBody, int
             ct_args.push(ct_val)
             ct_args.push(ct_false)
             let ct_raw = wl_build_call(self.builder, ct_fnt, ct_func, vec_data_i64(&ct_args), 2)
-            result = if ct_width == 32: ct_raw else: wl_build_zext(self.builder, ct_raw, wl_i32_type(self.context))
+            result = if ct_width < 32: wl_build_zext(self.builder, ct_raw, ct_i32_ty) else if ct_width > 32: wl_build_trunc(self.builder, ct_raw, ct_i32_ty) else: ct_raw
 
     else if intrinsic == MirIntrinsic.BITREVERSE:
         let br_val = self.mir_intrinsic_arg(body, args_id, 0)
