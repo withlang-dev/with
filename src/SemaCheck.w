@@ -12041,6 +12041,39 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             let mc_ret = self.sig_return_type(sig_idx)
             // For TypeKind.TY_GENERIC_INST receivers, check arg types and substitute return type
             let mc_resolved_tk = self.get_type_kind(recv_type)
+            if mc_resolved_tk != TypeKind.TY_GENERIC_INST:
+                // #567: plain receivers previously had no argument type
+                // checking at all — wrong-typed args (including &T where
+                // plain T is declared) sailed through to codegen, which
+                // either rejected them without a source location or
+                // miscompiled. Mirror check_call's known-function loop.
+                let mc_plain_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
+                let mc_plain_pc = self.sig_get_param_count(sig_idx)
+                let mc_plain_poff = if is_static_receiver != 0: 0 else: 1
+                for mc_pai in 0..mc_resolved_arg_count:
+                    let mc_plain_pi = mc_pai + mc_plain_poff
+                    if mc_plain_pi >= mc_plain_pc:
+                        break
+                    let mc_exp_ty = self.sig_param_type(sig_idx, mc_plain_pi)
+                    let mc_act_ty = arg_types.get(mc_pai as i64)
+                    if mc_exp_ty != 0 and mc_act_ty != 0:
+                        if self.type_is_dyn_object(self.resolve_alias(mc_exp_ty)) == 0:
+                            let mc_perr_arg = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, mc_pai) else: self.ast.get_extra(extra_start + mc_pai)
+                            var mc_compat = self.call_arg_type_compatible(mc_exp_ty, mc_act_ty)
+                            if mc_compat == 0:
+                                // Deliberate slice-1 carve-out: method args
+                                // accept the base type where a distinct type
+                                // is declared. The compiler's own sources pass
+                                // raw i32 for NodeId-style ids at ~9.6k method
+                                // sites (never checked before #567); tightening
+                                // that is its own migration.
+                                let mc_exp_unwrapped = self.unwrap_builtin_arg_distinct(mc_exp_ty)
+                                if mc_exp_unwrapped != mc_exp_ty:
+                                    mc_compat = self.call_arg_type_compatible(mc_exp_unwrapped, mc_act_ty)
+                            if mc_compat == 0:
+                                self.emit_argument_type_mismatch(mc_plain_name, method_fn_sym, mc_pai, mc_plain_pi, mc_exp_ty, mc_act_ty, if mc_perr_arg > 0: mc_perr_arg else: node)
+                            else:
+                                self.note_auto_ref_call_arg(mc_exp_ty, mc_act_ty, mc_perr_arg, node)
             if mc_resolved_tk == TypeKind.TY_GENERIC_INST:
                 // Check argument types against substituted parameter types
                 let mc_method_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
