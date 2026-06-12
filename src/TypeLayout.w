@@ -339,7 +339,9 @@ fn Sema.type_layout_size_of(self: Sema, tid: i32) -> i64:
         return 0
     if tk == TypeKind.TY_STR or tk == TypeKind.TY_SLICE:
         return 16
-    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
+    if tk == TypeKind.TY_FN:
+        return 16
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
         return 8
     if tk == TypeKind.TY_ARRAY:
         return self.type_layout_size_of(self.get_type_d0(resolved)) * self.get_type_d1(resolved) as i64

@@ -13066,6 +13066,13 @@ fn Codegen.gen_transmute(self: Codegen, node: i32, body: MirBody, args_id: i32) 
         return wl_get_undef(target_ty)
     let arg_op = body.call_arg_operands.get(mir_start as i64)
     let arg_val = self.mir_eval_operand(body, arg_op, 0)
+    let dl = wl_get_module_data_layout(self.llmod)
+    let source_size = wl_abi_size_of(dl, wl_type_of(arg_val))
+    let target_size = wl_abi_size_of(dl, target_ty)
+    if source_size != target_size:
+        with_eprint(f"error: internal compiler error: unchecked transmute size mismatch ({source_size} byte(s) to {target_size} byte(s))")
+        self.had_error = 1
+        return wl_get_undef(target_ty)
     // Use alloca + store + load to reinterpret the bits
     let src_alloca = self.create_entry_alloca(wl_type_of(arg_val))
     wl_build_store(self.builder, arg_val, src_alloca)

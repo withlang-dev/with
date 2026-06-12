@@ -8215,15 +8215,21 @@ fn Sema.is_sizeof_or_alignof(self: Sema, callee: i32) -> i32:
     let kind = self.ast.kind(callee)
     if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
         return 0
-    let gi_base = self.ast.get_data0(callee)
-    if self.ast.kind(gi_base) != NodeKind.NK_IDENT:
-        return 0
-    let gi_name = self.pool_resolve(self.ast.get_data0(gi_base))
+    let gi_name = self.generic_builtin_callee_name(callee)
     if gi_name == "sizeof" or gi_name == "size_of":
         return 1
     if gi_name == "alignof" or gi_name == "align_of":
         return 1
     0
+
+fn Sema.generic_builtin_callee_name(self: Sema, callee: i32) -> str:
+    let kind = self.ast.kind(callee)
+    let gi_base = self.ast.get_data0(callee)
+    if kind == NodeKind.NK_TYPE_GENERIC:
+        return self.pool_resolve(gi_base)
+    if kind == NodeKind.NK_INDEX and gi_base > 0 and gi_base < self.ast.node_count() and self.ast.kind(gi_base) == NodeKind.NK_IDENT:
+        return self.pool_resolve(self.ast.get_data0(gi_base))
+    ""
 
 fn Sema.sizeof_alignof_type_arg_node(self: Sema, callee: i32) -> i32:
     let kind = self.ast.kind(callee)
@@ -8238,10 +8244,7 @@ fn Sema.sizeof_alignof_type_arg_node(self: Sema, callee: i32) -> i32:
     0
 
 fn Sema.sizeof_alignof_name(self: Sema, callee: i32) -> str:
-    let gi_base = self.ast.get_data0(callee)
-    if self.ast.kind(gi_base) != NodeKind.NK_IDENT:
-        return "sizeof"
-    let name = self.pool_resolve(self.ast.get_data0(gi_base))
+    let name = self.generic_builtin_callee_name(callee)
     if name == "alignof" or name == "align_of":
         return "alignof"
     "sizeof"
@@ -8250,10 +8253,7 @@ fn Sema.is_chan_call(self: Sema, callee: i32) -> i32:
     let kind = self.ast.kind(callee)
     if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
         return 0
-    let gi_base = self.ast.get_data0(callee)
-    if self.ast.kind(gi_base) != NodeKind.NK_IDENT:
-        return 0
-    let gi_name = self.pool_resolve(self.ast.get_data0(gi_base))
+    let gi_name = self.generic_builtin_callee_name(callee)
     if gi_name == "chan":
         return 1
     0
@@ -8304,10 +8304,7 @@ fn Sema.is_nameof_call(self: Sema, callee: i32) -> i32:
     let kind = self.ast.kind(callee)
     if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
         return 0
-    let gi_base = self.ast.get_data0(callee)
-    if self.ast.kind(gi_base) != NodeKind.NK_IDENT:
-        return 0
-    let gi_name = self.pool_resolve(self.ast.get_data0(gi_base))
+    let gi_name = self.generic_builtin_callee_name(callee)
     if gi_name == "nameof" or gi_name == "type_name":
         return 1
     0
@@ -8316,24 +8313,60 @@ fn Sema.is_transmute_call(self: Sema, callee: i32) -> i32:
     let kind = self.ast.kind(callee)
     if kind != NodeKind.NK_TYPE_GENERIC and kind != NodeKind.NK_INDEX:
         return 0
-    let gi_base = self.ast.get_data0(callee)
-    if self.ast.kind(gi_base) != NodeKind.NK_IDENT:
-        return 0
-    let gi_name = self.pool_resolve(self.ast.get_data0(gi_base))
+    let gi_name = self.generic_builtin_callee_name(callee)
     if gi_name == "transmute":
         return 1
     0
 
-fn Sema.transmute_target_type(self: Sema, callee: i32) -> i32:
-    let tp_node = if self.ast.kind(callee) == NodeKind.NK_TYPE_GENERIC:
+fn Sema.transmute_target_type_node(self: Sema, callee: i32) -> i32:
+    if self.ast.kind(callee) == NodeKind.NK_TYPE_GENERIC:
         let tp_start = self.ast.get_data1(callee)
         let tp_count = self.ast.get_data2(callee)
-        if tp_count == 0:
+        if tp_count <= 0:
             return 0
-        self.ast.get_extra(tp_start)
-    else:
-        self.ast.get_data1(callee)
-    self.resolve_type_expr(tp_node) as i32
+        return self.ast.get_extra(tp_start)
+    self.ast.get_data1(callee)
+
+fn Sema.transmute_type_has_known_layout(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    if self.is_opaque_value_type(tid) != 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    let kind = self.get_type_kind(resolved)
+    if kind == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        if not self.named_types.contains(base_sym):
+            return 0
+    1
+
+fn Sema.check_transmute_call(self: Sema, node: i32, callee: i32, extra_start: i32, arg_count: i32) -> i32:
+    if self.require_unsafe_operation("transmute requires unsafe context", node) == 0:
+        return 0
+    if arg_count != 1:
+        self.emit_error("transmute expects exactly one argument", node)
+        return 0
+    let target_node = self.transmute_target_type_node(callee)
+    if target_node == 0:
+        self.emit_error("transmute target type could not be resolved", callee)
+        return 0
+    let target_ty = self.resolve_type_level_arg_expr(target_node) as i32
+    if target_ty == 0:
+        self.emit_error("transmute target type could not be resolved", target_node)
+        return 0
+    let value_node = self.ast.get_extra(extra_start)
+    let source_ty = self.check_expr_value_context(value_node) as i32
+    if source_ty == 0:
+        return 0
+    if self.transmute_type_has_known_layout(source_ty) == 0 or self.transmute_type_has_known_layout(target_ty) == 0:
+        self.emit_error("transmute requires known-size types", node)
+        return 0
+    let source_size = self.type_layout_size_of(source_ty)
+    let target_size = self.type_layout_size_of(target_ty)
+    if source_size != target_size:
+        self.emit_error(f"transmute source and target sizes differ: {self.type_name(source_ty)} is {source_size} byte(s), {self.type_name(target_ty)} is {target_size} byte(s)", node)
+        return 0
+    target_ty
 
 fn Sema.type_is_unit(self: Sema, tid: i32) -> i32:
     if tid == 0:
@@ -8450,9 +8483,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     if self.is_nameof_call(callee) != 0:
         return self.ty_str as i32
     if self.is_transmute_call(callee) != 0:
-        if self.require_unsafe_operation("transmute requires unsafe context", node) == 0:
-            return 0
-        return self.transmute_target_type(callee)
+        return self.check_transmute_call(node, callee, extra_start, arg_count)
     if self.is_chan_call(callee) != 0:
         return self.chan_return_type(callee)
 

@@ -152,6 +152,19 @@ and cannot be declared by value. Full `with build`, `with build :fixpoint`,
 `with build :test`, and `with build :test-green` passed on 2026-06-11 for
 #463.
 
+#539 is implemented and verified. `transmute[T](value)` now requires unsafe,
+exactly one value argument, a resolvable target type, known source/target
+layouts, and equal source/target byte sizes during Sema. Size mismatch
+diagnostics include both type names and byte counts. Codegen also has a
+defensive tripwire for unchecked transmute size mismatches. The implementation
+exposed and fixed the type-layout model for With `fn` values: closure/function
+values are two-pointer records, while `extern fn` remains one pointer. Focused
+coverage includes same-size integer transmutes, `fn` value to raw two-pointer
+record transmute, unsafe-required, arity, opaque target, and size-mismatch
+negative cases. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-11 for
+#539.
+
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
 C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib
