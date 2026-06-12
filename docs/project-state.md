@@ -23,10 +23,11 @@ assignment propagation into generic-container storage. Full verification is
 complete: `with build`, `with build :fixpoint`, `with build :test`, and
 `with build :test-green` passed on 2026-06-12. The first full-suite run hit a
 transient Conan/raylib package download failure; `cli-selfhost-project-tests`
-passed on rerun before the final clean full-suite pass. #362 remains open until
-its named Phase 4 consumers (#378 and #355) land on top of this substrate.
+passed on rerun before the final clean full-suite pass. #362 is now closed:
+its named Phase 4 consumers #378 and #355 have both landed on top of this
+substrate.
 
-#378 is implemented locally. Returned-view provenance now poisons surviving
+#378 is implemented and pushed. Returned-view provenance now poisons surviving
 bindings when any possible stack origin leaves scope, then rejects the first
 later use with the §21.1 Rule 6 / §22.3 diagnostic contract: the diagnostic
 labels the view assignment, the origin scope that ended, and the later use, and
@@ -40,7 +41,7 @@ existing returned-local-reference and two-origin view tests.
 Full `with build`, `with build :fixpoint`, `with build :test`, and
 `with build :test-green` passed on 2026-06-12 for #378.
 
-#477 is implemented locally. Stdlib synchronization guards
+#477 is implemented and pushed. Stdlib synchronization guards
 (`MutexGuard`, `MutexGuardMut`, `RwReadGuard`, `RwWriteGuard`), borrowed-data
 iterators (`VecIter`, `VecIterPlace`, `MapIter`, `FilterIter`, `TakeIter`,
 `ZipIter`, `FlatMapIter`), and scoped borrowed handles (`VecSlot`,
@@ -53,7 +54,7 @@ pipeline adapters working. Existing `with` slot/entry, iterator borrowing, and
 `with build :test`, and `with build :test-green` passed on 2026-06-12 for
 #477.
 
-#355 is implemented locally. By-value ephemeral `Task` arguments now require
+#355 is implemented and pushed. By-value ephemeral `Task` arguments now require
 proof that the callee consumes the task in scope; unproven ordinary callees are
 hard errors instead of warnings, extern callees remain hard errors even inside
 `unsafe`, and explicit `unsafe` on ordinary unproven callees records the
