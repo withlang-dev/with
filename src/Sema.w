@@ -393,6 +393,7 @@ type Sema {
     copy_visit_stack: Vec[i32],
     current_drop_type_sym: i32,
     drop_control_flow_depth: i32,
+    move_control_flow_depth: i32,
     drop_consumed_field_owner_syms: Vec[i32],
     drop_consumed_field_syms: Vec[i32],
 
@@ -1098,6 +1099,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         copy_visit_stack: Vec.new(),
         current_drop_type_sym: 0,
         drop_control_flow_depth: 0,
+        move_control_flow_depth: 0,
         drop_consumed_field_owner_syms: Vec.new(),
         drop_consumed_field_syms: Vec.new(),
         bind_names: Vec.new(),

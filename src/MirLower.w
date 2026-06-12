@@ -44,6 +44,8 @@ type MirBuilder = ephemeral {
     drop_local_ids: Vec[i32],
     drop_kinds: Vec[i32],
     drop_scope_starts: Vec[i32],
+    stmt_temp_locals: Vec[i32],
+    stmt_temp_starts: Vec[i32],
     with_cleanup_guard_locals: Vec[i32],
     with_cleanup_payload_locals: Vec[i32],
     with_cleanup_method_syms: Vec[i32],
@@ -115,6 +117,8 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         drop_local_ids: Vec.new(),
         drop_kinds: Vec.new(),
         drop_scope_starts: Vec.new(),
+        stmt_temp_locals: Vec.new(),
+        stmt_temp_starts: Vec.new(),
         with_cleanup_guard_locals: Vec.new(),
         with_cleanup_payload_locals: Vec.new(),
         with_cleanup_method_syms: Vec.new(),
@@ -265,6 +269,66 @@ fn MirBuilder.cancel_scheduled_value_drop_for_local(self: MirBuilder, local_id: 
             self.drop_kinds.set_i32(i as i64, DropKind.DK_STORAGE)
             return
         i = i - 1
+
+fn MirBuilder.push_stmt_temp_frame(self: MirBuilder) -> i32:
+    let depth = self.stmt_temp_starts.len() as i32
+    self.stmt_temp_starts.push(self.stmt_temp_locals.len() as i32)
+    depth
+
+fn MirBuilder.stmt_temp_needs_drop(self: MirBuilder, type_id: i32) -> i32:
+    if type_id == 0 or type_id == self.sema.ty_void as i32 or type_id == self.sema.ty_never as i32:
+        return 0
+    if self.sema.is_copy(type_id as TypeId) != 0:
+        return 0
+    if self.sema.type_is_task(type_id) != 0 or self.sema.type_is_scoped_task(type_id) != 0 or self.sema.type_is_scoped_join_handle(type_id) != 0:
+        return 0
+    1
+
+fn MirBuilder.register_stmt_temp(self: MirBuilder, local_id: i32, type_id: i32) -> Unit:
+    if self.stmt_temp_starts.len() as i32 == 0:
+        return
+    if self.stmt_temp_needs_drop(type_id) == 0:
+        return
+    self.stmt_temp_locals.push(local_id)
+
+fn MirBuilder.cancel_stmt_temp_for_local(self: MirBuilder, local_id: i32) -> Unit:
+    var i = self.stmt_temp_locals.len() as i32 - 1
+    while i >= 0:
+        if self.stmt_temp_locals.get(i as i64) == local_id:
+            self.stmt_temp_locals.set_i32(i as i64, -1)
+            return
+        i = i - 1
+
+fn MirBuilder.consume_moved_operand(self: MirBuilder, operand_id: i32) -> Unit:
+    if operand_id < 0 or operand_id >= self.body.operand_kinds.len() as i32:
+        return
+    if self.body.operand_kinds.get(operand_id as i64) != OperandKind.OK_MOVE:
+        return
+    let place = self.body.operand_d0.get(operand_id as i64)
+    let local_id = mir_place_plain_local(&self.body, place)
+    if local_id < 0:
+        return
+    self.cancel_scheduled_value_drop_for_local(local_id)
+    self.cancel_stmt_temp_for_local(local_id)
+
+fn MirBuilder.flush_stmt_temp_frame(self: MirBuilder) -> Unit:
+    if self.stmt_temp_starts.len() as i32 == 0:
+        return
+    let frame_idx = self.stmt_temp_starts.len() as i32 - 1
+    let start = self.stmt_temp_starts.get(frame_idx as i64)
+    var i = self.stmt_temp_locals.len() as i32 - 1
+    while i >= start:
+        let local_id = self.stmt_temp_locals.get(i as i64)
+        if local_id >= 0:
+            self.emit_drop_entry(local_id, DropKind.DK_VALUE)
+        i = i - 1
+    while self.stmt_temp_locals.len() as i32 > start:
+        self.stmt_temp_locals.pop()
+    self.stmt_temp_starts.pop()
+
+fn MirBuilder.finish_stmt_temp_frame(self: MirBuilder, frame_depth: i32) -> Unit:
+    while self.stmt_temp_starts.len() as i32 > frame_depth:
+        self.flush_stmt_temp_frame()
 
 fn MirBuilder.task_drop_kind_for_binding(self: MirBuilder, node: i32, bind_ty: i32) -> i32:
     if self.sema.type_is_task(bind_ty) == 0:
@@ -1594,6 +1658,7 @@ fn MirBuilder.materialize_operand(self: MirBuilder, operand_id: i32, type_id: i3
     let temp = self.new_temp(type_id)
     let place = self.place_for_local(temp)
     self.assign_operand_to_place(place, operand_id, span)
+    self.register_stmt_temp(temp, type_id)
     place
 
 fn MirBuilder.new_temp(self: MirBuilder, type_id: i32) -> i32:
@@ -2467,6 +2532,7 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32, node_id: i32) 
     self.unit_operand()
 
 fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: i32, span: i32):
+    self.consume_moved_operand(operand_id)
     self.update_string_alias_after_assignment(place, operand_id)
     let rval = self.body.new_rvalue(RvalueKind.RK_USE, operand_id, 0, 0)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rval, span)
@@ -3778,6 +3844,7 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
             let tmp = self.new_temp(ty)
             let p = self.place_for_local(tmp)
             self.assign_operand_to_place(p, op, self.ast.get_start(node))
+            self.register_stmt_temp(tmp, ty)
             return p
         if self.is_runtime_pair_multi_index(node) != 0:
             return self.lower_multi_index_read(node)
@@ -3817,6 +3884,7 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
     let tmp = self.new_temp(ty)
     let p = self.place_for_local(tmp)
     self.assign_operand_to_place(p, op, self.ast.get_start(node))
+    self.register_stmt_temp(tmp, ty)
     p
 
 fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
@@ -3916,7 +3984,6 @@ fn MirBuilder.lower_expr_discard(self: MirBuilder, node: i32) -> i32:
     if node == 0:
         return self.unit_operand()
     let saved_expected = self.expected_type
-    self.expected_type = self.sema.ty_void as i32
     let kind = self.ast.kind(node)
     let result = if kind == NodeKind.NK_BLOCK:
         self.lower_block_mode(node, 0)
@@ -3977,49 +4044,63 @@ fn MirBuilder.lower_block_mode(self: MirBuilder, node: i32, want_result: i32) ->
     for i in 0..stmt_count:
         let stmt = self.ast.get_extra(stmt_start + i)
         let sk = self.ast.kind(stmt)
+        let stmt_frame = self.push_stmt_temp_frame()
         if sk == NodeKind.NK_LET_BINDING:
             self.lower_let_binding(stmt)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_LET_ELSE:
             self.lower_let_else(stmt)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_ASSIGN:
             self.lower_assign(self.ast.get_data0(stmt), self.ast.get_data1(stmt))
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_RETURN:
             let _ = self.lower_return(stmt)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_BREAK:
             let _ = self.lower_break(stmt)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_CONTINUE:
             let _ = self.lower_continue(stmt)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_GOTO:
             let _ = self.lower_goto(stmt)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_LABEL:
             let _ = self.lower_label(stmt)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_YIELD:
             if self.in_generator != 0:
                 let _ = self.lower_generator_yield(stmt)
+                self.finish_stmt_temp_frame(stmt_frame)
                 continue
         
         if sk == NodeKind.NK_DEFER:
             let defer_body = self.ast.get_data0(stmt)
             if defer_body != 0:
                 self.defer_nodes.push(defer_body)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_ERRDEFER:
             let errdefer_body = self.ast.get_data0(stmt)
             if errdefer_body != 0:
                 self.errdefer_nodes.push(errdefer_body)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         if sk == NodeKind.NK_TUPLE_DESTRUCTURE:
             self.lower_tuple_destructure(stmt)
+            self.finish_stmt_temp_frame(stmt_frame)
             continue
         let _ = self.lower_expr_discard(stmt)
+        self.finish_stmt_temp_frame(stmt_frame)
 
     var result = self.unit_operand()
     if tail_expr != 0:
@@ -4027,7 +4108,9 @@ fn MirBuilder.lower_block_mode(self: MirBuilder, node: i32, want_result: i32) ->
             self.cancel_scheduled_value_drop_for_receiver_expr(tail_expr)
             result = self.lower_expr(tail_expr)
         else:
+            let tail_frame = self.push_stmt_temp_frame()
             result = self.lower_expr_discard(tail_expr)
+            self.finish_stmt_temp_frame(tail_frame)
 
     // Emit defers added in this block scope (LIFO order), before popping scope
     let defer_end = self.defer_nodes.len() as i32
@@ -4053,6 +4136,7 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
     var cond_op = 0
     var regex_capture_node = 0
     var regex_captures_opt_place = -1
+    let cond_frame = self.push_stmt_temp_frame()
     if self.ast.kind(cond_expr) == NodeKind.NK_MATCH_OP:
         let lhs = self.ast.get_data0(cond_expr)
         let rhs = self.ast.get_data1(cond_expr)
@@ -4066,6 +4150,7 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
             regex_capture_node = rhs
     else:
         cond_op = self.lower_expr(cond_expr)
+    self.finish_stmt_temp_frame(cond_frame)
 
     let then_bb = self.new_block()
     let else_bb = self.new_block()
@@ -4111,6 +4196,7 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
     self.forget_string_flow_facts()
     if want_result == 0:
         return self.unit_operand()
+    self.register_stmt_temp(result_local, result_ty)
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -4149,6 +4235,7 @@ fn MirBuilder.lower_if_let(self: MirBuilder, pat: i32, scrutinee_expr: i32, then
 
     self.switch_to(join_bb)
     self.forget_string_flow_facts()
+    self.register_stmt_temp(result_local, result_ty)
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -4195,6 +4282,7 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32, node
     var cond_op = 0
     var regex_capture_node = 0
     var regex_captures_opt_place = -1
+    let cond_frame = self.push_stmt_temp_frame()
     if self.ast.kind(cond_expr) == NodeKind.NK_MATCH_OP:
         let lhs = self.ast.get_data0(cond_expr)
         let rhs = self.ast.get_data1(cond_expr)
@@ -4208,6 +4296,7 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32, node
             regex_capture_node = rhs
     else:
         cond_op = self.lower_expr(cond_expr)
+    self.finish_stmt_temp_frame(cond_frame)
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
@@ -5265,6 +5354,7 @@ fn MirBuilder.lower_break(self: MirBuilder, node: i32) -> i32:
         if loop_info.result_place >= 0:
             self.assign_operand_to_place(loop_info.result_place, value_op, self.ast.get_start(value_expr))
 
+    self.flush_stmt_temp_frame()
     self.emit_cleanup_to_target(loop_info)
     self.terminate(TermKind.TK_GOTO, loop_info.break_bb, 0, 0, 0)
 
@@ -5277,6 +5367,7 @@ fn MirBuilder.lower_continue(self: MirBuilder, node: i32) -> i32:
     if loop_info.continue_bb < 0:
         return self.unit_operand()
 
+    self.flush_stmt_temp_frame()
     self.emit_cleanup_to_target(loop_info)
     self.terminate(TermKind.TK_GOTO, loop_info.continue_bb, 0, 0, 0)
     self.switch_to(self.new_block())
@@ -5287,6 +5378,7 @@ fn MirBuilder.lower_goto(self: MirBuilder, node: i32) -> i32:
     let target = self.goto_target_info(label)
     if target.break_bb < 0:
         return self.unit_operand()
+    self.flush_stmt_temp_frame()
     self.emit_cleanup_to_target(target)
     self.terminate(TermKind.TK_GOTO, target.break_bb, 0, 0, 0)
     self.switch_to(self.new_block())
@@ -5313,6 +5405,7 @@ fn MirBuilder.lower_return(self: MirBuilder, node: i32) -> i32:
     let ret_place = self.place_for_local(0)
     self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(node))
 
+    self.flush_stmt_temp_frame()
     self.emit_defers_for_return()
     self.emit_drops_for_return()
     self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
@@ -6095,6 +6188,7 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
 
     self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
     self.switch_to(next_bb)
+    self.register_stmt_temp(result_local, ret_type_id)
 
     if self.sema.is_copy(ret_type_id) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
@@ -6114,6 +6208,7 @@ fn MirBuilder.lower_call_redirected(self: MirBuilder, fn_op: i32, fn_sym: i32, a
     let next_bb = self.new_block()
     self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
     self.switch_to(next_bb)
+    self.register_stmt_temp(result_local, ret_type_id)
     if self.sema.is_copy(ret_type_id) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -6133,6 +6228,7 @@ fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, callee_sym
     let next_bb = self.new_block()
     self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
     self.switch_to(next_bb)
+    self.register_stmt_temp(result_local, ret_type_id)
     if self.sema.is_copy(ret_type_id) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -6198,6 +6294,7 @@ fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, call
         return autoderef_op
     let lowered = self.lower_expr(arg_node)
     self.expected_type = saved_expected
+    self.consume_moved_operand(lowered)
     lowered
 
 fn MirBuilder.lower_method_arg_with_expected(self: MirBuilder, recv_type: i32, method_sym: i32, arg_node: i32, arg_index: i32) -> i32:
@@ -8034,6 +8131,8 @@ fn MirBuilder.operand_for_place(self: MirBuilder, place: i32, type_id: i32) -> i
     self.body.new_operand(op_kind, place)
 
 fn MirBuilder.lower_call_with_operand_args(self: MirBuilder, fn_op: i32, args: Vec[i32], ret_type: i32, node: i32) -> i32:
+    for ai in 0..args.len() as i32:
+        self.consume_moved_operand(args.get(ai as i64))
     let args_id = self.body.new_call_args(args)
     self.body.set_call_ast_node(args_id, node)
     let result_local = self.new_temp(ret_type)
@@ -8041,6 +8140,7 @@ fn MirBuilder.lower_call_with_operand_args(self: MirBuilder, fn_op: i32, args: V
     let next_bb = self.new_block()
     self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
     self.switch_to(next_bb)
+    self.register_stmt_temp(result_local, ret_type)
     if self.sema.is_copy(ret_type) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -8048,6 +8148,7 @@ fn MirBuilder.lower_call_with_operand_args(self: MirBuilder, fn_op: i32, args: V
 fn MirBuilder.lower_call_with_receiver_operand(self: MirBuilder, fn_op: i32, callee_sym: i32, recv_op: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
     let sig_idx = self.call_sig_for_sym(callee_sym)
     let args: Vec[i32] = Vec.new()
+    self.consume_moved_operand(recv_op)
     args.push(recv_op)
     for ai in 0..arg_count:
         args.push(self.lower_call_arg(self.ast.get_extra(arg_start + ai), sig_idx, 0, ai + 1))
@@ -8058,6 +8159,7 @@ fn MirBuilder.lower_call_with_receiver_operand(self: MirBuilder, fn_op: i32, cal
     let next_bb = self.new_block()
     self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
     self.switch_to(next_bb)
+    self.register_stmt_temp(result_local, ret_type)
     if self.sema.is_copy(ret_type) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)

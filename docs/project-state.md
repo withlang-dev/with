@@ -11,7 +11,21 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase 3 is in progress. #544 is implemented and pushed: `panic`, `todo`,
+Phase 4 is in progress. #430 is implemented and verified. Expression
+temporaries that own non-Copy values are now registered in deterministic
+statement frames and dropped at the end of the enclosing statement, with
+condition temporaries flushed before branch dispatch. Ownership handoff through
+assignment, returns, `let _ =`, and by-value call arguments cancels pending
+caller-side drops so moved values are not double-dropped. Conditional moves of
+Drop locals are rejected loudly until drop-state flags exist, avoiding the
+former false-path leak. Focused coverage pins discarded call temps,
+field/method-chain temps, auto-ref temps, by-value temp arguments, reverse
+creation-order temp drops, named move handoff, discard handoff, returned values,
+partial moves from Drop temporaries, and conditional Drop moves. Full
+`with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-12 for #430.
+
+Phase 3 is complete. #544 is implemented and pushed: `panic`, `todo`,
 and `unreachable` are ordinary `std.builtins` functions returning `Never`,
 user calls no longer lower to raw LLVM `unreachable`, and backend-generated
 unreachable terminators now call the runtime panic path before ending the
