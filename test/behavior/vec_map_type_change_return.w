@@ -25,19 +25,21 @@ fn total_age(v: Vec[U]) -> i32:
         sum = sum + a
     sum
 
-fn main:
+fn make_users() -> Vec[U]:
     let v: Vec[U] = Vec.new()
     v.push(U { name: "ada", age: 36 })
     v.push(U { name: "bob", age: 24 })
+    v
 
-    let ns = names(v)
+fn main:
+    let ns = names(make_users())
     assert(ns.len() == 2)
     assert(ns.get(0) == "ada")
     assert(ns.get(1) == "bob")
 
-    let ag = ages(v)
+    let ag = ages(make_users())
     assert(ag.get(0) == 36)
     assert(ag.get(1) == 24)
 
-    assert(first_name(v) == "ada")
-    assert(total_age(v) == 60)
+    assert(first_name(make_users()) == "ada")
+    assert(total_age(make_users()) == 60)

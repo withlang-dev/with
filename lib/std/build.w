@@ -929,7 +929,7 @@ pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> 
     tool_capability_require(self.token, "SourceEmitter")
     GeneratedSource { path, contents }
 
-fn tool_process_argv(args: Vec[str]) -> str:
+fn tool_process_argv(args: &Vec[str]) -> str:
     var out = StringBuilder.new()
     for i in 0..args.len() as i32:
         out.push_str(args.get(i as i64))
@@ -978,7 +978,7 @@ fn tool_process_restore_env(saved: SavedProcessEnv):
         let _restore = with_setenv_str(saved.names.get(i as i64), saved.values.get(i as i64))
     tool_process_restore_driver_env(saved.driver)
 
-pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
@@ -990,14 +990,14 @@ pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, 
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.run(self: &Self, args: Vec[str]) -> i32:
+pub fn ProcessRunner.run(self: &Self, args: &Vec[str]) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv(tool_process_argv(args))
     tool_process_restore_driver_env(env)
     rc
 
-pub fn ProcessRunner.run_capture_with_env(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture_with_env(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     let env = tool_process_apply_env(process_env)
     let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
@@ -1517,7 +1517,7 @@ pub fn Target.compiler(mut self: Target, compiler: str) -> Target:
     self.args.push("compiler=" ++ compiler)
     self
 
-fn build_action_outputs(target: Target) -> Vec[str]:
+fn build_action_outputs(target: &Target) -> Vec[str]:
     let outputs: Vec[str] = Vec.new()
     if target.output.len() > 0:
         outputs.push(target.output)
@@ -1525,13 +1525,13 @@ fn build_action_outputs(target: Target) -> Vec[str]:
         outputs.push(target.extra_outputs.get(i as i64))
     outputs
 
-fn build_action_write_scope(target: Target) -> Vec[str]:
+fn build_action_write_scope(target: &Target) -> Vec[str]:
     let scopes = build_action_outputs(target)
     for i in 0..target.write_scopes.len() as i32:
         scopes.push(target.write_scopes.get(i as i64))
     scopes
 
-fn build_action_ctx(ctx: BuildCtx, target: Target) -> ActionCtx:
+fn build_action_ctx(ctx: BuildCtx, target: &Target) -> ActionCtx:
     let fs_outputs = build_action_write_scope(target)
     let ctx_outputs = build_action_outputs(target)
     ActionCtx {

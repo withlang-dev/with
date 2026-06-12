@@ -5,12 +5,13 @@ use issue61_queries.samples
 use issue61_queries.shared
 
 pub fn mirrored_score(state: State, lookup: HashMap[str, i32]) -> i32:
-    var total = builtin_score(state, lookup)
+    var total = 0
     var i = 0
     while i < state.entries.len():
         total = total + edge_score(state.entries[i].name)
         i = i + 1
-    total + cell_sum(sample_cells())
+    total = total + cell_sum(sample_cells())
+    total + builtin_score(state, lookup)
 
 pub fn orchestrated_score() -> i32:
     mirrored_score(sample_state(), sample_lookup())

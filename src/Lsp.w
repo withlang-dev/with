@@ -653,7 +653,7 @@ fn lsp_publish_diagnostics(state: &LspState, uri: str, text: str):
     var diags = jarr_start()
     var first = true
     for i in 0..dl.count():
-        let d = dl.item_at(i as i64)
+        let d = dl.items.get(i as i64)
         let severity = d.severity
         let sl = lsp_offset_to_line(text, d.primary.start)
         let sc = lsp_offset_to_col(text, d.primary.start)

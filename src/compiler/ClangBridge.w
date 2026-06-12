@@ -57,6 +57,7 @@ type CXSourceRange:
     ptr_data: [2]i64
     begin_int_data: u32
     end_int_data: u32
+impl Copy for CXSourceRange
 
 type CXToken:
     int_data: [4]u32

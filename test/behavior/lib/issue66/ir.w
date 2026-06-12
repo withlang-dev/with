@@ -9,7 +9,7 @@ pub fn ir_const_f32(dest: i32, value: f32) -> IRInst:
     let _ = value
     IRInst { op: dest, d0: dest, dtype: .Float32 }
 
-pub fn count_float_values(prog: IRProgram) -> i32:
+pub fn count_float_values(prog: &IRProgram) -> i32:
     var count: i32 = 0
     for ip in 0..prog.insts.len():
         let inst = prog.insts[ip]
@@ -18,7 +18,7 @@ pub fn count_float_values(prog: IRProgram) -> i32:
             .Int32 => continue
     count
 
-pub fn validate_program(prog: IRProgram) -> Result[i32, DemoError]:
+pub fn validate_program(prog: &IRProgram) -> Result[i32, DemoError]:
     if prog.insts.len() == 0:
         return Err(.ParseError("empty program"))
     Ok(count_float_values(prog))

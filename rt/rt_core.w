@@ -2279,16 +2279,19 @@ pub fn with_sb_append(sb: *mut u8, s: str) -> Unit:
     let slen = str_length(s)
     if slen == 0: return
     let sp = str_data(s)
+    // sb_grow is declared before sb_buf so assigning it into sb_buf is a
+    // view of an earlier (longer-lived) binding under §21.1.
+    var sb_grow: *mut u8 = 0 as *mut u8
     var sb_buf = unsafe *(sb as *const *mut u8)
     var sb_len = unsafe *((sb as i64 + SB_OFF_LEN) as *const i64)
     var sb_cap = unsafe *((sb as i64 + SB_OFF_CAP) as *const i64)
     while sb_len + slen > sb_cap:
         let old_cap = sb_cap
         let new_cap = old_cap * 2
-        let new_buf = rt_alloc(new_cap)
-        rt_memcpy(new_buf, sb_buf as *const u8, sb_len)
+        sb_grow = rt_alloc(new_cap)
+        rt_memcpy(sb_grow, sb_buf as *const u8, sb_len)
         rt_free_sized(sb_buf, old_cap)
-        sb_buf = new_buf
+        sb_buf = sb_grow
         sb_cap = new_cap
     rt_memcpy((sb_buf as i64 + sb_len) as *mut u8, sp, slen)
     sb_len = sb_len + slen
@@ -2902,18 +2905,21 @@ pub fn with_scope_track(handle: i64, fiber_id: i32, result_buf: *mut u8) -> Unit
     let entries_ptr = scope_entries_ptr(handle)
     let count = unsafe *count_ptr
     let cap = unsafe *cap_ptr
+    // pending_grow is declared before entries so assigning it into
+    // entries is a view of an earlier (longer-lived) binding (§21.1).
+    var pending_grow: *mut u8 = 0 as *mut u8
     var entries = unsafe *entries_ptr
     let entry_size = 16
     if count >= cap:
         let new_cap = cap * 2
         let new_size = new_cap * entry_size
-        let new_ptr = rt_alloc(new_size as i64)
-        if new_ptr as i64 == 0:
+        pending_grow = rt_alloc(new_size as i64)
+        if pending_grow as i64 == 0:
             return
         let old_size = count * entry_size
-        rt_memcpy(new_ptr, entries as *const u8, old_size as i64)
+        rt_memcpy(pending_grow, entries as *const u8, old_size as i64)
         rt_free(entries)
-        entries = new_ptr
+        entries = pending_grow
         unsafe:
             *entries_ptr = entries
         unsafe:
@@ -2986,16 +2992,19 @@ pub fn with_thread_scope_track(scope: i64, handle: i64) -> i32:
     let entries_ptr = scope_entries_ptr(scope)
     let count = unsafe *count_ptr
     let cap = unsafe *cap_ptr
+    // pending_grow precedes entries so the assignment below is a view of
+    // an earlier (longer-lived) binding (§21.1).
+    var pending_grow: *mut u8 = 0 as *mut u8
     var entries = unsafe *entries_ptr
     let entry_size = 16
     if count >= cap:
         let new_cap = cap * 2
-        let new_ptr = rt_alloc((new_cap * entry_size) as i64)
-        if new_ptr as i64 == 0:
+        pending_grow = rt_alloc((new_cap * entry_size) as i64)
+        if pending_grow as i64 == 0:
             return -1
-        rt_memcpy(new_ptr, entries as *const u8, (count * entry_size) as i64)
+        rt_memcpy(pending_grow, entries as *const u8, (count * entry_size) as i64)
         rt_free(entries)
-        entries = new_ptr
+        entries = pending_grow
         unsafe:
             *entries_ptr = entries
         unsafe:

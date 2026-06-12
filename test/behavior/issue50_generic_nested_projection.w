@@ -29,19 +29,19 @@ fn make_outer(name0: str, rank0: i32, name1: str, rank1: i32) -> Outer[Entry]:
     let out: Outer[Entry] = Outer { wrapped }
     out
 
-fn vec_name_eq(w: Wrapper[Entry]) -> bool:
+fn vec_name_eq(w: &Wrapper[Entry]) -> bool:
     w.items[0].name == w.items[1].name
 
-fn vec_rank_eq(w: Wrapper[Entry]) -> bool:
+fn vec_rank_eq(w: &Wrapper[Entry]) -> bool:
     w.items[0].rank == w.items[1].rank
 
-fn nested_name_eq(o: Outer[Entry]) -> bool:
+fn nested_name_eq(o: &Outer[Entry]) -> bool:
     o.wrapped.items[0].name == o.wrapped.items[1].name
 
-fn nested_rank_eq(o: Outer[Entry]) -> bool:
+fn nested_rank_eq(o: &Outer[Entry]) -> bool:
     o.wrapped.items[0].rank == o.wrapped.items[1].rank
 
-fn loop_find_name(o: Outer[Entry], target: str) -> bool:
+fn loop_find_name(o: &Outer[Entry], target: str) -> bool:
     var i: i32 = 0
     while i < o.wrapped.items.len() as i32:
         if o.wrapped.items[i].name == target:
@@ -49,7 +49,7 @@ fn loop_find_name(o: Outer[Entry], target: str) -> bool:
         i = i + 1
     false
 
-fn loop_find_rank(o: Outer[Entry], target: i32) -> bool:
+fn loop_find_rank(o: &Outer[Entry], target: i32) -> bool:
     var i: i32 = 0
     while i < o.wrapped.items.len() as i32:
         if o.wrapped.items[i].rank == target:

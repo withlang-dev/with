@@ -17,5 +17,6 @@ fn sum_pair(value: Pair) -> i32:
 fn main:
     let value = Pair { x: 40, y: 2 }
     assert(describe_pair(value) == "x=40;y=2;")
-    assert(sum_pair(value) == 42)
+    let value2 = Pair { x: 40, y: 2 }
+    assert(sum_pair(value2) == 42)
     print("ok")

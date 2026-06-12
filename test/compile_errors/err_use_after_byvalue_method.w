@@ -2,8 +2,8 @@
 
 // §3.8: a plain `T` method parameter consumes its argument, even when
 // the method body only reads it. The receiver is not affected.
-// First slice (#562): enforced for types with a user drop impl;
-// full non-Copy enforcement is tracked by #564.
+// Enforced for every non-Copy type since #564's gate flip; the
+// drop-impl case here was the #562 first slice.
 
 type Resource { id: i32 }
 impl Resource:

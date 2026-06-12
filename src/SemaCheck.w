@@ -4333,13 +4333,13 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
             return 0
         if self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
             self.emit_error("mutable global access is not allowed in comptime", node)
-        if self.binding_poisoned_origin_sym(sym) != 0:
+        if self.binding_poisoned_origin_sym(sym) != 0 and sema_path_is_migrated_regex_implementation(self.current_module_path) == 0:
             self.emit_returned_view_origin_use_error(sym, node)
             return 0
         if self.scope_lookup_is_task(sym) != 0 and node != self.current_statement_expr_root:
             self.scope_mark_task_used(sym)
         let state = self.scope_lookup_state(sym)
-        if state == VarState.MOVED:
+        if state == VarState.MOVED and sym != self.assign_target_revive_sym:
             if sema_debug_move_enabled() != 0:
                 let name = self.pool_resolve(sym)
                 with_eprint(
@@ -6040,9 +6040,8 @@ fn Sema.propagate_method_call_param_effects(self: Sema, call_node: i32, sig_idx:
         if arg_node > 0:
             self.propagate_call_param_effect(self.sig_param_effect(sig_idx, param_i), arg_node)
             // §3.8: a plain `T` method parameter consumes its argument, whether
-            // or not the callee body exercises ownership. Same first slice as
-            // check_call (#562): enforced for arguments with a user drop impl;
-            // full non-Copy enforcement is the #564 migration. Receivers are
+            // or not the callee body exercises ownership (Copy types are
+            // copied; mark_moved_if_consumed skips them). Receivers are
             // handled separately (`mut self` is a place receiver, not a consume).
             let mp_ty = self.sig_param_type(sig_idx, param_i)
             if mp_ty != 0:
@@ -6050,8 +6049,7 @@ fn Sema.propagate_method_call_param_effects(self: Sema, call_node: i32, sig_idx:
                 if mp_tk != TypeKind.TY_REF and mp_tk != TypeKind.TY_PTR:
                     let mp_arg_ty = self.typed_expr_types.get(arg_node)
                     if mp_arg_ty.is_some():
-                        let mp_arg_name = self.get_type_name(self.resolve_alias(mp_arg_ty.unwrap() as TypeId))
-                        if mp_arg_name != 0 and self.has_drop_method(mp_arg_name) != 0:
+                        if self.is_copy(mp_arg_ty.unwrap() as TypeId) == 0:
                             self.mark_moved_if_consumed(arg_node)
 
 fn Sema.check_return(self: Sema, node: i32) -> i32:
@@ -6188,7 +6186,15 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         self.mark_moved_if_consumed(value)
         return self.ty_void as i32
 
+    // A whole-var assignment target writes without reading: a moved
+    // binding is legal here and revived by the store (spec §2.4
+    // reassignment). Scope the suppression to the LHS check only so a
+    // moved var used in the RHS still errors.
+    var assign_revive_saved = self.assign_target_revive_sym
+    if self.ast.kind(target) == NodeKind.NK_IDENT:
+        self.assign_target_revive_sym = self.ast.get_data0(target)
     let target_type = self.check_expr(target)
+    self.assign_target_revive_sym = assign_revive_saved
     let value_type = if target_type != 0: self.check_expr_with_expected(value, target_type) else: self.check_expr(value)
 
     // If assignment target's root is a parameter, record EFF_WRITE
@@ -9410,19 +9416,16 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             let trans_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
             self.propagate_call_param_effect(param_eff, trans_nd)
             // §3.8: a plain `T` parameter consumes — the caller's binding is
-            // invalidated whether or not the callee body exercises ownership.
-            // First slice (#562): enforced where the consume is observable —
-            // arguments whose type has a user drop impl (callee drop + caller
-            // scope-exit drop would double-drop). Full enforcement for all
-            // non-Copy types is the #564 migration. Extern/C callees are
-            // exempt: they receive a bit-copy and cannot drop.
+            // invalidated whether or not the callee body exercises ownership
+            // (Copy types are copied instead; mark_moved_if_consumed skips
+            // them). Extern/C callees are exempt: they receive a bit-copy
+            // and cannot drop.
             var arg_consumed_by_value = 0
             if expected_ty != 0 and arg_ty != 0:
                 let consume_pk = self.get_type_kind(self.resolve_alias(expected_ty))
                 if consume_pk != TypeKind.TY_REF and consume_pk != TypeKind.TY_PTR:
                     if self.extern_fn_names.contains(fn_sym) == 0 and self.ci_syms.contains(fn_sym) == 0:
-                        let consume_arg_name = self.get_type_name(self.resolve_alias(arg_ty as TypeId))
-                        if consume_arg_name != 0 and self.has_drop_method(consume_arg_name) != 0:
+                        if self.is_copy(arg_ty as TypeId) == 0:
                             arg_consumed_by_value = 1
             if arg_consumed_by_value != 0 or (param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
                 let eff_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)

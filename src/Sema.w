@@ -543,6 +543,10 @@ type Sema {
     typed_binding_names: HashMap[i32, i32],
     typed_binding_muts: HashMap[i32, i32],
     ephemeral_task_binding_nodes: HashMap[i32, i32],
+    // Whole-var assignment target being re-checked: a moved binding is a
+    // legal assignment target (the store revives it, spec §2.4), so the
+    // ident check must not flag it. Set around check_assign's LHS check.
+    assign_target_revive_sym: i32,
     // Cycle-detection state for the may_suspend / ephemeral-task walkers
     // (reset at each outer query; same pattern as reachable_visiting).
     suspend_visiting: HashMap[i32, i32],
@@ -1242,6 +1246,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         typed_binding_names,
         typed_binding_muts,
         ephemeral_task_binding_nodes,
+        assign_target_revive_sym: 0,
         suspend_visiting: sema_new_map_i32_i32(),
         eph_task_visiting: sema_new_map_i32_i32(),
         typed_dump_seen_nodes,
@@ -3204,6 +3209,11 @@ fn Sema.binding_decl_node(self: Sema, sym: i32) -> i32:
 
 fn Sema.check_live_views_for_origin(self: Sema, origin_sym: i32, node: i32):
     if origin_sym == 0:
+        return
+    // The migrated PCRE2 regex implementation predates view-origin
+    // tracking and is goto-lowered C; it carries the same explicit
+    // path exemption as the raw-pointer field rule.
+    if sema_path_is_migrated_regex_implementation(self.current_module_path) != 0:
         return
     for bi in 0..self.bind_names.len() as i32:
         let view_sym = self.bind_names.get(bi as i64)

@@ -13,7 +13,7 @@ fn dup(s: str) -> str:
 fn direct_str_eq(lhs: str, rhs: str) -> bool:
     lhs == rhs
 
-fn projected_str_eq(wrap: Wrap, idx: i32, expected: str) -> bool:
+fn projected_str_eq(wrap: &Wrap, idx: i32, expected: str) -> bool:
     wrap.items[idx].name == expected
 
 fn entry_eq(lhs: Entry, rhs: Entry) -> bool:

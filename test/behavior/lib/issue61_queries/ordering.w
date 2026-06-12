@@ -5,21 +5,17 @@ use issue61_queries.receivers
 use issue61_queries.samples
 
 pub fn forward_score() -> i32:
-    let state = sample_state()
-    let lookup = sample_lookup()
-    var total = builtin_score(state, lookup)
-    total = total + alias_and_temporary_score(state)
+    var total = builtin_score(sample_state(), sample_lookup())
+    total = total + alias_and_temporary_score(sample_state())
     total = total + cache_key_score()
     total = total + long_name_score()
     total
 
 pub fn reverse_score() -> i32:
-    let state = sample_state()
-    let lookup = sample_lookup()
     var total = long_name_score()
     total = total + cache_key_score()
-    total = total + alias_and_temporary_score(state)
-    total = total + builtin_score(state, lookup)
+    total = total + alias_and_temporary_score(sample_state())
+    total = total + builtin_score(sample_state(), sample_lookup())
     total
 
 pub fn repeated_score() -> i32:

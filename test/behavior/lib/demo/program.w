@@ -46,7 +46,7 @@ pub fn bind(name: str, view: View) -> BindEntry:
 pub fn bindings_from(entries: Vec[BindEntry]) -> Bindings:
     Bindings { entries }
 
-pub fn compile(device: Device, source: ProgramSource) -> Result[Program, DemoError]:
+pub fn compile(device: Device, source: &ProgramSource) -> Result[Program, DemoError]:
     let _ = device
     let _ = source.entry
     if source.ir_text.contains("select") and source.ir_text.contains("store out [@0] %7"):

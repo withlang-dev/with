@@ -7,6 +7,7 @@ pub type Span {
     start: i32,
     end: i32,
 }
+impl Copy for Span
 
 pub fn span_zero -> Span:
     Span {

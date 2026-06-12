@@ -8,10 +8,8 @@ use issue61_queries.receivers
 use issue61_queries.samples
 
 fn local_forward_score() -> i32:
-    let state = sample_state()
-    let lookup = sample_lookup()
-    var total = builtin_score(state, lookup)
-    total = total + alias_and_temporary_score(state)
+    var total = builtin_score(sample_state(), sample_lookup())
+    total = total + alias_and_temporary_score(sample_state())
     total = total + cache_key_score()
     total = total + long_name_score()
     total

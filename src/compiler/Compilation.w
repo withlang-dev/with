@@ -1201,6 +1201,10 @@ fn Compilation.active_pool(self: Compilation, pool: AstPool) -> AstPool:
         return self.zcu.typed_pool_cache
     pool
 
+type MirLowerSemaBox {
+    sema: Sema,
+}
+
 fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     let do_profile = profile_enabled()
     let active_pool = pool
@@ -1241,7 +1245,12 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
         return self.zcu.last_mir_module
 
     let t_mir = profile_now()
-    let mir_mod: MirModule = lower_module(sema, active_pool, self.zcu.pool)
+    // §3.8: lower_module consumes its Sema. Route the value through a
+    // single-field box so the consuming argument is a field place and
+    // rebind afterwards; the struct copies share the same heap state.
+    var mir_lower_box = MirLowerSemaBox { sema: sema }
+    let mir_mod: MirModule = lower_module(mir_lower_box.sema, active_pool, self.zcu.pool)
+    sema = mir_lower_box.sema
     let tailrec_syms = collect_tailrec_fn_syms(active_pool)
     if tailrec_syms.len() > 0:
         let tailrec_violations = mir_mod.verify_tailrec_contracts(&sema, active_pool, tailrec_syms)

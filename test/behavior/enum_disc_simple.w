@@ -1,6 +1,8 @@
 
 enum Color: i32 { Red = 1 | Green = 2 | Blue = 4 }
 
+impl Copy for Color
+
 fn main:
     let r = Color.Red
     let g = Color.Green

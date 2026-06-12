@@ -1637,7 +1637,7 @@ fn mir_validation_fail(fn_sym: i32, span: i32, message: str) -> MirValidationErr
         message: message,
     }
 
-fn mir_validation_has_error(err: MirValidationError) -> bool:
+fn mir_validation_has_error(err: &MirValidationError) -> bool:
     err.message.len() > 0
 
 fn mir_validate_find_named_type(mir_mod: &MirModule, type_sym: i32) -> i32:

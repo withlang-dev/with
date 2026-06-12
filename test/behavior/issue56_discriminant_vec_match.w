@@ -11,7 +11,7 @@ fn decode(kind: i32) -> str:
         TypeKind.TY_INT => "int"
         _ => "other"
 
-fn decode_vec(kinds: Vec[i32], idx: i32) -> str:
+fn decode_vec(kinds: &Vec[i32], idx: i32) -> str:
     let kind = kinds.get(idx as i64)
     match kind:
         TypeKind.TY_STR => "str"

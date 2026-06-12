@@ -94,13 +94,13 @@ pub fn p7_build_target_args(target: str) -> str:
 pub fn p7_build_target_no_deps_args(target: str) -> str:
     p7_argv_append(p7_argv_append(p7_argv_append("", "build"), target), "--no-deps")
 
-pub fn p7_assert_success(result: P7Run, label: str) -> Unit:
+pub fn p7_assert_success(result: &P7Run, label: str) -> Unit:
     if result.rc != 0:
         print("stdout:\n" ++ result.stdout)
         print("stderr:\n" ++ result.stderr)
     assert(result.rc == 0)
 
-pub fn p7_assert_failure_contains(result: P7Run, needle: str, label: str) -> Unit:
+pub fn p7_assert_failure_contains(result: &P7Run, needle: str, label: str) -> Unit:
     let _ = label
     assert(result.rc != 0)
     assert(result.stderr.contains(needle) or result.stdout.contains(needle))

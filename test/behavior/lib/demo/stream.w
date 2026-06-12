@@ -20,7 +20,7 @@ fn alloc_event(done: bool) -> Result[Event, DemoError]:
         (*rec).done = done
     Ok(rec as Event)
 
-fn binding_view(bindings: Bindings, name: str) -> Result[View, DemoError]:
+fn binding_view(bindings: &Bindings, name: str) -> Result[View, DemoError]:
     var i = 0
     while i < bindings.entries.len():
         let entry = bindings.entries[i]
@@ -29,7 +29,7 @@ fn binding_view(bindings: Bindings, name: str) -> Result[View, DemoError]:
         i = i + 1
     Err(.MissingBinding(name))
 
-fn run_reduce(bindings: Bindings):
+fn run_reduce(bindings: &Bindings):
     let a_view = binding_view(bindings, "a").unwrap()
     let out_view = binding_view(bindings, "out").unwrap()
     let a_ptr = a_view.memory as *mut i32
@@ -44,7 +44,7 @@ fn run_reduce(bindings: Bindings):
     unsafe:
         *out_ptr = base + sum
 
-fn run_relu(bindings: Bindings):
+fn run_relu(bindings: &Bindings):
     let a_view = binding_view(bindings, "a").unwrap()
     let out_view = binding_view(bindings, "out").unwrap()
     let a_ptr = a_view.memory as *mut i32
@@ -64,7 +64,7 @@ pub fn stream_create(device: Device) -> Stream:
 pub fn stream_destroy(stream: Stream) -> Unit:
     let _ = stream
 
-pub fn dispatch(stream: Stream, prog: Program, bindings: Bindings) -> Result[Event, DemoError]:
+pub fn dispatch(stream: Stream, prog: Program, bindings: &Bindings) -> Result[Event, DemoError]:
     let _ = stream
     let kind = program_kind(prog)
     if kind == 1:
