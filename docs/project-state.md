@@ -11,6 +11,21 @@ conversation context after compaction.
 
 ## Current Focus
 
+#437 is implemented locally and focused tests pass. `std.alloc` now has real
+region `Arena` allocation with mark/reset watermarks, `FrameArena` with
+external reset and high-water tracking, and a fixed-block `Pool`/
+`PoolAllocator` that reuses freed slots. `ArenaScope` now uses the real arena
+watermark model. Borrowed-allocator container virality is covered by
+ephemeral `ArenaVec[T]` plus unsafe raw-pointer helper functions; storage in a
+non-ephemeral struct is rejected. The codegen generic-call binder now infers
+type parameters nested under pointer/reference/slice/array wrappers, with
+`behav_generic_pointer_binding.w` pinning the regression. Builtin `Vec.new_in`
+ABI/runtime work remains tracked separately in #570, and broader generic
+constructor/method limitations are recorded on #391. Focused coverage for
+arena region reuse, frame reset/high-water behavior, pool reuse, ArenaVec local
+use, ArenaVec storage rejection, ArenaScope, TempArena, no_alloc arena
+approval, and generic pointer binding passes.
+
 Phase 4 is in progress. #350 is implemented and verified. Task values now
 follow the §14.7 position-based disposition contract: statement-position task
 creation detaches only after must-observe and detach-safety gates pass, bound

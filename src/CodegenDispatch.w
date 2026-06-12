@@ -11777,6 +11777,83 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                         bind_sema_tys.push(self.llvm_type_to_sema_type(arg_ty))
             continue
 
+        if p_kind == NodeKind.NK_TYPE_PTR or p_kind == NodeKind.NK_TYPE_REF or p_kind == NodeKind.NK_TYPE_SLICE or p_kind == NodeKind.NK_TYPE_ARRAY:
+            let inner_node = self.pool.get_data0(p_type_node)
+            let arg_sema_outer = self.sema_type_of_node(arg_nodes.get(pi as i64))
+            var arg_inner_sema = 0
+            if arg_sema_outer > 0:
+                let arg_resolved = self.sema.resolve_alias(arg_sema_outer as TypeId)
+                let arg_kind = self.sema.get_type_kind(arg_resolved)
+                if (p_kind == NodeKind.NK_TYPE_PTR or p_kind == NodeKind.NK_TYPE_REF) and (arg_kind == TypeKind.TY_PTR or arg_kind == TypeKind.TY_REF):
+                    arg_inner_sema = self.sema.get_type_d0(arg_resolved)
+                else if p_kind == NodeKind.NK_TYPE_SLICE and arg_kind == TypeKind.TY_SLICE:
+                    arg_inner_sema = self.sema.get_type_d0(arg_resolved)
+                else if p_kind == NodeKind.NK_TYPE_ARRAY and arg_kind == TypeKind.TY_ARRAY:
+                    arg_inner_sema = self.sema.get_type_d0(arg_resolved)
+
+            let inner_kind = self.pool.kind(inner_node)
+            if inner_kind == NodeKind.NK_TYPE_NAMED or inner_kind == NodeKind.NK_IDENT:
+                let inner_sym = self.pool.get_data0(inner_node)
+                var canonical_inner_sym = 0
+                let inner_text = self.intern.resolve(inner_sym)
+                for ti in 0..tp_syms.len() as i32:
+                    let candidate = tp_syms.get(ti as i64)
+                    if candidate == inner_sym:
+                        canonical_inner_sym = candidate
+                        break
+                    if inner_text.len() > 0 and self.intern.resolve(candidate) == inner_text:
+                        canonical_inner_sym = candidate
+                        break
+                if canonical_inner_sym != 0 and arg_inner_sema > 0:
+                    var already_bound = false
+                    for bi in 0..bind_syms.len() as i32:
+                        if bind_syms.get(bi as i64) == canonical_inner_sym:
+                            already_bound = true
+                            break
+                    if not already_bound:
+                        let inner_llvm = self.sema_type_to_llvm(arg_inner_sema)
+                        if inner_llvm != 0:
+                            bind_syms.push(canonical_inner_sym)
+                            bind_tys.push(inner_llvm)
+                            bind_sema_tys.push(arg_inner_sema)
+                continue
+
+            if inner_kind == NodeKind.NK_TYPE_GENERIC and arg_inner_sema > 0 and self.sema.get_type_kind(arg_inner_sema as TypeId) == TypeKind.TY_GENERIC_INST:
+                let g_extra = self.pool.get_data1(inner_node)
+                let g_count = self.pool.get_data2(inner_node)
+                for gi in 0..g_count:
+                    let generic_arg_node = self.pool.get_extra(g_extra + gi)
+                    let generic_arg_kind = self.pool.kind(generic_arg_node)
+                    if generic_arg_kind != NodeKind.NK_TYPE_NAMED and generic_arg_kind != NodeKind.NK_IDENT:
+                        continue
+                    let generic_arg_sym = self.pool.get_data0(generic_arg_node)
+                    var canonical_arg_sym = 0
+                    let generic_arg_text = self.intern.resolve(generic_arg_sym)
+                    for ti in 0..tp_syms.len() as i32:
+                        let candidate = tp_syms.get(ti as i64)
+                        if candidate == generic_arg_sym:
+                            canonical_arg_sym = candidate
+                            break
+                        if generic_arg_text.len() > 0 and self.intern.resolve(candidate) == generic_arg_text:
+                            canonical_arg_sym = candidate
+                            break
+                    if canonical_arg_sym == 0:
+                        continue
+                    var already_bound = false
+                    for bi in 0..bind_syms.len() as i32:
+                        if bind_syms.get(bi as i64) == canonical_arg_sym:
+                            already_bound = true
+                            break
+                    if already_bound:
+                        continue
+                    let inner_llvm = self.sema_generic_arg_llvm(arg_inner_sema, gi)
+                    if inner_llvm == 0:
+                        continue
+                    bind_syms.push(canonical_arg_sym)
+                    bind_tys.push(inner_llvm)
+                    bind_sema_tys.push(self.sema.get_generic_inst_arg(arg_inner_sema, gi))
+                continue
+
         if p_kind == NodeKind.NK_TYPE_GENERIC:
             let g_name_sym = self.pool.get_data0(p_type_node)
             let g_name = self.intern.resolve(g_name_sym)

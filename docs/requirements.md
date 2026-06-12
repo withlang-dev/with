@@ -2862,7 +2862,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: `PoolAllocator` — fixed-size blocks
   - Source: `§8.3 L2902`
   - Related spec refs: none
-- [x] `8.3.1.6` **Standard containers accept an optional allocator parameter.** — impl: [#437](https://github.com/withlang-dev/with/issues/437)
+- [x] `8.3.1.6` **Standard containers accept an optional allocator parameter.** — impl: [#570](https://github.com/withlang-dev/with/issues/570)
   - Requirement: Standard containers accept an optional allocator parameter.
   - Source: `§8.3 L2904`
   - Related spec refs: none
