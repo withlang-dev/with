@@ -26,6 +26,20 @@ transient Conan/raylib package download failure; `cli-selfhost-project-tests`
 passed on rerun before the final clean full-suite pass. #362 remains open until
 its named Phase 4 consumers (#378 and #355) land on top of this substrate.
 
+#378 is implemented locally. Returned-view provenance now poisons surviving
+bindings when any possible stack origin leaves scope, then rejects the first
+later use with the §21.1 Rule 6 / §22.3 diagnostic contract: the diagnostic
+labels the view assignment, the origin scope that ended, and the later use, and
+includes a copy-or-outer-scope remedy. The expression-origin query now derives
+dependencies from recorded call effects as well as direct reference/value-node
+fallbacks, so reassigned views through helper calls are handled the same way as
+direct `&origin` assignments. Focused coverage includes three negative
+use-after-origin-death cases, including a >31-parameter conservative-origin
+regression, a positive case where the last use precedes origin death, and the
+existing returned-local-reference and two-origin view tests.
+Full `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-12 for #378.
+
 #444 is implemented and verified.
 Drop-implementing bindings now record concrete view dependencies from their
 initializers and reassignments, including references stored inside struct

@@ -60,11 +60,30 @@ type BindingProvenance {
     view_dep_count: i32,
     is_ephemeral_value: i32,
     is_ephemeral_task: i32,
+    poisoned_origin_sym: i32,
+    poisoned_origin_node: i32,
+    poisoned_binding_node: i32,
 }
 impl Copy for BindingProvenance
 
 fn binding_provenance_empty -> BindingProvenance:
-    BindingProvenance { view_origin_mask: 0, view_dep_start: 0, view_dep_count: 0, is_ephemeral_value: 0, is_ephemeral_task: 0 }
+    BindingProvenance { view_origin_mask: 0, view_dep_start: 0, view_dep_count: 0, is_ephemeral_value: 0, is_ephemeral_task: 0, poisoned_origin_sym: 0, poisoned_origin_node: 0, poisoned_binding_node: 0 }
+
+fn sema_param_origin_bit(pi: i32) -> i32:
+    if pi < 0:
+        return 0
+    if pi >= 31:
+        return -1
+    ((1 as i64) << (pi as u32)) as i32
+
+fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> i32:
+    if mask == 0 or pi < 0:
+        return 0
+    if mask < 0:
+        return 1
+    if pi >= 31:
+        return 0
+    if (mask & sema_param_origin_bit(pi)) != 0: 1 else: 0
 
 enum BorrowKind: i32:
     SHARED = 0
@@ -2650,7 +2669,9 @@ fn Sema.pop_scope(self: Sema):
     let reported_pending_calls: Vec[i32] = Vec.new()
     while self.bind_names.len() as i32 > start:
         let removed_sym = self.bind_names.get(self.bind_names.len() - 1)
-        self.check_live_views_for_origin(removed_sym, self.binding_decl_node(removed_sym))
+        let removed_node = self.binding_decl_node(removed_sym)
+        self.check_live_views_for_origin(removed_sym, removed_node)
+        self.poison_live_views_for_origin(removed_sym, removed_node)
         if self.pending_generic_binding_base.contains(removed_sym):
             let pending_call = if self.pending_generic_binding_call.contains(removed_sym): self.pending_generic_binding_call.get(removed_sym).unwrap() else: 0
             let report_key = if pending_call != 0: pending_call else: removed_sym
@@ -2890,6 +2911,9 @@ fn Sema.clear_binding_view_deps(self: Sema, sym: i32):
             provenance.view_origin_mask = 0
             provenance.view_dep_start = 0
             provenance.view_dep_count = 0
+            provenance.poisoned_origin_sym = 0
+            provenance.poisoned_origin_node = 0
+            provenance.poisoned_binding_node = 0
             slot.set(provenance)
 
 fn Sema.set_binding_view_deps(self: Sema, sym: i32, param_mask: i32, deps: Vec[i32]):
@@ -2910,6 +2934,9 @@ fn Sema.set_binding_view_deps(self: Sema, sym: i32, param_mask: i32, deps: Vec[i
             provenance.view_origin_mask = param_mask
             provenance.view_dep_start = start
             provenance.view_dep_count = deps.len() as i32
+            provenance.poisoned_origin_sym = 0
+            provenance.poisoned_origin_node = 0
+            provenance.poisoned_binding_node = 0
             slot.set(provenance)
 
 fn Sema.binding_view_origin_mask(self: Sema, sym: i32) -> i32:
@@ -2942,6 +2969,50 @@ fn Sema.binding_depends_on_origin(self: Sema, sym: i32, origin_sym: i32) -> i32:
             return 1
     0
 
+fn Sema.mark_binding_poisoned_by_origin(self: Sema, view_sym: i32, origin_sym: i32, origin_node: i32):
+    let opt = self.scope_name_map.get(view_sym)
+    if not opt.is_some():
+        return
+    let idx = opt.unwrap()
+    let slot_idx = idx as i64
+    with self.bind_provenance.slot(slot_idx) as mut slot:
+        var provenance = slot.get()
+        if provenance.poisoned_origin_sym == 0:
+            provenance.poisoned_origin_sym = origin_sym
+            provenance.poisoned_origin_node = origin_node
+            provenance.poisoned_binding_node = if self.binding_value_nodes.contains(view_sym): self.binding_value_nodes.get(view_sym).unwrap() else: self.binding_decl_node(view_sym)
+            slot.set(provenance)
+
+fn Sema.binding_poisoned_origin_sym(self: Sema, sym: i32) -> i32:
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_provenance.get(opt.unwrap() as i64).poisoned_origin_sym
+    0
+
+fn Sema.binding_poisoned_origin_node(self: Sema, sym: i32) -> i32:
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_provenance.get(opt.unwrap() as i64).poisoned_origin_node
+    0
+
+fn Sema.binding_poisoned_binding_node(self: Sema, sym: i32) -> i32:
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_provenance.get(opt.unwrap() as i64).poisoned_binding_node
+    0
+
+fn Sema.poison_live_views_for_origin(self: Sema, origin_sym: i32, origin_node: i32):
+    if origin_sym == 0:
+        return
+    for bi in 0..self.bind_names.len() as i32:
+        let view_sym = self.bind_names.get(bi as i64)
+        if view_sym == origin_sym:
+            continue
+        if self.bind_states.get(bi as i64) != VarState.LIVE:
+            continue
+        if self.binding_depends_on_origin(view_sym, origin_sym) != 0 or self.binding_value_depends_on_origin(view_sym, origin_sym) != 0:
+            self.mark_binding_poisoned_by_origin(view_sym, origin_sym, origin_node)
+
 fn Sema.expr_view_depends_on_origin(self: Sema, node: i32, origin_sym: i32) -> i32:
     if node == 0 or origin_sym == 0:
         return 0
@@ -2964,6 +3035,37 @@ fn Sema.expr_view_depends_on_origin(self: Sema, node: i32, origin_sym: i32) -> i
         if self.expr_view_depends_on_origin(self.ast.get_data1(node), origin_sym) != 0:
             return 1
         return self.expr_view_depends_on_origin(self.ast.get_data2(node), origin_sym)
+    if kind == NodeKind.NK_CALL:
+        let dep_count = self.expr_view_dep_count(node)
+        for i in 0..dep_count:
+            if self.expr_view_dep_at(node, i) == origin_sym:
+                return 1
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            let fn_sym_raw = self.ast.get_data0(callee)
+            let fn_sym = if self.comp_resolved.contains(node): self.comp_resolved.get(node).unwrap() else: fn_sym_raw
+            var sig_idx = self.get_sig(fn_sym)
+            if sig_idx < 0:
+                let sema_fn_sym = self.pool_lookup_symbol(self.pool_resolve(fn_sym))
+                sig_idx = self.get_sig(sema_fn_sym)
+            if sig_idx >= 0:
+                let has_resolved = self.has_resolved_call_args(node)
+                let extra_start = self.ast.get_data1(node)
+                let arg_count = if has_resolved != 0: self.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
+                let param_count = self.sig_get_param_count(sig_idx)
+                for pi in 0..param_count:
+                    if (self.sig_param_effect(sig_idx, pi) & EFF_ESCAPE_VIEW) == 0:
+                        continue
+                    let origin_mask = self.sig_param_view_origin(sig_idx, pi)
+                    for origin_pi in 0..param_count:
+                        if sema_param_origin_mask_contains(origin_mask, origin_pi) == 0:
+                            continue
+                        if origin_pi >= arg_count:
+                            continue
+                        let origin_arg = if has_resolved != 0: self.get_resolved_call_arg(node, origin_pi) else: self.ast.get_extra(extra_start + origin_pi)
+                        if self.place_root_sym(origin_arg) == origin_sym or self.expr_view_depends_on_origin(origin_arg, origin_sym) != 0:
+                            return 1
+        return 0
     if kind == NodeKind.NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
@@ -2971,6 +3073,10 @@ fn Sema.expr_view_depends_on_origin(self: Sema, node: i32, origin_sym: i32) -> i
             if self.expr_view_depends_on_origin(self.ast.get_extra(extra_start + fi * 2 + 1), origin_sym) != 0:
                 return 1
         return 0
+    let dep_count = self.expr_view_dep_count(node)
+    for i in 0..dep_count:
+        if self.expr_view_dep_at(node, i) == origin_sym:
+            return 1
     0
 
 fn Sema.binding_value_depends_on_origin(self: Sema, sym: i32, origin_sym: i32) -> i32:
@@ -3009,6 +3115,26 @@ fn Sema.emit_implicit_drop_view_use_error(self: Sema, view_sym: i32, origin_sym:
     if origin_node != 0:
         diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(origin_node), end: self.ast.get_end(origin_node) }, "`" ++ origin_name ++ "` is destroyed before `" ++ view_name ++ "` drops")
     diag.add_help("declare `" ++ view_name ++ "` after `" ++ origin_name ++ "`, or clear/drop `" ++ view_name ++ "` before `" ++ origin_name ++ "` goes out of scope")
+    self.diags.emit(diag)
+
+fn Sema.emit_returned_view_origin_use_error(self: Sema, view_sym: i32, use_node: i32):
+    let origin_sym = self.binding_poisoned_origin_sym(view_sym)
+    if origin_sym == 0:
+        return
+    let view_name = self.pool_resolve(view_sym)
+    let origin_name = self.pool_resolve(origin_sym)
+    let origin_node = self.binding_poisoned_origin_node(view_sym)
+    let binding_node = self.binding_poisoned_binding_node(view_sym)
+    let primary_start = if use_node != 0: self.ast.get_start(use_node) else: 0
+    let primary_end = if use_node != 0: self.ast.get_end(use_node) else: 0
+    var diag = Diagnostic.err("view `" ++ view_name ++ "` may originate from `" ++ origin_name ++ "`, which no longer lives here (§21.1 Rule 6)", Span { file: self.local_file_id, start: primary_start, end: primary_end })
+    if binding_node != 0:
+        diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(binding_node), end: self.ast.get_end(binding_node) }, "view origin was recorded here")
+    if origin_node != 0:
+        diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(origin_node), end: self.ast.get_end(origin_node) }, "`" ++ origin_name ++ "` is dropped at the end of its scope before this use")
+    if use_node != 0:
+        diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(use_node), end: self.ast.get_end(use_node) }, "view is used here after a possible origin died")
+    diag.add_help("copy the data out before the origin's scope ends, or declare `" ++ origin_name ++ "` in the outer scope")
     self.diags.emit(diag)
 
 fn Sema.binding_decl_node(self: Sema, sym: i32) -> i32:

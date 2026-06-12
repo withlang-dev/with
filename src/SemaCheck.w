@@ -3960,6 +3960,9 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
             return 0
         if self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
             self.emit_error("mutable global access is not allowed in comptime", node)
+        if self.binding_poisoned_origin_sym(sym) != 0:
+            self.emit_returned_view_origin_use_error(sym, node)
+            return 0
         let state = self.scope_lookup_state(sym)
         if state == VarState.MOVED:
             if sema_debug_move_enabled() != 0:
@@ -5342,7 +5345,7 @@ fn Sema.compute_expr_view_origin_mask(self: Sema, node: i32) -> i32:
         let sym = self.ast.get_data0(node)
         let direct_pi = self.param_index_for_sym(sym)
         if direct_pi >= 0:
-            return ((1 as i64) << (direct_pi as u32)) as i32
+            return sema_param_origin_bit(direct_pi)
         return self.binding_view_origin_mask(sym)
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
         return self.compute_expr_view_origin_mask(self.ast.get_data0(node))
@@ -5406,7 +5409,7 @@ fn Sema.check_yielded_view_origins(self: Sema, expr_node: i32, report_node: i32)
                         continue
                     let origin_mask = self.sig_param_view_origin(sig_idx, pi)
                     for origin_pi in 0..param_count:
-                        if (origin_mask & (((1 as i64) << (origin_pi as u32)) as i32)) == 0:
+                        if sema_param_origin_mask_contains(origin_mask, origin_pi) == 0:
                             continue
                         if origin_pi >= arg_count:
                             continue
@@ -5473,7 +5476,7 @@ fn Sema.check_returned_view_origins(self: Sema, expr_node: i32, report_node: i32
                         continue
                     let origin_mask = self.sig_param_view_origin(sig_idx, pi)
                     for origin_pi in 0..param_count:
-                        if (origin_mask & (((1 as i64) << (origin_pi as u32)) as i32)) == 0:
+                        if sema_param_origin_mask_contains(origin_mask, origin_pi) == 0:
                             continue
                         if origin_pi >= arg_count:
                             continue
@@ -5524,7 +5527,7 @@ fn Sema.record_call_view_origins(self: Sema, call_node: i32, sig_idx: i32, param
             continue
         let param_origin_mask = self.sig_param_view_origin(sig_idx, pi)
         for origin_pi in 0..param_count:
-            if (param_origin_mask & (((1 as i64) << (origin_pi as u32)) as i32)) == 0:
+            if sema_param_origin_mask_contains(param_origin_mask, origin_pi) == 0:
                 continue
             var origin_arg = 0
             if param_offset == 1 and origin_pi == 0:
@@ -8054,6 +8057,8 @@ fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
         self.push_scope()
         let had_binding = self.scope_has(name)
         self.scope_put(name, payload_ty, is_mut)
+        self.binding_decl_nodes.insert(name, node)
+        self.binding_value_nodes.insert(name, source)
         if had_binding == 0:
             self.register_pending_generic_binding(name, 0, source, payload_ty)
         if self.type_is_no_await_guard(source_ty as i32) != 0:
@@ -8071,6 +8076,8 @@ fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
     self.push_scope()
     let had_binding = self.scope_has(name)
     self.scope_put(name, source_ty as i32, is_mut)
+    self.binding_decl_nodes.insert(name, node)
+    self.binding_value_nodes.insert(name, source)
     if had_binding == 0:
         self.register_pending_generic_binding(name, 0, source, source_ty as i32)
     let body_ty = self.check_expr(body)
@@ -8106,6 +8113,7 @@ fn Sema.check_with_tuple(self: Sema, node: i32) -> i32:
         if sym != 0:
             let elem_ty = self.type_extra.get((te_start + i) as i64)
             self.scope_put(sym, elem_ty, is_mut)
+            self.binding_decl_nodes.insert(sym, node)
     let body_ty = self.check_expr(body)
     self.pop_scope()
     if is_mut != 0:
