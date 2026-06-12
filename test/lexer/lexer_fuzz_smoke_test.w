@@ -4,8 +4,10 @@ use Lexer
 use Token
 
 fn assert_deterministic(src: str):
-    var a = Lexer.init(src, 0).tokenize()
-    var b = Lexer.init(src, 0).tokenize()
+    var la = Lexer.init(src, 0)
+    var a = la.tokenize()
+    var lb = Lexer.init(src, 0)
+    var b = lb.tokenize()
 
     assert(a.len() == b.len())
     for i in 0..a.len():

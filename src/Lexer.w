@@ -68,7 +68,7 @@ enum CharCode: i32:
     LowerX = 120
     LowerZ = 122
 
-type Lexer {
+pub type Lexer {
     source: str,
     pos: i32,
     file_id: i32,

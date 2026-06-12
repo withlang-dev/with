@@ -17,7 +17,7 @@ extern fn with_alloc(size: i64) -> *mut u8
 type NodeId = distinct i32
 impl Copy for NodeId
 
-enum NodeKind: i32:
+pub enum NodeKind: i32:
     // Declarations
     NK_FN_DECL = 1
     NK_TYPE_DECL = 2
@@ -249,8 +249,8 @@ const INDEX_ELLIPSIS: i32 = 2
 const INDEX_NEWAXIS: i32 = 3
 const INDEX_KIND_SHIFT: i32 = 268435456  // 1 << 28
 
-const TYPE_TRAIT_OBJECT_DYN: i32 = 1
-const TYPE_TRAIT_OBJECT_IMPL: i32 = 2
+pub const TYPE_TRAIT_OBJECT_DYN: i32 = 1
+pub const TYPE_TRAIT_OBJECT_IMPL: i32 = 2
 
 // NK_UNSAFE_BLOCK.d1 distinguishes a true unsafe block from the narrow
 // `unsafe *p` / `unsafe p[i]` raw-access prefix form. d2 marks parser-inserted
@@ -310,7 +310,7 @@ enum Visibility: i32:
     Public = 1
 
 // Binary operators
-enum BinaryOp: i32:
+pub enum BinaryOp: i32:
     OP_ADD = 0
     OP_SUB = 1
     OP_MUL = 2
@@ -459,7 +459,7 @@ type AstPoolState {
     frozen: i32,
 }
 
-type AstPool {
+pub type AstPool {
     state: *mut AstPoolState,
 }
 impl Copy for AstPool

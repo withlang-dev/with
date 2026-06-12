@@ -99,7 +99,7 @@ fn Diagnostic.render(self: Diagnostic, source: Source):
         let help: str = self.helps.get(i as i64)
         with_eprint(render_diag_help_line(help))
 
-type DiagnosticList {
+pub type DiagnosticList {
     items: Vec[Diagnostic],
 }
 

@@ -12,7 +12,7 @@ use Diagnostic
 
 extern fn with_parse_i64(s: str) -> i64
 extern fn str_from_byte(b: i32) -> str
-type Parser {
+pub type Parser {
     tokens: TokenList,
     pos: i32,
     pool: AstPool,

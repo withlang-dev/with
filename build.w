@@ -852,6 +852,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     internals_tests = internals_tests.dep("selfcheck")
     out = out.add_target(internals_tests)
 
+    var lexer_tests = target_new(.Test, "lexer-tests", "test/lexer/*.w")
+    lexer_tests = lexer_tests.arg("compiler=" ++ release_compiler_bin("with"))
+    lexer_tests = lexer_tests.dep("build")
+    lexer_tests = lexer_tests.dep("selfcheck")
+    out = out.add_target(lexer_tests)
+
+    var parser_tests = target_new(.Test, "parser-tests", "test/parser/*.w")
+    parser_tests = parser_tests.arg("compiler=" ++ release_compiler_bin("with"))
+    parser_tests = parser_tests.dep("build")
+    parser_tests = parser_tests.dep("selfcheck")
+    out = out.add_target(parser_tests)
+
     var cli_selfhost_smoke_tests = target_new(.Action, "cli-selfhost-smoke-tests", "").output("out/test-graph/cli-selfhost-smoke-tests")
     cli_selfhost_smoke_tests.action = run_cli_selfhost_smoke_action
     cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input(release_compiler_bin("with"))
@@ -953,6 +965,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("native-spec-tests")
     tests = tests.dep("native-phase-tests")
     tests = tests.dep("internals-tests")
+    tests = tests.dep("lexer-tests")
+    tests = tests.dep("parser-tests")
     tests = tests.dep("cli-selfhost-smoke-tests")
     tests = tests.dep("cli-selfhost-one-liner-tests")
     tests = tests.dep("cli-selfhost-object-symbol-tests")

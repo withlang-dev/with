@@ -7,7 +7,7 @@
 use Span
 
 // All token kinds produced by the lexer.
-enum TokenKind: i32:
+pub enum TokenKind: i32:
     // Literals
     TK_INT_LIT = 0
     TK_FLOAT_LIT = 1
