@@ -224,6 +224,20 @@ fn rt_f64_to_fixed_buf(val: f64, precision: i32, buf: *mut u8, bufsize: i64) -> 
     let v = rt_f64_abs_value(val, bits)
     rt_f64_write_fixed_abs(v, precision, false, buf, bufsize, pos)
 
+// Format f64 with scientific notation and fixed fractional precision.
+fn rt_f64_to_scientific_buf(val: f64, precision: i32, buf: *mut u8, bufsize: i64) -> i64:
+    let bits = f64_bits(val)
+    if f64_is_nan_bits(bits) or f64_is_inf_bits(bits):
+        return rt_f64_write_special(bits, buf, bufsize)
+    var pos: i64 = 0
+    if f64_is_negative_bits(bits):
+        pos = rt_buf_put(buf, bufsize, pos, 45)
+    let v = rt_f64_abs_value(val, bits)
+    if v == 0.0:
+        pos = rt_f64_write_fixed_abs(0.0, precision, false, buf, bufsize, pos)
+        return rt_f64_write_exponent(0, buf, bufsize, pos)
+    rt_f64_write_scientific_abs(v, precision, false, buf, bufsize, pos)
+
 // Internal helper for u64-to-decimal (used by float formatting)
 fn u64_to_buf_internal(n: u64, buf: *mut u8) -> i64:
     var tmp: [21]u8 = [0 as u8; 21]
@@ -1129,11 +1143,18 @@ pub fn with_fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32,
 // ── with_fmt_f64_spec ──────────────────────────────────────────────
 
 pub fn with_fmt_f64_spec(val: f64, flags: i64, width: i32, precision: i32, mode: i32) -> str:
-    let _ = mode
     var buf: [64]u8 = [0 as u8; 64]
     var len: i64 = 0
 
-    if precision >= 0:
+    if mode == 102:  // 'f'
+        let fixed_precision = if precision >= 0: precision else: 6
+        len = rt_f64_to_fixed_buf(val, fixed_precision, &buf as *mut u8, 64)
+    else if mode == 101:  // 'e'
+        let scientific_precision = if precision >= 0: precision else: 6
+        len = rt_f64_to_scientific_buf(val, scientific_precision, &buf as *mut u8, 64)
+    else if mode == 103:  // 'g'
+        len = rt_f64_to_buf(val, &buf as *mut u8, 64)
+    else if precision >= 0:
         len = rt_f64_to_fixed_buf(val, precision, &buf as *mut u8, 64)
     else:
         len = rt_f64_to_buf(val, &buf as *mut u8, 64)

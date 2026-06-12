@@ -48,6 +48,19 @@ default display (`3.14`, `10`, `1.5`, `0.5`, `0.001`), debug-display parity,
 `with build :fixpoint`, `with build :test`, and `with build :test-green`
 passed on 2026-06-11 for #438.
 
+#440 is implemented and verified. `with_fmt_f64_spec` now honors float mode
+bytes from f-string specs: `:f` uses fixed-point with default precision 6,
+`:e` uses scientific notation with default precision 6, `:g` uses general
+display, and precision-without-mode continues to mean fixed-point. NaN/inf
+classification is shared across modes, and the emit-C direct formatting path
+now passes the mode argument to the five-argument runtime formatter API.
+Behavior coverage pins explicit fixed/scientific/general modes, bare `:f` and
+`:e`, width/sign/zero padding, and NaN/+/-inf under float modes; existing
+compile-error tests cover invalid float/integer mode combinations. Full
+`with build`, `with build :emit-c-smoke`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-11 for
+#440.
+
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
 C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib

@@ -6402,9 +6402,9 @@ fn CCodegen.emit_builtin_format_call_term(self: CCodegen, body: MirBody, kind: C
         return out
 
     if kind == CcBuiltin.FMT_SPEC:
-        // args: value, flags(i64), width(i32), precision(i32)
-        if argc < 4:
-            self.fail("fmt.spec expects four arguments")
+        // args: value, flags(i64), width(i32), precision(i32), sema_type_id
+        if argc < 5:
+            self.fail("fmt.spec expects five arguments")
             return "    abort();"
         let val_operand = self.call_arg_operand(body, args_id, 0)
         let val_text = self.operand_text(body, val_operand)
@@ -6419,12 +6419,13 @@ fn CCodegen.emit_builtin_format_call_term(self: CCodegen, body: MirBody, kind: C
         var out = ""
         if has_ret != 0:
             let dst = self.place_text(body, dest_place)
+            let mode_text = "(((" ++ flags_text ++ ") & 255))"
             if tk == TypeKind.TY_FLOAT:
-                out = out ++ "    " ++ dst ++ " = with_fmt_f64_spec((double)(" ++ val_text ++ "), (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
+                out = out ++ "    " ++ dst ++ " = with_fmt_f64_spec((double)(" ++ val_text ++ "), (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "), (int32_t)(" ++ mode_text ++ "));\n"
             else if tk == TypeKind.TY_STR:
                 out = out ++ "    " ++ dst ++ " = with_fmt_str_spec(" ++ val_text ++ ", (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
             else:
-                out = out ++ "    " ++ dst ++ " = with_fmt_int_spec((int64_t)(" ++ val_text ++ "), 0, (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "));\n"
+                out = out ++ "    " ++ dst ++ " = with_fmt_int_spec((int64_t)(" ++ val_text ++ "), 0, (int64_t)(" ++ flags_text ++ "), (int32_t)(" ++ width_text ++ "), (int32_t)(" ++ prec_text ++ "), (int32_t)(" ++ mode_text ++ "));\n"
         else:
             out = out ++ "    (void)0;\n"
         out = out ++ f"    goto bb{next_bb};"
