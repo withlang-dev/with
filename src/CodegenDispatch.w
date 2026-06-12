@@ -2885,17 +2885,19 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: &MirBody, rval_id: i32, dest_ty:
         return arg
 
     if rk == RvalueKind.RK_REF:
-        let ptr = self.mir_place_ptr(body, d1, false, 0)
+        var ptr = self.mir_place_ptr(body, d1, false, 0)
         if ptr == 0:
             return wl_get_undef(fallback_ty)
+        ptr = self.mir_ref_through_indirect_base(body, d1, ptr)
         if dest_ty != 0 and wl_type_of(ptr) != dest_ty and wl_get_type_kind(dest_ty) == wl_pointer_type_kind():
             return wl_build_bitcast(self.builder, ptr, dest_ty)
         return ptr
 
     if rk == RvalueKind.RK_ADDR_OF:
-        let ptr = self.mir_place_ptr(body, d0, false, 0)
+        var ptr = self.mir_place_ptr(body, d0, false, 0)
         if ptr == 0:
             return wl_get_undef(fallback_ty)
+        ptr = self.mir_ref_through_indirect_base(body, d0, ptr)
         if dest_ty != 0 and wl_type_of(ptr) != dest_ty and wl_get_type_kind(dest_ty) == wl_pointer_type_kind():
             return wl_build_bitcast(self.builder, ptr, dest_ty)
         return ptr
@@ -3611,6 +3613,36 @@ fn Codegen.mir_try_place_ptr_for_ref(self: Codegen, body: &MirBody, operand_id: 
                 return indirect_ptr
         return ptr
     0
+
+// #568: a bare place over a pointer-ABI'd aggregate parameter (struct
+// `self` and indirect-value params) stores the struct POINTER in its
+// slot. A reference to such a place is that pointer, not the slot
+// address — returning the slot address hands callees a pointer to a
+// pointer, which they then read as the struct header (memory
+// corruption). The field-projection walk in mir_place_ptr already
+// loads through; this covers the projection-free case for RK_REF and
+// RK_ADDR_OF.
+fn Codegen.mir_ref_through_indirect_base(self: Codegen, body: &MirBody, place_id: i32, ptr: i64) -> i64:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return ptr
+    if body.place_proj_counts.get(place_id as i64) != 0:
+        return ptr
+    let local_id = body.place_locals.get(place_id as i64)
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return ptr
+    let sema_ty = body.local_type_ids.get(local_id as i64)
+    if sema_ty <= 0:
+        return ptr
+    let semantic_ty = self.mir_sema_type_to_llvm(sema_ty)
+    if semantic_ty == 0 or wl_get_type_kind(semantic_ty) == wl_pointer_type_kind():
+        return ptr
+    let st_opt = self.mir_local_types.get(local_id)
+    if st_opt.is_none():
+        return ptr
+    let st = st_opt.unwrap() as i64
+    if st == 0 or wl_get_type_kind(st) != wl_pointer_type_kind():
+        return ptr
+    wl_build_load(self.builder, st, ptr)
 
 fn Codegen.mir_indirect_value_local_ptr(self: Codegen, local_id: i32, storage_ptr: i64) -> i64:
     if storage_ptr == 0:
