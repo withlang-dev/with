@@ -1591,6 +1591,132 @@ fn ComptimeEvaluator.eval_shift_value(self: ComptimeEvaluator, op: i32, result_t
         return exact_int_logical_shr_word(lhs, rhs as i32)
     lhs >> count
 
+fn comptime_positive_mod(value: i64, divisor: i32) -> i32:
+    if divisor <= 0:
+        return 0
+    var out = (value % divisor as i64) as i32
+    if out < 0:
+        out = out + divisor
+    out
+
+fn comptime_bit_pattern(value: i64, width: i32) -> i64:
+    int_truncate_to_width(value, width, true)
+
+fn comptime_bit_result(value: i64, width: i32, is_unsigned: bool) -> i64:
+    int_truncate_to_width(value, width, is_unsigned)
+
+fn comptime_count_ones(value: i64, width: i32) -> i32:
+    let raw = comptime_bit_pattern(value, width)
+    var count = 0
+    for bit in 0..width:
+        if (raw & exact_int_pow2_word(bit)) != 0:
+            count = count + 1
+    count
+
+fn comptime_count_leading_zeros(value: i64, width: i32) -> i32:
+    let raw = comptime_bit_pattern(value, width)
+    var count = 0
+    var bit = width - 1
+    while bit >= 0:
+        if (raw & exact_int_pow2_word(bit)) != 0:
+            return count
+        count = count + 1
+        bit = bit - 1
+    count
+
+fn comptime_count_trailing_zeros(value: i64, width: i32) -> i32:
+    let raw = comptime_bit_pattern(value, width)
+    var count = 0
+    for bit in 0..width:
+        if (raw & exact_int_pow2_word(bit)) != 0:
+            return count
+        count = count + 1
+    count
+
+fn comptime_rotate_bits(value: i64, width: i32, count_raw: i64, left: bool) -> i64:
+    let raw = comptime_bit_pattern(value, width)
+    let count = comptime_positive_mod(count_raw, width)
+    if count == 0:
+        return raw
+    let mask = exact_int_low_mask(width)
+    if left:
+        return (exact_int_shl_word(raw, count) | exact_int_logical_shr_word(raw, width - count)) & mask
+    (exact_int_logical_shr_word(raw, count) | exact_int_shl_word(raw, width - count)) & mask
+
+fn comptime_swap_bytes_bits(value: i64, width: i32) -> i64:
+    let raw = comptime_bit_pattern(value, width)
+    if width <= 8:
+        return raw
+    let byte_count = width / 8
+    var out: i64 = 0
+    for bi in 0..byte_count:
+        let byte = exact_int_logical_shr_word(raw, bi * 8) & 255
+        out = out | exact_int_shl_word(byte, (byte_count - 1 - bi) * 8)
+    out & exact_int_low_mask(width)
+
+fn comptime_reverse_bits(value: i64, width: i32) -> i64:
+    let raw = comptime_bit_pattern(value, width)
+    var out: i64 = 0
+    for bit in 0..width:
+        if (raw & exact_int_pow2_word(bit)) != 0:
+            out = out | exact_int_pow2_word(width - 1 - bit)
+    out & exact_int_low_mask(width)
+
+fn ComptimeEvaluator.eval_int_method_call(self: ComptimeEvaluator, recv_value: ComptimeValue, recv_type_raw: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let method = self.pool.resolve(field)
+    var recv_type = recv_type_raw
+    if recv_type == 0:
+        recv_type = recv_value.type_id
+    if recv_type == 0:
+        recv_type = self.sema.ty_i64 as i32
+    let width = self.comptime_int_width(recv_type)
+    let is_unsigned = self.comptime_int_is_unsigned(recv_type)
+    if width <= 0 or width > 64:
+        return self.fail(node, "comptime integer bit methods currently support integer widths up to 64 bits")
+
+    if method == "rotate_left" or method == "rotate_right":
+        if arg_count != 1:
+            return self.fail(node, method ++ "() expects exactly one argument")
+        let count_signal = self.eval_expr(self.ast.get_extra(extra_start))
+        if count_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return count_signal
+        if comptime_value_is_intlike(count_signal.value) == 0:
+            return self.fail(node, method ++ "() argument must be an integer")
+        let rotated = comptime_rotate_bits(recv_value.data0, width, comptime_value_intlike(count_signal.value), method == "rotate_left")
+        let result_type = self.node_type_or(node, recv_type)
+        return comptime_control_value(comptime_value_int(result_type, comptime_bit_result(rotated, width, is_unsigned)))
+
+    if method == "swap_bytes":
+        if arg_count != 0:
+            return self.fail(node, "swap_bytes() takes no arguments")
+        let swapped = comptime_swap_bytes_bits(recv_value.data0, width)
+        let result_type2 = self.node_type_or(node, recv_type)
+        return comptime_control_value(comptime_value_int(result_type2, comptime_bit_result(swapped, width, is_unsigned)))
+
+    if method == "popcount":
+        if arg_count != 0:
+            return self.fail(node, "popcount() takes no arguments")
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), comptime_count_ones(recv_value.data0, width) as i64))
+
+    if method == "clz":
+        if arg_count != 0:
+            return self.fail(node, "clz() takes no arguments")
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), comptime_count_leading_zeros(recv_value.data0, width) as i64))
+
+    if method == "ctz":
+        if arg_count != 0:
+            return self.fail(node, "ctz() takes no arguments")
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), comptime_count_trailing_zeros(recv_value.data0, width) as i64))
+
+    if method == "bitreverse":
+        if arg_count != 0:
+            return self.fail(node, "bitreverse() takes no arguments")
+        let reversed = comptime_reverse_bits(recv_value.data0, width)
+        let result_type3 = self.node_type_or(node, recv_type)
+        return comptime_control_value(comptime_value_int(result_type3, comptime_bit_result(reversed, width, is_unsigned)))
+
+    self.fail(node, "integer method '" ++ method ++ "' is not comptime-evaluable yet")
+
 fn ComptimeEvaluator.static_type_expr(self: ComptimeEvaluator, node: i32) -> i32:
     if node == 0:
         return 0
@@ -5206,6 +5332,8 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
             return recv_signal
         if recv_signal.value.kind == ComptimeValueKind.CV_CAPABILITY:
             return self.eval_capability_method_call(recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
+        if recv_signal.value.kind == ComptimeValueKind.CV_INT:
+            return self.eval_int_method_call(recv_signal.value, self.node_type_or(recv_node, recv_signal.value.type_id), field, self.ast.get_data1(node), arg_count, node)
         if self.is_string_builder_value(recv_signal.value):
             return self.eval_string_builder_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
         if recv_signal.value.kind == ComptimeValueKind.CV_STRUCT:

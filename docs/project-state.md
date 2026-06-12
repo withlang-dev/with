@@ -77,6 +77,23 @@ compiles to an object. Full `with build`, `with build :fixpoint`,
 `with build :test`, and `with build :test-green` passed on 2026-06-11 for
 #428.
 
+#422 is implemented and verified. Integer bit-manipulation methods now have a
+comptime evaluator path matching the existing runtime intrinsic surface:
+`rotate_left`, `rotate_right`, `swap_bytes`, `popcount`, `clz`, `ctz`, and
+`bitreverse` operate on fixed-width bit patterns for integer receivers.
+Rotations normalize counts by width, `swap_bytes` is identity for 8-bit
+integers, `popcount`/`clz`/`ctz` return `i32`, and zero `clz`/`ctz` return the
+declared integer width. Signed receivers are evaluated through their declared
+width bit pattern before being converted back to the receiver type where
+appropriate. Behavior coverage pins representative comptime results for u8,
+u16, u32, and signed i8 values, including oversized and negative rotate counts,
+zero count operations, byte swapping, bit reversal, and signed popcount. A
+compile-error test covers invalid comptime arity. Full `with build`,
+`with build :fixpoint`, `with build :test`, and `with build :test-green` passed
+on 2026-06-11 for #422. Follow-up #565 tracks the separate bug where pipeline
+syntax for primitive intrinsic methods works at runtime but is rejected inside
+`comptime`.
+
 Release UAT gates are implemented in With build actions, not shell scripts.
 `with build :release-uat` now groups release artifact smoke, fresh project,
 C migration, zlib, bzip2, sqlite3, OpenSSL, libcurl, install-layout, raylib
