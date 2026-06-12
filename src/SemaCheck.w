@@ -5503,6 +5503,20 @@ fn Sema.propagate_method_call_param_effects(self: Sema, call_node: i32, sig_idx:
         let arg_node = if has_resolved != 0: self.get_resolved_call_arg(call_node, ai) else: self.ast.get_extra(extra_start + ai)
         if arg_node > 0:
             self.propagate_call_param_effect(self.sig_param_effect(sig_idx, param_i), arg_node)
+            // §3.8: a plain `T` method parameter consumes its argument, whether
+            // or not the callee body exercises ownership. Same first slice as
+            // check_call (#562): enforced for arguments with a user drop impl;
+            // full non-Copy enforcement is the #564 migration. Receivers are
+            // handled separately (`mut self` is a place receiver, not a consume).
+            let mp_ty = self.sig_param_type(sig_idx, param_i)
+            if mp_ty != 0:
+                let mp_tk = self.get_type_kind(self.resolve_alias(mp_ty))
+                if mp_tk != TypeKind.TY_REF and mp_tk != TypeKind.TY_PTR:
+                    let mp_arg_ty = self.typed_expr_types.get(arg_node)
+                    if mp_arg_ty.is_some():
+                        let mp_arg_name = self.get_type_name(self.resolve_alias(mp_arg_ty.unwrap() as TypeId))
+                        if mp_arg_name != 0 and self.has_drop_method(mp_arg_name) != 0:
+                            self.mark_moved_if_consumed(arg_node)
 
 fn Sema.check_return(self: Sema, node: i32) -> i32:
     if self.in_defer != 0:
@@ -8786,7 +8800,22 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             // function's effect set.
             let trans_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
             self.propagate_call_param_effect(param_eff, trans_nd)
-            if (param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
+            // §3.8: a plain `T` parameter consumes — the caller's binding is
+            // invalidated whether or not the callee body exercises ownership.
+            // First slice (#562): enforced where the consume is observable —
+            // arguments whose type has a user drop impl (callee drop + caller
+            // scope-exit drop would double-drop). Full enforcement for all
+            // non-Copy types is the #564 migration. Extern/C callees are
+            // exempt: they receive a bit-copy and cannot drop.
+            var arg_consumed_by_value = 0
+            if expected_ty != 0 and arg_ty != 0:
+                let consume_pk = self.get_type_kind(self.resolve_alias(expected_ty))
+                if consume_pk != TypeKind.TY_REF and consume_pk != TypeKind.TY_PTR:
+                    if self.extern_fn_names.contains(fn_sym) == 0 and self.ci_syms.contains(fn_sym) == 0:
+                        let consume_arg_name = self.get_type_name(self.resolve_alias(arg_ty as TypeId))
+                        if consume_arg_name != 0 and self.has_drop_method(consume_arg_name) != 0:
+                            arg_consumed_by_value = 1
+            if arg_consumed_by_value != 0 or (param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
                 let eff_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                 if eff_arg_nd > 0:
                     // Mark the arg as consumed so subsequent uses are caught.
