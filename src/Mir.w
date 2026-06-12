@@ -723,7 +723,7 @@ fn MirBody.new_const(mut self: MirBody, kind: i32, d0: i32, d1: i32, d2: i32, ty
     self.const_types.push(type_id)
     id
 
-fn mir_const_int_value(body: MirBody, const_id: i32) -> i64:
+fn mir_const_int_value(body: &MirBody, const_id: i32) -> i64:
     ast_int_from_parts(
         body.const_d0.get(const_id as i64),
         body.const_d1.get(const_id as i64),

@@ -979,7 +979,7 @@ fn CCodegen.global_decl_tid(self: CCodegen, decl: NodeId) -> i32:
         return self.sema.typed_expr_types.get(value).unwrap()
     self.sema.ty_i32 as i32
 
-fn CCodegen.local_global_sym(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_global_sym(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id <= 0 or local_id >= body.local_names.len() as i32:
         return 0
     let sym = body.local_names.get(local_id as i64)
@@ -1049,7 +1049,7 @@ fn CCodegen.fn_param_is_c_pointer(self: CCodegen, fn_sym: i32, param_idx: i32) -
     self.fn_pointer_param_cache.insert(cache_key, out)
     out
 
-fn CCodegen.local_is_c_pointer_param(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_is_c_pointer_param(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id <= 0:
         return 0
     let sig_idx = self.body_sig_index(body.fn_sym)
@@ -1058,7 +1058,7 @@ fn CCodegen.local_is_c_pointer_param(self: CCodegen, body: MirBody, local_id: i3
         return 0
     self.fn_param_is_c_pointer(body.fn_sym, local_id - 1)
 
-fn CCodegen.call_param_expects_c_pointer(self: CCodegen, body: MirBody, callee_operand: i32, param_idx: i32) -> i32:
+fn CCodegen.call_param_expects_c_pointer(self: CCodegen, body: &MirBody, callee_operand: i32, param_idx: i32) -> i32:
     let fn_sym = self.call_callee_fn_sym(body, callee_operand)
     self.fn_param_is_c_pointer(fn_sym, param_idx)
 
@@ -1241,7 +1241,7 @@ fn CCodegen.struct_field_tid(self: CCodegen, struct_tid: i32, field_sym: i32) ->
             return self.sema.type_extra.get((start + fi * 3 + 1) as i64)
     0
 
-fn CCodegen.place_tid(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+fn CCodegen.place_tid(self: CCodegen, body: &MirBody, place_id: i32) -> i32:
     let lid = self.place_local_id(body, place_id)
     var base_tid = self.local_effective_tid(body, lid)
     if self.is_void_tid(base_tid) != 0:
@@ -1309,7 +1309,7 @@ fn CCodegen.place_tid(self: CCodegen, body: MirBody, place_id: i32) -> i32:
         return 0
     tid
 
-fn CCodegen.place_ref_target_tid(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+fn CCodegen.place_ref_target_tid(self: CCodegen, body: &MirBody, place_id: i32) -> i32:
     let lid = self.place_local_id(body, place_id)
     var base_tid = self.local_effective_tid(body, lid)
     if self.is_void_tid(base_tid) != 0:
@@ -1379,7 +1379,7 @@ fn CCodegen.place_ref_target_tid(self: CCodegen, body: MirBody, place_id: i32) -
         return 0
     tid
 
-fn CCodegen.place_tid_no_infer(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+fn CCodegen.place_tid_no_infer(self: CCodegen, body: &MirBody, place_id: i32) -> i32:
     let base_tid = self.place_local_tid(body, place_id)
     if base_tid == 0:
         return 0
@@ -1670,7 +1670,7 @@ fn CCodegen.vec_synthetic_field_tid(self: CCodegen, vec_tid: i32, field_sym: i32
         return mut_ptr
     self.sema.ensure_exact_type(TypeKind.TY_PTR, elem_tid, 0, 0) as i32
 
-fn CCodegen.vec_new_elem_size_text(self: CCodegen, body: MirBody, dest_place: i32) -> str:
+fn CCodegen.vec_new_elem_size_text(self: CCodegen, body: &MirBody, dest_place: i32) -> str:
     var vec_tid = self.place_tid_no_infer(body, dest_place)
     var elem_tid = self.vec_element_tid(vec_tid)
     if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
@@ -1746,14 +1746,14 @@ fn CCodegen.option_tid_for_payload(self: CCodegen, payload_tid: i32) -> i32:
     args.push(payload_tid)
     self.sema.ensure_generic_inst_type(self.sema.syms.option, args, 1) as i32
 
-fn CCodegen.call_hashmap_get_option_tid(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+fn CCodegen.call_hashmap_get_option_tid(self: CCodegen, body: &MirBody, args_id: i32) -> i32:
     let recv_operand = self.call_arg_operand(body, args_id, 0)
     var value_tid = self.hashmap_value_tid(self.operand_tid(body, recv_operand))
     if value_tid == 0:
         value_tid = self.call_hashmap_value_tid_from_usage(body, args_id)
     self.option_tid_for_payload(value_tid)
 
-fn CCodegen.call_hashmap_value_tid_from_usage(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+fn CCodegen.call_hashmap_value_tid_from_usage(self: CCodegen, body: &MirBody, args_id: i32) -> i32:
     let recv_operand = self.call_arg_operand(body, args_id, 0)
     let recv_text = self.operand_text(body, recv_operand)
     if recv_text.len() == 0:
@@ -1781,7 +1781,7 @@ fn CCodegen.call_hashmap_value_tid_from_usage(self: CCodegen, body: MirBody, arg
             return 0
     out
 
-fn CCodegen.vec_local_element_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.vec_local_element_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0:
         return 0
     var out = 0
@@ -1833,12 +1833,12 @@ fn CCodegen.vec_local_element_tid(self: CCodegen, body: MirBody, local_id: i32) 
             return 0
     out
 
-fn CCodegen.place_local_id(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+fn CCodegen.place_local_id(self: CCodegen, body: &MirBody, place_id: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
     body.place_locals.get(place_id as i64)
 
-fn CCodegen.local_declared_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_declared_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
         return 0
     let declared = body.local_type_ids.get(local_id as i64)
@@ -1854,7 +1854,7 @@ fn CCodegen.local_declared_tid(self: CCodegen, body: MirBody, local_id: i32) -> 
         return self.sema.sig_param_type(sig_idx, local_id - 1)
     declared
 
-fn CCodegen.local_effective_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_effective_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     let declared = self.local_declared_tid(body, local_id)
     if local_id <= 0:
         return declared
@@ -1910,7 +1910,7 @@ fn CCodegen.local_effective_tid(self: CCodegen, body: MirBody, local_id: i32) ->
     self.local_effective_cache.insert(cache_key, declared)
     declared
 
-fn CCodegen.local_struct_collection_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_struct_collection_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     let declared = self.local_declared_tid(body, local_id)
     if local_id <= 0:
         return declared
@@ -1927,7 +1927,7 @@ fn CCodegen.local_struct_collection_tid(self: CCodegen, body: MirBody, local_id:
             return declared
     declared
 
-fn CCodegen.local_direct_call_return_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_direct_call_return_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0:
         return 0
     let cache_key = cc_body_local_cache_key(body.fn_sym, local_id)
@@ -1966,7 +1966,7 @@ fn CCodegen.local_direct_call_return_tid(self: CCodegen, body: MirBody, local_id
     self.local_call_ret_cache.insert(cache_key, out)
     out
 
-fn CCodegen.local_copied_payload_enum_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_copied_payload_enum_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0:
         return 0
     let cache_key = cc_body_local_cache_key(body.fn_sym, local_id)
@@ -2016,7 +2016,7 @@ fn CCodegen.local_copied_payload_enum_tid(self: CCodegen, body: MirBody, local_i
     self.local_copied_payload_cache.insert(cache_key, out)
     out
 
-fn CCodegen.place_has_downcast(self: CCodegen, body: MirBody, place_id: i32) -> bool:
+fn CCodegen.place_has_downcast(self: CCodegen, body: &MirBody, place_id: i32) -> bool:
     let _ = self
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return false
@@ -2027,7 +2027,7 @@ fn CCodegen.place_has_downcast(self: CCodegen, body: MirBody, place_id: i32) -> 
             return true
     false
 
-fn CCodegen.local_payload_downcast_option_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_payload_downcast_option_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0:
         return 0
     let cache_key = cc_body_local_cache_key(body.fn_sym, local_id)
@@ -2102,7 +2102,7 @@ fn CCodegen.record_local_tid(self: CCodegen, values: Vec[i32], local_id: i32, ti
     if self.strict_type_match(current, tid) == 0:
         values.set_i32(local_id, -1)
 
-fn CCodegen.body_downcast_option_tids(self: CCodegen, body: MirBody) -> Vec[i32]:
+fn CCodegen.body_downcast_option_tids(self: CCodegen, body: &MirBody) -> Vec[i32]:
     let out = cc_zero_i32_vec(body.local_count())
     for bb in 0..body.block_count():
         let start = body.bb_stmt_starts.get(bb as i64)
@@ -2133,7 +2133,7 @@ fn CCodegen.body_downcast_option_tids(self: CCodegen, body: MirBody) -> Vec[i32]
             self.record_local_tid(out, src_local, opt_tid)
     out
 
-fn CCodegen.body_copied_payload_enum_tids(self: CCodegen, body: MirBody, downcast_option_tids: Vec[i32]) -> Vec[i32]:
+fn CCodegen.body_copied_payload_enum_tids(self: CCodegen, body: &MirBody, downcast_option_tids: Vec[i32]) -> Vec[i32]:
     let out = cc_zero_i32_vec(body.local_count())
     for bb in 0..body.block_count():
         let start = body.bb_stmt_starts.get(bb as i64)
@@ -2169,7 +2169,7 @@ fn CCodegen.body_copied_payload_enum_tids(self: CCodegen, body: MirBody, downcas
             self.record_local_tid(out, dst_local, src_tid)
     out
 
-fn CCodegen.body_ref_target_tids(self: CCodegen, body: MirBody) -> Vec[i32]:
+fn CCodegen.body_ref_target_tids(self: CCodegen, body: &MirBody) -> Vec[i32]:
     let out = cc_zero_i32_vec(body.local_count())
     for bb in 0..body.block_count():
         let start = body.bb_stmt_starts.get(bb as i64)
@@ -2197,11 +2197,11 @@ fn CCodegen.body_ref_target_tids(self: CCodegen, body: MirBody) -> Vec[i32]:
             self.record_local_tid(out, dst_local, src_tid)
     out
 
-fn CCodegen.place_local_tid(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+fn CCodegen.place_local_tid(self: CCodegen, body: &MirBody, place_id: i32) -> i32:
     let local_id = self.place_local_id(body, place_id)
     self.local_declared_tid(body, local_id)
 
-fn CCodegen.place_is_direct_local(self: CCodegen, body: MirBody, place_id: i32, local_id: i32) -> i32:
+fn CCodegen.place_is_direct_local(self: CCodegen, body: &MirBody, place_id: i32, local_id: i32) -> i32:
     let _ = self
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
@@ -2211,7 +2211,7 @@ fn CCodegen.place_is_direct_local(self: CCodegen, body: MirBody, place_id: i32, 
         return 0
     1
 
-fn CCodegen.place_uses_local(self: CCodegen, body: MirBody, place_id: i32, local_id: i32) -> i32:
+fn CCodegen.place_uses_local(self: CCodegen, body: &MirBody, place_id: i32, local_id: i32) -> i32:
     let _ = self
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
@@ -2219,7 +2219,7 @@ fn CCodegen.place_uses_local(self: CCodegen, body: MirBody, place_id: i32, local
         return 1
     0
 
-fn CCodegen.local_is_read(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_is_read(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0:
         return 0
     for oi in 0..body.operand_kinds.len() as i32:
@@ -2231,7 +2231,7 @@ fn CCodegen.local_is_read(self: CCodegen, body: MirBody, local_id: i32) -> i32:
             return 1
     0
 
-fn CCodegen.operand_uses_local(self: CCodegen, body: MirBody, operand_id: i32, local_id: i32) -> i32:
+fn CCodegen.operand_uses_local(self: CCodegen, body: &MirBody, operand_id: i32, local_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return 0
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -2240,7 +2240,7 @@ fn CCodegen.operand_uses_local(self: CCodegen, body: MirBody, operand_id: i32, l
     let place_id = body.operand_d0.get(operand_id as i64)
     self.place_uses_local(body, place_id, local_id)
 
-fn CCodegen.operand_direct_local_id(self: CCodegen, body: MirBody, operand_id: i32) -> i32:
+fn CCodegen.operand_direct_local_id(self: CCodegen, body: &MirBody, operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return -1
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -2252,7 +2252,7 @@ fn CCodegen.operand_direct_local_id(self: CCodegen, body: MirBody, operand_id: i
         return -1
     local_id
 
-fn CCodegen.rvalue_uses_local(self: CCodegen, body: MirBody, rval_id: i32, local_id: i32) -> i32:
+fn CCodegen.rvalue_uses_local(self: CCodegen, body: &MirBody, rval_id: i32, local_id: i32) -> i32:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return 0
     let rk = body.rval_kinds.get(rval_id as i64)
@@ -2299,13 +2299,13 @@ fn CCodegen.rvalue_uses_local(self: CCodegen, body: MirBody, rval_id: i32, local
                 return 1
     0
 
-fn CCodegen.local_value_use_mark_place(self: CCodegen, body: MirBody, place_id: i32):
+fn CCodegen.local_value_use_mark_place(self: CCodegen, body: &MirBody, place_id: i32):
     let local_id = self.place_local_id(body, place_id)
     if local_id < 0:
         return
     self.local_value_use_cache.insert(cc_body_local_cache_key(body.fn_sym, local_id), 1)
 
-fn CCodegen.local_value_use_mark_operand(self: CCodegen, body: MirBody, operand_id: i32):
+fn CCodegen.local_value_use_mark_operand(self: CCodegen, body: &MirBody, operand_id: i32):
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -2313,7 +2313,7 @@ fn CCodegen.local_value_use_mark_operand(self: CCodegen, body: MirBody, operand_
         return
     self.local_value_use_mark_place(body, body.operand_d0.get(operand_id as i64))
 
-fn CCodegen.local_value_use_mark_rvalue(self: CCodegen, body: MirBody, rval_id: i32):
+fn CCodegen.local_value_use_mark_rvalue(self: CCodegen, body: &MirBody, rval_id: i32):
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return
     let rk = body.rval_kinds.get(rval_id as i64)
@@ -2361,7 +2361,7 @@ fn CCodegen.local_value_use_mark_rvalue(self: CCodegen, body: MirBody, rval_id: 
         for i in 0..count:
             self.local_value_use_mark_operand(body, body.agg_field_operands.get((start + i) as i64))
 
-fn CCodegen.local_value_use_populate(self: CCodegen, body: MirBody):
+fn CCodegen.local_value_use_populate(self: CCodegen, body: &MirBody):
     for li in 0..body.local_count():
         self.local_value_use_cache.insert(cc_body_local_cache_key(body.fn_sym, li), 0)
     for bb in 0..body.block_count():
@@ -2383,7 +2383,7 @@ fn CCodegen.local_value_use_populate(self: CCodegen, body: MirBody):
         else if tk == TermKind.TK_DROP_AND_GOTO:
             self.local_value_use_mark_place(body, body.term_data0(bb))
 
-fn CCodegen.local_has_value_use(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_has_value_use(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0:
         return 0
     let cache_key = cc_body_local_cache_key(body.fn_sym, local_id)
@@ -2396,7 +2396,7 @@ fn CCodegen.local_has_value_use(self: CCodegen, body: MirBody, local_id: i32) ->
         return populated.unwrap()
     0
 
-fn CCodegen.operand_tid(self: CCodegen, body: MirBody, operand_id: i32) -> i32:
+fn CCodegen.operand_tid(self: CCodegen, body: &MirBody, operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return 0
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -2409,7 +2409,7 @@ fn CCodegen.operand_tid(self: CCodegen, body: MirBody, operand_id: i32) -> i32:
         return body.const_types.get(od as i64)
     0
 
-fn CCodegen.operand_tid_no_infer(self: CCodegen, body: MirBody, operand_id: i32) -> i32:
+fn CCodegen.operand_tid_no_infer(self: CCodegen, body: &MirBody, operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return 0
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -2422,7 +2422,7 @@ fn CCodegen.operand_tid_no_infer(self: CCodegen, body: MirBody, operand_id: i32)
         return body.const_types.get(od as i64)
     0
 
-fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
+fn CCodegen.place_text(self: CCodegen, body: &MirBody, place_id: i32) -> str:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         self.fail(f"invalid place id {place_id}")
         return "_0"
@@ -2542,7 +2542,7 @@ fn cc_exact_uint_expr(lo: i64, hi: i64) -> str:
         return "((uint64_t)0x" ++ cc_hex_u64(lo) ++ "ULL)"
     "((((unsigned __int128)0x" ++ cc_hex_u64(hi) ++ "ULL) << 64) | ((unsigned __int128)0x" ++ cc_hex_u64(lo) ++ "ULL))"
 
-fn CCodegen.exact_int_const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
+fn CCodegen.exact_int_const_text(self: CCodegen, body: &MirBody, const_id: i32) -> str:
     let node = body.const_d0.get(const_id as i64)
     let tid = body.const_types.get(const_id as i64)
     if tid == 0:
@@ -2634,7 +2634,7 @@ fn CCodegen.global_init_text(self: CCodegen, node: i32, tid: i32, source_text: s
         return cc_lbrace() ++ "0" ++ cc_rbrace()
     self.zero_value_text(tid)
 
-fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
+fn CCodegen.const_text(self: CCodegen, body: &MirBody, const_id: i32) -> str:
     if const_id < 0 or const_id >= body.const_kinds.len() as i32:
         self.fail(f"invalid const id {const_id}")
         return "0"
@@ -2679,7 +2679,7 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
     self.fail(f"unsupported const kind {ck}")
     "0"
 
-fn CCodegen.operand_text(self: CCodegen, body: MirBody, operand_id: i32) -> str:
+fn CCodegen.operand_text(self: CCodegen, body: &MirBody, operand_id: i32) -> str:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         self.fail(f"invalid operand id {operand_id}")
         return "0"
@@ -2692,7 +2692,7 @@ fn CCodegen.operand_text(self: CCodegen, body: MirBody, operand_id: i32) -> str:
     self.fail(f"unsupported operand kind {ok}")
     "0"
 
-fn CCodegen.rvalue_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
+fn CCodegen.rvalue_tid(self: CCodegen, body: &MirBody, rval_id: i32) -> i32:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return 0
     let rk = body.rval_kinds.get(rval_id as i64)
@@ -2775,7 +2775,7 @@ fn CCodegen.raw_pointer_binop_text(self: CCodegen, op: i32, lhs: str, rhs: str, 
         return "((" ++ self.c_type(rhs_tid, 0) ++ ")(((uintptr_t)(" ++ lhs ++ ") * " ++ self.raw_pointer_elem_size_expr(rhs_tid) ++ ") + (uintptr_t)(" ++ rhs ++ ")))"
     ""
 
-fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
+fn CCodegen.rvalue_text(self: CCodegen, body: &MirBody, rval_id: i32) -> str:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         self.fail(f"invalid rvalue id {rval_id}")
         return "0"
@@ -2900,12 +2900,12 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
     self.fail(f"unknown MIR rvalue kind {rk}")
     "0"
 
-fn CCodegen.call_arg_count(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+fn CCodegen.call_arg_count(self: CCodegen, body: &MirBody, args_id: i32) -> i32:
     if args_id < 0 or args_id >= body.call_arg_counts.len() as i32:
         return 0
     body.call_arg_counts.get(args_id as i64)
 
-fn CCodegen.aggregate_compound_literal(self: CCodegen, body: MirBody, rval_id: i32, dst_tid: i32) -> str:
+fn CCodegen.aggregate_compound_literal(self: CCodegen, body: &MirBody, rval_id: i32, dst_tid: i32) -> str:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return ""
     if body.rval_kinds.get(rval_id as i64) != RvalueKind.RK_AGGREGATE:
@@ -2957,7 +2957,7 @@ fn CCodegen.aggregate_compound_literal(self: CCodegen, body: MirBody, rval_id: i
     out = out ++ cc_rbrace()
     out
 
-fn CCodegen.aggregate_array_initializer(self: CCodegen, body: MirBody, rval_id: i32) -> str:
+fn CCodegen.aggregate_array_initializer(self: CCodegen, body: &MirBody, rval_id: i32) -> str:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return ""
     if body.rval_kinds.get(rval_id as i64) != RvalueKind.RK_AGGREGATE:
@@ -2977,7 +2977,7 @@ fn CCodegen.aggregate_array_initializer(self: CCodegen, body: MirBody, rval_id: 
             out = out ++ self.operand_text(body, body.agg_field_operands.get((start + i) as i64))
     out ++ cc_rbrace()
 
-fn CCodegen.aggregate_struct_assignment_with_array_fields(self: CCodegen, body: MirBody, rval_id: i32, dst_tid: i32, dst_place: str) -> str:
+fn CCodegen.aggregate_struct_assignment_with_array_fields(self: CCodegen, body: &MirBody, rval_id: i32, dst_tid: i32, dst_place: str) -> str:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return ""
     if body.rval_kinds.get(rval_id as i64) != RvalueKind.RK_AGGREGATE:
@@ -3036,7 +3036,7 @@ fn CCodegen.aggregate_struct_assignment_with_array_fields(self: CCodegen, body: 
             out = out ++ " " ++ field_place ++ " = " ++ value_text ++ ";"
     out ++ " " ++ cc_rbrace()
 
-fn CCodegen.map_recv_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+fn CCodegen.map_recv_text(self: CCodegen, body: &MirBody, args_id: i32) -> str:
     let recv_operand = self.call_arg_operand(body, args_id, 0)
     let recv = self.operand_text(body, recv_operand)
     let recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
@@ -3047,7 +3047,7 @@ fn CCodegen.map_recv_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
             return "(*(" ++ recv ++ "))"
     recv
 
-fn CCodegen.vec_recv_ptr_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+fn CCodegen.vec_recv_ptr_text(self: CCodegen, body: &MirBody, args_id: i32) -> str:
     let recv_operand = self.call_arg_operand(body, args_id, 0)
     let recv = self.operand_text(body, recv_operand)
     let recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
@@ -3058,7 +3058,7 @@ fn CCodegen.vec_recv_ptr_text(self: CCodegen, body: MirBody, args_id: i32) -> st
             return "((with_vec*)(" ++ recv ++ "))"
     "&(" ++ recv ++ ")"
 
-fn CCodegen.atomic_recv_ptr_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+fn CCodegen.atomic_recv_ptr_text(self: CCodegen, body: &MirBody, args_id: i32) -> str:
     let recv_operand = self.call_arg_operand(body, args_id, 0)
     let recv = self.operand_text(body, recv_operand)
     let recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
@@ -3067,7 +3067,7 @@ fn CCodegen.atomic_recv_ptr_text(self: CCodegen, body: MirBody, args_id: i32) ->
         return "(" ++ recv ++ ")"
     "&(" ++ recv ++ ")"
 
-fn CCodegen.atomic_recv_value_tid(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+fn CCodegen.atomic_recv_value_tid(self: CCodegen, body: &MirBody, args_id: i32) -> i32:
     let recv_operand = self.call_arg_operand(body, args_id, 0)
     var recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
     let recv_tk = self.sema.get_type_kind(recv_tid)
@@ -3082,7 +3082,7 @@ fn CCodegen.atomic_order_text(self: CCodegen, order_text: str) -> str:
     let o = "(" ++ order_text ++ ")"
     "(" ++ o ++ " == 0 ? __ATOMIC_RELAXED : " ++ o ++ " == 1 ? __ATOMIC_ACQUIRE : " ++ o ++ " == 2 ? __ATOMIC_RELEASE : " ++ o ++ " == 3 ? __ATOMIC_ACQ_REL : __ATOMIC_SEQ_CST)"
 
-fn CCodegen.call_arg_operand(self: CCodegen, body: MirBody, args_id: i32, idx: i32) -> i32:
+fn CCodegen.call_arg_operand(self: CCodegen, body: &MirBody, args_id: i32, idx: i32) -> i32:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         return 0
     let start = body.call_arg_starts.get(args_id as i64)
@@ -3094,7 +3094,7 @@ fn CCodegen.call_arg_operand(self: CCodegen, body: MirBody, args_id: i32, idx: i
         return 0
     body.call_arg_operands.get(at as i64)
 
-fn CCodegen.str_concat_n_text(self: CCodegen, body: MirBody, args_id: i32, move_first: i32) -> str:
+fn CCodegen.str_concat_n_text(self: CCodegen, body: &MirBody, args_id: i32, move_first: i32) -> str:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         self.fail(f"invalid str_concat_n args id {args_id}")
         return "WITH_STR_LIT(\"\")"
@@ -3112,7 +3112,7 @@ fn CCodegen.str_concat_n_text(self: CCodegen, body: MirBody, args_id: i32, move_
         out = out ++ self.operand_text(body, body.call_arg_operands.get((start + i) as i64))
     out ++ "}, " ++ with_i64_to_str(count as i64) ++ ")"
 
-fn CCodegen.local_assigned_fn_sym_depth(self: CCodegen, body: MirBody, local_id: i32, depth: i32) -> i32:
+fn CCodegen.local_assigned_fn_sym_depth(self: CCodegen, body: &MirBody, local_id: i32, depth: i32) -> i32:
     if local_id < 0:
         return 0
     if depth > 8:
@@ -3165,10 +3165,10 @@ fn CCodegen.local_assigned_fn_sym_depth(self: CCodegen, body: MirBody, local_id:
                 return -2
     out
 
-fn CCodegen.local_assigned_fn_sym(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_assigned_fn_sym(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     self.local_assigned_fn_sym_depth(body, local_id, 0)
 
-fn CCodegen.call_callee_fn_sym(self: CCodegen, body: MirBody, callee_operand: i32) -> i32:
+fn CCodegen.call_callee_fn_sym(self: CCodegen, body: &MirBody, callee_operand: i32) -> i32:
     if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
         return 0
     let ok = body.operand_kinds.get(callee_operand as i64)
@@ -3191,13 +3191,13 @@ fn CCodegen.call_callee_fn_sym(self: CCodegen, body: MirBody, callee_operand: i3
             return inferred
     0
 
-fn CCodegen.call_method_base_name(self: CCodegen, body: MirBody, callee_operand: i32) -> str:
+fn CCodegen.call_method_base_name(self: CCodegen, body: &MirBody, callee_operand: i32) -> str:
     let fn_sym = self.call_callee_fn_sym(body, callee_operand)
     if fn_sym == 0:
         return ""
     cc_base_name(cc_intern_resolve(self.intern, fn_sym))
 
-fn CCodegen.call_first_arg_place_id(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+fn CCodegen.call_first_arg_place_id(self: CCodegen, body: &MirBody, args_id: i32) -> i32:
     if self.call_arg_count(body, args_id) <= 0:
         return -1
     let first_arg = self.call_arg_operand(body, args_id, 0)
@@ -3208,7 +3208,7 @@ fn CCodegen.call_first_arg_place_id(self: CCodegen, body: MirBody, args_id: i32)
         return -1
     body.operand_d0.get(first_arg as i64)
 
-fn CCodegen.place_same(self: CCodegen, body: MirBody, a: i32, b: i32) -> i32:
+fn CCodegen.place_same(self: CCodegen, body: &MirBody, a: i32, b: i32) -> i32:
     let _ = self
     if a < 0 or b < 0:
         return 0
@@ -3280,7 +3280,7 @@ fn CCodegen.callee_field_hint(self: CCodegen, fn_sym: i32) -> CcCalleeHint:
     self.callee_hint_cache_store(fn_sym, out)
     out
 
-fn CCodegen.infer_place_kind_impl(self: CCodegen, body: MirBody, place_id: i32) -> CcPlaceKind:
+fn CCodegen.infer_place_kind_impl(self: CCodegen, body: &MirBody, place_id: i32) -> CcPlaceKind:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return CcPlaceKind.UNKNOWN
 
@@ -3326,7 +3326,7 @@ fn CCodegen.infer_place_kind_impl(self: CCodegen, body: MirBody, place_id: i32) 
         return CcPlaceKind.HASHMAP
     CcPlaceKind.OPTION
 
-fn CCodegen.infer_place_kind(self: CCodegen, body: MirBody, place_id: i32) -> CcPlaceKind:
+fn CCodegen.infer_place_kind(self: CCodegen, body: &MirBody, place_id: i32) -> CcPlaceKind:
     let cache_hit = self.place_kind_cache_lookup(body.fn_sym, place_id)
     if cache_hit.is_some():
         return cache_hit.unwrap()
@@ -3334,7 +3334,7 @@ fn CCodegen.infer_place_kind(self: CCodegen, body: MirBody, place_id: i32) -> Cc
     self.place_kind_cache_store(body.fn_sym, place_id, kind)
     kind
 
-fn CCodegen.local_place_kind_depth(self: CCodegen, body: MirBody, local_id: i32, depth: i32) -> CcPlaceKind:
+fn CCodegen.local_place_kind_depth(self: CCodegen, body: &MirBody, local_id: i32, depth: i32) -> CcPlaceKind:
     if local_id < 0:
         return CcPlaceKind.UNKNOWN
     if depth > 1:
@@ -3425,10 +3425,10 @@ fn CCodegen.local_place_kind_depth(self: CCodegen, body: MirBody, local_id: i32,
         return CcPlaceKind.HASHMAP
     CcPlaceKind.OPTION
 
-fn CCodegen.local_place_kind(self: CCodegen, body: MirBody, local_id: i32) -> CcPlaceKind:
+fn CCodegen.local_place_kind(self: CCodegen, body: &MirBody, local_id: i32) -> CcPlaceKind:
     self.local_place_kind_depth(body, local_id, 0)
 
-fn CCodegen.call_dest_expected_tid(self: CCodegen, body: MirBody, dest_place: i32) -> i32:
+fn CCodegen.call_dest_expected_tid(self: CCodegen, body: &MirBody, dest_place: i32) -> i32:
     let dest_tid = self.place_local_tid(body, dest_place)
     if self.in_field_cache_build != 0:
         return dest_tid
@@ -3467,7 +3467,7 @@ fn CCodegen.sig_matches_call_name(self: CCodegen, sig_sym: i32, fn_sym: i32) -> 
         return 1
     0
 
-fn CCodegen.infer_named_call_sym_scan(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
+fn CCodegen.infer_named_call_sym_scan(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
     let raw = cc_intern_resolve(self.intern, fn_sym)
     if raw.len() == 0:
         return 0
@@ -3512,7 +3512,7 @@ fn CCodegen.infer_named_call_sym_scan(self: CCodegen, body: MirBody, fn_sym: i32
             match_sym = sym
     match_sym
 
-fn CCodegen.infer_named_call_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
+fn CCodegen.infer_named_call_sym(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
     if self.infer_local_depth > 0:
         return self.infer_named_call_sym_scan(body, fn_sym, args_id, dest_place, 1)
     let cached = self.call_infer_cache_lookup("named", body.fn_sym, fn_sym, args_id, dest_place)
@@ -3522,7 +3522,7 @@ fn CCodegen.infer_named_call_sym(self: CCodegen, body: MirBody, fn_sym: i32, arg
     self.call_infer_cache_store("named", body.fn_sym, fn_sym, args_id, dest_place, result)
     result
 
-fn CCodegen.infer_body_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
+fn CCodegen.infer_body_method_sym(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
     if self.infer_local_depth == 0:
         let cached = self.call_infer_cache_lookup("body-method", body.fn_sym, fn_sym, args_id, dest_place)
         if cached != -1234567:
@@ -3579,7 +3579,7 @@ fn CCodegen.infer_body_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, ar
         self.call_infer_cache_store("body-method", body.fn_sym, fn_sym, args_id, dest_place, match_sym)
     match_sym
 
-fn CCodegen.infer_direct_call_sym_scan(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
+fn CCodegen.infer_direct_call_sym_scan(self: CCodegen, body: &MirBody, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
     let arg_count = self.call_arg_count(body, args_id)
     let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
     var match_sym = 0
@@ -3615,7 +3615,7 @@ fn CCodegen.infer_direct_call_sym_scan(self: CCodegen, body: MirBody, args_id: i
             match_sym = sym
     match_sym
 
-fn CCodegen.describe_call_candidates(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32, only_local_defs: i32) -> str:
+fn CCodegen.describe_call_candidates(self: CCodegen, body: &MirBody, args_id: i32, dest_place: i32, only_local_defs: i32) -> str:
     let arg_count = self.call_arg_count(body, args_id)
     let dest_tid = self.place_local_tid(body, dest_place)
     var out = ""
@@ -3648,7 +3648,7 @@ fn CCodegen.describe_call_candidates(self: CCodegen, body: MirBody, args_id: i32
             break
     out
 
-fn CCodegen.describe_qualified_method_candidates(self: CCodegen, body: MirBody, method_sym: i32, args_id: i32, only_local_defs: i32) -> str:
+fn CCodegen.describe_qualified_method_candidates(self: CCodegen, body: &MirBody, method_sym: i32, args_id: i32, only_local_defs: i32) -> str:
     let raw = cc_intern_resolve(self.intern, method_sym)
     if raw.len() == 0:
         return ""
@@ -3671,7 +3671,7 @@ fn CCodegen.describe_qualified_method_candidates(self: CCodegen, body: MirBody, 
             return out ++ ", ..."
     out
 
-fn CCodegen.call_arg_tids_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+fn CCodegen.call_arg_tids_text(self: CCodegen, body: &MirBody, args_id: i32) -> str:
     let arg_count = self.call_arg_count(body, args_id)
     var out = ""
     for ai in 0..arg_count:
@@ -3681,7 +3681,7 @@ fn CCodegen.call_arg_tids_text(self: CCodegen, body: MirBody, args_id: i32) -> s
         out = out ++ f"{self.operand_tid(body, arg_operand)}"
     out
 
-fn CCodegen.call_first_arg_hint_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+fn CCodegen.call_first_arg_hint_text(self: CCodegen, body: &MirBody, args_id: i32) -> str:
     if self.call_arg_count(body, args_id) <= 0:
         return ""
     let first_arg = self.call_arg_operand(body, args_id, 0)
@@ -3689,7 +3689,7 @@ fn CCodegen.call_first_arg_hint_text(self: CCodegen, body: MirBody, args_id: i32
     let owner_text = self.type_owner_text(first_arg_tid)
     f"tid={first_arg_tid} type={self.sema.type_name(first_arg_tid)} owner={owner_text}"
 
-fn CCodegen.call_first_arg_resolved_tid(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+fn CCodegen.call_first_arg_resolved_tid(self: CCodegen, body: &MirBody, args_id: i32) -> i32:
     if self.call_arg_count(body, args_id) <= 0:
         return 0
     let first_arg = self.call_arg_operand(body, args_id, 0)
@@ -3709,10 +3709,10 @@ fn CCodegen.type_owner_text(self: CCodegen, tid: i32) -> str:
         return cc_intern_resolve(self.intern, owner_sym)
     ""
 
-fn CCodegen.call_first_arg_owner_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+fn CCodegen.call_first_arg_owner_text(self: CCodegen, body: &MirBody, args_id: i32) -> str:
     self.type_owner_text(self.call_first_arg_resolved_tid(body, args_id))
 
-fn CCodegen.owner_named_body_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> i32:
+fn CCodegen.owner_named_body_sym(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32) -> i32:
     let raw = cc_intern_resolve(self.intern, fn_sym)
     if raw.len() == 0:
         return 0
@@ -3823,7 +3823,7 @@ fn CCodegen.local_usage_hint_cache_lookup(self: CCodegen, body_fn_sym: i32, loca
 fn CCodegen.local_usage_hint_cache_store(self: CCodegen, body_fn_sym: i32, local_id: i32, tid: i32):
     self.local_usage_hint_cache.insert(cc_body_local_cache_key(body_fn_sym, local_id), tid)
 
-fn CCodegen.local_usage_hint_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_usage_hint_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0:
         return 0
     let cache_hit = self.local_usage_hint_cache_lookup(body.fn_sym, local_id)
@@ -3944,7 +3944,7 @@ fn CCodegen.local_usage_hint_tid(self: CCodegen, body: MirBody, local_id: i32) -
     self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
     hint_tid
 
-fn CCodegen.infer_direct_call_sym(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> i32:
+fn CCodegen.infer_direct_call_sym(self: CCodegen, body: &MirBody, args_id: i32, dest_place: i32) -> i32:
     let cache_hit = self.call_infer_cache_lookup("direct", body.fn_sym, 0, args_id, dest_place)
     if cache_hit != -1234567:
         return cache_hit
@@ -3962,7 +3962,7 @@ fn CCodegen.infer_direct_call_sym(self: CCodegen, body: MirBody, args_id: i32, d
     self.call_infer_cache_store("direct", body.fn_sym, 0, args_id, dest_place, result)
     result
 
-fn CCodegen.unique_method_owner_from_name(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> str:
+fn CCodegen.unique_method_owner_from_name(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32) -> str:
     let raw = cc_intern_resolve(self.intern, fn_sym)
     if raw.len() == 0:
         return ""
@@ -3986,7 +3986,7 @@ fn CCodegen.unique_method_owner_from_name(self: CCodegen, body: MirBody, fn_sym:
             return ""
     out
 
-fn CCodegen.local_owner_hint_depth(self: CCodegen, body: MirBody, local_id: i32, depth: i32) -> str:
+fn CCodegen.local_owner_hint_depth(self: CCodegen, body: &MirBody, local_id: i32, depth: i32) -> str:
     if depth > 8:
         return ""
     for bb in 0..body.block_count():
@@ -4074,10 +4074,10 @@ fn CCodegen.local_owner_hint_depth(self: CCodegen, body: MirBody, local_id: i32,
             return owner
     ""
 
-fn CCodegen.local_owner_hint(self: CCodegen, body: MirBody, local_id: i32) -> str:
+fn CCodegen.local_owner_hint(self: CCodegen, body: &MirBody, local_id: i32) -> str:
     self.local_owner_hint_depth(body, local_id, 0)
 
-fn CCodegen.infer_qualified_method_sym_scan(self: CCodegen, body: MirBody, method_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
+fn CCodegen.infer_qualified_method_sym_scan(self: CCodegen, body: &MirBody, method_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
     let raw = cc_intern_resolve(self.intern, method_sym)
     if raw.len() == 0:
         return 0
@@ -4129,7 +4129,7 @@ fn CCodegen.infer_qualified_method_sym_scan(self: CCodegen, body: MirBody, metho
             match_sym = sym
     match_sym
 
-fn CCodegen.infer_qualified_method_sym(self: CCodegen, body: MirBody, method_sym: i32, args_id: i32, dest_place: i32) -> i32:
+fn CCodegen.infer_qualified_method_sym(self: CCodegen, body: &MirBody, method_sym: i32, args_id: i32, dest_place: i32) -> i32:
     if self.infer_local_depth > 0:
         return self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 1)
     let cache_hit = self.call_infer_cache_lookup("qualified-method", body.fn_sym, method_sym, args_id, dest_place)
@@ -4149,7 +4149,7 @@ fn CCodegen.infer_qualified_method_sym(self: CCodegen, body: MirBody, method_sym
     self.call_infer_cache_store("qualified-method", body.fn_sym, method_sym, args_id, dest_place, result)
     result
 
-fn CCodegen.infer_owner_method_sym_scan(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
+fn CCodegen.infer_owner_method_sym_scan(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
     if self.call_arg_count(body, args_id) <= 0:
         return 0
     let raw = cc_intern_resolve(self.intern, fn_sym)
@@ -4203,7 +4203,7 @@ fn CCodegen.infer_owner_method_sym_scan(self: CCodegen, body: MirBody, fn_sym: i
             match_sym = sym
     match_sym
 
-fn CCodegen.infer_owner_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
+fn CCodegen.infer_owner_method_sym(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
     if self.infer_local_depth > 0:
         return self.infer_owner_method_sym_scan(body, fn_sym, args_id, dest_place, 1)
     let cached = self.call_infer_cache_lookup("owner-method", body.fn_sym, fn_sym, args_id, dest_place)
@@ -4217,21 +4217,21 @@ fn CCodegen.infer_owner_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, a
     self.call_infer_cache_store("owner-method", body.fn_sym, fn_sym, args_id, dest_place, result)
     result
 
-fn CCodegen.infer_builtin_call_name(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> str:
+fn CCodegen.infer_builtin_call_name(self: CCodegen, body: &MirBody, args_id: i32, dest_place: i32) -> str:
     let _ = self
     let _ = body
     let _ = args_id
     let _ = dest_place
     ""
 
-fn CCodegen.infer_print_call_name(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> str:
+fn CCodegen.infer_print_call_name(self: CCodegen, body: &MirBody, args_id: i32, dest_place: i32) -> str:
     let _ = self
     let _ = body
     let _ = args_id
     let _ = dest_place
     ""
 
-fn CCodegen.extern_call_name(self: CCodegen, sym: i32, body: MirBody, args_id: i32, dest_place: i32) -> str:
+fn CCodegen.extern_call_name(self: CCodegen, sym: i32, body: &MirBody, args_id: i32, dest_place: i32) -> str:
     let _ = body
     let _ = args_id
     let _ = dest_place
@@ -4289,7 +4289,7 @@ fn CCodegen.sig_index_for_sym(self: CCodegen, fn_sym: i32) -> i32:
     self.sig_idx_cache.insert(fn_sym, out)
     out
 
-fn CCodegen.unqualified_builtin_method_name(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> str:
+fn CCodegen.unqualified_builtin_method_name(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32) -> str:
     let raw = cc_intern_resolve(self.intern, fn_sym)
     if raw.len() == 0:
         return ""
@@ -4317,7 +4317,7 @@ fn CCodegen.unqualified_builtin_method_name(self: CCodegen, body: MirBody, fn_sy
         return "with_str_byte_at"
     ""
 
-fn CCodegen.unqualified_builtin_method_ret_tid(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> i32:
+fn CCodegen.unqualified_builtin_method_ret_tid(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32) -> i32:
     let raw = cc_intern_resolve(self.intern, fn_sym)
     if raw.len() == 0:
         return 0
@@ -4345,7 +4345,7 @@ fn CCodegen.unqualified_builtin_method_ret_tid(self: CCodegen, body: MirBody, fn
         return self.sema.ty_i32 as i32
     0
 
-fn CCodegen.call_builtin_kind(self: CCodegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32) -> CcBuiltin:
+fn CCodegen.call_builtin_kind(self: CCodegen, body: &MirBody, callee_operand: i32, args_id: i32, dest_place: i32) -> CcBuiltin:
     let method = self.call_method_base_name(body, callee_operand)
     if method.len() == 0:
         return CcBuiltin.NONE
@@ -4512,7 +4512,7 @@ fn CCodegen.call_builtin_kind(self: CCodegen, body: MirBody, callee_operand: i32
 
     CcBuiltin.NONE
 
-fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
+fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: &MirBody, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
     let mir_intrinsic = body.call_intrinsic(args_id)
     var kind = cc_builtin_from_mir_intrinsic(mir_intrinsic)
     if kind == CcBuiltin.NONE:
@@ -4747,7 +4747,7 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         return self.sema.ty_bool as i32
     0
 
-fn CCodegen.resolve_call_named_callee(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> str:
+fn CCodegen.resolve_call_named_callee(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> str:
     let fn_body_sym = self.canonical_body_sym(fn_sym)
     if fn_body_sym != 0:
         return self.fn_c_name(fn_body_sym)
@@ -4783,7 +4783,7 @@ fn CCodegen.resolve_call_named_callee(self: CCodegen, body: MirBody, fn_sym: i32
         return self.fn_c_name(body_method)
     self.extern_call_name(fn_sym, body, args_id, dest_place)
 
-fn CCodegen.call_return_tid_for_fn_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32, fallback: i32) -> i32:
+fn CCodegen.call_return_tid_for_fn_sym(self: CCodegen, body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32, fallback: i32) -> i32:
     let fn_body_sym = self.canonical_body_sym(fn_sym)
     if fn_body_sym != 0:
         let body_sig = self.sig_index_for_sym(fn_body_sym)
@@ -4829,7 +4829,7 @@ fn CCodegen.call_return_tid_for_fn_sym(self: CCodegen, body: MirBody, fn_sym: i3
         return self.sema.ty_str as i32
     fallback
 
-fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> str:
+fn CCodegen.resolve_call_callee_text(self: CCodegen, body: &MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> str:
     let _ = bb
     if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
         self.fail(f"invalid call callee operand id {callee_operand}")
@@ -4889,7 +4889,7 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
     self.fail(f"unsupported call callee operand kind {ok}")
     "/*unsupported_callee*/"
 
-fn CCodegen.call_return_tid(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
+fn CCodegen.call_return_tid(self: CCodegen, body: &MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
     let fallback = self.place_local_tid(body, dest_place)
     let _ = bb
     let builtin_ret = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
@@ -4934,7 +4934,7 @@ fn CCodegen.call_return_tid(self: CCodegen, body: MirBody, bb: i32, callee_opera
 
     fallback
 
-fn CCodegen.call_callee_sig_return_tid(self: CCodegen, body: MirBody, callee_operand: i32) -> i32:
+fn CCodegen.call_callee_sig_return_tid(self: CCodegen, body: &MirBody, callee_operand: i32) -> i32:
     if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
         return 0
     if body.operand_kinds.get(callee_operand as i64) != OperandKind.OK_CONSTANT:
@@ -4952,7 +4952,7 @@ fn CCodegen.call_callee_sig_return_tid(self: CCodegen, body: MirBody, callee_ope
         return 0
     self.sema.sig_return_type(sig_idx)
 
-fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.infer_local_tid_impl(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     let declared = self.local_declared_tid(body, local_id)
     let declared_resolved = self.sema.resolve_alias(declared)
     let allow_container_receiver_infer =
@@ -5059,7 +5059,7 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
         return recv_hint
     0
 
-fn CCodegen.infer_local_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.infer_local_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
         return 0
     let cache_hit = self.local_infer_cache_lookup(body.fn_sym, local_id)
@@ -5110,7 +5110,7 @@ fn CCodegen.infer_local_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32
     self.local_infer_cache_store(body.fn_sym, local_id, declared)
     declared
 
-fn CCodegen.callee_fn_type_from_operand(self: CCodegen, body: MirBody, callee_op: i32) -> i32:
+fn CCodegen.callee_fn_type_from_operand(self: CCodegen, body: &MirBody, callee_op: i32) -> i32:
     if callee_op < 0 or callee_op >= body.operand_kinds.len() as i32:
         return 0
     let ok = body.operand_kinds.get(callee_op as i64)
@@ -5118,7 +5118,7 @@ fn CCodegen.callee_fn_type_from_operand(self: CCodegen, body: MirBody, callee_op
         return self.sema.callable_any_fn_type(self.operand_tid_no_infer(body, callee_op) as TypeId)
     0
 
-fn CCodegen.operand_ref_target_tid(self: CCodegen, body: MirBody, operand_id: i32) -> i32:
+fn CCodegen.operand_ref_target_tid(self: CCodegen, body: &MirBody, operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return 0
     let ok = body.operand_kinds.get(operand_id as i64)
@@ -5132,7 +5132,7 @@ fn CCodegen.operand_ref_target_tid(self: CCodegen, body: MirBody, operand_id: i3
         return 0
     self.local_ref_target_tid(body, local_id)
 
-fn CCodegen.operand_is_pointer_value(self: CCodegen, body: MirBody, operand_id: i32) -> i32:
+fn CCodegen.operand_is_pointer_value(self: CCodegen, body: &MirBody, operand_id: i32) -> i32:
     let tid = self.operand_tid(body, operand_id)
     if tid == 0:
         return 0
@@ -5142,7 +5142,7 @@ fn CCodegen.operand_is_pointer_value(self: CCodegen, body: MirBody, operand_id: 
         return 1
     0
 
-fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_operand: i32) -> str:
+fn CCodegen.call_args_text(self: CCodegen, body: &MirBody, args_id: i32, callee_operand: i32) -> str:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         return ""
     let start = body.call_arg_starts.get(args_id as i64)
@@ -5213,7 +5213,7 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
         out = out ++ arg_text
     out
 
-fn CCodegen.callee_extern_name_from_operand(self: CCodegen, body: MirBody, callee_op: i32) -> str:
+fn CCodegen.callee_extern_name_from_operand(self: CCodegen, body: &MirBody, callee_op: i32) -> str:
     if callee_op < 0 or callee_op >= body.operand_kinds.len() as i32:
         return ""
     let ok = body.operand_kinds.get(callee_op as i64)
@@ -5226,7 +5226,7 @@ fn CCodegen.callee_extern_name_from_operand(self: CCodegen, body: MirBody, calle
                 return self.canonical_extern_name(cc_intern_resolve(self.intern, fn_sym))
     ""
 
-fn CCodegen.callee_sig_from_operand(self: CCodegen, body: MirBody, callee_op: i32) -> i32:
+fn CCodegen.callee_sig_from_operand(self: CCodegen, body: &MirBody, callee_op: i32) -> i32:
     if callee_op < 0 or callee_op >= body.operand_kinds.len() as i32:
         return -1
     let ok = body.operand_kinds.get(callee_op as i64)
@@ -5239,7 +5239,7 @@ fn CCodegen.callee_sig_from_operand(self: CCodegen, body: MirBody, callee_op: i3
                 return self.body_sig_index(fn_sym)
     -1
 
-fn CCodegen.emit_len_result(self: CCodegen, body: MirBody, dest_place: i32, raw_expr: str, kind: CcBuiltin, has_ret: i32) -> str:
+fn CCodegen.emit_len_result(self: CCodegen, body: &MirBody, dest_place: i32, raw_expr: str, kind: CcBuiltin, has_ret: i32) -> str:
     let mode = cc_builtin_len_mode(kind)
     var out = "    " ++ cc_lbrace() ++ " int64_t __with_len = (int64_t)(" ++ raw_expr ++ ");"
     if mode == CcLenMode.I32:
@@ -5370,7 +5370,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.FMA: return CcBuiltin.FMA
     CcBuiltin.NONE
 
-fn CCodegen.emit_builtin_vec_core_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_vec_core_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     if kind == CcBuiltin.DYN_CALL:
         self.fail("C backend is LLVM-only for dyn trait method dispatch by design (#301); compile this program with the LLVM backend")
         return "    abort();"
@@ -5542,7 +5542,7 @@ fn CCodegen.emit_builtin_vec_core_call_term(self: CCodegen, body: MirBody, kind:
 
     ""
 
-fn CCodegen.emit_builtin_map_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_map_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     if kind == CcBuiltin.MAP_NEW:
         var out = ""
         if has_ret != 0:
@@ -5683,7 +5683,7 @@ fn CCodegen.emit_builtin_map_call_term(self: CCodegen, body: MirBody, kind: CcBu
 
     ""
 
-fn CCodegen.emit_builtin_option_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_option_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     if kind == CcBuiltin.OPT_IS_SOME:
         if argc < 1:
             self.fail("Option.is_some expects one argument")
@@ -5771,7 +5771,7 @@ fn CCodegen.emit_builtin_option_call_term(self: CCodegen, body: MirBody, kind: C
 
     ""
 
-fn CCodegen.emit_builtin_atomic_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_atomic_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     if kind == CcBuiltin.ATOMIC_LOAD:
         if argc < 2:
             self.fail("Atomic.load expects two arguments")
@@ -5814,7 +5814,7 @@ fn CCodegen.emit_builtin_atomic_call_term(self: CCodegen, body: MirBody, kind: C
 
     ""
 
-fn CCodegen.emit_builtin_string_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_string_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     if cc_builtin_is_str_len(kind):
         if argc < 1:
             self.fail("str.len expects one argument")
@@ -6021,7 +6021,7 @@ fn CCodegen.emit_builtin_string_call_term(self: CCodegen, body: MirBody, kind: C
 
     ""
 
-fn CCodegen.emit_builtin_option_string_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_option_string_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     var out = self.emit_builtin_option_call_term(body, kind, args_id, dest_place, next_bb, argc, ret_tid, has_ret)
     if out.len() > 0:
         return out
@@ -6033,7 +6033,7 @@ fn CCodegen.emit_builtin_option_string_call_term(self: CCodegen, body: MirBody, 
         return out
     ""
 
-fn CCodegen.emit_builtin_vec_extra_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_vec_extra_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     if kind == CcBuiltin.MAP_CLEAR:
         if argc < 1:
             self.fail("map.clear expects one argument")
@@ -6187,7 +6187,7 @@ fn CCodegen.emit_builtin_vec_extra_call_term(self: CCodegen, body: MirBody, kind
 
     ""
 
-fn CCodegen.emit_builtin_numeric_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_numeric_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     if kind == CcBuiltin.ROTATE_LEFT:
         if argc < 2:
             self.fail("rotate_left expects two arguments")
@@ -6344,7 +6344,7 @@ fn CCodegen.emit_builtin_numeric_call_term(self: CCodegen, body: MirBody, kind: 
 
     ""
 
-fn CCodegen.emit_builtin_format_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_format_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     if kind == CcBuiltin.FMT_BUF_NEW:
         var out = ""
         if has_ret != 0:
@@ -6499,7 +6499,7 @@ fn CCodegen.emit_builtin_format_call_term(self: CCodegen, body: MirBody, kind: C
 
     ""
 
-fn CCodegen.emit_builtin_dyn_unsupported_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_dyn_unsupported_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     if kind == CcBuiltin.DYN_VTABLE_CMP:
         // Dynamic trait vtable comparison
         if argc < 2:
@@ -6553,7 +6553,7 @@ fn CCodegen.emit_builtin_dyn_unsupported_call_term(self: CCodegen, body: MirBody
 
     ""
 
-fn CCodegen.emit_builtin_numeric_format_call_term(self: CCodegen, body: MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
+fn CCodegen.emit_builtin_numeric_format_call_term(self: CCodegen, body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
     var out = self.emit_builtin_numeric_call_term(body, kind, args_id, dest_place, next_bb, argc, ret_tid, has_ret)
     if out.len() > 0:
         return out
@@ -6565,7 +6565,7 @@ fn CCodegen.emit_builtin_numeric_format_call_term(self: CCodegen, body: MirBody,
         return out
     ""
 
-fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> str:
+fn CCodegen.emit_builtin_call_term(self: CCodegen, body: &MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> str:
     // Read intrinsic marker from MIR instead of name-heuristic inference.
     let mir_intrinsic = body.call_intrinsic(args_id)
     var kind = cc_builtin_from_mir_intrinsic(mir_intrinsic)
@@ -6603,7 +6603,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         return out
     ""
 
-fn CCodegen.field_place_matches(self: CCodegen, body: MirBody, place_id: i32, struct_tid: i32, field_sym: i32) -> i32:
+fn CCodegen.field_place_matches(self: CCodegen, body: &MirBody, place_id: i32, struct_tid: i32, field_sym: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
     let count = body.place_proj_counts.get(place_id as i64)
@@ -6634,7 +6634,7 @@ fn CCodegen.field_place_matches(self: CCodegen, body: MirBody, place_id: i32, st
         return 1
     0
 
-fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
+fn CCodegen.rvalue_infer_tid(self: CCodegen, body: &MirBody, rval_id: i32) -> i32:
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return 0
     let no_infer = if self.in_field_cache_build != 0: 1 else: 0
@@ -6688,7 +6688,7 @@ fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32
         return self.sema.ty_i32 as i32
     0
 
-fn CCodegen.record_field_tid_from_place(self: CCodegen, body: MirBody, place_id: i32, tid: i32):
+fn CCodegen.record_field_tid_from_place(self: CCodegen, body: &MirBody, place_id: i32, tid: i32):
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return
     if tid == 0:
@@ -6711,7 +6711,7 @@ fn CCodegen.record_field_tid_from_place(self: CCodegen, body: MirBody, place_id:
         return
     self.field_cache_record(base_resolved, field_sym, tid)
 
-fn CCodegen.place_is_single_field(self: CCodegen, body: MirBody, place_id: i32) -> i32:
+fn CCodegen.place_is_single_field(self: CCodegen, body: &MirBody, place_id: i32) -> i32:
     let _ = self
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
@@ -6962,7 +6962,7 @@ fn CCodegen.effective_field_tid(self: CCodegen, struct_tid: i32, field_sym: i32,
                 return self.sema.ty_i64 as i32
     raw_field_tid
 
-fn CCodegen.is_unit_rvalue(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
+fn CCodegen.is_unit_rvalue(self: CCodegen, body: &MirBody, rval_id: i32) -> i32:
     let _ = self
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return 0
@@ -6981,7 +6981,7 @@ fn CCodegen.is_unit_rvalue(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
         return 1
     0
 
-fn CCodegen.rvalue_direct_local_id(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
+fn CCodegen.rvalue_direct_local_id(self: CCodegen, body: &MirBody, rval_id: i32) -> i32:
     let _ = self
     if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
         return -1
@@ -7003,7 +7003,7 @@ fn CCodegen.rvalue_direct_local_id(self: CCodegen, body: MirBody, rval_id: i32) 
         return -1
     local_id
 
-fn CCodegen.local_has_assignment(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_has_assignment(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0:
         return 0
     for bb in 0..body.block_count():
@@ -7039,7 +7039,7 @@ fn CCodegen.zero_value_text(self: CCodegen, tid: i32) -> str:
         return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
     "0"
 
-fn CCodegen.line_directive(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
+fn CCodegen.line_directive(self: CCodegen, body: &MirBody, stmt_id: i32) -> str:
     if self.source_path.len() == 0:
         return ""
     if stmt_id < 0 or stmt_id >= body.stmt_spans.len() as i32:
@@ -7054,7 +7054,7 @@ fn CCodegen.line_directive(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
     self.last_line_directive = line
     f"#line {line} \"{cc_line_directive_path(self.source_path)}\"\n"
 
-fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
+fn CCodegen.emit_stmt_line(self: CCodegen, body: &MirBody, stmt_id: i32) -> str:
     if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:
         self.fail(f"invalid statement id {stmt_id}")
         return "    /* invalid statement */"
@@ -7179,7 +7179,7 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
     self.fail(f"unsupported statement kind {sk}")
     "    /* unsupported statement */"
 
-fn CCodegen.emit_switch_term(self: CCodegen, body: MirBody, d0: i32, d1: i32, d2: i32) -> str:
+fn CCodegen.emit_switch_term(self: CCodegen, body: &MirBody, d0: i32, d1: i32, d2: i32) -> str:
     let cond = self.operand_text(body, d0)
     if d1 < 0 or d1 >= body.switch_table_starts.len() as i32:
         self.fail(f"invalid switch table id {d1}")
@@ -7205,7 +7205,7 @@ fn CCodegen.emit_switch_term(self: CCodegen, body: MirBody, d0: i32, d1: i32, d2
     out = out ++ "    " ++ cc_rbrace()
     out
 
-fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
+fn CCodegen.emit_term(self: CCodegen, body: &MirBody, bb: i32) -> str:
     let tk = body.term_kind(bb)
     let d0 = body.term_data0(bb)
     let d1 = body.term_data1(bb)
@@ -7890,7 +7890,7 @@ fn CCodegen.emit_extern_fn_decls(self: CCodegen) -> str:
         out = out ++ "\n"
     out
 
-fn CCodegen.emit_fn_decl(self: CCodegen, body: MirBody) -> str:
+fn CCodegen.emit_fn_decl(self: CCodegen, body: &MirBody) -> str:
     let fn_sym = body.fn_sym
     let fn_name = self.fn_c_name(fn_sym)
     let sig_idx = self.body_sig_index(fn_sym)
@@ -7930,10 +7930,10 @@ fn CCodegen.prepare_c_type_instantiations(self: CCodegen):
             if dst_tid != 0 and self.is_void_tid(dst_tid) == 0 and self.is_scalar_like_tid(dst_tid) == 0:
                 let _ = self.option_tid_for_payload(dst_tid)
 
-fn CCodegen.local_receives_ref(self: CCodegen, body: MirBody, local_id: i32) -> bool:
+fn CCodegen.local_receives_ref(self: CCodegen, body: &MirBody, local_id: i32) -> bool:
     self.local_ref_target_tid(body, local_id) != 0
 
-fn CCodegen.local_ref_target_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+fn CCodegen.local_ref_target_tid(self: CCodegen, body: &MirBody, local_id: i32) -> i32:
     if local_id < 0:
         return 0
     let cache_key = cc_body_local_cache_key(body.fn_sym, local_id)
@@ -7980,7 +7980,7 @@ fn CCodegen.local_ref_target_tid(self: CCodegen, body: MirBody, local_id: i32) -
         self.local_ref_target_cache.insert(cache_key, out)
     out
 
-fn CCodegen.local_receives_arith(self: CCodegen, body: MirBody, local_id: i32) -> bool:
+fn CCodegen.local_receives_arith(self: CCodegen, body: &MirBody, local_id: i32) -> bool:
     for bb in 0..body.block_count():
         // Check statements
         let start = body.bb_stmt_starts.get(bb as i64)
@@ -8016,7 +8016,7 @@ fn CCodegen.local_receives_arith(self: CCodegen, body: MirBody, local_id: i32) -
                     return true
     false
 
-fn CCodegen.operand_is_int_const(self: CCodegen, body: MirBody, operand_id: i32, value: i64) -> bool:
+fn CCodegen.operand_is_int_const(self: CCodegen, body: &MirBody, operand_id: i32, value: i64) -> bool:
     let _ = self
     if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
         return false
@@ -8030,7 +8030,7 @@ fn CCodegen.operand_is_int_const(self: CCodegen, body: MirBody, operand_id: i32,
         return false
     mir_const_int_value(body, const_id) == value
 
-fn CCodegen.local_originates_from_map_get_depth(self: CCodegen, body: MirBody, local_id: i32, depth: i32) -> bool:
+fn CCodegen.local_originates_from_map_get_depth(self: CCodegen, body: &MirBody, local_id: i32, depth: i32) -> bool:
     if local_id < 0 or depth > 8:
         return false
     for bb in 0..body.block_count():
@@ -8060,10 +8060,10 @@ fn CCodegen.local_originates_from_map_get_depth(self: CCodegen, body: MirBody, l
                 return true
     false
 
-fn CCodegen.local_originates_from_map_get(self: CCodegen, body: MirBody, local_id: i32) -> bool:
+fn CCodegen.local_originates_from_map_get(self: CCodegen, body: &MirBody, local_id: i32) -> bool:
     self.local_originates_from_map_get_depth(body, local_id, 0)
 
-fn CCodegen.local_used_as_vec_receiver(self: CCodegen, body: MirBody, local_id: i32) -> bool:
+fn CCodegen.local_used_as_vec_receiver(self: CCodegen, body: &MirBody, local_id: i32) -> bool:
     if local_id < 0:
         return false
     for bb in 0..body.block_count():
@@ -8082,7 +8082,7 @@ fn CCodegen.local_used_as_vec_receiver(self: CCodegen, body: MirBody, local_id: 
             return true
     false
 
-fn CCodegen.local_used_as_option_receiver(self: CCodegen, body: MirBody, local_id: i32) -> bool:
+fn CCodegen.local_used_as_option_receiver(self: CCodegen, body: &MirBody, local_id: i32) -> bool:
     if local_id < 0:
         return false
     for bb in 0..body.block_count():
@@ -8112,7 +8112,7 @@ fn cc_mark_local_repr(flags_in: Vec[i32], local_id: i32, mark: i32) -> Vec[i32]:
             slot.set(mark)
     flags
 
-fn CCodegen.encoded_option_local_flags(self: CCodegen, body: MirBody) -> Vec[i32]:
+fn CCodegen.encoded_option_local_flags(self: CCodegen, body: &MirBody) -> Vec[i32]:
     var flags: Vec[i32] = Vec.new()
     for _i in 0..body.local_count():
         flags.push(0)
@@ -8158,7 +8158,7 @@ fn CCodegen.encoded_option_local_flags(self: CCodegen, body: MirBody) -> Vec[i32
                     flags = cc_mark_local_repr(flags, self.operand_direct_local_id(body, rhs), 1)
     flags
 
-fn CCodegen.local_used_as_encoded_option(self: CCodegen, body: MirBody, local_id: i32) -> bool:
+fn CCodegen.local_used_as_encoded_option(self: CCodegen, body: &MirBody, local_id: i32) -> bool:
     if local_id < 0:
         return false
     if self.local_used_as_vec_receiver(body, local_id):
@@ -8191,7 +8191,7 @@ fn CCodegen.local_used_as_encoded_option(self: CCodegen, body: MirBody, local_id
                 return true
     false
 
-fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
+fn CCodegen.emit_fn_body(self: CCodegen, body: &MirBody) -> str:
     if self.check_interrupted() != 0:
         return ""
     let fn_sym = body.fn_sym
@@ -8358,7 +8358,7 @@ fn CCodegen.emit_fn_body(self: CCodegen, body: MirBody) -> str:
     out.write(cc_rbrace() ++ "\n")
     out.finish()
 
-fn CCodegen.max_referenced_bb(self: CCodegen, body: MirBody) -> i32:
+fn CCodegen.max_referenced_bb(self: CCodegen, body: &MirBody) -> i32:
     var max_bb = body.block_count() - 1
     for bb in 0..body.block_count():
         let tk = body.term_kind(bb)
