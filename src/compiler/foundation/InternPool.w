@@ -56,6 +56,7 @@ pub type InternPoolState {
 pub type InternPool {
     state: *mut InternPoolState,
 }
+impl Copy for InternPool
 
 fn foundation_new_map_str_i32 -> HashMap[str, i32]:
     let map: HashMap[str, i32] = HashMap.new()

@@ -74,6 +74,7 @@ type CiTypePoolState {
 type CiTypePool {
     state: *mut CiTypePoolState,
 }
+impl Copy for CiTypePool
 
 fn CiTypePool.new -> CiTypePool:
     let ptr = with_alloc(256) as *mut CiTypePoolState
@@ -293,6 +294,7 @@ type CiExprPoolState {
 type CiExprPool {
     state: *mut CiExprPoolState,
 }
+impl Copy for CiExprPool
 
 fn CiExprPool.new -> CiExprPool:
     let ptr = with_alloc(256) as *mut CiExprPoolState
@@ -467,6 +469,7 @@ type CiStmtPoolState {
 type CiStmtPool {
     state: *mut CiStmtPoolState,
 }
+impl Copy for CiStmtPool
 
 fn CiStmtPool.new -> CiStmtPool:
     let ptr = with_alloc(256) as *mut CiStmtPoolState
@@ -673,6 +676,7 @@ type CiDeclPoolState {
 type CiDeclPool {
     state: *mut CiDeclPoolState,
 }
+impl Copy for CiDeclPool
 
 fn CiDeclPool.new -> CiDeclPool:
     let ptr = with_alloc(256) as *mut CiDeclPoolState

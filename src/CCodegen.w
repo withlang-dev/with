@@ -23,6 +23,7 @@ extern fn with_fmt_buf_finish(buf: *mut u8) -> str
 type COut {
     buf: *mut u8,
 }
+impl Copy for COut
 
 fn COut.new -> COut:
     COut { buf: with_fmt_buf_new() }

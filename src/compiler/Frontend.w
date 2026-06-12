@@ -1811,6 +1811,7 @@ type DepOrderAccumState {
 type DepOrderAccum {
     state: *mut DepOrderAccumState,
 }
+impl Copy for DepOrderAccum
 
 fn DepOrderAccum.new() -> DepOrderAccum:
     let ptr = with_alloc(32) as *mut DepOrderAccumState
