@@ -231,9 +231,11 @@ fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, method_sym: i32
     wl_set_linkage(wrapper_fn, wl_internal_linkage())
 
     let saved_fn = self.current_function
+    let saved_fn_name_sym = self.current_function_name_sym
     let saved_ret = self.current_ret_type
     let saved_bb = wl_get_insert_block(self.builder)
     self.current_function = wrapper_fn
+    self.current_function_name_sym = 0
     self.current_ret_type = ret_ty
 
     let entry = wl_append_bb(self.context, wrapper_fn, "entry")
@@ -262,6 +264,7 @@ fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, method_sym: i32
         let _ = wl_build_ret(self.builder, call_val)
 
     self.current_function = saved_fn
+    self.current_function_name_sym = saved_fn_name_sym
     self.current_ret_type = saved_ret
     if saved_bb != 0:
         wl_position_at_end(self.builder, saved_bb)
@@ -429,6 +432,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
         self.record_ref_param(fn_sym, 0, param_count)
 
     let saved_fn = self.current_function
+    let saved_fn_name_sym = self.current_function_name_sym
     let saved_ret = self.current_ret_type
     let saved_owner = self.current_method_owner_sym
     let saved_allocas = self.local_allocas
@@ -459,6 +463,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     let saved_bb = wl_get_insert_block(self.builder)
 
     self.current_function = function
+    self.current_function_name_sym = fn_sym
     self.current_ret_type = final_ret_ty
     self.current_method_owner_sym = impl_type_sym
     let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
@@ -534,6 +539,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     // ── MIR-based default trait method body compilation ──
     let saved_mir_locals = self.mir_local_ptrs
     let saved_mir_local_types = self.mir_local_types
+    let saved_mir_memory_locals = self.mir_memory_locals
     let saved_mir_bbs = self.mir_bb_values
     let saved_mir_unreachable = self.mir_default_unreachable_bbs
     let dtm_fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
@@ -542,6 +548,7 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     let dtm_fresh_mir_unr: Vec[i64] = Vec.new()
     self.mir_local_ptrs = dtm_fresh_mir_locals
     self.mir_local_types = dtm_fresh_mir_types
+    self.mir_memory_locals = HashMap.new()
     self.mir_bb_values = dtm_fresh_mir_bbs
     self.mir_default_unreachable_bbs = dtm_fresh_mir_unr
 
@@ -603,6 +610,8 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
             if dtm_m_ty_opt.is_some():
                 self.mir_local_types.insert(dtm_m_local_id, dtm_m_ty_opt.unwrap())
 
+    self.mir_scan_memory_locals(dtm_body)
+
     // Pre-populate globals
     for dtm_gli in 0..dtm_body.local_names.len() as i32:
         let dtm_gl_name = dtm_body.local_names.get(dtm_gli as i64)
@@ -647,10 +656,12 @@ fn Codegen.generate_default_trait_method_for_impl(self: Codegen, impl_type_sym: 
     // Restore MIR state
     self.mir_local_ptrs = saved_mir_locals
     self.mir_local_types = saved_mir_local_types
+    self.mir_memory_locals = saved_mir_memory_locals
     self.mir_bb_values = saved_mir_bbs
     self.mir_default_unreachable_bbs = saved_mir_unreachable
 
     self.current_function = saved_fn
+    self.current_function_name_sym = saved_fn_name_sym
     self.current_ret_type = saved_ret
     self.current_method_owner_sym = saved_owner
     self.local_allocas = saved_allocas

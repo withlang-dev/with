@@ -113,6 +113,8 @@ fn Sema.collect_declarations(self: Sema):
         if kind == NodeKind.NK_LET_DECL:
             self.collect_let_decl(decl, is_local)
 
+    self.check_trait_default_method_bodies()
+
 fn Sema.collect_enum_constructor_imports(self: Sema):
     for di in 0..self.ast.decl_count():
         self.update_decl_source_context(di)
@@ -1383,6 +1385,126 @@ fn Sema.register_method_sig_alias(self: Sema, node: i32, fn_sym: i32, sig_idx: i
     self.method_lookup.fn_lookup.insert(key, fn_sym)
     self.method_symbol_flags.insert(fn_sym, 1)
 
+fn Sema.impl_decl_has_method(self: Sema, impl_node: i32, method_sym: i32) -> i32:
+    let start = self.ast.get_start(impl_node)
+    let end = self.ast.get_end(impl_node)
+    let method_name = self.pool_resolve(method_sym)
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        let decl_start = self.ast.get_start(decl)
+        let decl_end = self.ast.get_end(decl)
+        if decl_start < start or decl_end > end:
+            continue
+        let fn_sym = self.ast.get_data0(decl)
+        let fn_name = self.pool_resolve(fn_sym)
+        let dot = sema_str_find_char(fn_name, 46)
+        if dot < 0:
+            if fn_name == method_name:
+                return 1
+        else:
+            let bare = fn_name.slice((dot + 1) as i64, fn_name.len() as i64)
+            if bare == method_name:
+                return 1
+    0
+
+fn Sema.trait_default_method_sig_exists(self: Sema, type_sym: i32, method_sym: i32) -> i32:
+    if self.lookup_method_sig(type_sym, method_sym) >= 0:
+        return 1
+    0
+
+fn Sema.install_trait_default_type_args(self: Sema, trait_sym: i32, impl_node: i32):
+    if trait_sym == 0 or impl_node == 0 or not self.trait_lookup.contains(trait_sym):
+        return
+    let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
+    let tp_count = self.trait_tp_counts.get(trait_idx as i64)
+    if tp_count <= 0:
+        return
+    let tta_idx = self.ast.find_impl_trait_type_args(impl_node as NodeId)
+    if tta_idx < 0:
+        return
+    let arg_start = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
+    let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+    let tp_start = self.trait_tp_starts.get(trait_idx as i64)
+    var ti = 0
+    while ti < tp_count and ti < arg_count:
+        let tp_sym = self.trait_tp_syms.get((tp_start + ti) as i64)
+        let arg_node = self.ast.get_extra(arg_start + ti)
+        let arg_tid = self.resolve_type_expr(arg_node)
+        if arg_tid != 0:
+            self.put_generic_subst(tp_sym, arg_tid as i32, arg_node)
+        ti = ti + 1
+
+fn Sema.resolve_trait_default_method_type(self: Sema, type_node: i32, impl_type_sym: i32, impl_type_tid: i32, trait_sym: i32, impl_node: i32) -> i32:
+    if type_node == 0:
+        return self.ty_void as i32
+    let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
+    let saved_subst_syms = self.generic_subst_param_syms
+    let saved_subst_tys = self.generic_subst_type_ids
+    self.generic_subst_param_syms = Vec.new()
+    self.generic_subst_type_ids = Vec.new()
+    if impl_type_tid != 0:
+        self.named_types.insert(self.syms.self_type, impl_type_tid)
+    self.install_trait_default_type_args(trait_sym, impl_node)
+    let resolved = self.resolve_type_expr(type_node) as i32
+    if impl_type_tid != 0:
+        if saved_self != 0:
+            self.named_types.insert(self.syms.self_type, saved_self)
+        else:
+            self.named_types.remove(self.syms.self_type)
+    self.generic_subst_param_syms = saved_subst_syms
+    self.generic_subst_type_ids = saved_subst_tys
+    resolved
+
+fn Sema.register_trait_default_method_for_impl(self: Sema, trait_sym: i32, impl_node: i32):
+    if not self.trait_lookup.contains(trait_sym):
+        return
+    let impl_type_sym = self.ast.get_data0(impl_node)
+    if impl_type_sym == 0:
+        return
+    let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
+    let mt_start = self.trait_method_starts.get(trait_idx as i64)
+    let mt_count = self.trait_method_counts.get(trait_idx as i64)
+    let impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
+    for mi in 0..mt_count:
+        let mt_idx = mt_start + mi
+        let default_body = self.trait_method_default_bodies.get(mt_idx as i64)
+        if default_body == 0:
+            continue
+        let method_sym = self.trait_method_names.get(mt_idx as i64)
+        if self.impl_decl_has_method(impl_node, method_sym) != 0:
+            continue
+        if self.trait_default_method_sig_exists(impl_type_sym, method_sym) != 0:
+            continue
+
+        let type_name = self.pool_resolve(impl_type_sym)
+        let method_name = self.pool_resolve(method_sym)
+        let fn_sym = self.pool_intern(type_name ++ "." ++ method_name)
+        let param_start = self.trait_method_param_starts.get(mt_idx as i64)
+        let param_count = self.trait_method_param_counts.get(mt_idx as i64)
+        let sig_param_start = self.sig_params.len() as i32
+        for pi in 0..param_count:
+            let p_type_node = self.ast.fn_param_type(param_start, pi)
+            let p_tid = self.resolve_trait_default_method_type(p_type_node, impl_type_sym, impl_type_tid, trait_sym, impl_node)
+            self.sig_params.push(p_tid)
+        let ret_node = self.trait_method_ret_nodes.get(mt_idx as i64)
+        let ret_tid = self.resolve_trait_default_method_type(ret_node, impl_type_sym, impl_type_tid, trait_sym, impl_node)
+        let fn_extra_start = self.type_extra.len() as i32
+        for pi in 0..param_count:
+            self.type_extra.push(self.sig_params.get((sig_param_start + pi) as i64))
+        let fn_tid = self.add_type(TypeKind.TY_FN, fn_extra_start, param_count, ret_tid)
+        self.add_sig(fn_sym, fn_tid, ret_tid, sig_param_start, param_count, 0)
+        let sig_idx = self.get_sig(fn_sym)
+        if sig_idx >= 0:
+            for pi in 0..param_count:
+                if self.fn_param_uses_value_ref_abi(param_start, pi, impl_type_sym, impl_type_tid) != 0:
+                    self.set_sig_param_value_ref_abi(sig_idx, pi, 1)
+            let key = sema_pair_key(impl_type_sym, method_sym)
+            self.method_lookup.sig_lookup.insert(key, sig_idx)
+            self.method_lookup.fn_lookup.insert(key, fn_sym)
+            self.method_symbol_flags.insert(fn_sym, 1)
+
 fn Sema.top_level_let_type_ann_extra(self: Sema, flags: i32) -> i32:
     let packed = flags / 16
     if packed <= 0:
@@ -1480,6 +1602,8 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
         let mt_flags = self.ast.get_extra(pos + 1)
         let mt_param_start = self.ast.get_extra(pos + 2)
         let mt_param_count = self.ast.get_extra(pos + 3)
+        let mt_ret_node = self.ast.get_extra(pos + 4)
+        let mt_default_body = self.ast.get_extra(pos + 5)
         if (mt_flags / FnFlags.ASYNC) % 2 == 1:
             self.require_async_runtime(node, "async trait method")
         // docs/mutability.md — trait method must declare explicit receiver mode.
@@ -1495,6 +1619,11 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
                         let mt_name_str = self.pool_resolve(mt_name)
                         self.emit_error(f"trait method '{mt_name_str}' requires an explicit receiver mode: use 'self: &Self', 'mut self: Self', or 'move self: Self'", node)
         self.trait_method_names.push(mt_name)
+        self.trait_method_flags.push(mt_flags)
+        self.trait_method_param_starts.push(mt_param_start)
+        self.trait_method_param_counts.push(mt_param_count)
+        self.trait_method_ret_nodes.push(mt_ret_node)
+        self.trait_method_default_bodies.push(mt_default_body)
         pos = pos + 6
     self.trait_method_counts.push(method_count)
     self.trait_lookup.insert(name, trait_idx)
@@ -1802,6 +1931,8 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> Unit:
             self.sealed_impl_starts.insert(trait_sym, self.sealed_impl_types.len() as i32)
             self.sealed_impl_counts.insert(trait_sym, 1)
             self.sealed_impl_types.push(type_name)
+
+    self.register_trait_default_method_for_impl(trait_sym, node)
 
 fn sema_trait_method_flag_generic -> i32: 4
 

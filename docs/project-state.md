@@ -11,6 +11,22 @@ conversation context after compaction.
 
 ## Current Focus
 
+#538 is implemented and verified. Trait default methods now participate in
+sema method lookup when an impl omits the method, using the same concrete
+`Type.method` symbols that codegen synthesizes. Sema records trait method
+signatures/default bodies, registers default method signatures for direct
+impls, substitutes `Self` and explicit trait type arguments during signature
+resolution and body checking, and validates omitted default bodies after
+ordinary function signatures are collected so defaults can call required
+methods supplied by the impl. Codegen default-method MIR emission now saves
+and restores function-name and MIR memory-local state and runs the normal MIR
+memory-local scan, preventing invalid default bodies from escaping into a
+fatal codegen path. Focused coverage includes omitted defaults, explicit
+overrides, defaults calling required methods, generic trait default method
+arguments/returns, unknown methods in defaults, and return-type mismatches.
+Full verification passed on 2026-06-13: `with build`, `with build
+:fixpoint`, `with build :test`, and `with build :test-green`.
+
 #405 is implemented and verified. `extend Name[T]:` now parses as a generic
 extension target instead of trait generic arguments, while `impl Trait[Args]
 for Type` keeps its existing trait-argument path. Generic method calls now

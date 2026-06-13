@@ -1220,6 +1220,93 @@ fn Sema.check_fn_body(self: Sema, node: i32):
     let sig_idx = self.get_sig(fn_name)
     self.check_fn_body_with_sig(node, sig_idx)
 
+fn Sema.check_trait_default_method_body_for_impl(self: Sema, impl_node: i32, method_idx: i32):
+    let body = self.trait_method_default_bodies.get(method_idx as i64)
+    if body == 0:
+        return
+    let impl_type_sym = self.ast.get_data0(impl_node)
+    let method_sym = self.trait_method_names.get(method_idx as i64)
+    if self.impl_decl_has_method(impl_node, method_sym) != 0:
+        return
+    let sig_idx = self.lookup_method_sig(impl_type_sym, method_sym)
+    if sig_idx < 0:
+        return
+
+    let saved_ret = self.current_return_type
+    let saved_fn_symbol = self.current_fn_symbol
+    let saved_expected = self.expected_expr_type
+    let saved_has_expected = self.has_expected_type
+    let saved_value_root = self.current_value_expr_root
+    let saved_stmt_root = self.current_statement_expr_root
+    let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
+    let saved_assoc = self.assoc_type_bindings
+    let saved_subst_syms = self.generic_subst_param_syms
+    let saved_subst_tys = self.generic_subst_type_ids
+    let fresh_assoc = sema_new_map_i32_i32()
+
+    let impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
+    if impl_type_tid != 0:
+        self.named_types.insert(self.syms.self_type, impl_type_tid)
+    self.assoc_type_bindings = fresh_assoc
+    self.generic_subst_param_syms = Vec.new()
+    self.generic_subst_type_ids = Vec.new()
+    self.install_trait_default_type_args(self.ast.get_data2(impl_node), impl_node)
+    let impl_ex = self.ast.get_data1(impl_node)
+    let impl_ac = self.ast.get_extra(impl_ex)
+    for iai in 0..impl_ac:
+        let at_name = self.ast.get_extra(impl_ex + 1 + iai * 2)
+        let at_type_nd = self.ast.get_extra(impl_ex + 1 + iai * 2 + 1)
+        let at_tid = self.resolve_type_expr(at_type_nd)
+        if at_tid != 0:
+            self.assoc_type_bindings.insert(at_name, at_tid as i32)
+
+    self.push_scope()
+    let param_start = self.trait_method_param_starts.get(method_idx as i64)
+    let param_count = self.trait_method_param_counts.get(method_idx as i64)
+    for pi in 0..param_count:
+        let p_name = self.ast.fn_param_name(param_start, pi)
+        self.scope_put(p_name, self.sig_param_type(sig_idx, pi), 0)
+
+    let ret_tid = self.sig_return_type(sig_idx)
+    self.current_return_type = ret_tid as TypeId
+    let fn_sym = self.lookup_method_fn(impl_type_sym, method_sym)
+    self.current_fn_symbol = fn_sym
+    let body_ty = self.check_expr_with_expected(body, ret_tid as TypeId)
+    self.typed_expr_types.insert(body, body_ty as i32)
+    if ret_tid != 0 and ret_tid != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+        if self.return_value_type_compatible(ret_tid, body_ty as i32) == 0 and self.arithmetic_result_type(ret_tid, body_ty) == 0:
+            self.emit_error("return type mismatch", body)
+
+    self.pop_scope()
+    if saved_self != 0:
+        self.named_types.insert(self.syms.self_type, saved_self)
+    else:
+        self.named_types.remove(self.syms.self_type)
+    self.assoc_type_bindings = saved_assoc
+    self.generic_subst_param_syms = saved_subst_syms
+    self.generic_subst_type_ids = saved_subst_tys
+    self.current_return_type = saved_ret
+    self.current_fn_symbol = saved_fn_symbol
+    self.expected_expr_type = saved_expected
+    self.has_expected_type = saved_has_expected
+    self.current_value_expr_root = saved_value_root
+    self.current_statement_expr_root = saved_stmt_root
+
+fn Sema.check_trait_default_method_bodies(self: Sema):
+    for di in 0..self.ast.decl_count():
+        self.update_decl_source_context(di)
+        let impl_node = self.ast.get_decl(di)
+        if self.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL:
+            continue
+        let trait_sym = self.ast.get_data2(impl_node)
+        if trait_sym == 0 or not self.trait_lookup.contains(trait_sym):
+            continue
+        let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
+        let mt_start = self.trait_method_starts.get(trait_idx as i64)
+        let mt_count = self.trait_method_counts.get(trait_idx as i64)
+        for mi in 0..mt_count:
+            self.check_trait_default_method_body_for_impl(impl_node, mt_start + mi)
+
 fn Sema.label_name(self: Sema, sym: i32) -> str:
     "'" ++ self.pool_resolve(sym)
 
