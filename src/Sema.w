@@ -152,6 +152,8 @@ type SemaBuiltinSymbols {
     embed_file: i32,
     copy_trait: i32,
     clone_trait: i32,
+    deref_trait: i32,
+    deref_method: i32,
     drop: i32,
     self_type: i32,
     vec: i32,
@@ -594,6 +596,12 @@ type Sema {
     try_branch_result_tys: HashMap[i32, i32],
     try_branch_fns: HashMap[i32, i32],
     try_from_break_fns: HashMap[i32, i32],
+    // Auto-deref adjustment sidecar: expression node -> contiguous step range.
+    // Step fn 0 means builtin &/* deref; non-zero is a user Deref.deref fn.
+    autoderef_step_starts: HashMap[i32, i32],
+    autoderef_step_counts: HashMap[i32, i32],
+    autoderef_step_fns: Vec[i32],
+    autoderef_step_tys: Vec[i32],
     // Match value-pattern sidecar: pattern node → symbol compared by value.
     pattern_value_syms: HashMap[i32, i32],
     // Regex literal metadata sidecars, keyed by NK_REGEX_LIT/NK_PAT_REGEX node.
@@ -1066,6 +1074,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         embed_file: 0,
         copy_trait: 0,
         clone_trait: 0,
+        deref_trait: 0,
+        deref_method: 0,
         drop: 0,
         self_type: 0,
         vec: 0,
@@ -1450,6 +1460,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         try_branch_result_tys: sema_new_map_i32_i32(),
         try_branch_fns: sema_new_map_i32_i32(),
         try_from_break_fns: sema_new_map_i32_i32(),
+        autoderef_step_starts: sema_new_map_i32_i32(),
+        autoderef_step_counts: sema_new_map_i32_i32(),
+        autoderef_step_fns: Vec.new(),
+        autoderef_step_tys: Vec.new(),
         pattern_value_syms: sema_new_map_i32_i32(),
         regex_capture_counts: sema_new_map_i32_i32(),
         regex_capture_name_starts: sema_new_map_i32_i32(),
@@ -1906,6 +1920,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.embed_file = self.pool_intern("embed_file")
     self.syms.copy_trait = self.pool_intern("Copy")
     self.syms.clone_trait = self.pool_intern("Clone")
+    self.syms.deref_trait = self.pool_intern("Deref")
+    self.syms.deref_method = self.pool_intern("deref")
     self.syms.regex = self.pool_intern("Regex")
     self.syms.drop = self.pool_intern("Drop")
     self.syms.self_type = self.pool_intern("Self")

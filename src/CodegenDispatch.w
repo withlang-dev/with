@@ -9685,6 +9685,55 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                     wl_build_br(self.builder, gc_next_val)
                 return true
 
+            // Synthetic MIR can call a generic struct method directly by
+            // callee symbol, without a source field-access call node. Dispatch
+            // from operand 0's MIR type, matching the explicit method-call path.
+            let gc_synth_method_decl = self.generic_struct_methods.get(gc_callee_sym)
+            let gc_synth_mir_start = body.call_arg_starts.get(args_id as i64)
+            let gc_synth_mir_count = body.call_arg_counts.get(args_id as i64)
+            var gc_synth_direct_method = true
+            if self.pool.kind(gc_node) == NodeKind.NK_CALL:
+                let gc_synth_callee_node = self.pool.get_data0(gc_node)
+                if self.pool.kind(gc_synth_callee_node) == NodeKind.NK_FIELD_ACCESS:
+                    gc_synth_direct_method = false
+            if gc_synth_direct_method and gc_synth_method_decl.is_some() and gc_synth_mir_count > 0:
+                let gc_synth_recv_op = body.call_arg_operands.get(gc_synth_mir_start as i64)
+                let gc_synth_recv_val = self.mir_eval_operand(body, gc_synth_recv_op, 0)
+                let gc_synth_recv_llvm_ty = wl_type_of(gc_synth_recv_val)
+                var gc_synth_recv_sema_ty = self.mir_operand_sema_type(body, gc_synth_recv_op)
+                if gc_synth_recv_sema_ty > 0:
+                    let gc_synth_recv_resolved = self.mir_input.mir_resolve_alias(gc_synth_recv_sema_ty)
+                    let gc_synth_recv_tk = self.mir_input.mir_get_type_kind(gc_synth_recv_resolved)
+                    if gc_synth_recv_tk == TypeKind.TY_REF or gc_synth_recv_tk == TypeKind.TY_PTR:
+                        gc_synth_recv_sema_ty = self.mir_input.mir_get_type_d0(gc_synth_recv_resolved)
+                var gc_synth_owner_sym = self.mir_struct_sym_from_sema_type(gc_synth_recv_sema_ty)
+                if gc_synth_owner_sym == 0:
+                    gc_synth_owner_sym = self.ensure_generic_method_owner_sym(gc_synth_recv_sema_ty)
+                if gc_synth_owner_sym == 0:
+                    gc_synth_owner_sym = self.find_struct_type_by_llvm(gc_synth_recv_llvm_ty)
+                if gc_synth_owner_sym != 0:
+                    let gc_synth_callee_name = self.intern.resolve(gc_callee_sym)
+                    var gc_synth_method_name = gc_synth_callee_name
+                    for gc_synth_di in 0..gc_synth_callee_name.len() as i32:
+                        if gc_synth_callee_name.byte_at(gc_synth_di as i64) == 46:
+                            gc_synth_method_name = gc_synth_callee_name.slice((gc_synth_di + 1) as i64, gc_synth_callee_name.len() as i64)
+                    let gc_synth_pre_args: Vec[i64] = Vec.new()
+                    for gc_synth_ai in 1..gc_synth_mir_count:
+                        let gc_synth_arg_op = body.call_arg_operands.get((gc_synth_mir_start + gc_synth_ai) as i64)
+                        gc_synth_pre_args.push(self.mir_eval_operand(body, gc_synth_arg_op, 0))
+                    let gc_synth_result = self.monomorphize_struct_method_core(gc_synth_owner_sym, gc_synth_method_name, gc_synth_method_decl.unwrap(), gc_synth_recv_val, 0, gc_synth_recv_llvm_ty, 0, gc_synth_mir_count - 1, gc_node, gc_synth_pre_args)
+                    if dest_place >= 0 and gc_synth_result != 0:
+                        let gc_synth_ret_ty = wl_type_of(gc_synth_result)
+                        if gc_synth_ret_ty != wl_void_type(self.context):
+                            let gc_synth_local = body.place_locals.get(dest_place as i64)
+                            let gc_synth_alloca = self.create_entry_alloca(gc_synth_ret_ty)
+                            wl_build_store(self.builder, gc_synth_result, gc_synth_alloca)
+                            self.mir_local_ptrs.insert(gc_synth_local, gc_synth_alloca)
+                            self.mir_local_types.insert(gc_synth_local, gc_synth_ret_ty)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                    return true
+
             // Handle builtins directly (no gen_expr needed)
             if gc_callee_sym > 0:
                 let gc_arg_count = self.pool.get_data2(gc_node)

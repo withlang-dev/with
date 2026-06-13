@@ -2734,7 +2734,7 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
 // Returns NodeKind.NK_TYPE_GENERIC node if args present, 0 otherwise.
 fn Parser.parse_optional_impl_target_args(self: Parser, type_name: i32) -> NodeId:
     if self.peek() != TokenKind.TK_L_BRACKET:
-        return self.poisoned_expr()
+        return 0 as NodeId
     let start = self.current_start()
     self.advance()
     self.skip_newlines()

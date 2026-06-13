@@ -6,6 +6,18 @@ impl AutoDerefUser:
     fn label(self: &Self) -> str:
         self.name
 
+type AutoDerefHandle { ptr: *const AutoDerefUser }
+
+impl Deref[AutoDerefUser] for AutoDerefHandle:
+    fn deref(self: &Self) -> &AutoDerefUser:
+        unsafe { self.ptr as &AutoDerefUser }
+
+type AutoDerefBox[T] { ptr: *const T }
+
+impl[T] Deref[T] for AutoDerefBox[T]:
+    fn deref(self: &Self) -> &T:
+        unsafe { self.ptr as &T }
+
 fn test_auto_deref_field_through_references:
     let user = AutoDerefUser { name: "Alice", score: 7 }
     let r = &user
@@ -17,6 +29,30 @@ fn test_auto_deref_method_receiver_through_references:
     let r = &user
     let rr = &r
     assert(rr.label() == "Ada")
+
+fn test_auto_deref_field_through_user_deref:
+    let user = AutoDerefUser { name: "Lin", score: 13 }
+    let handle = AutoDerefHandle { ptr: &raw const user as *const AutoDerefUser }
+    assert(handle.name == "Lin")
+
+fn test_auto_deref_method_receiver_through_user_deref:
+    let user = AutoDerefUser { name: "Barbara", score: 17 }
+    let handle = AutoDerefHandle { ptr: &raw const user as *const AutoDerefUser }
+    assert(handle.label() == "Barbara")
+
+fn test_auto_deref_user_deref_plus_references:
+    let user = AutoDerefUser { name: "Katherine", score: 19 }
+    let handle = AutoDerefHandle { ptr: &raw const user as *const AutoDerefUser }
+    let r = &handle
+    let rr = &r
+    assert(rr.name == "Katherine")
+    assert(rr.label() == "Katherine")
+
+fn test_auto_deref_generic_wrapper:
+    let user = AutoDerefUser { name: "Edsger", score: 23 }
+    let wrapped: AutoDerefBox[AutoDerefUser] = AutoDerefBox { ptr: &raw const user as *const AutoDerefUser }
+    assert(wrapped.name == "Edsger")
+    assert(wrapped.label() == "Edsger")
 
 fn test_auto_deref_vec_method_through_references:
     var values = Vec.new()

@@ -4965,6 +4965,16 @@ type SemaTryInfo {
 fn sema_try_info_none -> SemaTryInfo:
     SemaTryInfo { ok: 0, carrier_ty: 0, continue_ty: 0, break_ty: 0, branch_result_ty: 0, branch_fn: 0, from_break_fn: 0 }
 
+type SemaDerefInfo {
+    ok: i32,
+    target_ty: i32,
+    result_ref_ty: i32,
+    deref_fn: i32,
+}
+
+fn sema_deref_info_none -> SemaDerefInfo:
+    SemaDerefInfo { ok: 0, target_ty: 0, result_ref_ty: 0, deref_fn: 0 }
+
 fn Sema.type_base_symbol(self: Sema, tid: i32) -> i32:
     if tid == 0:
         return 0
@@ -5078,6 +5088,97 @@ fn Sema.try_method_fn(self: Sema, carrier_ty: i32, method_sym: i32) -> i32:
     if direct != 0:
         return direct
     self.lookup_generic_method_fn(owner_sym, method_sym)
+
+fn Sema.deref_method_fn(self: Sema, source_ty: i32) -> i32:
+    let owner_sym = self.method_owner_symbol_for_type(source_ty)
+    if owner_sym == 0:
+        return 0
+    let direct = self.lookup_method_fn(owner_sym, self.syms.deref_method)
+    if direct != 0:
+        return direct
+    self.lookup_generic_method_fn(owner_sym, self.syms.deref_method)
+
+fn Sema.impl_target_actual_for_type_param(self: Sema, impl_node: i32, source_ty: i32, param_sym: i32) -> i32:
+    let target_node = self.ast.find_impl_target_type_node(impl_node as NodeId)
+    if target_node == 0 or self.ast.kind(target_node) != NodeKind.NK_TYPE_GENERIC:
+        return 0
+    let source_resolved = self.resolve_alias(source_ty as TypeId)
+    if self.get_type_kind(source_resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let pattern_base = self.canonical_symbol_by_text(self.ast.get_data0(target_node))
+    let source_base = self.get_generic_inst_base(source_resolved as i32)
+    if pattern_base != source_base and self.pool_resolve(pattern_base) != self.pool_resolve(source_base):
+        return 0
+    let pattern_count = self.ast.get_data2(target_node)
+    if pattern_count != self.get_generic_inst_arg_count(source_resolved as i32):
+        return 0
+    let pattern_start = self.ast.get_data1(target_node)
+    for ai in 0..pattern_count:
+        let pattern_arg = self.ast.get_extra(pattern_start + ai)
+        let pattern_kind = self.ast.kind(pattern_arg)
+        if pattern_kind == NodeKind.NK_TYPE_NAMED or pattern_kind == NodeKind.NK_IDENT:
+            if self.ast.get_data0(pattern_arg) == param_sym:
+                return self.get_generic_inst_arg(source_resolved as i32, ai)
+    0
+
+fn Sema.resolve_impl_trait_arg_for_source(self: Sema, impl_node: i32, source_ty: i32, arg_node: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    let arg_kind = self.ast.kind(arg_node)
+    if arg_kind == NodeKind.NK_TYPE_NAMED or arg_kind == NodeKind.NK_IDENT:
+        let arg_sym = self.ast.get_data0(arg_node)
+        let subst = sema_subst_vec_lookup(subst_names, subst_types, arg_sym)
+        if subst != 0:
+            return subst
+        let target_actual = self.impl_target_actual_for_type_param(impl_node, source_ty, arg_sym)
+        if target_actual != 0:
+            return target_actual
+    self.resolve_type_node_with_subst(arg_node, source_ty, subst_names, subst_types)
+
+fn Sema.resolve_user_deref_info(self: Sema, source_ty: i32, node: i32) -> SemaDerefInfo:
+    let deref_trait_name = "Deref"
+    if source_ty == 0:
+        return sema_deref_info_none()
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+            continue
+        if self.pool_resolve(self.ast.get_data2(decl)) != deref_trait_name:
+            continue
+        let subst_names: Vec[i32] = Vec.new()
+        let subst_types: Vec[i32] = Vec.new()
+        if self.try_impl_target_matches(decl, source_ty, subst_names, subst_types) == 0:
+            continue
+        let deref_fn = self.deref_method_fn(source_ty)
+        if deref_fn == 0:
+            continue
+        let receiver_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, source_ty, 0, 0) as i32
+        var target_ty = 0
+        let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
+        if tta_idx >= 0:
+            let arg_start = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
+            let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+            if arg_count >= 1:
+                target_ty = self.resolve_impl_trait_arg_for_source(decl, source_ty, self.ast.get_extra(arg_start), subst_names, subst_types)
+        let sig_idx = self.get_sig(deref_fn)
+        var result_ref_ty = 0
+        if sig_idx >= 0:
+            result_ref_ty = self.sig_return_type(sig_idx)
+        if result_ref_ty == 0 and target_ty != 0:
+            result_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, target_ty, 0, 0) as i32
+        if result_ref_ty == 0:
+            continue
+        let result_resolved = self.resolve_alias(result_ref_ty as TypeId)
+        if self.get_type_kind(result_resolved) != TypeKind.TY_REF:
+            self.emit_error("Deref.deref must return a reference", node)
+            return sema_deref_info_none()
+        let pointee = self.get_type_d0(result_resolved)
+        if target_ty != 0 and self.types_compatible(target_ty, pointee) == 0:
+            self.emit_error("Deref.deref return reference must match Deref target type", node)
+            return sema_deref_info_none()
+        let concrete_target = if target_ty != 0: target_ty else: pointee
+        let concrete_result_ref = if target_ty != 0: self.ensure_exact_type(TypeKind.TY_REF, target_ty, 0, 0) as i32 else: result_resolved as i32
+        let _ = receiver_ref_ty
+        return SemaDerefInfo { ok: 1, target_ty: concrete_target, result_ref_ty: concrete_result_ref, deref_fn }
+    sema_deref_info_none()
 
 fn Sema.resolve_user_try_info(self: Sema, carrier_ty: i32) -> SemaTryInfo:
     if carrier_ty == 0:
@@ -7103,6 +7204,9 @@ fn Sema.field_access_type_from_obj(self: Sema, obj_type: TypeId, field: i32) -> 
     if obj_type == 0:
         return 0
     let field_base = self.auto_deref_ref_ptr_type(obj_type)
+    self.field_access_type_direct(field_base, field)
+
+fn Sema.field_access_type_direct(self: Sema, field_base: TypeId, field: i32) -> i32:
     let ftk = self.get_type_kind(field_base)
     if ftk == TypeKind.TY_STRUCT or ftk == TypeKind.TY_GENERIC_INST:
         return self.struct_field_type(field_base as i32, field)
@@ -7117,7 +7221,114 @@ fn Sema.field_access_type_from_obj(self: Sema, obj_type: TypeId, field: i32) -> 
                 idx = idx * 10 + ch - 48
         if idx < elem_count:
             return self.type_extra.get((te_start + idx) as i64)
+    if ftk == TypeKind.TY_ARRAY or ftk == TypeKind.TY_SLICE or ftk == TypeKind.TY_STR:
+        if self.pool_resolve(field) == "len":
+            return self.ty_i64 as i32
     0
+
+fn Sema.autoderef_record_steps(self: Sema, expr: i32, step_fns: &Vec[i32], step_tys: &Vec[i32]):
+    if expr == 0:
+        return
+    if step_fns.len() as i32 == 0:
+        return
+    let start = self.autoderef_step_fns.len() as i32
+    for i in 0..step_fns.len() as i32:
+        self.autoderef_step_fns.push(step_fns.get(i as i64))
+        self.autoderef_step_tys.push(step_tys.get(i as i64))
+    self.autoderef_step_starts.insert(expr, start)
+    self.autoderef_step_counts.insert(expr, step_fns.len() as i32)
+
+fn sema_autoderef_seen_type(types: &Vec[i32], ty: i32) -> i32:
+    for i in 0..types.len() as i32:
+        if types.get(i as i64) == ty:
+            return 1
+    0
+
+fn Sema.autoderef_type_has_field(self: Sema, ty: TypeId, field: i32) -> i32:
+    if self.field_access_type_direct(ty, field) != 0:
+        return 1
+    if self.get_type_kind(ty) == TypeKind.TY_ENUM and self.enum_has_variant(ty as i32, field) != 0:
+        return 1
+    0
+
+fn Sema.autoderef_type_has_method(self: Sema, ty: TypeId, method: i32) -> i32:
+    if self.get_type_kind(ty) == TypeKind.TY_REF:
+        return 0
+    if self.enum_accessor_variant_for_method(ty as i32, method) != 0:
+        return 1
+    let owner = self.method_owner_symbol_for_type(ty as i32)
+    if owner == 0:
+        return 0
+    if self.lookup_generic_method_fn(owner, method) != 0:
+        return 1
+    if self.lookup_method_sig(owner, method) >= 0:
+        return 1
+    if self.builtin_intrinsic_method_return_type(ty as i32, owner, method) != 0:
+        return 1
+    if self.get_type_kind(ty) == TypeKind.TY_GENERIC_INST:
+        return self.pipeline_generic_builtin_method_exists(owner, method)
+    0
+
+fn Sema.autoderef_next_type(self: Sema, current: TypeId, node: i32, mut step_fns: Vec[i32], mut step_tys: Vec[i32]) -> TypeId:
+    let tk = self.get_type_kind(current)
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        let inner = self.get_type_d0(current)
+        if inner == 0:
+            return current
+        let resolved_inner = self.resolve_alias(inner as TypeId)
+        step_fns.push(0)
+        step_tys.push(resolved_inner as i32)
+        return resolved_inner
+    let deref_info = self.resolve_user_deref_info(current as i32, node)
+    if deref_info.ok == 0:
+        return current
+    step_fns.push(deref_info.deref_fn)
+    step_tys.push(deref_info.result_ref_ty)
+    self.resolve_alias(deref_info.result_ref_ty as TypeId)
+
+fn Sema.auto_deref_field_type(self: Sema, tid: TypeId, field: i32, node: i32, expr: i32) -> TypeId:
+    var current = self.resolve_alias(tid)
+    let seen: Vec[i32] = Vec.new()
+    let step_fns: Vec[i32] = Vec.new()
+    let step_tys: Vec[i32] = Vec.new()
+    var depth = 0
+    while depth < 32:
+        if self.autoderef_type_has_field(current, field) != 0:
+            self.autoderef_record_steps(expr, step_fns, step_tys)
+            return current
+        if sema_autoderef_seen_type(&seen, current as i32) != 0:
+            self.emit_error("auto-deref cycle through Deref implementation", node)
+            return current
+        seen.push(current as i32)
+        let next = self.autoderef_next_type(current, node, step_fns, step_tys)
+        if next == current:
+            return current
+        current = next
+        depth = depth + 1
+    self.emit_error("auto-deref cycle through Deref implementation", node)
+    current
+
+fn Sema.auto_deref_method_type(self: Sema, tid: TypeId, method: i32, node: i32, expr: i32) -> TypeId:
+    var current = self.resolve_alias(tid)
+    let seen: Vec[i32] = Vec.new()
+    let step_fns: Vec[i32] = Vec.new()
+    let step_tys: Vec[i32] = Vec.new()
+    var depth = 0
+    while depth < 32:
+        if self.autoderef_type_has_method(current, method) != 0:
+            self.autoderef_record_steps(expr, step_fns, step_tys)
+            return current
+        if sema_autoderef_seen_type(&seen, current as i32) != 0:
+            self.emit_error("auto-deref cycle through Deref implementation", node)
+            return current
+        seen.push(current as i32)
+        let next = self.autoderef_next_type(current, node, step_fns, step_tys)
+        if next == current:
+            return current
+        current = next
+        depth = depth + 1
+    self.emit_error("auto-deref cycle through Deref implementation", node)
+    current
 
 fn Sema.field_access_type_no_diagnostic(self: Sema, node: i32) -> i32:
     if node == 0 or self.ast.kind(node) != NodeKind.NK_FIELD_ACCESS:
@@ -7185,7 +7396,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
     if obj_type == 0:
         return 0
 
-    let field_base = self.auto_deref_ref_ptr_type(obj_type)
+    let field_base = self.auto_deref_field_type(obj_type, field, node, expr)
     if self.type_is_raw_pointer_value(obj_type as i32) != 0:
         self.note_raw_pointer_validity_precondition(expr)
         if self.type_is_compiler_handle_state_pointer(obj_type as i32) == 0 and sema_path_is_migrated_regex_implementation(self.current_module_path) == 0 and self.require_unsafe_operation("raw pointer field access requires unsafe context", node) == 0:
@@ -9141,10 +9352,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
 fn Sema.pipeline_method_exists(self: Sema, recv_type: i32, method: i32) -> i32:
     if recv_type == 0 or method == 0:
         return 0
-    var resolved = self.resolve_alias(recv_type as TypeId)
-    let tk0 = self.get_type_kind(resolved)
-    if tk0 == TypeKind.TY_PTR or tk0 == TypeKind.TY_REF:
-        resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    var resolved = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
     let owner = self.method_owner_symbol_for_type(resolved as i32)
     if owner == 0:
         return 0
@@ -9703,7 +9911,7 @@ fn Sema.check_qualified_extension_call(self: Sema, recv_expr: i32, method_sym: i
     let recv_ty_raw = self.check_expr(recv_arg)
     if recv_ty_raw == 0:
         return 0
-    let recv_ty = self.auto_deref_ref_ptr_type(recv_ty_raw)
+    let recv_ty = self.auto_deref_method_type(recv_ty_raw, method_sym, node, recv_arg)
     let owner_sym = self.method_owner_symbol_for_type(recv_ty as i32)
     if owner_sym == 0:
         self.emit_error("qualified extension method '" ++ pkg_name ++ "." ++ method_name ++ "' receiver has no method owner type", recv_arg)
@@ -12774,7 +12982,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             return opt_ty
     // Normalize method receivers through ref/ptr layers so builtin
     // method typing matches field access auto-deref behavior.
-    var recv_type = self.auto_deref_ref_ptr_type(resolved)
+    var recv_type = self.auto_deref_method_type(resolved, field, node, expr)
     let dyn_trait_sym = self.dyn_trait_symbol_for_type(obj_type as i32)
     if dyn_trait_sym != 0:
         let dyn_ret = self.check_dyn_trait_method_call(dyn_trait_sym, field, arg_types, extra_start, mc_resolved_arg_count, node)

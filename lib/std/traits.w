@@ -57,6 +57,12 @@ pub trait Try[T, E]:
     fn branch(move self: Self) -> ControlFlow[E, T]
     fn from_break(value: E) -> Self
 
+/// Safe dereference protocol for pointer-like user types. Field and method
+/// lookup auto-dereferences through this trait the same way it does through
+/// built-in references.
+pub trait Deref[T]:
+    fn deref(self: &Self) -> &T
+
 /// Hashing. Implement to use a type as a HashMap key or HashSet element.
 pub trait Hash:
     fn hash_value(self) -> i64

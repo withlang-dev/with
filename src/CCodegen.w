@@ -2172,30 +2172,8 @@ fn CCodegen.body_copied_payload_enum_tids(self: CCodegen, body: &MirBody, downca
 
 fn CCodegen.body_ref_target_tids(self: CCodegen, body: &MirBody) -> Vec[i32]:
     var out = cc_zero_i32_vec(body.local_count())
-    for bb in 0..body.block_count():
-        let start = body.bb_stmt_starts.get(bb as i64)
-        let count = body.bb_stmt_counts.get(bb as i64)
-        for si in 0..count:
-            let stmt_id = start + si
-            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
-                continue
-            let dst_place = body.stmt_d0.get(stmt_id as i64)
-            let dst_local = self.place_local_id(body, dst_place)
-            if self.place_is_direct_local(body, dst_place, dst_local) == 0:
-                continue
-            let rval_id = body.stmt_d1.get(stmt_id as i64)
-            if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
-                continue
-            let rk = body.rval_kinds.get(rval_id as i64)
-            var src_place = -1
-            if rk == RvalueKind.RK_REF:
-                src_place = body.rval_d1.get(rval_id as i64)
-            else if rk == RvalueKind.RK_ADDR_OF:
-                src_place = body.rval_d0.get(rval_id as i64)
-            else:
-                continue
-            let src_tid = self.place_ref_target_tid(body, src_place)
-            out = self.record_local_tid(out, dst_local, src_tid)
+    for li in 0..body.local_count():
+        out = self.record_local_tid(out, li, self.local_ref_target_tid(body, li))
     out
 
 fn CCodegen.place_local_tid(self: CCodegen, body: &MirBody, place_id: i32) -> i32:
@@ -7965,6 +7943,28 @@ fn CCodegen.local_ref_target_tid(self: CCodegen, body: &MirBody, local_id: i32) 
                 src_place = body.rval_d1.get(rval_id as i64)
             else if rk == RvalueKind.RK_ADDR_OF:
                 src_place = body.rval_d0.get(rval_id as i64)
+            else if rk == RvalueKind.RK_USE:
+                let src_operand = body.rval_d0.get(rval_id as i64)
+                if src_operand < 0 or src_operand >= body.operand_kinds.len() as i32:
+                    continue
+                let ok = body.operand_kinds.get(src_operand as i64)
+                if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
+                    continue
+                let copied_place = body.operand_d0.get(src_operand as i64)
+                let copied_local = self.place_local_id(body, copied_place)
+                if copied_local == local_id:
+                    continue
+                if self.place_is_direct_local(body, copied_place, copied_local) == 0:
+                    continue
+                let copied_tid = self.local_ref_target_tid(body, copied_local)
+                if copied_tid == 0 or self.is_void_tid(copied_tid) != 0:
+                    continue
+                if out == 0:
+                    out = copied_tid
+                else if self.strict_type_match(out, copied_tid) == 0:
+                    self.local_ref_target_cache.insert(cache_key, -1)
+                    return 0
+                continue
             else:
                 continue
             let src_tid = self.place_ref_target_tid(body, src_place)

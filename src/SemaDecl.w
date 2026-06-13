@@ -1148,12 +1148,14 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
         let bi_impl = self.method_impl_nodes.get(fn_name).unwrap()
         let bi_tp_meta = self.ast.find_impl_type_params(bi_impl)
         if bi_tp_meta >= 0:
-            self.generic_fn_nodes.insert(fn_name, node)
-            self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
-            let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
-            if self_type_id != 0:
-                self.named_types.remove(self_sym)
-            return
+            let bi_tp_count = self.ast.state.impl_type_params.get((bi_tp_meta + 2) as i64)
+            if bi_tp_count > 0:
+                self.generic_fn_nodes.insert(fn_name, node)
+                self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
+                let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                if self_type_id != 0:
+                    self.named_types.remove(self_sym)
+                return
 
     // Methods on generic structs: treat as generic (type params come from struct)
     if tp_count == 0 and self_type_id != 0:

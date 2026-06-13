@@ -901,6 +901,11 @@ fn MirBuilder.local_type(self: MirBuilder, local_id: i32) -> i32:
     self.body.local_type_ids.get(local_id as i64) as i32
 
 fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
+    let sym_text = self.pool.resolve_symbol(sym)
+    if sym_text == "__FILE__" or sym_text == "__FN__":
+        return self.sema.ty_str as i32
+    if sym_text == "__LINE__":
+        return self.sema.ty_u32 as i32
     let local = self.lookup_local(sym)
     if local >= 0:
         return self.local_type(local)
@@ -3671,10 +3676,56 @@ fn MirBuilder.lower_field_access(self: MirBuilder, node: i32) -> i32:
     if field_ty == 0 or field_ty == self.sema.ty_void as i32:
         self.mark_unsupported()
         return self.place_for_local(0)
-    let base = self.lower_field_base_place(base_expr)
+    let base = self.lower_field_base_place_for_field(base_expr, field_idx)
     self.body.new_field_place(base, field_idx, field_ty)
 
+fn MirBuilder.lower_user_deref_result_place(self: MirBuilder, place: i32, current_ty: i32, deref_info: SemaDerefInfo, node: i32) -> i32:
+    let result_ref_ty = if deref_info.target_ty != 0: self.sema.ensure_exact_type(TypeKind.TY_REF, deref_info.target_ty, 0, 0) as i32 else: deref_info.result_ref_ty
+    var recv_ref_ty = 0
+    if not self.sema.generic_fn_nodes.contains(deref_info.deref_fn):
+        let sig_idx = self.sema.get_sig(deref_info.deref_fn)
+        if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0:
+            recv_ref_ty = self.sema.sig_param_type(sig_idx, 0)
+    if recv_ref_ty == 0:
+        recv_ref_ty = self.sema.ensure_exact_type(TypeKind.TY_REF, current_ty, 0, 0) as i32
+    let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
+    let recv_tmp = self.new_temp(recv_ref_ty)
+    let recv_place = self.place_for_local(recv_tmp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, recv_place, rv, self.ast.get_start(node))
+    let args: Vec[i32] = Vec.new()
+    args.push(self.body.new_operand(OperandKind.OK_COPY, recv_place))
+    let deref_op = self.lower_resolved_call_with_operand_args(deref_info.deref_fn, args, result_ref_ty, node)
+    self.materialize_operand(deref_op, result_ref_ty, self.ast.get_start(node))
+
+fn MirBuilder.lower_field_base_place_for_field(self: MirBuilder, base_expr: i32, field: i32) -> i32:
+    var place = self.lower_expr_place(base_expr)
+    var current_ty = self.expr_type(base_expr)
+    let place_ty = self.place_local_type(place)
+    if place_ty != 0 and place_ty != self.sema.ty_void as i32:
+        current_ty = place_ty
+    var depth = 0
+    while current_ty > 0 and depth < 32:
+        let current = self.sema.resolve_alias(current_ty as TypeId)
+        if self.sema.autoderef_type_has_field(current, field) != 0:
+            return place
+        let tk = self.sema.get_type_kind(current)
+        if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+            place = self.body.new_deref_place(place)
+            current_ty = self.sema.get_type_d0(current)
+            depth = depth + 1
+            continue
+        let deref_info = self.sema.resolve_user_deref_info(current as i32, base_expr)
+        if deref_info.ok == 0:
+            return place
+        let result_ref_ty = deref_info.result_ref_ty
+        place = self.lower_user_deref_result_place(place, current as i32, deref_info, base_expr)
+        current_ty = result_ref_ty
+        depth = depth + 1
+    place
+
 fn MirBuilder.lower_field_base_place(self: MirBuilder, base_expr: i32) -> i32:
+    if self.sema.autoderef_step_counts.contains(base_expr):
+        return self.lower_recorded_autoderef_place(base_expr)
     var base = self.lower_expr_place(base_expr)
     var base_ty = self.expr_type(base_expr)
     while base_ty > 0:
@@ -3685,6 +3736,23 @@ fn MirBuilder.lower_field_base_place(self: MirBuilder, base_expr: i32) -> i32:
         base = self.body.new_deref_place(base)
         base_ty = self.sema.get_type_d0(resolved)
     base
+
+fn MirBuilder.lower_recorded_autoderef_place(self: MirBuilder, expr: i32) -> i32:
+    var place = self.lower_expr_place(expr)
+    var current_ty = self.expr_type(expr)
+    if not self.sema.autoderef_step_counts.contains(expr):
+        return place
+    let start = self.sema.autoderef_step_starts.get(expr).unwrap()
+    let count = self.sema.autoderef_step_counts.get(expr).unwrap()
+    for i in 0..count:
+        let step_fn = self.sema.autoderef_step_fns.get((start + i) as i64)
+        let step_ty = self.sema.autoderef_step_tys.get((start + i) as i64)
+        if step_fn == 0:
+            place = self.body.new_deref_place(place)
+        else:
+            place = self.lower_user_deref_result_place(place, current_ty, SemaDerefInfo { ok: 1, target_ty: 0, result_ref_ty: step_ty, deref_fn: step_fn }, expr)
+        current_ty = step_ty
+    place
 
 fn MirBuilder.lower_index(self: MirBuilder, base_expr: i32, index_expr: i32) -> i32:
     var base = self.lower_expr_place(base_expr)
@@ -3745,6 +3813,8 @@ fn MirBuilder.lower_binding_alias_place(self: MirBuilder, node: i32) -> i32:
         if base_place < 0:
             return -1
         let field_sym = self.ast.get_data1(node)
+        if self.sema.autoderef_step_counts.contains(base_expr):
+            return self.body.new_field_place(self.lower_recorded_autoderef_place(base_expr), field_sym, self.expr_type(node))
         var field_base = base_place
         var base_ty = self.expr_type(base_expr)
         while base_ty > 0:
@@ -3939,6 +4009,15 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
         let gv_local = self.ensure_global_local(sym)
         if gv_local >= 0:
             return self.place_for_local(gv_local)
+        let magic_kind = self.magic_ident_kind(node)
+        if magic_kind != 0:
+            let op = self.lower_magic_ident(magic_kind, node)
+            let ty = self.expr_type(node)
+            let tmp = self.new_temp(ty)
+            let p = self.place_for_local(tmp)
+            self.assign_operand_to_place(p, op, self.ast.get_start(node))
+            self.register_stmt_temp(tmp, ty)
+            return p
         self.mark_unsupported()
         return self.place_for_local(0)
 
@@ -6450,34 +6529,99 @@ fn MirBuilder.lower_auto_ref_call_arg(self: MirBuilder, arg_node: i32, expected_
 fn MirBuilder.lower_auto_deref_call_arg(self: MirBuilder, arg_node: i32, expected_ty: i32) -> i32:
     if arg_node == 0 or expected_ty == 0:
         return -1
-    let expected_resolved = self.sema.resolve_alias(expected_ty as TypeId)
-    let expected_kind = self.sema.get_type_kind(expected_resolved)
-    if expected_kind != TypeKind.TY_REF and expected_kind != TypeKind.TY_PTR:
+    if self.sema.autoderef_step_counts.contains(arg_node):
+        let place = self.lower_recorded_autoderef_place(arg_node)
+        let start = self.sema.autoderef_step_starts.get(arg_node).unwrap()
+        let count = self.sema.autoderef_step_counts.get(arg_node).unwrap()
+        var final_ty = self.expr_type(arg_node)
+        if count > 0:
+            final_ty = self.sema.autoderef_step_tys.get((start + count - 1) as i64)
+        if self.sema.types_compatible(expected_ty, final_ty) != 0:
+            return self.body.new_operand(OperandKind.OK_COPY, place)
+        if self.sema.can_auto_ref_arg(expected_ty, final_ty) != 0:
+            let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
+            let temp = self.new_temp(expected_ty)
+            let temp_place = self.place_for_local(temp)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(arg_node))
+            return self.body.new_operand(OperandKind.OK_COPY, temp_place)
         return -1
     var current_ty = self.expr_type(arg_node)
     if current_ty == 0:
         return -1
     if self.sema.types_compatible(expected_ty, current_ty) != 0:
         return -1
-
-    var deref_count = 0
+    var place = self.lower_expr_place(arg_node)
+    let place_ty = self.place_local_type(place)
+    if place_ty != 0 and place_ty != self.sema.ty_void as i32:
+        current_ty = place_ty
     var depth = 0
     while current_ty > 0 and depth < 32:
+        if self.sema.types_compatible(expected_ty, current_ty) != 0:
+            return self.body.new_operand(OperandKind.OK_COPY, place)
+        if self.sema.can_auto_ref_arg(expected_ty, current_ty) != 0:
+            let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
+            let temp = self.new_temp(expected_ty)
+            let temp_place = self.place_for_local(temp)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(arg_node))
+            return self.body.new_operand(OperandKind.OK_COPY, temp_place)
         let current_resolved = self.sema.resolve_alias(current_ty as TypeId)
         let current_kind = self.sema.get_type_kind(current_resolved)
-        if current_kind != TypeKind.TY_REF and current_kind != TypeKind.TY_PTR:
-            break
-        deref_count = deref_count + 1
-        current_ty = self.sema.get_type_d0(current_resolved)
-        if current_ty != 0 and self.sema.types_compatible(expected_ty, current_ty) != 0:
-            var place = self.lower_expr_place(arg_node)
-            for _ in 0..deref_count:
-                place = self.body.new_deref_place(place)
-            return self.body.new_operand(OperandKind.OK_COPY, place)
+        if current_kind == TypeKind.TY_REF or current_kind == TypeKind.TY_PTR:
+            let inner = self.sema.get_type_d0(current_resolved)
+            if inner == 0:
+                return -1
+            place = self.body.new_deref_place(place)
+            current_ty = inner
+            depth = depth + 1
+            continue
+        let deref_info = self.sema.resolve_user_deref_info(current_resolved as i32, arg_node)
+        if deref_info.ok == 0:
+            return -1
+        let result_ref_ty = deref_info.result_ref_ty
+        place = self.lower_user_deref_result_place(place, current_resolved as i32, deref_info, arg_node)
+        current_ty = result_ref_ty
         depth = depth + 1
     -1
 
+fn MirBuilder.lower_receiver_with_method_autoderef_for_method(self: MirBuilder, recv_node: i32, method_sym: i32) -> i32:
+    if method_sym == 0:
+        return self.lower_receiver_with_method_autoderef(recv_node)
+    let sema_method_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(method_sym))
+    let lookup_method = if sema_method_sym != 0: sema_method_sym else: method_sym
+    var current_ty = self.expr_type(recv_node)
+    if current_ty == 0:
+        return self.lower_expr(recv_node)
+    var place = self.lower_expr_place(recv_node)
+    let place_ty = self.place_local_type(place)
+    if place_ty != 0 and place_ty != self.sema.ty_void as i32:
+        current_ty = place_ty
+    var depth = 0
+    while current_ty > 0 and depth < 32:
+        let current = self.sema.resolve_alias(current_ty as TypeId)
+        if self.sema.autoderef_type_has_method(current, lookup_method) != 0:
+            return self.body.new_operand(OperandKind.OK_COPY, place)
+        let kind = self.sema.get_type_kind(current)
+        if kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR:
+            let inner = self.sema.get_type_d0(current)
+            if inner == 0:
+                return self.body.new_operand(OperandKind.OK_COPY, place)
+            place = self.body.new_deref_place(place)
+            current_ty = inner
+            depth = depth + 1
+            continue
+        let deref_info = self.sema.resolve_user_deref_info(current as i32, recv_node)
+        if deref_info.ok == 0:
+            return self.body.new_operand(OperandKind.OK_COPY, place)
+        let result_ref_ty = deref_info.result_ref_ty
+        place = self.lower_user_deref_result_place(place, current as i32, deref_info, recv_node)
+        current_ty = result_ref_ty
+        depth = depth + 1
+    self.body.new_operand(OperandKind.OK_COPY, place)
+
 fn MirBuilder.lower_receiver_with_method_autoderef(self: MirBuilder, recv_node: i32) -> i32:
+    if self.sema.autoderef_step_counts.contains(recv_node):
+        let place = self.lower_recorded_autoderef_place(recv_node)
+        return self.body.new_operand(OperandKind.OK_COPY, place)
     var current_ty = self.expr_type(recv_node)
     if current_ty == 0:
         return self.lower_expr(recv_node)
@@ -6501,12 +6645,28 @@ fn MirBuilder.lower_receiver_with_method_autoderef(self: MirBuilder, recv_node: 
         place = self.body.new_deref_place(place)
     self.body.new_operand(OperandKind.OK_COPY, place)
 
+fn MirBuilder.recorded_autoderef_result_type(self: MirBuilder, expr: i32, fallback_ty: i32) -> i32:
+    if not self.sema.autoderef_step_counts.contains(expr):
+        return fallback_ty
+    let count = self.sema.autoderef_step_counts.get(expr).unwrap()
+    if count <= 0:
+        return fallback_ty
+    let start = self.sema.autoderef_step_starts.get(expr).unwrap()
+    self.sema.autoderef_step_tys.get((start + count - 1) as i64)
+
+fn MirBuilder.autoderef_result_type_for_method(self: MirBuilder, recv_ty: i32, method_sym: i32) -> i32:
+    if recv_ty == 0 or recv_ty == self.sema.ty_void as i32:
+        return recv_ty
+    let sema_method_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(method_sym))
+    let lookup_method = if sema_method_sym != 0: sema_method_sym else: method_sym
+    self.sema.auto_deref_method_type(recv_ty as TypeId, lookup_method, 0, 0) as i32
+
 fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method_sym: i32) -> i32:
     // Translate method_sym from AST pool to sema pool for method lookups.
     let sema_method_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(method_sym))
     let obj_type = self.expr_type(self_expr)
     if obj_type != 0 and obj_type != self.sema.ty_void:
-        let resolved = self.sema.auto_deref_ref_ptr_type(obj_type as TypeId)
+        let resolved = self.autoderef_result_type_for_method(obj_type, method_sym)
         let type_name_sym = self.sema.method_owner_symbol_for_type(resolved as i32)
         if type_name_sym != 0:
             if type_name_sym != self.sema.syms.fixed_string:
@@ -6842,7 +7002,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
         callee_sym = method_sym
     if self.receiver_is_static_type_expr(self_expr) != 0 and recv_type != 0 and self.sema.enum_has_variant(recv_type, method_sym) != 0:
         return self.lower_static_enum_variant_call(recv_type, method_sym, arg_start, arg_count, node)
-    let enum_accessor_recv_type = if recv_type != 0 and recv_type != self.sema.ty_void as i32: self.sema.auto_deref_ref_ptr_type(recv_type as TypeId) as i32 else: recv_type
+    let enum_accessor_recv_type = if recv_type != 0 and recv_type != self.sema.ty_void as i32: self.autoderef_result_type_for_method(recv_type, method_sym) else: recv_type
     let enum_accessor_variant = self.sema.enum_accessor_variant_for_method(enum_accessor_recv_type, method_sym)
     if enum_accessor_variant != 0:
         return self.lower_enum_accessor_call(self_expr, method_sym, node)
@@ -6865,7 +7025,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     if method_name == "unwrap_or" and self.is_option_or_result_type(enum_accessor_recv_type) != 0:
         return self.lower_unwrap_or_method(self_expr, arg_start, arg_count, node)
 
-    var intrinsic = self.classify_intrinsic(recv_type, method_name)
+    var intrinsic = self.classify_intrinsic(enum_accessor_recv_type, method_name)
 
     // When classify_intrinsic fails for "unwrap"/"expect"/"is_some", handle as Option
     // intrinsic. Sema's type system returns the raw value type for HashMap.get
@@ -6949,7 +7109,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
                     if self.lookup_local(gc_idx_sym) < 0 and self.sema.named_types.contains(gc_idx_sym):
                         gc_is_static = true
             if not gc_is_static:
-                let gc_recv_op = self.lower_expr(self_expr)
+                let gc_recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
                 gc_args.push(gc_recv_op)
             for gc_mai in 0..arg_count:
                 let gc_ma_node = self.ast.get_extra(arg_start + gc_mai)
@@ -7011,7 +7171,7 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
     var recv_type_for_args = 0
     if not is_static:
         let recv_ty = self.expr_type(self_expr)
-        recv_type_for_args = recv_ty
+        recv_type_for_args = self.autoderef_result_type_for_method(recv_ty, method_sym)
         let recv_resolved = if recv_ty != 0: self.sema.resolve_alias(recv_ty as TypeId) else: 0
         let recv_kind = self.sema.get_type_kind(recv_resolved)
         let raw_pointer_option_receiver = recv_kind == TypeKind.TY_PTR and (intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT or intrinsic == MirIntrinsic.OPT_IS_SOME or intrinsic == MirIntrinsic.OPT_IS_NONE or intrinsic == MirIntrinsic.OPT_FILTER)
@@ -7019,7 +7179,7 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
         if raw_pointer_option_receiver:
             recv_op = self.lower_expr(self_expr)
         else:
-            recv_op = self.lower_receiver_with_method_autoderef(self_expr)
+            recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
         if intrinsic != MirIntrinsic.FIBER_CANCEL:
             self.consume_moved_operand(recv_op)
         call_args.push(recv_op)
@@ -7181,7 +7341,7 @@ fn MirBuilder.lower_enum_accessor_call(self: MirBuilder, self_expr: i32, method_
     if enum_ty == 0 or enum_ty == self.sema.ty_void as i32:
         self.mark_unsupported()
         return self.unit_operand()
-    enum_ty = self.sema.auto_deref_ref_ptr_type(enum_ty as TypeId) as i32
+    enum_ty = self.recorded_autoderef_result_type(self_expr, self.sema.auto_deref_ref_ptr_type(enum_ty as TypeId) as i32)
 
     let variant_sym = self.sema.enum_accessor_variant_for_method(enum_ty, method_sym)
     let accessor_kind = self.sema.enum_accessor_kind_for_method(enum_ty, method_sym)
