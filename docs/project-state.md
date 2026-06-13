@@ -11,6 +11,20 @@ conversation context after compaction.
 
 ## Current Focus
 
+#458 is implemented and verified. The no_std tier model now rejects std-only
+module imports from the resolved module graph, so `std.io`, `std.fs`,
+`std.net`, `std.sync`, and other OS/runtime-backed std modules cannot leak
+through `use` declarations under `--no-std`. Async syntax and async function
+declarations now diagnose `requires std/fiber runtime` in no_std user code,
+and constructed alloc-backed builtins such as `Vec[T]`, `HashMap[K, V]`,
+and pending `Vec.new()`/`HashMap.new()` receivers are gated before falling
+through to unknown-type or unresolved-symbol paths. Focused coverage includes
+core no_std rejection for Vec, HashMap, async fn, and await; alloc no_std
+allowing Vec while still rejecting async and std-only imports; and existing
+core/alloc no_std positives. Full verification passed on 2026-06-12:
+`with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green`.
+
 #457 is implemented and verified. `std.fixed_string` now exposes
 `FixedString[N]` through all preludes, including `prelude_core`, with compiler
 support that maps `FixedString[N]` to stack storage and lowers `new`, length,

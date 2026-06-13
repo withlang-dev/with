@@ -27,6 +27,11 @@ extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 const STRICT_NO_MUT_REF: i32 = 1
 
 fn Sema.require_async_runtime(self: Sema, node: i32, feature: str):
+    if self.current_module_is_std_implementation() != 0:
+        return
+    if self.no_std != 0:
+        self.emit_error(feature ++ " requires std/fiber runtime", node)
+        return
     if self.runtime_available != 0:
         return
     self.emit_error(feature ++ " requires the fiber runtime", node)
@@ -295,6 +300,10 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
         // Self is resolved at codegen time
         if sym == self.syms.self_type:
             return 0 as TypeId
+        if self.require_alloc_tier_for_symbol(sym, node) == 0:
+            return 0 as TypeId
+        if self.require_std_tier_for_symbol(sym, node) == 0:
+            return 0 as TypeId
         if self.private_symbol_path_from_current(sym).len() > 0:
             self.emit_private_symbol_error(sym, node)
             return 0 as TypeId
@@ -506,6 +515,23 @@ fn Sema.no_std_decl_is_user_code(self: Sema, di: i32) -> i32:
             return 0
     1
 
+fn Sema.validate_no_std_import_tiers(self: Sema, fallback_node: NodeId):
+    for mi in 0..self.module_paths.len() as i32:
+        let module_path = self.module_paths.get(mi as i64)
+        if sema_tier_path_is_std_implementation(module_path) != 0:
+            continue
+        if mi >= self.module_import_starts.len() as i32:
+            continue
+        let start = self.module_import_starts.get(mi as i64)
+        let count = self.module_import_counts.get(mi as i64)
+        for ii in 0..count:
+            let idx = start + ii
+            if idx < 0 or idx >= self.module_import_paths.len() as i32:
+                continue
+            let import_path = self.module_import_paths.get(idx as i64)
+            if sema_tier_std_only_module(import_path) != 0:
+                self.emit_error(import_path ++ " requires std", fallback_node)
+
 fn Sema.validate_no_std_requirements(self: Sema):
     if self.no_std == 0:
         return
@@ -538,6 +564,7 @@ fn Sema.validate_no_std_requirements(self: Sema):
 
     if has_user_decl == 0:
         return
+    self.validate_no_std_import_tiers(fallback_node)
     if has_panic_handler == 0:
         self.emit_error("no_std requires @[panic_handler]", fallback_node)
     if has_no_main == 0 and has_entry == 0:
@@ -11664,6 +11691,12 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     var obj_type = self.check_expr(expr)
     let static_type_sym = self.static_receiver_base_sym(expr)
     let early_method_name = self.pool_resolve(field)
+    let static_receiver_is_tiered_type = self.static_receiver_type_is_known(expr) != 0 or self.is_pending_generic_collection_base(static_type_sym) != 0 or self.symbol_requires_std_tier(static_type_sym) != 0
+    if static_type_sym != 0 and static_receiver_is_tiered_type:
+        if self.require_alloc_tier_for_symbol(static_type_sym, expr) == 0:
+            return 0
+        if self.require_std_tier_for_symbol(static_type_sym, expr) == 0:
+            return 0
     if static_type_sym != 0 and self.is_pending_generic_collection_base(static_type_sym) != 0 and (field == self.syms.new or (static_type_sym == self.syms.vec and early_method_name == "with_capacity")):
         self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
     let static_expr_kind = self.ast.kind(expr)

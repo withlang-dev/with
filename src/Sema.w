@@ -671,6 +671,7 @@ type Sema {
     module_import_starts: Vec[i32],  // per-module start into module_import_targets
     module_import_counts: Vec[i32],  // per-module import edge count
     module_import_targets: Vec[i32], // flattened target module indices
+    module_import_paths: Vec[str],   // flattened import path text aligned with module_import_targets
     module_index_by_path: HashMap[str, i32],   // path -> module index
     global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
     module_visibility_cache: HashMap[str, i32], // "from->to" -> visibility
@@ -782,6 +783,33 @@ fn sema_tier_path_is_std_implementation(path: str) -> i32:
 fn Sema.current_module_is_std_implementation(self: Sema) -> i32:
     sema_tier_path_is_std_implementation(self.current_module_path)
 
+fn sema_tier_std_only_module(path: str) -> i32:
+    if path == "std.io" or path.starts_with("std.io."):
+        return 1
+    if path == "std.fs" or path.starts_with("std.fs."):
+        return 1
+    if path == "std.net" or path.starts_with("std.net."):
+        return 1
+    if path == "std.sync" or path.starts_with("std.sync."):
+        return 1
+    if path == "std.channel" or path.starts_with("std.channel."):
+        return 1
+    if path == "std.task" or path.starts_with("std.task."):
+        return 1
+    if path == "std.thread" or path.starts_with("std.thread."):
+        return 1
+    if path == "std.process" or path.starts_with("std.process."):
+        return 1
+    if path == "std.os" or path.starts_with("std.os."):
+        return 1
+    if path == "std.signal" or path.starts_with("std.signal."):
+        return 1
+    if path == "std.sysinfo" or path.starts_with("std.sysinfo."):
+        return 1
+    if path == "std.time" or path.starts_with("std.time."):
+        return 1
+    0
+
 fn sema_path_is_compiler_owned_implementation(path: str) -> i32:
     if path.starts_with("src/") or path.contains("/src/"):
         return 1
@@ -829,6 +857,14 @@ fn Sema.symbol_requires_std_tier(self: Sema, sym: i32) -> i32:
     if name == "print" or name == "eprint" or name == "write" or name == "ewrite":
         return 1
     if name == "print_i32" or name == "print_i64" or name == "print_bool":
+        return 1
+    if name == "Task" or name == "ScopedTask" or name == "ScopedJoinHandle":
+        return 1
+    if name == "Sender" or name == "Receiver" or name == "chan":
+        return 1
+    if name == "Mutex" or name == "RwLock" or name == "AtomicI64":
+        return 1
+    if name == "MutexGuard" or name == "MutexGuardMut" or name == "RwReadGuard" or name == "RwWriteGuard":
         return 1
     0
 
@@ -911,6 +947,7 @@ fn Sema.copy_module_graph_from(mut self: Sema, source: &Sema):
     self.module_import_starts = sema_new_vec_i32()
     self.module_import_counts = sema_new_vec_i32()
     self.module_import_targets = sema_new_vec_i32()
+    self.module_import_paths = sema_new_vec_str()
     self.module_index_by_path = sema_new_map_str_i32()
     self.global_visible_module_paths = sema_new_map_str_i32()
     self.module_visibility_cache = sema_new_map_str_i32()
@@ -928,6 +965,8 @@ fn Sema.copy_module_graph_from(mut self: Sema, source: &Sema):
         self.module_import_counts.push(source.module_import_counts.get(i as i64))
     for i in 0..source.module_import_targets.len() as i32:
         self.module_import_targets.push(source.module_import_targets.get(i as i64))
+    for i in 0..source.module_import_paths.len() as i32:
+        self.module_import_paths.push(sema_owned_text(source.module_import_paths.get(i as i64)))
 
 fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
     SemaBuiltinSymbols {
@@ -1388,6 +1427,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         module_import_starts: Vec.new(),
         module_import_counts: Vec.new(),
         module_import_targets: Vec.new(),
+        module_import_paths: sema_new_vec_str(),
         module_index_by_path: sema_new_map_str_i32(),
         global_visible_module_paths: sema_new_map_str_i32(),
         module_visibility_cache: sema_new_map_str_i32(),
@@ -2438,6 +2478,10 @@ fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
             gi_base_tid = self.lookup_named_type_visible(gi_base_sym)
     if gi_base_tid == 0:
         if not self.type_decl_nodes.contains(gi_base_sym):
+            if self.require_alloc_tier_for_symbol(gi_base_sym, node) == 0:
+                return 0
+            if self.require_std_tier_for_symbol(gi_base_sym, node) == 0:
+                return 0
             let gi_name = self.pool_resolve_symbol(gi_base_sym)
             self.emit_error("unknown type: " ++ gi_name, node)
             return 0

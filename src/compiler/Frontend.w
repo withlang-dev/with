@@ -196,6 +196,7 @@ fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult) -> Unit:
     self.module_import_starts = sema_new_vec_i32()
     self.module_import_counts = sema_new_vec_i32()
     self.module_import_targets = sema_new_vec_i32()
+    self.module_import_paths = sema_new_vec_str()
     self.module_index_by_path = HashMap.new()
     self.global_visible_module_paths = HashMap.new()
     self.module_visibility_cache = HashMap.new()
@@ -210,6 +211,7 @@ fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult) -> Unit:
             let imp = resolved.imports.get((mod.import_start + ii) as i64)
             if imp.target_module >= 0:
                 self.module_import_targets.push(imp.target_module)
+                self.module_import_paths.push(frontend_owned_text(imp.path_text))
                 visible_count = visible_count + 1
         self.module_import_counts.push(visible_count)
         self.module_index_by_path.insert(frontend_owned_text(mod.path), mod.module_id)
