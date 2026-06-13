@@ -32,6 +32,7 @@ impl Matrix:
             return
         self.a11 = value
 
+impl MultiIndex[i32] for Matrix:
     fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> i32:
         assert(count == 2)
         let row = specs[0]
@@ -42,6 +43,7 @@ impl Matrix:
         assert(col.has_start)
         self.at(row.start, col.start)
 
+impl MultiIndexMut[i32] for Matrix:
     fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, value: i32) -> Unit:
         assert(count == 2)
         let row = specs[0]
@@ -53,7 +55,7 @@ impl Matrix:
 
 type SpecProbe { marker: i32 }
 
-impl SpecProbe:
+impl MultiIndex[i32] for SpecProbe:
     fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> i32:
         assert(count == 4)
         let range = specs[0]
@@ -72,6 +74,26 @@ impl SpecProbe:
         assert(axis.kind == 3)
         assert(dots.kind == 2)
         self.marker
+
+impl MultiIndexMut[i32] for SpecProbe:
+    fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, value: i32) -> Unit:
+        assert(count == 4)
+        let range = specs[0]
+        let full = specs[1]
+        let axis = specs[2]
+        let dots = specs[3]
+        assert(range.kind == 1)
+        assert(range.has_start)
+        assert(range.has_stop)
+        assert(not range.has_step)
+        assert(range.start == 2)
+        assert(range.stop == 5)
+        assert(full.kind == 1)
+        assert(not full.has_start)
+        assert(not full.has_stop)
+        assert(axis.kind == 3)
+        assert(dots.kind == 2)
+        self.marker = value + count
 
 type Offset { value: i32 }
 
@@ -101,6 +123,11 @@ fn test_multi_index_specs:
     let probe = SpecProbe { marker: 77 }
     assert(probe[2:5, :, newaxis, ...] == 77)
 
+fn test_multi_index_slice_assignment:
+    var probe = SpecProbe { marker: 1 }
+    probe[2:5, :, newaxis, ...] = 80
+    assert(probe.marker == 84)
+
 fn test_right_side_dispatch:
     let shifted = 3 + Offset { value: 4 }
     assert(shifted.value == 34)
@@ -117,6 +144,7 @@ fn test_matmul_dispatch:
 fn main:
     test_multi_index_read_write()
     test_multi_index_specs()
+    test_multi_index_slice_assignment()
     test_right_side_dispatch()
     test_matmul_dispatch()
     print("ok")

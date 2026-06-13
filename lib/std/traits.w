@@ -242,8 +242,13 @@ impl Hash for str:    fn hash_value(self:
         h
 
 /// Multi-dimensional indexing. Implement to enable `a[i, j]` and slice syntax.
-pub trait MultiIndex:    fn multi_index(self: &Self, specs: &[IndexSpec], count:
-    i32) -> Self
+pub trait MultiIndex[O]:
+    fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> O
+
+/// Mutable multi-dimensional indexing. Implement to enable `a[i, j] = value`
+/// and slice assignment syntax.
+pub trait MultiIndexMut[V]:
+    fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, value: V) -> Unit
 
 /// Single-axis read-only indexing (docs/mut.md Rev 8 §2.4).
 /// `P[i]` on an `IndexGet`-only type returns a value, not a place — the

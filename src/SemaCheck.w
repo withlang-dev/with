@@ -6843,12 +6843,12 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
                 let mis_sym = self.pool_intern("multi_index_set")
                 let mis_sig = self.lookup_method_sig(base_name, mis_sym)
                 if mis_sig >= 0:
-                    if self.validate_multi_index_method_sig(mis_sig, mis_sym, 1, target) != 0:
+                    if self.validate_multi_index_method_sig(base_name, mis_sig, mis_sym, 1, target) != 0:
                         expected_value_type = self.sig_param_type(mis_sig, 3)
                 else:
-                    self.emit_error("type does not support indexed assignment (no multi_index_set method)", target)
+                    self.emit_error("type does not support multi-dimensional indexed assignment (missing multi_index_set method required by MultiIndexMut)", target)
             else:
-                self.emit_error("type does not support indexed assignment (no multi_index_set method)", target)
+                self.emit_error("type does not support multi-dimensional indexed assignment (missing multi_index_set method required by MultiIndexMut)", target)
 
         let value_type = if expected_value_type != 0: self.check_expr_with_expected(value, expected_value_type as TypeId) else: self.check_expr(value)
         self.note_place_effect(base_expr, EFF_WRITE)
@@ -6857,9 +6857,10 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         let lhs_packed = self.classify_place(base_expr)
         let lhs_kind = unpack_place_kind(lhs_packed)
         let lhs_mut_state = unpack_place_mut(lhs_packed)
+        let lhs_via_ro_ref = self.place_base_is_read_only_ref(base_expr)
         if lhs_kind == PlaceKind.PK_NotPlace:
             self.emit_warning("cannot assign to a non-place expression", node)
-        else if lhs_mut_state == PlaceMut.PM_ReadOnly:
+        else if lhs_mut_state == PlaceMut.PM_ReadOnly or lhs_via_ro_ref != 0:
             self.emit_error("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
 
         let assign_root = self.place_root_sym(base_expr)
@@ -7660,10 +7661,10 @@ fn Sema.check_multi_index_method(self: Sema, node: i32, base_ty: TypeId) -> i32:
         let mi_sym = self.pool_intern("multi_index")
         let mi_sig = self.lookup_method_sig(base_name, mi_sym)
         if mi_sig >= 0:
-            if self.validate_multi_index_method_sig(mi_sig, mi_sym, 0, node) != 0:
+            if self.validate_multi_index_method_sig(base_name, mi_sig, mi_sym, 0, node) != 0:
                 return self.sig_return_type(mi_sig)
             return 0
-    self.emit_error("type does not support multi-dimensional indexing", node)
+    self.emit_error("type does not support multi-dimensional indexing (missing multi_index method required by MultiIndex)", node)
     0
 
 fn Sema.check_pair_multi_index(self: Sema, node: i32, base_ty: TypeId) -> i32:
@@ -7689,7 +7690,7 @@ fn Sema.is_index_spec_slice_ref_type(self: Sema, tid: i32) -> i32:
         return 1
     0
 
-fn Sema.validate_multi_index_method_sig(self: Sema, sig_idx: i32, method_sym: i32, is_set: i32, node: i32) -> i32:
+fn Sema.validate_multi_index_method_sig(self: Sema, owner_sym: i32, sig_idx: i32, method_sym: i32, is_set: i32, node: i32) -> i32:
     let method_name = self.pool_resolve(method_sym)
     let expected_count = if is_set != 0: 4 else: 3
     if self.sig_get_param_count(sig_idx) != expected_count:
@@ -7704,9 +7705,41 @@ fn Sema.validate_multi_index_method_sig(self: Sema, sig_idx: i32, method_sym: i3
         self.emit_error("method `" ++ method_name ++ "` count parameter must be `i32`", node)
         return 0
     if is_set != 0:
+        if self.method_has_mut_self_flag(owner_sym, method_sym) == 0:
+            self.emit_error("method `multi_index_set` receiver must be `mut self: Self` for MultiIndexMut", node)
+            return 0
+        let value_ty = self.sig_param_type(sig_idx, 3)
+        if value_ty == 0:
+            self.emit_error("method `multi_index_set` value parameter must have a concrete type", node)
+            return 0
+        let value_resolved = self.resolve_alias(value_ty as TypeId)
+        if self.get_type_kind(value_resolved) == TypeKind.TY_VOID:
+            self.emit_error("method `multi_index_set` value parameter must not be Unit", node)
+            return 0
+        if self.is_opaque_value_type(value_ty as TypeId) != 0:
+            self.emit_error("method `multi_index_set` value parameter must be a concrete value type", node)
+            return 0
+        if self.get_type_kind(value_resolved) == TypeKind.TY_NEVER:
+            self.emit_error("method `multi_index_set` value parameter must be a concrete value type", node)
+            return 0
         let ret_ty = self.resolve_alias(self.sig_return_type(sig_idx) as TypeId)
         if ret_ty != self.ty_void:
             self.emit_error("method `" ++ method_name ++ "` must return void", node)
+            return 0
+    else:
+        let fn_sym = self.lookup_method_fn(owner_sym, method_sym)
+        if fn_sym != 0 and self.fn_decl_nodes.contains(fn_sym):
+            let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+            let meta = self.ast.find_fn_meta(fn_node)
+            if meta >= 0:
+                let ps = self.ast.fn_meta_param_start(meta)
+                let pflags = self.ast.fn_param_flags(ps, 0)
+                if fn_param_is_ref_self(pflags) == 0:
+                    self.emit_error("method `multi_index` receiver must be `self: &Self` for MultiIndex", node)
+                    return 0
+        let ret_ty = self.sig_return_type(sig_idx)
+        if ret_ty == 0 or self.resolve_alias(ret_ty as TypeId) == self.ty_void:
+            self.emit_error("method `multi_index` must return the indexed value type", node)
             return 0
     1
 

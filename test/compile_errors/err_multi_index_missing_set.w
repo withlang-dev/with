@@ -1,4 +1,4 @@
-//! expect-check-fail: type does not support indexed assignment
+//! expect-check-fail: missing multi_index_set method required by MultiIndexMut
 
 type Tensor { value: i32 }
 
