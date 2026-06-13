@@ -119,6 +119,8 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         out.mark_no_await_guard_type((src.state.no_await_guard_type_nodes.get(ni as i64)) as NodeId)
     for nai in 0..src.state.no_alloc_fn_nodes.len() as i32:
         out.mark_no_alloc_fn((src.state.no_alloc_fn_nodes.get(nai as i64)) as NodeId)
+    for ii in 0..src.state.iter_of_self_fn_nodes.len() as i32:
+        out.mark_iter_of_self_fn((src.state.iter_of_self_fn_nodes.get(ii as i64)) as NodeId)
     for si in 0..src.state.sealed_trait_nodes.len() as i32:
         out.mark_sealed_trait((src.state.sealed_trait_nodes.get(si as i64)) as NodeId)
     for ci in 0..src.state.comptime_decl_nodes.len() as i32:

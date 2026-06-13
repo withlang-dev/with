@@ -20,6 +20,31 @@ impl Iter[Token] for TokenStream:    fn next(mut self:
 fn token_text(tok: Token) -> str:
     tok.text
 
+type OwnedIterBag { count: i32 }
+
+type OwnedIter { value: i32, done: bool }
+
+impl Iter[i32] for OwnedIter:    fn next(mut self:
+    Self) -> Option[i32]:
+        if self.done:
+            return .None
+        self.done = true
+        .Some(self.value)
+
+impl OwnedIterBag:
+    fn add(mut self: Self, value: i32) -> i32:
+        self.count = self.count + value
+        self.count
+
+    fn owned_iter(self: &Self) -> OwnedIter:
+        OwnedIter { value: self.count, done: false }
+
+fn consume_owned(iter: OwnedIter, cb: fn(i32) -> i32) -> i32:
+    var sum = 0
+    for x in iter:
+        sum = sum + cb(x)
+    sum
+
 fn test_stdlib_iterator_next_twice:
     let names: Vec[str] = Vec.new()
     names.push("alice")
@@ -47,3 +72,9 @@ fn test_collect_owned_tokens_from_custom_iterator:
     assert(tokens.len() == 2)
     assert(tokens.get(0).text == "let")
     assert(tokens.get(1).text == "value")
+
+fn test_unannotated_user_iterator_does_not_retain_receiver:
+    var bag = OwnedIterBag { count: 1 }
+    let n = consume_owned(bag.owned_iter(), item => bag.add(item))
+    assert(n == 2)
+    assert(bag.count == 2)

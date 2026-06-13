@@ -15779,7 +15779,12 @@ fn Sema.maybe_register_iter_of_self_borrow(self: Sema, arg_node: i32) -> i32:
     let owner_sym = self.method_owner_symbol_for_type(recv_ty)
     if owner_sym == 0:
         return -1
-    if self.method_is_iter_of_self_fn(owner_sym, method) == 0:
+    var is_iter_of_self = 0
+    if self.comp_resolved.contains(arg_node):
+        is_iter_of_self = self.fn_symbol_is_iter_of_self(self.comp_resolved.get(arg_node).unwrap())
+    if is_iter_of_self == 0:
+        is_iter_of_self = self.method_is_iter_of_self_fn(owner_sym, method)
+    if is_iter_of_self == 0:
         return -1
     let pre_count = self.borrow_kinds.len() as i32
     let path_start = self.borrow_path_data.len() as i32
@@ -15924,6 +15929,10 @@ fn Sema.arg_retains_access_to(self: Sema, arg_node: i32, sym: i32) -> i32:
                 let method = self.ast.get_data1(callee)
                 let cap_ty = self.scope_lookup(sym)
                 if cap_ty >= 0:
+                    if self.comp_resolved.contains(arg_node):
+                        let resolved_fn = self.comp_resolved.get(arg_node).unwrap()
+                        if self.fn_symbol_is_iter_of_self(resolved_fn) != 0:
+                            return 1
                     let resolved = self.resolve_alias(cap_ty as TypeId)
                     var inner = resolved
                     let tk = self.get_type_kind(inner)
@@ -15942,16 +15951,20 @@ fn Sema.arg_retains_access_to(self: Sema, arg_node: i32, sym: i32) -> i32:
 // receiver place (e.g., Vec.iter, HashMap.entries). Used by check_call's
 // arg-loop to register a SHARED borrow on the receiver place root for the
 // duration of the enclosing call so that sibling closure mutations conflict.
+fn Sema.fn_symbol_is_iter_of_self(self: Sema, fn_sym: i32) -> i32:
+    if fn_sym == 0:
+        return 0
+    if self.fn_decl_nodes.contains(fn_sym):
+        return self.ast.is_iter_of_self_fn_node(self.fn_decl_nodes.get(fn_sym).unwrap())
+    if self.generic_fn_nodes.contains(fn_sym):
+        return self.ast.is_iter_of_self_fn_node(self.generic_fn_nodes.get(fn_sym).unwrap())
+    0
+
 fn Sema.method_is_iter_of_self_fn(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     if self.builtin_method_is_iter_of_self(type_sym, method_sym) != 0:
         return 1
     let fn_sym = self.lookup_method_fn(type_sym, method_sym)
-    if fn_sym == 0:
-        return 0
-    if not self.fn_decl_nodes.contains(fn_sym):
-        return 0
-    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
-    self.ast.is_iter_of_self_fn_node(fn_node)
+    self.fn_symbol_is_iter_of_self(fn_sym)
 
 fn Sema.method_has_mut_self_flag(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     let fn_sym = self.lookup_method_fn(type_sym, method_sym)

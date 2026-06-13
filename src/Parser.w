@@ -2847,13 +2847,18 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     let extra_start = self.pool.extra_len()
     var method_count = 0
 
-    while self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
+    while self.peek() == TokenKind.TK_AT or self.peek() == TokenKind.TK_KW_FN or self.peek() == TokenKind.TK_KW_PUB or self.peek() == TokenKind.TK_KW_ASYNC or self.peek() == TokenKind.TK_KW_TYPE or (impl_braced and self.peek() == TokenKind.TK_R_BRACE):
         if impl_braced and self.peek() == TokenKind.TK_R_BRACE:
             break
         if not impl_braced:
             let fn_col = column_of(self.source, self.current_start())
             if fn_col == 0:
                 break
+
+        self.skip_attributes()
+        self.skip_newlines()
+        if impl_braced and self.peek() == TokenKind.TK_R_BRACE:
+            break
 
         // Associated type binding: type Name = ConcreteType
         if self.peek() == TokenKind.TK_KW_TYPE:
