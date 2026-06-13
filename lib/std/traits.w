@@ -14,6 +14,36 @@ pub trait Eq:    fn eq(self, other:
 pub trait Ord:    fn cmp(self, other:
     Self) -> i32
 
+/// Addition. Available for explicit generic bounds; `+` dispatches by the
+/// fixed method name `add` on concrete operand types.
+pub trait Add[Rhs, Output]:
+    fn add(self: &Self, rhs: &Rhs) -> Output
+
+/// Subtraction. Available for explicit generic bounds; `-` dispatches by the
+/// fixed method name `sub` on concrete operand types.
+pub trait Sub[Rhs, Output]:
+    fn sub(self: &Self, rhs: &Rhs) -> Output
+
+/// Multiplication. Available for explicit generic bounds; `*` dispatches by the
+/// fixed method name `mul` on concrete operand types.
+pub trait Mul[Rhs, Output]:
+    fn mul(self: &Self, rhs: &Rhs) -> Output
+
+/// Division. Available for explicit generic bounds; `/` dispatches by the
+/// fixed method name `div` on concrete operand types.
+pub trait Div[Rhs, Output]:
+    fn div(self: &Self, rhs: &Rhs) -> Output
+
+/// Matrix multiplication. Available for explicit generic bounds; `@` dispatches
+/// by the fixed method name `matmul` on concrete operand types.
+pub trait MatMul[Rhs, Output]:
+    fn matmul(self: &Self, rhs: &Rhs) -> Output
+
+/// Unary negation. Available for explicit generic bounds; unary `-` dispatches
+/// by the fixed method name `neg` on concrete operand types.
+pub trait Neg[Output]:
+    fn neg(self: &Self) -> Output
+
 /// Hashing. Implement to use a type as a HashMap key or HashSet element.
 pub trait Hash:
     fn hash_value(self) -> i64
