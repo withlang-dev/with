@@ -212,6 +212,8 @@ type Codegen {
 
     // Enum by LLVM type (for match lookups)
     enum_by_llvm: HashMap[i64, i32],
+    generic_enum_inst_types: HashMap[i32, i64],
+    generic_enum_inst_syms: HashMap[i32, i32],
 
     // Discriminant enums: sym → index into disc_enum_* arrays
     disc_enum_type_map: HashMap[i32, i32],
@@ -594,6 +596,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         enum_variant_names: Vec.new(),
         enum_variant_payloads: Vec.new(),
         enum_by_llvm: HashMap.new(),
+        generic_enum_inst_types: HashMap.new(),
+        generic_enum_inst_syms: HashMap.new(),
         disc_enum_type_map: HashMap.new(),
         disc_enum_name_syms: Vec.new(),
         disc_enum_repr_types: Vec.new(),
@@ -2330,6 +2334,110 @@ fn Codegen.sema_generic_arg_llvm(self: Codegen, sema_tid: i32, arg_idx: i32) -> 
     let inner_tid = self.sema.get_generic_inst_arg(sema_tid, arg_idx)
     self.sema_type_to_llvm(inner_tid)
 
+fn Codegen.generic_enum_payload_llvm_type(self: Codegen, payload_tys: &Vec[i32]) -> i64:
+    let count = payload_tys.len() as i32
+    if count <= 0:
+        return 0
+    if count == 1:
+        return self.sema_type_to_llvm(payload_tys.get(0))
+    let fields: Vec[i64] = Vec.new()
+    for pi in 0..count:
+        var field_ty = self.sema_type_to_llvm(payload_tys.get(pi as i64))
+        if field_ty == 0:
+            field_ty = self.type_fallback()
+        fields.push(field_ty)
+    wl_struct_type(self.context, vec_data_i64(&fields), count, 0)
+
+fn Codegen.get_or_create_generic_enum_type(self: Codegen, sema_tid: i32) -> i64:
+    let resolved = self.sema.resolve_alias(sema_tid)
+    if resolved <= 0 or self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let cached = self.generic_enum_inst_types.get(resolved)
+    if cached.is_some():
+        return cached.unwrap() as i64
+    let base_sym = self.sema.get_generic_inst_base(resolved)
+    if base_sym == 0 or not self.sema.named_types.contains(base_sym):
+        return 0
+    let base_tid = self.sema.named_types.get(base_sym).unwrap()
+    if self.sema.get_type_kind(base_tid) != TypeKind.TY_ENUM:
+        return 0
+    let cg_base_sym = self.sema_sym_to_codegen_sym(base_sym)
+    if cg_base_sym == 0:
+        return 0
+
+    let base_name = self.sema_symbol_text(base_sym)
+    let enum_name = if base_name.len() > 0: base_name else: self.intern.resolve(cg_base_sym)
+    let mono_name = f"{enum_name}__enuminst_{resolved}"
+    let mono_sym = self.intern.intern(mono_name)
+    let enum_type = wl_struct_create_named(self.context, mono_name)
+    let enum_idx = self.enum_llvm_types.len() as i32
+    self.enum_llvm_types.push(enum_type)
+    self.enum_variant_starts.push(self.enum_variant_names.len() as i32)
+    self.enum_variant_counts.push(0)
+    self.enum_type_map.insert(mono_sym, enum_idx)
+    self.enum_by_llvm.insert(enum_type, mono_sym)
+    self.generic_enum_inst_types.insert(resolved, enum_type)
+    self.generic_enum_inst_syms.insert(resolved, mono_sym)
+
+    let owner_decl = self.generic_type_decl_node(cg_base_sym)
+    if owner_decl != 0:
+        self.mono_struct_base.insert(mono_sym, cg_base_sym)
+        let tp_count = self.type_decl_tp_count(owner_decl)
+        let tp_flat_start = self.mono_struct_tp_flat_syms.len() as i32
+        var tp_pos = self.type_decl_tp_start(owner_decl)
+        for ti in 0..tp_count:
+            let tp_sym = self.pool.get_extra(tp_pos)
+            let bound_count = self.pool.get_extra(tp_pos + 1)
+            let arg_tid = if ti < self.sema.get_generic_inst_arg_count(resolved): self.sema.get_generic_inst_arg(resolved, ti) else: 0
+            var arg_llvm = if arg_tid > 0: self.sema_type_to_llvm(arg_tid) else: 0
+            if arg_llvm == 0:
+                arg_llvm = self.type_fallback()
+            self.mono_struct_tp_flat_syms.push(tp_sym)
+            self.mono_struct_tp_flat_types.push(arg_llvm)
+            self.mono_struct_tp_flat_sema_types.push(arg_tid)
+            tp_pos = tp_pos + 2 + bound_count
+        self.mono_struct_tp_starts.insert(mono_sym, tp_flat_start)
+        self.mono_struct_tp_counts.insert(mono_sym, tp_count)
+
+    let te_start = self.sema.get_type_d1(base_tid)
+    let variant_count = self.sema.get_type_d2(base_tid)
+    let v_start = self.enum_variant_names.len() as i32
+    var pos = te_start
+    var max_payload_size: i64 = 0
+    var invalid_layout = 0
+    for vi in 0..variant_count:
+        let variant_name = self.sema.type_extra.get(pos as i64)
+        let payload_count = self.sema.type_extra.get((pos + 1) as i64)
+        var payload_ty: i64 = 0
+        if payload_count > 0:
+            let payload_tys = self.sema.resolve_generic_enum_payload(resolved, base_sym, variant_name, payload_count)
+            if payload_tys.len() as i32 == payload_count:
+                payload_ty = self.generic_enum_payload_llvm_type(&payload_tys)
+            if payload_ty == 0:
+                with_eprint("error: unresolved payload type for generic enum variant '" ++ self.sema_symbol_text(variant_name) ++ "' in '" ++ mono_name ++ "'")
+                self.had_error = 1
+                invalid_layout = 1
+            else:
+                let sz = self.abi_size_of(payload_ty)
+                if sz > max_payload_size:
+                    max_payload_size = sz
+        let cg_variant_name = self.sema_sym_to_codegen_sym(variant_name)
+        self.enum_variant_names.push(if cg_variant_name != 0: cg_variant_name else: variant_name)
+        self.enum_variant_payloads.push(payload_ty)
+        pos = pos + 2 + payload_count
+
+    if invalid_layout != 0:
+        return 0
+
+    let body: Vec[i64] = Vec.new()
+    body.push(wl_i32_type(self.context))
+    if max_payload_size > 0:
+        body.push(wl_array_type(wl_i8_type(self.context), max_payload_size))
+    wl_struct_set_body(enum_type, vec_data_i64(&body), body.len() as i32, 0)
+    self.enum_variant_starts.set_i32(enum_idx as i64, v_start)
+    self.enum_variant_counts.set_i32(enum_idx as i64, variant_count)
+    enum_type
+
 fn Codegen.mono_struct_sema_type(self: Codegen, mono_sym: i32) -> i32:
     let mono_base_opt = self.mono_struct_base.get(mono_sym)
     let tp_start_opt = self.mono_struct_tp_starts.get(mono_sym)
@@ -2448,6 +2556,10 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             vip_fields.push(wl_i64_type(self.context))
             vip_fields.push(wl_i64_type(self.context))
             return wl_struct_type(self.context, vec_data_i64(&vip_fields), 3, 0)
+        if base_sym != 0 and self.sema.named_types.contains(base_sym):
+            let base_tid = self.sema.named_types.get(base_sym).unwrap()
+            if self.sema.get_type_kind(base_tid) == TypeKind.TY_ENUM:
+                return self.get_or_create_generic_enum_type(resolved_tid)
         // User-defined generic structs: monomorphize via type bindings
         if cg_base_sym != 0 and self.generic_structs.contains(cg_base_sym):
             let saved_len = self.type_bindings_len
@@ -2840,6 +2952,26 @@ fn Codegen.type_decl_tp_count(self: Codegen, type_node: i32) -> i32:
     if meta_start + 1 >= self.pool.extra_len():
         return 0
     self.pool.get_extra(meta_start + 1)
+
+fn Codegen.generic_type_decl_node(self: Codegen, type_sym: i32) -> i32:
+    if type_sym <= 0:
+        return 0
+    let gs = self.generic_structs.get(type_sym)
+    if gs.is_some():
+        return gs.unwrap()
+    for di in 0..self.pool.decl_count():
+        let decl = self.pool.get_decl(di)
+        if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
+            continue
+        if self.pool.get_data0(decl) != type_sym:
+            continue
+        let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
+        if sub_kind != TypeDeclKind.Struct and sub_kind != TypeDeclKind.Enum:
+            return 0
+        if self.type_decl_tp_count(decl) > 0:
+            return decl as i32
+        return 0
+    0
 
 // ── Declare struct type ───────────────────────────────────────────
 
@@ -3425,13 +3557,12 @@ fn Codegen.declare_function_at(self: Codegen, fn_node: i32, decl_index: i32):
                 method_key_sym = self.intern.intern(mk_str)
             break
 
-    // Methods owned by generic structs are always compiled lazily against a
+    // Methods owned by generic types are always compiled lazily against a
     // concrete owner instantiation. Even "static" methods like Foo.wrap(x: T)
     // or methods returning Self need the owner bindings before their LLVM
     // signature can be resolved correctly.
     if method_owner_sym != 0:
-        let gs_decl_opt = self.generic_structs.get(method_owner_sym)
-        if gs_decl_opt.is_some():
+        if self.generic_type_decl_node(method_owner_sym) != 0:
             self.generic_struct_methods.insert(name_sym, fn_node)
             return
 
@@ -3779,7 +3910,7 @@ fn Codegen.is_method_on_generic_struct(self: Codegen, name_sym: i32) -> bool:
     for di in 0..name_str.len() as i32:
         if name_str.byte_at(di as i64) == 46:
             let owner_sym = self.intern.intern(name_str.slice(0, di as i64))
-            return self.generic_structs.contains(owner_sym)
+            return self.generic_type_decl_node(owner_sym) != 0
     false
 
 fn Codegen.is_ref_param(self: Codegen, fn_sym: i32, param_idx: i32) -> bool:
@@ -4779,6 +4910,10 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
             let tp_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
             tp_sema = self.llvm_type_to_sema_type(tp_llvm)
         sm_tp_sema_tys.push(tp_sema)
+    let concrete_self_ty = self.mono_struct_sema_type(mono_type_sym)
+    if concrete_self_ty != 0:
+        sm_tp_syms.push(self.sema.syms.self_type)
+        sm_tp_sema_tys.push(concrete_self_ty)
 
     let alias_base_sym = self.mono_struct_base.get(mono_type_sym).unwrap()
     let alias_base_text = self.intern.resolve(alias_base_sym)
@@ -4950,6 +5085,10 @@ fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: 
             let tp_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
             tp_sema = self.llvm_type_to_sema_type(tp_llvm)
         sm_tp_sema_tys.push(tp_sema)
+    let concrete_self_ty = self.mono_struct_sema_type(mono_type_sym)
+    if concrete_self_ty != 0:
+        sm_tp_syms.push(self.sema.syms.self_type)
+        sm_tp_sema_tys.push(concrete_self_ty)
 
     let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym)
     let saved_sema_named: Vec[i32] = Vec.new()

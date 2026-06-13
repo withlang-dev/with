@@ -4952,6 +4952,196 @@ type SemaOperatorCandidate {
 fn sema_operator_candidate_none -> SemaOperatorCandidate:
     SemaOperatorCandidate { sig: -1, fn_sym: 0, owner_sym: 0 }
 
+type SemaTryInfo {
+    ok: i32,
+    carrier_ty: i32,
+    continue_ty: i32,
+    break_ty: i32,
+    branch_result_ty: i32,
+    branch_fn: i32,
+    from_break_fn: i32,
+}
+
+fn sema_try_info_none -> SemaTryInfo:
+    SemaTryInfo { ok: 0, carrier_ty: 0, continue_ty: 0, break_ty: 0, branch_result_ty: 0, branch_fn: 0, from_break_fn: 0 }
+
+fn Sema.type_base_symbol(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    let kind = self.get_type_kind(resolved)
+    if kind == TypeKind.TY_GENERIC_INST or kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_ALIAS:
+        return self.get_type_d0(resolved)
+    self.get_type_name(resolved)
+
+fn Sema.resolve_type_node_with_subst(self: Sema, type_node: i32, self_ty: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    if type_node == 0:
+        return self.ty_void as i32
+    let kind = self.ast.kind(type_node)
+    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(type_node)
+        if sym == self.syms.self_type and self_ty != 0:
+            return self_ty
+        let subst = sema_subst_vec_lookup(subst_names, subst_types, sym)
+        if subst != 0:
+            return subst
+        return self.resolve_type_expr(type_node) as i32
+    if kind == NodeKind.NK_TYPE_REF:
+        let inner = self.resolve_type_node_with_subst(self.ast.get_data0(type_node), self_ty, subst_names, subst_types)
+        return self.ensure_exact_type(TypeKind.TY_REF, inner, self.ast.get_data1(type_node), 0) as i32
+    if kind == NodeKind.NK_TYPE_PTR:
+        let inner2 = self.resolve_type_node_with_subst(self.ast.get_data0(type_node), self_ty, subst_names, subst_types)
+        return self.ensure_exact_type(TypeKind.TY_PTR, inner2, self.ast.get_data1(type_node), self.ast.get_data2(type_node)) as i32
+    if kind == NodeKind.NK_TYPE_TUPLE:
+        let extra_start = self.ast.get_data0(type_node)
+        let elem_count = self.ast.get_data1(type_node)
+        let elems: Vec[i32] = Vec.new()
+        for ei in 0..elem_count:
+            elems.push(self.resolve_type_node_with_subst(self.ast.get_extra(extra_start + ei), self_ty, subst_names, subst_types))
+        return self.ensure_tuple_type(elems, elem_count) as i32
+    if kind == NodeKind.NK_TYPE_GENERIC:
+        let base_sym = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
+        let extra_start2 = self.ast.get_data1(type_node)
+        let arg_count = self.ast.get_data2(type_node)
+        let args: Vec[i32] = Vec.new()
+        for ai in 0..arg_count:
+            let arg_ty = self.resolve_type_node_with_subst(self.ast.get_extra(extra_start2 + ai), self_ty, subst_names, subst_types)
+            if arg_ty == 0:
+                return 0
+            args.push(arg_ty)
+        return self.ensure_generic_inst_type(base_sym, args, arg_count) as i32
+    if kind == NodeKind.NK_TYPE_OPTIONAL:
+        let inner3 = self.resolve_type_node_with_subst(self.ast.get_data0(type_node), self_ty, subst_names, subst_types)
+        let opt_args: Vec[i32] = Vec.new()
+        opt_args.push(inner3)
+        return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
+    self.resolve_type_expr(type_node) as i32
+
+fn Sema.bind_try_target_type_param(self: Sema, mut subst_names: Vec[i32], mut subst_types: Vec[i32], sym: i32, actual_ty: i32) -> i32:
+    let existing = sema_subst_vec_lookup(&subst_names, &subst_types, sym)
+    if existing != 0:
+        return if self.types_compatible(existing, actual_ty) != 0: 1 else: 0
+    subst_names.push(sym)
+    subst_types.push(actual_ty)
+    1
+
+fn Sema.try_impl_target_matches(self: Sema, impl_node: i32, carrier_ty: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    let carrier_resolved = self.resolve_alias(carrier_ty as TypeId)
+    let carrier_base = self.type_base_symbol(carrier_ty)
+    if carrier_base == 0:
+        return 0
+    let target_node = self.ast.find_impl_target_type_node(impl_node as NodeId)
+    if target_node == 0:
+        let impl_type_sym = self.canonical_symbol_by_text(self.ast.get_data0(impl_node))
+        if impl_type_sym == carrier_base:
+            return 1
+        if self.pool_resolve(impl_type_sym) == self.pool_resolve(carrier_base):
+            return 1
+        return 0
+    if self.ast.kind(target_node) == NodeKind.NK_TYPE_GENERIC:
+        if self.get_type_kind(carrier_resolved) != TypeKind.TY_GENERIC_INST:
+            return 0
+        let pattern_base = self.canonical_symbol_by_text(self.ast.get_data0(target_node))
+        if pattern_base != carrier_base:
+            return 0
+        let pattern_arg_count = self.ast.get_data2(target_node)
+        if pattern_arg_count != self.get_generic_inst_arg_count(carrier_resolved as i32):
+            return 0
+        let tp_meta = self.ast.find_impl_type_params(impl_node as NodeId)
+        let tp_start = if tp_meta >= 0: self.ast.state.impl_type_params.get((tp_meta + 1) as i64) else: 0
+        let tp_count = if tp_meta >= 0: self.ast.state.impl_type_params.get((tp_meta + 2) as i64) else: 0
+        let pattern_arg_start = self.ast.get_data1(target_node)
+        for ai in 0..pattern_arg_count:
+            let pattern_arg = self.ast.get_extra(pattern_arg_start + ai)
+            let actual_arg = self.get_generic_inst_arg(carrier_resolved as i32, ai)
+            let pattern_kind = self.ast.kind(pattern_arg)
+            if pattern_kind == NodeKind.NK_TYPE_NAMED or pattern_kind == NodeKind.NK_IDENT:
+                let pattern_sym = self.ast.get_data0(pattern_arg)
+                if self.type_param_in_impl_list(tp_start, tp_count, pattern_sym) != 0:
+                    if self.bind_try_target_type_param(*subst_names, *subst_types, pattern_sym, actual_arg) == 0:
+                        return 0
+                    continue
+            let pattern_ty = self.resolve_type_node_with_subst(pattern_arg, carrier_ty, subst_names, subst_types)
+            if pattern_ty == 0 or self.types_compatible(pattern_ty, actual_arg) == 0:
+                return 0
+        return self.blanket_impl_type_bounds_satisfied(impl_node, subst_names, subst_types)
+    let target_ty = self.resolve_type_node_with_subst(target_node, carrier_ty, subst_names, subst_types)
+    if target_ty != 0 and self.types_compatible(target_ty, carrier_ty) != 0:
+        return 1
+    0
+
+fn Sema.try_method_fn(self: Sema, carrier_ty: i32, method_sym: i32) -> i32:
+    let owner_sym = self.method_owner_symbol_for_type(carrier_ty)
+    if owner_sym == 0:
+        return 0
+    let direct = self.lookup_method_fn(owner_sym, method_sym)
+    if direct != 0:
+        return direct
+    self.lookup_generic_method_fn(owner_sym, method_sym)
+
+fn Sema.resolve_user_try_info(self: Sema, carrier_ty: i32) -> SemaTryInfo:
+    if carrier_ty == 0:
+        return sema_try_info_none()
+    let try_sym = self.pool_lookup_symbol("Try")
+    let control_flow_sym = self.pool_lookup_symbol("ControlFlow")
+    if try_sym == 0 or control_flow_sym == 0:
+        return sema_try_info_none()
+    let branch_sym = self.pool_intern("branch")
+    let from_break_sym = self.pool_intern("from_break")
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+            continue
+        if self.ast.get_data2(decl) != try_sym:
+            continue
+        let subst_names: Vec[i32] = Vec.new()
+        let subst_types: Vec[i32] = Vec.new()
+        if self.try_impl_target_matches(decl, carrier_ty, subst_names, subst_types) == 0:
+            continue
+        let branch_fn = self.try_method_fn(carrier_ty, branch_sym)
+        let from_break_fn = self.try_method_fn(carrier_ty, from_break_sym)
+        if branch_fn == 0 or from_break_fn == 0:
+            continue
+        let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
+        var continue_ty = 0
+        var break_ty = 0
+        if tta_idx >= 0:
+            let arg_start = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
+            let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+            if arg_count >= 2:
+                continue_ty = self.resolve_type_node_with_subst(self.ast.get_extra(arg_start), carrier_ty, subst_names, subst_types)
+                break_ty = self.resolve_type_node_with_subst(self.ast.get_extra(arg_start + 1), carrier_ty, subst_names, subst_types)
+        if continue_ty == 0 or break_ty == 0:
+            let branch_sig = self.get_sig(branch_fn)
+            if branch_sig >= 0:
+                let branch_ret = self.resolve_alias(self.sig_return_type(branch_sig) as TypeId)
+                if self.get_type_kind(branch_ret) == TypeKind.TY_GENERIC_INST and self.get_type_d0(branch_ret) == control_flow_sym:
+                    break_ty = self.get_generic_inst_arg(branch_ret as i32, 0)
+                    continue_ty = self.get_generic_inst_arg(branch_ret as i32, 1)
+        if continue_ty == 0 or break_ty == 0:
+            continue
+        let cf_args: Vec[i32] = Vec.new()
+        cf_args.push(break_ty)
+        cf_args.push(continue_ty)
+        let branch_result_ty = self.ensure_generic_inst_type(control_flow_sym, cf_args, 2) as i32
+        return SemaTryInfo { ok: 1, carrier_ty, continue_ty, break_ty, branch_result_ty, branch_fn, from_break_fn }
+    if self.type_implements_trait(carrier_ty, try_sym) != 0:
+        let branch_fn2 = self.try_method_fn(carrier_ty, branch_sym)
+        let from_break_fn2 = self.try_method_fn(carrier_ty, from_break_sym)
+        if branch_fn2 != 0 and from_break_fn2 != 0:
+            let branch_sig2 = self.get_sig(branch_fn2)
+            if branch_sig2 >= 0:
+                let branch_ret2 = self.resolve_alias(self.sig_return_type(branch_sig2) as TypeId)
+                if self.get_type_kind(branch_ret2) == TypeKind.TY_GENERIC_INST and self.get_type_d0(branch_ret2) == control_flow_sym:
+                    let break_ty2 = self.get_generic_inst_arg(branch_ret2 as i32, 0)
+                    let continue_ty2 = self.get_generic_inst_arg(branch_ret2 as i32, 1)
+                    let cf_args2: Vec[i32] = Vec.new()
+                    cf_args2.push(break_ty2)
+                    cf_args2.push(continue_ty2)
+                    let branch_result_ty2 = self.ensure_generic_inst_type(control_flow_sym, cf_args2, 2) as i32
+                    return SemaTryInfo { ok: 1, carrier_ty, continue_ty: continue_ty2, break_ty: break_ty2, branch_result_ty: branch_result_ty2, branch_fn: branch_fn2, from_break_fn: from_break_fn2 }
+    sema_try_info_none()
+
 fn sema_operator_method_name(op: i32) -> str:
     if op == BinaryOp.OP_ADD: return "add"
     if op == BinaryOp.OP_SUB: return "sub"
@@ -5623,8 +5813,24 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
             return 0
         let unwrapped = self.try_unwrapped_type(operand as i32)
         if unwrapped == 0:
-            self.emit_error("? operator requires an Option or Result with a single success payload", node)
-            return 0
+            let try_info = self.resolve_user_try_info(operand as i32)
+            if try_info.ok == 0:
+                self.emit_error("? operator requires an Option, Result, or a type implementing Try", node)
+                return 0
+            let return_try = self.resolve_user_try_info(self.current_return_type as i32)
+            if return_try.ok == 0:
+                self.emit_error("? on '" ++ self.type_name(operand as i32) ++ "' requires the enclosing function to return a Try-compatible type, found '" ++ self.type_name(self.current_return_type as i32) ++ "'", node)
+                return 0
+            if self.types_compatible(return_try.break_ty, try_info.break_ty) == 0:
+                self.emit_error("? cannot propagate break type '" ++ self.type_name(try_info.break_ty) ++ "' through enclosing return type '" ++ self.type_name(self.current_return_type as i32) ++ "'", node)
+                return 0
+            self.try_continue_tys.insert(node, try_info.continue_ty)
+            self.try_break_tys.insert(node, try_info.break_ty)
+            self.try_branch_result_tys.insert(node, try_info.branch_result_ty)
+            self.try_branch_fns.insert(node, try_info.branch_fn)
+            self.try_from_break_fns.insert(node, return_try.from_break_fn)
+            self.typed_expr_types.insert(node, try_info.continue_ty)
+            return try_info.continue_ty
         let source_err_ty = self.result_error_type(operand as i32)
         if source_err_ty != 0:
             let target_err_ty = self.result_error_type(self.current_return_type as i32)
@@ -12399,7 +12605,12 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     
 
     let mc_is_static_enum_variant = self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0
-    let mc_static_variant_payload_tys = if mc_is_static_enum_variant: self.enum_variant_payload_types(obj_type, field) else: Vec.new()
+    let mc_static_variant_result_ty = if mc_is_static_enum_variant:
+        let expected_variant_ty = self.expected_variant_constructor_type(field)
+        if expected_variant_ty != 0: expected_variant_ty else: obj_type as i32
+    else:
+        0
+    let mc_static_variant_payload_tys = if mc_is_static_enum_variant: self.enum_variant_payload_types(mc_static_variant_result_ty, field) else: Vec.new()
 
     // Check all arguments (with expected-type propagation for Atomic ordering params)
     // Also applies method and static enum variant payload expected types.
@@ -12739,7 +12950,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                         let owner_name = self.type_name(obj_type)
                         let variant_name = self.pool_resolve(field)
                         self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, if static_payload_arg_node > 0: static_payload_arg_node else: node)
-        return obj_type as i32
+        return mc_static_variant_result_ty
 
     if self.static_receiver_type_is_known(expr) != 0 and self.pool_resolve(field) == "from_int":
         let enum_resolved = self.resolve_alias(obj_type)

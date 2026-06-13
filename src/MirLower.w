@@ -3467,6 +3467,66 @@ fn MirBuilder.lower_method_un_op(self: MirBuilder, expr: i32, method_sym: i32, n
     arg_nodes.push(expr)
     self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, self.expr_type(node), node)
 
+fn MirBuilder.lower_user_try_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32:
+    let branch_fn = self.sema.try_branch_fns.get(node).unwrap()
+    let from_break_fn = self.sema.try_from_break_fns.get(node).unwrap()
+    let continue_ty = self.sema.try_continue_tys.get(node).unwrap()
+    let break_ty = self.sema.try_break_tys.get(node).unwrap()
+    let branch_ty = self.sema.try_branch_result_tys.get(node).unwrap()
+
+    let branch_args: Vec[i32] = Vec.new()
+    branch_args.push(self.lower_expr(expr))
+    let branch_op = self.lower_resolved_call_with_operand_args(branch_fn, branch_args, branch_ty, node)
+    let branch_place = self.materialize_operand(branch_op, branch_ty, self.ast.get_start(expr))
+
+    let pass_bb = self.new_block()
+    let fail_bb = self.new_block()
+    let join_bb = self.new_block()
+
+    let continue_sym = self.pool.intern("Continue")
+    let break_sym = self.pool.intern("Break")
+    let continue_idx = self.enum_variant_index_for_type(branch_ty, continue_sym)
+    let break_idx = self.enum_variant_index_for_type(branch_ty, break_sym)
+    if continue_idx < 0 or break_idx < 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+
+    let disc = self.lower_enum_discriminant(branch_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(continue_idx)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(pass_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, fail_bb, 0)
+
+    self.switch_to(fail_bb)
+    let ret_place = self.place_for_local(0)
+    let ret_ty = self.body.local_type_ids.get(0)
+    let break_downcast = self.body.new_downcast_place(branch_place, break_idx, branch_ty)
+    let break_payload_place = self.body.new_field_place(break_downcast, 0, break_ty)
+    let break_op = self.operand_for_place(break_payload_place, break_ty)
+    let from_break_args: Vec[i32] = Vec.new()
+    from_break_args.push(break_op)
+    let ret_op = self.lower_resolved_call_with_operand_args(from_break_fn, from_break_args, ret_ty, node)
+    self.assign_operand_to_place(ret_place, ret_op, self.ast.get_start(expr))
+    self.emit_errdefers_for_return()
+    self.emit_defers_for_return()
+    self.emit_drops_for_return()
+    self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+
+    self.switch_to(pass_bb)
+    let result_local = self.new_temp(continue_ty)
+    let result_place = self.place_for_local(result_local)
+    let continue_downcast = self.body.new_downcast_place(branch_place, continue_idx, branch_ty)
+    let payload_place = self.body.new_field_place(continue_downcast, 0, continue_ty)
+    let pass_op = self.operand_for_place(payload_place, continue_ty)
+    self.assign_operand_to_place(result_place, pass_op, self.ast.get_start(expr))
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    self.forget_string_flow_facts()
+    self.operand_for_place(result_place, continue_ty)
+
 fn MirBuilder.is_runtime_pair_multi_index(self: MirBuilder, node: i32) -> i32:
     if self.ast.kind(node) != NodeKind.NK_INDEX:
         return 0
@@ -7191,6 +7251,9 @@ fn MirBuilder.lower_enum_accessor_call(self: MirBuilder, self_expr: i32, method_
     self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, result_place)
 
 fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32:
+    if self.sema.try_branch_fns.contains(node):
+        return self.lower_user_try_question_mark(expr, node)
+
     let value_op = self.lower_expr(expr)
     let value_ty = self.expr_type(expr)
     let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(expr))
@@ -8236,6 +8299,24 @@ fn MirBuilder.lower_call_with_operand_args(self: MirBuilder, fn_op: i32, args: V
         self.consume_moved_operand(args.get(ai as i64))
     let args_id = self.body.new_call_args(args)
     self.body.set_call_ast_node(args_id, node)
+    let result_local = self.new_temp(ret_type)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.register_stmt_temp(result_local, ret_type)
+    if self.sema.is_copy(ret_type) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, result_place)
+    self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+fn MirBuilder.lower_resolved_call_with_operand_args(self: MirBuilder, fn_sym: i32, args: Vec[i32], ret_type: i32, node: i32) -> i32:
+    let fn_op = self.lower_var(fn_sym, 0, node)
+    for ai in 0..args.len() as i32:
+        self.consume_moved_operand(args.get(ai as i64))
+    let args_id = self.body.new_call_args(args)
+    self.body.set_call_ast_node(args_id, node)
+    if self.sema.generic_fn_nodes.contains(fn_sym):
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
     let result_local = self.new_temp(ret_type)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()

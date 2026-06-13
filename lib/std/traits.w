@@ -44,6 +44,19 @@ pub trait MatMul[Rhs, Output]:
 pub trait Neg[Output]:
     fn neg(self: &Self) -> Output
 
+/// Control-flow carrier used by the `Try` syntax trait. `Continue` carries the
+/// successful `expr?` value; `Break` carries the residual value for propagation.
+pub enum ControlFlow[B, C]:
+    Continue(C)
+    Break(B)
+
+/// `?` propagation protocol for user carriers. Option and Result use compiler
+/// fast paths with the same semantics; user carriers provide both directions
+/// explicitly so early return can rebuild the enclosing carrier.
+pub trait Try[T, E]:
+    fn branch(move self: Self) -> ControlFlow[E, T]
+    fn from_break(value: E) -> Self
+
 /// Hashing. Implement to use a type as a HashMap key or HashSet element.
 pub trait Hash:
     fn hash_value(self) -> i64

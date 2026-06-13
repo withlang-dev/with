@@ -4148,7 +4148,9 @@ fn load_config(path: &str) -> Result[Config, AppError]:
 The `?` operator is controlled by the `Try` syntax trait (§11.7).
 `Result` and `Option` implement `Try` in the standard library. User
 types can also implement `Try` to participate in `?` propagation —
-for example, parser result types or validation types.
+for example, parser result types or validation types. `Try.branch`
+decides whether evaluation continues, and `Try.from_break` rebuilds
+the enclosing return carrier for the early-return path.
 
 ### 10.3 Optional Chaining (`?.`)
 
@@ -4755,10 +4757,12 @@ enum ParseResult[T]:
     ParseErr(msg: str, pos: usize)
 
 impl Try[T, ParseError] for ParseResult[T]:
-    fn branch(self: Self) -> ControlFlow[ParseError, T]:
+    fn branch(move self: Self) -> ControlFlow[ParseError, T]:
         match self:
             ParseOk(v, _) => ControlFlow.Continue(v)
             ParseErr(m, p) => ControlFlow.Break(ParseError { msg: m, pos: p })
+    fn from_break(err: ParseError) -> Self:
+        ParseErr(err.msg, err.pos)
 
 // Now ? works naturally in parser combinators:
 fn parse_pair(input: &str) -> ParseResult[(Expr, Expr)]:
@@ -4819,6 +4823,14 @@ trait MatMul[Rhs, Output]:
     fn matmul(self: Self, rhs: Rhs) -> Output
 trait Neg[Output]:
     fn neg(self: Self) -> Output
+
+enum ControlFlow[B, C]:
+    Continue(C)
+    Break(B)
+
+trait Try[T, E]:
+    fn branch(move self: Self) -> ControlFlow[E, T]
+    fn from_break(value: E) -> Self
 ```
 
 **The `Contains` trait:**

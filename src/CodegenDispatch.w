@@ -1007,12 +1007,19 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: &MirBody, place_id: i32
                     let proj_owner_ty = self.resolve_named_type(self.current_method_owner_sym)
                     if proj_owner_ty != 0:
                         cur_ty = proj_owner_ty
+            let variant_owner_sema_ty = cur_sema_ty
             let field_sema_ty = if active_variant_idx >= 0:
-                self.mir_enum_payload_sema_type(cur_sema_ty, active_variant_idx, pd)
+                self.mir_enum_payload_sema_type(variant_owner_sema_ty, active_variant_idx, pd)
             else:
                 self.mir_project_field_sema_type(cur_sema_ty, pd)
             if field_sema_ty > 0:
                 cur_sema_ty = field_sema_ty
+            if active_variant_idx >= 0 and pd == 0 and self.mir_enum_variant_payload_count(variant_owner_sema_ty, active_variant_idx) == 1:
+                let payload_ty = self.mir_sema_type_to_llvm(field_sema_ty)
+                if payload_ty != 0:
+                    cur_ty = payload_ty
+                    active_variant_idx = -1
+                    continue
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
@@ -1181,12 +1188,19 @@ fn Codegen.mir_place_ptr(self: Codegen, body: &MirBody, place_id: i32, create_ba
                     let owner_ty = self.resolve_named_type(self.current_method_owner_sym)
                     if owner_ty != 0:
                         cur_ty = owner_ty
+            let variant_owner_sema_ty = cur_sema_ty
             let field_sema_ty = if active_variant_idx >= 0:
-                self.mir_enum_payload_sema_type(cur_sema_ty, active_variant_idx, pd)
+                self.mir_enum_payload_sema_type(variant_owner_sema_ty, active_variant_idx, pd)
             else:
                 self.mir_project_field_sema_type(cur_sema_ty, pd)
             if field_sema_ty > 0:
                 cur_sema_ty = field_sema_ty
+            if active_variant_idx >= 0 and pd == 0 and self.mir_enum_variant_payload_count(variant_owner_sema_ty, active_variant_idx) == 1:
+                let payload_ty = self.mir_sema_type_to_llvm(field_sema_ty)
+                if payload_ty != 0:
+                    cur_ty = payload_ty
+                    active_variant_idx = -1
+                    continue
             let fi = self.mir_resolve_field_index(cur_ty, pd)
             if fi < 0:
                 return 0
@@ -2330,6 +2344,8 @@ fn Codegen.gen_enum_payload_field_value(self: Codegen, enum_val: i64, enum_sema_
     wl_build_store(self.builder, enum_val, enum_ptr)
     let data_ptr = wl_build_struct_gep(self.builder, enum_ty, enum_ptr, 1)
     let payload_ptr = wl_build_bitcast(self.builder, data_ptr, wl_ptr_type(self.context))
+    if field_idx == 0 and self.mir_enum_variant_payload_count(enum_sema_ty, variant_idx) == 1:
+        return wl_build_load(self.builder, payload_ty, payload_ptr)
     if wl_get_type_kind(payload_ty) == wl_struct_type_kind():
         let field_count = wl_count_struct_elem_types(payload_ty)
         if field_idx >= field_count:
@@ -2904,6 +2920,12 @@ fn Codegen.mir_enum_variant_payload_llvm_type(self: Codegen, enum_sema_ty: i32, 
         return builtin_payload
     if enum_sema_ty <= 0 or variant_idx < 0:
         return 0
+    if self.mir_enum_variant_payload_count(enum_sema_ty, variant_idx) == 1:
+        let substituted_payload = self.mir_enum_payload_sema_type(enum_sema_ty, variant_idx, 0)
+        if substituted_payload > 0:
+            let substituted_llvm = self.mir_sema_type_to_llvm(substituted_payload)
+            if substituted_llvm != 0:
+                return substituted_llvm
     let enum_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_name(enum_sema_ty))
     if enum_sym <= 0:
         return 0
@@ -3125,7 +3147,8 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: &MirBody, rval_id: i32, dest_ty:
                     else:
                         let ev_op = body.agg_field_operands.get(agg_start as i64)
                         let ev_val = self.mir_eval_operand(body, ev_op, ev_payload_ty)
-                        wl_build_store(self.builder, self.coerce_value_to_type(ev_val, ev_payload_ty), ev_data_ptr)
+                        let ev_payload_ptr = wl_build_bitcast(self.builder, ev_data_ptr, wl_ptr_type(self.context))
+                        wl_build_store(self.builder, self.coerce_value_to_type(ev_val, ev_payload_ty), ev_payload_ptr)
                 return wl_build_load(self.builder, struct_ty, ev_alloca)
             // Check if this struct is bitpacked (stored as iN) — must check before rejecting non-struct types
             if struct_ty != 0 and self.is_bitpacked_struct(struct_ty):
@@ -4505,9 +4528,12 @@ fn Codegen.mir_struct_sym_from_sema_type(self: Codegen, sema_ty: i32) -> i32:
             return 0
         if live_tk == TypeKind.TY_GENERIC_INST:
             let live_base_sym = self.sema_sym_to_codegen_sym(self.sema.get_type_d0(live_resolved))
-            if live_base_sym == 0 or not self.generic_structs.contains(live_base_sym):
+            if live_base_sym == 0 or self.generic_type_decl_node(live_base_sym) == 0:
                 return 0
             let _ = self.sema_type_to_llvm(live_resolved)
+            let live_enum_sym = self.generic_enum_inst_syms.get(live_resolved)
+            if live_enum_sym.is_some():
+                return live_enum_sym.unwrap()
             var live_mangled = self.intern.resolve(live_base_sym)
             let live_arg_count = self.sema.get_generic_inst_arg_count(live_resolved)
             for ai in 0..live_arg_count:
@@ -4530,9 +4556,12 @@ fn Codegen.mir_struct_sym_from_sema_type(self: Codegen, sema_ty: i32) -> i32:
         return 0
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
-        if base_sym == 0 or not self.generic_structs.contains(base_sym):
+        if base_sym == 0 or self.generic_type_decl_node(base_sym) == 0:
             return 0
         let _ = self.mir_sema_type_to_llvm(resolved)
+        let enum_sym = self.generic_enum_inst_syms.get(resolved)
+        if enum_sym.is_some():
+            return enum_sym.unwrap()
         var mangled = self.intern.resolve(base_sym)
         let arg_count = self.mir_input.mir_get_type_d2(resolved)
         let te_start = self.mir_input.mir_get_type_d1(resolved)
@@ -4566,10 +4595,9 @@ fn Codegen.ensure_generic_method_owner_sym(self: Codegen, sema_ty: i32) -> i32:
     let base_sym = self.sema_sym_to_codegen_sym(raw_base)
     if base_sym == 0:
         return 0
-    let owner_decl_opt = self.generic_structs.get(base_sym)
-    if not owner_decl_opt.is_some():
+    let owner_decl = self.generic_type_decl_node(base_sym)
+    if owner_decl == 0:
         return 0
-    let owner_decl = owner_decl_opt.unwrap()
     let tp_count = self.type_decl_tp_count(owner_decl)
     if tp_count <= 0:
         return 0
@@ -4604,6 +4632,10 @@ fn Codegen.ensure_generic_method_owner_sym(self: Codegen, sema_ty: i32) -> i32:
         tp_pos = tp_pos + 2 + bound_count
 
     let mono_sym = self.intern.intern(mangled)
+    let _ = self.mir_sema_type_to_llvm(sema_ty)
+    let enum_sym = self.generic_enum_inst_syms.get(live_resolved)
+    if enum_sym.is_some():
+        return enum_sym.unwrap()
     if not self.mono_struct_tp_counts.contains(mono_sym):
         let tp_flat_start = self.mono_struct_tp_flat_syms.len() as i32
         for pi in 0..pending_syms.len() as i32:
@@ -9581,6 +9613,47 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
             var gc_callee_sym = 0
             if gc_co_k == OperandKind.OK_CONSTANT and gc_co_d >= 0 and gc_co_d < body.const_kinds.len() as i32:
                 gc_callee_sym = body.const_d0.get(gc_co_d as i64)
+
+            if self.sema.try_branch_fns.contains(gc_node):
+                let try_branch_sym = self.sema.try_branch_fns.get(gc_node).unwrap()
+                let try_from_break_sym = self.sema.try_from_break_fns.get(gc_node).unwrap()
+                if gc_callee_sym == try_branch_sym or gc_callee_sym == try_from_break_sym:
+                    let gc_mir_start = body.call_arg_starts.get(args_id as i64)
+                    let gc_mir_count = body.call_arg_counts.get(args_id as i64)
+                    var try_result: i64 = 0
+                    if gc_callee_sym == try_branch_sym and gc_mir_count > 0:
+                        let recv_op = body.call_arg_operands.get(gc_mir_start as i64)
+                        let recv_val = self.mir_eval_operand(body, recv_op, 0)
+                        let recv_sema = self.mir_operand_sema_type(body, recv_op)
+                        let owner_sym = self.ensure_generic_method_owner_sym(recv_sema)
+                        let decl = self.generic_struct_methods.get(gc_callee_sym)
+                        if owner_sym != 0 and decl.is_some():
+                            let no_args: Vec[i64] = Vec.new()
+                            try_result = self.monomorphize_struct_method_core(owner_sym, "branch", decl.unwrap(), recv_val, 0, wl_type_of(recv_val), 0, 0, gc_node, no_args)
+                    else if gc_callee_sym == try_from_break_sym:
+                        var carrier_sema = self.mir_place_sema_type(body, dest_place)
+                        if carrier_sema == 0 and dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+                            let local_id = body.place_locals.get(dest_place as i64)
+                            if local_id >= 0 and local_id < body.local_type_ids.len() as i32:
+                                carrier_sema = body.local_type_ids.get(local_id as i64)
+                        let owner_sym2 = self.ensure_generic_method_owner_sym(carrier_sema)
+                        let decl2 = self.generic_struct_methods.get(gc_callee_sym)
+                        if owner_sym2 != 0 and decl2.is_some():
+                            let fb_args: Vec[i64] = Vec.new()
+                            for fb_i in 0..gc_mir_count:
+                                let fb_op = body.call_arg_operands.get((gc_mir_start + fb_i) as i64)
+                                fb_args.push(self.mir_eval_operand(body, fb_op, 0))
+                            try_result = self.monomorphize_struct_static_method_core(owner_sym2, "from_break", decl2.unwrap(), 0, gc_mir_count, gc_node, fb_args)
+                    if try_result != 0:
+                        if dest_place >= 0 and wl_type_of(try_result) != wl_void_type(self.context):
+                            let try_local = body.place_locals.get(dest_place as i64)
+                            let try_alloca = self.create_entry_alloca(wl_type_of(try_result))
+                            wl_build_store(self.builder, try_result, try_alloca)
+                            self.mir_local_ptrs.insert(try_local, try_alloca)
+                            self.mir_local_types.insert(try_local, wl_type_of(try_result))
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                        return true
 
             // Generic function call — eval MIR args, call monomorphize directly
             let gc_gf = self.generic_fns.get(gc_callee_sym)

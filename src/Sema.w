@@ -588,6 +588,12 @@ type Sema {
     // node -> 1 when the right operand is the receiver.
     operator_method_calls: HashMap[i32, i32],
     operator_method_reversed: HashMap[i32, i32],
+    // User Try resolution sidecars for NK_UNARY(UOP_TRY): node -> type/fn data.
+    try_continue_tys: HashMap[i32, i32],
+    try_break_tys: HashMap[i32, i32],
+    try_branch_result_tys: HashMap[i32, i32],
+    try_branch_fns: HashMap[i32, i32],
+    try_from_break_fns: HashMap[i32, i32],
     // Match value-pattern sidecar: pattern node → symbol compared by value.
     pattern_value_syms: HashMap[i32, i32],
     // Regex literal metadata sidecars, keyed by NK_REGEX_LIT/NK_PAT_REGEX node.
@@ -1439,6 +1445,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pipeline_method_calls: sema_new_map_i32_i32(),
         operator_method_calls: sema_new_map_i32_i32(),
         operator_method_reversed: sema_new_map_i32_i32(),
+        try_continue_tys: sema_new_map_i32_i32(),
+        try_break_tys: sema_new_map_i32_i32(),
+        try_branch_result_tys: sema_new_map_i32_i32(),
+        try_branch_fns: sema_new_map_i32_i32(),
+        try_from_break_fns: sema_new_map_i32_i32(),
         pattern_value_syms: sema_new_map_i32_i32(),
         regex_capture_counts: sema_new_map_i32_i32(),
         regex_capture_name_starts: sema_new_map_i32_i32(),
