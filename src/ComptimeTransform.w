@@ -169,9 +169,9 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
             out.state.fn_stack_sizes.insert(ni, src.state.fn_stack_sizes.get(ni).unwrap())
         if src.state.fn_weak_flags.contains(ni):
             out.state.fn_weak_flags.insert(ni, src.state.fn_weak_flags.get(ni).unwrap())
-        if src.state.fn_effect_pin_params.contains(ni):
-            out.state.fn_effect_pin_params.insert(ni, src.state.fn_effect_pin_params.get(ni).unwrap())
-            out.state.fn_effect_pin_bits.insert(ni, src.state.fn_effect_pin_bits.get(ni).unwrap())
+        let effect_pin_count = src.fn_effect_pin_count(node)
+        for pi in 0..effect_pin_count:
+            out.add_fn_effect_pin(node, src.fn_effect_pin_param(node, pi), src.fn_effect_pin_bits(node, pi))
         // `in`/`not in` argument slots (#234). The extra array is copied verbatim
         // above, so the slot index remains valid in the cloned pool.
         let membership_slot = src.find_membership_arg(node)

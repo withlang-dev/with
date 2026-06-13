@@ -1,5 +1,6 @@
 // std.thread — OS-thread facade.
 
+@[effect(fn_ptr: escape_value, ctx: escape_value)]
 extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
 
@@ -21,7 +22,7 @@ pub type ScopedJoinHandle ephemeral {
 }
 
 /// Spawn an OS thread running `worker`. Returns a JoinHandle.
-@[effect(worker = [read, escape_value])]
+@[effect(worker: escape_value)]
 pub fn spawn_os(worker: fn() -> i32) -> JoinHandle:
     let raw: RawFn0I32 = unsafe transmute[RawFn0I32](worker)
     JoinHandle { handle: with_thread_spawn(raw.fn_ptr, raw.ctx) }

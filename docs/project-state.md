@@ -3,13 +3,30 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-06-12.
+Last updated: 2026-06-13.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
 conversation context after compaction.
 
 ## Current Focus
+
+#402 is implemented and verified. `@[effect]` now accepts the §16.3d
+multi-parameter `param: effect` spelling, keeps `=` as a compatibility alias,
+rejects unknown effect names and unknown parameter names, and stores effect
+contracts in a per-declaration side table that works for both bodied functions
+and extern declarations. Extern `@[effect]` contracts now populate signature
+parameter effects so existing call-mode propagation handles consume/escape
+rules without weakening manual extern/raw unsafe classification. Bodied
+function pins are exact checked contracts over the public effect bits; no pin
+silently widens or overrides inference. `std.thread.spawn_os` and the compiler
+runtime `with_thread_spawn` declarations now carry normalized escape contracts,
+with binding-level effect provenance for the raw transmute carrier used by the
+thread runtime. Focused coverage includes spec-spelling extern contracts,
+unknown effect names, unknown bodied/extern parameters, both exact-pin mismatch
+directions, extern consume propagation, and unsafe preservation. Full
+verification passed on 2026-06-13: `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green`. Phase 4 is complete.
 
 #387 is implemented and verified. Sema now records whole-program concurrency
 evidence from async constructs, `std.thread.spawn_os`, `@[c_export]`, and

@@ -1176,27 +1176,24 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     else:
         self.fn_may_alloc.insert(fn_name, 0)
 
-    // @[effect(param = bits)] pin enforcement: floor and ceiling checks
-    if self.ast.state.fn_effect_pin_params.contains(node):
-        let pin_param_sym = self.ast.state.fn_effect_pin_params.get(node).unwrap()
-        let pin_bits = if self.ast.state.fn_effect_pin_bits.contains(node): self.ast.state.fn_effect_pin_bits.get(node).unwrap() else: 0
-        // Find which param index this pin covers
-        var pin_pi = -1
-        for pi in 0..self.current_fn_param_syms.len() as i32:
-            if self.current_fn_param_syms.get(pi as i64) == pin_param_sym:
-                pin_pi = pi
-                break
-        if pin_pi >= 0:
-            let inferred = self.sig_param_effect(sig_idx, pin_pi)
-            // Floor: exported effect is at least the pinned set (merge pin into stored effect)
-            let merged = inferred | pin_bits
-            if merged != inferred:
-                self.set_sig_param_effect(sig_idx, pin_pi, merged)
-            // Ceiling: inferred effects must not exceed pinned set
-            let excess = inferred & (pin_bits ^ 0x3f)  // bits inferred but not pinned (among EFF_*)
-            if excess != 0:
-                let param_name = self.pool_resolve(pin_param_sym)
-                self.emit_error(f"function body uses effects on '{param_name}' not permitted by @[effect(...)] pin; remove or expand the pin", node)
+    // §16.3d: a bodied-function @[effect] pin is a checked contract, not an
+    // override. Compare only spec-visible bits; RAW_PTR_VALIDITY is internal.
+    let pin_count = self.ast.fn_effect_pin_count(node as NodeId)
+    if pin_count > 0:
+        let pin_meta = self.ast.find_fn_meta(node)
+        let pin_param_start = if pin_meta >= 0: self.ast.fn_meta_param_start(pin_meta) else: 0
+        let pin_param_count = if pin_meta >= 0: self.ast.fn_meta_param_count(pin_meta) else: 0
+        for pin_i in 0..pin_count:
+            let pin_param_sym = self.ast.fn_effect_pin_param(node as NodeId, pin_i)
+            let pin_bits = self.ast.fn_effect_pin_bits(node as NodeId, pin_i) & EFF_DECLARED_MASK
+            let pin_pi = self.find_effect_pin_param_index(pin_param_start, pin_param_count, pin_param_sym)
+            let param_name = self.pool_resolve(pin_param_sym)
+            if pin_pi < 0:
+                self.emit_error("@[effect] names unknown parameter '" ++ param_name ++ "'", node)
+            else:
+                let inferred = self.sig_param_effect(sig_idx, pin_pi) & EFF_DECLARED_MASK
+                if inferred != pin_bits:
+                    self.emit_error("@[effect] pin on '" ++ param_name ++ "' does not match inferred effects (pinned: " ++ sema_effect_bits_text(pin_bits) ++ "; inferred: " ++ sema_effect_bits_text(inferred) ++ "); the pin is a checked contract", node)
 
     // Restore state
     self.current_fn_sig_idx = saved_eff_sig_idx
@@ -5796,6 +5793,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     self.scope_set_is_ephemeral_task(name, is_ephemeral_task)
     let is_ephemeral_value = if self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0: 1 else: 0
     self.scope_set_is_ephemeral_value(name, is_ephemeral_value)
+    self.scope_set_effect_dep_sym(name, self.expr_transmute_source_param_sym(value))
     if is_task_val != 0 and is_ephemeral_task != 0:
         self.ephemeral_task_binding_nodes.insert(node, 1)
     if self.ast.kind(value) == NodeKind.NK_CLOSURE:
@@ -6260,9 +6258,7 @@ fn Sema.propagate_call_param_effect(self: Sema, param_eff: i32, arg_node: i32):
         return
     let trans_bits = param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)
     if trans_bits != 0:
-        let trans_sym = self.place_root_sym(arg_node)
-        if trans_sym != 0:
-            self.note_param_effect(trans_sym, trans_bits)
+        self.note_place_effect(arg_node, trans_bits)
     if (param_eff & EFF_RAW_PTR_VALIDITY) != 0:
         self.note_raw_pointer_validity_precondition(arg_node)
 
@@ -9111,6 +9107,27 @@ fn Sema.transmute_target_type_node(self: Sema, callee: i32) -> i32:
             return 0
         return self.ast.get_extra(tp_start)
     self.ast.get_data1(callee)
+
+fn Sema.expr_transmute_source_param_sym(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_GROUPED:
+        return self.expr_transmute_source_param_sym(self.ast.get_data0(node))
+    if kind != NodeKind.NK_CALL:
+        return 0
+    let callee = self.ast.get_data0(node)
+    if self.is_transmute_call(callee) == 0:
+        return 0
+    let arg_count = self.ast.get_data2(node)
+    if arg_count != 1:
+        return 0
+    let extra_start = self.ast.get_data1(node)
+    let arg = self.ast.get_extra(extra_start)
+    let root = self.place_root_sym(arg)
+    if root != 0 and self.param_index_for_sym(root) >= 0:
+        return root
+    0
 
 fn Sema.transmute_type_has_known_layout(self: Sema, tid: i32) -> i32:
     if tid == 0:

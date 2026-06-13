@@ -1319,6 +1319,9 @@ fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
     let fn_tid = self.add_type(TypeKind.TY_FN, fn_extra_start, param_count, ret_type)
 
     self.add_sig(name, fn_tid, ret_type, sig_param_start, param_count, is_variadic)
+    let sig_idx = self.get_sig(name)
+    if sig_idx >= 0:
+        self.apply_declared_effects_to_extern_sig(node, sig_idx, param_start, param_count)
     self.extern_fn_names.insert(name, 1)
 
 fn Sema.collect_extern_var(self: Sema, node: i32, is_local: i32):

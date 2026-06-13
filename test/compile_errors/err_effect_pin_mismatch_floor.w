@@ -4,12 +4,11 @@ type Resource { id: i32 }
 impl Resource:
     fn drop(move self: Self): ()
 
-// pin declares only 'read', but body actually escapes the value
-@[effect(r: read)]
-fn take(r: Resource) -> Resource:
-    return r
+// pin declares an escaping value, but the body only reads the parameter.
+@[effect(r: escape_value)]
+fn read_resource(r: Resource) -> i32:
+    r.id
 
 fn main:
     let r = Resource { id: 1 }
-    let r2 = take(move r)
-    assert(r2.id == 1)
+    let _ = read_resource(r)

@@ -50,8 +50,8 @@ pub type Parser {
     pending_weak: i32,
     pending_callconv: i32,
     pending_stack_size: i32,
-    pending_effect_param: i32,    // param name sym (0 = no pin)
-    pending_effect_bits: i32,     // EFF_* bitmask
+    pending_effect_params: Vec[i32],
+    pending_effect_bits: Vec[i32],
     pending_compiler_hook_phase: i32,
     pending_comptime_with_names: Vec[i32],
     pending_comptime_with_types: Vec[i32],
@@ -120,8 +120,8 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_weak: 0,
         pending_callconv: 0,
         pending_stack_size: 0,
-        pending_effect_param: 0,
-        pending_effect_bits: 0,
+        pending_effect_params: Vec.new(),
+        pending_effect_bits: Vec.new(),
         pending_compiler_hook_phase: 0,
         pending_comptime_with_names: Vec.new(),
         pending_comptime_with_types: Vec.new(),
@@ -385,6 +385,51 @@ fn Parser.emit_error_code(self: Parser, msg: str, code: str):
     diag.set_code(code)
     self.diags.emit(diag)
 
+fn Parser.effect_name_bit(self: Parser, name: str) -> i32:
+    if name == "read":
+        return 1
+    if name == "write":
+        return 2
+    if name == "consume":
+        return 4
+    if name == "escape_value":
+        return 8
+    if name == "escape_view":
+        return 16
+    0
+
+fn Parser.parse_effect_name_bit(self: Parser) -> i32:
+    if self.peek() != TokenKind.TK_IDENT:
+        self.emit_error("expected effect name")
+        return 0
+    let es = self.current_start()
+    let ee = self.current_end()
+    let ef_name = self.source.slice(es as i64, ee as i64)
+    let ef_bit = self.effect_name_bit(ef_name)
+    if ef_bit == 0:
+        self.emit_error("unknown effect '" ++ ef_name ++ "' in @[effect]; expected read, write, consume, escape_value, or escape_view")
+    self.advance()
+    ef_bit
+
+fn Parser.parse_effect_bits(self: Parser) -> i32:
+    var eff_bits = 0
+    if self.peek() == TokenKind.TK_L_BRACKET:
+        self.advance()
+        self.skip_newlines()
+        while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
+            eff_bits = eff_bits | self.parse_effect_name_bit()
+            self.skip_newlines()
+            if self.peek() == TokenKind.TK_COMMA:
+                self.advance()
+                self.skip_newlines()
+            else if self.peek() != TokenKind.TK_R_BRACKET:
+                self.emit_error("expected ',' or ']' in effect list")
+                break
+        if self.peek() == TokenKind.TK_R_BRACKET:
+            self.advance()
+        return eff_bits
+    return self.parse_effect_name_bit()
+
 fn Parser.poisoned_expr(self: Parser) -> NodeId:
     let start = self.current_start()
     let end = self.current_end()
@@ -476,8 +521,8 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_weak = 0
     self.pending_callconv = 0
     self.pending_stack_size = 0
-    self.pending_effect_param = 0
-    self.pending_effect_bits = 0
+    self.pending_effect_params = Vec.new()
+    self.pending_effect_bits = Vec.new()
     self.pending_iter_of_self = 0
     self.pending_compiler_hook_phase = 0
     var derive_syms: Vec[i32] = Vec.new()
@@ -619,52 +664,34 @@ fn Parser.skip_attributes(self: Parser):
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
         else if self.is_ident_named("effect"):
-            // @[effect(param = effect_name)] — effect pin for one parameter.
-            // effect_name is one of: read, write, consume, escape_value, escape_view
-            // or a bracketed list: [read, write, ...]
+            // §16.3d declared effect contracts:
+            // @[effect(dst: write, src: read)] or a bracketed list.
             self.advance()
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
-                if self.peek() == TokenKind.TK_IDENT:
+                self.skip_newlines()
+                while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+                    if self.peek() != TokenKind.TK_IDENT:
+                        self.emit_error("expected parameter name in @[effect]")
+                        break
                     let p_sym = self.intern_current()
                     self.advance()
-                    if self.peek() == TokenKind.TK_EQ:
+                    if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_EQ:
                         self.advance()
-                        var eff_bits = 0
-                        if self.peek() == TokenKind.TK_L_BRACKET:
-                            self.advance()
-                            while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
-                                if self.peek() == TokenKind.TK_IDENT:
-                                    let es = self.current_start()
-                                    let ee = self.current_end()
-                                    let ef_name = self.source.slice(es as i64, ee as i64)
-                                    let ef_bit = if ef_name == "read": 1
-                                        else if ef_name == "write": 2
-                                        else if ef_name == "consume": 4
-                                        else if ef_name == "escape_value": 8
-                                        else if ef_name == "escape_view": 16
-                                        else: 0
-                                    eff_bits = eff_bits | ef_bit
-                                    self.advance()
-                                if self.peek() == TokenKind.TK_COMMA:
-                                    self.advance()
-                                    self.skip_newlines()
-                            if self.peek() == TokenKind.TK_R_BRACKET:
-                                self.advance()
-                        else if self.peek() == TokenKind.TK_IDENT:
-                            let es = self.current_start()
-                            let ee = self.current_end()
-                            let ef_name = self.source.slice(es as i64, ee as i64)
-                            eff_bits = if ef_name == "read": 1
-                                else if ef_name == "write": 2
-                                else if ef_name == "consume": 4
-                                else if ef_name == "escape_value": 8
-                                else if ef_name == "escape_view": 16
-                                else: 0
-                            self.advance()
-                        if eff_bits != 0:
-                            self.pending_effect_param = p_sym
-                            self.pending_effect_bits = eff_bits
+                    else:
+                        self.emit_error("expected ':' in @[effect] parameter contract")
+                        break
+                    let eff_bits = self.parse_effect_bits()
+                    if eff_bits != 0:
+                        self.pending_effect_params.push(p_sym)
+                        self.pending_effect_bits.push(eff_bits)
+                    self.skip_newlines()
+                    if self.peek() == TokenKind.TK_COMMA:
+                        self.advance()
+                        self.skip_newlines()
+                    else if self.peek() != TokenKind.TK_R_PAREN:
+                        self.emit_error("expected ',' or ')' in @[effect]")
+                        break
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
         else if self.is_ident_named("compiler_hook"):
@@ -784,6 +811,12 @@ fn Parser.parse_module(self: Parser) -> AstPool:
 
 // ── Declaration parsing ──────────────────────────────────────────
 
+fn Parser.attach_pending_effect_pins(self: Parser, fn_node: NodeId):
+    for i in 0..self.pending_effect_params.len() as i32:
+        self.pool.add_fn_effect_pin(fn_node, self.pending_effect_params.get(i as i64), self.pending_effect_bits.get(i as i64))
+    self.pending_effect_params = Vec.new()
+    self.pending_effect_bits = Vec.new()
+
 fn Parser.parse_decl(self: Parser) -> NodeId:
     var is_pub = Visibility.Private
     let start = self.current_start()
@@ -807,6 +840,12 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
        t != TokenKind.TK_KW_LET and t != TokenKind.TK_KW_VAR and t != TokenKind.TK_KW_GLOBAL:
         self.emit_error("global_allocator attribute can only be used on global bindings")
         self.pending_global_allocator = 0
+    if self.pending_effect_params.len() > 0 and
+       t != TokenKind.TK_KW_FN and t != TokenKind.TK_KW_UNSAFE and t != TokenKind.TK_KW_COMPTIME and
+       t != TokenKind.TK_KW_ASYNC and t != TokenKind.TK_KW_GEN and t != TokenKind.TK_KW_EXTERN:
+        self.emit_error("effect attribute can only be used on functions and extern functions")
+        self.pending_effect_params = Vec.new()
+        self.pending_effect_bits = Vec.new()
     if t == TokenKind.TK_KW_FN:
         return self.parse_fn_decl(is_pub, start, 0, 0, 0)
     if t == TokenKind.TK_KW_UNSAFE:
@@ -1159,11 +1198,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     if self.pending_no_alloc != 0:
         self.pool.mark_no_alloc_fn(fn_node)
         self.pending_no_alloc = 0
-    if self.pending_effect_param != 0:
-        self.pool.state.fn_effect_pin_params.insert(fn_node as i32, self.pending_effect_param)
-        self.pool.state.fn_effect_pin_bits.insert(fn_node as i32, self.pending_effect_bits)
-        self.pending_effect_param = 0
-        self.pending_effect_bits = 0
+    self.attach_pending_effect_pins(fn_node)
     if self.pending_compiler_hook_phase != 0:
         self.pool.mark_compiler_hook_fn(fn_node, self.pending_compiler_hook_phase)
         self.pending_compiler_hook_phase = 0
@@ -1185,6 +1220,10 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> NodeId:
         if ev_name == 0: return self.poisoned_expr()
         if self.expect(TokenKind.TK_COLON) == 0: return self.poisoned_expr()
         let ev_type = self.parse_type_expr()
+        if self.pending_effect_params.len() > 0:
+            self.emit_error("effect attribute can only be used on functions and extern functions")
+            self.pending_effect_params = Vec.new()
+            self.pending_effect_bits = Vec.new()
         return self.pool.add_node(NodeKind.NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut)
     if self.expect(TokenKind.TK_KW_FN) == 0:
         return self.poisoned_expr()
@@ -1222,6 +1261,7 @@ fn Parser.parse_extern_decl(self: Parser, start: i32) -> NodeId:
     let meta_flags = is_variadic + required_param_count * FN_META_REQUIRED_UNIT
     self.pool.add_fn_meta(extern_node, meta_flags, ret_type, extra_start, param_count, self.pending_callconv, 0)
     self.pending_callconv = 0
+    self.attach_pending_effect_pins(extern_node)
     extern_node
 
 // ── type decl ────────────────────────────────────────────────────

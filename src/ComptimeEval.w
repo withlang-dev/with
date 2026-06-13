@@ -33,6 +33,7 @@ extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: s
 extern fn with_exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32
 extern fn with_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32
 extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
+@[effect(fn_ptr: escape_value, ctx: escape_value)]
 extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
 extern fn with_alloc(size: i64) -> *mut u8

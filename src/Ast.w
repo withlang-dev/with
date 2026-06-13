@@ -453,8 +453,10 @@ type AstPoolState {
     call_named_args: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     fn_weak_flags: HashMap[i32, i32],
-    fn_effect_pin_params: HashMap[i32, i32],   // fn_node → param_name_sym
-    fn_effect_pin_bits: HashMap[i32, i32],     // fn_node → effect bitmask
+    fn_effect_pin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_effect_pin_*
+    fn_effect_pin_counts: HashMap[i32, i32],   // fn_node → entry count
+    fn_effect_pin_params: Vec[i32],            // param_name_sym
+    fn_effect_pin_bits: Vec[i32],              // effect bitmask
     // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
     copy_arg_needs_clone: HashMap[i32, i32],   // node → 1
     frozen: i32,
@@ -531,8 +533,10 @@ fn AstPool.new -> AstPool:
             call_named_args: HashMap.new(),
             fn_stack_sizes: HashMap.new(),
             fn_weak_flags: HashMap.new(),
-            fn_effect_pin_params: HashMap.new(),
-            fn_effect_pin_bits: HashMap.new(),
+            fn_effect_pin_starts: HashMap.new(),
+            fn_effect_pin_counts: HashMap.new(),
+            fn_effect_pin_params: Vec.new(),
+            fn_effect_pin_bits: Vec.new(),
             copy_arg_needs_clone: HashMap.new(),
             frozen: 0,
         }
@@ -1113,6 +1117,36 @@ fn AstPool.add_fn_meta(self: AstPool, node: NodeId, flags: i32, ret: i32, ps: i3
     self.state.fn_meta.push(ts)
     self.state.fn_meta.push(tc)
     self.state.fn_meta_map.insert(node as i32, idx)
+
+fn AstPool.add_fn_effect_pin(self: AstPool, node: NodeId, param_sym: i32, bits: i32):
+    let n = node as i32
+    if not self.state.fn_effect_pin_starts.contains(n):
+        self.state.fn_effect_pin_starts.insert(n, self.state.fn_effect_pin_params.len() as i32)
+        self.state.fn_effect_pin_counts.insert(n, 0)
+    self.state.fn_effect_pin_params.push(param_sym)
+    self.state.fn_effect_pin_bits.push(bits)
+    let count = self.state.fn_effect_pin_counts.get(n).unwrap()
+    self.state.fn_effect_pin_counts.insert(n, count + 1)
+
+fn AstPool.fn_effect_pin_count(self: AstPool, node: NodeId) -> i32:
+    let n = node as i32
+    if self.state.fn_effect_pin_counts.contains(n):
+        return self.state.fn_effect_pin_counts.get(n).unwrap()
+    0
+
+fn AstPool.fn_effect_pin_param(self: AstPool, node: NodeId, idx: i32) -> i32:
+    let n = node as i32
+    if not self.state.fn_effect_pin_starts.contains(n):
+        return 0
+    let start = self.state.fn_effect_pin_starts.get(n).unwrap()
+    self.state.fn_effect_pin_params.get((start + idx) as i64)
+
+fn AstPool.fn_effect_pin_bits(self: AstPool, node: NodeId, idx: i32) -> i32:
+    let n = node as i32
+    if not self.state.fn_effect_pin_starts.contains(n):
+        return 0
+    let start = self.state.fn_effect_pin_starts.get(n).unwrap()
+    self.state.fn_effect_pin_bits.get((start + idx) as i64)
 
 // Record the extra-array slot holding the `contains` argument for an `in` node.
 fn AstPool.set_membership_arg(self: AstPool, node: NodeId, slot: i32):

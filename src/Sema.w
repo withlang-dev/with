@@ -57,6 +57,7 @@ type BindingProvenance {
     view_origin_mask: i32,
     view_dep_start: i32,
     view_dep_count: i32,
+    effect_dep_sym: i32,
     is_ephemeral_value: i32,
     is_ephemeral_task: i32,
     poisoned_origin_sym: i32,
@@ -66,7 +67,7 @@ type BindingProvenance {
 impl Copy for BindingProvenance
 
 fn binding_provenance_empty -> BindingProvenance:
-    BindingProvenance { view_origin_mask: 0, view_dep_start: 0, view_dep_count: 0, is_ephemeral_value: 0, is_ephemeral_task: 0, poisoned_origin_sym: 0, poisoned_origin_node: 0, poisoned_binding_node: 0 }
+    BindingProvenance { view_origin_mask: 0, view_dep_start: 0, view_dep_count: 0, effect_dep_sym: 0, is_ephemeral_value: 0, is_ephemeral_task: 0, poisoned_origin_sym: 0, poisoned_origin_node: 0, poisoned_binding_node: 0 }
 
 fn sema_param_origin_bit(pi: i32) -> i32:
     if pi < 0:
@@ -250,6 +251,7 @@ const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
 const EFF_ESCAPE_VALUE: i32 = 8   // owned value escapes the call (return / global store)
 const EFF_ESCAPE_VIEW: i32  = 16  // view into parameter escapes (return &param.field)
 const EFF_RAW_PTR_VALIDITY: i32 = 32  // raw pointer parameter validity is caller-guaranteed
+const EFF_DECLARED_MASK: i32 = EFF_READ | EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW
 
 enum WithFormKind: i32:
     Binding = 0
@@ -266,6 +268,27 @@ enum AllocConstructKind: i32:
     ASYNC_FIBER = 7
     FFI_TEMPORARY = 8
     CALLEE = 9
+
+fn sema_effect_bits_text(bits: i32) -> str:
+    let public_bits = bits & EFF_DECLARED_MASK
+    var out = ""
+    if (public_bits & EFF_READ) != 0:
+        out = "read"
+    if (public_bits & EFF_WRITE) != 0:
+        if out.len() > 0: out = out ++ ", "
+        out = out ++ "write"
+    if (public_bits & EFF_CONSUME) != 0:
+        if out.len() > 0: out = out ++ ", "
+        out = out ++ "consume"
+    if (public_bits & EFF_ESCAPE_VALUE) != 0:
+        if out.len() > 0: out = out ++ ", "
+        out = out ++ "escape_value"
+    if (public_bits & EFF_ESCAPE_VIEW) != 0:
+        if out.len() > 0: out = out ++ ", "
+        out = out ++ "escape_view"
+    if out.len() == 0:
+        return "none"
+    out
 
 // ── Sema state ───────────────────────────────────────────────────
 
@@ -3089,6 +3112,22 @@ fn Sema.scope_set_is_ephemeral_value(self: Sema, sym: i32, is_ephemeral_value: i
             provenance.is_ephemeral_value = is_ephemeral_value
             slot.set(provenance)
 
+fn Sema.scope_set_effect_dep_sym(self: Sema, sym: i32, dep_sym: i32):
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        let idx = opt.unwrap()
+        let slot_idx = idx as i64
+        with self.bind_provenance.slot(slot_idx) as mut slot:
+            var provenance = slot.get()
+            provenance.effect_dep_sym = dep_sym
+            slot.set(provenance)
+
+fn Sema.binding_effect_dep_sym(self: Sema, sym: i32) -> i32:
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_provenance.get(opt.unwrap() as i64).effect_dep_sym
+    0
+
 fn Sema.scope_is_view_bound(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)
     if opt.is_some():
@@ -3542,6 +3581,27 @@ fn Sema.set_sig_param_effect(self: Sema, si: i32, pi: i32, eff: i32):
         return
     self.sig_param_effects.set_i32((start + pi) as i64, eff)
 
+fn Sema.find_effect_pin_param_index(self: Sema, param_start: i32, param_count: i32, param_sym: i32) -> i32:
+    let param_name = self.pool_resolve(param_sym)
+    for pi in 0..param_count:
+        let candidate_sym = self.ast.fn_param_name(param_start, pi)
+        if candidate_sym == param_sym:
+            return pi
+        if self.pool_resolve(candidate_sym) == param_name:
+            return pi
+    -1
+
+fn Sema.apply_declared_effects_to_extern_sig(self: Sema, node: i32, sig_idx: i32, param_start: i32, param_count: i32):
+    let pin_count = self.ast.fn_effect_pin_count(node as NodeId)
+    for pin_i in 0..pin_count:
+        let pin_param_sym = self.ast.fn_effect_pin_param(node as NodeId, pin_i)
+        let pin_bits = self.ast.fn_effect_pin_bits(node as NodeId, pin_i) & EFF_DECLARED_MASK
+        let pin_pi = self.find_effect_pin_param_index(param_start, param_count, pin_param_sym)
+        if pin_pi < 0:
+            self.emit_error("@[effect] names unknown parameter '" ++ self.pool_resolve(pin_param_sym) ++ "'", node)
+        else:
+            self.set_sig_param_effect(sig_idx, pin_pi, pin_bits)
+
 fn Sema.sig_param_view_origin(self: Sema, si: i32, pi: i32) -> i32:
     if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
         return 0
@@ -3561,8 +3621,10 @@ fn Sema.set_sig_param_view_origin(self: Sema, si: i32, pi: i32, mask: i32):
     self.sig_param_view_origins.set_i32((start + pi) as i64, mask)
 
 fn Sema.param_index_for_sym(self: Sema, sym: i32) -> i32:
+    let name = self.pool_resolve(sym)
     for pi in 0..self.current_fn_param_syms.len() as i32:
-        if self.current_fn_param_syms.get(pi as i64) == sym:
+        let param_sym = self.current_fn_param_syms.get(pi as i64)
+        if param_sym == sym or self.pool_resolve(param_sym) == name:
             return pi
     -1
 
@@ -3592,6 +3654,9 @@ fn Sema.note_place_effect(self: Sema, expr_node: i32, eff: i32):
     let root = self.place_root_sym(expr_node)
     if root != 0:
         self.note_param_effect(root, eff)
+        let dep_sym = self.binding_effect_dep_sym(root)
+        if dep_sym != 0:
+            self.note_param_effect(dep_sym, eff)
 
 fn Sema.get_sig(self: Sema, name: i32) -> i32:
     if self.sig_lookup.contains(name):
