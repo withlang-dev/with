@@ -1251,7 +1251,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     var mir_lower_box = MirLowerSemaBox { sema: sema }
     let mir_mod: MirModule = lower_module(mir_lower_box.sema, active_pool, self.zcu.pool)
     sema = mir_lower_box.sema
-    let tailrec_syms = collect_tailrec_fn_syms(active_pool)
+    let tailrec_syms = collect_tailrec_fn_syms(&sema, active_pool, self.zcu.pool)
     if tailrec_syms.len() > 0:
         let tailrec_violations = mir_mod.verify_tailrec_contracts(&sema, active_pool, tailrec_syms)
         if tailrec_violations.len() > 0:

@@ -15,12 +15,11 @@ type Raw {
 fn singleton() -> *mut Handle:
     if G != null:
         return G
-    // Assign the global directly from the allocation so no scope-bound
-    // local is recorded as its view origin (§21.1).
-    G = unsafe { malloc(32usize) }.unwrap() as *mut Handle
-    let p = G as *mut Raw
+    let raw = unsafe { malloc(32usize) }.unwrap()
+    let p = raw as *mut Raw
     unsafe:
-        (*p).base = G as *mut c_void
+        (*p).base = raw
+    G = p as *mut Handle
     G
 
 fn make_holder() -> Holder:

@@ -14,8 +14,7 @@ extern fn with_alloc(size: i64) -> *mut u8
 
 // ── Node kinds ───────────────────────────────────────────────────
 
-type NodeId = distinct i32
-impl Copy for NodeId
+type NodeId = i32
 
 pub enum NodeKind: i32:
     // Declarations

@@ -127,7 +127,14 @@ fn bs_run_cli_capture(ctx: &ActionCtx, compiler_path: str, label: str, args: &Ve
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
-fn bs_run_cli_capture_with_env(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], timeout_ms: i32, process_env: ProcessEnv) -> SelfhostRunResult:
+fn bs_clone_process_env(process_env: &ProcessEnv) -> ProcessEnv:
+    var vars: Vec[ProcessEnvVar] = Vec.new()
+    for i in 0..process_env.vars.len() as i32:
+        let item = process_env.vars.get(i as i64)
+        vars.push(ProcessEnvVar { name: item.name, value: item.value })
+    ProcessEnv { vars }
+
+fn bs_run_cli_capture_with_env(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], timeout_ms: i32, process_env: &ProcessEnv) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
@@ -136,13 +143,13 @@ fn bs_run_cli_capture_with_env(ctx: &ActionCtx, compiler_path: str, label: str, 
     argv |> push(compiler_path)
     for i in 0..args.len() as i32:
         argv |> push(args.get(i as i64))
-    let result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, timeout_ms, process_env)
+    let result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_clone_process_env(process_env))
     if result.rc == 0:
         let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
-fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], timeout_ms: i32, cwd: str, process_env: ProcessEnv) -> SelfhostRunResult:
+fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], timeout_ms: i32, cwd: str, process_env: &ProcessEnv) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
@@ -151,7 +158,7 @@ fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: str, label: s
     argv |> push(compiler_path)
     for i in 0..args.len() as i32:
         argv |> push(args.get(i as i64))
-    let result = ctx.process_runner().run_capture_cwd_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_abs(root, cwd), process_env)
+    let result = ctx.process_runner().run_capture_cwd_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_abs(root, cwd), bs_clone_process_env(process_env))
     if result.rc == 0:
         let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))

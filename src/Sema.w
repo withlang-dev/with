@@ -47,8 +47,7 @@ enum TypeKind: i32:
     TY_GENERIC_INST = 19
     TY_EXTERN_FN = 20
 
-type TypeId = distinct i32
-impl Copy for TypeId
+type TypeId = i32
 
 enum VarState: i32:
     LIVE = 0

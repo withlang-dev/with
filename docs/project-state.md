@@ -43,6 +43,20 @@ the bootstrap-compatible `fn(ActionCtx) -> i32` shape. Full verification
 passed on 2026-06-12: `with build`, `with build :fixpoint`, `with build
 :test`, and `with build :test-green`.
 
+#567/#573/#574/#575/#576/#577 are implemented locally and verified. The generic
+template lowering skip now handles blanket-impl generic functions before MIR
+lowering (#576/#577); comptime eval now writes evaluator Sema state back to the
+caller instead of dropping type-table mutations (#574); chained/pipeline/in
+method receivers reuse the already-checked receiver type (#573); raw pointers no
+longer participate in view-origin escape tracking and the spec documents that
+they are not views (#575); and the method-argument distinct-base carve-out is
+removed, backed by de-distincted compiler-internal `NodeId`/`TypeId` aliases
+and explicit `BlockId` casts at real MIR boundaries (#567). The build driver
+was also conformed to the full by-value rule by borrowing read-only action
+contexts, tool filesystem handles, command argument vectors, and result
+records. Full verification passed on 2026-06-12: `with build`,
+`with build :fixpoint`, `with build :test`, and `with build :test-green`.
+
 #437 is implemented locally and focused tests pass. `std.alloc` now has real
 region `Arena` allocation with mark/reset watermarks, `FrameArena` with
 external reset and high-water tracking, and a fixed-block `Pool`/

@@ -10572,6 +10572,11 @@ At every program point, the following must hold:
    the intersection of those origin lifetimes. If any possible origin
    dies before the view's last use, the program is rejected.
 
+   Raw pointers are not views for this rule. A `*const T` or `*mut T`
+   value is an address, not a borrow; validity is asserted when it is
+   dereferenced, converted to a safe reference/slice/view inside
+   `unsafe`, or relied on across an `unsafe fn` boundary (§16.11).
+
    ```
    fn longest(a: &String, b: &String) -> &str:
        if a.len() > b.len():

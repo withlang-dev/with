@@ -907,13 +907,12 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
         if self.is_copy(body_ty) == 0:
             self.note_place_effect(body, EFF_ESCAPE_VALUE)
         let body_kind = self.get_type_kind(self.resolve_alias(body_ty))
-        if body_kind == TypeKind.TY_REF or body_kind == TypeKind.TY_PTR:
+        if body_kind == TypeKind.TY_REF:
             self.note_place_effect(body, EFF_ESCAPE_VIEW)
             let body_root = self.place_root_sym(body)
             if body_root != 0:
                 self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body))
-            if body_kind == TypeKind.TY_REF:
-                self.check_returned_view_origins(body, body)
+            self.check_returned_view_origins(body, body)
     if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
         if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0:
             self.emit_error("return type mismatch", body)
@@ -950,9 +949,9 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
         self.verify_tail_position(body, fn_name, 1)
 
     // Write accumulated per-param effects into sig_param_effects.
-    // For &T/*T-typed params, clamp to effects they can semantically carry:
-    // reads/views plus raw-pointer validity preconditions. They cannot have
-    // consume or escape_value since you cannot own through a reference.
+    // For &T/*T-typed params, clamp to effects they can semantically carry.
+    // References may carry returned-view origins; raw pointers carry raw
+    // validity preconditions instead. Neither owns through the parameter.
     var raw_validity_param_sym = 0
     for pi in 0..self.current_fn_param_effs.len() as i32:
         var eff = self.current_fn_param_effs.get(pi as i64)
@@ -961,8 +960,10 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
                 let p_tid = self.sig_param_type(sig_idx, pi)
                 if p_tid > 0:
                     let p_tk = self.get_type_kind(self.resolve_alias(p_tid))
-                    if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
+                    if p_tk == TypeKind.TY_REF:
                         eff = eff & (EFF_READ | EFF_ESCAPE_VIEW | EFF_RAW_PTR_VALIDITY)
+                    else if p_tk == TypeKind.TY_PTR:
+                        eff = eff & (EFF_READ | EFF_RAW_PTR_VALIDITY)
             self.set_sig_param_effect(sig_idx, pi, eff)
             if (eff & EFF_ESCAPE_VIEW) != 0:
                 self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins.get(pi as i64))
@@ -4909,7 +4910,7 @@ fn Sema.check_membership_operator(self: Sema, node: i32, lhs_node: i32, rhs_node
     if arg_idx < 0:
         self.emit_error("malformed `in` expression: missing membership argument", node)
         return 0
-    let ret = self.check_method_call_parts(rhs_node, contains_sym, arg_idx, 1, node)
+    let ret = self.check_method_call_parts(rhs_node, contains_sym, arg_idx, 1, node, rhs_ty)
     if ret == 0:
         return 0
     if self.types_compatible(self.ty_bool as i32, ret) == 0:
@@ -5597,7 +5598,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     else:
         self.binding_closure_nodes.remove(name)
     let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
-    if bind_kind == TypeKind.TY_REF or bind_kind == TypeKind.TY_PTR or self.type_has_drop_impl(bind_type as i32) != 0:
+    if bind_kind == TypeKind.TY_REF or self.type_has_drop_impl(bind_type as i32) != 0:
         self.record_view_binding_from_expr(name, value)
     else:
         self.clear_binding_view_deps(name)
@@ -5804,7 +5805,7 @@ fn Sema.collect_expr_view_deps(self: Sema, node: i32, out0: Vec[i32]) -> Vec[i32
         let ty = self.scope_lookup(sym)
         if ty > 0:
             let tk = self.get_type_kind(self.resolve_alias(ty as TypeId))
-            if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            if tk == TypeKind.TY_REF:
                 out = self.push_unique_i32(out, sym)
         return out
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
@@ -6097,13 +6098,12 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
         if self.is_copy(val_type) == 0:
             self.note_place_effect(value, EFF_ESCAPE_VALUE)
         let val_kind = self.get_type_kind(self.resolve_alias(val_type))
-        if val_kind == TypeKind.TY_REF or val_kind == TypeKind.TY_PTR:
+        if val_kind == TypeKind.TY_REF:
             self.note_place_effect(value, EFF_ESCAPE_VIEW)
             let root = self.place_root_sym(value)
             if root != 0:
                 self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value))
-            if val_kind == TypeKind.TY_REF:
-                self.check_returned_view_origins(value, node)
+            self.check_returned_view_origins(value, node)
         if self.current_return_type != 0 and val_type != 0:
             let compat = self.types_compatible(self.current_return_type as i32, val_type as i32)
             let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1 as TypeId
@@ -6305,7 +6305,7 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         else:
             self.binding_closure_nodes.remove(target_sym)
         let tgt_kind = self.get_type_kind(self.resolve_alias(target_type as TypeId))
-        if tgt_kind == TypeKind.TY_REF or tgt_kind == TypeKind.TY_PTR or self.type_has_drop_impl(target_type as i32) != 0:
+        if tgt_kind == TypeKind.TY_REF or self.type_has_drop_impl(target_type as i32) != 0:
             self.record_view_binding_from_expr(target_sym, value)
         else:
             self.clear_binding_view_deps(target_sym)
@@ -6522,12 +6522,8 @@ fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
 
     0
 
-fn Sema.field_access_type_no_diagnostic(self: Sema, node: i32) -> i32:
-    if node == 0 or self.ast.kind(node) != NodeKind.NK_FIELD_ACCESS:
-        return 0
-    let expr = self.ast.get_data0(node)
-    let field = self.ast.get_data1(node)
-    var obj_type = self.check_expr(expr)
+fn Sema.adjust_static_receiver_type(self: Sema, expr: i32, obj_type_raw: i32) -> TypeId:
+    var obj_type = obj_type_raw as TypeId
     let static_type_sym = self.static_receiver_base_sym(expr)
     let static_expr_kind = self.ast.kind(expr)
     if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0 and (static_expr_kind == NodeKind.NK_IDENT or static_expr_kind == NodeKind.NK_TYPE_NAMED):
@@ -6538,6 +6534,13 @@ fn Sema.field_access_type_no_diagnostic(self: Sema, node: i32) -> i32:
             let static_named = self.lookup_named_type_visible(static_type_sym)
             if static_named != 0:
                 obj_type = static_named as TypeId
+    else if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0 and static_expr_kind == NodeKind.NK_INDEX:
+        let static_indexed = self.resolve_type_level_arg_expr(expr)
+        if static_indexed != 0:
+            obj_type = static_indexed as TypeId
+    obj_type
+
+fn Sema.field_access_type_from_obj(self: Sema, obj_type: TypeId, field: i32) -> i32:
     if obj_type == 0:
         return 0
     let field_base = self.auto_deref_ref_ptr_type(obj_type)
@@ -6556,6 +6559,14 @@ fn Sema.field_access_type_no_diagnostic(self: Sema, node: i32) -> i32:
         if idx < elem_count:
             return self.type_extra.get((te_start + idx) as i64)
     0
+
+fn Sema.field_access_type_no_diagnostic(self: Sema, node: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let expr = self.ast.get_data0(node)
+    let field = self.ast.get_data1(node)
+    let obj_type = self.adjust_static_receiver_type(expr, self.check_expr(expr) as i32)
+    self.field_access_type_from_obj(obj_type, field)
 
 fn Sema.auto_deref_ref_ptr_type(self: Sema, tid: TypeId) -> TypeId:
     var current = self.resolve_alias(tid)
@@ -8229,7 +8240,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         if self.is_copy(body_ty) == 0:
             self.note_place_effect(body, EFF_ESCAPE_VALUE)
         let body_kind = self.get_type_kind(self.resolve_alias(body_ty))
-        if body_kind == TypeKind.TY_REF or body_kind == TypeKind.TY_PTR:
+        if body_kind == TypeKind.TY_REF:
             self.note_place_effect(body, EFF_ESCAPE_VIEW)
             let body_root = self.place_root_sym(body)
             if body_root != 0:
@@ -8368,7 +8379,7 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
             if rhs_method != 0:
                 let method = rhs_method
                 if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
-                    let ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node)
+                    let ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, lhs_ty as i32)
                     if ret != 0:
                         self.pipeline_method_calls.insert(node, method)
                         self.typed_expr_types.insert(node, ret)
@@ -8376,7 +8387,7 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
         else if self.ast.kind(rhs) == NodeKind.NK_IDENT:
             let method = self.ast.get_data0(rhs)
             if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
-                let ret2 = self.check_method_call_parts(lhs, method, -1, 0, node)
+                let ret2 = self.check_method_call_parts(lhs, method, -1, 0, node, lhs_ty as i32)
                 if ret2 != 0:
                     self.pipeline_method_calls.insert(node, method)
                     self.typed_expr_types.insert(node, ret2)
@@ -8384,7 +8395,7 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
         else if self.ast.kind(rhs) == NodeKind.NK_TYPE_GENERIC:
             let method2 = self.ast.get_data0(rhs)
             if method2 != 0 and self.pipeline_method_exists(lhs_ty as i32, method2) != 0:
-                let ret3 = self.check_method_call_parts(lhs, method2, -1, 0, node)
+                let ret3 = self.check_method_call_parts(lhs, method2, -1, 0, node, lhs_ty as i32)
                 if ret3 != 0:
                     self.pipeline_method_calls.insert(node, method2)
                     self.typed_expr_types.insert(node, ret3)
@@ -8394,7 +8405,7 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
             if self.ast.kind(rhs_indexed_base) == NodeKind.NK_IDENT:
                 let method3 = self.ast.get_data0(rhs_indexed_base)
                 if method3 != 0 and self.pipeline_method_exists(lhs_ty as i32, method3) != 0:
-                    let ret4 = self.check_method_call_parts(lhs, method3, -1, 0, node)
+                    let ret4 = self.check_method_call_parts(lhs, method3, -1, 0, node, lhs_ty as i32)
                     if ret4 != 0:
                         self.pipeline_method_calls.insert(node, method3)
                         self.typed_expr_types.insert(node, ret4)
@@ -9006,14 +9017,14 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closu
                     let cap_tid = self.scope_lookup(cap_sym)
                     if cap_tid > 0:
                         let cap_tk = self.get_type_kind(self.resolve_alias(cap_tid as TypeId))
-                        if cap_tk == TypeKind.TY_REF or cap_tk == TypeKind.TY_PTR:
+                        if cap_tk == TypeKind.TY_REF:
                             closure_view_deps = self.push_unique_i32(closure_view_deps, cap_sym)
             if (cap_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0 and self.scope_has(cap_sym) != 0:
                 let cap_tid = self.scope_lookup(cap_sym)
                 if self.is_copy(cap_tid as TypeId) == 0:
                     self.scope_set_state(cap_sym, VarState.MOVED)
         let ret_tk = self.get_type_kind(self.resolve_alias(self.get_type_d2(fn_tid) as TypeId))
-        if ret_tk == TypeKind.TY_REF or ret_tk == TypeKind.TY_PTR:
+        if ret_tk == TypeKind.TY_REF:
             self.set_expr_view_deps(node, closure_view_mask, closure_view_deps)
 
     let ret = self.get_type_d2(fn_tid)
@@ -9047,7 +9058,10 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Method call or callable field: callee is field_access
     if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
-        let callable_tid = self.callable_any_fn_type(self.field_access_type_no_diagnostic(callee) as TypeId)
+        let recv_expr = self.ast.get_data0(callee)
+        let recv_field = self.ast.get_data1(callee)
+        let recv_ty = self.adjust_static_receiver_type(recv_expr, self.check_expr(recv_expr) as i32)
+        let callable_tid = self.callable_any_fn_type(self.field_access_type_from_obj(recv_ty, recv_field) as TypeId)
         if callable_tid != 0:
             if self.ast.has_call_named_args(node) != 0:
                 self.emit_error("named arguments are not supported for closures or function pointers", node)
@@ -9060,7 +9074,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             for cai2 in 0..arg_count:
                 self.mark_moved_if_consumed(self.ast.get_extra(extra_start + cai2))
             return self.check_callable_value_call("", callable_tid, 0, node, extra_start, arg_count, 0, 0, arg_types_for_callable)
-        let ret = self.check_method_call(callee, extra_start, arg_count, node)
+        let ret = self.check_method_call_parts(recv_expr, recv_field, extra_start, arg_count, node, recv_ty as i32)
         if ret != 0:
             self.typed_expr_types.insert(node, ret)
         return ret
@@ -11685,10 +11699,10 @@ fn Sema.emit_builtin_mutable_receiver_error(self: Sema, type_name_sym: i32, fiel
 fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
     let expr = self.ast.get_data0(callee)
     let field = self.ast.get_data1(callee)
-    self.check_method_call_parts(expr, field, extra_start, arg_count, node)
+    self.check_method_call_parts(expr, field, extra_start, arg_count, node, 0)
 
-fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
-    var obj_type = self.check_expr(expr)
+fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty: i32) -> i32:
+    var obj_type = if known_recv_ty != 0: known_recv_ty as TypeId else: self.check_expr(expr)
     let static_type_sym = self.static_receiver_base_sym(expr)
     let early_method_name = self.pool_resolve(field)
     let static_receiver_is_tiered_type = self.static_receiver_type_is_known(expr) != 0 or self.is_pending_generic_collection_base(static_type_sym) != 0 or self.symbol_requires_std_tier(static_type_sym) != 0
@@ -11699,19 +11713,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             return 0
     if static_type_sym != 0 and self.is_pending_generic_collection_base(static_type_sym) != 0 and (field == self.syms.new or (static_type_sym == self.syms.vec and early_method_name == "with_capacity")):
         self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
-    let static_expr_kind = self.ast.kind(expr)
-    if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0 and (static_expr_kind == NodeKind.NK_IDENT or static_expr_kind == NodeKind.NK_TYPE_NAMED):
-        let static_prim = self.primitive_type_by_sym(static_type_sym)
-        if static_prim != 0:
-            obj_type = static_prim as TypeId
-        else:
-            let static_named = self.lookup_named_type_visible(static_type_sym)
-            if static_named != 0:
-                obj_type = static_named as TypeId
-    else if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0 and static_expr_kind == NodeKind.NK_INDEX:
-        let static_indexed = self.resolve_type_level_arg_expr(expr)
-        if static_indexed != 0:
-            obj_type = static_indexed as TypeId
+    obj_type = self.adjust_static_receiver_type(expr, obj_type as i32)
 
     if obj_type != 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
         if self.is_tool_capability_type(obj_type as i32) and self.pool_resolve(field) == "__driver_new" and not self.can_access_tool_capability_internals():
@@ -12140,17 +12142,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                     if mc_exp_ty != 0 and mc_act_ty != 0:
                         if self.type_is_dyn_object(self.resolve_alias(mc_exp_ty)) == 0:
                             let mc_perr_arg = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, mc_pai) else: self.ast.get_extra(extra_start + mc_pai)
-                            var mc_compat = self.call_arg_type_compatible(mc_exp_ty, mc_act_ty)
-                            if mc_compat == 0:
-                                // Deliberate slice-1 carve-out: method args
-                                // accept the base type where a distinct type
-                                // is declared. The compiler's own sources pass
-                                // raw i32 for NodeId-style ids at ~9.6k method
-                                // sites (never checked before #567); tightening
-                                // that is its own migration.
-                                let mc_exp_unwrapped = self.unwrap_builtin_arg_distinct(mc_exp_ty)
-                                if mc_exp_unwrapped != mc_exp_ty:
-                                    mc_compat = self.call_arg_type_compatible(mc_exp_unwrapped, mc_act_ty)
+                            let mc_compat = self.call_arg_type_compatible(mc_exp_ty, mc_act_ty)
                             if mc_compat == 0:
                                 self.emit_argument_type_mismatch(mc_plain_name, method_fn_sym, mc_pai, mc_plain_pi, mc_exp_ty, mc_act_ty, if mc_perr_arg > 0: mc_perr_arg else: node)
                             else:

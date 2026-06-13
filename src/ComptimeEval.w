@@ -573,14 +573,25 @@ fn comptime_eval_result_invalid() -> ComptimeEvalResult:
         effect_records: Vec.new(),
     }
 
-fn comptime_eval_result_from_evaluator(evaluator: ComptimeEvaluator, value: ComptimeValue) -> ComptimeEvalResult:
+unsafe fn comptime_eval_finish(sema_ptr: *mut Sema, evaluator: ComptimeEvaluator, value: ComptimeValue) -> ComptimeEvalResult:
+    let has_pending_diag = evaluator.has_pending_diag
+    let pending_diag = evaluator.pending_diag
+    let extras = evaluator.extra_values
+    let error_msg = evaluator.last_error_msg
+    let runtime_exit_code = evaluator.runtime_exit_code
+    let runtime_stderr = evaluator.runtime_stderr
+    let effect_records = evaluator.effect_records
+    let synced_sema = evaluator.sema
+    *sema_ptr = synced_sema
+    if has_pending_diag != 0:
+        sema_ptr.diags.emit(pending_diag)
     ComptimeEvalResult {
         value,
-        extras: evaluator.extra_values,
-        error_msg: evaluator.last_error_msg,
-        runtime_exit_code: evaluator.runtime_exit_code,
-        runtime_stderr: evaluator.runtime_stderr,
-        effect_records: evaluator.effect_records,
+        extras,
+        error_msg,
+        runtime_exit_code,
+        runtime_stderr,
+        effect_records,
     }
 
 fn comptime_capability_record(kind: i32, package_name: str, package_version: str, project_root: str) -> ComptimeCapabilityRecord:
@@ -673,11 +684,7 @@ unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool:
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
-    var tracked_paths = sema_ptr.tracked_input_paths
-    sema_ptr.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &evaluator.sema.tracked_input_paths)
-    if evaluator.has_pending_diag != 0:
-        sema_ptr.diags.emit(evaluator.pending_diag)
-    comptime_eval_result_from_evaluator(evaluator, value)
+    comptime_eval_finish(sema_ptr, evaluator, value)
 
 unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
@@ -685,11 +692,7 @@ unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, poo
     sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
-    var tracked_paths = sema_ptr.tracked_input_paths
-    sema_ptr.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &evaluator.sema.tracked_input_paths)
-    if evaluator.has_pending_diag != 0:
-        sema_ptr.diags.emit(evaluator.pending_diag)
-    comptime_eval_result_from_evaluator(evaluator, value)
+    comptime_eval_finish(sema_ptr, evaluator, value)
 
 unsafe fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     comptime_try_eval_expr_result(sema_ptr, ast, pool, node).value
@@ -709,7 +712,7 @@ unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, poo
     let call_node = if ast.decl_count() > 0: ast.get_decl(0) else: 0
     let ctx_type = evaluator.capability_type_id(CapabilityKind.CK_BUILD_CTX, call_node)
     if ctx_type == 0:
-        return comptime_eval_result_from_evaluator(evaluator, comptime_value_invalid())
+        return comptime_eval_finish(sema_ptr, evaluator, comptime_value_invalid())
     let ctx_record = comptime_capability_record(CapabilityKind.CK_BUILD_CTX, package_name, package_version, project_root)
     let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
     let args: Vec[ComptimeValue] = Vec.new()
@@ -717,14 +720,12 @@ unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, poo
     let signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
     evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
-    if evaluator.has_pending_diag != 0:
-        sema_ptr.diags.emit(evaluator.pending_diag)
     let value =
         if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
             signal.value
         else:
             comptime_value_invalid()
-    comptime_eval_result_from_evaluator(evaluator, value)
+    comptime_eval_finish(sema_ptr, evaluator, value)
 
 unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
@@ -738,7 +739,7 @@ unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, po
     let call_node = if ast.decl_count() > 0: ast.get_decl(0) else: 0
     let ctx_type = evaluator.capability_type_id(CapabilityKind.CK_BUILD_ACTION_CTX, call_node)
     if ctx_type == 0:
-        return comptime_eval_result_from_evaluator(evaluator, comptime_value_invalid())
+        return comptime_eval_finish(sema_ptr, evaluator, comptime_value_invalid())
     let ctx_record = comptime_action_capability_record(package_name, package_version, project_root, target_name, inputs, output, extra_outputs, args_values, write_scopes, timeout_ms, cwd, env, network)
     let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
     let args: Vec[ComptimeValue] = Vec.new()
@@ -746,14 +747,12 @@ unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, po
     let signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
     evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
-    if evaluator.has_pending_diag != 0:
-        sema_ptr.diags.emit(evaluator.pending_diag)
     let value =
         if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
             signal.value
         else:
             comptime_value_invalid()
-    comptime_eval_result_from_evaluator(evaluator, value)
+    comptime_eval_finish(sema_ptr, evaluator, value)
 
 fn ComptimeEvaluator.eval_root(self: ComptimeEvaluator, node: i32) -> ComptimeValue:
     let signal = self.eval_expr(node)

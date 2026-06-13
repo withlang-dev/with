@@ -782,7 +782,7 @@ fn MirBuilder.define_goto_label(self: MirBuilder, label: i32) -> i32:
     self.goto_label_defined.set_i32(idx as i64, 1)
     if self.cur_bb != bb and self.body.term_kind(self.cur_bb) == TermKind.TK_UNREACHABLE:
         self.terminate(TermKind.TK_GOTO, bb, 0, 0, 0)
-    self.switch_to(bb)
+    self.switch_to(bb as BlockId)
     bb
 
 fn MirBuilder.goto_target_info(self: MirBuilder, label: i32) -> LoopInfo:
@@ -5749,10 +5749,10 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
                 continue
             let field_place = self.body.new_field_place(variant_place, bi, 0)
             let next_test_bb = self.new_block()
-            self.switch_to(cur_test_bb)
+            self.switch_to(cur_test_bb as BlockId)
             self.lower_pattern_match(field_place, inner_pat, next_test_bb, fail_bb)
             cur_test_bb = next_test_bb as i32
-        self.switch_to(cur_test_bb)
+        self.switch_to(cur_test_bb as BlockId)
         self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
         return
 
@@ -9304,7 +9304,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
         // 5. Each arm: await winner, cancel losers, execute body
         for ai in 0..arm_count:
-            self.switch_to(arm_bbs.get(ai as i64) as i32)
+            self.switch_to(arm_bbs.get(ai as i64) as BlockId)
             let arm_name = self.ast.get_extra(extra_start + ai * 3)
             let task_node = self.ast.get_extra(extra_start + ai * 3 + 1)
             let arm_body = self.ast.get_extra(extra_start + ai * 3 + 2)
@@ -9915,6 +9915,16 @@ fn lower_generator_next_body(sema: &Sema, source: MirBody, fn_node: i32) -> MirB
 
     out
 
+fn mir_fn_is_generic_template(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32) -> bool:
+    let meta = ast_pool.find_fn_meta(fn_node)
+    if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
+        return true
+    let fn_sym = ast_pool.get_data0(fn_node)
+    if sema.generic_fn_nodes.contains(fn_sym):
+        return true
+    let sema_sym = sema.pool_lookup_symbol(pool.resolve_symbol(fn_sym))
+    sema_sym != 0 and sema.generic_fn_nodes.contains(sema_sym)
+
 fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
     var mir_mod = MirModule.init()
     // Snapshot sema type tables before any MirBuilder copy can realloc/free the buffer
@@ -9926,8 +9936,7 @@ fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModul
             continue
 
         let fn_sym = ast_pool.get_data0(decl)
-        let meta = ast_pool.find_fn_meta(decl)
-        if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
+        if mir_fn_is_generic_template(&sema, ast_pool, pool, decl as i32):
             continue
 
         sema.update_decl_source_context(di)
@@ -9950,14 +9959,13 @@ fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModul
 
     mir_mod
 
-fn collect_tailrec_fn_syms(ast_pool: AstPool) -> Vec[i32]:
+fn collect_tailrec_fn_syms(sema: &Sema, ast_pool: AstPool, pool: InternPool) -> Vec[i32]:
     let tailrec_syms: Vec[i32] = Vec.new()
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
         if ast_pool.kind(decl) != NodeKind.NK_FN_DECL:
             continue
-        let meta = ast_pool.find_fn_meta(decl)
-        if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
+        if mir_fn_is_generic_template(sema, ast_pool, pool, decl as i32):
             continue
         let fn_flags = ast_pool.get_data2(decl)
         if (fn_flags / FnFlags.TAILREC) % 2 == 1:
