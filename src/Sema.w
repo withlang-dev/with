@@ -402,6 +402,7 @@ type Sema {
     blanket_bound_counts: Vec[i32],
     // Blanket impl target type: 0 = bare type param, else: = base_sym of generic target
     blanket_target_base_syms: Vec[i32],
+    blanket_impl_nodes: Vec[i32],
     // Trait obligations + deterministic selection cache
     obligation_trait_syms: Vec[i32],
     obligation_type_syms: Vec[i32],
@@ -1253,6 +1254,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         blanket_bound_starts: Vec.new(),
         blanket_bound_counts: Vec.new(),
         blanket_target_base_syms: Vec.new(),
+        blanket_impl_nodes: Vec.new(),
         obligation_trait_syms: Vec.new(),
         obligation_type_syms: Vec.new(),
         obligation_nodes: Vec.new(),
@@ -3870,6 +3872,12 @@ fn Sema.types_compatible_fast(self: Sema, expected: TypeId, actual: TypeId) -> i
         return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
     if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_ENUM:
         return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+    if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_ENUM:
+        if self.generic_inst_accepts_unit_enum_value(exp_r, act_r) != 0:
+            return 1
+    if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_GENERIC_INST:
+        if self.generic_inst_accepts_unit_enum_value(act_r, exp_r) != 0:
+            return 1
     if exp_k == TypeKind.TY_RANGE and act_k == TypeKind.TY_RANGE:
         if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
             return 0
@@ -3888,15 +3896,6 @@ fn Sema.types_compatible_fast(self: Sema, expected: TypeId, actual: TypeId) -> i
                             gi_all_match = 0
                 return gi_all_match
         return 0
-    // TypeKind.TY_GENERIC_INST is compatible with its base struct type (for codegen interop)
-    if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_STRUCT:
-        return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
-    if exp_k == TypeKind.TY_STRUCT and act_k == TypeKind.TY_GENERIC_INST:
-        return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
-    if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_ENUM:
-        return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
-    if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_GENERIC_INST:
-        return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
     0
 
 fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
@@ -3957,19 +3956,32 @@ fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
                         break
                 if gi_all_ok != 0:
                     return 1
-    // TypeKind.TY_GENERIC_INST ↔ base struct/enum (interop with codegen's erased types)
-    if exp_k == TypeKind.TY_GENERIC_INST and (act_k == TypeKind.TY_STRUCT or act_k == TypeKind.TY_ENUM):
-        if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
-            return 1
-    if (exp_k == TypeKind.TY_STRUCT or exp_k == TypeKind.TY_ENUM) and act_k == TypeKind.TY_GENERIC_INST:
-        if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
-            return 1
-
     // Auto-referencing: T → &T
     if exp_k == TypeKind.TY_REF:
         if self.get_type_d1(exp_r) == 0:
             if self.types_compatible(self.get_type_d0(exp_r), act_r):
                 return 1
+    0
+
+fn Sema.generic_inst_accepts_unit_enum_value(self: Sema, generic_tid: TypeId, enum_tid: TypeId) -> i32:
+    if self.get_type_kind(generic_tid) != TypeKind.TY_GENERIC_INST or self.get_type_kind(enum_tid) != TypeKind.TY_ENUM:
+        return 0
+    let base_sym = self.get_type_d0(generic_tid)
+    if base_sym == 0 or self.get_type_d0(enum_tid) != base_sym:
+        return 0
+    if not self.type_decl_nodes.contains(base_sym):
+        return 0
+    let type_decl = self.type_decl_nodes.get(base_sym).unwrap()
+    if self.type_decl_tp_count(type_decl) <= 0:
+        return 0
+    let extra_start = self.get_type_d1(enum_tid)
+    let variant_count = self.get_type_d2(enum_tid)
+    var pos = extra_start
+    for _ in 0..variant_count:
+        let payload_count = self.type_extra.get((pos + 1) as i64)
+        if payload_count == 0:
+            return 1
+        pos = pos + 2 + payload_count
     0
 
 fn Sema.arithmetic_result_type(self: Sema, lhs: TypeId, rhs: TypeId) -> TypeId:

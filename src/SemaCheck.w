@@ -10410,13 +10410,12 @@ fn Sema.check_generic_trait_bounds(self: Sema, tp_start: i32, tp_count: i32, cal
             if concrete_tid == 0:
                 continue
             let concrete_sym = self.type_symbol_for_bounds(concrete_tid)
-            if concrete_sym == 0:
-                continue
+            let obligation_type = if concrete_sym != 0: concrete_sym else: concrete_tid
             self.obligation_trait_syms.push(trait_sym)
-            self.obligation_type_syms.push(concrete_sym)
+            self.obligation_type_syms.push(obligation_type)
             self.obligation_nodes.push(call_node)
-            if self.select_trait_impl(concrete_sym, trait_sym) == 0:
-                let type_str = self.pool_resolve(concrete_sym)
+            if self.type_implements_trait(concrete_tid, trait_sym) == 0:
+                let type_str = self.type_name(concrete_tid)
                 let tp_str = self.pool_resolve(tp_name)
                 self.emit_error("type '" ++ type_str ++ "' does not implement trait '" ++ trait_name ++ "' required by bound '" ++ tp_str ++ ": " ++ trait_name ++ "'", call_node)
         pos = pos + 2 + bound_count
@@ -10567,14 +10566,104 @@ fn Sema.select_trait_impl(self: Sema, type_sym: i32, trait_sym: i32) -> i32:
     self.selection_cache.insert(key, found)
     found
 
-// Check if a TypeKind.TY_GENERIC_INST type implements a trait via exact-match impls.
+fn sema_subst_vec_lookup(names: &Vec[i32], types: &Vec[i32], name: i32) -> i32:
+    for i in 0..names.len() as i32:
+        if names.get(i as i64) == name:
+            return types.get(i as i64)
+    0
+
+fn Sema.type_param_in_impl_list(self: Sema, tp_start: i32, tp_count: i32, sym: i32) -> i32:
+    var pos = tp_start
+    for ti in 0..tp_count:
+        let tp_name = self.ast.get_extra(pos)
+        if tp_name == sym:
+            return 1
+        let bound_count = self.ast.get_extra(pos + 1)
+        pos = pos + 2 + bound_count
+    0
+
+fn Sema.blanket_impl_type_bounds_satisfied(self: Sema, impl_node: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+    let tp_meta = self.ast.find_impl_type_params(impl_node)
+    if tp_meta < 0:
+        return 1
+    let tp_start = self.ast.state.impl_type_params.get((tp_meta + 1) as i64)
+    let tp_count = self.ast.state.impl_type_params.get((tp_meta + 2) as i64)
+    var pos = tp_start
+    for ti in 0..tp_count:
+        let tp_name = self.ast.get_extra(pos)
+        let bound_count = self.ast.get_extra(pos + 1)
+        let concrete_tid = sema_subst_vec_lookup(subst_names, subst_types, tp_name)
+        for bi in 0..bound_count:
+            let bound_trait = self.ast.get_extra(pos + 2 + bi)
+            if concrete_tid == 0:
+                return 0
+            if self.type_implements_trait(concrete_tid, bound_trait) == 0:
+                return 0
+        pos = pos + 2 + bound_count
+    1
+
+fn Sema.select_blanket_impl_for_generic_inst(self: Sema, tid: i32, trait_sym: i32) -> i32:
+    let resolved = self.resolve_alias(tid as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let base_sym = self.get_generic_inst_base(resolved as i32)
+    for bi in 0..self.blanket_trait_syms.len() as i32:
+        if self.blanket_trait_syms.get(bi as i64) != trait_sym:
+            continue
+        let target_base = self.blanket_target_base_syms.get(bi as i64)
+        if target_base != base_sym:
+            continue
+        let impl_node = self.blanket_impl_nodes.get(bi as i64)
+        let target_node = self.ast.find_impl_target_type_node(impl_node)
+        if target_node == 0:
+            continue
+        if self.ast.kind(target_node) != NodeKind.NK_TYPE_GENERIC:
+            continue
+        let tp_meta = self.ast.find_impl_type_params(impl_node)
+        if tp_meta < 0:
+            continue
+        let tp_start = self.ast.state.impl_type_params.get((tp_meta + 1) as i64)
+        let tp_count = self.ast.state.impl_type_params.get((tp_meta + 2) as i64)
+        let pattern_arg_count = self.ast.get_data2(target_node)
+        if pattern_arg_count != self.get_generic_inst_arg_count(resolved as i32):
+            continue
+        let pattern_arg_start = self.ast.get_data1(target_node)
+        let subst_names: Vec[i32] = Vec.new()
+        let subst_types: Vec[i32] = Vec.new()
+        var matches = 1
+        for ai in 0..pattern_arg_count:
+            let pattern_arg = self.ast.get_extra(pattern_arg_start + ai)
+            let actual_arg = self.get_generic_inst_arg(resolved as i32, ai)
+            let pattern_kind = self.ast.kind(pattern_arg)
+            if pattern_kind == NodeKind.NK_TYPE_NAMED or pattern_kind == NodeKind.NK_IDENT:
+                let pattern_sym = self.ast.get_data0(pattern_arg)
+                if self.type_param_in_impl_list(tp_start, tp_count, pattern_sym) != 0:
+                    let existing = sema_subst_vec_lookup(subst_names, subst_types, pattern_sym)
+                    if existing != 0:
+                        if self.types_compatible(existing, actual_arg) == 0:
+                            matches = 0
+                            break
+                    else:
+                        subst_names.push(pattern_sym)
+                        subst_types.push(actual_arg)
+                    continue
+            let concrete_pattern = self.resolve_type_expr(pattern_arg) as i32
+            if concrete_pattern == 0 or self.types_compatible(concrete_pattern, actual_arg) == 0:
+                matches = 0
+                break
+        if matches == 0:
+            continue
+        if self.blanket_impl_type_bounds_satisfied(impl_node, subst_names, subst_types) != 0:
+            return 1
+    0
+
+// Check if a TypeKind.TY_GENERIC_INST type implements a trait via exact-match
+// impls or generic blanket impls whose target pattern matches its type args.
 fn Sema.select_trait_impl_for_generic_inst(self: Sema, tid: i32, trait_sym: i32) -> i32:
     let gi_key = sema_pair_key(tid, trait_sym)
     if self.impl_generic_inst.contains(gi_key):
         return 1
-    // Fall back to base symbol lookup (handles impl Trait for Vec without args)
-    let base_sym = self.get_type_d0(tid)
-    self.select_trait_impl(base_sym, trait_sym)
+    self.select_blanket_impl_for_generic_inst(tid, trait_sym)
 
 fn Sema.type_implements_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
     if tid == 0 or trait_sym == 0:

@@ -10085,6 +10085,17 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                     gc_fb_fn_sym = self.intern.intern(gc_fb_q1)
                     if not self.fn_values.get(gc_fb_fn_sym).is_some():
                         gc_fb_fn_sym = 0
+                if gc_fb_fn_sym == 0:
+                    var gc_fb_recv_sema_ty = self.ast_static_type_expr(gc_fb_recv)
+                    if gc_fb_recv_sema_ty == 0 and gc_fb_mir_count > 0:
+                        let gc_fb_recv_op = body.call_arg_operands.get(gc_fb_mir_start as i64)
+                        gc_fb_recv_sema_ty = self.mir_operand_sema_type(body, gc_fb_recv_op)
+                    let gc_fb_owner_mangle = self.sema_generic_inst_owner_mangle(gc_fb_recv_sema_ty)
+                    if gc_fb_owner_mangle.len() > 0:
+                        let gc_fb_q_inst = gc_fb_owner_mangle ++ "." ++ gc_fb_method
+                        let gc_fb_inst_sym = self.intern.intern(gc_fb_q_inst)
+                        if self.fn_values.get(gc_fb_inst_sym).is_some():
+                            gc_fb_fn_sym = gc_fb_inst_sym
                 // Search all traits for a method with this name
                 if gc_fb_fn_sym == 0:
                     for gc_fb_ti in 0..self.trait_idx_syms.len() as i32:
@@ -11991,6 +12002,22 @@ fn Codegen.sema_type_mangle(self: Codegen, sema_ty: i32) -> str:
     if tk == TypeKind.TY_NEVER:
         return "never"
     "unknown"
+
+fn Codegen.sema_generic_inst_owner_mangle(self: Codegen, sema_ty: i32) -> str:
+    if sema_ty <= 0:
+        return ""
+    let resolved = self.sema.resolve_alias(sema_ty)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return ""
+    let base_sym = self.sema.get_type_d0(resolved)
+    if base_sym == 0:
+        return ""
+    var mangled = self.intern.resolve(base_sym)
+    let arg_count = self.sema.get_generic_inst_arg_count(resolved as i32)
+    for ai in 0..arg_count:
+        let arg_tid = self.sema.get_generic_inst_arg(resolved as i32, ai)
+        mangled = mangled ++ "__" ++ self.sema_type_mangle(arg_tid)
+    mangled
 
 fn Codegen.llvm_type_mangle(self: Codegen, ty: i64) -> str:
     if ty == 0:

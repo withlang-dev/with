@@ -1728,6 +1728,7 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> Unit:
         if target_type_nd != 0 and self.ast.kind(target_type_nd) == NodeKind.NK_TYPE_GENERIC:
             target_base_sym = self.ast.get_data0(target_type_nd)
         self.blanket_target_base_syms.push(target_base_sym)
+        self.blanket_impl_nodes.push(node)
         // Overlap check: blanket vs existing direct impls
         self.check_blanket_overlap(trait_sym, bound_start, total_bounds, target_base_sym, node)
         return
@@ -1735,14 +1736,22 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> Unit:
     // If the impl target is a generic type (e.g., impl Trait for Vec[i32]),
     // resolve the full type and record it for exact-match trait selection.
     let target_type_node = self.ast.find_impl_target_type_node(node)
+    var exact_generic_impl = 0
     if target_type_node != 0:
         let target_tid = self.resolve_type_expr(target_type_node)
         if target_tid != 0 and self.get_type_kind(target_tid) == TypeKind.TY_GENERIC_INST:
             let gi_key = sema_pair_key(target_tid as i32, trait_sym)
+            if self.impl_generic_inst.contains(gi_key):
+                self.emit_error_code("duplicate implementation of trait for type", node, "E1102")
+                return
             self.impl_generic_inst.insert(gi_key, 1)
+            exact_generic_impl = 1
 
     // Overlap check: direct impl vs existing blanket impls
     self.check_direct_overlap(type_name, trait_sym, node)
+
+    if exact_generic_impl != 0:
+        return
 
     // Record direct impl
     // When appending to an existing type, relocate all entries to keep them

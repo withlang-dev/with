@@ -11,6 +11,24 @@ conversation context after compaction.
 
 ## Current Focus
 
+#391 is implemented and verified. Generic instantiations now keep
+`TY_GENERIC_INST` identity at Sema boundaries instead of falling back to raw
+base struct/enum compatibility; exact impls such as `impl Trait for Box[i32]`
+no longer register as blanket impls for every `Box[T]`, and generic blanket
+impls such as `impl[T: Bound] Trait for Box[T]` match concrete type arguments
+and check their substituted bounds. Generic function bound diagnostics now name
+the concrete instantiation (`Box[str]`, `Box[NoName]`) rather than the erased
+base. A narrow unit-variant bridge keeps `None`-style generic enum values
+compatible with concrete `Option[T]` without restoring broad generic erasure.
+Focused coverage includes exact generic impl dispatch, direct impl leakage
+rejection, `Box[i32]`/`Box[str]` argument mismatch, blanket impl positive
+selection, blanket bound rejection, and the existing tail-match
+`Some`/`None` regression. Full verification passed on 2026-06-13:
+`with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green`. During verification, by-reference method dispatch
+for concrete generic trait impls was found to pass the receiver with the wrong
+ABI; that separate bug is tracked as #584.
+
 #402 is implemented and verified. `@[effect]` now accepts the §16.3d
 multi-parameter `param: effect` spelling, keeps `=` as a compatibility alias,
 rejects unknown effect names and unknown parameter names, and stores effect
