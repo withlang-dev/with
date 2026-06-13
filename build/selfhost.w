@@ -1844,6 +1844,44 @@ fn bs_check_loop_string_concat_warning(ctx: &ActionCtx, compiler_path: str, case
     if result.rc != 0: return result.rc
     bs_assert_contains(ctx, result.stderr, "warning: string concatenation with ++ inside a loop repeatedly copies the accumulator", "loop_string_concat_warning")
 
+fn bs_check_by_value_read_only_warning(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "by_value_read_only_warning.w")
+    let source =
+        "type ReadOnly {\n" ++
+        "    value: i32,\n" ++
+        "}\n\n" ++
+        "type DropRead {\n" ++
+        "    value: i32,\n" ++
+        "}\n\n" ++
+        "impl Drop for DropRead:\n" ++
+        "    fn drop(move self: Self): ()\n\n" ++
+        "fn inspect(x: ReadOnly) -> i32:\n" ++
+        "    x.value\n\n" ++
+        "fn inspect_ref(x: &ReadOnly) -> i32:\n" ++
+        "    x.value\n\n" ++
+        "fn inspect_drop(x: DropRead) -> i32:\n" ++
+        "    x.value\n\n" ++
+        "fn main:\n" ++
+        "    let r = ReadOnly { value: 1 }\n" ++
+        "    let d = DropRead { value: 2 }\n" ++
+        "    assert(inspect(r) == 1)\n" ++
+        "    let r2 = ReadOnly { value: 3 }\n" ++
+        "    assert(inspect_ref(&r2) == 3)\n" ++
+        "    assert(inspect_drop(d) == 2)\n"
+    var rc = bs_write_fixture(ctx, src, source, "by-value read-only warning source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(bs_abs(root, src))
+    let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "by-value-read-only-warning", args)
+    if result.rc != 0: return result.rc
+    rc = bs_assert_contains(ctx, result.stderr, "warning: 'inspect' only reads 'x'; consider 'x: &ReadOnly' so callers keep their binding", "by_value_read_only_warning")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, result.stderr, "'inspect_ref' only reads", "by_value_read_only_ref_clean")
+    if rc != 0: return rc
+    bs_assert_not_contains(ctx, result.stderr, "'inspect_drop' only reads", "by_value_read_only_drop_clean")
+
 fn bs_check_not_in_lint(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let warn_src = bs_join(case_dir, "not_in_lint_warning.w")
@@ -2559,6 +2597,8 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     rc = bs_check_unsafe_prefix_redundant_warning(ctx, compiler_path, bs_join(output_dir, "unsafe_prefix_redundant_warning_case"))
     if rc != 0: return rc
     rc = bs_check_loop_string_concat_warning(ctx, compiler_path, bs_join(output_dir, "loop_string_concat_warning_case"))
+    if rc != 0: return rc
+    rc = bs_check_by_value_read_only_warning(ctx, compiler_path, bs_join(output_dir, "by_value_read_only_warning_case"))
     if rc != 0: return rc
     rc = bs_check_not_in_lint(ctx, compiler_path, bs_join(output_dir, "not_in_lint_case"))
     if rc != 0: return rc

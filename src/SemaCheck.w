@@ -750,6 +750,92 @@ fn Sema.finalize_generator_state_type(self: Sema, fn_node: i32, sig_idx: i32):
     self.type_d1.set_i32(state_tid as i64, field_start)
     self.type_d2.set_i32(state_tid as i64, field_count)
 
+fn Sema.param_type_is_by_value(self: Sema, tid: i32) -> i32:
+    if tid <= 0:
+        return 0
+    let tk = self.get_type_kind(self.resolve_alias(tid))
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR or tk == TypeKind.TY_SLICE:
+        return 0
+    1
+
+fn Sema.fn_param_node_or_fn(self: Sema, fn_node: i32, pi: i32) -> i32:
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return fn_node
+    let param_start = self.ast.fn_meta_param_start(meta)
+    let param_count = self.ast.fn_meta_param_count(meta)
+    if pi < 0 or pi >= param_count:
+        return fn_node
+    let param_node = self.ast.fn_param_type(param_start, pi)
+    if param_node == 0:
+        return fn_node
+    param_node
+
+fn Sema.emit_by_value_param_returned_view_error(self: Sema, fn_node: i32, sig_idx: i32, pi: i32):
+    if self.suppress_errors != 0:
+        return
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return
+    let param_start = self.ast.fn_meta_param_start(meta)
+    let param_sym = self.ast.fn_param_name(param_start, pi)
+    let param_name = self.pool_resolve(param_sym)
+    let fn_name = self.pool_resolve(self.ast.get_data0(fn_node))
+    let param_tid = self.sig_param_type(sig_idx, pi)
+    let ty_name = self.type_name(param_tid)
+    var msg = "'" ++ fn_name ++ "' consumes '" ++ param_name ++ "' but returns a view derived from it; take '" ++ param_name ++ ": &" ++ ty_name ++ "'"
+    if self.is_copy(param_tid as TypeId) != 0:
+        msg = msg ++ " or return the value instead of a view"
+    let param_node = self.fn_param_node_or_fn(fn_node, pi)
+    let primary = Span { file: self.local_file_id, start: self.ast.get_start(param_node), end: self.ast.get_end(param_node) }
+    var diag = Diagnostic.err(msg, primary)
+    diag.add_label(primary, "'" ++ param_name ++ "' is by-value here, so the callee owns it")
+    if pi >= 0 and pi < self.current_fn_param_view_nodes.len() as i32:
+        let view_node = self.current_fn_param_view_nodes.get(pi as i64)
+        if view_node != 0:
+            let view_span = Span { file: self.local_file_id, start: self.ast.get_start(view_node), end: self.ast.get_end(view_node) }
+            diag.add_label(view_span, "returned view is derived from '" ++ param_name ++ "' here")
+    diag.add_help("change the parameter to '" ++ param_name ++ ": &" ++ ty_name ++ "'")
+    self.diags.emit(diag)
+
+fn Sema.should_warn_by_value_read_only_param(self: Sema, fn_node: i32, sig_idx: i32, pi: i32, eff: i32, param_tid: i32) -> i32:
+    if eff != EFF_READ:
+        return 0
+    if sema_path_is_user_lint_source(self.current_module_path) == 0:
+        return 0
+    if self.param_type_is_by_value(param_tid) == 0:
+        return 0
+    if self.is_copy(param_tid as TypeId) != 0:
+        return 0
+    if self.type_has_drop_impl(param_tid) != 0:
+        return 0
+    let fn_sym = self.ast.get_data0(fn_node)
+    let fn_name = self.pool_resolve(fn_sym)
+    if fn_name == "main" or fn_name.starts_with("test_"):
+        return 0
+    if self.method_impl_nodes.contains(fn_sym):
+        return 0
+    if self.extern_fn_names.contains(fn_sym):
+        return 0
+    if self.fn_decl_has_c_export(fn_node) != 0:
+        return 0
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0 or pi >= self.ast.fn_meta_param_count(meta):
+        return 0
+    1
+
+fn Sema.emit_by_value_param_read_only_warning(self: Sema, fn_node: i32, sig_idx: i32, pi: i32):
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return
+    let param_start = self.ast.fn_meta_param_start(meta)
+    let param_sym = self.ast.fn_param_name(param_start, pi)
+    let param_name = self.pool_resolve(param_sym)
+    let fn_name = self.pool_resolve(self.ast.get_data0(fn_node))
+    let ty_name = self.type_name(self.sig_param_type(sig_idx, pi))
+    let node = self.fn_param_node_or_fn(fn_node, pi)
+    self.emit_warning("'" ++ fn_name ++ "' only reads '" ++ param_name ++ "'; consider '" ++ param_name ++ ": &" ++ ty_name ++ "' so callers keep their binding", node)
+
 fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let fn_name = self.ast.get_data0(node)
     let body = self.ast.get_data1(node)
@@ -823,6 +909,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
         self.current_fn_param_syms.pop()
         self.current_fn_param_effs.pop()
         self.current_fn_param_origins.pop()
+        self.current_fn_param_view_nodes.pop()
     if meta >= 0:
         let eff_ps = self.ast.fn_meta_param_start(meta)
         let eff_pc = self.ast.fn_meta_param_count(meta)
@@ -830,6 +917,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
             self.current_fn_param_syms.push(self.ast.fn_param_name(eff_ps, pi))
             self.current_fn_param_effs.push(0)
             self.current_fn_param_origins.push(0)
+            self.current_fn_param_view_nodes.push(0)
     self.current_fn_sig_idx = sig_idx
 
     // Set current return type
@@ -911,7 +999,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
             self.note_place_effect(body, EFF_ESCAPE_VIEW)
             let body_root = self.place_root_sym(body)
             if body_root != 0:
-                self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body))
+                self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), body)
             self.check_returned_view_origins(body, body)
     if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
         if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0:
@@ -964,6 +1052,10 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
                         eff = eff & (EFF_READ | EFF_ESCAPE_VIEW | EFF_RAW_PTR_VALIDITY)
                     else if p_tk == TypeKind.TY_PTR:
                         eff = eff & (EFF_READ | EFF_RAW_PTR_VALIDITY)
+                    if (eff & (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW | EFF_RAW_PTR_VALIDITY)) != 0:
+                        eff = eff & (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW | EFF_RAW_PTR_VALIDITY)
+                    if self.param_type_is_by_value(p_tid) != 0 and (eff & EFF_ESCAPE_VIEW) != 0:
+                        self.emit_by_value_param_returned_view_error(node, sig_idx, pi)
             self.set_sig_param_effect(sig_idx, pi, eff)
             if (eff & EFF_ESCAPE_VIEW) != 0:
                 self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins.get(pi as i64))
@@ -971,6 +1063,10 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
                 self.set_sig_param_view_origin(sig_idx, pi, 0)
             if raw_validity_param_sym == 0 and (eff & EFF_RAW_PTR_VALIDITY) != 0 and pi < self.current_fn_param_syms.len() as i32:
                 raw_validity_param_sym = self.current_fn_param_syms.get(pi as i64)
+            if sig_idx >= 0:
+                let p_tid_for_lint = self.sig_param_type(sig_idx, pi)
+                if self.should_warn_by_value_read_only_param(node, sig_idx, pi, eff, p_tid_for_lint) != 0:
+                    self.emit_by_value_param_read_only_warning(node, sig_idx, pi)
 
     if raw_validity_param_sym != 0 and self.fn_symbol_is_unsafe(fn_name) == 0:
         let param_name = self.pool_resolve(raw_validity_param_sym)
@@ -1008,6 +1104,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
         self.current_fn_param_syms.pop()
         self.current_fn_param_effs.pop()
         self.current_fn_param_origins.pop()
+        self.current_fn_param_view_nodes.pop()
     self.current_return_type = saved_ret
     self.current_gen_yield_type = saved_gen_yield_type
     self.has_gen_yield_type = saved_has_gen_yield_type
@@ -4379,6 +4476,8 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
                     f"[moved-use] sym={name} tid={tid} node_kind={self.ast.kind(node)}"
                 )
             self.emit_error("use of moved value", node)
+        if sym != self.assign_target_revive_sym:
+            self.note_param_effect(sym, EFF_READ)
         var final_tid = tid
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let pending_tid = self.settle_pending_generic_binding_from_expected(sym, self.expected_expr_type as i32, node)
@@ -6032,6 +6131,8 @@ fn Sema.record_call_view_origins(self: Sema, call_node: i32, sig_idx: i32, param
         for origin_pi in 0..param_count:
             if sema_param_origin_mask_contains(param_origin_mask, origin_pi) == 0:
                 continue
+            if self.param_type_is_by_value(self.sig_param_type(sig_idx, origin_pi)) != 0:
+                continue
             var origin_arg = 0
             if param_offset == 1 and origin_pi == 0:
                 origin_arg = recv_node
@@ -6102,7 +6203,7 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
             self.note_place_effect(value, EFF_ESCAPE_VIEW)
             let root = self.place_root_sym(value)
             if root != 0:
-                self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value))
+                self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value), value)
             self.check_returned_view_origins(value, node)
         if self.current_return_type != 0 and val_type != 0:
             let compat = self.types_compatible(self.current_return_type as i32, val_type as i32)
@@ -8118,14 +8219,17 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     let saved_capture_syms: Vec[i32] = Vec.new()
     let saved_capture_effs: Vec[i32] = Vec.new()
     let saved_capture_origins: Vec[i32] = Vec.new()
+    let saved_capture_view_nodes: Vec[i32] = Vec.new()
     for i in 0..self.current_fn_param_syms.len() as i32:
         saved_capture_syms.push(self.current_fn_param_syms.get(i as i64))
         saved_capture_effs.push(self.current_fn_param_effs.get(i as i64))
         saved_capture_origins.push(self.current_fn_param_origins.get(i as i64))
+        saved_capture_view_nodes.push(self.current_fn_param_view_nodes.get(i as i64))
     while self.current_fn_param_syms.len() > 0:
         self.current_fn_param_syms.pop()
         self.current_fn_param_effs.pop()
         self.current_fn_param_origins.pop()
+        self.current_fn_param_view_nodes.pop()
     let closure_capture_syms: Vec[i32] = Vec.new()
     for ci in 0..outer_count:
         let cap_sym = self.bind_names.get(ci as i64)
@@ -8134,6 +8238,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             self.current_fn_param_syms.push(cap_sym)
             self.current_fn_param_effs.push(0)
             self.current_fn_param_origins.push(0)
+            self.current_fn_param_view_nodes.push(0)
     self.current_fn_sig_idx = if closure_capture_syms.len() > 0: 0 else: saved_capture_sig_idx
 
     var expected_fn_tid = 0
@@ -8244,7 +8349,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             self.note_place_effect(body, EFF_ESCAPE_VIEW)
             let body_root = self.place_root_sym(body)
             if body_root != 0:
-                self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body))
+                self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), body)
 
     self.pop_scope()
 
@@ -8256,10 +8361,12 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         self.current_fn_param_syms.pop()
         self.current_fn_param_effs.pop()
         self.current_fn_param_origins.pop()
+        self.current_fn_param_view_nodes.pop()
     for i in 0..saved_capture_syms.len() as i32:
         self.current_fn_param_syms.push(saved_capture_syms.get(i as i64))
         self.current_fn_param_effs.push(saved_capture_effs.get(i as i64))
         self.current_fn_param_origins.push(saved_capture_origins.get(i as i64))
+        self.current_fn_param_view_nodes.push(saved_capture_view_nodes.get(i as i64))
     self.current_fn_sig_idx = saved_capture_sig_idx
 
     // Restore borrow state — discard borrows created inside closure body.

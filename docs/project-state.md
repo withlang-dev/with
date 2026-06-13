@@ -11,6 +11,21 @@ conversation context after compaction.
 
 ## Current Focus
 
+#373 is implemented and verified. Definition-site effect finalization now
+rejects by-value parameters whose returned view is derived from that consumed
+parameter, with a §22.3-style diagnostic naming the function, parameter,
+by-value origin, escaping expression, and `&T` remedy. Read effects are now
+recorded for ordinary identifier use and normalized away when stronger effects
+such as write/consume/escape are present, preserving existing `@[effect]`
+contracts while enabling the conservative read-only by-value warning. Call-site
+returned-view origin recording no longer treats by-value parameters as valid
+borrow anchors. Focused coverage includes explicit-return, tail-expression, and
+nested-field dangling-view errors, a borrowed-parameter positive spec case, the
+read-only warning plus `&T`/Drop exemptions in CLI edge tests, and the
+`behav_effect_pin.w` normalization regression. Full verification passed on
+2026-06-12: `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green`. Remaining Phase 4 issues: #387 and #402.
+
 #458 is implemented and verified. The no_std tier model now rejects std-only
 module imports from the resolved module graph, so `std.io`, `std.fs`,
 `std.net`, `std.sync`, and other OS/runtime-backed std modules cannot leak

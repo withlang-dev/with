@@ -571,6 +571,7 @@ type Sema {
     current_fn_param_syms: Vec[i32],   // param name symbols for the function being checked
     current_fn_param_effs: Vec[i32],   // accumulated effect bits per param
     current_fn_param_origins: Vec[i32],// accumulated escape_view origin masks per param
+    current_fn_param_view_nodes: Vec[i32], // representative return/view node for escape_view diagnostics
     current_fn_sig_idx: i32,           // sig index of current function (-1 if not in a fn body)
 
     // Closure capture summaries: closure node -> flat [capture_sym, effect_bits]* slice.
@@ -1355,6 +1356,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_fn_param_syms: Vec.new(),
         current_fn_param_effs: Vec.new(),
         current_fn_param_origins: Vec.new(),
+        current_fn_param_view_nodes: Vec.new(),
         current_fn_sig_idx: -1,
         closure_capture_summary_starts: sema_new_map_i32_i32(),
         closure_capture_summary_counts: sema_new_map_i32_i32(),
@@ -3549,13 +3551,15 @@ fn Sema.note_param_effect(self: Sema, sym: i32, eff: i32):
         self.current_fn_param_effs.set_i32(pi as i64, cur | eff)
         return
 
-fn Sema.note_param_view_origin(self: Sema, sym: i32, mask: i32):
+fn Sema.note_param_view_origin(self: Sema, sym: i32, mask: i32, origin_node: i32):
     if self.current_fn_sig_idx < 0 or sym == 0 or mask == 0:
         return
     let pi = self.param_index_for_sym(sym)
     if pi >= 0:
         let cur = self.current_fn_param_origins.get(pi as i64)
         self.current_fn_param_origins.set_i32(pi as i64, cur | mask)
+        if origin_node != 0 and self.current_fn_param_view_nodes.get(pi as i64) == 0:
+            self.current_fn_param_view_nodes.set_i32(pi as i64, origin_node)
         return
 
 fn Sema.note_place_effect(self: Sema, expr_node: i32, eff: i32):
