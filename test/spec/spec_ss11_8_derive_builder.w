@@ -22,7 +22,8 @@ fn test_override_default:
     assert(c.port == 443)
 
 fn test_missing_required_field:
-    let missing = Config.builder().build()
+    let builder = Config.builder()
+    let missing = builder.build()
     match missing:
         Err(.MissingField(field)) => assert(field == "host")
         _ => assert(false)

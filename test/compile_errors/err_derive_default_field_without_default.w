@@ -1,4 +1,4 @@
-//! expect-error: unknown method 'default'
+//! expect-error: cannot derive Default for type 'UsesNoDefault': field 'value' of type 'NoDefault' does not implement Default
 
 type NoDefault { value: i32 }
 

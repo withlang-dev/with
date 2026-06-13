@@ -117,6 +117,30 @@ impl Eq for i64:    fn eq(self: i64, other:
     i64) -> bool:
         self == other
 
+impl Ord for i32:
+    fn cmp(self: i32, other: i32) -> i32:
+        if self < other: return -1
+        if self > other: return 1
+        0
+
+impl Ord for i64:
+    fn cmp(self: i64, other: i64) -> i32:
+        if self < other: return -1
+        if self > other: return 1
+        0
+
+impl Ord for u8:
+    fn cmp(self: u8, other: u8) -> i32:
+        if self < other: return -1
+        if self > other: return 1
+        0
+
+impl Ord for bool:
+    fn cmp(self: bool, other: bool) -> i32:
+        if self == other: return 0
+        if not self and other: return -1
+        1
+
 impl Debug for i32:    fn debug_str(self:
     i32) -> str:
         with_i32_to_str(self)

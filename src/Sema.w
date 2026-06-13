@@ -117,7 +117,13 @@ type LabelRegistryState {
 enum DeriveReq: i32:
     COPY = 0
     CLONE = 1
-    EQ = 2
+    DEFAULT = 2
+    EQ = 3
+    HASH = 4
+    ORD = 5
+    DEBUG = 6
+    DISPLAY = 7
+    BUILDER = 8
 
 enum SemaMagicIdentKind: i32:
     NONE = 0
@@ -986,6 +992,14 @@ fn sema_pair_key(a: i32, b: i32) -> i64:
     (a as i64) * 4294967296 + (b as i64)
 
 fn Sema.copy_module_graph_from(mut self: Sema, source: &Sema):
+    let global_paths = sema_new_vec_str()
+    for mi in 0..source.module_paths.len() as i32:
+        let source_path = source.module_paths.get(mi as i64)
+        if source.global_visible_module_paths.contains(source_path):
+            global_paths.push(sema_owned_text(source_path))
+    self.copy_module_graph_parts(&source.module_paths, &source.module_import_starts, &source.module_import_counts, &source.module_import_targets, &source.module_import_paths, &global_paths)
+
+fn Sema.copy_module_graph_parts(mut self: Sema, module_paths: &Vec[str], module_import_starts: &Vec[i32], module_import_counts: &Vec[i32], module_import_targets: &Vec[i32], module_import_paths: &Vec[str], global_paths: &Vec[str]):
     self.module_paths = sema_new_vec_str()
     self.module_import_starts = sema_new_vec_i32()
     self.module_import_counts = sema_new_vec_i32()
@@ -995,21 +1009,22 @@ fn Sema.copy_module_graph_from(mut self: Sema, source: &Sema):
     self.global_visible_module_paths = sema_new_map_str_i32()
     self.module_visibility_cache = sema_new_map_str_i32()
 
-    for mi in 0..source.module_paths.len() as i32:
-        let source_path = source.module_paths.get(mi as i64)
+    for mi in 0..module_paths.len() as i32:
+        let source_path = module_paths.get(mi as i64)
         self.module_paths.push(sema_owned_text(source_path))
         self.module_index_by_path.insert(sema_owned_text(source_path), mi)
-        if source.global_visible_module_paths.contains(source_path):
-            self.global_visible_module_paths.insert(sema_owned_text(source_path), 1)
 
-    for i in 0..source.module_import_starts.len() as i32:
-        self.module_import_starts.push(source.module_import_starts.get(i as i64))
-    for i in 0..source.module_import_counts.len() as i32:
-        self.module_import_counts.push(source.module_import_counts.get(i as i64))
-    for i in 0..source.module_import_targets.len() as i32:
-        self.module_import_targets.push(source.module_import_targets.get(i as i64))
-    for i in 0..source.module_import_paths.len() as i32:
-        self.module_import_paths.push(sema_owned_text(source.module_import_paths.get(i as i64)))
+    for gi in 0..global_paths.len() as i32:
+        self.global_visible_module_paths.insert(sema_owned_text(global_paths.get(gi as i64)), 1)
+
+    for i in 0..module_import_starts.len() as i32:
+        self.module_import_starts.push(module_import_starts.get(i as i64))
+    for i in 0..module_import_counts.len() as i32:
+        self.module_import_counts.push(module_import_counts.get(i as i64))
+    for i in 0..module_import_targets.len() as i32:
+        self.module_import_targets.push(module_import_targets.get(i as i64))
+    for i in 0..module_import_paths.len() as i32:
+        self.module_import_paths.push(sema_owned_text(module_import_paths.get(i as i64)))
 
 fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
     SemaBuiltinSymbols {

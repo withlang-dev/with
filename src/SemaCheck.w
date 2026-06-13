@@ -11317,6 +11317,75 @@ fn Sema.infer_pending_generic_method_receiver(self: Sema, expr: i32, field: i32,
                 return self.settle_pending_generic_binding(sym, concrete4, expr)
     0
 
+fn Sema.derive_builder_original_type_sym(self: Sema, builder_sym: i32) -> i32:
+    let builder_name = self.pool_resolve(builder_sym)
+    let suffix = "Builder"
+    if not builder_name.ends_with(suffix):
+        return 0
+    if builder_name.len() <= suffix.len():
+        return 0
+    let original_name = builder_name.slice(0, builder_name.len() - suffix.len())
+    let original_sym = self.pool_intern(original_name)
+    if original_sym == 0 or not self.type_decl_nodes.contains(original_sym):
+        return 0
+    let original_decl = self.type_decl_nodes.get(original_sym).unwrap()
+    if self.type_decl_has_derive(original_decl, self.pool_intern("Builder")) == 0:
+        return 0
+    original_sym
+
+fn Sema.visible_builder_chain_root_matches(self: Sema, node: i32, original_sym: i32, builder_sym: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
+        return 0
+    let callee = self.ast.get_data0(node)
+    if callee == 0 or self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let recv = self.ast.get_data0(callee)
+    let method = self.ast.get_data1(callee)
+    if method == self.pool_intern("builder"):
+        let recv_sym = self.static_receiver_base_sym(recv)
+        if recv_sym == original_sym:
+            return 1
+        return 0
+    if self.lookup_method_sig(builder_sym, method) < 0:
+        return 0
+    self.visible_builder_chain_root_matches(recv, original_sym, builder_sym)
+
+fn Sema.visible_builder_chain_has_setter(self: Sema, node: i32, builder_sym: i32, field_sym: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
+        return 0
+    let callee = self.ast.get_data0(node)
+    if callee == 0 or self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let recv = self.ast.get_data0(callee)
+    let method = self.ast.get_data1(callee)
+    if method == field_sym and self.lookup_method_sig(builder_sym, method) >= 0:
+        return 1
+    self.visible_builder_chain_has_setter(recv, builder_sym, field_sym)
+
+fn Sema.check_visible_derive_builder_build(self: Sema, builder_sym: i32, expr: i32, node: i32) -> i32:
+    let original_sym = self.derive_builder_original_type_sym(builder_sym)
+    if original_sym == 0:
+        return 1
+    if self.visible_builder_chain_root_matches(expr, original_sym, builder_sym) == 0:
+        return 1
+    let original_tid = self.lookup_named_type_visible(original_sym)
+    if original_tid == 0:
+        return 1
+    let resolved = self.resolve_alias(original_tid as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return 1
+    let te_start = self.get_type_d1(resolved)
+    let field_count = self.get_type_d2(resolved)
+    for fi in 0..field_count:
+        let field_sym = self.type_extra.get((te_start + fi * 3) as i64)
+        let default_node = self.type_extra.get((te_start + fi * 3 + 2) as i64)
+        if default_node != 0:
+            continue
+        if self.visible_builder_chain_has_setter(expr, builder_sym, field_sym) == 0:
+            self.emit_error("derive Builder missing required field '" ++ self.pool_resolve(field_sym) ++ "' before build()", node)
+            return 0
+    1
+
 fn Sema.ensure_vec_str_type(self: Sema) -> i32:
     let args: Vec[i32] = Vec.new()
     args.push(self.ty_str as i32)
@@ -12606,6 +12675,9 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         let method_fn_sym = self.lookup_method_fn(type_name_sym, field)
         let sig_idx = self.lookup_method_sig(type_name_sym, field)
         if sig_idx >= 0:
+            if field == self.pool_intern("build"):
+                if self.check_visible_derive_builder_build(type_name_sym, expr, node) == 0:
+                    return 0
             if self.check_comptime_method_restriction(method_fn_sym, node) != 0:
                 return 0
             if method_fn_sym != 0:

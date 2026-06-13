@@ -11,6 +11,23 @@ conversation context after compaction.
 
 ## Current Focus
 
+#409 is implemented and verified. Built-in derives now cover the remaining
+§11.8 surface: `Ord` derives lexicographic `cmp`, enum `Display` derives
+variant-name `to_str`, explicit `Default`/`Eq`/`Hash`/`Ord`/`Clone` derives
+reject concrete fields that cannot supply the requested trait, and
+`derive(all)` remains conservative by deriving only traits all concrete fields
+can satisfy and never inferring `Copy`. User-defined derive targets now route
+through comptime `derive_name[T]() -> str`, parse the generated source back
+into the module, and let normal sema/codegen validate the result. Builder
+derive now diagnoses missing required fields at compile time when the full
+builder call chain is visible, while non-visible builder values keep the
+runtime `Result` path. Focused coverage includes positive Ord/Display/all,
+user-defined derive generation, concrete field rejection for Eq/Hash/Ord/
+Default, bad user-derive output, unknown derive targets, non-enum Display,
+and visible Builder missing-field rejection. Full verification passed on
+2026-06-13: `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green`.
+
 #538 is implemented and verified. Trait default methods now participate in
 sema method lookup when an impl omits the method, using the same concrete
 `Type.method` symbols that codegen synthesizes. Sema records trait method
