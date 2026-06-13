@@ -1510,12 +1510,15 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var prelude_ordered: Vec[i32] = Vec.new()
     var prelude_paths = frontend_new_vec_str()
     var prelude_file_ids: Vec[i32] = Vec.new()
+    var prelude_c_import: Vec[i32] = Vec.new()
     var user_import_ordered: Vec[i32] = Vec.new()
     var user_import_paths = frontend_new_vec_str()
     var user_import_file_ids: Vec[i32] = Vec.new()
+    var user_import_c_import: Vec[i32] = Vec.new()
     var root_ordered: Vec[i32] = Vec.new()
     var root_paths = frontend_new_vec_str()
     var root_file_ids: Vec[i32] = Vec.new()
+    var root_c_import: Vec[i32] = Vec.new()
 
     // Phase 1: Expand prelude USE (position 0) and its transitive imports.
     let has_prelude = self.prelude_mode != PRELUDE_NONE() and initial_count > 0 and merged_pool.kind(merged_pool.get_decl(0)) == NodeKind.NK_USE_DECL
@@ -1541,6 +1544,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                 prelude_ordered.push(decl as i32)
                 prelude_paths.push(self.decl_source_path_frontend(pi))
                 prelude_file_ids.push(self.decl_source_file_id_frontend(pi))
+                prelude_c_import.push(if pi < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(pi as i64) else: 0)
                 pi = pi + 1
                 continue
             let pps = merged_pool.get_data0(decl)
@@ -1550,6 +1554,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                     prelude_ordered.push(decl as i32)
                     prelude_paths.push(self.decl_source_path_frontend(pi))
                     prelude_file_ids.push(self.decl_source_file_id_frontend(pi))
+                    prelude_c_import.push(if pi < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(pi as i64) else: 0)
                 else:
                     let ppname = self.use_path_name_frontend(merged_pool, pps, ppc)
                     let ppfpath = self.resolve_module_path_frontend(ppname, self.decl_source_dir_frontend(pi))
@@ -1571,6 +1576,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             root_ordered.push(decl as i32)
             root_paths.push(self.decl_source_path_frontend(ui))
             root_file_ids.push(self.decl_source_file_id_frontend(ui))
+            root_c_import.push(if ui < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(ui as i64) else: 0)
             continue
         let ups = merged_pool.get_data0(decl)
         let upc = merged_pool.get_data1(decl)
@@ -1579,6 +1585,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                 root_ordered.push(decl as i32)
                 root_paths.push(self.decl_source_path_frontend(ui))
                 root_file_ids.push(self.decl_source_file_id_frontend(ui))
+                root_c_import.push(if ui < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(ui as i64) else: 0)
             else:
                 let upname = self.use_path_name_frontend(merged_pool, ups, upc)
                 let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui))
@@ -1597,6 +1604,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             user_import_ordered.push(decl as i32)
             user_import_paths.push(self.decl_source_path_frontend(ui2))
             user_import_file_ids.push(self.decl_source_file_id_frontend(ui2))
+            user_import_c_import.push(if ui2 < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(ui2 as i64) else: 0)
             ui2 = ui2 + 1
             continue
         let ups = merged_pool.get_data0(decl)
@@ -1606,6 +1614,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                 user_import_ordered.push(decl as i32)
                 user_import_paths.push(self.decl_source_path_frontend(ui2))
                 user_import_file_ids.push(self.decl_source_file_id_frontend(ui2))
+                user_import_c_import.push(if ui2 < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(ui2 as i64) else: 0)
             else:
                 let upname = self.use_path_name_frontend(merged_pool, ups, upc)
                 let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui2))
@@ -1616,15 +1625,17 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                     self.emit_missing_import_frontend(merged_pool, decl)
         ui2 = ui2 + 1
 
-    let prelude_reordered = self.reorder_import_tier_frontend(prelude_ordered, prelude_paths, prelude_file_ids)
+    let prelude_reordered = self.reorder_import_tier_frontend(prelude_ordered, prelude_paths, prelude_file_ids, prelude_c_import)
     prelude_ordered = prelude_reordered.decls
     prelude_paths = prelude_reordered.paths
     prelude_file_ids = prelude_reordered.file_ids
+    prelude_c_import = prelude_reordered.ci_flags
 
-    let user_reordered = self.reorder_import_tier_frontend(user_import_ordered, user_import_paths, user_import_file_ids)
+    let user_reordered = self.reorder_import_tier_frontend(user_import_ordered, user_import_paths, user_import_file_ids, user_import_c_import)
     user_import_ordered = user_reordered.decls
     user_import_paths = user_reordered.paths
     user_import_file_ids = user_reordered.file_ids
+    user_import_c_import = user_reordered.ci_flags
 
     // Collect fn names from higher-priority tiers for deduplication.
     var root_fn_names: Vec[i32] = Vec.new()
@@ -1647,6 +1658,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         merged_pool.state.decls.pop()
     let rebuilt_paths = frontend_new_vec_str()
     let rebuilt_file_ids: Vec[i32] = Vec.new()
+    let rebuilt_c_import: Vec[i32] = Vec.new()
     // Combine user + root fn names for prelude cross-tier shadowing.
     var higher_fn_names: Vec[i32] = Vec.new()
     for hi in 0..root_fn_names.len() as i32:
@@ -1656,7 +1668,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for oi in 0..prelude_ordered.len() as i32:
         let id = prelude_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
-        if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, oi, higher_fn_names):
+        if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, self.pool, oi, higher_fn_names):
             // Error when a prelude fn (with a body) is shadowed by an extern fn
             // (no body). The extern silently replaces the real function with an
             // unresolved C symbol, causing a cryptic linker error later.
@@ -1672,10 +1684,11 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         merged_pool.add_decl(id)
         rebuilt_paths.push(frontend_owned_text(prelude_paths.get(oi as i64)))
         rebuilt_file_ids.push(prelude_file_ids.get(oi as i64))
+        rebuilt_c_import.push(prelude_c_import.get(oi as i64))
     for oi in 0..user_import_ordered.len() as i32:
         let id = user_import_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
-        if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, merged_pool, oi, root_fn_names):
+        if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, merged_pool, self.pool, oi, root_fn_names):
             continue
         if ik == NodeKind.NK_EXTERN_VAR:
             if frontend_extern_var_shadowed_in_tier(user_import_ordered, merged_pool, self.pool, oi) or frontend_extern_var_shadowed_by_tier(root_ordered, merged_pool, self.pool, id):
@@ -1683,6 +1696,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         merged_pool.add_decl(id)
         rebuilt_paths.push(frontend_owned_text(user_import_paths.get(oi as i64)))
         rebuilt_file_ids.push(user_import_file_ids.get(oi as i64))
+        rebuilt_c_import.push(user_import_c_import.get(oi as i64))
     for oi in 0..root_ordered.len() as i32:
         let id = root_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
@@ -1691,8 +1705,10 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         merged_pool.add_decl(id)
         rebuilt_paths.push(frontend_owned_text(root_paths.get(oi as i64)))
         rebuilt_file_ids.push(root_file_ids.get(oi as i64))
+        rebuilt_c_import.push(root_c_import.get(oi as i64))
     self.decl_source_paths = rebuilt_paths
     self.decl_source_file_ids = rebuilt_file_ids
+    self.decl_is_c_import = rebuilt_c_import
     merged_pool
 
 fn frontend_name_shadowed_by_extern(tier: &Vec[i32], pool: AstPool, name: i32) -> bool:
@@ -1709,10 +1725,17 @@ fn frontend_fn_decl_rank(kind: i32) -> i32:
         return 1
     0
 
-fn frontend_fn_shadowed_in_tier(tier: &Vec[i32], pool: AstPool, idx: i32, higher_names: &Vec[i32]) -> bool:
+fn frontend_fn_decl_is_method(pool: AstPool, intern: InternPool, decl: i32) -> bool:
+    if pool.kind(decl) != NodeKind.NK_FN_DECL:
+        return false
+    frontend_str_contains_byte(intern.resolve(pool.get_data0(decl)), 46)
+
+fn frontend_fn_shadowed_in_tier(tier: &Vec[i32], pool: AstPool, intern: InternPool, idx: i32, higher_names: &Vec[i32]) -> bool:
     // Check if this fn is shadowed by a higher-priority tier.
     let current = tier.get(idx as i64)
     let current_kind = pool.kind(current)
+    if frontend_fn_decl_is_method(pool, intern, current):
+        return false
     let iname = pool.get_data0(current)
     if frontend_vec_contains_i32(higher_names, iname):
         return true
@@ -1830,6 +1853,7 @@ type ReorderedTier {
     decls: Vec[i32],
     paths: Vec[str],
     file_ids: Vec[i32],
+    ci_flags: Vec[i32],
 }
 
 fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_paths: HashMap[str, i32], seen_paths: HashMap[str, i32], accum: DepOrderAccum) -> Unit:
@@ -1850,7 +1874,7 @@ fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_pat
                 self.collect_module_dependency_order_frontend(dep.path, wanted_paths, seen_paths, accum)
     accum.state.order.push(frontend_owned_text(path))
 
-fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: &Vec[i32], paths: &Vec[str], file_ids: &Vec[i32]) -> ReorderedTier:
+fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: &Vec[i32], paths: &Vec[str], file_ids: &Vec[i32], ci_flags: &Vec[i32]) -> ReorderedTier:
     let wanted_paths: HashMap[str, i32] = HashMap.new()
     let first_seen_paths = frontend_new_vec_str()
     for i in 0..paths.len() as i32:
@@ -1871,6 +1895,7 @@ fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: &Vec[i32], paths: &Vec[str
     let out_decls: Vec[i32] = Vec.new()
     let out_paths = frontend_new_vec_str()
     let out_file_ids: Vec[i32] = Vec.new()
+    let out_c_import: Vec[i32] = Vec.new()
     for oi in 0..module_order.len() as i32:
         let module_path = module_order.get(oi as i64)
         for di in 0..decls.len() as i32:
@@ -1879,6 +1904,7 @@ fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: &Vec[i32], paths: &Vec[str
             out_decls.push(decls.get(di as i64))
             out_paths.push(frontend_owned_text(paths.get(di as i64)))
             out_file_ids.push(file_ids.get(di as i64))
+            out_c_import.push(ci_flags.get(di as i64))
     for di in 0..decls.len() as i32:
         let path = paths.get(di as i64)
         if path.len() != 0:
@@ -1886,7 +1912,8 @@ fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: &Vec[i32], paths: &Vec[str
         out_decls.push(decls.get(di as i64))
         out_paths.push(frontend_owned_text(path))
         out_file_ids.push(file_ids.get(di as i64))
-    ReorderedTier { decls: out_decls, paths: out_paths, file_ids: out_file_ids }
+        out_c_import.push(ci_flags.get(di as i64))
+    ReorderedTier { decls: out_decls, paths: out_paths, file_ids: out_file_ids, ci_flags: out_c_import }
 
 fn frontend_parent_module_rel(module_rel: str) -> str:
     var last_slash = -1

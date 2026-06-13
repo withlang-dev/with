@@ -6908,6 +6908,8 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     // For static method calls (receiver is a type name, not a value),
     // don't pass the receiver as an argument.
     var is_static_call = false
+    if self.sema.qualified_extension_call_nodes.contains(node):
+        is_static_call = true
     if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
         let recv_sym = self.ast.get_data0(self_expr)
         if self.lookup_local(recv_sym) < 0 and self.sema.named_types.contains(recv_sym):
@@ -9373,7 +9375,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     self.unit_operand()
 
 fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
-    let fn_sym = builder.ast.get_data0(fn_node)
+    let fn_sym = builder.body.fn_sym
     var sig_idx = builder.sema.get_sig(fn_sym)
     // If sig not found, try translating fn_sym from AST pool to sema pool.
     // Sema registers sigs under sema pool symbols, not AST pool symbols.
@@ -9728,7 +9730,7 @@ fn mir_gen_remap_rvalue(source: &MirBody, local_map: &Vec[i32], rv_id: i32, d_in
     raw
 
 fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, sig_idx: i32) -> MirBody:
-    let fn_sym = ast_pool.get_data0(fn_node)
+    let fn_sym = sema.fn_decl_semantic_symbol(fn_node, ast_pool.get_data0(fn_node))
     let state_tid = sema.generator_fn_state_types.get(fn_sym).unwrap()
     var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
     builder.body.local_type_ids.set_i32(0, state_tid)
@@ -9925,10 +9927,13 @@ fn lower_generator_next_body(sema: &Sema, source: MirBody, fn_node: i32) -> MirB
     out
 
 fn mir_fn_is_generic_template(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32) -> bool:
+    mir_fn_is_generic_template_at(sema, ast_pool, pool, fn_node, -1)
+
+fn mir_fn_is_generic_template_at(sema: &Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, decl_index: i32) -> bool:
     let meta = ast_pool.find_fn_meta(fn_node)
     if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
         return true
-    let fn_sym = ast_pool.get_data0(fn_node)
+    let fn_sym = sema.fn_decl_semantic_symbol_at(fn_node, ast_pool.get_data0(fn_node), decl_index)
     if sema.generic_fn_nodes.contains(fn_sym):
         return true
     let sema_sym = sema.pool_lookup_symbol(pool.resolve_symbol(fn_sym))
@@ -9944,8 +9949,8 @@ fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModul
         if ast_pool.kind(decl) != NodeKind.NK_FN_DECL:
             continue
 
-        let fn_sym = ast_pool.get_data0(decl)
-        if mir_fn_is_generic_template(&sema, ast_pool, pool, decl as i32):
+        let fn_sym = sema.fn_decl_semantic_symbol_at(decl as i32, ast_pool.get_data0(decl), di)
+        if mir_fn_is_generic_template_at(&sema, ast_pool, pool, decl as i32, di):
             continue
 
         sema.update_decl_source_context(di)

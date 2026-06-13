@@ -12,8 +12,9 @@ extern fn with_eprint(s: str) -> Unit
 // ── gen_function_dispatch: MIR-first, AST fallback for unsupported patterns ──
 
 fn Codegen.fail_mir_codegen_for_function(self: Codegen, fn_node: i32, reason: str):
-    let fn_sym = self.pool.get_data0(fn_node)
-    let fn_name = self.function_symbol_name(fn_sym)
+    let fn_sym = self.sema.fn_decl_semantic_symbol(fn_node, self.pool.get_data0(fn_node))
+    let sema_name = self.sema_symbol_text(fn_sym)
+    let fn_name = if sema_name.len() > 0: sema_name else: self.function_symbol_name(fn_sym)
     let decl_index = self.find_decl_index(fn_node)
     let source_path =
         if decl_index >= 0: self.decl_source_path(decl_index)
@@ -34,8 +35,11 @@ fn Codegen.fail_mir_codegen_for_function(self: Codegen, fn_node: i32, reason: st
     self.had_error = 1
 
 fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
+    self.gen_function_dispatch_at(fn_node, self.find_decl_index(fn_node))
+
+fn Codegen.gen_function_dispatch_at(self: Codegen, fn_node: i32, decl_index: i32):
     let flags = self.pool.get_data2(fn_node)
-    let fn_sym = self.pool.get_data0(fn_node)
+    let fn_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, self.pool.get_data0(fn_node), decl_index)
     // Skip functions with fn-level type params — compiled via monomorphization
     let meta = self.pool.find_fn_meta(fn_node)
     if meta >= 0 and self.pool.fn_meta_tp_count(meta) > 0:
@@ -9989,7 +9993,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                         let gc_base_name = self.intern.resolve(gc_base_sym)
                         let gc_qualified = gc_base_name ++ "." ++ gc_method_name
                         let gc_fn_sym_early = self.intern.intern(gc_qualified)
-                        let gc_gsm = self.generic_struct_methods.get(gc_fn_sym_early)
+                        var gc_gsm = self.generic_struct_methods.get(gc_fn_sym_early)
+                        if not gc_gsm.is_some() and gc_callee_sym != 0 and gc_callee_sym != gc_fn_sym_early:
+                            gc_gsm = self.generic_struct_methods.get(gc_callee_sym)
                         // Build pre-evaluated args (method args only, not self)
                         let gc_call_args_start = self.pool.get_data1(gc_node)
                         let gc_method_arg_count = gc_mir_count - 1
@@ -10983,9 +10989,10 @@ fn Codegen.run_mir_cleanup_passes(self: Codegen, function: i64, name_str: str):
         with_eprint("===== END POST MIR CLEANUP =====\n")
 
 fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: &MirBody):
-    let name_sym = self.pool.get_data0(fn_node)
+    let name_sym = body.fn_sym
     let resolved_name = self.intern.resolve(name_sym)
-    let name_str = if resolved_name.len() > 0: resolved_name else: self.fn_decl_name_from_node(fn_node)
+    let sema_name = self.sema_symbol_text(name_sym)
+    let name_str = if resolved_name.len() > 0: resolved_name else: if sema_name.len() > 0: sema_name else: self.fn_decl_name_from_node(fn_node)
     if name_sym == 0:
         return
     let fv = self.fn_values.get(name_sym)

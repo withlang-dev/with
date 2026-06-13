@@ -3379,11 +3379,15 @@ fn Codegen.let_binding_name_from_node(self: Codegen, node: i32) -> str:
     text.slice(start as i64, i as i64)
 
 fn Codegen.declare_function(self: Codegen, fn_node: i32):
-    let name_sym = self.pool.get_data0(fn_node)
-    let name_str = self.intern.resolve(name_sym)
+    self.declare_function_at(fn_node, self.find_decl_index(fn_node))
+
+fn Codegen.declare_function_at(self: Codegen, fn_node: i32, decl_index: i32):
+    let name_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, self.pool.get_data0(fn_node), decl_index)
+    let raw_name_str = self.intern.resolve(name_sym)
+    let sema_name_str = self.sema_symbol_text(name_sym)
+    let name_str = if sema_name_str.len() > 0: sema_name_str else: raw_name_str
     if name_sym == 0:
         return
-    let sema_name_str = self.sema_symbol_text(name_sym)
     let parsed_name = if sema_name_str.len() == 0 and name_str.len() == 0: self.fn_decl_name_from_node(fn_node) else: ""
     let alias_text =
         if sema_name_str.len() > 0:
@@ -3610,7 +3614,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_param_types), actual_param_count, 0)
 
     // Use "main" for @[entry] functions
-    var effective_name = self.function_symbol_name(name_sym)
+    var effective_name = if sema_name_str.len() > 0: sema_name_str else: self.function_symbol_name(name_sym)
     if parsed_name.len() > 0:
         effective_name = parsed_name
     if (flags / FnFlags.ENTRY) % 2 == 1:
@@ -5107,7 +5111,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         let kind = self.pool.kind(decl)
         if kind != NodeKind.NK_TYPE_DECL:
             continue
-        let name_sym = self.pool.get_data0(decl)
+        let name_sym = self.sema.fn_decl_semantic_symbol_at(decl as i32, self.pool.get_data0(decl), i)
         let name_str = self.intern.resolve(name_sym)
         if name_sym == 0 or name_str.len() == 0:
             continue
@@ -5198,7 +5202,8 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             continue
         if kind != NodeKind.NK_FN_DECL:
             continue
-        let name_sym = self.pool.get_data0(decl)
+        let parsed_name_sym = self.pool.get_data0(decl)
+        let name_sym = self.sema.fn_decl_semantic_symbol_at(decl as i32, parsed_name_sym, i)
         if name_sym == 0:
             continue
         let flags = self.pool.get_data2(decl)
@@ -5217,7 +5222,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             else if (flags / FnFlags.ASYNC) % 2 == 1:
                 self.declare_async_function(decl)
             else:
-                self.declare_function(decl)
+                self.declare_function_at(decl, i)
     self.declare_generator_next_functions()
 
     // Pass 1.3: synthesize missing impl methods from trait defaults.
@@ -5248,7 +5253,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
         if kind == NodeKind.NK_FN_DECL:
             if self.current_decl_is_imported_module_symbol():
                 continue
-            let name_sym = self.pool.get_data0(decl)
+            let name_sym = self.sema.fn_decl_semantic_symbol_at(decl as i32, self.pool.get_data0(decl), i)
             if name_sym == 0:
                 continue
             let flags = self.pool.get_data2(decl)
@@ -5257,7 +5262,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
                 let tp_count = self.pool.fn_meta_tp_count(meta)
                 let is_generic_struct_method = self.is_method_on_generic_struct(name_sym)
                 if tp_count == 0 and not self.sema.generic_fn_nodes.contains(name_sym) and not is_generic_struct_method:
-                    self.gen_function_dispatch(decl)
+                    self.gen_function_dispatch_at(decl, i)
     self.gen_generator_next_functions_from_mir()
 
     if self.had_error != 0:

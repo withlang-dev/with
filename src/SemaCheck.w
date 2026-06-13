@@ -580,8 +580,9 @@ fn Sema.check_bodies(self: Sema):
         self.update_decl_source_context(di)
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NodeKind.NK_FN_DECL:
-            let fn_name = self.ast.get_data0(decl)
-            if self.should_skip_trait_method(di, fn_name) == 0:
+            let parsed_fn_name = self.ast.get_data0(decl)
+            if self.should_skip_trait_method(di, parsed_fn_name) == 0:
+                let fn_name = self.fn_decl_semantic_symbol_at(decl, parsed_fn_name, di)
                 // Skip shadowed functions: if a later decl registered with
                 // the same name, this decl's body would be checked against
                 // the wrong signature. The shadowed function is unreachable.
@@ -615,7 +616,7 @@ fn Sema.check_bodies(self: Sema):
                             break
                     if not is_generic_struct_method:
                         self.update_module_context(di)
-                        self.check_fn_body(decl)
+                        self.check_fn_body_at(decl, di)
     self.validate_global_data_race_accesses()
 
 fn Sema.record_global_concurrency_evidence(self: Sema, node: i32, reason: str):
@@ -933,7 +934,10 @@ fn Sema.emit_by_value_param_read_only_warning(self: Sema, fn_node: i32, sig_idx:
     self.emit_warning("'" ++ fn_name ++ "' only reads '" ++ param_name ++ "'; consider '" ++ param_name ++ ": &" ++ ty_name ++ "' so callers keep their binding", node)
 
 fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
-    let fn_name = self.ast.get_data0(node)
+    self.check_fn_body_with_sig_at(node, sig_idx, self.find_decl_index(node))
+
+fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_index: i32):
+    let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
     let body = self.ast.get_data1(node)
     let flags = self.ast.get_data2(node)
     if sig_idx < 0:
@@ -941,7 +945,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let saved_body_file_id = self.local_file_id
     let saved_body_module_path = self.current_module_path
     let saved_body_module_has_ci = self.current_module_has_ci
-    let fn_di = self.find_decl_index(node)
+    let fn_di = decl_index
     if fn_di >= 0:
         self.update_decl_source_context(fn_di)
     if (flags / FnFlags.ASYNC) % 2 == 1:
@@ -1216,9 +1220,14 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     self.current_module_has_ci = saved_body_module_has_ci
 
 fn Sema.check_fn_body(self: Sema, node: i32):
-    let fn_name = self.ast.get_data0(node)
+    let fn_name = self.fn_decl_semantic_symbol(node, self.ast.get_data0(node))
     let sig_idx = self.get_sig(fn_name)
     self.check_fn_body_with_sig(node, sig_idx)
+
+fn Sema.check_fn_body_at(self: Sema, node: i32, decl_index: i32):
+    let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
+    let sig_idx = self.get_sig(fn_name)
+    self.check_fn_body_with_sig_at(node, sig_idx, decl_index)
 
 fn Sema.check_trait_default_method_body_for_impl(self: Sema, impl_node: i32, method_idx: i32):
     let body = self.trait_method_default_bodies.get(method_idx as i64)
@@ -9435,6 +9444,62 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closu
     self.typed_expr_types.insert(node, ret)
     ret
 
+fn Sema.check_qualified_extension_call(self: Sema, recv_expr: i32, method_sym: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
+    if recv_expr == 0 or self.ast.kind(recv_expr) != NodeKind.NK_IDENT:
+        return -1
+    let pkg_sym = self.ast.get_data0(recv_expr)
+    if self.scope_lookup(pkg_sym) >= 0 or self.lookup_named_type_visible(pkg_sym) != 0 or self.get_sig(pkg_sym) >= 0 or self.generic_fn_nodes.contains(pkg_sym):
+        return -1
+    let module_path = self.direct_imported_module_path_for_alias(pkg_sym)
+    if module_path.len() == 0:
+        return -1
+    let pkg_name = self.pool_resolve(pkg_sym)
+    let method_name = self.pool_resolve(method_sym)
+    if arg_count <= 0:
+        self.emit_error("qualified extension method '" ++ pkg_name ++ "." ++ method_name ++ "' requires a receiver argument", node)
+        return 0
+    let recv_arg = self.ast.get_extra(extra_start)
+    let recv_ty_raw = self.check_expr(recv_arg)
+    if recv_ty_raw == 0:
+        return 0
+    let recv_ty = self.auto_deref_ref_ptr_type(recv_ty_raw)
+    let owner_sym = self.method_owner_symbol_for_type(recv_ty as i32)
+    if owner_sym == 0:
+        self.emit_error("qualified extension method '" ++ pkg_name ++ "." ++ method_name ++ "' receiver has no method owner type", recv_arg)
+        return 0
+    let sig_idx = self.extension_sig_for_module(owner_sym, method_sym, module_path, pkg_name)
+    let fn_sym = self.extension_fn_for_module(owner_sym, method_sym, module_path, pkg_name)
+    if sig_idx < 0 or fn_sym == 0:
+        self.emit_error("unknown qualified extension method '" ++ pkg_name ++ "." ++ method_name ++ "'", node)
+        return 0
+    if self.fn_symbol_is_unsafe(fn_sym) != 0:
+        if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
+            return 0
+    self.emit_no_await_guard_may_suspend_call(node, fn_sym)
+    self.note_allocating_callee(node, fn_sym)
+    let param_count = self.sig_get_param_count(sig_idx)
+    if arg_count != param_count:
+        self.emit_error("wrong argument count", node)
+    for ai in 0..arg_count:
+        let arg_node = self.ast.get_extra(extra_start + ai)
+        let expected_ty = if ai < param_count: self.sig_param_type(sig_idx, ai) else: 0
+        let actual_ty = if ai == 0:
+            recv_ty_raw as i32
+        else:
+            if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) as i32 else: self.check_expr(arg_node) as i32
+        if expected_ty != 0 and actual_ty != 0:
+            if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
+                self.emit_argument_type_mismatch(pkg_name ++ "." ++ method_name, fn_sym, ai, ai, expected_ty, actual_ty, arg_node)
+            else:
+                self.note_auto_ref_call_arg(expected_ty, actual_ty, arg_node, node)
+    self.comp_resolved.insert(node, fn_sym)
+    self.qualified_extension_call_nodes.insert(node, 1)
+    self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, arg_count, 0)
+    self.record_call_view_origins(node, sig_idx, 0, 0, extra_start, arg_count, 0)
+    let ret = self.sig_return_type(sig_idx)
+    self.typed_expr_types.insert(node, ret)
+    ret
+
 fn Sema.check_call(self: Sema, node: i32) -> i32:
     let callee = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
@@ -9464,6 +9529,11 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
         let recv_expr = self.ast.get_data0(callee)
         let recv_field = self.ast.get_data1(callee)
+        let qualified_extension_ret = self.check_qualified_extension_call(recv_expr, recv_field, extra_start, arg_count, node)
+        if qualified_extension_ret >= 0:
+            if qualified_extension_ret != 0:
+                self.typed_expr_types.insert(node, qualified_extension_ret)
+            return qualified_extension_ret
         let recv_ty = self.adjust_static_receiver_type(recv_expr, self.check_expr(recv_expr) as i32)
         let callable_tid = self.callable_any_fn_type(self.field_access_type_from_obj(recv_ty, recv_field) as TypeId)
         if callable_tid != 0:
@@ -12672,6 +12742,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             return generic_ret
 
     if type_name_sym != 0:
+        let method_key = sema_pair_key(type_name_sym, field)
+        if not self.method_lookup.sig_lookup.contains(method_key) and self.visible_extension_candidate_count(type_name_sym, field) > 1:
+            self.emit_ambiguous_extension_method_error(type_name_sym, field, node)
+            return 0
         let method_fn_sym = self.lookup_method_fn(type_name_sym, field)
         let sig_idx = self.lookup_method_sig(type_name_sym, field)
         if sig_idx >= 0:
@@ -15064,6 +15138,9 @@ fn Sema.lookup_method_sig(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     let key = sema_pair_key(type_sym, method_sym)
     if self.method_lookup.sig_lookup.contains(key):
         return self.method_lookup.sig_lookup.get(key).unwrap()
+    let ext = self.unique_visible_extension_sig(type_sym, method_sym)
+    if ext >= 0:
+        return ext
     -1
 
 fn Sema.lookup_method_fn(self: Sema, type_sym: i32, method_sym: i32) -> i32:
@@ -15072,7 +15149,146 @@ fn Sema.lookup_method_fn(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     let key = sema_pair_key(type_sym, method_sym)
     if self.method_lookup.fn_lookup.contains(key):
         return self.method_lookup.fn_lookup.get(key).unwrap()
+    self.unique_visible_extension_fn(type_sym, method_sym)
+
+fn sema_module_display_name(path: str) -> str:
+    var start = 0
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 46 or ch == 47 or ch == 92:
+            start = i + 1
+    var end = path.len()
+    if end - start > 2 and path.slice(end - 2, end) == ".w":
+        end = end - 2
+    path.slice(start, end)
+
+fn sema_import_alias_matches(import_text: str, alias: str) -> i32:
+    if import_text == alias:
+        return 1
+    if sema_module_display_name(import_text) == alias:
+        return 1
     0
+
+fn Sema.direct_imported_module_path_for_alias(self: Sema, alias_sym: i32) -> str:
+    let alias = self.pool_resolve(alias_sym)
+    if alias.len() == 0 or self.current_module_path.len() == 0:
+        return ""
+    if not self.module_index_by_path.contains(self.current_module_path):
+        return ""
+    let current = self.module_index_by_path.get(self.current_module_path).unwrap()
+    if current < 0 or current >= self.module_import_starts.len() as i32:
+        return ""
+    let start = self.module_import_starts.get(current as i64)
+    let count = self.module_import_counts.get(current as i64)
+    for i in 0..count:
+        let idx = start + i
+        if idx < 0 or idx >= self.module_import_targets.len() as i32 or idx >= self.module_import_paths.len() as i32:
+            continue
+        let import_text = self.module_import_paths.get(idx as i64)
+        if sema_import_alias_matches(import_text, alias) == 0:
+            continue
+        let target = self.module_import_targets.get(idx as i64)
+        if target >= 0 and target < self.module_paths.len() as i32:
+            return self.module_paths.get(target as i64)
+    ""
+
+fn Sema.extension_path_visible_from_current(self: Sema, path: str) -> i32:
+    if path.len() == 0 or path == self.current_module_path:
+        return 1
+    if self.global_visible_module_paths.contains(path):
+        return 1
+    if self.current_module_path.len() == 0:
+        return 1
+    if not self.module_index_by_path.contains(self.current_module_path) or not self.module_index_by_path.contains(path):
+        return self.module_is_visible_from_current(path)
+    let current = self.module_index_by_path.get(self.current_module_path).unwrap()
+    let target = self.module_index_by_path.get(path).unwrap()
+    if current == target:
+        return 1
+    let start = self.module_import_starts.get(current as i64)
+    let count = self.module_import_counts.get(current as i64)
+    for i in 0..count:
+        if self.module_import_targets.get((start + i) as i64) == target:
+            return 1
+    0
+
+fn Sema.extension_candidate_visible(self: Sema, idx: i32) -> i32:
+    if idx < 0 or idx >= self.extension_method_fn_syms.len() as i32 or idx >= self.extension_method_paths.len() as i32:
+        return 0
+    let fn_sym = self.extension_method_fn_syms.get(idx as i64)
+    if self.symbol_visible_from_current(fn_sym) == 0:
+        return 0
+    self.extension_path_visible_from_current(self.extension_method_paths.get(idx as i64))
+
+fn Sema.visible_extension_candidate_count(self: Sema, owner_sym: i32, method_sym: i32) -> i32:
+    var count = 0
+    for i in 0..self.extension_method_owner_syms.len() as i32:
+        if self.extension_method_owner_syms.get(i as i64) == owner_sym and self.extension_method_syms.get(i as i64) == method_sym and self.extension_candidate_visible(i) != 0:
+            count = count + 1
+    count
+
+fn Sema.unique_visible_extension_sig(self: Sema, owner_sym: i32, method_sym: i32) -> i32:
+    var found = -1
+    var count = 0
+    for i in 0..self.extension_method_owner_syms.len() as i32:
+        if self.extension_method_owner_syms.get(i as i64) != owner_sym or self.extension_method_syms.get(i as i64) != method_sym:
+            continue
+        if self.extension_candidate_visible(i) == 0:
+            continue
+        found = self.extension_method_sig_idxs.get(i as i64)
+        count = count + 1
+    if count == 1:
+        return found
+    -1
+
+fn Sema.unique_visible_extension_fn(self: Sema, owner_sym: i32, method_sym: i32) -> i32:
+    var found = 0
+    var count = 0
+    for i in 0..self.extension_method_owner_syms.len() as i32:
+        if self.extension_method_owner_syms.get(i as i64) != owner_sym or self.extension_method_syms.get(i as i64) != method_sym:
+            continue
+        if self.extension_candidate_visible(i) == 0:
+            continue
+        found = self.extension_method_fn_syms.get(i as i64)
+        count = count + 1
+    if count == 1:
+        return found
+    0
+
+fn sema_extension_module_path_matches(candidate_path: str, module_path: str, alias: str) -> i32:
+    if candidate_path == module_path:
+        return 1
+    let candidate_name = sema_module_display_name(candidate_path)
+    if alias.len() > 0 and candidate_name == alias:
+        return 1
+    0
+
+fn Sema.extension_fn_for_module(self: Sema, owner_sym: i32, method_sym: i32, module_path: str, alias: str) -> i32:
+    for i in 0..self.extension_method_owner_syms.len() as i32:
+        if self.extension_method_owner_syms.get(i as i64) == owner_sym and self.extension_method_syms.get(i as i64) == method_sym and sema_extension_module_path_matches(self.extension_method_paths.get(i as i64), module_path, alias) != 0:
+            return self.extension_method_fn_syms.get(i as i64)
+    0
+
+fn Sema.extension_sig_for_module(self: Sema, owner_sym: i32, method_sym: i32, module_path: str, alias: str) -> i32:
+    for i in 0..self.extension_method_owner_syms.len() as i32:
+        if self.extension_method_owner_syms.get(i as i64) == owner_sym and self.extension_method_syms.get(i as i64) == method_sym and sema_extension_module_path_matches(self.extension_method_paths.get(i as i64), module_path, alias) != 0:
+            return self.extension_method_sig_idxs.get(i as i64)
+    -1
+
+fn Sema.emit_ambiguous_extension_method_error(self: Sema, owner_sym: i32, method_sym: i32, node: i32):
+    let method_name = self.pool_resolve(method_sym)
+    var candidates = ""
+    var count = 0
+    for i in 0..self.extension_method_owner_syms.len() as i32:
+        if self.extension_method_owner_syms.get(i as i64) != owner_sym or self.extension_method_syms.get(i as i64) != method_sym:
+            continue
+        if self.extension_candidate_visible(i) == 0:
+            continue
+        if count > 0:
+            candidates = candidates ++ ", "
+        candidates = candidates ++ sema_module_display_name(self.extension_method_paths.get(i as i64)) ++ "." ++ method_name
+        count = count + 1
+    self.emit_error("ambiguous extension method '" ++ method_name ++ "'; candidates: " ++ candidates ++ "; use pkg.method(value)", node)
 
 // docs/mut.md Rev 8 §5.1 — returns 1 when the resolved (concrete) method
 // for `type_sym.method_sym` was declared with `mut self: Self` (the parser

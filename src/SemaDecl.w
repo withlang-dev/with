@@ -34,6 +34,7 @@ fn Sema.compute_method_origins(self: Sema):
                     break
                 let fn_name = self.ast.get_data0(md)
                 self.method_decl_origins.insert(j, origin)
+                self.method_decl_impl_nodes.insert(j, decl as i32)
                 self.method_impl_nodes.insert(fn_name, decl as i32)
                 self.method_symbol_flags.insert(fn_name, 1)
                 if origin == 0:
@@ -105,7 +106,7 @@ fn Sema.collect_declarations(self: Sema):
         if kind == NodeKind.NK_FN_DECL:
             let fn_name = self.ast.get_data0(decl)
             if self.should_skip_trait_method(di, fn_name) == 0:
-                self.collect_fn_decl(decl, is_local)
+                self.collect_fn_decl(decl, is_local, di)
         if kind == NodeKind.NK_EXTERN_FN:
             self.collect_extern_fn(decl, is_local)
         if kind == NodeKind.NK_EXTERN_VAR:
@@ -1054,8 +1055,18 @@ fn Sema.register_generator_next_method(self: Sema, fn_sym: i32, state_sym: i32, 
     self.method_symbol_flags.insert(next_fn_sym, 1)
     self.fn_decl_source_paths.insert(next_fn_sym, self.current_module_path)
 
-fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
-    let fn_name = self.ast.get_data0(node)
+fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
+    let parsed_fn_name = self.ast.get_data0(node)
+    var fn_name = parsed_fn_name
+    let owner_sym_for_extension = self.impl_owner_type_sym_for_decl(node)
+    if owner_sym_for_extension != 0 and self.method_decl_is_foreign_extension_at(node, owner_sym_for_extension, decl_index) != 0:
+        fn_name = self.extension_method_unique_symbol_at(decl_index, parsed_fn_name)
+        self.fn_decl_effective_syms.insert(node, fn_name)
+        self.fn_decl_effective_indices.insert(decl_index, fn_name)
+        let impl_node = self.impl_node_for_method_decl(node)
+        if impl_node != 0:
+            self.method_impl_nodes.insert(fn_name, impl_node)
+        self.method_symbol_flags.insert(fn_name, 1)
     if is_local != 0:
         self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
     let fn_flags = self.ast.get_data2(node)
@@ -1139,6 +1150,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
         if bi_tp_meta >= 0:
             self.generic_fn_nodes.insert(fn_name, node)
             self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
+            let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
             if self_type_id != 0:
                 self.named_types.remove(self_sym)
             return
@@ -1154,6 +1166,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
                     if self.type_decl_tp_count(cf_td) > 0:
                         self.generic_fn_nodes.insert(fn_name, node)
                         self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
+                        let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
                         self.named_types.remove(self_sym)
                         return
                 break
@@ -1162,6 +1175,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     if tp_count > 0:
         self.generic_fn_nodes.insert(fn_name, node)
         self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
+        let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
         for pi in 0..param_count:
             let p_type_node = self.ast.fn_param_type(param_start, pi)
             self.validate_type_expr_with_type_params(p_type_node, self.ast.fn_meta_tp_start(meta), tp_count)
@@ -1233,7 +1247,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
         for pi in 0..param_count:
             if self.fn_param_uses_value_ref_abi(param_start, pi, method_owner_sym, self_type_id) != 0:
                 self.set_sig_param_value_ref_abi(fn_sig_idx, pi, 1)
-    self.register_method_sig_alias(node, fn_name, fn_sig_idx)
+    self.register_method_sig_alias(node, fn_name, parsed_fn_name, fn_sig_idx, decl_index)
 
     // Track must_use
     if (flags / FnFlags.MUST_USE) % 2 == 1:
@@ -1346,11 +1360,24 @@ fn sema_str_find_char(text: str, needle: i32) -> i32:
     return -1
 
 fn Sema.impl_owner_type_sym_for_decl(self: Sema, decl: i32) -> i32:
+    let impl_node = self.impl_node_for_method_decl(decl)
+    if impl_node != 0:
+        return self.ast.get_data0(impl_node)
+    0
+
+fn Sema.impl_node_for_method_decl(self: Sema, decl: i32) -> i32:
+    let decl_index = self.find_decl_index(decl)
+    if decl_index >= 0 and self.method_decl_impl_nodes.contains(decl_index):
+        return self.method_decl_impl_nodes.get(decl_index).unwrap()
+    if decl_index < 0:
+        return 0
     let start = self.ast.get_start(decl)
     let end = self.ast.get_end(decl)
     var best_span = 0
-    var best_sym = 0
+    var best_node = 0
     for di in 0..self.ast.decl_count():
+        if self.decls_share_source_file(decl_index, di) == 0:
+            continue
         let cand = self.ast.get_decl(di)
         if self.ast.kind(cand) != NodeKind.NK_IMPL_DECL:
             continue
@@ -1358,16 +1385,106 @@ fn Sema.impl_owner_type_sym_for_decl(self: Sema, decl: i32) -> i32:
         let impl_end = self.ast.get_end(cand)
         if impl_start <= start and end <= impl_end:
             let span = impl_end - impl_start
-            if best_sym == 0 or span < best_span:
+            if best_node == 0 or span < best_span:
                 best_span = span
-                best_sym = self.ast.get_data0(cand)
-    best_sym
+                best_node = cand
+    best_node
 
-fn Sema.register_method_sig_alias(self: Sema, node: i32, fn_sym: i32, sig_idx: i32):
+fn sema_extension_path_hash(path: str) -> i64:
+    var h: i64 = 17
+    for i in 0..path.len() as i32:
+        h = (h * 131 + path.byte_at(i as i64) as i64) % 2147483647
+    h
+
+fn Sema.decl_source_path_for_node(self: Sema, node: i32) -> str:
+    let di = self.find_decl_index(node)
+    if di >= 0 and di < self.decl_source_paths.len() as i32:
+        return self.decl_source_paths.get(di as i64)
+    self.current_module_path
+
+fn Sema.decl_source_path_for_index(self: Sema, decl_index: i32) -> str:
+    if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
+        return self.decl_source_paths.get(decl_index as i64)
+    self.current_module_path
+
+fn Sema.decl_source_file_id_for_index(self: Sema, decl_index: i32) -> i32:
+    if decl_index >= 0 and decl_index < self.decl_source_file_ids.len() as i32:
+        return self.decl_source_file_ids.get(decl_index as i64)
+    0
+
+fn Sema.extension_method_unique_symbol_at(self: Sema, decl_index: i32, qualified_sym: i32) -> i32:
+    let qualified = self.pool_resolve(qualified_sym)
+    if qualified.len() == 0:
+        return qualified_sym
+    self.pool_intern(qualified ++ "$ext$" ++ f"{sema_extension_path_hash(self.decl_source_path_for_index(decl_index))}")
+
+fn Sema.fn_decl_semantic_symbol(self: Sema, node: i32, fallback: i32) -> i32:
+    if self.fn_decl_effective_syms.contains(node):
+        return self.fn_decl_effective_syms.get(node).unwrap()
+    fallback
+
+fn Sema.fn_decl_semantic_symbol_at(self: Sema, node: i32, fallback: i32, decl_index: i32) -> i32:
+    if self.fn_decl_effective_indices.contains(decl_index):
+        return self.fn_decl_effective_indices.get(decl_index).unwrap()
+    if decl_index >= 0:
+        return fallback
+    self.fn_decl_semantic_symbol(node, fallback)
+
+fn Sema.method_decl_is_foreign_extension(self: Sema, node: i32, owner_sym: i32) -> i32:
+    self.method_decl_is_foreign_extension_at(node, owner_sym, self.find_decl_index(node))
+
+fn Sema.method_decl_is_foreign_extension_at(self: Sema, node: i32, owner_sym: i32, method_di: i32) -> i32:
+    let impl_node = self.impl_node_for_method_decl(node)
+    if impl_node == 0:
+        return 0
+    if self.ast.get_data2(impl_node) != 0:
+        return 0
+    let owner_file = self.type_decl_source_file_id(owner_sym)
+    let method_file = self.decl_source_file_id_for_index(method_di)
+    if owner_file != 0 and method_file != 0:
+        if owner_file != method_file:
+            return 1
+        return 0
+    let owner_path = self.type_decl_source_path(owner_sym)
+    let method_path = self.decl_source_path_for_index(method_di)
+    if owner_path.len() == 0 or method_path.len() == 0:
+        return 0
+    if owner_path != method_path:
+        return 1
+    0
+
+fn Sema.register_extension_method_candidate(self: Sema, node: i32, fn_sym: i32, parsed_fn_sym: i32, sig_idx: i32, decl_index: i32) -> i32:
+    let qualified = self.pool_resolve(parsed_fn_sym)
+    if qualified.len() == 0:
+        return 0
+    let dot = sema_str_find_char(qualified, 46)
+    if dot < 0:
+        return 0
+    let owner_name = qualified.slice(0, dot as i64)
+    let method_name = qualified.slice((dot + 1) as i64, qualified.len() as i64)
+    if owner_name.len() == 0 or method_name.len() == 0:
+        return 0
+
+    let owner_sym = self.pool_intern(owner_name)
+    let method_sym = self.pool_intern(method_name)
+    if self.method_decl_is_foreign_extension_at(node, owner_sym, decl_index) != 0:
+        self.extension_method_owner_syms.push(owner_sym)
+        self.extension_method_syms.push(method_sym)
+        self.extension_method_fn_syms.push(fn_sym)
+        self.extension_method_sig_idxs.push(sig_idx)
+        self.extension_method_paths.push(sema_owned_text(self.decl_source_path_for_index(decl_index)))
+        self.method_symbol_flags.insert(fn_sym, 1)
+        return 1
+    0
+
+fn Sema.register_method_sig_alias(self: Sema, node: i32, fn_sym: i32, parsed_fn_sym: i32, sig_idx: i32, decl_index: i32):
     if sig_idx < 0:
         return
 
-    let qualified = self.pool_resolve(fn_sym)
+    if self.register_extension_method_candidate(node, fn_sym, parsed_fn_sym, sig_idx, decl_index) != 0:
+        return
+
+    let qualified = self.pool_resolve(parsed_fn_sym)
     if qualified.len() == 0:
         return
     let dot = sema_str_find_char(qualified, 46)
@@ -1384,6 +1501,24 @@ fn Sema.register_method_sig_alias(self: Sema, node: i32, fn_sym: i32, sig_idx: i
     self.method_lookup.sig_lookup.insert(key, sig_idx)
     self.method_lookup.fn_lookup.insert(key, fn_sym)
     self.method_symbol_flags.insert(fn_sym, 1)
+
+fn Sema.type_decl_source_path(self: Sema, type_sym: i32) -> str:
+    if type_sym == 0 or not self.type_decl_nodes.contains(type_sym):
+        return ""
+    let node = self.type_decl_nodes.get(type_sym).unwrap()
+    let di = self.find_decl_index(node)
+    if di >= 0 and di < self.decl_source_paths.len() as i32:
+        return self.decl_source_paths.get(di as i64)
+    ""
+
+fn Sema.type_decl_source_file_id(self: Sema, type_sym: i32) -> i32:
+    if type_sym == 0 or not self.type_decl_nodes.contains(type_sym):
+        return 0
+    let node = self.type_decl_nodes.get(type_sym).unwrap()
+    let di = self.find_decl_index(node)
+    if di >= 0 and di < self.decl_source_file_ids.len() as i32:
+        return self.decl_source_file_ids.get(di as i64)
+    0
 
 fn Sema.impl_decl_has_method(self: Sema, impl_node: i32, method_sym: i32) -> i32:
     let start = self.ast.get_start(impl_node)

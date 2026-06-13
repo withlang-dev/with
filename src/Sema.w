@@ -350,6 +350,11 @@ type Sema {
     extern_fn_names: HashMap[i32, i32],
     // Function AST node indices by name
     fn_decl_nodes: HashMap[i32, i32],
+    // Function declaration node -> semantic symbol. Most declarations use
+    // their parsed symbol; cross-module extension methods get a unique symbol
+    // so packages can define the same Type.method without colliding.
+    fn_decl_effective_syms: HashMap[i32, i32],
+    fn_decl_effective_indices: HashMap[i32, i32],
     // Function declaration source path by name
     fn_decl_source_paths: HashMap[i32, str],
     // Memoized §14.22 by-value Task parameter disposition:
@@ -361,6 +366,12 @@ type Sema {
     generic_fn_nodes: HashMap[i32, i32],
 
     // Methods: hash(type_sym, method_sym) → sig index
+    extension_method_owner_syms: Vec[i32],
+    extension_method_syms: Vec[i32],
+    extension_method_fn_syms: Vec[i32],
+    extension_method_sig_idxs: Vec[i32],
+    extension_method_paths: Vec[str],
+    qualified_extension_call_nodes: HashMap[i32, i32],
     // Variant lookup: variant_sym → variant_index
     variant_lookup: HashMap[i32, i32],
     // Variant type IDs: variant_sym → enum_tid
@@ -479,6 +490,7 @@ type Sema {
 
     // Method origin tracking
     method_impl_nodes: HashMap[i32, i32],
+    method_decl_impl_nodes: HashMap[i32, i32],
     method_decl_origins: HashMap[i32, i32],
     method_has_inherent: HashMap[i32, i32],
     method_symbol_flags: HashMap[i32, i32],
@@ -1155,6 +1167,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let sig_lookup = sema_new_map_i32_i32()
     let extern_fn_names = sema_new_map_i32_i32()
     let fn_decl_nodes = sema_new_map_i32_i32()
+    let fn_decl_effective_syms = sema_new_map_i32_i32()
+    let fn_decl_effective_indices = sema_new_map_i32_i32()
     let fn_decl_source_paths = HashMap[i32, str].new()
     let generic_fn_nodes = sema_new_map_i32_i32()
     let variant_lookup = sema_new_map_i32_i32()
@@ -1197,10 +1211,17 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let global_race_mutated_syms = sema_new_map_i32_i32()
     let global_race_mutation_nodes = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
+    let method_decl_impl_nodes = sema_new_map_i32_i32()
     let method_decl_origins = sema_new_map_i32_i32()
     let method_has_inherent = sema_new_map_i32_i32()
     let method_symbol_flags = sema_new_map_i32_i32()
     let method_lookup = sema_method_lookup_new()
+    let extension_method_owner_syms = sema_new_vec_i32()
+    let extension_method_syms = sema_new_vec_i32()
+    let extension_method_fn_syms = sema_new_vec_i32()
+    let extension_method_sig_idxs = sema_new_vec_i32()
+    let extension_method_paths = sema_new_vec_str()
+    let qualified_extension_call_nodes = sema_new_map_i32_i32()
     let drop_method_cache = sema_new_map_i32_i32()
     let typed_expr_types = sema_new_map_i32_i32()
     let typed_binding_types = sema_new_map_i32_i32()
@@ -1239,11 +1260,19 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_value_ref_abi_params: Vec.new(),
         extern_fn_names,
         fn_decl_nodes,
+        fn_decl_effective_syms,
+        fn_decl_effective_indices,
         fn_decl_source_paths,
         task_param_consumed_memo: sema_new_map_i64_i32(),
         task_param_consumed_visiting: sema_new_map_i64_i32(),
         detached_task_stmt_nodes: sema_new_map_i32_i32(),
         generic_fn_nodes,
+        extension_method_owner_syms,
+        extension_method_syms,
+        extension_method_fn_syms,
+        extension_method_sig_idxs,
+        extension_method_paths,
+        qualified_extension_call_nodes,
         variant_lookup,
         variant_type_ids,
         imported_variant_owners,
@@ -1330,6 +1359,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_race_concurrency_reason: "",
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
+        method_decl_impl_nodes,
         method_decl_origins,
         method_has_inherent,
         method_symbol_flags,
