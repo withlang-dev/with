@@ -12511,6 +12511,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 self.note_allocation_site(node, AllocConstructKind.TO_OWNED, 0, 0)
             else:
                 self.note_allocating_callee(node, generic_method_fn)
+            self.comp_resolved.insert(node, generic_method_fn)
             let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, arg_types, extra_start, mc_resolved_arg_count, node)
             return generic_ret
 

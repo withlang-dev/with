@@ -11,6 +11,19 @@ conversation context after compaction.
 
 ## Current Focus
 
+#405 is implemented and verified. `extend Name[T]:` now parses as a generic
+extension target instead of trait generic arguments, while `impl Trait[Args]
+for Type` keeps its existing trait-argument path. Generic method calls now
+record their resolved qualified method symbol for MIR lowering, so calls such
+as `xs.is_empty()` preserve `Vec.is_empty` through codegen. MIR lowering keeps
+resolved generic methods on the generic-call path, and codegen can synthesize a
+deterministic monomorphized method owner for generic receivers that use
+built-in wrapper layouts such as `Vec[T]`. Focused coverage includes the
+§9.5 `extend Box[T]`/`extend Vec[T]` positive path, unbound target type
+parameters, and wrong generic-base method lookup rejection. Full verification
+passed on 2026-06-13: `with build`, `with build :fixpoint`, `with build
+:test`, and `with build :test-green`.
+
 #423 is implemented and verified. Module-level comptime transform now treats
 non-evaluable `comptime if` conditions as deferred instead of emitting an early
 error, allowing generic `T`-dependent branches to survive until instantiation.

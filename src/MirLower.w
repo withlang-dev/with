@@ -6856,9 +6856,12 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
         return self.body.new_operand(OperandKind.OK_MOVE, dyn_place)
 
     // If resolution returned bare method_sym, the method is unresolved.
+    // If resolution returned a generic method symbol, keep the same
+    // GENERIC_CALL handoff so codegen can monomorphize the receiver-specific
+    // method instead of looking for an eager function body.
     // Route through MirIntrinsic.GENERIC_CALL so codegen's gen_call handles it
     // (disc enums, from_int, Option methods, concrete/generic struct methods, etc.).
-    if callee_sym == method_sym:
+    if callee_sym == method_sym or self.sema.generic_fn_nodes.contains(callee_sym):
             let gc_fn_op = self.const_operand(ConstKind.CK_FN, callee_sym, 0)
             let gc_args: Vec[i32] = Vec.new()
             // Lower self + method args so the handler can eval them.

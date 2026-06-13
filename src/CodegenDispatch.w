@@ -4543,6 +4543,74 @@ fn Codegen.mir_struct_sym_from_sema_type(self: Codegen, sema_ty: i32) -> i32:
             return mono_sym
     0
 
+fn Codegen.ensure_generic_method_owner_sym(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    var live_resolved = resolved
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        live_resolved = self.sema.resolve_alias(resolved)
+        tk = self.sema.get_type_kind(live_resolved)
+    if tk != TypeKind.TY_GENERIC_INST:
+        return 0
+
+    let raw_base = if resolved > 0 and resolved < self.mir_input.sema_type_kinds.len() as i32:
+        self.mir_input.mir_get_type_d0(resolved)
+    else:
+        self.sema.get_type_d0(live_resolved)
+    let base_sym = self.sema_sym_to_codegen_sym(raw_base)
+    if base_sym == 0:
+        return 0
+    let owner_decl_opt = self.generic_structs.get(base_sym)
+    if not owner_decl_opt.is_some():
+        return 0
+    let owner_decl = owner_decl_opt.unwrap()
+    let tp_count = self.type_decl_tp_count(owner_decl)
+    if tp_count <= 0:
+        return 0
+    let arg_count = if resolved > 0 and resolved < self.mir_input.sema_type_kinds.len() as i32:
+        self.mir_input.mir_get_type_d2(resolved)
+    else:
+        self.sema.get_generic_inst_arg_count(live_resolved as i32)
+    if arg_count != tp_count:
+        return 0
+
+    var mangled = self.intern.resolve(base_sym)
+    let pending_syms: Vec[i32] = Vec.new()
+    let pending_types: Vec[i64] = Vec.new()
+    let pending_sema_types: Vec[i32] = Vec.new()
+    var tp_pos = self.type_decl_tp_start(owner_decl)
+    for ti in 0..tp_count:
+        let tp_sym = self.pool.get_extra(tp_pos)
+        let bound_count = self.pool.get_extra(tp_pos + 1)
+        let arg_tid = if resolved > 0 and resolved < self.mir_input.sema_type_kinds.len() as i32:
+            self.mir_input.mir_get_type_extra(self.mir_input.mir_get_type_d1(resolved) + ti)
+        else:
+            self.sema.get_generic_inst_arg(live_resolved as i32, ti)
+        var arg_llvm = self.mir_sema_type_to_llvm(arg_tid)
+        if arg_llvm == 0:
+            arg_llvm = self.sema_type_to_llvm(arg_tid)
+        if arg_llvm == 0:
+            arg_llvm = self.type_fallback()
+        pending_syms.push(tp_sym)
+        pending_types.push(arg_llvm)
+        pending_sema_types.push(arg_tid)
+        mangled = mangled ++ "__" ++ self.llvm_type_mangle(arg_llvm)
+        tp_pos = tp_pos + 2 + bound_count
+
+    let mono_sym = self.intern.intern(mangled)
+    if not self.mono_struct_tp_counts.contains(mono_sym):
+        let tp_flat_start = self.mono_struct_tp_flat_syms.len() as i32
+        for pi in 0..pending_syms.len() as i32:
+            self.mono_struct_tp_flat_syms.push(pending_syms.get(pi as i64))
+            self.mono_struct_tp_flat_types.push(pending_types.get(pi as i64))
+            self.mono_struct_tp_flat_sema_types.push(pending_sema_types.get(pi as i64))
+        self.mono_struct_base.insert(mono_sym, base_sym)
+        self.mono_struct_tp_starts.insert(mono_sym, tp_flat_start)
+        self.mono_struct_tp_counts.insert(mono_sym, tp_count)
+    mono_sym
+
 fn Codegen.mir_multi_index_failure_value(self: Codegen, body: &MirBody, dest_place: i32) -> i64:
     let dest_ty = self.mir_dest_llvm_type(body, dest_place)
     if dest_ty != 0 and dest_ty != wl_void_type(self.context):
@@ -9910,6 +9978,8 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                     if gc_llvm_intrinsic != MirIntrinsic.NONE:
                         return self.mir_emit_intrinsic_call(body, gc_llvm_intrinsic, args_id, dest_place, next_bb)
                     var gc_recv_type_sym = self.mir_struct_sym_from_sema_type(gc_recv_type_unwrapped)
+                    if gc_recv_type_sym == 0:
+                        gc_recv_type_sym = self.ensure_generic_method_owner_sym(gc_recv_type_unwrapped)
                     if gc_recv_type_sym == 0:
                         gc_recv_type_sym = self.find_struct_type_by_llvm(gc_recv_ty)
                     // Generic struct method: receiver is monomorphized generic struct

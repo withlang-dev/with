@@ -2760,9 +2760,11 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     let start = self.current_start()
     if self.peek() == TokenKind.TK_KW_PUB:
         self.advance()
+    var is_extend = 0
     if self.peek() == TokenKind.TK_KW_IMPL:
         self.advance()
     else if self.peek() == TokenKind.TK_KW_EXTEND:
+        is_extend = 1
         self.advance()
     else:
         return
@@ -2783,7 +2785,9 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
     var target_type_node: NodeId = 0 as NodeId
     var trait_arg_extra_start = 0
     var trait_arg_count = 0
-    if self.peek() == TokenKind.TK_L_BRACKET:
+    if self.peek() == TokenKind.TK_L_BRACKET and is_extend != 0:
+        target_type_node = self.parse_optional_impl_target_args(type_name)
+    else if self.peek() == TokenKind.TK_L_BRACKET:
         self.advance()
         self.skip_newlines()
         trait_arg_extra_start = self.pool.extra_len()
