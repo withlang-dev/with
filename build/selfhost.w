@@ -11,7 +11,7 @@ type SelfhostRunResult {
     stderr: str,
 }
 
-fn bs_fail(ctx: ActionCtx, message: str) -> i32:
+fn bs_fail(ctx: &ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
@@ -112,7 +112,7 @@ fn bs_cross_target_triple() -> str:
         return "aarch64-apple-darwin"
     "x86_64-unknown-linux-gnu"
 
-fn bs_run_cli_capture(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32) -> SelfhostRunResult:
+fn bs_run_cli_capture(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
@@ -127,7 +127,7 @@ fn bs_run_cli_capture(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
-fn bs_run_cli_capture_with_env(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32, process_env: ProcessEnv) -> SelfhostRunResult:
+fn bs_run_cli_capture_with_env(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], timeout_ms: i32, process_env: ProcessEnv) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
@@ -142,7 +142,7 @@ fn bs_run_cli_capture_with_env(ctx: ActionCtx, compiler_path: str, label: str, a
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
-fn bs_run_cli_capture_cwd_with_env(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32, cwd: str, process_env: ProcessEnv) -> SelfhostRunResult:
+fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], timeout_ms: i32, cwd: str, process_env: ProcessEnv) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
@@ -157,7 +157,7 @@ fn bs_run_cli_capture_cwd_with_env(ctx: ActionCtx, compiler_path: str, label: st
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
-fn bs_run_cli_capture_input(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], stdin_text: str, timeout_ms: i32) -> SelfhostRunResult:
+fn bs_run_cli_capture_input(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], stdin_text: str, timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdin_rel = bs_join(output_dir, label ++ ".stdin")
@@ -177,7 +177,7 @@ fn bs_run_cli_capture_input(ctx: ActionCtx, compiler_path: str, label: str, args
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
-fn bs_run_cli_capture_cwd(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32, cwd: str) -> SelfhostRunResult:
+fn bs_run_cli_capture_cwd(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], timeout_ms: i32, cwd: str) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
@@ -192,7 +192,7 @@ fn bs_run_cli_capture_cwd(ctx: ActionCtx, compiler_path: str, label: str, args: 
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
-fn bs_run_binary_capture(ctx: ActionCtx, exe_path: str, label: str, timeout_ms: i32) -> SelfhostRunResult:
+fn bs_run_binary_capture(ctx: &ActionCtx, exe_path: str, label: str, timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
@@ -268,7 +268,7 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove copied compiler after embedded runtime regression")
     0
 
-fn bs_run_cli_expect_success(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+fn bs_run_cli_expect_success(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": cli selfhost command '" ++ label ++ f"' failed with exit code {result.rc}")
@@ -283,35 +283,35 @@ fn bs_trim_trailing_line_endings(text: str) -> str:
         end = end - 1
     text.slice(0, end)
 
-fn bs_assert_stdout_exact(ctx: ActionCtx, result: SelfhostRunResult, expected: str, label: str) -> i32:
+fn bs_assert_stdout_exact(ctx: &ActionCtx, result: &SelfhostRunResult, expected: str, label: str) -> i32:
     let actual = bs_trim_trailing_line_endings(result.stdout)
     if actual == expected:
         return 0
     bs_fail(ctx, "stdout mismatch for " ++ label ++ ": expected '" ++ expected ++ "' got '" ++ actual ++ "'")
 
-fn bs_expect_cli_success_exact(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], expected: str) -> i32:
+fn bs_expect_cli_success_exact(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], expected: str) -> i32:
     let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
     if result.rc != 0:
         return bs_fail(ctx, "one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
     bs_assert_stdout_exact(ctx, result, expected, label)
 
-fn bs_expect_cli_input_success_exact(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], stdin_text: str, expected: str) -> i32:
+fn bs_expect_cli_input_success_exact(ctx: &ActionCtx, compiler_path: str, label: str, args: &Vec[str], stdin_text: str, expected: str) -> i32:
     let result = bs_run_cli_capture_input(ctx, compiler_path, label, args, stdin_text, 120000)
     if result.rc != 0:
         return bs_fail(ctx, "one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
     bs_assert_stdout_exact(ctx, result, expected, label)
 
-fn bs_assert_contains(ctx: ActionCtx, text: str, needle: str, label: str) -> i32:
+fn bs_assert_contains(ctx: &ActionCtx, text: str, needle: str, label: str) -> i32:
     if text.contains(needle):
         return 0
     bs_fail(ctx, "missing expected output for " ++ label ++ ": " ++ needle)
 
-fn bs_assert_not_contains(ctx: ActionCtx, text: str, needle: str, label: str) -> i32:
+fn bs_assert_not_contains(ctx: &ActionCtx, text: str, needle: str, label: str) -> i32:
     if not text.contains(needle):
         return 0
     bs_fail(ctx, "found forbidden output for " ++ label ++ ": " ++ needle)
 
-fn bs_check_help(ctx: ActionCtx, compiler_path: str) -> i32:
+fn bs_check_help(ctx: &ActionCtx, compiler_path: str) -> i32:
     var args: Vec[str] = Vec.new()
     args |> push("--help")
     let result = bs_run_cli_expect_success(ctx, compiler_path, "help", args)
@@ -366,7 +366,7 @@ fn bs_check_help(ctx: ActionCtx, compiler_path: str) -> i32:
         return build_short_help.rc
     bs_assert_contains(ctx, build_short_help.stdout, "Usage: with build [source.w|:target] [options]", "build_help_short")
 
-fn bs_check_doc_repl_cli(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var doc_help_args: Vec[str] = Vec.new()
     doc_help_args |> push("doc")
     doc_help_args |> push("--help")
@@ -467,7 +467,7 @@ fn bs_test_args(source_path: str) -> Vec[str]:
     args |> push(source_path)
     args
 
-fn bs_check_test_directives(ctx: ActionCtx, compiler_path: str, test_dir: str) -> i32:
+fn bs_check_test_directives(ctx: &ActionCtx, compiler_path: str, test_dir: str) -> i32:
     let fs = ctx.fs()
     if fs.mkdir_all(test_dir) != 0:
         return bs_fail(ctx, "could not create smoke test directory: " ++ test_dir)
@@ -684,13 +684,13 @@ fn bs_project_args(command: str) -> Vec[str]:
     args |> push(command)
     args
 
-fn bs_project_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+fn bs_project_expect_success(ctx: &ActionCtx, compiler_path: str, case_dir: str, label: str, args: &Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": project selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
 
-fn bs_check_init_ai_docs(ctx: ActionCtx, project_dir: str, label: str) -> i32:
+fn bs_check_init_ai_docs(ctx: &ActionCtx, project_dir: str, label: str) -> i32:
     let expected = ctx.fs().read_text("docs/with_for_ai.md")
     if expected.len() == 0:
         return bs_fail(ctx, "could not read docs/with_for_ai.md")
@@ -702,7 +702,7 @@ fn bs_check_init_ai_docs(ctx: ActionCtx, project_dir: str, label: str) -> i32:
         return bs_fail(ctx, "CLAUDE.md did not match docs/with_for_ai.md for " ++ label)
     0
 
-fn bs_check_init_common_files(ctx: ActionCtx, project_dir: str, package_name: str, label: str) -> i32:
+fn bs_check_init_common_files(ctx: &ActionCtx, project_dir: str, package_name: str, label: str) -> i32:
     var rc = bs_expect_file(ctx, bs_join(project_dir, "build.w"), label ++ " build")
     if rc != 0: return rc
     rc = bs_expect_file(ctx, bs_join(project_dir, "README.md"), label ++ " readme")
@@ -729,7 +729,7 @@ fn bs_check_init_common_files(ctx: ActionCtx, project_dir: str, package_name: st
     if rc != 0: return rc
     bs_check_init_ai_docs(ctx, project_dir, label)
 
-fn bs_check_init_in_cwd(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_init_in_cwd(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     if ctx.fs().mkdir_all(case_dir) != 0:
         return bs_fail(ctx, "could not create init case directory: " ++ case_dir)
     let expected_name = bs_basename(case_dir)
@@ -753,7 +753,7 @@ fn bs_check_init_in_cwd(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i3
     if build.rc != 0: return build.rc
     bs_expect_file(ctx, bs_join(case_dir, "out/bin/" ++ expected_name), "init_in_cwd build output")
 
-fn bs_check_init_named_dir(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_init_named_dir(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     if ctx.fs().mkdir_all(case_dir) != 0:
         return bs_fail(ctx, "could not create init named case directory: " ++ case_dir)
     let project_name = "sqlite"
@@ -785,7 +785,7 @@ fn bs_check_init_named_dir(ctx: ActionCtx, compiler_path: str, case_dir: str) ->
     if build.rc != 0: return build.rc
     bs_expect_file(ctx, bs_join(project_dir, "out/bin/" ++ project_name), "init_named_dir build output")
 
-fn bs_check_build_uses_package_section_name(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_uses_package_section_name(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "pkgdemo")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"ok\")\n", "package_section_name main")
@@ -794,7 +794,7 @@ fn bs_check_build_uses_package_section_name(ctx: ActionCtx, compiler_path: str, 
     if result.rc != 0: return result.rc
     bs_expect_file(ctx, bs_join(case_dir, "out/bin/pkgdemo"), "package_section_name output")
 
-fn bs_check_build_rejects_imperative_manifest(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_rejects_imperative_manifest(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), "[package]\nname = \"badmanifest\"\nversion = \"0.1.0\"\n\n[build]\ncommand = \"echo nope\"\n", "imperative manifest")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"ok\")\n", "imperative main")
@@ -813,7 +813,7 @@ fn bs_check_build_rejects_imperative_manifest(ctx: ActionCtx, compiler_path: str
         return bs_fail(ctx, "imperative manifest explicit source unexpectedly succeeded")
     bs_assert_contains(ctx, explicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", "imperative manifest explicit source diagnostic")
 
-fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "src/main.w")
     let manifest =
@@ -970,7 +970,7 @@ fn bs_check_declarative_manifest_config(ctx: ActionCtx, compiler_path: str, case
         return bs_fail(ctx, "imperative [target] manifest unexpectedly succeeded")
     bs_assert_contains(ctx, imperative_target.stderr, "imperative build configuration belongs in build.w", "declarative_target_imperative")
 
-fn bs_check_runtime_manifest_config(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let runtime_dir = bs_join(case_dir, "runtime_valid")
     var rc = bs_write_fixture(ctx, bs_join(runtime_dir, "with.toml"), "[package]\nname = \"runtimecfg\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_stack_size = 98304\nfiber_pool_size = 1\n", "runtime config manifest")
     if rc != 0: return rc
@@ -1047,7 +1047,7 @@ fn bs_check_runtime_manifest_config(ctx: ActionCtx, compiler_path: str, case_dir
         return bs_fail(ctx, "unknown [runtime] key unexpectedly succeeded")
     bs_assert_contains(ctx, unknown.stderr, "unknown key 'executor' in [runtime]", "runtime_manifest_unknown")
 
-fn bs_check_copy_warning_manifest_config(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_copy_warning_manifest_config(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let default_dir = bs_join(case_dir, "default_warn")
     var rc = bs_write_project_manifest(ctx, default_dir, "copydefault")
     if rc != 0: return rc
@@ -1136,7 +1136,7 @@ fn bs_check_copy_warning_manifest_config(ctx: ActionCtx, compiler_path: str, cas
         return bs_fail(ctx, "negative copy_warn_threshold unexpectedly succeeded")
     bs_assert_contains(ctx, invalid.stderr, "copy_warn_threshold must be a non-negative integer", "copy_warning_invalid_threshold")
 
-fn bs_check_link_libs_manifest_diagnostics(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_link_libs_manifest_diagnostics(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), "[package]\nname = \"badlinklibs\"\nversion = \"0.1.0\"\n\n[link]\nlibs = \"sqlite3\"\n", "bad link libs manifest")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"badlinklibs\")\n", "bad link libs source")
@@ -1146,7 +1146,7 @@ fn bs_check_link_libs_manifest_diagnostics(ctx: ActionCtx, compiler_path: str, c
         return bs_fail(ctx, "malformed [link].libs unexpectedly succeeded")
     bs_assert_contains(ctx, result.stderr, "link.libs must be an array of strings", "link_libs_malformed")
 
-fn bs_check_manual_c_dep_manifest(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_manual_c_dep_manifest(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let manifest =
         "[package]\n" ++
@@ -1211,7 +1211,7 @@ fn bs_check_manual_c_dep_manifest(ctx: ActionCtx, compiler_path: str, case_dir: 
         return bs_fail(ctx, "manual C dep collision unexpectedly succeeded")
     bs_assert_contains(ctx, collision.stderr, "declared both as a Conan dependency and a manual", "manual_c_dep_collision")
 
-fn bs_check_run_project_targets(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_run_project_targets(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "rundemo")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/Foo.w"), "pub fn add(a: i32, b: i32) -> i32: a + b\n", "run project imported module")
@@ -1235,7 +1235,7 @@ fn bs_check_run_project_targets(ctx: ActionCtx, compiler_path: str, case_dir: st
     if target_result.rc != 0: return target_result.rc
     bs_assert_stdout_exact(ctx, target_result, "tool-run", "run_project_target")
 
-fn bs_check_get_force_reinstall(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_get_force_reinstall(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "getforcedemo")
     if rc != 0: return rc
 
@@ -1319,7 +1319,7 @@ fn bs_lock_json_system(dep: str) -> str:
     "  }\n" ++
     "}\n"
 
-fn bs_check_get_lock_restore(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_get_lock_restore(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let fixture_sha = "b82d14bd3717287c78a2e1351107a49a925192cae59c0f844437eed8a0d6caef"
 
     let no_lock_dir = bs_join(case_dir, "no_lock")
@@ -1374,7 +1374,7 @@ fn bs_check_get_lock_restore(ctx: ActionCtx, compiler_path: str, case_dir: str) 
         return bs_fail(ctx, "registry lock restore unexpectedly succeeded")
     bs_assert_contains(ctx, registry.stderr, "registry is not available yet", "get_lock_registry")
 
-fn bs_check_with_package_registry_surface(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "withpkgsurface")
     if rc != 0: return rc
     let before = ctx.fs().read_text(bs_join(case_dir, "with.toml"))
@@ -1436,7 +1436,7 @@ fn bs_check_with_package_registry_surface(ctx: ActionCtx, compiler_path: str, ca
     if rc != 0: return rc
     bs_assert_contains(ctx, manifest.stderr, "registry is not available yet", "with_package_manifest_dep_registry")
 
-fn bs_check_remove_update_packages(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_remove_update_packages(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let remove_dir = bs_join(case_dir, "remove")
     var rc = bs_write_fixture(ctx, bs_join(remove_dir, "with.toml"), "[package]\nname = \"removepkg\"\nversion = \"0.1.0\"\n\n[deps]\nc.opengl = \"system\"\n", "remove package manifest")
     if rc != 0: return rc
@@ -1482,7 +1482,7 @@ fn bs_check_remove_update_packages(ctx: ActionCtx, compiler_path: str, case_dir:
     if no_deps.rc != 0: return no_deps.rc
     bs_assert_contains(ctx, no_deps.stderr, "no C dependencies to update", "update_no_deps")
 
-fn bs_check_get_raylib_versions(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_get_raylib_versions(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let latest_dir = bs_join(case_dir, "latest")
     var rc = bs_write_project_manifest(ctx, latest_dir, "getraylib")
     if rc != 0: return rc
@@ -1521,7 +1521,7 @@ fn bs_check_get_raylib_versions(ctx: ActionCtx, compiler_path: str, case_dir: st
     if rc != 0: return rc
     bs_expect_file_contains(ctx, bs_join(pinned_dir, "with.toml"), "c.raylib = \"6.0\"", "get raylib 6.0 manifest dep")
 
-fn bs_check_build_cache_tracks_compiler(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_cache_tracks_compiler(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "cachecompiler")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "main.w"), "fn main:\n    print(\"cache\")\n", "cache compiler main")
@@ -1533,7 +1533,7 @@ fn bs_check_build_cache_tracks_compiler(ctx: ActionCtx, compiler_path: str, case
     if result.rc != 0: return result.rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/cachecompiler.state"), "compiler:", "build cache compiler fingerprint")
 
-fn bs_check_build_cache_tracks_action_source(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_cache_tracks_action_source(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "cacheaction")
     if rc != 0: return rc
     let build_dir = bs_join(case_dir, "build")
@@ -1541,7 +1541,7 @@ fn bs_check_build_cache_tracks_action_source(ctx: ActionCtx, compiler_path: str,
         return bs_fail(ctx, "could not create build action module directory")
     rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\nuse build.actions\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    var stamp = target_new(.Action, \"stamp\", \"\").output(\"out/stamp.txt\")\n    stamp.action = write_stamp\n    stamp = stamp.write_scope(\"out\")\n    out = out.add_target(stamp)\n    out.default(\"stamp\")\n", "cache action build")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"first\\n\") != 0:\n        return 1\n    0\n", "cache action source first")
+    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: &ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"first\\n\") != 0:\n        return 1\n    0\n", "cache action source first")
     if rc != 0: return rc
 
     let first = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-action-first", bs_project_args("build"))
@@ -1549,13 +1549,13 @@ fn bs_check_build_cache_tracks_action_source(ctx: ActionCtx, compiler_path: str,
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "first", "build cache action first output")
     if rc != 0: return rc
 
-    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"second\\n\") != 0:\n        return 1\n    0\n", "cache action source second")
+    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: &ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"second\\n\") != 0:\n        return 1\n    0\n", "cache action source second")
     if rc != 0: return rc
     let second = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-action-second", bs_project_args("build"))
     if second.rc != 0: return second.rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "second", "build cache action source invalidation")
 
-fn bs_check_build_cache_tracks_embed_file(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "embedcache")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "const DATA: str = embed_file(\"data.txt\")\n\nfn main:\n    print(DATA)\n", "embed cache main")
@@ -1590,10 +1590,10 @@ fn bs_check_build_cache_tracks_embed_file(ctx: ActionCtx, compiler_path: str, ca
         return bs_fail(ctx, f"embed cache second binary failed with exit code {second_run.rc}: " ++ second_run.stderr)
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(second_run.stdout), "second", "build_cache_embed_second", "stdout")
 
-fn bs_check_build_effects_audit(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "effectaudit")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args().get(1)\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: Vec[str] = Vec.new()\n    argv.push(ctx.args().get(0))\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: &ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args().get(1)\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: Vec[str] = Vec.new()\n    argv.push(ctx.args().get(0))\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
     if rc != 0: return rc
 
     var env_one = ProcessEnv { vars: Vec.new() }
@@ -1651,7 +1651,10 @@ fn bs_check_build_effects_audit(ctx: ActionCtx, compiler_path: str, case_dir: st
     strict_args |> push("build")
     strict_args |> push("--strict-effects")
     strict_args |> push(":bad")
-    let strict = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-strict", strict_args, 120000, strict_dir, env_one)
+    var env_strict = ProcessEnv { vars: Vec.new() }
+    env_strict.vars.push(ProcessEnvVar { name: "WITH_EFFECT_FLAG", value: "one" })
+    env_strict.vars.push(ProcessEnvVar { name: "WITH_GRAPH_FLAG", value: "graph-one" })
+    let strict = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-strict", strict_args, 120000, strict_dir, env_strict)
     if strict.rc == 0:
         return bs_fail(ctx, "strict effects build unexpectedly succeeded")
     bs_assert_contains(ctx, strict.stderr, "no declared action inputs or outputs in strict mode", "effects_strict_process")
@@ -1713,7 +1716,7 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     bs_check_run_project_targets(ctx, compiler_path, bs_join(output_dir, "run_project_case"))
 
-fn bs_edge_assert_exact(ctx: ActionCtx, actual: str, expected: str, label: str, stream_name: str) -> i32:
+fn bs_edge_assert_exact(ctx: &ActionCtx, actual: str, expected: str, label: str, stream_name: str) -> i32:
     if actual == expected:
         return 0
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ stream_name ++ " mismatch for " ++ label)
@@ -1721,7 +1724,7 @@ fn bs_edge_assert_exact(ctx: ActionCtx, actual: str, expected: str, label: str, 
     ctx.diagnostics().error("actual: '" ++ actual ++ "'")
     1
 
-fn bs_edge_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+fn bs_edge_expect_success(ctx: &ActionCtx, compiler_path: str, case_dir: str, label: str, args: &Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": edge selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
@@ -1737,7 +1740,7 @@ fn bs_edge_build_obj_args(src: str, obj: str) -> Vec[str]:
     args |> push(obj)
     args
 
-fn bs_check_pointer_index_rejected(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_pointer_index_rejected(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "pointer_index_rejected.w")
     let obj = bs_join(case_dir, "pointer_index_rejected.o")
@@ -1750,7 +1753,7 @@ fn bs_check_pointer_index_rejected(ctx: ActionCtx, compiler_path: str, case_dir:
     if rc != 0: return rc
     bs_assert_not_contains(ctx, result.stderr, "LLVM verify error", "pointer_index_rejected")
 
-fn bs_check_prelude_output_functions(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_prelude_output_functions(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "prelude_output_functions.w")
     var rc = bs_write_fixture(ctx, src, "fn main:\n    write(\"A\")\n    print(\"B\")\n    write(\"C\")\n    ewrite(\"D\")\n    eprint(\"E\")\n    ewrite(\"F\")\n", "prelude output source")
@@ -1764,7 +1767,7 @@ fn bs_check_prelude_output_functions(ctx: ActionCtx, compiler_path: str, case_di
     if rc != 0: return rc
     bs_edge_assert_exact(ctx, result.stderr, "DE\nF", "prelude_output_functions", "stderr")
 
-fn bs_check_unit_tail_value_not_returned(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_unit_tail_value_not_returned(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "unit_tail_value_not_returned.w")
     let source =
@@ -1796,7 +1799,7 @@ fn bs_check_unit_tail_value_not_returned(ctx: ActionCtx, compiler_path: str, cas
     if rc != 0: return rc
     bs_assert_not_contains(ctx, callee_mir, "_0 =", "unit_tail_value_not_returned")
 
-fn bs_check_unsafe_prefix_redundant_warning(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_unsafe_prefix_redundant_warning(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "unsafe_prefix_redundant_warning.w")
     let source =
@@ -1815,7 +1818,7 @@ fn bs_check_unsafe_prefix_redundant_warning(ctx: ActionCtx, compiler_path: str, 
     if result.rc != 0: return result.rc
     bs_assert_contains(ctx, result.stderr, "warning: redundant unsafe prefix inside unsafe context", "unsafe_prefix_redundant_warning")
 
-fn bs_check_loop_string_concat_warning(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_loop_string_concat_warning(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "loop_string_concat_warning.w")
     let source =
@@ -1834,7 +1837,7 @@ fn bs_check_loop_string_concat_warning(ctx: ActionCtx, compiler_path: str, case_
     if result.rc != 0: return result.rc
     bs_assert_contains(ctx, result.stderr, "warning: string concatenation with ++ inside a loop repeatedly copies the accumulator", "loop_string_concat_warning")
 
-fn bs_check_not_in_lint(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_not_in_lint(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let warn_src = bs_join(case_dir, "not_in_lint_warning.w")
     let warn_source =
@@ -1878,7 +1881,7 @@ fn bs_partial_statement_match_source() -> str:
     "    match s:\n" ++
     "        .Ready => print(\"ready\")\n"
 
-fn bs_check_partial_statement_match_lint(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_partial_statement_match_lint(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let default_dir = bs_join(case_dir, "default")
     var rc = bs_write_project_manifest(ctx, default_dir, "partialmatchdefault")
@@ -1920,7 +1923,7 @@ fn bs_check_partial_statement_match_lint(ctx: ActionCtx, compiler_path: str, cas
         return bs_fail(ctx, "invalid partial_statement_match lint setting unexpectedly succeeded")
     bs_assert_contains(ctx, invalid_result.stderr, "lint.partial_statement_match must be true or false", "partial_statement_match_invalid")
 
-fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "hello_build_options.w")
     var rc = bs_write_fixture(ctx, src, "fn main:\n    print(\"build-options\")\n", "build options source")
@@ -2067,7 +2070,7 @@ fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str)
     if rc != 0: return rc
     return 0
 
-fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_whole_program_extern_var_redecl(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let defs_src = bs_join(case_dir, "defs.w")
     let user_src = bs_join(case_dir, "user.w")
@@ -2090,7 +2093,7 @@ fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, 
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "ok", "whole_program_extern_var_redecl", "stdout")
 
-fn bs_check_imported_module_dependency_order(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_imported_module_dependency_order(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let defs_src = bs_join(case_dir, "defs.w")
     let module_src = bs_join(case_dir, "m.w")
@@ -2108,7 +2111,7 @@ fn bs_check_imported_module_dependency_order(ctx: ActionCtx, compiler_path: str,
     if result.rc != 0: return result.rc
     0
 
-fn bs_check_c_import_header_cache_tracks_contents(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_c_import_header_cache_tracks_contents(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let header = bs_join(case_dir, "answer.h")
     let first_src = bs_join(case_dir, "first.w")
@@ -2137,7 +2140,7 @@ fn bs_check_c_import_header_cache_tracks_contents(ctx: ActionCtx, compiler_path:
     if second.rc != 0: return second.rc
     bs_assert_stdout_exact(ctx, second, "ok", "c_import_header_cache_second")
 
-fn bs_compile_emit_c_output(ctx: ActionCtx, root: str, case_dir: str, c_path: str, bin: str, label: str) -> i32:
+fn bs_compile_emit_c_output(ctx: &ActionCtx, root: str, case_dir: str, c_path: str, bin: str, label: str) -> i32:
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
     let platform_obj = bs_host_platform_runtime_object()
@@ -2170,7 +2173,7 @@ fn bs_compile_emit_c_output(ctx: ActionCtx, root: str, case_dir: str, c_path: st
     ctx.diagnostics().error(cc_result.stderr)
     cc_result.rc
 
-fn bs_check_emit_c_receiver_abi(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "receiver_abi.w")
     let c_path = bs_join(case_dir, "receiver_abi.c")
@@ -2208,7 +2211,7 @@ fn bs_check_emit_c_receiver_abi(ctx: ActionCtx, compiler_path: str, case_dir: st
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_receiver_abi", "stdout")
 
-fn bs_check_emit_c_hashmap_new_field(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_emit_c_hashmap_new_field(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "hashmap_new_field.w")
     let c_path = bs_join(case_dir, "hashmap_new_field.c")
@@ -2263,7 +2266,7 @@ fn bs_check_emit_c_hashmap_new_field(ctx: ActionCtx, compiler_path: str, case_di
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_hashmap_new_field", "stdout")
 
-fn bs_check_emit_c_array_fill_rvalue(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_emit_c_array_fill_rvalue(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "array_fill_rvalue.w")
     let c_path = bs_join(case_dir, "array_fill_rvalue.c")
@@ -2294,7 +2297,7 @@ fn bs_check_emit_c_array_fill_rvalue(ctx: ActionCtx, compiler_path: str, case_di
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_array_fill_rvalue", "stdout")
 
-fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     if not (os() == "Macos" and (arch() == "armv8" or arch() == "aarch64")):
         return 0
 
@@ -2636,12 +2639,12 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
         return 1
     0
 
-fn bs_file_contains(ctx: ActionCtx, path: str, needle: str, label: str) -> i32:
+fn bs_file_contains(ctx: &ActionCtx, path: str, needle: str, label: str) -> i32:
     if not ctx.fs().exists(path):
         return bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
     bs_assert_contains(ctx, ctx.fs().read_text(path), needle, label)
 
-fn bs_file_forbids(ctx: ActionCtx, path: str, needle: str, label: str) -> i32:
+fn bs_file_forbids(ctx: &ActionCtx, path: str, needle: str, label: str) -> i32:
     if not ctx.fs().exists(path):
         return bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
     bs_assert_not_contains(ctx, ctx.fs().read_text(path), needle, label)
@@ -2675,13 +2678,13 @@ fn bs_count_occurrences(text: str, needle: str) -> i32:
         offset = offset + found + needle.len() as i32
     count
 
-fn bs_migrate_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+fn bs_migrate_expect_success(ctx: &ActionCtx, compiler_path: str, case_dir: str, label: str, args: &Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": migrator selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
 
-fn bs_check_migrate_global_init_list(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "initlist.c")
     let out_w = bs_join(case_dir, "initlist.w")
@@ -2698,7 +2701,7 @@ fn bs_check_migrate_global_init_list(ctx: ActionCtx, compiler_path: str, case_di
     if result.rc != 0: return result.rc
     bs_file_contains(ctx, out_w, "var g: outer = outer { in_: inner { cb: add1, data: null }, limit: 7 }", "global_init_list")
 
-fn bs_check_migrate_host_header_compat(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_host_header_compat(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "uses_isatty.c")
     let out_w = bs_join(case_dir, "uses_isatty.w")
@@ -2720,7 +2723,7 @@ fn bs_check_migrate_host_header_compat(ctx: ActionCtx, compiler_path: str, case_
     if result.rc != 0: return result.rc
     bs_file_contains(ctx, out_w, "tty_status", "host_header_compat")
 
-fn bs_check_migrate_assignment_compat(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "assignments.c")
     let out_w = bs_join(case_dir, "assignments.w")
@@ -2756,7 +2759,7 @@ fn bs_check_migrate_assignment_compat(ctx: ActionCtx, compiler_path: str, case_d
     if check_result.rc != 0: return check_result.rc
     0
 
-fn bs_check_migrate_rvalue_sequencing(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_rvalue_sequencing(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "rvalue_sequencing.c")
     let out_w = bs_join(case_dir, "rvalue_sequencing.w")
@@ -2794,7 +2797,7 @@ fn bs_check_migrate_rvalue_sequencing(ctx: ActionCtx, compiler_path: str, case_d
     if run_result.rc != 0: return run_result.rc
     0
 
-fn bs_check_migrate_directory_progress(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_directory_progress(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src_dir = bs_join(case_dir, "src")
     let out_dir = bs_join(case_dir, "out")
@@ -2814,7 +2817,7 @@ fn bs_check_migrate_directory_progress(ctx: ActionCtx, compiler_path: str, case_
     if rc != 0: return rc
     bs_assert_contains(ctx, result.stdout, "migrate: processing b.c - 2/2, 100% completed", "directory_progress_stdout")
 
-fn bs_check_migrate_cross_file_global_owner_arrays(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_cross_file_global_owner_arrays(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let generated_dir = bs_join(case_dir, "generated")
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "tables.h"), "extern const unsigned char issue121_table[];\nint issue121_value(int idx);\nint issue121_sum(void);\n", "cross file table header")
@@ -2869,7 +2872,7 @@ fn bs_check_migrate_cross_file_global_owner_arrays(ctx: ActionCtx, compiler_path
     if user_build.rc != 0: return user_build.rc
     0
 
-fn bs_check_migrate_shared_defs_ownerless_extern(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_shared_defs_ownerless_extern(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let generated_dir = bs_join(case_dir, "generated")
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "tables.h"), "extern const unsigned char issue140_unused_external[];\nextern const unsigned char issue140_owned_table[];\nint issue140_read_owned(void);\n", "shared defs table header")
@@ -2898,7 +2901,7 @@ fn bs_check_migrate_shared_defs_ownerless_extern(ctx: ActionCtx, compiler_path: 
         return bs_fail(ctx, "shared_defs_ownerless_extern emitted duplicate or missing string_find_char helper")
     0
 
-fn bs_check_migrate_switch_macro_case_values(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_switch_macro_case_values(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "switch_macro_cases.c")
     let out_w = bs_join(case_dir, "switch_macro_cases.w")
@@ -2929,7 +2932,7 @@ fn bs_check_migrate_switch_macro_case_values(ctx: ActionCtx, compiler_path: str,
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_sizeof_pointer_width(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_sizeof_pointer_width(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "sizeof_pointer_width.c")
     let out_w = bs_join(case_dir, "sizeof_pointer_width.w")
@@ -2956,7 +2959,7 @@ fn bs_check_migrate_sizeof_pointer_width(ctx: ActionCtx, compiler_path: str, cas
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_variadic_definition_rejected(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_variadic_definition_rejected(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "variadic_definition.c")
     let out_w = bs_join(case_dir, "variadic_definition.w")
@@ -3017,7 +3020,7 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     bs_check_migrate_variadic_definition_rejected(ctx, compiler_path, bs_join(output_dir, "variadic_definition_rejected"))
 
-fn bs_check_migrate_libc_ctype(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_libc_ctype(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "libc_ctype.c")
     let out_w = bs_join(case_dir, "libc_ctype.w")
@@ -3058,7 +3061,7 @@ fn bs_check_migrate_libc_ctype(ctx: ActionCtx, compiler_path: str, case_dir: str
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_macro_unsigned_minus(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_macro_unsigned_minus(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "macro_initializer_unsigned_minus.c")
     let out_w = bs_join(case_dir, "macro_initializer_unsigned_minus.w")
@@ -3092,7 +3095,7 @@ fn bs_check_migrate_macro_unsigned_minus(ctx: ActionCtx, compiler_path: str, cas
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_ulong_max_width(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "ulong_max_width.c")
     let out_w = bs_join(case_dir, "ulong_max_width.w")
@@ -3120,7 +3123,7 @@ fn bs_check_migrate_ulong_max_width(ctx: ActionCtx, compiler_path: str, case_dir
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_tentative_global_owner(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_tentative_global_owner(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "tentative_global_owner.c")
     let out_w = bs_join(case_dir, "tentative_global_owner.w")
@@ -3145,7 +3148,7 @@ fn bs_check_migrate_tentative_global_owner(ctx: ActionCtx, compiler_path: str, c
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_cross_file_tentative_global_owner(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_cross_file_tentative_global_owner(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let generated_dir = bs_join(case_dir, "generated")
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "a.c"), "int issue127_counter;\nint issue127_get(void) { return issue127_counter; }\n", "cross tentative a")
@@ -3178,7 +3181,7 @@ fn bs_check_migrate_cross_file_tentative_global_owner(ctx: ActionCtx, compiler_p
     if check_b.rc != 0: return check_b.rc
     0
 
-fn bs_check_migrate_noop_pointer_casts(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_noop_pointer_casts(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "noop_pointer_cast_exprs.c")
     let out_w = bs_join(case_dir, "noop_pointer_cast_exprs.w")
@@ -3217,7 +3220,7 @@ fn bs_check_migrate_noop_pointer_casts(ctx: ActionCtx, compiler_path: str, case_
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_raw_pointer_index(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_raw_pointer_index(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "raw_pointer_index_unsafe.c")
     let out_w = bs_join(case_dir, "raw_pointer_index_unsafe.w")
@@ -3245,7 +3248,7 @@ fn bs_check_migrate_raw_pointer_index(ctx: ActionCtx, compiler_path: str, case_d
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_prefer_brace_ws(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_prefer_brace_ws(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "prefer_brace_ws.c")
     let out_w = bs_join(case_dir, "prefer_brace_ws.w")
@@ -3303,7 +3306,7 @@ fn bs_check_migrate_prefer_brace_ws(ctx: ActionCtx, compiler_path: str, case_dir
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_typed_cast_macros(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_typed_cast_macros(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "typed_cast_macros.c")
     let out_w = bs_join(case_dir, "typed_cast_macros.w")
@@ -3330,7 +3333,7 @@ fn bs_check_migrate_typed_cast_macros(ctx: ActionCtx, compiler_path: str, case_d
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_switch_case_scope(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_switch_case_scope(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "switch_case_scope.c")
     let out_w = bs_join(case_dir, "switch_case_scope.w")
@@ -3424,7 +3427,7 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     bs_check_migrate_switch_case_scope(ctx, compiler_path, bs_join(output_dir, "switch_case_scope"))
 
 
-fn bs_build_w_write_fixture(ctx: ActionCtx, path: str, contents: str, _target_name: str, label: str) -> i32:
+fn bs_build_w_write_fixture(ctx: &ActionCtx, path: str, contents: str, _target_name: str, label: str) -> i32:
     let _ = _target_name
     bs_write_fixture(ctx, path, contents, label)
 
@@ -3441,7 +3444,7 @@ fn bs_blob_to_args(blob: str) -> Vec[str]:
             start = i + 1
     args
 
-fn bs_build_w_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+fn bs_build_w_expect_success(ctx: &ActionCtx, compiler_path: str, case_dir: str, label: str, args: &Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
@@ -3453,7 +3456,7 @@ fn bs_build_w_tool_from_env(env_name: str, fallback: str) -> str:
         return value
     fallback
 
-fn bs_build_w_nm_smoke(ctx: ActionCtx, obj_path: str, label: str) -> i32:
+fn bs_build_w_nm_smoke(ctx: &ActionCtx, obj_path: str, label: str) -> i32:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_rel = bs_join(output_dir, label ++ ".nm.stdout")
@@ -3468,7 +3471,7 @@ fn bs_build_w_nm_smoke(ctx: ActionCtx, obj_path: str, label: str) -> i32:
     let _remove_stderr = ctx.fs().remove_file(stderr_rel)
     0
 
-fn bs_check_build_w_not_ignored(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_w_not_ignored(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "buildwdemo")
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"default main\")\n", ctx.target_name(), "default main")
@@ -3496,7 +3499,7 @@ fn bs_check_build_w_not_ignored(ctx: ActionCtx, compiler_path: str, case_dir: st
     if explicit.rc != 0: return explicit.rc
     0
 
-fn bs_check_build_w_comptime_with_entry(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_build_w_comptime_with_entry(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let canonical_dir = bs_join(base_dir, "canonical")
     var rc = bs_write_project_manifest(ctx, canonical_dir, "comptimewithcanonical")
     if rc != 0: return rc
@@ -3543,7 +3546,7 @@ fn bs_check_build_w_comptime_with_entry(ctx: ActionCtx, compiler_path: str, base
         return bs_fail(ctx, "duplicate comptime-with default binding unexpectedly succeeded")
     bs_assert_contains(ctx, duplicate.stderr, "duplicate capability binding", "build_w_comptime_with_duplicate")
 
-fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let file_dir = bs_join(base_dir, "file_workspace")
     var rc = bs_write_project_manifest(ctx, file_dir, "workspacefile")
     if rc != 0: return rc
@@ -4410,7 +4413,7 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         return bs_fail(ctx, "current_workspace before create unexpectedly succeeded")
     bs_assert_contains(ctx, current_result.stderr, "current_workspace called before create_workspace", "build_w_workspace_current")
 
-fn bs_check_build_w_test_targets(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_build_w_test_targets(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let single_dir = bs_join(base_dir, "single")
     var rc = bs_write_project_manifest(ctx, single_dir, "buildwtest")
     if rc != 0: return rc
@@ -4440,7 +4443,7 @@ fn bs_check_build_w_test_targets(ctx: ActionCtx, compiler_path: str, base_dir: s
     if glob_result.rc != 0: return glob_result.rc
     bs_assert_contains(ctx, glob_result.stdout, "ok: 2 files passed in build.w test target glob-tests", "build_w_test_target_glob")
 
-fn bs_check_build_w_library_and_targets(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_build_w_library_and_targets(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let lib_dir = bs_join(base_dir, "library")
     var rc = bs_write_project_manifest(ctx, lib_dir, "buildwlib")
     if rc != 0: return rc
@@ -4490,7 +4493,7 @@ fn bs_check_build_w_library_and_targets(ctx: ActionCtx, compiler_path: str, base
         return 1
     bs_assert_contains(ctx, non_native_result.stderr, "build.w cross-target platform", "build_w_non_native_target")
 
-fn bs_check_build_w_generated_source(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let gen_dir = bs_join(base_dir, "generated")
     var rc = bs_write_project_manifest(ctx, gen_dir, "buildwgenerated")
     if rc != 0: return rc
@@ -4580,7 +4583,7 @@ fn bs_check_build_w_generated_source(ctx: ActionCtx, compiler_path: str, base_di
         return 1
     bs_assert_contains(ctx, toolfs_tree_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_tree_escape")
 
-fn bs_check_comptime_string_budget(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_comptime_string_budget(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let source =
         "comptime fn blow() -> str:\n" ++
         "    var out = \"\"\n" ++
@@ -4663,21 +4666,21 @@ fn bs_graph_build_file() -> str:
     "    out = out.add_target(aggregate)\n" ++
     "    out.default(\"toolchain\")\n"
 
-fn bs_require_case_file(ctx: ActionCtx, case_dir: str, rel_path: str, label: str) -> i32:
+fn bs_require_case_file(ctx: &ActionCtx, case_dir: str, rel_path: str, label: str) -> i32:
     let path = bs_join(case_dir, rel_path)
     if ctx.fs().exists(path):
         return 0
     ctx.diagnostics().error("error: " ++ ctx.target_name() ++ " " ++ label ++ " missing expected output: " ++ rel_path)
     1
 
-fn bs_forbid_case_file(ctx: ActionCtx, case_dir: str, rel_path: str, label: str) -> i32:
+fn bs_forbid_case_file(ctx: &ActionCtx, case_dir: str, rel_path: str, label: str) -> i32:
     let path = bs_join(case_dir, rel_path)
     if not ctx.fs().exists(path):
         return 0
     ctx.diagnostics().error("error: " ++ ctx.target_name() ++ " " ++ label ++ " produced unexpected output: " ++ rel_path)
     1
 
-fn bs_check_build_w_graph_v2(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_w_graph_v2(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "buildwgraphv2")
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/one.w"), "fn main:\n    print(\"one\")\n", ctx.target_name(), "graph one")
@@ -4808,7 +4811,7 @@ fn bs_check_build_w_graph_v2(ctx: ActionCtx, compiler_path: str, case_dir: str) 
         return 1
     0
 
-fn bs_check_removed_build_kind_diagnostic(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_removed_build_kind_diagnostic(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "removedkind")
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "removed kind source")
@@ -4830,7 +4833,7 @@ fn bs_check_removed_build_kind_diagnostic(ctx: ActionCtx, compiler_path: str, ca
     if rc != 0: return rc
     bs_assert_contains(ctx, result.stderr, "regenerate your build graph", "build_w_removed_kind")
 
-fn bs_check_build_w_action_target(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "buildwaction")
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action source")
@@ -4839,7 +4842,7 @@ fn bs_check_build_w_action_target(ctx: ActionCtx, compiler_path: str, case_dir: 
     if rc != 0: return rc
     let build_text =
         "use std.build\n\n" ++
-        "fn generate(ctx: ActionCtx) -> i32:\n" ++
+        "fn generate(ctx: &ActionCtx) -> i32:\n" ++
         "    assert(ctx.target_name() == \"generate\")\n" ++
         "    assert(ctx.project_info().package_name() == \"buildwaction\")\n" ++
         "    assert(ctx.inputs().get(0) == \"src/input.txt\")\n" ++
@@ -4888,17 +4891,17 @@ fn bs_check_build_w_action_target(ctx: ActionCtx, compiler_path: str, case_dir: 
     if rc != 0: return rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/extra.txt"), "extra:hello", "build_w_action_extra_output")
 
-fn bs_check_build_w_action_no_deps(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_build_w_action_no_deps(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "actionnodeps")
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action no-deps source")
     if rc != 0: return rc
     let build_text =
         "use std.build\n\n" ++
-        "fn prepare(ctx: ActionCtx) -> i32:\n" ++
+        "fn prepare(ctx: &ActionCtx) -> i32:\n" ++
         "    let _ = ctx\n" ++
         "    17\n\n" ++
-        "fn leaf(ctx: ActionCtx) -> i32:\n" ++
+        "fn leaf(ctx: &ActionCtx) -> i32:\n" ++
         "    assert(ctx.fs().write_text(ctx.output(), \"leaf\") == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -4937,7 +4940,7 @@ fn bs_check_build_w_action_no_deps(ctx: ActionCtx, compiler_path: str, case_dir:
     if rc != 0: return rc
     bs_assert_contains(ctx, with_deps.stderr, "failed with exit code 17", "build_w_action_no_deps_failure")
 
-fn bs_check_build_w_action_failures(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let missing_dir = bs_join(base_dir, "missing_input")
     var rc = bs_write_project_manifest(ctx, missing_dir, "actionmissing")
     if rc != 0: return rc
@@ -4945,7 +4948,7 @@ fn bs_check_build_w_action_failures(ctx: ActionCtx, compiler_path: str, base_dir
     if rc != 0: return rc
     let missing_build =
         "use std.build\n\n" ++
-        "fn generate(ctx: ActionCtx) -> i32:\n" ++
+        "fn generate(ctx: &ActionCtx) -> i32:\n" ++
         "    assert(ctx.fs().write_text(ctx.output(), \"should not run\") == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -4971,7 +4974,7 @@ fn bs_check_build_w_action_failures(ctx: ActionCtx, compiler_path: str, base_dir
     if rc != 0: return rc
     let failure_build =
         "use std.build\n\n" ++
-        "fn fail_action(ctx: ActionCtx) -> i32:\n" ++
+        "fn fail_action(ctx: &ActionCtx) -> i32:\n" ++
         "    7\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
         "    var out = ctx.new_build()\n" ++
@@ -4995,7 +4998,7 @@ fn bs_check_build_w_action_failures(ctx: ActionCtx, compiler_path: str, base_dir
     if rc != 0: return rc
     let undeclared_build =
         "use std.build\n\n" ++
-        "fn bad_write(ctx: ActionCtx) -> i32:\n" ++
+        "fn bad_write(ctx: &ActionCtx) -> i32:\n" ++
         "    assert(ctx.fs().write_text(\"out/action/other.txt\", \"bad\") == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -5020,7 +5023,7 @@ fn bs_check_build_w_action_failures(ctx: ActionCtx, compiler_path: str, base_dir
     if rc != 0: return rc
     let escape_build =
         "use std.build\n\n" ++
-        "fn bad_escape(ctx: ActionCtx) -> i32:\n" ++
+        "fn bad_escape(ctx: &ActionCtx) -> i32:\n" ++
         "    assert(ctx.fs().write_text(\"../outside.txt\", \"bad\") == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -5082,7 +5085,7 @@ pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
     bs_check_build_w_action_failures(ctx, compiler_path, bs_join(base_dir, "action_failures"))
 
 
-fn bs_copy_fixture_file(ctx: ActionCtx, src: str, dst: str, label: str) -> i32:
+fn bs_copy_fixture_file(ctx: &ActionCtx, src: str, dst: str, label: str) -> i32:
     if not ctx.fs().exists(src):
         return bs_fail(ctx, "missing source file for " ++ label ++ ": " ++ src)
     bs_write_fixture(ctx, dst, ctx.fs().read_text(src), label)
@@ -5100,19 +5103,19 @@ fn bs_drop_first_lines(text: str, count: i32) -> str:
         return text.slice(line_start as i64, text.len())
     ""
 
-fn bs_pcre2_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+fn bs_pcre2_expect_success(ctx: &ActionCtx, compiler_path: str, case_dir: str, label: str, args: &Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": pcre2 prep selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
 
-fn bs_check_pcre2_defs_prune_ebcdic_tables(ctx: ActionCtx) -> i32:
+fn bs_check_pcre2_defs_prune_ebcdic_tables(ctx: &ActionCtx) -> i32:
     let defs = "lib/std/re/defs.w"
     var rc = bs_file_forbids(ctx, defs, "_pcre2_ebcdic_1047_to_ascii_8", "ebcdic table externs")
     if rc != 0: return rc
     bs_file_forbids(ctx, defs, "_pcre2_ascii_to_ebcdic_1047_8", "ebcdic table externs")
 
-fn bs_check_pcre2_prepare_shared_externs(ctx: ActionCtx, base_dir: str) -> i32:
+fn bs_check_pcre2_prepare_shared_externs(ctx: &ActionCtx, base_dir: str) -> i32:
     let raw_dir = bs_join(base_dir, "raw")
     let generated_dir = bs_join(base_dir, "generated")
     var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nextern fn preamble_helper() -> Unit\n", "shared externs defs")
@@ -5146,7 +5149,7 @@ fn bs_check_pcre2_prepare_shared_externs(ctx: ActionCtx, base_dir: str) -> i32:
     if rc != 0: return rc
     bs_file_contains(ctx, bs_join(generated_dir, "pcre2_compile_class.w"), "extern var _pcre2_posix_class_maps8: *c_int", "shared externs class")
 
-fn bs_check_pcre2_prepare_width_prunes(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_pcre2_prepare_width_prunes(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let raw_dir = bs_join(base_dir, "raw")
     let generated_dir = bs_join(base_dir, "generated")
@@ -5175,7 +5178,7 @@ fn bs_check_pcre2_prepare_width_prunes(ctx: ActionCtx, compiler_path: str, base_
     if result.rc != 0: return result.rc
     0
 
-fn bs_check_pcre2_prepare_shared_lets(ctx: ActionCtx, base_dir: str) -> i32:
+fn bs_check_pcre2_prepare_shared_lets(ctx: &ActionCtx, base_dir: str) -> i32:
     let raw_dir = bs_join(base_dir, "raw")
     let generated_dir = bs_join(base_dir, "generated")
     var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nlet ucp_C: c_uint = 0\nlet ucp_L: c_uint = 1\n", "shared lets defs")
@@ -5213,7 +5216,7 @@ fn bs_check_pcre2_prepare_shared_lets(ctx: ActionCtx, base_dir: str) -> i32:
     if rc != 0: return rc
     bs_file_contains(ctx, bs_join(generated_dir, "pcre2_match.w"), "let MATCH_ONLY: c_uint = 8", "shared lets match")
 
-fn bs_check_std_re_shared_dependency_imports(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_std_re_shared_dependency_imports(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "main.w")
     var rc = bs_write_fixture(ctx, src, "use std.re.defs\nuse std.re.pcre2_compile\nuse std.re.pcre2_match\n\nfn main:\n    print(\"ok\")\n", "std re dependency imports")
@@ -5225,7 +5228,7 @@ fn bs_check_std_re_shared_dependency_imports(ctx: ActionCtx, compiler_path: str,
     if result.rc != 0: return result.rc
     0
 
-fn bs_check_opaque_field_access_rejected(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_opaque_field_access_rejected(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "opaque_field_access.w")
     var rc = bs_write_fixture(ctx, src, "type T = opaque\n\nfn f(p: *mut T):\n    (p.x = 1)\n\nfn main:\n    let _ = 0\n", "opaque field access")
@@ -5238,7 +5241,7 @@ fn bs_check_opaque_field_access_rejected(ctx: ActionCtx, compiler_path: str, bas
         return bs_fail(ctx, "accepted opaque field access")
     bs_assert_contains(ctx, result.stderr, "field access requires a concrete struct or union type; this type is opaque", "opaque_field_access")
 
-fn bs_check_pcre2_match_heapframe(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_pcre2_match_heapframe(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let match_path = "lib/std/re/pcre2_match.w"
     let match_text = ctx.fs().read_text(match_path)
@@ -5259,7 +5262,7 @@ fn bs_check_pcre2_match_heapframe(ctx: ActionCtx, compiler_path: str, base_dir: 
     if result.rc != 0: return result.rc
     0
 
-fn bs_check_pcre2_compile_builds(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_pcre2_compile_builds(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "pcre2_compile_builds.w")
     let bin = bs_join(base_dir, "pcre2_compile_builds")
@@ -5280,7 +5283,7 @@ fn bs_check_pcre2_compile_builds(ctx: ActionCtx, compiler_path: str, base_dir: s
         return bs_fail(ctx, "missing pcre2_compile_builds output: " ++ bin)
     0
 
-fn bs_check_pcre2_jit_no_support(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+fn bs_check_pcre2_jit_no_support(ctx: &ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "pcre2_jit_no_support.w")
     let text = "use std.re.defs\nuse std.re.pcre2_jit_compile\n\nfn main() -> i32:\n    let rc_null = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), 0)\n    if rc_null != PCRE2_ERROR_NULL: return 1\n\n    let rc_test_alloc = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), PCRE2_JIT_TEST_ALLOC)\n    if rc_test_alloc != PCRE2_ERROR_JIT_UNSUPPORTED: return 2\n\n    let stack = pcre2_jit_stack_create_8(1, 1024, (null as *mut pcre2_real_general_context_8))\n    if stack != null: return 3\n\n    pcre2_jit_stack_assign_8((null as *mut pcre2_real_match_context_8), (null as *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8), (null as *mut c_void))\n    pcre2_jit_stack_free_8(stack)\n    pcre2_jit_free_unused_memory_8((null as *mut pcre2_real_general_context_8))\n    _pcre2_jit_free_rodata_8((null as *mut c_void), (null as *mut c_void))\n    _pcre2_jit_free_8((null as *mut c_void), (null as *mut pcre2_memctl))\n\n    if _pcre2_jit_get_size_8((null as *mut c_void)) != 0: return 4\n    if _pcre2_jit_get_target_8() == null: return 5\n    return 0\n"
@@ -5293,7 +5296,7 @@ fn bs_check_pcre2_jit_no_support(ctx: ActionCtx, compiler_path: str, base_dir: s
     if result.rc != 0: return result.rc
     0
 
-fn bs_check_pcre2_generated_existing_main(ctx: ActionCtx, case_dir: str) -> i32:
+fn bs_check_pcre2_generated_existing_main(ctx: &ActionCtx, case_dir: str) -> i32:
     let generated_dir = bs_join(case_dir, "generated")
     var rc = bs_write_fixture(ctx, bs_join(generated_dir, "defs.w"), "// std.re.defs\ntype c_int = i32\n", "pcre2 generated defs")
     if rc != 0: return rc
@@ -5404,7 +5407,7 @@ fn bs_nm_symbol_type(line: str) -> str:
         return ""
     words.get(words.len() - 2)
 
-fn bs_nm_output(ctx: ActionCtx, nm_tool: str, obj_path: str, label: str) -> SelfhostRunResult:
+fn bs_nm_output(ctx: &ActionCtx, nm_tool: str, obj_path: str, label: str) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
     let stdout_rel = bs_join(output_dir, label ++ ".nm.stdout")
@@ -5441,19 +5444,19 @@ fn bs_nm_has_symbol(nm_text: str, exact: str, suffix: str, prefix: str, type_req
             return true
     false
 
-fn bs_expect_nm_symbol(ctx: ActionCtx, nm_text: str, label: str, exact: str, suffix: str, prefix: str, required_type: str, forbidden_type: str) -> i32:
+fn bs_expect_nm_symbol(ctx: &ActionCtx, nm_text: str, label: str, exact: str, suffix: str, prefix: str, required_type: str, forbidden_type: str) -> i32:
     if bs_nm_has_symbol(nm_text, exact, suffix, prefix, required_type, forbidden_type):
         return 0
     let want = if exact.len() > 0: exact else: prefix ++ "*" ++ suffix
     bs_fail(ctx, "missing expected symbol for " ++ label ++ ": " ++ want)
 
-fn bs_expect_nm_forbid(ctx: ActionCtx, nm_text: str, label: str, exact: str, suffix: str, prefix: str) -> i32:
+fn bs_expect_nm_forbid(ctx: &ActionCtx, nm_text: str, label: str, exact: str, suffix: str, prefix: str) -> i32:
     if not bs_nm_has_symbol(nm_text, exact, suffix, prefix, "", ""):
         return 0
     let want = if exact.len() > 0: exact else: prefix ++ "*" ++ suffix
     bs_fail(ctx, "found forbidden symbol for " ++ label ++ ": " ++ want)
 
-fn bs_write_fixture(ctx: ActionCtx, path: str, contents: str, label: str) -> i32:
+fn bs_write_fixture(ctx: &ActionCtx, path: str, contents: str, label: str) -> i32:
     let dir = bs_dirname(path)
     if ctx.fs().mkdir_all(dir) != 0:
         return bs_fail(ctx, "could not create fixture directory for " ++ label ++ ": " ++ dir)
@@ -5461,27 +5464,27 @@ fn bs_write_fixture(ctx: ActionCtx, path: str, contents: str, label: str) -> i32
         return bs_fail(ctx, "could not write fixture for " ++ label ++ ": " ++ path)
     0
 
-fn bs_write_project_manifest(ctx: ActionCtx, case_dir: str, package_name: str) -> i32:
+fn bs_write_project_manifest(ctx: &ActionCtx, case_dir: str, package_name: str) -> i32:
     bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), "[package]\nname = \"" ++ package_name ++ "\"\nversion = \"0.1.0\"\n", package_name ++ " manifest")
 
-fn bs_expect_file(ctx: ActionCtx, path: str, label: str) -> i32:
+fn bs_expect_file(ctx: &ActionCtx, path: str, label: str) -> i32:
     if ctx.fs().exists(path):
         return 0
     bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
 
-fn bs_expect_absent(ctx: ActionCtx, path: str, label: str) -> i32:
+fn bs_expect_absent(ctx: &ActionCtx, path: str, label: str) -> i32:
     if not ctx.fs().exists(path):
         return 0
     bs_fail(ctx, "found unexpected file for " ++ label ++ ": " ++ path)
 
-fn bs_expect_file_contains(ctx: ActionCtx, path: str, needle: str, label: str) -> i32:
+fn bs_expect_file_contains(ctx: &ActionCtx, path: str, needle: str, label: str) -> i32:
     if not ctx.fs().exists(path):
         return bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
     if ctx.fs().read_text(path).contains(needle):
         return 0
     bs_fail(ctx, "file mismatch for " ++ label ++ ": missing '" ++ needle ++ "' in " ++ path)
 
-fn bs_build_emit_obj(ctx: ActionCtx, compiler_path: str, label: str, src_path: str, obj_path: str) -> i32:
+fn bs_build_emit_obj(ctx: &ActionCtx, compiler_path: str, label: str, src_path: str, obj_path: str) -> i32:
     var args: Vec[str] = Vec.new()
     args |> push("build")
     args |> push(src_path)
@@ -5494,7 +5497,7 @@ fn bs_build_emit_obj(ctx: ActionCtx, compiler_path: str, label: str, src_path: s
         return bs_fail(ctx, f"failed to build object for {label} with exit code {result.rc}")
     0
 
-fn bs_check_object_symbols(ctx: ActionCtx, compiler_path: str, nm_tool: str, case_dir: str) -> i32:
+fn bs_check_object_symbols(ctx: &ActionCtx, compiler_path: str, nm_tool: str, case_dir: str) -> i32:
     let globals_src = bs_join(case_dir, "emit_obj_globals.w")
     let globals_obj = bs_join(case_dir, "emit_obj_globals.o")
     var rc = bs_write_fixture(ctx, globals_src, "var explicit_global: i32 = 42\nvar zero_global: i32\n", "emit_obj_globals")

@@ -854,7 +854,7 @@ fn build_action_run_result(rc: i32) -> BuildActionRunResult:
 fn build_action_run_result_with_effects(rc: i32, effects: Vec[str]) -> BuildActionRunResult:
     BuildActionRunResult { rc: rc, effects: effects }
 
-fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: &BuildGraphTarget, sema: Sema, strict_effects: bool) -> BuildActionRunResult:
+unsafe fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: &BuildGraphTarget, sema_ptr: *mut Sema, strict_effects: bool) -> BuildActionRunResult:
     if target.output.len() == 0:
         with_eprint("error: action target '" ++ target.name ++ "' requires a declared output")
         return build_action_run_result(1)
@@ -874,8 +874,7 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: &BuildGr
     if target.action_fn == 0:
         with_eprint("error: action target '" ++ target.name ++ "' is missing an evaluator action function")
         return build_action_run_result(1)
-    var action_sema = sema
-    let result = unsafe { comptime_eval_tool_action_result(&raw mut action_sema as *mut Sema, action_sema.ast, action_sema.pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, target.inputs, target.output, target.extra_outputs, target.args, target.write_scopes, target.timeout_ms, target.cwd, target.env, target.network, if strict_effects: 1 else: 0) }
+    let result = comptime_eval_tool_action_result(sema_ptr, (*sema_ptr).ast, (*sema_ptr).pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, target.inputs, target.output, target.extra_outputs, target.args, target.write_scopes, target.timeout_ms, target.cwd, target.env, target.network, if strict_effects: 1 else: 0)
     if result.runtime_exit_code != 0:
         if result.runtime_stderr.len() > 0:
             with_ewrite(result.runtime_stderr)
@@ -1041,7 +1040,7 @@ fn build_options_for_graph_target(root: str, base: &BuildCommandOptions, target:
         options.output_kind = BuildOutputKind.Binary
     options
 
-fn run_build_graph(root: str, cfg: ProjectConfig, graph: &BuildGraph, action_sema: Sema, options: &BuildCommandOptions) -> i32:
+unsafe fn run_build_graph(root: str, cfg: ProjectConfig, graph: &BuildGraph, action_sema: *mut Sema, options: &BuildCommandOptions) -> i32:
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
         return 1
@@ -1387,7 +1386,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
             if actual_options.output_kind != BuildOutputKind.Binary:
                 with_eprint("error: build.w tool-mode only supports binary builds")
                 return 1
-            let load_result = load_build_graph_from_build_w(root, &cfg, &actual_options)
+            var load_result = load_build_graph_from_build_w(root, &cfg, &actual_options)
             let graph = load_result.graph
             if not graph.ok:
                 with_eprint("error: " ++ graph.error_msg)
@@ -1412,7 +1411,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
                 return 0
             if not repo_lock_acquire(selected_target_name):
                 return 1
-            let build_rc = run_build_graph(root, cfg, selected_graph, load_result.sema, actual_options)
+            let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, actual_options) }
             repo_lock_release()
             link_stage_cleanup_current_process_temp_archives()
             return build_rc
@@ -1487,7 +1486,7 @@ fn run_run_project_command(selected_target_hint: str, opt_level: i32, no_std: bo
     options.runtime_available = runtime_available
     options.prelude_mode = prelude_mode
     options.debug_info = debug_info
-    let load_result = load_build_graph_from_build_w(root, &cfg, &options)
+    var load_result = load_build_graph_from_build_w(root, &cfg, &options)
     let graph = load_result.graph
     if not graph.ok:
         with_eprint("error: " ++ graph.error_msg)
@@ -1511,7 +1510,7 @@ fn run_run_project_command(selected_target_hint: str, opt_level: i32, no_std: bo
         return 1
     if not repo_lock_acquire(selected_target_name):
         return 1
-    let build_rc = run_build_graph(root, cfg, selected_graph, load_result.sema, options)
+    let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, options) }
     repo_lock_release()
     if build_rc != 0:
         return build_rc

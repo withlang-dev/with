@@ -670,6 +670,7 @@ fn ComptimeEvaluator.check_workspace_intercepts_finished(self: ComptimeEvaluator
 unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
+    sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
     var tracked_paths = sema_ptr.tracked_input_paths
@@ -681,6 +682,7 @@ unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool:
 unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
+    sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
     var tracked_paths = sema_ptr.tracked_input_paths
@@ -698,6 +700,7 @@ unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
 unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, strict_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
+    sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
     evaluator.strict_effects = strict_effects
@@ -726,6 +729,7 @@ unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, poo
 unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
     var sema = *sema_ptr
     sema.ast = ast
+    sema = sema.prepare_comptime_eval_copy()
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
     evaluator.strict_effects = strict_effects
@@ -1798,7 +1802,6 @@ fn ComptimeEvaluator.variant_payload_name(self: ComptimeEvaluator, type_id: i32,
     out ++ ")"
 
 fn ComptimeEvaluator.eval_type_fields_array(self: ComptimeEvaluator, type_id: i32) -> ComptimeControl:
-    let layout_sema = self.sema
     let field_count = self.sema.type_reflection_field_count(type_id)
     let array_tid = self.sema.ensure_exact_type(TypeKind.TY_ARRAY, self.sema.ty_field_info as i32, field_count, 0) as i32
     let arr_start = self.extra_values.len() as i32
@@ -1811,8 +1814,8 @@ fn ComptimeEvaluator.eval_type_fields_array(self: ComptimeEvaluator, type_id: i3
         let field_tid = self.sema.type_reflection_field_type(type_id, fi)
         payload_values.push(comptime_value_str(self.pool.resolve(field_sym)))
         payload_values.push(comptime_value_str(self.sema.type_name(field_tid)))
-        payload_values.push(comptime_value_int(self.sema.ty_usize as i32, layout_sema.type_layout_struct_field_offset(type_id, fi)))
-        payload_values.push(comptime_value_int(self.sema.ty_usize as i32, layout_sema.type_layout_size_of(field_tid)))
+        payload_values.push(comptime_value_int(self.sema.ty_usize as i32, self.sema.type_layout_struct_field_offset(type_id, fi)))
+        payload_values.push(comptime_value_int(self.sema.ty_usize as i32, self.sema.type_layout_size_of(field_tid)))
         payload_values.push(comptime_value_bool(self.sema.type_is_ephemeral_value(field_tid)))
     for pi in 0..payload_values.len() as i32:
         self.extra_values.push(payload_values.get(pi as i64))
@@ -2260,7 +2263,6 @@ fn ComptimeEvaluator.eval_pipeline(self: ComptimeEvaluator, node: i32) -> Compti
     self.eval_fn_symbol_call_values(fn_sym, args, node)
 
 fn ComptimeEvaluator.eval_static_type_method_call(self: ComptimeEvaluator, recv_type: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
-    let layout_sema = self.sema
     let method = self.pool.resolve(field)
     let resolved_recv = self.sema.resolve_alias(recv_type)
     if self.sema.enum_has_variant(resolved_recv as i32, field) != 0:
@@ -2273,11 +2275,11 @@ fn ComptimeEvaluator.eval_static_type_method_call(self: ComptimeEvaluator, recv_
     if method == "size":
         if arg_count != 0:
             return self.fail(node, "type.size() takes no arguments")
-        return comptime_control_value(comptime_value_int(self.sema.ty_usize as i32, layout_sema.type_layout_size_of(recv_type)))
+        return comptime_control_value(comptime_value_int(self.sema.ty_usize as i32, self.sema.type_layout_size_of(recv_type)))
     if method == "align":
         if arg_count != 0:
             return self.fail(node, "type.align() takes no arguments")
-        return comptime_control_value(comptime_value_int(self.sema.ty_usize as i32, layout_sema.type_layout_align_of(recv_type)))
+        return comptime_control_value(comptime_value_int(self.sema.ty_usize as i32, self.sema.type_layout_align_of(recv_type)))
     if method == "is_copy":
         if arg_count != 0:
             return self.fail(node, "type.is_copy() takes no arguments")

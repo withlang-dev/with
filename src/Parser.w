@@ -6887,8 +6887,11 @@ fn Parser.parse_type_expr(self: Parser) -> NodeId:
             var args: Vec[i32] = Vec.new()
             if self.peek() != TokenKind.TK_R_BRACKET:
                 while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
-                    let ty = self.parse_type_expr()
-                    args.push(ty as i32)
+                    let arg = if self.intern.resolve(sym) == "FixedString":
+                        self.parse_expr()
+                    else:
+                        self.parse_type_expr()
+                    args.push(arg as i32)
                     self.skip_newlines()
                     if self.peek() != TokenKind.TK_COMMA:
                         break

@@ -9,7 +9,7 @@ type UatRunResult {
     stderr: str,
 }
 
-fn ruat_fail(ctx: ActionCtx, message: str) -> i32:
+fn ruat_fail(ctx: &ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
@@ -62,7 +62,7 @@ fn ruat_trim_trailing_line_endings(text: str) -> str:
         end = end - 1
     text.slice(0, end)
 
-fn ruat_write_stamp(ctx: ActionCtx) -> i32:
+fn ruat_write_stamp(ctx: &ActionCtx) -> i32:
     let output = ctx.output()
     let output_dir = ruat_dirname(output)
     if ctx.fs().mkdir_all(output_dir) != 0:
@@ -71,7 +71,7 @@ fn ruat_write_stamp(ctx: ActionCtx) -> i32:
         return ruat_fail(ctx, "could not write UAT stamp: " ++ output)
     0
 
-fn ruat_prepare_clean_dir(ctx: ActionCtx, path: str) -> i32:
+fn ruat_prepare_clean_dir(ctx: &ActionCtx, path: str) -> i32:
     let fs = ctx.fs()
     if fs.exists(path) and fs.remove_tree(path) != 0:
         return ruat_fail(ctx, "could not remove previous UAT directory: " ++ path)
@@ -79,13 +79,13 @@ fn ruat_prepare_clean_dir(ctx: ActionCtx, path: str) -> i32:
         return ruat_fail(ctx, "could not create UAT directory: " ++ path)
     0
 
-fn ruat_compiler_input(ctx: ActionCtx) -> str:
+fn ruat_compiler_input(ctx: &ActionCtx) -> str:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return ""
     ruat_abs(ctx.project_info().project_root(), inputs.get(0))
 
-fn ruat_compiler_input_rel(ctx: ActionCtx) -> str:
+fn ruat_compiler_input_rel(ctx: &ActionCtx) -> str:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return ""
@@ -117,21 +117,21 @@ fn ruat_argv3(compiler: str, a: str, b: str, c: str) -> Vec[str]:
 fn ruat_capture_path(root: str, dir: str, label: str, suffix: str) -> str:
     ruat_abs(root, ruat_join(dir, label ++ "." ++ suffix))
 
-fn ruat_run_capture_cwd(ctx: ActionCtx, compiler: str, workdir: str, label: str, args: Vec[str], timeout_ms: i32) -> UatRunResult:
+fn ruat_run_capture_cwd(ctx: &ActionCtx, compiler: str, workdir: str, label: str, args: Vec[str], timeout_ms: i32) -> UatRunResult:
     let root = ctx.project_info().project_root()
     let stdout_path = ruat_capture_path(root, workdir, label, "stdout")
     let stderr_path = ruat_capture_path(root, workdir, label, "stderr")
     let result = ctx.process_runner().run_capture_cwd(args, stdout_path, stderr_path, timeout_ms, ruat_abs(root, workdir))
     UatRunResult { result.rc, result.stdout, result.stderr }
 
-fn ruat_run_capture(ctx: ActionCtx, workdir: str, label: str, args: Vec[str], timeout_ms: i32) -> UatRunResult:
+fn ruat_run_capture(ctx: &ActionCtx, workdir: str, label: str, args: Vec[str], timeout_ms: i32) -> UatRunResult:
     let root = ctx.project_info().project_root()
     let stdout_path = ruat_capture_path(root, workdir, label, "stdout")
     let stderr_path = ruat_capture_path(root, workdir, label, "stderr")
     let result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, timeout_ms)
     UatRunResult { result.rc, result.stdout, result.stderr }
 
-fn ruat_run_capture_input(ctx: ActionCtx, compiler: str, workdir: str, label: str, code_mode: str, code: str, stdin_text: str, timeout_ms: i32) -> UatRunResult:
+fn ruat_run_capture_input(ctx: &ActionCtx, compiler: str, workdir: str, label: str, code_mode: str, code: str, stdin_text: str, timeout_ms: i32) -> UatRunResult:
     let root = ctx.project_info().project_root()
     let stdin_rel = ruat_join(workdir, label ++ ".stdin")
     if ctx.fs().write_text(stdin_rel, stdin_text) != 0:
@@ -142,12 +142,12 @@ fn ruat_run_capture_input(ctx: ActionCtx, compiler: str, workdir: str, label: st
     let result = ctx.process_runner().run_capture_input(args, stdout_path, stderr_path, timeout_ms, ruat_abs(root, stdin_rel))
     UatRunResult { result.rc, result.stdout, result.stderr }
 
-fn ruat_expect_success(ctx: ActionCtx, result: UatRunResult, label: str) -> i32:
+fn ruat_expect_success(ctx: &ActionCtx, result: &UatRunResult, label: str) -> i32:
     if result.rc == 0:
         return 0
     ruat_fail(ctx, label ++ f" failed with exit code {result.rc}\nstdout:\n" ++ result.stdout ++ "\nstderr:\n" ++ result.stderr)
 
-fn ruat_expect_stdout(ctx: ActionCtx, result: UatRunResult, expected: str, label: str) -> i32:
+fn ruat_expect_stdout(ctx: &ActionCtx, result: &UatRunResult, expected: str, label: str) -> i32:
     let rc = ruat_expect_success(ctx, result, label)
     if rc != 0:
         return rc
@@ -156,7 +156,7 @@ fn ruat_expect_stdout(ctx: ActionCtx, result: UatRunResult, expected: str, label
         return 0
     ruat_fail(ctx, "stdout mismatch for " ++ label ++ "\nexpected:\n" ++ expected ++ "\nactual:\n" ++ actual)
 
-fn ruat_expect_stdout_contains(ctx: ActionCtx, result: UatRunResult, expected: str, label: str) -> i32:
+fn ruat_expect_stdout_contains(ctx: &ActionCtx, result: &UatRunResult, expected: str, label: str) -> i32:
     let rc = ruat_expect_success(ctx, result, label)
     if rc != 0:
         return rc
@@ -164,7 +164,7 @@ fn ruat_expect_stdout_contains(ctx: ActionCtx, result: UatRunResult, expected: s
         return 0
     ruat_fail(ctx, "stdout for " ++ label ++ " did not contain '" ++ expected ++ "'\nstdout:\n" ++ result.stdout ++ "\nstderr:\n" ++ result.stderr)
 
-fn ruat_expect_file_contains(ctx: ActionCtx, path: str, expected: str, label: str) -> i32:
+fn ruat_expect_file_contains(ctx: &ActionCtx, path: str, expected: str, label: str) -> i32:
     if not ctx.fs().exists(path):
         return ruat_fail(ctx, label ++ " did not create " ++ path)
     let text = ctx.fs().read_text(path)
@@ -299,7 +299,7 @@ pub fn run_release_migrate_uat_action(ctx: ActionCtx) -> i32:
 
     ruat_write_stamp(ctx)
 
-fn ruat_run_c_package_uat(ctx: ActionCtx, package: str, label: str, fixture: str, expected_stdout: str) -> i32:
+fn ruat_run_c_package_uat(ctx: &ActionCtx, package: str, label: str, fixture: str, expected_stdout: str) -> i32:
     let compiler = ruat_compiler_input(ctx)
     if compiler.len() == 0:
         return ruat_fail(ctx, "missing compiler input")

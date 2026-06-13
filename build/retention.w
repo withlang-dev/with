@@ -7,11 +7,11 @@ use std.process
 const RET_SEED_KEEP: i32 = 5
 const RET_RELEASE_VERSION_KEEP: i32 = 5
 
-fn ret_fail(ctx: ActionCtx, message: str) -> i32:
+fn ret_fail(ctx: &ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
-fn ret_write_output_stamp(ctx: ActionCtx) -> i32:
+fn ret_write_output_stamp(ctx: &ActionCtx) -> i32:
     let output = ctx.output()
     if output.len() == 0:
         return 0
@@ -141,7 +141,7 @@ fn ret_short(text: str, n: i32) -> str:
         return text
     text.slice(0, n as i64)
 
-fn ret_run_first_line(ctx: ActionCtx, label: str, args: Vec[str], timeout_ms: i32) -> str:
+fn ret_run_first_line(ctx: &ActionCtx, label: str, args: &Vec[str], timeout_ms: i32) -> str:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let dir = ret_join("out/command", ctx.target_name())
@@ -154,7 +154,7 @@ fn ret_run_first_line(ctx: ActionCtx, label: str, args: Vec[str], timeout_ms: i3
         return ""
     ret_first_line(result.stdout)
 
-fn ret_run_lines(ctx: ActionCtx, label: str, args: Vec[str], timeout_ms: i32) -> Vec[str]:
+fn ret_run_lines(ctx: &ActionCtx, label: str, args: &Vec[str], timeout_ms: i32) -> Vec[str]:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let dir = ret_join("out/command", ctx.target_name())
@@ -167,7 +167,7 @@ fn ret_run_lines(ctx: ActionCtx, label: str, args: Vec[str], timeout_ms: i32) ->
         return Vec.new()
     ret_split_lines(result.stdout)
 
-fn ret_run_status(ctx: ActionCtx, label: str, args: Vec[str], timeout_ms: i32) -> i32:
+fn ret_run_status(ctx: &ActionCtx, label: str, args: &Vec[str], timeout_ms: i32) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let dir = ret_join("out/command", ctx.target_name())
@@ -180,21 +180,21 @@ fn ret_run_status(ctx: ActionCtx, label: str, args: Vec[str], timeout_ms: i32) -
         ctx.diagnostics().error(ctx.target_name() ++ ": command '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     result.rc
 
-fn ret_shell_first_line(ctx: ActionCtx, label: str, script: str) -> str:
+fn ret_shell_first_line(ctx: &ActionCtx, label: str, script: str) -> str:
     let args: Vec[str] = Vec.new()
     args.push("sh")
     args.push("-c")
     args.push(script)
     ret_run_first_line(ctx, label, args, 120000)
 
-fn ret_shell_lines(ctx: ActionCtx, label: str, script: str) -> Vec[str]:
+fn ret_shell_lines(ctx: &ActionCtx, label: str, script: str) -> Vec[str]:
     let args: Vec[str] = Vec.new()
     args.push("sh")
     args.push("-c")
     args.push(script)
     ret_run_lines(ctx, label, args, 120000)
 
-fn ret_sha256_file(ctx: ActionCtx, label: str, path: str) -> str:
+fn ret_sha256_file(ctx: &ActionCtx, label: str, path: str) -> str:
     let root = ctx.project_info().project_root()
     let target_path = ret_abs(root, path)
     let shasum_args: Vec[str] = Vec.new()
@@ -213,7 +213,7 @@ fn ret_sha256_file(ctx: ActionCtx, label: str, path: str) -> str:
         return ret_first_field(sha256)
     ""
 
-fn ret_sha256_text(ctx: ActionCtx, label: str, text: str) -> str:
+fn ret_sha256_text(ctx: &ActionCtx, label: str, text: str) -> str:
     let fs = ctx.fs()
     let dir = ret_join("out/command", ctx.target_name())
     if fs.mkdir_all(dir) != 0:
@@ -320,7 +320,7 @@ fn ret_sorted_release_versions(items: Vec[str]) -> Vec[str]:
         sorted = next
     sorted
 
-fn ret_direct_w_files(fs: ToolFs, dir: str) -> Vec[str]:
+fn ret_direct_w_files(fs: &ToolFs, dir: str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     let files = fs.list_files(dir)
     for i in 0..files.len() as i32:
@@ -329,7 +329,7 @@ fn ret_direct_w_files(fs: ToolFs, dir: str) -> Vec[str]:
             out.push(path)
     ret_sorted_strings(out)
 
-fn ret_expected_test_marker(ctx: ActionCtx, target_name: str, entry: str) -> str:
+fn ret_expected_test_marker(ctx: &ActionCtx, target_name: str, entry: str) -> str:
     let fs = ctx.fs()
     let compiler_path = ret_release_compiler_path()
     var text = "v1\n"
@@ -358,7 +358,7 @@ fn ret_release_compiler_path() -> str:
 fn ret_stage_fixpoint_path(name: str) -> str:
     "out/stage/bin/" ++ name
 
-fn ret_append_test_marker(ctx: ActionCtx, combined: str, target_name: str, entry: str) -> str:
+fn ret_append_test_marker(ctx: &ActionCtx, combined: str, target_name: str, entry: str) -> str:
     let marker_path = "out/.build-state/" ++ target_name ++ ".test-pass"
     let fs = ctx.fs()
     let actual = fs.read_text(marker_path)
@@ -371,7 +371,7 @@ fn ret_append_test_marker(ctx: ActionCtx, combined: str, target_name: str, entry
         return ""
     combined ++ "marker:" ++ target_name ++ "\n" ++ actual
 
-fn ret_append_state_file(ctx: ActionCtx, combined: str, target_name: str) -> str:
+fn ret_append_state_file(ctx: &ActionCtx, combined: str, target_name: str) -> str:
     let state_path = "out/.build-state/" ++ target_name ++ ".state"
     let state = ctx.fs().read_text(state_path)
     if state.len() == 0:
@@ -379,7 +379,7 @@ fn ret_append_state_file(ctx: ActionCtx, combined: str, target_name: str) -> str
         return ""
     combined ++ "state:" ++ target_name ++ "\n" ++ state ++ "\n"
 
-fn ret_sha256_files_manifest(ctx: ActionCtx, label: str, files: Vec[str]) -> str:
+fn ret_sha256_files_manifest(ctx: &ActionCtx, label: str, files: &Vec[str]) -> str:
     if files.len() == 0:
         return ""
     let safe_label = ret_safe_label(label)
@@ -399,14 +399,14 @@ fn ret_sha256_files_manifest(ctx: ActionCtx, label: str, files: Vec[str]) -> str
     let sha256 = ret_run_lines(ctx, safe_label ++ "-sha256sum", sha256_args, 120000)
     ret_join_lines(sha256)
 
-fn ret_append_file_hashes(combined: str, ctx: ActionCtx, label: str, files: Vec[str]) -> str:
+fn ret_append_file_hashes(combined: str, ctx: &ActionCtx, label: str, files: &Vec[str]) -> str:
     let manifest = ret_sha256_files_manifest(ctx, label, files)
     if files.len() > 0 and manifest.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash " ++ label ++ " files")
         return ""
     combined ++ "files:" ++ label ++ "\n" ++ manifest
 
-fn ret_build_driver_sources_manifest(ctx: ActionCtx) -> str:
+fn ret_build_driver_sources_manifest(ctx: &ActionCtx) -> str:
     let fs = ctx.fs()
     let files: Vec[str] = Vec.new()
     files.push("build.w")
@@ -420,7 +420,7 @@ fn ret_build_driver_sources_manifest(ctx: ActionCtx) -> str:
     files.push("src/BuildGraphCache.w")
     ret_append_file_hashes("", ctx, "build-driver", files)
 
-fn ret_append_test_file_hashes(combined: str, ctx: ActionCtx, entry: str) -> str:
+fn ret_append_test_file_hashes(combined: str, ctx: &ActionCtx, entry: str) -> str:
     let dir = ret_dirname(entry)
     let script = "if command -v shasum >/dev/null 2>&1; then find " ++ dir ++ " -maxdepth 1 -type f -name '*.w' -print | LC_ALL=C sort | xargs shasum -a 256; else find " ++ dir ++ " -maxdepth 1 -type f -name '*.w' -print | LC_ALL=C sort | xargs sha256sum; fi"
     let manifest = ret_join_lines(ret_shell_lines(ctx, ret_safe_label(entry) ++ "-files", script))
@@ -429,7 +429,7 @@ fn ret_append_test_file_hashes(combined: str, ctx: ActionCtx, entry: str) -> str
         return ""
     combined ++ "files:" ++ entry ++ "\n" ++ manifest
 
-fn ret_test_green_fingerprint(ctx: ActionCtx) -> str:
+fn ret_test_green_fingerprint(ctx: &ActionCtx) -> str:
     var combined = ret_build_driver_sources_manifest(ctx)
     if combined.len() == 0: return ""
     combined = ret_append_test_marker(ctx, combined, "behavior-tests", "test/behavior/*.w")
@@ -480,14 +480,14 @@ fn ret_test_green_fingerprint(ctx: ActionCtx) -> str:
     if combined.len() == 0: return ""
     ret_sha256_text(ctx, "test-green-inputs", combined)
 
-fn ret_git_commit(ctx: ActionCtx) -> str:
+fn ret_git_commit(ctx: &ActionCtx) -> str:
     let args: Vec[str] = Vec.new()
     args.push("git")
     args.push("rev-parse")
     args.push("HEAD")
     ret_run_first_line(ctx, "git-head", args, 30000)
 
-fn ret_compiler_version(ctx: ActionCtx, compiler_path: str) -> str:
+fn ret_compiler_version(ctx: &ActionCtx, compiler_path: str) -> str:
     let root = ctx.project_info().project_root()
     let args: Vec[str] = Vec.new()
     args.push(ret_abs(root, compiler_path))
@@ -526,12 +526,12 @@ fn ret_join_lines(items: Vec[str]) -> str:
         out = out ++ items.get(i as i64) ++ "\n"
     out
 
-fn ret_seed_manifest_entries(fs: ToolFs) -> Vec[str]:
+fn ret_seed_manifest_entries(fs: &ToolFs) -> Vec[str]:
     if not fs.exists("out/seed-archive/manifest.tsv"):
         return Vec.new()
     ret_split_lines(fs.read_text("out/seed-archive/manifest.tsv"))
 
-fn ret_archive_verified_seed(ctx: ActionCtx, version: str, commit: str, sha256: str) -> i32:
+fn ret_archive_verified_seed(ctx: &ActionCtx, version: str, commit: str, sha256: str) -> i32:
     let fs = ctx.fs()
     if fs.mkdir_all("out/seed-archive") != 0:
         return ret_fail(ctx, "could not create out/seed-archive")
@@ -582,7 +582,7 @@ pub fn run_test_green_action(ctx: ActionCtx) -> i32:
     print("[test-green] recorded current test evidence in out/.build-state/test-green.json")
     0
 
-fn ret_require_test_green(ctx: ActionCtx, compiler_sha: str) -> i32:
+fn ret_require_test_green(ctx: &ActionCtx, compiler_sha: str) -> i32:
     let manifest = ctx.fs().read_text("out/.build-state/test-green.json")
     if manifest.len() == 0:
         return ret_fail(ctx, "missing test-green manifest; run `with build :test`")
@@ -717,7 +717,7 @@ pub fn run_install_verified_compiler_action(ctx: ActionCtx) -> i32:
             return ret_fail(ctx, "could not write " ++ output)
     0
 
-fn ret_live_targets(args: Vec[str]) -> Vec[str]:
+fn ret_live_targets(args: &Vec[str]) -> Vec[str]:
     let live: Vec[str] = Vec.new()
     let prefix = "live-target="
     for i in 0..args.len() as i32:
@@ -732,7 +732,7 @@ fn ret_state_target_name(path: str) -> str:
     let base = ret_basename(path)
     base.slice(0, base.len() - 6)
 
-fn ret_add_stale_state_files(fs: ToolFs, live_targets: Vec[str], candidates: Vec[str]) -> Vec[str]:
+fn ret_add_stale_state_files(fs: &ToolFs, live_targets: Vec[str], candidates: Vec[str]) -> Vec[str]:
     var out = candidates
     if live_targets.len() == 0 or not fs.exists("out/.build-state"):
         return out
@@ -744,7 +744,7 @@ fn ret_add_stale_state_files(fs: ToolFs, live_targets: Vec[str], candidates: Vec
             out = ret_add_unique(out, path)
     out
 
-fn ret_add_old_seed_archives(fs: ToolFs, candidates: Vec[str]) -> Vec[str]:
+fn ret_add_old_seed_archives(fs: &ToolFs, candidates: Vec[str]) -> Vec[str]:
     var out = candidates
     let entries = ret_seed_manifest_entries(fs)
     var keep_from = entries.len() as i32 - RET_SEED_KEEP
@@ -774,7 +774,7 @@ fn ret_release_artifact_version(path: str) -> str:
             return version
     ""
 
-fn ret_release_artifact_versions(fs: ToolFs) -> Vec[str]:
+fn ret_release_artifact_versions(fs: &ToolFs) -> Vec[str]:
     var versions: Vec[str] = Vec.new()
     if not fs.exists("out/release"):
         return versions
@@ -784,7 +784,7 @@ fn ret_release_artifact_versions(fs: ToolFs) -> Vec[str]:
         versions = ret_add_unique(versions, version)
     ret_sorted_release_versions(versions)
 
-fn ret_stale_release_artifact_versions(fs: ToolFs) -> Vec[str]:
+fn ret_stale_release_artifact_versions(fs: &ToolFs) -> Vec[str]:
     let versions = ret_release_artifact_versions(fs)
     let stale: Vec[str] = Vec.new()
     let stale_count = versions.len() as i32 - RET_RELEASE_VERSION_KEEP
@@ -794,7 +794,7 @@ fn ret_stale_release_artifact_versions(fs: ToolFs) -> Vec[str]:
         stale.push(versions.get(i as i64))
     stale
 
-fn ret_add_old_release_artifacts(fs: ToolFs, candidates: Vec[str]) -> Vec[str]:
+fn ret_add_old_release_artifacts(fs: &ToolFs, candidates: Vec[str]) -> Vec[str]:
     var out = candidates
     let stale_versions = ret_stale_release_artifact_versions(fs)
     if stale_versions.len() == 0 or not fs.exists("out/release"):
@@ -807,7 +807,7 @@ fn ret_add_old_release_artifacts(fs: ToolFs, candidates: Vec[str]) -> Vec[str]:
             out = ret_add_unique(out, path)
     out
 
-fn ret_small_prune_candidates(ctx: ActionCtx) -> Vec[str]:
+fn ret_small_prune_candidates(ctx: &ActionCtx) -> Vec[str]:
     let fs = ctx.fs()
     var candidates: Vec[str] = Vec.new()
     candidates = ret_add_stale_state_files(fs, ret_live_targets(ctx.args()), candidates)
@@ -815,7 +815,7 @@ fn ret_small_prune_candidates(ctx: ActionCtx) -> Vec[str]:
     candidates = ret_add_old_release_artifacts(fs, candidates)
     ret_sorted_strings(candidates)
 
-fn ret_apply_small_prune(ctx: ActionCtx, candidates: Vec[str]) -> i32:
+fn ret_apply_small_prune(ctx: &ActionCtx, candidates: Vec[str]) -> i32:
     let fs = ctx.fs()
     var removed = 0
     for i in 0..candidates.len() as i32:
@@ -830,7 +830,7 @@ fn ret_apply_small_prune(ctx: ActionCtx, candidates: Vec[str]) -> i32:
     print(f"[prune] removed {removed} stale retained artifact(s)")
     0
 
-fn ret_apply_large_prune(ctx: ActionCtx) -> i32:
+fn ret_apply_large_prune(ctx: &ActionCtx) -> i32:
     let fs = ctx.fs()
     let bin_count = ret_shell_first_line(ctx, "apply-count-temp-bin", "if [ -d out/bin ]; then find out/bin -maxdepth 1 \\( -type d -name '*.tmp.*.dSYM' -o -type f -name '*.tmp.*' \\) -print | wc -l; else echo 0; fi")
     let lib_count = ret_shell_first_line(ctx, "apply-count-temp-lib-archives", "if [ -d out/lib ]; then find out/lib -maxdepth 1 -type f -name '*.o.*.a' -print | wc -l; else echo 0; fi")
@@ -933,7 +933,7 @@ fn ret_report_prune(candidates: Vec[str]):
     if candidates.len() as i32 > shown:
         print(f"  ... and {candidates.len() as i32 - shown} more")
 
-fn ret_report_large_prune(ctx: ActionCtx):
+fn ret_report_large_prune(ctx: &ActionCtx):
     let bin_count = ret_shell_first_line(ctx, "count-temp-bin", "if [ -d out/bin ]; then find out/bin -maxdepth 1 \\( -type d -name '*.tmp.*.dSYM' -o -type f -name '*.tmp.*' \\) -print | wc -l; else echo 0; fi")
     let lib_count = ret_shell_first_line(ctx, "count-temp-lib-archives", "if [ -d out/lib ]; then find out/lib -maxdepth 1 -type f -name '*.o.*.a' -print | wc -l; else echo 0; fi")
     let bootstrap_count = ret_shell_first_line(ctx, "count-temp-bootstrap-archives", "if [ -d out/bootstrap-lib ]; then find out/bootstrap-lib -maxdepth 1 -type f -name '*.o.*.a' -print | wc -l; else echo 0; fi")

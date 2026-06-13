@@ -7,7 +7,7 @@ use std.sysinfo
 const COMPILER_LLVM_VERSION: str = "22.1.6"
 const COMPILER_FALLBACK_LLVM_PREFIX: str = "/usr/local/llvm"
 
-fn comp_fail(ctx: ActionCtx, message: str) -> i32:
+fn comp_fail(ctx: &ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
@@ -76,7 +76,7 @@ fn comp_windows_sdk_ucrt_lib(name: str) -> str:
 fn comp_windows_msvc_lib(name: str) -> str:
     comp_rsp_path("C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64/" ++ name)
 
-fn comp_linux_system_lib_arg(fs: ToolFs, name: str) -> str:
+fn comp_linux_system_lib_arg(fs: &ToolFs, name: str) -> str:
     if name == "z":
         if fs.host_exists("/usr/lib/x86_64-linux-gnu/libz.so"):
             return "-lz"
@@ -238,7 +238,7 @@ fn comp_libclang_path(llvm_prefix: str) -> str:
         return llvm_prefix ++ "/lib/libclang.lib"
     llvm_prefix ++ "/lib/libclang.dylib"
 
-fn comp_select_libclang_path(fs: ToolFs, llvm_prefix: str) -> str:
+fn comp_select_libclang_path(fs: &ToolFs, llvm_prefix: str) -> str:
     let explicit = env("WITH_LIBCLANG")
     if explicit.len() > 0:
         return explicit
@@ -262,7 +262,7 @@ pub fn compiler_default_libclang_archive_path() -> str:
         return prefix ++ "/lib/libclang.lib"
     prefix ++ "/lib/libclang.a"
 
-fn comp_host_sdk_path(ctx: ActionCtx) -> str:
+fn comp_host_sdk_path(ctx: &ActionCtx) -> str:
     let sdkroot = env("SDKROOT")
     if sdkroot.len() > 0:
         return sdkroot
@@ -275,7 +275,7 @@ fn comp_host_sdk_path(ctx: ActionCtx) -> str:
         return xcode
     ""
 
-fn comp_arg_value(args: Vec[str], prefix: str) -> str:
+fn comp_arg_value(args: &Vec[str], prefix: str) -> str:
     for i in 0..args.len() as i32:
         let arg = args.get(i as i64)
         if arg.starts_with(prefix):
@@ -295,7 +295,7 @@ fn comp_path_separator() -> i32:
         return 59
     58
 
-fn comp_resolve_seed_compiler(ctx: ActionCtx) -> str:
+fn comp_resolve_seed_compiler(ctx: &ActionCtx) -> str:
     let explicit = env("WITH")
     if explicit.len() > 0:
         return explicit
@@ -320,12 +320,12 @@ fn comp_resolve_seed_compiler(ctx: ActionCtx) -> str:
         return legacy_compiler
     "with"
 
-fn comp_compiler_path(ctx: ActionCtx, compiler: str) -> str:
+fn comp_compiler_path(ctx: &ActionCtx, compiler: str) -> str:
     if compiler == "seed":
         return comp_resolve_seed_compiler(ctx)
     compiler
 
-fn comp_path_exists(ctx: ActionCtx, path: str) -> bool:
+fn comp_path_exists(ctx: &ActionCtx, path: str) -> bool:
     if path == "with":
         return true
     if comp_is_absolute_path(path):
@@ -339,7 +339,7 @@ fn comp_path_for_process(root: str, path: str) -> str:
         return path
     comp_abs(root, path)
 
-fn comp_run_compiler_capture(ctx: ActionCtx, label: str, argv: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
+fn comp_run_compiler_capture(ctx: &ActionCtx, label: str, argv: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
     let root = ctx.project_info().project_root()
     var process_env = process_env()
     process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
@@ -379,7 +379,7 @@ fn comp_run_compiler_capture(ctx: ActionCtx, label: str, argv: Vec[str], stdout_
     let _stderr = fs.write_text(stderr_path, result.stderr ++ "\n")
     0
 
-fn comp_compile_args(ctx: ActionCtx, command: str, compiler_path: str, source_path: str) -> Vec[str]:
+fn comp_compile_args(ctx: &ActionCtx, command: str, compiler_path: str, source_path: str) -> Vec[str]:
     let root = ctx.project_info().project_root()
     let args = ctx.args()
     var argv: Vec[str] = Vec.new()
@@ -392,17 +392,17 @@ fn comp_compile_args(ctx: ActionCtx, command: str, compiler_path: str, source_pa
             argv |> push(arg)
     argv
 
-fn comp_remove_file_if_exists(fs: ToolFs, path: str) -> i32:
+fn comp_remove_file_if_exists(fs: &ToolFs, path: str) -> i32:
     if not fs.exists(path):
         return 0
     fs.remove_file(path)
 
-fn comp_remove_tree_if_exists(fs: ToolFs, path: str) -> i32:
+fn comp_remove_tree_if_exists(fs: &ToolFs, path: str) -> i32:
     if not fs.exists(path):
         return 0
     fs.remove_tree(path)
 
-fn comp_run_first_line(ctx: ActionCtx, capture_dir: str, label: str, argv: Vec[str], timeout_ms: i32) -> str:
+fn comp_run_first_line(ctx: &ActionCtx, capture_dir: str, label: str, argv: Vec[str], timeout_ms: i32) -> str:
     let root = ctx.project_info().project_root()
     let stdout_path = comp_join(capture_dir, label ++ ".stdout")
     let stderr_path = comp_join(capture_dir, label ++ ".stderr")
@@ -446,7 +446,7 @@ fn comp_c_export_budget(path: str) -> i32:
     let _ = path
     -1
 
-fn comp_check_c_export_path(ctx: ActionCtx, path: str) -> i32:
+fn comp_check_c_export_path(ctx: &ActionCtx, path: str) -> i32:
     if not path.ends_with(".w"):
         return 0
     let text = ctx.fs().read_text(path)
@@ -554,7 +554,7 @@ fn comp_json_escape(text: str) -> str:
             out = out ++ text.slice(i as i64, (i + 1) as i64)
     out
 
-fn comp_resolve_command_file(ctx: ActionCtx, capture_dir: str, path: str) -> str:
+fn comp_resolve_command_file(ctx: &ActionCtx, capture_dir: str, path: str) -> str:
     if path != "with":
         return comp_abs(ctx.project_info().project_root(), path)
     let which_args: Vec[str] = Vec.new()
@@ -565,7 +565,7 @@ fn comp_resolve_command_file(ctx: ActionCtx, capture_dir: str, path: str) -> str
         return resolved
     path
 
-fn comp_sha256_file(ctx: ActionCtx, capture_dir: str, label: str, path: str) -> str:
+fn comp_sha256_file(ctx: &ActionCtx, capture_dir: str, label: str, path: str) -> str:
     if os() == "Windows":
         let certutil_args: Vec[str] = Vec.new()
         certutil_args.push("certutil")
@@ -599,7 +599,7 @@ fn comp_sha256_file(ctx: ActionCtx, capture_dir: str, label: str, path: str) -> 
         return comp_first_field(sha256)
     ""
 
-fn comp_record_seed_input(ctx: ActionCtx, compiler_path: str, capture_dir: str) -> i32:
+fn comp_record_seed_input(ctx: &ActionCtx, compiler_path: str, capture_dir: str) -> i32:
     let fs = ctx.fs()
     if fs.mkdir_all("out/.build-state") != 0:
         return comp_fail(ctx, "could not create out/.build-state")
@@ -625,7 +625,7 @@ fn comp_record_seed_input(ctx: ActionCtx, compiler_path: str, capture_dir: str) 
         return comp_fail(ctx, "could not write out/.build-state/seed-input.json")
     0
 
-fn comp_resolve_compiler_version(ctx: ActionCtx) -> str:
+fn comp_resolve_compiler_version(ctx: &ActionCtx) -> str:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let base = comp_first_trimmed_line(fs.read_text("src/version"))
@@ -639,7 +639,7 @@ fn comp_resolve_compiler_version(ctx: ActionCtx) -> str:
         return base ++ "-g" ++ short_hash
     base
 
-fn comp_read_git_short_hash(fs: ToolFs, root: str) -> str:
+fn comp_read_git_short_hash(fs: &ToolFs, root: str) -> str:
     let head_raw = fs.read_text(".git/HEAD")
     let head = comp_first_trimmed_line(head_raw)
     if head.len() == 0:
@@ -654,7 +654,7 @@ fn comp_read_git_short_hash(fs: ToolFs, root: str) -> str:
         return head.slice(0, 9)
     ""
 
-fn comp_find_packed_ref(fs: ToolFs, root: str, ref_path: str) -> str:
+fn comp_find_packed_ref(fs: &ToolFs, root: str, ref_path: str) -> str:
     let packed = fs.read_text(".git/packed-refs")
     if packed.len() == 0:
         return ""
@@ -675,7 +675,7 @@ fn comp_find_packed_ref(fs: ToolFs, root: str, ref_path: str) -> str:
                 return line.slice(0, 9)
     ""
 
-fn comp_write_versioned_source(ctx: ActionCtx, source: str, output: str, version: str) -> i32:
+fn comp_write_versioned_source(ctx: &ActionCtx, source: str, output: str, version: str) -> i32:
     let fs = ctx.fs()
     let text = fs.read_text(source)
     if text.len() == 0:
@@ -974,7 +974,7 @@ pub fn run_bless_manifest_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, "could not write blessed-manifest")
     0
 
-fn comp_build_source_manifest(fs: ToolFs) -> str:
+fn comp_build_source_manifest(fs: &ToolFs) -> str:
     let dirs: Vec[str] = Vec.new()
     dirs.push("src")
     dirs.push("rt")
@@ -998,7 +998,7 @@ fn comp_build_source_manifest(fs: ToolFs) -> str:
         manifest = manifest ++ path ++ ":" ++ f"{hash}" ++ "\n"
     manifest
 
-fn comp_check_manifest(fs: ToolFs, manifest: str) -> str:
+fn comp_check_manifest(fs: &ToolFs, manifest: str) -> str:
     var changed = ""
     var line_start: i64 = 0
     for i in 0..manifest.len() as i32:

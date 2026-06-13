@@ -103,7 +103,7 @@ fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
         return 1
     0
 
-fn target_with_embedded_stdlib_inputs(target: Target, ctx: BuildCtx) -> Target:
+fn target_with_embedded_stdlib_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     let files = ctx.fs().list_files("lib/std")
     for i in 0..files.len() as i32:
@@ -112,7 +112,7 @@ fn target_with_embedded_stdlib_inputs(target: Target, ctx: BuildCtx) -> Target:
             out = out.input(path)
     out
 
-fn target_with_compiler_c_export_audit_inputs(target: Target, ctx: BuildCtx) -> Target:
+fn target_with_compiler_c_export_audit_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     let roots: Vec[str] = Vec.new()
     roots.push("src")
@@ -126,7 +126,7 @@ fn target_with_compiler_c_export_audit_inputs(target: Target, ctx: BuildCtx) -> 
                 out = out.input(path)
     out
 
-fn target_with_compiler_source_inputs(target: Target, ctx: BuildCtx) -> Target:
+fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     let roots: Vec[str] = Vec.new()
     roots.push("src")
@@ -161,7 +161,7 @@ fn build_project_trim_line(text: str) -> str:
         end = end - 1
     text.slice(start as i64, end as i64)
 
-fn target_with_version_inputs(target: Target, ctx: BuildCtx) -> Target:
+fn target_with_version_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     out = out.arg("version-env=" ++ env("WITH_VERSION"))
     let fs = ctx.fs()
@@ -177,7 +177,7 @@ fn target_with_version_inputs(target: Target, ctx: BuildCtx) -> Target:
             out = out.input(".git/packed-refs")
     out
 
-fn target_with_live_targets(target: Target, graph: Build) -> Target:
+fn target_with_live_targets(target: Target, graph: &Build) -> Target:
     var out = target
     for i in 0..graph.targets.len() as i32:
         out = out.arg("live-target=" ++ graph.targets.get(i as i64).name)
@@ -359,7 +359,7 @@ fn build_replace_once(text: str, needle: str, replacement: str) -> str:
         return ""
     text.slice(0, idx) ++ replacement ++ text.slice(idx + needle.len(), text.len())
 
-fn issue61_fail(ctx: ActionCtx, message: str) -> i32:
+fn issue61_fail(ctx: &ActionCtx, message: str) -> i32:
     ctx.diagnostics().error("issue61-regression: " ++ message)
     1
 

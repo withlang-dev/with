@@ -16,6 +16,10 @@ fn zcu_owned_text(text: str) -> str:
         return ""
     runtime_str_clone(text)
 
+fn zcu_new_vec_str -> Vec[str]:
+    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
+    out
+
 fn zcu_debug_init_enabled() -> i32:
     let raw = runtime_getenv("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
@@ -99,24 +103,24 @@ fn Zcu.init -> Zcu:
         // struct copy shares the same diagnostics buffer (§3.8: the
         // local was consumed by Sema.placeholder above).
         diagnostics: sema_seed.diags,
-        imported_paths: Vec.new(),
-        decl_source_paths: Vec.new(),
+        imported_paths: zcu_new_vec_str(),
+        decl_source_paths: zcu_new_vec_str(),
         decl_source_file_ids: Vec.new(),
         decl_is_c_import: Vec.new(),
         c_import_omitted_symbols: HashMap.new(),
-        c_import_cache_keys: Vec.new(),
-        c_import_cache_values: Vec.new(),
+        c_import_cache_keys: zcu_new_vec_str(),
+        c_import_cache_values: zcu_new_vec_str(),
         source_dir: ".",
         next_file_id: 1,
         current_source_path: "<unknown>",
         current_source_text: "",
-        extra_source_names: Vec.new(),
-        extra_source_texts: Vec.new(),
+        extra_source_names: zcu_new_vec_str(),
+        extra_source_texts: zcu_new_vec_str(),
         source_text_file_ids: Vec.new(),
-        source_text_names: Vec.new(),
-        source_texts: Vec.new(),
+        source_text_names: zcu_new_vec_str(),
+        source_texts: zcu_new_vec_str(),
         tool_mode_entry_path: "",
-        pending_warnings: Vec.new(),
+        pending_warnings: zcu_new_vec_str(),
         last_resolved: ResolveResult.init(),
         resolved_root_path: "",
         typed_expr_types: HashMap.new(),
@@ -130,21 +134,21 @@ fn Zcu.init -> Zcu:
         last_mir_dump: "",
         last_async_mir_module: AsyncMirModule.init(),
         last_async_mir_dump: "",
-        last_link_lib_names: Vec.new(),
-        tracked_input_paths: Vec.new(),
+        last_link_lib_names: zcu_new_vec_str(),
+        tracked_input_paths: zcu_new_vec_str(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,
         prelude_mode: PRELUDE_FULL(),
         cli_diag_gen_starts: Vec.new(),
         cli_diag_gen_ends: Vec.new(),
-        cli_diag_source_names: Vec.new(),
-        cli_diag_source_texts: Vec.new(),
+        cli_diag_source_names: zcu_new_vec_str(),
+        cli_diag_source_texts: zcu_new_vec_str(),
     }
 
 fn Zcu.reset_import_state(self: Zcu):
-    let empty: Vec[str] = Vec.new()
+    let empty = zcu_new_vec_str()
     self.imported_paths = empty
-    self.decl_source_paths = Vec.new()
+    self.decl_source_paths = zcu_new_vec_str()
     self.decl_source_file_ids = Vec.new()
     self.decl_is_c_import = Vec.new()
     self.c_import_omitted_symbols = HashMap.new()
@@ -163,23 +167,20 @@ fn Zcu.seed_decl_source_paths(self: Zcu, pool: AstPool, path: str, file_id: i32)
     self.decl_source_paths = Vec.new()
     self.decl_source_file_ids = Vec.new()
     self.decl_is_c_import = Vec.new()
-    let owned = zcu_owned_text(path)
     for _ in 0..pool.decl_count():
-        self.decl_source_paths.push(owned)
+        self.decl_source_paths.push(zcu_owned_text(path))
         self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(0)
 
 fn Zcu.append_decl_source_paths(self: Zcu, count: i32, path: str, file_id: i32) -> Unit:
-    let owned = zcu_owned_text(path)
     for _ in 0..count:
-        self.decl_source_paths.push(owned)
+        self.decl_source_paths.push(zcu_owned_text(path))
         self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(0)
 
 fn Zcu.append_c_import_decl_paths(self: Zcu, count: i32, path: str, file_id: i32) -> Unit:
-    let owned = zcu_owned_text(path)
     for _ in 0..count:
-        self.decl_source_paths.push(owned)
+        self.decl_source_paths.push(zcu_owned_text(path))
         self.decl_source_file_ids.push(file_id)
         self.decl_is_c_import.push(1)
 
@@ -287,7 +288,7 @@ fn Zcu.print_warnings(self: Zcu):
     self.render_warnings_frontend()
 
 fn Zcu.reset_pending_warnings(self: Zcu):
-    let empty: Vec[str] = Vec.new()
+    let empty = zcu_new_vec_str()
     self.pending_warnings = empty
 
 fn Zcu.capture_pending_warnings(self: Zcu):
@@ -371,8 +372,61 @@ fn Zcu.sync_from_sema(self: Zcu, sema: Sema):
         runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.state.symbol_texts.len() as i32} last_sema.pool={self.last_sema.pool.state.symbol_texts.len() as i32} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
 
 fn Zcu.set_resolve_snapshot(self: Zcu, result: ResolveResult, root_path: str):
-    self.last_resolved = result
-    self.resolved_root_path = root_path
+    let modules: Vec[ResolvedModule] = Vec.new()
+    for i in 0..result.modules.len() as i32:
+        let m = result.modules.get(i as i64)
+        modules.push(ResolvedModule {
+            module_id: m.module_id,
+            file_id: m.file_id,
+            path: zcu_owned_text(m.path),
+            import_start: m.import_start,
+            import_count: m.import_count,
+            decl_count: m.decl_count,
+        })
+
+    let imports: Vec[ResolvedImport] = Vec.new()
+    for i in 0..result.imports.len() as i32:
+        let imp = result.imports.get(i as i64)
+        imports.push(ResolvedImport {
+            module_id: imp.module_id,
+            index_in_module: imp.index_in_module,
+            kind: imp.kind,
+            path_text: zcu_owned_text(imp.path_text),
+            target_module: imp.target_module,
+            span_start: imp.span_start,
+            span_end: imp.span_end,
+        })
+
+    let defs: Vec[ResolvedDef] = Vec.new()
+    for i in 0..result.defs.len() as i32:
+        defs.push(result.defs.get(i as i64))
+
+    let scopes: Vec[ResolvedScope] = Vec.new()
+    for i in 0..result.scopes.len() as i32:
+        scopes.push(result.scopes.get(i as i64))
+
+    let bindings: Vec[ResolvedBinding] = Vec.new()
+    for i in 0..result.bindings.len() as i32:
+        bindings.push(result.bindings.get(i as i64))
+
+    let uses: Vec[ResolvedUse] = Vec.new()
+    for i in 0..result.uses.len() as i32:
+        uses.push(result.uses.get(i as i64))
+
+    let link_libs: Vec[i32] = Vec.new()
+    for i in 0..result.link_libs.len() as i32:
+        link_libs.push(result.link_libs.get(i as i64))
+
+    self.last_resolved = ResolveResult {
+        modules,
+        imports,
+        defs,
+        scopes,
+        bindings,
+        uses,
+        link_libs,
+    }
+    self.resolved_root_path = zcu_owned_text(root_path)
 
 fn Zcu.set_typed_snapshot(self: Zcu, typed_dump: str, typed_pool: AstPool):
     self.last_typed_dump = typed_dump
@@ -388,7 +442,7 @@ fn Zcu.set_link_lib_names(self: Zcu, names: Vec[str]):
     self.last_link_lib_names = names
 
 fn Zcu.reset_last_link_lib_names(self: Zcu):
-    let empty: Vec[str] = Vec.new()
+    let empty = zcu_new_vec_str()
     self.last_link_lib_names = empty
 
 fn Zcu.capture_last_link_lib_names(self: Zcu, pool: InternPool, result: ResolveResult) -> Unit:

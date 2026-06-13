@@ -178,6 +178,14 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         return wl_struct_type(self.context, vec_data_i64(&body_types), 2, 0)
     0
 
+fn Codegen.mir_vec_storage_elem_type(self: Codegen, elem_tid: i32) -> i64:
+    let resolved = self.mir_input.mir_resolve_alias(elem_tid)
+    if self.mir_input.mir_get_type_kind(resolved) == TypeKind.TY_STR:
+        let str_ty = self.str_llvm_type()
+        if str_ty != 0:
+            return str_ty
+    self.mir_sema_type_to_llvm(elem_tid)
+
 fn codegen_regex_flag_options(flags: str) -> i32:
     var options: i32 = 0
     var i: i64 = 0
@@ -3966,6 +3974,17 @@ fn Codegen.mir_intrinsic_arg(self: Codegen, body: &MirBody, args_id: i32, idx: i
     let op_id = body.call_arg_operands.get((arg_start + idx) as i64)
     self.mir_eval_operand(body, op_id, 0)
 
+fn Codegen.mir_intrinsic_arg_str_value(self: Codegen, body: &MirBody, args_id: i32, idx: i32) -> i64:
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let op_id = body.call_arg_operands.get((arg_start + idx) as i64)
+    let arg = self.mir_eval_operand(body, op_id, 0)
+    let arg_sema = self.mir_operand_sema_type(body, op_id)
+    if self.mir_sema_type_is_ref_to_str(arg_sema) != 0 and wl_get_type_kind(wl_type_of(arg)) == wl_pointer_type_kind():
+        let str_ty = self.str_llvm_type()
+        if str_ty != 0:
+            return wl_build_load(self.builder, str_ty, arg)
+    arg
+
 fn Codegen.mir_intrinsic_recv_str_value(self: Codegen, body: &MirBody, args_id: i32) -> i64:
     let arg_start = body.call_arg_starts.get(args_id as i64)
     let recv_op = body.call_arg_operands.get(arg_start as i64)
@@ -4123,10 +4142,10 @@ fn Codegen.mir_vec_elem_size(self: Codegen, body: &MirBody, dest_place: i32) -> 
                 let te_start = self.mir_input.mir_get_type_d1(resolved)
                 let elem_tid = self.mir_input.mir_get_type_extra(te_start)
                 if elem_tid > 0:
-                    let elem_llvm = self.mir_sema_type_to_llvm(elem_tid)
+                    let elem_llvm = self.mir_vec_storage_elem_type(elem_tid)
                     if elem_llvm != 0:
                         return self.abi_size_of(elem_llvm)
-    8 // default — safe for pointers, i64, str
+    8 // default for pointer-sized elements when sema data is unavailable
 
 fn Codegen.mir_type_kind_from_snapshot(self: Codegen, sema_ty: i32) -> i32:
     if sema_ty <= 0:
@@ -5019,6 +5038,19 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "contains": return MirIntrinsic.VEC_CONTAINS
         if method_name == "join": return MirIntrinsic.VEC_JOIN
         return MirIntrinsic.NONE
+    if type_name == "FixedString" or type_name.starts_with("FixedString__"):
+        if method_name == "new": return MirIntrinsic.FIXED_STRING_NEW
+        if method_name == "len": return MirIntrinsic.FIXED_STRING_LEN
+        if method_name == "len_i32": return MirIntrinsic.FIXED_STRING_LEN32
+        if method_name == "len_i64": return MirIntrinsic.FIXED_STRING_LEN64
+        if method_name == "capacity": return MirIntrinsic.FIXED_STRING_CAPACITY
+        if method_name == "is_empty": return MirIntrinsic.FIXED_STRING_IS_EMPTY
+        if method_name == "clear": return MirIntrinsic.FIXED_STRING_CLEAR
+        if method_name == "push_byte": return MirIntrinsic.FIXED_STRING_PUSH_BYTE
+        if method_name == "push_str": return MirIntrinsic.FIXED_STRING_PUSH_STR
+        if method_name == "as_view": return MirIntrinsic.FIXED_STRING_AS_VIEW
+        if method_name == "equals": return MirIntrinsic.FIXED_STRING_EQUALS
+        return MirIntrinsic.NONE
     if type_name == "VecIter" or type_name == "VecIterRef":
         if method_name == "next":
             if type_name == "VecIterRef": return MirIntrinsic.VECITERREF_NEXT
@@ -5192,7 +5224,7 @@ fn Codegen.mir_emit_vec_core_intrinsic_call(self: Codegen, body: &MirBody, intri
                     let te_start_new = self.mir_input.mir_get_type_d1(resolved_new)
                     let elem_tid_new = self.mir_input.mir_get_type_extra(te_start_new)
                     if elem_tid_new > 0:
-                        let elem_llvm_new = self.mir_sema_type_to_llvm(elem_tid_new)
+                        let elem_llvm_new = self.mir_vec_storage_elem_type(elem_tid_new)
                         if elem_llvm_new != 0:
                             vec_elem_ty = elem_llvm_new
         let elem_size = self.abi_size_of(vec_elem_ty)
@@ -5206,6 +5238,192 @@ fn Codegen.mir_emit_vec_core_intrinsic_call(self: Codegen, body: &MirBody, intri
         args.push(wl_const_int(i64_ty, elem_size, 0))
         let _ = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&args), 2)
         result = wl_build_load(self.builder, vec_ty, alloca)
+
+    else if intrinsic == MirIntrinsic.FIXED_STRING_NEW:
+        let fs_dest_ty = self.mir_dest_llvm_type(body, dest_place)
+        if fs_dest_ty == 0:
+            return false
+        result = self.build_default_value(fs_dest_ty)
+
+    else if intrinsic == MirIntrinsic.FIXED_STRING_LEN or intrinsic == MirIntrinsic.FIXED_STRING_LEN32 or intrinsic == MirIntrinsic.FIXED_STRING_LEN64:
+        let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
+        let fs_len_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 1)
+        let fs_raw_len = wl_build_load(self.builder, i64_ty, fs_len_ptr)
+        if intrinsic == MirIntrinsic.FIXED_STRING_LEN32:
+            result = wl_build_trunc(self.builder, fs_raw_len, i32_ty)
+        else:
+            result = fs_raw_len
+
+    else if intrinsic == MirIntrinsic.FIXED_STRING_CAPACITY:
+        let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
+        let fs_buf_ty = wl_struct_get_type_at(fs_ty, 0)
+        var fs_cap = 0
+        if wl_get_type_kind(fs_buf_ty) == wl_array_type_kind():
+            fs_cap = wl_get_array_length(fs_buf_ty)
+        result = wl_const_int(i64_ty, fs_cap, 0)
+
+    else if intrinsic == MirIntrinsic.FIXED_STRING_IS_EMPTY:
+        let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
+        let fs_len_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 1)
+        let fs_len = wl_build_load(self.builder, i64_ty, fs_len_ptr)
+        result = wl_build_icmp(self.builder, wl_int_eq(), fs_len, wl_const_int(i64_ty, 0, 0))
+
+    else if intrinsic == MirIntrinsic.FIXED_STRING_CLEAR:
+        let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
+        let fs_len_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 1)
+        let _ = wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), fs_len_ptr)
+        result = wl_get_undef(void_ty)
+
+    else if intrinsic == MirIntrinsic.FIXED_STRING_PUSH_BYTE:
+        let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
+        let fs_buf_ty = wl_struct_get_type_at(fs_ty, 0)
+        if fs_buf_ty == 0 or wl_get_type_kind(fs_buf_ty) != wl_array_type_kind():
+            return false
+        let fs_cap = wl_get_array_length(fs_buf_ty)
+        let fs_len_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 1)
+        let fs_len = wl_build_load(self.builder, i64_ty, fs_len_ptr)
+        let ok_bb = wl_append_bb(self.context, self.current_function, "fixed.push.byte.ok")
+        let done_bb = wl_append_bb(self.context, self.current_function, "fixed.push.byte.done")
+        let out_ptr = self.create_entry_alloca(wl_i1_type(self.context))
+        let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
+        let fits = wl_build_icmp(self.builder, wl_int_ult(), fs_len, wl_const_int(i64_ty, fs_cap, 0))
+        wl_build_cond_br(self.builder, fits, ok_bb, done_bb)
+        wl_position_at_end(self.builder, ok_bb)
+        let fs_buf_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 0)
+        let elem_indices: Vec[i64] = Vec.new()
+        elem_indices.push(wl_const_int(i32_ty, 0, 0))
+        elem_indices.push(fs_len)
+        let byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, vec_data_i64(&elem_indices), 2)
+        let byte_val = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), wl_i8_type(self.context))
+        let _ = wl_build_store(self.builder, byte_val, byte_ptr)
+        let _ = wl_build_store(self.builder, wl_build_add(self.builder, fs_len, wl_const_int(i64_ty, 1, 0)), fs_len_ptr)
+        let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), out_ptr)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+        result = wl_build_load(self.builder, wl_i1_type(self.context), out_ptr)
+
+    else if intrinsic == MirIntrinsic.FIXED_STRING_PUSH_STR:
+        let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
+        let fs_buf_ty = wl_struct_get_type_at(fs_ty, 0)
+        if fs_buf_ty == 0 or wl_get_type_kind(fs_buf_ty) != wl_array_type_kind():
+            return false
+        let fs_cap = wl_get_array_length(fs_buf_ty)
+        let fs_len_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 1)
+        let fs_start_len = wl_build_load(self.builder, i64_ty, fs_len_ptr)
+        let text = self.mir_intrinsic_arg_str_value(body, args_id, 1)
+        let text_ptr = wl_build_extract_value(self.builder, text, 0)
+        let text_len = wl_build_extract_value(self.builder, text, 1)
+        let end_len = wl_build_add(self.builder, fs_start_len, text_len)
+        let copy_bb = wl_append_bb(self.context, self.current_function, "fixed.push.str.copy")
+        let loop_bb = wl_append_bb(self.context, self.current_function, "fixed.push.str.loop")
+        let body_bb = wl_append_bb(self.context, self.current_function, "fixed.push.str.body")
+        let copied_bb = wl_append_bb(self.context, self.current_function, "fixed.push.str.copied")
+        let done_bb = wl_append_bb(self.context, self.current_function, "fixed.push.str.done")
+        let out_ptr = self.create_entry_alloca(wl_i1_type(self.context))
+        let idx_ptr = self.create_entry_alloca(i64_ty)
+        let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
+        let fits = wl_build_icmp(self.builder, wl_int_ule(), end_len, wl_const_int(i64_ty, fs_cap, 0))
+        wl_build_cond_br(self.builder, fits, copy_bb, done_bb)
+        wl_position_at_end(self.builder, copy_bb)
+        let _ = wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), idx_ptr)
+        wl_build_br(self.builder, loop_bb)
+        wl_position_at_end(self.builder, loop_bb)
+        let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
+        let more = wl_build_icmp(self.builder, wl_int_ult(), idx, text_len)
+        wl_build_cond_br(self.builder, more, body_bb, copied_bb)
+        wl_position_at_end(self.builder, body_bb)
+        let src_indices: Vec[i64] = Vec.new()
+        src_indices.push(idx)
+        let src_byte_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), text_ptr, vec_data_i64(&src_indices), 1)
+        let src_byte = wl_build_load(self.builder, wl_i8_type(self.context), src_byte_ptr)
+        let dst_index = wl_build_add(self.builder, fs_start_len, idx)
+        let fs_buf_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 0)
+        let dst_indices: Vec[i64] = Vec.new()
+        dst_indices.push(wl_const_int(i32_ty, 0, 0))
+        dst_indices.push(dst_index)
+        let dst_byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, vec_data_i64(&dst_indices), 2)
+        let _ = wl_build_store(self.builder, src_byte, dst_byte_ptr)
+        let _ = wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
+        wl_build_br(self.builder, loop_bb)
+        wl_position_at_end(self.builder, copied_bb)
+        let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), out_ptr)
+        let _ = wl_build_store(self.builder, end_len, fs_len_ptr)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+        result = wl_build_load(self.builder, wl_i1_type(self.context), out_ptr)
+
+    else if intrinsic == MirIntrinsic.FIXED_STRING_AS_VIEW:
+        let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
+        let fs_buf_ty = wl_struct_get_type_at(fs_ty, 0)
+        if fs_buf_ty == 0 or wl_get_type_kind(fs_buf_ty) != wl_array_type_kind():
+            return false
+        let fs_len_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 1)
+        let fs_len = wl_build_load(self.builder, i64_ty, fs_len_ptr)
+        let fs_buf_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 0)
+        let view_indices: Vec[i64] = Vec.new()
+        view_indices.push(wl_const_int(i32_ty, 0, 0))
+        view_indices.push(wl_const_int(i64_ty, 0, 0))
+        let data_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, vec_data_i64(&view_indices), 2)
+        result = self.build_str_value(data_ptr, fs_len)
+
+    else if intrinsic == MirIntrinsic.FIXED_STRING_EQUALS:
+        let fs_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let fs_ty = self.mir_intrinsic_recv_storage_type(body, args_id, fs_recv_ptr)
+        let fs_buf_ty = wl_struct_get_type_at(fs_ty, 0)
+        if fs_buf_ty == 0 or wl_get_type_kind(fs_buf_ty) != wl_array_type_kind():
+            return false
+        let fs_len_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 1)
+        let fs_len = wl_build_load(self.builder, i64_ty, fs_len_ptr)
+        let text = self.mir_intrinsic_arg_str_value(body, args_id, 1)
+        let text_ptr = wl_build_extract_value(self.builder, text, 0)
+        let text_len = wl_build_extract_value(self.builder, text, 1)
+        let prep_bb = wl_append_bb(self.context, self.current_function, "fixed.eq.prep")
+        let loop_bb = wl_append_bb(self.context, self.current_function, "fixed.eq.loop")
+        let body_bb = wl_append_bb(self.context, self.current_function, "fixed.eq.body")
+        let mismatch_bb = wl_append_bb(self.context, self.current_function, "fixed.eq.mismatch")
+        let done_bb = wl_append_bb(self.context, self.current_function, "fixed.eq.done")
+        let out_ptr = self.create_entry_alloca(wl_i1_type(self.context))
+        let idx_ptr = self.create_entry_alloca(i64_ty)
+        let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
+        let same_len = wl_build_icmp(self.builder, wl_int_eq(), fs_len, text_len)
+        wl_build_cond_br(self.builder, same_len, prep_bb, done_bb)
+        wl_position_at_end(self.builder, prep_bb)
+        let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), out_ptr)
+        let _ = wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), idx_ptr)
+        wl_build_br(self.builder, loop_bb)
+        wl_position_at_end(self.builder, loop_bb)
+        let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
+        let more = wl_build_icmp(self.builder, wl_int_ult(), idx, fs_len)
+        wl_build_cond_br(self.builder, more, body_bb, done_bb)
+        wl_position_at_end(self.builder, body_bb)
+        let fs_buf_ptr = wl_build_struct_gep(self.builder, fs_ty, fs_recv_ptr, 0)
+        let fs_indices: Vec[i64] = Vec.new()
+        fs_indices.push(wl_const_int(i32_ty, 0, 0))
+        fs_indices.push(idx)
+        let fs_byte_ptr = wl_build_gep(self.builder, fs_buf_ty, fs_buf_ptr, vec_data_i64(&fs_indices), 2)
+        let fs_byte = wl_build_load(self.builder, wl_i8_type(self.context), fs_byte_ptr)
+        let text_indices: Vec[i64] = Vec.new()
+        text_indices.push(idx)
+        let text_byte_ptr = wl_build_gep(self.builder, wl_i8_type(self.context), text_ptr, vec_data_i64(&text_indices), 1)
+        let text_byte = wl_build_load(self.builder, wl_i8_type(self.context), text_byte_ptr)
+        let bytes_same = wl_build_icmp(self.builder, wl_int_eq(), fs_byte, text_byte)
+        let eq_next_bb = wl_append_bb(self.context, self.current_function, "fixed.eq.next")
+        wl_build_cond_br(self.builder, bytes_same, eq_next_bb, mismatch_bb)
+        wl_position_at_end(self.builder, eq_next_bb)
+        let _ = wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
+        wl_build_br(self.builder, loop_bb)
+        wl_position_at_end(self.builder, mismatch_bb)
+        let _ = wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), out_ptr)
+        wl_build_br(self.builder, done_bb)
+        wl_position_at_end(self.builder, done_bb)
+        result = wl_build_load(self.builder, wl_i1_type(self.context), out_ptr)
 
     else if intrinsic == MirIntrinsic.VEC_WITH_CAPACITY:
         let wc_cap = self.mir_intrinsic_arg(body, args_id, 0)

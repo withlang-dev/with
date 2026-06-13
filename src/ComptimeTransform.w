@@ -7,6 +7,10 @@ use Sema
 use SemaCheck
 use Span
 
+fn ct_new_vec_str -> Vec[str]:
+    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
+    out
+
 fn Sema.ct_emit_error(mut self: Sema, ast: AstPool, node: i32, msg: str):
     let start = ast.get_start(node)
     let end = ast.get_end(node)
@@ -2455,7 +2459,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
     let component_id_trait_sym = intern.intern("ComponentId")
 
     let ordered: Vec[i32] = Vec.new()
-    let ordered_paths: Vec[str] = Vec.new()
+    let ordered_paths = ct_new_vec_str()
     let ordered_file_ids: Vec[i32] = Vec.new()
     let ordered_ci: Vec[i32] = Vec.new()
     let base_decl_count = out.decl_count()
@@ -2468,7 +2472,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
         let decl_ci = self.ct_decl_is_c_import(di)
 
         ordered.push(decl as i32)
-        ordered_paths.push(decl_path)
+        ordered_paths.push(sema_owned_text(decl_path))
         ordered_file_ids.push(decl_file_id)
         ordered_ci.push(decl_ci)
 
@@ -2478,7 +2482,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_copy = self.ct_generate_copy_derive(out, intern, decl as i32)
             for gi in 0..generated_copy.len() as i32:
                 ordered.push(generated_copy.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2487,7 +2491,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_defaults = self.ct_generate_default_derive(out, intern, decl as i32)
             for gi in 0..generated_defaults.len() as i32:
                 ordered.push(generated_defaults.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2496,7 +2500,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_eq = self.ct_generate_eq_derive(out, intern, decl as i32)
             for gi in 0..generated_eq.len() as i32:
                 ordered.push(generated_eq.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2505,7 +2509,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_hash = self.ct_generate_hash_derive(out, intern, decl as i32)
             for gi in 0..generated_hash.len() as i32:
                 ordered.push(generated_hash.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2514,7 +2518,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_debug = self.ct_generate_debug_derive(out, intern, decl as i32)
             for gi in 0..generated_debug.len() as i32:
                 ordered.push(generated_debug.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2523,7 +2527,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_clone = self.ct_generate_clone_derive(out, intern, decl as i32)
             for gi in 0..generated_clone.len() as i32:
                 ordered.push(generated_clone.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2532,7 +2536,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_builder = self.ct_generate_builder_derive(out, intern, decl as i32)
             for gi in 0..generated_builder.len() as i32:
                 ordered.push(generated_builder.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2541,7 +2545,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_soa = self.ct_generate_soa_derive(out, intern, decl as i32)
             for gi in 0..generated_soa.len() as i32:
                 ordered.push(generated_soa.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2550,7 +2554,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_serialize = self.ct_generate_serialize_derive(out, intern, decl as i32)
             for gi in 0..generated_serialize.len() as i32:
                 ordered.push(generated_serialize.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2559,7 +2563,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_deserialize = self.ct_generate_deserialize_derive(out, intern, decl as i32)
             for gi in 0..generated_deserialize.len() as i32:
                 ordered.push(generated_deserialize.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2568,7 +2572,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
             let generated_component_id = self.ct_generate_component_id_derive(out, intern, decl as i32)
             for gi in 0..generated_component_id.len() as i32:
                 ordered.push(generated_component_id.get(gi as i64))
-                ordered_paths.push(decl_path)
+                ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
@@ -2589,17 +2593,11 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
     let transform_pool = intern
     var transform_sema = Sema.init(transform_pool, self.diags, out)
     transform_sema.source_text = self.source_text
-    transform_sema.decl_source_paths = self.decl_source_paths
-    transform_sema.decl_source_file_ids = self.decl_source_file_ids
-    transform_sema.decl_is_c_import = self.decl_is_c_import
+    transform_sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+    transform_sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
+    transform_sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
     transform_sema.overflow_mode = self.overflow_mode
-    transform_sema.module_paths = self.module_paths
-    transform_sema.module_import_starts = self.module_import_starts
-    transform_sema.module_import_counts = self.module_import_counts
-    transform_sema.module_import_targets = self.module_import_targets
-    transform_sema.module_index_by_path = self.module_index_by_path
-    transform_sema.global_visible_module_paths = self.global_visible_module_paths
-    transform_sema.module_visibility_cache = HashMap.new()
+    transform_sema.copy_module_graph_from(&self)
     transform_sema.set_tracked_input_context(self.tracked_input_root, self.tracked_input_paths)
     transform_sema.prepare_for_comptime_transform()
     if transform_sema.diags.has_errors():

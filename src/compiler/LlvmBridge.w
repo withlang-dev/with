@@ -13,6 +13,8 @@ extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
 extern fn with_nanosleep(ns: i64) -> i32
 extern fn pthread_self() -> i64
 extern fn abort() -> Unit
+extern fn rt_sysinfo_os() -> str
+extern fn rt_sysinfo_arch() -> str
 
 // ── LLVM enum constants ─────────────────────────────────────────
 let LLVM_CodeGenLevelNone: i32 = 0
@@ -513,35 +515,39 @@ fn codegen_level(level: i32) -> i32:
     if level == 3: return LLVM_CodeGenLevelAggressive
     LLVM_CodeGenLevelDefault
 
+fn llvm_host_object_triple(default_triple: *mut u8) -> *const u8:
+    if rt_sysinfo_os() == "Macos" and (rt_sysinfo_arch() == "armv8" or rt_sysinfo_arch() == "aarch64"):
+        return c"arm64-apple-macosx11.0.0".ptr
+    default_triple as *const u8
+
 pub fn wl_init_target_machine(mod_ref: i64, level: i32) -> i64:
     unsafe:
-        let triple = LLVMGetDefaultTargetTriple()
+        let default_triple = LLVMGetDefaultTargetTriple()
+        let triple = llvm_host_object_triple(default_triple)
         var target: *mut u8 = 0 as *mut u8
         var err: *mut u8 = 0 as *mut u8
-        if LLVMGetTargetFromTriple(triple as *const u8, &raw mut target, &raw mut err) != 0:
+        if LLVMGetTargetFromTriple(triple, &raw mut target, &raw mut err) != 0:
             if err as i64 != 0:
                 let err_len = c_strlen(err as *const u8)
                 if err_len > 0:
                     let _ = rt_write(2, err as *const u8, err_len as u64)
                     let _ = rt_write(2, "\n" as *const u8, 1)
                 LLVMDisposeMessage(err)
-            LLVMDisposeMessage(triple)
+            LLVMDisposeMessage(default_triple)
             return 0
-        let tm = LLVMCreateTargetMachine(target, triple as *const u8,
+        let tm = LLVMCreateTargetMachine(target, triple,
             c"generic".ptr, empty_cstr(),
             codegen_level(level), LLVM_RelocDefault, LLVM_CodeModelDefault)
         if tm as i64 == 0:
             let msg = "LLVM target machine creation failed\n"
             let _ = rt_write(2, msg as *const u8, 36)
-            LLVMDisposeMessage(triple)
+            LLVMDisposeMessage(default_triple)
             return 0
         let layout = LLVMCreateTargetDataLayout(tm)
         LLVMSetModuleDataLayout(mod_ref as *mut u8, layout)
-        let triple2 = LLVMGetDefaultTargetTriple()
-        LLVMSetTarget(mod_ref as *mut u8, triple2 as *const u8)
-        LLVMDisposeMessage(triple2)
+        LLVMSetTarget(mod_ref as *mut u8, triple)
         LLVMDisposeTargetData(layout)
-        LLVMDisposeMessage(triple)
+        LLVMDisposeMessage(default_triple)
         tm as i64
 
 pub fn wl_dispose_target_machine(tm: i64) -> Unit: unsafe { LLVMDisposeTargetMachine(tm as *mut u8) }
@@ -1374,20 +1380,21 @@ pub fn wl_assemble_to_object(source_path: str, output_path: str) -> i32:
         let asm_len = LLVMGetBufferSize(mem_buf)
         let ctx = LLVMContextCreate()
         let m = LLVMModuleCreateWithNameInContext("asm\0" as *const u8, ctx)
-        let triple = LLVMGetDefaultTargetTriple()
-        LLVMSetTarget(m, triple as *const u8)
+        let default_triple = LLVMGetDefaultTargetTriple()
+        let triple = llvm_host_object_triple(default_triple)
+        LLVMSetTarget(m, triple)
         LLVMSetModuleInlineAsm2(m, asm_ptr, asm_len)
         LLVMDisposeMemoryBuffer(mem_buf)
         var target: *mut u8 = 0 as *mut u8
         var terr: *mut u8 = 0 as *mut u8
-        if LLVMGetTargetFromTriple(triple as *const u8, &raw mut target, &raw mut terr) != 0:
+        if LLVMGetTargetFromTriple(triple, &raw mut target, &raw mut terr) != 0:
             if terr as i64 != 0: LLVMDisposeMessage(terr)
-            LLVMDisposeMessage(triple)
+            LLVMDisposeMessage(default_triple)
             LLVMDisposeModule(m)
             LLVMContextDispose(ctx)
             return 1
-        let tm = LLVMCreateTargetMachine(target, triple as *const u8, c"generic".ptr, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
-        LLVMDisposeMessage(triple)
+        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
+        LLVMDisposeMessage(default_triple)
         var out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
         var emit_err: *mut u8 = 0 as *mut u8
@@ -1422,21 +1429,22 @@ pub fn wl_compile_ir_to_object(source_path: str, output_path: str) -> i32:
                 LLVMDisposeMessage(parse_err)
             LLVMContextDispose(ctx)
             return 1
-        let triple = LLVMGetDefaultTargetTriple()
-        LLVMSetTarget(m, triple as *const u8)
+        let default_triple = LLVMGetDefaultTargetTriple()
+        let triple = llvm_host_object_triple(default_triple)
+        LLVMSetTarget(m, triple)
         var target: *mut u8 = 0 as *mut u8
         var terr: *mut u8 = 0 as *mut u8
-        if LLVMGetTargetFromTriple(triple as *const u8, &raw mut target, &raw mut terr) != 0:
+        if LLVMGetTargetFromTriple(triple, &raw mut target, &raw mut terr) != 0:
             if terr as i64 != 0: LLVMDisposeMessage(terr)
-            LLVMDisposeMessage(triple)
+            LLVMDisposeMessage(default_triple)
             LLVMDisposeModule(m)
             LLVMContextDispose(ctx)
             return 1
-        let tm = LLVMCreateTargetMachine(target, triple as *const u8, c"generic".ptr, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
+        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
         let layout = LLVMCreateTargetDataLayout(tm)
         LLVMSetModuleDataLayout(m, layout)
         LLVMDisposeTargetData(layout)
-        LLVMDisposeMessage(triple)
+        LLVMDisposeMessage(default_triple)
         var out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
         var emit_err: *mut u8 = 0 as *mut u8

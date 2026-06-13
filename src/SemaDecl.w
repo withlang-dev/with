@@ -1579,6 +1579,12 @@ fn Sema.warn_large_copy_type(self: Sema, type_name: i32, type_tid: i32, node: i3
     let threshold = self.copy_warn_threshold
     if threshold <= 0 or type_tid <= 0:
         return
+    if self.ast.kind(node) == NodeKind.NK_IMPL_DECL and self.ast.find_impl_type_params(node) >= 0:
+        return
+    if self.type_decl_type_param_count(type_name) != 0:
+        return
+    if self.type_has_unresolved_parts(type_tid) != 0:
+        return
     let size = self.type_layout_size_of(type_tid)
     if size > threshold:
         let name = self.pool_resolve(type_name)

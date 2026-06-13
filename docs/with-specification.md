@@ -9977,6 +9977,7 @@ what users import.
 | `std.process` | Process control, args, env, Command | `stdlib.h`, `unistd.h` |
 | `std.mem` | Low-level memory, Allocator trait, mmap | `stdlib.h`, `sys/mman.h` |
 | `std.alloc` | Arena, TempArena, Pool | — |
+| `std.fixed_string` | `FixedString[N]` stack-owned string storage for `core`/`no_std` code | — |
 | `std.build` | Typed project build graph construction | Make/CMake project files |
 | `std.context` | Standard implicit execution context | ad hoc context parameters |
 | `std.signal` | Signal handling | `signal.h` |

@@ -5,6 +5,7 @@ use Source
 use DiagnosticRender
 
 extern fn with_eprint(s: str) -> Unit
+extern fn with_str_clone(s: str) -> str
 
 enum DiagSeverity: i32:
     Error = 1
@@ -33,11 +34,14 @@ type Diagnostic {
     helps: Vec[str],
 }
 
+fn diagnostic_owned_text(text: str) -> str:
+    with_str_clone(text)
+
 fn diagnostic_error(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
         severity: DiagSeverity.Error,
         code: "",
-        message,
+        message: diagnostic_owned_text(message),
         primary,
         labels: Vec.new(),
         notes: Vec.new(),
@@ -48,7 +52,7 @@ fn diagnostic_warning(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
         severity: DiagSeverity.Warning,
         code: "",
-        message,
+        message: diagnostic_owned_text(message),
         primary,
         labels: Vec.new(),
         notes: Vec.new(),
@@ -62,16 +66,16 @@ fn Diagnostic.warn(message: str, span: Span) -> Diagnostic:
     diagnostic_warning(message, span)
 
 fn Diagnostic.set_code(mut self: Diagnostic, code: str):
-    self.code = code
+    self.code = diagnostic_owned_text(code)
 
 fn Diagnostic.add_label(mut self: Diagnostic, span: Span, message: str) -> Unit:
-    self.labels.push(DiagnosticLabel { span, message })
+    self.labels.push(DiagnosticLabel { span, message: diagnostic_owned_text(message) })
 
 fn Diagnostic.add_note(mut self: Diagnostic, message: str) -> Unit:
-    self.notes.push(message)
+    self.notes.push(diagnostic_owned_text(message))
 
 fn Diagnostic.add_help(mut self: Diagnostic, message: str) -> Unit:
-    self.helps.push(message)
+    self.helps.push(diagnostic_owned_text(message))
 
 fn Diagnostic.render(self: Diagnostic, source: Source):
     let code: str = self.code

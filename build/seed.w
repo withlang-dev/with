@@ -28,7 +28,7 @@ fn seed_abs(root: str, path: str) -> str:
         return path
     seed_join(root, path)
 
-fn seed_fail(ctx: ActionCtx, message: str) -> i32:
+fn seed_fail(ctx: &ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
@@ -90,7 +90,7 @@ fn seed_json_line_value(line: str, key: str) -> str:
         end = end + 1
     ""
 
-fn seed_release_from_api(ctx: ActionCtx, repo: str, asset_name: str) -> str:
+fn seed_release_from_api(ctx: &ActionCtx, repo: str, asset_name: str) -> str:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let tmp_dir = seed_join("out/tmp", "seed-download")

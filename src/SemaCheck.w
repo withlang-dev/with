@@ -449,6 +449,11 @@ fn Sema.resolve_type_level_arg_expr(self: Sema, node: i32) -> i32:
         if self.ast.kind(base) != NodeKind.NK_IDENT:
             return 0
         var base_sym = self.ast.get_data0(base)
+        if self.is_fixed_string_symbol(base_sym) != 0:
+            if self.ast.get_data2(node) != 0:
+                self.emit_error("FixedString expects exactly one length argument", node)
+                return 0
+            return self.fixed_string_type_from_length_node(self.ast.get_data1(node))
         var base_tid = self.lookup_named_type_visible(base_sym)
         if base_tid == 0:
             let canonical_base = self.canonical_symbol_by_text(base_sym)
@@ -8436,6 +8441,12 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
         let result_method_name = self.pool_resolve(field)
         if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err or field == self.syms.map or field == self.syms.transpose or result_method_name == "map_err" or result_method_name == "unwrap_or" or result_method_name == "context" or result_method_name == "with_context":
             return 1
+    if owner_sym == self.syms.fixed_string:
+        let fixed_method_name = self.pool_resolve(field)
+        if field == self.syms.new or self.is_collection_len_method(field):
+            return 1
+        if fixed_method_name == "len_i32" or fixed_method_name == "len_i64" or fixed_method_name == "capacity" or fixed_method_name == "is_empty" or fixed_method_name == "clear" or fixed_method_name == "push_byte" or fixed_method_name == "push_str" or fixed_method_name == "as_view" or fixed_method_name == "equals":
+            return 1
     if owner_sym == self.syms.vecslot or owner_sym == self.syms.vecrange:
         if field == self.syms.get or self.pool_resolve(field) == "set" or self.is_collection_len_method(field):
             return 1
@@ -11117,6 +11128,24 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
     if owner_sym == self.syms.hashset:
         if field == self.syms.new:
             return self.generic_constructor_return_type(owner_sym, recv_type)
+    if owner_sym == self.syms.fixed_string:
+        if field == self.syms.new:
+            return self.generic_constructor_return_type(owner_sym, recv_type)
+        if tk == TypeKind.TY_GENERIC_INST:
+            if len_method_ret != 0:
+                return len_method_ret
+            if method_name == "len_i32":
+                return self.ty_i32 as i32
+            if method_name == "len_i64":
+                return self.ty_i64 as i32
+            if method_name == "capacity":
+                return self.ty_usize as i32
+            if method_name == "is_empty" or method_name == "push_byte" or method_name == "push_str" or method_name == "equals":
+                return self.ty_bool as i32
+            if method_name == "clear":
+                return self.ty_void as i32
+            if method_name == "as_view":
+                return self.ty_str as i32
     if owner_sym == self.syms.slotmap:
         if field == self.syms.new:
             return self.generic_constructor_return_type(owner_sym, recv_type)
@@ -11277,6 +11306,11 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
                 let update_params: Vec[i32] = Vec.new()
                 update_params.push(update_value_ty)
                 return self.ensure_fn_type(update_params, 1, update_value_ty as TypeId) as i32
+    if owner_sym == self.syms.fixed_string:
+        if method_name == "push_byte" and arg_index == 0:
+            return self.ty_u8 as i32
+        if (method_name == "push_str" or method_name == "equals") and arg_index == 0:
+            return self.ty_str_view as i32
     if owner_name == "Sender" and method_name == "send" and arg_index == 0:
         return self.get_generic_inst_arg(resolved as i32, 0)
     if owner_sym == self.syms.option:
@@ -11599,6 +11633,10 @@ fn Sema.builtin_method_requires_mutable_receiver(self: Sema, type_name_sym: i32,
     if type_name_sym == self.syms.hashset:
         if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
             return 1
+    if type_name_sym == self.syms.fixed_string:
+        let method_name = self.pool_resolve(field)
+        if method_name == "clear" or method_name == "push_byte" or method_name == "push_str":
+            return 1
     0
 
 fn Sema.is_shared_ref_like_receiver(self: Sema, recv_ty: i32) -> i32:
@@ -11637,6 +11675,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             let static_named = self.lookup_named_type_visible(static_type_sym)
             if static_named != 0:
                 obj_type = static_named as TypeId
+    else if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0 and static_expr_kind == NodeKind.NK_INDEX:
+        let static_indexed = self.resolve_type_level_arg_expr(expr)
+        if static_indexed != 0:
+            obj_type = static_indexed as TypeId
 
     if obj_type != 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
         if self.is_tool_capability_type(obj_type as i32) and self.pool_resolve(field) == "__driver_new" and not self.can_access_tool_capability_internals():
@@ -12120,6 +12162,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if self.get_type_kind(recv_type) == TypeKind.TY_GENERIC_INST:
         let mc_call_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
         let mc_method_name_raw = self.pool_resolve(field)
+        if type_name_sym == self.syms.fixed_string and field == self.syms.new:
+            if arg_count != 0:
+                self.emit_error("FixedString.new() expects no arguments", node)
+            return recv_type as i32
         if (type_name_sym == self.syms.vec or type_name_sym == self.syms.hashmap or type_name_sym == self.syms.hashset or type_name_sym == self.syms.slotmap or self.pool_resolve(type_name_sym) == "Atomic") and field == self.syms.new:
             self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
             return recv_type as i32
@@ -12251,8 +12297,43 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 if slot_elem_ty != 0 and set_arg_ty != 0:
                     if self.builtin_arg_type_compatible(slot_elem_ty, set_arg_ty) == 0:
                         self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, slot_elem_ty, set_arg_ty, self.ast.get_extra(extra_start))
+        else if type_name_sym == self.syms.fixed_string:
+            if mc_method_name_raw == "push_byte":
+                if arg_count != 1:
+                    self.emit_error("FixedString.push_byte() expects exactly one argument", node)
+                else:
+                    let fs_byte_ty = arg_types.get(0)
+                    if fs_byte_ty != 0 and self.builtin_arg_type_compatible(self.ty_u8 as i32, fs_byte_ty) == 0:
+                        self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, self.ty_u8 as i32, fs_byte_ty, self.ast.get_extra(extra_start))
+            else if mc_method_name_raw == "push_str" or mc_method_name_raw == "equals":
+                if arg_count != 1:
+                    self.emit_error("FixedString." ++ mc_method_name_raw ++ "() expects exactly one argument", node)
+                else:
+                    let fs_str_ty = arg_types.get(0)
+                    if fs_str_ty != 0 and self.call_arg_type_compatible(self.ty_str_view as i32, fs_str_ty) == 0:
+                        self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, self.ty_str_view as i32, fs_str_ty, self.ast.get_extra(extra_start))
+            else if mc_method_name_raw == "clear" or mc_method_name_raw == "is_empty" or mc_method_name_raw == "as_view" or mc_method_name_raw == "capacity" or mc_method_name_raw == "len_i32" or mc_method_name_raw == "len_i64" or self.is_collection_len_method(field):
+                if arg_count != 0:
+                    self.emit_error("FixedString." ++ mc_method_name_raw ++ "() expects no arguments", node)
         // Return types for builtin generic methods
         let generic_len_ret = self.collection_len_method_return_type(mc_method_name_raw)
+        if type_name_sym == self.syms.fixed_string:
+            if field == self.syms.new:
+                return recv_type as i32
+            if generic_len_ret != 0:
+                return generic_len_ret
+            if mc_method_name_raw == "len_i32":
+                return self.ty_i32 as i32
+            if mc_method_name_raw == "len_i64":
+                return self.ty_i64 as i32
+            if mc_method_name_raw == "capacity":
+                return self.ty_usize as i32
+            if mc_method_name_raw == "is_empty" or mc_method_name_raw == "push_byte" or mc_method_name_raw == "push_str" or mc_method_name_raw == "equals":
+                return self.ty_bool as i32
+            if mc_method_name_raw == "clear":
+                return self.ty_void as i32
+            if mc_method_name_raw == "as_view":
+                return self.ty_str as i32
         if type_name_sym == self.syms.vec:
             if field == self.syms.push:
                 return recv_type as i32

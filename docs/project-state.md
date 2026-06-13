@@ -11,6 +11,24 @@ conversation context after compaction.
 
 ## Current Focus
 
+#457 is implemented and verified. `std.fixed_string` now exposes
+`FixedString[N]` through all preludes, including `prelude_core`, with compiler
+support that maps `FixedString[N]` to stack storage and lowers `new`, length,
+capacity, `clear`, `push_byte`, `push_str`, `as_view`, and `equals` without
+heap allocation or string-runtime calls. Positive coverage exercises normal
+use and the `core`/`--no-std` surface; negative coverage rejects dynamic and
+mismatched type-level lengths. The no-std object check has no forbidden
+allocator/string symbols. During verification, MIR moved-value ownership was
+tightened so `async scope s.track(task)` consumes the raw `Task` owner without
+leaving a second detached cleanup, while `Task.cancel()` still preserves the
+required cleanup await for `no_suspend` diagnostics. After rebasing onto the
+§3.8 by-value consume flip, build action/helper APIs were conformed so
+`ActionCtx`, `BuildCtx`, `ToolFs`, argv vectors, and action result structs are
+borrowed at read-only helper boundaries while stored action callbacks remain
+the bootstrap-compatible `fn(ActionCtx) -> i32` shape. Full verification
+passed on 2026-06-12: `with build`, `with build :fixpoint`, `with build
+:test`, and `with build :test-green`.
+
 #437 is implemented locally and focused tests pass. `std.alloc` now has real
 region `Arena` allocation with mark/reset watermarks, `FrameArena` with
 external reset and high-water tracking, and a fixed-block `Pool`/

@@ -16,7 +16,7 @@ type EmitCFunction {
     ok: i32,
 }
 
-fn emitc_fail(ctx: ActionCtx, message: str) -> i32:
+fn emitc_fail(ctx: &ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
@@ -321,7 +321,7 @@ fn emitc_parse_export_function(symbol: str, line: str) -> EmitCFunction:
             return EmitCFunction { symbol, return_type: "", params: parsed_params, ok: 0 }
     EmitCFunction { symbol, return_type, params: parsed_params, ok: 1 }
 
-fn emitc_collect_exports_from_text(ctx: ActionCtx, text: str, source_path: str) -> Vec[EmitCFunction]:
+fn emitc_collect_exports_from_text(ctx: &ActionCtx, text: str, source_path: str) -> Vec[EmitCFunction]:
     let exports: Vec[EmitCFunction] = Vec.new()
     let lines = emitc_split_lines(text)
     var pending_symbol = ""
@@ -372,7 +372,7 @@ fn emitc_is_bridge_abi_symbol(name: str) -> bool:
 fn emitc_is_runtime_abi_symbol(name: str) -> bool:
     name.starts_with("with_regex_")
 
-fn emitc_collect_public_abi_from_text(ctx: ActionCtx, text: str, source_path: str, runtime: i32) -> Vec[EmitCFunction]:
+fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: str, source_path: str, runtime: i32) -> Vec[EmitCFunction]:
     let exports: Vec[EmitCFunction] = Vec.new()
     let lines = emitc_split_lines(text)
     for li in 0..lines.len() as i32:
@@ -394,7 +394,7 @@ fn emitc_collect_public_abi_from_text(ctx: ActionCtx, text: str, source_path: st
         exports.push(fn_sig)
     exports
 
-fn emitc_collect_public_abi(ctx: ActionCtx, sources: Vec[str], runtime: i32) -> Vec[EmitCFunction]:
+fn emitc_collect_public_abi(ctx: &ActionCtx, sources: Vec[str], runtime: i32) -> Vec[EmitCFunction]:
     let all: Vec[EmitCFunction] = Vec.new()
     let fs = ctx.fs()
     for si in 0..sources.len() as i32:
@@ -410,7 +410,7 @@ fn emitc_collect_public_abi(ctx: ActionCtx, sources: Vec[str], runtime: i32) -> 
             all.push(exports.get(ei as i64))
     all
 
-fn emitc_collect_exports(ctx: ActionCtx, sources: Vec[str]) -> Vec[EmitCFunction]:
+fn emitc_collect_exports(ctx: &ActionCtx, sources: Vec[str]) -> Vec[EmitCFunction]:
     let all: Vec[EmitCFunction] = Vec.new()
     let fs = ctx.fs()
     for si in 0..sources.len() as i32:
@@ -426,7 +426,7 @@ fn emitc_collect_exports(ctx: ActionCtx, sources: Vec[str]) -> Vec[EmitCFunction
             all.push(exports.get(ei as i64))
     all
 
-fn emitc_function_proto(fn_sig: EmitCFunction) -> str:
+fn emitc_function_proto(fn_sig: &EmitCFunction) -> str:
     var out = fn_sig.return_type ++ " " ++ fn_sig.symbol ++ "("
     if fn_sig.params.len() == 0:
         out = out ++ "void"
@@ -438,7 +438,7 @@ fn emitc_function_proto(fn_sig: EmitCFunction) -> str:
             out = out ++ param.c_type ++ " " ++ param.name
     out ++ ")"
 
-fn emitc_generate_stub_files(ctx: ActionCtx) -> i32:
+fn emitc_generate_stub_files(ctx: &ActionCtx) -> i32:
     let bridge_sources: Vec[str] = Vec.new()
     bridge_sources |> push("src/compiler/LlvmBridge.w")
     bridge_sources |> push("src/compiler/ClangBridge.w")
@@ -478,10 +478,10 @@ fn emitc_generate_stub_files(ctx: ActionCtx) -> i32:
         return emitc_fail(ctx, "could not write out/gen/wl_stubs.c")
     0
 
-fn emitc_capture_rel(ctx: ActionCtx, label: str, suffix: str) -> str:
+fn emitc_capture_rel(ctx: &ActionCtx, label: str, suffix: str) -> str:
     emitc_join(emitc_join("out/command", ctx.target_name()), label ++ "." ++ suffix)
 
-fn emitc_run_capture(ctx: ActionCtx, label: str, argv: Vec[str], timeout_ms: i32) -> i32:
+fn emitc_run_capture(ctx: &ActionCtx, label: str, argv: Vec[str], timeout_ms: i32) -> i32:
     let root = ctx.project_info().project_root()
     let fs = ctx.fs()
     let capture_dir = emitc_join("out/command", ctx.target_name())
@@ -510,7 +510,7 @@ fn emitc_compile_runtime_args(root: str, argv: Vec[str], platform_obj: str) -> V
     argv |> push(emitc_abs(root, "out/lib/cimport_stubs.o"))
     argv
 
-fn emitc_build_compiler_c(ctx: ActionCtx, compiler_path: str, main_c: str) -> i32:
+fn emitc_build_compiler_c(ctx: &ActionCtx, compiler_path: str, main_c: str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: Vec[str] = Vec.new()
     argv |> push(emitc_abs(root, compiler_path))
@@ -521,7 +521,7 @@ fn emitc_build_compiler_c(ctx: ActionCtx, compiler_path: str, main_c: str) -> i3
     argv |> push(emitc_abs(root, main_c))
     emitc_run_capture(ctx, "emit-compiler-c", argv, 600000)
 
-fn emitc_build_compiler_c_workspace(ctx: ActionCtx, source_w: str, main_c: str) -> i32:
+fn emitc_build_compiler_c_workspace(ctx: &ActionCtx, source_w: str, main_c: str) -> i32:
     let ws = ctx.create_workspace("emit-compiler-c")
     ws.add_file(source_w)
     var options = ws.options()
@@ -545,7 +545,7 @@ pub fn run_bootstrap_c_emit_sources_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     emitc_generate_stub_files(ctx)
 
-fn emitc_compile_c_compiler(ctx: ActionCtx, main_c: str, output_path: str) -> i32:
+fn emitc_compile_c_compiler(ctx: &ActionCtx, main_c: str, output_path: str) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let platform_obj = emitc_host_platform_runtime_object()
@@ -570,7 +570,7 @@ fn emitc_compile_c_compiler(ctx: ActionCtx, main_c: str, output_path: str) -> i3
     argv |> push("@" ++ emitc_abs(root, llvm_rsp))
     emitc_run_capture(ctx, "compile-with-from-c", argv, 600000)
 
-fn emitc_compile_c_compiler_with_bridges(ctx: ActionCtx, main_c: str, output_path: str) -> i32:
+fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: str, output_path: str) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let platform_obj = emitc_host_platform_runtime_object()
@@ -596,7 +596,7 @@ fn emitc_compile_c_compiler_with_bridges(ctx: ActionCtx, main_c: str, output_pat
     argv |> push("@" ++ emitc_abs(root, "out/lib/llvm_link.rsp"))
     emitc_run_capture(ctx, "compile-with-from-c-full", argv, 900000)
 
-fn emitc_migrate_compiler_c(ctx: ActionCtx, compiler_path: str, main_c: str, output_w: str) -> i32:
+fn emitc_migrate_compiler_c(ctx: &ActionCtx, compiler_path: str, main_c: str, output_w: str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: Vec[str] = Vec.new()
     argv |> push(emitc_abs(root, compiler_path))
@@ -611,7 +611,7 @@ fn emitc_migrate_compiler_c(ctx: ActionCtx, compiler_path: str, main_c: str, out
     argv |> push("--no-c-export")
     emitc_run_capture(ctx, "migrate-compiler-c", argv, 900000)
 
-fn emitc_build_with_compiler(ctx: ActionCtx, compiler_path: str, source_w: str, output_path: str, label: str) -> i32:
+fn emitc_build_with_compiler(ctx: &ActionCtx, compiler_path: str, source_w: str, output_path: str, label: str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: Vec[str] = Vec.new()
     argv |> push(emitc_abs(root, compiler_path))
@@ -622,7 +622,7 @@ fn emitc_build_with_compiler(ctx: ActionCtx, compiler_path: str, source_w: str, 
     argv |> push(emitc_abs(root, output_path))
     emitc_run_capture(ctx, label, argv, 900000)
 
-fn emitc_run_single_test(ctx: ActionCtx, compiler_path: str, test_path: str, label: str) -> i32:
+fn emitc_run_single_test(ctx: &ActionCtx, compiler_path: str, test_path: str, label: str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: Vec[str] = Vec.new()
     argv |> push(emitc_abs(root, compiler_path))
@@ -631,7 +631,7 @@ fn emitc_run_single_test(ctx: ActionCtx, compiler_path: str, test_path: str, lab
     argv |> push(emitc_abs(root, test_path))
     emitc_run_capture(ctx, label, argv, 300000)
 
-fn emitc_test_target_files(ctx: ActionCtx, entry: str) -> Vec[str]:
+fn emitc_test_target_files(ctx: &ActionCtx, entry: str) -> Vec[str]:
     let files: Vec[str] = Vec.new()
     let star = emitc_index_of(entry, "*")
     if star < 0:
@@ -646,7 +646,7 @@ fn emitc_test_target_files(ctx: ActionCtx, entry: str) -> Vec[str]:
             files.push(path)
     files
 
-fn emitc_run_test_group(ctx: ActionCtx, compiler_path: str, entry: str, label: str) -> i32:
+fn emitc_run_test_group(ctx: &ActionCtx, compiler_path: str, entry: str, label: str) -> i32:
     let files = emitc_test_target_files(ctx, entry)
     if files.len() == 0:
         return emitc_fail(ctx, "matched no tests: " ++ entry)
@@ -658,7 +658,7 @@ fn emitc_run_test_group(ctx: ActionCtx, compiler_path: str, entry: str, label: s
             return rc
     0
 
-fn emitc_run_compiler_test_suite(ctx: ActionCtx, compiler_path: str, label: str) -> i32:
+fn emitc_run_compiler_test_suite(ctx: &ActionCtx, compiler_path: str, label: str) -> i32:
     let groups: [5]str = [
         "test/behavior/*.w",
         "test/compile_errors/*.w",
@@ -672,7 +672,7 @@ fn emitc_run_compiler_test_suite(ctx: ActionCtx, compiler_path: str, label: str)
             return rc
     0
 
-fn emitc_build_hello_c(ctx: ActionCtx, compiler_path: str, hello_c: str) -> i32:
+fn emitc_build_hello_c(ctx: &ActionCtx, compiler_path: str, hello_c: str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: Vec[str] = Vec.new()
     argv |> push(emitc_abs(root, compiler_path))
@@ -684,7 +684,7 @@ fn emitc_build_hello_c(ctx: ActionCtx, compiler_path: str, hello_c: str) -> i32:
     argv |> push(emitc_abs(root, hello_c))
     emitc_run_capture(ctx, "emit-hello-c", argv, 600000)
 
-fn emitc_compile_hello(ctx: ActionCtx, hello_c: str, output_path: str) -> i32:
+fn emitc_compile_hello(ctx: &ActionCtx, hello_c: str, output_path: str) -> i32:
     let root = ctx.project_info().project_root()
     let platform_obj = emitc_host_platform_runtime_object()
     if platform_obj.len() == 0:
@@ -702,7 +702,7 @@ fn emitc_compile_hello(ctx: ActionCtx, hello_c: str, output_path: str) -> i32:
     argv = emitc_push_system_libs(argv)
     emitc_run_capture(ctx, "compile-hello", argv, 600000)
 
-fn emitc_run_hello(ctx: ActionCtx, hello_path: str) -> i32:
+fn emitc_run_hello(ctx: &ActionCtx, hello_path: str) -> i32:
     let root = ctx.project_info().project_root()
     let fs = ctx.fs()
     let stdout_rel = emitc_capture_rel(ctx, "hello", "stdout")
@@ -720,7 +720,7 @@ fn emitc_run_hello(ctx: ActionCtx, hello_path: str) -> i32:
         return emitc_fail(ctx, "hello output mismatch: " ++ result.stdout)
     0
 
-fn emitc_compare_files(ctx: ActionCtx, left_path: str, right_path: str) -> i32:
+fn emitc_compare_files(ctx: &ActionCtx, left_path: str, right_path: str) -> i32:
     let fs = ctx.fs()
     let left = fs.read_text(left_path)
     let right = fs.read_text(right_path)

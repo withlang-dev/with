@@ -149,6 +149,7 @@ type SemaBuiltinSymbols {
     drop: i32,
     self_type: i32,
     vec: i32,
+    fixed_string: i32,
     veciter: i32,
     mapiter: i32,
     filteriter: i32,
@@ -234,7 +235,6 @@ type SemaBuiltinSymbols {
     implements: i32,
     is_copy: i32,
 }
-impl Copy for SemaBuiltinSymbols
 
 type SemaMethodLookup {
     sig_lookup: HashMap[i64, i32],
@@ -866,13 +866,68 @@ fn sema_new_map_str_i32 -> HashMap[str, i32]:
 fn sema_new_map_i64_i32 -> HashMap[i64, i32]:
     HashMap.new()
 
+fn sema_new_vec_str -> Vec[str]:
+    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
+    out
+
+fn sema_new_vec_i32 -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    out
+
 fn sema_owned_text(text: str) -> str:
     if text.len() == 0:
         return ""
     with_str_clone(text)
 
+fn sema_clone_str_vec(values: &Vec[str]) -> Vec[str]:
+    let out = sema_new_vec_str()
+    for i in 0..values.len() as i32:
+        out.push(sema_owned_text(values.get(i as i64)))
+    out
+
+fn sema_clone_i32_vec(values: &Vec[i32]) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    for i in 0..values.len() as i32:
+        out.push(values.get(i as i64))
+    out
+
+pub fn Sema.prepare_comptime_eval_copy(mut self: Sema) -> Sema:
+    self.type_kinds = sema_clone_i32_vec(&self.type_kinds)
+    self.type_d0 = sema_clone_i32_vec(&self.type_d0)
+    self.type_d1 = sema_clone_i32_vec(&self.type_d1)
+    self.type_d2 = sema_clone_i32_vec(&self.type_d2)
+    self.type_extra = sema_clone_i32_vec(&self.type_extra)
+    self.generic_inst_cache = sema_new_map_i64_i32()
+    self.generic_subst_param_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+    self.generic_subst_type_ids = sema_clone_i32_vec(&self.generic_subst_type_ids)
+    self.tracked_input_paths = sema_clone_str_vec(&self.tracked_input_paths)
+    self
+
 fn sema_pair_key(a: i32, b: i32) -> i64:
     (a as i64) * 4294967296 + (b as i64)
+
+fn Sema.copy_module_graph_from(mut self: Sema, source: &Sema):
+    self.module_paths = sema_new_vec_str()
+    self.module_import_starts = sema_new_vec_i32()
+    self.module_import_counts = sema_new_vec_i32()
+    self.module_import_targets = sema_new_vec_i32()
+    self.module_index_by_path = sema_new_map_str_i32()
+    self.global_visible_module_paths = sema_new_map_str_i32()
+    self.module_visibility_cache = sema_new_map_str_i32()
+
+    for mi in 0..source.module_paths.len() as i32:
+        let source_path = source.module_paths.get(mi as i64)
+        self.module_paths.push(sema_owned_text(source_path))
+        self.module_index_by_path.insert(sema_owned_text(source_path), mi)
+        if source.global_visible_module_paths.contains(source_path):
+            self.global_visible_module_paths.insert(sema_owned_text(source_path), 1)
+
+    for i in 0..source.module_import_starts.len() as i32:
+        self.module_import_starts.push(source.module_import_starts.get(i as i64))
+    for i in 0..source.module_import_counts.len() as i32:
+        self.module_import_counts.push(source.module_import_counts.get(i as i64))
+    for i in 0..source.module_import_targets.len() as i32:
+        self.module_import_targets.push(source.module_import_targets.get(i as i64))
 
 fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
     SemaBuiltinSymbols {
@@ -899,6 +954,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         drop: 0,
         self_type: 0,
         vec: 0,
+        fixed_string: 0,
         veciter: 0,
         mapiter: 0,
         filteriter: 0,
@@ -1193,15 +1249,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         label_break_value_types: Vec.new(),
         fn_label_syms: Vec.new(),
         fn_label_nodes: Vec.new(),
-        fn_label_paths: Vec.new(),
+        fn_label_paths: sema_new_vec_str(),
         fn_label_orders: Vec.new(),
         fn_label_used: Vec.new(),
         fn_goto_syms: Vec.new(),
         fn_goto_nodes: Vec.new(),
-        fn_goto_paths: Vec.new(),
+        fn_goto_paths: sema_new_vec_str(),
         fn_goto_orders: Vec.new(),
         fn_init_nodes: Vec.new(),
-        fn_init_paths: Vec.new(),
+        fn_init_paths: sema_new_vec_str(),
         fn_init_orders: Vec.new(),
         fn_label_scope_stack: Vec.new(),
         fn_label_next_scope_id: 0,
@@ -1280,7 +1336,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_fn_symbol: 0,
         source_text: "",
         tracked_input_root: "",
-        tracked_input_paths: Vec.new(),
+        tracked_input_paths: sema_new_vec_str(),
         current_return_type: 0,
         current_gen_yield_type: 0,
         has_gen_yield_type: 0,
@@ -1323,12 +1379,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_cstr: 0, ty_cstr_view: 0,
         ty_usize: 0, ty_isize: 0, ty_const_i8_ptr: 0,
         ty_field_info: 0, ty_variant_info: 0,
-        decl_source_paths: Vec.new(),
+        decl_source_paths: sema_new_vec_str(),
         decl_source_file_ids: Vec.new(),
         decl_is_c_import: Vec.new(),
         current_module_path: "",
         tool_mode_entry_path: "",
-        module_paths: Vec.new(),
+        module_paths: sema_new_vec_str(),
         module_import_starts: Vec.new(),
         module_import_counts: Vec.new(),
         module_import_targets: Vec.new(),
@@ -1337,10 +1393,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         module_visibility_cache: sema_new_map_str_i32(),
         named_type_candidate_syms: Vec.new(),
         named_type_candidate_tids: Vec.new(),
-        named_type_candidate_paths: Vec.new(),
+        named_type_candidate_paths: sema_new_vec_str(),
         named_type_candidate_pub: Vec.new(),
         decl_visibility_syms: Vec.new(),
-        decl_visibility_paths: Vec.new(),
+        decl_visibility_paths: sema_new_vec_str(),
         decl_visibility_pub: Vec.new(),
         decl_visibility_nodes: Vec.new(),
         ci_syms: sema_new_map_i32_i32(),
@@ -1436,8 +1492,8 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s
 
 fn Sema.set_tracked_input_context(self: Sema, root: str, paths: Vec[str]):
-    self.tracked_input_root = root
-    self.tracked_input_paths = paths
+    self.tracked_input_root = sema_owned_text(root)
+    self.tracked_input_paths = sema_clone_str_vec(&paths)
 
 fn Sema.record_tracked_input(self: Sema, path: str):
     var paths = self.tracked_input_paths
@@ -1693,6 +1749,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.drop = self.pool_intern("Drop")
     self.syms.self_type = self.pool_intern("Self")
     self.syms.vec = self.pool_intern("Vec")
+    self.syms.fixed_string = self.pool_intern("FixedString")
     self.syms.veciter = self.pool_intern("VecIter")
     self.syms.mapiter = self.pool_intern("MapIter")
     self.syms.filteriter = self.pool_intern("FilterIter")
@@ -2262,6 +2319,32 @@ fn Sema.canonical_range_type_constructor_inclusive(self: Sema, sym: i32) -> i32:
         return self.range_type_constructor_inclusive(canonical)
     -1
 
+fn Sema.is_fixed_string_symbol(self: Sema, sym: i32) -> i32:
+    if sym == self.syms.fixed_string:
+        return 1
+    let canonical = self.canonical_symbol_by_text(sym)
+    if canonical == self.syms.fixed_string:
+        return 1
+    if self.pool_resolve_symbol(sym) == "FixedString":
+        return 1
+    0
+
+fn Sema.fixed_string_type_from_length_node(self: Sema, length_node: i32) -> i32:
+    let length = self.int_literal_i64_value(length_node)
+    if length.ok == 0:
+        self.emit_error("FixedString length must be a compile-time integer constant", length_node)
+        return 0
+    if length.value <= 0:
+        self.emit_error("FixedString length must be positive", length_node)
+        return 0
+    if length.value > 2147483647:
+        self.emit_error("FixedString length is too large", length_node)
+        return 0
+    let storage_tid = self.ensure_exact_type(TypeKind.TY_ARRAY, self.ty_u8 as i32, length.value as i32, 0) as i32
+    let args: Vec[i32] = Vec.new()
+    args.push(storage_tid)
+    self.ensure_generic_inst_type(self.syms.fixed_string, args, 1) as i32
+
 // Pre-register generic instantiation types needed by MirLower so that
 // downstream passes never need to mutate the type tables.
 // Must be called after check_module() and before freeze_types().
@@ -2329,6 +2412,13 @@ fn Sema.preregister_mir_types(self: Sema):
 
 fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
     var gi_base_sym = self.ast.get_data0(node)
+    if self.is_fixed_string_symbol(gi_base_sym) != 0:
+        let gi_arg_count = self.ast.get_data2(node)
+        if gi_arg_count != 1:
+            self.emit_error("FixedString expects exactly one length argument", node)
+            return 0
+        let gi_extra_start = self.ast.get_data1(node)
+        return self.fixed_string_type_from_length_node(self.ast.get_extra(gi_extra_start))
     let range_inclusive = self.canonical_range_type_constructor_inclusive(gi_base_sym)
     if range_inclusive >= 0:
         let gi_arg_count = self.ast.get_data2(node)

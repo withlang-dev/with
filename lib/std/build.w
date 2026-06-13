@@ -1009,7 +1009,7 @@ pub fn ProcessRunner.run_capture_with_env(self: &Self, args: &Vec[str], stdout_p
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture_cwd(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
@@ -1021,7 +1021,7 @@ pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: s
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str, process_env: ProcessEnv) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str, process_env: ProcessEnv) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     let env = tool_process_apply_env(process_env)
     let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
@@ -1033,7 +1033,7 @@ pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: Vec[str], stdou
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.run_capture_input(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> ToolProcessResult:
+pub fn ProcessRunner.run_capture_input(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture_input(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, stdin_path)
@@ -1045,7 +1045,7 @@ pub fn ProcessRunner.run_capture_input(self: &Self, args: Vec[str], stdout_path:
         timed_out: rc == 124,
     }
 
-pub fn ProcessRunner.spawn_capture(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str) -> i32:
+pub fn ProcessRunner.spawn_capture(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
     let env = tool_process_clear_driver_env()
     let pid = with_exec_argv_capture_spawn(tool_process_argv(args), stdout_path, stderr_path)
@@ -1531,7 +1531,7 @@ fn build_action_write_scope(target: &Target) -> Vec[str]:
         scopes.push(target.write_scopes.get(i as i64))
     scopes
 
-fn build_action_ctx(ctx: BuildCtx, target: &Target) -> ActionCtx:
+fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
     let fs_outputs = build_action_write_scope(target)
     let ctx_outputs = build_action_outputs(target)
     ActionCtx {
@@ -1558,7 +1558,8 @@ pub fn Build.__driver_run_action(self: Build, ctx: BuildCtx, action_name: str) -
             if target.kind != .Action:
                 with_eprint("error: build action target '" ++ action_name ++ "' is not an Action target\n")
                 return 1
-            return target.action(build_action_ctx(ctx, target))
+            let action_ctx = build_action_ctx(ctx, target)
+            return target.action(action_ctx)
     with_eprint("error: build action target not found: " ++ action_name ++ "\n")
     1
 

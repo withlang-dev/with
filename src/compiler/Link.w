@@ -92,6 +92,62 @@ fn link_stage_argv_append(argv: str, arg: str) -> str:
 fn link_stage_is_digit(ch: i32) -> bool:
     ch >= 48 and ch <= 57
 
+fn link_stage_read_u32_le(data: str, offset: i32) -> i64:
+    if offset < 0 or offset + 3 >= data.len() as i32:
+        return -1
+    (data.byte_at(offset as i64) as i64) |
+        ((data.byte_at((offset + 1) as i64) as i64) << 8) |
+        ((data.byte_at((offset + 2) as i64) as i64) << 16) |
+        ((data.byte_at((offset + 3) as i64) as i64) << 24)
+
+fn link_stage_macho_macos_minos(path: str) -> i64:
+    let data = runtime_read_file(path)
+    if data.len() < 32:
+        return 0
+    // 64-bit little-endian Mach-O object.
+    if link_stage_read_u32_le(data, 0) != 0xfeedfacf:
+        return 0
+    let ncmds = link_stage_read_u32_le(data, 16) as i32
+    var offset = 32
+    var best: i64 = 0
+    var i = 0
+    while i < ncmds and offset + 8 <= data.len() as i32:
+        let cmd = link_stage_read_u32_le(data, offset)
+        let cmdsize = link_stage_read_u32_le(data, offset + 4) as i32
+        if cmdsize < 8 or offset + cmdsize > data.len() as i32:
+            break
+        if cmd == 0x32 and cmdsize >= 24:
+            let platform = link_stage_read_u32_le(data, offset + 8)
+            let minos = link_stage_read_u32_le(data, offset + 12)
+            if platform == 1 and minos > best:
+                best = minos
+        else if cmd == 0x24 and cmdsize >= 16:
+            let minos = link_stage_read_u32_le(data, offset + 8)
+            if minos > best:
+                best = minos
+        offset = offset + cmdsize
+        i = i + 1
+    best
+
+fn link_stage_darwin_version_string(encoded: i64) -> str:
+    let major = encoded / 65536
+    let minor = (encoded / 256) % 256
+    let patch = encoded % 256
+    if patch != 0:
+        return f"{major}.{minor}.{patch}"
+    f"{major}.{minor}"
+
+fn link_stage_darwin_platform_version(obj_path: str, extras: &Vec[str]) -> str:
+    var best: i64 = 11 * 65536
+    let obj_minos = link_stage_macho_macos_minos(obj_path)
+    if obj_minos > best:
+        best = obj_minos
+    for i in 0..extras.len() as i32:
+        let extra_minos = link_stage_macho_macos_minos(extras.get(i as i64))
+        if extra_minos > best:
+            best = extra_minos
+    link_stage_darwin_version_string(best)
+
 fn link_stage_is_temp_archive_path(path: str) -> bool:
     if not path.ends_with(".a"):
         return false
@@ -102,7 +158,7 @@ fn link_stage_is_temp_archive_path(path: str) -> bool:
         i = i + 1
     false
 
-fn link_stage_collect_cleanup_files(extras: Vec[str]) -> Vec[str]:
+fn link_stage_collect_cleanup_files(extras: &Vec[str]) -> Vec[str]:
     let cleanup: Vec[str] = Vec.new()
     for i in 0..extras.len() as i32:
         let extra = extras.get(i as i64)
@@ -217,7 +273,7 @@ fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extra
         args.push(link_args.get(i as i64))
     if runtime_sysinfo_os() == "Linux":
         args.push("-lm")
-    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    let cleanup_files = link_stage_collect_cleanup_files(&extras)
     LinkStageCommand { linker, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_file_exists(path: str) -> bool:
@@ -277,12 +333,13 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: str, obj_path: str, bin_pat
     let env: Vec[LinkStageEnvVar] = Vec.new()
     let inputs: Vec[str] = Vec.new()
     let outputs: Vec[str] = Vec.new()
+    let platform_version = link_stage_darwin_platform_version(obj_path, &extras)
     args.push("-arch")
     args.push("arm64")
     args.push("-platform_version")
     args.push("macos")
-    args.push("11.0")
-    args.push("11.0")
+    args.push(platform_version)
+    args.push(platform_version)
     args.push("-dead_strip")
     args.push("-o")
     args.push(bin_path)
@@ -298,7 +355,7 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: str, obj_path: str, bin_pat
     for i in 0..link_args.len() as i32:
         args.push(link_args.get(i as i64))
     args.push("-lSystem")
-    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    let cleanup_files = link_stage_collect_cleanup_files(&extras)
     LinkStageCommand { linker: llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
@@ -367,7 +424,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
     inputs.push(crtend)
     args.push(crtn)
     inputs.push(crtn)
-    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    let cleanup_files = link_stage_collect_cleanup_files(&extras)
     LinkStageCommand { linker: llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_make_windows_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
@@ -422,7 +479,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: str, obj_path: str, bin_pa
     args.push("psapi.lib")
     args.push("dbghelp.lib")
     args.push("ntdll.lib")
-    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    let cleanup_files = link_stage_collect_cleanup_files(&extras)
     LinkStageCommand { linker: llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:

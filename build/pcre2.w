@@ -121,7 +121,7 @@ fn pcre2_normalize_heap_output(text: str) -> str:
         i = i + 1
     out
 
-fn pcre2_copy_if_missing(ctx: ActionCtx, src: str, dst: str) -> i32:
+fn pcre2_copy_if_missing(ctx: &ActionCtx, src: str, dst: str) -> i32:
     let fs = ctx.fs()
     if fs.exists(dst):
         return 0
@@ -132,11 +132,11 @@ fn pcre2_copy_if_missing(ctx: ActionCtx, src: str, dst: str) -> i32:
     print("generated " ++ pcre2_abs(ctx.project_info().project_root(), dst))
     0
 
-fn pcre2_fail(ctx: ActionCtx, message: str) -> i32:
+fn pcre2_fail(ctx: &ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
-fn pcre2_remove_tree_if_exists(ctx: ActionCtx, path: str) -> i32:
+fn pcre2_remove_tree_if_exists(ctx: &ActionCtx, path: str) -> i32:
     let fs = ctx.fs()
     if not fs.exists(path):
         return 0
@@ -144,7 +144,7 @@ fn pcre2_remove_tree_if_exists(ctx: ActionCtx, path: str) -> i32:
         return pcre2_fail(ctx, "could not remove directory: " ++ path)
     0
 
-fn pcre2_remove_file_if_exists(ctx: ActionCtx, path: str) -> i32:
+fn pcre2_remove_file_if_exists(ctx: &ActionCtx, path: str) -> i32:
     let fs = ctx.fs()
     if not fs.exists(path):
         return 0
@@ -180,7 +180,7 @@ fn pcre2_migrate_options(source_path: str, output_path: str, source_dir: str, ex
         ir_roundtrip: false,
     }
 
-fn pcre2_count_w_files(ctx: ActionCtx, dir: str) -> i32:
+fn pcre2_count_w_files(ctx: &ActionCtx, dir: str) -> i32:
     let files = ctx.fs().list_files(dir)
     var count = 0
     for i in 0..files.len() as i32:
@@ -188,7 +188,7 @@ fn pcre2_count_w_files(ctx: ActionCtx, dir: str) -> i32:
             count = count + 1
     count
 
-fn pcre2_reject_c_exports(ctx: ActionCtx, generated_dir: str) -> i32:
+fn pcre2_reject_c_exports(ctx: &ActionCtx, generated_dir: str) -> i32:
     let fs = ctx.fs()
     let files = fs.list_files(generated_dir)
     var errors = 0
@@ -228,7 +228,7 @@ fn pcre2_insert_after_defs_import(text: str, insertion: str) -> str:
         return out
     text
 
-fn pcre2_add_imports(ctx: ActionCtx, path: str, sentinel: str, insertion: str) -> i32:
+fn pcre2_add_imports(ctx: &ActionCtx, path: str, sentinel: str, insertion: str) -> i32:
     let fs = ctx.fs()
     if not fs.exists(path):
         return 0
@@ -311,7 +311,7 @@ fn pcre2_decls_contain_function(decls: Vec[DeclSummary], name: str, source_suffi
             return true
     false
 
-fn pcre2_check_synthetic_module(ctx: ActionCtx, mod_name: str, source_name: str, source_text: str, expected_decl: str) -> i32:
+fn pcre2_check_synthetic_module(ctx: &ActionCtx, mod_name: str, source_name: str, source_text: str, expected_decl: str) -> i32:
     let ws = ctx.create_workspace("pcre2-check-" ++ mod_name)
     ws.add_string(source_name, source_text)
     var options = ws.options()
@@ -343,7 +343,7 @@ fn pcre2_check_synthetic_module(ctx: ActionCtx, mod_name: str, source_name: str,
         return 1
     0
 
-fn pcre2_ensure_generated_dependencies(ctx: ActionCtx, generated_dir: str) -> i32:
+fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: str) -> i32:
     let compile_path = pcre2_join(generated_dir, "pcre2_compile.w")
     let compile_imports =
         "use std.re.pcre2_auto_possess\n" ++
@@ -382,7 +382,7 @@ fn pcre2_ensure_generated_dependencies(ctx: ActionCtx, generated_dir: str) -> i3
             return pcre2_fail(ctx, "could not update imports in " ++ pcre2test_path)
     0
 
-pub fn pcre2_count_generated_errors(ctx: ActionCtx, generated_dir: str, print_summary: bool) -> i32:
+pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: str, print_summary: bool) -> i32:
     let fs = ctx.fs()
     if not fs.is_dir(generated_dir):
         let _ = pcre2_fail(ctx, "missing generated directory: " ++ generated_dir)
@@ -420,7 +420,7 @@ pub fn pcre2_count_generated_errors(ctx: ActionCtx, generated_dir: str, print_su
         print(f"OK={ok} TOTAL_ERRORS={total_errors}")
     total_errors
 
-fn pcre2_copy_w_files(ctx: ActionCtx, source_dir: str, dest_dir: str) -> i32:
+fn pcre2_copy_w_files(ctx: &ActionCtx, source_dir: str, dest_dir: str) -> i32:
     let fs = ctx.fs()
     let files = fs.list_files(source_dir)
     var copied = 0
@@ -437,10 +437,10 @@ fn pcre2_copy_w_files(ctx: ActionCtx, source_dir: str, dest_dir: str) -> i32:
         return pcre2_fail(ctx, "no .w files found in " ++ source_dir)
     0
 
-fn pcre2_migrate_tmp_dir(ctx: ActionCtx) -> str:
+fn pcre2_migrate_tmp_dir(ctx: &ActionCtx) -> str:
     pcre2_join(pcre2_scratch_dir(), "migrate-" ++ f"{ctx.target_name()}")
 
-fn pcre2_prepare_reference_tree(ctx: ActionCtx, ref_dir: str) -> i32:
+fn pcre2_prepare_reference_tree(ctx: &ActionCtx, ref_dir: str) -> i32:
     let fs = ctx.fs()
     let src_dir = pcre2_join(ref_dir, "src")
     if not fs.is_dir(src_dir):

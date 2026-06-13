@@ -10,9 +10,19 @@ use InternPool
 use Diagnostic
 use Span
 use compiler.EmbeddedStdlib
+use compiler.Runtime
 
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_write(s: str) -> Unit
+
+fn resolve_owned_text(text: str) -> str:
+    if text.len() == 0:
+        return ""
+    runtime_str_clone(text)
+
+fn resolve_new_vec_str -> Vec[str]:
+    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
+    out
 
 enum ImportKind: i32:
     IK_USE = 1
@@ -211,8 +221,8 @@ fn ResolveState.init(pool: InternPool, diags: DiagnosticList, emit_resolve_diags
         pool,
         diags,
         result: ResolveResult.init(),
-        module_paths: Vec.new(),
-        module_dirs: Vec.new(),
+        module_paths: resolve_new_vec_str(),
+        module_dirs: resolve_new_vec_str(),
         module_file_ids: Vec.new(),
         module_decl_counts: Vec.new(),
         module_import_starts: Vec.new(),
@@ -248,10 +258,10 @@ fn ResolveState.reserve_module(self: ResolveState, path: str, source_dir: str, f
         return existing.unwrap()
 
     let id = self.module_paths.len() as i32
-    self.module_map.insert(canon, id)
+    self.module_map.insert(resolve_owned_text(canon), id)
 
-    self.module_paths.push(canon)
-    self.module_dirs.push(source_dir)
+    self.module_paths.push(resolve_owned_text(canon))
+    self.module_dirs.push(resolve_owned_text(source_dir))
     if file_id_hint >= 0:
         self.module_file_ids.push(file_id_hint)
     else:
@@ -270,7 +280,7 @@ fn ResolveState.build_module_table(self: ResolveState) -> Vec[ResolvedModule]:
         out.push(ResolvedModule {
             module_id: mid,
             file_id: self.module_file_ids.get(mid as i64),
-            path: self.module_paths.get(mid as i64),
+            path: resolve_owned_text(self.module_paths.get(mid as i64)),
             import_start: self.module_import_starts.get(mid as i64),
             import_count: self.module_import_counts.get(mid as i64),
             decl_count: self.module_decl_counts.get(mid as i64),
@@ -311,7 +321,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
                 module_id,
                 index_in_module: import_index,
                 kind: ImportKind.IK_USE,
-                path_text: dotted,
+                path_text: resolve_owned_text(dotted),
                 target_module,
                 span_start: start,
                 span_end: end,
@@ -326,7 +336,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
                 module_id,
                 index_in_module: import_index,
                 kind: ImportKind.IK_C_IMPORT,
-                path_text: header,
+                path_text: resolve_owned_text(header),
                 target_module: -1,
                 span_start: start,
                 span_end: end,

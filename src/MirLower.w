@@ -45,6 +45,7 @@ type MirBuilder = ephemeral {
     drop_local_ids: Vec[i32],
     drop_kinds: Vec[i32],
     drop_scope_starts: Vec[i32],
+    moved_value_local_ids: Vec[i32],
     stmt_temp_locals: Vec[i32],
     stmt_temp_starts: Vec[i32],
     with_cleanup_guard_locals: Vec[i32],
@@ -118,6 +119,7 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         drop_local_ids: Vec.new(),
         drop_kinds: Vec.new(),
         drop_scope_starts: Vec.new(),
+        moved_value_local_ids: Vec.new(),
         stmt_temp_locals: Vec.new(),
         stmt_temp_starts: Vec.new(),
         with_cleanup_guard_locals: Vec.new(),
@@ -202,6 +204,10 @@ fn MirBuilder.push_scope(self: MirBuilder) -> Unit:
     self.errdefer_scope_starts.push(self.errdefer_nodes.len() as i32)
 
 fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32) -> Unit:
+    if self.drop_kind_owns_value(drop_kind) != 0 and self.local_value_moved(local_id) != 0:
+        self.drop_local_ids.push(local_id)
+        self.drop_kinds.push(DropKind.DK_STORAGE)
+        return
     self.drop_local_ids.push(local_id)
     self.drop_kinds.push(drop_kind)
 
@@ -263,6 +269,30 @@ fn MirBuilder.drop_kind_owns_value(self: MirBuilder, drop_kind: i32) -> i32:
         return 1
     0
 
+fn MirBuilder.local_value_moved(self: MirBuilder, local_id: i32) -> i32:
+    for i in 0..self.moved_value_local_ids.len() as i32:
+        if self.moved_value_local_ids.get(i as i64) == local_id:
+            return 1
+    0
+
+fn MirBuilder.mark_local_value_moved(self: MirBuilder, local_id: i32) -> Unit:
+    if local_id < 0:
+        return
+    if self.local_value_moved(local_id) != 0:
+        return
+    self.moved_value_local_ids.push(local_id)
+
+fn MirBuilder.clear_local_value_moved(self: MirBuilder, local_id: i32) -> Unit:
+    var i = self.moved_value_local_ids.len() as i32 - 1
+    while i >= 0:
+        if self.moved_value_local_ids.get(i as i64) == local_id:
+            let last = self.moved_value_local_ids.len() as i32 - 1
+            if i != last:
+                self.moved_value_local_ids.set_i32(i as i64, self.moved_value_local_ids.get(last as i64))
+            self.moved_value_local_ids.pop()
+            return
+        i = i - 1
+
 fn MirBuilder.cancel_scheduled_value_drop_for_local(self: MirBuilder, local_id: i32) -> Unit:
     var i = self.drop_local_ids.len() as i32 - 1
     while i >= 0:
@@ -309,6 +339,7 @@ fn MirBuilder.consume_moved_operand(self: MirBuilder, operand_id: i32) -> Unit:
     let local_id = mir_place_plain_local(&self.body, place)
     if local_id < 0:
         return
+    self.mark_local_value_moved(local_id)
     self.cancel_scheduled_value_drop_for_local(local_id)
     self.cancel_stmt_temp_for_local(local_id)
 
@@ -351,6 +382,9 @@ fn MirBuilder.emit_task_cancel_call(self: MirBuilder, task_op: i32, intrinsic: M
     self.switch_to(after_cancel_bb)
 
 fn MirBuilder.emit_drop_entry(self: MirBuilder, local_id: i32, drop_kind: i32):
+    if self.drop_kind_owns_value(drop_kind) != 0 and self.local_value_moved(local_id) != 0:
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
+        return
     if drop_kind == DropKind.DK_WITH_GUARD or drop_kind == DropKind.DK_WITH_GUARD_MUT:
         self.emit_with_guard_cleanup(local_id, drop_kind)
         return
@@ -886,6 +920,11 @@ fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
     // Resolve NodeKind.NK_INDEX(NodeKind.NK_IDENT("Vec"), type_arg) to a TypeKind.TY_GENERIC_INST.
     // Used for Vec[i32].new() and HashMap[str, i32].new().
     // Sema.check_index creates these during the check pass; we only look up here.
+    let whole_type = self.sema.resolve_type_level_arg_expr(node)
+    if whole_type > 0:
+        let whole_resolved = self.sema.resolve_alias(whole_type as TypeId)
+        if self.sema.get_type_kind(whole_resolved) == TypeKind.TY_GENERIC_INST:
+            return whole_resolved as i32
     let base = self.ast.get_data0(node)
     if self.ast.kind(base) != NodeKind.NK_IDENT:
         return 0
@@ -927,6 +966,9 @@ fn MirBuilder.type_receiver_type(self: MirBuilder, node: i32) -> i32:
         if self.sema.named_types.contains(sym):
             return self.sema.named_types.get(sym).unwrap()
     if self.ast.kind(node) == NodeKind.NK_INDEX:
+        let indexed_ty = self.sema.resolve_type_level_arg_expr(node)
+        if indexed_ty != 0:
+            return indexed_ty
         let base = self.ast.get_data0(node)
         if self.ast.kind(base) == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(base)
@@ -2537,6 +2579,9 @@ fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: 
     self.update_string_alias_after_assignment(place, operand_id)
     let rval = self.body.new_rvalue(RvalueKind.RK_USE, operand_id, 0, 0)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rval, span)
+    let dest_local = mir_place_plain_local(&self.body, place)
+    if dest_local >= 0:
+        self.clear_local_value_moved(dest_local)
 
 fn MirBuilder.direct_place_local(self: MirBuilder, place: i32) -> i32:
     if place < 0 or place >= self.body.place_locals.len() as i32:
@@ -6395,24 +6440,27 @@ fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method
         let resolved = self.sema.auto_deref_ref_ptr_type(obj_type as TypeId)
         let type_name_sym = self.sema.method_owner_symbol_for_type(resolved as i32)
         if type_name_sym != 0:
-            let method_fn = self.sema.lookup_method_fn(type_name_sym, sema_method_sym)
-            if method_fn != 0 and self.sema.lookup_method_sig(type_name_sym, sema_method_sym) >= 0:
-                return method_fn
+            if type_name_sym != self.sema.syms.fixed_string:
+                let method_fn = self.sema.lookup_method_fn(type_name_sym, sema_method_sym)
+                if method_fn != 0 and self.sema.lookup_method_sig(type_name_sym, sema_method_sym) >= 0:
+                    return method_fn
 
     if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
         let type_sym = self.ast.get_data0(self_expr)
-        let method_fn = self.sema.lookup_method_fn(type_sym, method_sym)
-        if method_fn != 0 and self.sema.lookup_method_sig(type_sym, method_sym) >= 0:
-            return method_fn
+        if type_sym != self.sema.syms.fixed_string:
+            let method_fn = self.sema.lookup_method_fn(type_sym, method_sym)
+            if method_fn != 0 and self.sema.lookup_method_sig(type_sym, method_sym) >= 0:
+                return method_fn
 
     // Handle Vec[i32].method() — receiver is NodeKind.NK_INDEX of a type name
     if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
         let base = self.ast.get_data0(self_expr)
         if self.ast.kind(base) == NodeKind.NK_IDENT:
             let type_sym = self.ast.get_data0(base)
-            let method_fn = self.sema.lookup_method_fn(type_sym, method_sym)
-            if method_fn != 0 and self.sema.lookup_method_sig(type_sym, method_sym) >= 0:
-                return method_fn
+            if type_sym != self.sema.syms.fixed_string:
+                let method_fn = self.sema.lookup_method_fn(type_sym, method_sym)
+                if method_fn != 0 and self.sema.lookup_method_sig(type_sym, method_sym) >= 0:
+                    return method_fn
 
     method_sym
 
@@ -6503,7 +6551,9 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     let type_name_sym = self.sema.get_type_name(resolved)
     if type_name_sym == 0:
         return MirIntrinsic.NONE
-    let type_name = self.pool.resolve_symbol(type_name_sym)
+    var type_name = self.sema.pool_resolve_symbol(type_name_sym)
+    if type_name.len() == 0:
+        type_name = self.pool.resolve_symbol(type_name_sym)
     if type_name == "Task" or type_name == "ScopedTask":
         if method_name == "cancel": return MirIntrinsic.FIBER_CANCEL
         return MirIntrinsic.NONE
@@ -6529,6 +6579,19 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "fold": return MirIntrinsic.VEC_FOLD
         if method_name == "contains": return MirIntrinsic.VEC_CONTAINS
         if method_name == "join": return MirIntrinsic.VEC_JOIN
+        return MirIntrinsic.NONE
+    if type_name == "FixedString" or type_name.starts_with("FixedString__"):
+        if method_name == "new": return MirIntrinsic.FIXED_STRING_NEW
+        if method_name == "len": return MirIntrinsic.FIXED_STRING_LEN
+        if method_name == "len_i32": return MirIntrinsic.FIXED_STRING_LEN32
+        if method_name == "len_i64": return MirIntrinsic.FIXED_STRING_LEN64
+        if method_name == "capacity": return MirIntrinsic.FIXED_STRING_CAPACITY
+        if method_name == "is_empty": return MirIntrinsic.FIXED_STRING_IS_EMPTY
+        if method_name == "clear": return MirIntrinsic.FIXED_STRING_CLEAR
+        if method_name == "push_byte": return MirIntrinsic.FIXED_STRING_PUSH_BYTE
+        if method_name == "push_str": return MirIntrinsic.FIXED_STRING_PUSH_STR
+        if method_name == "as_view": return MirIntrinsic.FIXED_STRING_AS_VIEW
+        if method_name == "equals": return MirIntrinsic.FIXED_STRING_EQUALS
         return MirIntrinsic.NONE
     if type_name == "VecIter" or type_name == "VecIterRef":
         if method_name == "next":
@@ -6770,9 +6833,13 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     if self.sema.dyn_trait_symbol_for_type(recv_type) != 0:
         let dyn_fn_op = self.const_operand(ConstKind.CK_FN, method_sym, 0)
         let dyn_args: Vec[i32] = Vec.new()
-        dyn_args.push(self.lower_expr(self_expr))
+        let dyn_recv_op = self.lower_expr(self_expr)
+        self.consume_moved_operand(dyn_recv_op)
+        dyn_args.push(dyn_recv_op)
         for dyn_ai in 0..arg_count:
-            dyn_args.push(self.lower_expr(self.ast.get_extra(arg_start + dyn_ai)))
+            let dyn_arg_op = self.lower_expr(self.ast.get_extra(arg_start + dyn_ai))
+            self.consume_moved_operand(dyn_arg_op)
+            dyn_args.push(dyn_arg_op)
         let dyn_args_id = self.body.new_call_args(dyn_args)
         self.body.set_call_intrinsic(dyn_args_id, MirIntrinsic.DYN_CALL)
         self.body.set_call_ast_node(dyn_args_id, node)
@@ -6810,11 +6877,14 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
                     if self.lookup_local(gc_idx_sym) < 0 and self.sema.named_types.contains(gc_idx_sym):
                         gc_is_static = true
             if not gc_is_static:
-                gc_args.push(self.lower_expr(self_expr))
+                let gc_recv_op = self.lower_expr(self_expr)
+                gc_args.push(gc_recv_op)
             for gc_mai in 0..arg_count:
                 let gc_ma_node = self.ast.get_extra(arg_start + gc_mai)
                 if self.ast.kind(gc_ma_node) != NodeKind.NK_CLOSURE:
-                    gc_args.push(self.lower_expr(gc_ma_node))
+                    let gc_arg_op = self.lower_expr(gc_ma_node)
+                    self.consume_moved_operand(gc_arg_op)
+                    gc_args.push(gc_arg_op)
                 else:
                     gc_args.push(self.const_operand(ConstKind.CK_INT, 0, self.sema.ty_i32))
             let gc_args_id = self.body.new_call_args(gc_args)
@@ -6862,7 +6932,7 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
 
     // Build argument operands. For static calls (Vec.new, HashMap.new),
     // the receiver is a type ident — skip it. For instance methods, include it.
-    let is_static = intrinsic == MirIntrinsic.VEC_NEW or intrinsic == MirIntrinsic.VEC_WITH_CAPACITY or intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_NEW
+    let is_static = intrinsic == MirIntrinsic.VEC_NEW or intrinsic == MirIntrinsic.FIXED_STRING_NEW or intrinsic == MirIntrinsic.VEC_WITH_CAPACITY or intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_NEW
     let call_args: Vec[i32] = Vec.new()
     var recv_type_for_args = 0
     if not is_static:
@@ -6871,13 +6941,19 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
         let recv_resolved = if recv_ty != 0: self.sema.resolve_alias(recv_ty as TypeId) else: 0
         let recv_kind = self.sema.get_type_kind(recv_resolved)
         let raw_pointer_option_receiver = recv_kind == TypeKind.TY_PTR and (intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT or intrinsic == MirIntrinsic.OPT_IS_SOME or intrinsic == MirIntrinsic.OPT_IS_NONE or intrinsic == MirIntrinsic.OPT_FILTER)
+        var recv_op = 0
         if raw_pointer_option_receiver:
-            call_args.push(self.lower_expr(self_expr))
+            recv_op = self.lower_expr(self_expr)
         else:
-            call_args.push(self.lower_receiver_with_method_autoderef(self_expr))
+            recv_op = self.lower_receiver_with_method_autoderef(self_expr)
+        if intrinsic != MirIntrinsic.FIBER_CANCEL:
+            self.consume_moved_operand(recv_op)
+        call_args.push(recv_op)
     for i in 0..arg_count:
         let arg_node = self.ast.get_extra(arg_start + i)
-        call_args.push(self.lower_method_arg_with_expected(recv_type_for_args, method_sym, arg_node, i))
+        let arg_op = self.lower_method_arg_with_expected(recv_type_for_args, method_sym, arg_node, i)
+        self.consume_moved_operand(arg_op)
+        call_args.push(arg_op)
     if intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT:
         call_args.push(self.source_location_operand(node))
 
@@ -8106,9 +8182,12 @@ fn MirBuilder.lower_optional_chain_field(self: MirBuilder, result_place: i32, re
 fn MirBuilder.lower_intrinsic_call_with_receiver_operand(self: MirBuilder, intrinsic: MirIntrinsic, recv_op: i32, recv_type: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
     let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
     let call_args: Vec[i32] = Vec.new()
+    self.consume_moved_operand(recv_op)
     call_args.push(recv_op)
     for ai in 0..arg_count:
-        call_args.push(self.lower_method_arg_with_expected(recv_type, method_sym, self.ast.get_extra(arg_start + ai), ai))
+        let arg_op = self.lower_method_arg_with_expected(recv_type, method_sym, self.ast.get_extra(arg_start + ai), ai)
+        self.consume_moved_operand(arg_op)
+        call_args.push(arg_op)
 
     let args_id = self.body.new_call_args(call_args)
     self.body.set_call_ast_node(args_id, node)

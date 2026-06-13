@@ -2,6 +2,7 @@
 
 use std.string
 use std.builtins
+use std.fixed_string
 use std.collections
 use std.regex
 use std.option

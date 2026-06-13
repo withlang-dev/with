@@ -40,6 +40,10 @@ fn frontend_owned_text(text: str) -> str:
         return ""
     runtime_str_clone(text)
 
+fn frontend_new_vec_str -> Vec[str]:
+    let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 16 }
+    out
+
 fn frontend_normalize_source_text(text: str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     var i = 0
@@ -188,10 +192,10 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
         runtime_eprint(msg)
 
 fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult) -> Unit:
-    self.module_paths = Vec.new()
-    self.module_import_starts = Vec.new()
-    self.module_import_counts = Vec.new()
-    self.module_import_targets = Vec.new()
+    self.module_paths = sema_new_vec_str()
+    self.module_import_starts = sema_new_vec_i32()
+    self.module_import_counts = sema_new_vec_i32()
+    self.module_import_targets = sema_new_vec_i32()
     self.module_index_by_path = HashMap.new()
     self.global_visible_module_paths = HashMap.new()
     self.module_visibility_cache = HashMap.new()
@@ -208,7 +212,7 @@ fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult) -> Unit:
                 self.module_import_targets.push(imp.target_module)
                 visible_count = visible_count + 1
         self.module_import_counts.push(visible_count)
-        self.module_index_by_path.insert(owned_path, mod.module_id)
+        self.module_index_by_path.insert(frontend_owned_text(mod.path), mod.module_id)
     if resolved.modules.len() > 0:
         let global_frontier: Vec[i32] = Vec.new()
         let root = resolved.modules.get(0)
@@ -236,7 +240,7 @@ fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult) -> Unit:
 fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var out = pool
     let ordered: Vec[i32] = Vec.new()
-    let ordered_paths: Vec[str] = Vec.new()
+    let ordered_paths = frontend_new_vec_str()
     let ordered_file_ids: Vec[i32] = Vec.new()
     let ordered_ci: Vec[i32] = Vec.new()
     let base_count = out.decl_count()
@@ -271,7 +275,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let decl = out.get_decl(i)
         if out.kind(decl) != NodeKind.NK_C_IMPORT:
             ordered.push(decl as i32)
-            ordered_paths.push(self.decl_source_path_frontend(i))
+            ordered_paths.push(frontend_owned_text(self.decl_source_path_frontend(i)))
             ordered_file_ids.push(self.decl_source_file_id_frontend(i))
             let ci_f = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(i as i64) else: 0
             ordered_ci.push(ci_f)
@@ -281,7 +285,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         // later sema passes can still tell which modules directly use c_import,
         // even if header expansion is deduplicated elsewhere in the merged AST.
         ordered.push(decl as i32)
-        ordered_paths.push(self.decl_source_path_frontend(i))
+        ordered_paths.push(frontend_owned_text(self.decl_source_path_frontend(i)))
         ordered_file_ids.push(self.decl_source_file_id_frontend(i))
         ordered_ci.push(0)
 
@@ -364,7 +368,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         var di = before
         while di < after:
             ordered.push(out.get_decl(di) as i32)
-            ordered_paths.push(ci_owner_path)
+            ordered_paths.push(frontend_owned_text(ci_owner_path))
             ordered_file_ids.push(ci_owner_file_id)
             ordered_ci.push(1)  // c_import origin
             di = di + 1
@@ -446,7 +450,7 @@ fn cimport_deps_str_compare(a: str, b: str) -> i32:
     (al - bl) as i32
 
 fn cimport_deps_sorted_unique_paths(files: str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+    var out = frontend_new_vec_str()
     var pos = 0
     let total = files.len() as i32
     while pos < total:
@@ -461,7 +465,7 @@ fn cimport_deps_sorted_unique_paths(files: str) -> Vec[str]:
                     exists = true
             if not exists:
                 var inserted = false
-                let next: Vec[str] = Vec.new()
+                let next = frontend_new_vec_str()
                 for i in 0..out.len() as i32:
                     let existing = out.get(i as i64)
                     if not inserted and cimport_deps_str_compare(path, existing) < 0:
@@ -526,7 +530,7 @@ fn c_import_deps_manifest_entries_valid(manifest: str) -> bool:
     saw_header
 
 fn c_import_deps_manifest_paths(manifest: str) -> Vec[str]:
-    var out: Vec[str] = Vec.new()
+    var out = frontend_new_vec_str()
     var pos = 0
     let total = manifest.len() as i32
     while pos < total:
@@ -1350,15 +1354,16 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
             runtime_eprint("[frontend] compile_source:comptime-transform")
         var pre_sema = self.configure_tracked_input_sema(Sema.init(self.pool, self.diagnostics, pool))
         pre_sema.source_text = text
-        pre_sema.decl_source_paths = self.decl_source_paths
-        pre_sema.decl_source_file_ids = self.decl_source_file_ids
-        pre_sema.decl_is_c_import = self.decl_is_c_import
+        pre_sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+        pre_sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
+        pre_sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
         pre_sema.ci_omitted_symbols = self.c_import_omitted_symbols
         pre_sema.tool_mode_entry_path = self.tool_mode_entry_path
         pre_sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
         pre_sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
         pre_sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
         pre_sema.copy_warn_threshold = self.project_config.copy_warn_threshold
+        pre_sema.emit_config_warnings = 0
         pre_sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
         pre_sema.overflow_mode = self.project_config.overflow_mode
         pre_sema.init_module_graph(&self.last_resolved)
@@ -1369,9 +1374,9 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         self.pool = pre_sema.pool
         pool = pre_sema.comptime_transform_module(pool, self.pool)
         self.diagnostics = pre_sema.diags
-        self.decl_source_paths = pre_sema.decl_source_paths
-        self.decl_source_file_ids = pre_sema.decl_source_file_ids
-        self.decl_is_c_import = pre_sema.decl_is_c_import
+        self.decl_source_paths = sema_clone_str_vec(&pre_sema.decl_source_paths)
+        self.decl_source_file_ids = sema_clone_i32_vec(&pre_sema.decl_source_file_ids)
+        self.decl_is_c_import = sema_clone_i32_vec(&pre_sema.decl_is_c_import)
         self.c_import_omitted_symbols = pre_sema.ci_omitted_symbols
         var tracked_paths = self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &pre_sema.tracked_input_paths)
@@ -1393,9 +1398,9 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     let t_sema = runtime_clock_nanos()
     var sema = self.configure_tracked_input_sema(Sema.init(self.pool, self.diagnostics, pool))
     sema.source_text = text
-    sema.decl_source_paths = self.decl_source_paths
-    sema.decl_source_file_ids = self.decl_source_file_ids
-    sema.decl_is_c_import = self.decl_is_c_import
+    sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
+    sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
+    sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
     sema.ci_omitted_symbols = self.c_import_omitted_symbols
     sema.tool_mode_entry_path = self.tool_mode_entry_path
     sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
@@ -1470,14 +1475,14 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
         return out
 
     let ordered: Vec[i32] = Vec.new()
-    let ordered_paths: Vec[str] = Vec.new()
+    let ordered_paths = frontend_new_vec_str()
     let ordered_file_ids: Vec[i32] = Vec.new()
     let ordered_c_import: Vec[i32] = Vec.new()
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
         if out.kind(decl) != NodeKind.NK_USE_DECL or out.get_data2(decl) > 0:
             ordered.push(decl as i32)
-            ordered_paths.push(self.decl_source_path_frontend(i))
+            ordered_paths.push(frontend_owned_text(self.decl_source_path_frontend(i)))
             ordered_file_ids.push(self.decl_source_file_id_frontend(i))
             let ci_flag = if i < self.decl_is_c_import.len() as i32: self.decl_is_c_import.get(i as i64) else: 0
             ordered_c_import.push(ci_flag)
@@ -1501,13 +1506,13 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     var merged_pool = pool
     let initial_count = merged_pool.decl_count()
     var prelude_ordered: Vec[i32] = Vec.new()
-    var prelude_paths: Vec[str] = Vec.new()
+    var prelude_paths = frontend_new_vec_str()
     var prelude_file_ids: Vec[i32] = Vec.new()
     var user_import_ordered: Vec[i32] = Vec.new()
-    var user_import_paths: Vec[str] = Vec.new()
+    var user_import_paths = frontend_new_vec_str()
     var user_import_file_ids: Vec[i32] = Vec.new()
     var root_ordered: Vec[i32] = Vec.new()
-    var root_paths: Vec[str] = Vec.new()
+    var root_paths = frontend_new_vec_str()
     var root_file_ids: Vec[i32] = Vec.new()
 
     // Phase 1: Expand prelude USE (position 0) and its transitive imports.
@@ -1638,7 +1643,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     // Drop fn/extern_fn decls shadowed by a higher-priority tier.
     while merged_pool.decl_count() > 0:
         merged_pool.state.decls.pop()
-    let rebuilt_paths: Vec[str] = Vec.new()
+    let rebuilt_paths = frontend_new_vec_str()
     let rebuilt_file_ids: Vec[i32] = Vec.new()
     // Combine user + root fn names for prelude cross-tier shadowing.
     var higher_fn_names: Vec[i32] = Vec.new()
@@ -1663,7 +1668,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             if frontend_extern_var_shadowed_in_tier(prelude_ordered, merged_pool, self.pool, oi) or frontend_extern_var_shadowed_by_tier(user_import_ordered, merged_pool, self.pool, id) or frontend_extern_var_shadowed_by_tier(root_ordered, merged_pool, self.pool, id):
                 continue
         merged_pool.add_decl(id)
-        rebuilt_paths.push(prelude_paths.get(oi as i64))
+        rebuilt_paths.push(frontend_owned_text(prelude_paths.get(oi as i64)))
         rebuilt_file_ids.push(prelude_file_ids.get(oi as i64))
     for oi in 0..user_import_ordered.len() as i32:
         let id = user_import_ordered.get(oi as i64)
@@ -1674,7 +1679,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             if frontend_extern_var_shadowed_in_tier(user_import_ordered, merged_pool, self.pool, oi) or frontend_extern_var_shadowed_by_tier(root_ordered, merged_pool, self.pool, id):
                 continue
         merged_pool.add_decl(id)
-        rebuilt_paths.push(user_import_paths.get(oi as i64))
+        rebuilt_paths.push(frontend_owned_text(user_import_paths.get(oi as i64)))
         rebuilt_file_ids.push(user_import_file_ids.get(oi as i64))
     for oi in 0..root_ordered.len() as i32:
         let id = root_ordered.get(oi as i64)
@@ -1682,7 +1687,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(root_ordered, merged_pool, self.pool, oi):
             continue
         merged_pool.add_decl(id)
-        rebuilt_paths.push(root_paths.get(oi as i64))
+        rebuilt_paths.push(frontend_owned_text(root_paths.get(oi as i64)))
         rebuilt_file_ids.push(root_file_ids.get(oi as i64))
     self.decl_source_paths = rebuilt_paths
     self.decl_source_file_ids = rebuilt_file_ids
@@ -1845,7 +1850,7 @@ fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_pat
 
 fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: &Vec[i32], paths: &Vec[str], file_ids: &Vec[i32]) -> ReorderedTier:
     let wanted_paths: HashMap[str, i32] = HashMap.new()
-    let first_seen_paths: Vec[str] = Vec.new()
+    let first_seen_paths = frontend_new_vec_str()
     for i in 0..paths.len() as i32:
         let path = paths.get(i as i64)
         if path.len() == 0:
@@ -1862,7 +1867,7 @@ fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: &Vec[i32], paths: &Vec[str
 
     let module_order = accum.state.order
     let out_decls: Vec[i32] = Vec.new()
-    let out_paths: Vec[str] = Vec.new()
+    let out_paths = frontend_new_vec_str()
     let out_file_ids: Vec[i32] = Vec.new()
     for oi in 0..module_order.len() as i32:
         let module_path = module_order.get(oi as i64)

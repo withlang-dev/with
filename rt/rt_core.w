@@ -388,13 +388,16 @@ var slab_remaining: i64 = 0
 var rt_slab_range_starts: [8192]i64 = [0 as i64; 8192]
 var rt_slab_range_ends: [8192]i64 = [0 as i64; 8192]
 var rt_slab_range_count: i32 = 0
+var rt_slab_ranges_complete: i32 = 1
 
 var rt_large_range_starts: [8192]i64 = [0 as i64; 8192]
 var rt_large_range_ends: [8192]i64 = [0 as i64; 8192]
 var rt_large_range_count: i32 = 0
+var rt_large_ranges_complete: i32 = 1
 
 fn rt_record_slab_range(start: i64, size: i64):
     if rt_slab_range_count >= RT_ALLOC_RANGE_CAP:
+        rt_slab_ranges_complete = 0
         return
     rt_slab_range_starts[rt_slab_range_count as i64] = start
     rt_slab_range_ends[rt_slab_range_count as i64] = start + size
@@ -402,6 +405,7 @@ fn rt_record_slab_range(start: i64, size: i64):
 
 fn rt_record_large_range(start: i64, size: i64):
     if rt_large_range_count >= RT_ALLOC_RANGE_CAP:
+        rt_large_ranges_complete = 0
         return
     rt_large_range_starts[rt_large_range_count as i64] = start
     rt_large_range_ends[rt_large_range_count as i64] = start + size
@@ -500,9 +504,7 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
             let cls_size = size_class_size(idx)
             if size != cls_size:
                 return 0
-            let block_size = size_class_block_size(idx)
-            if ((header - start) % block_size) != 0:
-                return 0
+            let block_size = RT_ALLOC_HEADER_SIZE + size
             if header + block_size > end:
                 return 0
             return 1
@@ -511,6 +513,13 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
         let end = rt_large_range_ends[i as i64]
         if header == start and payload < end:
             return 1
+    0
+
+fn rt_payload_start_can_be_owned(ptr: *const u8) -> i32:
+    if rt_payload_start_is_owned(ptr) != 0:
+        return 1
+    if rt_slab_ranges_complete == 0 or rt_large_ranges_complete == 0:
+        return 1
     0
 
 fn free_small_block(block: i64, idx: i32):
@@ -566,11 +575,15 @@ fn rt_alloc(size_arg: i64) -> *mut u8:
     rt_allocator_lock()
     let ptr = rt_alloc_unlocked(size_arg)
     rt_allocator_unlock()
+    if rt_payload_start_can_be_owned(ptr as *const u8) == 0:
+        with_panic_core(make_str("allocator returned invalid payload" as *const u8, 34), make_str("" as *const u8, 0), 0)
     ptr
 
 fn rt_free_unlocked(ptr: *mut u8):
     if ptr as i64 == 0:
         return
+    if rt_payload_start_can_be_owned(ptr as *const u8) == 0:
+        with_panic_core(make_str("invalid free: pointer is not an allocated payload start" as *const u8, 55), make_str("" as *const u8, 0), 0)
     let block = alloc_header_ptr(ptr as *const u8) as i64
     let size = unsafe *(block as *const i64)
     if size > RT_LARGE_THRESHOLD:

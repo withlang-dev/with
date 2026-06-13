@@ -2,6 +2,8 @@
 
 use compiler.foundation.Span
 
+extern fn with_str_clone(s: str) -> str
+
 pub enum DiagSeverity: i32:
     Error = 1
     Warning = 2
@@ -26,11 +28,14 @@ pub type DiagnosticStore {
     items: Vec[Diagnostic],
 }
 
+fn diagnostic_owned_text(text: str) -> str:
+    with_str_clone(text)
+
 pub fn diagnostic_error(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
         severity: DiagSeverity.Error,
         code: "",
-        message,
+        message: diagnostic_owned_text(message),
         primary,
         labels: Vec.new(),
         notes: Vec.new(),
@@ -41,7 +46,7 @@ pub fn diagnostic_warning(message: str, primary: Span) -> Diagnostic:
     Diagnostic {
         severity: DiagSeverity.Warning,
         code: "",
-        message,
+        message: diagnostic_owned_text(message),
         primary,
         labels: Vec.new(),
         notes: Vec.new(),
@@ -49,16 +54,16 @@ pub fn diagnostic_warning(message: str, primary: Span) -> Diagnostic:
     }
 
 pub fn Diagnostic.set_code(self: Diagnostic, code: str) -> Unit:
-    self.code = code
+    self.code = diagnostic_owned_text(code)
 
 pub fn Diagnostic.add_label(self: Diagnostic, span: Span, message: str) -> Unit:
-    self.labels.push(DiagnosticLabel { span, message })
+    self.labels.push(DiagnosticLabel { span, message: diagnostic_owned_text(message) })
 
 pub fn Diagnostic.add_note(self: Diagnostic, message: str) -> Unit:
-    self.notes.push(message)
+    self.notes.push(diagnostic_owned_text(message))
 
 pub fn Diagnostic.add_help(self: Diagnostic, message: str) -> Unit:
-    self.helps.push(message)
+    self.helps.push(diagnostic_owned_text(message))
 
 pub fn DiagnosticStore.init -> DiagnosticStore:
     DiagnosticStore {
