@@ -11,6 +11,23 @@ conversation context after compaction.
 
 ## Current Focus
 
+#423 is implemented and verified. Module-level comptime transform now treats
+non-evaluable `comptime if` conditions as deferred instead of emitting an early
+error, allowing generic `T`-dependent branches to survive until instantiation.
+Concrete generic body checking evaluates `comptime if` conditions with the
+bound type substitutions, checks only the selected runtime branch, records that
+selection for MIR lowering, and fires `comptime_error` only from selected
+branches. `else if` cascades are handled as part of the same comptime chain,
+including parser-produced nested `comptime` wrappers. MIR lowering now lowers
+the recorded selected branch, so type-method conditions such as `T.is_copy()`
+and `T.implements(Trait)` do not survive to codegen as generic-call intrinsics.
+Focused coverage includes selected branch execution for Copy/non-Copy
+instantiations, erased invalid branches, `implements`/`is_copy` cascades, taken
+`comptime_error`, invalid taken branches, and the existing non-generic
+comptime transform regression. Full verification passed on 2026-06-13:
+`with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green`.
+
 #391 is implemented and verified. Generic instantiations now keep
 `TY_GENERIC_INST` identity at Sema boundaries instead of falling back to raw
 base struct/enum compatibility; exact impls such as `impl Trait for Box[i32]`

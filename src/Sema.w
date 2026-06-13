@@ -557,6 +557,8 @@ type Sema {
     // For-comprehension resolved variants: node → resolved variant sym.
     // Maps _Payload/_Empty marker nodes to Some/None or Ok/Err.
     comp_resolved: HashMap[i32, i32],
+    // Surviving generic comptime-if wrapper node → selected branch node.
+    comptime_selected_branches: HashMap[i32, i32],
     // Pipeline method calls: NK_PIPELINE node → method-name symbol.
     pipeline_method_calls: HashMap[i32, i32],
     // Operator method calls: NK_BINARY node -> resolved function symbol, plus
@@ -640,6 +642,7 @@ type Sema {
     match_in_stmt_pos: i32,
     current_for_comprehension_carrier: i32,
     in_comptime_fn: i32,
+    in_concrete_generic_body: i32,
     in_async_fn: i32,
     no_std: i32,
     alloc: i32,
@@ -1377,6 +1380,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         with_exit_methods: sema_new_map_i32_i32(),
         no_await_guard_scope_depth: 0,
         comp_resolved: sema_new_map_i32_i32(),
+        comptime_selected_branches: sema_new_map_i32_i32(),
         pipeline_method_calls: sema_new_map_i32_i32(),
         operator_method_calls: sema_new_map_i32_i32(),
         operator_method_reversed: sema_new_map_i32_i32(),
@@ -1433,6 +1437,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         match_in_stmt_pos: 0,
         current_for_comprehension_carrier: 0,
         in_comptime_fn: 0,
+        in_concrete_generic_body: 0,
         in_async_fn: 0,
         no_std: 0,
         alloc: 0,

@@ -456,7 +456,7 @@ fn Sema.ct_build_value_tree(self: Sema, pool: AstPool, intern: InternPool, value
     0
 
 fn Sema.ct_eval_truthy(mut self: Sema, source_ast: AstPool, node: i32) -> i32:
-    let value = unsafe { comptime_force_eval_expr(self as *mut Sema, source_ast, self.pool, node) }
+    let value = unsafe { comptime_try_eval_expr(self as *mut Sema, source_ast, self.pool, node) }
     if comptime_value_is_valid(value) == 0:
         return -1
     let truthy = comptime_value_truthy(value)

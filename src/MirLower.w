@@ -9111,9 +9111,15 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.lower_optional_chain(node)
 
     if kind == NodeKind.NK_COMPTIME:
-        // Comptime branches are already pruned by ComptimeTransform.
-        // Just unwrap and lower the inner expression.
         let inner = self.ast.get_data0(node)
+        let selected_opt = self.sema.comptime_selected_branches.get(node)
+        if selected_opt.is_some():
+            let selected = selected_opt.unwrap()
+            if selected != 0:
+                return self.lower_expr(selected)
+            return self.unit_operand()
+        // Non-generic comptime branches are already pruned by ComptimeTransform.
+        // Just unwrap and lower the inner expression.
         if inner != 0:
             return self.lower_expr(inner)
         return self.unit_operand()

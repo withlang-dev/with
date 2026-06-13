@@ -2078,7 +2078,10 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: &Vec[i32], tp_
     // Type-check body with concrete substitutions installed. Generic bodies
     // may still become invalid after instantiation (for example `T + T`
     // specialized with `str`), so these diagnostics must stay visible.
+    let saved_concrete_generic_body = self.in_concrete_generic_body
+    self.in_concrete_generic_body = self.in_concrete_generic_body + 1
     self.check_fn_body_with_sig(fn_node, sig_idx)
+    self.in_concrete_generic_body = saved_concrete_generic_body
 
     self.bind_names = saved_bind_names
     self.bind_types = saved_bind_types
@@ -4215,6 +4218,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.ty_void
 
     if kind == NodeKind.NK_COMPTIME_ERROR:
+        if self.in_concrete_generic_body != 0:
+            self.emit_reachable_comptime_error(node)
         return TypeKind.TY_NEVER as TypeId
 
     if kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER:
@@ -4366,9 +4371,21 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.ty_void
 
     if kind == NodeKind.NK_COMPTIME:
+        let inner = self.ast.get_data0(node)
+        if inner != 0 and self.ast.kind(inner) == NodeKind.NK_IF_EXPR:
+            let selected = self.select_comptime_if_branch(inner)
+            if selected < 0:
+                return 0 as TypeId
+            self.comptime_selected_branches.insert(node, selected)
+            if selected == 0:
+                return self.ty_void
+            let result2 = if self.has_expected_type != 0: self.check_expr_with_expected(selected, self.expected_expr_type) else: self.check_expr(selected)
+            if result2 != 0:
+                self.typed_expr_types.insert(node, result2 as i32)
+            return result2 as TypeId
         let saved_comptime = self.in_comptime_fn
         self.in_comptime_fn = self.in_comptime_fn + 1
-        let result = self.check_expr(self.ast.get_data0(node))
+        let result = self.check_expr(inner)
         self.in_comptime_fn = saved_comptime
         return result
 
@@ -8631,6 +8648,73 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
         if self.get_type_kind(resolved) == TypeKind.TY_FN:
             return self.get_type_d2(resolved)
     rhs_ty as i32
+
+fn Sema.eval_comptime_if_condition_truthy(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return -1
+    if self.ast.kind(node) == NodeKind.NK_FIELD_ACCESS:
+        let recv = self.ast.get_data0(node)
+        let field = self.ast.get_data1(node)
+        let recv_type = self.resolve_type_level_arg_expr(recv)
+        if recv_type != 0:
+            let method = self.pool_resolve(field)
+            if method == "is_copy":
+                return self.is_copy(recv_type)
+    if self.ast.kind(node) == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(node)
+        if callee != 0 and self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let recv = self.ast.get_data0(callee)
+            let field = self.ast.get_data1(callee)
+            let recv_type = self.resolve_type_level_arg_expr(recv)
+            if recv_type != 0:
+                let arg_start = self.ast.get_data1(node)
+                let arg_count = self.ast.get_data2(node)
+                let method = self.pool_resolve(field)
+                if method == "is_copy":
+                    if arg_count != 0:
+                        self.emit_error("type.is_copy() takes no arguments", node)
+                        return -1
+                    return self.is_copy(recv_type)
+                if method == "implements":
+                    if arg_count != 1:
+                        self.emit_error("type.implements() expects exactly one trait argument", node)
+                        return -1
+                    let trait_node = self.ast.get_extra(arg_start)
+                    if trait_node == 0:
+                        self.emit_error("type.implements() requires a trait name", node)
+                        return -1
+                    let trait_kind = self.ast.kind(trait_node)
+                    if trait_kind != NodeKind.NK_IDENT and trait_kind != NodeKind.NK_TYPE_NAMED:
+                        self.emit_error("type.implements() requires a trait name", trait_node)
+                        return -1
+                    let trait_sym = self.ast.get_data0(trait_node)
+                    if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
+                        self.emit_error("unknown trait '" ++ self.pool_resolve(trait_sym) ++ "'", trait_node)
+                        return -1
+                    return self.type_implements_trait(recv_type, trait_sym)
+    self.ct_eval_truthy(self.ast, node)
+
+fn Sema.select_comptime_if_branch(self: Sema, if_node: i32) -> i32:
+    var current = if_node
+    while current != 0 and self.ast.kind(current) == NodeKind.NK_IF_EXPR:
+        let cond = self.ast.get_data0(current)
+        let truthy = self.eval_comptime_if_condition_truthy(cond)
+        if truthy < 0:
+            self.emit_error("comptime if condition is not comptime-evaluable", cond)
+            return -1
+        let selected = if truthy != 0: self.ast.get_data1(current) else: self.ast.get_data2(current)
+        if truthy != 0:
+            return selected
+        var cascade = selected
+        if cascade != 0 and self.ast.kind(cascade) == NodeKind.NK_COMPTIME:
+            let cascade_inner = self.ast.get_data0(cascade)
+            if cascade_inner != 0 and self.ast.kind(cascade_inner) == NodeKind.NK_IF_EXPR:
+                cascade = cascade_inner
+        if cascade != 0 and self.ast.kind(cascade) == NodeKind.NK_IF_EXPR:
+            current = cascade
+            continue
+        return selected
+    current
 
 fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field: i32) -> i32:
     // Temporary bridge: builtin generic collection methods do not all flow
