@@ -5316,6 +5316,16 @@ fn ComptimeEvaluator.resolve_generic_comptime_type_args(self: ComptimeEvaluator,
 fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let callee = self.ast.get_data0(node)
     let arg_count = self.ast.get_data2(node)
+    let typeinfo_field = self.sema.typeinfo_module_field(callee)
+    if typeinfo_field != 0:
+        let method_name = self.pool.resolve(typeinfo_field)
+        if self.sema.typeinfo_module_type_arg_count(callee) != 1:
+            return self.fail(node, "TypeInfo." ++ method_name ++ " takes exactly one type argument")
+        let type_node = self.sema.typeinfo_module_type_arg_node(callee, 0)
+        let recv_type = self.sema.resolve_type_level_arg_expr(type_node)
+        if recv_type == 0:
+            return self.fail(type_node, "TypeInfo." ++ method_name ++ " type argument could not be resolved")
+        return self.eval_static_type_method_call(recv_type, typeinfo_field, self.ast.get_data1(node), arg_count, node)
     if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
         let recv_node = self.ast.get_data0(callee)
         let field = self.ast.get_data1(callee)

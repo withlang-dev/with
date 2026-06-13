@@ -10006,6 +10006,12 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         return self.check_transmute_call(node, callee, extra_start, arg_count)
     if self.is_chan_call(callee) != 0:
         return self.chan_return_type(callee)
+    let typeinfo_ret = self.check_typeinfo_module_call(callee, extra_start, arg_count, node)
+    if typeinfo_ret != 0:
+        self.typed_expr_types.insert(node, typeinfo_ret)
+        return typeinfo_ret
+    if self.typeinfo_module_field(callee) != 0:
+        return 0
 
     // Method call or callable field: callee is field_access
     if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
@@ -14178,6 +14184,30 @@ fn Sema.check_static_type_method_call(self: Sema, obj_type: i32, field: i32, ext
     let result = self.ensure_exact_type(TypeKind.TY_ARRAY, self.ty_variant_info as i32, variant_count, 0)
     self.typed_expr_types.insert(node, result as i32)
     result as i32
+
+fn Sema.check_typeinfo_module_call(self: Sema, callee: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
+    let field = self.typeinfo_module_field(callee)
+    if field == 0:
+        return 0
+    let method_name = self.pool_resolve(field)
+    if self.in_comptime_fn == 0:
+        self.emit_error("TypeInfo is only available in comptime context", node)
+        return 0
+    if self.typeinfo_module_type_arg_count(callee) != 1:
+        self.emit_error("TypeInfo." ++ method_name ++ " takes exactly one type argument", node)
+        return 0
+    let type_node = self.typeinfo_module_type_arg_node(callee, 0)
+    let obj_type = self.resolve_type_level_arg_expr(type_node)
+    if obj_type == 0:
+        self.emit_error("TypeInfo." ++ method_name ++ " type argument could not be resolved", type_node)
+        return 0
+    let result = self.check_static_type_method_call(obj_type, field, extra_start, arg_count, node)
+    if result == 0:
+        self.emit_error("TypeInfo method '" ++ method_name ++ "' is not available", node)
+        return 0
+    if result < 0:
+        return 0
+    result
 
 fn Sema.type_expr_contains_ref(self: Sema, node: i32) -> i32:
     if node == 0:

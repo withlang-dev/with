@@ -1857,6 +1857,48 @@ fn Sema.has_named_type_visible(self: Sema, sym: i32) -> i32:
         return 1
     0
 
+fn Sema.typeinfo_builtin_shadowed(self: Sema, sym: i32) -> i32:
+    if self.scope_lookup(sym) >= 0:
+        return 1
+    if self.has_named_type_visible(sym) != 0:
+        return 1
+    0
+
+fn Sema.typeinfo_module_field(self: Sema, callee: i32) -> i32:
+    var access = callee
+    let kind = self.ast.kind(callee)
+    if kind == NodeKind.NK_INDEX:
+        access = self.ast.get_data0(callee)
+    else if kind != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    if self.ast.kind(access) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let recv = self.ast.get_data0(access)
+    if self.ast.kind(recv) != NodeKind.NK_IDENT:
+        return 0
+    let recv_sym = self.ast.get_data0(recv)
+    if self.pool_resolve(recv_sym) != "TypeInfo":
+        return 0
+    if self.typeinfo_builtin_shadowed(recv_sym) != 0:
+        return 0
+    self.ast.get_data1(access)
+
+fn Sema.typeinfo_module_type_arg_count(self: Sema, callee: i32) -> i32:
+    if self.ast.kind(callee) != NodeKind.NK_INDEX:
+        return 0
+    if self.ast.get_data2(callee) != 0:
+        return 2
+    1
+
+fn Sema.typeinfo_module_type_arg_node(self: Sema, callee: i32, index: i32) -> i32:
+    if self.ast.kind(callee) != NodeKind.NK_INDEX:
+        return 0
+    if index == 0:
+        return self.ast.get_data1(callee)
+    if index == 1:
+        return self.ast.get_data2(callee)
+    0
+
 fn Sema.register_builtin_struct_type(mut self: Sema, name: str, field_names: Vec[str], field_types: Vec[i32], field_count: i32) -> i32:
     let name_sym = self.pool_intern(name)
     let te_start = self.type_extra.len() as i32
