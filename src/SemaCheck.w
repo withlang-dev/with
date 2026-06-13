@@ -26,6 +26,9 @@ extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 // docs/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
 const STRICT_NO_MUT_REF: i32 = 1
 
+const GLOBAL_RACE_ACCESS_READ: i32 = 1
+const GLOBAL_RACE_ACCESS_WRITE: i32 = 2
+
 fn Sema.require_async_runtime(self: Sema, node: i32, feature: str):
     if self.current_module_is_std_implementation() != 0:
         return
@@ -613,6 +616,99 @@ fn Sema.check_bodies(self: Sema):
                     if not is_generic_struct_method:
                         self.update_module_context(di)
                         self.check_fn_body(decl)
+    self.validate_global_data_race_accesses()
+
+fn Sema.record_global_concurrency_evidence(self: Sema, node: i32, reason: str):
+    if node == 0:
+        return
+    if self.global_race_concurrency_node != 0:
+        return
+    self.global_race_concurrency_node = node
+    self.global_race_concurrency_file = self.local_file_id
+    self.global_race_concurrency_reason = reason
+
+fn Sema.global_symbol_is_synchronized(self: Sema, sym: i32) -> i32:
+    let tid = self.scope_lookup(sym)
+    if tid <= 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    let name_sym = self.get_type_name(resolved as i32)
+    if name_sym == 0:
+        return 0
+    let name = self.pool_resolve(name_sym)
+    if name == "Atomic" or name == "AtomicI64":
+        return 1
+    0
+
+fn Sema.record_global_data_race_access(self: Sema, sym: i32, node: i32, kind: i32):
+    if sym == 0 or node == 0:
+        return
+    if sema_path_is_std_implementation(self.current_module_path) != 0 or sema_path_is_runtime_implementation(self.current_module_path) != 0:
+        return
+    if self.global_value_decl_kind(sym) == 0:
+        return
+    if self.global_symbol_is_synchronized(sym) != 0:
+        return
+    self.global_race_access_syms.push(sym)
+    self.global_race_access_nodes.push(node)
+    self.global_race_access_files.push(self.local_file_id)
+    self.global_race_access_paths.push(self.current_module_path)
+    self.global_race_access_kinds.push(kind)
+    self.global_race_access_unsafe.push(self.in_unsafe)
+    if kind == GLOBAL_RACE_ACCESS_WRITE:
+        if not self.global_race_mutated_syms.contains(sym):
+            self.global_race_mutated_syms.insert(sym, 1)
+            self.global_race_mutation_nodes.insert(sym, node)
+    if self.in_unsafe != 0:
+        if kind == GLOBAL_RACE_ACCESS_WRITE or self.is_mutable_global(sym) != 0 or self.global_race_mutated_syms.contains(sym):
+            self.note_unsafe_operation()
+
+fn Sema.record_global_place_write(self: Sema, place_node: i32, report_node: i32):
+    let root = self.place_root_sym(place_node)
+    if root == 0:
+        return
+    self.record_global_data_race_access(root, report_node, GLOBAL_RACE_ACCESS_WRITE)
+
+fn Sema.global_data_race_access_needs_proof(self: Sema, idx: i32) -> i32:
+    let sym = self.global_race_access_syms.get(idx as i64)
+    let kind = self.global_race_access_kinds.get(idx as i64)
+    if kind == GLOBAL_RACE_ACCESS_WRITE:
+        return 1
+    if self.global_race_mutated_syms.contains(sym):
+        return 1
+    0
+
+fn Sema.emit_global_data_race_error(self: Sema, idx: i32):
+    let sym = self.global_race_access_syms.get(idx as i64)
+    let node = self.global_race_access_nodes.get(idx as i64)
+    let file_id = self.global_race_access_files.get(idx as i64)
+    let kind = self.global_race_access_kinds.get(idx as i64)
+    let name = self.pool_resolve(sym)
+    let access = if kind == GLOBAL_RACE_ACCESS_WRITE: "mutation" else: "read"
+    var diag = Diagnostic.err("E0921: " ++ access ++ " of global `" ++ name ++ "` may race", Span { file: file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+    let access_label = if kind == GLOBAL_RACE_ACCESS_WRITE: "global mutated here" else: "global read here; this global is mutated elsewhere"
+    diag.add_label(Span { file: file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) }, access_label)
+    if self.global_race_concurrency_node != 0:
+        let conc = self.global_race_concurrency_node
+        diag.add_label(Span { file: self.global_race_concurrency_file, start: self.ast.get_start(conc), end: self.ast.get_end(conc) }, "program may run concurrently here (" ++ self.global_race_concurrency_reason ++ ")")
+    diag.add_help("use Atomic[T], wrap the state in a synchronization type, or assert the access with `unsafe`")
+    self.diags.emit(diag)
+
+fn Sema.validate_global_data_race_accesses(self: Sema):
+    let proof_failed = if self.global_race_concurrency_node != 0: 1 else: 0
+    for i in 0..self.global_race_access_syms.len() as i32:
+        if self.global_data_race_access_needs_proof(i) == 0:
+            continue
+        let in_unsafe = self.global_race_access_unsafe.get(i as i64)
+        if proof_failed != 0:
+            if in_unsafe == 0:
+                self.emit_global_data_race_error(i)
+        else if in_unsafe != 0:
+            let path = self.global_race_access_paths.get(i as i64)
+            if sema_path_is_user_lint_source(path) == 0:
+                continue
+            let node = self.global_race_access_nodes.get(i as i64)
+            self.emit_warning("unsafe global access is currently covered by the single-thread proof; keep `unsafe` only if future concurrency is intended", node)
 
 fn Sema.generator_push_state_field(self: Sema, state_tid: i32, field_count: i32, sym: i32, tid: i32, report_node: i32) -> i32:
     if sym == 0 or sym == self.discard_sym:
@@ -848,6 +944,10 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let fn_di = self.find_decl_index(node)
     if fn_di >= 0:
         self.update_decl_source_context(fn_di)
+    if (flags / FnFlags.ASYNC) % 2 == 1:
+        self.record_global_concurrency_evidence(node, "async function")
+    if self.fn_decl_has_c_export(node) != 0:
+        self.record_global_concurrency_evidence(node, "@[c_export]")
     let saved_no_alloc_depth = self.current_no_alloc_depth
     let saved_fn_may_alloc = self.current_fn_may_alloc
     let saved_current_fn_symbol = self.current_fn_symbol
@@ -4224,6 +4324,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
 
     if kind == NodeKind.NK_ASYNC_BLOCK:
+        self.record_global_concurrency_evidence(node, "async block")
         self.require_async_runtime(node, "async")
         self.note_allocation_site(node, AllocConstructKind.ASYNC_FIBER, 0, 0)
         if self.in_comptime_fn != 0:
@@ -4311,6 +4412,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return ty
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
+        self.record_global_concurrency_evidence(node, "async scope")
         self.require_async_runtime(node, "async scope")
         let body = self.ast.get_data1(node)
         let name = self.ast.get_data0(node)
@@ -4461,6 +4563,8 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
         if binding_decl == 0 and self.global_value_decl_kind(sym) != 0 and self.has_extern_var_decl(sym) == 0 and self.symbol_visible_from_current(sym) == 0:
             self.emit_private_symbol_error(sym, node)
             return 0
+        if sym != self.assign_target_revive_sym:
+            self.record_global_data_race_access(sym, node, GLOBAL_RACE_ACCESS_READ)
         if self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:
             self.emit_error("mutable global access is not allowed in comptime", node)
         if self.binding_poisoned_origin_sym(sym) != 0 and sema_path_is_migrated_regex_implementation(self.current_module_path) == 0:
@@ -5345,6 +5449,8 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
             else if op == UnaryOp.UOP_RAW_REF_MUT and raw_mut_state == PlaceMut.PM_ReadOnly:
                 self.emit_error("`&raw mut` requires a mutable place; this place is read-only (e.g., dereferenced &T or *const T) (§15.14)", node)
             let raw_mut = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
+            if raw_mut != 0:
+                self.record_global_place_write(operand_node, node)
             return self.add_type(TypeKind.TY_PTR, operand as i32, raw_mut, 0) as i32
         self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
         return self.add_type(TypeKind.TY_REF, operand as i32, 0, 0) as i32
@@ -6295,6 +6401,7 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
 
         let value_type = if expected_value_type != 0: self.check_expr_with_expected(value, expected_value_type as TypeId) else: self.check_expr(value)
         self.note_place_effect(base_expr, EFF_WRITE)
+        self.record_global_place_write(base_expr, node)
 
         let lhs_packed = self.classify_place(base_expr)
         let lhs_kind = unpack_place_kind(lhs_packed)
@@ -6332,6 +6439,7 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
 
     // If assignment target's root is a parameter, record EFF_WRITE
     self.note_place_effect(target, EFF_WRITE)
+    self.record_global_place_write(target, node)
 
     // Check mutability
     if self.ast.kind(target) == NodeKind.NK_IDENT:
@@ -8303,6 +8411,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         expected_ret_ty = self.get_type_d2(expected_fn_tid)
     let body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr(body)
     if expected_extern_fn != 0:
+        self.record_global_concurrency_evidence(node, "extern C callback coercion")
         if closure_capture_syms.len() as i32 > 0:
             self.emit_error("capturing closure cannot coerce to extern \"C\" fn pointer", node)
         self.suspend_visiting = sema_new_map_i32_i32()
@@ -9448,6 +9557,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         if sig_idx >= 0 and self.extern_fn_names.contains(fn_sym) and expected_ty != 0:
             let callback_expected = self.resolve_alias(expected_ty as TypeId)
             if self.get_type_kind(callback_expected) == TypeKind.TY_EXTERN_FN:
+                self.record_global_concurrency_evidence(arg_node, "extern C callback coercion")
                 self.suspend_visiting = sema_new_map_i32_i32()
                 if self.expr_may_suspend(arg_node) != 0:
                     self.emit_error("may_suspend in extern C callback", arg_node)
@@ -9484,6 +9594,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     if self.check_comptime_call_restriction(fn_sym, node) != 0:
         return 0
+    if self.fn_symbol_is_std_thread_spawn_os(fn_sym) != 0:
+        self.record_global_concurrency_evidence(node, "std.thread.spawn_os")
     if self.fn_symbol_is_unsafe(fn_sym) != 0:
         if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
             return 0
@@ -12040,6 +12152,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 self.emit_error("cannot call mutable enum accessor through a read-only place", node)
                 return 0
             self.check_mutation_against_views(expr, node)
+            self.record_global_place_write(expr, node)
             self.check_borrow_create(expr, BorrowKind.EXCLUSIVE, node)
         let enum_accessor_ret = self.enum_accessor_return_type(recv_type as i32, enum_accessor_variant, enum_accessor_kind)
         if enum_accessor_ret != 0:
@@ -12111,6 +12224,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         // mut self), to avoid noise on read-only method calls.
         let is_mut_recv_call = self.method_has_mut_self_flag(type_name_sym, field) != 0 or self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0
         if is_mut_recv_call:
+            self.record_global_place_write(expr, node)
             let recv_idx_sym = self.expr_indexed_into(expr)
             if recv_idx_sym != 0:
                 var ai = 0

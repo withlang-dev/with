@@ -1882,6 +1882,26 @@ fn bs_check_by_value_read_only_warning(ctx: &ActionCtx, compiler_path: str, case
     if rc != 0: return rc
     bs_assert_not_contains(ctx, result.stderr, "'inspect_drop' only reads", "by_value_read_only_drop_clean")
 
+fn bs_check_global_data_race_unsafe_warning(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "global_data_race_unsafe_warning.w")
+    let source =
+        "global var counter: i32 = 0\n\n" ++
+        "fn bump:\n" ++
+        "    unsafe { counter = counter + 1 }\n\n" ++
+        "fn main:\n" ++
+        "    bump()\n"
+    var rc = bs_write_fixture(ctx, src, source, "global data-race unsafe warning source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(bs_abs(root, src))
+    let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "global-data-race-unsafe-warning", args)
+    if result.rc != 0: return result.rc
+    rc = bs_assert_contains(ctx, result.stderr, "warning: unsafe global access is currently covered by the single-thread proof", "global_data_race_unsafe_warning")
+    if rc != 0: return rc
+    bs_assert_not_contains(ctx, result.stderr, "unsafe block contains no unsafe operations", "global_data_race_unsafe_used")
+
 fn bs_check_not_in_lint(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let warn_src = bs_join(case_dir, "not_in_lint_warning.w")
@@ -2599,6 +2619,8 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     rc = bs_check_loop_string_concat_warning(ctx, compiler_path, bs_join(output_dir, "loop_string_concat_warning_case"))
     if rc != 0: return rc
     rc = bs_check_by_value_read_only_warning(ctx, compiler_path, bs_join(output_dir, "by_value_read_only_warning_case"))
+    if rc != 0: return rc
+    rc = bs_check_global_data_race_unsafe_warning(ctx, compiler_path, bs_join(output_dir, "global_data_race_unsafe_warning_case"))
     if rc != 0: return rc
     rc = bs_check_not_in_lint(ctx, compiler_path, bs_join(output_dir, "not_in_lint_case"))
     if rc != 0: return rc

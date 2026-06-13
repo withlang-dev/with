@@ -427,6 +427,17 @@ type Sema {
     // here — it's rebindable.
     stable_global_syms: HashMap[i32, i32],
     global_value_decl_kinds: HashMap[i32, i32],
+    global_race_access_syms: Vec[i32],
+    global_race_access_nodes: Vec[i32],
+    global_race_access_files: Vec[i32],
+    global_race_access_paths: Vec[str],
+    global_race_access_kinds: Vec[i32],
+    global_race_access_unsafe: Vec[i32],
+    global_race_mutated_syms: HashMap[i32, i32],
+    global_race_mutation_nodes: HashMap[i32, i32],
+    global_race_concurrency_node: i32,
+    global_race_concurrency_file: i32,
+    global_race_concurrency_reason: str,
 
     // Hot intrinsic symbols used in semantic dispatch paths.
     syms: SemaBuiltinSymbols,
@@ -1136,6 +1147,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let mutable_global_syms = sema_new_map_i32_i32()
     let stable_global_syms = sema_new_map_i32_i32()
     let global_value_decl_kinds = sema_new_map_i32_i32()
+    let global_race_mutated_syms = sema_new_map_i32_i32()
+    let global_race_mutation_nodes = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
     let method_decl_origins = sema_new_map_i32_i32()
     let method_has_inherent = sema_new_map_i32_i32()
@@ -1251,6 +1264,17 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         mutable_global_syms,
         stable_global_syms,
         global_value_decl_kinds,
+        global_race_access_syms: Vec.new(),
+        global_race_access_nodes: Vec.new(),
+        global_race_access_files: Vec.new(),
+        global_race_access_paths: sema_new_vec_str(),
+        global_race_access_kinds: Vec.new(),
+        global_race_access_unsafe: Vec.new(),
+        global_race_mutated_syms,
+        global_race_mutation_nodes,
+        global_race_concurrency_node: 0,
+        global_race_concurrency_file: 0,
+        global_race_concurrency_reason: "",
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
         method_decl_origins,

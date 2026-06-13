@@ -11,6 +11,23 @@ conversation context after compaction.
 
 ## Current Focus
 
+#387 is implemented and verified. Sema now records whole-program concurrency
+evidence from async constructs, `std.thread.spawn_os`, `@[c_export]`, and
+extern C callback coercions, records global reads/writes after body checking,
+and enforces §9.1c with E0921 when a bare mutable global access depends on a
+single-thread proof that has failed. Never-mutated globals and implemented
+atomic globals remain safe; std/runtime internals are excluded from this
+user-facing rule until their translated low-level globals are cleaned up
+separately. Unsafe global accesses count as proof-dependent unsafe operations:
+they satisfy the unsafe-use checker, require no diagnostic when concurrency is
+present, and warn in user code when the current single-thread proof covers
+them. Focused coverage includes async mutation/read E0921 cases, single-thread
+mutation, never-mutated reads in async-enabled programs, atomic globals, and a
+self-host warning check; existing async cancellation fixtures now spell their
+intentional global witness access with `unsafe`. Full verification passed on
+2026-06-12: `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green`. Remaining Phase 4 issue: #402.
+
 #373 is implemented and verified. Definition-site effect finalization now
 rejects by-value parameters whose returned view is derived from that consumed
 parameter, with a §22.3-style diagnostic naming the function, parameter,
@@ -24,7 +41,7 @@ nested-field dangling-view errors, a borrowed-parameter positive spec case, the
 read-only warning plus `&T`/Drop exemptions in CLI edge tests, and the
 `behav_effect_pin.w` normalization regression. Full verification passed on
 2026-06-12: `with build`, `with build :fixpoint`, `with build :test`, and
-`with build :test-green`. Remaining Phase 4 issues: #387 and #402.
+`with build :test-green`.
 
 #458 is implemented and verified. The no_std tier model now rejects std-only
 module imports from the resolved module graph, so `std.io`, `std.fs`,
