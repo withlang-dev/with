@@ -12,7 +12,8 @@ pre-review design under the required path for reference.
 Status: implementation design. Implementation pending.
 
 Phase D closes the gap between the current Make-parity build graph and the
-Jai-style integrated compiler driver described in `docs/build-spec.md`.
+Jai-style integrated compiler driver described in
+`docs/completed/build-spec.md`.
 The current build system can express this repository's targets, but it still
 uses generated runner binaries for `build.w` and project-local actions, and it
 does not expose compiler workspaces or compiler message interception to build

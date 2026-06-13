@@ -60,9 +60,9 @@ including `defer`, `errdefer`, `comptime`, and `unsafe`. `if`, `else if`,
 and `else` use those same body forms; every arm requires `:` or `{`.
 `else if` is a two-token keyword pair parsed as a chain continuation.
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
-roadmap to `docs/roadmap.md`, design rationale to `docs/design-rationale.md`,
-stdlib API tables to `docs/libstd-spec.md`. Added grammar appendix (§30).
-Added labels on arbitrary statements and `goto` (§13.5a, §13.5b).
+roadmap to `docs/roadmap.md`, and stdlib API tables to
+`docs/libstd-spec.md`. Added grammar appendix (§30). Added labels on
+arbitrary statements and `goto` (§13.5a, §13.5b).
 **Positioning:** Systems programming that feels like a modern language.
 **Principle:** Make the common case delightful. Be as safe as Rust without front-loading Rust's ceremony. Trust the programmer at the edges without accepting safety-contract violations.
 
@@ -217,7 +217,8 @@ features listed above. This is the core design invariant.
 
 ### 1.6 Comparison
 
-*For a detailed comparison with Rust, see `docs/design-rationale.md`.*
+With targets Rust-level safety and C-level reach while removing explicit
+lifetime annotation ceremony from the common path.
 
 ---
 
@@ -301,8 +302,10 @@ With prioritizes joy. The common case should be effortless:
 
 ### 1.8 Known Tradeoffs
 
-*For a discussion of trade-offs from eliminating lifetime annotations,
-see `docs/design-rationale.md`.*
+Eliminating lifetime annotations moves complexity into compiler analysis and
+diagnostics. When the compiler cannot prove a reference or view is safe, it must
+reject the program loudly rather than ask the user to write ceremonial lifetime
+syntax.
 
 ---
 
@@ -6950,8 +6953,9 @@ See `lib/std/async.w` and `lib/std/async/` docs for API details.
 
 ### 14.12 Why Fibers, Not State Machines?
 
-*For design rationale on fibers vs state machines, see
-`docs/design-rationale.md`.*
+Fibers keep async code as ordinary control flow with real stacks, so the same
+ownership, borrowing, cleanup, and panic paths apply before and after
+suspension.
 
 ### 14.13 Interaction with Ownership
 

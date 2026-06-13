@@ -61,7 +61,7 @@ Latest #369 root-cause facts:
 
 Current paper-over:
 
-- Until the async backend migration in `docs/async-proposal.md` replaces the
+- Until the async backend migration in `docs/feature_plans/async-proposal.md` replaces the
   current Windows custom assembly fiber stack, the test runner supports a
   narrow `//! skip-windows:` directive. Only
   `test/behavior/behav_async_stack_overflow.w` uses it. The expected `134`
@@ -757,8 +757,9 @@ and explicitly marks `with_cimport_set_resource_dir(path: str) -> void`.
 
 The next link attempt with the correct Windows object set eliminated duplicate
 bridge/platform symbols but exposed `str_from_byte` and `i64_to_string` as
-unresolved. `git log`/`docs/project-state.md` and `Link.w` show these are a
-small non-prefixed runtime shim exception to the normal `with_`/`rt_`/`wl_`
+unresolved. `git log`, then-current project-state notes, and `Link.w` show
+these are a small non-prefixed runtime shim exception to the normal
+`with_`/`rt_`/`wl_`
 runtime ABI naming rule. Current source edit adds exact stable C names for
 the actual `rt_core.w` shims: `i32_to_str`, `i64_to_string`, and
 `str_from_byte`.
@@ -784,7 +785,8 @@ Completed:
 
 ## Progress Log
 
-- 2026-06-05: Re-read `AGENTS.md` and `docs/project-state.md`.
+- 2026-06-05: Re-read `AGENTS.md` and the then-current project-state
+  checkpoint.
 - 2026-06-05: Confirmed host source build passes after latest
   `src/CCodegen.w` edit.
 - 2026-06-05: Created this status document to avoid losing state or spinning in

@@ -432,9 +432,15 @@ conventions. When you can't find something, grep `examples/`,
 `src/`, and `docs/with-specification.md` before assuming it
 doesn't exist. Never rely on memory.
 
-Read `docs/project-state.md` immediately after this file if it
-exists. Keep it current when phase status, blockers, or the next
-work queue changes.
+Read `out/project-state.md` immediately after this file if it exists.
+This file is ignored local agent scratch, not repository documentation.
+Do not create it from scratch as routine agent bookkeeping; only create
+it if the maintainer explicitly asks. If it exists, keep it current
+when phase status, blockers, or the next work queue changes, and follow
+its retention policy: it is a short-lived checkpoint, not a history log.
+Prune stale completed entries while updating it, prefer GitHub issues
+for follow-ups and real docs/specs for durable design facts, and keep
+it concise.
 
 ### One logical change at a time
 

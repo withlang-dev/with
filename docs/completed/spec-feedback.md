@@ -449,7 +449,7 @@ exactly. Fiber stacks are **fixed 64 KB** plus a guard page, mmap'd
 `with_fiber_pool_reuses`/`_allocs` counters at `:701-705`). Not
 growable; no 8 KB initial allocation; no `with.toml`
 `fiber_stack_size` config; no FFI stack switching; no `@[ffi_stack]`;
-no `ffi_reachable` analysis. (`docs/async-proposal.md:18-26` floats a
+no `ffi_reachable` analysis. (`docs/feature_plans/async-proposal.md:18-26` floats a
 minicoro migration for growable stacks later.) `may_suspend` analysis
 and the E0701 guard checks are implemented at compile time
 (`src/SemaCheck.w` `fn_symbol_may_suspend`, `src/MirSuspendCheck.w`).
@@ -479,7 +479,7 @@ cancel-and-join-before-return, so the slowest-loser latency behavior
 is live today, not hypothetical. Tuple `.await`
 (`FIBER_TUPLE_AWAIT`), `select await` (`FIBER_SELECT`/`_BIASED`), and
 `async scope` + `s.track()` (`rt/rt_core.w:2766-2839`) are all
-implemented. (Side note from the survey: `docs/async-proposal.md`
+implemented. (Side note from the survey: `docs/feature_plans/async-proposal.md`
 records a known bug — `with_scope_track` reallocating its tracking
 buffer while the caller holds the old handle.)
 

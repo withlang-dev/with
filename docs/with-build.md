@@ -3,7 +3,9 @@
 Status: current user documentation.
 
 This document describes how to create, configure, and build With projects.
-The formal build system contract is [build-spec.md](build-spec.md).
+The active repository plan to remove the remaining Makefile compatibility layer
+is [eliminate-Makefile.md](eliminate-Makefile.md). Historical build-system plan
+and spec documents are archived under `docs/completed/`.
 
 ---
 

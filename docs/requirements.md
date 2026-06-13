@@ -302,8 +302,8 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
 
 ### §1.6 Comparison
 
-- [x] `1.6.1.1` **For a detailed comparison with Rust, see docs/design-rationale.md.**
-  - Requirement: *For a detailed comparison with Rust, see `docs/design-rationale.md`.*
+- [x] `1.6.1.1` **With targets Rust-level safety and C-level reach while removing explicit lifetime annotation ceremony from...**
+  - Requirement: With targets Rust-level safety and C-level reach while removing explicit lifetime annotation ceremony from the common path.
   - Source: `§1.6 L220`
   - Related spec refs: none
 
@@ -460,8 +460,8 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
 
 ### §1.8 Known Tradeoffs
 
-- [x] `1.8.1.1` **For a discussion of trade-offs from eliminating lifetime annotations, see d...**
-  - Requirement: *For a discussion of trade-offs from eliminating lifetime annotations, see `docs/design-rationale.md`.*
+- [x] `1.8.1.1` **Eliminating lifetime annotations moves complexity into compiler analysis and diagnostics. When the compiler cannot...**
+  - Requirement: Eliminating lifetime annotations moves complexity into compiler analysis and diagnostics. When the compiler cannot prove a reference or view is safe, it must reject the program loudly rather than ask the user to write ceremonial lifetime syntax.
   - Source: `§1.8 L304-L305`
   - Related spec refs: none
 
@@ -7349,8 +7349,8 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
 
 ### §14.12 Why Fibers, Not State Machines?
 
-- [x] `14.12.1.1` **For design rationale on fibers vs state machines, see docs/design-rationale...***
-  - Requirement: *For design rationale on fibers vs state machines, see `docs/design-rationale.md`.*
+- [x] `14.12.1.1` **Fibers keep async code as ordinary control flow with real stacks, so the same ownership,...**
+  - Requirement: Fibers keep async code as ordinary control flow with real stacks, so the same ownership, borrowing, cleanup, and panic paths apply before and after suspension.
   - Source: `§14.12 L6946-L6947`
   - Related spec refs: none
 

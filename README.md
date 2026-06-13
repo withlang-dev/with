@@ -3,7 +3,7 @@
 A systems programming language that compiles to native code via LLVM.
 Fast, safe, and designed to feel less hostile than existing native languages.
 
-[Specification](docs/with-specification.md) | [Contributing](CONTRIBUTING.md) | [Editor Support](docs/editor-support.md) | [Devlog](https://github.com/withlang-dev/with/discussions/185)
+[Specification](docs/with-specification.md) | [Contributing](CONTRIBUTING.md) | [Editor Support](docs/feature_plans/editor-support.md) | [Devlog](https://github.com/withlang-dev/with/discussions/185)
 
 ## Why With?
 
@@ -124,7 +124,7 @@ with build :fixpoint
 
 The compiler includes a built-in language server (`with lsp`) with diagnostics,
 go-to-definition, hover, and format-on-save. Setup instructions for VSCode,
-Neovim, Vim, Emacs, Zed, and Helix are in [docs/editor-support.md](docs/editor-support.md).
+Neovim, Vim, Emacs, Zed, and Helix are in [docs/feature_plans/editor-support.md](docs/feature_plans/editor-support.md).
 
 ## Contributing
 

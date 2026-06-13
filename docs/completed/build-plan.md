@@ -1,5 +1,9 @@
 # Build System Completion Plan
 
+Archived: historical build-system completion plan. The active Makefile-removal
+plan is `docs/eliminate-Makefile.md`. This file is retained as project history,
+not as the current implementation queue.
+
 Status: complete. All phases implemented and verified.
 
 This plan describes the remaining work needed to make
@@ -676,7 +680,7 @@ Update:
 
 - `docs/with-build.md`
 - `docs/build-spec.md`
-- `docs/toolchain.md`
+- `docs/completed/toolchain.md`
 - bootstrap instructions;
 - release instructions;
 - AI-facing repository docs.
