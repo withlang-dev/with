@@ -3461,6 +3461,12 @@ fn MirBuilder.lower_method_bin_op(self: MirBuilder, lhs_expr: i32, rhs_expr: i32
     arg_nodes.push(rhs_expr)
     self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, self.expr_type(node), node)
 
+fn MirBuilder.lower_method_un_op(self: MirBuilder, expr: i32, method_sym: i32, node: i32) -> i32:
+    let fn_op = self.lower_var(method_sym, 0, 0)
+    let arg_nodes: Vec[i32] = Vec.new()
+    arg_nodes.push(expr)
+    self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, self.expr_type(node), node)
+
 fn MirBuilder.is_runtime_pair_multi_index(self: MirBuilder, node: i32) -> i32:
     if self.ast.kind(node) != NodeKind.NK_INDEX:
         return 0
@@ -3556,6 +3562,9 @@ fn MirBuilder.lower_fn_address(self: MirBuilder, expr: i32, type_id: i32) -> i32
     -1
 
 fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i32:
+    if op == UnaryOp.UOP_NEGATE and self.sema.operator_method_calls.contains(node):
+        return self.lower_method_un_op(expr, self.sema.operator_method_calls.get(node).unwrap(), node)
+
     if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
         let fn_addr = self.lower_fn_address(expr, self.expr_type(node))
         if fn_addr >= 0:

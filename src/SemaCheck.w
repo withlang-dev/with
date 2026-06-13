@@ -5016,6 +5016,38 @@ fn Sema.type_has_operator_method(self: Sema, tid: i32, method_sym: i32) -> i32:
         return 1
     0
 
+fn Sema.unary_operator_candidate_for(self: Sema, owner_ty: i32, method_sym: i32) -> SemaOperatorCandidate:
+    if owner_ty == 0 or method_sym == 0:
+        return sema_operator_candidate_none()
+    let owner_resolved = self.resolve_alias(owner_ty as TypeId)
+    let owner_sym = self.get_type_name(owner_resolved)
+    if owner_sym == 0:
+        return sema_operator_candidate_none()
+    let sig = self.lookup_method_sig(owner_sym, method_sym)
+    if sig < 0:
+        return sema_operator_candidate_none()
+    if self.sig_get_param_count(sig) != 1:
+        return sema_operator_candidate_none()
+    let self_ty = self.sig_param_type(sig, 0)
+    if self.call_arg_type_compatible(self_ty, owner_ty) == 0:
+        return sema_operator_candidate_none()
+    let fn_sym = self.lookup_method_fn(owner_sym, method_sym)
+    if fn_sym == 0:
+        return sema_operator_candidate_none()
+    SemaOperatorCandidate { sig, fn_sym, owner_sym }
+
+fn Sema.check_unary_neg_operator_method(self: Sema, node: i32, operand: i32) -> i32:
+    let method_sym = self.pool_intern("neg")
+    let candidate = self.unary_operator_candidate_for(operand, method_sym)
+    if candidate.sig < 0:
+        if self.type_has_operator_method(operand, method_sym) != 0:
+            self.emit_error("operator '-' has no applicable 'neg' implementation for " ++ self.type_name(operand), node)
+        else:
+            self.emit_error("unary '-' requires a signed numeric operand or a type implementing 'neg'", node)
+        return 0
+    self.operator_method_calls.insert(node, candidate.fn_sym)
+    self.sig_return_type(candidate.sig)
+
 fn Sema.check_binary_operator_method(self: Sema, node: i32, op: i32, lhs: i32, rhs: i32) -> i32:
     let method_name = sema_operator_method_name(op)
     if method_name.len() == 0:
@@ -5524,7 +5556,10 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     if op == UnaryOp.UOP_NEGATE:
         if self.is_unsigned_int_type(operand as i32):
             self.emit_error("cannot negate an unsigned value", node)
-        return operand as i32
+            return 0
+        if self.is_numeric_type(operand as i32):
+            return operand as i32
+        return self.check_unary_neg_operator_method(node, operand as i32)
     if op == UnaryOp.UOP_BIT_NOT:
         return operand as i32
     if op == UnaryOp.UOP_NOT:
