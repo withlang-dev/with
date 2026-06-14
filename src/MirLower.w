@@ -8816,14 +8816,8 @@ fn MirBuilder.option_some_index(self: MirBuilder, option_ty: i32) -> i32:
         return idx
     self.success_variant_index()
 
-fn MirBuilder.lower_optional_chain_field(self: MirBuilder, result_place: i32, result_ty: i32, base_place: i32, base_ty: i32, member_sym: i32, span: i32):
-    let payload_ty = self.option_payload_type(base_ty)
-    if payload_ty == 0:
-        self.mark_unsupported()
-        return
-
-    let some_idx = self.option_some_index(base_ty)
-    let downcast_place = self.body.new_downcast_place(base_place, some_idx, base_ty)
+fn MirBuilder.lower_optional_chain_field(self: MirBuilder, result_place: i32, result_ty: i32, base_place: i32, base_ty: i32, payload_ty: i32, success_idx: i32, success_sym: i32, member_sym: i32, span: i32):
+    let downcast_place = self.body.new_downcast_place(base_place, success_idx, base_ty)
     let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
     let field_ty = self.sema.struct_field_type(payload_ty, member_sym)
     if field_ty == 0:
@@ -8837,9 +8831,9 @@ fn MirBuilder.lower_optional_chain_field(self: MirBuilder, result_place: i32, re
         self.assign_operand_to_place(result_place, field_op, span)
         return
 
-    let some_fields: Vec[i32] = Vec.new()
-    some_fields.push(field_op)
-    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
+    let success_fields: Vec[i32] = Vec.new()
+    success_fields.push(field_op)
+    self.assign_enum_variant_to_place(result_place, result_ty, success_sym, success_fields, span)
 
 fn MirBuilder.lower_intrinsic_call_with_receiver_operand(self: MirBuilder, intrinsic: MirIntrinsic, recv_op: i32, recv_type: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
     let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
@@ -8931,18 +8925,13 @@ fn MirBuilder.lower_call_with_receiver_operand(self: MirBuilder, fn_op: i32, cal
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
-fn MirBuilder.lower_optional_chain_method(self: MirBuilder, result_place: i32, result_ty: i32, base_place: i32, base_ty: i32, member_sym: i32, extra_start: i32, node: i32):
-    let payload_ty = self.option_payload_type(base_ty)
-    if payload_ty == 0:
-        self.mark_unsupported()
-        return
+fn MirBuilder.lower_optional_chain_method(self: MirBuilder, result_place: i32, result_ty: i32, base_place: i32, base_ty: i32, payload_ty: i32, success_idx: i32, success_sym: i32, member_sym: i32, extra_start: i32, node: i32):
     let raw_ret_ty = self.sema.optional_chain_method_raw_result_type(payload_ty, member_sym)
     if raw_ret_ty == 0:
         self.mark_unsupported()
         return
 
-    let some_idx = self.option_some_index(base_ty)
-    let downcast_place = self.body.new_downcast_place(base_place, some_idx, base_ty)
+    let downcast_place = self.body.new_downcast_place(base_place, success_idx, base_ty)
     let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
     let method_name = self.pool.resolve_symbol(member_sym)
     let arg_count = self.ast.optional_chain_arg_count(extra_start)
@@ -8970,9 +8959,9 @@ fn MirBuilder.lower_optional_chain_method(self: MirBuilder, result_place: i32, r
         self.assign_operand_to_place(result_place, raw_op, self.ast.get_start(node))
         return
 
-    let some_fields: Vec[i32] = Vec.new()
-    some_fields.push(raw_op)
-    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, self.ast.get_start(node))
+    let success_fields: Vec[i32] = Vec.new()
+    success_fields.push(raw_op)
+    self.assign_enum_variant_to_place(result_place, result_ty, success_sym, success_fields, self.ast.get_start(node))
 
 fn MirBuilder.lower_pipeline(self: MirBuilder, lhs_expr: i32, fn_expr: i32, args_start: i32, args_count: i32, node: i32) -> i32:
     if self.sema.pipeline_method_calls.contains(node):
@@ -9013,33 +9002,61 @@ fn MirBuilder.lower_optional_chain(self: MirBuilder, node: i32) -> i32:
     let base_op = self.lower_expr(base_expr)
     let base_ty = self.expr_type(base_expr)
     let base_place = self.materialize_operand(base_op, base_ty, self.ast.get_start(base_expr))
+    let option_payload_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.option, 0)
+    let result_ok_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.result, 0)
+    let result_err_ty = self.generic_inst_arg_type(base_ty, self.sema.syms.result, 1)
+    var payload_ty = option_payload_ty
+    var success_sym = self.sema.syms.some
+    var failure_sym = self.sema.syms.none
+    var success_idx = self.option_some_index(base_ty)
+    var is_result_chain = 0
+    if payload_ty == 0 and result_ok_ty != 0 and result_err_ty != 0:
+        payload_ty = result_ok_ty
+        success_sym = self.sema.syms.ok
+        failure_sym = self.sema.syms.err
+        success_idx = self.enum_variant_index_for_type(base_ty, self.sema.syms.ok)
+        is_result_chain = 1
+    if payload_ty == 0 or success_idx < 0:
+        self.mark_unsupported()
+        return self.unit_operand()
 
-    let some_bb = self.new_block()
-    let none_bb = self.new_block()
+    let success_bb = self.new_block()
+    let failure_bb = self.new_block()
     let join_bb = self.new_block()
 
     let disc = self.lower_enum_discriminant(base_place)
     let vals: Vec[i32] = Vec.new()
-    vals.push(self.option_some_index(base_ty))
+    vals.push(success_idx)
     let targets: Vec[i32] = Vec.new()
-    targets.push(some_bb as i32)
+    targets.push(success_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
-    self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, failure_bb, 0)
 
     let result_ty = self.expr_type(node)
     let result_local = self.new_temp(result_ty)
     let result_place = self.place_for_local(result_local)
 
-    self.switch_to(some_bb)
+    self.switch_to(success_bb)
     if is_call != 0:
-        self.lower_optional_chain_method(result_place, result_ty, base_place, base_ty, member_sym, extra_start, node)
+        self.lower_optional_chain_method(result_place, result_ty, base_place, base_ty, payload_ty, success_idx, success_sym, member_sym, extra_start, node)
     else:
-        self.lower_optional_chain_field(result_place, result_ty, base_place, base_ty, member_sym, self.ast.get_start(node))
+        self.lower_optional_chain_field(result_place, result_ty, base_place, base_ty, payload_ty, success_idx, success_sym, member_sym, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
-    self.switch_to(none_bb)
-    let none_fields: Vec[i32] = Vec.new()
-    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, self.ast.get_start(node))
+    self.switch_to(failure_bb)
+    if is_result_chain != 0:
+        let err_idx = self.enum_variant_index_for_type(base_ty, failure_sym)
+        if err_idx < 0:
+            self.mark_unsupported()
+        else:
+            let err_downcast = self.body.new_downcast_place(base_place, err_idx, base_ty)
+            let err_payload_place = self.body.new_field_place(err_downcast, 0, result_err_ty)
+            let err_fields: Vec[i32] = Vec.new()
+            err_fields.push(self.operand_for_place(err_payload_place, result_err_ty))
+            self.assign_enum_variant_to_place(result_place, result_ty, failure_sym, err_fields, self.ast.get_start(node))
+    else:
+        let none_fields: Vec[i32] = Vec.new()
+        self.assign_enum_variant_to_place(result_place, result_ty, failure_sym, none_fields, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)

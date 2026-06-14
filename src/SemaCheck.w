@@ -7062,12 +7062,11 @@ fn Sema.struct_field_info_by_index(self: Sema, struct_type: i32, index: i32) -> 
             return (f_name as i64) | ((f_type as i64) * 4294967296)
     0
 
-// Result type of `base?.member` (field access form). `base` is the receiver
-// type — typically `Option[T]`, whose payload `T` carries the field. Per §10.3
-// type-aware desugaring: if the field is itself `Option[U]` the result is
-// `Option[U]` (and_then / flatten); otherwise it is `Option[F]` (map / wrap).
-// The wrap goes through `ensure_option_type_for` so the synthesized Option is
-// the same interned TypeId as a written `Option[F]` annotation.
+// Result type of `base?.member` (field access form). `base` may be
+// `Option[T]` or `Result[T, E]`; payload `T` carries the field. Per §10.3
+// type-aware desugaring: an already-carried field (`Option[U]` for Option,
+// `Result[U, E]` for Result) flattens, while ordinary fields wrap in the
+// same carrier. Result chains preserve the original Err type.
 fn Sema.optional_chain_payload_type(self: Sema, base: i32) -> i32:
     if base == 0:
         return 0
@@ -7078,21 +7077,65 @@ fn Sema.optional_chain_payload_type(self: Sema, base: i32) -> i32:
         return 0
     self.get_generic_inst_arg(resolved as i32, 0)
 
+fn Sema.optional_chain_result_ok_type(self: Sema, base: i32) -> i32:
+    if base == 0:
+        return 0
+    let resolved = self.resolve_alias(base as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.get_type_d0(resolved) != self.syms.result:
+        return 0
+    if self.get_generic_inst_arg_count(resolved as i32) != 2:
+        return 0
+    self.get_generic_inst_arg(resolved as i32, 0)
+
+fn Sema.optional_chain_result_err_type(self: Sema, base: i32) -> i32:
+    if base == 0:
+        return 0
+    let resolved = self.resolve_alias(base as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.get_type_d0(resolved) != self.syms.result:
+        return 0
+    if self.get_generic_inst_arg_count(resolved as i32) != 2:
+        return 0
+    self.get_generic_inst_arg(resolved as i32, 1)
+
+fn Sema.optional_chain_wrap_result_for_error_type(self: Sema, raw_ret: i32, err_ty: i32) -> i32:
+    let rr = self.resolve_alias(raw_ret as TypeId)
+    if self.get_type_kind(rr) == TypeKind.TY_GENERIC_INST and self.get_type_d0(rr) == self.syms.result:
+        if self.get_generic_inst_arg_count(rr as i32) == 2:
+            let raw_err = self.get_generic_inst_arg(rr as i32, 1)
+            if self.types_compatible(raw_err as TypeId, err_ty as TypeId) != 0:
+                return raw_ret
+    self.ensure_result_type_for(raw_ret, err_ty)
+
 fn Sema.optional_chain_result_type(self: Sema, base: i32, member: i32) -> i32:
     if base == 0:
         return base
     let payload = self.optional_chain_payload_type(base)
-    if payload == 0:
+    if payload != 0:
+        let f = self.struct_field_type(payload, member)
+        if f == 0:
+            // Not a field (e.g. a method-call form) — keep the receiver type.
+            return base
+        let fr = self.resolve_alias(f as TypeId)
+        if self.get_type_kind(fr) == TypeKind.TY_GENERIC_INST:
+            if self.get_type_d0(fr) == self.syms.option:
+                return f
+        return self.ensure_option_type_for(f)
+
+    let result_payload = self.optional_chain_result_ok_type(base)
+    if result_payload == 0:
         return base
-    let f = self.struct_field_type(payload, member)
+    let f = self.struct_field_type(result_payload, member)
     if f == 0:
         // Not a field (e.g. a method-call form) — keep the receiver type.
         return base
-    let fr = self.resolve_alias(f as TypeId)
-    if self.get_type_kind(fr) == TypeKind.TY_GENERIC_INST:
-        if self.get_type_d0(fr) == self.syms.option:
-            return f
-    return self.ensure_option_type_for(f)
+    let err_ty = self.optional_chain_result_err_type(base)
+    if err_ty == 0:
+        return base
+    self.optional_chain_wrap_result_for_error_type(f, err_ty)
 
 fn Sema.optional_chain_method_raw_result_type(self: Sema, payload: i32, member: i32) -> i32:
     if payload == 0:
@@ -7126,27 +7169,44 @@ fn Sema.optional_chain_wrap_result_type(self: Sema, raw_ret: i32) -> i32:
 
 fn Sema.optional_chain_method_result_type_no_check(self: Sema, base: i32, member: i32) -> i32:
     let payload = self.optional_chain_payload_type(base)
-    if payload == 0:
+    if payload != 0:
+        let raw_ret = self.optional_chain_method_raw_result_type(payload, member)
+        if raw_ret == 0:
+            return 0
+        return self.optional_chain_wrap_result_type(raw_ret)
+
+    let result_payload = self.optional_chain_result_ok_type(base)
+    if result_payload == 0:
         return base
-    let raw_ret = self.optional_chain_method_raw_result_type(payload, member)
+    let raw_ret = self.optional_chain_method_raw_result_type(result_payload, member)
     if raw_ret == 0:
         return 0
-    self.optional_chain_wrap_result_type(raw_ret)
+    let err_ty = self.optional_chain_result_err_type(base)
+    if err_ty == 0:
+        return 0
+    self.optional_chain_wrap_result_for_error_type(raw_ret, err_ty)
 
 fn Sema.optional_chain_method_result_type(self: Sema, base: i32, member: i32, extra_start: i32, node: i32) -> i32:
     let payload = self.optional_chain_payload_type(base)
-    if payload == 0:
+    var payload_ty = payload
+    var result_err_ty = 0
+    if payload_ty == 0:
+        payload_ty = self.optional_chain_result_ok_type(base)
+        result_err_ty = self.optional_chain_result_err_type(base)
+    if payload_ty == 0:
         return base
     let arg_count = self.ast.optional_chain_arg_count(extra_start)
     let arg_start = self.ast.optional_chain_arg_start(extra_start)
     for ai in 0..arg_count:
         self.check_expr(self.ast.get_extra(arg_start + ai))
-    let raw_ret = self.optional_chain_method_raw_result_type(payload, member)
+    let raw_ret = self.optional_chain_method_raw_result_type(payload_ty, member)
     if raw_ret == 0:
-        let recv_name = self.type_name(payload)
+        let recv_name = self.type_name(payload_ty)
         let method_name = self.pool_resolve(member)
         self.emit_error("unknown method '" ++ method_name ++ "' for optional-chain payload type '" ++ recv_name ++ "'", node)
         return 0
+    if result_err_ty != 0:
+        return self.optional_chain_wrap_result_for_error_type(raw_ret, result_err_ty)
     self.optional_chain_wrap_result_type(raw_ret)
 
 fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
