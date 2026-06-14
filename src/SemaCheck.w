@@ -4173,6 +4173,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_LOOP:
         self.loop_depth = self.loop_depth + 1
+        self.push_scope()
         self.push_label_frame(self.ast.get_data1(node), LabelFrameKind.LFK_LOOP, node)
         let loop_frame_idx = self.label_syms.len() as i32 - 1
         let saved_drop_cf_loop = self.drop_control_flow_depth
@@ -4185,6 +4186,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.drop_control_flow_depth = saved_drop_cf_loop
         let result_ty = if loop_frame_idx >= 0: self.label_break_value_types.get(loop_frame_idx as i64) else: 0
         self.pop_label_frame()
+        self.pop_scope()
         self.loop_depth = self.loop_depth - 1
         let loop_ty = if result_ty != 0: result_ty else: self.ty_never as i32
         self.typed_expr_types.insert(node, loop_ty)
