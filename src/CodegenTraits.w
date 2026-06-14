@@ -206,6 +206,17 @@ fn Codegen.lookup_impl_method_symbol_by_slot(self: Codegen, impl_node: i32, slot
         return 0
     rev_syms.get(rev_idx as i64)
 
+fn Codegen.find_impl_for_type_trait(self: Codegen, impl_type_sym: i32, trait_sym: i32) -> i32:
+    if impl_type_sym == 0 or trait_sym == 0:
+        return 0
+    for i in 0..self.pool.decl_count():
+        let decl = self.pool.get_decl(i)
+        if self.pool.kind(decl) != NodeKind.NK_IMPL_DECL:
+            continue
+        if self.pool.get_data0(decl) == impl_type_sym and self.pool.get_data2(decl) == trait_sym:
+            return decl
+    0
+
 fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, method_sym: i32, method_fn: i64, method_ft: i64) -> i64:
     let type_name = self.intern.resolve(impl_type_sym)
     let method_name = self.intern.resolve(method_sym)
@@ -753,6 +764,49 @@ fn Codegen.generate_trait_vtable_for_impl(self: Codegen, impl_node: i32):
 
     let trait_name = self.intern.resolve(trait_sym)
     let type_name = self.intern.resolve(impl_type_sym)
+    let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name
+    let vg = wl_add_global(self.llmod, vtable_ty, global_name)
+    let vconst = wl_const_named_struct(vtable_ty, vec_data_i64(&entries), method_count)
+    wl_set_initializer(vg, vconst)
+    wl_set_global_constant(vg, 1)
+    wl_set_linkage(vg, wl_internal_linkage())
+    self.vtable_globals.insert(key, vg)
+
+fn Codegen.ensure_monomorphized_trait_vtable(self: Codegen, impl_type_sym: i32, trait_sym: i32):
+    let key = codegen_hash_type_trait_key(impl_type_sym, trait_sym)
+    if self.vtable_globals.get(key).is_some():
+        return
+    let base_opt = self.mono_struct_base.get(impl_type_sym)
+    if not base_opt.is_some():
+        return
+    let impl_node = self.find_impl_for_type_trait(base_opt.unwrap(), trait_sym)
+    if impl_node == 0:
+        return
+    let trait_idx_opt = self.trait_map.get(trait_sym)
+    if not trait_idx_opt.is_some():
+        return
+
+    let trait_idx = trait_idx_opt.unwrap()
+    let method_start = self.trait_method_starts.get(trait_idx as i64)
+    let method_count = self.trait_method_counts.get(trait_idx as i64)
+    let vtable_ty = self.trait_vtable_types.get(trait_idx as i64)
+    let type_name = self.intern.resolve(impl_type_sym)
+    let trait_name = self.intern.resolve(trait_sym)
+
+    let entries: Vec[i64] = Vec.new()
+    for mi in 0..method_count:
+        let method_sym = self.trait_method_names.get((method_start + mi) as i64)
+        let method_name = self.intern.resolve(method_sym)
+        let concrete_sym = self.intern.intern(type_name ++ "." ++ method_name)
+        let fv = self.fn_values.get(concrete_sym)
+        let ft = self.fn_fn_types.get(concrete_sym)
+        if not fv.is_some() or not ft.is_some():
+            with_eprint("error: missing monomorphized trait method '" ++ type_name ++ "." ++ method_name ++ "' for trait '" ++ trait_name ++ "'")
+            self.had_error = 1
+            return
+        let wrapper = self.create_dyn_wrapper(impl_type_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64)
+        entries.push(wrapper)
+
     let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name
     let vg = wl_add_global(self.llmod, vtable_ty, global_name)
     let vconst = wl_const_named_struct(vtable_ty, vec_data_i64(&entries), method_count)

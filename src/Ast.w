@@ -182,6 +182,7 @@ const TDK_FLAG_EPHEMERAL: i32 = 8
 const TDK_FLAG_PACKED: i32 = 16
 const TDK_FLAG_BITPACKED: i32 = 32
 const TDK_FLAG_SPECIFIED: i32 = 64
+const TDK_FLAG_ERROR: i32 = 128
 
 fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
     if is_ephemeral != 0:
@@ -202,6 +203,9 @@ fn type_decl_is_bitpacked(packed: i32) -> i32:
 
 fn type_decl_is_specified(packed: i32) -> i32:
     (packed / TDK_FLAG_SPECIFIED) % 2
+
+fn type_decl_is_error(packed: i32) -> i32:
+    (packed / TDK_FLAG_ERROR) % 2
 
 // Fn decl flag bits (stored in data2 field)
 @[flags]

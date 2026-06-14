@@ -2211,6 +2211,81 @@ fn Sema.ct_generate_ord_derive(self: Sema, out: AstPool, intern: InternPool, dec
 fn ct_build_concat(out: AstPool, decl: i32, lhs: i32, rhs: i32) -> i32:
     out.ct_build_binary(decl, BinaryOp.OP_CONCAT, lhs, rhs)
 
+fn ct_build_fstring_self(out: AstPool, decl: i32, self_sym: i32, debug_mode: i32, deref_self: i32) -> i32:
+    let spec_node =
+        if debug_mode != 0:
+            out.add_node(NodeKind.NK_FSTRING_SPEC, out.get_start(decl), out.get_end(decl), 63 | (32 << 8), 0, -1) as i32
+        else:
+            0
+    let self_ident = out.ct_build_ident(decl, self_sym)
+    let self_expr =
+        if deref_self != 0:
+            out.add_node(NodeKind.NK_UNARY, out.get_start(decl), out.get_end(decl), UnaryOp.UOP_DEREF, self_ident, 0) as i32
+        else:
+            self_ident
+    let extra_start = out.extra_len()
+    out.add_extra(FStringSegmentKind.EXPR)
+    out.add_extra(self_expr)
+    out.add_extra(spec_node)
+    out.add_node(NodeKind.NK_FSTRING, out.get_start(decl), out.get_end(decl), 1, extra_start, 0) as i32
+
+fn Sema.ct_generate_error_format_impl(self: Sema, out: AstPool, intern: InternPool, decl: i32, trait_sym: i32, method_sym: i32, debug_mode: i32, receiver_flags: i32) -> Vec[i32]:
+    let generated: Vec[i32] = Vec.new()
+    let type_name_sym = out.get_data0(decl)
+    if self.lookup_method_sig(type_name_sym, method_sym) >= 0:
+        return generated
+    if self.select_trait_impl(type_name_sym, trait_sym) != 0:
+        return generated
+
+    let type_name = intern.resolve(type_name_sym)
+    let start = out.get_start(decl)
+    let end = out.get_end(decl)
+    let self_sym = intern.intern("self")
+    let self_type_named = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+    let self_type =
+        if receiver_flags == FN_PARAM_FLAG_REF_SELF:
+            out.add_node(NodeKind.NK_TYPE_REF, start, end, self_type_named as i32, 0, 0)
+        else:
+            self_type_named
+    let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("str"), 0, 0)
+    let body = ct_build_fstring_self(out, decl, self_sym, debug_mode, if receiver_flags == FN_PARAM_FLAG_REF_SELF: 1 else: 0)
+
+    let param_start = out.extra_len()
+    out.ct_add_fn_param(self_sym, self_type as i32, receiver_flags)
+    let fn_sym = intern.intern(type_name ++ "." ++ intern.resolve(method_sym))
+    let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
+    out.add_fn_meta(fn_node, FN_META_REQUIRED_UNIT, ret_type as i32, param_start, 1, 0, 0)
+
+    let impl_extra = out.extra_len()
+    out.add_extra(0)
+    out.add_extra(1)
+    let impl_node = out.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name_sym, impl_extra, trait_sym)
+    ct_add_generated_impl_target(out, decl, impl_node as i32, type_name_sym, ct_type_decl_tp_start(out, decl), ct_type_decl_tp_count(out, decl), trait_sym)
+
+    generated.push(fn_node as i32)
+    generated.push(impl_node as i32)
+    generated
+
+fn Sema.ct_generate_error_decl_impls(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
+    let generated: Vec[i32] = Vec.new()
+    let packed_kind = out.get_data2(decl)
+    if type_decl_is_error(packed_kind) == 0 or type_decl_sub_kind(packed_kind) != TypeDeclKind.Enum:
+        return generated
+
+    let debug_impl = self.ct_generate_error_format_impl(out, intern, decl, intern.intern("Debug"), intern.intern("debug_str"), 1, FN_PARAM_FLAG_MOVE_SELF)
+    for i in 0..debug_impl.len() as i32:
+        generated.push(debug_impl.get(i as i64))
+
+    let display_impl = self.ct_generate_error_format_impl(out, intern, decl, intern.intern("Display"), intern.intern("to_str"), 0, FN_PARAM_FLAG_MOVE_SELF)
+    for i in 0..display_impl.len() as i32:
+        generated.push(display_impl.get(i as i64))
+
+    let error_impl = self.ct_generate_error_format_impl(out, intern, decl, intern.intern("Error"), intern.intern("display"), 0, FN_PARAM_FLAG_REF_SELF)
+    for i in 0..error_impl.len() as i32:
+        generated.push(error_impl.get(i as i64))
+
+    generated
+
 fn Sema.ct_generate_debug_derive(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
     let generated: Vec[i32] = Vec.new()
     if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
@@ -2921,6 +2996,15 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
                 generated_local_count = generated_local_count + generated_display.len() as i32
+        if type_decl_is_error(out.get_data2(decl)) != 0:
+            let generated_error = self.ct_generate_error_decl_impls(out, intern, decl as i32)
+            for gi in 0..generated_error.len() as i32:
+                ordered.push(generated_error.get(gi as i64))
+                ordered_paths.push(sema_owned_text(decl_path))
+                ordered_file_ids.push(decl_file_id)
+                ordered_ci.push(decl_ci)
+            if ct_source_decl_is_local(source_ast, di) != 0:
+                generated_local_count = generated_local_count + generated_error.len() as i32
         if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, clone_trait_sym, all_sym) != 0:
             let generated_clone = self.ct_generate_clone_derive(out, intern, decl as i32)
             for gi in 0..generated_clone.len() as i32:

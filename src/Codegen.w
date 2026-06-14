@@ -98,6 +98,7 @@ type Codegen {
     async_trampolines: HashMap[i32, i64],
     current_function: i64,
     current_function_name_sym: i32,
+    current_function_node: i32,
     current_method_owner_sym: i32,
 
     // Pre-interned symbols for O(1) dispatch (avoid string comparisons)
@@ -542,6 +543,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         async_trampolines: HashMap.new(),
         current_function: 0,
         current_function_name_sym: 0,
+        current_function_node: 0,
         current_method_owner_sym: 0,
         sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
         sym_hashset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
@@ -975,6 +977,18 @@ fn Codegen.get_dyn_fat_ptr_type(self: Codegen) -> i64:
     fat_types.push(ptr_ty)
     self.dyn_fat_ptr_type = wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
     self.dyn_fat_ptr_type
+
+fn Codegen.llvm_type_is_dyn_fat_ptr(self: Codegen, ty: i64) -> i32:
+    if ty == 0 or wl_get_type_kind(ty) != wl_struct_type_kind():
+        return 0
+    if wl_count_struct_elem_types(ty) != 2:
+        return 0
+    let ptr_ty = wl_ptr_type(self.context)
+    if wl_struct_get_type_at(ty, 0) != ptr_ty:
+        return 0
+    if wl_struct_get_type_at(ty, 1) != ptr_ty:
+        return 0
+    1
 
 fn Codegen.get_fn_dyn_param_trait(self: Codegen, fn_sym: i32, param_idx: i32) -> i32:
     let base_opt = self.fn_dyn_param_starts.get(fn_sym)
@@ -1496,9 +1510,9 @@ fn Codegen.coerce_call_arg_to_param(self: Codegen, arg_node: i32, arg_val: i64, 
 
 fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> DynArgInfo:
     if wl_get_type_kind(arg_ty) == wl_struct_type_kind():
-        let st_sym = self.find_struct_type_by_llvm(arg_ty)
-        if st_sym != 0:
-            return DynArgInfo { type_sym: st_sym, use_ptr: 0 }
+        let nominal_sym = self.find_nominal_type_by_llvm(arg_ty)
+        if nominal_sym != 0:
+            return DynArgInfo { type_sym: nominal_sym, use_ptr: 0 }
 
     if wl_get_type_kind(arg_ty) != wl_pointer_type_kind():
         return DynArgInfo { type_sym: 0, use_ptr: 0 }
@@ -1514,9 +1528,9 @@ fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> D
                     return DynArgInfo { type_sym: known, use_ptr: 1 }
                 let base_ty = self.lookup_local_type(base_sym)
                 if base_ty != 0:
-                    let st_sym = self.find_struct_type_by_llvm(base_ty)
-                    if st_sym != 0:
-                        return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+                    let nominal_sym = self.find_nominal_type_by_llvm(base_ty)
+                    if nominal_sym != 0:
+                        return DynArgInfo { type_sym: nominal_sym, use_ptr: 1 }
                 let base_name = self.ident_text_from_node(inner)
                 if base_name.len() > 0:
                     let alias_sym = self.intern.intern(base_name)
@@ -1528,9 +1542,9 @@ fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> D
                         return DynArgInfo { type_sym: aps.unwrap(), use_ptr: 1 }
                     let alt = self.local_types.get(alias_sym)
                     if alt.is_some():
-                        let st_sym = self.find_struct_type_by_llvm(alt.unwrap() as i64)
-                        if st_sym != 0:
-                            return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+                        let nominal_sym = self.find_nominal_type_by_llvm(alt.unwrap() as i64)
+                        if nominal_sym != 0:
+                            return DynArgInfo { type_sym: nominal_sym, use_ptr: 1 }
 
     if arg_node != 0 and self.pool.kind(arg_node) == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(arg_node)
@@ -1542,9 +1556,9 @@ fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> D
             return DynArgInfo { type_sym: ps, use_ptr: 1 }
         let sym_ty = self.lookup_local_type(sym)
         if sym_ty != 0:
-            let st_sym = self.find_struct_type_by_llvm(sym_ty)
-            if st_sym != 0:
-                return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+            let nominal_sym = self.find_nominal_type_by_llvm(sym_ty)
+            if nominal_sym != 0:
+                return DynArgInfo { type_sym: nominal_sym, use_ptr: 1 }
         let name = self.ident_text_from_node(arg_node)
         if name.len() > 0:
             let alias_sym = self.intern.intern(name)
@@ -1556,22 +1570,23 @@ fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> D
                 return DynArgInfo { type_sym: aps.unwrap(), use_ptr: 1 }
             let alt = self.local_types.get(alias_sym)
             if alt.is_some():
-                let st_sym = self.find_struct_type_by_llvm(alt.unwrap() as i64)
-                if st_sym != 0:
-                    return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+                let nominal_sym = self.find_nominal_type_by_llvm(alt.unwrap() as i64)
+                if nominal_sym != 0:
+                    return DynArgInfo { type_sym: nominal_sym, use_ptr: 1 }
 
     // Symbol lookup can miss when parser/resolver symbol IDs diverge; fall
     // back to pointee LLVM type to recover concrete dyn coercions.
     let pointee_ty = wl_get_element_type(arg_ty)
     if pointee_ty != 0:
-        let st_sym = self.find_struct_type_by_llvm(pointee_ty)
-        if st_sym != 0:
-            return DynArgInfo { type_sym: st_sym, use_ptr: 1 }
+        let nominal_sym = self.find_nominal_type_by_llvm(pointee_ty)
+        if nominal_sym != 0:
+            return DynArgInfo { type_sym: nominal_sym, use_ptr: 1 }
 
     DynArgInfo { type_sym: 0, use_ptr: 0 }
 
 fn Codegen.build_dyn_trait_value(self: Codegen, concrete_val: i64, type_sym: i32, trait_sym: i32) -> i64:
     let key = codegen_hash_type_trait_key(type_sym, trait_sym)
+    self.ensure_monomorphized_trait_vtable(type_sym, trait_sym)
     let vg = self.vtable_globals.get(key)
     if not vg.is_some():
         with_eprint("error: missing vtable for type '" ++ self.intern.resolve(type_sym) ++ "' implementing trait '" ++ self.intern.resolve(trait_sym) ++ "'")
@@ -1589,6 +1604,7 @@ fn Codegen.build_dyn_trait_value(self: Codegen, concrete_val: i64, type_sym: i32
 
 fn Codegen.build_dyn_trait_value_from_ptr(self: Codegen, data_ptr: i64, type_sym: i32, trait_sym: i32) -> i64:
     let key = codegen_hash_type_trait_key(type_sym, trait_sym)
+    self.ensure_monomorphized_trait_vtable(type_sym, trait_sym)
     let vg = self.vtable_globals.get(key)
     if not vg.is_some():
         with_eprint("error: missing vtable for type '" ++ self.intern.resolve(type_sym) ++ "' implementing trait '" ++ self.intern.resolve(trait_sym) ++ "'")
@@ -2328,6 +2344,10 @@ fn Codegen.resolve_named_type(self: Codegen, sym: i32) -> i64:
 fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
     if node == 0:
         return 0
+    if self.sema.typed_expr_types.contains(node):
+        let typed = self.sema.typed_expr_types.get(node).unwrap()
+        if typed > 0:
+            return typed
     let nk = self.pool.kind(node)
     if nk == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(node)
@@ -2339,10 +2359,15 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
             let canon_opt = self.local_sema_types.get(canon)
             if canon_opt.is_some():
                 return canon_opt.unwrap()
-    if self.sema.typed_expr_types.contains(node):
-        let typed = self.sema.typed_expr_types.get(node).unwrap()
-        if typed > 0:
-            return typed
+    if nk == NodeKind.NK_UNARY:
+        let op = self.pool.get_data0(node)
+        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+            let inner_ty = self.sema_type_of_node(self.pool.get_data1(node))
+            if inner_ty > 0:
+                if op == UnaryOp.UOP_REF:
+                    return self.sema.ensure_exact_type(TypeKind.TY_REF, inner_ty, 0, 0) as i32
+                let is_mut = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
+                return self.sema.ensure_exact_type(TypeKind.TY_PTR, inner_ty, is_mut, 0) as i32
     // Literal types
     if nk == NodeKind.NK_STRING_LIT:
         return self.sema.ty_str as i32
@@ -2702,6 +2727,10 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             elem_ty = self.type_fallback()
         return wl_array_type(elem_ty, arr_len as i64)
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        let pointee_tid = self.sema.get_type_d0(resolved_tid)
+        let pointee_resolved = self.sema.resolve_alias(pointee_tid)
+        if self.sema.get_type_kind(pointee_resolved) == TypeKind.TY_TRAIT_OBJ:
+            return self.get_dyn_fat_ptr_type()
         return wl_ptr_type(self.context)
     if tk == TypeKind.TY_FN:
         let ptr_ty = wl_ptr_type(self.context)
@@ -2759,6 +2788,15 @@ fn Codegen.llvm_type_to_sema_type(self: Codegen, ty: i64) -> i32:
                 let found = self.sema.ensure_generic_inst_type(mono_base_opt.unwrap(), sema_args, tp_count)
                 if found != 0:
                     return found as i32
+        let enum_sym_opt = self.enum_by_llvm.get(ty)
+        if enum_sym_opt.is_some():
+            let enum_sym = enum_sym_opt.unwrap()
+            if self.sema.named_types.contains(enum_sym):
+                return self.sema.named_types.get(enum_sym).unwrap() as i32
+            let enum_text = self.intern.resolve(enum_sym)
+            let sema_enum_sym = if enum_text.len() > 0: self.sema.pool_lookup_symbol(enum_text) else: 0
+            if sema_enum_sym != 0 and self.sema.named_types.contains(sema_enum_sym):
+                return self.sema.named_types.get(sema_enum_sym).unwrap() as i32
     0
 
 // ── Builtin str type ──────────────────────────────────────────────
@@ -4822,7 +4860,7 @@ fn Codegen.monomorphize_struct(self: Codegen, name_sym: i32, extra_start: i32, a
 // Compiles a method body with the struct's type params bound to concrete types.
 // Called lazily when the method is first invoked on a monomorphized struct.
 
-fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, method_name: str, decl: i32, obj: i64, obj_node: i32, obj_ty: i64, args_start: i32, arg_count: i32, call_node: i32, pre_args: Vec[i64]) -> i64:
+fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, method_name: str, decl: i32, obj: i64, obj_ptr: i64, obj_node: i32, obj_ty: i64, args_start: i32, arg_count: i32, call_node: i32, pre_args: Vec[i64]) -> i64:
     let tp_start_opt = self.mono_struct_tp_starts.get(mono_type_sym)
     if not tp_start_opt.is_some():
         with_eprint("error: no type param bindings for monomorphized struct")
@@ -4842,7 +4880,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
         let args: Vec[i64] = Vec.new()
         let is_ref = self.fn_ref_param_starts.get(mono_sym).is_some()
         if is_ref:
-            args.push(self.get_mutable_receiver_ptr(obj_node, obj, obj_ty))
+            args.push(if obj_ptr != 0: obj_ptr else: self.get_mutable_receiver_ptr(obj_node, obj, obj_ty))
         else:
             args.push(obj)
         for ai in 0..arg_count:
@@ -5021,7 +5059,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
     // Now call the monomorphized method
     let call_args: Vec[i64] = Vec.new()
     if has_ref_self:
-        call_args.push(self.get_mutable_receiver_ptr(obj_node, obj, obj_ty))
+        call_args.push(if obj_ptr != 0: obj_ptr else: self.get_mutable_receiver_ptr(obj_node, obj, obj_ty))
     else:
         call_args.push(obj)
     for ai in 0..arg_count:

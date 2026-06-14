@@ -2060,6 +2060,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.lang_trait_syms.insert(self.pool_intern("ScopedSend"), 1)
     self.lang_trait_syms.insert(self.pool_intern("Scoped"), 1)
     self.lang_trait_syms.insert(self.pool_intern("ScopedMut"), 1)
+    self.lang_trait_syms.insert(self.pool_intern("Error"), 1)
 
 fn sema_is_name_char(ch: i32) -> i32:
     if ch >= 48 and ch <= 57:

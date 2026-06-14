@@ -2556,7 +2556,7 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(0)
         self.pool.add_extra(0)
-        return self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TypeDeclKind.Enum, 0))
+        return self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TypeDeclKind.Enum, 0) + TDK_FLAG_ERROR)
 
     // error Name = Variant1, Variant2(payload), ...
     if self.expect(TokenKind.TK_EQ) == 0:
@@ -2567,7 +2567,7 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     self.pool.add_extra(is_pub)
     self.pool.add_extra(0)
     self.pool.add_extra(0)
-    self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TypeDeclKind.Enum, 0))
+    self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), err_name, extra_start, pack_type_decl_kind(TypeDeclKind.Enum, 0) + TDK_FLAG_ERROR)
 
 // ── trait decl ───────────────────────────────────────────────────
 

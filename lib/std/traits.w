@@ -75,6 +75,11 @@ pub trait Debug:
 pub trait Display:
     fn to_str(self) -> str
 
+/// Error values expose a display string and an optional underlying cause.
+pub trait Error:
+    fn display(self: &Self) -> str
+    fn source(self: &Self) -> Option[&dyn Error]: None
+
 /// Default value construction. Call `Type.default()` to get the zero value.
 pub trait Default:
     fn default() -> Self

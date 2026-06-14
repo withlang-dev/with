@@ -1195,9 +1195,62 @@ fn CCodegen.payload_enum_literal(self: CCodegen, enum_tid: i32, variant_index: i
         out = out ++ ", ." ++ self.payload_enum_variant_field(variant_index) ++ " = " ++ payload_text
     out ++ cc_rbrace()
 
+fn cc_str_concat_expr(left: str, right: str) -> str:
+    "with_str_concat(" ++ left ++ ", " ++ right ++ ")"
+
+fn CCodegen.display_format_expr(self: CCodegen, tid: i32, expr: str, context: str) -> str:
+    let resolved = self.sema.resolve_alias(tid as TypeId)
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TypeKind.TY_STR:
+        return "with_fmt_str(" ++ expr ++ ")"
+    if tk == TypeKind.TY_BOOL:
+        return "with_fmt_bool((int32_t)(" ++ expr ++ "))"
+    if tk == TypeKind.TY_FLOAT:
+        return "with_fmt_f64((double)(" ++ expr ++ "))"
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        return "with_fmt_i64((int64_t)(intptr_t)(" ++ expr ++ "))"
+    if tk == TypeKind.TY_INT:
+        return "with_fmt_i64((int64_t)(" ++ expr ++ "))"
+    if tk == TypeKind.TY_ENUM and self.type_is_payload_enum(resolved as i32) != 0:
+        return self.payload_enum_format_expr(resolved as i32, expr, context)
+    self.fail("emit-c does not yet support Display formatting for aggregate " ++ context ++ " payloads")
+    "WITH_STR_LIT(\"<unsupported>\")"
+
+fn CCodegen.payload_enum_variant_format_expr(self: CCodegen, enum_tid: i32, expr: str, variant_index: i32, context: str) -> str:
+    let name_sym = self.sema.type_reflection_variant_name(enum_tid, variant_index)
+    let variant_name = self.sema.pool_resolve(name_sym)
+    var out = "WITH_STR_LIT(\"" ++ cc_escape_c_string(variant_name) ++ "\")"
+    let payload_count = self.sema.type_reflection_variant_payload_count(enum_tid, variant_index)
+    if payload_count <= 0:
+        return out
+    if payload_count != 1:
+        self.fail("emit-c does not yet support formatting enum variant '" ++ variant_name ++ "' with multiple payloads in " ++ context)
+        return "WITH_STR_LIT(\"<unsupported>\")"
+    let payload_tid = self.sema.type_reflection_variant_payload_type(enum_tid, variant_index, 0)
+    let payload_expr = expr ++ "." ++ self.payload_enum_variant_field(variant_index)
+    let payload_text = self.display_format_expr(payload_tid, payload_expr, context)
+    cc_str_concat_expr(cc_str_concat_expr(out, "WITH_STR_LIT(\"(\")"), cc_str_concat_expr(payload_text, "WITH_STR_LIT(\")\")"))
+
+fn CCodegen.payload_enum_format_expr(self: CCodegen, enum_tid: i32, expr: str, context: str) -> str:
+    let variant_count = self.sema.type_reflection_variant_count(enum_tid)
+    if variant_count <= 0:
+        return "WITH_STR_LIT(\"<invalid enum>\")"
+    var out = "WITH_STR_LIT(\"<invalid enum>\")"
+    var vi = variant_count - 1
+    while vi >= 0:
+        let disc = self.sema.type_reflection_variant_discriminant(enum_tid, vi)
+        let case_text = self.payload_enum_variant_format_expr(enum_tid, expr, vi, context)
+        out = "((" ++ expr ++ ").tag == " ++ f"{disc}" ++ " ? " ++ case_text ++ " : " ++ out ++ ")"
+        if vi == 0:
+            break
+        vi = vi - 1
+    out
+
 fn CCodegen.debug_format_expr(self: CCodegen, tid: i32, expr: str, context: str) -> str:
     let resolved = self.sema.resolve_alias(tid as TypeId)
     let tk = self.sema.get_type_kind(resolved)
+    if tk == TypeKind.TY_ENUM and self.type_is_payload_enum(resolved as i32) != 0:
+        return self.payload_enum_format_expr(resolved as i32, expr, context)
     if tk == TypeKind.TY_STR:
         return "with_fmt_str_debug(" ++ expr ++ ")"
     if tk == TypeKind.TY_BOOL:
@@ -6390,6 +6443,15 @@ fn CCodegen.emit_builtin_format_call_term(self: CCodegen, body: &MirBody, kind: 
             val_tid = self.sema.ty_i64 as i32
         let resolved = self.sema.resolve_alias(val_tid as TypeId)
         let tk = self.sema.get_type_kind(resolved)
+        if tk == TypeKind.TY_ENUM and self.type_is_payload_enum(resolved as i32) != 0:
+            let fmt_expr = self.payload_enum_format_expr(resolved as i32, val_text, "fmt.to_str")
+            var out_enum = ""
+            if has_ret != 0:
+                out_enum = out_enum ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ fmt_expr ++ ";\n"
+            else:
+                out_enum = out_enum ++ "    (void)(" ++ fmt_expr ++ ");\n"
+            out_enum = out_enum ++ f"    goto bb{next_bb};"
+            return out_enum
         let fmt_fn = if tk == TypeKind.TY_STR: "with_fmt_str"
             else if tk == TypeKind.TY_BOOL: "with_fmt_bool"
             else if tk == TypeKind.TY_FLOAT: "with_fmt_f64"
@@ -6430,6 +6492,15 @@ fn CCodegen.emit_builtin_format_call_term(self: CCodegen, body: &MirBody, kind: 
             val_tid = self.sema.ty_i64 as i32
         let resolved = self.sema.resolve_alias(val_tid as TypeId)
         let tk = self.sema.get_type_kind(resolved)
+        if tk == TypeKind.TY_ENUM and self.type_is_payload_enum(resolved as i32) != 0:
+            let fmt_expr = self.payload_enum_format_expr(resolved as i32, val_text, "fmt.debug")
+            var out_enum = ""
+            if has_ret != 0:
+                out_enum = out_enum ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ fmt_expr ++ ";\n"
+            else:
+                out_enum = out_enum ++ "    (void)(" ++ fmt_expr ++ ");\n"
+            out_enum = out_enum ++ f"    goto bb{next_bb};"
+            return out_enum
         let fmt_fn = if tk == TypeKind.TY_STR: "with_fmt_str_debug"
             else if tk == TypeKind.TY_BOOL: "with_fmt_bool"
             else if tk == TypeKind.TY_FLOAT: "with_fmt_f64"

@@ -22,3 +22,9 @@ pub type ContextError[E]  {
     message: str
     source: E
 }
+
+impl[E: Error] Error for ContextError[E]:
+    fn display(self: &Self) -> str:
+        self.message
+    fn source(self: &Self) -> Option[&dyn Error]:
+        Some(&self.source)
