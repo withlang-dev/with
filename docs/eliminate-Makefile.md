@@ -89,9 +89,7 @@ Still blocking Makefile and script removal:
   - `tools/build-cmake.ps1`
   - `tools/build-static-llvm.sh`
   - `tools/build-static-llvm.ps1`
-- Build checks still execute Python scripts:
-  - `scripts/check-no-c-export.py`
-  - `scripts/check-requirements-informative.py`
+- A build check still executes a Python script:
   - `scripts/check-spec-inventory.py`
 - Build-system shell snippets remain in `build/retention.w` prune logic.
 - `ToolFs` has no action-scoped scratch directory capability; actions still
@@ -101,6 +99,19 @@ Still blocking Makefile and script removal:
 - Some std.build / build-cache behavior is not strong enough to be the final
   script-free contract.
 
+## Progress
+
+- 2026-06-14: Fixed `ToolFs.write_binary` so it writes the provided byte
+  payload and added a build.w selfhost regression that round-trips non-text
+  bytes through `write_binary` and `read_binary`.
+- 2026-06-14: Replaced `scripts/check-no-c-export.py` with a pure With build
+  action and deleted the script.
+- 2026-06-14: Replaced `scripts/check-requirements-informative.py` with a pure
+  With build action and deleted the script.
+- 2026-06-14: Documented direct replacements for Make compatibility aliases in
+  `docs/with-build.md`; `make cross`, first-seed bootstrap, and
+  `make print-version` remain explicit exceptions.
+
 ## Implementation Tasks
 
 ### 1. Fix public build capability correctness
@@ -108,7 +119,7 @@ Still blocking Makefile and script removal:
 Implement before deleting Make or scripts, because build actions must be
 trustworthy once `build.w` owns every workflow.
 
-- Fix `ToolFs.write_binary(path, bytes)` so it writes the provided bytes
+- [x] Fix `ToolFs.write_binary(path, bytes)` so it writes the provided bytes
   instead of an empty file. Add a build-w/selfhost regression that writes
   non-text bytes and reads them back through `read_binary`.
 - Reconcile `ProcessRunner` with the intended struct API. Prefer adding the
@@ -170,9 +181,9 @@ depending on scripts or shell fragments for normal maintenance.
 - Replace `build/retention.w` shell snippets used for prune counts, samples,
   and `.w` manifest hashing with typed filesystem traversal and With-native
   hashing.
-- Move `scripts/check-no-c-export.py` into a With build action that reads source
+- [x] Move `scripts/check-no-c-export.py` into a With build action that reads source
   files directly and reports the same violations.
-- Move `scripts/check-requirements-informative.py` into a With build action.
+- [x] Move `scripts/check-requirements-informative.py` into a With build action.
 - Move `scripts/check-spec-inventory.py` into a With build action.
 - Audit `build/`, `src/`, `lib/`, `rt/`, `build.w`, `scripts/`, and `tools/`
   for `sh -c`, `bash -c`, `powershell`, `.py`, `.sh`, `.ps1`, `.cmd`, pipes,

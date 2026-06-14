@@ -63,6 +63,48 @@ with init --name foo   # override project name
 
 ---
 
+## Make Compatibility Aliases
+
+The repository `Makefile` is a transitional compatibility layer. Prefer direct
+`with build` targets for normal development:
+
+| Old Make target | Direct command |
+|-----------------|----------------|
+| `make`, `make all`, `make build` | `with build` |
+| `make stage1` | `with build :stage1` |
+| `make stage2` | `with build :stage2` |
+| `make stage3` | `with build :stage3` |
+| `make runtime` | `with build :runtime` |
+| `make selfcheck`, `make smoke` | `with build :selfcheck` |
+| `make test` | `with build :test` |
+| `make test-pcre2`, `make regex-test`, `make pcre2-test` | `with build :pcre2-test` |
+| `make fixpoint` | `with build :fixpoint` |
+| `make install` | `with build :install` |
+| `make install-user` | `with build :install-user` |
+| `make update-seed` | `with build :update-seed` |
+| `make clean` | `with build :clean` |
+| `make seed` after a seed already exists | `with build :seed` |
+| `make deps` | `with build :deps` |
+| `make pcre2-migrate`, `make regex-migrate` | `with build :pcre2-migrate` |
+| `make pcre2-build`, `make regex-build` | `with build :pcre2-build` |
+| `make pcre2-promote`, `make regex-promote` | `with build :pcre2-promote` |
+| `make emit-c-test` | `with build :emit-c-test` |
+| `make emit-c-fixpoint` | `with build :emit-c-fixpoint` |
+| `make emit-c-roundtrip` | `with build :emit-c-roundtrip` |
+
+Known exceptions:
+
+- A clean checkout with no `with` binary still needs a bootstrap-only first
+  seed acquisition path before `with build :seed` can run.
+- `make cross` still owns the stale cross-compile workflow and must be replaced
+  before the Makefile can be deleted.
+- `make print-version` prints the repository release-version string through
+  shell/git logic. `with version` prints the active compiler version, but the
+  exact release-version helper still needs a graph target or With-native
+  replacement.
+
+---
+
 ## with.toml
 
 `with.toml` is the package manifest. It declares identity, dependencies,

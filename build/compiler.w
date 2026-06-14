@@ -464,53 +464,88 @@ fn comp_check_c_export_path(ctx: &ActionCtx, path: str) -> i32:
         ctx.diagnostics().warn(path ++ f": @[c_export] count is now {count}; tighten compiler c_export budget from {budget}")
     0
 
-pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
-    let root = ctx.project_info().project_root()
-    let capture_dir = comp_join("out/command", ctx.target_name())
-    if ctx.fs().mkdir_all(capture_dir) != 0:
-        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
-    let argv: Vec[str] = Vec.new()
-    argv.push(if os() == "Windows": "python" else: "python3")
-    argv.push("scripts/check-no-c-export.py")
-    let result = ctx.process_runner().run_capture(argv, comp_abs(root, comp_join(capture_dir, "stdout.txt")), comp_abs(root, comp_join(capture_dir, "stderr.txt")), 60000)
-    if result.rc != 0:
-        if result.stderr.len() > 0:
-            ctx.diagnostics().error(result.stderr)
-        else:
-            ctx.diagnostics().error("compiler-owned source has forbidden @[c_export] attributes")
-        return result.rc
+fn comp_compiler_c_export_audit_files(fs: &ToolFs) -> Vec[str]:
+    let roots: Vec[str] = Vec.new()
+    roots.push("src")
+    roots.push("rt")
+    roots.push("lib/std")
+    let files: Vec[str] = Vec.new()
+    for ri in 0..roots.len() as i32:
+        let listing = fs.list_files(roots.get(ri as i64))
+        for fi in 0..listing.len() as i32:
+            let path = listing.get(fi as i64)
+            if path.ends_with(".w"):
+                files.push(path)
+    comp_sort_strings(files)
+
+fn comp_write_ok_output(ctx: &ActionCtx) -> i32:
     let output = ctx.output()
-    if output.len() > 0:
-        let dir = comp_dirname(output)
-        if ctx.fs().mkdir_all(dir) != 0:
-            return comp_fail(ctx, "could not create output directory: " ++ dir)
-        if ctx.fs().write_text(output, "ok\n") != 0:
-            return comp_fail(ctx, "could not write: " ++ output)
+    if output.len() == 0:
+        return 0
+    let dir = comp_dirname(output)
+    if ctx.fs().mkdir_all(dir) != 0:
+        return comp_fail(ctx, "could not create output directory: " ++ dir)
+    if ctx.fs().write_text(output, "ok\n") != 0:
+        return comp_fail(ctx, "could not write: " ++ output)
     0
 
-pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
-    let root = ctx.project_info().project_root()
-    let capture_dir = comp_join("out/command", ctx.target_name())
-    if ctx.fs().mkdir_all(capture_dir) != 0:
-        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
-    let argv: Vec[str] = Vec.new()
-    argv.push(if os() == "Windows": "python" else: "python3")
-    argv.push("scripts/check-requirements-informative.py")
-    let result = ctx.process_runner().run_capture(argv, comp_abs(root, comp_join(capture_dir, "stdout.txt")), comp_abs(root, comp_join(capture_dir, "stderr.txt")), 60000)
-    if result.rc != 0:
-        if result.stderr.len() > 0:
-            ctx.diagnostics().error(result.stderr)
-        else:
-            ctx.diagnostics().error("requirements Section 30 informative check failed")
-        return result.rc
-    let output = ctx.output()
-    if output.len() > 0:
-        let dir = comp_dirname(output)
-        if ctx.fs().mkdir_all(dir) != 0:
-            return comp_fail(ctx, "could not create output directory: " ++ dir)
-        if ctx.fs().write_text(output, "ok\n") != 0:
-            return comp_fail(ctx, "could not write: " ++ output)
+fn comp_split_lines(text: str) -> Vec[str]:
+    let lines: Vec[str] = Vec.new()
+    var start: i64 = 0
+    var i: i64 = 0
+    while i <= text.len():
+        let at_end = i == text.len()
+        if at_end or text.byte_at(i) == 10:
+            var end = i
+            if end > start and text.byte_at(end - 1) == 13:
+                end = end - 1
+            lines.push(text.slice(start, end))
+            start = i + 1
+        i = i + 1
+    lines
+
+fn comp_requirements_section_30_start(lines: &Vec[str]) -> i32:
+    for i in 0..lines.len() as i32:
+        if lines.get(i as i64).starts_with("## 30."):
+            return i
+    -1
+
+fn comp_check_requirements_informative_text(ctx: &ActionCtx, text: str) -> i32:
+    if not text.contains("Section 30 is explicitly informative"):
+        return comp_fail(ctx, "requirements must state that Section 30 is explicitly informative")
+    let lines = comp_split_lines(text)
+    let section_start = comp_requirements_section_30_start(lines)
+    if section_start < 0:
+        return comp_fail(ctx, "requirements missing Section 30")
+    var has_trace = false
+    for i in section_start..lines.len() as i32:
+        let line = lines.get(i as i64)
+        if line.contains("Informative trace:"):
+            has_trace = true
+        if line.contains("  - Requirement:"):
+            return comp_fail(ctx, f"docs/requirements.md:{i + 1}: Section 30 must not contain normative Requirement rows")
+    if not has_trace:
+        return comp_fail(ctx, "requirements Section 30 must include Informative trace:")
     0
+
+pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let files = comp_compiler_c_export_audit_files(fs)
+    for i in 0..files.len() as i32:
+        let rc = comp_check_c_export_path(ctx, files.get(i as i64))
+        if rc != 0:
+            return rc
+    comp_write_ok_output(ctx)
+
+pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let path = "docs/requirements.md"
+    if not fs.exists(path):
+        return comp_fail(ctx, "missing " ++ path)
+    let rc = comp_check_requirements_informative_text(ctx, fs.read_text(path))
+    if rc != 0:
+        return rc
+    comp_write_ok_output(ctx)
 
 pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     let root = ctx.project_info().project_root()

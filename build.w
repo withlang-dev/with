@@ -472,16 +472,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     var compiler_no_c_export = target_new(.Action, "compiler-no-c-export", "").output("out/.build-state/compiler-no-c-export.txt")
     compiler_no_c_export.action = run_check_compiler_no_new_c_export_action
     compiler_no_c_export = compiler_no_c_export.write_scope("out/.build-state")
-    compiler_no_c_export = compiler_no_c_export.write_scope("out/command/compiler-no-c-export")
-    compiler_no_c_export = compiler_no_c_export.input("scripts/check-no-c-export.py")
     compiler_no_c_export = target_with_compiler_c_export_audit_inputs(compiler_no_c_export, ctx)
     out = out.add_target(compiler_no_c_export)
 
     var requirements_informative = target_new(.Action, "requirements-informative-check", "").output("out/.build-state/requirements-informative-check.txt")
     requirements_informative.action = run_check_requirements_informative_action
     requirements_informative = requirements_informative.write_scope("out/.build-state")
-    requirements_informative = requirements_informative.write_scope("out/command/requirements-informative-check")
-    requirements_informative = requirements_informative.input("scripts/check-requirements-informative.py")
     requirements_informative = requirements_informative.input("docs/requirements.md")
     out = out.add_target(requirements_informative)
 

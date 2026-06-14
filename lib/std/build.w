@@ -870,8 +870,10 @@ pub fn ToolFs.write_text(self: &Self, path: str, contents: str) -> i32:
 
 pub fn ToolFs.write_binary(self: &Self, path: str, bytes: Vec[u8]) -> i32:
     self.require_write_file_allowed(path)
-    let _ = bytes.len()
-    with_fs_write_file(self.resolve_path(path), "")
+    var out = StringBuilder.with_capacity(bytes.len())
+    for i in 0..bytes.len() as i32:
+        out.push_byte(bytes.get(i as i64))
+    with_fs_write_file(self.resolve_path(path), out.to_str())
 
 pub fn ToolFs.copy_file(self: &Self, src: str, dst: str) -> i32:
     tool_path_require_project_relative(src)
