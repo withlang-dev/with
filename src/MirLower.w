@@ -6044,14 +6044,15 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         let sp_head = self.ast.get_data1(pat_node)
         let sp_extra = self.ast.get_data0(pat_node)
         let sp_has_rest = self.ast.get_extra(sp_extra)
+        let sp_tail_count = self.ast.get_extra(sp_extra + 1 + sp_head)
         // Get array length from scrutinee sema type
         let sp_arr_ty = self.place_local_type(scrutinee_place)
         let sp_arr_tk = self.sema.get_type_kind(sp_arr_ty)
         if sp_arr_tk == TypeKind.TY_ARRAY:
             let sp_arr_len = self.sema.get_type_d1(sp_arr_ty)
             if sp_has_rest != 0:
-                // [a, b, ..rest] matches if arr_len >= head_count
-                if sp_arr_len >= sp_head:
+                // [a, b, ..rest, z] matches if there is room for both ends.
+                if sp_arr_len >= sp_head + sp_tail_count:
                     self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
                 else:
                     self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
@@ -6256,8 +6257,18 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             self.assign_operand_to_place(self.place_for_local(local_id), src_op, self.ast.get_start(pat_node))
             out.push(local_id)
             out.push(field_place)
-        // Bind tail variables (from the end of the array)
         let sp_tail_count = self.ast.get_extra(sp_extra + 1 + sp_head_count)
+        let sp_has_rest = self.ast.get_extra(sp_extra)
+        let rest_sym = self.ast.get_data2(pat_node)
+        if sp_has_rest != 0 and rest_sym != 0 and sp_arr_tk == TypeKind.TY_ARRAY:
+            let rest_count = sp_arr_len - sp_head_count - sp_tail_count
+            let local_id = self.body.new_local(self.sema.ty_i64 as i32, 0, rest_sym, 1)
+            self.bind_local(rest_sym, local_id)
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
+            let count_op = self.int_const_operand(rest_count as i64, self.sema.ty_i64)
+            self.assign_operand_to_place(self.place_for_local(local_id), count_op, self.ast.get_start(pat_node))
+            out.push(local_id)
+        // Bind tail variables (from the end of the array)
         for ti in 0..sp_tail_count:
             let sym = self.ast.get_extra(sp_extra + 2 + sp_head_count + ti)
             if sym == 0:
