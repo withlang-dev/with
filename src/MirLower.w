@@ -1234,12 +1234,15 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                     return self.sema.get_generic_inst_arg(resolved, 0)
             if method_name == "filter":
                 return recv_type
-            if method_name == "map" or method_name == "and_then":
+            if method_name == "map" or method_name == "and_then" or method_name == "or_else" or method_name == "inspect" or method_name == "cloned":
                 return recv_type
             if method_name == "unwrap_or":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
             if method_name == "unwrap_or_else":
+                if tk == TypeKind.TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            if method_name == "flatten":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
             return self.sema.ty_void as i32
@@ -1248,6 +1251,11 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
             if method_name == "unwrap" or method_name == "expect":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
+            if method_name == "unwrap_or_else":
+                if tk == TypeKind.TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
+            if method_name == "inspect" or method_name == "inspect_err":
+                return recv_type
             return self.sema.ty_void as i32
         if type_name == "Atomic":
             if method_name == "new": return recv_type
@@ -7011,11 +7019,23 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     if enum_accessor_variant != 0:
         return self.lower_enum_accessor_call(self_expr, method_sym, node)
 
-    if self.is_option_type(enum_accessor_recv_type) != 0 and (method_name == "map" or method_name == "and_then"):
+    if self.is_option_type(enum_accessor_recv_type) != 0 and (method_name == "map" or method_name == "and_then" or method_name == "or_else" or method_name == "inspect" or method_name == "cloned"):
         return self.lower_option_combinator_method(self_expr, method_name, arg_start, arg_count, node)
 
-    if self.is_result_type(enum_accessor_recv_type) != 0 and (method_name == "map" or method_name == "map_err" or method_name == "context" or method_name == "with_context"):
+    if self.is_option_type(enum_accessor_recv_type) != 0 and method_name == "zip":
+        return self.lower_option_zip_method(self_expr, arg_start, arg_count, node)
+
+    if self.is_option_type(enum_accessor_recv_type) != 0 and method_name == "unzip":
+        return self.lower_option_unzip_method(self_expr, arg_count, node)
+
+    if self.is_option_type(enum_accessor_recv_type) != 0 and method_name == "flatten":
+        return self.lower_option_flatten_method(self_expr, arg_count, node)
+
+    if self.is_result_type(enum_accessor_recv_type) != 0 and (method_name == "map" or method_name == "map_err" or method_name == "context" or method_name == "with_context" or method_name == "and_then" or method_name == "or_else" or method_name == "inspect" or method_name == "inspect_err"):
         return self.lower_result_combinator_method(self_expr, method_name, arg_start, arg_count, node)
+
+    if self.is_result_type(enum_accessor_recv_type) != 0 and (method_name == "ok" or method_name == "err"):
+        return self.lower_result_ok_err_method(self_expr, method_name, arg_count, node)
 
     if self.is_option_type(enum_accessor_recv_type) != 0 and method_name == "transpose":
         return self.lower_option_transpose_method(self_expr, arg_count, node)
@@ -7028,6 +7048,9 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
 
     if method_name == "unwrap_or" and self.is_option_or_result_type(enum_accessor_recv_type) != 0:
         return self.lower_unwrap_or_method(self_expr, arg_start, arg_count, node)
+
+    if method_name == "unwrap_or_else" and self.is_option_or_result_type(enum_accessor_recv_type) != 0:
+        return self.lower_unwrap_or_else_method(self_expr, arg_start, arg_count, node)
 
     var intrinsic = self.classify_intrinsic(enum_accessor_recv_type, method_name)
 
@@ -7798,6 +7821,271 @@ fn MirBuilder.lower_result_transpose_method(self: MirBuilder, self_expr: i32, ar
     self.forget_string_flow_facts()
     self.operand_for_place(result_place, result_ty)
 
+fn MirBuilder.tuple_operand_from_fields(self: MirBuilder, fields: Vec[i32], result_ty: i32, span: i32) -> i32:
+    let names: Vec[i32] = Vec.new()
+    for _ in 0..fields.len() as i32:
+        names.push(0)
+    let fid = self.body.new_agg_fields(fields, names)
+    let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
+    let tmp = self.new_temp(result_ty)
+    let place = self.place_for_local(tmp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, span)
+    self.operand_for_place(place, result_ty)
+
+fn MirBuilder.clone_or_copy_place(self: MirBuilder, payload_place: i32, payload_ty: i32, node: i32) -> i32:
+    if self.sema.is_copy(payload_ty) != 0:
+        return self.operand_for_place(payload_place, payload_ty)
+    let resolved = self.sema.resolve_alias(payload_ty)
+    let type_sym = self.sema.get_type_name(resolved)
+    let clone_sym = self.pool.intern("clone")
+    let clone_fn = if type_sym != 0: self.sema.lookup_method_fn(type_sym, clone_sym) else: 0
+    if clone_fn == 0:
+        self.mark_unsupported()
+        return self.operand_for_place(payload_place, payload_ty)
+    let sig_idx = self.sema.lookup_method_sig(type_sym, clone_sym)
+    let expected = if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0: self.sema.sig_param_type(sig_idx, 0) else: 0
+    let args: Vec[i32] = Vec.new()
+    args.push(self.operand_for_place_arg(payload_place, payload_ty, expected, self.ast.get_start(node)))
+    self.lower_resolved_call_with_operand_args(clone_fn, args, payload_ty, node)
+
+fn MirBuilder.lower_option_flatten_method(self: MirBuilder, self_expr: i32, arg_count: i32, node: i32) -> i32:
+    if arg_count != 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let span = self.ast.get_start(node)
+    var value_ty = self.expr_type(self_expr)
+    if value_ty == 0 or value_ty == self.sema.ty_void:
+        value_ty = self.type_receiver_type(self_expr)
+    let inner_option_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.option, 0)
+    let result_ty = self.expr_type(node)
+    if value_ty == 0 or inner_option_ty == 0 or result_ty == 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let value_place = self.lower_owned_receiver_place(self_expr, value_ty)
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+    let some_bb = self.new_block()
+    let none_bb = self.new_block()
+    let join_bb = self.new_block()
+    let disc = self.lower_enum_discriminant(value_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
+    let targets: Vec[i32] = Vec.new()
+    targets.push(some_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
+
+    self.switch_to(none_bb)
+    let none_fields: Vec[i32] = Vec.new()
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(some_bb)
+    let some_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.some)
+    let some_downcast = self.body.new_downcast_place(value_place, some_idx, value_ty)
+    let inner_place = self.body.new_field_place(some_downcast, 0, inner_option_ty)
+    self.assign_operand_to_place(result_place, self.operand_for_place(inner_place, inner_option_ty), span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    self.forget_string_flow_facts()
+    self.operand_for_place(result_place, result_ty)
+
+fn MirBuilder.lower_result_ok_err_method(self: MirBuilder, self_expr: i32, method_name: str, arg_count: i32, node: i32) -> i32:
+    if arg_count != 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let span = self.ast.get_start(node)
+    var value_ty = self.expr_type(self_expr)
+    if value_ty == 0 or value_ty == self.sema.ty_void:
+        value_ty = self.type_receiver_type(self_expr)
+    let ok_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 0)
+    let err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
+    let result_ty = self.expr_type(node)
+    let payload_ty = if method_name == "ok": ok_ty else: err_ty
+    if value_ty == 0 or ok_ty == 0 or err_ty == 0 or result_ty == 0 or payload_ty == 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let value_place = self.lower_owned_receiver_place(self_expr, value_ty)
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+    let wanted_bb = self.new_block()
+    let other_bb = self.new_block()
+    let join_bb = self.new_block()
+    let wanted_variant = if method_name == "ok": self.sema.syms.ok else: self.sema.syms.err
+    let disc = self.lower_enum_discriminant(value_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(self.enum_variant_discriminant_for_type(value_ty, wanted_variant))
+    let targets: Vec[i32] = Vec.new()
+    targets.push(wanted_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, other_bb, 0)
+
+    self.switch_to(other_bb)
+    let none_fields: Vec[i32] = Vec.new()
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(wanted_bb)
+    let variant_idx = self.enum_variant_index_for_type(value_ty, wanted_variant)
+    let downcast = self.body.new_downcast_place(value_place, variant_idx, value_ty)
+    let payload_place = self.body.new_field_place(downcast, 0, payload_ty)
+    let some_fields: Vec[i32] = Vec.new()
+    some_fields.push(self.operand_for_place(payload_place, payload_ty))
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    self.forget_string_flow_facts()
+    self.operand_for_place(result_place, result_ty)
+
+fn MirBuilder.lower_option_zip_method(self: MirBuilder, self_expr: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+    if arg_count != 1:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let span = self.ast.get_start(node)
+    var left_ty = self.expr_type(self_expr)
+    if left_ty == 0 or left_ty == self.sema.ty_void:
+        left_ty = self.type_receiver_type(self_expr)
+    let right_ty = self.expr_type(self.ast.get_extra(arg_start))
+    let left_elem_ty = self.generic_inst_arg_type(left_ty, self.sema.syms.option, 0)
+    let right_elem_ty = self.generic_inst_arg_type(right_ty, self.sema.syms.option, 0)
+    let result_ty = self.expr_type(node)
+    let tuple_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.option, 0)
+    if left_ty == 0 or right_ty == 0 or left_elem_ty == 0 or right_elem_ty == 0 or result_ty == 0 or tuple_ty == 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let left_place = self.lower_owned_receiver_place(self_expr, left_ty)
+    let right_op = self.lower_expr(self.ast.get_extra(arg_start))
+    let right_place = self.materialize_operand(right_op, right_ty, span)
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+    let left_some_bb = self.new_block()
+    let none_bb = self.new_block()
+    let right_some_bb = self.new_block()
+    let join_bb = self.new_block()
+
+    let left_disc = self.lower_enum_discriminant(left_place)
+    let left_vals: Vec[i32] = Vec.new()
+    left_vals.push(self.enum_variant_discriminant_for_type(left_ty, self.sema.syms.some))
+    let left_targets: Vec[i32] = Vec.new()
+    left_targets.push(left_some_bb as i32)
+    let left_table = self.body.new_switch_table(left_vals, left_targets)
+    self.terminate(TermKind.TK_SWITCH_INT, left_disc, left_table, none_bb, 0)
+
+    self.switch_to(left_some_bb)
+    let right_disc = self.lower_enum_discriminant(right_place)
+    let right_vals: Vec[i32] = Vec.new()
+    right_vals.push(self.enum_variant_discriminant_for_type(right_ty, self.sema.syms.some))
+    let right_targets: Vec[i32] = Vec.new()
+    right_targets.push(right_some_bb as i32)
+    let right_table = self.body.new_switch_table(right_vals, right_targets)
+    self.terminate(TermKind.TK_SWITCH_INT, right_disc, right_table, none_bb, 0)
+
+    self.switch_to(none_bb)
+    let none_fields: Vec[i32] = Vec.new()
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(right_some_bb)
+    let left_idx = self.enum_variant_index_for_type(left_ty, self.sema.syms.some)
+    let left_downcast = self.body.new_downcast_place(left_place, left_idx, left_ty)
+    let left_payload_place = self.body.new_field_place(left_downcast, 0, left_elem_ty)
+    let right_idx = self.enum_variant_index_for_type(right_ty, self.sema.syms.some)
+    let right_downcast = self.body.new_downcast_place(right_place, right_idx, right_ty)
+    let right_payload_place = self.body.new_field_place(right_downcast, 0, right_elem_ty)
+    let tuple_fields: Vec[i32] = Vec.new()
+    tuple_fields.push(self.operand_for_place(left_payload_place, left_elem_ty))
+    tuple_fields.push(self.operand_for_place(right_payload_place, right_elem_ty))
+    let tuple_op = self.tuple_operand_from_fields(tuple_fields, tuple_ty, span)
+    let some_fields: Vec[i32] = Vec.new()
+    some_fields.push(tuple_op)
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    self.forget_string_flow_facts()
+    self.operand_for_place(result_place, result_ty)
+
+fn MirBuilder.lower_option_unzip_method(self: MirBuilder, self_expr: i32, arg_count: i32, node: i32) -> i32:
+    if arg_count != 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let span = self.ast.get_start(node)
+    var value_ty = self.expr_type(self_expr)
+    if value_ty == 0 or value_ty == self.sema.ty_void:
+        value_ty = self.type_receiver_type(self_expr)
+    let tuple_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.option, 0)
+    let tuple_resolved = self.sema.resolve_alias(tuple_ty)
+    let result_ty = self.expr_type(node)
+    if value_ty == 0 or tuple_ty == 0 or result_ty == 0 or self.sema.get_type_kind(tuple_resolved) != TypeKind.TY_TUPLE or self.sema.get_type_d1(tuple_resolved) != 2:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let elem_start = self.sema.get_type_d0(tuple_resolved)
+    let left_elem_ty = self.sema.type_extra.get(elem_start as i64)
+    let right_elem_ty = self.sema.type_extra.get((elem_start + 1) as i64)
+    let result_resolved = self.sema.resolve_alias(result_ty)
+    let result_start = self.sema.get_type_d0(result_resolved)
+    let left_option_ty = self.sema.type_extra.get(result_start as i64)
+    let right_option_ty = self.sema.type_extra.get((result_start + 1) as i64)
+    let value_place = self.lower_owned_receiver_place(self_expr, value_ty)
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+    let some_bb = self.new_block()
+    let none_bb = self.new_block()
+    let join_bb = self.new_block()
+
+    let disc = self.lower_enum_discriminant(value_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
+    let targets: Vec[i32] = Vec.new()
+    targets.push(some_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
+
+    self.switch_to(none_bb)
+    let left_none_local = self.new_temp(left_option_ty)
+    let left_none_place = self.place_for_local(left_none_local)
+    let left_none_fields: Vec[i32] = Vec.new()
+    self.assign_enum_variant_to_place(left_none_place, left_option_ty, self.sema.syms.none, left_none_fields, span)
+    let right_none_local = self.new_temp(right_option_ty)
+    let right_none_place = self.place_for_local(right_none_local)
+    let right_none_fields: Vec[i32] = Vec.new()
+    self.assign_enum_variant_to_place(right_none_place, right_option_ty, self.sema.syms.none, right_none_fields, span)
+    let none_tuple_fields: Vec[i32] = Vec.new()
+    none_tuple_fields.push(self.operand_for_place(left_none_place, left_option_ty))
+    none_tuple_fields.push(self.operand_for_place(right_none_place, right_option_ty))
+    let none_tuple_op = self.tuple_operand_from_fields(none_tuple_fields, result_ty, span)
+    self.assign_operand_to_place(result_place, none_tuple_op, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(some_bb)
+    let some_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.some)
+    let some_downcast = self.body.new_downcast_place(value_place, some_idx, value_ty)
+    let tuple_place = self.body.new_field_place(some_downcast, 0, tuple_ty)
+    let left_place = self.body.new_field_place(tuple_place, 0, left_elem_ty)
+    let right_place = self.body.new_field_place(tuple_place, 1, right_elem_ty)
+    let left_some_local = self.new_temp(left_option_ty)
+    let left_some_place = self.place_for_local(left_some_local)
+    let left_some_fields: Vec[i32] = Vec.new()
+    left_some_fields.push(self.operand_for_place(left_place, left_elem_ty))
+    self.assign_enum_variant_to_place(left_some_place, left_option_ty, self.sema.syms.some, left_some_fields, span)
+    let right_some_local = self.new_temp(right_option_ty)
+    let right_some_place = self.place_for_local(right_some_local)
+    let right_some_fields: Vec[i32] = Vec.new()
+    right_some_fields.push(self.operand_for_place(right_place, right_elem_ty))
+    self.assign_enum_variant_to_place(right_some_place, right_option_ty, self.sema.syms.some, right_some_fields, span)
+    let some_tuple_fields: Vec[i32] = Vec.new()
+    some_tuple_fields.push(self.operand_for_place(left_some_place, left_option_ty))
+    some_tuple_fields.push(self.operand_for_place(right_some_place, right_option_ty))
+    let some_tuple_op = self.tuple_operand_from_fields(some_tuple_fields, result_ty, span)
+    self.assign_operand_to_place(result_place, some_tuple_op, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    self.forget_string_flow_facts()
+    self.operand_for_place(result_place, result_ty)
+
 fn MirBuilder.lower_vec_sequence_or_traverse_method(self: MirBuilder, self_expr: i32, method_name: str, arg_start: i32, arg_count: i32, node: i32) -> i32:
     let span = self.ast.get_start(node)
     var recv_type = self.expr_type(self_expr)
@@ -7936,7 +8224,11 @@ fn MirBuilder.lower_vec_sequence_or_traverse_method(self: MirBuilder, self_expr:
     self.operand_for_place(result_place, result_ty)
 
 fn MirBuilder.lower_option_combinator_method(self: MirBuilder, self_expr: i32, method_name: str, arg_start: i32, arg_count: i32, node: i32) -> i32:
-    if arg_count != 1:
+    if method_name == "cloned":
+        if arg_count != 0:
+            self.mark_unsupported()
+            return self.unit_operand()
+    else if arg_count != 1:
         self.mark_unsupported()
         return self.unit_operand()
 
@@ -7955,7 +8247,9 @@ fn MirBuilder.lower_option_combinator_method(self: MirBuilder, self_expr: i32, m
     let value_op = self.lower_expr(self_expr)
     self.expected_type = saved_expected
     let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(self_expr))
-    let mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
+    var mapper_op = 0
+    if method_name != "cloned":
+        mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
 
     let some_bb = self.new_block()
     let none_bb = self.new_block()
@@ -7972,23 +8266,43 @@ fn MirBuilder.lower_option_combinator_method(self: MirBuilder, self_expr: i32, m
     self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
 
     self.switch_to(none_bb)
-    let none_fields: Vec[i32] = Vec.new()
-    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
+    if method_name == "or_else":
+        let no_args: Vec[i32] = Vec.new()
+        let fallback_op = self.lower_call_with_operand_args(mapper_op, no_args, result_ty, node)
+        self.assign_operand_to_place(result_place, fallback_op, span)
+    else:
+        let none_fields: Vec[i32] = Vec.new()
+        self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(some_bb)
     let some_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.some)
     let downcast_place = self.body.new_downcast_place(value_place, some_idx, value_ty)
     let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
-    let call_args: Vec[i32] = Vec.new()
-    call_args.push(self.operand_for_place(payload_place, payload_ty))
-    let raw_ret_ty = if method_name == "and_then": result_ty else: self.generic_inst_arg_type(result_ty, self.sema.syms.option, 0)
-    let mapped_op = self.lower_call_with_operand_args(mapper_op, call_args, raw_ret_ty, node)
     if method_name == "and_then":
+        let call_args: Vec[i32] = Vec.new()
+        call_args.push(self.operand_for_place(payload_place, payload_ty))
+        let mapped_op = self.lower_call_with_operand_args(mapper_op, call_args, result_ty, node)
         self.assign_operand_to_place(result_place, mapped_op, span)
     else:
+        var payload_op = 0
+        if method_name == "map":
+            let call_args2: Vec[i32] = Vec.new()
+            call_args2.push(self.operand_for_place(payload_place, payload_ty))
+            let mapped_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.option, 0)
+            payload_op = self.lower_call_with_operand_args(mapper_op, call_args2, mapped_ty, node)
+        else if method_name == "inspect":
+            let inspect_args: Vec[i32] = Vec.new()
+            let ref_ty = self.sema.ensure_exact_type(TypeKind.TY_REF, payload_ty, 0, 0) as i32
+            inspect_args.push(self.operand_for_place_arg(payload_place, payload_ty, ref_ty, span))
+            let _ = self.lower_call_with_operand_args(mapper_op, inspect_args, self.sema.ty_void as i32, node)
+            payload_op = self.operand_for_place(payload_place, payload_ty)
+        else if method_name == "cloned":
+            payload_op = self.clone_or_copy_place(payload_place, payload_ty, node)
+        else:
+            payload_op = self.operand_for_place(payload_place, payload_ty)
         let some_fields: Vec[i32] = Vec.new()
-        some_fields.push(mapped_op)
+        some_fields.push(payload_op)
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
@@ -8052,6 +8366,29 @@ fn MirBuilder.lower_result_combinator_method(self: MirBuilder, self_expr: i32, m
         let ok_call_args: Vec[i32] = Vec.new()
         ok_call_args.push(self.operand_for_place(ok_payload_place, source_ok_ty))
         ok_fields.push(self.lower_call_with_operand_args(mapper_op, ok_call_args, result_ok_ty, node))
+    else if method_name == "and_then":
+        let ok_call_args2: Vec[i32] = Vec.new()
+        ok_call_args2.push(self.operand_for_place(ok_payload_place, source_ok_ty))
+        let chained_op = self.lower_call_with_operand_args(mapper_op, ok_call_args2, result_ty, node)
+        self.assign_operand_to_place(result_place, chained_op, span)
+        self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        self.switch_to(err_bb)
+        let err_idx2 = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
+        let err_downcast2 = self.body.new_downcast_place(value_place, err_idx2, value_ty)
+        let err_payload_place2 = self.body.new_field_place(err_downcast2, 0, source_err_ty)
+        let err_fields2: Vec[i32] = Vec.new()
+        err_fields2.push(self.operand_for_place(err_payload_place2, source_err_ty))
+        self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields2, span)
+        self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        self.switch_to(join_bb)
+        self.forget_string_flow_facts()
+        return self.operand_for_place(result_place, result_ty)
+    else if method_name == "inspect":
+        let inspect_args: Vec[i32] = Vec.new()
+        let ok_ref_ty = self.sema.ensure_exact_type(TypeKind.TY_REF, source_ok_ty, 0, 0) as i32
+        inspect_args.push(self.operand_for_place_arg(ok_payload_place, source_ok_ty, ok_ref_ty, span))
+        let _ = self.lower_call_with_operand_args(mapper_op, inspect_args, self.sema.ty_void as i32, node)
+        ok_fields.push(self.operand_for_place(ok_payload_place, source_ok_ty))
     else:
         ok_fields.push(self.operand_for_place(ok_payload_place, source_ok_ty))
     self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.ok, ok_fields, span)
@@ -8066,6 +8403,15 @@ fn MirBuilder.lower_result_combinator_method(self: MirBuilder, self_expr: i32, m
         let err_call_args: Vec[i32] = Vec.new()
         err_call_args.push(self.operand_for_place(err_payload_place, source_err_ty))
         err_fields.push(self.lower_call_with_operand_args(mapper_op, err_call_args, result_err_ty, node))
+    else if method_name == "or_else":
+        let err_call_args2: Vec[i32] = Vec.new()
+        err_call_args2.push(self.operand_for_place(err_payload_place, source_err_ty))
+        let recovered_op = self.lower_call_with_operand_args(mapper_op, err_call_args2, result_ty, node)
+        self.assign_operand_to_place(result_place, recovered_op, span)
+        self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        self.switch_to(join_bb)
+        self.forget_string_flow_facts()
+        return self.operand_for_place(result_place, result_ty)
     else if method_name == "context" or method_name == "with_context":
         var message_op = context_message_op
         if method_name == "with_context":
@@ -8073,6 +8419,12 @@ fn MirBuilder.lower_result_combinator_method(self: MirBuilder, self_expr: i32, m
             message_op = self.lower_call_with_operand_args(context_fn_op, no_context_args, self.sema.ty_str as i32, node)
         let source_op = self.operand_for_place(err_payload_place, source_err_ty)
         err_fields.push(self.lower_context_error_operand(message_op, source_op, result_err_ty, span))
+    else if method_name == "inspect_err":
+        let inspect_err_args: Vec[i32] = Vec.new()
+        let err_ref_ty = self.sema.ensure_exact_type(TypeKind.TY_REF, source_err_ty, 0, 0) as i32
+        inspect_err_args.push(self.operand_for_place_arg(err_payload_place, source_err_ty, err_ref_ty, span))
+        let _ = self.lower_call_with_operand_args(mapper_op, inspect_err_args, self.sema.ty_void as i32, node)
+        err_fields.push(self.operand_for_place(err_payload_place, source_err_ty))
     else:
         err_fields.push(self.operand_for_place(err_payload_place, source_err_ty))
     self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields, span)
@@ -8151,6 +8503,66 @@ fn MirBuilder.lower_unwrap_or_method(self: MirBuilder, self_expr: i32, arg_start
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+fn MirBuilder.lower_unwrap_or_else_method(self: MirBuilder, self_expr: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+    if arg_count != 1:
+        self.mark_unsupported()
+        return self.unit_operand()
+    var value_ty = self.expr_type(self_expr)
+    if value_ty == 0 or value_ty == self.sema.ty_void:
+        value_ty = self.type_receiver_type(self_expr)
+    var result_ty = self.expr_type(node)
+    if result_ty == 0:
+        result_ty = self.sema.try_unwrapped_type(value_ty) as i32
+    if value_ty == 0 or result_ty == 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let span = self.ast.get_start(node)
+    let saved_expected = self.expected_type
+    self.expected_type = value_ty
+    let value_op = self.lower_expr(self_expr)
+    self.expected_type = saved_expected
+    let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(self_expr))
+    let fallback_op = self.lower_expr(self.ast.get_extra(arg_start))
+
+    let success_bb = self.new_block()
+    let failure_bb = self.new_block()
+    let join_bb = self.new_block()
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+
+    let disc = self.lower_enum_discriminant(value_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(self.success_variant_index())
+    let targets: Vec[i32] = Vec.new()
+    targets.push(success_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, failure_bb, 0)
+
+    self.switch_to(success_bb)
+    let success_downcast = self.body.new_downcast_place(value_place, self.success_variant_index(), value_ty)
+    let success_payload_place = self.body.new_field_place(success_downcast, 0, result_ty)
+    self.assign_operand_to_place(result_place, self.operand_for_place(success_payload_place, result_ty), span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(failure_bb)
+    let call_args: Vec[i32] = Vec.new()
+    if self.is_result_type(value_ty) != 0:
+        let err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
+        if err_ty == 0:
+            self.mark_unsupported()
+            return self.unit_operand()
+        let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
+        let err_downcast = self.body.new_downcast_place(value_place, err_idx, value_ty)
+        let err_payload_place = self.body.new_field_place(err_downcast, 0, err_ty)
+        call_args.push(self.operand_for_place(err_payload_place, err_ty))
+    let default_op = self.lower_call_with_operand_args(fallback_op, call_args, result_ty, node)
+    self.assign_operand_to_place(result_place, default_op, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    self.forget_string_flow_facts()
+    self.operand_for_place(result_place, result_ty)
 
 fn MirBuilder.lower_with_form1(self: MirBuilder, guard_expr: i32, body_expr: i32) -> i32:
     let _ = self.lower_expr(guard_expr)

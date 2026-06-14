@@ -12185,6 +12185,7 @@ fn Sema.vec_traverse_return_type(self: Sema, recv_type: i32, arg_types: &Vec[i32
     0
 
 fn Sema.option_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
+    let elem_ty = self.get_generic_inst_arg(recv_type, 0)
     if method_name == "transpose":
         if arg_count != 0:
             self.emit_error("Option.transpose() expects no arguments", node)
@@ -12219,6 +12220,98 @@ fn Sema.option_combinator_return_type(self: Sema, recv_type: i32, method_name: s
             self.emit_error("Option.and_then() function must return Option", node)
             return 0
         return chained_ty
+    if method_name == "or_else":
+        if arg_count != 1:
+            self.emit_error("Option.or_else() expects exactly one argument", node)
+            return 0
+        let fn_ty = self.callable_fn_type(arg_types.get(0) as TypeId)
+        if fn_ty == 0:
+            self.emit_error("Option.or_else() expects a function argument", node)
+            return 0
+        if self.get_type_d1(fn_ty) != 0:
+            self.emit_error("Option.or_else() expects a zero-argument function", node)
+            return 0
+        let fallback_ty = self.get_type_d2(fn_ty)
+        let fallback_resolved = self.resolve_alias(fallback_ty as TypeId)
+        if self.get_type_kind(fallback_resolved) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(fallback_resolved as i32) != self.syms.option:
+            self.emit_error("Option.or_else() function must return Option", node)
+            return 0
+        if self.types_compatible(recv_type as TypeId, fallback_ty as TypeId) == 0:
+            self.emit_argument_type_mismatch("Option.or_else", 0, 0, 0, recv_type, fallback_ty, node)
+        return recv_type
+    if method_name == "unwrap_or_else":
+        if arg_count != 1:
+            self.emit_error("Option.unwrap_or_else() expects exactly one argument", node)
+            return 0
+        let fn_ty2 = self.callable_fn_type(arg_types.get(0) as TypeId)
+        if fn_ty2 == 0:
+            self.emit_error("Option.unwrap_or_else() expects a function argument", node)
+            return 0
+        if self.get_type_d1(fn_ty2) != 0:
+            self.emit_error("Option.unwrap_or_else() expects a zero-argument function", node)
+            return 0
+        let default_ty = self.get_type_d2(fn_ty2)
+        if default_ty != 0 and self.types_compatible(elem_ty as TypeId, default_ty as TypeId) == 0:
+            self.emit_argument_type_mismatch("Option.unwrap_or_else", 0, 0, 0, elem_ty, default_ty, node)
+        return elem_ty
+    if method_name == "zip":
+        if arg_count != 1:
+            self.emit_error("Option.zip() expects exactly one argument", node)
+            return 0
+        let other_ty = self.resolve_alias(arg_types.get(0) as TypeId)
+        if self.get_type_kind(other_ty) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(other_ty as i32) != self.syms.option:
+            self.emit_error("Option.zip() expects an Option argument", node)
+            return 0
+        let other_elem_ty = self.get_generic_inst_arg(other_ty as i32, 0)
+        let tuple_elems: Vec[i32] = Vec.new()
+        tuple_elems.push(elem_ty)
+        tuple_elems.push(other_elem_ty)
+        return self.ensure_option_type_for(self.ensure_tuple_type(tuple_elems, 2) as i32)
+    if method_name == "unzip":
+        if arg_count != 0:
+            self.emit_error("Option.unzip() expects no arguments", node)
+            return 0
+        let elem_resolved = self.resolve_alias(elem_ty as TypeId)
+        if self.get_type_kind(elem_resolved) != TypeKind.TY_TUPLE or self.get_type_d1(elem_resolved) != 2:
+            self.emit_error("Option.unzip() requires Option[(A, B)]", node)
+            return 0
+        let elem_start = self.get_type_d0(elem_resolved)
+        let out_elems: Vec[i32] = Vec.new()
+        out_elems.push(self.ensure_option_type_for(self.type_extra.get(elem_start as i64)))
+        out_elems.push(self.ensure_option_type_for(self.type_extra.get((elem_start + 1) as i64)))
+        return self.ensure_tuple_type(out_elems, 2) as i32
+    if method_name == "flatten":
+        if arg_count != 0:
+            self.emit_error("Option.flatten() expects no arguments", node)
+            return 0
+        let elem_resolved2 = self.resolve_alias(elem_ty as TypeId)
+        if self.get_type_kind(elem_resolved2) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(elem_resolved2 as i32) != self.syms.option:
+            self.emit_error("Option.flatten() requires Option[Option[T]]", node)
+            return 0
+        return elem_ty
+    if method_name == "cloned":
+        if arg_count != 0:
+            self.emit_error("Option.cloned() expects no arguments", node)
+            return 0
+        if self.is_copy(elem_ty as TypeId) == 0 and self.type_implements_trait(elem_ty, self.syms.clone_trait) == 0:
+            self.emit_error("Option.cloned() requires the payload type to implement Clone", node)
+        return recv_type
+    if method_name == "inspect":
+        if arg_count != 1:
+            self.emit_error("Option.inspect() expects exactly one argument", node)
+            return 0
+        let inspect_fn = self.callable_fn_type(arg_types.get(0) as TypeId)
+        if inspect_fn == 0:
+            self.emit_error("Option.inspect() expects a function argument", node)
+            return 0
+        if self.get_type_d1(inspect_fn) != 1:
+            self.emit_error("Option.inspect() expects a one-argument function", node)
+            return 0
+        let elem_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
+        let inspect_param = self.fn_type_param_type(inspect_fn, 0)
+        if inspect_param != 0 and self.types_compatible(elem_ref_ty as TypeId, inspect_param as TypeId) == 0:
+            self.emit_argument_type_mismatch("Option.inspect", 0, 0, 0, elem_ref_ty, inspect_param, node)
+        return recv_type
     0
 
 fn Sema.result_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
@@ -12234,7 +12327,17 @@ fn Sema.result_combinator_return_type(self: Sema, recv_type: i32, method_name: s
             return 0
         let inner_ty = self.get_generic_inst_arg(ok_resolved as i32, 0)
         return self.ensure_option_type_for(self.ensure_result_type_for(inner_ty, err_ty))
-    if method_name != "map" and method_name != "map_err" and method_name != "context" and method_name != "with_context":
+    if method_name == "ok":
+        if arg_count != 0:
+            self.emit_error("Result.ok() expects no arguments", node)
+            return 0
+        return self.ensure_option_type_for(self.get_generic_inst_arg(recv_type, 0))
+    if method_name == "err":
+        if arg_count != 0:
+            self.emit_error("Result.err() expects no arguments", node)
+            return 0
+        return self.ensure_option_type_for(self.get_generic_inst_arg(recv_type, 1))
+    if method_name != "map" and method_name != "map_err" and method_name != "context" and method_name != "with_context" and method_name != "and_then" and method_name != "or_else" and method_name != "unwrap_or_else" and method_name != "inspect" and method_name != "inspect_err":
         return 0
     if arg_count != 1:
         self.emit_error("Result." ++ method_name ++ "() expects exactly one argument", node)
@@ -12264,7 +12367,51 @@ fn Sema.result_combinator_return_type(self: Sema, recv_type: i32, method_name: s
         return 0
     if method_name == "map":
         return self.ensure_result_type_for(mapped_ty, err_ty)
-    self.ensure_result_type_for(ok_ty, mapped_ty)
+    if method_name == "map_err":
+        return self.ensure_result_type_for(ok_ty, mapped_ty)
+    if method_name == "and_then":
+        let chained_resolved = self.resolve_alias(mapped_ty as TypeId)
+        if self.get_type_kind(chained_resolved) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(chained_resolved as i32) != self.syms.result:
+            self.emit_error("Result.and_then() function must return Result", node)
+            return 0
+        let chained_err_ty = self.get_generic_inst_arg(chained_resolved as i32, 1)
+        if self.types_compatible(err_ty as TypeId, chained_err_ty as TypeId) == 0:
+            self.emit_argument_type_mismatch("Result.and_then", 0, 0, 0, err_ty, chained_err_ty, node)
+        return mapped_ty
+    if method_name == "or_else":
+        let recovered_resolved = self.resolve_alias(mapped_ty as TypeId)
+        if self.get_type_kind(recovered_resolved) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(recovered_resolved as i32) != self.syms.result:
+            self.emit_error("Result.or_else() function must return Result", node)
+            return 0
+        let recovered_ok_ty = self.get_generic_inst_arg(recovered_resolved as i32, 0)
+        if self.types_compatible(ok_ty as TypeId, recovered_ok_ty as TypeId) == 0:
+            self.emit_argument_type_mismatch("Result.or_else", 0, 0, 0, ok_ty, recovered_ok_ty, node)
+        return mapped_ty
+    if method_name == "unwrap_or_else":
+        if self.types_compatible(ok_ty as TypeId, mapped_ty as TypeId) == 0:
+            self.emit_argument_type_mismatch("Result.unwrap_or_else", 0, 0, 0, ok_ty, mapped_ty, node)
+        return ok_ty
+    if method_name == "inspect":
+        let inspect_fn = self.callable_fn_type(arg_types.get(0) as TypeId)
+        let ok_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, ok_ty, 0, 0) as i32
+        if self.get_type_d1(inspect_fn) != 1:
+            self.emit_error("Result.inspect() expects a one-argument function", node)
+        else:
+            let inspect_param = self.fn_type_param_type(inspect_fn, 0)
+            if inspect_param != 0 and self.types_compatible(ok_ref_ty as TypeId, inspect_param as TypeId) == 0:
+                self.emit_argument_type_mismatch("Result.inspect", 0, 0, 0, ok_ref_ty, inspect_param, node)
+        return recv_type
+    if method_name == "inspect_err":
+        let inspect_err_fn = self.callable_fn_type(arg_types.get(0) as TypeId)
+        let err_ref_ty = self.ensure_exact_type(TypeKind.TY_REF, err_ty, 0, 0) as i32
+        if self.get_type_d1(inspect_err_fn) != 1:
+            self.emit_error("Result.inspect_err() expects a one-argument function", node)
+        else:
+            let inspect_err_param = self.fn_type_param_type(inspect_err_fn, 0)
+            if inspect_err_param != 0 and self.types_compatible(err_ref_ty as TypeId, inspect_err_param as TypeId) == 0:
+                self.emit_argument_type_mismatch("Result.inspect_err", 0, 0, 0, err_ref_ty, inspect_err_param, node)
+        return recv_type
+    0
 
 fn Sema.collection_len_method_return_type(self: Sema, method_name: str) -> i32:
     if method_name == "len":
@@ -12515,11 +12662,24 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
             let params: Vec[i32] = Vec.new()
             params.push(option_elem)
             return self.ensure_fn_type(params, 1, 0 as TypeId) as i32
+        if (method_name == "or_else" or method_name == "unwrap_or_else") and arg_index == 0:
+            let option_elem3 = self.get_generic_inst_arg(resolved as i32, 0)
+            let params3: Vec[i32] = Vec.new()
+            let ret3 = if method_name == "or_else": self.ensure_option_type_for(option_elem3) else: option_elem3
+            return self.ensure_fn_type(params3, 0, ret3 as TypeId) as i32
+        if method_name == "zip" and arg_index == 0:
+            return 0
         if field == self.syms.filter and arg_index == 0:
             let option_elem2 = self.get_generic_inst_arg(resolved as i32, 0)
             let params2: Vec[i32] = Vec.new()
             params2.push(option_elem2)
             return self.ensure_fn_type(params2, 1, self.ty_bool) as i32
+        if method_name == "inspect" and arg_index == 0:
+            let option_elem4 = self.get_generic_inst_arg(resolved as i32, 0)
+            let option_elem_ref = self.ensure_exact_type(TypeKind.TY_REF, option_elem4, 0, 0) as i32
+            let params4: Vec[i32] = Vec.new()
+            params4.push(option_elem_ref)
+            return self.ensure_fn_type(params4, 1, self.ty_void) as i32
     if owner_sym == self.syms.result:
         if field == self.syms.expect and arg_index == 0:
             return self.ty_str as i32
@@ -12528,6 +12688,21 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
             let result_params: Vec[i32] = Vec.new()
             result_params.push(result_arg)
             return self.ensure_fn_type(result_params, 1, 0 as TypeId) as i32
+        if (method_name == "and_then" or method_name == "or_else" or method_name == "unwrap_or_else") and arg_index == 0:
+            let result_ok = self.get_generic_inst_arg(resolved as i32, 0)
+            let result_err = self.get_generic_inst_arg(resolved as i32, 1)
+            let result_params2: Vec[i32] = Vec.new()
+            result_params2.push(if method_name == "or_else" or method_name == "unwrap_or_else": result_err else: result_ok)
+            let result_ret = if method_name == "unwrap_or_else": result_ok else: 0
+            return self.ensure_fn_type(result_params2, 1, result_ret as TypeId) as i32
+        if (method_name == "inspect" or method_name == "inspect_err") and arg_index == 0:
+            let result_ok2 = self.get_generic_inst_arg(resolved as i32, 0)
+            let result_err2 = self.get_generic_inst_arg(resolved as i32, 1)
+            let inspect_payload = if method_name == "inspect_err": result_err2 else: result_ok2
+            let inspect_ref = self.ensure_exact_type(TypeKind.TY_REF, inspect_payload, 0, 0) as i32
+            let inspect_params: Vec[i32] = Vec.new()
+            inspect_params.push(inspect_ref)
+            return self.ensure_fn_type(inspect_params, 1, self.ty_void) as i32
         if method_name == "context" and arg_index == 0:
             return self.ty_str as i32
         if method_name == "with_context" and arg_index == 0:
