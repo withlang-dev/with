@@ -6228,7 +6228,8 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         self.emit_error("`let _ = ...` is not the detach spelling for Task values; use statement position to detach, or bind and cancel(task)", node)
 
     let had_binding = self.scope_has(name)
-    self.scope_put_at(name, bind_type as i32, is_mut, node)
+    if self.scope_put_consuming_rebind_at(name, bind_type as i32, is_mut, node) == 0:
+        return self.ty_void as i32
     self.binding_decl_nodes.insert(name, node)
     self.binding_value_nodes.insert(name, value)
     self.typed_binding_types.insert(node, bind_type as i32)

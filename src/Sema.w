@@ -3098,6 +3098,33 @@ fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
         return
     self.scope_insert_at(sym, tid, is_mut)
 
+fn Sema.scope_put_consuming_rebind_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32) -> i32:
+    if self.is_discard_binding_symbol(sym) != 0:
+        return 1
+    let existing = self.scope_name_map.get(sym)
+    if not existing.is_some():
+        self.scope_insert_at(sym, tid, is_mut)
+        return 1
+    let idx = existing.unwrap()
+    let current_start = if self.scope_starts.len() > 0: self.scope_starts.get((self.scope_starts.len() - 1) as i64) else: 0
+    if idx < current_start or self.bind_states.get(idx as i64) != VarState.MOVED:
+        let name = self.pool_resolve(sym)
+        self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
+        return 0
+    self.bind_types.set_i32(idx as i64, tid)
+    self.bind_muts.set_i32(idx as i64, is_mut)
+    self.bind_states.set_i32(idx as i64, VarState.LIVE)
+    self.bind_is_task.set_i32(idx as i64, 0)
+    self.bind_task_used.set_i32(idx as i64, 0)
+    self.bind_is_scoped_task.set_i32(idx as i64, 0)
+    self.bind_is_view_bound.set_i32(idx as i64, 0)
+    let slot_idx = idx as i64
+    with self.bind_provenance.slot(slot_idx) as mut slot:
+        slot.set(binding_provenance_empty())
+    self.clear_binding_view_deps(sym)
+    self.binding_closure_nodes.remove(sym)
+    1
+
 fn Sema.global_value_decl_kind(self: Sema, sym: i32) -> i32:
     let opt = self.global_value_decl_kinds.get(sym)
     if opt.is_some():
