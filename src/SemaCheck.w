@@ -9472,7 +9472,9 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
     if rhs_ty != 0:
         let resolved = self.resolve_alias(rhs_ty)
         if self.get_type_kind(resolved) == TypeKind.TY_FN:
-            return self.get_type_d2(resolved)
+            let ret_ty = self.get_type_d2(resolved)
+            self.typed_expr_types.insert(node, ret_ty)
+            return ret_ty
     rhs_ty as i32
 
 fn Sema.eval_comptime_if_condition_truthy(self: Sema, node: i32) -> i32:

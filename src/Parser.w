@@ -3043,7 +3043,19 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
         if op_code == 500 and self.peek() == TokenKind.TK_KW_MATCH:
             self.advance()
             self.skip_newlines()
-            let arm_count = self.parse_match_arms()
+            var inline_match = false
+            if self.peek() == TokenKind.TK_COLON:
+                self.advance()
+            else if self.peek() == TokenKind.TK_L_BRACE:
+                inline_match = true
+                self.advance()
+            else:
+                self.emit_error("expected ':' or '{' after pipeline match")
+                lhs = self.poisoned_expr()
+                continue
+            if not inline_match:
+                self.skip_newlines()
+            let arm_count = if inline_match: self.parse_inline_match_arms() else: self.parse_match_arms()
             let arms_start = if arm_count > 0: self.pool.extra_len() - arm_count else: self.pool.extra_len()
             lhs = self.pool.add_node(NodeKind.NK_MATCH, self.pool.get_start(lhs), self.prev_end(), lhs, arms_start, arm_count)
             continue
