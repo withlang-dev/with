@@ -7478,17 +7478,23 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
                 let err_downcast = self.body.new_downcast_place(value_place, err_idx, value_ty)
                 let err_payload_place = self.body.new_field_place(err_downcast, 0, source_err_ty)
                 var target_err_op = self.operand_for_place(err_payload_place, source_err_ty)
-                let conversion_variant = self.sema.error_conversion_variant(target_err_ty, source_err_ty)
-                if conversion_variant > 0:
-                    let wrapped_err_local = self.new_temp(target_err_ty)
-                    let wrapped_err_place = self.place_for_local(wrapped_err_local)
-                    let wrapped_fields: Vec[i32] = Vec.new()
-                    wrapped_fields.push(target_err_op)
-                    self.assign_enum_variant_to_place(wrapped_err_place, target_err_ty, conversion_variant, wrapped_fields, self.ast.get_start(expr))
-                    target_err_op = self.operand_for_place(wrapped_err_place, target_err_ty)
-                else if conversion_variant < 0:
+                let conversion_chain = self.sema.error_conversion_chain(target_err_ty, source_err_ty)
+                if conversion_chain.found == 0 or conversion_chain.ambiguous != 0:
                     self.mark_unsupported()
-                if conversion_variant >= 0:
+                else:
+                    var ci = conversion_chain.variant_syms.len() as i32 - 1
+                    while ci >= 0:
+                        let wrapped_ty = conversion_chain.type_ids.get(ci as i64)
+                        let conversion_variant = conversion_chain.variant_syms.get(ci as i64)
+                        let wrapped_err_local = self.new_temp(wrapped_ty)
+                        let wrapped_err_place = self.place_for_local(wrapped_err_local)
+                        let wrapped_fields: Vec[i32] = Vec.new()
+                        wrapped_fields.push(target_err_op)
+                        self.assign_enum_variant_to_place(wrapped_err_place, wrapped_ty, conversion_variant, wrapped_fields, self.ast.get_start(expr))
+                        target_err_op = self.operand_for_place(wrapped_err_place, wrapped_ty)
+                        if ci == 0:
+                            break
+                        ci = ci - 1
                     let err_fields: Vec[i32] = Vec.new()
                     err_fields.push(target_err_op)
                     self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.err, err_fields, self.ast.get_start(expr))

@@ -5945,7 +5945,11 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
             if target_err_ty == 0:
                 self.emit_error("? on Result requires the enclosing function to return Result", node)
                 return 0
-            if self.error_conversion_variant(target_err_ty, source_err_ty) < 0:
+            let conversion_chain = self.error_conversion_chain(target_err_ty, source_err_ty)
+            if conversion_chain.ambiguous != 0:
+                self.emit_error("ambiguous error conversion from '" ++ self.type_name(source_err_ty) ++ "' to '" ++ self.type_name(target_err_ty) ++ "': via variants '" ++ self.pool_resolve(conversion_chain.first_variant) ++ "' and '" ++ self.pool_resolve(conversion_chain.other_variant) ++ "'", node)
+                return 0
+            if conversion_chain.found == 0:
                 self.emit_error("? cannot convert error type '" ++ self.type_name(source_err_ty) ++ "' to '" ++ self.type_name(target_err_ty) ++ "'", node)
                 return 0
         else:
@@ -8370,27 +8374,132 @@ fn Sema.option_payload_type_for_try(self: Sema, option_tid: i32) -> i32:
         return 0
     self.get_generic_inst_arg(resolved as i32, 0)
 
-// Returns 0 when no wrapper is needed, a variant symbol when target_err wraps
-// source_err, and -1 when `?` cannot convert source_err to target_err.
-fn Sema.error_conversion_variant(self: Sema, target_err_ty: i32, source_err_ty: i32) -> i32:
+type ErrorConversionChain {
+    found: i32
+    ambiguous: i32
+    first_variant: i32
+    other_variant: i32
+    type_ids: Vec[i32]
+    variant_syms: Vec[i32]
+}
+
+fn error_conversion_chain_not_found -> ErrorConversionChain:
+    ErrorConversionChain { 0, 0, 0, 0, Vec.new(), Vec.new() }
+
+fn error_conversion_chain_empty -> ErrorConversionChain:
+    ErrorConversionChain { 1, 0, 0, 0, Vec.new(), Vec.new() }
+
+fn Sema.error_conversion_type_matches(self: Sema, left: i32, right: i32) -> i32:
+    if left == right:
+        return 1
+    let left_resolved = self.resolve_alias(left as TypeId) as i32
+    let right_resolved = self.resolve_alias(right as TypeId) as i32
+    if left_resolved != 0 and left_resolved == right_resolved:
+        return 1
+    let left_name = self.type_name(left)
+    if left_name.len() > 0 and left_name == self.type_name(right):
+        return 1
+    0
+
+fn Sema.error_conversion_chain(self: Sema, target_err_ty: i32, source_err_ty: i32) -> ErrorConversionChain:
     if target_err_ty <= 0 or source_err_ty <= 0:
+        return error_conversion_chain_not_found()
+    if self.error_conversion_type_matches(target_err_ty, source_err_ty) != 0:
+        return error_conversion_chain_empty()
+
+    let queue_types: Vec[i32] = Vec.new()
+    let queue_starts: Vec[i32] = Vec.new()
+    let queue_counts: Vec[i32] = Vec.new()
+    let queue_first_variants: Vec[i32] = Vec.new()
+    let path_types: Vec[i32] = Vec.new()
+    let path_variants: Vec[i32] = Vec.new()
+    queue_types.push(target_err_ty)
+    queue_starts.push(0)
+    queue_counts.push(0)
+    queue_first_variants.push(0)
+
+    var best_start = -1
+    var best_count = -1
+    var best_first_variant = 0
+    var ambiguous = 0
+    var other_first_variant = 0
+    var qi = 0
+    while qi < queue_types.len() as i32:
+        let current_ty = queue_types.get(qi as i64)
+        let current_start = queue_starts.get(qi as i64)
+        let current_count = queue_counts.get(qi as i64)
+        let current_first = queue_first_variants.get(qi as i64)
+        qi = qi + 1
+        if best_count >= 0 and current_count >= best_count:
+            continue
+        if current_count >= 8:
+            continue
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
+                continue
+            let packed_kind = self.ast.get_data2(decl)
+            if type_decl_sub_kind(packed_kind) != TypeDeclKind.Enum:
+                continue
+            let decl_ty = if self.type_decl_tids.contains(decl): self.type_decl_tids.get(decl).unwrap() else: self.lookup_named_type_visible(self.ast.get_data0(decl))
+            if decl_ty == 0 or self.error_conversion_type_matches(decl_ty, current_ty) == 0:
+                continue
+            let extra_start = self.ast.get_data1(decl)
+            let variant_count = self.ast.get_extra(extra_start)
+            var pos = extra_start + 1
+            for _ in 0..variant_count:
+                let variant_sym = self.ast.get_extra(pos)
+                pos = pos + 1
+                let payload_count = self.ast.get_extra(pos)
+                pos = pos + 1
+                if payload_count == 1:
+                    let payload_ty = self.resolve_type_expr(self.ast.get_extra(pos)) as i32
+                    if payload_ty != 0:
+                        let direct_match = self.error_conversion_type_matches(payload_ty, source_err_ty)
+                        let new_count = current_count + 1
+                        let new_start = path_types.len() as i32
+                        for pi in 0..current_count:
+                            let existing_ty = path_types.get((current_start + pi) as i64)
+                            let existing_variant = path_variants.get((current_start + pi) as i64)
+                            path_types.push(existing_ty)
+                            path_variants.push(existing_variant)
+                        path_types.push(current_ty)
+                        path_variants.push(variant_sym)
+                        let first_variant = if current_count == 0: variant_sym else: current_first
+                        if direct_match != 0:
+                            if best_count < 0:
+                                best_start = new_start
+                                best_count = new_count
+                                best_first_variant = first_variant
+                            else if new_count == best_count:
+                                ambiguous = 1
+                                other_first_variant = first_variant
+                        if direct_match == 0:
+                            queue_types.push(payload_ty)
+                            queue_starts.push(new_start)
+                            queue_counts.push(new_count)
+                            queue_first_variants.push(first_variant)
+                pos = pos + payload_count
+
+    if best_count < 0:
+        return error_conversion_chain_not_found()
+    let out_types: Vec[i32] = Vec.new()
+    let out_variants: Vec[i32] = Vec.new()
+    for pi in 0..best_count:
+        out_types.push(path_types.get((best_start + pi) as i64))
+        out_variants.push(path_variants.get((best_start + pi) as i64))
+    ErrorConversionChain { 1, ambiguous, best_first_variant, other_first_variant, out_types, out_variants }
+
+// Returns 0 when no wrapper is needed, a variant symbol when target_err wraps
+// source_err directly, and -1 when `?` cannot convert source_err to target_err.
+fn Sema.error_conversion_variant(self: Sema, target_err_ty: i32, source_err_ty: i32) -> i32:
+    let chain = self.error_conversion_chain(target_err_ty, source_err_ty)
+    if chain.found == 0 or chain.ambiguous != 0:
         return -1
-    if self.types_compatible(target_err_ty as TypeId, source_err_ty as TypeId) != 0:
+    if chain.variant_syms.len() as i32 == 0:
         return 0
-    let enum_decl = self.enum_variant_decl_type(target_err_ty)
-    if enum_decl == 0:
-        return -1
-    let te_start = self.get_type_d1(enum_decl)
-    let variant_count = self.get_type_d2(enum_decl)
-    var pos = te_start
-    for _ in 0..variant_count:
-        let variant_sym = self.type_extra.get(pos as i64)
-        let payload_count = self.type_extra.get((pos + 1) as i64)
-        if payload_count == 1:
-            let payloads = self.enum_variant_payload_types(target_err_ty, variant_sym)
-            if payloads.len() as i32 == 1 and self.types_compatible(payloads.get(0) as TypeId, source_err_ty as TypeId) != 0:
-                return variant_sym
-        pos = pos + 2 + payload_count
+    if chain.variant_syms.len() as i32 == 1:
+        return chain.variant_syms.get(0)
     -1
 
 fn Sema.enum_variant_payload_types(self: Sema, enum_tid: i32, variant_name: i32) -> Vec[i32]:
