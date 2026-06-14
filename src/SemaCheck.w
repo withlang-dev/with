@@ -9778,9 +9778,79 @@ fn Sema.check_let_else(self: Sema, node: i32) -> i32:
     let val_type = self.check_expr(value)
     if val_type != 0 and val_type != self.ty_void:
         self.typed_expr_types.insert(value, val_type as i32)
+    if else_body == 0 and self.pattern_is_refutable(pattern) != 0:
+        self.emit_error("let ... else requires an else branch for refutable patterns", node)
+    if else_body != 0 and self.pattern_contains_slice_rest(pattern) != 0:
+        self.emit_error("slice rest pattern in let ... else is not implemented yet; track #474", pattern)
     self.check_pattern(pattern, val_type as i32)
-    self.check_expr(else_body)
+    if else_body != 0:
+        let else_ty = self.check_expr(else_body)
+        let else_kind = self.get_type_kind(self.resolve_alias(else_ty as TypeId))
+        if else_kind != TypeKind.TY_NEVER:
+            self.emit_error("let ... else requires a diverging else branch", else_body)
     self.ty_void as i32
+
+fn Sema.pattern_is_refutable(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_PAT_WILDCARD or kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_REST:
+        return 0
+    if kind == NodeKind.NK_PAT_TUPLE:
+        let start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        for i in 0..count:
+            if self.pattern_is_refutable(self.ast.get_extra(start + i)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_PAT_STRUCT:
+        let start2 = self.ast.get_data1(node)
+        let count2 = self.ast.get_data2(node)
+        for i2 in 0..count2:
+            let field_pat = self.ast.get_extra(start2 + 1 + i2 * 2 + 1)
+            if field_pat != 0 and self.pattern_is_refutable(field_pat) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_PAT_AT_BINDING:
+        return self.pattern_is_refutable(self.ast.get_data1(node))
+    1
+
+fn Sema.pattern_contains_slice_rest(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_PAT_SLICE:
+        if self.ast.get_data2(node) != 0:
+            return 1
+        return 0
+    if kind == NodeKind.NK_PAT_TUPLE:
+        let start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        for i in 0..count:
+            if self.pattern_contains_slice_rest(self.ast.get_extra(start + i)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_PAT_STRUCT:
+        let start2 = self.ast.get_data1(node)
+        let count2 = self.ast.get_data2(node)
+        for i2 in 0..count2:
+            let field_pat = self.ast.get_extra(start2 + 1 + i2 * 2 + 1)
+            if field_pat != 0 and self.pattern_contains_slice_rest(field_pat) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND or kind == NodeKind.NK_PAT_OR:
+        var start3 = self.ast.get_data1(node)
+        var count3 = self.ast.get_data2(node)
+        if kind == NodeKind.NK_PAT_OR:
+            start3 = self.ast.get_data0(node)
+            count3 = self.ast.get_data1(node)
+        for i3 in 0..count3:
+            if self.pattern_contains_slice_rest(self.ast.get_extra(start3 + i3)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_PAT_AT_BINDING:
+        return self.pattern_contains_slice_rest(self.ast.get_data1(node))
+    0
 
 fn Sema.check_tuple_destructure(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)

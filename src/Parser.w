@@ -6071,15 +6071,21 @@ fn Parser.parse_let_binding(self: Parser) -> NodeId:
         is_mut = true
         self.advance()
 
-    // Tuple and struct destructuring use the normal pattern tree so the
+    // Destructuring patterns use the normal pattern tree so the
     // bindings share the same Sema/MIR path as patterns elsewhere (§9.7).
-    if self.peek() == TokenKind.TK_L_PAREN or self.peek() == TokenKind.TK_L_BRACE:
+    if self.peek() == TokenKind.TK_L_PAREN or self.peek() == TokenKind.TK_L_BRACE or self.peek() == TokenKind.TK_L_BRACKET:
         let pat = self.parse_pattern()
         if self.expect(TokenKind.TK_EQ) == 0:
             return self.poisoned_expr()
         self.skip_newlines()
         let value = self.parse_expr()
-        return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, 0)
+        var else_body: NodeId = 0 as NodeId
+        if self.peek() == TokenKind.TK_KW_ELSE:
+            self.advance()
+            if self.peek() == TokenKind.TK_COLON: self.advance()
+            self.skip_newlines()
+            else_body = self.parse_block_or_expr()
+        return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, else_body)
 
     // Let-else: with variant shorthand: let .Some(v) = expr else: body
     if self.peek() == TokenKind.TK_DOT_IDENT:
