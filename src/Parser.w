@@ -5257,6 +5257,34 @@ fn Parser.parse_loop(self: Parser, label: i32) -> NodeId:
     let body = self.parse_body()
     self.pool.add_node(NodeKind.NK_LOOP, start, self.prev_end(), body, label, 0)
 
+fn Parser.for_binding_should_parse_pattern(self: Parser) -> bool:
+    let t = self.peek()
+    if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_L_BRACKET or
+       t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_DOT_DOT or t == TokenKind.TK_INT_LIT or
+       t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or
+       t == TokenKind.TK_REGEX_LIT or t == TokenKind.TK_MINUS:
+        return true
+    if t != TokenKind.TK_IDENT:
+        return true
+
+    let start = self.current_start()
+    let end = self.current_end()
+    let text = self.source.slice(start as i64, end as i64)
+    if text == "_":
+        return true
+    if text.len() > 0:
+        let first = text.byte_at(0 as i64)
+        if first >= 65 and first <= 90:
+            return true
+
+    let saved_pos = self.pos
+    self.advance()
+    let next = self.peek()
+    self.pos = saved_pos
+    next == TokenKind.TK_DOT or next == TokenKind.TK_DOT_IDENT or
+    next == TokenKind.TK_L_PAREN or next == TokenKind.TK_L_BRACE or
+    next == TokenKind.TK_AT or next == TokenKind.TK_COLON
+
 fn Parser.parse_for(self: Parser, label: i32) -> NodeId:
     let start = self.current_start()
     self.advance()
@@ -5264,10 +5292,8 @@ fn Parser.parse_for(self: Parser, label: i32) -> NodeId:
     var binding = 0
     var index_binding = 0
 
-    if self.peek() == TokenKind.TK_L_PAREN:
-        // Tuple destructuring - simplified: parse as pattern
-        let pat = self.parse_pattern()
-        binding = pat as i32
+    if self.for_binding_should_parse_pattern():
+        binding = self.parse_pattern() as i32
     else:
         binding = self.expect_ident()
         if self.peek() == TokenKind.TK_COMMA:

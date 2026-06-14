@@ -4677,7 +4677,7 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
     let next_payload = self.body.new_operand(OperandKind.OK_COPY, payload_place)
     self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
 
-    self.bind_for_element(for_node, pat_or_sym, item_place, elem_ty, body_expr)
+    self.bind_for_element_or_skip(for_node, pat_or_sym, item_place, elem_ty, body_expr, header_bb)
 
     let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
@@ -4707,6 +4707,15 @@ fn MirBuilder.bind_for_element(self: MirBuilder, for_node: i32, pat_or_sym: i32,
         let bind_place = self.place_for_local(bind_local)
         let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
         self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
+
+fn MirBuilder.bind_for_element_or_skip(self: MirBuilder, for_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, body_expr: i32, continue_bb: i32):
+    if self.ast.for_binding_is_pattern(for_node):
+        let matched_bb = self.new_block()
+        self.lower_pattern_match(item_place, pat_or_sym, matched_bb, continue_bb)
+        self.switch_to(matched_bb)
+        let _ = self.lower_pattern(pat_or_sym, item_place)
+        return
+    self.bind_for_element(for_node, pat_or_sym, item_place, elem_ty, body_expr)
 
 fn MirBuilder.bind_comprehension_element(self: MirBuilder, comp_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, span_node: i32):
     if self.ast.comprehension_binding_is_pattern(comp_node, pat_or_sym):
@@ -5174,7 +5183,7 @@ fn MirBuilder.lower_for_range_var(self: MirBuilder, for_node: i32, pat_or_sym: i
 
     // Body
     self.switch_to(body_bb)
-    self.bind_for_element(for_node, pat_or_sym, counter_place, elem_ty, body_expr)
+    self.bind_for_element_or_skip(for_node, pat_or_sym, counter_place, elem_ty, body_expr, inc_bb)
     let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
@@ -5241,7 +5250,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
 
     // Body: bind loop variable = counter, execute body
     self.switch_to(body_bb)
-    self.bind_for_element(for_node, pat_or_sym, counter_place, elem_ty, body_expr)
+    self.bind_for_element_or_skip(for_node, pat_or_sym, counter_place, elem_ty, body_expr, inc_bb)
 
     let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
@@ -5314,7 +5323,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
     let elem_local = self.new_temp(elem_ty)
     let elem_place = self.place_for_local(elem_local)
     self.assign_operand_to_place(elem_place, elem_op, self.ast.get_start(body_expr))
-    self.bind_for_element(for_node, pat_or_sym, elem_place, elem_ty, body_expr)
+    self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb)
 
     let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
@@ -5397,7 +5406,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, for_node: i32, pat_or_sym: i32, it
     self.switch_to(get_after_bb)
 
     // Bind loop variable
-    self.bind_for_element(for_node, pat_or_sym, elem_place, elem_ty, body_expr)
+    self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb)
 
     let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
@@ -5465,7 +5474,7 @@ fn MirBuilder.lower_for_iter_place(self: MirBuilder, for_node: i32, pat_or_sym: 
     let slot_after_bb = self.new_block()
     self.terminate(TermKind.TK_CALL, self.unit_operand(), slot_args_id, slot_place, slot_after_bb)
     self.switch_to(slot_after_bb)
-    self.bind_for_element(for_node, pat_or_sym, slot_place, slot_ty, body_expr)
+    self.bind_for_element_or_skip(for_node, pat_or_sym, slot_place, slot_ty, body_expr, inc_bb)
     let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
     self.switch_to(inc_bb)
@@ -5535,7 +5544,7 @@ fn MirBuilder.lower_for_iter_ref(self: MirBuilder, for_node: i32, pat_or_sym: i3
     let ref_after_bb = self.new_block()
     self.terminate(TermKind.TK_CALL, self.unit_operand(), ref_args_id, ref_place, ref_after_bb)
     self.switch_to(ref_after_bb)
-    self.bind_for_element(for_node, pat_or_sym, ref_place, ref_elem_ty, body_expr)
+    self.bind_for_element_or_skip(for_node, pat_or_sym, ref_place, ref_elem_ty, body_expr, inc_bb)
     let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
     self.switch_to(inc_bb)
