@@ -7079,7 +7079,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             self.skip_newlines()
             default_node = self.parse_expr() as i32
             if (extra_flags / FN_PARAM_FLAG_IMPLICIT) % 2 != 0:
-                self.emit_error("implicit parameter cannot have a default value")
+                self.emit_error("implicit parameter may not have a default value")
         if default_node == 0:
             required_count = required_count + 1
 

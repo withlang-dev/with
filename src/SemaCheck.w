@@ -990,6 +990,7 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
     // Add parameters to scope
     let meta = self.ast.find_fn_meta(node)
     let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
+    let saved_implicit_binding_len = self.implicit_binding_syms.len()
     if meta >= 0:
         let param_start = self.ast.fn_meta_param_start(meta)
         let param_count = self.ast.fn_meta_param_count(meta)
@@ -997,6 +998,9 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
             let p_name = self.ast.fn_param_name(param_start, pi)
             let p_tid = self.sig_param_type(sig_idx, pi)
             self.scope_put(p_name, p_tid, 0)
+            if fn_param_is_implicit(self.ast.fn_param_flags(param_start, pi)) != 0:
+                self.implicit_binding_types.push(p_tid)
+                self.implicit_binding_syms.push(p_name)
         let pmeta = self.ast.find_fn_param_pattern_meta(node)
         if pmeta >= 0:
             let ppat_start = self.ast.fn_param_pattern_meta_start(pmeta)
@@ -1214,6 +1218,9 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
     self.current_no_alloc_depth = saved_no_alloc_depth
     self.current_fn_may_alloc = saved_fn_may_alloc
     self.current_fn_symbol = saved_current_fn_symbol
+    while self.implicit_binding_syms.len() > saved_implicit_binding_len:
+        self.implicit_binding_types.pop()
+        self.implicit_binding_syms.pop()
     self.pop_scope()
     self.local_file_id = saved_body_file_id
     self.current_module_path = saved_body_module_path
@@ -9024,6 +9031,22 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     if expected_ret_ty != 0 and expected_ret_ty != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
         if self.return_value_type_compatible(expected_ret_ty, body_ty as i32) == 0:
             self.emit_error("closure return type mismatch", body)
+
+    for ici in 0..outer_count:
+        let implicit_cap_sym = self.bind_names.get(ici as i64)
+        if self.expr_uses_symbol(body, implicit_cap_sym) == 0:
+            continue
+        var already_captured = 0
+        for cci in 0..closure_capture_syms.len() as i32:
+            if closure_capture_syms.get(cci as i64) == implicit_cap_sym:
+                already_captured = 1
+                break
+        if already_captured == 0:
+            closure_capture_syms.push(implicit_cap_sym)
+            self.current_fn_param_syms.push(implicit_cap_sym)
+            self.current_fn_param_effs.push(0)
+            self.current_fn_param_origins.push(0)
+            self.current_fn_param_view_nodes.push(0)
     if expected_ret_ty != 0 and expected_ret_ty != self.ty_void and body_ty != 0 and body_ty != self.ty_never:
         if body_ty == self.ty_void:
             let closure_void_results_ok = self.check_body_explicit_value_results(body, 1, expected_ret_ty, "closure return type mismatch")
@@ -12831,6 +12854,69 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     let field = self.ast.get_data1(callee)
     self.check_method_call_parts(expr, field, extra_start, arg_count, node, 0)
 
+fn Sema.resolve_method_implicit_default_args(self: Sema, call_node: i32, sig_idx: i32, method_fn_sym: i32, param_offset: i32, extra_start: i32, arg_count: i32) -> i32:
+    if sig_idx < 0 or self.has_resolved_call_args(call_node) != 0:
+        return arg_count
+    let param_count = self.sig_get_param_count(sig_idx)
+    let actual = arg_count + param_offset
+    if actual >= param_count:
+        return arg_count
+    var param_start = -1
+    if method_fn_sym != 0 and self.fn_decl_nodes.contains(method_fn_sym):
+        let fn_node = self.fn_decl_nodes.get(method_fn_sym).unwrap()
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta >= 0:
+            param_start = self.ast.fn_meta_param_start(meta)
+    if param_start < 0:
+        return arg_count
+    let resolved_map: HashMap[i32, i32] = HashMap.new()
+    let resolved_defaults: HashMap[i32, i32] = HashMap.new()
+    for ai in 0..arg_count:
+        resolved_map.insert(ai + param_offset, self.ast.get_extra(extra_start + ai))
+    var filled = 0
+    var missing_implicit = 0
+    for pi in actual..param_count:
+        let pflags = self.ast.fn_param_flags(param_start, pi)
+        if fn_param_is_implicit(pflags) == 0:
+            continue
+        let expected_ty = self.sig_param_type(sig_idx, pi)
+        var si = self.implicit_binding_types.len() as i32 - 1
+        var found = 0
+        while si >= 0:
+            let bind_ty = self.implicit_binding_types.get(si as i64)
+            if self.types_compatible(expected_ty, bind_ty) != 0:
+                let bind_sym = self.implicit_binding_syms.get(si as i64)
+                resolved_map.insert(pi, 0 - bind_sym)
+                filled = 1
+                found = 1
+                break
+            si = si - 1
+        if found == 0:
+            missing_implicit = 1
+    for pi2 in actual..param_count:
+        if resolved_map.contains(pi2):
+            continue
+        let default_node = self.ast.get_fn_param_default(param_start, pi2)
+        if default_node != 0:
+            resolved_map.insert(pi2, default_node)
+            resolved_defaults.insert(pi2, 1)
+            filled = 1
+    if missing_implicit != 0:
+        self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", call_node)
+    if filled == 0:
+        return arg_count
+    let final_args: Vec[i32] = Vec.new()
+    for pi3 in param_offset..param_count:
+        if resolved_map.contains(pi3):
+            final_args.push(resolved_map.get(pi3).unwrap())
+        else:
+            final_args.push(0)
+    self.store_resolved_call_args(call_node, final_args)
+    for pi4 in param_offset..param_count:
+        if resolved_defaults.contains(pi4):
+            self.mark_resolved_call_arg_default(call_node, pi4 - param_offset)
+    param_count - param_offset
+
 fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty: i32) -> i32:
     var obj_type = if known_recv_ty != 0: known_recv_ty as TypeId else: self.check_expr(expr)
     let static_type_sym = self.static_receiver_base_sym(expr)
@@ -12871,10 +12957,12 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     let mc_order_type = self.resolve_atomic_order_type(obj_type as i32)
     let mc_owner_sym_for_effect = self.method_owner_symbol_for_type(obj_type as i32)
     let mc_sig_idx_for_effect = if mc_owner_sym_for_effect != 0: self.lookup_method_sig(mc_owner_sym_for_effect, field) else: -1
+    let mc_method_fn_for_resolution = if mc_owner_sym_for_effect != 0: self.lookup_method_fn(mc_owner_sym_for_effect, field) else: 0
     let arg_types: Vec[i32] = Vec.new()
     // docs/mut.md Rev 8 §15.8 — see check_call.
     let mc_iter_borrow_idxs: Vec[i32] = Vec.new()
-    var mc_resolved_arg_count = arg_count
+    let mc_param_offset_for_resolution = if self.static_receiver_type_is_known(expr) != 0: 0 else: 1
+    var mc_resolved_arg_count = self.resolve_method_implicit_default_args(node, mc_sig_idx_for_effect, mc_method_fn_for_resolution, mc_param_offset_for_resolution, extra_start, arg_count)
     if self.has_resolved_call_args(node) == 0 and self.ast.has_call_named_args(node) == 0 and arg_count == 0:
         var mc_unit_expected = self.atomic_method_expected_arg_type(mc_order_type, field, 0)
         if mc_unit_expected == 0:
@@ -14565,8 +14653,14 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
             return 1
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
-        for ai in 0..arg_count:
-            if self.expr_uses_symbol(self.ast.get_extra(extra_start + ai), sym) != 0:
+        let has_resolved = self.has_resolved_call_args(node)
+        let actual_count = if has_resolved != 0: self.get_resolved_call_arg_count(node) else: arg_count
+        for ai in 0..actual_count:
+            let arg = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+            if arg < 0:
+                if 0 - arg == sym:
+                    return 1
+            else if self.expr_uses_symbol(arg, sym) != 0:
                 return 1
         return 0
     if kind == NodeKind.NK_FIELD_ACCESS:

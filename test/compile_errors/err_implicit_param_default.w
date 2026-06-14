@@ -1,4 +1,4 @@
-//! expect-error: implicit parameter cannot have a default value
+//! expect-error: implicit parameter may not have a default value
 
 type Ctx { value: i32 }
 

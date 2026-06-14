@@ -1400,6 +1400,46 @@ fn Codegen.lookup_local_type(self: Codegen, sym: i32) -> i64:
             return alias.unwrap() as i64
     0
 
+fn Codegen.lookup_capture_alloca(self: Codegen, sym: i32) -> i64:
+    let direct = self.lookup_local_alloca(sym)
+    if direct != 0:
+        return direct
+    let cg_sym = self.sema_sym_to_codegen_sym(sym)
+    if cg_sym != 0 and cg_sym != sym:
+        return self.lookup_local_alloca(cg_sym)
+    0
+
+fn Codegen.lookup_capture_type(self: Codegen, sym: i32) -> i64:
+    let direct = self.lookup_local_type(sym)
+    if direct != 0:
+        return direct
+    let cg_sym = self.sema_sym_to_codegen_sym(sym)
+    if cg_sym != 0 and cg_sym != sym:
+        return self.lookup_local_type(cg_sym)
+    0
+
+fn Codegen.lookup_capture_mut(self: Codegen, sym: i32) -> i32:
+    let direct = self.local_muts.get(sym)
+    if direct.is_some():
+        return direct.unwrap()
+    let cg_sym = self.sema_sym_to_codegen_sym(sym)
+    if cg_sym != 0 and cg_sym != sym:
+        let cg = self.local_muts.get(cg_sym)
+        if cg.is_some():
+            return cg.unwrap()
+    0
+
+fn Codegen.lookup_capture_sema_type(self: Codegen, sym: i32) -> i32:
+    let direct = self.local_sema_types.get(sym)
+    if direct.is_some():
+        return direct.unwrap()
+    let cg_sym = self.sema_sym_to_codegen_sym(sym)
+    if cg_sym != 0 and cg_sym != sym:
+        let cg = self.local_sema_types.get(cg_sym)
+        if cg.is_some():
+            return cg.unwrap()
+    0
+
 fn Codegen.lookup_local_pointee_struct(self: Codegen, sym: i32) -> i32:
     let direct = self.local_pointee_structs.get(sym)
     if direct.is_some():

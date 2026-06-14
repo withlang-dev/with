@@ -12739,6 +12739,27 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                 is_param = 1
         if is_param == 0:
             captures.push(sym)
+    let summary_count = self.sema.closure_capture_summary_count(node)
+    for sci in 0..summary_count:
+        let summary_sym = self.sema.closure_capture_summary_sym(node, sci)
+        if summary_sym == 0:
+            continue
+        var summary_is_param = 0
+        let summary_name = self.sema_symbol_text(summary_sym)
+        for pi2 in 0..param_count:
+            let param_sym = param_syms.get(pi2 as i64)
+            if param_sym == summary_sym or self.intern.resolve(param_sym) == summary_name:
+                summary_is_param = 1
+        if summary_is_param != 0:
+            continue
+        var already_captured = 0
+        for ci2 in 0..captures.len() as i32:
+            let existing = captures.get(ci2 as i64)
+            if existing == summary_sym or self.intern.resolve(existing) == summary_name or self.sema_symbol_text(existing) == summary_name:
+                already_captured = 1
+                break
+        if already_captured == 0:
+            captures.push(summary_sym)
     let capture_count = captures.len() as i32
     if is_extern_closure and capture_count > 0:
         with_eprint("internal error: capturing closure reached extern C function pointer lowering")
@@ -12754,9 +12775,9 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         if is_ref_capture:
             cap_types.push(ptr_ty)
         else:
-            let ty_opt = self.local_types.get(sym)
-            if ty_opt.is_some():
-                cap_types.push(ty_opt.unwrap() as i64)
+            let capture_ty = self.lookup_capture_type(sym)
+            if capture_ty != 0:
+                cap_types.push(capture_ty)
             else:
                 cap_types.push(i32_ty)
     // Collect original types for ref capture (needed inside closure body)
@@ -12764,9 +12785,9 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     if is_ref_capture:
         for ci in 0..capture_count:
             let sym = captures.get(ci as i64)
-            let ty_opt = self.local_types.get(sym)
-            if ty_opt.is_some():
-                cap_orig_types.push(ty_opt.unwrap() as i64)
+            let capture_ty = self.lookup_capture_type(sym)
+            if capture_ty != 0:
+                cap_orig_types.push(capture_ty)
             else:
                 cap_orig_types.push(i32_ty)
     var cap_struct_type: i64 = 0
@@ -12848,8 +12869,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                 let outer_ptr_slot = self.create_entry_alloca(ptr_ty)
                 wl_build_store(self.builder, outer_ptr, outer_ptr_slot)
                 // Look up outer mutability
-                let outer_mut_opt = saved_muts.get(sym)
-                let outer_mut = if outer_mut_opt.is_some(): outer_mut_opt.unwrap() else: 0
+                let outer_mut = self.lookup_capture_mut(sym)
                 self.record_local(sym, outer_ptr_slot, ptr_ty, outer_mut)
             else:
                 // Value capture: load value, create fresh alloca
@@ -12912,9 +12932,9 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     for cl_ci in 0..capture_count:
         let cl_cap_sym = captures.get(cl_ci as i64)
         var cl_cap_sema_ty = self.sema.ty_i32 as i32
-        let cl_cap_sema_opt = self.local_sema_types.get(cl_cap_sym)
-        if cl_cap_sema_opt.is_some():
-            cl_cap_sema_ty = cl_cap_sema_opt.unwrap()
+        let cl_cap_sema = self.lookup_capture_sema_type(cl_cap_sym)
+        if cl_cap_sema != 0:
+            cl_cap_sema_ty = cl_cap_sema
         let cl_cap_local = closure_builder.body.new_local(cl_cap_sema_ty, 0, cl_cap_sym, 1)
         closure_builder.bind_local(cl_cap_sym, cl_cap_local)
 
@@ -12969,17 +12989,16 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     for cl_mi in 0..capture_count:
         let cl_m_sym = captures.get(cl_mi as i64)
         let cl_m_local_id = cl_mi + 1
-        let cl_m_alloca_opt = self.local_allocas.get(cl_m_sym)
-        if cl_m_alloca_opt.is_some():
-            self.mir_local_ptrs.insert(cl_m_local_id, cl_m_alloca_opt.unwrap())
-            let cl_m_ty_opt = self.local_types.get(cl_m_sym)
-            if cl_m_ty_opt.is_some():
-                let cl_storage_ty = cl_m_ty_opt.unwrap() as i64
+        let cl_m_alloca = self.lookup_capture_alloca(cl_m_sym)
+        if cl_m_alloca != 0:
+            self.mir_local_ptrs.insert(cl_m_local_id, cl_m_alloca)
+            let cl_m_ty = self.lookup_capture_type(cl_m_sym)
+            if cl_m_ty != 0:
+                let cl_storage_ty = cl_m_ty
                 self.mir_local_types.insert(cl_m_local_id, cl_storage_ty)
                 if is_ref_capture:
-                    let cl_sem_ty_opt = self.local_sema_types.get(cl_m_sym)
-                    if cl_sem_ty_opt.is_some():
-                        let cl_sem_ty = cl_sem_ty_opt.unwrap()
+                    let cl_sem_ty = self.lookup_capture_sema_type(cl_m_sym)
+                    if cl_sem_ty != 0:
                         let cl_sem_llvm_ty = self.sema_type_to_llvm(cl_sem_ty)
                         if cl_sem_llvm_ty != 0:
                             self.mir_indirect_value_local_types.insert(cl_m_local_id, cl_sem_llvm_ty)
@@ -13075,18 +13094,18 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         for ci in 0..capture_count:
             let sym = captures.get(ci as i64)
             let cap_ty = cap_types.get(ci as i64)
-            let alloca_opt = self.local_allocas.get(sym)
-            if alloca_opt.is_some():
+            let alloca = self.lookup_capture_alloca(sym)
+            if alloca != 0:
                 let indices: Vec[i64] = Vec.new()
                 indices.push(wl_const_int(i32_ty, 0, 0))
                 indices.push(wl_const_int(i32_ty, ci as i64, 0))
                 let gep = wl_build_gep(self.builder, cap_struct_type, cap_alloca, vec_data_i64(&indices), 2)
                 if is_ref_capture:
                     // Store pointer to outer alloca (not the value)
-                    wl_build_store(self.builder, alloca_opt.unwrap() as i64, gep)
+                    wl_build_store(self.builder, alloca, gep)
                 else:
                     // Store the value
-                    let val = wl_build_load(self.builder, cap_ty, alloca_opt.unwrap() as i64)
+                    let val = wl_build_load(self.builder, cap_ty, alloca)
                     wl_build_store(self.builder, val, gep)
         ctx_ptr = cap_alloca
 

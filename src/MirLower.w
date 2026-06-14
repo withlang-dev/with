@@ -6418,7 +6418,11 @@ fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, callee_sym
     let sig_idx = self.call_sig_for_sym(callee_sym)
     let args: Vec[i32] = Vec.new()
     for i in 0..arg_node_vec.len() as i32:
-        args.push(self.lower_call_arg(arg_node_vec.get(i as i64), sig_idx, 0, i))
+        let arg_node = arg_node_vec.get(i as i64)
+        if arg_node < 0:
+            args.push(self.lower_var(0 - arg_node, 0, 0))
+        else:
+            args.push(self.lower_call_arg(arg_node, sig_idx, 0, i))
     let args_id = self.body.new_call_args(args)
     self.body.set_call_ast_node(args_id, node)
     let result_local = self.new_temp(ret_type_id)
@@ -7154,8 +7158,11 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
                 is_static_call = true
     if not is_static_call:
         arg_nodes.push(self_expr)
-    for i in 0..arg_count:
-        arg_nodes.push(self.ast.get_extra(arg_start + i))
+    let has_resolved_method_args = self.sema.has_resolved_call_args(node)
+    let method_arg_count = if has_resolved_method_args != 0: self.sema.get_resolved_call_arg_count(node) else: arg_count
+    for i in 0..method_arg_count:
+        let method_arg = if has_resolved_method_args != 0: self.sema.get_resolved_call_arg(node, i) else: self.ast.get_extra(arg_start + i)
+        arg_nodes.push(method_arg)
 
     self.lower_call_with_arg_nodes(fn_op, callee_sym, arg_nodes, self.expr_type(node), node)
 
