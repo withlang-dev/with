@@ -8917,6 +8917,12 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     let body = self.ast.get_data0(node)
     let extra_start = self.ast.get_data1(node)
     let param_count = self.ast.get_data2(node)
+    if self.ast.kind(body) == NodeKind.NK_CALL and self.ast.has_call_named_args(body) != 0:
+        for ppi in 0..param_count:
+            let p_sym = self.ast.get_extra(extra_start + ppi * 2)
+            if self.pool_resolve(p_sym).starts_with("__partial_arg_"):
+                self.emit_error("placeholder partial application does not support named arguments", node)
+                break
     let outer_count = self.bind_names.len() as i32
     let saved_capture_sig_idx = self.current_fn_sig_idx
     let saved_capture_syms: Vec[i32] = Vec.new()

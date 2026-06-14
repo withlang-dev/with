@@ -4224,6 +4224,9 @@ fn Parser.parse_call(self: Parser, callee: i32) -> NodeId:
 
     if placeholder_count == 0:
         return call_node
+    if has_named != 0:
+        self.emit_error("placeholder partial application does not support named arguments")
+        return self.poisoned_expr()
 
     let param_start = self.pool.extra_len()
     let param_count = partial_param_syms.len() as i32
@@ -7075,6 +7078,8 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             self.advance()
             self.skip_newlines()
             default_node = self.parse_expr() as i32
+            if (extra_flags / FN_PARAM_FLAG_IMPLICIT) % 2 != 0:
+                self.emit_error("implicit parameter cannot have a default value")
         if default_node == 0:
             required_count = required_count + 1
 
