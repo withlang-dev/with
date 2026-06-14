@@ -5785,6 +5785,27 @@ fn MirBuilder.pattern_payload_node(self: MirBuilder, owner_pat: i32, payload_ent
         return 0
     payload_entry
 
+fn MirBuilder.positional_struct_pattern_type(self: MirBuilder, pat_node: i32, scrutinee_place: i32) -> i32:
+    if pat_node == 0 or self.ast.kind(pat_node) != NodeKind.NK_PAT_VARIANT:
+        return 0
+    let type_name_sym = self.ast.get_data0(pat_node)
+    if type_name_sym == 0:
+        return 0
+    let named_tid = self.sema.lookup_named_type_visible(type_name_sym)
+    if named_tid == 0:
+        return 0
+    if self.sema.get_type_kind(self.sema.resolve_alias(named_tid as TypeId)) != TypeKind.TY_STRUCT:
+        return 0
+    let subject_place = self.pattern_shape_place(scrutinee_place)
+    let subject_ty = self.place_local_type(subject_place)
+    let subject_resolved = self.sema.resolve_alias(subject_ty as TypeId)
+    let subject_kind = self.sema.get_type_kind(subject_resolved)
+    if subject_kind == TypeKind.TY_STRUCT and self.sema.get_type_d0(subject_resolved) == type_name_sym:
+        return subject_resolved as i32
+    if subject_kind == TypeKind.TY_GENERIC_INST and self.sema.get_type_d0(subject_resolved) == type_name_sym:
+        return subject_resolved as i32
+    0
+
 fn MirBuilder.pattern_subject_ref_mutability(self: MirBuilder, place: i32) -> i32:
     let ty = self.place_local_type(place)
     if ty == 0:
@@ -5860,6 +5881,30 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             self.lower_pattern_match(scrutinee_place, alt_pat, arm_bb, alt_fail)
             next_test_bb = alt_fail
         return
+
+    if pk == NodeKind.NK_PAT_VARIANT:
+        let struct_ty = self.positional_struct_pattern_type(pat_node, scrutinee_place)
+        if struct_ty != 0:
+            let bind_start = self.ast.get_data1(pat_node)
+            let bind_count = self.ast.get_data2(pat_node)
+            let struct_subject_place = self.pattern_shape_place(scrutinee_place)
+            var cur_test_bb = self.cur_bb
+            for bi in 0..bind_count:
+                let inner_pat = self.ast.get_extra(bind_start + bi)
+                let inner_pk = self.ast.kind(inner_pat)
+                if inner_pk == NodeKind.NK_PAT_WILDCARD or inner_pk == NodeKind.NK_PAT_IDENT or inner_pk == NodeKind.NK_PAT_REST:
+                    continue
+                let field_name = self.sema.type_reflection_field_name(struct_ty, bi)
+                let field_ty = self.sema.type_reflection_field_type(struct_ty, bi)
+                let field_place = self.body.new_field_place(struct_subject_place, field_name, field_ty)
+                let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
+                let next_test_bb = self.new_block()
+                self.switch_to(cur_test_bb)
+                self.lower_pattern_match(child_place, inner_pat, next_test_bb, fail_bb)
+                cur_test_bb = next_test_bb
+            self.switch_to(cur_test_bb)
+            self.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
+            return
 
     if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
         let variant_subject_place = self.pattern_shape_place(scrutinee_place)
@@ -6115,6 +6160,25 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         for i in 0..inner.len() as i32:
             out.push(inner.get(i as i64))
         return out
+
+    if pk == NodeKind.NK_PAT_VARIANT:
+        let struct_ty = self.positional_struct_pattern_type(pat_node, scrutinee_place)
+        if struct_ty != 0:
+            let bind_start = self.ast.get_data1(pat_node)
+            let bind_count = self.ast.get_data2(pat_node)
+            let struct_subject_place = self.pattern_shape_place(scrutinee_place)
+            for bi in 0..bind_count:
+                let inner_pat = self.ast.get_extra(bind_start + bi)
+                if inner_pat != 0 and self.ast.kind(inner_pat) == NodeKind.NK_PAT_REST:
+                    continue
+                let field_name = self.sema.type_reflection_field_name(struct_ty, bi)
+                let field_ty = self.sema.type_reflection_field_type(struct_ty, bi)
+                let field_place = self.body.new_field_place(struct_subject_place, field_name, field_ty)
+                let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
+                let inner = self.lower_pattern(inner_pat, child_place)
+                for i in 0..inner.len() as i32:
+                    out.push(inner.get(i as i64))
+            return out
 
     if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
         if self.sema.pattern_value_syms.contains(pat_node):

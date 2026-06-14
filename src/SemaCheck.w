@@ -8826,6 +8826,39 @@ fn Sema.pattern_child_subject_type(self: Sema, parent_subject_type: i32, child_t
         return child_type
     self.ensure_exact_type(TypeKind.TY_REF, child_type, ref_mut, 0) as i32
 
+fn Sema.positional_struct_pattern_type(self: Sema, node: i32, subject_type: i32, type_name_sym: i32) -> i32:
+    if node == 0 or subject_type == 0 or type_name_sym == 0:
+        return 0
+    let named_tid = self.lookup_named_type_visible(type_name_sym)
+    if named_tid == 0:
+        return 0
+    let named_resolved = self.resolve_alias(named_tid as TypeId)
+    if self.get_type_kind(named_resolved) != TypeKind.TY_STRUCT:
+        return 0
+
+    let subject_resolved = self.resolve_alias(subject_type as TypeId)
+    let subject_kind = self.get_type_kind(subject_resolved)
+    if subject_kind == TypeKind.TY_STRUCT and self.get_type_d0(subject_resolved) == type_name_sym:
+        return subject_resolved as i32
+    if subject_kind == TypeKind.TY_GENERIC_INST and self.get_type_d0(subject_resolved) == type_name_sym:
+        return subject_resolved as i32
+    if subject_kind != TypeKind.TY_ERR:
+        self.emit_error("positional struct pattern '" ++ self.pool_resolve(type_name_sym) ++ "' requires subject type '" ++ self.pool_resolve(type_name_sym) ++ "', found '" ++ self.type_name(subject_type) ++ "'", node)
+        return -1
+    0
+
+fn Sema.check_positional_struct_pattern(self: Sema, node: i32, subject_type: i32, struct_ty: i32, type_name_sym: i32):
+    let bind_start = self.ast.get_data1(node)
+    let bind_count = self.ast.get_data2(node)
+    let field_count = self.type_reflection_field_count(struct_ty)
+    if bind_count != field_count:
+        self.emit_error("struct pattern '" ++ self.pool_resolve(type_name_sym) ++ "' expects " ++ int_to_string(field_count as i64) ++ " field pattern(s), found " ++ int_to_string(bind_count as i64), node)
+        return
+    for bi in 0..bind_count:
+        let inner_pat = self.ast.get_extra(bind_start + bi)
+        let field_ty = self.type_reflection_field_type(struct_ty, bi)
+        self.check_pattern(inner_pat, self.pattern_child_subject_type(subject_type, field_ty))
+
 fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if node == 0:
         return
@@ -8872,6 +8905,13 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let bind_count = self.ast.get_data2(node)
         let subject_shape_type = self.pattern_subject_shape_type(subject_type)
         let subject_enum_ty = self.enum_pattern_type(subject_shape_type)
+        if kind == NodeKind.NK_PAT_VARIANT and subject_enum_ty == 0 and bind_count != 0 and self.ast.pattern_qualifier(node) == 0:
+            let struct_ty = self.positional_struct_pattern_type(node, subject_shape_type, v_name)
+            if struct_ty > 0:
+                self.check_positional_struct_pattern(node, subject_type, struct_ty, v_name)
+                return
+            if struct_ty < 0:
+                return
         // Resolve for-comprehension markers: _Payload → Some/Ok, _Empty → None/Err
         let v_name_str = self.pool_resolve(v_name)
         if v_name_str == "_Payload" or v_name_str == "_Empty":

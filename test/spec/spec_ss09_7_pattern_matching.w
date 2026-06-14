@@ -17,6 +17,11 @@ enum Expr:
     Lit(i32)
     Neg(i32)
 
+type Point {
+    x: i32,
+    y: i32,
+}
+
 fn eval(e: Expr) -> i32:
     match e:
         .Lit(0) => 1000
@@ -48,3 +53,8 @@ fn test_if_let:
     var got = 0
     if let Some(x) = o: got = x
     assert(got == 7)
+
+fn test_positional_struct_pattern:
+    let point = Point { x: 3, y: 4 }
+    match point:
+        Point(x, y) => assert(x + y == 7)
