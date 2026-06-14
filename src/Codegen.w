@@ -963,7 +963,7 @@ fn Codegen.dyn_trait_from_type_node(self: Codegen, type_node: i32) -> i32:
         let name_sym = self.pool.get_data0(type_node)
         let g_extra = self.pool.get_data1(type_node)
         let g_count = self.pool.get_data2(type_node)
-        if name_sym == self.sym_box and g_count == 1:
+        if self.sema.type_symbol_is_std_box(name_sym) != 0 and g_count == 1:
             return self.dyn_trait_from_type_node(self.pool.get_extra(g_extra))
     0
 
@@ -1587,10 +1587,9 @@ fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> D
     DynArgInfo { type_sym: 0, use_ptr: 0 }
 
 fn Codegen.build_dyn_trait_value(self: Codegen, concrete_val: i64, type_sym: i32, trait_sym: i32) -> i64:
-    let key = codegen_hash_type_trait_key(type_sym, trait_sym)
     self.ensure_monomorphized_trait_vtable(type_sym, trait_sym)
-    let vg = self.vtable_globals.get(key)
-    if not vg.is_some():
+    let vg = self.lookup_trait_vtable_global(type_sym, trait_sym)
+    if vg == 0:
         with_eprint("error: missing vtable for type '" ++ self.intern.resolve(type_sym) ++ "' implementing trait '" ++ self.intern.resolve(trait_sym) ++ "'")
         self.had_error = 1
         return wl_get_undef(self.get_dyn_fat_ptr_type())
@@ -1601,14 +1600,13 @@ fn Codegen.build_dyn_trait_value(self: Codegen, concrete_val: i64, type_sym: i32
     let fat_ty = self.get_dyn_fat_ptr_type()
     var fat = wl_get_undef(fat_ty)
     fat = wl_build_insert_value(self.builder, fat, alloca, 0)
-    fat = wl_build_insert_value(self.builder, fat, vg.unwrap() as i64, 1)
+    fat = wl_build_insert_value(self.builder, fat, vg, 1)
     fat
 
 fn Codegen.build_dyn_trait_value_from_ptr(self: Codegen, data_ptr: i64, type_sym: i32, trait_sym: i32) -> i64:
-    let key = codegen_hash_type_trait_key(type_sym, trait_sym)
     self.ensure_monomorphized_trait_vtable(type_sym, trait_sym)
-    let vg = self.vtable_globals.get(key)
-    if not vg.is_some():
+    let vg = self.lookup_trait_vtable_global(type_sym, trait_sym)
+    if vg == 0:
         with_eprint("error: missing vtable for type '" ++ self.intern.resolve(type_sym) ++ "' implementing trait '" ++ self.intern.resolve(trait_sym) ++ "'")
         self.had_error = 1
         return wl_get_undef(self.get_dyn_fat_ptr_type())
@@ -1618,7 +1616,7 @@ fn Codegen.build_dyn_trait_value_from_ptr(self: Codegen, data_ptr: i64, type_sym
     let erased = wl_build_bitcast(self.builder, data_ptr, ptr_ty)
     var fat = wl_get_undef(fat_ty)
     fat = wl_build_insert_value(self.builder, fat, erased, 0)
-    fat = wl_build_insert_value(self.builder, fat, vg.unwrap() as i64, 1)
+    fat = wl_build_insert_value(self.builder, fat, vg, 1)
     fat
 
 fn Codegen.infer_local_pointee_struct(self: Codegen, value_node: i32, declared_type_node: i32, storage_ty: i64) -> i32:
@@ -2205,7 +2203,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
         let g_extra = self.pool.get_data1(type_node)
         let g_count = self.pool.get_data2(type_node)
         // Box[T] is always a pointer (fat pointer for Box[dyn Trait])
-        if name_sym == self.sym_box and g_count == 1:
+        if self.sema.type_symbol_is_std_box(name_sym) != 0 and g_count == 1:
             let inner_node = self.pool.get_extra(g_extra)
             if self.pool.kind(inner_node) == NodeKind.NK_TYPE_TRAIT_OBJ:
                 return self.get_dyn_fat_ptr_type()
@@ -2550,6 +2548,12 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         let base_sym = self.sema.get_type_d0(resolved_tid)
         let cg_base_sym = self.sema_sym_to_codegen_sym(base_sym)
         let arg_count = self.sema.get_generic_inst_arg_count(resolved_tid)
+        if self.sema.type_symbol_is_std_box(base_sym) != 0 and arg_count == 1:
+            let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
+            let elem_resolved = self.sema.resolve_alias(elem_tid)
+            if self.sema.get_type_kind(elem_resolved) == TypeKind.TY_TRAIT_OBJ:
+                return self.get_dyn_fat_ptr_type()
+            return wl_ptr_type(self.context)
         if cg_base_sym == self.sym_vec and arg_count > 0:
             let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let elem_ty = self.sema_type_to_llvm(elem_tid)
@@ -4584,7 +4588,7 @@ fn Codegen.detect_drop_functions(self: Codegen):
                     let type_name = name.slice(0, name.len() - 5)
                     if type_name.len() > 0:
                         let type_sym = self.intern.intern(type_name)
-                        if self.struct_type_map.get(type_sym).is_some() or self.enum_type_map.get(type_sym).is_some():
+                        if self.sema.type_symbol_is_std_box(type_sym) != 0 or self.struct_type_map.get(type_sym).is_some() or self.enum_type_map.get(type_sym).is_some():
                             let fv = self.fn_values.get(sym)
                             let ft = self.fn_fn_types.get(sym)
                             if fv.is_some() and ft.is_some():

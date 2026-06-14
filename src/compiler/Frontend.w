@@ -1652,6 +1652,16 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         if uk == NodeKind.NK_FN_DECL or uk == NodeKind.NK_EXTERN_FN:
             user_fn_names.push(merged_pool.get_data0(ud))
 
+    var higher_type_names: Vec[i32] = Vec.new()
+    for ri in 0..root_ordered.len() as i32:
+        let rd = root_ordered.get(ri as i64)
+        if merged_pool.kind(rd) == NodeKind.NK_TYPE_DECL:
+            higher_type_names.push(merged_pool.get_data0(rd))
+    for ui in 0..user_import_ordered.len() as i32:
+        let ud = user_import_ordered.get(ui as i64)
+        if merged_pool.kind(ud) == NodeKind.NK_TYPE_DECL:
+            higher_type_names.push(merged_pool.get_data0(ud))
+
     // Rebuild decl list: prelude → user imports → root.
     // Drop fn/extern_fn decls shadowed by a higher-priority tier.
     while merged_pool.decl_count() > 0:
@@ -1668,6 +1678,9 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     for oi in 0..prelude_ordered.len() as i32:
         let id = prelude_ordered.get(oi as i64)
         let ik = merged_pool.kind(id)
+        let prelude_path = prelude_paths.get(oi as i64)
+        if frontend_path_is_std_box_module(prelude_path) and frontend_vec_contains_i32(higher_type_names, self.pool.intern("Box")):
+            continue
         if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, self.pool, oi, higher_fn_names):
             // Error when a prelude fn (with a body) is shadowed by an extern fn
             // (no body). The extern silently replaces the real function with an
@@ -1682,7 +1695,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             if frontend_extern_var_shadowed_in_tier(prelude_ordered, merged_pool, self.pool, oi) or frontend_extern_var_shadowed_by_tier(user_import_ordered, merged_pool, self.pool, id) or frontend_extern_var_shadowed_by_tier(root_ordered, merged_pool, self.pool, id):
                 continue
         merged_pool.add_decl(id)
-        rebuilt_paths.push(frontend_owned_text(prelude_paths.get(oi as i64)))
+        rebuilt_paths.push(frontend_owned_text(prelude_path))
         rebuilt_file_ids.push(prelude_file_ids.get(oi as i64))
         rebuilt_c_import.push(prelude_c_import.get(oi as i64))
     for oi in 0..user_import_ordered.len() as i32:
@@ -1710,6 +1723,13 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     self.decl_source_file_ids = rebuilt_file_ids
     self.decl_is_c_import = rebuilt_c_import
     merged_pool
+
+fn frontend_path_is_std_box_module(path: str) -> bool:
+    if path == "lib/std/box.w" or path == "<embedded-std>/std/box.w":
+        return true
+    if path.ends_with("/lib/std/box.w") or path.ends_with("\\lib\\std\\box.w"):
+        return true
+    false
 
 fn frontend_name_shadowed_by_extern(tier: &Vec[i32], pool: AstPool, name: i32) -> bool:
     for i in 0..tier.len() as i32:

@@ -11305,6 +11305,15 @@ fn Sema.put_generic_subst(self: Sema, param_sym: i32, tid: i32, node: i32) -> Un
                 let a = self.type_name(existing)
                 let b = self.type_name(tid)
                 self.emit_error("cannot infer a single type for '" ++ tp_name ++ "': saw '" ++ a ++ "' and '" ++ b ++ "'", node)
+        else:
+            let existing_r = self.resolve_alias(existing as TypeId)
+            if self.get_type_kind(existing_r) == TypeKind.TY_TRAIT_OBJ and self.type_implements_trait(tid, self.get_type_d0(existing_r)) != 0:
+                var i = self.generic_subst_param_syms.len() as i32 - 1
+                while i >= 0:
+                    if self.generic_subst_param_syms.get(i as i64) == param_sym:
+                        self.generic_subst_type_ids.set_i32(i as i64, tid)
+                        return
+                    i = i - 1
         return
 
     self.generic_subst_param_syms.push(param_sym)
@@ -11682,6 +11691,8 @@ fn Sema.type_implements_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
         let drop_name = self.get_type_name(resolved)
         if drop_name != 0:
             return self.has_drop_method(drop_name)
+        if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+            return self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym)
         return 0
     if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
         return self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym)
@@ -11889,6 +11900,10 @@ fn Sema.generic_method_bind_owner_from_expected(self: Sema, owner_sym: i32) -> i
         return 0
     if self.get_generic_inst_base(expected as i32) != owner_sym:
         return 0
+    if self.type_symbol_is_std_box(owner_sym) != 0 and self.get_generic_inst_arg_count(expected as i32) == 1:
+        let expected_arg = self.get_generic_inst_arg(expected as i32, 0)
+        if self.get_type_kind(self.resolve_alias(expected_arg as TypeId)) == TypeKind.TY_TRAIT_OBJ:
+            return 0
     self.setup_generic_inst_substitution(expected as i32, owner_sym)
 
 fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, method_fn_sym: i32, is_static: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
@@ -13017,7 +13032,7 @@ fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
         return self.trait_object_from_type_node(self.ast.get_data0(type_node))
     if kind == NodeKind.NK_TYPE_GENERIC:
         let base = self.ast.get_data0(type_node)
-        if base != self.syms.box:
+        if self.type_symbol_is_std_box(base) == 0:
             return 0
         let extra_start = self.ast.get_data1(type_node)
         let arg_count = self.ast.get_data2(type_node)
@@ -13037,7 +13052,7 @@ fn Sema.dyn_trait_symbol_for_type(self: Sema, tid: i32) -> i32:
         return self.dyn_trait_symbol_for_type(self.get_type_d0(resolved))
     if tk == TypeKind.TY_GENERIC_INST:
         let base = self.get_generic_inst_base(resolved as i32)
-        if base == self.syms.box and self.get_generic_inst_arg_count(resolved as i32) == 1:
+        if self.type_symbol_is_std_box(base) != 0 and self.get_generic_inst_arg_count(resolved as i32) == 1:
             return self.dyn_trait_symbol_for_type(self.get_generic_inst_arg(resolved as i32, 0))
     0
 
@@ -16576,9 +16591,13 @@ fn Sema.method_has_move_self_flag(self: Sema, type_sym: i32, method_sym: i32) ->
     let fn_sym = self.lookup_method_fn(type_sym, method_sym)
     if fn_sym == 0:
         return 0
-    if not self.fn_decl_nodes.contains(fn_sym):
+    var fn_node = 0
+    if self.fn_decl_nodes.contains(fn_sym):
+        fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+    else if self.generic_fn_nodes.contains(fn_sym):
+        fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
+    else:
         return 0
-    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
     let meta = self.ast.find_fn_meta(fn_node)
     if meta < 0:
         return 0

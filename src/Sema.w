@@ -863,8 +863,31 @@ fn sema_tier_path_is_std_implementation(path: str) -> i32:
         return 1
     0
 
+fn sema_path_is_std_box_module(path: str) -> i32:
+    if path == "lib/std/box.w" or path == "<embedded-std>/std/box.w":
+        return 1
+    if path.ends_with("/lib/std/box.w") or path.ends_with("\\lib\\std\\box.w"):
+        return 1
+    0
+
 fn Sema.current_module_is_std_implementation(self: Sema) -> i32:
     sema_tier_path_is_std_implementation(self.current_module_path)
+
+fn Sema.type_symbol_is_std_box(self: Sema, sym: i32) -> i32:
+    if sym != self.syms.box:
+        return 0
+    sema_path_is_std_box_module(self.type_decl_source_path(sym))
+
+fn Sema.type_is_std_box_inst(self: Sema, tid: i32) -> i32:
+    let resolved = self.resolve_alias(tid as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.get_generic_inst_arg_count(resolved as i32) != 1:
+        return 0
+    self.type_symbol_is_std_box(self.get_type_d0(resolved))
+
+fn Sema.fn_symbol_is_std_box_member(self: Sema, fn_sym: i32) -> i32:
+    sema_path_is_std_box_module(self.fn_symbol_source_path(fn_sym))
 
 fn sema_tier_std_only_module(path: str) -> i32:
     if path == "std.io" or path.starts_with("std.io."):
@@ -926,7 +949,9 @@ fn Sema.core_without_alloc(self: Sema) -> i32:
     1
 
 fn Sema.symbol_requires_alloc_tier(self: Sema, sym: i32) -> i32:
-    if sym == self.syms.vec or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap or sym == self.syms.box:
+    if sym == self.syms.vec or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap:
+        return 1
+    if self.type_symbol_is_std_box(sym) != 0:
         return 1
     let name = self.pool_resolve_symbol(sym)
     if name == "String" or name == "StringBuilder":
@@ -4138,6 +4163,13 @@ fn Sema.types_compatible_fast(self: Sema, expected: TypeId, actual: TypeId) -> i
         if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
             let gi_ac = self.get_type_d2(exp_r)
             if gi_ac == self.get_type_d2(act_r):
+                if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) != 0 and gi_ac == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)) != 0:
+                    let box_exp_arg = self.get_generic_inst_arg(exp_r, 0)
+                    let box_act_arg = self.get_generic_inst_arg(act_r, 0)
+                    let box_exp_arg_r = self.resolve_alias(box_exp_arg as TypeId)
+                    if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
+                        if self.type_implements_trait(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
+                            return 1
                 var gi_all_match = 1
                 for gi_i in 0..gi_ac:
                     let gi_exp_arg = self.get_generic_inst_arg(exp_r, gi_i)
@@ -4200,6 +4232,13 @@ fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
             let gi_ec = self.get_type_d2(exp_r)
             let gi_ac2 = self.get_type_d2(act_r)
             if gi_ec == gi_ac2:
+                if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) != 0 and gi_ec == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)) != 0:
+                    let box_exp_arg = self.get_generic_inst_arg(exp_r, 0)
+                    let box_act_arg = self.get_generic_inst_arg(act_r, 0)
+                    let box_exp_arg_r = self.resolve_alias(box_exp_arg as TypeId)
+                    if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
+                        if self.type_implements_trait(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
+                            return 1
                 var gi_all_ok = 1
                 for gi_i in 0..gi_ec:
                     if self.types_compatible(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)) == 0:

@@ -772,9 +772,33 @@ fn Codegen.generate_trait_vtable_for_impl(self: Codegen, impl_node: i32):
     wl_set_linkage(vg, wl_internal_linkage())
     self.vtable_globals.insert(key, vg)
 
+fn Codegen.trait_vtable_global_name(self: Codegen, impl_type_sym: i32, trait_sym: i32) -> str:
+    var type_name = self.intern.resolve(impl_type_sym)
+    if type_name.len() == 0:
+        type_name = self.sema_symbol_text(impl_type_sym)
+    var trait_name = self.intern.resolve(trait_sym)
+    if trait_name.len() == 0:
+        trait_name = self.sema_symbol_text(trait_sym)
+    if type_name.len() == 0 or trait_name.len() == 0:
+        return ""
+    "__vtable_" ++ type_name ++ "_" ++ trait_name
+
+fn Codegen.lookup_trait_vtable_global(self: Codegen, impl_type_sym: i32, trait_sym: i32) -> i64:
+    let key = codegen_hash_type_trait_key(impl_type_sym, trait_sym)
+    let global_name = self.trait_vtable_global_name(impl_type_sym, trait_sym)
+    if global_name.len() > 0:
+        let existing_global = wl_get_named_global(self.llmod, global_name)
+        if existing_global != 0:
+            self.vtable_globals.insert(key, existing_global)
+            return existing_global
+    let direct = self.vtable_globals.get(key)
+    if direct.is_some() and direct.unwrap() != 0:
+        return direct.unwrap() as i64
+    0
+
 fn Codegen.ensure_monomorphized_trait_vtable(self: Codegen, impl_type_sym: i32, trait_sym: i32):
     let key = codegen_hash_type_trait_key(impl_type_sym, trait_sym)
-    if self.vtable_globals.get(key).is_some():
+    if self.lookup_trait_vtable_global(impl_type_sym, trait_sym) != 0:
         return
     let base_opt = self.mono_struct_base.get(impl_type_sym)
     if not base_opt.is_some():

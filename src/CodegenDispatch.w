@@ -1699,9 +1699,19 @@ fn Codegen.mir_coerce_operand_to_dyn_trait_target(self: Codegen, body: &MirBody,
     let trait_sym = self.mir_dyn_trait_symbol_from_sema_type(target_sema_ty)
     if trait_sym == 0:
         return val
+    let source_sema_ty = self.mir_operand_sema_type(body, operand_id)
+    let source_resolved = self.mir_input.mir_resolve_alias(source_sema_ty)
+    if self.mir_input.mir_get_type_kind(source_resolved) == TypeKind.TY_GENERIC_INST:
+        let source_base = self.mir_input.mir_get_type_d0(source_resolved)
+        if self.sema.type_symbol_is_std_box(source_base) != 0 and self.mir_input.mir_get_type_d2(source_resolved) == 1:
+            let source_arg_start = self.mir_input.mir_get_type_d1(source_resolved)
+            let payload_sema_ty = self.mir_input.mir_get_type_extra(source_arg_start)
+            let payload_info = self.mir_dyn_arg_info_from_sema_type(payload_sema_ty, 1)
+            if payload_info.type_sym != 0 and wl_get_type_kind(wl_type_of(val)) == wl_pointer_type_kind():
+                return self.build_dyn_trait_value_from_ptr(val, payload_info.type_sym, trait_sym)
     var info = self.mir_dyn_arg_info_from_operand(body, operand_id, val)
     if info.type_sym == 0:
-        info = self.mir_dyn_arg_info_from_sema_type(self.mir_operand_sema_type(body, operand_id), 0)
+        info = self.mir_dyn_arg_info_from_sema_type(source_sema_ty, 0)
     if info.type_sym == 0:
         return val
     if info.use_ptr != 0 or wl_get_type_kind(wl_type_of(val)) == wl_pointer_type_kind():
@@ -3596,6 +3606,48 @@ fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> Unit:
         let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
     self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
 
+fn Codegen.mir_sema_type_is_box(self: Codegen, sema_ty: i32) -> bool:
+    if sema_ty <= 0:
+        return false
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return false
+    if self.mir_input.mir_get_type_d2(resolved) != 1:
+        return false
+    let base_sym = self.mir_input.mir_get_type_d0(resolved)
+    self.sema.type_symbol_is_std_box(base_sym) != 0
+
+fn Codegen.mir_emit_box_drop_place(self: Codegen, body: &MirBody, place_id: i32, sema_ty: i32) -> bool:
+    if not self.mir_sema_type_is_box(sema_ty):
+        return false
+    let free_fn = self.ensure_box_free_fn()
+    if free_fn == 0:
+        return false
+    let box_ty = self.mir_sema_type_to_llvm(sema_ty)
+    if box_ty == 0:
+        return false
+    var ptr = self.mir_place_ptr(body, place_id, false, 0)
+    if ptr == 0:
+        ptr = self.mir_place_ptr(body, place_id, true, box_ty)
+    if ptr == 0:
+        return false
+    let value = wl_build_load(self.builder, box_ty, ptr)
+    var heap_ptr = value
+    var payload_ty: i64 = 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    let arg_start = self.mir_input.mir_get_type_d1(resolved)
+    let payload_sema_ty = self.mir_input.mir_get_type_extra(arg_start)
+    if self.llvm_type_is_dyn_fat_ptr(box_ty) != 0:
+        heap_ptr = wl_build_extract_value(self.builder, value, 0)
+    else:
+        payload_ty = self.mir_sema_type_to_llvm(payload_sema_ty)
+    if payload_ty != 0:
+        self.mir_emit_drop_ptr(heap_ptr, payload_ty)
+    let args: Vec[i64] = Vec.new()
+    args.push(heap_ptr)
+    let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args), 1)
+    true
+
 fn Codegen.mir_emit_stmt(self: Codegen, body: &MirBody, stmt_id: i32) -> bool:
     if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:
         return false
@@ -3827,12 +3879,14 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: &MirBody, stmt_id: i32) -> bool:
     if sk == StmtKind.Drop:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
+        let drop_sema_ty = self.mir_place_sema_type(body, d0)
+        if self.mir_emit_box_drop_place(body, d0, drop_sema_ty):
+            return true
         var drop_ty = self.mir_place_projected_type(body, d0)
         let drop_proj_count = body.place_proj_counts.get(d0 as i64)
         if drop_ty == 0 and drop_proj_count > 0:
-            let sema_ty = self.mir_place_sema_type(body, d0)
-            if sema_ty > 0:
-                drop_ty = self.mir_sema_type_to_llvm(sema_ty)
+            if drop_sema_ty > 0:
+                drop_ty = self.mir_sema_type_to_llvm(drop_sema_ty)
         if drop_ty == 0:
             let local_id = body.place_locals.get(d0 as i64)
             drop_ty = self.mir_local_llvm_type(body, local_id)
@@ -5028,7 +5082,7 @@ fn Codegen.mir_dyn_trait_symbol_from_sema_type(self: Codegen, sema_ty: i32) -> i
         return self.mir_dyn_trait_symbol_from_sema_type(self.mir_input.mir_get_type_d0(resolved))
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.mir_input.mir_get_type_d0(resolved)
-        if self.sema_symbol_text(base_sym) == "Box" and self.mir_input.mir_get_type_d2(resolved) == 1:
+        if self.sema.type_symbol_is_std_box(base_sym) != 0 and self.mir_input.mir_get_type_d2(resolved) == 1:
             let extra_start = self.mir_input.mir_get_type_d1(resolved)
             return self.mir_dyn_trait_symbol_from_sema_type(self.mir_input.mir_get_type_extra(extra_start))
     0
@@ -5564,6 +5618,93 @@ fn Codegen.mir_finish_intrinsic_call(self: Codegen, body: &MirBody, dest_place: 
                 wl_build_store(self.builder, result, dest_ptr)
     if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
         wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+
+fn Codegen.ensure_box_alloc_fn(self: Codegen) -> i64:
+    var alloc_fn = wl_get_named_function(self.llmod, "with_alloc")
+    if alloc_fn != 0:
+        return alloc_fn
+    let params: Vec[i64] = Vec.new()
+    params.push(wl_i64_type(self.context))
+    let fn_ty = wl_function_type(wl_ptr_type(self.context), vec_data_i64(&params), 1, 0)
+    wl_add_function(self.llmod, "with_alloc", fn_ty)
+
+fn Codegen.ensure_box_free_fn(self: Codegen) -> i64:
+    var free_fn = wl_get_named_function(self.llmod, "with_free")
+    if free_fn != 0:
+        return free_fn
+    let params: Vec[i64] = Vec.new()
+    params.push(wl_ptr_type(self.context))
+    let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+    wl_add_function(self.llmod, "with_free", fn_ty)
+
+fn Codegen.mir_emit_box_new_call(self: Codegen, body: &MirBody, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    let arg_count = body.call_arg_counts.get(args_id as i64)
+    if arg_count != 1:
+        return false
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let value_op = body.call_arg_operands.get(arg_start as i64)
+    let value = self.mir_eval_operand(body, value_op, 0)
+    if value == 0:
+        return false
+    let value_ty = wl_type_of(value)
+    if value_ty == 0 or value_ty == wl_void_type(self.context):
+        return false
+    let alloc_fn = self.ensure_box_alloc_fn()
+    if alloc_fn == 0:
+        return false
+    let alloc_args: Vec[i64] = Vec.new()
+    alloc_args.push(wl_const_int(wl_i64_type(self.context), self.abi_size_of(value_ty), 0))
+    let heap_ptr = wl_build_call(self.builder, wl_global_get_value_type(alloc_fn), alloc_fn, vec_data_i64(&alloc_args), 1)
+    wl_build_store(self.builder, value, heap_ptr)
+
+    var result = heap_ptr
+    let dest_ty = self.mir_dest_llvm_type(body, dest_place)
+    if dest_ty != 0 and self.llvm_type_is_dyn_fat_ptr(dest_ty) != 0:
+        let dest_sema_ty = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        let trait_sym = self.mir_dyn_trait_symbol_from_sema_type(dest_sema_ty)
+        var info = self.mir_dyn_arg_info_from_operand(body, value_op, value)
+        if info.type_sym == 0:
+            info = self.mir_dyn_arg_info_from_sema_type(self.mir_operand_sema_type(body, value_op), 0)
+        if trait_sym == 0 or info.type_sym == 0:
+            with_eprint("error: cannot lower Box.new value to boxed dyn trait")
+            self.had_error = 1
+            result = wl_get_undef(dest_ty)
+        else:
+            result = self.build_dyn_trait_value_from_ptr(heap_ptr, info.type_sym, trait_sym)
+
+    self.mir_finish_intrinsic_call(body, dest_place, next_bb, result)
+    true
+
+fn Codegen.mir_emit_box_into_inner_call(self: Codegen, body: &MirBody, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    let arg_count = body.call_arg_counts.get(args_id as i64)
+    if arg_count != 1:
+        return false
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let box_op = body.call_arg_operands.get(arg_start as i64)
+    let box_ptr = self.mir_eval_operand(body, box_op, 0)
+    if box_ptr == 0 or wl_get_type_kind(wl_type_of(box_ptr)) != wl_pointer_type_kind():
+        return false
+    let box_sema_ty = self.mir_operand_sema_type(body, box_op)
+    let box_resolved = self.mir_input.mir_resolve_alias(box_sema_ty)
+    if self.mir_input.mir_get_type_kind(box_resolved) != TypeKind.TY_GENERIC_INST:
+        return false
+    let box_base = self.mir_input.mir_get_type_d0(box_resolved)
+    if self.sema.type_symbol_is_std_box(box_base) == 0 or self.mir_input.mir_get_type_d2(box_resolved) != 1:
+        return false
+    let arg_extra = self.mir_input.mir_get_type_d1(box_resolved)
+    let payload_sema_ty = self.mir_input.mir_get_type_extra(arg_extra)
+    let payload_ty = self.mir_sema_type_to_llvm(payload_sema_ty)
+    if payload_ty == 0:
+        return false
+    let payload = wl_build_load(self.builder, payload_ty, box_ptr)
+    let free_fn = self.ensure_box_free_fn()
+    if free_fn == 0:
+        return false
+    let free_args: Vec[i64] = Vec.new()
+    free_args.push(box_ptr)
+    let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&free_args), 1)
+    self.mir_finish_intrinsic_call(body, dest_place, next_bb, payload)
+    true
 
 fn Codegen.mir_emit_vec_core_intrinsic_call(self: Codegen, body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
     let i64_ty = wl_i64_type(self.context)
@@ -9910,6 +10051,12 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
                         return true
 
+            let gc_callee_name_for_box = self.sema_symbol_text(gc_callee_sym)
+            if (gc_callee_name_for_box == "Box.new" or self.intern.resolve(gc_callee_sym) == "Box.new") and self.sema.fn_symbol_is_std_box_member(gc_callee_sym) != 0:
+                return self.mir_emit_box_new_call(body, args_id, dest_place, next_bb)
+            if (gc_callee_name_for_box == "Box.into_inner" or self.intern.resolve(gc_callee_sym) == "Box.into_inner") and self.sema.fn_symbol_is_std_box_member(gc_callee_sym) != 0:
+                return self.mir_emit_box_into_inner_call(body, args_id, dest_place, next_bb)
+
             // Generic function call — eval MIR args, call monomorphize directly
             let gc_gf = self.generic_fns.get(gc_callee_sym)
             if gc_gf.is_some() and gc_callee_sym > 0:
@@ -11310,21 +11457,23 @@ fn Codegen.mir_emit_term(self: Codegen, body: &MirBody, bb: i32) -> bool:
     if tk == TermKind.TK_DROP_AND_GOTO:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
+        let drop_sema_ty = self.mir_place_sema_type(body, d0)
+        let emitted_box_drop = self.mir_emit_box_drop_place(body, d0, drop_sema_ty)
         var drop_ty = self.mir_place_projected_type(body, d0)
-        let drop_term_proj_count = body.place_proj_counts.get(d0 as i64)
-        if drop_ty == 0 and drop_term_proj_count > 0:
-            let sema_ty = self.mir_place_sema_type(body, d0)
-            if sema_ty > 0:
-                drop_ty = self.mir_sema_type_to_llvm(sema_ty)
-        if drop_ty == 0:
-            let local_id = body.place_locals.get(d0 as i64)
-            drop_ty = self.mir_local_llvm_type(body, local_id)
-        var ptr = self.mir_place_ptr(body, d0, false, 0)
-        if ptr == 0 and drop_ty != 0:
-            ptr = self.mir_place_ptr(body, d0, true, drop_ty)
-        if ptr != 0:
-            if drop_ty != 0:
-                self.mir_emit_drop_ptr(ptr, drop_ty)
+        if not emitted_box_drop:
+            let drop_term_proj_count = body.place_proj_counts.get(d0 as i64)
+            if drop_ty == 0 and drop_term_proj_count > 0:
+                if drop_sema_ty > 0:
+                    drop_ty = self.mir_sema_type_to_llvm(drop_sema_ty)
+            if drop_ty == 0:
+                let local_id = body.place_locals.get(d0 as i64)
+                drop_ty = self.mir_local_llvm_type(body, local_id)
+            var ptr = self.mir_place_ptr(body, d0, false, 0)
+            if ptr == 0 and drop_ty != 0:
+                ptr = self.mir_place_ptr(body, d0, true, drop_ty)
+            if ptr != 0:
+                if drop_ty != 0:
+                    self.mir_emit_drop_ptr(ptr, drop_ty)
         if d1 < 0 or d1 >= self.mir_bb_values.len() as i32:
             return false
         let target_bb = self.mir_bb_values.get(d1 as i64)

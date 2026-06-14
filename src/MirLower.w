@@ -6552,6 +6552,20 @@ fn MirBuilder.call_sig_for_sym(self: MirBuilder, sym: i32) -> i32:
     let sema_sym = self.sema.pool_lookup_symbol(name)
     self.sema.get_sig(sema_sym)
 
+fn MirBuilder.callee_has_move_self(self: MirBuilder, fn_sym: i32) -> bool:
+    var fn_node = 0
+    if self.sema.fn_decl_nodes.contains(fn_sym):
+        fn_node = self.sema.fn_decl_nodes.get(fn_sym).unwrap()
+    else if self.sema.generic_fn_nodes.contains(fn_sym):
+        fn_node = self.sema.generic_fn_nodes.get(fn_sym).unwrap()
+    else:
+        return false
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0 or self.ast.fn_meta_param_count(meta) == 0:
+        return false
+    let ps = self.ast.fn_meta_param_start(meta)
+    fn_param_is_move_self(self.ast.fn_param_flags(ps, 0)) != 0
+
 fn MirBuilder.call_sig_for_expr(self: MirBuilder, fn_expr: i32) -> i32:
     if fn_expr == 0:
         return -1
@@ -6695,6 +6709,9 @@ fn MirBuilder.lower_receiver_with_method_autoderef_for_method(self: MirBuilder, 
     while current_ty > 0 and depth < 32:
         let current = self.sema.resolve_alias(current_ty as TypeId)
         if self.sema.autoderef_type_has_method(current, lookup_method) != 0:
+            let owner_sym = self.sema.method_owner_symbol_for_type(current as i32)
+            if owner_sym != 0 and self.sema.method_has_move_self_flag(owner_sym, lookup_method) != 0:
+                return self.body.new_operand(OperandKind.OK_MOVE, place)
             return self.body.new_operand(OperandKind.OK_COPY, place)
         let kind = self.sema.get_type_kind(current)
         if kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR:
@@ -7220,7 +7237,13 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
                     if self.lookup_local(gc_idx_sym) < 0 and self.sema.named_types.contains(gc_idx_sym):
                         gc_is_static = true
             if not gc_is_static:
-                let gc_recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
+                let gc_recv_op =
+                    if self.callee_has_move_self(callee_sym):
+                        let gc_recv_place = self.lower_expr_place(self_expr)
+                        self.body.new_operand(OperandKind.OK_MOVE, gc_recv_place)
+                    else:
+                        self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
+                self.consume_moved_operand(gc_recv_op)
                 gc_args.push(gc_recv_op)
             for gc_mai in 0..arg_count:
                 let gc_ma_node = self.ast.get_extra(arg_start + gc_mai)
