@@ -1055,9 +1055,54 @@ fn Sema.register_generator_next_method(self: Sema, fn_sym: i32, state_sym: i32, 
     self.method_symbol_flags.insert(next_fn_sym, 1)
     self.fn_decl_source_paths.insert(next_fn_sym, self.current_module_path)
 
+fn Sema.fn_decl_has_refutable_param_pattern(self: Sema, node: i32) -> i32:
+    let meta = self.ast.find_fn_meta(node)
+    if meta < 0:
+        return 0
+    let param_count = self.ast.fn_meta_param_count(meta)
+    let pmeta = self.ast.find_fn_param_pattern_meta(node)
+    if pmeta < 0:
+        return 0
+    let start = self.ast.fn_param_pattern_meta_start(pmeta)
+    let count = self.ast.fn_param_pattern_meta_count(pmeta)
+    let apply_count = if count < param_count: count else: param_count
+    for pi in 0..apply_count:
+        let pat = self.ast.fn_param_pattern_value(start + pi)
+        if pat != 0 and self.pattern_is_refutable(pat) != 0:
+            return 1
+    0
+
+fn Sema.prepare_first_fn_clause(self: Sema, dispatch_sym: i32, node: i32, decl_index: i32):
+    if self.fn_decl_effective_indices.contains(decl_index):
+        self.register_fn_clause_decl(dispatch_sym, node)
+        return
+    let body_sym = self.fn_clause_body_symbol_at(dispatch_sym, decl_index)
+    self.fn_decl_effective_syms.insert(node, body_sym)
+    self.fn_decl_effective_indices.insert(decl_index, body_sym)
+    self.fn_decl_nodes.insert(body_sym, node)
+    self.fn_decl_source_paths.insert(body_sym, self.decl_source_path_for_index(decl_index))
+    self.fn_clause_body_dispatch.insert(body_sym, dispatch_sym)
+    let dispatch_sig = self.get_sig(dispatch_sym)
+    if dispatch_sig >= 0:
+        self.copy_sig_alias(body_sym, dispatch_sig)
+    if self.no_alloc_fns.contains(dispatch_sym):
+        self.no_alloc_fns.insert(body_sym, 1)
+    self.register_fn_clause_decl(dispatch_sym, node)
+
+fn Sema.prepare_current_fn_clause(self: Sema, dispatch_sym: i32, node: i32, decl_index: i32) -> i32:
+    let body_sym = self.fn_clause_body_symbol_at(dispatch_sym, decl_index)
+    self.fn_decl_effective_syms.insert(node, body_sym)
+    self.fn_decl_effective_indices.insert(decl_index, body_sym)
+    self.fn_decl_nodes.insert(body_sym, node)
+    self.fn_decl_source_paths.insert(body_sym, self.decl_source_path_for_index(decl_index))
+    self.fn_clause_body_dispatch.insert(body_sym, dispatch_sym)
+    self.register_fn_clause_decl(dispatch_sym, node)
+    body_sym
+
 fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
     let parsed_fn_name = self.ast.get_data0(node)
     var fn_name = parsed_fn_name
+    var dispatch_fn_name = 0
     let owner_sym_for_extension = self.impl_owner_type_sym_for_decl(node)
     if owner_sym_for_extension != 0 and self.method_decl_is_foreign_extension_at(node, owner_sym_for_extension, decl_index) != 0:
         fn_name = self.extension_method_unique_symbol_at(decl_index, parsed_fn_name)
@@ -1078,9 +1123,16 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
             let existing_di = self.find_decl_index(existing_node)
             let current_di = self.find_decl_index(node)
             if self.decls_share_source_file(existing_di, current_di) != 0:
-                let fn_name_str = self.pool_resolve(fn_name)
-                self.emit_error(f"function '{fn_name_str}' is already defined", node)
-                return
+                let is_clause_group = if self.fn_clause_group_index(fn_name) >= 0: 1 else:
+                    if self.fn_decl_has_refutable_param_pattern(existing_node) != 0 or self.fn_decl_has_refutable_param_pattern(node) != 0: 1 else: 0
+                if is_clause_group != 0:
+                    dispatch_fn_name = fn_name
+                    self.prepare_first_fn_clause(dispatch_fn_name, existing_node, existing_di)
+                    fn_name = self.prepare_current_fn_clause(dispatch_fn_name, node, current_di)
+                else:
+                    let fn_name_str = self.pool_resolve(fn_name)
+                    self.emit_error(f"function '{fn_name_str}' is already defined", node)
+                    return
     self.fn_decl_nodes.insert(fn_name, node)
     self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
     if self.ast.is_no_alloc_fn_node(node as NodeId) != 0:
@@ -1249,6 +1301,11 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
         for pi in 0..param_count:
             if self.fn_param_uses_value_ref_abi(param_start, pi, method_owner_sym, self_type_id) != 0:
                 self.set_sig_param_value_ref_abi(fn_sig_idx, pi, 1)
+    if dispatch_fn_name != 0:
+        let dispatch_sig = self.get_sig(dispatch_fn_name)
+        let clause_sig = self.get_sig(fn_name)
+        if dispatch_sig >= 0 and clause_sig >= 0 and self.signatures_match(dispatch_sig, clause_sig) == 0:
+            self.emit_error("function clause signature mismatch for '" ++ self.pool_resolve(dispatch_fn_name) ++ "'", node)
     self.register_method_sig_alias(node, fn_name, parsed_fn_name, fn_sig_idx, decl_index)
 
     // Track must_use

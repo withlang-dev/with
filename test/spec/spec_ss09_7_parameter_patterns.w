@@ -28,6 +28,12 @@ fn swap((a, b): (i32, i32)) -> (i32, i32):
 fn offset_sum({ x, y }: Point, z: i32) -> i32:
     x + y + z
 
+fn option_value(Some(x): Option[i32]) -> i32:
+    x
+
+fn option_value(None: Option[i32]) -> i32:
+    0
+
 fn test_struct_param_shorthand:
     assert(sum_pt(Point { x: 3, y: 4 }) == 7)
 
@@ -40,6 +46,10 @@ fn test_tuple_param:
 
 fn test_pattern_then_ordinary_param:
     assert(offset_sum(Point { x: 1, y: 2 }, 3) == 6)
+
+fn test_refutable_param_clauses:
+    assert(option_value(Some(8)) == 8)
+    assert(option_value(None) == 0)
 
 fn test_for_loop_destructure:
     var pairs: Vec[(i32, i32)] = Vec.new()

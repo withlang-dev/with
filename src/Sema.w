@@ -359,6 +359,14 @@ type Sema {
     fn_decl_effective_indices: HashMap[i32, i32],
     // Function declaration source path by name
     fn_decl_source_paths: HashMap[i32, str],
+    // Multiple function clauses (§9.7): public dispatch symbol -> clause group index.
+    fn_clause_group_lookup: HashMap[i32, i32],
+    fn_clause_group_names: Vec[i32],
+    fn_clause_group_starts: Vec[i32],
+    fn_clause_group_counts: Vec[i32],
+    fn_clause_group_decls: Vec[i32],
+    // Hidden clause body symbol -> public dispatch symbol.
+    fn_clause_body_dispatch: HashMap[i32, i32],
     // Memoized §14.22 by-value Task parameter disposition:
     // key(fn_sym,param_i) -> 1 when the parameter is proven consumed in scope.
     task_param_consumed_memo: HashMap[i64, i32],
@@ -1186,6 +1194,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let fn_decl_effective_syms = sema_new_map_i32_i32()
     let fn_decl_effective_indices = sema_new_map_i32_i32()
     let fn_decl_source_paths = HashMap[i32, str].new()
+    let fn_clause_group_lookup = sema_new_map_i32_i32()
+    let fn_clause_body_dispatch = sema_new_map_i32_i32()
     let generic_fn_nodes = sema_new_map_i32_i32()
     let variant_lookup = sema_new_map_i32_i32()
     let variant_type_ids = sema_new_map_i32_i32()
@@ -1279,6 +1289,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         fn_decl_effective_syms,
         fn_decl_effective_indices,
         fn_decl_source_paths,
+        fn_clause_group_lookup,
+        fn_clause_group_names: Vec.new(),
+        fn_clause_group_starts: Vec.new(),
+        fn_clause_group_counts: Vec.new(),
+        fn_clause_group_decls: Vec.new(),
+        fn_clause_body_dispatch,
         task_param_consumed_memo: sema_new_map_i64_i32(),
         task_param_consumed_visiting: sema_new_map_i64_i32(),
         detached_task_stmt_nodes: sema_new_map_i32_i32(),
@@ -3849,6 +3865,84 @@ fn Sema.set_sig_return_type(self: Sema, idx: i32, ret: i32):
     let fn_tid = self.sig_type_ids.get(idx as i64)
     if fn_tid >= 0 and fn_tid < self.type_d2.len() as i32:
         self.type_d2.set_i32(fn_tid as i64, ret)
+
+fn Sema.copy_sig_alias(self: Sema, alias: i32, source_sig: i32):
+    if self.sig_idx_valid(source_sig) == 0:
+        return
+    let fn_tid = self.sig_type_ids.get(source_sig as i64)
+    let ret = self.sig_ret_types.get(source_sig as i64)
+    let param_start = self.sig_param_starts.get(source_sig as i64)
+    let param_count = self.sig_param_counts.get(source_sig as i64)
+    let variadic = self.sig_variadic.get(source_sig as i64)
+    self.add_sig(alias, fn_tid, ret, param_start, param_count, variadic)
+    let alias_sig = self.get_sig(alias)
+    if alias_sig < 0:
+        return
+    for pi in 0..param_count:
+        self.set_sig_param_effect(alias_sig, pi, self.sig_param_effect(source_sig, pi))
+        self.set_sig_param_view_origin(alias_sig, pi, self.sig_param_view_origin(source_sig, pi))
+        self.set_sig_param_value_ref_abi(alias_sig, pi, self.sig_param_uses_value_ref_abi(source_sig, pi))
+
+fn Sema.signatures_match(self: Sema, a_sig: i32, b_sig: i32) -> i32:
+    if self.sig_idx_valid(a_sig) == 0 or self.sig_idx_valid(b_sig) == 0:
+        return 0
+    if self.sig_return_type(a_sig) != self.sig_return_type(b_sig):
+        return 0
+    let a_count = self.sig_get_param_count(a_sig)
+    if a_count != self.sig_get_param_count(b_sig):
+        return 0
+    for pi in 0..a_count:
+        if self.sig_param_type(a_sig, pi) != self.sig_param_type(b_sig, pi):
+            return 0
+    if self.sig_is_variadic(a_sig) != self.sig_is_variadic(b_sig):
+        return 0
+    1
+
+fn Sema.fn_clause_body_symbol_at(self: Sema, dispatch_sym: i32, decl_index: i32) -> i32:
+    let base = self.pool_resolve(dispatch_sym)
+    self.pool_intern(base ++ "$clause$" ++ f"{decl_index}")
+
+fn Sema.fn_clause_group_index(self: Sema, dispatch_sym: i32) -> i32:
+    if self.fn_clause_group_lookup.contains(dispatch_sym):
+        return self.fn_clause_group_lookup.get(dispatch_sym).unwrap()
+    -1
+
+fn Sema.ensure_fn_clause_group(self: Sema, dispatch_sym: i32) -> i32:
+    let existing = self.fn_clause_group_index(dispatch_sym)
+    if existing >= 0:
+        return existing
+    let idx = self.fn_clause_group_names.len() as i32
+    self.fn_clause_group_lookup.insert(dispatch_sym, idx)
+    self.fn_clause_group_names.push(dispatch_sym)
+    self.fn_clause_group_starts.push(self.fn_clause_group_decls.len() as i32)
+    self.fn_clause_group_counts.push(0)
+    idx
+
+fn Sema.register_fn_clause_decl(self: Sema, dispatch_sym: i32, decl_node: i32):
+    let group = self.ensure_fn_clause_group(dispatch_sym)
+    let start = self.fn_clause_group_starts.get(group as i64)
+    let count = self.fn_clause_group_counts.get(group as i64)
+    for i in 0..count:
+        if self.fn_clause_group_decls.get((start + i) as i64) == decl_node:
+            return
+    self.fn_clause_group_decls.push(decl_node)
+    self.fn_clause_group_counts.set_i32(group as i64, count + 1)
+
+fn Sema.fn_clause_group_count(self: Sema) -> i32:
+    self.fn_clause_group_names.len() as i32
+
+fn Sema.fn_clause_group_name(self: Sema, group: i32) -> i32:
+    self.fn_clause_group_names.get(group as i64)
+
+fn Sema.fn_clause_group_clause_count(self: Sema, group: i32) -> i32:
+    self.fn_clause_group_counts.get(group as i64)
+
+fn Sema.fn_clause_group_clause(self: Sema, group: i32, clause_i: i32) -> i32:
+    let start = self.fn_clause_group_starts.get(group as i64)
+    self.fn_clause_group_decls.get((start + clause_i) as i64)
+
+fn Sema.fn_is_clause_body_symbol(self: Sema, sym: i32) -> i32:
+    if self.fn_clause_body_dispatch.contains(sym): 1 else: 0
 
 // ── Main entry point ─────────────────────────────────────────────
 

@@ -1009,6 +1009,8 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
             for pi in 0..apply_count:
                 let ppat = self.ast.fn_param_pattern_value(ppat_start + pi)
                 if ppat != 0:
+                    if self.pattern_is_refutable(ppat) != 0 and self.fn_is_clause_body_symbol(fn_name) == 0:
+                        self.emit_error("refutable parameter pattern requires another function clause or an else", ppat)
                     self.check_pattern(ppat, self.sig_param_type(sig_idx, pi))
 
     // Effect tracking: save outer state and populate for this function

@@ -10175,6 +10175,17 @@ fn lower_fn(builder: MirBuilder, fn_node: i32) -> MirBody:
             sig_idx = builder.sema.lookup_method_sig(sema_type_sym, sema_method_sym)
     lower_fn_with_sig(builder, fn_node, sig_idx)
 
+fn mir_symbol_for_pool(sema: &Sema, pool: InternPool, sym: i32) -> i32:
+    if sym == 0:
+        return 0
+    let pool_name = pool.resolve_symbol(sym)
+    if pool_name.len() > 0:
+        return sym
+    let sema_name = sema.pool_resolve(sym)
+    if sema_name.len() > 0:
+        return pool.intern(sema_name)
+    sym
+
 fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody:
     let fn_flags = builder.ast.get_data2(fn_node)
     if sig_idx >= 0:
@@ -10288,6 +10299,107 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     if (fn_flags / FnFlags.TAILREC) % 2 == 1:
         builder.body.optimize_self_tail_calls()
 
+    builder.body
+
+fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, group: i32) -> MirBody:
+    let dispatch_sym = sema.fn_clause_group_name(group)
+    let sig_idx = sema.get_sig(dispatch_sym)
+    let dispatch_body_sym = mir_symbol_for_pool(sema, pool, dispatch_sym)
+    var builder = MirBuilder.init(sema, ast_pool, pool, dispatch_body_sym)
+    if sig_idx < 0:
+        builder.body.local_type_ids.set_i32(0, sema.ty_void)
+        builder.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+        return builder.body
+
+    let ret_ty = sema.sig_return_type(sig_idx)
+    builder.body.local_type_ids.set_i32(0, ret_ty)
+    builder.push_scope()
+
+    let clause_count = sema.fn_clause_group_clause_count(group)
+    let first_clause = if clause_count > 0: sema.fn_clause_group_clause(group, 0) else: 0
+    let first_meta = if first_clause != 0: ast_pool.find_fn_meta(first_clause) else: -1
+    let param_count = sema.sig_get_param_count(sig_idx)
+    let param_locals: Vec[i32] = Vec.new()
+    for pi in 0..param_count:
+        var p_name = pool.intern(f"__param_{pi}")
+        if first_meta >= 0:
+            let first_param_start = ast_pool.fn_meta_param_start(first_meta)
+            if pi < ast_pool.fn_meta_param_count(first_meta):
+                p_name = ast_pool.fn_param_name(first_param_start, pi)
+        let p_ty = sema.sig_param_type(sig_idx, pi)
+        let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
+        builder.bind_local(p_name, local_id)
+        builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, if first_clause != 0: ast_pool.get_start(first_clause) else: 0)
+        if builder.local_type_is_str(local_id) != 0:
+            builder.set_string_local_flags(local_id, 1)
+        if sema.is_copy(p_ty) == 0:
+            builder.schedule_drop(local_id, DropKind.DK_VALUE)
+        param_locals.push(local_id)
+    builder.body.n_params = param_count
+
+    var dispatch_bb = builder.cur_bb
+    for ci in 0..clause_count:
+        let clause_node = sema.fn_clause_group_clause(group, ci)
+        let clause_di = sema.find_decl_index(clause_node)
+        let clause_sym = mir_symbol_for_pool(sema, pool, sema.fn_decl_semantic_symbol_at(clause_node, ast_pool.get_data0(clause_node), clause_di))
+        let clause_meta = ast_pool.find_fn_meta(clause_node)
+        let arm_bb = builder.new_block()
+        let fail_bb = if ci + 1 < clause_count: builder.new_block() else: builder.new_block()
+
+        builder.switch_to(dispatch_bb)
+        var cur_test_bb = dispatch_bb
+        if clause_meta >= 0:
+            let pmeta = ast_pool.find_fn_param_pattern_meta(clause_node)
+            if pmeta >= 0:
+                let ppat_start = ast_pool.fn_param_pattern_meta_start(pmeta)
+                let ppat_count = ast_pool.fn_param_pattern_meta_count(pmeta)
+                for pi in 0..param_count:
+                    if pi < ppat_count:
+                        let ppat = ast_pool.fn_param_pattern_value(ppat_start + pi)
+                        if ppat != 0:
+                            let next_test_bb = builder.new_block()
+                            builder.switch_to(cur_test_bb)
+                            builder.lower_pattern_match(builder.place_for_local(param_locals.get(pi as i64)), ppat, next_test_bb, fail_bb)
+                            cur_test_bb = next_test_bb
+            builder.switch_to(cur_test_bb)
+            builder.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
+        else:
+            builder.terminate(TermKind.TK_GOTO, arm_bb, 0, 0, 0)
+
+        builder.switch_to(arm_bb)
+        let fn_op = builder.const_operand(ConstKind.CK_FN, clause_sym, sema.ty_void)
+        let args: Vec[i32] = Vec.new()
+        for pi2 in 0..param_count:
+            let p_ty = sema.sig_param_type(sig_idx, pi2)
+            let place = builder.place_for_local(param_locals.get(pi2 as i64))
+            args.push(builder.body.new_operand(if sema.is_copy(p_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, place))
+        let args_id = builder.body.new_call_args(args)
+        let call_ret_local = builder.new_temp(ret_ty)
+        let call_ret_place = builder.place_for_local(call_ret_local)
+        let after_call_bb = builder.new_block()
+        builder.terminate(TermKind.TK_CALL, fn_op, args_id, call_ret_place, after_call_bb)
+        builder.switch_to(after_call_bb)
+        if ret_ty != sema.ty_void:
+            let ret_op = builder.body.new_operand(if sema.is_copy(ret_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, call_ret_place)
+            builder.assign_operand_to_place(builder.place_for_local(0), ret_op, ast_pool.get_start(clause_node))
+        builder.emit_drops_for_return()
+        builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+
+        dispatch_bb = fail_bb
+
+    builder.switch_to(dispatch_bb)
+    let panic_sym = sema.pool_lookup_symbol("with_panic")
+    let panic_op = builder.const_operand(ConstKind.CK_FN, panic_sym, sema.ty_void)
+    let panic_args: Vec[i32] = Vec.new()
+    panic_args.push(builder.lower_str_lit(pool.intern("no function clause matched")))
+    panic_args.push(builder.lower_str_lit(pool.intern("")))
+    panic_args.push(builder.int_const_operand(0, sema.ty_i32))
+    let panic_args_id = builder.body.new_call_args(panic_args)
+    let panic_place = builder.place_for_local(builder.new_temp(sema.ty_void))
+    let unreachable_bb = builder.new_block()
+    builder.terminate(TermKind.TK_CALL, panic_op, panic_args_id, panic_place, unreachable_bb)
+    builder.switch_to(unreachable_bb)
+    builder.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
     builder.body
 
 fn MirBody.optimize_self_tail_calls(mut self: MirBody):
@@ -10726,6 +10838,7 @@ fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModul
             continue
 
         let fn_sym = sema.fn_decl_semantic_symbol_at(decl as i32, ast_pool.get_data0(decl), di)
+        let mir_fn_sym = mir_symbol_for_pool(&sema, pool, fn_sym)
         if mir_fn_is_generic_template_at(&sema, ast_pool, pool, decl as i32, di):
             continue
 
@@ -10735,7 +10848,7 @@ fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModul
             let sig_idx = sema.get_sig(fn_sym)
             if sig_idx < 0:
                 continue
-            var source_builder = MirBuilder.init(&sema, ast_pool, pool, fn_sym)
+            var source_builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)
             source_builder.in_generator = 1
             let source_body = lower_fn_with_sig(source_builder, decl as i32, sig_idx)
             let ctor_body = lower_generator_constructor(sema, ast_pool, pool, decl as i32, sig_idx)
@@ -10743,9 +10856,15 @@ fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModul
             mir_mod.add_body(ctor_body)
             mir_mod.add_body(next_body)
             continue
-        var builder = MirBuilder.init(&sema, ast_pool, pool, fn_sym)
+        var builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)
         let body = lower_fn(builder, decl as i32)
         mir_mod.add_body(body)
+
+    for gi in 0..sema.fn_clause_group_count():
+        let dispatch_sym = sema.fn_clause_group_name(gi)
+        if sema.generic_fn_nodes.contains(dispatch_sym):
+            continue
+        mir_mod.add_body(lower_fn_clause_dispatcher(&sema, ast_pool, pool, gi))
 
     mir_mod
 

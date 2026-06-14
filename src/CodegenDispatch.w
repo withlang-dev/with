@@ -11373,6 +11373,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: &MirBody):
     let name_str = if resolved_name.len() > 0: resolved_name else: if sema_name.len() > 0: sema_name else: self.fn_decl_name_from_node(fn_node)
     if name_sym == 0:
         return
+    self.generated_mir_body_syms.insert(name_sym, 1)
     let fv = self.fn_values.get(name_sym)
     if not fv.is_some():
         with_eprint("error: no fn_value for MIR function: " ++ name_str)
@@ -11479,9 +11480,13 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: &MirBody):
     let meta = self.pool.find_fn_meta(fn_node)
     var param_start = 0
     var param_count = 0
+    var has_ast_params = 0
     if meta >= 0:
         param_start = self.pool.fn_meta_param_start(meta)
         param_count = self.pool.fn_meta_param_count(meta)
+        has_ast_params = 1
+    else:
+        param_count = body.n_params
     let fn_byval_mask_opt = self.extern_fn_byval_params.get(name_sym)
     let fn_byval_mask = if fn_byval_mask_opt.is_some(): fn_byval_mask_opt.unwrap() as i64 else: 0
     var fn_byval_types: Vec[i64] = Vec.new()
@@ -11504,8 +11509,16 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: &MirBody):
 
     let max_params = param_count
     for pi in 0..max_params:
-        let p_name = self.pool.fn_param_name(param_start, pi)
-        let p_type_node = self.pool.fn_param_type(param_start, pi)
+        let p_name =
+            if has_ast_params != 0:
+                self.pool.fn_param_name(param_start, pi)
+            else:
+                if pi + 1 < body.local_names.len() as i32: body.local_names.get((pi + 1) as i64) else: self.intern.intern(f"__param_{pi}")
+        let p_type_node =
+            if has_ast_params != 0:
+                self.pool.fn_param_type(param_start, pi)
+            else:
+                0
         let actual_pi = pi + (if fn_has_sret != 0: 1 else: 0)
         let param_val = wl_get_param(function, actual_pi)
         var param_type = wl_type_of(param_val)

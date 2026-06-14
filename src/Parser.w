@@ -7023,6 +7023,33 @@ fn Parser.parse_param_attrs(self: Parser) -> i32:
         self.skip_newlines()
     flags
 
+fn Parser.param_binding_should_parse_pattern(self: Parser) -> bool:
+    let t = self.peek()
+    if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_L_BRACKET or
+       t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_DOT_DOT or t == TokenKind.TK_INT_LIT or
+       t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or
+       t == TokenKind.TK_REGEX_LIT or t == TokenKind.TK_MINUS:
+        return true
+    if t != TokenKind.TK_IDENT:
+        return true
+
+    let start = self.current_start()
+    let end = self.current_end()
+    let text = self.source.slice(start as i64, end as i64)
+    if text == "_":
+        return true
+    if text.len() > 0:
+        let first = text.byte_at(0 as i64)
+        if first >= 65 and first <= 90:
+            return true
+
+    let saved_pos = self.pos
+    self.advance()
+    let next = self.peek()
+    self.pos = saved_pos
+    next == TokenKind.TK_DOT or next == TokenKind.TK_DOT_IDENT or
+    next == TokenKind.TK_L_PAREN or next == TokenKind.TK_L_BRACE or next == TokenKind.TK_AT
+
 fn Parser.parse_param_list(self: Parser) -> i32:
     var params: Vec[i32] = Vec.new()
     var default_nodes: Vec[i32] = Vec.new()
@@ -7066,16 +7093,14 @@ fn Parser.parse_param_list(self: Parser) -> i32:
 
         var name = 0
         var param_pattern: NodeId = 0 as NodeId
-        if self.peek() == TokenKind.TK_IDENT:
+        if self.param_binding_should_parse_pattern():
+            param_pattern = self.parse_pattern()
+            let synth = f"__param_pat_{self.pos}_{(params.len() / (FN_PARAM_STRIDE as i64)) as i32}"
+            name = self.intern.intern(synth)
+        else if self.peek() == TokenKind.TK_IDENT:
             name = self.expect_ident()
         else:
-            let t = self.peek()
-            if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_DOT_IDENT:
-                param_pattern = self.parse_pattern()
-                let synth = f"__param_pat_{self.pos}_{(params.len() / (FN_PARAM_STRIDE as i64)) as i32}"
-                name = self.intern.intern(synth)
-            else:
-                name = self.expect_ident()
+            name = self.expect_ident()
         if name == 0:
             break
 

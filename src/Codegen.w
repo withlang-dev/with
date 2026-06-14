@@ -162,6 +162,7 @@ type Codegen {
     // Declared functions: sym → value/type
     fn_values: HashMap[i32, i64],
     fn_fn_types: HashMap[i32, i64],
+    generated_mir_body_syms: HashMap[i32, i32],
     // C ABI: fns with struct params/returns transformed for C ABI.
     // Maps fn sym → 1 if the fn has an sret return (first param is hidden sret ptr).
     extern_fn_has_sret: HashMap[i32, i32],
@@ -567,6 +568,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         local_sema_types: HashMap.new(),
         fn_values: HashMap.new(),
         fn_fn_types: HashMap.new(),
+        generated_mir_body_syms: HashMap.new(),
         extern_fn_has_sret: HashMap.new(),
         extern_fn_byval_params: HashMap.new(),
         extern_fn_byval_types: HashMap.new(),
@@ -3979,6 +3981,54 @@ fn Codegen.declare_generator_next_functions(self: Codegen):
             continue
         self.declare_function_from_sig(fn_sym, si, 1)
 
+fn Codegen.find_sema_sig_for_mir_body_sym(self: Codegen, body_sym: i32) -> (i32, i32):
+    let body_name = self.function_symbol_name(body_sym)
+    if body_name.len() == 0:
+        return (0, -1)
+    for si in 0..self.sema.sig_names.len() as i32:
+        let sig_sym = self.sema.sig_names.get(si as i64)
+        if self.sema_symbol_text(sig_sym) == body_name:
+            return (sig_sym, si)
+    (0, -1)
+
+fn Codegen.mir_body_is_generated_function_clause(self: Codegen, body_sym: i32) -> bool:
+    let body_name = self.function_symbol_name(body_sym)
+    if body_name.contains("$clause$"):
+        return true
+    for gi in 0..self.sema.fn_clause_group_count():
+        if self.sema_symbol_text(self.sema.fn_clause_group_name(gi)) == body_name:
+            return true
+    false
+
+fn Codegen.declare_mir_only_functions(self: Codegen):
+    for bi in 0..self.mir_input.body_fn_syms.len() as i32:
+        let body_sym = self.mir_input.body_fn_syms.get(bi as i64)
+        if body_sym == 0:
+            continue
+        if not self.mir_body_is_generated_function_clause(body_sym):
+            continue
+        if self.fn_values.get(body_sym).is_some():
+            continue
+        let sig_pair = self.find_sema_sig_for_mir_body_sym(body_sym)
+        let sig_sym = sig_pair.0
+        let sig_idx = sig_pair.1
+        if sig_sym != 0 and sig_idx >= 0:
+            self.declare_function_from_sig(sig_sym, sig_idx, 1)
+
+fn Codegen.gen_mir_only_functions(self: Codegen):
+    for bi in 0..self.mir_input.body_fn_syms.len() as i32:
+        let body_sym = self.mir_input.body_fn_syms.get(bi as i64)
+        if body_sym == 0:
+            continue
+        if not self.mir_body_is_generated_function_clause(body_sym):
+            continue
+        if self.generated_mir_body_syms.contains(body_sym):
+            continue
+        let body = self.mir_input.bodies.get(bi as i64)
+        if body.lowering_failed != 0 or body.block_count() == 0:
+            continue
+        self.gen_function_mir(0, body)
+
 fn Codegen.is_method_on_generic_struct(self: Codegen, name_sym: i32) -> bool:
     if name_sym <= 0:
         return false
@@ -5441,6 +5491,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             else:
                 self.declare_function_at(decl, i)
     self.declare_generator_next_functions()
+    self.declare_mir_only_functions()
 
     // Pass 1.3: synthesize missing impl methods from trait defaults.
     self.generate_default_trait_methods()
@@ -5480,6 +5531,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
                 let is_generic_struct_method = self.is_method_on_generic_struct(name_sym)
                 if tp_count == 0 and not self.sema.generic_fn_nodes.contains(name_sym) and not is_generic_struct_method:
                     self.gen_function_dispatch_at(decl, i)
+    self.gen_mir_only_functions()
     self.gen_generator_next_functions_from_mir()
 
     if self.had_error != 0:
