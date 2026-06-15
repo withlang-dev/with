@@ -5305,6 +5305,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.MAP_LEN64: return CcBuiltin.MAP_LEN64
     if intrinsic == MirIntrinsic.MAP_ULEN32: return CcBuiltin.MAP_ULEN32
     if intrinsic == MirIntrinsic.MAP_REMOVE: return CcBuiltin.MAP_REMOVE
+    if intrinsic == MirIntrinsic.COLLECTION_LITERAL or intrinsic == MirIntrinsic.MAP_LITERAL: return CcBuiltin.GENERIC_CALL
     if intrinsic == MirIntrinsic.OPT_IS_SOME: return CcBuiltin.OPT_IS_SOME
     if intrinsic == MirIntrinsic.OPT_UNWRAP: return CcBuiltin.OPT_UNWRAP
     if intrinsic == MirIntrinsic.OPT_EXPECT: return CcBuiltin.OPT_EXPECT

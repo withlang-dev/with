@@ -8087,6 +8087,8 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: &MirBody, i
     true
 
 fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    if self.mir_emit_collection_literal_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
+        return true
     if self.mir_emit_vec_core_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
         return true
     if self.mir_emit_map_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
@@ -8096,6 +8098,105 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: &MirBody, intrinsic: Mir
     if self.mir_emit_atomic_fiber_intrinsic_call(body, intrinsic, args_id, dest_place, next_bb):
         return true
     self.mir_emit_intrinsic_call_ext(body, intrinsic, args_id, dest_place, next_bb)
+
+fn Codegen.mir_collection_literal_target(self: Codegen, body: &MirBody, dest_place: i32) -> (i32, i32, i32):
+    let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+    if dest_sema == 0:
+        return (0, 0, 0)
+    let resolved = self.mir_input.mir_resolve_alias(dest_sema)
+    if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return (0, 0, 0)
+    let base_sym = self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
+    let arg_count = self.mir_input.mir_get_type_d2(resolved)
+    let arg_start = self.mir_input.mir_get_type_d1(resolved)
+    let first_arg = if arg_count > 0: self.mir_input.mir_get_type_extra(arg_start) else: 0
+    let second_arg = if arg_count > 1: self.mir_input.mir_get_type_extra(arg_start + 1) else: 0
+    (base_sym, first_arg, second_arg)
+
+fn Codegen.mir_emit_collection_literal_intrinsic_call(self: Codegen, body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    if intrinsic != MirIntrinsic.COLLECTION_LITERAL and intrinsic != MirIntrinsic.MAP_LITERAL:
+        return false
+    let i64_ty = wl_i64_type(self.context)
+    let byte_ty = wl_i8_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let void_ty = wl_void_type(self.context)
+    let arg_count = body.call_arg_counts.get(args_id as i64)
+    let (base_sym, first_tid, second_tid) = self.mir_collection_literal_target(body, dest_place)
+    var result: i64 = 0
+
+    if intrinsic == MirIntrinsic.COLLECTION_LITERAL and base_sym == self.sym_vec:
+        let elem_ty0 = self.sema_type_to_llvm(first_tid)
+        let elem_ty = if elem_ty0 != 0: elem_ty0 else: i64_ty
+        let vec_ty0 = self.mir_dest_llvm_type(body, dest_place)
+        let vec_ty = if vec_ty0 != 0: vec_ty0 else: self.get_or_create_vec_type(0, elem_ty)
+        let out_ptr = self.create_entry_alloca(vec_ty)
+        wl_build_store(self.builder, self.build_default_value(vec_ty), out_ptr)
+        let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
+        let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
+        let new_args: Vec[i64] = Vec.new()
+        new_args.push(out_ptr)
+        new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
+        let _new = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
+        let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
+        let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
+        for i in 0..arg_count:
+            let raw = self.mir_intrinsic_arg(body, args_id, i)
+            let elem = if wl_type_of(raw) != elem_ty: self.coerce_value_to_type(raw, elem_ty) else: raw
+            let elem_alloca = self.create_entry_alloca(elem_ty)
+            wl_build_store(self.builder, elem, elem_alloca)
+            let push_args: Vec[i64] = Vec.new()
+            push_args.push(out_ptr)
+            push_args.push(elem_alloca)
+            let _push = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&push_args), 2)
+        result = wl_build_load(self.builder, vec_ty, out_ptr)
+
+    else if (intrinsic == MirIntrinsic.COLLECTION_LITERAL and base_sym == self.sym_hashset) or (intrinsic == MirIntrinsic.MAP_LITERAL and base_sym == self.sym_hashmap):
+        let key_ty0 = self.sema_type_to_llvm(first_tid)
+        let val_ty0 = if intrinsic == MirIntrinsic.MAP_LITERAL: self.sema_type_to_llvm(second_tid) else: byte_ty
+        let key_ty = if key_ty0 != 0: key_ty0 else: i64_ty
+        let val_ty = if val_ty0 != 0: val_ty0 else: byte_ty
+        let map_ty0 = self.mir_dest_llvm_type(body, dest_place)
+        let map_ty = if map_ty0 != 0: map_ty0 else: if base_sym == self.sym_hashset: self.get_or_create_hashset_type(0, key_ty) else: self.get_or_create_hashmap_type(0, key_ty, val_ty)
+        let new_fn = self.ensure_hashmap_new_declared()
+        let new_ty = self.get_hashmap_new_fn_type()
+        let new_args2: Vec[i64] = Vec.new()
+        new_args2.push(wl_const_int(i64_ty, self.abi_size_of(key_ty), 0))
+        new_args2.push(wl_const_int(i64_ty, self.abi_size_of(val_ty), 0))
+        let handle = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args2), 2)
+        var map_value = wl_build_insert_value(self.builder, self.build_default_value(map_ty), handle, 0)
+        let insert_params: Vec[i64] = Vec.new()
+        insert_params.push(ptr_ty)
+        insert_params.push(ptr_ty)
+        insert_params.push(ptr_ty)
+        insert_params.push(i64_ty)
+        let insert_ty = wl_function_type(void_ty, vec_data_i64(&insert_params), 4, 0)
+        var insert_fn = wl_get_named_function(self.llmod, "with_hashmap_insert")
+        if insert_fn == 0:
+            insert_fn = wl_add_function(self.llmod, "with_hashmap_insert", insert_ty)
+        let entry_count = if intrinsic == MirIntrinsic.MAP_LITERAL: arg_count / 2 else: arg_count
+        for i2 in 0..entry_count:
+            let key_arg_idx = if intrinsic == MirIntrinsic.MAP_LITERAL: i2 * 2 else: i2
+            let val_arg_idx = key_arg_idx + 1
+            let key_raw = self.mir_intrinsic_arg(body, args_id, key_arg_idx)
+            let key = if wl_type_of(key_raw) != key_ty: self.coerce_value_to_type(key_raw, key_ty) else: key_raw
+            let val_raw = if intrinsic == MirIntrinsic.MAP_LITERAL: self.mir_intrinsic_arg(body, args_id, val_arg_idx) else: wl_const_int(byte_ty, 1, 0)
+            let val = if wl_type_of(val_raw) != val_ty: self.coerce_value_to_type(val_raw, val_ty) else: val_raw
+            let key_alloca = self.create_entry_alloca(key_ty)
+            let val_alloca = self.create_entry_alloca(val_ty)
+            wl_build_store(self.builder, key, key_alloca)
+            wl_build_store(self.builder, val, val_alloca)
+            let insert_args: Vec[i64] = Vec.new()
+            insert_args.push(handle)
+            insert_args.push(key_alloca)
+            insert_args.push(val_alloca)
+            insert_args.push(wl_const_int(i64_ty, if self.is_str_type(key_ty): 1 else: 0, 0))
+            let _ins = wl_build_call(self.builder, insert_ty, insert_fn, vec_data_i64(&insert_args), 4)
+        result = map_value
+
+    else:
+        return false
+    self.mir_finish_intrinsic_call(body, dest_place, next_bb, result)
+    true
 
 fn Codegen.mir_emit_ext_string_map_intrinsic_call(self: Codegen, body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
     let i64_ty = wl_i64_type(self.context)

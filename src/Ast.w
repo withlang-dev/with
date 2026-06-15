@@ -114,6 +114,9 @@ pub enum NodeKind: i32:
     NK_NEG_MATCH_OP = 124
     // NK_NO_SUSPEND: d0=body(node), d1=0, d2=0
     NK_NO_SUSPEND = 126
+    // NK_MAP_LIT: d0=extra_start, d1=pair_count, d2=0
+    // Extra stores key/value node pairs in source order.
+    NK_MAP_LIT = 128
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81

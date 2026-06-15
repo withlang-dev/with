@@ -6454,8 +6454,43 @@ fn Parser.parse_array_literal(self: Parser) -> NodeId:
     self.skip_newlines()
     var elems: Vec[i32] = Vec.new()
 
+    if self.peek() == TokenKind.TK_COLON:
+        self.advance()
+        self.skip_newlines()
+        self.expect(TokenKind.TK_R_BRACKET)
+        let empty_start = self.pool.extra_len()
+        return self.pool.add_node(NodeKind.NK_MAP_LIT, start, self.prev_end(), empty_start, 0, 0)
+
     if self.peek() != TokenKind.TK_R_BRACKET:
         let first = self.parse_expr()
+
+        if self.peek() == TokenKind.TK_COLON:
+            let keys: Vec[i32] = Vec.new()
+            let values: Vec[i32] = Vec.new()
+            keys.push(first as i32)
+            while true:
+                if self.peek() != TokenKind.TK_COLON:
+                    self.emit_error("map literal entries require ':' between key and value")
+                    return self.poisoned_expr()
+                self.advance()
+                self.skip_newlines()
+                values.push(self.parse_expr() as i32)
+                self.skip_newlines()
+                if self.peek() != TokenKind.TK_COMMA:
+                    break
+                self.advance()
+                self.skip_newlines()
+                if self.peek() == TokenKind.TK_R_BRACKET:
+                    break
+                keys.push(self.parse_expr() as i32)
+                self.skip_newlines()
+            self.expect(TokenKind.TK_R_BRACKET)
+            let pair_count = keys.len() as i32
+            let map_extra_start = self.pool.extra_len()
+            for mi in 0..pair_count:
+                self.pool.add_extra(keys.get(mi as i64))
+                self.pool.add_extra(values.get(mi as i64))
+            return self.pool.add_node(NodeKind.NK_MAP_LIT, start, self.prev_end(), map_extra_start, pair_count, 0)
 
         // Array fill: [value; N]
         if self.peek() == TokenKind.TK_SEMICOLON:
@@ -6519,7 +6554,11 @@ fn Parser.parse_array_literal(self: Parser) -> NodeId:
             self.skip_newlines()
             if self.peek() == TokenKind.TK_R_BRACKET:
                 break
-            elems.push(self.parse_expr() as i32)
+            let elem = self.parse_expr()
+            if self.peek() == TokenKind.TK_COLON:
+                self.emit_error("element and map forms cannot be mixed in one literal")
+                return self.poisoned_expr()
+            elems.push(elem as i32)
 
     self.expect(TokenKind.TK_R_BRACKET)
     let extra_start = self.pool.extra_len()

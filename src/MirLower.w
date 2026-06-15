@@ -3872,6 +3872,76 @@ fn MirBuilder.lower_vec_literal(self: MirBuilder, node: i32, vec_ty: i32) -> i32
         return self.body.new_operand(OperandKind.OK_COPY, vec_place)
     self.body.new_operand(OperandKind.OK_MOVE, vec_place)
 
+fn MirBuilder.literal_target_base_sym(self: MirBuilder, ty: i32) -> i32:
+    if ty == 0:
+        return 0
+    let resolved = self.sema.resolve_alias(ty)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    self.sema.get_generic_inst_base(resolved as i32)
+
+fn MirBuilder.lower_collection_literal_call(self: MirBuilder, node: i32, intrinsic: MirIntrinsic, operands: &Vec[i32]) -> i32:
+    let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("__collection_literal"), self.sema.ty_void)
+    let args_id = self.body.new_call_args(operands)
+    let ret_type = self.expr_type(node)
+    let result_local = self.new_temp(ret_type)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.body.set_call_intrinsic(args_id, intrinsic)
+    self.body.set_call_ast_node(args_id, node)
+    self.switch_to(next_bb)
+    if self.sema.is_copy(ret_type) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, result_place)
+    self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+fn MirBuilder.lower_collection_seq_literal(self: MirBuilder, node: i32) -> i32:
+    let elem_start = self.ast.get_data0(node)
+    let elem_count = self.ast.get_data1(node)
+    let target_ty = self.expr_type(node)
+    let target_base = self.literal_target_base_sym(target_ty)
+    if target_base != self.sema.syms.vec and target_base != self.sema.syms.hashset:
+        return -1
+    var elem_ty = 0
+    let resolved = self.sema.resolve_alias(target_ty)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) > 0:
+        elem_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
+    let saved_expected = self.expected_type
+    let args: Vec[i32] = Vec.new()
+    for i in 0..elem_count:
+        let elem_node = self.ast.get_extra(elem_start + i)
+        if elem_ty != 0:
+            self.expected_type = elem_ty
+        args.push(self.lower_expr(elem_node))
+        self.expected_type = saved_expected
+    self.lower_collection_literal_call(node, MirIntrinsic.COLLECTION_LITERAL, &args)
+
+fn MirBuilder.lower_map_literal(self: MirBuilder, node: i32) -> i32:
+    let pair_start = self.ast.get_data0(node)
+    let pair_count = self.ast.get_data1(node)
+    let target_ty = self.expr_type(node)
+    let resolved = self.sema.resolve_alias(target_ty)
+    var key_ty = 0
+    var val_ty = 0
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
+        key_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
+        val_ty = self.sema.get_generic_inst_arg(resolved as i32, 1)
+    let saved_expected = self.expected_type
+    let args: Vec[i32] = Vec.new()
+    for i in 0..pair_count:
+        let key_node = self.ast.get_extra(pair_start + i * 2)
+        let val_node = self.ast.get_extra(pair_start + i * 2 + 1)
+        if key_ty != 0:
+            self.expected_type = key_ty
+        args.push(self.lower_expr(key_node))
+        if val_ty != 0:
+            self.expected_type = val_ty
+        else:
+            self.expected_type = saved_expected
+        args.push(self.lower_expr(val_node))
+        self.expected_type = saved_expected
+    self.lower_collection_literal_call(node, MirIntrinsic.MAP_LITERAL, &args)
+
 fn MirBuilder.lower_deref(self: MirBuilder, expr: i32) -> i32:
     let base = self.lower_expr_place(expr)
     self.body.new_deref_place(base)
@@ -9897,6 +9967,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.body.new_operand(OperandKind.OK_COPY, tup_place)
 
     if kind == NodeKind.NK_ARRAY_LIT:
+        let collection_op = self.lower_collection_seq_literal(node)
+        if collection_op >= 0:
+            return collection_op
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         if elem_count > 64:
@@ -9927,6 +10000,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let arr_place = self.place_for_local(arr_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, arr_place, arr_rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, arr_place)
+
+    if kind == NodeKind.NK_MAP_LIT:
+        return self.lower_map_literal(node)
 
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
         var vs_name_sym = self.resolve_variant_sym(node)

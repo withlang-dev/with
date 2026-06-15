@@ -4375,6 +4375,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_ARRAY_LIT:
         return self.check_array_literal(node) as TypeId
 
+    if kind == NodeKind.NK_MAP_LIT:
+        return self.check_map_literal(node) as TypeId
+
     if kind == NodeKind.NK_STRUCT_LIT:
         return self.check_struct_literal(node) as TypeId
 
@@ -7983,15 +7986,34 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)
     let elem_count = self.ast.get_data1(node)
     var expected_elem = 0
+    var target_ty = 0
+    var target_base = 0
     if self.has_expected_type != 0 and self.expected_expr_type != 0:
         let expected = self.resolve_alias(self.expected_expr_type)
         let expected_kind = self.get_type_kind(expected)
         if expected_kind == TypeKind.TY_ARRAY or expected_kind == TypeKind.TY_SLICE:
             expected_elem = self.get_type_d0(expected)
+            target_ty = self.expected_expr_type as i32
+        else if expected_kind == TypeKind.TY_GENERIC_INST:
+            target_base = self.get_generic_inst_base(expected as i32)
+            let target_name = self.pool_resolve(target_base)
+            if target_base == self.syms.vec or target_base == self.syms.hashset:
+                expected_elem = self.get_generic_inst_arg(expected as i32, 0)
+                target_ty = expected as i32
+            else if target_name == "BTreeSet":
+                self.emit_error("collection literal target BTreeSet is not implemented yet (#414)", node)
+                return 0
+            else if target_base == self.syms.hashmap or target_name == "BTreeMap":
+                self.emit_error("sequence literal cannot target a map; use [key: value] form", node)
+                return 0
     if elem_count == 0:
+        if target_ty != 0:
+            self.typed_expr_types.insert(node, target_ty)
+            return target_ty
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
-            self.typed_expr_types.insert(node, self.expected_expr_type as i32)
-            return self.expected_expr_type as i32
+            self.emit_error("empty sequence literal requires array, slice, Vec, or HashSet expected type", node)
+            return 0
+        self.emit_error("empty sequence literal requires expected type", node)
         return 0
 
     var elem_type = 0
@@ -8009,12 +8031,78 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
 
     if expected_elem != 0:
         elem_type = expected_elem
-    let result: TypeId = if self.has_expected_type != 0 and self.expected_expr_type != 0 and expected_elem != 0:
-        self.expected_expr_type
+    let result: TypeId = if target_ty != 0:
+        target_ty as TypeId
     else:
         self.add_type(TypeKind.TY_ARRAY, elem_type, elem_count, 0)
     self.typed_expr_types.insert(node, result as i32)
     result as i32
+
+fn Sema.check_map_literal(self: Sema, node: i32) -> i32:
+    let extra_start = self.ast.get_data0(node)
+    let pair_count = self.ast.get_data1(node)
+    var target_ty = 0
+    var key_expected = 0
+    var val_expected = 0
+    if self.has_expected_type != 0 and self.expected_expr_type != 0:
+        let expected = self.resolve_alias(self.expected_expr_type)
+        if self.get_type_kind(expected) != TypeKind.TY_GENERIC_INST:
+            self.emit_error("map literal requires HashMap expected type", node)
+            return 0
+        let base = self.get_generic_inst_base(expected as i32)
+        let base_name = self.pool_resolve(base)
+        if base_name == "BTreeMap":
+            self.emit_error("map literal target BTreeMap is not implemented yet (#414)", node)
+            return 0
+        if base != self.syms.hashmap:
+            self.emit_error("map literal requires HashMap expected type", node)
+            return 0
+        if self.get_generic_inst_arg_count(expected as i32) != 2:
+            self.emit_error("HashMap map literal target requires key and value types", node)
+            return 0
+        target_ty = expected as i32
+        key_expected = self.get_generic_inst_arg(expected as i32, 0)
+        val_expected = self.get_generic_inst_arg(expected as i32, 1)
+    else if pair_count == 0:
+        self.emit_error("empty map literal requires expected HashMap type", node)
+        return 0
+
+    var key_ty = key_expected
+    var val_ty = val_expected
+    for i in 0..pair_count:
+        let key_node = self.ast.get_extra(extra_start + i * 2)
+        let val_node = self.ast.get_extra(extra_start + i * 2 + 1)
+        let kt = if key_expected != 0:
+            self.check_expr_with_expected(key_node, key_expected as TypeId)
+        else if key_ty != 0 and sema_node_is_numeric_literal(self.ast, key_node):
+            self.check_expr_with_expected(key_node, key_ty as TypeId)
+        else:
+            self.check_expr(key_node)
+        let vt = if val_expected != 0:
+            self.check_expr_with_expected(val_node, val_expected as TypeId)
+        else if val_ty != 0 and sema_node_is_numeric_literal(self.ast, val_node):
+            self.check_expr_with_expected(val_node, val_ty as TypeId)
+        else:
+            self.check_expr(val_node)
+        if key_ty == 0:
+            key_ty = kt as i32
+        else if kt != 0 and self.types_compatible(key_ty as TypeId, kt) == 0:
+            self.emit_error("map literal key types must match", key_node)
+        if val_ty == 0:
+            val_ty = vt as i32
+        else if vt != 0 and self.types_compatible(val_ty as TypeId, vt) == 0:
+            self.emit_error("map literal value types must match", val_node)
+    if target_ty == 0:
+        let args: Vec[i32] = Vec.new()
+        args.push(key_ty)
+        args.push(val_ty)
+        target_ty = self.ensure_generic_inst_type(self.syms.hashmap, args, 2) as i32
+    let hash_trait = self.pool_lookup_symbol("Hash")
+    if hash_trait != 0 and key_ty != 0 and self.type_implements_trait(key_ty, hash_trait) == 0:
+        self.emit_error("HashMap literal key type must implement Hash", node)
+        return 0
+    self.typed_expr_types.insert(node, target_ty)
+    target_ty
 
 fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
     let name = self.ast.get_data0(node)
