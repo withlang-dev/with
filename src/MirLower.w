@@ -6999,7 +6999,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "none": return MirIntrinsic.ITER_NONE
         if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
         if method_name == "count": return MirIntrinsic.ITER_COUNT
-        if method_name == "collect": return MirIntrinsic.ITER_COLLECT_VEC
+        if method_name == "collect": return MirIntrinsic.ITER_COLLECT
         if method_name == "partition": return MirIntrinsic.ITER_PARTITION
         if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
         return MirIntrinsic.NONE
@@ -7046,7 +7046,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "none": return MirIntrinsic.ITER_NONE
         if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
         if method_name == "count": return MirIntrinsic.ITER_COUNT
-        if method_name == "collect": return MirIntrinsic.ITER_COLLECT_VEC
+        if method_name == "collect": return MirIntrinsic.ITER_COLLECT
         if method_name == "partition": return MirIntrinsic.ITER_PARTITION
         if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
         return MirIntrinsic.NONE
@@ -9572,6 +9572,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             if self.callable_fn_type_for_expr(callee) != 0:
                 return self.lower_call(callee, self.ast.get_data1(node), self.ast.get_data2(node), self.expr_type(node), node)
             return self.lower_method_call(self.ast.get_data0(callee), self.ast.get_data1(callee), self.ast.get_data1(node), self.ast.get_data2(node), node)
+        if self.ast.kind(callee) == NodeKind.NK_INDEX:
+            let generic_method_base = self.ast.get_data0(callee)
+            if self.ast.kind(generic_method_base) == NodeKind.NK_FIELD_ACCESS:
+                return self.lower_method_call(self.ast.get_data0(generic_method_base), self.ast.get_data1(generic_method_base), self.ast.get_data1(node), self.ast.get_data2(node), node)
         var generic_builtin_sym = 0
         if self.ast.kind(callee) == NodeKind.NK_INDEX or self.ast.kind(callee) == NodeKind.NK_TYPE_GENERIC:
             let gb_base = self.ast.get_data0(callee)

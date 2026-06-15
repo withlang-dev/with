@@ -9565,7 +9565,11 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
             if rhs_method != 0:
                 let method = rhs_method
                 if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
-                    let ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, lhs_ty as i32)
+                    var ret = 0
+                    if method == self.syms.collect and self.ast.kind(rhs_callee) == NodeKind.NK_INDEX:
+                        ret = self.collect_target_type_from_callee(rhs_callee, lhs_ty as i32, node)
+                    else:
+                        ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node, lhs_ty as i32)
                     if ret != 0:
                         self.pipeline_method_calls.insert(node, method)
                         self.typed_expr_types.insert(node, ret)
@@ -9591,7 +9595,11 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
             if self.ast.kind(rhs_indexed_base) == NodeKind.NK_IDENT:
                 let method3 = self.ast.get_data0(rhs_indexed_base)
                 if method3 != 0 and self.pipeline_method_exists(lhs_ty as i32, method3) != 0:
-                    let ret4 = self.check_method_call_parts(lhs, method3, -1, 0, node, lhs_ty as i32)
+                    var ret4 = 0
+                    if method3 == self.syms.collect:
+                        ret4 = self.collect_target_type_from_callee(rhs, lhs_ty as i32, node)
+                    else:
+                        ret4 = self.check_method_call_parts(lhs, method3, -1, 0, node, lhs_ty as i32)
                     if ret4 != 0:
                         self.pipeline_method_calls.insert(node, method3)
                         self.typed_expr_types.insert(node, ret4)
@@ -10449,6 +10457,24 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         if ret != 0:
             self.typed_expr_types.insert(node, ret)
         return ret
+    if self.ast.kind(callee) == NodeKind.NK_INDEX:
+        let generic_method_base = self.ast.get_data0(callee)
+        if self.ast.kind(generic_method_base) == NodeKind.NK_FIELD_ACCESS:
+            let recv_expr2 = self.ast.get_data0(generic_method_base)
+            let recv_field2 = self.ast.get_data1(generic_method_base)
+            let recv_ty2 = self.adjust_static_receiver_type(recv_expr2, self.check_expr(recv_expr2) as i32)
+            if recv_field2 == self.syms.collect:
+                if arg_count != 0:
+                    self.emit_error("collect[C]() takes no runtime arguments", node)
+                    return 0
+                let collect_ret = self.collect_target_type_from_callee(callee, recv_ty2 as i32, node)
+                if collect_ret != 0:
+                    self.typed_expr_types.insert(node, collect_ret)
+                return collect_ret
+            let ret_generic_method = self.check_method_call_parts(recv_expr2, recv_field2, extra_start, arg_count, node, recv_ty2 as i32)
+            if ret_generic_method != 0:
+                self.typed_expr_types.insert(node, ret_generic_method)
+            return ret_generic_method
 
     // Direct call: callee should be ident
     var fn_sym = 0
@@ -13092,6 +13118,101 @@ fn Sema.iterator_constructor_known_but_unimplemented(self: Sema, method_name: st
     if method_name == "unfold": return true
     if method_name == "from_fn": return true
     false
+
+fn Sema.collect_target_type_from_type_node(self: Sema, type_node: i32, iter_elem_ty: i32, node: i32) -> i32:
+    if type_node == 0:
+        self.emit_error("collect[C]() requires a collection target type", node)
+        return 0
+    let target_name =
+        if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+            self.pool_resolve(self.ast.get_data0(type_node))
+        else if self.ast.kind(type_node) == NodeKind.NK_INDEX:
+            let base = self.ast.get_data0(type_node)
+            if self.ast.kind(base) == NodeKind.NK_IDENT: self.pool_resolve(self.ast.get_data0(base)) else: ""
+        else:
+            ""
+    if target_name == "Vec":
+        if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+            return self.ensure_vec_type_for(iter_elem_ty)
+    if target_name == "HashSet":
+        if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+            let hs_args: Vec[i32] = Vec.new()
+            hs_args.push(iter_elem_ty)
+            return self.ensure_generic_inst_type(self.syms.hashset, hs_args, 1) as i32
+    if target_name == "HashMap":
+        if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+            let pair_resolved0 = self.resolve_alias(iter_elem_ty as TypeId)
+            if self.get_type_kind(pair_resolved0) != TypeKind.TY_TUPLE or self.get_type_d1(pair_resolved0) != 2:
+                self.emit_error("collect[HashMap]() requires iterator elements of type (K, V)", node)
+                return 0
+            let pair_start0 = self.get_type_d0(pair_resolved0)
+            let hm_args0: Vec[i32] = Vec.new()
+            hm_args0.push(self.type_extra.get(pair_start0 as i64))
+            hm_args0.push(self.type_extra.get((pair_start0 + 1) as i64))
+            return self.ensure_generic_inst_type(self.syms.hashmap, hm_args0, 2) as i32
+    if target_name == "BTreeSet" or target_name == "BTreeMap":
+        self.emit_error("collect[" ++ target_name ++ "] requires BTree collections, which are not implemented yet (#414)", node)
+        return 0
+
+    let target_ty = self.resolve_type_level_arg_expr(type_node)
+    if target_ty == 0:
+        self.emit_error("collect target type could not be resolved", type_node)
+        return 0
+    let target_resolved = self.resolve_alias(target_ty as TypeId)
+    let target_kind = self.get_type_kind(target_resolved)
+    if target_ty == self.ty_str as i32 or target_resolved == self.ty_str:
+        if self.resolve_alias(iter_elem_ty as TypeId) != self.ty_u8:
+            self.emit_error("collect[String]() currently supports u8 iterator elements", node)
+            return 0
+        return self.ty_str as i32
+    if target_kind != TypeKind.TY_GENERIC_INST:
+        self.emit_error("unsupported collect target '" ++ self.type_name(target_ty) ++ "'", node)
+        return 0
+    let base_sym = self.get_generic_inst_base(target_resolved as i32)
+    let base_name = self.pool_resolve(base_sym)
+    if base_sym == self.syms.vec:
+        let elem_ty = self.get_generic_inst_arg(target_resolved as i32, 0)
+        if self.types_compatible(elem_ty as TypeId, iter_elem_ty as TypeId) == 0:
+            self.emit_error("collect[Vec[T]] element type does not match iterator element type", node)
+            return 0
+        return target_ty
+    if base_sym == self.syms.hashset:
+        let elem_ty2 = self.get_generic_inst_arg(target_resolved as i32, 0)
+        if self.types_compatible(elem_ty2 as TypeId, iter_elem_ty as TypeId) == 0:
+            self.emit_error("collect[HashSet[T]] element type does not match iterator element type", node)
+            return 0
+        return target_ty
+    if base_sym == self.syms.hashmap:
+        let pair_resolved = self.resolve_alias(iter_elem_ty as TypeId)
+        if self.get_type_kind(pair_resolved) != TypeKind.TY_TUPLE or self.get_type_d1(pair_resolved) != 2:
+            self.emit_error("collect[HashMap[K, V]] requires iterator elements of type (K, V)", node)
+            return 0
+        let pair_start = self.get_type_d0(pair_resolved)
+        let key_ty = self.type_extra.get(pair_start as i64)
+        let val_ty = self.type_extra.get((pair_start + 1) as i64)
+        let want_key_ty = self.get_generic_inst_arg(target_resolved as i32, 0)
+        let want_val_ty = self.get_generic_inst_arg(target_resolved as i32, 1)
+        if self.types_compatible(want_key_ty as TypeId, key_ty as TypeId) == 0:
+            self.emit_error("collect[HashMap[K, V]] key type does not match iterator pair key", node)
+            return 0
+        if self.types_compatible(want_val_ty as TypeId, val_ty as TypeId) == 0:
+            self.emit_error("collect[HashMap[K, V]] value type does not match iterator pair value", node)
+            return 0
+        return target_ty
+    if base_name == "BTreeSet" or base_name == "BTreeMap":
+        self.emit_error("collect[" ++ base_name ++ "] requires BTree collections, which are not implemented yet (#414)", node)
+        return 0
+    self.emit_error("unsupported collect target '" ++ self.type_name(target_ty) ++ "'", node)
+    0
+
+fn Sema.collect_target_type_from_callee(self: Sema, callee: i32, recv_type: i32, node: i32) -> i32:
+    if callee == 0 or self.ast.kind(callee) != NodeKind.NK_INDEX:
+        return 0
+    let iter_elem_ty = self.iterator_element_type(recv_type)
+    if iter_elem_ty == 0:
+        return 0
+    let type_node = self.ast.get_data1(callee)
+    self.collect_target_type_from_type_node(type_node, iter_elem_ty, node)
 
 fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_sym: i32, field: i32) -> i32:
     if recv_type == 0:
