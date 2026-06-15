@@ -55,6 +55,33 @@ fn test_pattern_binding:
     let sums = [a + b for (a, b) in src]
     assert_vec_i32(sums, 3, 7, 11)
 
+fn test_hashset_target:
+    let values: HashSet[i32] = [x for x in 0..6 if x % 2 == 0]
+    assert(values.contains(0))
+    assert(values.contains(2))
+    assert(values.contains(4))
+    assert(not values.contains(1))
+
+fn test_hashmap_default:
+    let pairs = [("a", 1), ("b", 2), ("a", 3)]
+    let index = [k: v for (k, v) in pairs]
+    assert(index.get("a").unwrap() == 3)
+    assert(index.get("b").unwrap() == 2)
+    assert(index.get("missing").is_none())
+
+fn test_hashmap_expected_type:
+    let pairs = [("a", 1), ("b", 2), ("a", 3)]
+    let index: HashMap[str, i32] = [k: v * 2 for (k, v) in pairs]
+    assert(index.get("a").unwrap() == 6)
+    assert(index.get("b").unwrap() == 4)
+
+fn test_map_nested_filter:
+    let diagonal = [x: y for x in 0..4 for y in 0..4 if x == y and x > 0]
+    assert(diagonal.get(0).is_none())
+    assert(diagonal.get(1).unwrap() == 1)
+    assert(diagonal.get(2).unwrap() == 2)
+    assert(diagonal.get(3).unwrap() == 3)
+
 fn main:
     test_basic_range()
     test_filter()
@@ -62,4 +89,8 @@ fn main:
     test_nested()
     test_vec_source()
     test_pattern_binding()
+    test_hashset_target()
+    test_hashmap_default()
+    test_hashmap_expected_type()
+    test_map_nested_filter()
     print("ok")

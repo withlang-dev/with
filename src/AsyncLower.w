@@ -258,6 +258,14 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
             self.walk_expr(async_extra_or_zero(self.ast, start + i))
         return
 
+    if kind == NodeKind.NK_MAP_LIT:
+        let start = async_ast_get_data0(self.ast, node)
+        let count = async_ast_get_data1(self.ast, node)
+        for i in 0..count:
+            self.walk_expr(async_extra_or_zero(self.ast, start + i * 2))
+            self.walk_expr(async_extra_or_zero(self.ast, start + i * 2 + 1))
+        return
+
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let comp_start = async_ast_get_data1(self.ast, node)
         let clause_count = async_ast_get_data2(self.ast, node)
@@ -266,6 +274,17 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
             self.walk_expr(async_extra_or_zero(self.ast, base + 1))
             self.walk_expr(async_extra_or_zero(self.ast, base + 2))
         self.walk_expr(async_ast_get_data0(self.ast, node))
+        return
+
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = async_ast_get_data0(self.ast, node)
+        let clause_count = async_ast_get_data1(self.ast, node)
+        for ci in 0..clause_count:
+            let base = comp_start + 2 + ci * 3
+            self.walk_expr(async_extra_or_zero(self.ast, base + 1))
+            self.walk_expr(async_extra_or_zero(self.ast, base + 2))
+        self.walk_expr(async_extra_or_zero(self.ast, comp_start))
+        self.walk_expr(async_extra_or_zero(self.ast, comp_start + 1))
         return
 
     if kind == NodeKind.NK_STRUCT_LIT:

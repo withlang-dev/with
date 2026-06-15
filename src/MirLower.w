@@ -748,6 +748,32 @@ fn MirBuilder.collect_goto_label_depths(self: MirBuilder, node: i32, scope_depth
         for ei in 0..elem_count:
             self.collect_goto_label_depths(self.ast.get_extra(elem_start + ei), scope_depth)
         return
+    if kind == NodeKind.NK_MAP_LIT:
+        let pair_start = self.ast.get_data0(node)
+        let pair_count = self.ast.get_data1(node)
+        for mi in 0..pair_count:
+            self.collect_goto_label_depths(self.ast.get_extra(pair_start + mi * 2), scope_depth)
+            self.collect_goto_label_depths(self.ast.get_extra(pair_start + mi * 2 + 1), scope_depth)
+        return
+    if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+        let comp_start = self.ast.get_data1(node)
+        let clause_count = self.ast.get_data2(node)
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            self.collect_goto_label_depths(self.ast.get_extra(base + 1), scope_depth)
+            self.collect_goto_label_depths(self.ast.get_extra(base + 2), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        return
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = self.ast.get_data0(node)
+        let clause_count = self.ast.get_data1(node)
+        for ci in 0..clause_count:
+            let base = comp_start + 2 + ci * 3
+            self.collect_goto_label_depths(self.ast.get_extra(base + 1), scope_depth)
+            self.collect_goto_label_depths(self.ast.get_extra(base + 2), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_extra(comp_start), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_extra(comp_start + 1), scope_depth)
+        return
     if kind == NodeKind.NK_STRUCT_LIT:
         let field_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
@@ -3084,6 +3110,37 @@ fn MirBuilder.expr_mentions_symbol(self: MirBuilder, node: i32, sym: i32) -> i32
             if self.expr_mentions_symbol(self.ast.get_extra(elem_start + ei), sym) != 0:
                 return 1
         0
+    else if kind == NodeKind.NK_MAP_LIT:
+        let pair_start = self.ast.get_data0(node)
+        let pair_count = self.ast.get_data1(node)
+        for mi in 0..pair_count:
+            if self.expr_mentions_symbol(self.ast.get_extra(pair_start + mi * 2), sym) != 0:
+                return 1
+            if self.expr_mentions_symbol(self.ast.get_extra(pair_start + mi * 2 + 1), sym) != 0:
+                return 1
+        0
+    else if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+        let comp_start = self.ast.get_data1(node)
+        let clause_count = self.ast.get_data2(node)
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            if self.expr_mentions_symbol(self.ast.get_extra(base + 1), sym) != 0:
+                return 1
+            if self.expr_mentions_symbol(self.ast.get_extra(base + 2), sym) != 0:
+                return 1
+        self.expr_mentions_symbol(self.ast.get_data0(node), sym)
+    else if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = self.ast.get_data0(node)
+        let clause_count = self.ast.get_data1(node)
+        for ci in 0..clause_count:
+            let base = comp_start + 2 + ci * 3
+            if self.expr_mentions_symbol(self.ast.get_extra(base + 1), sym) != 0:
+                return 1
+            if self.expr_mentions_symbol(self.ast.get_extra(base + 2), sym) != 0:
+                return 1
+        if self.expr_mentions_symbol(self.ast.get_extra(comp_start), sym) != 0:
+            return 1
+        self.expr_mentions_symbol(self.ast.get_extra(comp_start + 1), sym)
     else if kind == NodeKind.NK_STRUCT_LIT:
         let field_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
@@ -4812,23 +4869,61 @@ fn MirBuilder.bind_comprehension_element(self: MirBuilder, comp_node: i32, pat_o
         self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(span_node))
 
 fn MirBuilder.lower_comprehension_leaf(self: MirBuilder, comp_node: i32, out_place: i32, out_elem_ty: i32):
+    if self.ast.kind(comp_node) == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = self.ast.get_data0(comp_node)
+        let key_expr = self.ast.get_extra(comp_start)
+        let val_expr = self.ast.get_extra(comp_start + 1)
+        let target_ty = self.expr_type(comp_node)
+        let resolved = self.sema.resolve_alias(target_ty)
+        var key_ty = 0
+        var val_ty = out_elem_ty
+        if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
+            key_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
+            val_ty = self.sema.get_generic_inst_arg(resolved as i32, 1)
+        let saved_expected2 = self.expected_type
+        if key_ty > 0:
+            self.expected_type = key_ty
+        let key_op = self.lower_expr(key_expr)
+        if val_ty > 0:
+            self.expected_type = val_ty
+        else:
+            self.expected_type = saved_expected2
+        let val_op = self.lower_expr(val_expr)
+        self.expected_type = saved_expected2
+        self.emit_map_insert(out_place, key_op, val_op, 0, self.ast.get_start(key_expr))
+        return
+
     let expr = self.ast.get_data0(comp_node)
     let saved_expected = self.expected_type
     if out_elem_ty > 0 and out_elem_ty != self.sema.ty_void:
         self.expected_type = out_elem_ty
     let elem_op = self.lower_expr(expr)
     self.expected_type = saved_expected
-    self.emit_vec_push(out_place, elem_op, self.ast.get_start(expr))
+    let target_base = self.literal_target_base_sym(self.expr_type(comp_node))
+    if target_base == self.sema.syms.hashset:
+        self.emit_map_insert(out_place, elem_op, self.unit_operand(), 1, self.ast.get_start(expr))
+    else:
+        self.emit_vec_push(out_place, elem_op, self.ast.get_start(expr))
+
+fn MirBuilder.comprehension_clause_start(self: MirBuilder, comp_node: i32) -> i32:
+    if self.ast.kind(comp_node) == NodeKind.NK_MAP_COMPREHENSION:
+        return self.ast.get_data0(comp_node) + 2
+    self.ast.get_data1(comp_node)
+
+fn MirBuilder.comprehension_clause_count(self: MirBuilder, comp_node: i32) -> i32:
+    if self.ast.kind(comp_node) == NodeKind.NK_MAP_COMPREHENSION:
+        return self.ast.get_data1(comp_node)
+    self.ast.get_data2(comp_node)
 
 fn MirBuilder.lower_comprehension_next_or_push(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32):
-    let clause_count = self.ast.get_data2(comp_node)
+    let clause_count = self.comprehension_clause_count(comp_node)
     if clause_index >= clause_count:
         self.lower_comprehension_leaf(comp_node, out_place, out_elem_ty)
         return
     self.lower_comprehension_clause(comp_node, clause_index, out_place, out_elem_ty)
 
 fn MirBuilder.lower_comprehension_body(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, continue_bb: i32):
-    let comp_start = self.ast.get_data1(comp_node)
+    let comp_start = self.comprehension_clause_start(comp_node)
     let filter = self.ast.get_extra(comp_start + clause_index * 3 + 2)
     if filter != 0:
         let pass_bb = self.new_block()
@@ -5135,7 +5230,7 @@ fn MirBuilder.lower_comprehension_generic_iter(self: MirBuilder, comp_node: i32,
     self.forget_string_flow_facts()
 
 fn MirBuilder.lower_comprehension_clause(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32):
-    let comp_start = self.ast.get_data1(comp_node)
+    let comp_start = self.comprehension_clause_start(comp_node)
     let base = comp_start + clause_index * 3
     let pat_or_sym = self.ast.get_extra(base)
     let iter_expr = self.ast.get_extra(base + 1)
@@ -5183,22 +5278,30 @@ fn MirBuilder.lower_comprehension_clause(self: MirBuilder, comp_node: i32, claus
     self.lower_comprehension_generic_iter(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr, iter_ty)
 
 fn MirBuilder.lower_array_comprehension(self: MirBuilder, comp_node: i32) -> i32:
-    var vec_ty = self.expr_type(comp_node)
-    if vec_ty == 0 or vec_ty == self.sema.ty_void:
+    var out_ty = self.expr_type(comp_node)
+    if out_ty == 0 or out_ty == self.sema.ty_void:
         self.mark_unsupported()
         return self.unit_operand()
-    var elem_ty = self.generic_inst_arg_type(vec_ty, self.sema.syms.vec, 0)
+    let out_base = self.literal_target_base_sym(out_ty)
+    var elem_ty = 0
+    let out_resolved = self.sema.resolve_alias(out_ty)
+    if self.sema.get_type_kind(out_resolved) == TypeKind.TY_GENERIC_INST:
+        if self.sema.get_generic_inst_arg_count(out_resolved as i32) > 0:
+            elem_ty = self.sema.get_generic_inst_arg(out_resolved as i32, if self.ast.kind(comp_node) == NodeKind.NK_MAP_COMPREHENSION: 1 else: 0)
     if elem_ty == 0:
         elem_ty = self.sema.ty_i32 as i32
 
-    let vec_local = self.new_temp(vec_ty)
-    let vec_place = self.place_for_local(vec_local)
-    self.emit_vec_new_into(vec_place, self.ast.get_start(comp_node))
-    self.lower_comprehension_clause(comp_node, 0, vec_place, elem_ty)
+    let out_local = self.new_temp(out_ty)
+    let out_place = self.place_for_local(out_local)
+    if out_base == self.sema.syms.hashset or out_base == self.sema.syms.hashmap:
+        self.emit_map_new_into(out_place, self.ast.get_start(comp_node))
+    else:
+        self.emit_vec_new_into(out_place, self.ast.get_start(comp_node))
+    self.lower_comprehension_clause(comp_node, 0, out_place, elem_ty)
 
-    if self.sema.is_copy(vec_ty) != 0:
-        return self.body.new_operand(OperandKind.OK_COPY, vec_place)
-    self.body.new_operand(OperandKind.OK_MOVE, vec_place)
+    if self.sema.is_copy(out_ty) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, out_place)
+    self.body.new_operand(OperandKind.OK_MOVE, out_place)
 
 fn MirBuilder.lower_for_range_var(self: MirBuilder, for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32, range_ty: i32) -> i32:
     // for i in range_var → extract start/end/inclusive from the range struct,
@@ -7918,6 +8021,32 @@ fn MirBuilder.emit_vec_push(self: MirBuilder, vec_place: i32, elem_op: i32, span
     self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
     self.switch_to(next_bb)
 
+fn MirBuilder.emit_map_new_into(self: MirBuilder, map_place: i32, span: i32):
+    let new_sym = self.sema.syms.new
+    let fn_op = self.const_operand(ConstKind.CK_FN, new_sym, self.sema.ty_void)
+    let args: Vec[i32] = Vec.new()
+    let args_id = self.body.new_call_args(args)
+    self.body.set_call_intrinsic(args_id, MirIntrinsic.MAP_NEW)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, map_place, next_bb)
+    self.switch_to(next_bb)
+
+fn MirBuilder.emit_map_insert(self: MirBuilder, map_place: i32, key_op: i32, val_op: i32, is_set: i32, span: i32):
+    let insert_sym = self.sema.syms.insert
+    let fn_op = self.const_operand(ConstKind.CK_FN, insert_sym, self.sema.ty_void)
+    let args: Vec[i32] = Vec.new()
+    args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
+    args.push(key_op)
+    if is_set == 0:
+        args.push(val_op)
+    let args_id = self.body.new_call_args(args)
+    self.body.set_call_intrinsic(args_id, MirIntrinsic.MAP_INSERT)
+    let result_local = self.new_temp(self.sema.ty_void)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+
 fn MirBuilder.lower_option_transpose_method(self: MirBuilder, self_expr: i32, arg_count: i32, node: i32) -> i32:
     if arg_count != 0:
         self.mark_unsupported()
@@ -9620,6 +9749,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.lower_for(node)
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+        return self.lower_array_comprehension(node)
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
         return self.lower_array_comprehension(node)
 
     if kind == NodeKind.NK_BREAK:

@@ -6474,7 +6474,44 @@ fn Parser.parse_array_literal(self: Parser) -> NodeId:
                     return self.poisoned_expr()
                 self.advance()
                 self.skip_newlines()
-                values.push(self.parse_expr() as i32)
+                let value_expr = self.parse_expr()
+                if self.peek() == TokenKind.TK_KW_FOR:
+                    let patterns: Vec[i32] = Vec.new()
+                    let iterables: Vec[i32] = Vec.new()
+                    var filter: NodeId = 0 as NodeId
+
+                    while self.peek() == TokenKind.TK_KW_FOR:
+                        self.advance()
+                        self.skip_newlines()
+                        let binding = self.parse_pattern()
+                        if self.expect(TokenKind.TK_KW_IN) == 0:
+                            return self.poisoned_expr()
+                        self.skip_newlines()
+                        let saved_sb = self.suppress_brace
+                        self.suppress_brace = 1
+                        let iterable = self.parse_expr()
+                        self.suppress_brace = saved_sb
+                        patterns.push(binding as i32)
+                        iterables.push(iterable as i32)
+                        self.skip_newlines()
+
+                    if self.peek() == TokenKind.TK_KW_IF:
+                        self.advance()
+                        self.skip_newlines()
+                        filter = self.parse_expr()
+                        self.skip_newlines()
+
+                    self.expect(TokenKind.TK_R_BRACKET)
+                    let clause_count = patterns.len() as i32
+                    let comp_extra_start = self.pool.extra_len()
+                    self.pool.add_extra(first as i32)
+                    self.pool.add_extra(value_expr as i32)
+                    for ci in 0..clause_count:
+                        self.pool.add_extra(patterns.get(ci as i64))
+                        self.pool.add_extra(iterables.get(ci as i64))
+                        self.pool.add_extra(if ci == clause_count - 1: filter as i32 else: 0)
+                    return self.pool.add_node(NodeKind.NK_MAP_COMPREHENSION, start, self.prev_end(), comp_extra_start, clause_count, 0)
+                values.push(value_expr as i32)
                 self.skip_newlines()
                 if self.peek() != TokenKind.TK_COMMA:
                     break

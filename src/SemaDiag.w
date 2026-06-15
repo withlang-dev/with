@@ -186,6 +186,8 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_CONTINUE: return "continue_expr"
     if kind == NodeKind.NK_ARRAY_LIT: return "array_literal"
     if kind == NodeKind.NK_ARRAY_COMPREHENSION: return "array_comprehension"
+    if kind == NodeKind.NK_MAP_LIT: return "map_lit"
+    if kind == NodeKind.NK_MAP_COMPREHENSION: return "map_comprehension"
     if kind == NodeKind.NK_STRUCT_LIT: return "struct_literal"
     if kind == NodeKind.NK_MATCH: return "match_expr"
     if kind == NodeKind.NK_ENUM_VARIANT: return "enum_variant"
@@ -798,6 +800,15 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return out
 
+    if kind == NodeKind.NK_MAP_LIT:
+        let extra_start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        let safe_count = self.clamp_extra_span_count(extra_start, count, 2, 128)
+        for i in 0..safe_count:
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 2), indent + 1)
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
+        return out
+
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let comp_start = self.ast.get_data1(node)
         let clause_count = self.ast.get_data2(node)
@@ -807,6 +818,18 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(base + 1), indent + 1)
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(base + 2), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return out
+
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = self.ast.get_data0(node)
+        let clause_count = self.ast.get_data1(node)
+        let safe_clause_count = self.clamp_extra_span_count(comp_start + 2, clause_count, 3, 128)
+        for i in 0..safe_clause_count:
+            let base = comp_start + 2 + i * 3
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(base + 1), indent + 1)
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(base + 2), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(comp_start), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(comp_start + 1), indent + 1)
         return out
 
     if kind == NodeKind.NK_STRUCT_LIT:
@@ -1070,6 +1093,15 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i), indent + 1)
         return
 
+    if kind == NodeKind.NK_MAP_LIT:
+        let extra_start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        let safe_count = self.clamp_extra_span_count(extra_start, count, 2, 128)
+        for i in 0..safe_count:
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i * 2), indent + 1)
+            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + i * 2 + 1), indent + 1)
+        return
+
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let comp_start = self.ast.get_data1(node)
         let clause_count = self.ast.get_data2(node)
@@ -1079,6 +1111,18 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
             self.emit_typed_expr_tree(self.ast.get_extra(base + 1), indent + 1)
             self.emit_typed_expr_tree(self.ast.get_extra(base + 2), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        return
+
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = self.ast.get_data0(node)
+        let clause_count = self.ast.get_data1(node)
+        let safe_clause_count = self.clamp_extra_span_count(comp_start + 2, clause_count, 3, 128)
+        for i in 0..safe_clause_count:
+            let base = comp_start + 2 + i * 3
+            self.emit_typed_expr_tree(self.ast.get_extra(base + 1), indent + 1)
+            self.emit_typed_expr_tree(self.ast.get_extra(base + 2), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_extra(comp_start), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_extra(comp_start + 1), indent + 1)
         return
 
     if kind == NodeKind.NK_STRUCT_LIT:

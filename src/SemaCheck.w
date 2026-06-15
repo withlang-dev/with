@@ -2094,6 +2094,25 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
         self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
         return
 
+    if kind == NodeKind.NK_MAP_LIT:
+        let pair_start = self.ast.get_data0(node)
+        let pair_count = self.ast.get_data1(node)
+        for mi in 0..pair_count:
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(pair_start + mi * 2))
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(pair_start + mi * 2 + 1))
+        return
+
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = self.ast.get_data0(node)
+        let clause_count = self.ast.get_data1(node)
+        for ci in 0..clause_count:
+            let base = comp_start + 2 + ci * 3
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(base + 1))
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(base + 2))
+        self.check_expr_reachable_comptime_errors(self.ast.get_extra(comp_start))
+        self.check_expr_reachable_comptime_errors(self.ast.get_extra(comp_start + 1))
+        return
+
     if kind == NodeKind.NK_ASYNC_SCOPE:
         self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
         return
@@ -2684,6 +2703,15 @@ fn Sema.expr_may_suspend(self: Sema, node: i32) -> i32:
             if self.expr_may_suspend(self.ast.get_extra(extra_start + ai)) != 0:
                 return 1
         return 0
+    if kind == NodeKind.NK_MAP_LIT:
+        let pair_start = self.ast.get_data0(node)
+        let pair_count = self.ast.get_data1(node)
+        for mi in 0..pair_count:
+            if self.expr_may_suspend(self.ast.get_extra(pair_start + mi * 2)) != 0:
+                return 1
+            if self.expr_may_suspend(self.ast.get_extra(pair_start + mi * 2 + 1)) != 0:
+                return 1
+        return 0
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let comp_start = self.ast.get_data1(node)
         let clause_count = self.ast.get_data2(node)
@@ -2694,6 +2722,18 @@ fn Sema.expr_may_suspend(self: Sema, node: i32) -> i32:
             if self.expr_may_suspend(self.ast.get_extra(base + 2)) != 0:
                 return 1
         return self.expr_may_suspend(self.ast.get_data0(node))
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = self.ast.get_data0(node)
+        let clause_count = self.ast.get_data1(node)
+        for ci in 0..clause_count:
+            let base = comp_start + 2 + ci * 3
+            if self.expr_may_suspend(self.ast.get_extra(base + 1)) != 0:
+                return 1
+            if self.expr_may_suspend(self.ast.get_extra(base + 2)) != 0:
+                return 1
+        if self.expr_may_suspend(self.ast.get_extra(comp_start)) != 0:
+            return 1
+        return self.expr_may_suspend(self.ast.get_extra(comp_start + 1))
     if kind == NodeKind.NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
@@ -3023,6 +3063,15 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32) -> i32:
             if self.expr_creates_ephemeral_task(self.ast.get_extra(extra_start + ai)) != 0:
                 return 1
         return 0
+    if kind == NodeKind.NK_MAP_LIT:
+        let pair_start = self.ast.get_data0(node)
+        let pair_count = self.ast.get_data1(node)
+        for mi in 0..pair_count:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(pair_start + mi * 2)) != 0:
+                return 1
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(pair_start + mi * 2 + 1)) != 0:
+                return 1
+        return 0
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let comp_start = self.ast.get_data1(node)
         let clause_count = self.ast.get_data2(node)
@@ -3033,6 +3082,18 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32) -> i32:
             if self.expr_creates_ephemeral_task(self.ast.get_extra(base + 2)) != 0:
                 return 1
         return self.expr_creates_ephemeral_task(self.ast.get_data0(node))
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = self.ast.get_data0(node)
+        let clause_count = self.ast.get_data1(node)
+        for ci in 0..clause_count:
+            let base = comp_start + 2 + ci * 3
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(base + 1)) != 0:
+                return 1
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(base + 2)) != 0:
+                return 1
+        if self.expr_creates_ephemeral_task(self.ast.get_extra(comp_start)) != 0:
+            return 1
+        return self.expr_creates_ephemeral_task(self.ast.get_extra(comp_start + 1))
     if kind == NodeKind.NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
@@ -4748,6 +4809,25 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         let expr = self.ast.get_data0(node)
         let comp_start = self.ast.get_data1(node)
         let clause_count = self.ast.get_data2(node)
+        var target_ty = 0
+        var result_expected = 0
+        if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            let expected = self.resolve_alias(self.expected_expr_type)
+            if self.get_type_kind(expected) == TypeKind.TY_GENERIC_INST:
+                let base = self.get_generic_inst_base(expected as i32)
+                let base_name = self.pool_resolve(base)
+                if base == self.syms.vec or base == self.syms.hashset:
+                    target_ty = expected as i32
+                    result_expected = self.get_generic_inst_arg(expected as i32, 0)
+                else if base_name == "BTreeSet":
+                    self.emit_error("comprehension target BTreeSet is not implemented yet (#414)", node)
+                    return 0
+                else if base == self.syms.hashmap or base_name == "BTreeMap":
+                    self.emit_error("element comprehension cannot target a map; use [key: value for ...] form", node)
+                    return 0
+            else:
+                self.emit_error("element comprehension requires Vec or HashSet expected type", node)
+                return 0
         var pushed_scopes = 0
         for ci in 0..clause_count:
             let base = comp_start + ci * 3
@@ -4766,12 +4846,71 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
                 let filter_ty = self.check_expr(filter)
                 if filter_ty != 0 and self.types_compatible(self.ty_bool as i32, filter_ty as i32) == 0:
                     self.emit_error("comprehension filter must be bool", filter)
-        let result_elem = self.check_expr(expr)
+        let result_elem = if result_expected != 0: self.check_expr_with_expected(expr, result_expected as TypeId) else: self.check_expr(expr)
         for _ in 0..pushed_scopes:
             self.pop_scope()
-        let result_ty = self.ensure_vec_type_for(result_elem as i32)
+        let result_ty = if target_ty != 0: target_ty else: self.ensure_vec_type_for(result_elem as i32)
         self.typed_expr_types.insert(node, result_ty)
         return result_ty as TypeId
+
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        self.note_allocation_site(node, AllocConstructKind.COMPREHENSION, 0, 0)
+        let comp_start2 = self.ast.get_data0(node)
+        let key_expr = self.ast.get_extra(comp_start2)
+        let val_expr = self.ast.get_extra(comp_start2 + 1)
+        let clause_count2 = self.ast.get_data1(node)
+        var map_target_ty = 0
+        var key_expected = 0
+        var val_expected = 0
+        if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            let expected2 = self.resolve_alias(self.expected_expr_type)
+            if self.get_type_kind(expected2) != TypeKind.TY_GENERIC_INST:
+                self.emit_error("map comprehension requires HashMap expected type", node)
+                return 0
+            let base2 = self.get_generic_inst_base(expected2 as i32)
+            let base_name2 = self.pool_resolve(base2)
+            if base_name2 == "BTreeMap":
+                self.emit_error("comprehension target BTreeMap is not implemented yet (#414)", node)
+                return 0
+            if base2 != self.syms.hashmap:
+                self.emit_error("map comprehension requires HashMap expected type", node)
+                return 0
+            map_target_ty = expected2 as i32
+            key_expected = self.get_generic_inst_arg(expected2 as i32, 0)
+            val_expected = self.get_generic_inst_arg(expected2 as i32, 1)
+        var pushed_scopes2 = 0
+        for ci2 in 0..clause_count2:
+            let base3 = comp_start2 + 2 + ci2 * 3
+            let binding2 = self.ast.get_extra(base3)
+            let iterable2 = self.ast.get_extra(base3 + 1)
+            let filter2 = self.ast.get_extra(base3 + 2)
+            let iter_ty2 = self.check_expr(iterable2)
+            let elem_ty2 = self.infer_for_element_type(iter_ty2 as i32)
+            self.push_scope()
+            pushed_scopes2 = pushed_scopes2 + 1
+            if self.ast.comprehension_binding_is_pattern(node, binding2):
+                self.check_pattern(binding2, elem_ty2)
+            else:
+                self.scope_put(binding2, elem_ty2, 0)
+            if filter2 != 0:
+                let filter_ty2 = self.check_expr(filter2)
+                if filter_ty2 != 0 and self.types_compatible(self.ty_bool as i32, filter_ty2 as i32) == 0:
+                    self.emit_error("comprehension filter must be bool", filter2)
+        let key_ty = if key_expected != 0: self.check_expr_with_expected(key_expr, key_expected as TypeId) else: self.check_expr(key_expr)
+        let val_ty = if val_expected != 0: self.check_expr_with_expected(val_expr, val_expected as TypeId) else: self.check_expr(val_expr)
+        for _ in 0..pushed_scopes2:
+            self.pop_scope()
+        if map_target_ty == 0:
+            let map_args: Vec[i32] = Vec.new()
+            map_args.push(key_ty as i32)
+            map_args.push(val_ty as i32)
+            map_target_ty = self.ensure_generic_inst_type(self.syms.hashmap, map_args, 2) as i32
+        let hash_trait2 = self.pool_lookup_symbol("Hash")
+        if hash_trait2 != 0 and key_ty != 0 and self.type_implements_trait(key_ty as i32, hash_trait2) == 0:
+            self.emit_error("HashMap comprehension key type must implement Hash", node)
+            return 0
+        self.typed_expr_types.insert(node, map_target_ty)
+        return map_target_ty as TypeId
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         let base = self.check_expr(self.ast.get_data0(node))
@@ -15935,6 +16074,15 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
         return 0
     if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_CAST:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+    if kind == NodeKind.NK_MAP_LIT:
+        let pair_start = self.ast.get_data0(node)
+        let pair_count = self.ast.get_data1(node)
+        for mi in 0..pair_count:
+            if self.expr_uses_symbol(self.ast.get_extra(pair_start + mi * 2), sym) != 0:
+                return 1
+            if self.expr_uses_symbol(self.ast.get_extra(pair_start + mi * 2 + 1), sym) != 0:
+                return 1
+        return 0
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let comp_start = self.ast.get_data1(node)
         let clause_count = self.ast.get_data2(node)
@@ -15945,6 +16093,20 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
             if self.expr_uses_symbol(self.ast.get_extra(base + 2), sym) != 0:
                 return 1
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return 0
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = self.ast.get_data0(node)
+        let clause_count = self.ast.get_data1(node)
+        for ci in 0..clause_count:
+            let base = comp_start + 2 + ci * 3
+            if self.expr_uses_symbol(self.ast.get_extra(base + 1), sym) != 0:
+                return 1
+            if self.expr_uses_symbol(self.ast.get_extra(base + 2), sym) != 0:
+                return 1
+        if self.expr_uses_symbol(self.ast.get_extra(comp_start), sym) != 0:
+            return 1
+        if self.expr_uses_symbol(self.ast.get_extra(comp_start + 1), sym) != 0:
             return 1
         return 0
     if kind == NodeKind.NK_ASYNC_SCOPE:

@@ -117,6 +117,9 @@ pub enum NodeKind: i32:
     // NK_MAP_LIT: d0=extra_start, d1=pair_count, d2=0
     // Extra stores key/value node pairs in source order.
     NK_MAP_LIT = 128
+    // NK_MAP_COMPREHENSION: d0=extra_start, d1=clause_count, d2=0
+    // Extra: [key_expr, value_expr, then per clause: binding, iterable, filter]
+    NK_MAP_COMPREHENSION = 129
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -1473,7 +1476,7 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 fn AstPool.comprehension_binding_is_pattern(self: AstPool, node: NodeId, binding: i32) -> bool:
     if node <= 0 or node >= self.node_count():
         return false
-    if self.kind(node) != NodeKind.NK_ARRAY_COMPREHENSION:
+    if self.kind(node) != NodeKind.NK_ARRAY_COMPREHENSION and self.kind(node) != NodeKind.NK_MAP_COMPREHENSION:
         return false
     if not self.is_pattern_node(binding):
         return false
@@ -1544,6 +1547,8 @@ fn AstPool.comprehension_binding_is_pattern(self: AstPool, node: NodeId, binding
 // NodeKind.NK_ARRAY_LIT:     d0=extra_start, d1=elem_count, d2=0
 // NodeKind.NK_ARRAY_COMPREHENSION: d0=expr(node), d1=extra_start, d2=clause_count
 //                   extra per clause: [binding(pattern or sym), iterable(node), filter(node,0=none)]
+// NodeKind.NK_MAP_COMPREHENSION: d0=extra_start, d1=clause_count, d2=0
+//                   extra: [key_expr, value_expr, then per clause: binding(pattern or sym), iterable(node), filter(node,0=none)]
 // NodeKind.NK_STRUCT_LIT:    d0=name(sym), d1=extra_start, d2=field_count
 // NodeKind.NK_CLOSURE:       d0=body(node), d1=extra_start, d2=param_count
 // NodeKind.NK_CAST:          d0=expr(node), d1=target_type(node), d2=0

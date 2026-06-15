@@ -671,6 +671,22 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
             out = out ++ render_expr(pool, intern, (pool.get_extra(extra_start + i)) as NodeId, 0)
         return out ++ "]"
 
+    if kind == NodeKind.NK_MAP_LIT:
+        let extra_start = pool.get_data0(node)
+        let count = pool.get_data1(node)
+        if count == 0:
+            return prefix ++ "[:]"
+        var out = prefix ++ "["
+        for i in 0..count:
+            if i > 0:
+                out = out ++ ", "
+            let key = pool.get_extra(extra_start + i * 2)
+            let value = pool.get_extra(extra_start + i * 2 + 1)
+            out = out ++ render_expr(pool, intern, (key) as NodeId, 0)
+            out = out ++ ": "
+            out = out ++ render_expr(pool, intern, (value) as NodeId, 0)
+        return out ++ "]"
+
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let expr = pool.get_data0(node)
         let comp_start = pool.get_data1(node)
@@ -679,6 +695,31 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         var out = f"{prefix}[{rendered_expr}"
         for ci in 0..clause_count:
             let base = comp_start + ci * 3
+            let binding = pool.get_extra(base)
+            let iterable = pool.get_extra(base + 1)
+            var binding_text = ""
+            if pool.comprehension_binding_is_pattern(node, binding):
+                binding_text = render_pattern(pool, intern, (binding) as NodeId)
+            else:
+                binding_text = intern.resolve(binding)
+            let iterable_text = render_expr(pool, intern, (iterable) as NodeId, 0)
+            out = f"{out} for {binding_text} in {iterable_text}"
+            let filter = pool.get_extra(base + 2)
+            if filter != 0:
+                let filter_text = render_expr(pool, intern, (filter) as NodeId, 0)
+                out = f"{out} if {filter_text}"
+        return f"{out}]"
+
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let comp_start = pool.get_data0(node)
+        let clause_count = pool.get_data1(node)
+        let key_expr = pool.get_extra(comp_start)
+        let value_expr = pool.get_extra(comp_start + 1)
+        let rendered_key = render_expr(pool, intern, (key_expr) as NodeId, 0)
+        let rendered_value = render_expr(pool, intern, (value_expr) as NodeId, 0)
+        var out = f"{prefix}[{rendered_key}: {rendered_value}"
+        for ci in 0..clause_count:
+            let base = comp_start + 2 + ci * 3
             let binding = pool.get_extra(base)
             let iterable = pool.get_extra(base + 1)
             var binding_text = ""
