@@ -5,6 +5,8 @@
 // collection types; this module provides the user-facing names so they
 // resolve through normal imports instead of hardcoded sema allowlists.
 
+use std.option
+
 /// A growable array. Create with `Vec.new()`, add with `.push()`,
 /// read with `.get()`. Supports iteration via `.iter()`.
 pub type Vec[T]  {
@@ -117,11 +119,35 @@ type MapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> U }
 /// Lazy iterator adapter produced by `.filter(pred)`.
 type FilterIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool }
 
+/// Lazy iterator adapter produced by `.filter_map(f)`.
+type FilterMapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> Option[U] }
+
 /// Lazy iterator adapter produced by `.take(n)`.
 type TakeIter[I, T] ephemeral { iter: I, remaining: i64 }
 
+/// Lazy iterator adapter produced by `.drop(n)`.
+type DropIter[I, T] ephemeral { iter: I, remaining: i64 }
+
+/// Lazy iterator adapter produced by `.take_while(pred)`.
+type TakeWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, done: bool }
+
+/// Lazy iterator adapter produced by `.drop_while(pred)`.
+type DropWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, dropping: bool }
+
 /// Lazy iterator adapter produced by `.zip(other)`.
 type ZipIter[A, B, T, U] ephemeral { left: A, right: B }
+
+/// Lazy iterator adapter produced by `.enumerate()`.
+type EnumerateIter[I, T] ephemeral { iter: I, idx: i64 }
+
+/// Lazy iterator adapter produced by `.chain(other)`.
+type ChainIter[A, B, T] ephemeral { left: A, right: B, use_right: bool }
+
+/// Lazy iterator adapter produced by `.zip_with(other, f)`.
+type ZipWithIter[A, B, T, U, V] ephemeral { left: A, right: B, f: fn(T, U) -> V }
+
+/// Lazy iterator adapter produced by `.step_by(n)`.
+type StepByIter[I, T] ephemeral { iter: I, step: i64, first: bool }
 
 /// Lazy iterator adapter produced by `.flat_map(f)`.
 type FlatMapIter[I, C, J, T, U] ephemeral {

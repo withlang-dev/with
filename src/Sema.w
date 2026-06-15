@@ -165,8 +165,16 @@ type SemaBuiltinSymbols {
     veciter: i32,
     mapiter: i32,
     filteriter: i32,
+    filtermapiter: i32,
     takeiter: i32,
+    dropiter: i32,
+    takewhileiter: i32,
+    dropwhileiter: i32,
     zipiter: i32,
+    enumerateiter: i32,
+    chainiter: i32,
+    zipwithiter: i32,
+    stepbyiter: i32,
     flatmapiter: i32,
     vecslot: i32,
     veciterplace: i32,
@@ -206,14 +214,34 @@ type SemaBuiltinSymbols {
     slot: i32,
     get_disjoint: i32,
     filter: i32,
+    filter_map: i32,
     map: i32,
     fold: i32,
     collect: i32,
     reduce: i32,
     take: i32,
+    take_while: i32,
+    drop_items: i32,
+    drop_while: i32,
     zip: i32,
+    zip_with: i32,
+    enumerate: i32,
+    chain: i32,
+    step_by: i32,
     flat_map: i32,
     sum: i32,
+    product: i32,
+    min: i32,
+    max: i32,
+    min_by: i32,
+    max_by: i32,
+    find: i32,
+    position: i32,
+    any: i32,
+    all: i32,
+    none_pred: i32,
+    for_each: i32,
+    unzip: i32,
     count: i32,
     partition: i32,
     sequence: i32,
@@ -1138,8 +1166,16 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         veciter: 0,
         mapiter: 0,
         filteriter: 0,
+        filtermapiter: 0,
         takeiter: 0,
+        dropiter: 0,
+        takewhileiter: 0,
+        dropwhileiter: 0,
         zipiter: 0,
+        enumerateiter: 0,
+        chainiter: 0,
+        zipwithiter: 0,
+        stepbyiter: 0,
         flatmapiter: 0,
         vecslot: 0,
         veciterplace: 0,
@@ -1179,14 +1215,34 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         slot: 0,
         get_disjoint: 0,
         filter: 0,
+        filter_map: 0,
         map: 0,
         fold: 0,
         collect: 0,
         reduce: 0,
         take: 0,
+        take_while: 0,
+        drop_items: 0,
+        drop_while: 0,
         zip: 0,
+        zip_with: 0,
+        enumerate: 0,
+        chain: 0,
+        step_by: 0,
         flat_map: 0,
         sum: 0,
+        product: 0,
+        min: 0,
+        max: 0,
+        min_by: 0,
+        max_by: 0,
+        find: 0,
+        position: 0,
+        any: 0,
+        all: 0,
+        none_pred: 0,
+        for_each: 0,
+        unzip: 0,
         count: 0,
         partition: 0,
         sequence: 0,
@@ -2038,8 +2094,16 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.veciter = self.pool_intern("VecIter")
     self.syms.mapiter = self.pool_intern("MapIter")
     self.syms.filteriter = self.pool_intern("FilterIter")
+    self.syms.filtermapiter = self.pool_intern("FilterMapIter")
     self.syms.takeiter = self.pool_intern("TakeIter")
+    self.syms.dropiter = self.pool_intern("DropIter")
+    self.syms.takewhileiter = self.pool_intern("TakeWhileIter")
+    self.syms.dropwhileiter = self.pool_intern("DropWhileIter")
     self.syms.zipiter = self.pool_intern("ZipIter")
+    self.syms.enumerateiter = self.pool_intern("EnumerateIter")
+    self.syms.chainiter = self.pool_intern("ChainIter")
+    self.syms.zipwithiter = self.pool_intern("ZipWithIter")
+    self.syms.stepbyiter = self.pool_intern("StepByIter")
     self.syms.flatmapiter = self.pool_intern("FlatMapIter")
     self.syms.vecslot = self.pool_intern("VecSlot")
     self.syms.veciterplace = self.pool_intern("VecIterPlace")
@@ -2078,14 +2142,34 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.slot = self.pool_intern("slot")
     self.syms.get_disjoint = self.pool_intern("get_disjoint")
     self.syms.filter = self.pool_intern("filter")
+    self.syms.filter_map = self.pool_intern("filter_map")
     self.syms.map = self.pool_intern("map")
     self.syms.fold = self.pool_intern("fold")
     self.syms.collect = self.pool_intern("collect")
     self.syms.reduce = self.pool_intern("reduce")
     self.syms.take = self.pool_intern("take")
+    self.syms.take_while = self.pool_intern("take_while")
+    self.syms.drop_items = self.pool_intern("drop")
+    self.syms.drop_while = self.pool_intern("drop_while")
     self.syms.zip = self.pool_intern("zip")
+    self.syms.zip_with = self.pool_intern("zip_with")
+    self.syms.enumerate = self.pool_intern("enumerate")
+    self.syms.chain = self.pool_intern("chain")
+    self.syms.step_by = self.pool_intern("step_by")
     self.syms.flat_map = self.pool_intern("flat_map")
     self.syms.sum = self.pool_intern("sum")
+    self.syms.product = self.pool_intern("product")
+    self.syms.min = self.pool_intern("min")
+    self.syms.max = self.pool_intern("max")
+    self.syms.min_by = self.pool_intern("min_by")
+    self.syms.max_by = self.pool_intern("max_by")
+    self.syms.find = self.pool_intern("find")
+    self.syms.position = self.pool_intern("position")
+    self.syms.any = self.pool_intern("any")
+    self.syms.all = self.pool_intern("all")
+    self.syms.none_pred = self.pool_intern("none")
+    self.syms.for_each = self.pool_intern("for_each")
+    self.syms.unzip = self.pool_intern("unzip")
     self.syms.count = self.pool_intern("count")
     self.syms.partition = self.pool_intern("partition")
     self.syms.sequence = self.pool_intern("sequence")

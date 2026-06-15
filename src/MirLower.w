@@ -6973,34 +6973,82 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
             return MirIntrinsic.VECITER_NEXT
         if method_name == "map": return MirIntrinsic.ITER_MAP
         if method_name == "filter": return MirIntrinsic.ITER_FILTER
+        if method_name == "filter_map": return MirIntrinsic.ITER_FILTER_MAP
         if method_name == "take": return MirIntrinsic.ITER_TAKE
+        if method_name == "drop": return MirIntrinsic.ITER_DROP
+        if method_name == "take_while": return MirIntrinsic.ITER_TAKE_WHILE
+        if method_name == "drop_while": return MirIntrinsic.ITER_DROP_WHILE
         if method_name == "zip": return MirIntrinsic.ITER_ZIP
+        if method_name == "enumerate": return MirIntrinsic.ITER_ENUMERATE
+        if method_name == "chain": return MirIntrinsic.ITER_CHAIN
+        if method_name == "zip_with": return MirIntrinsic.ITER_ZIP_WITH
+        if method_name == "step_by": return MirIntrinsic.ITER_STEP_BY
         if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
         if method_name == "fold": return MirIntrinsic.ITER_FOLD
         if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
         if method_name == "sum": return MirIntrinsic.ITER_SUM
+        if method_name == "product": return MirIntrinsic.ITER_PRODUCT
+        if method_name == "min": return MirIntrinsic.ITER_MIN
+        if method_name == "max": return MirIntrinsic.ITER_MAX
+        if method_name == "min_by": return MirIntrinsic.ITER_MIN_BY
+        if method_name == "max_by": return MirIntrinsic.ITER_MAX_BY
+        if method_name == "find": return MirIntrinsic.ITER_FIND
+        if method_name == "position": return MirIntrinsic.ITER_POSITION
+        if method_name == "any": return MirIntrinsic.ITER_ANY
+        if method_name == "all": return MirIntrinsic.ITER_ALL
+        if method_name == "none": return MirIntrinsic.ITER_NONE
+        if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
         if method_name == "count": return MirIntrinsic.ITER_COUNT
         if method_name == "collect": return MirIntrinsic.ITER_COLLECT_VEC
         if method_name == "partition": return MirIntrinsic.ITER_PARTITION
+        if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
         return MirIntrinsic.NONE
-    if type_name == "MapIter" or type_name == "FilterIter" or type_name == "TakeIter" or type_name == "ZipIter" or type_name == "FlatMapIter":
+    if type_name == "MapIter" or type_name == "FilterIter" or type_name == "FilterMapIter" or type_name == "TakeIter" or type_name == "DropIter" or type_name == "TakeWhileIter" or type_name == "DropWhileIter" or type_name == "ZipIter" or type_name == "EnumerateIter" or type_name == "ChainIter" or type_name == "ZipWithIter" or type_name == "StepByIter" or type_name == "FlatMapIter":
         if method_name == "next":
             if type_name == "MapIter": return MirIntrinsic.MAPITER_NEXT
             if type_name == "FilterIter": return MirIntrinsic.FILTERITER_NEXT
+            if type_name == "FilterMapIter": return MirIntrinsic.FILTERMAPITER_NEXT
             if type_name == "TakeIter": return MirIntrinsic.TAKEITER_NEXT
+            if type_name == "DropIter": return MirIntrinsic.DROPITER_NEXT
+            if type_name == "TakeWhileIter": return MirIntrinsic.TAKEWHILEITER_NEXT
+            if type_name == "DropWhileIter": return MirIntrinsic.DROPWHILEITER_NEXT
             if type_name == "ZipIter": return MirIntrinsic.ZIPITER_NEXT
+            if type_name == "EnumerateIter": return MirIntrinsic.ENUMERATEITER_NEXT
+            if type_name == "ChainIter": return MirIntrinsic.CHAINITER_NEXT
+            if type_name == "ZipWithIter": return MirIntrinsic.ZIPWITHITER_NEXT
+            if type_name == "StepByIter": return MirIntrinsic.STEPBYITER_NEXT
             if type_name == "FlatMapIter": return MirIntrinsic.FLATMAPITER_NEXT
         if method_name == "map": return MirIntrinsic.ITER_MAP
         if method_name == "filter": return MirIntrinsic.ITER_FILTER
+        if method_name == "filter_map": return MirIntrinsic.ITER_FILTER_MAP
         if method_name == "take": return MirIntrinsic.ITER_TAKE
+        if method_name == "drop": return MirIntrinsic.ITER_DROP
+        if method_name == "take_while": return MirIntrinsic.ITER_TAKE_WHILE
+        if method_name == "drop_while": return MirIntrinsic.ITER_DROP_WHILE
         if method_name == "zip": return MirIntrinsic.ITER_ZIP
+        if method_name == "enumerate": return MirIntrinsic.ITER_ENUMERATE
+        if method_name == "chain": return MirIntrinsic.ITER_CHAIN
+        if method_name == "zip_with": return MirIntrinsic.ITER_ZIP_WITH
+        if method_name == "step_by": return MirIntrinsic.ITER_STEP_BY
         if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
         if method_name == "fold": return MirIntrinsic.ITER_FOLD
         if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
         if method_name == "sum": return MirIntrinsic.ITER_SUM
+        if method_name == "product": return MirIntrinsic.ITER_PRODUCT
+        if method_name == "min": return MirIntrinsic.ITER_MIN
+        if method_name == "max": return MirIntrinsic.ITER_MAX
+        if method_name == "min_by": return MirIntrinsic.ITER_MIN_BY
+        if method_name == "max_by": return MirIntrinsic.ITER_MAX_BY
+        if method_name == "find": return MirIntrinsic.ITER_FIND
+        if method_name == "position": return MirIntrinsic.ITER_POSITION
+        if method_name == "any": return MirIntrinsic.ITER_ANY
+        if method_name == "all": return MirIntrinsic.ITER_ALL
+        if method_name == "none": return MirIntrinsic.ITER_NONE
+        if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
         if method_name == "count": return MirIntrinsic.ITER_COUNT
         if method_name == "collect": return MirIntrinsic.ITER_COLLECT_VEC
         if method_name == "partition": return MirIntrinsic.ITER_PARTITION
+        if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
         return MirIntrinsic.NONE
     if type_name == "VecSlot":
         if method_name == "get": return MirIntrinsic.VECSLOT_GET

@@ -30,6 +30,17 @@ fn vec_1_to_10() -> Vec[i32]:
     xs.push(10)
     xs
 
+fn maybe_even_double(x: i32) -> Option[i32]:
+    if x % 2 == 0: Some(x * 2) else: None
+
+fn cmp_i32(a: i32, b: i32) -> i32:
+    if a < b: -1 else if a > b: 1 else: 0
+
+var FOREACH_TOTAL: i32 = 0
+
+fn add_foreach(x: i32):
+    FOREACH_TOTAL = FOREACH_TOTAL + x
+
 fn assert_vec_i32(xs: Vec[i32], a: i32, b: i32, c: i32):
     assert(xs.len() == 3)
     assert(xs.get(0) == a)
@@ -143,6 +154,74 @@ fn test_adapter_next:
     assert(third.unwrap() == 30)
     assert(done.is_none())
 
+fn test_filter_map_and_skip_adapters:
+    let mapped = vec_1_to_4().iter()
+        |> filter_map(maybe_even_double)
+        |> collect[Vec]()
+    assert(mapped.len() == 2)
+    assert(mapped.get(0) == 4)
+    assert(mapped.get(1) == 8)
+
+    let window = vec_1_to_10().iter()
+        |> drop(2)
+        |> take_while(x => x < 7)
+        |> drop_while(x => x < 5)
+        |> collect[Vec]()
+    assert(window.len() == 2)
+    assert(window.get(0) == 5)
+    assert(window.get(1) == 6)
+
+fn test_enumerate_chain_zip_with_step_by:
+    let enumerated = vec_123().iter()
+        |> enumerate()
+        |> collect[Vec]()
+    assert(enumerated.len() == 3)
+    let (i0, v0) = enumerated.get(0)
+    let (i2, v2) = enumerated.get(2)
+    assert(i0 == 0)
+    assert(v0 == 1)
+    assert(i2 == 2)
+    assert(v2 == 3)
+
+    let chained = vec_123().iter()
+        |> chain(vec_1_to_4().iter())
+        |> step_by(2)
+        |> collect[Vec]()
+    assert(chained.len() == 4)
+    assert(chained.get(0) == 1)
+    assert(chained.get(1) == 3)
+    assert(chained.get(2) == 2)
+    assert(chained.get(3) == 4)
+
+    let combined = vec_123().iter()
+        |> zip_with(vec_1_to_4().iter(), (a, b) => a * 10 + b)
+        |> collect[Vec]()
+    assert_vec_i32(combined, 11, 22, 33)
+
+fn test_eager_consumers:
+    let nums = vec_1_to_4()
+    assert(nums.iter() |> product() == 24)
+    assert((nums.iter() |> min()).unwrap() == 1)
+    assert((nums.iter() |> max()).unwrap() == 4)
+    assert((nums.iter() |> min_by(cmp_i32)).unwrap() == 1)
+    assert((nums.iter() |> max_by(cmp_i32)).unwrap() == 4)
+    assert((nums.iter() |> find(x => x == 3)).unwrap() == 3)
+    assert((nums.iter() |> position(x => x == 3)).unwrap() == 2)
+    assert(nums.iter() |> any(x => x == 4))
+    assert(nums.iter() |> all(x => x > 0))
+    assert(nums.iter() |> none(x => x < 0))
+
+    FOREACH_TOTAL = 0
+    nums.iter() |> for_each(add_foreach)
+    assert(FOREACH_TOTAL == 10)
+
+fn test_unzip:
+    let pairs = vec_123().iter()
+        |> zip(vec_1_to_4().iter())
+    let (lefts, rights) = pairs.unzip()
+    assert_vec_i32(lefts, 1, 2, 3)
+    assert_vec_i32(rights, 1, 2, 3)
+
 fn main:
     test_reduce()
     test_fold()
@@ -153,4 +232,8 @@ fn main:
     test_complex_pipeline()
     test_membership_filter_pipeline()
     test_adapter_next()
+    test_filter_map_and_skip_adapters()
+    test_enumerate_chain_zip_with_step_by()
+    test_eager_consumers()
+    test_unzip()
     print("ok")
