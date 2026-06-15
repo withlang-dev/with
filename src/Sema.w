@@ -193,6 +193,8 @@ type SemaBuiltinSymbols {
     context_error: i32,
     hashmap: i32,
     hashset: i32,
+    btreemap: i32,
+    btreeset: i32,
     handle: i32,
     slotmap: i32,
     slotmapslot: i32,
@@ -1194,6 +1196,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         context_error: 0,
         hashmap: 0,
         hashset: 0,
+        btreemap: 0,
+        btreeset: 0,
         handle: 0,
         slotmap: 0,
         slotmapslot: 0,
@@ -2122,6 +2126,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.context_error = self.pool_intern("ContextError")
     self.syms.hashmap = self.pool_intern("HashMap")
     self.syms.hashset = self.pool_intern("HashSet")
+    self.syms.btreemap = self.pool_intern("BTreeMap")
+    self.syms.btreeset = self.pool_intern("BTreeSet")
     self.syms.handle = self.pool_intern("Handle")
     self.syms.slotmap = self.pool_intern("SlotMap")
     self.syms.slotmapslot = self.pool_intern("SlotMapSlot")

@@ -45,6 +45,28 @@ fn test_collect_hashmap:
     assert(map.get("b").unwrap() == 2)
     assert(map.get("missing").is_none())
 
+fn test_collect_btreeset:
+    let xs = numbers()
+    let set: BTreeSet[i32] = xs.iter() |> collect[BTreeSet[i32]]()
+    assert(set.len() == 3)
+    assert(set.contains(1))
+    assert(set.contains(2))
+    assert(set.contains(3))
+    let items = set.items()
+    assert(items.get(0) == 1)
+    assert(items.get(1) == 2)
+    assert(items.get(2) == 3)
+
+fn test_collect_btreemap:
+    let xs = pairs()
+    let map: BTreeMap[str, i32] = xs.iter() |> collect[BTreeMap[str, i32]]()
+    assert(map.len() == 2)
+    assert(map.get("a").unwrap() == 3)
+    assert(map.get("b").unwrap() == 2)
+    let keys = map.keys()
+    assert(keys.get(0) == "a")
+    assert(keys.get(1) == "b")
+
 fn test_collect_string:
     let xs = bytes()
     let text: str = xs.iter() |> collect[String]()
@@ -54,5 +76,7 @@ fn main:
     test_collect_vec()
     test_collect_hashset()
     test_collect_hashmap()
+    test_collect_btreeset()
+    test_collect_btreemap()
     test_collect_string()
     print("ok")

@@ -1005,9 +1005,19 @@ fn Sema.fn_param_uses_value_ref_abi(self: Sema, param_start: i32, param_idx: i32
         return 0
 
     let p_type_node = self.ast.fn_param_type(param_start, param_idx)
-    if p_type_node == 0 or self.ast.kind(p_type_node) != NodeKind.NK_TYPE_NAMED:
+    if p_type_node == 0:
         return 0
-    let p_sym = self.ast.get_data0(p_type_node)
+    var p_sym = 0
+    let p_kind = self.ast.kind(p_type_node)
+    if p_kind == NodeKind.NK_TYPE_NAMED:
+        p_sym = self.ast.get_data0(p_type_node)
+    else if p_kind == NodeKind.NK_TYPE_GENERIC:
+        let p_base = self.ast.get_data0(p_type_node)
+        let p_base_kind = self.ast.kind(p_base)
+        if p_base_kind == NodeKind.NK_TYPE_NAMED or p_base_kind == NodeKind.NK_IDENT:
+            p_sym = self.ast.get_data0(p_base)
+    else:
+        return 0
     if p_sym == self.syms.self_type:
         return 1
     if p_sym == method_owner_sym:

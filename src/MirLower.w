@@ -3851,7 +3851,9 @@ fn MirBuilder.lower_call_place(self: MirBuilder, node: i32) -> i32:
         recv_type = self.type_receiver_type(recv_expr)
     if recv_type == 0 or recv_type == self.sema.ty_void:
         return -1
-    let method_name = self.pool.resolve_symbol(method_sym)
+    var method_name = self.pool.resolve_symbol(method_sym)
+    if method_name.len() == 0:
+        method_name = self.sema.pool_resolve(method_sym)
     let intrinsic = self.classify_intrinsic(recv_type, method_name)
     // Preserve lvalue identity for vec element projections used as a place
     // (for example `items.get(0).tags.push(...)`).
@@ -3937,6 +3939,160 @@ fn MirBuilder.literal_target_base_sym(self: MirBuilder, ty: i32) -> i32:
         return 0
     self.sema.get_generic_inst_base(resolved as i32)
 
+fn MirBuilder.is_btreeset_base_sym(self: MirBuilder, sym: i32) -> i32:
+    if sym == self.sema.syms.btreeset:
+        return 1
+    let name = self.sema.pool_resolve(sym)
+    if name == "BTreeSet" or name.starts_with("BTreeSet"):
+        return 1
+    0
+
+fn MirBuilder.is_btreemap_base_sym(self: MirBuilder, sym: i32) -> i32:
+    if sym == self.sema.syms.btreemap:
+        return 1
+    let name = self.sema.pool_resolve(sym)
+    if name == "BTreeMap" or name.starts_with("BTreeMap"):
+        return 1
+    0
+
+fn MirBuilder.btree_storage_vec_type(self: MirBuilder, target_ty: i32) -> i32:
+    let resolved = self.sema.resolve_alias(target_ty)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let base = self.sema.get_generic_inst_base(resolved as i32)
+    if self.is_btreeset_base_sym(base) != 0:
+        let values_ty = self.struct_field_type(target_ty, self.pool.intern("values"))
+        if values_ty != 0:
+            return values_ty
+        if self.sema.get_generic_inst_arg_count(resolved as i32) <= 0:
+            return 0
+        return self.sema.ensure_vec_type_for(self.sema.get_generic_inst_arg(resolved as i32, 0))
+    if self.is_btreemap_base_sym(base) != 0:
+        let entries_ty = self.struct_field_type(target_ty, self.pool.intern("entries"))
+        if entries_ty != 0:
+            return entries_ty
+        if self.sema.get_generic_inst_arg_count(resolved as i32) < 2:
+            return 0
+        let elems: Vec[i32] = Vec.new()
+        elems.push(self.sema.get_generic_inst_arg(resolved as i32, 0))
+        elems.push(self.sema.get_generic_inst_arg(resolved as i32, 1))
+        let pair_ty = self.sema.ensure_tuple_type(elems, 2) as i32
+        return self.sema.ensure_vec_type_for(pair_ty)
+    0
+
+fn MirBuilder.emit_btree_new_into(self: MirBuilder, out_place: i32, target_ty: i32, span: i32):
+    let storage_ty = self.btree_storage_vec_type(target_ty)
+    if storage_ty == 0:
+        self.mark_unsupported()
+        return
+    let storage_local = self.new_temp(storage_ty)
+    let storage_place = self.place_for_local(storage_local)
+    self.emit_vec_new_into(storage_place, span)
+    let storage_op = self.body.new_operand(OperandKind.OK_MOVE, storage_place)
+    let fields: Vec[i32] = Vec.new()
+    let names: Vec[i32] = Vec.new()
+    fields.push(storage_op)
+    names.push(0)
+    let fid = self.body.new_agg_fields(fields, names)
+    let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, out_place, rv, span)
+
+fn MirBuilder.emit_btree_set_insert(self: MirBuilder, set_place: i32, elem_op: i32, node: i32):
+    let insert_sym = self.sema.pool_lookup_symbol("insert")
+    let fn_sym = if insert_sym != 0: self.sema.lookup_generic_method_fn(self.sema.syms.btreeset, insert_sym) else: 0
+    if fn_sym == 0:
+        self.mark_unsupported()
+        return
+    let args: Vec[i32] = Vec.new()
+    args.push(self.body.new_operand(OperandKind.OK_COPY, set_place))
+    args.push(elem_op)
+    let _ = self.lower_resolved_call_with_operand_args(fn_sym, args, self.sema.ty_void as i32, node)
+
+fn MirBuilder.emit_btree_map_insert(self: MirBuilder, map_place: i32, key_op: i32, val_op: i32, node: i32):
+    let insert_sym = self.sema.pool_lookup_symbol("insert")
+    let fn_sym = if insert_sym != 0: self.sema.lookup_generic_method_fn(self.sema.syms.btreemap, insert_sym) else: 0
+    if fn_sym == 0:
+        self.mark_unsupported()
+        return
+    let args: Vec[i32] = Vec.new()
+    args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
+    args.push(key_op)
+    args.push(val_op)
+    let _ = self.lower_resolved_call_with_operand_args(fn_sym, args, self.sema.ty_void as i32, node)
+
+fn MirBuilder.lower_btree_seq_literal(self: MirBuilder, node: i32, elem_ty: i32) -> i32:
+    let elem_start = self.ast.get_data0(node)
+    let elem_count = self.ast.get_data1(node)
+    let target_ty = self.expr_type(node)
+    if self.btree_storage_vec_type(target_ty) == 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let out_local = self.new_temp(target_ty)
+    let out_place = self.place_for_local(out_local)
+    self.emit_btree_new_into(out_place, target_ty, self.ast.get_start(node))
+    let saved_expected = self.expected_type
+    for i in 0..elem_count:
+        let elem_node = self.ast.get_extra(elem_start + i)
+        if elem_ty != 0:
+            self.expected_type = elem_ty
+        let elem_op = self.lower_expr(elem_node)
+        self.expected_type = saved_expected
+        self.emit_btree_set_insert(out_place, elem_op, elem_node)
+    if self.sema.is_copy(target_ty) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, out_place)
+    self.body.new_operand(OperandKind.OK_MOVE, out_place)
+
+fn MirBuilder.lower_btree_map_literal(self: MirBuilder, node: i32, key_ty: i32, val_ty: i32) -> i32:
+    let pair_start = self.ast.get_data0(node)
+    let pair_count = self.ast.get_data1(node)
+    let target_ty = self.expr_type(node)
+    if self.btree_storage_vec_type(target_ty) == 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let out_local = self.new_temp(target_ty)
+    let out_place = self.place_for_local(out_local)
+    self.emit_btree_new_into(out_place, target_ty, self.ast.get_start(node))
+    let saved_expected = self.expected_type
+    for i in 0..pair_count:
+        let key_node = self.ast.get_extra(pair_start + i * 2)
+        let val_node = self.ast.get_extra(pair_start + i * 2 + 1)
+        if key_ty != 0:
+            self.expected_type = key_ty
+        let key_op = self.lower_expr(key_node)
+        if val_ty != 0:
+            self.expected_type = val_ty
+        else:
+            self.expected_type = saved_expected
+        let val_op = self.lower_expr(val_node)
+        self.expected_type = saved_expected
+        self.emit_btree_map_insert(out_place, key_op, val_op, key_node)
+    if self.sema.is_copy(target_ty) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, out_place)
+    self.body.new_operand(OperandKind.OK_MOVE, out_place)
+
+fn MirBuilder.lower_btree_new(self: MirBuilder, node: i32, fallback_ty: i32) -> i32:
+    var target_ty = self.expr_type(node)
+    var storage_ty = self.btree_storage_vec_type(target_ty)
+    if storage_ty == 0 and self.expected_type > 0:
+        let expected_storage_ty = self.btree_storage_vec_type(self.expected_type)
+        if expected_storage_ty != 0:
+            target_ty = self.expected_type
+            storage_ty = expected_storage_ty
+    if storage_ty == 0 and fallback_ty > 0:
+        let fallback_storage_ty = self.btree_storage_vec_type(fallback_ty)
+        if fallback_storage_ty != 0:
+            target_ty = fallback_ty
+            storage_ty = fallback_storage_ty
+    if storage_ty == 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+    let out_local = self.new_temp(target_ty)
+    let out_place = self.place_for_local(out_local)
+    self.emit_btree_new_into(out_place, target_ty, self.ast.get_start(node))
+    if self.sema.is_copy(target_ty) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, out_place)
+    self.body.new_operand(OperandKind.OK_MOVE, out_place)
+
 fn MirBuilder.lower_collection_literal_call(self: MirBuilder, node: i32, intrinsic: MirIntrinsic, operands: &Vec[i32]) -> i32:
     let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("__collection_literal"), self.sema.ty_void)
     let args_id = self.body.new_call_args(operands)
@@ -3957,12 +4113,14 @@ fn MirBuilder.lower_collection_seq_literal(self: MirBuilder, node: i32) -> i32:
     let elem_count = self.ast.get_data1(node)
     let target_ty = self.expr_type(node)
     let target_base = self.literal_target_base_sym(target_ty)
-    if target_base != self.sema.syms.vec and target_base != self.sema.syms.hashset:
+    if target_base != self.sema.syms.vec and target_base != self.sema.syms.hashset and self.is_btreeset_base_sym(target_base) == 0:
         return -1
     var elem_ty = 0
     let resolved = self.sema.resolve_alias(target_ty)
     if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) > 0:
         elem_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
+    if self.is_btreeset_base_sym(target_base) != 0:
+        return self.lower_btree_seq_literal(node, elem_ty)
     let saved_expected = self.expected_type
     let args: Vec[i32] = Vec.new()
     for i in 0..elem_count:
@@ -3983,6 +4141,9 @@ fn MirBuilder.lower_map_literal(self: MirBuilder, node: i32) -> i32:
     if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
         key_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
         val_ty = self.sema.get_generic_inst_arg(resolved as i32, 1)
+    let target_base = self.literal_target_base_sym(target_ty)
+    if self.is_btreemap_base_sym(target_base) != 0:
+        return self.lower_btree_map_literal(node, key_ty, val_ty)
     let saved_expected = self.expected_type
     let args: Vec[i32] = Vec.new()
     for i in 0..pair_count:
@@ -4890,6 +5051,13 @@ fn MirBuilder.lower_comprehension_leaf(self: MirBuilder, comp_node: i32, out_pla
             self.expected_type = saved_expected2
         let val_op = self.lower_expr(val_expr)
         self.expected_type = saved_expected2
+        let target_base = self.literal_target_base_sym(target_ty)
+        if self.is_btreemap_base_sym(target_base) != 0:
+            if self.btree_storage_vec_type(target_ty) == 0:
+                self.mark_unsupported()
+                return
+            self.emit_btree_map_insert(out_place, key_op, val_op, key_expr)
+            return
         self.emit_map_insert(out_place, key_op, val_op, 0, self.ast.get_start(key_expr))
         return
 
@@ -4900,6 +5068,12 @@ fn MirBuilder.lower_comprehension_leaf(self: MirBuilder, comp_node: i32, out_pla
     let elem_op = self.lower_expr(expr)
     self.expected_type = saved_expected
     let target_base = self.literal_target_base_sym(self.expr_type(comp_node))
+    if self.is_btreeset_base_sym(target_base) != 0:
+        if self.btree_storage_vec_type(self.expr_type(comp_node)) == 0:
+            self.mark_unsupported()
+            return
+        self.emit_btree_set_insert(out_place, elem_op, expr)
+        return
     if target_base == self.sema.syms.hashset:
         self.emit_map_insert(out_place, elem_op, self.unit_operand(), 1, self.ast.get_start(expr))
     else:
@@ -5291,10 +5465,15 @@ fn MirBuilder.lower_array_comprehension(self: MirBuilder, comp_node: i32) -> i32
     if elem_ty == 0:
         elem_ty = self.sema.ty_i32 as i32
 
-    let out_local = self.new_temp(out_ty)
-    let out_place = self.place_for_local(out_local)
+    var out_local = self.new_temp(out_ty)
+    var out_place = self.place_for_local(out_local)
     if out_base == self.sema.syms.hashset or out_base == self.sema.syms.hashmap:
         self.emit_map_new_into(out_place, self.ast.get_start(comp_node))
+    else if self.is_btreeset_base_sym(out_base) != 0 or self.is_btreemap_base_sym(out_base) != 0:
+        if self.btree_storage_vec_type(out_ty) == 0:
+            self.mark_unsupported()
+            return self.unit_operand()
+        self.emit_btree_new_into(out_place, out_ty, self.ast.get_start(comp_node))
     else:
         self.emit_vec_new_into(out_place, self.ast.get_start(comp_node))
     self.lower_comprehension_clause(comp_node, 0, out_place, elem_ty)
@@ -7025,6 +7204,22 @@ fn MirBuilder.receiver_is_static_type_expr(self: MirBuilder, expr: i32) -> i32:
         return self.receiver_is_static_type_expr(self.ast.get_data0(expr))
     0
 
+fn MirBuilder.static_receiver_base_sym(self: MirBuilder, expr: i32) -> i32:
+    if expr == 0:
+        return 0
+    let kind = self.ast.kind(expr)
+    if kind == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(expr)
+        let sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(sym))
+        if self.lookup_local(sym) < 0 and sema_sym != 0 and self.sema.named_types.contains(sema_sym):
+            return sema_sym
+        return 0
+    if kind == NodeKind.NK_INDEX:
+        return self.static_receiver_base_sym(self.ast.get_data0(expr))
+    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC:
+        return self.sema.pool_lookup_symbol(self.pool.resolve_symbol(self.ast.get_data0(expr)))
+    0
+
 fn MirBuilder.lower_static_enum_variant_call(self: MirBuilder, enum_ty: i32, variant_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
     var result_ty = self.expr_type(node)
     if result_ty == 0 or result_ty == self.sema.ty_void:
@@ -7322,7 +7517,9 @@ fn MirBuilder.receiver_option_intrinsic(self: MirBuilder, recv_expr: i32) -> Mir
     let base_ty = self.expr_type(base)
     if base_ty == 0 or base_ty == self.sema.ty_void:
         return MirIntrinsic.NONE
-    let method_name = self.pool.resolve_symbol(method_sym)
+    var method_name = self.pool.resolve_symbol(method_sym)
+    if method_name.len() == 0:
+        method_name = self.sema.pool_resolve(method_sym)
     let resolved = self.sema.resolve_alias(base_ty)
     let type_name_sym = self.sema.get_type_name(resolved)
     if type_name_sym == 0:
@@ -7359,7 +7556,9 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             let type_sym = self.ast.get_data0(self_expr)
             if ret_name_sym == type_sym:
                 recv_type = ret_type
-    let method_name = self.pool.resolve_symbol(method_sym)
+    var method_name = self.pool.resolve_symbol(method_sym)
+    if method_name.len() == 0:
+        method_name = self.sema.pool_resolve(method_sym)
     if method_name == "as_option":
         let resolved_recv = self.sema.resolve_alias(recv_type as TypeId)
         if self.sema.get_type_kind(resolved_recv) == TypeKind.TY_PTR:
@@ -7399,6 +7598,11 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
 
     if self.is_vec_type(enum_accessor_recv_type) != 0 and (method_name == "sequence" or method_name == "traverse"):
         return self.lower_vec_sequence_or_traverse_method(self_expr, method_name, arg_start, arg_count, node)
+
+    let static_recv_base_for_btree = self.static_receiver_base_sym(self_expr)
+    let recv_base_for_btree = self.literal_target_base_sym(enum_accessor_recv_type)
+    if method_name == "new" and (self.is_btreeset_base_sym(static_recv_base_for_btree) != 0 or self.is_btreemap_base_sym(static_recv_base_for_btree) != 0 or self.is_btreeset_base_sym(recv_base_for_btree) != 0 or self.is_btreemap_base_sym(recv_base_for_btree) != 0):
+        return self.lower_btree_new(node, recv_type)
 
     if method_name == "unwrap_or" and self.is_option_or_result_type(enum_accessor_recv_type) != 0:
         return self.lower_unwrap_or_method(self_expr, arg_start, arg_count, node)

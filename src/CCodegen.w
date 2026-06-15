@@ -2840,6 +2840,18 @@ fn CCodegen.rvalue_text(self: CCodegen, body: &MirBody, rval_id: i32) -> str:
                 if d0 == BinaryOp.OP_EQ:
                     return eq_expr
                 return "(!(" ++ eq_expr ++ "))"
+        if d0 == BinaryOp.OP_LT or d0 == BinaryOp.OP_GT or d0 == BinaryOp.OP_LTE or d0 == BinaryOp.OP_GTE:
+            let lhs_tid2 = self.sema.resolve_alias(self.operand_tid(body, d1))
+            let rhs_tid2 = self.sema.resolve_alias(self.operand_tid(body, d2))
+            if self.sema.get_type_kind(lhs_tid2) == TypeKind.TY_STR and self.sema.get_type_kind(rhs_tid2) == TypeKind.TY_STR:
+                let cmp_expr = "with_str_cmp(" ++ lhs ++ ", " ++ rhs ++ ")"
+                if d0 == BinaryOp.OP_LT:
+                    return "(" ++ cmp_expr ++ " < 0)"
+                if d0 == BinaryOp.OP_GT:
+                    return "(" ++ cmp_expr ++ " > 0)"
+                if d0 == BinaryOp.OP_LTE:
+                    return "(" ++ cmp_expr ++ " <= 0)"
+                return "(" ++ cmp_expr ++ " >= 0)"
         let result_bin_tid = self.sema.resolve_alias(self.rvalue_tid(body, rval_id))
         let result_is_int_bin = self.sema.get_type_kind(result_bin_tid) == TypeKind.TY_INT
         let is_checked_arith_bin = d0 == BinaryOp.OP_ADD or d0 == BinaryOp.OP_SUB or d0 == BinaryOp.OP_MUL or d0 == BinaryOp.OP_DIV or d0 == BinaryOp.OP_MOD
@@ -4857,6 +4869,8 @@ fn CCodegen.call_return_tid_for_fn_sym(self: CCodegen, body: &MirBody, fn_sym: i
         return self.sema.ty_str as i32
     if raw == "with_str_eq":
         return self.sema.ty_bool as i32
+    if raw == "with_str_cmp":
+        return self.sema.ty_i32 as i32
     if raw == "dump_async_mir" or raw == "Driver.dump_async_mir":
         return self.sema.ty_str as i32
     fallback
@@ -8563,6 +8577,7 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out.write("extern with_str with_str_concat(with_str, with_str);\n")
     out.write("extern with_str with_str_concat_n(const with_str*, int64_t);\n")
     out.write("extern with_str with_str_concat_n_move_first(const with_str*, int64_t);\n")
+    out.write("extern int32_t with_str_cmp(with_str, with_str);\n")
     out.write("extern int64_t with_str_len(with_str);\n")
     out.write("extern int32_t with_str_byte_at(with_str, int64_t);\n")
     out.write("extern int32_t with_str_contains_char(with_str, int32_t);\n")

@@ -1334,6 +1334,19 @@ pub fn with_str_eq(a: str, b: str) -> i32:
         return 1
     if rt_memcmp(ap, bp, al) == 0: 1 else: 0
 
+pub fn with_str_cmp(a: str, b: str) -> i32:
+    let al = str_length(a)
+    let bl = str_length(b)
+    let n = if al < bl: al else: bl
+    let cmp = rt_memcmp(str_data(a), str_data(b), n)
+    if cmp != 0:
+        return cmp
+    if al < bl:
+        return -1
+    if al > bl:
+        return 1
+    0
+
 pub fn with_str_clone(s: str) -> str:
     let slen = str_length(s)
     if slen == 0:

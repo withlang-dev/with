@@ -2205,6 +2205,30 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: &Vec[i32], tp_
     if sig_idx < 0:
         self.add_sig(mono_sym, 0, ret_tid, ps, param_count, 0)
         sig_idx = self.get_sig(mono_sym)
+    else:
+        self.sig_type_ids.set_i32(sig_idx as i64, 0)
+        self.sig_ret_types.set_i32(sig_idx as i64, ret_tid as i32)
+        self.sig_param_starts.set_i32(sig_idx as i64, ps)
+        self.sig_param_counts.set_i32(sig_idx as i64, param_count)
+        self.sig_variadic.set_i32(sig_idx as i64, 0)
+        self.sig_param_eff_starts.set_i32(sig_idx as i64, self.sig_param_effects.len() as i32)
+        for cpi in 0..param_count:
+            self.sig_param_effects.push(0)
+            self.sig_param_view_origins.push(0)
+            self.sig_value_ref_abi_params.push(0)
+    var method_owner_sym = 0
+    var self_type_id = 0
+    let fn_name_str = self.pool_resolve(fn_name)
+    for owner_ci in 0..fn_name_str.len() as i32:
+        if fn_name_str.byte_at(owner_ci as i64) == 46:
+            let owner_name = fn_name_str.slice(0, owner_ci as i64)
+            method_owner_sym = self.pool_lookup_symbol(owner_name)
+            if method_owner_sym != 0:
+                self_type_id = self.lookup_named_type_visible(method_owner_sym)
+            break
+    for abi_pi in 0..param_count:
+        if self.fn_param_uses_value_ref_abi(param_start, abi_pi, method_owner_sym, self_type_id) != 0:
+            self.set_sig_param_value_ref_abi(sig_idx, abi_pi, 1)
 
     // Concrete generic validation must run in the callee's own lexical
     // environment, not inside the caller's active local scopes.
@@ -4816,17 +4840,14 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             if self.get_type_kind(expected) == TypeKind.TY_GENERIC_INST:
                 let base = self.get_generic_inst_base(expected as i32)
                 let base_name = self.pool_resolve(base)
-                if base == self.syms.vec or base == self.syms.hashset:
+                if base == self.syms.vec or base == self.syms.hashset or base == self.syms.btreeset:
                     target_ty = expected as i32
                     result_expected = self.get_generic_inst_arg(expected as i32, 0)
-                else if base_name == "BTreeSet":
-                    self.emit_error("comprehension target BTreeSet is not implemented yet (#414)", node)
-                    return 0
-                else if base == self.syms.hashmap or base_name == "BTreeMap":
+                else if base == self.syms.hashmap or base == self.syms.btreemap:
                     self.emit_error("element comprehension cannot target a map; use [key: value for ...] form", node)
                     return 0
             else:
-                self.emit_error("element comprehension requires Vec or HashSet expected type", node)
+                self.emit_error("element comprehension requires Vec, HashSet, or BTreeSet expected type", node)
                 return 0
         var pushed_scopes = 0
         for ci in 0..clause_count:
@@ -4850,6 +4871,14 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         for _ in 0..pushed_scopes:
             self.pop_scope()
         let result_ty = if target_ty != 0: target_ty else: self.ensure_vec_type_for(result_elem as i32)
+        if target_ty != 0:
+            let target_resolved = self.resolve_alias(target_ty as TypeId)
+            if self.get_type_kind(target_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(target_resolved as i32) == self.syms.btreeset:
+                let ord_trait = self.pool_lookup_symbol("Ord")
+                if ord_trait != 0 and result_expected != 0 and self.type_implements_trait(result_expected, ord_trait) == 0:
+                    self.emit_error("BTreeSet comprehension element type must implement Ord", node)
+                    return 0
+                let _btree_storage_ty = self.ensure_btree_storage_type(target_ty)
         self.typed_expr_types.insert(node, result_ty)
         return result_ty as TypeId
 
@@ -4865,15 +4894,11 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected2 = self.resolve_alias(self.expected_expr_type)
             if self.get_type_kind(expected2) != TypeKind.TY_GENERIC_INST:
-                self.emit_error("map comprehension requires HashMap expected type", node)
+                self.emit_error("map comprehension requires HashMap or BTreeMap expected type", node)
                 return 0
             let base2 = self.get_generic_inst_base(expected2 as i32)
-            let base_name2 = self.pool_resolve(base2)
-            if base_name2 == "BTreeMap":
-                self.emit_error("comprehension target BTreeMap is not implemented yet (#414)", node)
-                return 0
-            if base2 != self.syms.hashmap:
-                self.emit_error("map comprehension requires HashMap expected type", node)
+            if base2 != self.syms.hashmap and base2 != self.syms.btreemap:
+                self.emit_error("map comprehension requires HashMap or BTreeMap expected type", node)
                 return 0
             map_target_ty = expected2 as i32
             key_expected = self.get_generic_inst_arg(expected2 as i32, 0)
@@ -4905,10 +4930,22 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             map_args.push(key_ty as i32)
             map_args.push(val_ty as i32)
             map_target_ty = self.ensure_generic_inst_type(self.syms.hashmap, map_args, 2) as i32
-        let hash_trait2 = self.pool_lookup_symbol("Hash")
-        if hash_trait2 != 0 and key_ty != 0 and self.type_implements_trait(key_ty as i32, hash_trait2) == 0:
-            self.emit_error("HashMap comprehension key type must implement Hash", node)
-            return 0
+        let map_target_resolved = self.resolve_alias(map_target_ty as TypeId)
+        let map_target_base = if self.get_type_kind(map_target_resolved) == TypeKind.TY_GENERIC_INST:
+            self.get_generic_inst_base(map_target_resolved as i32)
+        else:
+            0
+        if map_target_base == self.syms.btreemap:
+            let ord_trait2 = self.pool_lookup_symbol("Ord")
+            if ord_trait2 != 0 and key_ty != 0 and self.type_implements_trait(key_ty as i32, ord_trait2) == 0:
+                self.emit_error("BTreeMap comprehension key type must implement Ord", node)
+                return 0
+            let _btree_storage_ty = self.ensure_btree_storage_type(map_target_ty)
+        else:
+            let hash_trait2 = self.pool_lookup_symbol("Hash")
+            if hash_trait2 != 0 and key_ty != 0 and self.type_implements_trait(key_ty as i32, hash_trait2) == 0:
+                self.emit_error("HashMap comprehension key type must implement Hash", node)
+                return 0
         self.typed_expr_types.insert(node, map_target_ty)
         return map_target_ty as TypeId
 
@@ -8136,13 +8173,10 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
         else if expected_kind == TypeKind.TY_GENERIC_INST:
             target_base = self.get_generic_inst_base(expected as i32)
             let target_name = self.pool_resolve(target_base)
-            if target_base == self.syms.vec or target_base == self.syms.hashset:
+            if target_base == self.syms.vec or target_base == self.syms.hashset or target_base == self.syms.btreeset:
                 expected_elem = self.get_generic_inst_arg(expected as i32, 0)
                 target_ty = expected as i32
-            else if target_name == "BTreeSet":
-                self.emit_error("collection literal target BTreeSet is not implemented yet (#414)", node)
-                return 0
-            else if target_base == self.syms.hashmap or target_name == "BTreeMap":
+            else if target_base == self.syms.hashmap or target_base == self.syms.btreemap:
                 self.emit_error("sequence literal cannot target a map; use [key: value] form", node)
                 return 0
     if elem_count == 0:
@@ -8150,7 +8184,7 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
             self.typed_expr_types.insert(node, target_ty)
             return target_ty
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
-            self.emit_error("empty sequence literal requires array, slice, Vec, or HashSet expected type", node)
+            self.emit_error("empty sequence literal requires array, slice, Vec, HashSet, or BTreeSet expected type", node)
             return 0
         self.emit_error("empty sequence literal requires expected type", node)
         return 0
@@ -8175,6 +8209,12 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
     else:
         self.add_type(TypeKind.TY_ARRAY, elem_type, elem_count, 0)
     self.typed_expr_types.insert(node, result as i32)
+    if target_base == self.syms.btreeset:
+        let ord_trait = self.pool_lookup_symbol("Ord")
+        if ord_trait != 0 and elem_type != 0 and self.type_implements_trait(elem_type, ord_trait) == 0:
+            self.emit_error("BTreeSet literal element type must implement Ord", node)
+            return 0
+        let _btree_storage_ty = self.ensure_btree_storage_type(result as i32)
     result as i32
 
 fn Sema.check_map_literal(self: Sema, node: i32) -> i32:
@@ -8186,18 +8226,15 @@ fn Sema.check_map_literal(self: Sema, node: i32) -> i32:
     if self.has_expected_type != 0 and self.expected_expr_type != 0:
         let expected = self.resolve_alias(self.expected_expr_type)
         if self.get_type_kind(expected) != TypeKind.TY_GENERIC_INST:
-            self.emit_error("map literal requires HashMap expected type", node)
+            self.emit_error("map literal requires HashMap or BTreeMap expected type", node)
             return 0
         let base = self.get_generic_inst_base(expected as i32)
         let base_name = self.pool_resolve(base)
-        if base_name == "BTreeMap":
-            self.emit_error("map literal target BTreeMap is not implemented yet (#414)", node)
-            return 0
-        if base != self.syms.hashmap:
-            self.emit_error("map literal requires HashMap expected type", node)
+        if base != self.syms.hashmap and base != self.syms.btreemap:
+            self.emit_error("map literal requires HashMap or BTreeMap expected type", node)
             return 0
         if self.get_generic_inst_arg_count(expected as i32) != 2:
-            self.emit_error("HashMap map literal target requires key and value types", node)
+            self.emit_error("map literal target requires key and value types", node)
             return 0
         target_ty = expected as i32
         key_expected = self.get_generic_inst_arg(expected as i32, 0)
@@ -8236,10 +8273,21 @@ fn Sema.check_map_literal(self: Sema, node: i32) -> i32:
         args.push(key_ty)
         args.push(val_ty)
         target_ty = self.ensure_generic_inst_type(self.syms.hashmap, args, 2) as i32
-    let hash_trait = self.pool_lookup_symbol("Hash")
-    if hash_trait != 0 and key_ty != 0 and self.type_implements_trait(key_ty, hash_trait) == 0:
-        self.emit_error("HashMap literal key type must implement Hash", node)
-        return 0
+    let target_base2 = if target_ty != 0 and self.get_type_kind(self.resolve_alias(target_ty as TypeId)) == TypeKind.TY_GENERIC_INST:
+        self.get_generic_inst_base(self.resolve_alias(target_ty as TypeId) as i32)
+    else:
+        0
+    if target_base2 == self.syms.btreemap:
+        let ord_trait = self.pool_lookup_symbol("Ord")
+        if ord_trait != 0 and key_ty != 0 and self.type_implements_trait(key_ty, ord_trait) == 0:
+            self.emit_error("BTreeMap literal key type must implement Ord", node)
+            return 0
+        let _btree_storage_ty = self.ensure_btree_storage_type(target_ty)
+    else:
+        let hash_trait = self.pool_lookup_symbol("Hash")
+        if hash_trait != 0 and key_ty != 0 and self.type_implements_trait(key_ty, hash_trait) == 0:
+            self.emit_error("HashMap literal key type must implement Hash", node)
+            return 0
     self.typed_expr_types.insert(node, target_ty)
     target_ty
 
@@ -12473,6 +12521,49 @@ fn Sema.generic_method_bind_owner_from_expected(self: Sema, owner_sym: i32) -> i
             return 0
     self.setup_generic_inst_substitution(expected as i32, owner_sym)
 
+fn Sema.bind_type_params_from_self_receiver(self: Sema, arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
+    if arg_tid == 0 or tp_count == 0:
+        return
+    var resolved = self.resolve_alias(arg_tid as TypeId)
+    let rkind = self.get_type_kind(resolved)
+    if rkind == TypeKind.TY_REF or rkind == TypeKind.TY_PTR:
+        resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return
+    let owner_sym = self.get_generic_inst_base(resolved as i32)
+    if owner_sym == 0 or not self.type_decl_nodes.contains(owner_sym):
+        return
+    let owner_node = self.type_decl_nodes.get(owner_sym).unwrap()
+    let owner_tp_start = self.type_decl_tp_start(owner_node)
+    let owner_tp_count = self.type_decl_tp_count(owner_node)
+    let arg_count = self.get_generic_inst_arg_count(resolved as i32)
+    let bind_count = if owner_tp_count < arg_count: owner_tp_count else: arg_count
+    var pos = owner_tp_start
+    for ti in 0..bind_count:
+        let owner_tp_name = self.ast.get_extra(pos)
+        let owner_bound_count = self.ast.get_extra(pos + 1)
+        if self.type_param_exists(tp_start, tp_count, owner_tp_name) != 0:
+            self.put_generic_subst(owner_tp_name, self.get_generic_inst_arg(resolved as i32, ti), err_node)
+        pos = pos + 2 + owner_bound_count
+
+fn Sema.bind_type_params_from_method_receiver_type(self: Sema, type_node: i32, arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
+    if type_node == 0 or arg_tid == 0 or tp_count == 0:
+        return
+    let kind = self.ast.kind(type_node)
+    if kind == NodeKind.NK_TYPE_NAMED and self.ast.get_data0(type_node) == self.syms.self_type:
+        self.bind_type_params_from_self_receiver(arg_tid, tp_start, tp_count, err_node)
+        return
+    if kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_PTR:
+        let inner = self.ast.get_data0(type_node)
+        let resolved = self.resolve_alias(arg_tid as TypeId)
+        let rkind = self.get_type_kind(resolved)
+        if rkind == TypeKind.TY_REF or rkind == TypeKind.TY_PTR:
+            self.bind_type_params_from_type_expr(type_node, arg_tid, tp_start, tp_count, err_node)
+        else:
+            self.bind_type_params_from_method_receiver_type(inner, arg_tid, tp_start, tp_count, err_node)
+        return
+    self.bind_type_params_from_type_expr(type_node, arg_tid, tp_start, tp_count, err_node)
+
 fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, method_fn_sym: i32, is_static: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
     if method_fn_sym == 0 or not self.generic_fn_nodes.contains(method_fn_sym):
         return 0
@@ -12500,6 +12591,8 @@ fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, m
         else if is_static != 0:
             let _ = self.generic_method_bind_owner_from_expected(owner_sym)
     if owner_tp_count > 0:
+        if is_static == 0 and param_count > 0:
+            self.bind_type_params_from_method_receiver_type(self.ast.fn_param_type(param_start, 0), owner_type, owner_tp_start, owner_tp_count, node)
         var bind_param_offset = if is_static != 0: 0 else: 1
         for ai in 0..arg_count:
             let pi = ai + bind_param_offset
@@ -12509,6 +12602,8 @@ fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, m
             let arg_ty = arg_types.get(ai as i64)
             self.bind_type_params_from_type_expr(p_type_node, arg_ty, owner_tp_start, owner_tp_count, node)
     if fn_tp_count > 0:
+        if is_static == 0 and param_count > 0:
+            self.bind_type_params_from_method_receiver_type(self.ast.fn_param_type(param_start, 0), owner_type, fn_tp_start, fn_tp_count, node)
         let bind_param_offset2 = if is_static != 0: 0 else: 1
         for ai2 in 0..arg_count:
             let pi2 = ai2 + bind_param_offset2
@@ -12826,6 +12921,25 @@ fn Sema.ensure_veciter_type_for(self: Sema, elem_ty: i32) -> i32:
     let args: Vec[i32] = Vec.new()
     args.push(elem_ty)
     self.ensure_generic_inst_type(self.syms.veciter, args, 1) as i32
+
+fn Sema.ensure_btree_storage_type(self: Sema, btree_ty: i32) -> i32:
+    let resolved = self.resolve_alias(btree_ty as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let base = self.get_generic_inst_base(resolved as i32)
+    let base_name = self.pool_resolve(base)
+    let argc = self.get_generic_inst_arg_count(resolved as i32)
+    if base_name == "BTreeSet" and argc > 0:
+        return self.ensure_vec_type_for(self.get_generic_inst_arg(resolved as i32, 0))
+    if base_name == "BTreeMap" and argc >= 2:
+        let elems: Vec[i32] = Vec.new()
+        elems.push(self.get_generic_inst_arg(resolved as i32, 0))
+        elems.push(self.get_generic_inst_arg(resolved as i32, 1))
+        let pair_ty = self.ensure_tuple_type(elems, 2) as i32
+        if pair_ty == 0:
+            return 0
+        return self.ensure_vec_type_for(pair_ty)
+    0
 
 fn Sema.ensure_mapiter_type_for(self: Sema, iter_ty: i32, in_ty: i32, out_ty: i32) -> i32:
     let args: Vec[i32] = Vec.new()
@@ -13366,6 +13480,15 @@ fn Sema.collect_target_type_from_type_node(self: Sema, type_node: i32, iter_elem
             let hs_args: Vec[i32] = Vec.new()
             hs_args.push(iter_elem_ty)
             return self.ensure_generic_inst_type(self.syms.hashset, hs_args, 1) as i32
+    if target_name == "BTreeSet":
+        if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+            let ord_trait0 = self.pool_lookup_symbol("Ord")
+            if ord_trait0 != 0 and self.type_implements_trait(iter_elem_ty, ord_trait0) == 0:
+                self.emit_error("collect[BTreeSet]() element type must implement Ord", node)
+                return 0
+            let bs_args: Vec[i32] = Vec.new()
+            bs_args.push(iter_elem_ty)
+            return self.ensure_generic_inst_type(self.syms.btreeset, bs_args, 1) as i32
     if target_name == "HashMap":
         if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
             let pair_resolved0 = self.resolve_alias(iter_elem_ty as TypeId)
@@ -13377,9 +13500,22 @@ fn Sema.collect_target_type_from_type_node(self: Sema, type_node: i32, iter_elem
             hm_args0.push(self.type_extra.get(pair_start0 as i64))
             hm_args0.push(self.type_extra.get((pair_start0 + 1) as i64))
             return self.ensure_generic_inst_type(self.syms.hashmap, hm_args0, 2) as i32
-    if target_name == "BTreeSet" or target_name == "BTreeMap":
-        self.emit_error("collect[" ++ target_name ++ "] requires BTree collections, which are not implemented yet (#414)", node)
-        return 0
+    if target_name == "BTreeMap":
+        if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
+            let pair_resolved_b0 = self.resolve_alias(iter_elem_ty as TypeId)
+            if self.get_type_kind(pair_resolved_b0) != TypeKind.TY_TUPLE or self.get_type_d1(pair_resolved_b0) != 2:
+                self.emit_error("collect[BTreeMap]() requires iterator elements of type (K, V)", node)
+                return 0
+            let pair_start_b0 = self.get_type_d0(pair_resolved_b0)
+            let key_b0 = self.type_extra.get(pair_start_b0 as i64)
+            let ord_trait_b0 = self.pool_lookup_symbol("Ord")
+            if ord_trait_b0 != 0 and self.type_implements_trait(key_b0, ord_trait_b0) == 0:
+                self.emit_error("collect[BTreeMap]() key type must implement Ord", node)
+                return 0
+            let bm_args0: Vec[i32] = Vec.new()
+            bm_args0.push(key_b0)
+            bm_args0.push(self.type_extra.get((pair_start_b0 + 1) as i64))
+            return self.ensure_generic_inst_type(self.syms.btreemap, bm_args0, 2) as i32
 
     let target_ty = self.resolve_type_level_arg_expr(type_node)
     if target_ty == 0:
@@ -13409,6 +13545,16 @@ fn Sema.collect_target_type_from_type_node(self: Sema, type_node: i32, iter_elem
             self.emit_error("collect[HashSet[T]] element type does not match iterator element type", node)
             return 0
         return target_ty
+    if base_sym == self.syms.btreeset:
+        let elem_ty_b = self.get_generic_inst_arg(target_resolved as i32, 0)
+        if self.types_compatible(elem_ty_b as TypeId, iter_elem_ty as TypeId) == 0:
+            self.emit_error("collect[BTreeSet[T]] element type does not match iterator element type", node)
+            return 0
+        let ord_trait_b = self.pool_lookup_symbol("Ord")
+        if ord_trait_b != 0 and self.type_implements_trait(elem_ty_b, ord_trait_b) == 0:
+            self.emit_error("collect[BTreeSet[T]] element type must implement Ord", node)
+            return 0
+        return target_ty
     if base_sym == self.syms.hashmap:
         let pair_resolved = self.resolve_alias(iter_elem_ty as TypeId)
         if self.get_type_kind(pair_resolved) != TypeKind.TY_TUPLE or self.get_type_d1(pair_resolved) != 2:
@@ -13426,9 +13572,27 @@ fn Sema.collect_target_type_from_type_node(self: Sema, type_node: i32, iter_elem
             self.emit_error("collect[HashMap[K, V]] value type does not match iterator pair value", node)
             return 0
         return target_ty
-    if base_name == "BTreeSet" or base_name == "BTreeMap":
-        self.emit_error("collect[" ++ base_name ++ "] requires BTree collections, which are not implemented yet (#414)", node)
-        return 0
+    if base_sym == self.syms.btreemap:
+        let pair_resolved_b = self.resolve_alias(iter_elem_ty as TypeId)
+        if self.get_type_kind(pair_resolved_b) != TypeKind.TY_TUPLE or self.get_type_d1(pair_resolved_b) != 2:
+            self.emit_error("collect[BTreeMap[K, V]] requires iterator elements of type (K, V)", node)
+            return 0
+        let pair_start_b = self.get_type_d0(pair_resolved_b)
+        let key_ty_b = self.type_extra.get(pair_start_b as i64)
+        let val_ty_b = self.type_extra.get((pair_start_b + 1) as i64)
+        let want_key_ty_b = self.get_generic_inst_arg(target_resolved as i32, 0)
+        let want_val_ty_b = self.get_generic_inst_arg(target_resolved as i32, 1)
+        if self.types_compatible(want_key_ty_b as TypeId, key_ty_b as TypeId) == 0:
+            self.emit_error("collect[BTreeMap[K, V]] key type does not match iterator pair key", node)
+            return 0
+        if self.types_compatible(want_val_ty_b as TypeId, val_ty_b as TypeId) == 0:
+            self.emit_error("collect[BTreeMap[K, V]] value type does not match iterator pair value", node)
+            return 0
+        let ord_trait_bm = self.pool_lookup_symbol("Ord")
+        if ord_trait_bm != 0 and self.type_implements_trait(want_key_ty_b, ord_trait_bm) == 0:
+            self.emit_error("collect[BTreeMap[K, V]] key type must implement Ord", node)
+            return 0
+        return target_ty
     self.emit_error("unsupported collect target '" ++ self.type_name(target_ty) ++ "'", node)
     0
 
@@ -14551,6 +14715,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 self.note_allocating_callee(node, generic_method_fn)
             self.comp_resolved.insert(node, generic_method_fn)
             let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, arg_types, extra_start, mc_resolved_arg_count, node)
+            let _btree_storage_ty = self.ensure_btree_storage_type(generic_ret)
             return generic_ret
 
     if type_name_sym != 0:
@@ -14649,7 +14814,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             if arg_count != 0:
                 self.emit_error("FixedString.new() expects no arguments", node)
             return recv_type as i32
-        if (type_name_sym == self.syms.vec or type_name_sym == self.syms.hashmap or type_name_sym == self.syms.hashset or type_name_sym == self.syms.slotmap or self.pool_resolve(type_name_sym) == "Atomic") and field == self.syms.new:
+        if (type_name_sym == self.syms.vec or type_name_sym == self.syms.hashmap or type_name_sym == self.syms.hashset or type_name_sym == self.syms.btreemap or type_name_sym == self.syms.btreeset or type_name_sym == self.syms.slotmap or self.pool_resolve(type_name_sym) == "Atomic") and field == self.syms.new:
             self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
             return recv_type as i32
         if type_name_sym == self.syms.vec and mc_method_name_raw == "with_capacity":

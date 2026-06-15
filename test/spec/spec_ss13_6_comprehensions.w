@@ -75,6 +75,25 @@ fn test_hashmap_expected_type:
     assert(index.get("a").unwrap() == 6)
     assert(index.get("b").unwrap() == 4)
 
+fn test_btreeset_target:
+    let values: BTreeSet[i32] = [x for x in 5..0 if x >= 0]
+    assert(values.len() == 0)
+    let ordered: BTreeSet[i32] = [x for x in 0..6 if x % 2 == 0]
+    let items = ordered.items()
+    assert(items.get(0) == 0)
+    assert(items.get(1) == 2)
+    assert(items.get(2) == 4)
+
+fn test_btreemap_expected_type:
+    let pairs = [("b", 2), ("a", 1), ("b", 4)]
+    let index: BTreeMap[str, i32] = [k: v * 2 for (k, v) in pairs]
+    assert(index.len() == 2)
+    assert(index.get("a").unwrap() == 2)
+    assert(index.get("b").unwrap() == 8)
+    let keys = index.keys()
+    assert(keys.get(0) == "a")
+    assert(keys.get(1) == "b")
+
 fn test_map_nested_filter:
     let diagonal = [x: y for x in 0..4 for y in 0..4 if x == y and x > 0]
     assert(diagonal.get(0).is_none())
@@ -92,5 +111,7 @@ fn main:
     test_hashset_target()
     test_hashmap_default()
     test_hashmap_expected_type()
+    test_btreeset_target()
+    test_btreemap_expected_type()
     test_map_nested_filter()
     print("ok")

@@ -195,6 +195,26 @@ impl Ord for bool:
         if not self and other: return -1
         1
 
+impl Ord for str:
+    fn cmp(self: str, other: str) -> i32:
+        var i = 0
+        let left_len = self.len()
+        let right_len = other.len()
+        let limit = if left_len < right_len: left_len else: right_len
+        while i < limit:
+            let left = self.byte_at(i)
+            let right = other.byte_at(i)
+            if left < right:
+                return -1
+            if left > right:
+                return 1
+            i = i + 1
+        if left_len < right_len:
+            return -1
+        if left_len > right_len:
+            return 1
+        0
+
 impl Debug for i32:    fn debug_str(self:
     i32) -> str:
         with_i32_to_str(self)

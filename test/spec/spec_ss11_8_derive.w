@@ -60,7 +60,7 @@ fn main:
     assert(not PIXEL_IS_COPY)
     assert(NAME_HAS_DEFAULT)
     assert(NAME_HAS_CLONE)
-    assert(not NAME_HAS_ORD)
+    assert(NAME_HAS_ORD)
     assert(ROLE_HAS_DISPLAY)
     assert(COPY_PAIR_IS_COPY)
 
@@ -88,6 +88,7 @@ fn main:
     assert(default_name.first == "")
     assert(default_name.last == "")
     assert(Name { first: "A", last: "B" }.clone().first == "A")
+    assert(Name { first: "A", last: "B" }.cmp(Name { first: "B", last: "A" }) < 0)
 
     let copied = CopyPair { x: 4, y: 5 }
     let copied2 = copied

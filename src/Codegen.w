@@ -107,6 +107,8 @@ type Codegen {
     sym_result: i32,
     sym_hashmap: i32,
     sym_hashset: i32,
+    sym_btreemap: i32,
+    sym_btreeset: i32,
     sym_handle: i32,
     sym_slotmap: i32,
     sym_slotmapslot: i32,
@@ -478,6 +480,8 @@ fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: In
     cg.sym_result = cg.intern.intern("Result")
     cg.sym_hashmap = cg.intern.intern("HashMap")
     cg.sym_hashset = cg.intern.intern("HashSet")
+    cg.sym_btreemap = cg.intern.intern("BTreeMap")
+    cg.sym_btreeset = cg.intern.intern("BTreeSet")
     cg.sym_handle = cg.intern.intern("Handle")
     cg.sym_slotmap = cg.intern.intern("SlotMap")
     cg.sym_slotmapslot = cg.intern.intern("SlotMapSlot")
@@ -547,7 +551,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         current_function_node: 0,
         current_method_owner_sym: 0,
         sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
-        sym_hashset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
+        sym_hashset: 0, sym_btreemap: 0, sym_btreeset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
         sym_vecslot: 0, sym_vecrange: 0, sym_veciterref: 0, sym_veciterplace: 0,
         sym_box: 0, sym_context_error: 0,
         sym_Self: 0, sym_self: 0, sym_unit: 0,
@@ -1956,6 +1960,13 @@ fn Codegen.ensure_with_str_eq_declared(self: Codegen) -> i64:
     param_types.push(str_ty)
     self.ensure_internal_runtime_fn("with_str_eq", param_types, 2, wl_i32_type(self.context))
 
+fn Codegen.ensure_with_str_cmp_declared(self: Codegen) -> i64:
+    let str_ty = self.resolve_named_type(self.intern.intern("str"))
+    let param_types: Vec[i64] = Vec.new()
+    param_types.push(str_ty)
+    param_types.push(str_ty)
+    self.ensure_internal_runtime_fn("with_str_cmp", param_types, 2, wl_i32_type(self.context))
+
 fn Codegen.compare_str_eq(self: Codegen, lhs: i64, rhs: i64, op: i32) -> i64:
     let fn_val = self.ensure_with_str_eq_declared()
     let fn_sym = self.intern.intern("with_str_eq")
@@ -1968,6 +1979,25 @@ fn Codegen.compare_str_eq(self: Codegen, lhs: i64, rhs: i64, op: i32) -> i64:
     if op == BinaryOp.OP_EQ:
         return wl_build_icmp(self.builder, wl_int_ne(), cmp, zero)
     wl_build_icmp(self.builder, wl_int_eq(), cmp, zero)
+
+fn Codegen.compare_str_order(self: Codegen, lhs: i64, rhs: i64, op: i32) -> i64:
+    let fn_val = self.ensure_with_str_cmp_declared()
+    let fn_sym = self.intern.intern("with_str_cmp")
+    let fn_ty = self.fn_fn_types.get(fn_sym).unwrap() as i64
+    let args: Vec[i64] = Vec.new()
+    args.push(lhs)
+    args.push(rhs)
+    let cmp = self.build_call_fn_value(fn_sym, fn_val, fn_ty, -1, 0, args, 2, "with_str_cmp", 0)
+    let zero = wl_const_int(wl_i32_type(self.context), 0, 0)
+    if op == BinaryOp.OP_LT:
+        return wl_build_icmp(self.builder, wl_int_slt(), cmp, zero)
+    if op == BinaryOp.OP_GT:
+        return wl_build_icmp(self.builder, wl_int_sgt(), cmp, zero)
+    if op == BinaryOp.OP_LTE:
+        return wl_build_icmp(self.builder, wl_int_sle(), cmp, zero)
+    if op == BinaryOp.OP_GTE:
+        return wl_build_icmp(self.builder, wl_int_sge(), cmp, zero)
+    wl_get_undef(wl_i1_type(self.context))
 
 fn Codegen.get_memcmp_fn_type(self: Codegen) -> i64:
     let i32_ty = wl_i32_type(self.context)
@@ -2221,13 +2251,10 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
             let src_node = self.pool.get_extra(g_extra)
             let src_ty = self.resolve_type(src_node)
             return self.get_or_create_context_error_type(src_ty)
-        // Sema-based path for builtin containers (Vec, HashMap, HashSet, Option, Result)
-        let sema_tid = self.sema.resolve_type_expr(type_node)
-        if sema_tid > 0:
-            let llvm_ty = self.sema_type_to_llvm(sema_tid)
-            if llvm_ty != 0:
-                return llvm_ty
-        // Codegen-level resolution when sema fails (e.g. type bindings active)
+        // Codegen-level resolution must run before the Sema fallback when
+        // monomorphizing generic struct fields. Sema does not see Codegen's
+        // active type bindings, so asking it first would turn Vec[(K, V)]
+        // into a fallback type and poison codegen with had_error.
         if name_sym == self.sym_option and g_count == 1:
             let opt_arg = self.resolve_type(self.pool.get_extra(g_extra))
             if opt_arg != 0:
@@ -2241,6 +2268,13 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
             let res_err = self.resolve_type(self.pool.get_extra(g_extra + 1))
             if res_ok != 0 and res_err != 0:
                 return self.get_or_create_result_type(0, res_ok, res_err)
+        // Sema-based path for other builtin containers (HashMap, HashSet)
+        // and fully concrete generic instantiations.
+        let sema_tid = self.sema.resolve_type_expr(type_node)
+        if sema_tid > 0:
+            let llvm_ty = self.sema_type_to_llvm(sema_tid)
+            if llvm_ty != 0:
+                return llvm_ty
         // Monomorphize user-defined generic structs
         let gs_opt = self.generic_structs.get(name_sym)
         if gs_opt.is_some():
@@ -4995,20 +5029,25 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
                 p_ty = self.type_fallback()
             // Methods pass struct self as pointer
             if pi == 0:
-                let p_kind = self.pool.kind(p_type_node)
-                if p_kind == NodeKind.NK_TYPE_GENERIC or p_kind == NodeKind.NK_TYPE_NAMED:
-                    let p_name_sym = self.pool.get_data0(p_type_node)
-                    let st_opt = self.struct_type_map.get(p_name_sym)
-                    if not st_opt.is_some():
-                        // Check for monomorphized struct
-                        let base = self.mono_struct_base.get(p_name_sym)
-                        if not base.is_some():
-                            // It's a generic self param — use the monomorphized struct type as pointer
+                let p_flags = self.pool.fn_param_flags(param_start, pi)
+                if fn_param_is_mut_self(p_flags) != 0 or fn_param_is_ref_self(p_flags) != 0:
+                    has_ref_self = true
+                    p_ty = wl_ptr_type(self.context)
+                else:
+                    let p_kind = self.pool.kind(p_type_node)
+                    if p_kind == NodeKind.NK_TYPE_GENERIC or p_kind == NodeKind.NK_TYPE_NAMED:
+                        let p_name_sym = self.pool.get_data0(p_type_node)
+                        let st_opt = self.struct_type_map.get(p_name_sym)
+                        if not st_opt.is_some():
+                            // Check for monomorphized struct
+                            let base = self.mono_struct_base.get(p_name_sym)
+                            if not base.is_some():
+                                // It's a generic self param — use the monomorphized struct type as pointer
+                                has_ref_self = true
+                                p_ty = wl_ptr_type(self.context)
+                        else:
                             has_ref_self = true
                             p_ty = wl_ptr_type(self.context)
-                    else:
-                        has_ref_self = true
-                        p_ty = wl_ptr_type(self.context)
             mono_param_types.push(p_ty)
         else:
             mono_param_types.push(self.type_fallback())
@@ -5048,7 +5087,7 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
     self.fn_values.insert(mono_sym, mono_fn)
     self.fn_fn_types.insert(mono_sym, mono_ft)
     if has_ref_self:
-        self.fn_ref_param_starts.insert(mono_sym, 0)
+        self.record_ref_param(mono_sym, 0, param_count)
 
     // Build sema type bindings for struct type params
     let sm_tp_syms: Vec[i32] = Vec.new()

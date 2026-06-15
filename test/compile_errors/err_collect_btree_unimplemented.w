@@ -1,5 +1,8 @@
-//! expect-check-fail: collect[BTreeSet] requires BTree collections, which are not implemented yet (#414)
+//! expect-check-fail: collect[BTreeSet[T]] element type must implement Ord
+
+type Key { value: i32 }
 
 fn main:
-    let xs: Vec[i32] = Vec.new()
-    let _set = xs.iter() |> collect[BTreeSet[i32]]()
+    let xs: Vec[Key] = Vec.new()
+    xs.push(Key { value: 1 })
+    let _set = xs.iter() |> collect[BTreeSet[Key]]()
