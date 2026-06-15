@@ -89,12 +89,13 @@ Still blocking Makefile and script removal:
   - `tools/build-cmake.ps1`
   - `tools/build-static-llvm.sh`
   - `tools/build-static-llvm.ps1`
-- A build check still executes a Python script:
-  - `scripts/check-spec-inventory.py`
-- Build-system shell snippets remain in `build/retention.w` prune logic.
-- `ToolFs` has no action-scoped scratch directory capability; actions still
-  hand-roll transient paths such as `out/pcre2_tmp` and authorize them through
-  manual `write_scope` plumbing.
+- Build-system maintenance still relies on host utilities for checksum and
+  release/SDK packaging work, but the low-level prune shell fragments have
+  been removed.
+- `ToolFs.scratch_dir()` exists, but repository build modules cannot call it
+  directly until the installed seed embeds that API. PCRE2 has moved from the
+  shared `out/pcre2_tmp` path to the action-scratch path convention with
+  explicit transitional write scopes for old-seed compatibility.
 - The active runbooks still describe scripts as normal release and SDK tools.
 - Some std.build / build-cache behavior is not strong enough to be the final
   script-free contract.
@@ -111,6 +112,23 @@ Still blocking Makefile and script removal:
 - 2026-06-14: Documented direct replacements for Make compatibility aliases in
   `docs/with-build.md`; `make cross`, first-seed bootstrap, and
   `make print-version` remain explicit exceptions.
+- 2026-06-14: Replaced `scripts/check-spec-inventory.py` with a pure With
+  build action and deleted the script.
+- 2026-06-14: Removed `sh -c`/`find`/`sed`/`wc` shell fragments from
+  `build/retention.w` prune reporting/deletion and switched test `.w`
+  manifest discovery to typed `ToolFs.list_files` traversal. Checksums still
+  use host `shasum`/`sha256sum` pending the native hashing capability.
+- 2026-06-14: Converted `install-user` and `update-seed` to graph `Install`
+  targets, removing the old action that spawned host `mkdir`, `cp`, and
+  `chmod`.
+- 2026-06-14: Added `ToolFs.scratch_dir()` as an action-scoped, driver-managed
+  scratch capability with selfhost coverage for write authority and cleanup.
+  PCRE2 no longer uses `out/pcre2_tmp`; it uses the action-scratch path
+  convention with explicit transitional scopes until a seed containing the new
+  API is installed.
+- 2026-06-14: Hardened `ProcessRunner.run_spec` so unsupported capture/stdin
+  combinations fail loudly, added small `ProcessSpec` builder methods, and
+  covered the path in build.w selfhost tests.
 
 ## Implementation Tasks
 
@@ -122,7 +140,7 @@ trustworthy once `build.w` owns every workflow.
 - [x] Fix `ToolFs.write_binary(path, bytes)` so it writes the provided bytes
   instead of an empty file. Add a build-w/selfhost regression that writes
   non-text bytes and reads them back through `read_binary`.
-- Reconcile `ProcessRunner` with the intended struct API. Prefer adding the
+- [x] Reconcile `ProcessRunner` with the intended struct API. Prefer adding the
   spec-shaped `ProcessRunner.run(spec: ProcessSpec) -> ProcessResult` while
   keeping old argv helpers as compatibility wrappers until build code is
   migrated. The primary public process API should be one structured value with
@@ -139,7 +157,7 @@ trustworthy once `build.w` owns every workflow.
   recursive directory creation/removal, content hashing, archive read/write,
   HTTP(S) fetch, and platform path handling so actions do not reach for shell
   utilities.
-- Implement `ToolFs.scratch_dir() -> str` as an action-scoped, driver-managed
+- [x] Implement `ToolFs.scratch_dir() -> str` as an action-scoped, driver-managed
   scratch directory. The returned path must be project-relative, private to the
   current action invocation, automatically included in that action's write
   authority, and cleared before non-cache action runs. Migrate manual scratch
@@ -180,11 +198,11 @@ depending on scripts or shell fragments for normal maintenance.
 
 - Replace `build/retention.w` shell snippets used for prune counts, samples,
   and `.w` manifest hashing with typed filesystem traversal and With-native
-  hashing.
+  hashing. Shell traversal is removed; native checksumming remains.
 - [x] Move `scripts/check-no-c-export.py` into a With build action that reads source
   files directly and reports the same violations.
 - [x] Move `scripts/check-requirements-informative.py` into a With build action.
-- Move `scripts/check-spec-inventory.py` into a With build action.
+- [x] Move `scripts/check-spec-inventory.py` into a With build action.
 - Audit `build/`, `src/`, `lib/`, `rt/`, `build.w`, `scripts/`, and `tools/`
   for `sh -c`, `bash -c`, `powershell`, `.py`, `.sh`, `.ps1`, `.cmd`, pipes,
   redirects, and shell utility names. Every post-seed hit must be eliminated or

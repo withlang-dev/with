@@ -99,6 +99,7 @@ type ComptimeCapabilityRecord {
     args: Vec[str],
     write_scope: Vec[str],
     write_scoped: i32,
+    scratch_path: str,
     timeout_ms: i32,
     cwd: str,
     env: Vec[str],
@@ -609,11 +610,28 @@ fn comptime_capability_record(kind: i32, package_name: str, package_version: str
         args: Vec.new(),
         write_scope: Vec.new(),
         write_scoped: 0,
+        scratch_path: "",
         timeout_ms: 0,
         cwd: "",
         env: Vec.new(),
         network: 0,
     }
+
+fn comptime_safe_label(text: str) -> str:
+    var out = ""
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
+        if keep:
+            out = out ++ text.slice(i as i64, (i + 1) as i64)
+        else:
+            out = out ++ "_"
+    if out.len() == 0:
+        return "unknown"
+    out
+
+fn comptime_action_scratch_dir(target_name: str) -> str:
+    "out/tmp/action-scratch/" ++ comptime_safe_label(target_name)
 
 fn comptime_action_outputs(output: str, extra_outputs: &Vec[str]) -> Vec[str]:
     let outputs: Vec[str] = Vec.new()
@@ -623,13 +641,15 @@ fn comptime_action_outputs(output: str, extra_outputs: &Vec[str]) -> Vec[str]:
         outputs.push(extra_outputs.get(i as i64))
     outputs
 
-fn comptime_action_write_scope(output: str, extra_outputs: Vec[str], write_scopes: Vec[str]) -> Vec[str]:
+fn comptime_action_write_scope(output: str, extra_outputs: Vec[str], write_scopes: Vec[str], scratch_path: str) -> Vec[str]:
     let scopes = comptime_action_outputs(output, extra_outputs)
     for i in 0..write_scopes.len() as i32:
         scopes.push(write_scopes.get(i as i64))
+    scopes.push(scratch_path)
     scopes
 
 fn comptime_action_capability_record(package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32) -> ComptimeCapabilityRecord:
+    let scratch_path = comptime_action_scratch_dir(target_name)
     ComptimeCapabilityRecord {
         kind: CapabilityKind.CK_BUILD_ACTION_CTX,
         generation: 0,
@@ -641,8 +661,9 @@ fn comptime_action_capability_record(package_name: str, package_version: str, pr
         inputs,
         outputs: comptime_action_outputs(output, extra_outputs),
         args,
-        write_scope: comptime_action_write_scope(output, extra_outputs, write_scopes),
+        write_scope: comptime_action_write_scope(output, extra_outputs, write_scopes, scratch_path),
         write_scoped: 1,
+        scratch_path,
         timeout_ms,
         cwd,
         env,
@@ -3672,6 +3693,12 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
         return comptime_control_error()
     let record = self.capability_records.get(handle as i64)
 
+    if method == "scratch_dir":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        if record.scratch_path.len() == 0:
+            return self.fail(node, "ToolFs.scratch_dir is only available inside an action")
+        return comptime_control_value(comptime_value_str(record.scratch_path))
     if method == "normalize":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
             return comptime_control_error()
@@ -3956,6 +3983,14 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         let spec_env = self.struct_field_value_by_name(spec_val, "env")
         let spec_timeout = self.struct_field_value_by_name(spec_val, "timeout_ms")
         let spec_stdin = self.struct_field_value_by_name(spec_val, "stdin_path")
+        let spec_capture_stdout = self.struct_field_value_by_name(spec_val, "capture_stdout")
+        let spec_capture_stderr = self.struct_field_value_by_name(spec_val, "capture_stderr")
+        if executable.text.len() == 0:
+            return self.fail(node, "ProcessRunner.run_spec: executable is required")
+        if spec_capture_stdout.kind != ComptimeValueKind.CV_BOOL or spec_capture_stderr.kind != ComptimeValueKind.CV_BOOL:
+            return self.fail(node, "ProcessRunner.run_spec: capture fields must be bool")
+        if spec_capture_stdout.data0 == 0 or spec_capture_stderr.data0 == 0:
+            return self.fail(node, "ProcessRunner.run_spec: non-capturing stdout/stderr is not implemented")
         var argv_parts: Vec[str] = Vec.new()
         argv_parts.push(executable.text)
         if spec_args.kind == ComptimeValueKind.CV_VEC or spec_args.kind == ComptimeValueKind.CV_ARRAY:
@@ -3969,11 +4004,15 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         let stderr_path = self.capability_arg_str(spec_args_signal.value, 2, method, node)
         if self.had_error != 0:
             return comptime_control_error()
+        if stdout_path.len() == 0 or stderr_path.len() == 0:
+            return self.fail(node, "ProcessRunner.run_spec: stdout and stderr capture paths are required")
         let timeout_ms = spec_timeout.data0 as i32
         let has_cwd = spec_cwd.text.len() > 0
         let env_vars = if spec_env.kind == ComptimeValueKind.CV_STRUCT: self.struct_field_value_by_name(spec_env, "vars") else: comptime_value_invalid()
         let has_env = env_vars.kind == ComptimeValueKind.CV_VEC and env_vars.extra_count > 0
         let has_stdin = spec_stdin.text.len() > 0
+        if has_stdin and (has_cwd or has_env):
+            return self.fail(node, "ProcessRunner.run_spec: stdin cannot yet be combined with cwd or env")
         let effect_env = if has_env: self.effect_env_text_from_process_env_value(spec_env) else: ""
         self.record_process_effect(record, method, argv_parts, spec_cwd.text, timeout_ms, spec_stdin.text, stdout_path, stderr_path, effect_env)
         if self.had_error != 0:
@@ -4177,6 +4216,7 @@ fn ComptimeEvaluator.eval_actionctx_capability_method(self: ComptimeEvaluator, r
     if child_kind == CapabilityKind.CK_BUILD_TOOL_FS:
         child.write_scope = record.write_scope
         child.write_scoped = 1
+        child.scratch_path = record.scratch_path
     comptime_control_value(self.mint_capability(child_type, child))
 
 fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:

@@ -11,8 +11,21 @@ fn pcre2_join(left: str, right: str) -> str:
         return left ++ right
     left ++ "/" ++ right
 
-fn pcre2_scratch_dir() -> str:
-    "out/pcre2_tmp"
+fn pcre2_safe_label(text: str) -> str:
+    var out = ""
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
+        if keep:
+            out = out ++ text.slice(i as i64, (i + 1) as i64)
+        else:
+            out = out ++ "_"
+    if out.len() == 0:
+        return "unknown"
+    out
+
+fn pcre2_scratch_dir(ctx: &ActionCtx) -> str:
+    "out/tmp/action-scratch/" ++ pcre2_safe_label(ctx.target_name())
 
 fn pcre2_dirname(path: str) -> str:
     var last_slash = -1
@@ -438,7 +451,7 @@ fn pcre2_copy_w_files(ctx: &ActionCtx, source_dir: str, dest_dir: str) -> i32:
     0
 
 fn pcre2_migrate_tmp_dir(ctx: &ActionCtx) -> str:
-    pcre2_join(pcre2_scratch_dir(), "migrate-" ++ f"{ctx.target_name()}")
+    pcre2_join(pcre2_scratch_dir(ctx), "migrate-" ++ f"{ctx.target_name()}")
 
 fn pcre2_prepare_reference_tree(ctx: &ActionCtx, ref_dir: str) -> i32:
     let fs = ctx.fs()
@@ -495,7 +508,7 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "requires reference tree output")
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
-    let scratch_dir = pcre2_scratch_dir()
+    let scratch_dir = pcre2_scratch_dir(ctx)
     let archive_path = pcre2_join(scratch_dir, release ++ ".tar.gz")
     if fs.mkdir_all(pcre2_dirname(archive_path)) != 0:
         return pcre2_fail(ctx, "could not create archive directory")
@@ -562,8 +575,9 @@ pub fn run_pcre2_migrate_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "could not create stamp directory: " ++ pcre2_dirname(stamp_path))
     if fs.mkdir_all(pcre2_dirname(generated_dir)) != 0:
         return pcre2_fail(ctx, "could not create generated parent: " ++ pcre2_dirname(generated_dir))
-    if fs.mkdir_all(pcre2_scratch_dir()) != 0:
-        return pcre2_fail(ctx, "could not create scratch directory: " ++ pcre2_scratch_dir())
+    let scratch_dir = pcre2_scratch_dir(ctx)
+    if fs.mkdir_all(scratch_dir) != 0:
+        return pcre2_fail(ctx, "could not create scratch directory: " ++ scratch_dir)
 
     let tmp_dir = pcre2_migrate_tmp_dir(ctx)
     let remove_tmp_rc = pcre2_remove_tree_if_exists(ctx, tmp_dir)
@@ -700,10 +714,11 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let migrated_dir = inputs.get(0)
     if not fs.is_dir(migrated_dir):
         return pcre2_fail(ctx, "missing migrated PCRE2 directory: " ++ migrated_dir ++ " - run pcre2-migrate deliberately")
-    if fs.mkdir_all(pcre2_scratch_dir()) != 0:
-        return pcre2_fail(ctx, "could not create scratch directory: " ++ pcre2_scratch_dir())
+    let scratch_dir = pcre2_scratch_dir(ctx)
+    if fs.mkdir_all(scratch_dir) != 0:
+        return pcre2_fail(ctx, "could not create scratch directory: " ++ scratch_dir)
 
-    let tmp_dir = pcre2_join(pcre2_scratch_dir(), "build-" ++ ctx.target_name())
+    let tmp_dir = pcre2_join(scratch_dir, "build-" ++ ctx.target_name())
     let re_dir = pcre2_join(pcre2_join(pcre2_join(tmp_dir, "lib"), "std"), "re")
     let bin_dir = pcre2_join(tmp_dir, "bin")
     if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:

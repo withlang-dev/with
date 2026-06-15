@@ -4917,6 +4917,11 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
         "    assert(ctx.inputs().get(0) == \"src/input.txt\")\n" ++
         "    assert(ctx.args().get(0) == \"hello\")\n" ++
         "    assert(ctx.fs().read_text(ctx.inputs().get(0)) == \"input\")\n" ++
+        "    let scratch = ctx.fs().scratch_dir()\n" ++
+        "    assert(scratch.starts_with(\"out/tmp/action-scratch/generate\"))\n" ++
+        "    let stale = ctx.fs().join(scratch, \"stale.txt\")\n" ++
+        "    assert(not ctx.fs().exists(stale))\n" ++
+        "    assert(ctx.fs().write_text(stale, \"stale\") == 0)\n" ++
         "    assert(ctx.fs().mkdir_all(\"out/action\") == 0)\n" ++
         "    assert(ctx.fs().write_text(ctx.output(), \"action:\" ++ ctx.args().get(0)) == 0)\n" ++
         "    assert(ctx.fs().write_text(ctx.outputs().get(1), \"extra:\" ++ ctx.args().get(0)) == 0)\n" ++
@@ -4933,6 +4938,11 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
         "    assert(inherited_env_result.rc == 0)\n" ++
         "    assert(not inherited_env_result.stdout.contains(\"WITH_TOOL_CAPABILITY_TOKEN=with-\"))\n" ++
         "    assert(not inherited_env_result.stdout.contains(\"WITH_BUILD_ACTION_NAME=generate\"))\n" ++
+        "    let spec = process_spec(\"/usr/bin/env\").env_var(\"WITH_RUN_SPEC_TEST\", \"present\").timeout(120000)\n" ++
+        "    let spec_result = ctx.process_runner().run_spec(spec, \"out/action/spec-env.txt\", \"out/action/spec-env.err\")\n" ++
+        "    assert(spec_result.rc == 0)\n" ++
+        "    assert(spec_result.stdout.contains(\"WITH_RUN_SPEC_TEST=present\"))\n" ++
+        "    assert(not spec_result.stdout.contains(\"WITH_TOOL_CAPABILITY_TOKEN=with-\"))\n" ++
         "    var direct_args: Vec[str] = Vec.new()\n" ++
         "    direct_args |> push(\"/bin/echo\")\n" ++
         "    direct_args |> push(\"streamed-process-run\")\n" ++
@@ -4958,7 +4968,13 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/value.txt"), "action:hello", "build_w_action_target")
     if rc != 0: return rc
-    bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/extra.txt"), "extra:hello", "build_w_action_extra_output")
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/extra.txt"), "extra:hello", "build_w_action_extra_output")
+    if rc != 0: return rc
+    let _remove_value = ctx.fs().remove_file(bs_join(case_dir, "out/action/value.txt"))
+    let _remove_extra = ctx.fs().remove_file(bs_join(case_dir, "out/action/extra.txt"))
+    let rerun = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-target-rerun", bs_blob_to_args(bs_argv_append("", "build")))
+    if rerun.rc != 0: return rerun.rc
+    bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/value.txt"), "action:hello", "build_w_action_scratch_rerun")
 
 fn bs_check_build_w_action_no_deps(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "actionnodeps")
@@ -5108,6 +5124,32 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: str, base_di
         ctx.diagnostics().error("error: build_w_action_escape_output unexpectedly succeeded")
         return 1
     rc = bs_assert_contains(ctx, escape.stderr, "ToolFs path escapes project root", "build_w_action_escape_output")
+    if rc != 0: return rc
+
+    let bad_spec_dir = bs_join(base_dir, "unsupported_process_spec")
+    rc = bs_write_project_manifest(ctx, bad_spec_dir, "actionbadspec")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(bad_spec_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action bad spec source")
+    if rc != 0: return rc
+    let bad_spec_build =
+        "use std.build\n\n" ++
+        "fn bad_spec(ctx: &ActionCtx) -> i32:\n" ++
+        "    let spec = process_spec(\"/bin/echo\").arg(\"unused\").capture(false, true)\n" ++
+        "    let _ = ctx.process_runner().run_spec(spec, \"out/action/stdout.txt\", \"out/action/stderr.txt\")\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"bad-spec\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = bad_spec\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"bad-spec\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(bad_spec_dir, "build.w"), bad_spec_build, ctx.target_name(), "action bad spec build.w")
+    if rc != 0: return rc
+    let bad_spec = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-bad-process-spec", bs_blob_to_args(bs_argv_append("", "build")), 120000, bad_spec_dir)
+    if bad_spec.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_bad_process_spec unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, bad_spec.stderr, "non-capturing stdout/stderr is not implemented", "build_w_action_bad_process_spec")
     if rc != 0: return rc
 
     0

@@ -2,7 +2,6 @@ module build.retention
 
 use std.build
 use std.sysinfo
-use std.process
 
 const RET_SEED_KEEP: i32 = 5
 const RET_RELEASE_VERSION_KEEP: i32 = 5
@@ -179,20 +178,6 @@ fn ret_run_status(ctx: &ActionCtx, label: str, args: &Vec[str], timeout_ms: i32)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": command '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     result.rc
-
-fn ret_shell_first_line(ctx: &ActionCtx, label: str, script: str) -> str:
-    let args: Vec[str] = Vec.new()
-    args.push("sh")
-    args.push("-c")
-    args.push(script)
-    ret_run_first_line(ctx, label, args, 120000)
-
-fn ret_shell_lines(ctx: &ActionCtx, label: str, script: str) -> Vec[str]:
-    let args: Vec[str] = Vec.new()
-    args.push("sh")
-    args.push("-c")
-    args.push(script)
-    ret_run_lines(ctx, label, args, 120000)
 
 fn ret_sha256_file(ctx: &ActionCtx, label: str, path: str) -> str:
     let root = ctx.project_info().project_root()
@@ -379,7 +364,7 @@ fn ret_append_state_file(ctx: &ActionCtx, combined: str, target_name: str) -> st
         return ""
     combined ++ "state:" ++ target_name ++ "\n" ++ state ++ "\n"
 
-fn ret_sha256_files_manifest(ctx: &ActionCtx, label: str, files: &Vec[str]) -> str:
+fn ret_sha256_files_batch(ctx: &ActionCtx, label: str, files: &Vec[str]) -> str:
     if files.len() == 0:
         return ""
     let safe_label = ret_safe_label(label)
@@ -398,6 +383,24 @@ fn ret_sha256_files_manifest(ctx: &ActionCtx, label: str, files: &Vec[str]) -> s
         sha256_args.push(files.get(i as i64))
     let sha256 = ret_run_lines(ctx, safe_label ++ "-sha256sum", sha256_args, 120000)
     ret_join_lines(sha256)
+
+fn ret_sha256_files_manifest(ctx: &ActionCtx, label: str, files: &Vec[str]) -> str:
+    if files.len() == 0:
+        return ""
+    var out = ""
+    var batch: Vec[str] = Vec.new()
+    var batch_index = 0
+    for i in 0..files.len() as i32:
+        batch.push(files.get(i as i64))
+        let last = i + 1 == files.len() as i32
+        if batch.len() as i32 >= 100 or last:
+            let part = ret_sha256_files_batch(ctx, label ++ "-" ++ f"{batch_index}", batch)
+            if part.len() == 0:
+                return ""
+            out = out ++ part
+            batch = Vec.new()
+            batch_index = batch_index + 1
+    out
 
 fn ret_append_file_hashes(combined: str, ctx: &ActionCtx, label: str, files: &Vec[str]) -> str:
     let manifest = ret_sha256_files_manifest(ctx, label, files)
@@ -422,8 +425,11 @@ fn ret_build_driver_sources_manifest(ctx: &ActionCtx) -> str:
 
 fn ret_append_test_file_hashes(combined: str, ctx: &ActionCtx, entry: str) -> str:
     let dir = ret_dirname(entry)
-    let script = "if command -v shasum >/dev/null 2>&1; then find " ++ dir ++ " -maxdepth 1 -type f -name '*.w' -print | LC_ALL=C sort | xargs shasum -a 256; else find " ++ dir ++ " -maxdepth 1 -type f -name '*.w' -print | LC_ALL=C sort | xargs sha256sum; fi"
-    let manifest = ret_join_lines(ret_shell_lines(ctx, ret_safe_label(entry) ++ "-files", script))
+    let files = ret_direct_w_files(ctx.fs(), dir)
+    if files.len() == 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": no test source files found for " ++ entry)
+        return ""
+    let manifest = ret_sha256_files_manifest(ctx, ret_safe_label(entry) ++ "-files", files)
     if manifest.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not hash " ++ entry ++ " files")
         return ""
@@ -661,62 +667,6 @@ pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
             return ret_fail(ctx, "could not write " ++ output)
     0
 
-fn ret_install_dest_abs(root: str, dest: str) -> str:
-    if dest.starts_with("$HOME/"):
-        let home = env("HOME")
-        if home.len() == 0:
-            return ""
-        return ret_join(home, dest.slice(6, dest.len()))
-    if dest.len() > 0 and dest.byte_at(0) == 47:
-        return dest
-    ret_abs(root, dest)
-
-pub fn run_install_verified_compiler_action(ctx: ActionCtx) -> i32:
-    let args = ctx.args()
-    if args.len() < 3:
-        return ret_fail(ctx, "requires source, destination, and mode args")
-    let root = ctx.project_info().project_root()
-    let source = args.get(0)
-    let dest = args.get(1)
-    let mode = args.get(2)
-    let fs = ctx.fs()
-    if not fs.exists(source):
-        return ret_fail(ctx, "missing source compiler: " ++ source)
-    let source_abs = ret_abs(root, source)
-    let dest_abs = ret_install_dest_abs(root, dest)
-    if dest_abs.len() == 0:
-        return ret_fail(ctx, "could not resolve install destination: " ++ dest)
-    let proc = ctx.process_runner()
-    let mkdir_args: Vec[str] = Vec.new()
-    mkdir_args.push("mkdir")
-    mkdir_args.push("-p")
-    mkdir_args.push(ret_dirname(dest_abs))
-    let mkdir_rc = proc.run(mkdir_args)
-    if mkdir_rc != 0:
-        return ret_fail(ctx, "could not create install directory: " ++ ret_dirname(dest_abs))
-    let copy_args: Vec[str] = Vec.new()
-    copy_args.push("cp")
-    copy_args.push(source_abs)
-    copy_args.push(dest_abs)
-    let copy_rc = proc.run(copy_args)
-    if copy_rc != 0:
-        return ret_fail(ctx, "could not copy compiler to " ++ dest)
-    let chmod_args: Vec[str] = Vec.new()
-    chmod_args.push("chmod")
-    chmod_args.push(mode)
-    chmod_args.push(dest_abs)
-    let chmod_rc = proc.run(chmod_args)
-    if chmod_rc != 0:
-        return ret_fail(ctx, "could not chmod " ++ dest)
-    let output = ctx.output()
-    if output.len() > 0 and output != dest:
-        let out_dir = ret_dirname(output)
-        if fs.mkdir_all(out_dir) != 0:
-            return ret_fail(ctx, "could not create " ++ out_dir)
-        if fs.write_text(output, "ok\n") != 0:
-            return ret_fail(ctx, "could not write " ++ output)
-    0
-
 fn ret_live_targets(args: &Vec[str]) -> Vec[str]:
     let live: Vec[str] = Vec.new()
     let prefix = "live-target="
@@ -830,96 +780,91 @@ fn ret_apply_small_prune(ctx: &ActionCtx, candidates: Vec[str]) -> i32:
     print(f"[prune] removed {removed} stale retained artifact(s)")
     0
 
+fn ret_immediate_children(fs: &ToolFs, dir: str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    if not fs.exists(dir):
+        return out
+    let files = fs.list_files(dir)
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        if ret_dirname(path) == dir:
+            out.push(path)
+    ret_sorted_strings(out)
+
+fn ret_temp_bin_candidates(fs: &ToolFs) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let files = ret_immediate_children(fs, "out/bin")
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        let base = ret_basename(path)
+        if fs.is_dir(path):
+            if base.contains(".tmp.") and base.ends_with(".dSYM"):
+                out.push(path)
+        else if base.contains(".tmp."):
+            out.push(path)
+    ret_sorted_strings(out)
+
+fn ret_temp_archive_candidates(fs: &ToolFs, dir: str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let files = ret_immediate_children(fs, dir)
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        let base = ret_basename(path)
+        if not fs.is_dir(path) and base.contains(".o.") and base.ends_with(".a"):
+            out.push(path)
+    ret_sorted_strings(out)
+
+fn ret_issue61_stale_candidates(fs: &ToolFs) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let files = ret_immediate_children(fs, "out/test-graph/issue61-regression")
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        if fs.is_dir(path) and ret_basename(path) != "repo":
+            out.push(path)
+    ret_sorted_strings(out)
+
+fn ret_embedded_compiler_candidates(fs: &ToolFs) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let path = "out/test-graph/embedded-runtime-regression/with"
+    if fs.exists(path) and not fs.is_dir(path):
+        out.push(path)
+    out
+
+fn ret_remove_prune_candidates(ctx: &ActionCtx, candidates: &Vec[str]) -> i32:
+    let fs = ctx.fs()
+    for i in 0..candidates.len() as i32:
+        let path = candidates.get(i as i64)
+        let rc = if fs.is_dir(path): fs.remove_tree(path) else: fs.remove_file(path)
+        if rc != 0:
+            return ret_fail(ctx, "could not remove stale artifact: " ++ path)
+    0
+
+fn ret_append_all_prune_candidates(out: Vec[str], candidates: &Vec[str]) -> Vec[str]:
+    var combined = out
+    for i in 0..candidates.len() as i32:
+        combined = ret_add_unique(combined, candidates.get(i as i64))
+    combined
+
 fn ret_apply_large_prune(ctx: &ActionCtx) -> i32:
     let fs = ctx.fs()
-    let bin_count = ret_shell_first_line(ctx, "apply-count-temp-bin", "if [ -d out/bin ]; then find out/bin -maxdepth 1 \\( -type d -name '*.tmp.*.dSYM' -o -type f -name '*.tmp.*' \\) -print | wc -l; else echo 0; fi")
-    let lib_count = ret_shell_first_line(ctx, "apply-count-temp-lib-archives", "if [ -d out/lib ]; then find out/lib -maxdepth 1 -type f -name '*.o.*.a' -print | wc -l; else echo 0; fi")
-    let bootstrap_count = ret_shell_first_line(ctx, "apply-count-temp-bootstrap-archives", "if [ -d out/bootstrap-lib ]; then find out/bootstrap-lib -maxdepth 1 -type f -name '*.o.*.a' -print | wc -l; else echo 0; fi")
-    let issue61_count = ret_shell_first_line(ctx, "apply-count-issue61-stale", "if [ -d out/test-graph/issue61-regression ]; then find out/test-graph/issue61-regression -mindepth 1 -maxdepth 1 -type d ! -name repo -print | wc -l; else echo 0; fi")
-    let embedded_compiler_count = ret_shell_first_line(ctx, "apply-count-embedded-compiler", "if [ -f out/test-graph/embedded-runtime-regression/with ]; then echo 1; else echo 0; fi")
-    if fs.exists("out/bin"):
-        let dsym_args: Vec[str] = Vec.new()
-        dsym_args.push("find")
-        dsym_args.push("out/bin")
-        dsym_args.push("-maxdepth")
-        dsym_args.push("1")
-        dsym_args.push("-type")
-        dsym_args.push("d")
-        dsym_args.push("-name")
-        dsym_args.push("*.tmp.*.dSYM")
-        dsym_args.push("-exec")
-        dsym_args.push("rm")
-        dsym_args.push("-rf")
-        dsym_args.push("{}")
-        dsym_args.push("+")
-        if ret_run_status(ctx, "delete-temp-dsym", dsym_args, 300000) != 0:
-            return 1
-        let tmp_args: Vec[str] = Vec.new()
-        tmp_args.push("find")
-        tmp_args.push("out/bin")
-        tmp_args.push("-maxdepth")
-        tmp_args.push("1")
-        tmp_args.push("-type")
-        tmp_args.push("f")
-        tmp_args.push("-name")
-        tmp_args.push("*.tmp.*")
-        tmp_args.push("-delete")
-        if ret_run_status(ctx, "delete-temp-bin", tmp_args, 300000) != 0:
-            return 1
-    if fs.exists("out/lib"):
-        let lib_args: Vec[str] = Vec.new()
-        lib_args.push("find")
-        lib_args.push("out/lib")
-        lib_args.push("-maxdepth")
-        lib_args.push("1")
-        lib_args.push("-type")
-        lib_args.push("f")
-        lib_args.push("-name")
-        lib_args.push("*.o.*.a")
-        lib_args.push("-delete")
-        if ret_run_status(ctx, "delete-temp-lib-archives", lib_args, 300000) != 0:
-            return 1
-    if fs.exists("out/bootstrap-lib"):
-        let bootstrap_args: Vec[str] = Vec.new()
-        bootstrap_args.push("find")
-        bootstrap_args.push("out/bootstrap-lib")
-        bootstrap_args.push("-maxdepth")
-        bootstrap_args.push("1")
-        bootstrap_args.push("-type")
-        bootstrap_args.push("f")
-        bootstrap_args.push("-name")
-        bootstrap_args.push("*.o.*.a")
-        bootstrap_args.push("-delete")
-        if ret_run_status(ctx, "delete-temp-bootstrap-archives", bootstrap_args, 300000) != 0:
-            return 1
-    if fs.exists("out/test-graph/issue61-regression"):
-        let issue61_args: Vec[str] = Vec.new()
-        issue61_args.push("find")
-        issue61_args.push("out/test-graph/issue61-regression")
-        issue61_args.push("-mindepth")
-        issue61_args.push("1")
-        issue61_args.push("-maxdepth")
-        issue61_args.push("1")
-        issue61_args.push("-type")
-        issue61_args.push("d")
-        issue61_args.push("!")
-        issue61_args.push("-name")
-        issue61_args.push("repo")
-        issue61_args.push("-exec")
-        issue61_args.push("rm")
-        issue61_args.push("-rf")
-        issue61_args.push("{}")
-        issue61_args.push("+")
-        if ret_run_status(ctx, "delete-issue61-stale", issue61_args, 300000) != 0:
-            return 1
-    if fs.exists("out/test-graph/embedded-runtime-regression/with"):
-        if fs.remove_file("out/test-graph/embedded-runtime-regression/with") != 0:
-            return ret_fail(ctx, "could not remove retained embedded-runtime copied compiler")
-    print("[prune] removed temp out/bin entries: " ++ ret_trim(bin_count))
-    print("[prune] removed temp out/lib archives: " ++ ret_trim(lib_count))
-    print("[prune] removed temp out/bootstrap-lib archives: " ++ ret_trim(bootstrap_count))
-    print("[prune] removed stale issue61 regression directories: " ++ ret_trim(issue61_count))
-    print("[prune] removed retained embedded runtime compiler copies: " ++ ret_trim(embedded_compiler_count))
+    let bin = ret_temp_bin_candidates(fs)
+    let lib = ret_temp_archive_candidates(fs, "out/lib")
+    let bootstrap = ret_temp_archive_candidates(fs, "out/bootstrap-lib")
+    let issue61 = ret_issue61_stale_candidates(fs)
+    let embedded = ret_embedded_compiler_candidates(fs)
+    var all: Vec[str] = Vec.new()
+    all = ret_append_all_prune_candidates(all, bin)
+    all = ret_append_all_prune_candidates(all, lib)
+    all = ret_append_all_prune_candidates(all, bootstrap)
+    all = ret_append_all_prune_candidates(all, issue61)
+    all = ret_append_all_prune_candidates(all, embedded)
+    if ret_remove_prune_candidates(ctx, all) != 0:
+        return 1
+    print(f"[prune] removed temp out/bin entries: {bin.len()}")
+    print(f"[prune] removed temp out/lib archives: {lib.len()}")
+    print(f"[prune] removed temp out/bootstrap-lib archives: {bootstrap.len()}")
+    print(f"[prune] removed stale issue61 regression directories: {issue61.len()}")
+    print(f"[prune] removed retained embedded runtime compiler copies: {embedded.len()}")
     0
 
 fn ret_report_prune(candidates: Vec[str]):
@@ -934,17 +879,24 @@ fn ret_report_prune(candidates: Vec[str]):
         print(f"  ... and {candidates.len() as i32 - shown} more")
 
 fn ret_report_large_prune(ctx: &ActionCtx):
-    let bin_count = ret_shell_first_line(ctx, "count-temp-bin", "if [ -d out/bin ]; then find out/bin -maxdepth 1 \\( -type d -name '*.tmp.*.dSYM' -o -type f -name '*.tmp.*' \\) -print | wc -l; else echo 0; fi")
-    let lib_count = ret_shell_first_line(ctx, "count-temp-lib-archives", "if [ -d out/lib ]; then find out/lib -maxdepth 1 -type f -name '*.o.*.a' -print | wc -l; else echo 0; fi")
-    let bootstrap_count = ret_shell_first_line(ctx, "count-temp-bootstrap-archives", "if [ -d out/bootstrap-lib ]; then find out/bootstrap-lib -maxdepth 1 -type f -name '*.o.*.a' -print | wc -l; else echo 0; fi")
-    let issue61_count = ret_shell_first_line(ctx, "count-issue61-stale", "if [ -d out/test-graph/issue61-regression ]; then find out/test-graph/issue61-regression -mindepth 1 -maxdepth 1 -type d ! -name repo -print | wc -l; else echo 0; fi")
-    let embedded_compiler_count = ret_shell_first_line(ctx, "count-embedded-compiler", "if [ -f out/test-graph/embedded-runtime-regression/with ]; then echo 1; else echo 0; fi")
-    print("[prune] temp out/bin entries: " ++ ret_trim(bin_count))
-    print("[prune] temp out/lib archives: " ++ ret_trim(lib_count))
-    print("[prune] temp out/bootstrap-lib archives: " ++ ret_trim(bootstrap_count))
-    print("[prune] stale issue61 regression directories: " ++ ret_trim(issue61_count))
-    print("[prune] retained embedded runtime compiler copies: " ++ ret_trim(embedded_compiler_count))
-    let examples = ret_shell_lines(ctx, "sample-temp-artifacts", "if [ -d out/bin ]; then find out/bin -maxdepth 1 \\( -type d -name '*.tmp.*.dSYM' -o -type f -name '*.tmp.*' \\) -print; fi; if [ -d out/lib ]; then find out/lib -maxdepth 1 -type f -name '*.o.*.a' -print | sed -n '1,30p'; fi; if [ -d out/bootstrap-lib ]; then find out/bootstrap-lib -maxdepth 1 -type f -name '*.o.*.a' -print | sed -n '1,10p'; fi; if [ -d out/test-graph/issue61-regression ]; then find out/test-graph/issue61-regression -mindepth 1 -maxdepth 1 -type d ! -name repo -print | sed -n '1,10p'; fi; if [ -f out/test-graph/embedded-runtime-regression/with ]; then echo out/test-graph/embedded-runtime-regression/with; fi")
+    let fs = ctx.fs()
+    let bin = ret_temp_bin_candidates(fs)
+    let lib = ret_temp_archive_candidates(fs, "out/lib")
+    let bootstrap = ret_temp_archive_candidates(fs, "out/bootstrap-lib")
+    let issue61 = ret_issue61_stale_candidates(fs)
+    let embedded = ret_embedded_compiler_candidates(fs)
+    print(f"[prune] temp out/bin entries: {bin.len()}")
+    print(f"[prune] temp out/lib archives: {lib.len()}")
+    print(f"[prune] temp out/bootstrap-lib archives: {bootstrap.len()}")
+    print(f"[prune] stale issue61 regression directories: {issue61.len()}")
+    print(f"[prune] retained embedded runtime compiler copies: {embedded.len()}")
+    var examples: Vec[str] = Vec.new()
+    examples = ret_append_all_prune_candidates(examples, bin)
+    examples = ret_append_all_prune_candidates(examples, lib)
+    examples = ret_append_all_prune_candidates(examples, bootstrap)
+    examples = ret_append_all_prune_candidates(examples, issue61)
+    examples = ret_append_all_prune_candidates(examples, embedded)
+    examples = ret_sorted_strings(examples)
     var shown = 0
     for i in 0..examples.len() as i32:
         if shown >= 50:

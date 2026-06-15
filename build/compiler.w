@@ -528,6 +528,392 @@ fn comp_check_requirements_informative_text(ctx: &ActionCtx, text: str) -> i32:
         return comp_fail(ctx, "requirements Section 30 must include Informative trace:")
     0
 
+fn comp_vec_contains(items: &Vec[str], item: str) -> bool:
+    for i in 0..items.len() as i32:
+        if items.get(i as i64) == item:
+            return true
+    false
+
+fn comp_add_unique(items: Vec[str], item: str) -> Vec[str]:
+    if item.len() == 0 or comp_vec_contains(items, item):
+        return items
+    items.push(item)
+    items
+
+fn comp_add_words(items: Vec[str], text: str) -> Vec[str]:
+    var out = items
+    var start = -1
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        let ws = ch == 9 or ch == 10 or ch == 13 or ch == 32
+        if ws:
+            if start >= 0:
+                out = comp_add_unique(out, text.slice(start as i64, i as i64))
+                start = -1
+        else if start < 0:
+            start = i
+    if start >= 0:
+        out = comp_add_unique(out, text.slice(start as i64, text.len()))
+    out
+
+fn comp_is_ident_start(ch: i32) -> bool:
+    (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 95
+
+fn comp_is_ident_continue(ch: i32) -> bool:
+    comp_is_ident_start(ch) or (ch >= 48 and ch <= 57)
+
+fn comp_find_from(text: str, needle: str, start: i32) -> i32:
+    if start < 0 or start >= text.len() as i32:
+        return -1
+    let at = comp_index_of(text.slice(start as i64, text.len()), needle)
+    if at < 0:
+        return -1
+    start + at
+
+fn comp_spec_subsection(text: str, heading: str) -> str:
+    let start = comp_index_of(text, heading)
+    if start < 0:
+        return ""
+    var end = text.len() as i32
+    var i = start + 1
+    while i < text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            if i + 4 < text.len() as i32 and text.slice((i + 1) as i64, (i + 4) as i64) == "## ":
+                end = i
+                break
+            if i + 5 < text.len() as i32 and text.slice((i + 1) as i64, (i + 5) as i64) == "### ":
+                end = i
+                break
+        i = i + 1
+    text.slice(start as i64, end as i64)
+
+fn comp_first_fenced_block(text: str) -> str:
+    let start = comp_index_of(text, "```\n")
+    if start < 0:
+        return ""
+    let body_start = start + 4
+    let end = comp_find_from(text, "\n```", body_start)
+    if end < 0:
+        return ""
+    text.slice(body_start as i64, end as i64)
+
+fn comp_collect_quoted_after(text: str, prefix: str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    var start = 0
+    while start < text.len() as i32:
+        let at = comp_find_from(text, prefix, start)
+        if at < 0:
+            break
+        let value_start = at + prefix.len() as i32
+        let value_end = comp_find_from(text, "\"", value_start)
+        if value_end < 0:
+            break
+        out = comp_add_unique(out, text.slice(value_start as i64, value_end as i64))
+        start = value_end + 1
+    out
+
+fn comp_collect_attr_names(items: Vec[str], text: str) -> Vec[str]:
+    var out = items
+    var start = 0
+    while start < text.len() as i32:
+        let at = comp_find_from(text, "@[", start)
+        if at < 0:
+            break
+        let name_start = at + 2
+        if name_start < text.len() as i32 and comp_is_ident_start(text.byte_at(name_start as i64)):
+            var name_end = name_start + 1
+            while name_end < text.len() as i32 and comp_is_ident_continue(text.byte_at(name_end as i64)):
+                name_end = name_end + 1
+            out = comp_add_unique(out, text.slice(name_start as i64, name_end as i64))
+            start = name_end
+        else:
+            start = at + 2
+    out
+
+fn comp_spec_keywords(spec: str) -> Vec[str]:
+    comp_add_words(Vec.new(), comp_first_fenced_block(comp_spec_subsection(spec, "### 29.11 Reserved Keywords")))
+
+fn comp_impl_keywords(fs: &ToolFs) -> Vec[str]:
+    comp_collect_quoted_after(fs.read_text("src/Token.w"), "if s == \"")
+
+fn comp_spec_public_attributes(spec: str) -> Vec[str]:
+    let lines = comp_split_lines(comp_spec_subsection(spec, "### 29.14 Attribute Index"))
+    var attrs: Vec[str] = Vec.new()
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i as i64)
+        if line.starts_with("| `@["):
+            var end = -1
+            for ci in 1..line.len() as i32:
+                if line.byte_at(ci as i64) == 124:
+                    end = ci
+                    break
+            if end > 1:
+                attrs = comp_collect_attr_names(attrs, line.slice(1, end as i64))
+    attrs
+
+fn comp_spec_internal_attributes(spec: str) -> Vec[str]:
+    let lines = comp_split_lines(comp_spec_subsection(spec, "### 29.14 Attribute Index"))
+    var attrs: Vec[str] = Vec.new()
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i as i64)
+        if line.starts_with("**Implementation-internal"):
+            var j = i
+            while j < lines.len() as i32 and comp_trim(lines.get(j as i64)).len() > 0:
+                attrs = comp_collect_attr_names(attrs, lines.get(j as i64))
+                j = j + 1
+    attrs
+
+fn comp_impl_attributes(fs: &ToolFs) -> Vec[str]:
+    var text = fs.read_text("src/Parser.w")
+    let start = comp_index_of(text, "fn Parser.skip_attributes")
+    if start >= 0:
+        let marker = comp_find_from(text, "fn Parser.parse_module", start)
+        if marker > start:
+            text = text.slice(start as i64, marker as i64)
+    var attrs = comp_collect_quoted_after(text, "is_ident_named(\"")
+    let more = comp_collect_quoted_after(text, "attr_text == \"")
+    for i in 0..more.len() as i32:
+        attrs = comp_add_unique(attrs, more.get(i as i64))
+    attrs
+
+fn comp_strip_comment(text: str) -> str:
+    let at = comp_index_of(text, "#")
+    if at < 0:
+        return text
+    text.slice(0, at as i64)
+
+fn comp_first_shell_word(text: str) -> str:
+    let trimmed = comp_trim(text)
+    for i in 0..trimmed.len() as i32:
+        let ch = trimmed.byte_at(i as i64)
+        if ch == 9 or ch == 32:
+            return trimmed.slice(0, i as i64)
+    trimmed
+
+fn comp_spec_cli_commands(spec: str) -> Vec[str]:
+    var commands: Vec[str] = Vec.new()
+    commands = comp_add_unique(commands, "version")
+    commands = comp_add_unique(commands, "help")
+    let block = comp_first_fenced_block(comp_spec_subsection(spec, "### 18.5 Toolchain"))
+    let lines = comp_split_lines(block)
+    for i in 0..lines.len() as i32:
+        let stripped = comp_trim(lines.get(i as i64))
+        if not stripped.starts_with("with "):
+            continue
+        let body = comp_trim(comp_strip_comment(stripped.slice(5, stripped.len())))
+        var part_start = 0
+        var pi = 0
+        while pi <= body.len() as i32:
+            if pi == body.len() as i32 or body.byte_at(pi as i64) == 124:
+                var part = comp_trim(body.slice(part_start as i64, pi as i64))
+                if part.starts_with("with "):
+                    part = comp_trim(part.slice(5, part.len()))
+                let token = comp_first_shell_word(part)
+                if token.len() > 0 and not token.starts_with("[") and not token.starts_with("-"):
+                    commands = comp_add_unique(commands, token)
+                part_start = pi + 1
+            pi = pi + 1
+    let package_sec = comp_spec_subsection(spec, "### 18.8 Package Management")
+    var tick = 0
+    while tick < package_sec.len() as i32:
+        let open = comp_find_from(package_sec, "`", tick)
+        if open < 0:
+            break
+        let close = comp_find_from(package_sec, "`", open + 1)
+        if close < 0:
+            break
+        let span = comp_trim(package_sec.slice((open + 1) as i64, close as i64))
+        if span.starts_with("with "):
+            let token = comp_first_shell_word(comp_trim(span.slice(5, span.len())))
+            if token.len() > 0 and not token.starts_with("-"):
+                commands = comp_add_unique(commands, token)
+        tick = close + 1
+    commands
+
+fn comp_spec_cli_flags() -> Vec[str]:
+    var flags: Vec[str] = Vec.new()
+    let defaults = "--release --target --emit-c --emit-obj --overflow --no-std --strict-effects -O0 -O1 -O2 -O3 --open -e -n -p"
+    comp_add_words(flags, defaults)
+
+fn comp_impl_commands(fs: &ToolFs) -> Vec[str]:
+    let raw = comp_collect_quoted_after(fs.read_text("src/main.w"), "cli_command(argc) == \"")
+    var commands: Vec[str] = Vec.new()
+    for i in 0..raw.len() as i32:
+        let cmd = raw.get(i as i64)
+        if not cmd.starts_with("-"):
+            commands = comp_add_unique(commands, cmd)
+    commands
+
+fn comp_collect_string_literal_flags(items: Vec[str], text: str) -> Vec[str]:
+    var flags = items
+    var i = 0
+    while i < text.len() as i32:
+        if text.byte_at(i as i64) != 34:
+            i = i + 1
+            continue
+        var j = i + 1
+        while j < text.len() as i32:
+            let ch = text.byte_at(j as i64)
+            if ch == 92:
+                j = j + 2
+                continue
+            if ch == 34:
+                break
+            j = j + 1
+        if j >= text.len() as i32:
+            break
+        let literal = text.slice((i + 1) as i64, j as i64)
+        if literal.len() >= 2 and literal.byte_at(0) == 45:
+            var hyphens = 1
+            if literal.len() >= 3 and literal.byte_at(1) == 45:
+                hyphens = 2
+            if literal.len() > hyphens and comp_is_ident_continue(literal.byte_at(hyphens as i64)):
+                var end = hyphens + 1
+                while end < literal.len() as i32:
+                    let ch = literal.byte_at(end as i64)
+                    if not ((ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or (ch >= 48 and ch <= 57) or ch == 45):
+                        break
+                    end = end + 1
+                flags = comp_add_unique(flags, literal.slice(0, end as i64))
+        i = j + 1
+    flags
+
+fn comp_impl_flags(fs: &ToolFs) -> Vec[str]:
+    comp_collect_string_literal_flags(Vec.new(), fs.read_text("src/main.w") ++ "\n" ++ fs.read_text("src/compiler/DriverOptions.w"))
+
+fn comp_spec_modules(spec: str) -> Vec[str]:
+    let sec = comp_spec_subsection(spec, "#### Module Map")
+    var modules: Vec[str] = Vec.new()
+    var tick = 0
+    while tick < sec.len() as i32:
+        let open = comp_find_from(sec, "`", tick)
+        if open < 0:
+            break
+        let close = comp_find_from(sec, "`", open + 1)
+        if close < 0:
+            break
+        let item = sec.slice((open + 1) as i64, close as i64)
+        if item.starts_with("std."):
+            modules = comp_add_unique(modules, item)
+        tick = close + 1
+    modules
+
+fn comp_strip_suffix(text: str, suffix: str) -> str:
+    if text.ends_with(suffix):
+        return text.slice(0, text.len() - suffix.len())
+    text
+
+fn comp_std_module_from_path(path: str) -> str:
+    let prefix = "lib/std/"
+    if not path.starts_with(prefix):
+        return ""
+    let rest = path.slice(prefix.len(), path.len())
+    if rest.len() == 0 or rest.starts_with("."):
+        return ""
+    var first = rest
+    for i in 0..rest.len() as i32:
+        if rest.byte_at(i as i64) == 47:
+            first = rest.slice(0, i as i64)
+            break
+    if first.len() == 0 or first.starts_with("."):
+        return ""
+    if first.ends_with(".w"):
+        first = comp_strip_suffix(first, ".w")
+    "std." ++ first
+
+fn comp_impl_modules(fs: &ToolFs) -> Vec[str]:
+    let files = fs.list_files("lib/std")
+    var modules: Vec[str] = Vec.new()
+    for i in 0..files.len() as i32:
+        modules = comp_add_unique(modules, comp_std_module_from_path(files.get(i as i64)))
+    if fs.exists("lib/std/internal/str_abi.w"):
+        modules = comp_add_unique(modules, "std.str_abi")
+    modules
+
+fn comp_known_missing_flag(item: str) -> str:
+    if item == "--target": return "#425"
+    if item == "--open": return "#537"
+    ""
+
+fn comp_known_missing_module(item: str) -> str:
+    if item == "std.os": return "#476"
+    ""
+
+fn comp_known_missing_attribute(item: str) -> str:
+    if item == "ffi_stack": return "\302\24714.19 roadmap"
+    if item == "align": return "#449"
+    if item == "repr": return "#449"
+    if item == "target": return "#479"
+    ""
+
+fn comp_internal_command(item: str) -> bool:
+    item == "ast" or item == "bench" or item == "clean" or item == "get" or item == "install-user" or item == "ir" or item == "lsp" or item == "remove" or item == "tokens"
+
+fn comp_internal_flag(item: str) -> bool:
+    item == "--alloc" or item == "--check" or item == "--c-export-functions" or item == "--convert-goto-to-structured" or item == "--deterministic" or item == "--diff" or item == "--dry-run" or item == "--dump-ast" or item == "--dump-async-mir" or item == "--dump-mir" or item == "--dump-project-info" or item == "--dump-resolved" or item == "--dump-tokens" or item == "--dump-typed" or item == "--exclude" or item == "--explain" or item == "--filter" or item == "--force" or item == "--force-reinstall" or item == "--freestanding" or item == "--graph" or item == "--help" or item == "--ir-roundtrip" or item == "--lib" or item == "--migrate-one" or item == "--name" or item == "--no-c-export" or item == "--no-deps" or item == "--no-prelude" or item == "--no-runtime" or item == "--output" or item == "--prefer-brace" or item == "--prefer-colon" or item == "--prefer-curly" or item == "--prelude" or item == "--quiet" or item == "--shared-defs" or item == "--shared-fragment" or item == "--stats" or item == "--verbose" or item == "--width-slice" or item == "--version" or item == "-f" or item == "-D" or item == "-g0" or item == "-h" or item == "-I" or item == "-include" or item == "-l" or item == "-o" or item == "-q" or item == "-v" or item == "-w"
+
+fn comp_internal_module(item: str) -> bool:
+    item == "std.builtins" or item == "std.channel" or item == "std.cfg" or item == "std.async" or item == "std.compiler" or item == "std.component" or item == "std.iter" or item == "std.libc" or item == "std.option" or item == "std.prelude" or item == "std.prelude_alloc" or item == "std.prelude_core" or item == "std.re" or item == "std.result" or item == "std.str" or item == "std.str_abi" or item == "std.sys" or item == "std.sysinfo" or item == "std.task" or item == "std.tls" or item == "std.traits"
+
+fn comp_inventory_add_errors(errors: Vec[str], label: str, spec_items: Vec[str], impl_items: Vec[str], known_missing_kind: str, internal_kind: str) -> Vec[str]:
+    var out = errors
+    let sorted_spec = comp_sort_strings(spec_items)
+    for i in 0..sorted_spec.len() as i32:
+        let item = sorted_spec.get(i as i64)
+        if comp_vec_contains(impl_items, item):
+            continue
+        let known =
+            if known_missing_kind == "flag":
+                comp_known_missing_flag(item)
+            else if known_missing_kind == "module":
+                comp_known_missing_module(item)
+            else if known_missing_kind == "attribute":
+                comp_known_missing_attribute(item)
+            else:
+                ""
+        if known.len() == 0:
+            out.push(label ++ ": missing " ++ item)
+    let sorted_impl = comp_sort_strings(impl_items)
+    for j in 0..sorted_impl.len() as i32:
+        let item = sorted_impl.get(j as i64)
+        if comp_vec_contains(sorted_spec, item):
+            continue
+        let internal =
+            if internal_kind == "command":
+                comp_internal_command(item)
+            else if internal_kind == "flag":
+                comp_internal_flag(item)
+            else if internal_kind == "module":
+                comp_internal_module(item)
+            else:
+                false
+        if not internal:
+            out.push(label ++ ": implementation has unspec'd " ++ item)
+    out
+
+fn comp_inventory_known_lines() -> Vec[str]:
+    var items: Vec[str] = Vec.new()
+    items.push("--open\t#537")
+    items.push("--target\t#425")
+    items.push("align\t#449")
+    items.push("ffi_stack\t\302\24714.19 roadmap")
+    items.push("repr\t#449")
+    items.push("std.os\t#476")
+    items.push("target\t#479")
+    comp_sort_strings(items)
+
+fn comp_inventory_error_text(errors: Vec[str]) -> str:
+    var out = ""
+    for i in 0..errors.len() as i32:
+        out = out ++ "spec inventory: " ++ errors.get(i as i64) ++ "\n"
+    let known = comp_inventory_known_lines()
+    for j in 0..known.len() as i32:
+        let line = known.get(j as i64)
+        let tab = comp_index_of(line, "\t")
+        if tab >= 0:
+            out = out ++ "spec inventory: known spec-ahead " ++ line.slice(0, tab as i64) ++ " tracked by " ++ line.slice((tab + 1) as i64, line.len()) ++ "\n"
+    out
+
 pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let files = comp_compiler_c_export_audit_files(fs)
@@ -548,28 +934,29 @@ pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
     comp_write_ok_output(ctx)
 
 pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
-    let root = ctx.project_info().project_root()
-    let capture_dir = comp_join("out/command", ctx.target_name())
-    if ctx.fs().mkdir_all(capture_dir) != 0:
-        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
-    let argv: Vec[str] = Vec.new()
-    argv.push(if os() == "Windows": "python" else: "python3")
-    argv.push("scripts/check-spec-inventory.py")
-    let result = ctx.process_runner().run_capture(argv, comp_abs(root, comp_join(capture_dir, "stdout.txt")), comp_abs(root, comp_join(capture_dir, "stderr.txt")), 60000)
-    if result.rc != 0:
-        if result.stderr.len() > 0:
-            ctx.diagnostics().error(result.stderr)
-        else:
-            ctx.diagnostics().error("spec inventory check failed")
-        return result.rc
-    let output = ctx.output()
-    if output.len() > 0:
-        let dir = comp_dirname(output)
-        if ctx.fs().mkdir_all(dir) != 0:
-            return comp_fail(ctx, "could not create output directory: " ++ dir)
-        if ctx.fs().write_text(output, "ok\n") != 0:
-            return comp_fail(ctx, "could not write: " ++ output)
-    0
+    let fs = ctx.fs()
+    let spec_path = "docs/with-specification.md"
+    if not fs.exists(spec_path):
+        return comp_fail(ctx, "missing " ++ spec_path)
+    let spec = fs.read_text(spec_path)
+    var errors: Vec[str] = Vec.new()
+
+    errors = comp_inventory_add_errors(errors, "keywords", comp_spec_keywords(spec), comp_impl_keywords(fs), "", "")
+
+    var allowed_attrs = comp_spec_public_attributes(spec)
+    let internal_attrs = comp_spec_internal_attributes(spec)
+    for ai in 0..internal_attrs.len() as i32:
+        allowed_attrs = comp_add_unique(allowed_attrs, internal_attrs.get(ai as i64))
+    errors = comp_inventory_add_errors(errors, "attributes", allowed_attrs, comp_impl_attributes(fs), "attribute", "")
+
+    errors = comp_inventory_add_errors(errors, "cli commands", comp_spec_cli_commands(spec), comp_impl_commands(fs), "", "command")
+    errors = comp_inventory_add_errors(errors, "cli flags", comp_spec_cli_flags(), comp_impl_flags(fs), "flag", "flag")
+    errors = comp_inventory_add_errors(errors, "stdlib modules", comp_spec_modules(spec), comp_impl_modules(fs), "module", "module")
+
+    if errors.len() > 0:
+        ctx.diagnostics().error(comp_inventory_error_text(errors))
+        return 1
+    comp_write_ok_output(ctx)
 
 fn comp_json_escape(text: str) -> str:
     var out = ""

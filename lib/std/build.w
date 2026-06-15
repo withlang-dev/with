@@ -272,6 +272,7 @@ pub type ToolFs {
     root: str,
     write_scope: Vec[str],
     write_scoped: bool,
+    scratch_path: str,
 }
 
 pub type ProcessRunner {
@@ -314,6 +315,27 @@ pub fn process_spec(executable: str) -> ProcessSpec:
         capture_stdout: true,
         capture_stderr: true,
     }
+
+pub fn ProcessSpec.arg(self: ProcessSpec, value: str) -> ProcessSpec:
+    var args = self.args
+    args.push(value)
+    ProcessSpec { executable: self.executable, args, cwd: self.cwd, env: self.env, timeout_ms: self.timeout_ms, stdin_path: self.stdin_path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+
+pub fn ProcessSpec.working_dir(self: ProcessSpec, path: str) -> ProcessSpec:
+    ProcessSpec { executable: self.executable, args: self.args, cwd: path, env: self.env, timeout_ms: self.timeout_ms, stdin_path: self.stdin_path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+
+pub fn ProcessSpec.timeout(self: ProcessSpec, ms: i32) -> ProcessSpec:
+    ProcessSpec { executable: self.executable, args: self.args, cwd: self.cwd, env: self.env, timeout_ms: ms, stdin_path: self.stdin_path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+
+pub fn ProcessSpec.stdin(self: ProcessSpec, path: str) -> ProcessSpec:
+    ProcessSpec { executable: self.executable, args: self.args, cwd: self.cwd, env: self.env, timeout_ms: self.timeout_ms, stdin_path: path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+
+pub fn ProcessSpec.env_var(self: ProcessSpec, name: str, value: str) -> ProcessSpec:
+    let env = self.env.set(name, value)
+    ProcessSpec { executable: self.executable, args: self.args, cwd: self.cwd, env, timeout_ms: self.timeout_ms, stdin_path: self.stdin_path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+
+pub fn ProcessSpec.capture(self: ProcessSpec, stdout: bool, stderr: bool) -> ProcessSpec:
+    ProcessSpec { executable: self.executable, args: self.args, cwd: self.cwd, env: self.env, timeout_ms: self.timeout_ms, stdin_path: self.stdin_path, capture_stdout: stdout, capture_stderr: stderr }
 
 pub type ToolProcessResult {
     rc: i32,
@@ -393,6 +415,23 @@ fn tool_capability_require(token: str, name: str):
         with_eprint("error: invalid tool capability: " ++ name)
         exit(1)
 
+fn tool_safe_label(text: str) -> str:
+    var out = StringBuilder.with_capacity(text.len())
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
+        if keep:
+            out.push_byte(ch)
+        else:
+            out.push_byte(95)
+    let result = out.to_str()
+    if result.len() == 0:
+        return "unknown"
+    result
+
+fn tool_action_scratch_dir(target_name: str) -> str:
+    "out/tmp/action-scratch/" ++ tool_safe_label(target_name)
+
 pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCtx:
     tool_capability_require(token, "BuildCtx")
     BuildCtx {
@@ -400,7 +439,7 @@ pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCt
         project: ProjectInfo { package, root },
         diagnostics: Diagnostics { token },
         source_emitter: SourceEmitter { token },
-        fs: ToolFs { token, root, write_scope: Vec.new(), write_scoped: false },
+        fs: ToolFs { token, root, write_scope: Vec.new(), write_scoped: false, scratch_path: "" },
         process_runner: ProcessRunner { token },
     }
 
@@ -927,6 +966,13 @@ pub fn ToolFs.join(self: &Self, base: str, child: str) -> str:
     else:
         base ++ "/" ++ child
 
+pub fn ToolFs.scratch_dir(self: &Self) -> str:
+    tool_capability_require(self.token, "ToolFs")
+    if self.scratch_path.len() == 0:
+        with_eprint("error: ToolFs.scratch_dir is only available inside an action\n")
+        exit(1)
+    self.scratch_path
+
 pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> GeneratedSource:
     tool_capability_require(self.token, "SourceEmitter")
     GeneratedSource { path, contents }
@@ -1058,8 +1104,23 @@ pub fn ProcessRunner.wait(self: &Self, pid: i32, timeout_ms: i32) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
     with_exec_wait(pid, timeout_ms)
 
+fn tool_process_spec_fail(message: str):
+    with_eprint("error: ProcessRunner.run_spec: " ++ message ++ "\n")
+    exit(1)
+
+fn tool_process_spec_validate(spec: &ProcessSpec, stdout_path: str, stderr_path: str):
+    if spec.executable.len() == 0:
+        tool_process_spec_fail("executable is required")
+    if stdout_path.len() == 0 or stderr_path.len() == 0:
+        tool_process_spec_fail("stdout and stderr capture paths are required")
+    if not spec.capture_stdout or not spec.capture_stderr:
+        tool_process_spec_fail("non-capturing stdout/stderr is not implemented")
+    if spec.stdin_path.len() > 0 and (spec.cwd.len() > 0 or spec.env.vars.len() > 0):
+        tool_process_spec_fail("stdin cannot yet be combined with cwd or env")
+
 pub fn ProcessRunner.run_spec(self: &Self, spec: ProcessSpec, stdout_path: str, stderr_path: str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
+    tool_process_spec_validate(spec, stdout_path, stderr_path)
     let full_args: Vec[str] = Vec.new()
     full_args.push(spec.executable)
     for i in 0..spec.args.len() as i32:
@@ -1531,17 +1592,19 @@ fn build_action_write_scope(target: &Target) -> Vec[str]:
     let scopes = build_action_outputs(target)
     for i in 0..target.write_scopes.len() as i32:
         scopes.push(target.write_scopes.get(i as i64))
+    scopes.push(tool_action_scratch_dir(target.name))
     scopes
 
 fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
     let fs_outputs = build_action_write_scope(target)
     let ctx_outputs = build_action_outputs(target)
+    let scratch_path = tool_action_scratch_dir(target.name)
     ActionCtx {
         token: ctx.token,
         target_name_value: target.name,
         project: ctx.project,
         diagnostics_value: ctx.diagnostics,
-        fs_value: ToolFs { token: ctx.token, root: ctx.fs.root, write_scope: fs_outputs, write_scoped: true },
+        fs_value: ToolFs { token: ctx.token, root: ctx.fs.root, write_scope: fs_outputs, write_scoped: true, scratch_path },
         process_runner_value: ctx.process_runner,
         inputs_value: target.inputs,
         outputs_value: ctx_outputs,
@@ -1559,6 +1622,17 @@ pub fn Build.__driver_run_action(self: Build, ctx: BuildCtx, action_name: str) -
         if target.name == action_name:
             if target.kind != .Action:
                 with_eprint("error: build action target '" ++ action_name ++ "' is not an Action target\n")
+                return 1
+            let scratch_path = tool_action_scratch_dir(target.name)
+            let scratch_abs = if ctx.fs.root.len() == 0 or ctx.fs.root == ".":
+                scratch_path
+            else if ctx.fs.root.ends_with("/"):
+                ctx.fs.root ++ scratch_path
+            else:
+                ctx.fs.root ++ "/" ++ scratch_path
+            let _remove_scratch = with_fs_remove_tree(scratch_abs)
+            if with_fs_mkdir_p(scratch_abs) != 0:
+                with_eprint("error: build action target '" ++ action_name ++ "' could not create scratch directory: " ++ scratch_path ++ "\n")
                 return 1
             let action_ctx = build_action_ctx(ctx, target)
             return target.action(action_ctx)

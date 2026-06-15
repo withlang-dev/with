@@ -854,6 +854,22 @@ fn build_action_run_result(rc: i32) -> BuildActionRunResult:
 fn build_action_run_result_with_effects(rc: i32, effects: Vec[str]) -> BuildActionRunResult:
     BuildActionRunResult { rc: rc, effects: effects }
 
+fn build_action_safe_label(text: str) -> str:
+    var out = ""
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
+        if keep:
+            out = out ++ text.slice(i as i64, (i + 1) as i64)
+        else:
+            out = out ++ "_"
+    if out.len() == 0:
+        return "unknown"
+    out
+
+fn build_action_scratch_dir(target_name: str) -> str:
+    "out/tmp/action-scratch/" ++ build_action_safe_label(target_name)
+
 unsafe fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: &BuildGraphTarget, sema_ptr: *mut Sema, strict_effects: bool) -> BuildActionRunResult:
     if target.output.len() == 0:
         with_eprint("error: action target '" ++ target.name ++ "' requires a declared output")
@@ -870,6 +886,12 @@ unsafe fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: &
     let output_dir = build_graph_dirname(output_path)
     if with_fs_mkdir_p(output_dir) != 0:
         with_eprint("error: action target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
+        return build_action_run_result(1)
+    let scratch_dir = build_action_scratch_dir(target.name)
+    let scratch_abs = build_graph_resolve_project_path(root, scratch_dir)
+    let _remove_scratch = with_fs_remove_tree(scratch_abs)
+    if with_fs_mkdir_p(scratch_abs) != 0:
+        with_eprint("error: action target '" ++ target.name ++ "' could not create scratch directory: " ++ scratch_dir)
         return build_action_run_result(1)
     if target.action_fn == 0:
         with_eprint("error: action target '" ++ target.name ++ "' is missing an evaluator action function")

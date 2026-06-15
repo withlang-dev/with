@@ -484,8 +484,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
     spec_inventory.action = run_check_spec_inventory_action
     spec_inventory = spec_inventory.write_scope("out/.build-state")
-    spec_inventory = spec_inventory.write_scope("out/command/spec-inventory-check")
-    spec_inventory = spec_inventory.input("scripts/check-spec-inventory.py")
     spec_inventory = spec_inventory.input("docs/with-specification.md")
     spec_inventory = spec_inventory.input("src/Token.w")
     spec_inventory = spec_inventory.input("src/Parser.w")
@@ -907,7 +905,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     var c_migrator_pcre2_prep_tests = target_new(.Action, "c-migrator-pcre2-prep-tests", "").output("out/test-graph/c-migrator-pcre2-prep-tests")
     c_migrator_pcre2_prep_tests.action = run_cli_selfhost_pcre2_prep_action
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.input(release_compiler_bin("with"))
-    c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.write_scope("out/pcre2_tmp")
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.dep("build")
     out = out.add_target(c_migrator_pcre2_prep_tests)
 
@@ -1126,14 +1123,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     check_committed = check_committed.write_scope("out/command/check-committed-state")
     out = out.add_target(check_committed)
 
-    var install_user = target_new(.Action, "install-user", "").output("out/command/install-user/ok")
-    install_user.action = run_install_verified_compiler_action
-    install_user = install_user.arg(release_compiler_bin("with"))
-    install_user = install_user.arg("$HOME/.local/bin/with")
-    install_user = install_user.arg("0755")
-    install_user = install_user.write_scope("out/command/install-user")
-    install_user = install_user.dep("require-last-green")
-    out = out.add_target(install_user)
+    out = out.add_target(install_file_target("install-user", release_compiler_bin("with"), "$HOME/.local/bin/with", "0755", "require-last-green"))
 
     out = out.add_target(install_file_target("install-compiler", release_compiler_bin("with"), "$INSTALL_BINDIR/with" ++ host_exe_suffix(), "0755", "build"))
     out = out.add_target(install_file_target("install-rt-core", "out/lib/rt_core.o", "$INSTALL_LIBDIR/rt_core.o", "0644", "runtime"))
@@ -1197,14 +1187,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     deps = deps.arg(llvm_sdk_dir_basename())
     out = out.add_target(deps)
 
-    var update_seed = target_new(.Action, "update-seed", "").output("src/main")
-    update_seed.action = run_install_verified_compiler_action
-    update_seed = update_seed.arg(release_compiler_bin("with"))
-    update_seed = update_seed.arg("src/main")
-    update_seed = update_seed.arg("0755")
-    update_seed = update_seed.write_scope("src")
-    update_seed = update_seed.dep("require-last-green")
-    out = out.add_target(update_seed)
+    out = out.add_target(install_file_target("update-seed", release_compiler_bin("with"), "src/main", "0755", "require-last-green"))
 
     var clean = target_new(.Clean, "clean", "")
     clean = clean.arg("out")
@@ -1222,7 +1205,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var pcre2_reference = target_new(.Action, "pcre2-reference", "").output("out/pcre2_reference/pcre2-10.47")
     pcre2_reference.action = run_pcre2_reference_action
     pcre2_reference = pcre2_reference.extra_output("out/pcre2_reference/pcre2-10.47/.with-reference-ready")
-    pcre2_reference = pcre2_reference.extra_output("out/pcre2_tmp")
+    pcre2_reference = pcre2_reference.write_scope("out/tmp/action-scratch/pcre2-reference")
     pcre2_reference = pcre2_reference.arg("pcre2-10.47")
     pcre2_reference = pcre2_reference.arg("https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.gz")
     out = out.add_target(pcre2_reference)
@@ -1230,7 +1213,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var pcre2_migrate = target_new(.Action, "pcre2-migrate", "").output("out/gen/.regex-migrate-stamp")
     pcre2_migrate.action = run_pcre2_migrate_action
     pcre2_migrate = pcre2_migrate.extra_output("out/pcre2_migrated")
-    pcre2_migrate = pcre2_migrate.write_scope("out/pcre2_tmp")
+    pcre2_migrate = pcre2_migrate.write_scope("out/tmp/action-scratch/pcre2-migrate")
     pcre2_migrate = pcre2_migrate.write_scope("out/pcre2_migrate_raw")
     pcre2_migrate = pcre2_migrate.write_scope("out/pcre2_generated")
     pcre2_migrate = pcre2_migrate.write_scope("out/pcre2_build")
@@ -1264,7 +1247,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var pcre2_build = target_new(.Action, "pcre2-build", "").output("out/pcre2_build")
     pcre2_build.action = run_pcre2_build_action
-    pcre2_build = pcre2_build.write_scope("out/pcre2_tmp")
+    pcre2_build = pcre2_build.write_scope("out/tmp/action-scratch/pcre2-build")
     pcre2_build = pcre2_build.input("out/pcre2_migrated")
     pcre2_build = pcre2_build.dep("build")
     out = out.add_target(pcre2_build)
@@ -1280,14 +1263,14 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var pcre2_check_generated = target_new(.Action, "pcre2-check-generated", "").output("out/gen/.pcre2-check-generated-stamp")
     pcre2_check_generated.action = run_pcre2_check_generated_action
-    pcre2_check_generated = pcre2_check_generated.write_scope("out/pcre2_tmp")
+    pcre2_check_generated = pcre2_check_generated.write_scope("out/tmp/action-scratch/pcre2-check-generated")
     pcre2_check_generated = pcre2_check_generated.input("out/pcre2_build/lib/std/re")
     pcre2_check_generated = pcre2_check_generated.dep("build")
     out = out.add_target(pcre2_check_generated)
 
     var pcre2_promote = target_new(.Action, "pcre2-promote", "").output("lib/std/re")
     pcre2_promote.action = run_pcre2_promote_action
-    pcre2_promote = pcre2_promote.write_scope("out/pcre2_tmp")
+    pcre2_promote = pcre2_promote.write_scope("out/tmp/action-scratch/pcre2-promote")
     pcre2_promote = pcre2_promote.input("out/pcre2_build/lib/std/re")
     pcre2_promote = pcre2_promote.dep("pcre2-test")
     out = out.add_target(pcre2_promote)
