@@ -4603,7 +4603,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: str, base_d
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "fixtures/tree/a.txt"), "tree", ctx.target_name(), "toolfs ok tree fixture")
     if rc != 0: return rc
-    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let bytes: Vec[u8] = Vec.new()\n    bytes.push(0 as u8)\n    bytes.push(65 as u8)\n    bytes.push(255 as u8)\n    assert(fs.write_binary(\"out/toolfs/binary.bin\", bytes) == 0)\n    let loaded = fs.read_binary(\"out/toolfs/binary.bin\")\n    assert(loaded.len() == 3)\n    assert(loaded.get(0) == 0 as u8)\n    assert(loaded.get(1) == 65 as u8)\n    assert(loaded.get(2) == 255 as u8)\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files.get(0) == \"fixtures/tree/a.txt\")\n    assert(fs.copy_file(\"fixtures/tree/a.txt\", \"out/toolfs/copied-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/copied-file.txt\") == \"tree\")\n    assert(fs.chmod(\"out/toolfs/copied-file.txt\", 0o644) == 0)\n    assert(fs.rename(\"out/toolfs/copied-file.txt\", \"out/toolfs/renamed-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/renamed-file.txt\") == \"tree\")\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", ctx.target_name(), "toolfs ok build.w")
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let bytes: Vec[u8] = Vec.new()\n    bytes.push(0 as u8)\n    bytes.push(65 as u8)\n    bytes.push(255 as u8)\n    assert(fs.write_binary(\"out/toolfs/binary.bin\", bytes) == 0)\n    let loaded = fs.read_binary(\"out/toolfs/binary.bin\")\n    assert(loaded.len() == 3)\n    assert(loaded.get(0) == 0 as u8)\n    assert(loaded.get(1) == 65 as u8)\n    assert(loaded.get(2) == 255 as u8)\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files.get(0) == \"fixtures/tree/a.txt\")\n    assert(fs.sha256_file(\"fixtures/tree/a.txt\") == \"dc9c5edb8b2d479e697b4b0b8ab874f32b325138598ce9e7b759eb8292110622\")\n    let host_path = ctx.project_info().project_root() ++ \"/fixtures/tree/a.txt\"\n    assert(fs.host_read_text(host_path) == \"tree\")\n    assert(fs.copy_file(\"fixtures/tree/a.txt\", \"out/toolfs/copied-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/copied-file.txt\") == \"tree\")\n    assert(fs.chmod(\"out/toolfs/copied-file.txt\", 0o644) == 0)\n    assert(fs.rename(\"out/toolfs/copied-file.txt\", \"out/toolfs/renamed-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/renamed-file.txt\") == \"tree\")\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", ctx.target_name(), "toolfs ok build.w")
     if rc != 0: return rc
     let toolfs_ok = bs_build_w_expect_success(ctx, compiler_path, toolfs_ok_dir, "build-w-toolfs-ok", bs_blob_to_args(bs_argv_append("", "build")))
     if toolfs_ok.rc != 0: return toolfs_ok.rc
@@ -4909,6 +4909,8 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/input.txt"), "input", ctx.target_name(), "action input")
     if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "fixtures/work/cwd.txt"), "cwd", ctx.target_name(), "action cwd fixture")
+    if rc != 0: return rc
     let build_text =
         "use std.build\n\n" ++
         "fn generate(ctx: &ActionCtx) -> i32:\n" ++
@@ -4916,6 +4918,12 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
         "    assert(ctx.project_info().package_name() == \"buildwaction\")\n" ++
         "    assert(ctx.inputs().get(0) == \"src/input.txt\")\n" ++
         "    assert(ctx.args().get(0) == \"hello\")\n" ++
+        "    assert(ctx.timeout() == 12345)\n" ++
+        "    assert(ctx.working_dir() == \"fixtures/work\")\n" ++
+        "    assert(ctx.env().len() == 2)\n" ++
+        "    assert(ctx.env().get(0) == \"WITH_DECLARED_ONE=1\")\n" ++
+        "    assert(ctx.env().get(1) == \"WITH_DECLARED_TWO=two\")\n" ++
+        "    assert(ctx.network())\n" ++
         "    assert(ctx.fs().read_text(ctx.inputs().get(0)) == \"input\")\n" ++
         "    let scratch = ctx.fs().scratch_dir()\n" ++
         "    assert(scratch.starts_with(\"out/tmp/action-scratch/generate\"))\n" ++
@@ -4943,6 +4951,13 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
         "    assert(spec_result.rc == 0)\n" ++
         "    assert(spec_result.stdout.contains(\"WITH_RUN_SPEC_TEST=present\"))\n" ++
         "    assert(not spec_result.stdout.contains(\"WITH_TOOL_CAPABILITY_TOKEN=with-\"))\n" ++
+        "    let cwd_spec = process_spec(\"/bin/cat\").arg(\"cwd.txt\").working_dir(ctx.project_info().project_root() ++ \"/fixtures/work\").timeout(120000)\n" ++
+        "    let cwd_result = ctx.process_runner().run_spec(cwd_spec, \"out/action/spec-cwd.txt\", \"out/action/spec-cwd.err\")\n" ++
+        "    assert(cwd_result.rc == 0)\n" ++
+        "    assert(cwd_result.stdout.contains(\"cwd\"))\n" ++
+        "    let timeout_spec = process_spec(\"/bin/sleep\").arg(\"1\").timeout(1)\n" ++
+        "    let timeout_result = ctx.process_runner().run_spec(timeout_spec, \"out/action/spec-timeout.txt\", \"out/action/spec-timeout.err\")\n" ++
+        "    assert(timeout_result.timed_out)\n" ++
         "    var direct_args: Vec[str] = Vec.new()\n" ++
         "    direct_args |> push(\"/bin/echo\")\n" ++
         "    direct_args |> push(\"streamed-process-run\")\n" ++
@@ -4954,6 +4969,11 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
         "    generate_target = generate_target.extra_output(\"out/action/extra.txt\")\n" ++
         "    generate_target = generate_target.input(\"src/input.txt\")\n" ++
         "    generate_target = generate_target.arg(\"hello\")\n" ++
+        "    generate_target = generate_target.timeout(12345)\n" ++
+        "    generate_target = generate_target.working_dir(\"fixtures/work\")\n" ++
+        "    generate_target = generate_target.with_env(\"WITH_DECLARED_ONE\", \"1\")\n" ++
+        "    generate_target = generate_target.with_env(\"WITH_DECLARED_TWO\", \"two\")\n" ++
+        "    generate_target = generate_target.allow_network()\n" ++
         "    generate_target.action = generate\n" ++
         "    out = out.add_target(generate_target)\n" ++
         "    var all = target_new(.Group, \"all\", \"\")\n" ++
@@ -4961,6 +4981,17 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
         "    out = out.add_target(all)\n" ++
         "    out.default(\"all\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build_text, ctx.target_name(), "action build.w")
+    if rc != 0: return rc
+    let explain_args = bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), "--explain"), "generate"))
+    let explain = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-explain", explain_args)
+    if explain.rc != 0: return explain.rc
+    rc = bs_assert_contains(ctx, explain.stdout, "timeout_ms: 12345", "build_w_action_explain_timeout")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, explain.stdout, "cwd: fixtures/work", "build_w_action_explain_cwd")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, explain.stdout, "WITH_DECLARED_ONE=1", "build_w_action_explain_env")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, explain.stdout, "network: true", "build_w_action_explain_network")
     if rc != 0: return rc
     let result = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-target", bs_blob_to_args(bs_argv_append("", "build")))
     if result.rc != 0: return result.rc

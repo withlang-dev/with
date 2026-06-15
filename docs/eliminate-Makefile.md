@@ -89,9 +89,9 @@ Still blocking Makefile and script removal:
   - `tools/build-cmake.ps1`
   - `tools/build-static-llvm.sh`
   - `tools/build-static-llvm.ps1`
-- Build-system maintenance still relies on host utilities for checksum and
-  release/SDK packaging work, but the low-level prune shell fragments have
-  been removed.
+- Build-system maintenance still relies on host utilities for release/SDK
+  packaging work. Repository build evidence, compiler seed hashes, and generic
+  `std.build` download checksum verification use With-owned SHA-256.
 - `ToolFs.scratch_dir()` exists, but repository build modules cannot call it
   directly until the installed seed embeds that API. PCRE2 has moved from the
   shared `out/pcre2_tmp` path to the action-scratch path convention with
@@ -110,14 +110,14 @@ Still blocking Makefile and script removal:
 - 2026-06-14: Replaced `scripts/check-requirements-informative.py` with a pure
   With build action and deleted the script.
 - 2026-06-14: Documented direct replacements for Make compatibility aliases in
-  `docs/with-build.md`; `make cross`, first-seed bootstrap, and
-  `make print-version` remain explicit exceptions.
+  `docs/with-build.md`; at that point `make cross`, first-seed bootstrap, and
+  `make print-version` remained explicit exceptions.
 - 2026-06-14: Replaced `scripts/check-spec-inventory.py` with a pure With
   build action and deleted the script.
 - 2026-06-14: Removed `sh -c`/`find`/`sed`/`wc` shell fragments from
   `build/retention.w` prune reporting/deletion and switched test `.w`
   manifest discovery to typed `ToolFs.list_files` traversal. Checksums still
-  use host `shasum`/`sha256sum` pending the native hashing capability.
+  used host `shasum`/`sha256sum` pending the native hashing capability.
 - 2026-06-14: Converted `install-user` and `update-seed` to graph `Install`
   targets, removing the old action that spawned host `mkdir`, `cp`, and
   `chmod`.
@@ -129,6 +129,20 @@ Still blocking Makefile and script removal:
 - 2026-06-14: Hardened `ProcessRunner.run_spec` so unsupported capture/stdin
   combinations fail loudly, added small `ProcessSpec` builder methods, and
   covered the path in build.w selfhost tests.
+- 2026-06-15: Added `with build :print-version` as the Make replacement for
+  repository version printing. It uses the compiler version rule
+  (`WITH_VERSION`, then `src/version-g<short_hash>`, then `src/version`) and is
+  deliberately always-run so it prints every invocation.
+- 2026-06-15: Added the self-hosted `with-sha256` utility, built by the graph
+  from `tools/with-sha256.w`, and replaced repository build evidence,
+  test-green/last-green, and compiler seed-input hashing with that tool.
+- 2026-06-15: Added `ToolFs.host_read_text` for future external file hashing
+  and added build.w selfhost coverage for action timeout/cwd/env/network
+  metadata plus `ProcessSpec` cwd and timeout behavior.
+- 2026-06-15: Added `ToolFs.sha256_file()` backed by the BearSSL-derived
+  `std.crypto.sha256` implementation, wired the tool-mode evaluator to hash
+  files natively, and removed host `shasum` from `Build.download`
+  verification.
 
 ## Implementation Tasks
 
@@ -149,6 +163,8 @@ trustworthy once `build.w` owns every workflow.
   and install-path access. Existing target fields are not enough; the tests
   must prove unavailable privileges fail loudly and available privileges are
   deliberately declared.
+  Timeout/cwd/env/network positive coverage exists; install-path and negative
+  privilege tests remain.
 - Decide and implement network semantics. If the local driver cannot enforce a
   true network sandbox, then network-capable standard operations such as
   downloads must still require an explicit `allow_network()` declaration and
@@ -157,6 +173,9 @@ trustworthy once `build.w` owns every workflow.
   recursive directory creation/removal, content hashing, archive read/write,
   HTTP(S) fetch, and platform path handling so actions do not reach for shell
   utilities.
+  Binary writes, copy/chmod/tree operations, scratch dirs, repository-local
+  self-hosted hashing, host file reads, and project-file SHA-256 hashing exist;
+  native archive support, HTTP fetch, and richer platform path handling remain.
 - [x] Implement `ToolFs.scratch_dir() -> str` as an action-scoped, driver-managed
   scratch directory. The returned path must be project-relative, private to the
   current action invocation, automatically included in that action's write
@@ -196,9 +215,9 @@ rebuild.
 The Makefile can disappear only after the repository build graph is not quietly
 depending on scripts or shell fragments for normal maintenance.
 
-- Replace `build/retention.w` shell snippets used for prune counts, samples,
+- [x] Replace `build/retention.w` shell snippets used for prune counts, samples,
   and `.w` manifest hashing with typed filesystem traversal and With-native
-  hashing. Shell traversal is removed; native checksumming remains.
+  hashing.
 - [x] Move `scripts/check-no-c-export.py` into a With build action that reads source
   files directly and reports the same violations.
 - [x] Move `scripts/check-requirements-informative.py` into a With build action.
@@ -398,7 +417,7 @@ Inventory and resolve:
 - `deps`
 - `pcre2-migrate`, `pcre2-build`, `pcre2-test`, `pcre2-promote`
 - `regex-migrate`, `regex-build`, `regex-test`, `regex-promote`
-- `print-version`
+- `print-version` -> `with build :print-version`
 - `emit-c-test`, `emit-c-fixpoint`, `emit-c-roundtrip`
 - `cross`
 

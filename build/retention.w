@@ -80,14 +80,6 @@ fn ret_first_line(text: str) -> str:
             break
     ret_trim(text.slice(0, end as i64))
 
-fn ret_first_field(text: str) -> str:
-    let line = ret_first_line(text)
-    for i in 0..line.len() as i32:
-        let ch = line.byte_at(i as i64)
-        if ch == 9 or ch == 32:
-            return line.slice(0, i as i64)
-    line
-
 fn ret_split_lines(text: str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     var start = 0
@@ -179,23 +171,19 @@ fn ret_run_status(ctx: &ActionCtx, label: str, args: &Vec[str], timeout_ms: i32)
         ctx.diagnostics().error(ctx.target_name() ++ ": command '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     result.rc
 
+fn ret_sha256_tool(root: str) -> str:
+    let suffix = if os() == "Windows": ".exe" else: ""
+    ret_abs(root, "out/bin/with-sha256" ++ suffix)
+
 fn ret_sha256_file(ctx: &ActionCtx, label: str, path: str) -> str:
     let root = ctx.project_info().project_root()
     let target_path = ret_abs(root, path)
-    let shasum_args: Vec[str] = Vec.new()
-    shasum_args.push("shasum")
-    shasum_args.push("-a")
-    shasum_args.push("256")
-    shasum_args.push(target_path)
-    let shasum = ret_run_first_line(ctx, label ++ "-shasum", shasum_args, 30000)
-    if shasum.len() > 0:
-        return ret_first_field(shasum)
-    let sha256_args: Vec[str] = Vec.new()
-    sha256_args.push("sha256sum")
-    sha256_args.push(target_path)
-    let sha256 = ret_run_first_line(ctx, label ++ "-sha256sum", sha256_args, 30000)
-    if sha256.len() > 0:
-        return ret_first_field(sha256)
+    let args: Vec[str] = Vec.new()
+    args.push(ret_sha256_tool(root))
+    args.push(target_path)
+    let line = ret_run_first_line(ctx, label ++ "-sha256", args, 120000)
+    if line.len() >= 64:
+        return line.slice(0, 64)
     ""
 
 fn ret_sha256_text(ctx: &ActionCtx, label: str, text: str) -> str:
@@ -364,41 +352,34 @@ fn ret_append_state_file(ctx: &ActionCtx, combined: str, target_name: str) -> st
         return ""
     combined ++ "state:" ++ target_name ++ "\n" ++ state ++ "\n"
 
-fn ret_sha256_files_batch(ctx: &ActionCtx, label: str, files: &Vec[str]) -> str:
-    if files.len() == 0:
-        return ""
-    let safe_label = ret_safe_label(label)
-    let shasum_args: Vec[str] = Vec.new()
-    shasum_args.push("shasum")
-    shasum_args.push("-a")
-    shasum_args.push("256")
-    for i in 0..files.len() as i32:
-        shasum_args.push(files.get(i as i64))
-    let shasum = ret_run_lines(ctx, safe_label ++ "-shasum", shasum_args, 120000)
-    if shasum.len() > 0:
-        return ret_join_lines(shasum)
-    let sha256_args: Vec[str] = Vec.new()
-    sha256_args.push("sha256sum")
-    for i in 0..files.len() as i32:
-        sha256_args.push(files.get(i as i64))
-    let sha256 = ret_run_lines(ctx, safe_label ++ "-sha256sum", sha256_args, 120000)
-    ret_join_lines(sha256)
-
 fn ret_sha256_files_manifest(ctx: &ActionCtx, label: str, files: &Vec[str]) -> str:
     if files.len() == 0:
         return ""
     var out = ""
     var batch: Vec[str] = Vec.new()
+    var batch_names: Vec[str] = Vec.new()
     var batch_index = 0
+    let root = ctx.project_info().project_root()
     for i in 0..files.len() as i32:
-        batch.push(files.get(i as i64))
+        let file = files.get(i as i64)
+        batch.push(ret_abs(root, file))
+        batch_names.push(file)
         let last = i + 1 == files.len() as i32
         if batch.len() as i32 >= 100 or last:
-            let part = ret_sha256_files_batch(ctx, label ++ "-" ++ f"{batch_index}", batch)
-            if part.len() == 0:
+            let args: Vec[str] = Vec.new()
+            args.push(ret_sha256_tool(root))
+            for bi in 0..batch.len() as i32:
+                args.push(batch.get(bi as i64))
+            let lines = ret_run_lines(ctx, label ++ "-" ++ f"{batch_index}" ++ "-sha256", args, 120000)
+            if lines.len() != batch.len():
                 return ""
-            out = out ++ part
+            for li in 0..lines.len() as i32:
+                let line = lines.get(li as i64)
+                if line.len() < 64:
+                    return ""
+                out = out ++ line.slice(0, 64) ++ "  " ++ batch_names.get(li as i64) ++ "\n"
             batch = Vec.new()
+            batch_names = Vec.new()
             batch_index = batch_index + 1
     out
 

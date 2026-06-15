@@ -10,6 +10,7 @@ use compiler.Compilation
 use compiler.Link
 use compiler.ProjectConfig
 use compiler.TrackedInputs
+use std.crypto.sha256
 use render
 use CiMigrate
 use Overflow
@@ -2436,6 +2437,11 @@ fn ComptimeEvaluator.capability_project_relative_path(self: ComptimeEvaluator, r
         return normalized.slice(prefix.len(), normalized.len())
     normalized
 
+fn comptime_sha256_text(data: str) -> str:
+    var digest: [32]u8 = [0 as u8; 32]
+    sha256_hash_str(data, &raw mut digest[0] as *mut u8)
+    sha256_hex(&digest[0] as *const u8)
+
 fn ComptimeEvaluator.str_vec_value(self: ComptimeEvaluator, values: Vec[str], node: i32) -> ComptimeValue:
     let vec_type = self.node_type_or(node, 0)
     if vec_type == 0:
@@ -3771,7 +3777,7 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
         for gi in 0..sorted.len() as i32:
             self.extra_values.push(comptime_value_str(sorted.get(gi as i64)))
         return comptime_control_value(comptime_value_vec(vec_type, gstart, sorted.len() as i32))
-    if method == "exists" or method == "is_dir" or method == "read_text" or method == "read_binary" or method == "list_files" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
+    if method == "exists" or method == "is_dir" or method == "read_text" or method == "read_binary" or method == "list_files" or method == "sha256_file" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
             return comptime_control_error()
         let args_signal = self.capability_args(extra_start, arg_count)
@@ -3794,6 +3800,10 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
             if vec_type == 0:
                 return self.fail(node, "ToolFs.read_binary result type is unknown")
             return comptime_control_value(comptime_value_bytes(vec_type, with_fs_read_file(resolved)))
+        if method == "sha256_file":
+            if with_fs_file_exists(resolved) == 0:
+                return comptime_control_value(comptime_value_str(""))
+            return comptime_control_value(comptime_value_str(comptime_sha256_text(with_fs_read_file(resolved))))
         if method == "list_files":
             let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved))
             let vec_type = self.node_type_or(node, 0)
@@ -3815,7 +3825,7 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
             if not self.capability_require_write_file_allowed(record, path, method, node):
                 return comptime_control_error()
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_remove_tree(resolved) as i64))
-    if method == "host_exists":
+    if method == "host_exists" or method == "host_read_text":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
             return comptime_control_error()
         let args_signal = self.capability_args(extra_start, arg_count)
@@ -3824,6 +3834,8 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
         let path = self.capability_arg_str(args_signal.value, 0, method, node)
         if self.had_error != 0:
             return comptime_control_error()
+        if method == "host_read_text":
+            return comptime_control_value(comptime_value_str(with_fs_read_file(path)))
         return comptime_control_value(comptime_value_bool(if with_fs_file_exists(path) != 0: 1 else: 0))
     if method == "host_list_files":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):

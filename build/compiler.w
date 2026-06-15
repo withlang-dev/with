@@ -411,14 +411,6 @@ fn comp_run_first_line(ctx: &ActionCtx, capture_dir: str, label: str, argv: Vec[
         return ""
     comp_first_trimmed_line(result.stdout)
 
-fn comp_first_field(text: str) -> str:
-    let line = comp_first_trimmed_line(text)
-    for i in 0..line.len() as i32:
-        let ch = line.byte_at(i as i64)
-        if ch == 9 or ch == 32:
-            return line.slice(0, i as i64)
-    line
-
 fn comp_count_actual_c_export_attrs(text: str) -> i32:
     var count = 0
     var line_start: i64 = 0
@@ -534,12 +526,6 @@ fn comp_vec_contains(items: &Vec[str], item: str) -> bool:
             return true
     false
 
-fn comp_add_unique(items: Vec[str], item: str) -> Vec[str]:
-    if item.len() == 0 or comp_vec_contains(items, item):
-        return items
-    items.push(item)
-    items
-
 fn comp_add_words(items: Vec[str], text: str) -> Vec[str]:
     var out = items
     var start = -1
@@ -548,12 +534,16 @@ fn comp_add_words(items: Vec[str], text: str) -> Vec[str]:
         let ws = ch == 9 or ch == 10 or ch == 13 or ch == 32
         if ws:
             if start >= 0:
-                out = comp_add_unique(move out, text.slice(start as i64, i as i64))
+                let word = text.slice(start as i64, i as i64)
+                if word.len() > 0 and not comp_vec_contains(out, word):
+                    out.push(word)
                 start = -1
         else if start < 0:
             start = i
     if start >= 0:
-        out = comp_add_unique(move out, text.slice(start as i64, text.len()))
+        let word = text.slice(start as i64, text.len())
+        if word.len() > 0 and not comp_vec_contains(out, word):
+            out.push(word)
     out
 
 fn comp_is_ident_start(ch: i32) -> bool:
@@ -608,7 +598,9 @@ fn comp_collect_quoted_after(text: str, prefix: str) -> Vec[str]:
         let value_end = comp_find_from(text, "\"", value_start)
         if value_end < 0:
             break
-        out = comp_add_unique(move out, text.slice(value_start as i64, value_end as i64))
+        let item = text.slice(value_start as i64, value_end as i64)
+        if item.len() > 0 and not comp_vec_contains(out, item):
+            out.push(item)
         start = value_end + 1
     out
 
@@ -624,7 +616,9 @@ fn comp_collect_attr_names(items: Vec[str], text: str) -> Vec[str]:
             var name_end = name_start + 1
             while name_end < text.len() as i32 and comp_is_ident_continue(text.byte_at(name_end as i64)):
                 name_end = name_end + 1
-            out = comp_add_unique(move out, text.slice(name_start as i64, name_end as i64))
+            let item = text.slice(name_start as i64, name_end as i64)
+            if item.len() > 0 and not comp_vec_contains(out, item):
+                out.push(item)
             start = name_end
         else:
             start = at + 2
@@ -673,7 +667,9 @@ fn comp_impl_attributes(fs: &ToolFs) -> Vec[str]:
     var attrs = comp_collect_quoted_after(text, "is_ident_named(\"")
     let more = comp_collect_quoted_after(text, "attr_text == \"")
     for i in 0..more.len() as i32:
-        attrs = comp_add_unique(move attrs, more.get(i as i64))
+        let item = more.get(i as i64)
+        if item.len() > 0 and not comp_vec_contains(attrs, item):
+            attrs.push(item)
     attrs
 
 fn comp_strip_comment(text: str) -> str:
@@ -692,8 +688,8 @@ fn comp_first_shell_word(text: str) -> str:
 
 fn comp_spec_cli_commands(spec: str) -> Vec[str]:
     var commands: Vec[str] = Vec.new()
-    commands = comp_add_unique(move commands, "version")
-    commands = comp_add_unique(move commands, "help")
+    commands.push("version")
+    commands.push("help")
     let block = comp_first_fenced_block(comp_spec_subsection(spec, "### 18.5 Toolchain"))
     let lines = comp_split_lines(block)
     for i in 0..lines.len() as i32:
@@ -710,7 +706,8 @@ fn comp_spec_cli_commands(spec: str) -> Vec[str]:
                     part = comp_trim(part.slice(5, part.len()))
                 let token = comp_first_shell_word(part)
                 if token.len() > 0 and not token.starts_with("[") and not token.starts_with("-"):
-                    commands = comp_add_unique(move commands, token)
+                    if not comp_vec_contains(commands, token):
+                        commands.push(token)
                 part_start = pi + 1
             pi = pi + 1
     let package_sec = comp_spec_subsection(spec, "### 18.8 Package Management")
@@ -726,7 +723,8 @@ fn comp_spec_cli_commands(spec: str) -> Vec[str]:
         if span.starts_with("with "):
             let token = comp_first_shell_word(comp_trim(span.slice(5, span.len())))
             if token.len() > 0 and not token.starts_with("-"):
-                commands = comp_add_unique(move commands, token)
+                if not comp_vec_contains(commands, token):
+                    commands.push(token)
         tick = close + 1
     commands
 
@@ -741,7 +739,8 @@ fn comp_impl_commands(fs: &ToolFs) -> Vec[str]:
     for i in 0..raw.len() as i32:
         let cmd = raw.get(i as i64)
         if not cmd.starts_with("-"):
-            commands = comp_add_unique(move commands, cmd)
+            if cmd.len() > 0 and not comp_vec_contains(commands, cmd):
+                commands.push(cmd)
     commands
 
 fn comp_collect_string_literal_flags(items: Vec[str], text: str) -> Vec[str]:
@@ -774,7 +773,9 @@ fn comp_collect_string_literal_flags(items: Vec[str], text: str) -> Vec[str]:
                     if not ((ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or (ch >= 48 and ch <= 57) or ch == 45):
                         break
                     end = end + 1
-                flags = comp_add_unique(move flags, literal.slice(0, end as i64))
+                let item = literal.slice(0, end as i64)
+                if item.len() > 0 and not comp_vec_contains(flags, item):
+                    flags.push(item)
         i = j + 1
     flags
 
@@ -794,7 +795,8 @@ fn comp_spec_modules(spec: str) -> Vec[str]:
             break
         let item = sec.slice((open + 1) as i64, close as i64)
         if item.starts_with("std."):
-            modules = comp_add_unique(move modules, item)
+            if not comp_vec_contains(modules, item):
+                modules.push(item)
         tick = close + 1
     modules
 
@@ -825,9 +827,12 @@ fn comp_impl_modules(fs: &ToolFs) -> Vec[str]:
     let files = fs.list_files("lib/std")
     var modules: Vec[str] = Vec.new()
     for i in 0..files.len() as i32:
-        modules = comp_add_unique(move modules, comp_std_module_from_path(files.get(i as i64)))
+        let item = comp_std_module_from_path(files.get(i as i64))
+        if item.len() > 0 and not comp_vec_contains(modules, item):
+            modules.push(item)
     if fs.exists("lib/std/internal/str_abi.w"):
-        modules = comp_add_unique(move modules, "std.str_abi")
+        if not comp_vec_contains(modules, "std.str_abi"):
+            modules.push("std.str_abi")
     modules
 
 fn comp_known_missing_flag(item: str) -> str:
@@ -946,7 +951,9 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     var allowed_attrs = comp_spec_public_attributes(spec)
     let internal_attrs = comp_spec_internal_attributes(spec)
     for ai in 0..internal_attrs.len() as i32:
-        allowed_attrs = comp_add_unique(move allowed_attrs, internal_attrs.get(ai as i64))
+        let item = internal_attrs.get(ai as i64)
+        if item.len() > 0 and not comp_vec_contains(allowed_attrs, item):
+            allowed_attrs.push(item)
     errors = comp_inventory_add_errors(errors, "attributes", allowed_attrs, comp_impl_attributes(fs), "attribute", "")
 
     errors = comp_inventory_add_errors(errors, "cli commands", comp_spec_cli_commands(spec), comp_impl_commands(fs), "", "command")
@@ -988,37 +995,13 @@ fn comp_resolve_command_file(ctx: &ActionCtx, capture_dir: str, path: str) -> st
     path
 
 fn comp_sha256_file(ctx: &ActionCtx, capture_dir: str, label: str, path: str) -> str:
-    if os() == "Windows":
-        let certutil_args: Vec[str] = Vec.new()
-        certutil_args.push("certutil")
-        certutil_args.push("-hashfile")
-        certutil_args.push(path)
-        certutil_args.push("SHA256")
-        let raw = comp_run_first_line(ctx, capture_dir, label ++ "-certutil", certutil_args, 30000)
-        let certutil_text = ctx.fs().read_text(comp_join(capture_dir, label ++ "-certutil.stdout"))
-        var line_start: i64 = 0
-        for i in 0..certutil_text.len() as i32:
-            if certutil_text.byte_at(i as i64) == 10:
-                let line = comp_trim(certutil_text.slice(line_start, i as i64))
-                if line.len() == 64:
-                    return line
-                line_start = i as i64 + 1
-        if raw.len() == 64:
-            return raw
-    let shasum_args: Vec[str] = Vec.new()
-    shasum_args.push("shasum")
-    shasum_args.push("-a")
-    shasum_args.push("256")
-    shasum_args.push(path)
-    let shasum = comp_run_first_line(ctx, capture_dir, label ++ "-shasum", shasum_args, 30000)
-    if shasum.len() > 0:
-        return comp_first_field(shasum)
-    let sha256_args: Vec[str] = Vec.new()
-    sha256_args.push("sha256sum")
-    sha256_args.push(path)
-    let sha256 = comp_run_first_line(ctx, capture_dir, label ++ "-sha256sum", sha256_args, 30000)
-    if sha256.len() > 0:
-        return comp_first_field(sha256)
+    let root = ctx.project_info().project_root()
+    let args: Vec[str] = Vec.new()
+    args.push(comp_abs(root, "out/bin/with-sha256" ++ comp_host_exe_suffix()))
+    args.push(path)
+    let output = comp_run_first_line(ctx, capture_dir, label ++ "-sha256", args, 120000)
+    if output.len() >= 64:
+        return output.slice(0, 64)
     ""
 
 fn comp_record_seed_input(ctx: &ActionCtx, compiler_path: str, capture_dir: str) -> i32:
@@ -1125,6 +1108,22 @@ pub fn run_generate_compiler_entrypoints_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     if fs.write_text("out/gen/version.txt", version ++ "\n") != 0:
         return comp_fail(ctx, "could not write: out/gen/version.txt")
+    if fs.write_text(stamp_path, version ++ "\n") != 0:
+        return comp_fail(ctx, "could not write stamp: " ++ stamp_path)
+    0
+
+pub fn run_print_version_action(ctx: ActionCtx) -> i32:
+    let stamp_path = ctx.output()
+    if stamp_path.len() == 0:
+        return comp_fail(ctx, "requires a stamp output")
+    let version = comp_resolve_compiler_version(ctx)
+    if version.len() == 0:
+        return comp_fail(ctx, "could not resolve compiler version from src/version")
+    print(version)
+    let fs = ctx.fs()
+    let stamp_dir = comp_dirname(stamp_path)
+    if fs.mkdir_all(stamp_dir) != 0:
+        return comp_fail(ctx, "could not create output directory: " ++ stamp_dir)
     if fs.write_text(stamp_path, version ++ "\n") != 0:
         return comp_fail(ctx, "could not write stamp: " ++ stamp_path)
     0

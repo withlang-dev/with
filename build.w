@@ -446,6 +446,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_sources = target_with_version_inputs(compiler_sources, ctx)
     out = out.add_target(compiler_sources)
 
+    var print_version = target_new(.Action, "print-version", "").output("out/.build-state/print-version.txt")
+    print_version.action = run_print_version_action
+    print_version = print_version.input("src/version")
+    print_version = target_with_version_inputs(print_version, ctx)
+    out = out.add_target(print_version)
+
     var bootstrap_c_emit_sources = target_new(.Action, "bootstrap-c-emit-sources", "").output("out/bootstrap-c/src/with_compiler.c")
     bootstrap_c_emit_sources.action = run_bootstrap_c_emit_sources_action
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/gen/wl_decls.h")
@@ -588,6 +594,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.dep("bootstrap-runtime")
     out = out.add_target(prepare_bootstrap_link_root)
 
+    var sha256_tool = target_new(.Executable, "with-sha256", "tools/with-sha256.w").output(host_bin("out/bin/with-sha256"))
+    sha256_tool = sha256_tool.compiler("seed")
+    sha256_tool = sha256_tool.dep("prepare-bootstrap-link-root")
+    out = out.add_target(sha256_tool)
+
     out = out.add_target(with_object_target("llvm-bridge-object", stage_compiler_bin("with-stage2"), "src/compiler/LlvmBridge.w", "out/lib/llvm_bridge.o", "-O0", "stage2"))
     out = out.add_target(with_object_target("clang-bridge-object", stage_compiler_bin("with-stage2"), "src/compiler/ClangBridge.w", "out/lib/clang_bridge.o", "-O0", "stage2"))
 
@@ -611,6 +622,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.arg("-O0")
     stage1 = stage1.extra_output("out/command/stage1")
     stage1 = stage1.extra_output("out/.build-state/seed-input.json")
+    stage1 = stage1.input(host_bin("out/bin/with-sha256"))
     stage1 = stage1.write_scope("out/bootstrap/bin")
     stage1 = stage1.write_scope("out/.build-state")
     stage1 = stage1.dep("compiler-sources")
@@ -618,6 +630,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.dep("embedded-clang-resource-source")
     stage1 = stage1.dep("compiler-no-c-export")
     stage1 = stage1.dep("prepare-bootstrap-link-root")
+    stage1 = stage1.dep("with-sha256")
     out = out.add_target(stage1)
 
     var stage2 = target_new(.Action, "stage2", "").output(stage_compiler_bin("with-stage2"))
@@ -947,8 +960,10 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var test_green = target_new(.Action, "test-green", "").output("out/.build-state/test-green.json")
     test_green.action = run_test_green_action
+    test_green = test_green.input(host_bin("out/bin/with-sha256"))
     test_green = test_green.write_scope("out/.build-state")
     test_green = test_green.write_scope("out/command/test-green")
+    test_green = test_green.dep("with-sha256")
     out = out.add_target(test_green)
 
     var tests = target_new(.Group, "test", "")
@@ -978,6 +993,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var last_green = target_new(.Action, "last-green", "").output("out/.build-state/last-green.json")
     last_green.action = run_last_green_action
+    last_green = last_green.input(host_bin("out/bin/with-sha256"))
     last_green = last_green.input(release_compiler_bin("with"))
     last_green = last_green.input(stage_compiler_obj("with-stage2-fixpoint.o"))
     last_green = last_green.input(stage_compiler_obj("with-stage3-fixpoint.o"))
@@ -989,11 +1005,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     last_green = last_green.write_scope("out/seed-archive")
     last_green = last_green.write_scope("out/command/last-green")
     last_green = last_green.dep("fixpoint")
+    last_green = last_green.dep("with-sha256")
     out = out.add_target(last_green)
 
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
     require_last_green.action = run_require_last_green_action
+    require_last_green = require_last_green.input(host_bin("out/bin/with-sha256"))
     require_last_green = require_last_green.write_scope("out/command/require-last-green")
+    require_last_green = require_last_green.dep("with-sha256")
     out = out.add_target(require_last_green)
 
     if release_platform_asset_is_distinct():

@@ -3,6 +3,8 @@
 // The compiler driver is responsible for executing build.w in tool mode and
 // turning this graph into concrete compiler/linker actions.
 
+use std.crypto.sha256
+
 extern fn with_eprint(s: str) -> Unit
 extern fn exit(code: i32) -> Unit
 extern fn with_getenv_str(name: str) -> str
@@ -843,6 +845,20 @@ pub fn ToolFs.host_exists(self: &Self, path: str) -> bool:
     tool_capability_require(self.token, "ToolFs")
     with_fs_file_exists(path) != 0
 
+pub fn ToolFs.host_read_text(self: &Self, path: str) -> str:
+    tool_capability_require(self.token, "ToolFs")
+    with_fs_read_file(path)
+
+fn tool_sha256_text(data: str) -> str:
+    var digest: [32]u8 = [0 as u8; 32]
+    sha256_hash_str(data, &raw mut digest[0] as *mut u8)
+    sha256_hex(&digest[0] as *const u8)
+
+pub fn ToolFs.sha256_file(self: &Self, path: str) -> str:
+    if not self.exists(path):
+        return ""
+    tool_sha256_text(self.read_text(path))
+
 pub fn ToolFs.host_list_files(self: &Self, path: str) -> Vec[str]:
     tool_capability_require(self.token, "ToolFs")
     tool_split_nonempty_lines(with_fs_list_files(path))
@@ -1430,16 +1446,10 @@ fn build_download_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error(ctx.target_name() ++ ": curl failed (rc=" ++ f"{result.rc}" ++ ")")
         return 1
     if sha256.len() > 0:
-        let sum_args: Vec[str] = Vec.new()
-        sum_args.push("shasum")
-        sum_args.push("-a")
-        sum_args.push("256")
-        sum_args.push(tmp_path)
-        let sum_result = proc.run_capture(sum_args, cmd_dir ++ "/sha.stdout", cmd_dir ++ "/sha.stderr", 30000)
-        if sum_result.rc != 0:
-            ctx.diagnostics().error(ctx.target_name() ++ ": shasum failed")
+        let actual = fs.sha256_file(tmp_path)
+        if actual.len() == 0:
+            ctx.diagnostics().error(ctx.target_name() ++ ": could not hash downloaded file")
             return 1
-        let actual = sum_result.stdout.slice(0, 64)
         if actual != sha256:
             ctx.diagnostics().error(ctx.target_name() ++ ": sha256 mismatch: expected " ++ sha256 ++ " got " ++ actual)
             let _ = fs.remove_file(tmp_path)
