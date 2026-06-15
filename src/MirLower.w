@@ -4071,6 +4071,16 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.lower_expr_place(self.ast.get_data0(node))
 
+    if kind == NodeKind.NK_MOVE_ARG:
+        let inner = self.ast.get_data0(node)
+        let place = self.lower_expr_place(inner)
+        let local_id = mir_place_plain_local(&self.body, place)
+        if local_id >= 0:
+            self.mark_local_value_moved(local_id)
+            self.cancel_scheduled_value_drop_for_local(local_id)
+            self.cancel_stmt_temp_for_local(local_id)
+        return place
+
     // Transparent pass-through. lower_expr already does this for the rvalue
     // case (line 4043); the place version was missing the same handling, so
     // `(unsafe *p) = expr` would fall through to the materialize-as-temp
@@ -6776,7 +6786,9 @@ fn MirBuilder.autoderef_result_type_for_method(self: MirBuilder, recv_ty: i32, m
 
 fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method_sym: i32) -> i32:
     // Translate method_sym from AST pool to sema pool for method lookups.
-    let sema_method_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(method_sym))
+    let method_text = self.pool.resolve_symbol(method_sym)
+    let sema_method_lookup = self.sema.pool_lookup_symbol(method_text)
+    let sema_method_sym = if sema_method_lookup != 0: sema_method_lookup else: method_sym
     let obj_type = self.expr_type(self_expr)
     if obj_type != 0 and obj_type != self.sema.ty_void:
         let resolved = self.autoderef_result_type_for_method(obj_type, method_sym)
@@ -6786,6 +6798,26 @@ fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method
                 let method_fn = self.sema.lookup_method_fn(type_name_sym, sema_method_sym)
                 if method_fn != 0 and self.sema.lookup_method_sig(type_name_sym, sema_method_sym) >= 0:
                     return method_fn
+                let generic_method_fn = self.sema.lookup_generic_method_fn(type_name_sym, sema_method_sym)
+                if generic_method_fn != 0:
+                    return generic_method_fn
+
+    if self.ast.kind(self_expr) == NodeKind.NK_IDENT and self.pool.resolve_symbol(self.ast.get_data0(self_expr)) == "self":
+        let current_fn_name = self.sema.pool_resolve(self.body.fn_sym)
+        var owner_text = ""
+        for ci in 0..current_fn_name.len() as i32:
+            if current_fn_name.byte_at(ci as i64) == 46:
+                owner_text = current_fn_name.slice(0, ci as i64)
+                break
+        if owner_text.len() > 0:
+            let owner_sym = self.sema.pool_lookup_symbol(owner_text)
+            if owner_sym != 0:
+                let method_fn = self.sema.lookup_method_fn(owner_sym, sema_method_sym)
+                if method_fn != 0 and self.sema.lookup_method_sig(owner_sym, sema_method_sym) >= 0:
+                    return method_fn
+                let generic_method_fn = self.sema.lookup_generic_method_fn(owner_sym, sema_method_sym)
+                if generic_method_fn != 0:
+                    return generic_method_fn
 
     if self.ast.kind(self_expr) == NodeKind.NK_IDENT:
         let type_sym = self.ast.get_data0(self_expr)

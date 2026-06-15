@@ -2168,6 +2168,14 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
     if kind == NodeKind.NK_TYPE_EXTERN_FN:
         return wl_ptr_type(self.context)
 
+    if kind == NodeKind.NK_INDEX:
+        let sema_tid = self.sema.resolve_type_level_arg_expr(type_node)
+        if sema_tid > 0:
+            let sema_ty = self.sema_type_to_llvm(sema_tid)
+            if sema_ty != 0:
+                return sema_ty
+        return 0
+
     if kind == NodeKind.NK_TYPE_ARRAY:
         let elem_node = self.pool.get_data0(type_node)
         let size_lo = self.pool.get_data1(type_node)
@@ -2326,7 +2334,12 @@ fn Codegen.resolve_user_named_type(self: Codegen, sym: i32) -> i64:
         return al_opt.unwrap() as i64
     // Check active type bindings (monomorphization)
     for i in 0..self.type_bindings_len:
-        if self.type_binding_syms.get(i as i64) == sym:
+        let binding_sym = self.type_binding_syms.get(i as i64)
+        let want_text = self.intern.resolve(sym)
+        let binding_text = self.intern.resolve(binding_sym)
+        let sema_want_text = if want_text.len() > 0: want_text else: self.sema_symbol_text(sym)
+        let sema_binding_text = if binding_text.len() > 0: binding_text else: self.sema_symbol_text(binding_sym)
+        if binding_sym == sym or (sema_want_text.len() > 0 and sema_want_text == sema_binding_text):
             return self.type_binding_types.get(i as i64)
     // Unsupported
     0
@@ -3047,8 +3060,14 @@ fn Codegen.generic_type_decl_node(self: Codegen, type_sym: i32) -> i32:
         let decl = self.pool.get_decl(di)
         if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:
             continue
-        if self.pool.get_data0(decl) != type_sym:
-            continue
+        let decl_sym = self.pool.get_data0(decl)
+        if decl_sym != type_sym:
+            let decl_name_raw = self.intern.resolve(decl_sym)
+            let decl_name = if decl_name_raw.len() > 0: decl_name_raw else: self.sema_symbol_text(decl_sym)
+            let type_name_raw = self.intern.resolve(type_sym)
+            let type_name = if type_name_raw.len() > 0: type_name_raw else: self.sema_symbol_text(type_sym)
+            if decl_name.len() == 0 or type_name.len() == 0 or decl_name != type_name:
+                continue
         let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))
         if sub_kind != TypeDeclKind.Struct and sub_kind != TypeDeclKind.Enum:
             return 0
@@ -3614,18 +3633,6 @@ fn Codegen.declare_function_at(self: Codegen, fn_node: i32, decl_index: i32):
     let flags = self.pool.get_data2(fn_node)
     let meta = self.pool.find_fn_meta(fn_node)
     if meta < 0: return
-    if (flags / FnFlags.GEN) % 2 == 1:
-        let sig_idx = self.sema.get_sig(name_sym)
-        if sig_idx >= 0:
-            self.declare_function_from_sig(name_sym, sig_idx, 0)
-        return
-
-    let ret_type_node = self.pool.fn_meta_ret(meta)
-    let param_start = self.pool.fn_meta_param_start(meta)
-    let param_count = self.pool.fn_meta_param_count(meta)
-
-    // Resolve param types
-    let param_types: Vec[i64] = Vec.new()
 
     // Check if method (has dot in name); for missing symbol text, infer owner
     // from `self: Type` in param 0.
@@ -3649,6 +3656,19 @@ fn Codegen.declare_function_at(self: Codegen, fn_node: i32, decl_index: i32):
         if self.generic_type_decl_node(method_owner_sym) != 0:
             self.generic_struct_methods.insert(name_sym, fn_node)
             return
+
+    if (flags / FnFlags.GEN) % 2 == 1:
+        let sig_idx = self.sema.get_sig(name_sym)
+        if sig_idx >= 0:
+            self.declare_function_from_sig(name_sym, sig_idx, 0)
+        return
+
+    let ret_type_node = self.pool.fn_meta_ret(meta)
+    let param_start = self.pool.fn_meta_param_start(meta)
+    let param_count = self.pool.fn_meta_param_count(meta)
+
+    // Resolve param types
+    let param_types: Vec[i64] = Vec.new()
 
     // Set method owner before resolving return type so Self can resolve
     let saved_owner = self.current_method_owner_sym
@@ -4036,7 +4056,8 @@ fn Codegen.gen_mir_only_functions(self: Codegen):
 fn Codegen.is_method_on_generic_struct(self: Codegen, name_sym: i32) -> bool:
     if name_sym <= 0:
         return false
-    let name_str = self.intern.resolve(name_sym)
+    let raw_name = self.intern.resolve(name_sym)
+    let name_str = if raw_name.len() > 0: raw_name else: self.sema_symbol_text(name_sym)
     if name_str.len() == 0:
         return false
     for di in 0..name_str.len() as i32:
@@ -5034,7 +5055,9 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
     let sm_tp_sema_tys: Vec[i32] = Vec.new()
     for ti in 0..tp_count:
         let tp_sym = self.mono_struct_tp_flat_syms.get((tp_flat_start + ti) as i64)
-        sm_tp_syms.push(tp_sym)
+        let tp_text = self.intern.resolve(tp_sym)
+        let sema_tp_sym = if tp_text.len() > 0: self.sema.pool_lookup_symbol(tp_text) else: 0
+        sm_tp_syms.push(if sema_tp_sym != 0: sema_tp_sym else: tp_sym)
         var tp_sema = 0
         if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
             tp_sema = self.mono_struct_tp_flat_sema_types.get((tp_flat_start + ti) as i64)
@@ -5081,12 +5104,23 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
             saved_sema_named.push(0)
         self.sema.named_types.insert(tp_sym2, sm_tp_sema_tys.get(ti2 as i64))
 
-    // 2. Lower to MIR
+    // 2. Lower to MIR in the method's defining module. Imported generic
+    // methods may mention private helper types in their body; lowering them
+    // from the caller's module corrupts those type references.
+    let saved_lower_file_id = self.sema.local_file_id
+    let saved_lower_module_path = self.sema.current_module_path
+    let saved_lower_module_has_ci = self.sema.current_module_has_ci
+    let lower_di = self.sema.find_decl_index(decl)
+    if lower_di >= 0:
+        self.sema.update_decl_source_context(lower_di)
     var mir_builder = MirBuilder.init(self.sema, self.pool, self.intern, mono_sym)
     let mir_body = lower_fn_with_sig(mir_builder, decl, sig_idx)
 
     // 3. Codegen via MIR (saves/restores all codegen state internally)
     self.gen_function_mir_mono(mono_sym, decl, mir_body)
+    self.sema.local_file_id = saved_lower_file_id
+    self.sema.current_module_path = saved_lower_module_path
+    self.sema.current_module_has_ci = saved_lower_module_has_ci
 
     if alias_sema_base != 0 and alias_sema_base != alias_base_sym:
         if alias_named_had != 0:
@@ -5235,9 +5269,18 @@ fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: 
             saved_sema_named.push(0)
         self.sema.named_types.insert(tp_sym2, sm_tp_sema_tys.get(ti2 as i64))
 
+    let saved_lower_file_id = self.sema.local_file_id
+    let saved_lower_module_path = self.sema.current_module_path
+    let saved_lower_module_has_ci = self.sema.current_module_has_ci
+    let lower_di = self.sema.find_decl_index(decl)
+    if lower_di >= 0:
+        self.sema.update_decl_source_context(lower_di)
     var mir_builder = MirBuilder.init(self.sema, self.pool, self.intern, mono_sym)
     let mir_body = lower_fn_with_sig(mir_builder, decl, sig_idx)
     self.gen_function_mir_mono(mono_sym, decl, mir_body)
+    self.sema.local_file_id = saved_lower_file_id
+    self.sema.current_module_path = saved_lower_module_path
+    self.sema.current_module_has_ci = saved_lower_module_has_ci
 
     for ti3 in 0..sm_tp_syms.len() as i32:
         let tp_sym3 = sm_tp_syms.get(ti3 as i64)
@@ -5488,6 +5531,8 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             let tp_count = self.pool.fn_meta_tp_count(meta)
             if tp_count > 0:
                 self.generic_fns.insert(name_sym, decl as i32)
+                if is_generic_struct_method:
+                    self.generic_struct_methods.insert(name_sym, decl as i32)
             else if is_sema_generic and not is_generic_struct_method:
                 continue
             else if (flags / FnFlags.ASYNC) % 2 == 1:

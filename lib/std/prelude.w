@@ -9,5 +9,6 @@ use std.option
 use std.result
 use std.traits
 use std.box
+use std.rc
 use std.task
 use std.thread

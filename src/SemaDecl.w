@@ -2655,7 +2655,9 @@ fn Sema.resolve_atomic_order_type(self: Sema, obj_type: i32) -> i32:
     if name_sym == 0: return 0
     let name = self.pool_resolve_symbol(name_sym)
     if name == "Atomic":
-        let order_sym = self.pool_intern("Order")
+        let order_sym = self.pool_lookup_symbol("Order")
+        if order_sym == 0:
+            return 0
         return self.lookup_named_type_visible(order_sym)
     0
 

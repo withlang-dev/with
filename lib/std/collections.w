@@ -67,7 +67,7 @@ pub type SlotMapSlot[T] ephemeral {
 }
 
 /// Memory ordering for atomic operations.
-enum Order: i32:
+pub enum Order: i32:
     Relaxed = 0
     Acquire = 1
     Release = 2
@@ -75,14 +75,14 @@ enum Order: i32:
     SeqCst = 4
 
 /// Atomic memory fence. Enforces ordering without an associated operation.
-fn fence(order: Order):
+pub fn fence(order: Order) -> Unit:
     // Compiler intrinsic — body is replaced by MIR_INTRINSIC_ATOMIC_FENCE
     0
 
 /// Lock-free atomic operations on integer types.
 /// Create with `Atomic.new(0)`, read with `.load(.acquire)`,
 /// write with `.store(val, .release)`.
-type Atomic[T]  {
+pub type Atomic[T]  {
     val: T,
 }
 

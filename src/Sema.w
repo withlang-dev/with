@@ -836,7 +836,7 @@ fn Sema.pool_intern(mut self: Sema, name: str) -> i32:
         let existing = self.pool_lookup_symbol(name)
         if existing != 0:
             return existing
-        with_eprint("BUG: Sema.pool_intern called after symbol freeze")
+        with_eprint("BUG: Sema.pool_intern called after symbol freeze: '" ++ name ++ "'")
         return 0
     let existing = self.pool.state.symbol_map.get(name)
     if existing.is_some():
@@ -870,6 +870,13 @@ fn sema_path_is_std_box_module(path: str) -> i32:
         return 1
     0
 
+fn sema_path_is_std_rc_module(path: str) -> i32:
+    if path == "lib/std/rc.w" or path == "<embedded-std>/std/rc.w":
+        return 1
+    if path.ends_with("/lib/std/rc.w") or path.ends_with("\\lib\\std\\rc.w"):
+        return 1
+    0
+
 fn Sema.current_module_is_std_implementation(self: Sema) -> i32:
     sema_tier_path_is_std_implementation(self.current_module_path)
 
@@ -888,6 +895,12 @@ fn Sema.type_is_std_box_inst(self: Sema, tid: i32) -> i32:
 
 fn Sema.fn_symbol_is_std_box_member(self: Sema, fn_sym: i32) -> i32:
     sema_path_is_std_box_module(self.fn_symbol_source_path(fn_sym))
+
+fn Sema.type_symbol_is_std_rc_owner(self: Sema, sym: i32) -> i32:
+    let name = self.pool_resolve_symbol(sym)
+    if name != "Rc" and name != "Arc":
+        return 0
+    sema_path_is_std_rc_module(self.type_decl_source_path(sym))
 
 fn sema_tier_std_only_module(path: str) -> i32:
     if path == "std.io" or path.starts_with("std.io."):
@@ -952,6 +965,8 @@ fn Sema.symbol_requires_alloc_tier(self: Sema, sym: i32) -> i32:
     if sym == self.syms.vec or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap:
         return 1
     if self.type_symbol_is_std_box(sym) != 0:
+        return 1
+    if self.type_symbol_is_std_rc_owner(sym) != 0:
         return 1
     let name = self.pool_resolve_symbol(sym)
     if name == "String" or name == "StringBuilder":

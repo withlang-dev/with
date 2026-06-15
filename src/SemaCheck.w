@@ -501,8 +501,8 @@ fn Sema.update_module_context(self: Sema, di: i32):
         if path != self.current_module_path:
             self.current_module_path = path
             if self.scoping_active != 0:
-                let path_sym = self.pool_intern(path)
-                self.current_module_has_ci = if self.ci_modules.contains(path_sym): 1 else: 0
+                let path_sym = self.pool_lookup_symbol(path)
+                self.current_module_has_ci = if path_sym != 0 and self.ci_modules.contains(path_sym): 1 else: 0
             else:
                 self.current_module_has_ci = 0
 
@@ -511,6 +511,31 @@ fn Sema.update_decl_source_context(self: Sema, di: i32):
     if di >= 0 and di < self.decl_source_file_ids.len() as i32:
         self.local_file_id = self.decl_source_file_ids.get(di as i64)
     self.update_module_context(di)
+
+fn Sema.update_source_context_path(self: Sema, path: str):
+    if path.len() == 0:
+        return
+    self.local_file_id = 0
+    for di in 0..self.decl_source_paths.len() as i32:
+        if self.decl_source_paths.get(di as i64) == path:
+            if di < self.decl_source_file_ids.len() as i32:
+                self.local_file_id = self.decl_source_file_ids.get(di as i64)
+            break
+    if path != self.current_module_path:
+        self.current_module_path = path
+        if self.scoping_active != 0:
+            let path_sym = self.pool_lookup_symbol(path)
+            self.current_module_has_ci = if path_sym != 0 and self.ci_modules.contains(path_sym): 1 else: 0
+        else:
+            self.current_module_has_ci = 0
+
+fn Sema.update_fn_source_context(self: Sema, fn_sym: i32, fn_node: i32):
+    let di = self.find_decl_index(fn_node)
+    if di >= 0:
+        self.update_decl_source_context(di)
+        return
+    if self.fn_decl_source_paths.contains(fn_sym):
+        self.update_source_context_path(self.fn_decl_source_paths.get(fn_sym).unwrap())
 
 fn Sema.no_std_decl_is_user_code(self: Sema, di: i32) -> i32:
     if di >= 0 and di < self.decl_source_paths.len() as i32:
@@ -948,6 +973,8 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
     let fn_di = decl_index
     if fn_di >= 0:
         self.update_decl_source_context(fn_di)
+    else:
+        self.update_fn_source_context(fn_name, node)
     if (flags / FnFlags.ASYNC) % 2 == 1:
         self.record_global_concurrency_evidence(node, "async function")
     if self.fn_decl_has_c_export(node) != 0:
@@ -2104,6 +2131,11 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: &Vec[i32], tp_
     if meta < 0:
         return -1
 
+    let saved_generic_file_id = self.local_file_id
+    let saved_generic_module_path = self.current_module_path
+    let saved_generic_module_has_ci = self.current_module_has_ci
+    self.update_fn_source_context(fn_name, fn_node)
+
     let tp_count = tp_syms.len() as i32
 
     let saved_generic_subst_param_syms = self.generic_subst_param_syms
@@ -2213,6 +2245,9 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: &Vec[i32], tp_
     self.generic_subst_param_syms = saved_generic_subst_param_syms
     self.generic_subst_type_ids = saved_generic_subst_type_ids
     self.types_frozen = saved_types_frozen
+    self.local_file_id = saved_generic_file_id
+    self.current_module_path = saved_generic_module_path
+    self.current_module_has_ci = saved_generic_module_has_ci
 
     sig_idx
 
@@ -11287,9 +11322,11 @@ fn Sema.clear_generic_substitution(self: Sema):
         self.generic_subst_type_ids.pop()
 
 fn Sema.lookup_generic_subst(self: Sema, param_sym: i32) -> i32:
+    let canonical_param = self.canonical_symbol_by_text(param_sym)
     var i = self.generic_subst_param_syms.len() as i32 - 1
     while i >= 0:
-        if self.generic_subst_param_syms.get(i as i64) == param_sym:
+        let stored = self.generic_subst_param_syms.get(i as i64)
+        if stored == param_sym or self.canonical_symbol_by_text(stored) == canonical_param:
             return self.generic_subst_type_ids.get(i as i64)
         i = i - 1
     0
@@ -11308,9 +11345,11 @@ fn Sema.put_generic_subst(self: Sema, param_sym: i32, tid: i32, node: i32) -> Un
         else:
             let existing_r = self.resolve_alias(existing as TypeId)
             if self.get_type_kind(existing_r) == TypeKind.TY_TRAIT_OBJ and self.type_implements_trait(tid, self.get_type_d0(existing_r)) != 0:
+                let canonical_param = self.canonical_symbol_by_text(param_sym)
                 var i = self.generic_subst_param_syms.len() as i32 - 1
                 while i >= 0:
-                    if self.generic_subst_param_syms.get(i as i64) == param_sym:
+                    let stored = self.generic_subst_param_syms.get(i as i64)
+                    if stored == param_sym or self.canonical_symbol_by_text(stored) == canonical_param:
                         self.generic_subst_type_ids.set_i32(i as i64, tid)
                         return
                     i = i - 1
@@ -11320,11 +11359,12 @@ fn Sema.put_generic_subst(self: Sema, param_sym: i32, tid: i32, node: i32) -> Un
     self.generic_subst_type_ids.push(tid)
 
 fn Sema.type_param_exists(self: Sema, tp_start: i32, tp_count: i32, sym: i32) -> i32:
+    let canonical_sym = self.canonical_symbol_by_text(sym)
     var pos = tp_start
     for ti in 0..tp_count:
         let tp_name = self.ast.get_extra(pos)
         let bound_count = self.ast.get_extra(pos + 1)
-        if tp_name == sym:
+        if tp_name == sym or self.canonical_symbol_by_text(tp_name) == canonical_sym:
             return 1
         pos = pos + 2 + bound_count
     0
@@ -11698,7 +11738,7 @@ fn Sema.type_implements_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
         return self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym)
     var type_sym = self.get_type_name(resolved)
     if type_sym == 0:
-        type_sym = self.pool_intern(self.type_name(resolved as i32))
+        type_sym = self.pool_lookup_symbol(self.type_name(resolved as i32))
     if type_sym == 0:
         return 0
     self.select_trait_impl(type_sym, trait_sym)
@@ -11813,7 +11853,9 @@ fn Sema.lookup_generic_method_fn(self: Sema, owner_sym: i32, method_sym: i32) ->
     let method_name = self.pool_resolve(method_sym)
     if owner_name.len() == 0 or method_name.len() == 0:
         return 0
-    let qualified = self.pool_intern(owner_name ++ "." ++ method_name)
+    let qualified = self.pool_lookup_symbol(owner_name ++ "." ++ method_name)
+    if qualified == 0:
+        return 0
     if self.generic_fn_nodes.contains(qualified):
         return qualified
     0
@@ -12176,11 +12218,12 @@ fn Sema.derive_builder_original_type_sym(self: Sema, builder_sym: i32) -> i32:
     if builder_name.len() <= suffix.len():
         return 0
     let original_name = builder_name.slice(0, builder_name.len() - suffix.len())
-    let original_sym = self.pool_intern(original_name)
+    let original_sym = self.pool_lookup_symbol(original_name)
     if original_sym == 0 or not self.type_decl_nodes.contains(original_sym):
         return 0
     let original_decl = self.type_decl_nodes.get(original_sym).unwrap()
-    if self.type_decl_has_derive(original_decl, self.pool_intern("Builder")) == 0:
+    let builder_derive_sym = self.pool_lookup_symbol("Builder")
+    if builder_derive_sym == 0 or self.type_decl_has_derive(original_decl, builder_derive_sym) == 0:
         return 0
     original_sym
 
@@ -12192,7 +12235,8 @@ fn Sema.visible_builder_chain_root_matches(self: Sema, node: i32, original_sym: 
         return 0
     let recv = self.ast.get_data0(callee)
     let method = self.ast.get_data1(callee)
-    if method == self.pool_intern("builder"):
+    let builder_method_sym = self.pool_lookup_symbol("builder")
+    if builder_method_sym != 0 and method == builder_method_sym:
         let recv_sym = self.static_receiver_base_sym(recv)
         if recv_sym == original_sym:
             return 1
@@ -13775,7 +13819,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         let method_fn_sym = self.lookup_method_fn(type_name_sym, field)
         let sig_idx = self.lookup_method_sig(type_name_sym, field)
         if sig_idx >= 0:
-            if field == self.pool_intern("build"):
+            let build_sym = self.pool_lookup_symbol("build")
+            if build_sym != 0 and field == build_sym:
                 if self.check_visible_derive_builder_build(type_name_sym, expr, node) == 0:
                     return 0
             if self.check_comptime_method_restriction(method_fn_sym, node) != 0:

@@ -9986,6 +9986,7 @@ what users import.
 | `std.time` | Clocks, durations, sleep | `time.h`, `sys/time.h` |
 | `std.math` | f32/f64 methods, constants | `math.h` |
 | `std.box` | `Box[T]` single-owner heap allocation | — |
+| `std.rc` | `Rc[T]`, `Arc[T]`, explicit shared ownership | — |
 | `std.collections` | Vec, HashMap, HashSet, BTreeMap, SlotMap, Handle | — |
 | `std.string` | String/StrView types and methods | `string.h`, `ctype.h` |
 | `std.net` | TCP, UDP, DNS | `sys/socket.h`, `netdb.h` |

@@ -3606,6 +3606,34 @@ fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> Unit:
         let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
     self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
 
+fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> Unit:
+    if ptr == 0 or ty == 0 or sema_ty <= 0:
+        return
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    let tk = self.mir_input.mir_get_type_kind(resolved)
+    var type_sym = 0
+    if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
+        type_sym = self.mir_input.mir_get_type_d0(resolved)
+    if type_sym == 0:
+        self.mir_emit_drop_ptr(ptr, ty)
+        return
+    let type_text = self.sema_symbol_text(type_sym)
+    if type_text.len() > 0:
+        type_sym = self.intern.intern(type_text)
+
+    let dfv = self.drop_fn_values.get(type_sym)
+    let dft = self.drop_fn_types.get(type_sym)
+    if dfv.is_some() and dft.is_some():
+        let drop_fn_ty = dft.unwrap() as i64
+        let args: Vec[i64] = Vec.new()
+        if wl_get_type_kind(ty) == wl_struct_type_kind():
+            args.push(ptr)
+        else:
+            let value = wl_build_load(self.builder, ty, ptr)
+            args.push(value)
+        let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
+    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
+
 fn Codegen.mir_sema_type_is_box(self: Codegen, sema_ty: i32) -> bool:
     if sema_ty <= 0:
         return false
@@ -3616,6 +3644,96 @@ fn Codegen.mir_sema_type_is_box(self: Codegen, sema_ty: i32) -> bool:
         return false
     let base_sym = self.mir_input.mir_get_type_d0(resolved)
     self.sema.type_symbol_is_std_box(base_sym) != 0
+
+// Returns 1 for Rc[T], 2 for Arc[T], and 0 for other types.
+fn Codegen.mir_sema_type_refcount_kind(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.mir_input.mir_get_type_d2(resolved) != 1:
+        return 0
+    let base_sym = self.mir_input.mir_get_type_d0(resolved)
+    if self.sema.type_symbol_is_std_rc_owner(base_sym) == 0:
+        return 0
+    let name = self.sema_symbol_text(base_sym)
+    if name == "Rc":
+        return 1
+    if name == "Arc":
+        return 2
+    0
+
+fn Codegen.mir_refcount_payload_sema_type(self: Codegen, sema_ty: i32) -> i32:
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.mir_input.mir_get_type_d2(resolved) != 1:
+        return 0
+    let arg_start = self.mir_input.mir_get_type_d1(resolved)
+    self.mir_input.mir_get_type_extra(arg_start)
+
+fn Codegen.mir_emit_refcount_drop_place(self: Codegen, body: &MirBody, place_id: i32, sema_ty: i32) -> bool:
+    let rc_kind = self.mir_sema_type_refcount_kind(sema_ty)
+    if rc_kind == 0:
+        return false
+    let handle_ty = self.mir_sema_type_to_llvm(sema_ty)
+    if handle_ty == 0:
+        return false
+    var handle_ptr = self.mir_place_ptr(body, place_id, false, 0)
+    if handle_ptr == 0:
+        handle_ptr = self.mir_place_ptr(body, place_id, true, handle_ty)
+    if handle_ptr == 0:
+        return false
+
+    let ptr_ty = wl_ptr_type(self.context)
+    var heap_ptr: i64 = 0
+    if wl_get_type_kind(handle_ty) == wl_pointer_type_kind():
+        heap_ptr = wl_build_load(self.builder, handle_ty, handle_ptr)
+    else:
+        let raw_field = wl_build_struct_gep(self.builder, handle_ty, handle_ptr, 0)
+        heap_ptr = wl_build_load(self.builder, ptr_ty, raw_field)
+    if heap_ptr == 0:
+        return false
+
+    let payload_sema_ty = self.mir_refcount_payload_sema_type(sema_ty)
+    let payload_ty = self.mir_sema_type_to_llvm(payload_sema_ty)
+    if payload_ty == 0:
+        return false
+    let i64_ty = wl_i64_type(self.context)
+    let inner_fields: Vec[i64] = Vec.new()
+    inner_fields.push(i64_ty)
+    inner_fields.push(ptr_ty)
+    let inner_ty = wl_struct_type(self.context, vec_data_i64(&inner_fields), 2, 0)
+    let strong_ptr = wl_build_struct_gep(self.builder, inner_ty, heap_ptr, 0)
+    let one = wl_const_int(i64_ty, 1, 0)
+    var is_last: i64 = 0
+    if rc_kind == 2:
+        let old = wl_build_atomic_rmw(self.builder, AtomicRmwOp.SUB, strong_ptr, one, AtomicOrdering.ACQ_REL)
+        is_last = wl_build_icmp(self.builder, wl_int_eq(), old, one)
+    else:
+        let old = wl_build_load(self.builder, i64_ty, strong_ptr)
+        let next = wl_build_sub(self.builder, old, one)
+        wl_build_store(self.builder, next, strong_ptr)
+        is_last = wl_build_icmp(self.builder, wl_int_eq(), next, wl_const_int(i64_ty, 0, 0))
+    let free_bb = wl_append_bb(self.context, self.current_function, "refcount.drop.free")
+    let done_bb = wl_append_bb(self.context, self.current_function, "refcount.drop.done")
+    wl_build_cond_br(self.builder, is_last, free_bb, done_bb)
+    wl_position_at_end(self.builder, free_bb)
+    let payload_ptr_slot = wl_build_struct_gep(self.builder, inner_ty, heap_ptr, 1)
+    let payload_ptr = wl_build_load(self.builder, ptr_ty, payload_ptr_slot)
+    self.mir_emit_drop_ptr_for_sema_type(payload_ptr, payload_ty, payload_sema_ty)
+    let free_fn = self.ensure_box_free_fn()
+    if free_fn != 0:
+        let payload_free_args: Vec[i64] = Vec.new()
+        payload_free_args.push(payload_ptr)
+        let _payload_free = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&payload_free_args), 1)
+        let free_args: Vec[i64] = Vec.new()
+        free_args.push(heap_ptr)
+        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&free_args), 1)
+    wl_build_br(self.builder, done_bb)
+    wl_position_at_end(self.builder, done_bb)
+    true
 
 fn Codegen.mir_emit_box_drop_place(self: Codegen, body: &MirBody, place_id: i32, sema_ty: i32) -> bool:
     if not self.mir_sema_type_is_box(sema_ty):
@@ -3881,6 +3999,8 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: &MirBody, stmt_id: i32) -> bool:
             return false
         let drop_sema_ty = self.mir_place_sema_type(body, d0)
         if self.mir_emit_box_drop_place(body, d0, drop_sema_ty):
+            return true
+        if self.mir_emit_refcount_drop_place(body, d0, drop_sema_ty):
             return true
         var drop_ty = self.mir_place_projected_type(body, d0)
         let drop_proj_count = body.place_proj_counts.get(d0 as i64)
@@ -7568,9 +7688,11 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: &MirBody, i
     else if intrinsic == MirIntrinsic.ATOMIC_STORE:
         // Atomic[T].store(val, order) — atomic store to field 0
         let as_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-        let as_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let as_val_raw = self.mir_intrinsic_arg(body, args_id, 1)
         let as_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
         let as_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, as_recv_ptr)
+        let as_elem_ty = wl_struct_get_type_at(as_recv_ty, 0)
+        let as_val = if wl_type_of(as_val_raw) != as_elem_ty: self.coerce_value_to_type(as_val_raw, as_elem_ty) else: as_val_raw
         let as_val_ptr = wl_build_struct_gep(self.builder, as_recv_ty, as_recv_ptr, 0)
         let as_order = if self.is_const_int_value(as_order_raw): wl_const_int_sext_val(as_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         wl_build_atomic_store(self.builder, as_val, as_val_ptr, as_order)
@@ -7578,9 +7700,11 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: &MirBody, i
     else if intrinsic == MirIntrinsic.ATOMIC_SWAP or intrinsic == MirIntrinsic.ATOMIC_FETCH_ADD or intrinsic == MirIntrinsic.ATOMIC_FETCH_SUB or intrinsic == MirIntrinsic.ATOMIC_FETCH_AND or intrinsic == MirIntrinsic.ATOMIC_FETCH_OR or intrinsic == MirIntrinsic.ATOMIC_FETCH_XOR or intrinsic == MirIntrinsic.ATOMIC_FETCH_MIN or intrinsic == MirIntrinsic.ATOMIC_FETCH_MAX:
         // Atomic[T].fetch_*(val, order) — atomicrmw on field 0
         let ar_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-        let ar_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let ar_val_raw = self.mir_intrinsic_arg(body, args_id, 1)
         let ar_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
         let ar_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, ar_recv_ptr)
+        let ar_elem_ty = wl_struct_get_type_at(ar_recv_ty, 0)
+        let ar_val = if wl_type_of(ar_val_raw) != ar_elem_ty: self.coerce_value_to_type(ar_val_raw, ar_elem_ty) else: ar_val_raw
         let ar_val_ptr = wl_build_struct_gep(self.builder, ar_recv_ty, ar_recv_ptr, 0)
         let ar_order = if self.is_const_int_value(ar_order_raw): wl_const_int_sext_val(ar_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         let ar_rmw_op = if intrinsic == MirIntrinsic.ATOMIC_SWAP: AtomicRmwOp.XCHG
@@ -7597,11 +7721,14 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: &MirBody, i
     else if intrinsic == MirIntrinsic.ATOMIC_CAS or intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK:
         // compare_exchange(expected, desired, success_order, failure_order)
         let cas_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
-        let cas_expected = self.mir_intrinsic_arg(body, args_id, 1)
-        let cas_desired = self.mir_intrinsic_arg(body, args_id, 2)
+        let cas_expected_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        let cas_desired_raw = self.mir_intrinsic_arg(body, args_id, 2)
         let cas_success_raw = self.mir_intrinsic_arg(body, args_id, 3)
         let cas_failure_raw = self.mir_intrinsic_arg(body, args_id, 4)
         let cas_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, cas_recv_ptr)
+        let cas_elem_ty = wl_struct_get_type_at(cas_recv_ty, 0)
+        let cas_expected = if wl_type_of(cas_expected_raw) != cas_elem_ty: self.coerce_value_to_type(cas_expected_raw, cas_elem_ty) else: cas_expected_raw
+        let cas_desired = if wl_type_of(cas_desired_raw) != cas_elem_ty: self.coerce_value_to_type(cas_desired_raw, cas_elem_ty) else: cas_desired_raw
         let cas_val_ptr = wl_build_struct_gep(self.builder, cas_recv_ty, cas_recv_ptr, 0)
         let cas_success_order = if self.is_const_int_value(cas_success_raw): wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
         let cas_failure_order = if self.is_const_int_value(cas_failure_raw): wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
@@ -10066,14 +10193,17 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                 let gc_arg_vals: Vec[i64] = Vec.new()
                 let gc_arg_tys: Vec[i64] = Vec.new()
                 let gc_arg_nodes: Vec[i32] = Vec.new()
+                let gc_arg_sema_tys: Vec[i32] = Vec.new()
+                let gc_ast_count = self.pool.get_data2(gc_node)
                 for gc_ai in 0..gc_mir_count:
-                    let gc_arg_nd = self.pool.get_extra(gc_as + gc_ai)
+                    let gc_arg_nd = if gc_ai < gc_ast_count: self.pool.get_extra(gc_as + gc_ai) else: 0
                     gc_arg_nodes.push(gc_arg_nd)
                     let gc_op = body.call_arg_operands.get((gc_mir_start + gc_ai) as i64)
                     let gc_val = self.mir_eval_operand(body, gc_op, 0)
                     gc_arg_vals.push(gc_val)
                     gc_arg_tys.push(wl_type_of(gc_val))
-                let gc_result = self.monomorphize_generic_call_core(gc_callee_sym, gc_gf.unwrap(), gc_as, gc_mir_count, gc_node, gc_arg_vals, gc_arg_tys, gc_arg_nodes)
+                    gc_arg_sema_tys.push(self.mir_operand_sema_type(body, gc_op))
+                let gc_result = self.monomorphize_generic_call_core(gc_callee_sym, gc_gf.unwrap(), gc_as, gc_mir_count, gc_node, gc_arg_vals, gc_arg_tys, gc_arg_nodes, gc_arg_sema_tys)
                 if dest_place >= 0 and gc_result != 0:
                     let gc_ret_ty = wl_type_of(gc_result)
                     if gc_ret_ty != wl_void_type(self.context):
@@ -10510,6 +10640,8 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                         gc_recv_type_sym = self.ensure_generic_method_owner_sym(gc_recv_type_unwrapped)
                     if gc_recv_type_sym == 0:
                         gc_recv_type_sym = self.find_struct_type_by_llvm(gc_recv_ty)
+                    if self.current_method_owner_sym != 0 and self.pool.kind(gc_self_expr_node) == NodeKind.NK_IDENT:
+                        gc_recv_type_sym = self.current_method_owner_sym
                     // Generic struct method: receiver is monomorphized generic struct
                     let gc_base_opt = self.mono_struct_base.get(gc_recv_type_sym)
                     if gc_base_opt.is_some():
@@ -10750,6 +10882,62 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                             wl_build_br(self.builder, gc_next_val)
                         return true
 
+            // Direct `self.method()` inside a monomorphized generic method
+            // body. The receiver may still be typed as `Self`, so owner
+            // recovery from the operand can fail even though the current
+            // method owner has the exact type-parameter bindings we need.
+            if self.current_method_owner_sym != 0 and self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
+                let gc_cur_recv = self.pool.get_data0(gc_callee_field)
+                if self.pool.kind(gc_cur_recv) == NodeKind.NK_IDENT:
+                    let gc_cur_method_sym = self.pool.get_data1(gc_callee_field)
+                    let gc_cur_method = self.codegen_ast_method_symbol_text(gc_cur_method_sym)
+                    let gc_cur_name = if gc_cur_method.len() > 0: gc_cur_method else: if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: ""
+                    if gc_cur_name.len() > 0:
+                        var gc_cur_base_sym = 0
+                        let gc_cur_base_opt = self.mono_struct_base.get(self.current_method_owner_sym)
+                        if gc_cur_base_opt.is_some():
+                            gc_cur_base_sym = gc_cur_base_opt.unwrap()
+                        else:
+                            let gc_cur_owner_text = self.intern.resolve(self.current_method_owner_sym)
+                            var gc_cur_sep = -1
+                            for gc_cur_i in 0..gc_cur_owner_text.len() as i32:
+                                if gc_cur_i + 1 < gc_cur_owner_text.len() as i32:
+                                    if gc_cur_owner_text.byte_at(gc_cur_i as i64) == 95 and gc_cur_owner_text.byte_at((gc_cur_i + 1) as i64) == 95:
+                                        gc_cur_sep = gc_cur_i
+                                        break
+                            if gc_cur_sep > 0:
+                                gc_cur_base_sym = self.intern.intern(gc_cur_owner_text.slice(0, gc_cur_sep as i64))
+                        if gc_cur_base_sym != 0:
+                            let gc_cur_base_name = self.intern.resolve(gc_cur_base_sym)
+                            let gc_cur_fn_sym = self.intern.intern(gc_cur_base_name ++ "." ++ gc_cur_name)
+                            let gc_cur_decl = self.generic_struct_methods.get(gc_cur_fn_sym)
+                            if gc_cur_decl.is_some():
+                                let gc_cur_mir_start = body.call_arg_starts.get(args_id as i64)
+                                let gc_cur_mir_count = body.call_arg_counts.get(args_id as i64)
+                                if gc_cur_mir_count > 0:
+                                    let gc_cur_recv_op = body.call_arg_operands.get(gc_cur_mir_start as i64)
+                                    let gc_cur_recv_val = self.mir_eval_operand(body, gc_cur_recv_op, 0)
+                                    let gc_cur_recv_ty = wl_type_of(gc_cur_recv_val)
+                                    let gc_cur_recv_ref_ptr = self.mir_try_place_ptr_for_ref(body, gc_cur_recv_op)
+                                    let gc_cur_call_args_start = self.pool.get_data1(gc_node)
+                                    let gc_cur_method_arg_count = gc_cur_mir_count - 1
+                                    let gc_cur_pre_args: Vec[i64] = Vec.new()
+                                    for gc_cur_ai in 0..gc_cur_method_arg_count:
+                                        let gc_cur_arg_op = body.call_arg_operands.get((gc_cur_mir_start + 1 + gc_cur_ai) as i64)
+                                        gc_cur_pre_args.push(self.mir_eval_operand(body, gc_cur_arg_op, 0))
+                                    let gc_cur_result = self.monomorphize_struct_method_core(self.current_method_owner_sym, gc_cur_name, gc_cur_decl.unwrap(), gc_cur_recv_val, gc_cur_recv_ref_ptr, gc_cur_recv, gc_cur_recv_ty, gc_cur_call_args_start, gc_cur_method_arg_count, gc_node, gc_cur_pre_args)
+                                    if dest_place >= 0 and gc_cur_result != 0:
+                                        let gc_cur_ret_ty = wl_type_of(gc_cur_result)
+                                        if gc_cur_ret_ty != wl_void_type(self.context):
+                                            let gc_cur_local = body.place_locals.get(dest_place as i64)
+                                            let gc_cur_alloca = self.create_entry_alloca(gc_cur_ret_ty)
+                                            wl_build_store(self.builder, gc_cur_result, gc_cur_alloca)
+                                            self.mir_local_ptrs.insert(gc_cur_local, gc_cur_alloca)
+                                            self.mir_local_types.insert(gc_cur_local, gc_cur_ret_ty)
+                                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                                    return true
+
             // async scope s.track(task_expr) — register task with scope
             let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
             if gc_name == "spawn":
@@ -10940,6 +11128,59 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                 if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                     wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
                 return true
+
+            // Generic method bodies can lower `self.method()` as a bare
+            // generic call when sema resolved the callee but the MIR call
+            // node no longer preserves field-access shape. Use the current
+            // monomorphized owner to recover the declared generic method.
+            if self.current_method_owner_sym != 0 and gc_name.len() > 0 and gc_name != "?":
+                var gc_bare_base_sym = 0
+                let gc_bare_base_opt = self.mono_struct_base.get(self.current_method_owner_sym)
+                if gc_bare_base_opt.is_some():
+                    gc_bare_base_sym = gc_bare_base_opt.unwrap()
+                else:
+                    let gc_bare_owner_text = self.intern.resolve(self.current_method_owner_sym)
+                    var gc_bare_sep = -1
+                    for gc_bare_i in 0..gc_bare_owner_text.len() as i32:
+                        if gc_bare_i + 1 < gc_bare_owner_text.len() as i32:
+                            if gc_bare_owner_text.byte_at(gc_bare_i as i64) == 95 and gc_bare_owner_text.byte_at((gc_bare_i + 1) as i64) == 95:
+                                gc_bare_sep = gc_bare_i
+                                break
+                    if gc_bare_sep > 0:
+                        gc_bare_base_sym = self.intern.intern(gc_bare_owner_text.slice(0, gc_bare_sep as i64))
+                if gc_bare_base_sym != 0:
+                    let gc_bare_base_name = self.intern.resolve(gc_bare_base_sym)
+                    let gc_bare_qualified = gc_bare_base_name ++ "." ++ gc_name
+                    let gc_bare_fn_sym = self.intern.intern(gc_bare_qualified)
+                    var gc_bare_decl = self.generic_struct_methods.get(gc_bare_fn_sym)
+                    if not gc_bare_decl.is_some():
+                        let gc_bare_sema_fn_sym = self.sema.pool_lookup_symbol(gc_bare_qualified)
+                        if gc_bare_sema_fn_sym != 0:
+                            gc_bare_decl = self.generic_struct_methods.get(gc_bare_sema_fn_sym)
+                    let gc_bare_mir_start = body.call_arg_starts.get(args_id as i64)
+                    let gc_bare_mir_count = body.call_arg_counts.get(args_id as i64)
+                    if gc_bare_decl.is_some() and gc_bare_mir_count > 0:
+                        let gc_bare_recv_op = body.call_arg_operands.get(gc_bare_mir_start as i64)
+                        let gc_bare_recv_val = self.mir_eval_operand(body, gc_bare_recv_op, 0)
+                        let gc_bare_recv_ty = wl_type_of(gc_bare_recv_val)
+                        let gc_bare_recv_ref_ptr = self.mir_try_place_ptr_for_ref(body, gc_bare_recv_op)
+                        let gc_bare_pre_args: Vec[i64] = Vec.new()
+                        for gc_bare_ai in 1..gc_bare_mir_count:
+                            let gc_bare_arg_op = body.call_arg_operands.get((gc_bare_mir_start + gc_bare_ai) as i64)
+                            gc_bare_pre_args.push(self.mir_eval_operand(body, gc_bare_arg_op, 0))
+                        let gc_bare_call_args_start = if self.pool.kind(gc_node) == NodeKind.NK_CALL: self.pool.get_data1(gc_node) else: 0
+                        let gc_bare_result = self.monomorphize_struct_method_core(self.current_method_owner_sym, gc_name, gc_bare_decl.unwrap(), gc_bare_recv_val, gc_bare_recv_ref_ptr, 0, gc_bare_recv_ty, gc_bare_call_args_start, gc_bare_mir_count - 1, gc_node, gc_bare_pre_args)
+                        if dest_place >= 0 and gc_bare_result != 0:
+                            let gc_bare_ret_ty = wl_type_of(gc_bare_result)
+                            if gc_bare_ret_ty != wl_void_type(self.context):
+                                let gc_bare_local = body.place_locals.get(dest_place as i64)
+                                let gc_bare_alloca = self.create_entry_alloca(gc_bare_ret_ty)
+                                wl_build_store(self.builder, gc_bare_result, gc_bare_alloca)
+                                self.mir_local_ptrs.insert(gc_bare_local, gc_bare_alloca)
+                                self.mir_local_types.insert(gc_bare_local, gc_bare_ret_ty)
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                        return true
 
             // All patterns should be handled above. If we reach here, it's a genuine error
             // (unless we're in a blanket impl body where T-method calls can't be resolved).
@@ -11459,8 +11700,9 @@ fn Codegen.mir_emit_term(self: Codegen, body: &MirBody, bb: i32) -> bool:
             return false
         let drop_sema_ty = self.mir_place_sema_type(body, d0)
         let emitted_box_drop = self.mir_emit_box_drop_place(body, d0, drop_sema_ty)
+        let emitted_refcount_drop = if emitted_box_drop: false else: self.mir_emit_refcount_drop_place(body, d0, drop_sema_ty)
         var drop_ty = self.mir_place_projected_type(body, d0)
-        if not emitted_box_drop:
+        if not emitted_box_drop and not emitted_refcount_drop:
             let drop_term_proj_count = body.place_proj_counts.get(d0 as i64)
             if drop_ty == 0 and drop_term_proj_count > 0:
                 if drop_sema_ty > 0:
@@ -12394,10 +12636,30 @@ fn Codegen.find_field_index(self: Codegen, type_sym: i32, field_sym: i32) -> i32
     self.find_field_index_from_ast(type_sym, field_sym)
 
 fn Codegen.find_binding_type(self: Codegen, syms: &Vec[i32], tys: &Vec[i64], sym: i32) -> i64:
+    let want = self.codegen_symbol_text(sym)
     for i in 0..syms.len() as i32:
-        if syms.get(i as i64) == sym:
+        let stored = syms.get(i as i64)
+        if stored == sym or (want.len() > 0 and self.codegen_symbol_text(stored) == want):
             return tys.get(i as i64)
     0
+
+fn Codegen.codegen_symbol_text(self: Codegen, sym: i32) -> str:
+    let text = self.intern.resolve(sym)
+    if text.len() > 0:
+        return text
+    self.sema_symbol_text(sym)
+
+fn Codegen.codegen_symbols_match(self: Codegen, a: i32, b: i32) -> bool:
+    if a == b:
+        return true
+    let a_text = self.codegen_symbol_text(a)
+    a_text.len() > 0 and a_text == self.codegen_symbol_text(b)
+
+fn Codegen.codegen_binding_index(self: Codegen, syms: &Vec[i32], sym: i32) -> i32:
+    for i in 0..syms.len() as i32:
+        if self.codegen_symbols_match(syms.get(i as i64), sym):
+            return i
+    -1
 
 fn Codegen.infer_static_generic_struct_mono_sym(self: Codegen, owner_sym: i32, decl: i32, owner_expr_node: i32, arg_tys: Vec[i64], arg_nodes: Vec[i32], call_sema_ty: i32) -> i32:
     let owner_decl_opt = self.generic_structs.get(owner_sym)
@@ -12684,7 +12946,7 @@ fn Codegen.llvm_type_mangle(self: Codegen, ty: i64) -> str:
         return "array"
     "unknown"
 
-fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i32, args_start: i32, arg_count: i32, call_node: i32, arg_vals: Vec[i64], arg_tys: Vec[i64], arg_nodes: Vec[i32]) -> i64:
+fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i32, args_start: i32, arg_count: i32, call_node: i32, arg_vals: Vec[i64], arg_tys: Vec[i64], arg_nodes: Vec[i32], arg_sema_tys: Vec[i32]) -> i64:
     var generic_node = fn_node
     var meta = self.pool.find_fn_meta(generic_node)
     if self.pool.kind(generic_node) != NodeKind.NK_FN_DECL or self.pool.get_data0(generic_node) != fn_sym or meta < 0 or self.pool.fn_meta_tp_count(meta) <= 0:
@@ -12739,20 +13001,19 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
             let p_sym = self.pool.get_data0(p_type_node)
             var is_tp = false
             for ti in 0..tp_syms.len() as i32:
-                if tp_syms.get(ti as i64) == p_sym:
+                if self.codegen_symbols_match(tp_syms.get(ti as i64), p_sym):
                     is_tp = true
                     break
             if is_tp:
-                var exists = false
-                for bi in 0..bind_syms.len() as i32:
-                    if bind_syms.get(bi as i64) == p_sym:
-                        exists = true
-                        break
-                if not exists:
+                if self.codegen_binding_index(bind_syms, p_sym) < 0:
                     bind_syms.push(p_sym)
                     bind_tys.push(arg_ty)
                     // Get sema type for this binding
-                    let arg_sema = self.sema_type_of_node(arg_nodes.get(pi as i64))
+                    var arg_sema = 0
+                    if pi < arg_sema_tys.len() as i32:
+                        arg_sema = arg_sema_tys.get(pi as i64)
+                    if arg_sema == 0:
+                        arg_sema = self.sema_type_of_node(arg_nodes.get(pi as i64))
                     if arg_sema > 0:
                         bind_sema_tys.push(arg_sema)
                     else:
@@ -12761,13 +13022,19 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
 
         if p_kind == NodeKind.NK_TYPE_PTR or p_kind == NodeKind.NK_TYPE_REF or p_kind == NodeKind.NK_TYPE_SLICE or p_kind == NodeKind.NK_TYPE_ARRAY:
             let inner_node = self.pool.get_data0(p_type_node)
-            let arg_sema_outer = self.sema_type_of_node(arg_nodes.get(pi as i64))
+            var arg_sema_outer = 0
+            if pi < arg_sema_tys.len() as i32:
+                arg_sema_outer = arg_sema_tys.get(pi as i64)
+            if arg_sema_outer == 0:
+                arg_sema_outer = self.sema_type_of_node(arg_nodes.get(pi as i64))
             var arg_inner_sema = 0
             if arg_sema_outer > 0:
                 let arg_resolved = self.sema.resolve_alias(arg_sema_outer as TypeId)
                 let arg_kind = self.sema.get_type_kind(arg_resolved)
                 if (p_kind == NodeKind.NK_TYPE_PTR or p_kind == NodeKind.NK_TYPE_REF) and (arg_kind == TypeKind.TY_PTR or arg_kind == TypeKind.TY_REF):
                     arg_inner_sema = self.sema.get_type_d0(arg_resolved)
+                else if p_kind == NodeKind.NK_TYPE_REF:
+                    arg_inner_sema = arg_resolved as i32
                 else if p_kind == NodeKind.NK_TYPE_SLICE and arg_kind == TypeKind.TY_SLICE:
                     arg_inner_sema = self.sema.get_type_d0(arg_resolved)
                 else if p_kind == NodeKind.NK_TYPE_ARRAY and arg_kind == TypeKind.TY_ARRAY:
@@ -12776,23 +13043,30 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
             let inner_kind = self.pool.kind(inner_node)
             if inner_kind == NodeKind.NK_TYPE_NAMED or inner_kind == NodeKind.NK_IDENT:
                 let inner_sym = self.pool.get_data0(inner_node)
+                if inner_sym == self.sym_Self and arg_inner_sema > 0:
+                    let recv_resolved = self.sema.resolve_alias(arg_inner_sema as TypeId)
+                    if self.sema.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
+                        let recv_arg_count = self.sema.get_generic_inst_arg_count(recv_resolved as i32)
+                        let bind_count = if recv_arg_count < tp_syms.len() as i32: recv_arg_count else: tp_syms.len() as i32
+                        for ri in 0..bind_count:
+                            let recv_tp_sym = tp_syms.get(ri as i64)
+                            if self.codegen_binding_index(bind_syms, recv_tp_sym) >= 0:
+                                continue
+                            let recv_arg_sema = self.sema.get_generic_inst_arg(recv_resolved as i32, ri)
+                            let recv_arg_llvm = self.sema_type_to_llvm(recv_arg_sema)
+                            if recv_arg_llvm != 0:
+                                bind_syms.push(recv_tp_sym)
+                                bind_tys.push(recv_arg_llvm)
+                                bind_sema_tys.push(recv_arg_sema)
+                        continue
                 var canonical_inner_sym = 0
-                let inner_text = self.intern.resolve(inner_sym)
                 for ti in 0..tp_syms.len() as i32:
                     let candidate = tp_syms.get(ti as i64)
-                    if candidate == inner_sym:
-                        canonical_inner_sym = candidate
-                        break
-                    if inner_text.len() > 0 and self.intern.resolve(candidate) == inner_text:
+                    if self.codegen_symbols_match(candidate, inner_sym):
                         canonical_inner_sym = candidate
                         break
                 if canonical_inner_sym != 0 and arg_inner_sema > 0:
-                    var already_bound = false
-                    for bi in 0..bind_syms.len() as i32:
-                        if bind_syms.get(bi as i64) == canonical_inner_sym:
-                            already_bound = true
-                            break
-                    if not already_bound:
+                    if self.codegen_binding_index(bind_syms, canonical_inner_sym) < 0:
                         let inner_llvm = self.sema_type_to_llvm(arg_inner_sema)
                         if inner_llvm != 0:
                             bind_syms.push(canonical_inner_sym)
@@ -12810,23 +13084,14 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                         continue
                     let generic_arg_sym = self.pool.get_data0(generic_arg_node)
                     var canonical_arg_sym = 0
-                    let generic_arg_text = self.intern.resolve(generic_arg_sym)
                     for ti in 0..tp_syms.len() as i32:
                         let candidate = tp_syms.get(ti as i64)
-                        if candidate == generic_arg_sym:
-                            canonical_arg_sym = candidate
-                            break
-                        if generic_arg_text.len() > 0 and self.intern.resolve(candidate) == generic_arg_text:
+                        if self.codegen_symbols_match(candidate, generic_arg_sym):
                             canonical_arg_sym = candidate
                             break
                     if canonical_arg_sym == 0:
                         continue
-                    var already_bound = false
-                    for bi in 0..bind_syms.len() as i32:
-                        if bind_syms.get(bi as i64) == canonical_arg_sym:
-                            already_bound = true
-                            break
-                    if already_bound:
+                    if self.codegen_binding_index(bind_syms, canonical_arg_sym) >= 0:
                         continue
                     let inner_llvm = self.sema_generic_arg_llvm(arg_inner_sema, gi)
                     if inner_llvm == 0:
@@ -12843,7 +13108,11 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
             let g_count = self.pool.get_data2(p_type_node)
 
             // Sema-based generic type param binding: infer from sema types first
-            let mg_arg_sema_tid = self.sema_type_of_node(arg_nodes.get(pi as i64))
+            var mg_arg_sema_tid = 0
+            if pi < arg_sema_tys.len() as i32:
+                mg_arg_sema_tid = arg_sema_tys.get(pi as i64)
+            if mg_arg_sema_tid == 0:
+                mg_arg_sema_tid = self.sema_type_of_node(arg_nodes.get(pi as i64))
             if mg_arg_sema_tid > 0 and self.sema.get_type_kind(mg_arg_sema_tid) == TypeKind.TY_GENERIC_INST:
                 var mg_sema_bound = true
                 for gi in 0..g_count:
@@ -12854,7 +13123,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                     let mg_inner_sym = self.pool.get_data0(mg_inner_node)
                     var mg_is_tp = false
                     for ti in 0..tp_syms.len() as i32:
-                        if tp_syms.get(ti as i64) == mg_inner_sym:
+                        if self.codegen_symbols_match(tp_syms.get(ti as i64), mg_inner_sym):
                             mg_is_tp = true
                             break
                     if not mg_is_tp:
@@ -12864,12 +13133,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                     if mg_inner_ty == 0:
                         mg_sema_bound = false
                         break
-                    var mg_exists = false
-                    for bi in 0..bind_syms.len() as i32:
-                        if bind_syms.get(bi as i64) == mg_inner_sym:
-                            mg_exists = true
-                            break
-                    if not mg_exists:
+                    if self.codegen_binding_index(bind_syms, mg_inner_sym) < 0:
                         bind_syms.push(mg_inner_sym)
                         bind_tys.push(mg_inner_ty)
                         // Get sema type from generic inst arg
@@ -12877,19 +13141,43 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                 if mg_sema_bound:
                     continue
 
+    if self.pool.kind(call_node) == NodeKind.NK_CALL:
+        let recv_callee = self.pool.get_data0(call_node)
+        if self.pool.kind(recv_callee) == NodeKind.NK_FIELD_ACCESS:
+            let recv_expr = self.pool.get_data0(recv_callee)
+            let recv_sema_outer = self.sema_type_of_node(recv_expr)
+            if recv_sema_outer > 0:
+                var recv_resolved = self.sema.resolve_alias(recv_sema_outer as TypeId)
+                let recv_kind = self.sema.get_type_kind(recv_resolved)
+                if recv_kind == TypeKind.TY_REF or recv_kind == TypeKind.TY_PTR:
+                    recv_resolved = self.sema.resolve_alias(self.sema.get_type_d0(recv_resolved) as TypeId)
+                if self.sema.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
+                    let recv_arg_count = self.sema.get_generic_inst_arg_count(recv_resolved as i32)
+                    let recv_bind_count = if recv_arg_count < tp_syms.len() as i32: recv_arg_count else: tp_syms.len() as i32
+                    for ri in 0..recv_bind_count:
+                        let recv_tp_sym = tp_syms.get(ri as i64)
+                        if self.codegen_binding_index(bind_syms, recv_tp_sym) >= 0:
+                            continue
+                        let recv_arg_sema = self.sema.get_generic_inst_arg(recv_resolved as i32, ri)
+                        let recv_arg_llvm = self.sema_type_to_llvm(recv_arg_sema)
+                        if recv_arg_llvm != 0:
+                            bind_syms.push(recv_tp_sym)
+                            bind_tys.push(recv_arg_llvm)
+                            bind_sema_tys.push(recv_arg_sema)
+
     let base_name = self.intern.resolve(fn_sym)
     var mangled = base_name
     for ti in 0..tp_syms.len() as i32:
         let tp_sym = tp_syms.get(ti as i64)
         let bty = self.find_binding_type(bind_syms, bind_tys, tp_sym)
         if bty == 0:
-            with_eprint("error: unknown type")
+            with_eprint("error: unknown type for generic parameter '" ++ self.intern.resolve(tp_sym) ++ "' in '" ++ base_name ++ "'")
             self.had_error = 1
             return wl_get_undef(wl_i32_type(self.context))
         // Use sema type for mangling when available (LLVM types lose struct identity)
         var sema_mangle = "unknown"
         for bi in 0..bind_syms.len() as i32:
-            if bind_syms.get(bi as i64) == tp_sym:
+            if self.codegen_symbols_match(bind_syms.get(bi as i64), tp_sym):
                 let sema_ty = bind_sema_tys.get(bi as i64)
                 if sema_ty > 0:
                     sema_mangle = self.sema_type_mangle(sema_ty)
@@ -13017,12 +13305,23 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
             saved_sema_named.push(0)
         self.sema.named_types.insert(tp_sym2, tp_sema_tys.get(ti2 as i64))
 
-    // 2. Lower to MIR
+    // 2. Lower to MIR in the generic function's defining module. Generic
+    // bodies can mention private helper types that are intentionally not
+    // visible from the caller's module.
+    let saved_lower_file_id = self.sema.local_file_id
+    let saved_lower_module_path = self.sema.current_module_path
+    let saved_lower_module_has_ci = self.sema.current_module_has_ci
+    let lower_di = self.sema.find_decl_index(generic_node)
+    if lower_di >= 0:
+        self.sema.update_decl_source_context(lower_di)
     var mir_builder = MirBuilder.init(self.sema, self.pool, self.intern, mono_sym)
     let mir_body = lower_fn_with_sig(mir_builder, generic_node, sig_idx)
 
     // 3. Codegen via MIR (saves/restores all codegen state internally)
     self.gen_function_mir_mono(mono_sym, generic_node, mir_body)
+    self.sema.local_file_id = saved_lower_file_id
+    self.sema.current_module_path = saved_lower_module_path
+    self.sema.current_module_has_ci = saved_lower_module_has_ci
 
     for ti3 in 0..tp_syms.len() as i32:
         let tp_sym3 = tp_syms.get(ti3 as i64)

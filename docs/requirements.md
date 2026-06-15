@@ -2932,7 +2932,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
 
 ### §8.4 Convenience Type
 
-- [x] `8.4.1.1` **Usable with with blocks for scoped access.** — impl: [#470](https://github.com/withlang-dev/with/issues/470)
+- [x] `8.4.1.1` **Usable with with blocks for scoped access.** — impl: [#471](https://github.com/withlang-dev/with/issues/471)
   - Requirement: Usable with `with` blocks for scoped access.
   - Source: `§8.4 L2966`
   - Related spec refs: none

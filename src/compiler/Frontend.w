@@ -1681,6 +1681,8 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let prelude_path = prelude_paths.get(oi as i64)
         if frontend_path_is_std_box_module(prelude_path) and frontend_vec_contains_i32(higher_type_names, self.pool.intern("Box")):
             continue
+        if frontend_path_is_std_rc_module(prelude_path) and (frontend_vec_contains_i32(higher_type_names, self.pool.intern("Rc")) or frontend_vec_contains_i32(higher_type_names, self.pool.intern("Arc"))):
+            continue
         if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, merged_pool, self.pool, oi, higher_fn_names):
             // Error when a prelude fn (with a body) is shadowed by an extern fn
             // (no body). The extern silently replaces the real function with an
@@ -1728,6 +1730,13 @@ fn frontend_path_is_std_box_module(path: str) -> bool:
     if path == "lib/std/box.w" or path == "<embedded-std>/std/box.w":
         return true
     if path.ends_with("/lib/std/box.w") or path.ends_with("\\lib\\std\\box.w"):
+        return true
+    false
+
+fn frontend_path_is_std_rc_module(path: str) -> bool:
+    if path == "lib/std/rc.w" or path == "<embedded-std>/std/rc.w":
+        return true
+    if path.ends_with("/lib/std/rc.w") or path.ends_with("\\lib\\std\\rc.w"):
         return true
     false
 
