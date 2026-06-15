@@ -7449,7 +7449,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: `Send`: safe to transfer across thread boundaries (value may outlive the sender). Ephemeral types are **not** `Send`.
   - Source: `§14.16 L7059-L7060`
   - Related spec refs: none
-- [x] `14.16.1.2` **Sync: safe to share via &T across threads** — impl: [#473](https://github.com/withlang-dev/with/issues/473)
+- [x] `14.16.1.2` **Sync: safe to share via &T across threads**
   - Requirement: `Sync`: safe to share via `&T` across threads
   - Source: `§14.16 L7061`
   - Related spec refs: none
@@ -7477,11 +7477,11 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: `i32`, `String`, owned types; Yes; Yes
   - Source: `§14.16 L7091`
   - Related spec refs: none
-- [x] `14.16.1.9` **Arc[T] where T: Send + Sync; Yes; Yes** — impl: [#473](https://github.com/withlang-dev/with/issues/473)
+- [x] `14.16.1.9` **Arc[T] where T: Send + Sync; Yes; Yes**
   - Requirement: `Arc[T]` where `T: Send + Sync`; Yes; Yes
   - Source: `§14.16 L7092`
   - Related spec refs: none
-- [x] `14.16.1.10` **Rc[T]; No; No** — impl: [#473](https://github.com/withlang-dev/with/issues/473)
+- [x] `14.16.1.10` **Rc[T]; No; No**
   - Requirement: `Rc[T]`; No; No
   - Source: `§14.16 L7093`
   - Related spec refs: none
@@ -7493,7 +7493,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: Ephemeral structs; No; Yes
   - Source: `§14.16 L7095`
   - Related spec refs: none
-- [x] `14.16.1.13` **Task[T] (non-ephemeral); Yes (if T: Send); Yes** — impl: [#473](https://github.com/withlang-dev/with/issues/473)
+- [x] `14.16.1.13` **Task[T] (non-ephemeral); Yes (if T: Send); Yes**
   - Requirement: `Task[T]` (non-ephemeral); Yes (if `T: Send`); Yes
   - Source: `§14.16 L7096`
   - Related spec refs: none
@@ -7872,7 +7872,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: **Storable**; Yes (if no captured refs); Task handle; storable only when non-ephemeral
   - Source: `§14.20 L7323`
   - Related spec refs: none
-- [x] `14.20.1.9` **Sendable; Yes if state is Send; Only when non-ephemeral, T: Send, and captu...** — impl: [#473](https://github.com/withlang-dev/with/issues/473)
+- [x] `14.20.1.9` **Sendable; Yes if state is Send; Only when non-ephemeral, T: Send, and captu...**
   - Requirement: **Sendable**; Yes if state is `Send`; Only when non-ephemeral, `T: Send`, and captures are `Send`
   - Source: `§14.20 L7324`
   - Related spec refs: none
@@ -7946,7 +7946,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: **Rule:** A `Task[T]` is ephemeral if its spawned fiber environment contains any ephemeral values (references, views, guards).
   - Source: `§14.22 L7374-L7377`
   - Related spec refs: none
-- [x] `14.22.1.4` **A Task[T] is Send only if all captured values are Send and the task is not...** — impl: [#473](https://github.com/withlang-dev/with/issues/473)
+- [x] `14.22.1.4` **A Task[T] is Send only if all captured values are Send and the task is not...**
   - Requirement: A `Task[T]` is `Send` only if all captured values are `Send` and the task is not ephemeral.
   - Source: `§14.22 L7374-L7377`
   - Related spec refs: none
@@ -8026,7 +8026,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Requirement: Only owned `Send` values; No; Yes; Yes (if `T: Send`)
   - Source: `§14.22 L7470`
   - Related spec refs: none
-- [x] `14.22.1.24` **Owned but non-Send values; No; Yes; No** — impl: [#473](https://github.com/withlang-dev/with/issues/473)
+- [x] `14.22.1.24` **Owned but non-Send values; No; Yes; No**
   - Requirement: Owned but non-`Send` values; No; Yes; No
   - Source: `§14.22 L7471`
   - Related spec refs: none

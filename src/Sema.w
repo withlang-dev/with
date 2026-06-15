@@ -60,6 +60,7 @@ type BindingProvenance {
     effect_dep_sym: i32,
     is_ephemeral_value: i32,
     is_ephemeral_task: i32,
+    is_non_send_task: i32,
     poisoned_origin_sym: i32,
     poisoned_origin_node: i32,
     poisoned_binding_node: i32,
@@ -67,7 +68,7 @@ type BindingProvenance {
 impl Copy for BindingProvenance
 
 fn binding_provenance_empty -> BindingProvenance:
-    BindingProvenance { view_origin_mask: 0, view_dep_start: 0, view_dep_count: 0, effect_dep_sym: 0, is_ephemeral_value: 0, is_ephemeral_task: 0, poisoned_origin_sym: 0, poisoned_origin_node: 0, poisoned_binding_node: 0 }
+    BindingProvenance { view_origin_mask: 0, view_dep_start: 0, view_dep_count: 0, effect_dep_sym: 0, is_ephemeral_value: 0, is_ephemeral_task: 0, is_non_send_task: 0, poisoned_origin_sym: 0, poisoned_origin_node: 0, poisoned_binding_node: 0 }
 
 fn sema_param_origin_bit(pi: i32) -> i32:
     if pi < 0:
@@ -152,6 +153,9 @@ type SemaBuiltinSymbols {
     embed_file: i32,
     copy_trait: i32,
     clone_trait: i32,
+    send_trait: i32,
+    sync_trait: i32,
+    scoped_send_trait: i32,
     deref_trait: i32,
     deref_method: i32,
     drop: i32,
@@ -1122,6 +1126,9 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         embed_file: 0,
         copy_trait: 0,
         clone_trait: 0,
+        send_trait: 0,
+        sync_trait: 0,
+        scoped_send_trait: 0,
         deref_trait: 0,
         deref_method: 0,
         drop: 0,
@@ -2018,6 +2025,9 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.embed_file = self.pool_intern("embed_file")
     self.syms.copy_trait = self.pool_intern("Copy")
     self.syms.clone_trait = self.pool_intern("Clone")
+    self.syms.send_trait = self.pool_intern("Send")
+    self.syms.sync_trait = self.pool_intern("Sync")
+    self.syms.scoped_send_trait = self.pool_intern("ScopedSend")
     self.syms.deref_trait = self.pool_intern("Deref")
     self.syms.deref_method = self.pool_intern("deref")
     self.syms.regex = self.pool_intern("Regex")
@@ -2112,8 +2122,9 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     // destruction, thread safety). Always recognized regardless of prelude.
     self.lang_trait_syms.insert(self.syms.copy_trait, 1)
     self.lang_trait_syms.insert(self.syms.drop, 1)
-    self.lang_trait_syms.insert(self.pool_intern("Send"), 1)
-    self.lang_trait_syms.insert(self.pool_intern("ScopedSend"), 1)
+    self.lang_trait_syms.insert(self.syms.send_trait, 1)
+    self.lang_trait_syms.insert(self.syms.sync_trait, 1)
+    self.lang_trait_syms.insert(self.syms.scoped_send_trait, 1)
     self.lang_trait_syms.insert(self.pool_intern("Scoped"), 1)
     self.lang_trait_syms.insert(self.pool_intern("ScopedMut"), 1)
     self.lang_trait_syms.insert(self.pool_intern("Error"), 1)
@@ -3309,6 +3320,22 @@ fn Sema.scope_set_is_ephemeral_task(self: Sema, sym: i32, is_ephemeral_task: i32
         with self.bind_provenance.slot(slot_idx) as mut slot:
             var provenance = slot.get()
             provenance.is_ephemeral_task = is_ephemeral_task
+            slot.set(provenance)
+
+fn Sema.scope_lookup_is_non_send_task(self: Sema, sym: i32) -> i32:
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_provenance.get(opt.unwrap() as i64).is_non_send_task
+    0
+
+fn Sema.scope_set_is_non_send_task(self: Sema, sym: i32, is_non_send_task: i32):
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        let idx = opt.unwrap()
+        let slot_idx = idx as i64
+        with self.bind_provenance.slot(slot_idx) as mut slot:
+            var provenance = slot.get()
+            provenance.is_non_send_task = is_non_send_task
             slot.set(provenance)
 
 fn Sema.scope_lookup_is_ephemeral_value(self: Sema, sym: i32) -> i32:

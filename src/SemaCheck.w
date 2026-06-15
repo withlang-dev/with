@@ -427,6 +427,11 @@ fn Sema.resolve_type_level_arg_expr(self: Sema, node: i32) -> i32:
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_GROUPED:
         return self.resolve_type_level_arg_expr(self.ast.get_data0(node))
+    if kind == NodeKind.NK_TYPE_TYPEOF:
+        let expr_ty = self.check_expr(self.ast.get_data0(node))
+        if expr_ty > 0:
+            return expr_ty as i32
+        return 0
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
         let inner = self.resolve_type_level_arg_expr(self.ast.get_data1(node))
@@ -2825,6 +2830,64 @@ fn Sema.callable_expr_creates_ephemeral_task(self: Sema, node: i32) -> i32:
         return 0
     self.expr_creates_ephemeral_task(node)
 
+fn Sema.callable_expr_closure_node(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
+        return self.callable_expr_closure_node(self.ast.get_data0(node))
+    if kind == NodeKind.NK_CLOSURE:
+        return node
+    if kind == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(node)
+        if self.binding_closure_nodes.contains(sym):
+            return self.binding_closure_nodes.get(sym).unwrap()
+    0
+
+fn Sema.check_callable_captures_thread_trait(self: Sema, node: i32, trait_sym: i32, context: str):
+    let closure = self.callable_expr_closure_node(node)
+    if closure == 0:
+        return
+    let body = self.ast.get_data0(closure)
+    let trait_name = self.pool_resolve_symbol(trait_sym)
+    for bi in 0..self.bind_names.len() as i32:
+        let cap_sym = self.bind_names.get(bi as i64)
+        if cap_sym == 0:
+            continue
+        if self.expr_uses_symbol(body, cap_sym) == 0:
+            continue
+        let cap_ty = self.scope_lookup(cap_sym)
+        let ok = if trait_sym == self.syms.scoped_send_trait:
+            self.type_is_scoped_send(cap_ty)
+        else if trait_sym == self.syms.sync_trait:
+            self.type_is_sync(cap_ty)
+        else:
+            if self.scope_lookup_is_ephemeral_value(cap_sym) != 0 or self.scope_lookup_is_ephemeral_task(cap_sym) != 0 or self.scope_lookup_is_non_send_task(cap_sym) != 0:
+                0
+            else:
+                self.type_is_send(cap_ty)
+        if ok == 0:
+            self.emit_error(context ++ " captures non-" ++ trait_name ++ " value `" ++ self.pool_resolve(cap_sym) ++ "`", closure)
+            return
+
+fn Sema.callable_captures_non_send(self: Sema, node: i32) -> i32:
+    let closure = self.callable_expr_closure_node(node)
+    if closure == 0:
+        return 0
+    let body = self.ast.get_data0(closure)
+    for bi in 0..self.bind_names.len() as i32:
+        let cap_sym = self.bind_names.get(bi as i64)
+        if cap_sym == 0:
+            continue
+        if self.expr_uses_symbol(body, cap_sym) == 0:
+            continue
+        let cap_ty = self.scope_lookup(cap_sym)
+        if self.scope_lookup_is_ephemeral_value(cap_sym) != 0 or self.scope_lookup_is_ephemeral_task(cap_sym) != 0 or self.scope_lookup_is_non_send_task(cap_sym) != 0:
+            return 1
+        if self.type_is_send(cap_ty) == 0:
+            return 1
+    0
+
 fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -3018,6 +3081,35 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32) -> i32:
             if seg_kind == 1 and self.expr_creates_ephemeral_task(seg_data) != 0:
                 return 1
             pos = pos + 2
+        return 0
+    0
+
+fn Sema.expr_creates_non_send_task(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        return self.expr_creates_non_send_task(self.ast.get_data0(node))
+    if kind == NodeKind.NK_IDENT:
+        return self.scope_lookup_is_non_send_task(self.ast.get_data0(node))
+    if kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_CLOSURE:
+        return self.callable_captures_non_send(node)
+    if kind == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            let fn_sym = self.ast.get_data0(callee)
+            if self.task_fns.contains(fn_sym):
+                let args_start = self.ast.get_data1(node)
+                let arg_count = self.ast.get_data2(node)
+                for ai in 0..arg_count:
+                    let arg_node = self.ast.get_extra(args_start + ai)
+                    if self.expr_is_ephemeral_value(arg_node) != 0 or self.expr_is_ephemeral_task(arg_node) != 0 or self.expr_creates_non_send_task(arg_node) != 0:
+                        return 1
+                    let arg_ty = self.cached_or_checked_expr_type(arg_node)
+                    if self.type_is_send(arg_ty) == 0:
+                        return 1
+            if self.binding_closure_nodes.contains(fn_sym):
+                return self.callable_captures_non_send(self.binding_closure_nodes.get(fn_sym).unwrap())
         return 0
     0
 
@@ -6297,6 +6389,8 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     self.scope_set_is_scoped_task(name, is_scoped_task_val)
     let is_ephemeral_task = self.expr_is_ephemeral_task(value)
     self.scope_set_is_ephemeral_task(name, is_ephemeral_task)
+    let is_non_send_task = if is_task_val != 0 and (self.type_is_send(bind_type as i32) == 0 or self.expr_creates_non_send_task(value) != 0): 1 else: 0
+    self.scope_set_is_non_send_task(name, is_non_send_task)
     let is_ephemeral_value = if self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0: 1 else: 0
     self.scope_set_is_ephemeral_value(name, is_ephemeral_value)
     self.scope_set_effect_dep_sym(name, self.expr_transmute_source_param_sym(value))
@@ -7010,6 +7104,8 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         self.scope_set_is_task(target_sym, self.expr_is_task_value(value))
         self.scope_set_is_scoped_task(target_sym, self.expr_is_scoped_task_value(value))
         self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
+        let assigned_non_send_task = if self.expr_is_task_value(value) != 0 and (self.type_is_send(target_type as i32) == 0 or self.expr_creates_non_send_task(value) != 0): 1 else: 0
+        self.scope_set_is_non_send_task(target_sym, assigned_non_send_task)
         let assigned_ephemeral_value = if self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(target_type as i32) != 0: 1 else: 0
         self.scope_set_is_ephemeral_value(target_sym, assigned_ephemeral_value)
         if self.ast.kind(value) == NodeKind.NK_CLOSURE:
@@ -10036,7 +10132,7 @@ fn Sema.chan_return_type(self: Sema, callee: i32) -> i32:
     else:
         self.emit_error("chan expects exactly one element type", callee)
         return 0
-    if self.type_is_ephemeral_value(elem_type) != 0:
+    if self.type_is_send(elem_type) == 0:
         self.emit_error("channel element type must be Send", if type_arg_node > 0: type_arg_node else: callee)
     // Build Sender[T] and Receiver[T] types
     let sender_sym = self.pool_intern("Sender")
@@ -10628,6 +10724,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 self.eph_task_visiting = sema_new_map_i32_i32()
                 if self.callable_expr_creates_ephemeral_task(arg_node) != 0:
                     self.emit_error("ephemeral Task cannot be created on OS thread", arg_node)
+                self.check_callable_captures_thread_trait(arg_node, self.syms.send_trait, "thread.spawn_os")
         arg_types.push(arg_ty as i32)
         let iter_idx = self.maybe_register_iter_of_self_borrow(arg_node)
         if iter_idx >= 0:
@@ -11734,6 +11831,12 @@ fn Sema.type_implements_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             return self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym)
         return 0
+    if trait_sym == self.syms.send_trait:
+        return self.type_is_send(resolved as i32)
+    if trait_sym == self.syms.sync_trait:
+        return self.type_is_sync(resolved as i32)
+    if trait_sym == self.syms.scoped_send_trait:
+        return self.type_is_scoped_send(resolved as i32)
     if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
         return self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym)
     var type_sym = self.get_type_name(resolved)
@@ -11742,6 +11845,175 @@ fn Sema.type_implements_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
     if type_sym == 0:
         return 0
     self.select_trait_impl(type_sym, trait_sym)
+
+fn Sema.type_struct_fields_satisfy_thread_trait(self: Sema, struct_tid: i32, trait_sym: i32) -> i32:
+    let resolved = self.resolve_alias(struct_tid)
+    if self.generator_state_field_counts.contains(resolved as i32):
+        let field_count2 = self.generator_state_field_counts.get(resolved as i32).unwrap()
+        for gi in 0..field_count2:
+            let key = sema_pair_key(resolved as i32, gi)
+            if self.generator_state_field_types.contains(key):
+                if self.type_satisfies_thread_trait(self.generator_state_field_types.get(key).unwrap(), trait_sym) == 0:
+                    return 0
+        return 1
+    let te_start = self.get_type_d1(resolved)
+    let field_count = self.get_type_d2(resolved)
+    for fi in 0..field_count:
+        let field_ty = self.type_extra.get((te_start + fi * 3 + 1) as i64)
+        if self.type_satisfies_thread_trait(field_ty, trait_sym) == 0:
+            return 0
+    1
+
+fn Sema.type_enum_payloads_satisfy_thread_trait(self: Sema, enum_tid: i32, trait_sym: i32) -> i32:
+    let resolved = self.resolve_alias(enum_tid)
+    let variant_count = self.get_type_d2(resolved)
+    var pos = self.get_type_d1(resolved)
+    for vi in 0..variant_count:
+        let payload_count = self.type_extra.get((pos + 1) as i64)
+        for pi in 0..payload_count:
+            let payload_ty = self.type_extra.get((pos + 2 + pi) as i64)
+            if self.type_satisfies_thread_trait(payload_ty, trait_sym) == 0:
+                return 0
+        pos = pos + 2 + payload_count
+    1
+
+fn Sema.type_generic_inst_decl_satisfies_thread_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
+    let resolved = self.resolve_alias(tid)
+    let base_sym = self.get_generic_inst_base(resolved as i32)
+    if not self.type_decl_nodes.contains(base_sym):
+        return 0
+    let decl = self.type_decl_nodes.get(base_sym).unwrap()
+    let base_tid = self.lookup_named_type_visible(base_sym)
+    if base_tid == 0:
+        return 0
+    let tp_start = self.type_decl_tp_start(decl)
+    let tp_count = self.type_decl_tp_count(decl)
+    let subst_syms: Vec[i32] = Vec.new()
+    let subst_tids: Vec[i32] = Vec.new()
+    var pos = tp_start
+    for ti in 0..tp_count:
+        let tp_name = self.ast.get_extra(pos)
+        let bound_count = self.ast.get_extra(pos + 1)
+        subst_syms.push(tp_name)
+        subst_tids.push(self.get_generic_inst_arg(resolved as i32, ti))
+        pos = pos + 2 + bound_count
+
+    let base_resolved = self.resolve_alias(base_tid)
+    let tk = self.get_type_kind(base_resolved)
+    if tk == TypeKind.TY_STRUCT:
+        let te_start = self.get_type_d1(base_resolved)
+        let field_count = self.get_type_d2(base_resolved)
+        for fi in 0..field_count:
+            let field_ty = self.substitute_type(self.type_extra.get((te_start + fi * 3 + 1) as i64), subst_syms, subst_tids, tp_count)
+            if self.type_satisfies_thread_trait(field_ty, trait_sym) == 0:
+                return 0
+        return 1
+    if tk == TypeKind.TY_ENUM:
+        let variant_count = self.get_type_d2(base_resolved)
+        var epos = self.get_type_d1(base_resolved)
+        for vi in 0..variant_count:
+            let payload_count = self.type_extra.get((epos + 1) as i64)
+            for pi in 0..payload_count:
+                let payload_ty = self.substitute_type(self.type_extra.get((epos + 2 + pi) as i64), subst_syms, subst_tids, tp_count)
+                if self.type_satisfies_thread_trait(payload_ty, trait_sym) == 0:
+                    return 0
+            epos = epos + 2 + payload_count
+        return 1
+    0
+
+fn Sema.type_generic_inst_satisfies_thread_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
+    let resolved = self.resolve_alias(tid)
+    let base = self.get_generic_inst_base(resolved as i32)
+    let base_name = self.pool_resolve_symbol(base)
+    if base_name == "Rc" and self.type_symbol_is_std_rc_owner(base) != 0:
+        return 0
+    if base_name == "Arc" and self.type_symbol_is_std_rc_owner(base) != 0:
+        if self.get_generic_inst_arg_count(resolved as i32) != 1:
+            return 0
+        let arg = self.get_generic_inst_arg(resolved as i32, 0)
+        if trait_sym == self.syms.sync_trait:
+            return if self.type_is_send(arg) != 0 and self.type_is_sync(arg) != 0: 1 else: 0
+        return if self.type_is_send(arg) != 0 and self.type_is_sync(arg) != 0: 1 else: 0
+    if self.type_symbol_is_std_box(base) != 0:
+        if self.get_generic_inst_arg_count(resolved as i32) != 1:
+            return 0
+        return self.type_satisfies_thread_trait(self.get_generic_inst_arg(resolved as i32, 0), trait_sym)
+    if base == self.syms.task:
+        if trait_sym == self.syms.sync_trait:
+            return 0
+        if trait_sym == self.syms.scoped_send_trait:
+            return 1
+        if self.get_generic_inst_arg_count(resolved as i32) != 1:
+            return 0
+        return self.type_is_send(self.get_generic_inst_arg(resolved as i32, 0))
+    if base == self.syms.scoped_task:
+        return if trait_sym == self.syms.scoped_send_trait: 1 else: 0
+    if base == self.syms.handle:
+        return 1
+    if base == self.syms.vec or base == self.syms.option or base == self.syms.hashset or base_name == "Sender" or base_name == "Receiver":
+        let arg_count = self.get_generic_inst_arg_count(resolved as i32)
+        for ai in 0..arg_count:
+            if self.type_satisfies_thread_trait(self.get_generic_inst_arg(resolved as i32, ai), trait_sym) == 0:
+                return 0
+        return 1
+    if base == self.syms.result or base == self.syms.hashmap:
+        let arg_count2 = self.get_generic_inst_arg_count(resolved as i32)
+        for ai2 in 0..arg_count2:
+            if self.type_satisfies_thread_trait(self.get_generic_inst_arg(resolved as i32, ai2), trait_sym) == 0:
+                return 0
+        return 1
+    if self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym) != 0:
+        return 1
+    self.type_generic_inst_decl_satisfies_thread_trait(resolved as i32, trait_sym)
+
+fn Sema.type_satisfies_thread_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_ERR or tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER or tk == TypeKind.TY_STR:
+        return 1
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_SLICE:
+        return if trait_sym == self.syms.scoped_send_trait: 1 else: 0
+    if tk == TypeKind.TY_PTR:
+        return 0
+    if tk == TypeKind.TY_FN:
+        return 1
+    if tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
+        return 0
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_RANGE:
+        return self.type_satisfies_thread_trait(self.get_type_d0(resolved), trait_sym)
+    if tk == TypeKind.TY_TUPLE:
+        let te_start = self.get_type_d0(resolved)
+        let elem_count = self.get_type_d1(resolved)
+        for ei in 0..elem_count:
+            if self.type_satisfies_thread_trait(self.type_extra.get((te_start + ei) as i64), trait_sym) == 0:
+                return 0
+        return 1
+    if tk == TypeKind.TY_STRUCT:
+        let name = self.get_type_d0(resolved)
+        if self.ephemeral_types.contains(name):
+            return if trait_sym == self.syms.scoped_send_trait: 1 else: 0
+        return self.type_struct_fields_satisfy_thread_trait(resolved as i32, trait_sym)
+    if tk == TypeKind.TY_ENUM:
+        return self.type_enum_payloads_satisfy_thread_trait(resolved as i32, trait_sym)
+    if tk == TypeKind.TY_GENERIC_INST:
+        return self.type_generic_inst_satisfies_thread_trait(resolved as i32, trait_sym)
+    let type_sym = self.get_type_name(resolved)
+    if type_sym != 0:
+        return self.select_trait_impl(type_sym, trait_sym)
+    0
+
+fn Sema.type_is_send(self: Sema, tid: i32) -> i32:
+    self.type_satisfies_thread_trait(tid, self.syms.send_trait)
+
+fn Sema.type_is_sync(self: Sema, tid: i32) -> i32:
+    self.type_satisfies_thread_trait(tid, self.syms.sync_trait)
+
+fn Sema.type_is_scoped_send(self: Sema, tid: i32) -> i32:
+    if self.type_is_send(tid) != 0:
+        return 1
+    self.type_satisfies_thread_trait(tid, self.syms.scoped_send_trait)
 
 fn Sema.type_has_default_value(self: Sema, tid: i32) -> i32:
     if tid == 0:
@@ -13507,7 +13779,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             self.check_ephemeral_task_storage(mc_arg_node, "generic container")
         let mc_sender_elem_ty = self.sender_send_element_type(obj_type as i32, field, ai)
         if mc_sender_elem_ty != 0:
-            if self.type_is_ephemeral_value(mc_sender_elem_ty) != 0 or self.type_is_ephemeral_value(mc_arg_ty as i32) != 0 or self.expr_is_ephemeral_value(mc_arg_node) != 0 or self.expr_is_ephemeral_task(mc_arg_node) != 0:
+            if self.type_is_send(mc_sender_elem_ty) == 0 or self.type_is_send(mc_arg_ty as i32) == 0 or self.expr_is_ephemeral_value(mc_arg_node) != 0 or self.expr_is_ephemeral_task(mc_arg_node) != 0 or self.expr_creates_non_send_task(mc_arg_node) != 0:
                 self.emit_error("channel send requires Send value", mc_arg_node)
         if mc_is_closure:
             self.closure_direct_arg_escape_flags.pop()
@@ -14461,7 +14733,7 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: &Vec
                 return 0
         let payload_node = self.ast.get_extra(args_start + 1)
         let payload_ty = arg_types.get(1)
-        if self.expr_is_ephemeral_value(payload_node) != 0 or self.expr_is_ephemeral_task(payload_node) != 0 or self.type_is_ephemeral_value(payload_ty) != 0:
+        if self.expr_is_ephemeral_value(payload_node) != 0 or self.expr_is_ephemeral_task(payload_node) != 0 or self.expr_creates_non_send_task(payload_node) != 0 or self.type_is_send(payload_ty) == 0:
             self.emit_error("channel send requires Send value", payload_node)
             return 0
         if payload_ty != 0:
@@ -15396,6 +15668,9 @@ fn Sema.check_sync_scope_spawn_expr_captures(self: Sema, node: i32, scope_sym: i
             if cap_sym == scope_sym or cap_sym == handle_sym:
                 continue
             if self.expr_uses_symbol(worker_body, cap_sym) != 0:
+                if self.type_is_scoped_send(self.scope_lookup(cap_sym)) == 0:
+                    self.emit_error("scoped thread worker captures non-ScopedSend value `" ++ self.pool_resolve(cap_sym) ++ "`", worker)
+                    continue
                 let mutating_capture = self.expr_mutates_place(worker_body, cap_sym)
                 self.check_sync_scope_capture_rest(cap_sym, mutating_capture, handle_sym, extra_start, stmt_count, next_stmt_index, tail, worker)
         return
