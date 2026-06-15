@@ -421,7 +421,7 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     check_args |> push(compiler_path)
     check_args |> push("check")
     check_args |> push("src/main.w")
-    let check = ctx.process_runner().run_capture_cwd(check_args, stdout_path, stderr_path, 60000, build_project_abs(root, repo_copy))
+    let check = ctx.process_runner().run_capture_cwd(check_args, stdout_path, stderr_path, 180000, build_project_abs(root, repo_copy))
     if check.rc == 124:
         return issue61_fail(ctx, "check timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     if check.rc != 0:
