@@ -548,12 +548,12 @@ fn comp_add_words(items: Vec[str], text: str) -> Vec[str]:
         let ws = ch == 9 or ch == 10 or ch == 13 or ch == 32
         if ws:
             if start >= 0:
-                out = comp_add_unique(out, text.slice(start as i64, i as i64))
+                out = comp_add_unique(move out, text.slice(start as i64, i as i64))
                 start = -1
         else if start < 0:
             start = i
     if start >= 0:
-        out = comp_add_unique(out, text.slice(start as i64, text.len()))
+        out = comp_add_unique(move out, text.slice(start as i64, text.len()))
     out
 
 fn comp_is_ident_start(ch: i32) -> bool:
@@ -608,7 +608,7 @@ fn comp_collect_quoted_after(text: str, prefix: str) -> Vec[str]:
         let value_end = comp_find_from(text, "\"", value_start)
         if value_end < 0:
             break
-        out = comp_add_unique(out, text.slice(value_start as i64, value_end as i64))
+        out = comp_add_unique(move out, text.slice(value_start as i64, value_end as i64))
         start = value_end + 1
     out
 
@@ -624,7 +624,7 @@ fn comp_collect_attr_names(items: Vec[str], text: str) -> Vec[str]:
             var name_end = name_start + 1
             while name_end < text.len() as i32 and comp_is_ident_continue(text.byte_at(name_end as i64)):
                 name_end = name_end + 1
-            out = comp_add_unique(out, text.slice(name_start as i64, name_end as i64))
+            out = comp_add_unique(move out, text.slice(name_start as i64, name_end as i64))
             start = name_end
         else:
             start = at + 2
@@ -673,7 +673,7 @@ fn comp_impl_attributes(fs: &ToolFs) -> Vec[str]:
     var attrs = comp_collect_quoted_after(text, "is_ident_named(\"")
     let more = comp_collect_quoted_after(text, "attr_text == \"")
     for i in 0..more.len() as i32:
-        attrs = comp_add_unique(attrs, more.get(i as i64))
+        attrs = comp_add_unique(move attrs, more.get(i as i64))
     attrs
 
 fn comp_strip_comment(text: str) -> str:
@@ -692,8 +692,8 @@ fn comp_first_shell_word(text: str) -> str:
 
 fn comp_spec_cli_commands(spec: str) -> Vec[str]:
     var commands: Vec[str] = Vec.new()
-    commands = comp_add_unique(commands, "version")
-    commands = comp_add_unique(commands, "help")
+    commands = comp_add_unique(move commands, "version")
+    commands = comp_add_unique(move commands, "help")
     let block = comp_first_fenced_block(comp_spec_subsection(spec, "### 18.5 Toolchain"))
     let lines = comp_split_lines(block)
     for i in 0..lines.len() as i32:
@@ -710,7 +710,7 @@ fn comp_spec_cli_commands(spec: str) -> Vec[str]:
                     part = comp_trim(part.slice(5, part.len()))
                 let token = comp_first_shell_word(part)
                 if token.len() > 0 and not token.starts_with("[") and not token.starts_with("-"):
-                    commands = comp_add_unique(commands, token)
+                    commands = comp_add_unique(move commands, token)
                 part_start = pi + 1
             pi = pi + 1
     let package_sec = comp_spec_subsection(spec, "### 18.8 Package Management")
@@ -726,7 +726,7 @@ fn comp_spec_cli_commands(spec: str) -> Vec[str]:
         if span.starts_with("with "):
             let token = comp_first_shell_word(comp_trim(span.slice(5, span.len())))
             if token.len() > 0 and not token.starts_with("-"):
-                commands = comp_add_unique(commands, token)
+                commands = comp_add_unique(move commands, token)
         tick = close + 1
     commands
 
@@ -741,7 +741,7 @@ fn comp_impl_commands(fs: &ToolFs) -> Vec[str]:
     for i in 0..raw.len() as i32:
         let cmd = raw.get(i as i64)
         if not cmd.starts_with("-"):
-            commands = comp_add_unique(commands, cmd)
+            commands = comp_add_unique(move commands, cmd)
     commands
 
 fn comp_collect_string_literal_flags(items: Vec[str], text: str) -> Vec[str]:
@@ -774,7 +774,7 @@ fn comp_collect_string_literal_flags(items: Vec[str], text: str) -> Vec[str]:
                     if not ((ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or (ch >= 48 and ch <= 57) or ch == 45):
                         break
                     end = end + 1
-                flags = comp_add_unique(flags, literal.slice(0, end as i64))
+                flags = comp_add_unique(move flags, literal.slice(0, end as i64))
         i = j + 1
     flags
 
@@ -794,7 +794,7 @@ fn comp_spec_modules(spec: str) -> Vec[str]:
             break
         let item = sec.slice((open + 1) as i64, close as i64)
         if item.starts_with("std."):
-            modules = comp_add_unique(modules, item)
+            modules = comp_add_unique(move modules, item)
         tick = close + 1
     modules
 
@@ -825,9 +825,9 @@ fn comp_impl_modules(fs: &ToolFs) -> Vec[str]:
     let files = fs.list_files("lib/std")
     var modules: Vec[str] = Vec.new()
     for i in 0..files.len() as i32:
-        modules = comp_add_unique(modules, comp_std_module_from_path(files.get(i as i64)))
+        modules = comp_add_unique(move modules, comp_std_module_from_path(files.get(i as i64)))
     if fs.exists("lib/std/internal/str_abi.w"):
-        modules = comp_add_unique(modules, "std.str_abi")
+        modules = comp_add_unique(move modules, "std.str_abi")
     modules
 
 fn comp_known_missing_flag(item: str) -> str:
@@ -946,7 +946,7 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     var allowed_attrs = comp_spec_public_attributes(spec)
     let internal_attrs = comp_spec_internal_attributes(spec)
     for ai in 0..internal_attrs.len() as i32:
-        allowed_attrs = comp_add_unique(allowed_attrs, internal_attrs.get(ai as i64))
+        allowed_attrs = comp_add_unique(move allowed_attrs, internal_attrs.get(ai as i64))
     errors = comp_inventory_add_errors(errors, "attributes", allowed_attrs, comp_impl_attributes(fs), "attribute", "")
 
     errors = comp_inventory_add_errors(errors, "cli commands", comp_spec_cli_commands(spec), comp_impl_commands(fs), "", "command")

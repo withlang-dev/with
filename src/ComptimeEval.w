@@ -5922,7 +5922,7 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, node: i32) -> ComptimeCo
         return comptime_control_value(comptime_value_str(comptime_decode_string_escapes(self.pool.resolve(self.ast.get_data0(node)))))
     if kind == NodeKind.NK_FSTRING:
         return self.eval_fstring(node)
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
         return self.eval_expr(self.ast.get_data0(node))
     if kind == NodeKind.NK_IDENT:
         return self.eval_ident(node)
