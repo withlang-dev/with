@@ -903,6 +903,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_project_tests = cli_selfhost_project_tests.dep("build")
     out = out.add_target(cli_selfhost_project_tests)
 
+    var cli_selfhost_lsp_tests = target_new(.Action, "cli-selfhost-lsp-tests", "").output("out/test-graph/cli-selfhost-lsp-tests")
+    cli_selfhost_lsp_tests.action = run_cli_selfhost_lsp_action
+    cli_selfhost_lsp_tests = cli_selfhost_lsp_tests.input(release_compiler_bin("with"))
+    cli_selfhost_lsp_tests = cli_selfhost_lsp_tests.dep("build")
+    out = out.add_target(cli_selfhost_lsp_tests)
+
     var cli_selfhost_edge_tests = target_new(.Action, "cli-selfhost-edge-tests", "").output("out/test-graph/cli-selfhost-edge-tests")
     cli_selfhost_edge_tests.action = run_cli_selfhost_edge_action
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.input(release_compiler_bin("with"))
@@ -980,6 +986,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-object-symbol-tests")
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("cli-selfhost-project-tests")
+    tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
     tests = tests.dep("cli-selfhost-parallel-tests")
     tests = tests.dep("c-migrator-tests")

@@ -32,7 +32,7 @@ fn lsp_read_message() -> str:
     var content_length = 0
     while true:
         let line = with_read_line_stdin()
-        if line.len() == 0:
+        if line.len() == 0 or line == "\r":
             break
         if line.starts_with("Content-Length: "):
             content_length = lsp_parse_int(line.slice(16, line.len()))
@@ -1284,14 +1284,16 @@ fn lsp_find_enclosing_fn(pool: AstPool, offset: i32) -> NodeId:
             break
         // Cursor is after this fn's start. Check if it's before the next decl.
         var fn_upper = pool.get_end(decl)
+        var upper_is_next_decl = false
         // Look for the next declaration to use as upper bound
         for di2 in (di + 1)..pool.decl_count():
             let next = pool.get_decl(di2)
             let ns = pool.get_start(next)
             if ns > fn_start:
                 fn_upper = ns
+                upper_is_next_decl = true
                 break
-        if offset >= fn_start and offset <= fn_upper:
+        if offset >= fn_start and ((upper_is_next_decl and offset < fn_upper) or ((not upper_is_next_decl) and offset <= fn_upper)):
             best = decl
     best
 
@@ -1600,7 +1602,7 @@ fn lsp_find_references(id: i32, state: &LspState, uri: str, text: str, line: i32
     for di in 0..parsed.pool.decl_count():
         let decl = parsed.pool.get_decl(di)
         let kind = parsed.pool.kind(decl)
-        if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_EXTERN_FN:
+        if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_TYPE_DECL or kind == NodeKind.NK_TRAIT_DECL or kind == NodeKind.NK_EXTERN_FN:
             if parsed.intern.resolve(parsed.pool.get_data0(decl)) == target:
                 is_top_level = true
                 break

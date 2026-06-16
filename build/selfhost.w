@@ -318,6 +318,429 @@ fn bs_assert_not_contains(ctx: &ActionCtx, text: str, needle: str, label: str) -
         return 0
     bs_fail(ctx, "found forbidden output for " ++ label ++ ": " ++ needle)
 
+fn bs_assert_count_at_least(ctx: &ActionCtx, text: str, needle: str, min_count: i32, label: str) -> i32:
+    let count = bs_count_occurrences(text, needle)
+    if count >= min_count:
+        return 0
+    bs_fail(ctx, "expected at least " ++ f"{min_count}" ++ " matches for " ++ label ++ ", got " ++ f"{count}" ++ ": " ++ needle)
+
+fn bs_assert_count_between(ctx: &ActionCtx, text: str, needle: str, min_count: i32, max_count: i32, label: str) -> i32:
+    let count = bs_count_occurrences(text, needle)
+    if count >= min_count and count <= max_count:
+        return 0
+    bs_fail(ctx, "expected " ++ f"{min_count}" ++ ".." ++ f"{max_count}" ++ " matches for " ++ label ++ ", got " ++ f"{count}" ++ ": " ++ needle)
+
+fn bs_json_string(value: str) -> str:
+    var out = "\""
+    for i in 0..value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 34:
+            out = out ++ "\\\""
+        else if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+    out ++ "\""
+
+fn bs_lsp_frame(payload: str) -> str:
+    "Content-Length: " ++ f"{payload.len()}" ++ "\r\n\r\n" ++ payload
+
+fn bs_lsp_input(text: str, request: str) -> str:
+    let init = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"capabilities\":{}}}"
+    let didopen =
+        "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/lsp_test.w\",\"languageId\":\"with\",\"version\":1,\"text\":" ++
+        bs_json_string(text) ++
+        "}}}"
+    bs_lsp_frame(init) ++ bs_lsp_frame(didopen) ++ bs_lsp_frame(request)
+
+fn bs_lsp_args() -> Vec[str]:
+    let args: Vec[str] = Vec.new()
+    args.push("lsp")
+    args
+
+fn bs_lsp_run(ctx: &ActionCtx, compiler_path: str, label: str, text: str, request: str) -> SelfhostRunResult:
+    bs_run_cli_capture_input(ctx, compiler_path, label, bs_lsp_args(), bs_lsp_input(text, request), 10000)
+
+fn bs_lsp_check(ctx: &ActionCtx, compiler_path: str, label: str, text: str, request: str, needle: str) -> i32:
+    let result = bs_lsp_run(ctx, compiler_path, label, text, request)
+    if result.rc != 0 and result.rc != 124:
+        return bs_fail(ctx, "LSP case '" ++ label ++ f"' failed with exit code {result.rc}: " ++ result.stderr)
+    bs_assert_contains(ctx, result.stdout, needle, label)
+
+fn bs_lsp_check_not(ctx: &ActionCtx, compiler_path: str, label: str, text: str, request: str, needle: str) -> i32:
+    let result = bs_lsp_run(ctx, compiler_path, label, text, request)
+    if result.rc != 0 and result.rc != 124:
+        return bs_fail(ctx, "LSP case '" ++ label ++ f"' failed with exit code {result.rc}: " ++ result.stderr)
+    bs_assert_not_contains(ctx, result.stdout, needle, label)
+
+fn bs_lsp_run_ok(ctx: &ActionCtx, compiler_path: str, label: str, text: str, request: str) -> SelfhostRunResult:
+    let result = bs_lsp_run(ctx, compiler_path, label, text, request)
+    if result.rc != 0 and result.rc != 124:
+        ctx.diagnostics().error(ctx.target_name() ++ ": LSP case '" ++ label ++ f"' failed with exit code {result.rc}: " ++ result.stderr)
+    result
+
+fn bs_lsp_completion(line: i32, character: i32) -> str:
+    "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/completion\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/lsp_test.w\"},\"position\":{\"line\":" ++ f"{line}" ++ ",\"character\":" ++ f"{character}" ++ "}}}"
+
+fn bs_lsp_definition(line: i32, character: i32) -> str:
+    "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/definition\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/lsp_test.w\"},\"position\":{\"line\":" ++ f"{line}" ++ ",\"character\":" ++ f"{character}" ++ "}}}"
+
+fn bs_lsp_signature(line: i32, character: i32) -> str:
+    "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/signatureHelp\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/lsp_test.w\"},\"position\":{\"line\":" ++ f"{line}" ++ ",\"character\":" ++ f"{character}" ++ "}}}"
+
+fn bs_lsp_references(line: i32, character: i32) -> str:
+    "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/references\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/lsp_test.w\"},\"position\":{\"line\":" ++ f"{line}" ++ ",\"character\":" ++ f"{character}" ++ "},\"context\":{\"includeDeclaration\":true}}}"
+
+fn bs_lsp_rename(line: i32, character: i32, new_name: str) -> str:
+    "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/rename\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/lsp_test.w\"},\"position\":{\"line\":" ++ f"{line}" ++ ",\"character\":" ++ f"{character}" ++ "},\"newName\":\"" ++ new_name ++ "\"}}"
+
+fn bs_lsp_hover(line: i32, character: i32) -> str:
+    "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"textDocument/hover\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/lsp_test.w\"},\"position\":{\"line\":" ++ f"{line}" ++ ",\"character\":" ++ f"{character}" ++ "}}}"
+
+fn bs_check_lsp_parser_recovery(ctx: &ActionCtx, compiler_path: str) -> i32:
+    let files = ctx.fs().list_files("test/compile_errors")
+    var checked = 0
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        let name = bs_basename(path)
+        if name.starts_with("err_recovery_") and name.ends_with(".w"):
+            checked = checked + 1
+            let args: Vec[str] = Vec.new()
+            args.push("check")
+            args.push(path)
+            let result = bs_run_cli_capture(ctx, compiler_path, "lsp-parser-" ++ name, args, 60000)
+            let combined = result.stdout ++ result.stderr
+            var rc = bs_assert_contains(ctx, combined, "error:", "lsp_parser_recovery_" ++ name)
+            if rc != 0: return rc
+            rc = bs_assert_not_contains(ctx, combined, "panic", "lsp_parser_recovery_" ++ name)
+            if rc != 0: return rc
+            rc = bs_assert_not_contains(ctx, combined, "SIGSEGV", "lsp_parser_recovery_" ++ name)
+            if rc != 0: return rc
+            rc = bs_assert_not_contains(ctx, combined, "abort", "lsp_parser_recovery_" ++ name)
+            if rc != 0: return rc
+    if checked == 0:
+        return bs_fail(ctx, "no parser recovery fixtures matched test/compile_errors/err_recovery_*.w")
+    0
+
+fn bs_check_lsp_scope_completion(ctx: &ActionCtx, compiler_path: str) -> i32:
+    let scope_text =
+        "fn greet(name: str, age: i32):\n" ++
+        "    let greeting = \"hello\"\n" ++
+        "    var count = 0\n" ++
+        "    count\n\n" ++
+        "fn main:\n" ++
+        "    greet(\"hi\", 5)\n"
+    let in_greet = bs_lsp_run_ok(ctx, compiler_path, "lsp-scope-greet", scope_text, bs_lsp_completion(3, 4))
+    if in_greet.rc != 0 and in_greet.rc != 124: return in_greet.rc
+    var rc = bs_assert_contains(ctx, in_greet.stdout, "\"label\":\"name\"", "lsp_scope_param_name")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, in_greet.stdout, "\"label\":\"age\"", "lsp_scope_param_age")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, in_greet.stdout, "\"label\":\"greeting\"", "lsp_scope_binding_greeting")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, in_greet.stdout, "\"label\":\"count\"", "lsp_scope_binding_count")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, in_greet.stdout, "\"label\":\"fn\"", "lsp_scope_keyword_fn")
+    if rc != 0: return rc
+
+    let in_main = bs_lsp_run_ok(ctx, compiler_path, "lsp-scope-main", scope_text, bs_lsp_completion(6, 4))
+    if in_main.rc != 0 and in_main.rc != 124: return in_main.rc
+    rc = bs_assert_not_contains(ctx, in_main.stdout, "\"label\":\"greeting\"", "lsp_scope_no_greeting_leak")
+    if rc != 0: return rc
+    bs_assert_not_contains(ctx, in_main.stdout, "\"label\":\"count\"", "lsp_scope_no_count_leak")
+
+fn bs_check_lsp_completion_cases(ctx: &ActionCtx, compiler_path: str) -> i32:
+    var rc = bs_check_lsp_scope_completion(ctx, compiler_path)
+    if rc != 0: return rc
+
+    let use_text = "use std.\n\nfn main:\n    print(\"hi\")\n"
+    let use_std = bs_lsp_run_ok(ctx, compiler_path, "lsp-use-std", use_text, bs_lsp_completion(0, 8))
+    if use_std.rc != 0 and use_std.rc != 124: return use_std.rc
+    rc = bs_assert_contains(ctx, use_std.stdout, "\"label\":\"collections\"", "lsp_use_std_collections")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, use_std.stdout, "\"label\":\"time\"", "lsp_use_std_time")
+    if rc != 0: return rc
+
+    let for_text = "fn main:\n    for item in 0..10:\n        let doubled = item * 2\n        doubled\n"
+    let for_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-for-binding", for_text, bs_lsp_completion(3, 8))
+    if for_out.rc != 0 and for_out.rc != 124: return for_out.rc
+    rc = bs_assert_contains(ctx, for_out.stdout, "\"label\":\"item\"", "lsp_for_item")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, for_out.stdout, "\"label\":\"doubled\"", "lsp_for_doubled")
+    if rc != 0: return rc
+
+    let boundary_text =
+        "fn main:\n" ++
+        "    let x = 10\n" ++
+        "    if x > 5:\n" ++
+        "        let inner = 42\n" ++
+        "        inner\n" ++
+        "    let y = 20\n" ++
+        "    y\n"
+    let boundary = bs_lsp_run_ok(ctx, compiler_path, "lsp-scope-boundary", boundary_text, bs_lsp_completion(5, 4))
+    if boundary.rc != 0 and boundary.rc != 124: return boundary.rc
+    rc = bs_assert_contains(ctx, boundary.stdout, "\"label\":\"x\"", "lsp_scope_x_visible")
+    if rc != 0: return rc
+    bs_assert_not_contains(ctx, boundary.stdout, "\"label\":\"inner\"", "lsp_scope_inner_hidden")
+
+fn bs_check_lsp_definition_signature(ctx: &ActionCtx, compiler_path: str) -> i32:
+    let def_text = "fn helper() -> i32:\n    42\n\nfn main:\n    let x = helper()\n"
+    let def_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-definition-helper", def_text, bs_lsp_definition(4, 12))
+    if def_out.rc != 0 and def_out.rc != 124: return def_out.rc
+    var rc = bs_assert_contains(ctx, def_out.stdout, "\"line\":0", "lsp_definition_line")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, def_out.stdout, "\"uri\":", "lsp_definition_uri")
+    if rc != 0: return rc
+    rc = bs_lsp_check(ctx, compiler_path, "lsp-definition-unknown", def_text, bs_lsp_definition(4, 0), "\"result\":null")
+    if rc != 0: return rc
+
+    let sig_text =
+        "fn greet(name: str, age: i32, active: bool):\n" ++
+        "    print(name)\n\n" ++
+        "fn main:\n" ++
+        "    greet(\"hi\", 25, true)\n"
+    let s0 = bs_lsp_run_ok(ctx, compiler_path, "lsp-signature-param0", sig_text, bs_lsp_signature(4, 10))
+    if s0.rc != 0 and s0.rc != 124: return s0.rc
+    rc = bs_assert_contains(ctx, s0.stdout, "\"activeParameter\":0", "lsp_signature_param0")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, s0.stdout, "\"label\":\"fn greet", "lsp_signature_label")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, s0.stdout, "\"label\":\"name: str\"", "lsp_signature_name_param")
+    if rc != 0: return rc
+    rc = bs_lsp_check(ctx, compiler_path, "lsp-signature-param1", sig_text, bs_lsp_signature(4, 16), "\"activeParameter\":1")
+    if rc != 0: return rc
+    rc = bs_lsp_check(ctx, compiler_path, "lsp-signature-param2", sig_text, bs_lsp_signature(4, 20), "\"activeParameter\":2")
+    if rc != 0: return rc
+    bs_lsp_check(ctx, compiler_path, "lsp-signature-null", sig_text, bs_lsp_signature(1, 4), "\"result\":null")
+
+fn bs_check_lsp_dot_completion(ctx: &ActionCtx, compiler_path: str) -> i32:
+    let str_text = "fn main:\n    let name = \"hello\"\n    name.\n"
+    let str_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-dot-str", str_text, bs_lsp_completion(2, 9))
+    if str_out.rc != 0 and str_out.rc != 124: return str_out.rc
+    var rc = bs_assert_contains(ctx, str_out.stdout, "\"label\":\"len\"", "lsp_dot_str_len")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, str_out.stdout, "\"label\":\"slice\"", "lsp_dot_str_slice")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, str_out.stdout, "\"label\":\"contains\"", "lsp_dot_str_contains")
+    if rc != 0: return rc
+
+    let point_text =
+        "type Point {\n" ++
+        "    x: i32,\n" ++
+        "    y: i32,\n" ++
+        "    name: str,\n" ++
+        "}\n\n" ++
+        "fn main:\n" ++
+        "    let p = Point { x: 1, y: 2, name: \"origin\" }\n" ++
+        "    p.\n"
+    let point_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-dot-struct", point_text, bs_lsp_completion(8, 6))
+    if point_out.rc != 0 and point_out.rc != 124: return point_out.rc
+    rc = bs_assert_contains(ctx, point_out.stdout, "\"label\":\"x\"", "lsp_dot_struct_x")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, point_out.stdout, "\"label\":\"y\"", "lsp_dot_struct_y")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, point_out.stdout, "\"label\":\"name\"", "lsp_dot_struct_name")
+    if rc != 0: return rc
+
+    let vec_text = "fn main:\n    let v = Vec.new()\n    v.\n"
+    let vec_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-dot-vec", vec_text, bs_lsp_completion(2, 6))
+    if vec_out.rc != 0 and vec_out.rc != 124: return vec_out.rc
+    rc = bs_assert_contains(ctx, vec_out.stdout, "\"label\":\"push\"", "lsp_dot_vec_push")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, vec_out.stdout, "\"label\":\"len\"", "lsp_dot_vec_len")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, vec_out.stdout, "\"label\":\"get\"", "lsp_dot_vec_get")
+    if rc != 0: return rc
+
+    let user_text =
+        "type User {\n" ++
+        "    name: str,\n" ++
+        "    age: i32,\n" ++
+        "}\n\n" ++
+        "fn greet(u: User):\n" ++
+        "    u.\n"
+    let user_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-dot-param", user_text, bs_lsp_completion(6, 6))
+    if user_out.rc != 0 and user_out.rc != 124: return user_out.rc
+    rc = bs_assert_contains(ctx, user_out.stdout, "\"label\":\"name\"", "lsp_dot_param_name")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, user_out.stdout, "\"label\":\"age\"", "lsp_dot_param_age")
+
+fn bs_check_lsp_references_rename_hover(ctx: &ActionCtx, compiler_path: str) -> i32:
+    let refs_text =
+        "fn helper(x: i32) -> i32:\n" ++
+        "    x * 2\n\n" ++
+        "fn main:\n" ++
+        "    let a = helper(1)\n" ++
+        "    let b = helper(2)\n" ++
+        "    let c = helper(a + b)\n" ++
+        "    print(c)\n"
+    let refs = bs_lsp_run_ok(ctx, compiler_path, "lsp-refs-helper", refs_text, bs_lsp_references(0, 3))
+    if refs.rc != 0 and refs.rc != 124: return refs.rc
+    let ref_loc_needle = "\"uri\":\"file:///tmp/lsp_test.w\",\"range\""
+    var rc = bs_assert_count_at_least(ctx, refs.stdout, ref_loc_needle, 4, "lsp_refs_helper")
+    if rc != 0: return rc
+    let refs_x = bs_lsp_run_ok(ctx, compiler_path, "lsp-refs-param", refs_text, bs_lsp_references(0, 10))
+    if refs_x.rc != 0 and refs_x.rc != 124: return refs_x.rc
+    rc = bs_assert_count_at_least(ctx, refs_x.stdout, ref_loc_needle, 2, "lsp_refs_param_x")
+    if rc != 0: return rc
+    rc = bs_lsp_check(ctx, compiler_path, "lsp-refs-empty", refs_text, bs_lsp_references(7, 0), "\"result\":[]")
+    if rc != 0: return rc
+
+    let extend_text =
+        "type Point {\n" ++
+        "    x: i32,\n" ++
+        "    y: i32,\n" ++
+        "}\n\n" ++
+        "extend Point:\n" ++
+        "    fn distance(self: Point) -> i32:\n" ++
+        "        self.x + self.y\n\n" ++
+        "    fn translate(self: Point, dx: i32) -> Point:\n" ++
+        "        Point { x: self.x + dx, y: self.y }\n\n" ++
+        "fn main:\n" ++
+        "    let p = Point { x: 1, y: 2 }\n" ++
+        "    p.\n"
+    let extend_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-dot-extend", extend_text, bs_lsp_completion(14, 6))
+    if extend_out.rc != 0 and extend_out.rc != 124: return extend_out.rc
+    rc = bs_assert_contains(ctx, extend_out.stdout, "\"label\":\"x\"", "lsp_dot_extend_x")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, extend_out.stdout, "\"label\":\"y\"", "lsp_dot_extend_y")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, extend_out.stdout, "\"label\":\"distance\"", "lsp_dot_extend_distance")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, extend_out.stdout, "\"label\":\"translate\"", "lsp_dot_extend_translate")
+    if rc != 0: return rc
+
+    let rename_text =
+        "fn helper(x: i32) -> i32:\n" ++
+        "    x * 2\n\n" ++
+        "fn main:\n" ++
+        "    let a = helper(1)\n" ++
+        "    let b = helper(2)\n"
+    let rename = bs_lsp_run_ok(ctx, compiler_path, "lsp-rename-helper", rename_text, bs_lsp_rename(0, 3, "util"))
+    if rename.rc != 0 and rename.rc != 124: return rename.rc
+    rc = bs_assert_count_at_least(ctx, rename.stdout, "\"newText\":\"util\"", 3, "lsp_rename_helper")
+    if rc != 0: return rc
+    rc = bs_lsp_check(ctx, compiler_path, "lsp-rename-none", rename_text, bs_lsp_rename(5, 0, "foo"), "\"result\":null")
+    if rc != 0: return rc
+    rc = bs_lsp_check(ctx, compiler_path, "lsp-rename-bad", rename_text, bs_lsp_rename(0, 3, "123bad"), "\"error\"")
+    if rc != 0: return rc
+
+    let hover_text =
+        "/// Adds two numbers together.\n" ++
+        "/// Returns the sum.\n" ++
+        "fn add(a: i32, b: i32) -> i32:\n" ++
+        "    a + b\n\n" ++
+        "fn main:\n" ++
+        "    add(1, 2)\n"
+    let hover = bs_lsp_run_ok(ctx, compiler_path, "lsp-hover-doc", hover_text, bs_lsp_hover(6, 4))
+    if hover.rc != 0 and hover.rc != 124: return hover.rc
+    rc = bs_assert_contains(ctx, hover.stdout, "fn add", "lsp_hover_fn_name")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, hover.stdout, "Adds two numbers", "lsp_hover_doc_comment")
+
+fn bs_check_lsp_prelude_trait_scope_slow(ctx: &ActionCtx, compiler_path: str) -> i32:
+    let prelude_text = "fn main:\n    pri\n"
+    let prelude = bs_lsp_run_ok(ctx, compiler_path, "lsp-prelude", prelude_text, bs_lsp_completion(1, 7))
+    if prelude.rc != 0 and prelude.rc != 124: return prelude.rc
+    var rc = bs_assert_contains(ctx, prelude.stdout, "\"label\":\"print\"", "lsp_prelude_print")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, prelude.stdout, "\"label\":\"Vec\"", "lsp_prelude_vec")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, prelude.stdout, "\"label\":\"Option\"", "lsp_prelude_option")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, prelude.stdout, "\"label\":\"assert\"", "lsp_prelude_assert")
+    if rc != 0: return rc
+
+    let trait_text =
+        "trait Drawable:\n" ++
+        "    fn draw(self: &Self) -> str\n" ++
+        "    fn area(self: &Self) -> i32\n\n" ++
+        "type Circle {\n" ++
+        "    radius: i32,\n" ++
+        "}\n\n" ++
+        "impl Drawable for Circle:\n" ++
+        "    fn draw(self: &Self) -> str:\n" ++
+        "        \"circle\"\n" ++
+        "    fn area(self: &Self) -> i32:\n" ++
+        "        self.radius * self.radius\n\n" ++
+        "fn main:\n" ++
+        "    let c = Circle { radius: 5 }\n" ++
+        "    c.\n"
+    let trait_out = bs_lsp_run_ok(ctx, compiler_path, "lsp-trait-methods", trait_text, bs_lsp_completion(16, 6))
+    if trait_out.rc != 0 and trait_out.rc != 124: return trait_out.rc
+    rc = bs_assert_contains(ctx, trait_out.stdout, "\"label\":\"radius\"", "lsp_trait_radius")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, trait_out.stdout, "\"label\":\"draw\"", "lsp_trait_draw")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, trait_out.stdout, "\"label\":\"area\"", "lsp_trait_area")
+    if rc != 0: return rc
+
+    let scope_refs_text =
+        "fn foo():\n" ++
+        "    let x = 1\n" ++
+        "    print(x)\n\n" ++
+        "fn bar():\n" ++
+        "    let x = 2\n" ++
+        "    print(x)\n"
+    let scope_refs = bs_lsp_run_ok(ctx, compiler_path, "lsp-scope-refs", scope_refs_text, bs_lsp_references(1, 8))
+    if scope_refs.rc != 0 and scope_refs.rc != 124: return scope_refs.rc
+    let ref_loc_needle = "\"uri\":\"file:///tmp/lsp_test.w\",\"range\""
+    rc = bs_assert_count_between(ctx, scope_refs.stdout, ref_loc_needle, 1, 3, "lsp_scope_refs_x")
+    if rc != 0: return rc
+
+    let slow_text =
+        "type Widget {\n" ++
+        "    name: str,\n" ++
+        "    width: i32,\n" ++
+        "}\n\n" ++
+        "fn make_widget() -> Widget:\n" ++
+        "    Widget { name: \"btn\", width: 100 }\n\n" ++
+        "fn main:\n" ++
+        "    let w = make_widget()\n" ++
+        "    w.\n"
+    let slow = bs_lsp_run_ok(ctx, compiler_path, "lsp-slow-type", slow_text, bs_lsp_completion(10, 6))
+    if slow.rc != 0 and slow.rc != 124: return slow.rc
+    rc = bs_assert_contains(ctx, slow.stdout, "\"label\":\"name\"", "lsp_slow_type_name")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, slow.stdout, "\"label\":\"width\"", "lsp_slow_type_width")
+
+pub fn run_cli_selfhost_lsp_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+
+    var rc = bs_check_lsp_parser_recovery(ctx, compiler_path)
+    if rc != 0: return rc
+    rc = bs_check_lsp_completion_cases(ctx, compiler_path)
+    if rc != 0: return rc
+    rc = bs_check_lsp_definition_signature(ctx, compiler_path)
+    if rc != 0: return rc
+    rc = bs_check_lsp_dot_completion(ctx, compiler_path)
+    if rc != 0: return rc
+    rc = bs_check_lsp_references_rename_hover(ctx, compiler_path)
+    if rc != 0: return rc
+    bs_check_lsp_prelude_trait_scope_slow(ctx, compiler_path)
+
 fn bs_check_help(ctx: &ActionCtx, compiler_path: str) -> i32:
     var args: Vec[str] = Vec.new()
     args |> push("--help")
@@ -1489,44 +1912,43 @@ fn bs_check_remove_update_packages(ctx: &ActionCtx, compiler_path: str, case_dir
     if no_deps.rc != 0: return no_deps.rc
     bs_assert_contains(ctx, no_deps.stderr, "no C dependencies to update", "update_no_deps")
 
-fn bs_check_get_raylib_versions(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
-    let latest_dir = bs_join(case_dir, "latest")
-    var rc = bs_write_project_manifest(ctx, latest_dir, "getraylib")
+fn bs_check_get_zlib_versions(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let pinned_latest_dir = bs_join(case_dir, "pinned_1_3_2")
+    var rc = bs_write_project_manifest(ctx, pinned_latest_dir, "getzlib132")
     if rc != 0: return rc
-
     var latest_args: Vec[str] = Vec.new()
     latest_args |> push("get")
-    latest_args |> push("c.raylib")
-    let latest = bs_run_cli_capture_cwd(ctx, compiler_path, "get-raylib-latest", latest_args, 300000, latest_dir)
+    latest_args |> push("c.zlib@1.3.2")
+    let latest = bs_run_cli_capture_cwd(ctx, compiler_path, "get-zlib-1-3-2", latest_args, 300000, pinned_latest_dir)
     if latest.rc != 0:
-        ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-raylib-latest' failed with exit code {latest.rc}")
+        ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-zlib-1-3-2' failed with exit code {latest.rc}")
         return latest.rc
-    rc = bs_assert_contains(ctx, latest.stderr, "resolving raylib/6.0", "get_raylib_latest")
+    rc = bs_assert_contains(ctx, latest.stderr, "resolving zlib/1.3.2", "get_zlib_1_3_2")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, latest.stderr, "added c.raylib@6.0", "get_raylib_latest")
+    rc = bs_assert_contains(ctx, latest.stderr, "added c.zlib@1.3.2", "get_zlib_1_3_2")
     if rc != 0: return rc
-    rc = bs_expect_file(ctx, bs_join(latest_dir, ".with/deps/c/raylib/6.0/metadata.json"), "get raylib latest metadata")
+    rc = bs_expect_file(ctx, bs_join(pinned_latest_dir, ".with/deps/c/zlib/1.3.2/metadata.json"), "get zlib 1.3.2 metadata")
     if rc != 0: return rc
-    rc = bs_expect_file_contains(ctx, bs_join(latest_dir, "with.toml"), "c.raylib = \"6.0\"", "get raylib latest manifest dep")
+    rc = bs_expect_file_contains(ctx, bs_join(pinned_latest_dir, "with.toml"), "c.zlib = \"1.3.2\"", "get zlib 1.3.2 manifest dep")
     if rc != 0: return rc
 
-    let pinned_dir = bs_join(case_dir, "pinned_6_0")
-    rc = bs_write_project_manifest(ctx, pinned_dir, "getraylib60")
+    let pinned_dir = bs_join(case_dir, "pinned_1_3_1")
+    rc = bs_write_project_manifest(ctx, pinned_dir, "getzlib131")
     if rc != 0: return rc
     var pinned_args: Vec[str] = Vec.new()
     pinned_args |> push("get")
-    pinned_args |> push("c.raylib@6.0")
-    let pinned = bs_run_cli_capture_cwd(ctx, compiler_path, "get-raylib-6-0", pinned_args, 300000, pinned_dir)
+    pinned_args |> push("c.zlib@1.3.1")
+    let pinned = bs_run_cli_capture_cwd(ctx, compiler_path, "get-zlib-1-3-1", pinned_args, 300000, pinned_dir)
     if pinned.rc != 0:
-        ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-raylib-6-0' failed with exit code {pinned.rc}")
+        ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-zlib-1-3-1' failed with exit code {pinned.rc}")
         return pinned.rc
-    rc = bs_assert_contains(ctx, pinned.stderr, "resolving raylib/6.0", "get_raylib_6_0")
+    rc = bs_assert_contains(ctx, pinned.stderr, "resolving zlib/1.3.1", "get_zlib_1_3_1")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, pinned.stderr, "added c.raylib@6.0", "get_raylib_6_0")
+    rc = bs_assert_contains(ctx, pinned.stderr, "added c.zlib@1.3.1", "get_zlib_1_3_1")
     if rc != 0: return rc
-    rc = bs_expect_file(ctx, bs_join(pinned_dir, ".with/deps/c/raylib/6.0/metadata.json"), "get raylib 6.0 metadata")
+    rc = bs_expect_file(ctx, bs_join(pinned_dir, ".with/deps/c/zlib/1.3.1/metadata.json"), "get zlib 1.3.1 metadata")
     if rc != 0: return rc
-    bs_expect_file_contains(ctx, bs_join(pinned_dir, "with.toml"), "c.raylib = \"6.0\"", "get raylib 6.0 manifest dep")
+    bs_expect_file_contains(ctx, bs_join(pinned_dir, "with.toml"), "c.zlib = \"1.3.1\"", "get zlib 1.3.1 manifest dep")
 
 fn bs_check_build_cache_tracks_compiler(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "cachecompiler")
@@ -1726,7 +2148,7 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_remove_update_packages(ctx, compiler_path, bs_join(output_dir, "remove_update_packages_case"))
     if rc != 0: return rc
-    rc = bs_check_get_raylib_versions(ctx, compiler_path, bs_join(output_dir, "get_raylib_versions_case"))
+    rc = bs_check_get_zlib_versions(ctx, compiler_path, bs_join(output_dir, "get_zlib_versions_case"))
     if rc != 0: return rc
     rc = bs_check_build_cache_tracks_compiler(ctx, compiler_path, bs_join(output_dir, "build_cache_compiler_case"))
     if rc != 0: return rc

@@ -130,7 +130,6 @@ and script dependency are gone.
 | `scripts/install.cmd` | post-seed blocker | Same as `scripts/install.sh` for CMD hosts. |
 | `scripts/check-stack-budget.py` | post-seed blocker | Replace with a With build action or delete if no live target/runbook references it. |
 | `scripts/generate-requirements.py` | post-seed blocker | Replace with a With docs-generation target or delete if requirements generation is obsolete. |
-| `test/lsp/run_lsp_tests.sh` | post-seed blocker | Replace with a With test target so LSP tests do not require shell dispatch. |
 | `tools/build-ninja.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
 | `tools/build-ninja.ps1` | bootstrap-only | Windows first-SDK bootstrap counterpart. |
 | `tools/build-cmake.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
@@ -186,6 +185,9 @@ and script dependency are gone.
 - 2026-06-15: Audited tracked repository shell, PowerShell, CMD, Python,
   Makefile, and workflow files into bootstrap-only, post-seed blocker, and
   historical/non-build buckets.
+- 2026-06-15: Replaced `test/lsp/run_lsp_tests.sh` with the
+  `with build :cli-selfhost-lsp-tests` action target and wired it into
+  `with build :test`.
 
 ## Implementation Tasks
 
@@ -265,6 +267,8 @@ depending on scripts or shell fragments for normal maintenance.
   files directly and reports the same violations.
 - [x] Move `scripts/check-requirements-informative.py` into a With build action.
 - [x] Move `scripts/check-spec-inventory.py` into a With build action.
+- [x] Move `test/lsp/run_lsp_tests.sh` into a With build action and delete the
+  shell wrapper.
 - [x] Audit `build/`, `src/`, `lib/`, `rt/`, `build.w`, `scripts/`, and `tools/`
   for `sh -c`, `bash -c`, `powershell`, `.py`, `.sh`, `.ps1`, `.cmd`, pipes,
   redirects, and shell utility names. Every post-seed hit must be eliminated or
