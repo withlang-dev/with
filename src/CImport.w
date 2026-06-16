@@ -8292,6 +8292,15 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
             first_arg = 0
         if callee_text == "cfprintf":
             return ci_value_ir_invalid()
+        // §13.5b: setjmp/longjmp have no With representation. Defensive
+        // guard in case a body pre-scan was bypassed — fail loudly with a
+        // recognizable bail message rather than lowering a wrong call.
+        if ci_is_setjmp_longjmp_name(callee_text):
+            if g_ci_bail_message.len() == 0:
+                g_ci_bail_message = f"setjmp/longjmp ('{callee_text}') is not supported"
+                g_ci_bail_location = with_ci_cursor_location(session, cursor)
+                g_ci_bail_kind = kind
+            return ci_value_ir_invalid()
         if callee_text == "__builtin_offsetof" or callee_text == "offsetof":
             let offset_id = exprs.lower_offsetof_value_expr(session, cursor)
             if (offset_id as i32) != 0:
@@ -12146,6 +12155,27 @@ fn ci_body_assigns_to(session: i64, cursor: i32, name: str) -> bool:
             return true
         i = i + 1
     false
+
+// §13.5b: setjmp/longjmp are unsupported for migration. Recognize a call
+// whose callee resolves to a member of the setjmp/longjmp family. The
+// macro forms (`setjmp`, `sigsetjmp`) expand to the underscore/builtin
+// spellings after preprocessing, so all of them are matched.
+fn ci_is_setjmp_longjmp_name(name: str) -> bool:
+    name == "setjmp" or name == "_setjmp" or name == "sigsetjmp" or name == "__sigsetjmp" or name == "longjmp" or name == "_longjmp" or name == "siglongjmp" or name == "__builtin_setjmp" or name == "__builtin_longjmp"
+
+// Find the first setjmp/longjmp-family call cursor in a subtree, or -1.
+fn ci_find_setjmp_longjmp_call(session: i64, cursor: i32) -> i32:
+    if with_ci_cursor_kind(session, cursor) == CXK_CALL_EXPR:
+        if ci_is_setjmp_longjmp_name(ci_call_callee_name(session, cursor)):
+            return cursor
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        let r = ci_find_setjmp_longjmp_call(session, with_ci_child(session, cursor, i))
+        if r >= 0:
+            return r
+        i = i + 1
+    -1
 
 // Check if a function body (or any subtree) contains a goto statement.
 fn ci_has_goto(session: i64, cursor: i32) -> bool:

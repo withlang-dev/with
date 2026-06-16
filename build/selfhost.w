@@ -3487,6 +3487,50 @@ fn bs_check_migrate_variadic_definition_rejected(ctx: &ActionCtx, compiler_path:
     if rc != 0: return rc
     bs_expect_absent(ctx, out_w, "variadic definition rejected output")
 
+fn bs_check_migrate_setjmp_rejected(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "uses_setjmp.c")
+    let out_w = bs_join(case_dir, "uses_setjmp.w")
+    let c_text = "#include <setjmp.h>\n\nstatic jmp_buf g_env;\n\nint guarded(int x) {\n  if (setjmp(g_env) != 0) {\n    return -1;\n  }\n  return x + 1;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "setjmp definition")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-setjmp-rejected", args, 180000, case_dir)
+    if result.rc == 0:
+        return bs_fail(ctx, "setjmp migration unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, result.stderr, "migrate: untranslatable function 'guarded': setjmp/longjmp", "setjmp_rejected")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "uses_setjmp.c:", "setjmp_rejected")
+    if rc != 0: return rc
+    bs_expect_absent(ctx, out_w, "setjmp rejected output")
+
+fn bs_check_migrate_longjmp_rejected(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "uses_longjmp.c")
+    let out_w = bs_join(case_dir, "uses_longjmp.w")
+    let c_text = "#include <setjmp.h>\n\nextern jmp_buf g_env;\n\nvoid bail(int code) {\n  longjmp(g_env, code);\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "longjmp definition")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-longjmp-rejected", args, 180000, case_dir)
+    if result.rc == 0:
+        return bs_fail(ctx, "longjmp migration unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, result.stderr, "migrate: untranslatable function 'bail': setjmp/longjmp", "longjmp_rejected")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "uses_longjmp.c:", "longjmp_rejected")
+    if rc != 0: return rc
+    bs_expect_absent(ctx, out_w, "longjmp rejected output")
+
 pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -3524,7 +3568,11 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_migrate_sizeof_pointer_width(ctx, compiler_path, bs_join(output_dir, "sizeof_pointer_width"))
     if rc != 0: return rc
-    bs_check_migrate_variadic_definition_rejected(ctx, compiler_path, bs_join(output_dir, "variadic_definition_rejected"))
+    rc = bs_check_migrate_variadic_definition_rejected(ctx, compiler_path, bs_join(output_dir, "variadic_definition_rejected"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_setjmp_rejected(ctx, compiler_path, bs_join(output_dir, "setjmp_rejected"))
+    if rc != 0: return rc
+    bs_check_migrate_longjmp_rejected(ctx, compiler_path, bs_join(output_dir, "longjmp_rejected"))
 
 fn bs_check_migrate_libc_ctype(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()

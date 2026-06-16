@@ -1256,6 +1256,20 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
                 cursor_param_names = cursor_param_names ++ "|" ++ cpname ++ "|"
             cpi = cpi + 1
 
+    // §13.5b: setjmp/longjmp are unsupported for migration. Reject the
+    // whole function loudly before any body translation — never emit a
+    // placeholder, extern fallback, TODO, or partial output for it.
+    if fn_body_cursor >= 0:
+        let sj_cursor = ci_find_setjmp_longjmp_call(session, fn_body_cursor)
+        if sj_cursor >= 0:
+            let sj_name = ci_call_callee_name(session, sj_cursor)
+            let sj_loc = with_ci_cursor_location(session, sj_cursor)
+            let loc_suffix = if sj_loc.len() > 0: " at " ++ sj_loc else: ""
+            let msg = f"migrate: untranslatable function '{name}': setjmp/longjmp (call to '{sj_name}') is not supported{loc_suffix}"
+            eprint(msg)
+            ci_migrate_set_error(msg)
+            return ""
+
     if is_variadic != 0 and fn_cursor >= 0 and with_ci_cursor_is_definition(session, fn_cursor) != 0:
         if name == "cfprintf" and ci_str_contains(g_migrate_current_input_path, "pcre2test.c"):
             with_cimport_mark_name_emitted(name)
@@ -1353,7 +1367,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         let loc_suffix = if bail_loc.len() > 0: " at " ++ bail_loc else: ""
         let msg = f"migrate: untranslatable function '{name}': {loud_bail}{loc_suffix}"
         eprint(msg)
-        if ci_str_contains(loud_bail, "computed or unresolved goto"):
+        if ci_str_contains(loud_bail, "computed or unresolved goto") or ci_str_contains(loud_bail, "setjmp/longjmp"):
             ci_migrate_set_error(msg)
             return ""
         g_migrate_fn_untranslatable = g_migrate_fn_untranslatable + 1
