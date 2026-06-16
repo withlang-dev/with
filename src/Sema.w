@@ -253,6 +253,8 @@ type SemaBuiltinSymbols {
     pop: i32,
     set_i32: i32,
     keys: i32,
+    values: i32,
+    items: i32,
     next: i32,
     unwrap: i32,
     expect: i32,
@@ -1256,6 +1258,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         pop: 0,
         set_i32: 0,
         keys: 0,
+        values: 0,
+        items: 0,
         next: 0,
         unwrap: 0,
         expect: 0,
@@ -2185,6 +2189,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.pop = self.pool_intern("pop")
     self.syms.set_i32 = self.pool_intern("set_i32")
     self.syms.keys = self.pool_intern("keys")
+    self.syms.values = self.pool_intern("values")
+    self.syms.items = self.pool_intern("items")
     self.syms.next = self.pool_intern("next")
     self.syms.unwrap = self.pool_intern("unwrap")
     self.syms.expect = self.pool_intern("expect")

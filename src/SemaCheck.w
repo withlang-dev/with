@@ -9982,7 +9982,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
         if field == self.syms.get or field == self.syms.contains or field == self.syms.remove:
             return 1
-        if self.is_collection_len_method(field) or field == self.syms.keys or field == self.syms.entry:
+        if self.is_collection_len_method(field) or field == self.syms.keys or field == self.syms.values or field == self.syms.items or field == self.syms.entry:
             return 1
         let method_name = self.pool_resolve(field)
         if method_name == "increment" or method_name == "decrement" or method_name == "update":
@@ -14192,7 +14192,7 @@ fn Sema.builtin_method_is_iter_of_self(self: Sema, type_name_sym: i32, field: i3
         if field == self.syms.iter or field == self.syms.keys or field == self.syms.iter_place or field == self.syms.iter_ref:
             return 1
     if type_name_sym == self.syms.hashmap:
-        if field == self.syms.iter or field == self.syms.keys:
+        if field == self.syms.iter or field == self.syms.keys or field == self.syms.values or field == self.syms.items:
             return 1
     if type_name_sym == self.syms.hashset:
         if field == self.syms.iter:
@@ -15238,12 +15238,15 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return generic_len_ret
             if field == self.syms.keys:
                 let key_ty = self.get_generic_inst_arg(recv_type, 0)
-                let key_vec_tid = self.find_generic_inst(self.syms.vec, key_ty)
-                if key_vec_tid != 0:
-                    return key_vec_tid
-                let key_vec_args: Vec[i32] = Vec.new()
-                key_vec_args.push(key_ty)
-                return self.ensure_generic_inst_type(self.syms.vec, key_vec_args, 1) as i32
+                return self.ensure_vec_type_for(key_ty)
+            if field == self.syms.values:
+                let value_ty = self.get_generic_inst_arg(recv_type, 1)
+                return self.ensure_vec_type_for(value_ty)
+            if field == self.syms.items:
+                let item_elems: Vec[i32] = Vec.new()
+                item_elems.push(self.get_generic_inst_arg(recv_type, 0))
+                item_elems.push(self.get_generic_inst_arg(recv_type, 1))
+                return self.ensure_vec_type_for(self.ensure_tuple_type(item_elems, 2) as i32)
             if field == self.syms.entry:
                 let ek = self.get_generic_inst_arg(recv_type, 0)
                 let ev = self.get_generic_inst_arg(recv_type, 1)
@@ -17112,6 +17115,11 @@ fn Sema.infer_for_element_type(self: Sema, iter_type: i32) -> i32:
         let base_name = self.pool_resolve(self.get_type_d0(resolved))
         if base_name == "Vec" and self.get_generic_inst_arg_count(resolved as i32) > 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
+        if base_name == "HashMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
+            let elems: Vec[i32] = Vec.new()
+            elems.push(self.get_generic_inst_arg(resolved as i32, 0))
+            elems.push(self.get_generic_inst_arg(resolved as i32, 1))
+            return self.ensure_tuple_type(elems, 2) as i32
         if base_name == "VecIterRef" and self.get_generic_inst_arg_count(resolved as i32) > 0:
             let iref_elem = self.get_generic_inst_arg(resolved as i32, 0)
             return self.ensure_exact_type(TypeKind.TY_REF, iref_elem, 0, 0) as i32

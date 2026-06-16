@@ -2267,6 +2267,43 @@ pub fn with_hashmap_keys_out(out: *mut u8, map: *mut u8, key_size: i64) -> Unit:
             with_vec_push(out, (hm_keys(m) as i64 + i * ksz) as *const u8)
         i = i + 1
 
+pub fn with_hashmap_values_out(out: *mut u8, map: *mut u8, val_size: i64) -> Unit:
+    let m = map as i64
+    if m == 0:
+        with_vec_new_out(out, val_size)
+        return
+    let cap = hm_cap(m)
+    let vsz = hm_val_size(m)
+    let effective_vsz = if vsz > 0: vsz else: val_size
+    with_vec_new_out(out, effective_vsz)
+    var i: i64 = 0
+    while i < cap:
+        if (unsafe hm_occ(m)[i]) != 0:
+            with_vec_push(out, (hm_vals(m) as i64 + i * vsz) as *const u8)
+        i = i + 1
+
+pub fn with_hashmap_items_out(out: *mut u8, map: *mut u8, key_size: i64, val_size: i64, pair_size: i64, val_offset: i64) -> Unit:
+    let m = map as i64
+    let effective_pair_size = if pair_size > 0: pair_size else: key_size + val_size
+    with_vec_new_out(out, effective_pair_size)
+    if m == 0:
+        return
+    let cap = hm_cap(m)
+    let ksz = hm_key_size(m)
+    let vsz = hm_val_size(m)
+    let effective_ksz = if ksz > 0: ksz else: key_size
+    let effective_vsz = if vsz > 0: vsz else: val_size
+    let tmp = rt_alloc(effective_pair_size)
+    var i: i64 = 0
+    while i < cap:
+        if (unsafe hm_occ(m)[i]) != 0:
+            rt_memset(tmp, 0, effective_pair_size)
+            rt_memcpy(tmp, (hm_keys(m) as i64 + i * ksz) as *const u8, effective_ksz)
+            rt_memcpy((tmp as i64 + val_offset) as *mut u8, (hm_vals(m) as i64 + i * vsz) as *const u8, effective_vsz)
+            with_vec_push(out, tmp as *const u8)
+        i = i + 1
+    rt_free_sized(tmp, effective_pair_size)
+
 pub fn with_hashmap_free(map: *mut u8) -> Unit:
     if map as i64 == 0: return
     let m = map as i64

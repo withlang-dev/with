@@ -203,6 +203,8 @@ enum MirIntrinsic: i32:
     FMT_SPEC
     INT_SWAP_BYTES
     MAP_KEYS
+    MAP_VALUES
+    MAP_ITEMS
     POPCOUNT
     CLZ
     CTZ

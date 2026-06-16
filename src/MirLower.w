@@ -1229,6 +1229,15 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
             if method_name == "get" or method_name == "remove":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 1)
+            if method_name == "values":
+                if tk == TypeKind.TY_GENERIC_INST:
+                    return self.sema.ensure_vec_type_for(self.sema.get_generic_inst_arg(resolved, 1))
+            if method_name == "items":
+                if tk == TypeKind.TY_GENERIC_INST:
+                    let elems: Vec[i32] = Vec.new()
+                    elems.push(self.sema.get_generic_inst_arg(resolved, 0))
+                    elems.push(self.sema.get_generic_inst_arg(resolved, 1))
+                    return self.sema.ensure_vec_type_for(self.sema.ensure_tuple_type(elems, 2) as i32)
             if method_name == "entry":
                 if tk == TypeKind.TY_GENERIC_INST:
                     let ek = self.sema.get_generic_inst_arg(resolved, 0)
@@ -4874,6 +4883,8 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
                 let type_name = self.pool.resolve(type_name_sym)
                 if type_name == "Vec":
                     return self.lower_for_vec(for_node, pat_or_sym, iter_expr, body_expr)
+                if type_name == "HashMap":
+                    return self.lower_for_hashmap(for_node, pat_or_sym, iter_expr, body_expr)
 
     // Handle for x in vec.iter() — redirect to lower_for_vec with the Vec receiver.
     // Handle for slot in vec.iter_place() — redirect to lower_for_iter_place.
@@ -5774,6 +5785,92 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, for_node: i32, pat_or_sym: i32, it
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
     // Increment: counter += 1
+    self.switch_to(inc_bb)
+    let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let one_op = self.int_const_operand(1, self.sema.ty_i64)
+    let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+    self.pop_control_target()
+    self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
+    self.unit_operand()
+
+fn MirBuilder.lower_for_hashmap(self: MirBuilder, for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
+    // for (k, v) in map → materialize map.items() then use the normal Vec loop.
+    let map_op = self.lower_expr(iter_expr)
+    let map_ty = self.expr_type(iter_expr)
+    let elem_ty = self.sema.infer_for_element_type(map_ty)
+    let items_vec_ty = self.sema.ensure_vec_type_for(elem_ty)
+
+    let map_place = self.materialize_operand(map_op, map_ty, self.ast.get_start(iter_expr))
+    let items_local = self.new_temp(items_vec_ty)
+    let items_place = self.place_for_local(items_local)
+    let items_args: Vec[i32] = Vec.new()
+    items_args.push(self.body.new_operand(OperandKind.OK_COPY, map_place))
+    let items_args_id = self.body.new_call_args(items_args)
+    self.body.set_call_intrinsic(items_args_id, MirIntrinsic.MAP_ITEMS)
+    let items_after_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), items_args_id, items_place, items_after_bb)
+    self.switch_to(items_after_bb)
+
+    let len_local = self.new_temp(self.sema.ty_i64)
+    let len_place = self.place_for_local(len_local)
+    let len_args: Vec[i32] = Vec.new()
+    len_args.push(self.body.new_operand(OperandKind.OK_COPY, items_place))
+    let len_args_id = self.body.new_call_args(len_args)
+    self.body.set_call_intrinsic(len_args_id, MirIntrinsic.VEC_LEN)
+    let len_after_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), len_args_id, len_place, len_after_bb)
+    self.switch_to(len_after_bb)
+
+    let counter_local = self.new_temp(self.sema.ty_i64)
+    let counter_place = self.place_for_local(counter_local)
+    let zero_op = self.int_const_operand(0, self.sema.ty_i64)
+    let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(iter_expr))
+
+    let header_bb = self.new_block()
+    let body_bb = self.new_block()
+    let inc_bb = self.new_block()
+    let exit_bb = self.new_block()
+
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+    self.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, inc_bb, exit_bb, -1)
+
+    self.switch_to(header_bb)
+    let counter_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let len_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
+    let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, counter_op, len_op)
+    let cmp_local = self.new_temp(self.sema.ty_bool)
+    let cmp_place = self.place_for_local(cmp_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
+    let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
+
+    self.switch_to(body_bb)
+    let elem_local = self.new_temp(elem_ty)
+    let elem_place = self.place_for_local(elem_local)
+    let get_args: Vec[i32] = Vec.new()
+    get_args.push(self.body.new_operand(OperandKind.OK_COPY, items_place))
+    get_args.push(self.body.new_operand(OperandKind.OK_COPY, counter_place))
+    let get_args_id = self.body.new_call_args(get_args)
+    self.body.set_call_intrinsic(get_args_id, MirIntrinsic.VEC_GET)
+    let get_after_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), get_args_id, elem_place, get_after_bb)
+    self.switch_to(get_after_bb)
+
+    self.bind_for_element_or_skip(for_node, pat_or_sym, elem_place, elem_ty, body_expr, inc_bb)
+
+    let _ = self.lower_expr_discard(body_expr)
+    self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
+
     self.switch_to(inc_bb)
     let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
     let one_op = self.int_const_operand(1, self.sema.ty_i64)
@@ -7460,6 +7557,8 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "decrement": return MirIntrinsic.MAP_DECREMENT
         if method_name == "update": return MirIntrinsic.MAP_UPDATE
         if method_name == "keys": return MirIntrinsic.MAP_KEYS
+        if method_name == "values": return MirIntrinsic.MAP_VALUES
+        if method_name == "items": return MirIntrinsic.MAP_ITEMS
         if method_name == "entry": return MirIntrinsic.MAP_ENTRY
         return MirIntrinsic.NONE
     if type_name == "HashMapEntry":
