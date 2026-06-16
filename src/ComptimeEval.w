@@ -107,6 +107,13 @@ type ComptimeCapabilityRecord {
     network: i32,
 }
 
+type ComptimeArchiveEntry {
+    kind: i32,
+    source_path: str,
+    archive_path: str,
+    mode: i32,
+}
+
 type ComptimeWorkspaceRecord {
     name: str,
     files: Vec[str],
@@ -482,6 +489,171 @@ fn comptime_tool_split_nonempty_lines(text: str) -> Vec[str]:
     if start < text.len() as i32:
         lines.push(text.slice(start as i64, text.len()))
     lines
+
+fn comptime_tar_zeroes(count: i64) -> str:
+    var out = StringBuilder.with_capacity(count)
+    var i: i64 = 0
+    while i < count:
+        out.push_byte(0 as u8)
+        i = i + 1
+    out.to_str()
+
+fn comptime_tar_padded_str(value: str, width: i64) -> str:
+    if value.len() > width:
+        return ""
+    var out = StringBuilder.with_capacity(width)
+    for i in 0..value.len() as i32:
+        out.push_byte(value.byte_at(i as i64) as u8)
+    var pad = value.len()
+    while pad < width:
+        out.push_byte(0 as u8)
+        pad = pad + 1
+    out.to_str()
+
+fn comptime_tar_octal_digits(value: i64) -> str:
+    if value == 0:
+        return "0"
+    var v = value
+    var rev = StringBuilder.new()
+    while v > 0:
+        rev.push_byte((48 + (v % 8) as i32) as u8)
+        v = v / 8
+    let reversed = rev.to_str()
+    var out = StringBuilder.with_capacity(reversed.len())
+    var i = reversed.len()
+    while i > 0:
+        i = i - 1
+        out.push_byte(reversed.byte_at(i) as u8)
+    out.to_str()
+
+fn comptime_tar_octal_nul(value: i64, width: i64) -> str:
+    if value < 0:
+        return ""
+    let digits = comptime_tar_octal_digits(value)
+    if digits.len() + 1 > width:
+        return ""
+    var out = StringBuilder.with_capacity(width)
+    var pad = digits.len() + 1
+    while pad < width:
+        out.push_byte(48 as u8)
+        pad = pad + 1
+    for i in 0..digits.len() as i32:
+        out.push_byte(digits.byte_at(i as i64) as u8)
+    out.push_byte(0 as u8)
+    out.to_str()
+
+fn comptime_tar_checksum_field(checksum: i64) -> str:
+    let digits = comptime_tar_octal_digits(checksum)
+    if digits.len() > 6:
+        return ""
+    var out = StringBuilder.with_capacity(8)
+    var pad = digits.len()
+    while pad < 6:
+        out.push_byte(48 as u8)
+        pad = pad + 1
+    for i in 0..digits.len() as i32:
+        out.push_byte(digits.byte_at(i as i64) as u8)
+    out.push_byte(0 as u8)
+    out.push_byte(32 as u8)
+    out.to_str()
+
+fn comptime_tar_sum(data: str) -> i64:
+    var sum: i64 = 0
+    for i in 0..data.len() as i32:
+        sum = sum + data.byte_at(i as i64) as i64
+    sum
+
+fn comptime_tar_entry_name(path: str, directory: bool) -> str:
+    if path.len() == 0 or (not directory and path.ends_with("/")):
+        return ""
+    let normalized = comptime_tool_path_normalize(path)
+    if normalized == "." or not comptime_tool_path_is_project_relative(normalized):
+        return ""
+    let result = if directory: normalized ++ "/" else: normalized
+    if result.len() > 100:
+        return ""
+    result
+
+fn comptime_tar_build_header(name: str, mode: i32, size: i64, directory: bool) -> str:
+    if name.len() == 0 or name.len() > 100 or mode < 0 or size < 0:
+        return ""
+    let name_field = comptime_tar_padded_str(name, 100)
+    let mode_field = comptime_tar_octal_nul(mode as i64, 8)
+    let uid_field = comptime_tar_octal_nul(0, 8)
+    let gid_field = comptime_tar_octal_nul(0, 8)
+    let size_field = comptime_tar_octal_nul(size, 12)
+    let mtime_field = comptime_tar_octal_nul(0, 12)
+    if name_field.len() == 0 or mode_field.len() == 0 or uid_field.len() == 0 or gid_field.len() == 0 or size_field.len() == 0 or mtime_field.len() == 0:
+        return ""
+    let prefix = name_field ++ mode_field ++ uid_field ++ gid_field ++ size_field ++ mtime_field
+    let typeflag = with_str_from_byte(if directory: 53 else: 48)
+    let suffix = typeflag ++ comptime_tar_zeroes(100) ++ comptime_tar_padded_str("ustar", 6) ++ comptime_tar_padded_str("00", 2) ++ comptime_tar_zeroes(247)
+    if suffix.len() != 356:
+        return ""
+    let checksum = comptime_tar_sum(prefix) + 256 + comptime_tar_sum(suffix)
+    let checksum_field = comptime_tar_checksum_field(checksum)
+    if checksum_field.len() != 8:
+        return ""
+    let header = prefix ++ checksum_field ++ suffix
+    if header.len() != 512:
+        return ""
+    header
+
+fn comptime_tar_block_is_zero(data: str, offset: i64) -> bool:
+    if offset + 512 > data.len():
+        return false
+    var i: i64 = 0
+    while i < 512:
+        if data.byte_at(offset + i) != 0:
+            return false
+        i = i + 1
+    true
+
+fn comptime_tar_field_str(data: str, offset: i64, width: i64) -> str:
+    var out = StringBuilder.new()
+    var i: i64 = 0
+    while i < width:
+        let b = data.byte_at(offset + i)
+        if b == 0:
+            return out.to_str()
+        out.push_byte(b as u8)
+        i = i + 1
+    out.to_str()
+
+fn comptime_tar_parse_octal(data: str, offset: i64, width: i64) -> i64:
+    var value: i64 = 0
+    var i: i64 = 0
+    while i < width:
+        let b = data.byte_at(offset + i)
+        if b != 0 and b != 32:
+            if b < 48 or b > 55:
+                return -1
+            value = value * 8 + (b as i64 - 48)
+        i = i + 1
+    value
+
+fn comptime_tar_header_checksum(data: str, offset: i64) -> i64:
+    var sum: i64 = 0
+    var i: i64 = 0
+    while i < 512:
+        if i >= 148 and i < 156:
+            sum = sum + 32
+        else:
+            sum = sum + data.byte_at(offset + i) as i64
+        i = i + 1
+    sum
+
+fn comptime_tar_magic_ok(data: str, offset: i64) -> bool:
+    data.byte_at(offset + 257) == 117 and
+        data.byte_at(offset + 258) == 115 and
+        data.byte_at(offset + 259) == 116 and
+        data.byte_at(offset + 260) == 97 and
+        data.byte_at(offset + 261) == 114
+
+fn comptime_tar_archive_name_safe(name: str) -> bool:
+    if name.len() == 0:
+        return false
+    comptime_tool_path_is_project_relative(name)
 
 fn comptime_glob_split_by_slash(path: str) -> Vec[str]:
     let parts: Vec[str] = Vec.new()
@@ -3718,6 +3890,149 @@ fn ComptimeEvaluator.eval_source_emitter_capability_method(self: ComptimeEvaluat
     self.extra_values.push(comptime_value_str(contents))
     comptime_control_value(comptime_value_struct(source_type, start, 2))
 
+fn ComptimeEvaluator.archive_entry_kind_value(self: ComptimeEvaluator, value: ComptimeValue, node: i32) -> i32:
+    if comptime_value_is_intlike(value) != 0:
+        return value.data0 as i32
+    if value.kind == ComptimeValueKind.CV_ENUM:
+        let sym = value.data0 as i32
+        if self.sema.variant_type_ids.contains(sym):
+            let enum_tid = self.sema.variant_type_ids.get(sym).unwrap()
+            let enum_resolved = self.sema.resolve_alias(enum_tid as TypeId)
+            if self.sema.disc_repr_types.contains(enum_resolved as i32) and not self.sema.disc_has_payload.contains(enum_resolved as i32):
+                return if self.sema.disc_values.contains(sym): self.sema.disc_values.get(sym).unwrap() else: self.sema.variant_lookup.get(sym).unwrap()
+    let _ = self.fail(node, "ArchiveEntry.kind must be ArchiveEntryKind")
+    -1
+
+fn ComptimeEvaluator.archive_entry_from_value(self: ComptimeEvaluator, value: ComptimeValue, node: i32) -> ComptimeArchiveEntry:
+    if value.kind != ComptimeValueKind.CV_STRUCT:
+        let _ = self.fail(node, "write_tar entries must contain ArchiveEntry values")
+        return ComptimeArchiveEntry { kind: -1, source_path: "", archive_path: "", mode: 0 }
+    let kind_value = self.struct_field_value_by_name(value, "kind")
+    let source_value = self.struct_field_value_by_name(value, "source_path")
+    let archive_value = self.struct_field_value_by_name(value, "archive_path")
+    let mode_value = self.struct_field_value_by_name(value, "mode")
+    if source_value.kind != ComptimeValueKind.CV_STR or archive_value.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(mode_value) == 0:
+        let _ = self.fail(node, "write_tar entries must be ArchiveEntry values")
+        return ComptimeArchiveEntry { kind: -1, source_path: "", archive_path: "", mode: 0 }
+    let kind = self.archive_entry_kind_value(kind_value, node)
+    if kind != 0 and kind != 1:
+        let _ = self.fail(node, "ArchiveEntry.kind must be File or Directory")
+        return ComptimeArchiveEntry { kind: -1, source_path: "", archive_path: "", mode: 0 }
+    ComptimeArchiveEntry {
+        kind,
+        source_path: source_value.text,
+        archive_path: archive_value.text,
+        mode: mode_value.data0 as i32,
+    }
+
+fn ComptimeEvaluator.toolfs_write_tar(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, output_path: str, entries_value: ComptimeValue, method: str, node: i32) -> i32:
+    if not self.capability_require_write_file_allowed(record, output_path, method, node):
+        return 1
+    let resolved_output = self.capability_resolve_project_path(record, output_path, method, node)
+    if self.had_error != 0:
+        return 1
+    if entries_value.kind != ComptimeValueKind.CV_VEC and entries_value.kind != ComptimeValueKind.CV_ARRAY:
+        let _ = self.fail(node, "write_tar second argument must be Vec[ArchiveEntry]")
+        return 1
+    var out = StringBuilder.new()
+    for i in 0..entries_value.extra_count:
+        let raw_entry = self.extra_values.get((entries_value.extra_start + i) as i64)
+        let entry = self.archive_entry_from_value(raw_entry, node)
+        if self.had_error != 0:
+            return 1
+        if entry.kind == 1:
+            let name = comptime_tar_entry_name(entry.archive_path, true)
+            let header = comptime_tar_build_header(name, entry.mode, 0, true)
+            if header.len() == 0:
+                return 1
+            out.push_str(header)
+        else:
+            if entry.source_path.len() == 0:
+                return 1
+            let resolved_source = self.capability_resolve_project_path(record, entry.source_path, method, node)
+            if self.had_error != 0:
+                return 1
+            let name = comptime_tar_entry_name(entry.archive_path, false)
+            let contents = with_fs_read_file(resolved_source)
+            let header = comptime_tar_build_header(name, entry.mode, contents.len(), false)
+            if header.len() == 0:
+                return 1
+            out.push_str(header)
+            out.push_str(contents)
+            let padding = (512 - (contents.len() % 512)) % 512
+            out.push_str(comptime_tar_zeroes(padding))
+    out.push_str(comptime_tar_zeroes(1024))
+    with_fs_write_file(resolved_output, out.to_str())
+
+fn ComptimeEvaluator.toolfs_extract_tar(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, archive_path: str, output_dir: str, method: str, node: i32) -> i32:
+    let resolved_archive = self.capability_resolve_project_path(record, archive_path, method, node)
+    if self.had_error != 0:
+        return 1
+    if not self.capability_require_mkdir_allowed(record, output_dir, method, node):
+        return 1
+    let resolved_output_dir = self.capability_resolve_project_path(record, output_dir, method, node)
+    if self.had_error != 0:
+        return 1
+    if with_fs_mkdir_p(resolved_output_dir) != 0:
+        return 1
+    let archive = with_fs_read_file(resolved_archive)
+    var offset: i64 = 0
+    while offset + 512 <= archive.len():
+        if comptime_tar_block_is_zero(archive, offset):
+            return 0
+        if not comptime_tar_magic_ok(archive, offset):
+            return 1
+        let stored_checksum = comptime_tar_parse_octal(archive, offset + 148, 8)
+        if stored_checksum < 0 or stored_checksum != comptime_tar_header_checksum(archive, offset):
+            return 1
+        let raw_name = comptime_tar_field_str(archive, offset, 100)
+        if not comptime_tar_archive_name_safe(raw_name):
+            return 1
+        let name = comptime_tool_path_normalize(raw_name)
+        let mode = comptime_tar_parse_octal(archive, offset + 100, 8)
+        let size = comptime_tar_parse_octal(archive, offset + 124, 12)
+        if mode < 0 or size < 0:
+            return 1
+        let typeflag = archive.byte_at(offset + 156)
+        let output_path = if output_dir.ends_with("/"): output_dir ++ name else: output_dir ++ "/" ++ name
+        if typeflag == 53:
+            if not self.capability_require_mkdir_allowed(record, output_path, method, node):
+                return 1
+            let resolved_dir = self.capability_resolve_project_path(record, output_path, method, node)
+            if self.had_error != 0:
+                return 1
+            if with_fs_mkdir_p(resolved_dir) != 0:
+                return 1
+            if mode > 0:
+                let _ = with_fs_chmod(resolved_dir, mode as i32)
+        else if typeflag == 48 or typeflag == 0:
+            let content_start = offset + 512
+            if content_start + size > archive.len():
+                return 1
+            if not self.capability_require_write_file_allowed(record, output_path, method, node):
+                return 1
+            let output_parent = comptime_tool_path_dirname(output_path)
+            if output_parent != ".":
+                if not self.capability_require_mkdir_allowed(record, output_parent, method, node):
+                    return 1
+                let resolved_parent = self.capability_resolve_project_path(record, output_parent, method, node)
+                if self.had_error != 0:
+                    return 1
+                if with_fs_mkdir_p(resolved_parent) != 0:
+                    return 1
+            let resolved_file = self.capability_resolve_project_path(record, output_path, method, node)
+            if self.had_error != 0:
+                return 1
+            if with_fs_write_file(resolved_file, archive.slice(content_start, content_start + size)) != 0:
+                return 1
+            if mode > 0:
+                let _ = with_fs_chmod(resolved_file, mode as i32)
+        else:
+            return 1
+        let padded = ((size + 511) / 512) * 512
+        offset = offset + 512 + padded
+    1
+
 fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_TOOL_FS, method, node)
     if handle < 0:
@@ -3967,6 +4282,34 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
             if self.had_error != 0:
                 return comptime_control_error()
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_symlink(resolved_target, resolved_link) as i64))
+    if method == "write_tar":
+        if not self.capability_expect_arg_count(arg_count, 2, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let output_path = self.capability_arg_str(args_signal.value, 0, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let entries_value = self.extra_values.get((args_signal.value.extra_start + 1) as i64)
+        let rc = self.toolfs_write_tar(&record, output_path, entries_value, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), rc as i64))
+    if method == "extract_tar":
+        if not self.capability_expect_arg_count(arg_count, 2, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let archive_path = self.capability_arg_str(args_signal.value, 0, method, node)
+        let output_dir = self.capability_arg_str(args_signal.value, 1, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let rc = self.toolfs_extract_tar(&record, archive_path, output_dir, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), rc as i64))
     if method == "write_binary":
         if not self.capability_expect_arg_count(arg_count, 2, method, node):
             return comptime_control_error()

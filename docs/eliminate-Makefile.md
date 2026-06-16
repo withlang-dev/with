@@ -93,6 +93,11 @@ Still blocking Makefile and script removal:
   packaging work. Repository build evidence, compiler seed hashes, generic
   `std.build` download checksum verification, and optional stack-budget
   inspection use With-owned tools or explicit With-owned SDK tool paths.
+- `ToolFs.write_tar()` and `ToolFs.extract_tar()` provide native
+  uncompressed USTAR support for regular files and directories. Release and
+  SDK packaging still need native compression, symlink metadata, archive
+  manifests, and package-format targets before host `tar`/`zstd`/`zip` scripts
+  can disappear.
 - `ToolFs.scratch_dir()` exists, but repository build modules cannot call it
   directly until the installed seed embeds that API. PCRE2 has moved from the
   shared `out/pcre2_tmp` path to the action-scratch path convention with
@@ -193,6 +198,9 @@ and script dependency are gone.
   binaries, invokes the pinned LLVM SDK `llvm-readobj` / `llvm-dwarfdump`
   paths, writes `out/test-graph/stack-budget-check/report.txt`, and enforces
   the previous 64 KiB default budget when run.
+- 2026-06-15: Added native uncompressed USTAR creation/extraction to
+  `ToolFs.write_tar()` / `ToolFs.extract_tar()` with build.w selfhost coverage
+  for directory entries, text files, and binary payloads.
 
 ## Implementation Tasks
 
@@ -225,7 +233,9 @@ trustworthy once `build.w` owns every workflow.
   utilities.
   Binary writes, copy/chmod/tree operations, scratch dirs, repository-local
   self-hosted hashing, host file reads, and project-file SHA-256 hashing exist;
-  native archive support, HTTP fetch, and richer platform path handling remain.
+  native uncompressed USTAR file/directory archive support exists; native
+  compression, symlink archive metadata, HTTP fetch, and richer platform path
+  handling remain.
 - [x] Implement `ToolFs.scratch_dir() -> str` as an action-scoped, driver-managed
   scratch directory. The returned path must be project-relative, private to the
   current action invocation, automatically included in that action's write

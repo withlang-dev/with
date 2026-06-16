@@ -306,6 +306,33 @@ pub type ProcessSpec {
     capture_stderr: bool,
 }
 
+pub enum ArchiveEntryKind: i32:
+    File = 0
+    Directory = 1
+
+pub type ArchiveEntry {
+    kind: ArchiveEntryKind,
+    source_path: str,
+    archive_path: str,
+    mode: i32,
+}
+
+pub fn archive_file_entry(source_path: str, archive_path: str, mode: i32) -> ArchiveEntry:
+    ArchiveEntry {
+        kind: ArchiveEntryKind.File,
+        source_path,
+        archive_path,
+        mode,
+    }
+
+pub fn archive_dir_entry(archive_path: str, mode: i32) -> ArchiveEntry:
+    ArchiveEntry {
+        kind: ArchiveEntryKind.Directory,
+        source_path: "",
+        archive_path,
+        mode,
+    }
+
 pub fn process_spec(executable: str) -> ProcessSpec:
     ProcessSpec {
         executable,
@@ -929,6 +956,258 @@ pub fn ToolFs.write_binary(self: &Self, path: str, bytes: Vec[u8]) -> i32:
     for i in 0..bytes.len() as i32:
         out.push_byte(bytes.get(i as i64))
     with_fs_write_file(self.resolve_path(path), out.to_str())
+
+fn tool_tar_append_zeroes(mut out: Vec[u8], count: i64) -> Vec[u8]:
+    var i: i64 = 0
+    while i < count:
+        out.push(0 as u8)
+        i = i + 1
+    out
+
+fn tool_tar_append_bytes(mut out: Vec[u8], bytes: &Vec[u8]) -> Vec[u8]:
+    for i in 0..bytes.len() as i32:
+        out.push(bytes.get(i as i64))
+    out
+
+fn tool_tar_append_str_padded(mut out: Vec[u8], value: str, width: i64) -> Vec[u8]:
+    if value.len() > width:
+        return Vec.new()
+    for i in 0..value.len() as i32:
+        out.push(value.byte_at(i as i64) as u8)
+    var pad = value.len()
+    while pad < width:
+        out.push(0 as u8)
+        pad = pad + 1
+    out
+
+fn tool_tar_octal_digits(value: i64) -> str:
+    if value == 0:
+        return "0"
+    var v = value
+    var rev = StringBuilder.new()
+    while v > 0:
+        rev.push_byte((48 + (v % 8) as i32) as u8)
+        v = v / 8
+    let reversed = rev.to_str()
+    var out = StringBuilder.with_capacity(reversed.len())
+    var i = reversed.len()
+    while i > 0:
+        i = i - 1
+        out.push_byte(reversed.byte_at(i) as u8)
+    out.to_str()
+
+fn tool_tar_append_octal_nul(mut out: Vec[u8], value: i64, width: i64) -> Vec[u8]:
+    if value < 0:
+        return Vec.new()
+    let digits = tool_tar_octal_digits(value)
+    if digits.len() + 1 > width:
+        return Vec.new()
+    var pad = digits.len() + 1
+    while pad < width:
+        out.push(48 as u8)
+        pad = pad + 1
+    for i in 0..digits.len() as i32:
+        out.push(digits.byte_at(i as i64) as u8)
+    out.push(0 as u8)
+    out
+
+fn tool_tar_append_checksum(mut out: Vec[u8], checksum: i64) -> Vec[u8]:
+    let digits = tool_tar_octal_digits(checksum)
+    if digits.len() > 6:
+        return Vec.new()
+    var pad = digits.len()
+    while pad < 6:
+        out.push(48 as u8)
+        pad = pad + 1
+    for i in 0..digits.len() as i32:
+        out.push(digits.byte_at(i as i64) as u8)
+    out.push(0 as u8)
+    out.push(32 as u8)
+    out
+
+fn tool_tar_sum(bytes: &Vec[u8]) -> i64:
+    var sum: i64 = 0
+    for i in 0..bytes.len() as i32:
+        sum = sum + bytes.get(i as i64) as i64
+    sum
+
+fn tool_tar_entry_name(path: str, directory: bool) -> str:
+    if path.len() == 0 or (not directory and path.ends_with("/")):
+        return ""
+    let normalized = tool_path_normalize(path)
+    if normalized == ".":
+        return ""
+    tool_path_require_project_relative(normalized)
+    let result = if directory: normalized ++ "/" else: normalized
+    if result.len() > 100:
+        return ""
+    result
+
+fn tool_tar_build_header(name: str, mode: i32, size: i64, kind: ArchiveEntryKind) -> Vec[u8]:
+    if name.len() == 0 or name.len() > 100 or mode < 0 or size < 0:
+        return Vec.new()
+    var prefix: Vec[u8] = Vec.new()
+    prefix = tool_tar_append_str_padded(prefix, name, 100)
+    prefix = tool_tar_append_octal_nul(prefix, mode as i64, 8)
+    prefix = tool_tar_append_octal_nul(prefix, 0, 8)
+    prefix = tool_tar_append_octal_nul(prefix, 0, 8)
+    prefix = tool_tar_append_octal_nul(prefix, size, 12)
+    prefix = tool_tar_append_octal_nul(prefix, 0, 12)
+    if prefix.len() == 0:
+        return Vec.new()
+    var suffix: Vec[u8] = Vec.new()
+    if kind == ArchiveEntryKind.Directory:
+        suffix.push(53 as u8)
+    else:
+        suffix.push(48 as u8)
+    suffix = tool_tar_append_zeroes(suffix, 100)
+    suffix = tool_tar_append_str_padded(suffix, "ustar", 6)
+    suffix = tool_tar_append_str_padded(suffix, "00", 2)
+    suffix = tool_tar_append_zeroes(suffix, 247)
+    if suffix.len() == 0:
+        return Vec.new()
+    let checksum = tool_tar_sum(&prefix) + 256 + tool_tar_sum(&suffix)
+    var header: Vec[u8] = Vec.new()
+    header = tool_tar_append_bytes(header, &prefix)
+    header = tool_tar_append_checksum(header, checksum)
+    header = tool_tar_append_bytes(header, &suffix)
+    if header.len() != 512:
+        return Vec.new()
+    header
+
+pub fn ToolFs.write_tar(self: &Self, output_path: str, entries: Vec[ArchiveEntry]) -> i32:
+    self.require_write_file_allowed(output_path)
+    var out: Vec[u8] = Vec.new()
+    for i in 0..entries.len() as i32:
+        let entry = entries.get(i as i64)
+        if entry.kind == ArchiveEntryKind.Directory:
+            let name = tool_tar_entry_name(entry.archive_path, true)
+            let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Directory)
+            if header.len() == 0:
+                return 1
+            out = tool_tar_append_bytes(out, &header)
+        else:
+            if entry.source_path.len() == 0:
+                return 1
+            tool_path_require_project_relative(entry.source_path)
+            let name = tool_tar_entry_name(entry.archive_path, false)
+            let contents = self.read_binary(entry.source_path)
+            let header = tool_tar_build_header(name, entry.mode, contents.len(), ArchiveEntryKind.File)
+            if header.len() == 0:
+                return 1
+            out = tool_tar_append_bytes(out, &header)
+            out = tool_tar_append_bytes(out, &contents)
+            let padding = (512 - (contents.len() % 512)) % 512
+            out = tool_tar_append_zeroes(out, padding)
+    out = tool_tar_append_zeroes(out, 1024)
+    self.write_binary(output_path, out)
+
+fn tool_tar_block_is_zero(bytes: &Vec[u8], offset: i64) -> bool:
+    if offset + 512 > bytes.len():
+        return false
+    var i: i64 = 0
+    while i < 512:
+        if bytes.get(offset + i) != 0 as u8:
+            return false
+        i = i + 1
+    true
+
+fn tool_tar_field_str(bytes: &Vec[u8], offset: i64, width: i64) -> str:
+    var out = StringBuilder.new()
+    var i: i64 = 0
+    while i < width:
+        let b = bytes.get(offset + i)
+        if b == 0 as u8:
+            return out.to_str()
+        out.push_byte(b)
+        i = i + 1
+    out.to_str()
+
+fn tool_tar_parse_octal(bytes: &Vec[u8], offset: i64, width: i64) -> i64:
+    var value: i64 = 0
+    var i: i64 = 0
+    while i < width:
+        let b = bytes.get(offset + i)
+        if b != 0 as u8 and b != 32 as u8:
+            if b < 48 as u8 or b > 55 as u8:
+                return -1
+            value = value * 8 + (b as i64 - 48)
+        i = i + 1
+    value
+
+fn tool_tar_header_checksum(bytes: &Vec[u8], offset: i64) -> i64:
+    var sum: i64 = 0
+    var i: i64 = 0
+    while i < 512:
+        if i >= 148 and i < 156:
+            sum = sum + 32
+        else:
+            sum = sum + bytes.get(offset + i) as i64
+        i = i + 1
+    sum
+
+fn tool_tar_magic_ok(bytes: &Vec[u8], offset: i64) -> bool:
+    bytes.get(offset + 257) == 117 as u8 and
+        bytes.get(offset + 258) == 115 as u8 and
+        bytes.get(offset + 259) == 116 as u8 and
+        bytes.get(offset + 260) == 97 as u8 and
+        bytes.get(offset + 261) == 114 as u8
+
+fn tool_tar_archive_name_safe(name: str) -> bool:
+    if name.len() == 0:
+        return false
+    tool_path_is_project_relative(name)
+
+pub fn ToolFs.extract_tar(self: &Self, archive_path: str, output_dir: str) -> i32:
+    tool_path_require_project_relative(archive_path)
+    if self.mkdir_all(output_dir) != 0:
+        return 1
+    let archive = self.read_binary(archive_path)
+    var offset: i64 = 0
+    while offset + 512 <= archive.len():
+        if tool_tar_block_is_zero(&archive, offset):
+            return 0
+        if not tool_tar_magic_ok(&archive, offset):
+            return 1
+        let stored_checksum = tool_tar_parse_octal(&archive, offset + 148, 8)
+        if stored_checksum < 0 or stored_checksum != tool_tar_header_checksum(&archive, offset):
+            return 1
+        let raw_name = tool_tar_field_str(&archive, offset, 100)
+        if not tool_tar_archive_name_safe(raw_name):
+            return 1
+        let name = tool_path_normalize(raw_name)
+        let mode = tool_tar_parse_octal(&archive, offset + 100, 8)
+        let size = tool_tar_parse_octal(&archive, offset + 124, 12)
+        if mode < 0 or size < 0:
+            return 1
+        let typeflag = archive.get(offset + 156)
+        let output_path = self.join(output_dir, name)
+        if typeflag == 53 as u8:
+            if self.mkdir_all(output_path) != 0:
+                return 1
+            if mode > 0:
+                let _ = self.chmod(output_path, mode as i32)
+        else if typeflag == 48 as u8 or typeflag == 0 as u8:
+            let content_start = offset + 512
+            if content_start + size > archive.len():
+                return 1
+            let output_parent = tool_path_dirname(output_path)
+            if output_parent != "." and self.mkdir_all(output_parent) != 0:
+                return 1
+            var payload: Vec[u8] = Vec[u8].with_capacity(size)
+            var pi: i64 = 0
+            while pi < size:
+                payload.push(archive.get(content_start + pi))
+                pi = pi + 1
+            if self.write_binary(output_path, payload) != 0:
+                return 1
+            if mode > 0:
+                let _ = self.chmod(output_path, mode as i32)
+        else:
+            return 1
+        let padded = ((size + 511) / 512) * 512
+        offset = offset + 512 + padded
+    1
 
 pub fn ToolFs.copy_file(self: &Self, src: str, dst: str) -> i32:
     tool_path_require_project_relative(src)
