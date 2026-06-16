@@ -17,6 +17,8 @@ pub async fn await_all[T](tasks: impl IntoIter[Task[T]]) -> Vec[T]
 ## Cancellation
 - Fallible overload: on first error, remaining owned tasks are cancelled and joined before return.
 - Infallible overload: no early cancellation; all tasks are awaited.
+- If the `await_all` combinator task is cancelled or dropped mid-flight,
+  every not-yet-awaited owned task is cancelled and joined before unwind.
 
 ## Complexity
 - Time: `O(n)` awaits in number of tasks.

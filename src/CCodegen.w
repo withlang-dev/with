@@ -64,6 +64,7 @@ enum CcBuiltin: i32:
     VEC_PUSH
     VEC_GET
     VEC_LEN
+    VEC_IS_EMPTY
     VEC_SET_I32
     VEC_REMOVE
     VEC_CLEAR
@@ -159,6 +160,7 @@ fn cc_builtin_uses_vec_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.VEC_PUSH: return true
     if kind == CcBuiltin.VEC_GET: return true
     if kind == CcBuiltin.VEC_LEN: return true
+    if kind == CcBuiltin.VEC_IS_EMPTY: return true
     if kind == CcBuiltin.VEC_LEN32: return true
     if kind == CcBuiltin.VEC_LEN64: return true
     if kind == CcBuiltin.VEC_ULEN32: return true
@@ -4801,6 +4803,8 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: &MirBody, callee_operand:
         return self.sema.ty_i64 as i32
     if kind == CcBuiltin.VEC_LEN:
         return self.sema.ty_usize as i32
+    if kind == CcBuiltin.VEC_IS_EMPTY:
+        return self.sema.ty_bool as i32
     if kind == CcBuiltin.VEC_LEN32:
         return self.sema.ty_i32 as i32
     if kind == CcBuiltin.VEC_LEN64:
@@ -5487,6 +5491,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.VEC_PUSH: return CcBuiltin.VEC_PUSH
     if intrinsic == MirIntrinsic.VEC_GET: return CcBuiltin.VEC_GET
     if intrinsic == MirIntrinsic.VEC_LEN: return CcBuiltin.VEC_LEN
+    if intrinsic == MirIntrinsic.VEC_IS_EMPTY: return CcBuiltin.VEC_IS_EMPTY
     if intrinsic == MirIntrinsic.VEC_LEN32: return CcBuiltin.VEC_LEN32
     if intrinsic == MirIntrinsic.VEC_LEN64: return CcBuiltin.VEC_LEN64
     if intrinsic == MirIntrinsic.VEC_ULEN32: return CcBuiltin.VEC_ULEN32
@@ -5724,6 +5729,17 @@ fn CCodegen.emit_builtin_vec_core_call_term(self: CCodegen, body: &MirBody, kind
             return "    abort();"
         let recv_ptr = self.vec_recv_ptr_text(body, args_id)
         var out = self.emit_len_result(body, dest_place, "with_vec_len(" ++ recv_ptr ++ ")", kind, has_ret)
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == CcBuiltin.VEC_IS_EMPTY:
+        if argc < 1:
+            self.fail("vec.is_empty expects one argument")
+            return "    abort();"
+        let recv_ptr = self.vec_recv_ptr_text(body, args_id)
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_vec_len(" ++ recv_ptr ++ ") == 0;\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 

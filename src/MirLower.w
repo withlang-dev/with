@@ -1040,6 +1040,8 @@ fn MirBuilder.vec_literal_type(self: MirBuilder, node: i32) -> i32:
 fn MirBuilder.collection_len_method_return_type(self: MirBuilder, method_name: str) -> i32:
     if method_name == "len":
         return self.sema.ty_usize as i32
+    if method_name == "is_empty":
+        return self.sema.ty_bool as i32
     if method_name == "len32":
         return self.sema.ty_i32 as i32
     if method_name == "len64":
@@ -6952,6 +6954,8 @@ fn MirBuilder.lower_call_redirected(self: MirBuilder, fn_op: i32, fn_sym: i32, a
         args.push(self.lower_call_arg(arg_node, sig_idx, 0, i))
     let args_id = self.body.new_call_args(args)
     self.body.set_call_ast_node(args_id, node)
+    if self.sym_is_generic_fn(fn_sym):
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
     let result_local = self.new_temp(ret_type_id)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()
@@ -6976,6 +6980,8 @@ fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, callee_sym
             args.push(self.lower_call_arg(arg_node, sig_idx, 0, i))
     let args_id = self.body.new_call_args(args)
     self.body.set_call_ast_node(args_id, node)
+    if self.sym_is_generic_fn(callee_sym):
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
     let result_local = self.new_temp(ret_type_id)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()
@@ -7010,6 +7016,17 @@ fn MirBuilder.call_sig_for_sym(self: MirBuilder, sym: i32) -> i32:
         return -1
     let sema_sym = self.sema.pool_lookup_symbol(name)
     self.sema.get_sig(sema_sym)
+
+fn MirBuilder.sym_is_generic_fn(self: MirBuilder, sym: i32) -> bool:
+    if sym == 0:
+        return false
+    if self.sema.generic_fn_nodes.contains(sym):
+        return true
+    let name = self.pool.resolve_symbol(sym)
+    if name.len() == 0:
+        return false
+    let sema_sym = self.sema.pool_lookup_symbol(name)
+    sema_sym != 0 and self.sema.generic_fn_nodes.contains(sema_sym)
 
 fn MirBuilder.callee_has_move_self(self: MirBuilder, fn_sym: i32) -> bool:
     var fn_node = 0
@@ -7405,6 +7422,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "with_capacity": return MirIntrinsic.VEC_WITH_CAPACITY
         if method_name == "push": return MirIntrinsic.VEC_PUSH
         if method_name == "get": return MirIntrinsic.VEC_GET
+        if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
         let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
         if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
         if method_name == "set_i32": return MirIntrinsic.VEC_SET
@@ -7641,6 +7659,17 @@ fn MirBuilder.receiver_option_intrinsic(self: MirBuilder, recv_expr: i32) -> Mir
         if method_name == "get": return MirIntrinsic.SLOTMAP_GET
     MirIntrinsic.NONE
 
+fn MirBuilder.lower_task_join_cleanup_call(self: MirBuilder, self_expr: i32, method_sym: i32, node: i32) -> i32:
+    let recv_ty = self.expr_type(self_expr)
+    let recv_type = self.autoderef_result_type_for_method(recv_ty, method_sym)
+    let recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
+    let stable_op = self.materialize_operand(recv_op, recv_type, self.ast.get_start(self_expr))
+    let task_op = self.body.new_operand(OperandKind.OK_COPY, stable_op)
+    self.emit_task_cancel_call(task_op, MirIntrinsic.FIBER_CANCEL, node)
+    let await_op = self.body.new_operand(OperandKind.OK_COPY, stable_op)
+    self.lower_cleanup_await(await_op, node)
+    self.unit_operand()
+
 fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
     // Lower method calls as normal calls with receiver inserted as first arg.
     var callee_sym = if self.sema.comp_resolved.contains(node):
@@ -7696,6 +7725,9 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
 
     if self.is_result_type(enum_accessor_recv_type) != 0 and (method_name == "ok" or method_name == "err"):
         return self.lower_result_ok_err_method(self_expr, method_name, arg_count, node)
+
+    if method_name == "join_cleanup" and self.sema.type_is_task(enum_accessor_recv_type) != 0:
+        return self.lower_task_join_cleanup_call(self_expr, method_sym, node)
 
     if self.is_option_type(enum_accessor_recv_type) != 0 and method_name == "transpose":
         return self.lower_option_transpose_method(self_expr, arg_count, node)

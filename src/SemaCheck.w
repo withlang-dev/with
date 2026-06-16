@@ -2152,7 +2152,7 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
 // populating typed_expr_types so MirLower has type information.
 // Returns the sig index for the concrete signature.
 
-fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], mono_sym: i32) -> i32:
+fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], mono_sym: i32, param_concrete_tys: &Vec[i32]) -> i32:
     let fn_name = self.ast.get_data0(fn_node)
     let body = self.ast.get_data1(fn_node)
     let meta = self.ast.find_fn_meta(fn_node)
@@ -2200,7 +2200,12 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: &Vec[i32], tp_
     let ps = self.sig_params.len() as i32
     for pi in 0..param_count:
         let p_type_node = self.ast.fn_param_type(param_start, pi)
-        let p_tid = if p_type_node != 0: self.resolve_type_expr(p_type_node) else: 0
+        var p_tid = if p_type_node != 0: self.resolve_type_expr(p_type_node) else: 0
+        if p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.ast.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL:
+            if pi < param_concrete_tys.len() as i32:
+                let concrete_param_ty = param_concrete_tys.get(pi as i64)
+                if concrete_param_ty != 0:
+                    p_tid = concrete_param_ty as TypeId
         self.sig_params.push(p_tid as i32)
 
     let ret_tid = if ret_type_node != 0: self.resolve_type_expr(ret_type_node) else: self.ty_void
@@ -3272,7 +3277,7 @@ fn Sema.task_param_expr_disposition(self: Sema, node: i32, target_sym: i32) -> i
             let recv = self.ast.get_data0(callee)
             let method = self.ast.get_data1(callee)
             if self.task_param_expr_is_target(recv, target_sym) != 0:
-                if method == self.syms.cancel:
+                if method == self.syms.cancel or method == self.syms.join_cleanup:
                     return 1
                 if method == self.syms.is_done or method == self.syms.was_cancelled:
                     return 0
@@ -11875,7 +11880,14 @@ fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: &Ve
         tp_sema_tys.push(self.lookup_generic_subst(tp_sym))
         tp_pos = tp_pos + 2 + bound_count
     let mono_sym = self.pool_intern(f"{self.pool_resolve(fn_sym)}__sema__{spec_key}")
-    let _ = self.check_fn_body_concrete(fn_node, tp_syms, tp_sema_tys, mono_sym)
+    let param_concrete_tys: Vec[i32] = Vec.new()
+    for cpi in 0..param_count:
+        var concrete_param_ty = 0
+        let p_type_node = self.ast.fn_param_type(param_start, cpi)
+        if cpi < arg_count and p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.ast.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL:
+            concrete_param_ty = arg_types.get(cpi as i64)
+        param_concrete_tys.push(concrete_param_ty)
+    let _ = self.check_fn_body_concrete(fn_node, tp_syms, tp_sema_tys, mono_sym, param_concrete_tys)
     if self.diags.count_by_severity(DiagSeverity.Error) != before_errors:
         return 0
 
@@ -12008,6 +12020,36 @@ fn Sema.bind_type_params_from_type_expr(self: Sema, type_node: i32, arg_tid: i32
             let concrete_arg_ty = self.get_generic_inst_arg(resolved as i32, gai)
             self.bind_type_params_from_type_expr(param_arg_node, concrete_arg_ty, tp_start, tp_count, err_node)
         return
+
+    if kind == NodeKind.NK_TYPE_TRAIT_OBJ and self.ast.get_data1(type_node) == TYPE_TRAIT_OBJECT_IMPL:
+        let trait_sym = self.ast.get_data0(type_node)
+        let trait_args_idx = self.ast.find_impl_trait_type_args(type_node as NodeId)
+        if trait_args_idx < 0:
+            return
+        let trait_arg_start = self.ast.state.impl_trait_type_args.get((trait_args_idx + 1) as i64)
+        let trait_arg_count = self.ast.state.impl_trait_type_args.get((trait_args_idx + 2) as i64)
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+                continue
+            if self.ast.get_data2(decl) != trait_sym:
+                continue
+            let subst_names: Vec[i32] = Vec.new()
+            let subst_types: Vec[i32] = Vec.new()
+            if self.try_impl_target_matches(decl, arg_tid, subst_names, subst_types) == 0:
+                continue
+            let impl_args_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
+            if impl_args_idx < 0:
+                continue
+            let impl_arg_start = self.ast.state.impl_trait_type_args.get((impl_args_idx + 1) as i64)
+            let impl_arg_count = self.ast.state.impl_trait_type_args.get((impl_args_idx + 2) as i64)
+            let bind_count = if trait_arg_count < impl_arg_count: trait_arg_count else: impl_arg_count
+            for tai in 0..bind_count:
+                let param_trait_arg = self.ast.get_extra(trait_arg_start + tai)
+                let impl_trait_arg = self.ast.get_extra(impl_arg_start + tai)
+                let actual_trait_arg = self.resolve_impl_trait_arg_for_source(decl, arg_tid, impl_trait_arg, subst_names, subst_types)
+                self.bind_type_params_from_type_expr(param_trait_arg, actual_trait_arg, tp_start, tp_count, err_node)
+            return
 
 fn Sema.generic_specialization_key(self: Sema, fn_sym: i32, tp_start: i32, tp_count: i32) -> str:
     var key = f"{fn_sym}"
@@ -13596,6 +13638,8 @@ fn Sema.result_combinator_return_type(self: Sema, recv_type: i32, method_name: s
 fn Sema.collection_len_method_return_type(self: Sema, method_name: str) -> i32:
     if method_name == "len":
         return self.ty_usize as i32
+    if method_name == "is_empty":
+        return self.ty_bool as i32
     if method_name == "len32":
         return self.ty_i32 as i32
     if method_name == "len64":
@@ -14167,6 +14211,8 @@ fn Sema.method_may_suspend_current_fiber(self: Sema, recv_type: i32, field: i32)
         return 1
     if owner_name == "Receiver" and method_name == "recv":
         return 1
+    if (owner_name == "Task" or owner_name == "ScopedTask") and method_name == "join_cleanup":
+        return 1
     0
 
 fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
@@ -14647,14 +14693,14 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if mc_order_type != 0:
         self.validate_atomic_ordering(field, extra_start, arg_count, node)
 
-    // Task/ScopedTask surface methods (spec §14.7): cancel(), is_done(), was_cancelled().
-    if field == self.syms.cancel or field == self.syms.is_done or field == self.syms.was_cancelled:
+    // Task/ScopedTask surface methods (spec §14.7/§14.11.1).
+    if field == self.syms.cancel or field == self.syms.join_cleanup or field == self.syms.is_done or field == self.syms.was_cancelled:
         if self.expr_is_awaitable_task_value(expr) == 0:
             return 0
         if mc_resolved_arg_count != 0:
             self.emit_error("task method expects zero arguments", node)
             return 0
-        if field == self.syms.cancel:
+        if field == self.syms.cancel or field == self.syms.join_cleanup:
             return self.ty_void as i32
         return self.ty_bool as i32
 

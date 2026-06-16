@@ -12,6 +12,8 @@ pub async fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Ve
 
 ## Cancellation
 - No early cancellation on ordinary success/failure paths because all tasks are awaited.
+- If the `await_settled` combinator task is cancelled or dropped mid-flight,
+  every not-yet-awaited owned task is cancelled and joined before unwind.
 
 ## Complexity
 - Time: `O(n)` awaits in number of tasks.

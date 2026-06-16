@@ -141,6 +141,7 @@ type SemaBuiltinSymbols {
     recv: i32,
     close: i32,
     cancel: i32,
+    join_cleanup: i32,
     is_done: i32,
     was_cancelled: i32,
     todo: i32,
@@ -1158,6 +1159,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         recv: 0,
         close: 0,
         cancel: 0,
+        join_cleanup: 0,
         is_done: 0,
         was_cancelled: 0,
         todo: 0,
@@ -2097,6 +2099,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.recv = self.pool_intern("recv")
     self.syms.close = self.pool_intern("close")
     self.syms.cancel = self.pool_intern("cancel")
+    self.syms.join_cleanup = self.pool_intern("join_cleanup")
     self.syms.is_done = self.pool_intern("is_done")
     self.syms.was_cancelled = self.pool_intern("was_cancelled")
     self.syms.todo = self.pool_intern("todo")

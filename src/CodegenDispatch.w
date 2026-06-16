@@ -5586,6 +5586,7 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "with_capacity": return MirIntrinsic.VEC_WITH_CAPACITY
         if method_name == "push": return MirIntrinsic.VEC_PUSH
         if method_name == "get": return MirIntrinsic.VEC_GET
+        if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
         let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
         if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
         if method_name == "set_i32": return MirIntrinsic.VEC_SET
@@ -5804,6 +5805,7 @@ fn Codegen.classify_generic_call_intrinsic_by_llvm(self: Codegen, recv_ty: i64, 
     if self.vec_is_vec.contains(recv_ty):
         if method_name == "push": return MirIntrinsic.VEC_PUSH
         if method_name == "get": return MirIntrinsic.VEC_GET
+        if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
         let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
         if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
         if method_name == "set_i32": return MirIntrinsic.VEC_SET
@@ -6333,6 +6335,15 @@ fn Codegen.mir_emit_vec_core_intrinsic_call(self: Codegen, body: &MirBody, intri
         let args: Vec[i64] = Vec.new()
         args.push(recv_ptr)
         result = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&args), 1)
+
+    else if intrinsic == MirIntrinsic.VEC_IS_EMPTY:
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
+        let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        let raw_len = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&args), 1)
+        result = wl_build_icmp(self.builder, wl_int_eq(), raw_len, wl_const_int(i64_ty, 0, 0))
 
     else if intrinsic == MirIntrinsic.VEC_LEN32 or intrinsic == MirIntrinsic.VEC_LEN64 or intrinsic == MirIntrinsic.VEC_ULEN32:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
@@ -13475,7 +13486,8 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: &MirBody):
             wl_build_store(self.builder, unpacked, direct_alloca)
             self.record_local(p_name, direct_alloca, param_type, 1)
             var p_sema_ty_direct = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids.get((pi + 1) as i64) else: 0
-            if p_type_node != 0:
+            let p_direct_is_impl_trait = p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.pool.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL
+            if p_type_node != 0 and not p_direct_is_impl_trait:
                 let resolved_p_sema_direct = self.sema.resolve_type_expr(p_type_node)
                 if resolved_p_sema_direct != 0:
                     p_sema_ty_direct = resolved_p_sema_direct as i32
@@ -13508,7 +13520,8 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: &MirBody):
             wl_build_store(self.builder, loaded, byval_alloca)
             self.record_local(p_name, byval_alloca, param_type, 1)
             var p_sema_ty = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids.get((pi + 1) as i64) else: 0
-            if p_type_node != 0:
+            let p_byval_is_impl_trait = p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.pool.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL
+            if p_type_node != 0 and not p_byval_is_impl_trait:
                 let resolved_p_sema = self.sema.resolve_type_expr(p_type_node)
                 if resolved_p_sema != 0:
                     p_sema_ty = resolved_p_sema as i32
@@ -13534,7 +13547,8 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: &MirBody):
                             self.current_method_owner_sym = method_owner_sym
             continue
         var p_sema_ty2 = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids.get((pi + 1) as i64) else: 0
-        if p_type_node != 0:
+        let p_plain_is_impl_trait = p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.pool.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL
+        if p_type_node != 0 and not p_plain_is_impl_trait:
             let resolved_p_sema2 = self.sema.resolve_type_expr(p_type_node)
             if resolved_p_sema2 != 0:
                 p_sema_ty2 = resolved_p_sema2 as i32
@@ -14695,6 +14709,110 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
                 if mg_sema_bound:
                     continue
 
+        if p_kind == NodeKind.NK_TYPE_TRAIT_OBJ and self.pool.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL:
+            var impl_arg_sema_tid = 0
+            if pi < arg_sema_tys.len() as i32:
+                impl_arg_sema_tid = arg_sema_tys.get(pi as i64)
+            if impl_arg_sema_tid == 0:
+                impl_arg_sema_tid = self.sema_type_of_node(arg_nodes.get(pi as i64))
+            let impl_trait_args_idx = self.pool.find_impl_trait_type_args(p_type_node)
+            if impl_arg_sema_tid != 0 and impl_trait_args_idx >= 0:
+                let impl_trait_sym = self.pool.get_data0(p_type_node)
+                let impl_trait_arg_start = self.pool.state.impl_trait_type_args.get((impl_trait_args_idx + 1) as i64)
+                let impl_trait_arg_count = self.pool.state.impl_trait_type_args.get((impl_trait_args_idx + 2) as i64)
+                for idi in 0..self.pool.decl_count():
+                    let idecl = self.pool.get_decl(idi)
+                    if self.pool.kind(idecl) != NodeKind.NK_IMPL_DECL:
+                        continue
+                    if not self.codegen_symbols_match(self.pool.get_data2(idecl), impl_trait_sym):
+                        continue
+                    let subst_names: Vec[i32] = Vec.new()
+                    let subst_types: Vec[i32] = Vec.new()
+                    if self.sema.try_impl_target_matches(idecl as i32, impl_arg_sema_tid, subst_names, subst_types) == 0:
+                        continue
+                    let concrete_trait_args_idx = self.pool.find_impl_trait_type_args(idecl as NodeId)
+                    if concrete_trait_args_idx < 0:
+                        continue
+                    let concrete_trait_arg_start = self.pool.state.impl_trait_type_args.get((concrete_trait_args_idx + 1) as i64)
+                    let concrete_trait_arg_count = self.pool.state.impl_trait_type_args.get((concrete_trait_args_idx + 2) as i64)
+                    let concrete_bind_count = if impl_trait_arg_count < concrete_trait_arg_count: impl_trait_arg_count else: concrete_trait_arg_count
+                    for itai in 0..concrete_bind_count:
+                        let param_trait_arg = self.pool.get_extra(impl_trait_arg_start + itai)
+                        let concrete_trait_arg = self.pool.get_extra(concrete_trait_arg_start + itai)
+                        let actual_trait_arg = self.sema.resolve_impl_trait_arg_for_source(idecl as i32, impl_arg_sema_tid, concrete_trait_arg, subst_names, subst_types)
+                        let param_trait_kind = self.pool.kind(param_trait_arg)
+                        if param_trait_kind == NodeKind.NK_TYPE_NAMED or param_trait_kind == NodeKind.NK_IDENT:
+                            let param_trait_sym = self.pool.get_data0(param_trait_arg)
+                            var param_canonical = 0
+                            for pti in 0..tp_syms.len() as i32:
+                                let candidate = tp_syms.get(pti as i64)
+                                if self.codegen_symbols_match(candidate, param_trait_sym):
+                                    param_canonical = candidate
+                                    break
+                            if param_canonical != 0 and self.codegen_binding_index(bind_syms, param_canonical) < 0:
+                                let actual_trait_llvm = self.sema_type_to_llvm(actual_trait_arg)
+                                if actual_trait_llvm != 0:
+                                    bind_syms.push(param_canonical)
+                                    bind_tys.push(actual_trait_llvm)
+                                    bind_sema_tys.push(actual_trait_arg)
+                        else if param_trait_kind == NodeKind.NK_TYPE_GENERIC:
+                            let actual_trait_resolved = self.sema.resolve_alias(actual_trait_arg as TypeId)
+                            if self.sema.get_type_kind(actual_trait_resolved) == TypeKind.TY_GENERIC_INST and self.codegen_symbols_match(self.pool.get_data0(param_trait_arg), self.sema.get_generic_inst_base(actual_trait_resolved as i32)):
+                                let param_inner_start = self.pool.get_data1(param_trait_arg)
+                                let param_inner_count = self.pool.get_data2(param_trait_arg)
+                                let actual_inner_count = self.sema.get_generic_inst_arg_count(actual_trait_resolved as i32)
+                                let inner_bind_count = if param_inner_count < actual_inner_count: param_inner_count else: actual_inner_count
+                                for piai in 0..inner_bind_count:
+                                    let param_inner = self.pool.get_extra(param_inner_start + piai)
+                                    let param_inner_kind = self.pool.kind(param_inner)
+                                    if param_inner_kind == NodeKind.NK_TYPE_GENERIC:
+                                        let actual_nested_sema = self.sema.get_generic_inst_arg(actual_trait_resolved as i32, piai)
+                                        let actual_nested_resolved = self.sema.resolve_alias(actual_nested_sema as TypeId)
+                                        if self.sema.get_type_kind(actual_nested_resolved) == TypeKind.TY_GENERIC_INST and self.codegen_symbols_match(self.pool.get_data0(param_inner), self.sema.get_generic_inst_base(actual_nested_resolved as i32)):
+                                            let nested_param_start = self.pool.get_data1(param_inner)
+                                            let nested_param_count = self.pool.get_data2(param_inner)
+                                            let nested_actual_count = self.sema.get_generic_inst_arg_count(actual_nested_resolved as i32)
+                                            let nested_bind_count = if nested_param_count < nested_actual_count: nested_param_count else: nested_actual_count
+                                            for ngi in 0..nested_bind_count:
+                                                let nested_param = self.pool.get_extra(nested_param_start + ngi)
+                                                let nested_param_kind = self.pool.kind(nested_param)
+                                                if nested_param_kind != NodeKind.NK_TYPE_NAMED and nested_param_kind != NodeKind.NK_IDENT:
+                                                    continue
+                                                let nested_param_sym = self.pool.get_data0(nested_param)
+                                                var nested_canonical = 0
+                                                for nti in 0..tp_syms.len() as i32:
+                                                    let candidate3 = tp_syms.get(nti as i64)
+                                                    if self.codegen_symbols_match(candidate3, nested_param_sym):
+                                                        nested_canonical = candidate3
+                                                        break
+                                                if nested_canonical == 0 or self.codegen_binding_index(bind_syms, nested_canonical) >= 0:
+                                                    continue
+                                                let nested_actual_sema = self.sema.get_generic_inst_arg(actual_nested_resolved as i32, ngi)
+                                                let nested_actual_llvm = self.sema_type_to_llvm(nested_actual_sema)
+                                                if nested_actual_llvm != 0:
+                                                    bind_syms.push(nested_canonical)
+                                                    bind_tys.push(nested_actual_llvm)
+                                                    bind_sema_tys.push(nested_actual_sema)
+                                            continue
+                                    if param_inner_kind != NodeKind.NK_TYPE_NAMED and param_inner_kind != NodeKind.NK_IDENT:
+                                        continue
+                                    let param_inner_sym = self.pool.get_data0(param_inner)
+                                    var inner_canonical = 0
+                                    for piti in 0..tp_syms.len() as i32:
+                                        let candidate2 = tp_syms.get(piti as i64)
+                                        if self.codegen_symbols_match(candidate2, param_inner_sym):
+                                            inner_canonical = candidate2
+                                            break
+                                    if inner_canonical == 0 or self.codegen_binding_index(bind_syms, inner_canonical) >= 0:
+                                        continue
+                                    let actual_inner_sema = self.sema.get_generic_inst_arg(actual_trait_resolved as i32, piai)
+                                    let actual_inner_llvm = self.sema_type_to_llvm(actual_inner_sema)
+                                    if actual_inner_llvm != 0:
+                                        bind_syms.push(inner_canonical)
+                                        bind_tys.push(actual_inner_llvm)
+                                        bind_sema_tys.push(actual_inner_sema)
+                    break
+
     if self.pool.kind(call_node) == NodeKind.NK_CALL:
         let recv_callee = self.pool.get_data0(call_node)
         if self.pool.kind(recv_callee) == NodeKind.NK_FIELD_ACCESS:
@@ -14786,10 +14904,18 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
             break
 
     let mono_param_types: Vec[i64] = Vec.new()
+    let param_concrete_sema_tys: Vec[i32] = Vec.new()
     for pi in 0..param_count:
         let p_type_node = self.pool.fn_param_type(param_start, pi)
+        var p_is_impl_trait = false
+        if p_type_node != 0 and self.pool.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.pool.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL:
+            p_is_impl_trait = true
+        var concrete_sema_ty = 0
+        if p_is_impl_trait and pi < arg_sema_tys.len() as i32:
+            concrete_sema_ty = arg_sema_tys.get(pi as i64)
+        param_concrete_sema_tys.push(concrete_sema_ty)
         if p_type_node != 0:
-            var p_ty = self.resolve_type(p_type_node)
+            var p_ty = if p_is_impl_trait and pi < arg_tys.len() as i32: arg_tys.get(pi as i64) else: self.resolve_type(p_type_node)
             if p_ty == 0:
                 self.type_binding_syms = saved_bind_syms
                 self.type_binding_types = saved_bind_tys
@@ -14859,7 +14985,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
         tp_sema_tys.push(sema_ty)
 
     // 1. Type-check body with concrete types
-    let sig_idx = self.sema.check_fn_body_concrete(generic_node, tp_syms, tp_sema_tys, mono_sym)
+    let sig_idx = self.sema.check_fn_body_concrete(generic_node, tp_syms, tp_sema_tys, mono_sym, param_concrete_sema_tys)
 
     let saved_sema_named: Vec[i32] = Vec.new()
     let saved_sema_had: Vec[i32] = Vec.new()

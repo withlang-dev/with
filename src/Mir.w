@@ -103,6 +103,7 @@ enum MirIntrinsic: i32:
     VEC_PUSH
     VEC_GET
     VEC_LEN
+    VEC_IS_EMPTY
     VEC_SET
     VEC_REMOVE
     VEC_CLEAR

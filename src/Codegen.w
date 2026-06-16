@@ -5129,7 +5129,8 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
             self.sema.type_decl_nodes.insert(alias_base_sym, self.sema.type_decl_nodes.get(alias_sema_base).unwrap())
 
     // 1. Type-check body with concrete types
-    let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym)
+    let param_concrete_tys: Vec[i32] = Vec.new()
+    let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym, param_concrete_tys)
 
     let saved_sema_named: Vec[i32] = Vec.new()
     let saved_sema_had: Vec[i32] = Vec.new()
@@ -5295,7 +5296,8 @@ fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: 
         sm_tp_syms.push(self.sema.syms.self_type)
         sm_tp_sema_tys.push(concrete_self_ty)
 
-    let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym)
+    let param_concrete_tys: Vec[i32] = Vec.new()
+    let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym, param_concrete_tys)
     let saved_sema_named: Vec[i32] = Vec.new()
     let saved_sema_had: Vec[i32] = Vec.new()
     for ti2 in 0..sm_tp_syms.len() as i32:

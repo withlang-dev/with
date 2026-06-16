@@ -7219,12 +7219,16 @@ fn Parser.parse_type_expr(self: Parser) -> NodeId:
             return self.poisoned_expr()
         let sym = self.intern_current()
         self.advance()
+        let trait_args = self.parse_optional_impl_target_args(sym)
         if self.peek() == TokenKind.TK_KW_FOR:
             self.advance()
-        let target = self.parse_type_expr()
-        if target == 0:
-            return self.poisoned_expr()
-        return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, TYPE_TRAIT_OBJECT_IMPL, 0)
+            let target = self.parse_type_expr()
+            if target == 0:
+                return self.poisoned_expr()
+        let impl_trait_node = self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, TYPE_TRAIT_OBJECT_IMPL, 0)
+        if trait_args != 0:
+            self.pool.add_impl_trait_type_args(impl_trait_node, self.pool.get_data1(trait_args), self.pool.get_data2(trait_args))
+        return impl_trait_node
 
     if t == TokenKind.TK_IDENT:
         let sym = self.intern_current()

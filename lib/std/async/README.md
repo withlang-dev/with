@@ -23,6 +23,11 @@ Collection await combinators for `Task[...]` values.
 - `await_all(Result)`: fail-fast on first `Err`, then cancel/join remaining owned tasks.
 - `await_first`: once one result is chosen, cancel/join remaining owned tasks.
 - `await_any`: once one `Ok` is chosen, cancel/join remaining owned tasks.
+- If a collection combinator task is itself cancelled or dropped while waiting,
+  it cancels and joins every not-yet-awaited owned task before unwinding.
+- The internal cleanup primitive is `Task.join_cleanup()`: it requests
+  cancellation and waits for the target to stop without propagating that
+  target's cancellation state into the cleanup path.
 
 ## Iterator consumption
 - Inputs are consumed exactly once and materialized into an internal `Vec` before awaiting.

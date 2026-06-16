@@ -15,6 +15,8 @@ pub async fn await_first[T](tasks: impl IntoIter[Task[T]]) -> T
 
 ## Cancellation
 - After choosing a result, remaining owned tasks are cancelled and joined before return.
+- If the `await_first` combinator task is cancelled or dropped mid-flight,
+  every not-yet-awaited owned task is cancelled and joined before unwind.
 
 ## Complexity
 - Time: `O(n)` in number of tasks.
