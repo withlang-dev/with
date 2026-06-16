@@ -2939,6 +2939,11 @@ pub fn with_sysinfo(out: *mut u8) -> i32:
 extern fn with_fiber_await(fiber_id: i32) -> Unit
 extern fn with_fiber_cleanup_await(fiber_id: i32) -> Unit
 extern fn with_fiber_cancel(fiber_id: i32) -> Unit
+extern fn with_fiber_in_fiber() -> i32
+extern fn with_fiber_yield() -> Unit
+extern fn with_runtime_run_one_step() -> Unit
+extern fn with_runtime_fiber_is_live(fiber_id: i32) -> i32
+extern fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32
 
 fn scope_count_ptr(handle: i64) -> *mut i32:
     handle as *mut i32
@@ -3007,6 +3012,31 @@ pub fn with_scope_track(handle: i64, fiber_id: i32, result_buf: *mut u8) -> Unit
     unsafe:
         *count_ptr = count + 1
 
+fn scope_cleanup_await_capture_panic(fiber_id: i32, first_panic_msg: *mut *const u8, first_panic_len: *mut i32) -> Unit:
+    while true:
+        var panic_msg: *const u8 = 0 as *const u8
+        var panic_msg_len: i32 = 0
+        var cancelled_return: i32 = 0
+        if with_runtime_take_completed_fiber(
+            fiber_id,
+            &raw mut panic_msg as *mut *const u8,
+            &raw mut panic_msg_len as *mut i32,
+            &raw mut cancelled_return as *mut i32
+        ) != 0:
+            let _ = cancelled_return
+            let existing_panic_msg = unsafe *first_panic_msg
+            if panic_msg as i64 != 0 and panic_msg_len > 0 and existing_panic_msg as i64 == 0:
+                unsafe:
+                    *first_panic_msg = panic_msg
+                    *first_panic_len = panic_msg_len
+            return
+        if with_runtime_fiber_is_live(fiber_id) == 0:
+            return
+        if with_fiber_in_fiber() != 0:
+            with_fiber_yield()
+        else:
+            with_runtime_run_one_step()
+
 pub fn with_scope_await_all(handle: i64) -> Unit:
     if handle == 0:
         return
@@ -3016,16 +3046,28 @@ pub fn with_scope_await_all(handle: i64) -> Unit:
     if entries as i64 == 0:
         return
     let entry_size = 16
+
     for i in 0..count:
         let entry = entries as i64 + i as i64 * entry_size
         let slot = entry as *const i32
         let fid = unsafe *slot
         with_fiber_cancel(fid)
-        with_fiber_cleanup_await(fid)
+
+    var first_panic_msg: *const u8 = 0 as *const u8
+    var first_panic_len: i32 = 0
+    for i in 0..count:
+        let entry = entries as i64 + i as i64 * entry_size
+        let slot = entry as *const i32
+        let fid = unsafe *slot
+        scope_cleanup_await_capture_panic(fid, &raw mut first_panic_msg as *mut *const u8, &raw mut first_panic_len as *mut i32)
         let rbuf_slot = (entry + 8) as *const *mut u8
         let rbuf = unsafe *rbuf_slot
         if rbuf as i64 != 0:
             rt_free(rbuf)
+    if first_panic_msg as i64 != 0 and first_panic_len > 0:
+        with_ewrite(make_str(first_panic_msg, first_panic_len as i64))
+        with_ewrite("\n")
+        rt_exit(134)
 
 pub fn with_scope_destroy(handle: i64) -> Unit:
     if handle == 0:
