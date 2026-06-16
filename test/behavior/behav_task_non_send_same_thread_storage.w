@@ -1,4 +1,4 @@
-//! expect-error: Task captures non-Send value `owner`
+//! expect-stdout: ok
 
 use std.rc
 
@@ -8,5 +8,7 @@ async fn work(owner: Rc[i32]) -> i32:
 fn main:
     let owner = Rc.new(1)
     let task = work(owner)
-    let (tx, _rx) = chan[Task[i32]](1)
-    tx.send(task)
+    let tasks: Vec[Task[i32]] = Vec.new()
+    tasks.push(task)
+    assert(tasks.len() == 1)
+    print("ok")

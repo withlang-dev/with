@@ -2970,7 +2970,7 @@ fn Sema.check_callable_captures_thread_trait(self: Sema, node: i32, trait_sym: i
             self.emit_error(context ++ " captures non-" ++ trait_name ++ " value `" ++ self.pool_resolve(cap_sym) ++ "`", closure)
             return
 
-fn Sema.callable_captures_non_send(self: Sema, node: i32) -> i32:
+fn Sema.callable_non_send_capture_symbol(self: Sema, node: i32) -> i32:
     let closure = self.callable_expr_closure_node(node)
     if closure == 0:
         return 0
@@ -2983,10 +2983,54 @@ fn Sema.callable_captures_non_send(self: Sema, node: i32) -> i32:
             continue
         let cap_ty = self.scope_lookup(cap_sym)
         if self.scope_lookup_is_ephemeral_value(cap_sym) != 0 or self.scope_lookup_is_ephemeral_task(cap_sym) != 0 or self.scope_lookup_is_non_send_task(cap_sym) != 0:
-            return 1
+            return cap_sym
         if self.type_is_send(cap_ty) == 0:
-            return 1
+            return cap_sym
     0
+
+fn Sema.callable_captures_non_send(self: Sema, node: i32) -> i32:
+    if self.callable_non_send_capture_symbol(node) != 0: 1 else: 0
+
+fn Sema.task_expr_non_send_capture_symbol(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        return self.task_expr_non_send_capture_symbol(self.ast.get_data0(node))
+    if kind == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(node)
+        if self.scope_lookup_is_non_send_task(sym) != 0 and self.binding_value_nodes.contains(sym):
+            return self.task_expr_non_send_capture_symbol(self.binding_value_nodes.get(sym).unwrap())
+        return 0
+    if kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_CLOSURE:
+        return self.callable_non_send_capture_symbol(node)
+    if kind == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            let fn_sym = self.ast.get_data0(callee)
+            if self.task_fns.contains(fn_sym):
+                let args_start = self.ast.get_data1(node)
+                let arg_count = self.ast.get_data2(node)
+                for ai in 0..arg_count:
+                    let arg_node = self.ast.get_extra(args_start + ai)
+                    let nested_capture = self.task_expr_non_send_capture_symbol(arg_node)
+                    if nested_capture != 0:
+                        return nested_capture
+                    if self.expr_is_ephemeral_value(arg_node) != 0 or self.expr_is_ephemeral_task(arg_node) != 0 or self.expr_creates_non_send_task(arg_node) != 0 or self.type_is_send(self.cached_or_checked_expr_type(arg_node)) == 0:
+                        if self.ast.kind(arg_node) == NodeKind.NK_IDENT:
+                            return self.ast.get_data0(arg_node)
+                        return 0
+            if self.binding_closure_nodes.contains(fn_sym):
+                return self.callable_non_send_capture_symbol(self.binding_closure_nodes.get(fn_sym).unwrap())
+        return 0
+    0
+
+fn Sema.emit_task_sendability_error(self: Sema, node: i32, fallback: str):
+    let cap_sym = self.task_expr_non_send_capture_symbol(node)
+    if cap_sym != 0:
+        self.emit_error("Task captures non-Send value `" ++ self.pool_resolve(cap_sym) ++ "`", node)
+    else:
+        self.emit_error(fallback, node)
 
 fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32) -> i32:
     if node == 0:
@@ -14670,7 +14714,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         let mc_sender_elem_ty = self.sender_send_element_type(obj_type as i32, field, ai)
         if mc_sender_elem_ty != 0:
             if self.type_is_send(mc_sender_elem_ty) == 0 or self.type_is_send(mc_arg_ty as i32) == 0 or self.expr_is_ephemeral_value(mc_arg_node) != 0 or self.expr_is_ephemeral_task(mc_arg_node) != 0 or self.expr_creates_non_send_task(mc_arg_node) != 0:
-                self.emit_error("channel send requires Send value", mc_arg_node)
+                self.emit_task_sendability_error(mc_arg_node, "channel send requires Send value")
         if mc_is_closure:
             self.closure_direct_arg_escape_flags.pop()
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
@@ -15712,7 +15756,7 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: &Vec
         let payload_node = self.ast.get_extra(args_start + 1)
         let payload_ty = arg_types.get(1)
         if self.expr_is_ephemeral_value(payload_node) != 0 or self.expr_is_ephemeral_task(payload_node) != 0 or self.expr_creates_non_send_task(payload_node) != 0 or self.type_is_send(payload_ty) == 0:
-            self.emit_error("channel send requires Send value", payload_node)
+            self.emit_task_sendability_error(payload_node, "channel send requires Send value")
             return 0
         if payload_ty != 0:
             let payload_kind = self.get_type_kind(self.resolve_alias(payload_ty))
