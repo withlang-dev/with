@@ -53,6 +53,7 @@ pub type Parser {
     // or 0 when it carries payloads (a real ADT enum).
     pending_inferred_disc_repr: i32,
     pending_packed: i32,
+    pending_repr_c: i32,
     pending_bitpacked: i32,
     pending_weak: i32,
     pending_callconv: i32,
@@ -124,6 +125,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_specified: 0,
         pending_inferred_disc_repr: 0,
         pending_packed: 0,
+        pending_repr_c: 0,
         pending_bitpacked: 0,
         pending_weak: 0,
         pending_callconv: 0,
@@ -526,6 +528,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_flags = 0
     self.pending_specified = 0
     self.pending_packed = 0
+    self.pending_repr_c = 0
     self.pending_bitpacked = 0
     self.pending_weak = 0
     self.pending_callconv = 0
@@ -659,6 +662,28 @@ fn Parser.skip_attributes(self: Parser):
                     let cc_name = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
                     self.pending_callconv = self.intern.intern(cc_name)
                     self.advance()
+                if self.peek() == TokenKind.TK_R_PAREN:
+                    self.advance()
+        else if self.is_ident_named("repr"):
+            // §16.4 @[repr(C)] / @[repr(packed)]. repr(packed) implies repr(C),
+            // sets field alignment to 1, and emits unaligned access. repr(C) is
+            // the C ABI layout (source field order, natural alignment).
+            self.advance()
+            if self.peek() != TokenKind.TK_L_PAREN:
+                self.emit_error("expected '(' after repr in @[repr(...)]")
+            else:
+                self.advance()
+                if self.peek() == TokenKind.TK_IDENT:
+                    let repr_text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                    if repr_text == "packed":
+                        self.pending_packed = 1
+                    else if repr_text == "C":
+                        self.pending_repr_c = 1
+                    else:
+                        self.emit_error("unknown representation '" ++ repr_text ++ "'; expected 'C' or 'packed'")
+                    self.advance()
+                else:
+                    self.emit_error("expected 'C' or 'packed' in @[repr(...)]")
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
         else if self.is_ident_named("target"):

@@ -6200,12 +6200,15 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         self.emit_error("`&mut` is not part of safe With (§15.1); use `&raw mut` for FFI or mutating receiver methods", node)
         return 0
     if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
-        // Reject address-of bitpacked fields — they may not be byte-aligned
+        // Reject address-of bitpacked/packed fields — they may not be aligned.
         if self.ast.kind(operand_node) == NodeKind.NK_FIELD_ACCESS:
             let ref_recv = self.ast.get_data0(operand_node)
             let ref_recv_ty = self.resolve_alias(self.check_expr(ref_recv))
             if self.bitpacked_types.contains(ref_recv_ty as i32):
                 self.emit_error("cannot take address of bitpacked field", node)
+                return 0
+            if self.packed_types.contains(ref_recv_ty as i32):
+                self.emit_error("cannot create reference to packed field", node)
                 return 0
         // docs/mut.md Rev 8 §13 — raw forms produce TY_PTR (*const T / *mut T)
         // and do not participate in borrow tracking. Forming a raw pointer is

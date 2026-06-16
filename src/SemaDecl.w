@@ -566,6 +566,21 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         self.type_decl_tids.insert(node, tid as i32)
         if type_decl_is_bitpacked(packed_kind) != 0:
             self.bitpacked_types.insert(tid as i32, 1)
+        if type_decl_is_packed(packed_kind) != 0:
+            self.packed_types.insert(tid as i32, 1)
+        // §16.4 @[align(N)] validation: power of two, ≤ 65536, ≥ natural.
+        for fi in 0..field_count:
+            let f_align = self.ast.get_extra(align_base + fi)
+            if f_align != 0:
+                let f_loc_node = self.ast.get_extra(extra_start + 1 + fi * 3 + 1)
+                if f_align < 0 or (f_align & (f_align - 1)) != 0:
+                    self.emit_error("alignment must be a power of two", f_loc_node)
+                else if f_align > 65536:
+                    self.emit_error("alignment exceeds maximum 65536", f_loc_node)
+                else:
+                    let natural = self.type_layout_align_of(field_tids.get(fi as i64)) as i32
+                    if natural > 0 and f_align < natural:
+                        self.emit_error("alignment is less than natural alignment of type", f_loc_node)
 
     if sub_kind == TypeDeclKind.Enum:
         let variant_count = self.ast.get_extra(extra_start)

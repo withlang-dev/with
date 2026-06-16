@@ -16053,6 +16053,16 @@ fn Codegen.gen_sizeof_alignof(self: Codegen, name_sym: i32, node: i32) -> i64:
     let dl = wl_get_module_data_layout(self.llmod)
     if name_sym == self.sym_sizeof or name_sym == self.sym_size_of:
         return wl_const_int(wl_i64_type(self.context), wl_abi_size_of(dl, type_val), 0)
+    // alignof: report the layout-model alignment, which honors §16.4 @[align]
+    // field annotations (LLVM's i8-padded struct representation keeps the
+    // correct size/stride but reports only the member ABI alignment).
+    let tp_kind = self.pool.kind(tp_node)
+    if tp_kind == NodeKind.NK_IDENT or tp_kind == NodeKind.NK_TYPE_NAMED:
+        let ty_sym = self.pool.get_data0(tp_node)
+        if self.sema.named_types.contains(ty_sym):
+            let model_align = self.sema.type_layout_align_of(self.sema.named_types.get(ty_sym).unwrap())
+            if model_align > 0:
+                return wl_const_int(wl_i64_type(self.context), model_align, 0)
     wl_const_int(wl_i64_type(self.context), wl_abi_align_of(dl, type_val) as i64, 0)
 
 // ── nameof/type_name intrinsic ─────────────────────────────────────

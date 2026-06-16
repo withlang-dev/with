@@ -431,6 +431,7 @@ type Sema {
     disc_values: HashMap[i32, i32],
     disc_has_payload: HashMap[i32, i32],
     bitpacked_types: HashMap[i32, i32],  // type_id → 1 if bitpacked
+    packed_types: HashMap[i32, i32],     // type_id → 1 if repr(packed)/@[packed]
 
     // Trait declarations
     trait_method_names: Vec[i32],
@@ -1427,6 +1428,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         disc_values,
         disc_has_payload,
         bitpacked_types: sema_new_map_i32_i32(),
+        packed_types: sema_new_map_i32_i32(),
         trait_method_names: Vec.new(),
         trait_method_starts: Vec.new(),
         trait_method_counts: Vec.new(),
