@@ -220,6 +220,17 @@ fn render_decl(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
                     out = out ++ ", "
                 out = out ++ "\"" ++ intern.resolve(pool.get_extra(extra_start + link_count + ai)) ++ "\""
             out = out ++ "]"
+        if c_import_no_methods_all(packed_counts) != 0:
+            out = out ++ ", no_methods: true"
+        else:
+            let nm_count = c_import_no_methods_count(packed_counts)
+            if nm_count > 0:
+                out = out ++ ", no_methods: ["
+                for ni in 0..nm_count:
+                    if ni > 0:
+                        out = out ++ ", "
+                    out = out ++ "\"" ++ intern.resolve(pool.get_extra(extra_start + link_count + allow_count + ni)) ++ "\""
+                out = out ++ "]"
         return out ++ ")"
 
     if kind == NodeKind.NK_TRAIT_DECL:

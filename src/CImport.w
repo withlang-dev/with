@@ -22,6 +22,26 @@ var g_cimport_omitted_symbol_reasons: Vec[str] = Vec.new()
 var g_cimport_included_files: str = ""
 var g_cimport_raw_function_names: str = ""
 var g_cimport_report_untranslated_macros: i32 = 0
+// §16.2a no_methods opt-out. Set per-import before translation.
+var g_cimport_no_methods_all: i32 = 0
+var g_cimport_no_methods_types: Vec[str] = Vec.new()
+
+fn ci_set_no_methods(all_flag: i32, types: Vec[str]):
+    g_cimport_no_methods_all = all_flag
+    g_cimport_no_methods_types = types
+
+fn ci_clear_no_methods():
+    g_cimport_no_methods_all = 0
+    g_cimport_no_methods_types = Vec.new()
+
+// True when auto-method/constructor generation is suppressed for `name`.
+fn ci_no_methods_for_type(name: str) -> bool:
+    if g_cimport_no_methods_all != 0:
+        return true
+    for i in 0..g_cimport_no_methods_types.len() as i32:
+        if g_cimport_no_methods_types.get(i as i64) == name:
+            return true
+    false
 
 extern fn with_getenv_str(name: str) -> str
 
@@ -1326,6 +1346,9 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
 // to a known struct), and the function name starts with StructName_ or
 // structname_, emit a method wrapper: fn StructName.short_name(self, ...) = fn_name(self, ...)
 fn ci_detect_member_functions(session: i64, count: i32, known_structs: str) -> str:
+    // §16.2a no_methods: true — suppress all auto-method/constructor generation.
+    if g_cimport_no_methods_all != 0:
+        return ""
     var output = ""
     var emitted_methods = ""
     // Pre-compute snake_case prefixes for all known structs.
@@ -1359,7 +1382,7 @@ fn ci_detect_member_functions(session: i64, count: i32, known_structs: str) -> s
                 if param_count > 0:
                     let first_param_type = with_cimport_fn_param_type_translated(session, i, 0)
                     let struct_name = ci_extract_struct_name_from_ptr(first_param_type)
-                    if struct_name.len() > 0 and ci_str_contains(known_structs, "|" ++ struct_name ++ "|"):
+                    if struct_name.len() > 0 and ci_str_contains(known_structs, "|" ++ struct_name ++ "|") and not ci_no_methods_for_type(struct_name):
                         // Try snake_case prefix first, fall back to case-insensitive
                         var method_name = ""
                         var sj = 0
@@ -1381,7 +1404,7 @@ fn ci_detect_member_functions(session: i64, count: i32, known_structs: str) -> s
                 // Constructor detection: returns *S without self param
                 if not matched:
                     let ret_struct = ci_extract_struct_name_from_ptr(ret_type)
-                    if ret_struct.len() > 0 and ci_str_contains(known_structs, "|" ++ ret_struct ++ "|"):
+                    if ret_struct.len() > 0 and ci_str_contains(known_structs, "|" ++ ret_struct ++ "|") and not ci_no_methods_for_type(ret_struct):
                         var method_name = ""
                         var sj = 0
                         while sj < struct_names.len() as i32:

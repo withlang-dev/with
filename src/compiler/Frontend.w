@@ -327,7 +327,16 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                 if self.trace_c_import_cache != 0:
                     runtime_eprint("c_import cache miss")
                 let libclang_header_spec = c_import_decode_escapes(resolved_header_spec)
+                // §16.2a: apply no_methods opt-out for this import before generation.
+                let nm_packed = out.get_data2(decl)
+                let nm_start = out.get_data1(decl)
+                let nm_base = nm_start + c_import_link_count(nm_packed) + c_import_allow_count(nm_packed)
+                let nm_types = frontend_new_vec_str()
+                for nmi in 0..c_import_no_methods_count(nm_packed):
+                    nm_types.push(frontend_owned_text(self.pool.resolve(out.get_extra(nm_base + nmi))))
+                ci_set_no_methods(c_import_no_methods_all(nm_packed), nm_types)
                 let libclang_result = process_c_import_with_defines(libclang_header_spec, self.project_config.c_import_defines)
+                ci_clear_no_methods()
                 if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
                     runtime_eprint("c_import generated:")
                     runtime_eprint(libclang_result)
@@ -386,7 +395,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     out
 
 fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_spec: str) -> str:
-    var key = header_spec ++ "\n#format:cimport-v11\n#links:"
+    var key = header_spec ++ "\n#format:cimport-v12\n#links:"
     let link_start = pool.get_data1(decl)
     let packed_counts = pool.get_data2(decl)
     let link_count = c_import_link_count(packed_counts)
@@ -398,6 +407,11 @@ fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_s
     for ai in 0..allow_count:
         let allow_sym = pool.get_extra(link_start + link_count + ai)
         key = key ++ "|" ++ self.pool.resolve(allow_sym)
+    key = key ++ "\n#no-methods:" ++ f"{c_import_no_methods_all(packed_counts)}"
+    let nm_count = c_import_no_methods_count(packed_counts)
+    for ni in 0..nm_count:
+        let nm_sym = pool.get_extra(link_start + link_count + allow_count + ni)
+        key = key ++ "|" ++ self.pool.resolve(nm_sym)
     key = key ++ "\n#defines:"
     for di in 0..self.project_config.c_import_defines.len() as i32:
         key = key ++ "|" ++ self.project_config.c_import_defines.get(di as i64)

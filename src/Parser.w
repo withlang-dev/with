@@ -2415,6 +2415,8 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
 
     let links: Vec[i32] = Vec.new()
     let allow_untranslated: Vec[i32] = Vec.new()
+    let no_methods_types: Vec[i32] = Vec.new()
+    var no_methods_all = 0
 
     while self.peek() == TokenKind.TK_COMMA:
         self.advance()
@@ -2467,6 +2469,37 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
                 self.advance()
             else:
                 self.emit_error("expected string literal or string array for allow_untranslated")
+        else if key == "no_methods":
+            // §16.2a: no_methods: true | "Type" | ["A", "B"]
+            if self.peek() == TokenKind.TK_TRUE:
+                no_methods_all = 1
+                self.advance()
+            else if self.peek() == TokenKind.TK_FALSE:
+                self.advance()
+            else if self.peek() == TokenKind.TK_L_BRACKET:
+                self.advance()
+                self.skip_newlines()
+                while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
+                    if self.peek() == TokenKind.TK_STRING_LIT:
+                        let ns = self.current_start()
+                        let ne = self.current_end()
+                        no_methods_types.push(self.intern.intern(self.source.slice((ns + 1) as i64, (ne - 1) as i64)))
+                        self.advance()
+                    else:
+                        self.emit_error("expected string literal in no_methods")
+                        self.advance()
+                    self.skip_newlines()
+                    if self.peek() == TokenKind.TK_COMMA:
+                        self.advance()
+                        self.skip_newlines()
+                self.expect(TokenKind.TK_R_BRACKET)
+            else if self.peek() == TokenKind.TK_STRING_LIT:
+                let ns = self.current_start()
+                let ne = self.current_end()
+                no_methods_types.push(self.intern.intern(self.source.slice((ns + 1) as i64, (ne - 1) as i64)))
+                self.advance()
+            else:
+                self.emit_error("expected true, a string literal, or a string array for no_methods")
         else:
             self.emit_error("unknown c_import option")
             while self.peek() != TokenKind.TK_COMMA and self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
@@ -2478,7 +2511,9 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
         self.pool.add_extra(links.get(i as i64))
     for i in 0..allow_untranslated.len() as i32:
         self.pool.add_extra(allow_untranslated.get(i as i64))
-    self.pool.add_node(NodeKind.NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, pack_c_import_counts(links.len() as i32, allow_untranslated.len() as i32))
+    for i in 0..no_methods_types.len() as i32:
+        self.pool.add_extra(no_methods_types.get(i as i64))
+    self.pool.add_node(NodeKind.NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, pack_c_import_counts_ex(links.len() as i32, allow_untranslated.len() as i32, no_methods_types.len() as i32, no_methods_all))
 
 // ── let decl ─────────────────────────────────────────────────────
 

@@ -303,15 +303,28 @@ fn let_decl_is_global_var(flags: i32) -> i32:
     (flags / LET_FLAG_GLOBAL_VAR) % 2
 
 const C_IMPORT_ALLOW_COUNT_UNIT: i32 = 1024
+const C_IMPORT_NO_METHODS_COUNT_UNIT: i32 = 1048576       // 1024 * 1024
+const C_IMPORT_NO_METHODS_ALL_UNIT: i32 = 1073741824      // 1 << 30
 
 fn c_import_link_count(packed: i32) -> i32:
     packed % C_IMPORT_ALLOW_COUNT_UNIT
 
 fn c_import_allow_count(packed: i32) -> i32:
-    packed / C_IMPORT_ALLOW_COUNT_UNIT
+    (packed / C_IMPORT_ALLOW_COUNT_UNIT) % C_IMPORT_ALLOW_COUNT_UNIT
+
+// Count of per-type `no_methods: "Type"` names stored after the allow group.
+fn c_import_no_methods_count(packed: i32) -> i32:
+    (packed / C_IMPORT_NO_METHODS_COUNT_UNIT) % C_IMPORT_ALLOW_COUNT_UNIT
+
+// 1 when `no_methods: true` disabled auto-methods for the whole import.
+fn c_import_no_methods_all(packed: i32) -> i32:
+    (packed / C_IMPORT_NO_METHODS_ALL_UNIT) % 2
 
 fn pack_c_import_counts(link_count: i32, allow_count: i32) -> i32:
-    link_count + allow_count * C_IMPORT_ALLOW_COUNT_UNIT
+    pack_c_import_counts_ex(link_count, allow_count, 0, 0)
+
+fn pack_c_import_counts_ex(link_count: i32, allow_count: i32, no_methods_count: i32, no_methods_all: i32) -> i32:
+    link_count + allow_count * C_IMPORT_ALLOW_COUNT_UNIT + no_methods_count * C_IMPORT_NO_METHODS_COUNT_UNIT + no_methods_all * C_IMPORT_NO_METHODS_ALL_UNIT
 
 // Visibility flags
 enum Visibility: i32:
