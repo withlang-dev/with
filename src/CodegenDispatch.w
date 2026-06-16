@@ -5563,10 +5563,12 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "index_of": return MirIntrinsic.STR_INDEX_OF
         if method_name == "repeat": return MirIntrinsic.STR_REPEAT
         return MirIntrinsic.NONE
-    if tk == TypeKind.TY_ARRAY:
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
         let arr_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.ARR_LEN, method_name)
         if arr_len_intrinsic != MirIntrinsic.NONE:
             return arr_len_intrinsic
+        if method_name == "split_at": return MirIntrinsic.SPLIT_AT
+        if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
         return MirIntrinsic.NONE
     var type_name_sym = 0
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
@@ -5595,6 +5597,8 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "slot": return MirIntrinsic.VEC_SLOT
         if method_name == "get_disjoint": return MirIntrinsic.VEC_GET_DISJOINT
         if method_name == "range": return MirIntrinsic.VEC_RANGE
+        if method_name == "split_at": return MirIntrinsic.SPLIT_AT
+        if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
         if method_name == "iter_place": return MirIntrinsic.VEC_ITER_PLACE
         if method_name == "map": return MirIntrinsic.VEC_MAP
         if method_name == "filter": return MirIntrinsic.VEC_FILTER
@@ -5721,6 +5725,8 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
     if type_name == "VecRange":
         if method_name == "get": return MirIntrinsic.VECRANGE_GET
         if method_name == "set": return MirIntrinsic.VECRANGE_SET
+        if method_name == "split_at": return MirIntrinsic.SPLIT_AT
+        if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
         let vecrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
         if vecrange_len_intrinsic != MirIntrinsic.NONE: return vecrange_len_intrinsic
         return MirIntrinsic.NONE
@@ -5808,6 +5814,8 @@ fn Codegen.classify_generic_call_intrinsic_by_llvm(self: Codegen, recv_ty: i64, 
         if method_name == "iter_ref": return MirIntrinsic.VEC_ITER_REF
         if method_name == "slot": return MirIntrinsic.VEC_SLOT
         if method_name == "range": return MirIntrinsic.VEC_RANGE
+        if method_name == "split_at": return MirIntrinsic.SPLIT_AT
+        if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
     MirIntrinsic.NONE
 
 fn Codegen.mir_finish_intrinsic_call(self: Codegen, body: &MirBody, dest_place: i32, next_bb: i32, result: i64):
@@ -5819,6 +5827,113 @@ fn Codegen.mir_finish_intrinsic_call(self: Codegen, body: &MirBody, dest_place: 
                 wl_build_store(self.builder, result, dest_ptr)
     if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
         wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+
+fn Codegen.mir_build_vecrange_value(self: Codegen, data_i64: i64, offset_i64: i64, len_i64: i64, range_ty: i64) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    var ty = range_ty
+    if ty == 0 or wl_get_type_kind(ty) != wl_struct_type_kind() or wl_count_struct_elem_types(ty) < 3:
+        let fields: Vec[i64] = Vec.new()
+        fields.push(i64_ty)
+        fields.push(i64_ty)
+        fields.push(i64_ty)
+        ty = wl_struct_type(self.context, vec_data_i64(&fields), 3, 0)
+    let alloca = self.create_entry_alloca(ty)
+    let f0 = wl_build_struct_gep(self.builder, ty, alloca, 0)
+    wl_build_store(self.builder, self.coerce_int(data_i64, wl_struct_get_type_at(ty, 0)), f0)
+    let f1 = wl_build_struct_gep(self.builder, ty, alloca, 1)
+    wl_build_store(self.builder, self.coerce_int(offset_i64, wl_struct_get_type_at(ty, 1)), f1)
+    let f2 = wl_build_struct_gep(self.builder, ty, alloca, 2)
+    wl_build_store(self.builder, self.coerce_int(len_i64, wl_struct_get_type_at(ty, 2)), f2)
+    wl_build_load(self.builder, ty, alloca)
+
+fn Codegen.mir_emit_split_at_call(self: Codegen, body: &MirBody, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    let arg_count = body.call_arg_counts.get(args_id as i64)
+    if arg_count != 2:
+        return false
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+    let recv_val = self.mir_intrinsic_arg(body, args_id, 0)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let recv_resolved = self.mir_unwrap_ref_like_sema_type(recv_sema)
+    let recv_kind = self.mir_type_kind_from_snapshot(recv_resolved)
+    let i64_ty = wl_i64_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let idx = self.coerce_int(self.mir_intrinsic_arg(body, args_id, 1), i64_ty)
+    var data_i64: i64 = 0
+    var base_offset = wl_const_int(i64_ty, 0, 0)
+    var recv_len: i64 = 0
+
+    if recv_kind == TypeKind.TY_ARRAY:
+        let recv_storage_ty = self.mir_intrinsic_recv_storage_type(body, args_id, recv_ptr)
+        data_i64 = wl_build_ptr_to_int(self.builder, recv_ptr, i64_ty)
+        recv_len = wl_const_int(i64_ty, wl_get_array_length(recv_storage_ty), 0)
+    else if recv_kind == TypeKind.TY_SLICE:
+        let recv_ty = wl_type_of(recv_val)
+        if wl_get_type_kind(recv_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(recv_ty) >= 2:
+            let raw_ptr = wl_build_extract_value(self.builder, recv_val, 0)
+            data_i64 = wl_build_ptr_to_int(self.builder, raw_ptr, i64_ty)
+            recv_len = self.coerce_int(wl_build_extract_value(self.builder, recv_val, 1), i64_ty)
+        else:
+            let slice_ty = self.mir_intrinsic_recv_storage_type(body, args_id, recv_ptr)
+            let dp = wl_build_struct_gep(self.builder, slice_ty, recv_ptr, 0)
+            let raw_ptr2 = wl_build_load(self.builder, ptr_ty, dp)
+            data_i64 = wl_build_ptr_to_int(self.builder, raw_ptr2, i64_ty)
+            let lp = wl_build_struct_gep(self.builder, slice_ty, recv_ptr, 1)
+            recv_len = self.coerce_int(wl_build_load(self.builder, wl_struct_get_type_at(slice_ty, 1), lp), i64_ty)
+    else if recv_kind == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.sema_sym_to_codegen_sym(self.mir_type_d0_from_snapshot(recv_resolved))
+        if base_sym == self.sym_vec:
+            let vec_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+            let raw_ptr3 = wl_build_extract_value(self.builder, vec_recv, 0)
+            data_i64 = wl_build_ptr_to_int(self.builder, raw_ptr3, i64_ty)
+            recv_len = self.coerce_int(wl_build_extract_value(self.builder, vec_recv, 1), i64_ty)
+        else if base_sym == self.sym_vecrange:
+            let range_ty = self.mir_intrinsic_recv_storage_type(body, args_id, recv_ptr)
+            let dp2 = wl_build_struct_gep(self.builder, range_ty, recv_ptr, 0)
+            data_i64 = self.coerce_int(wl_build_load(self.builder, wl_struct_get_type_at(range_ty, 0), dp2), i64_ty)
+            let op = wl_build_struct_gep(self.builder, range_ty, recv_ptr, 1)
+            base_offset = self.coerce_int(wl_build_load(self.builder, wl_struct_get_type_at(range_ty, 1), op), i64_ty)
+            let lp2 = wl_build_struct_gep(self.builder, range_ty, recv_ptr, 2)
+            recv_len = self.coerce_int(wl_build_load(self.builder, wl_struct_get_type_at(range_ty, 2), lp2), i64_ty)
+    if data_i64 == 0 or recv_len == 0:
+        return false
+
+    let bad_neg = wl_build_icmp(self.builder, wl_int_slt(), idx, wl_const_int(i64_ty, 0, 0))
+    let bad_hi = wl_build_icmp(self.builder, wl_int_sgt(), idx, recv_len)
+    let bad = wl_build_or(self.builder, bad_neg, bad_hi)
+    let panic_bb = wl_append_bb(self.context, self.current_function, "split_at.panic")
+    let ok_bb = wl_append_bb(self.context, self.current_function, "split_at.ok")
+    wl_build_cond_br(self.builder, bad, panic_bb, ok_bb)
+    wl_position_at_end(self.builder, panic_bb)
+    self.emit_runtime_panic("split_at index out of bounds")
+    wl_position_at_end(self.builder, ok_bb)
+
+    let right_len = wl_build_sub(self.builder, recv_len, idx)
+    let right_offset = wl_build_add(self.builder, base_offset, idx)
+    var tuple_ty = self.mir_dest_llvm_type(body, dest_place)
+    var range_ty_out: i64 = 0
+    if tuple_ty != 0 and wl_get_type_kind(tuple_ty) == wl_struct_type_kind() and wl_count_struct_elem_types(tuple_ty) >= 2:
+        range_ty_out = wl_struct_get_type_at(tuple_ty, 0)
+    else:
+        let rf: Vec[i64] = Vec.new()
+        rf.push(i64_ty)
+        rf.push(i64_ty)
+        rf.push(i64_ty)
+        range_ty_out = wl_struct_type(self.context, vec_data_i64(&rf), 3, 0)
+        let tf: Vec[i64] = Vec.new()
+        tf.push(range_ty_out)
+        tf.push(range_ty_out)
+        tuple_ty = wl_struct_type(self.context, vec_data_i64(&tf), 2, 0)
+    let left = self.mir_build_vecrange_value(data_i64, base_offset, idx, range_ty_out)
+    let right = self.mir_build_vecrange_value(data_i64, right_offset, right_len, range_ty_out)
+    let tuple_alloca = self.create_entry_alloca(tuple_ty)
+    let f0 = wl_build_struct_gep(self.builder, tuple_ty, tuple_alloca, 0)
+    wl_build_store(self.builder, left, f0)
+    let f1 = wl_build_struct_gep(self.builder, tuple_ty, tuple_alloca, 1)
+    wl_build_store(self.builder, right, f1)
+    self.mir_finish_intrinsic_call(body, dest_place, next_bb, wl_build_load(self.builder, tuple_ty, tuple_alloca))
+    true
 
 fn Codegen.ensure_box_alloc_fn(self: Codegen) -> i64:
     var alloc_fn = wl_get_named_function(self.llmod, "with_alloc")
@@ -5914,6 +6029,8 @@ fn Codegen.mir_emit_vec_core_intrinsic_call(self: Codegen, body: &MirBody, intri
     let void_ty = wl_void_type(self.context)
     let arg_start = body.call_arg_starts.get(args_id as i64)
     var result: i64 = 0
+    if intrinsic == MirIntrinsic.SPLIT_AT or intrinsic == MirIntrinsic.SPLIT_AT_MUT:
+        return self.mir_emit_split_at_call(body, args_id, dest_place, next_bb)
     if intrinsic == MirIntrinsic.VEC_NEW:
         var vec_elem_ty = wl_i64_type(self.context)
         let dest_sema_new = self.mir_intrinsic_dest_sema_type(body, dest_place)
@@ -7603,7 +7720,7 @@ fn Codegen.mir_emit_scalar_vec_intrinsic_call(self: Codegen, body: &MirBody, int
         let vr_ok_bb = wl_append_bb(self.context, self.current_function, "vr.ok")
         wl_build_cond_br(self.builder, vr_bad2, vr_panic_bb, vr_ok_bb)
         wl_position_at_end(self.builder, vr_panic_bb)
-        let _ = wl_build_unreachable(self.builder)
+        self.emit_runtime_panic("Vec.range index out of bounds")
         wl_position_at_end(self.builder, vr_ok_bb)
         let vr_range_len = wl_build_sub(self.builder, vr_end, vr_start)
         let vr_data_raw = wl_build_extract_value(self.builder, vr_recv, 0)
@@ -7651,7 +7768,7 @@ fn Codegen.mir_emit_scalar_vec_intrinsic_call(self: Codegen, body: &MirBody, int
         let vrg_ok_bb = wl_append_bb(self.context, self.current_function, "vrg.ok")
         wl_build_cond_br(self.builder, vrg_bad, vrg_panic_bb, vrg_ok_bb)
         wl_position_at_end(self.builder, vrg_panic_bb)
-        let _ = wl_build_unreachable(self.builder)
+        self.emit_runtime_panic("VecRange.get index out of bounds")
         wl_position_at_end(self.builder, vrg_ok_bb)
         let vrg_abs = wl_build_add(self.builder, vrg_off, vrg_idx64)
         let vrg_typed_ptr = wl_build_int_to_ptr(self.builder, vrg_data, ptr_ty)
@@ -7685,7 +7802,7 @@ fn Codegen.mir_emit_scalar_vec_intrinsic_call(self: Codegen, body: &MirBody, int
         let vrs_ok_bb = wl_append_bb(self.context, self.current_function, "vrs.ok")
         wl_build_cond_br(self.builder, vrs_bad, vrs_panic_bb, vrs_ok_bb)
         wl_position_at_end(self.builder, vrs_panic_bb)
-        let _ = wl_build_unreachable(self.builder)
+        self.emit_runtime_panic("VecRange.set index out of bounds")
         wl_position_at_end(self.builder, vrs_ok_bb)
         let vrs_abs = wl_build_add(self.builder, vrs_off, vrs_idx64)
         let vrs_typed_ptr = wl_build_int_to_ptr(self.builder, vrs_data, ptr_ty)

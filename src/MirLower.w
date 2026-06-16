@@ -7370,6 +7370,8 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
         let arr_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.ARR_LEN, method_name)
         if arr_len_intrinsic != MirIntrinsic.NONE: return arr_len_intrinsic
+        if method_name == "split_at": return MirIntrinsic.SPLIT_AT
+        if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
         return MirIntrinsic.NONE
     if tk == TypeKind.TY_INT:
         if method_name == "rotate_left": return MirIntrinsic.ROTATE_LEFT
@@ -7412,6 +7414,8 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "slot": return MirIntrinsic.VEC_SLOT
         if method_name == "get_disjoint": return MirIntrinsic.VEC_GET_DISJOINT
         if method_name == "range": return MirIntrinsic.VEC_RANGE
+        if method_name == "split_at": return MirIntrinsic.SPLIT_AT
+        if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
         if method_name == "iter_place": return MirIntrinsic.VEC_ITER_PLACE
         if method_name == "map": return MirIntrinsic.VEC_MAP
         if method_name == "filter": return MirIntrinsic.VEC_FILTER
@@ -7538,6 +7542,8 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     if type_name == "VecRange":
         if method_name == "get": return MirIntrinsic.VECRANGE_GET
         if method_name == "set": return MirIntrinsic.VECRANGE_SET
+        if method_name == "split_at": return MirIntrinsic.SPLIT_AT
+        if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
         let vecrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
         if vecrange_len_intrinsic != MirIntrinsic.NONE: return vecrange_len_intrinsic
         return MirIntrinsic.NONE

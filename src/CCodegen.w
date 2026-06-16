@@ -5404,6 +5404,8 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.VECRANGE_LEN32: return CcBuiltin.VECRANGE
     if intrinsic == MirIntrinsic.VECRANGE_LEN64: return CcBuiltin.VECRANGE
     if intrinsic == MirIntrinsic.VECRANGE_ULEN32: return CcBuiltin.VECRANGE
+    if intrinsic == MirIntrinsic.SPLIT_AT or intrinsic == MirIntrinsic.SPLIT_AT_MUT:
+        return CcBuiltin.VECRANGE
     if intrinsic == MirIntrinsic.MULTI_INDEX: return CcBuiltin.MULTI_INDEX
     if intrinsic == MirIntrinsic.MULTI_INDEX_SET: return CcBuiltin.MULTI_INDEX
     if intrinsic == MirIntrinsic.INT_SWAP_BYTES: return CcBuiltin.INT_SWAP_BYTES

@@ -1244,7 +1244,8 @@ fn Sema.type_name(self: Sema, tid: i32) -> str:
         let size = self.get_type_d1(resolved)
         return f"[{size}]" ++ self.type_name(self.get_type_d0(resolved))
     if tk == TypeKind.TY_SLICE:
-        return "[]" ++ self.type_name(self.get_type_d0(resolved))
+        let mut_text = if self.get_type_d1(resolved) != 0: "mut " else: ""
+        return "[]" ++ mut_text ++ self.type_name(self.get_type_d0(resolved))
     if tk == TypeKind.TY_TUPLE:
         let te_start = self.get_type_d0(resolved)
         let elem_count = self.get_type_d1(resolved)

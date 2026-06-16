@@ -185,6 +185,8 @@ type SemaBuiltinSymbols {
     iter_place: i32,
     iter_ref: i32,
     range_method: i32,
+    split_at: i32,
+    split_at_mut: i32,
     hashmapentry: i32,
     entry: i32,
     or_insert: i32,
@@ -1190,6 +1192,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         iter_place: 0,
         iter_ref: 0,
         range_method: 0,
+        split_at: 0,
+        split_at_mut: 0,
         hashmapentry: 0,
         entry: 0,
         or_insert: 0,
@@ -2122,6 +2126,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.iter_place = self.pool_intern("iter_place")
     self.syms.iter_ref = self.pool_intern("iter_ref")
     self.syms.range_method = self.pool_intern("range")
+    self.syms.split_at = self.pool_intern("split_at")
+    self.syms.split_at_mut = self.pool_intern("split_at_mut")
     self.syms.hashmapentry = self.pool_intern("HashMapEntry")
     self.syms.entry = self.pool_intern("entry")
     self.syms.or_insert = self.pool_intern("or_insert")
@@ -3072,7 +3078,7 @@ fn Sema.substitute_type(self: Sema, tid: i32, subst_syms: Vec[i32], subst_tids: 
         let elem = d0
         let subbed = self.substitute_type(elem, subst_syms, subst_tids, count)
         if subbed == elem: return tid
-        return self.ensure_exact_type(TypeKind.TY_SLICE, subbed, 0, 0) as i32
+        return self.ensure_exact_type(TypeKind.TY_SLICE, subbed, self.get_type_d1(tid as TypeId), 0) as i32
     // TypeKind.TY_TUPLE: substitute each element
     if kind == TypeKind.TY_TUPLE:
         let te_start_orig = d0
@@ -4345,6 +4351,8 @@ fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
     if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
         return self.fn_types_compatible(exp_r, act_r)
     if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
+        if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:
+            return 0
         return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
     if exp_k == TypeKind.TY_ARRAY and act_k == TypeKind.TY_ARRAY:
         if self.get_type_d1(exp_r) != self.get_type_d1(act_r):

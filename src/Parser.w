@@ -7029,8 +7029,13 @@ fn Parser.parse_type_expr(self: Parser) -> NodeId:
         if self.peek() == TokenKind.TK_R_BRACKET:
             self.advance()
             self.skip_newlines()
+            var is_mut_slice = 0
+            if self.peek() == TokenKind.TK_KW_MUT:
+                is_mut_slice = 1
+                self.advance()
+                self.skip_newlines()
             let elem = self.parse_type_expr()
-            return self.pool.add_node(NodeKind.NK_TYPE_SLICE, start, self.prev_end(), elem, 0, 0)
+            return self.pool.add_node(NodeKind.NK_TYPE_SLICE, start, self.prev_end(), elem, is_mut_slice, 0)
         // [N]T → fixed array (legacy), detect by leading int literal
         if self.peek() == TokenKind.TK_INT_LIT:
             let ss = self.current_start()

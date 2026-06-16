@@ -243,7 +243,7 @@ fn Sema.ct_build_type_expr(self: Sema, pool: AstPool, intern: InternPool, type_i
         let elem_node = self.ct_build_type_expr(pool, intern, self.get_type_d0(resolved), node)
         if elem_node == 0:
             return 0
-        return pool.add_node(NodeKind.NK_TYPE_SLICE, start, end, elem_node, 0, 0) as i32
+        return pool.add_node(NodeKind.NK_TYPE_SLICE, start, end, elem_node, self.get_type_d1(resolved), 0) as i32
 
     if tk == TypeKind.TY_TUPLE:
         let extra_start = self.get_type_d0(resolved)

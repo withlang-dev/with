@@ -379,7 +379,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_TYPE_SLICE:
         let elem = self.resolve_type_expr(self.ast.get_data0(node))
-        return self.ensure_exact_type(TypeKind.TY_SLICE, elem as i32, 0, 0)
+        return self.ensure_exact_type(TypeKind.TY_SLICE, elem as i32, self.ast.get_data1(node), 0)
 
     if kind == NodeKind.NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(node)
@@ -9973,7 +9973,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
         if field == self.syms.iter or field == self.syms.slot or field == self.syms.get_disjoint:
             return 1
-        if field == self.syms.range_method or field == self.syms.iter_ref or field == self.syms.iter_place:
+        if field == self.syms.range_method or field == self.syms.split_at or field == self.syms.split_at_mut or field == self.syms.iter_ref or field == self.syms.iter_place:
             return 1
         if field == self.syms.filter or field == self.syms.map or field == self.syms.fold or field == self.syms.sequence or field == self.syms.traverse:
             return 1
@@ -11903,7 +11903,7 @@ fn Sema.resolve_generic_return_type_node(self: Sema, ret_node: i32, tp_start: i3
 
     if kind == NodeKind.NK_TYPE_SLICE:
         let elem = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
-        return self.ensure_exact_type(TypeKind.TY_SLICE, elem, 0, 0) as i32
+        return self.ensure_exact_type(TypeKind.TY_SLICE, elem, self.ast.get_data1(ret_node), 0) as i32
 
     if kind == NodeKind.NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(ret_node)
@@ -12471,7 +12471,7 @@ fn Sema.resolve_type_node_with_current_subst(self: Sema, type_node: i32, self_ty
         return self.ensure_exact_type(TypeKind.TY_ARRAY, elem, self.ast.get_data1(type_node), 0) as i32
     if kind == NodeKind.NK_TYPE_SLICE:
         let elem = self.resolve_type_node_with_current_subst(self.ast.get_data0(type_node), self_ty)
-        return self.ensure_exact_type(TypeKind.TY_SLICE, elem, 0, 0) as i32
+        return self.ensure_exact_type(TypeKind.TY_SLICE, elem, self.ast.get_data1(type_node), 0) as i32
     if kind == NodeKind.NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(type_node)
         let elem_count = self.ast.get_data1(type_node)
@@ -13437,6 +13437,21 @@ fn Sema.collection_len_method_return_type(self: Sema, method_name: str) -> i32:
 fn Sema.is_collection_len_method(self: Sema, field: i32) -> bool:
     self.collection_len_method_return_type(self.pool_resolve(field)) != 0
 
+fn Sema.ensure_vecrange_type_for(self: Sema, elem_ty: i32) -> i32:
+    let existing = self.find_generic_inst(self.syms.vecrange, elem_ty)
+    if existing != 0:
+        return existing
+    let args: Vec[i32] = Vec.new()
+    args.push(elem_ty)
+    self.ensure_generic_inst_type(self.syms.vecrange, args, 1) as i32
+
+fn Sema.ensure_vecrange_pair_type_for(self: Sema, elem_ty: i32) -> i32:
+    let range_ty = self.ensure_vecrange_type_for(elem_ty)
+    let elems: Vec[i32] = Vec.new()
+    elems.push(range_ty)
+    elems.push(range_ty)
+    self.ensure_tuple_type(elems, 2) as i32
+
 fn Sema.iterator_operation_known_but_unimplemented(self: Sema, method_name: str) -> bool:
     if method_name == "flatten": return true
     if method_name == "peekable": return true
@@ -14189,7 +14204,10 @@ fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_
 // builtin codegen path (see `if field == self.syms.iter` in check_method_call).
 fn Sema.builtin_method_is_iter_of_self(self: Sema, type_name_sym: i32, field: i32) -> i32:
     if type_name_sym == self.syms.vec:
-        if field == self.syms.iter or field == self.syms.keys or field == self.syms.iter_place or field == self.syms.iter_ref:
+        if field == self.syms.iter or field == self.syms.keys or field == self.syms.iter_place or field == self.syms.iter_ref or field == self.syms.range_method or field == self.syms.split_at or field == self.syms.split_at_mut:
+            return 1
+    if type_name_sym == self.syms.vecrange:
+        if field == self.syms.split_at or field == self.syms.split_at_mut:
             return 1
     if type_name_sym == self.syms.hashmap:
         if field == self.syms.iter or field == self.syms.keys or field == self.syms.values or field == self.syms.items:
@@ -14201,7 +14219,12 @@ fn Sema.builtin_method_is_iter_of_self(self: Sema, type_name_sym: i32, field: i3
 
 fn Sema.builtin_method_requires_mutable_receiver(self: Sema, type_name_sym: i32, field: i32) -> i32:
     if type_name_sym == self.syms.vec:
+        if field == self.syms.split_at_mut:
+            return 1
         if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.remove or field == self.syms.clear or field == self.syms.pop:
+            return 1
+    if type_name_sym == self.syms.vecrange:
+        if field == self.syms.split_at_mut:
             return 1
     if type_name_sym == self.syms.hashmap:
         if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
@@ -14850,6 +14873,15 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                     let index_ty = self.ty_i64 as i32
                     if self.builtin_arg_type_compatible(index_ty, a0_ty) == 0:
                             self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, index_ty, a0_ty, self.ast.get_extra(extra_start))
+        else if (type_name_sym == self.syms.vec or type_name_sym == self.syms.vecrange) and (field == self.syms.split_at or field == self.syms.split_at_mut):
+            if arg_count != 1:
+                self.emit_error(mc_method_name_raw ++ "() expects exactly one index argument", node)
+            else:
+                let split_arg_ty = arg_types.get(0)
+                if split_arg_ty != 0:
+                    let split_index_ty = self.ty_i64 as i32
+                    if self.builtin_arg_type_compatible(split_index_ty, split_arg_ty) == 0:
+                        self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, split_index_ty, split_arg_ty, self.ast.get_extra(extra_start))
         else if type_name_sym == self.syms.vec and field == self.syms.contains:
             // Vec.contains(value: T) — arg[0] must be T
             if arg_count >= 1:
@@ -15024,12 +15056,9 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.ensure_tuple_type(gd_elems, 2) as i32
             if field == self.syms.range_method:
                 let vr_elem_ty = self.get_generic_inst_arg(recv_type, 0)
-                let vr_tid = self.find_generic_inst(self.syms.vecrange, vr_elem_ty)
-                if vr_tid != 0:
-                    return vr_tid
-                let vr_args: Vec[i32] = Vec.new()
-                vr_args.push(vr_elem_ty)
-                return self.ensure_generic_inst_type(self.syms.vecrange, vr_args, 1) as i32
+                return self.ensure_vecrange_type_for(vr_elem_ty)
+            if field == self.syms.split_at or field == self.syms.split_at_mut:
+                return self.ensure_vecrange_pair_type_for(self.get_generic_inst_arg(recv_type, 0))
             if field == self.syms.iter_ref:
                 let iref_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                 let iref_tid = self.find_generic_inst(self.syms.veciterref, iref_elem_ty)
@@ -15080,6 +15109,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.ty_void as i32
             if generic_len_ret != 0:
                 return generic_len_ret
+            if field == self.syms.split_at or field == self.syms.split_at_mut:
+                return self.ensure_vecrange_pair_type_for(self.get_generic_inst_arg(recv_type, 0))
         if type_name_sym == self.syms.veciterplace:
             if field == self.syms.next:
                 let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
@@ -15361,6 +15392,27 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if resolved_tk == TypeKind.TY_ARRAY or resolved_tk == TypeKind.TY_SLICE:
         if primitive_len_ret != 0:
             return primitive_len_ret
+        if field == self.syms.split_at or field == self.syms.split_at_mut:
+            if field == self.syms.split_at_mut:
+                let split_recv_packed = self.classify_place(expr)
+                let split_recv_kind = unpack_place_kind(split_recv_packed)
+                let split_recv_mut = unpack_place_mut(split_recv_packed)
+                if split_recv_kind == PlaceKind.PK_NotPlace:
+                    self.emit_error("split_at_mut() requires a mutable place receiver", node)
+                    return 0
+                if split_recv_mut == PlaceMut.PM_ReadOnly or self.place_base_is_read_only_ref(expr) != 0:
+                    self.emit_error("split_at_mut() requires a mutable place receiver", node)
+                    return 0
+                self.check_mutation_against_views(expr, node)
+            if mc_resolved_arg_count != 1:
+                self.emit_error(self.pool_resolve(field) ++ "() expects exactly one index argument", node)
+                return 0
+            if arg_types.len() > 0:
+                let split_idx_ty = arg_types.get(0)
+                if split_idx_ty != 0 and self.builtin_arg_type_compatible(self.ty_i64 as i32, split_idx_ty) == 0:
+                    self.emit_argument_type_mismatch(self.pool_resolve(field), 0, 0, 0, self.ty_i64 as i32, split_idx_ty, if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(extra_start))
+                    return 0
+            return self.ensure_vecrange_pair_type_for(self.get_type_d0(resolved))
 
     // Static method call on a named type expression.
     if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:

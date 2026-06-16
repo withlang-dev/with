@@ -1593,7 +1593,7 @@ fn AstPool.comprehension_binding_is_pattern(self: AstPool, node: NodeId, binding
 // NodeKind.NK_TYPE_TUPLE:    d0=extra_start, d1=elem_count, d2=0
 // NodeKind.NK_TYPE_OPTIONAL: d0=inner(node), d1=0, d2=0
 // NodeKind.NK_TYPE_ARRAY:    d0=element(node), d1=size_low, d2=size_high
-// NodeKind.NK_TYPE_SLICE:    d0=element(node), d1=0, d2=0
+// NodeKind.NK_TYPE_SLICE:    d0=element(node), d1=is_mut(0/1), d2=0
 // NodeKind.NK_TYPE_TRAIT_OBJ: d0=sym, d1=TYPE_TRAIT_OBJECT_*, d2=0
 // NodeKind.NK_TYPE_INFERRED: d0=0, d1=0, d2=0
 //

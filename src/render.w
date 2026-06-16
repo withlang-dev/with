@@ -1094,7 +1094,8 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: NodeId) -> str:
 
     if kind == NodeKind.NK_TYPE_SLICE:
         let elem = pool.get_data0(node)
-        return "[]" ++ render_type_expr(pool, intern, (elem) as NodeId)
+        let mut_text = if pool.get_data1(node) != 0: "mut " else: ""
+        return "[]" ++ mut_text ++ render_type_expr(pool, intern, (elem) as NodeId)
 
     if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
         let prefix = if pool.get_data1(node) == TYPE_TRAIT_OBJECT_IMPL: "impl " else: "dyn "
