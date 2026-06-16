@@ -213,6 +213,11 @@ and script dependency are gone.
   `docs/requirements.md` and does not reproduce the committed matrix as a
   no-op. Filed #593 to replace it with a With docs-generation target or
   explicitly retire the generated requirements matrix.
+- 2026-06-15: Finished capability denial coverage for action writes and process
+  execution. `ActionCtx.process_runner()` now inherits action network/write
+  declarations, `ProcessRunner` capture paths must stay within declared action
+  outputs/write scopes, and build.w selfhost covers undeclared process capture
+  output denial plus an allowed-network process case.
 
 ## Implementation Tasks
 
@@ -229,13 +234,11 @@ trustworthy once `build.w` owns every workflow.
   keeping old argv helpers as compatibility wrappers until build code is
   migrated. The primary public process API should be one structured value with
   argv, cwd, environment, stdin, capture, and timeout.
-- Add focused tests for action timeout, declared cwd/env, network declaration,
-  and install-path access. Existing target fields are not enough; the tests
-  must prove unavailable privileges fail loudly and available privileges are
-  deliberately declared.
-  Timeout/cwd/env/network positive coverage exists; install-path and negative
-  privilege tests remain.
-- Decide and implement network semantics. If the local driver cannot enforce a
+- [x] Add focused tests for action timeout, declared cwd/env metadata, network
+  declaration, write scopes, process capture outputs, and install-path access.
+  The tests prove unavailable write/install/network privileges fail loudly and
+  declared network/write privileges are deliberately honored.
+- [x] Decide and implement network semantics. If the local driver cannot enforce a
   true network sandbox, then network-capable standard operations such as
   downloads must still require an explicit `allow_network()` declaration and
   diagnostics must make undeclared network use visible.

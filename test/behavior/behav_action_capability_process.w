@@ -23,6 +23,7 @@ fn main:
     build_text = build_text ++ "pub fn build(ctx: BuildCtx) -> Build:\n"
     build_text = build_text ++ "    var out = ctx.new_build()\n"
     build_text = build_text ++ "    var target = target_new(.Action, \"generate\", \"\").output(\"out/action/process.txt\")\n"
+    build_text = build_text ++ "    target = target.write_scope(\"out\")\n"
     build_text = build_text ++ "    target.action = generate\n"
     build_text = build_text ++ "    out = out.add_target(target)\n"
     build_text = build_text ++ "    out.default(\"generate\")\n"

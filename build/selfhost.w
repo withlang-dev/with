@@ -5411,6 +5411,7 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
         "    generate_target = generate_target.with_env(\"WITH_DECLARED_ONE\", \"1\")\n" ++
         "    generate_target = generate_target.with_env(\"WITH_DECLARED_TWO\", \"two\")\n" ++
         "    generate_target = generate_target.allow_network()\n" ++
+        "    generate_target = generate_target.write_scope(\"out/action\")\n" ++
         "    generate_target.action = generate\n" ++
         "    out = out.add_target(generate_target)\n" ++
         "    var all = target_new(.Group, \"all\", \"\")\n" ++
@@ -5647,6 +5648,70 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: str, base_di
     rc = bs_assert_contains(ctx, network.stderr, "without target.allow_network()", "build_w_action_network_denied")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, network.stderr, "network tool 'curl'", "build_w_action_network_denied")
+    if rc != 0: return rc
+
+    let network_allowed_dir = bs_join(base_dir, "network_allowed")
+    rc = bs_write_project_manifest(ctx, network_allowed_dir, "actionnetworkallowed")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(network_allowed_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action network allowed source")
+    if rc != 0: return rc
+    let network_allowed_build =
+        "use std.build\n\n" ++
+        "fn allowed_network(ctx: &ActionCtx) -> i32:\n" ++
+        "    let fs = ctx.fs()\n" ++
+        "    assert(fs.mkdir_all(\"out/action\") == 0)\n" ++
+        "    let args: Vec[str] = Vec.new()\n" ++
+        "    args.push(\"curl\")\n" ++
+        "    args.push(\"--version\")\n" ++
+        "    let result = ctx.process_runner().run_capture(args, \"out/action/stdout.txt\", \"out/action/stderr.txt\", 120000)\n" ++
+        "    if result.rc != 0:\n" ++
+        "        return result.rc\n" ++
+        "    assert(result.stdout.contains(\"curl\"))\n" ++
+        "    assert(fs.write_text(ctx.output(), \"ok\") == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"allowed-network\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target = target.allow_network()\n" ++
+        "    target = target.write_scope(\"out/action\")\n" ++
+        "    target.action = allowed_network\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"allowed-network\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(network_allowed_dir, "build.w"), network_allowed_build, ctx.target_name(), "action network allowed build.w")
+    if rc != 0: return rc
+    let network_allowed = bs_build_w_expect_success(ctx, compiler_path, network_allowed_dir, "build-w-action-network-allowed", bs_blob_to_args(bs_argv_append("", "build")))
+    if network_allowed.rc != 0: return network_allowed.rc
+    rc = bs_expect_file_contains(ctx, bs_join(network_allowed_dir, "out/action/value.txt"), "ok", "build_w_action_network_allowed")
+    if rc != 0: return rc
+
+    let capture_dir = bs_join(base_dir, "capture_output_denied")
+    rc = bs_write_project_manifest(ctx, capture_dir, "actioncapture")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(capture_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action capture source")
+    if rc != 0: return rc
+    let capture_build =
+        "use std.build\n\n" ++
+        "fn bad_capture(ctx: &ActionCtx) -> i32:\n" ++
+        "    let args: Vec[str] = Vec.new()\n" ++
+        "    args.push(\"/bin/echo\")\n" ++
+        "    args.push(\"bad\")\n" ++
+        "    let _ = ctx.process_runner().run_capture(args, \"out/other/stdout.txt\", \"out/other/stderr.txt\", 120000)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"bad-capture\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = bad_capture\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"bad-capture\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(capture_dir, "build.w"), capture_build, ctx.target_name(), "action capture build.w")
+    if rc != 0: return rc
+    let capture = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-capture-output-denied", bs_blob_to_args(bs_argv_append("", "build")), 120000, capture_dir)
+    if capture.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_capture_output_denied unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, capture.stderr, "ProcessRunner.run_capture", "build_w_action_capture_output_denied")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, capture.stderr, "not a declared action output", "build_w_action_capture_output_denied")
     if rc != 0: return rc
 
     let download_dir = bs_join(base_dir, "download_network")

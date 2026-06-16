@@ -1432,6 +1432,23 @@ fn ComptimeEvaluator.require_network_tool_allowed(self: ComptimeEvaluator, recor
     let _ = self.fail(node, "ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()")
     1
 
+fn ComptimeEvaluator.require_process_capture_path_allowed(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, path: str, method: str, node: i32) -> i32:
+    if path.len() == 0:
+        return 0
+    let rel = self.capability_project_relative_path(record, path)
+    if not comptime_tool_path_is_project_relative(rel):
+        let _ = self.fail(node, "ProcessRunner." ++ method ++ " capture path escapes project root: " ++ path)
+        return 1
+    if not self.capability_write_file_allowed(record, rel):
+        let _ = self.fail(node, "ProcessRunner." ++ method ++ " capture path is not a declared action output: " ++ rel)
+        return 1
+    0
+
+fn ComptimeEvaluator.require_process_capture_allowed(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, stdout_path: str, stderr_path: str, method: str, node: i32) -> i32:
+    if self.require_process_capture_path_allowed(record, stdout_path, method, node) != 0:
+        return 1
+    self.require_process_capture_path_allowed(record, stderr_path, method, node)
+
 fn ComptimeEvaluator.lookup_slot_index(self: ComptimeEvaluator, sym: i32) -> i32:
     var i = self.slot_syms.len() as i32 - 1
     while i >= 0:
@@ -4396,6 +4413,8 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         let effect_env = if has_env: self.effect_env_text_from_process_env_value(spec_env) else: ""
         if self.require_network_tool_allowed(record, method, argv_parts, node) != 0:
             return comptime_control_error()
+        if self.require_process_capture_allowed(record, stdout_path, stderr_path, method, node) != 0:
+            return comptime_control_error()
         self.record_process_effect(record, method, argv_parts, spec_cwd.text, timeout_ms, spec_stdin.text, stdout_path, stderr_path, effect_env)
         if self.had_error != 0:
             return comptime_control_error()
@@ -4466,6 +4485,8 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         let stderr_path = self.capability_arg_str(args_signal.value, 2, method, node)
         if self.had_error != 0:
             return comptime_control_error()
+        if self.require_process_capture_allowed(record, stdout_path, stderr_path, method, node) != 0:
+            return comptime_control_error()
         self.record_process_effect(record, method, argv_parts, "", 0, "", stdout_path, stderr_path, "")
         let saved_env = self.process_driver_env_clear(node)
         if self.had_error != 0:
@@ -4478,6 +4499,8 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
     let stderr_path = self.capability_arg_str(args_signal.value, 2, method, node)
     let timeout_ms = self.capability_arg_i32(args_signal.value, 3, method, node)
     if self.had_error != 0:
+        return comptime_control_error()
+    if self.require_process_capture_allowed(record, stdout_path, stderr_path, method, node) != 0:
         return comptime_control_error()
 
     if method == "run_capture":
@@ -4601,6 +4624,10 @@ fn ComptimeEvaluator.eval_actionctx_capability_method(self: ComptimeEvaluator, r
         child.write_scope = record.write_scope
         child.write_scoped = 1
         child.scratch_path = record.scratch_path
+    else if child_kind == CapabilityKind.CK_BUILD_PROCESS_RUNNER:
+        child.write_scope = record.write_scope
+        child.write_scoped = record.write_scoped
+        child.network = record.network
     comptime_control_value(self.mint_capability(child_type, child))
 
 fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:

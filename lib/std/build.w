@@ -279,6 +279,11 @@ pub type ToolFs {
 
 pub type ProcessRunner {
     token: str,
+    root: str,
+    target_name: str,
+    write_scope: Vec[str],
+    write_scoped: bool,
+    network: bool,
 }
 
 pub type Workspace ephemeral {
@@ -469,7 +474,7 @@ pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCt
         diagnostics: Diagnostics { token },
         source_emitter: SourceEmitter { token },
         fs: ToolFs { token, root, write_scope: Vec.new(), write_scoped: false, scratch_path: "" },
-        process_runner: ProcessRunner { token },
+        process_runner: ProcessRunner { token, root, target_name: "", write_scope: Vec.new(), write_scoped: false, network: false },
     }
 
 pub fn BuildCtx.project_info(self: &Self) -> ProjectInfo:
@@ -1323,6 +1328,8 @@ fn tool_process_restore_env(saved: SavedProcessEnv):
 
 pub fn ProcessRunner.run_capture(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
+    self.require_network_allowed(args, "run_capture")
+    self.require_capture_allowed(stdout_path, stderr_path, "run_capture")
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
     tool_process_restore_driver_env(env)
@@ -1335,6 +1342,7 @@ pub fn ProcessRunner.run_capture(self: &Self, args: &Vec[str], stdout_path: str,
 
 pub fn ProcessRunner.run(self: &Self, args: &Vec[str]) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
+    self.require_network_allowed(args, "run")
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv(tool_process_argv(args))
     tool_process_restore_driver_env(env)
@@ -1342,6 +1350,8 @@ pub fn ProcessRunner.run(self: &Self, args: &Vec[str]) -> i32:
 
 pub fn ProcessRunner.run_capture_with_env(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
+    self.require_network_allowed(args, "run_capture_with_env")
+    self.require_capture_allowed(stdout_path, stderr_path, "run_capture_with_env")
     let env = tool_process_apply_env(process_env)
     let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
     tool_process_restore_env(env)
@@ -1354,6 +1364,8 @@ pub fn ProcessRunner.run_capture_with_env(self: &Self, args: &Vec[str], stdout_p
 
 pub fn ProcessRunner.run_capture_cwd(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
+    self.require_network_allowed(args, "run_capture_cwd")
+    self.require_capture_allowed(stdout_path, stderr_path, "run_capture_cwd")
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
     tool_process_restore_driver_env(env)
@@ -1366,6 +1378,8 @@ pub fn ProcessRunner.run_capture_cwd(self: &Self, args: &Vec[str], stdout_path: 
 
 pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str, process_env: ProcessEnv) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
+    self.require_network_allowed(args, "run_capture_cwd_with_env")
+    self.require_capture_allowed(stdout_path, stderr_path, "run_capture_cwd_with_env")
     let env = tool_process_apply_env(process_env)
     let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
     tool_process_restore_env(env)
@@ -1378,6 +1392,8 @@ pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: &Vec[str], stdo
 
 pub fn ProcessRunner.run_capture_input(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
+    self.require_network_allowed(args, "run_capture_input")
+    self.require_capture_allowed(stdout_path, stderr_path, "run_capture_input")
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture_input(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, stdin_path)
     tool_process_restore_driver_env(env)
@@ -1390,6 +1406,8 @@ pub fn ProcessRunner.run_capture_input(self: &Self, args: &Vec[str], stdout_path
 
 pub fn ProcessRunner.spawn_capture(self: &Self, args: &Vec[str], stdout_path: str, stderr_path: str) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
+    self.require_network_allowed(args, "spawn_capture")
+    self.require_capture_allowed(stdout_path, stderr_path, "spawn_capture")
     let env = tool_process_clear_driver_env()
     let pid = with_exec_argv_capture_spawn(tool_process_argv(args), stdout_path, stderr_path)
     tool_process_restore_driver_env(env)
@@ -1398,6 +1416,63 @@ pub fn ProcessRunner.spawn_capture(self: &Self, args: &Vec[str], stdout_path: st
 pub fn ProcessRunner.wait(self: &Self, pid: i32, timeout_ms: i32) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
     with_exec_wait(pid, timeout_ms)
+
+fn tool_process_basename(path: str) -> str:
+    var start = 0
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
+            start = i + 1
+    path.slice(start as i64, path.len())
+
+fn tool_process_requires_network(args: &Vec[str]) -> bool:
+    if args.len() == 0:
+        return false
+    let name = tool_process_basename(args.get(0))
+    name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe"
+
+fn ProcessRunner.project_relative_path(self: &Self, path: str) -> str:
+    let normalized = tool_path_normalize(path)
+    if self.root.len() == 0 or self.root == ".":
+        return normalized
+    let root = tool_path_normalize(self.root)
+    let prefix = if root.ends_with("/"): root else: root ++ "/"
+    if normalized.starts_with(prefix):
+        return normalized.slice(prefix.len(), normalized.len())
+    normalized
+
+fn ProcessRunner.write_path_allowed(self: &Self, path: str) -> bool:
+    if not self.write_scoped:
+        return true
+    for i in 0..self.write_scope.len() as i32:
+        if tool_path_is_same_or_child(path, self.write_scope.get(i as i64)):
+            return true
+    false
+
+fn ProcessRunner.require_network_allowed(self: &Self, args: &Vec[str], method: str):
+    if not tool_process_requires_network(args):
+        return
+    if self.network:
+        return
+    let target = if self.target_name.len() > 0: self.target_name else: "<build>"
+    let tool = tool_process_basename(args.get(0))
+    with_eprint("error: ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()\n")
+    exit(1)
+
+fn ProcessRunner.require_capture_path_allowed(self: &Self, path: str, method: str):
+    if path.len() == 0:
+        return
+    let rel = self.project_relative_path(path)
+    if not tool_path_is_project_relative(rel):
+        with_eprint("error: ProcessRunner." ++ method ++ " capture path escapes project root: " ++ path ++ "\n")
+        exit(1)
+    if not self.write_path_allowed(rel):
+        with_eprint("error: ProcessRunner." ++ method ++ " capture path is not a declared action output: " ++ rel ++ "\n")
+        exit(1)
+
+fn ProcessRunner.require_capture_allowed(self: &Self, stdout_path: str, stderr_path: str, method: str):
+    self.require_capture_path_allowed(stdout_path, method)
+    self.require_capture_path_allowed(stderr_path, method)
 
 fn tool_process_spec_fail(message: str):
     with_eprint("error: ProcessRunner.run_spec: " ++ message ++ "\n")
@@ -1895,7 +1970,7 @@ fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
         project: ctx.project,
         diagnostics_value: ctx.diagnostics,
         fs_value: ToolFs { token: ctx.token, root: ctx.fs.root, write_scope: fs_outputs, write_scoped: true, scratch_path },
-        process_runner_value: ctx.process_runner,
+        process_runner_value: ProcessRunner { token: ctx.token, root: ctx.fs.root, target_name: target.name, write_scope: fs_outputs, write_scoped: true, network: target.network },
         inputs_value: target.inputs,
         outputs_value: ctx_outputs,
         args_value: target.args,
