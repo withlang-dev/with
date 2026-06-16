@@ -2775,7 +2775,7 @@ fn CCodegen.collect_cstr_literal_texts(self: CCodegen) -> Vec[str]:
             expr = self.ast.get_data0(expr)
         if expr != 0 and self.ast.kind(expr) == NodeKind.NK_C_STRING_LIT:
             let text = self.c_string_literal_node_payload_from_source(expr, self.decl_source_text(decl))
-            texts = cc_push_unique_str(texts, text)
+            texts = cc_push_unique_str(move texts, move text)
     for bi in 0..self.mir_mod.bodies.len() as i32:
         if self.check_interrupted() != 0:
             return texts
@@ -2785,7 +2785,7 @@ fn CCodegen.collect_cstr_literal_texts(self: CCodegen) -> Vec[str]:
                 continue
             let sym = body.const_d0.get(ci as i64)
             let text = if sym != 0: cc_string_literal_payload(cc_intern_resolve(self.intern, sym)) else: ""
-            texts = cc_push_unique_str(texts, text)
+            texts = cc_push_unique_str(move texts, move text)
     texts
 
 fn CCodegen.emit_cstr_literal_defs(self: CCodegen) -> str:
