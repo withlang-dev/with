@@ -12,6 +12,13 @@ use Diagnostic
 
 extern fn with_parse_i64(s: str) -> i64
 extern fn str_from_byte(b: i32) -> str
+extern fn with_sysinfo_arch() -> str
+
+// Canonical active target architecture for @[target("arch")] guards.
+// Until CLI-selected cross targets land (#425) this is the host arch.
+fn parser_active_arch() -> str:
+    let a = with_sysinfo_arch()
+    if a == "x86_64" or a == "amd64": "x86_64" else: "aarch64"
 pub type Parser {
     tokens: TokenList,
     pos: i32,
@@ -50,6 +57,7 @@ pub type Parser {
     pending_weak: i32,
     pending_callconv: i32,
     pending_stack_size: i32,
+    pending_target: i32,
     pending_effect_params: Vec[i32],
     pending_effect_bits: Vec[i32],
     pending_compiler_hook_phase: i32,
@@ -120,6 +128,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_weak: 0,
         pending_callconv: 0,
         pending_stack_size: 0,
+        pending_target: 0,
         pending_effect_params: Vec.new(),
         pending_effect_bits: Vec.new(),
         pending_compiler_hook_phase: 0,
@@ -521,6 +530,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_weak = 0
     self.pending_callconv = 0
     self.pending_stack_size = 0
+    self.pending_target = 0
     self.pending_effect_params = Vec.new()
     self.pending_effect_bits = Vec.new()
     self.pending_iter_of_self = 0
@@ -648,6 +658,24 @@ fn Parser.skip_attributes(self: Parser):
                 if self.peek() == TokenKind.TK_STRING_LIT:
                     let cc_name = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
                     self.pending_callconv = self.intern.intern(cc_name)
+                    self.advance()
+                if self.peek() == TokenKind.TK_R_PAREN:
+                    self.advance()
+        else if self.is_ident_named("target"):
+            // §16.13 @[target("aarch64")] / @[target("x86_64")] architecture guard.
+            self.advance()
+            if self.peek() != TokenKind.TK_L_PAREN:
+                self.emit_error("expected '(' after target in @[target(\"arch\")]")
+            else:
+                self.advance()
+                if self.peek() != TokenKind.TK_STRING_LIT:
+                    self.emit_error("@[target(...)] requires a string literal architecture name, e.g. @[target(\"aarch64\")]")
+                else:
+                    let arch = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                    if arch != "aarch64" and arch != "x86_64":
+                        self.emit_error("unknown target architecture '" ++ arch ++ "'; expected \"aarch64\" or \"x86_64\"")
+                    else:
+                        self.pending_target = self.intern.intern(arch)
                     self.advance()
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
@@ -798,10 +826,27 @@ fn Parser.parse_module(self: Parser) -> AstPool:
         else:
             let decl = self.parse_decl()
             if decl != 0:
-                self.pool.add_decl(decl)
-                if self.pool.kind(decl) == NodeKind.NK_FN_DECL and self.intern.resolve(self.pool.get_data0(decl)) == "main":
-                    self.explicit_main_decl = decl as i32
-                self.flush_pending_post_decls()
+                // §16.13 @[target("arch")] guard: a declaration guarded for an
+                // architecture other than the active target is excluded from
+                // compilation entirely (not collected, not checked, not lowered)
+                // so non-portable code stays explicit without breaking other
+                // hosts. Matching guards are recorded on the node (visible to
+                // later phases) and compiled normally.
+                // fn decls record the guard on the node (parse_fn_decl); other
+                // decl kinds still carry it in pending_target.
+                var guard = self.pending_target
+                self.pending_target = 0
+                if self.pool.kind(decl) == NodeKind.NK_FN_DECL:
+                    guard = self.pool.fn_target_arch_of(decl)
+                if guard != 0 and self.intern.resolve(guard) != parser_active_arch():
+                    // Drop: do not add to the pool, and discard any post-decls
+                    // it generated so nothing dangling references it.
+                    self.pending_post_decls = Vec.new()
+                else:
+                    self.pool.add_decl(decl)
+                    if self.pool.kind(decl) == NodeKind.NK_FN_DECL and self.intern.resolve(self.pool.get_data0(decl)) == "main":
+                        self.explicit_main_decl = decl as i32
+                    self.flush_pending_post_decls()
             else:
                 self.recover_to_top_level()
         self.skip_separators()
@@ -1076,6 +1121,10 @@ fn Parser.parse_comptime_decl_block(self: Parser):
 // ── fn decl ──────────────────────────────────────────────────────
 
 fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is_gen: i32, is_comptime: i32) -> NodeId:
+    // Capture the @[target("arch")] guard up front — parsing the body may run
+    // skip_attributes for nested constructs and clear pending_target.
+    let fn_target_guard = self.pending_target
+    self.pending_target = 0
     if self.expect(TokenKind.TK_KW_FN) == 0:
         return self.poisoned_expr()
     var name = self.expect_ident_or_keyword()
@@ -1175,6 +1224,8 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     if self.pending_unsafe_fn != 0:
         final_body = self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, self.pool.get_start(body), self.pool.get_end(body), body, UNSAFE_KIND_BLOCK, UNSAFE_ORIGIN_FN_BODY)
     let fn_node = self.pool.add_node(NodeKind.NK_FN_DECL, start, self.pool.get_end(body), name, final_body, flags)
+    if fn_target_guard != 0:
+        self.pool.mark_fn_target_arch(fn_node, fn_target_guard)
     let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
     // @[c_export("name")] on non-extern fn: store callconv in tp_start slot
     var final_tp_start = if tp_count > 0: tp_start else: 0

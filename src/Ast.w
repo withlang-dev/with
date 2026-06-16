@@ -463,6 +463,7 @@ type AstPoolState {
     call_named_args: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     fn_weak_flags: HashMap[i32, i32],
+    fn_target_arch: HashMap[i32, i32],   // fn_node → @[target("arch")] arch name sym
     fn_effect_pin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_effect_pin_*
     fn_effect_pin_counts: HashMap[i32, i32],   // fn_node → entry count
     fn_effect_pin_params: Vec[i32],            // param_name_sym
@@ -543,6 +544,7 @@ fn AstPool.new -> AstPool:
             call_named_args: HashMap.new(),
             fn_stack_sizes: HashMap.new(),
             fn_weak_flags: HashMap.new(),
+            fn_target_arch: HashMap.new(),
             fn_effect_pin_starts: HashMap.new(),
             fn_effect_pin_counts: HashMap.new(),
             fn_effect_pin_params: Vec.new(),
@@ -1279,6 +1281,14 @@ fn AstPool.mark_no_alloc_fn(self: AstPool, node: NodeId):
 fn AstPool.is_no_alloc_fn_node(self: AstPool, node: NodeId) -> i32:
     if self.state.no_alloc_fn_set.contains(node as i32): return 1
     0
+
+fn AstPool.mark_fn_target_arch(self: AstPool, node: NodeId, arch_sym: i32):
+    self.state.fn_target_arch.insert(node as i32, arch_sym)
+
+// Returns the @[target("arch")] arch name sym for a fn node, or 0 if none.
+fn AstPool.fn_target_arch_of(self: AstPool, node: NodeId) -> i32:
+    let v = self.state.fn_target_arch.get(node as i32)
+    if v.is_some(): v.unwrap() else: 0
 
 fn AstPool.mark_iter_of_self_fn(self: AstPool, node: NodeId):
     self.state.iter_of_self_fn_nodes.push(node as i32)
