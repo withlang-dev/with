@@ -9823,9 +9823,12 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let asm_extra_start = asm_packed_d2 >> 8
         let asm_args: Vec[i32] = Vec.new()
         if asm_extra_start > 0:
-            let asm_input_count = self.ast.get_extra(asm_extra_start + 1)
+            // Extras: [output_count, out_types.., input_count, in_exprs..]
+            let asm_output_count = self.ast.get_extra(asm_extra_start)
+            let asm_in_base = asm_extra_start + 1 + asm_output_count
+            let asm_input_count = self.ast.get_extra(asm_in_base)
             for asm_ii in 0..asm_input_count:
-                let asm_in_node = self.ast.get_extra(asm_extra_start + 2 + asm_ii)
+                let asm_in_node = self.ast.get_extra(asm_in_base + 1 + asm_ii)
                 asm_args.push(self.lower_expr(asm_in_node))
         let asm_args_id = self.body.new_call_args(asm_args)
         self.body.set_call_intrinsic(asm_args_id, MirIntrinsic.ASM)

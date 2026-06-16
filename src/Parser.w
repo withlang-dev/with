@@ -4983,6 +4983,58 @@ fn Parser.parse_unsafe(self: Parser) -> NodeId:
         body = self.parse_precedence(13)
     self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, unsafe_kind, UNSAFE_ORIGIN_EXPR)
 
+// Operand index for an asm {name} placeholder: position of `name_sym` in the
+// operand-name table (outputs in declaration order, then inputs). Returns -1
+// if not found.
+fn Parser.asm_operand_index(self: Parser, names: &Vec[i32], name_sym: i32) -> i32:
+    for i in 0..names.len() as i32:
+        if names.get(i as i64) == name_sym:
+            return i
+    -1
+
+// §16.13: rewrite a template's `{name}` placeholders to LLVM `$N` operand
+// references. `{{`/`}}` are literal braces; a bare `$` is escaped to `$$` so
+// user text cannot accidentally form an LLVM substitution. Unknown names are a
+// compile error.
+fn Parser.rewrite_asm_template(self: Parser, tmpl: str, names: &Vec[i32]) -> str:
+    var out = ""
+    var i = 0
+    let n = tmpl.len() as i32
+    while i < n:
+        let c = tmpl.byte_at(i as i64)
+        if c == 123:  // '{'
+            if i + 1 < n and tmpl.byte_at((i + 1) as i64) == 123:
+                out = out ++ "{"
+                i = i + 2
+            else:
+                var j = i + 1
+                while j < n and tmpl.byte_at(j as i64) != 125:  // '}'
+                    j = j + 1
+                if j >= n:
+                    self.emit_error("unterminated '{' in asm template")
+                    return tmpl
+                let nm = tmpl.slice((i + 1) as i64, j as i64)
+                let idx = self.asm_operand_index(names, self.intern.intern(nm))
+                if idx < 0:
+                    self.emit_error("asm template references unknown binding '" ++ nm ++ "'")
+                    return tmpl
+                out = out ++ f"${idx}"
+                i = j + 1
+        else if c == 125:  // '}'
+            if i + 1 < n and tmpl.byte_at((i + 1) as i64) == 125:
+                out = out ++ "}"
+                i = i + 2
+            else:
+                out = out ++ "}"
+                i = i + 1
+        else if c == 36:  // '$'
+            out = out ++ "$$"
+            i = i + 1
+        else:
+            out = out ++ str_from_byte(c)
+            i = i + 1
+    out
+
 fn Parser.parse_asm_expr(self: Parser) -> NodeId:
     // asm("template" : outputs : inputs : clobbers)
     // asm volatile("template" ::: "memory")
@@ -5002,54 +5054,67 @@ fn Parser.parse_asm_expr(self: Parser) -> NodeId:
         return self.pool.add_node(NodeKind.NK_POISONED_EXPR, start, self.prev_end(), 0, 0, 0)
     let tmpl_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
     let tmpl_text = strip_string_token_text(tmpl_raw)
-    let tmpl_sym = self.intern.intern(tmpl_text)
     self.advance()
     // Build LLVM constraint string and collect input expression nodes.
     // LLVM format: "output_constraints,input_constraints,~{clobber1},~{clobber2}"
+    // Operand numbering for {name}->$N substitution: outputs in declaration
+    // order, then inputs (clobbers are not numbered).
     var constraints_str = ""
     var has_output = false
-    var output_type_node: NodeId = 0 as NodeId
+    let output_type_nodes: Vec[NodeId] = Vec.new()
     let input_exprs: Vec[NodeId] = Vec.new()
+    let operand_names: Vec[i32] = Vec.new()
     var first_constraint = true
-    // Section 1: outputs
+    // Section 1: outputs (comma-separated `name("constraint") -> type`,
+    // or a single read-write `name("+r")`).
     var rw_output_sym: i32 = 0  // read-write output variable symbol
+    var output_count = 0
     if self.peek() == TokenKind.TK_COLON:
         self.advance()
-        // Parse output: ident("constraint") -> type
-        //   or read-write: ident("+r") ident  (same variable as input+output)
-        if self.peek() == TokenKind.TK_IDENT and self.peek() != TokenKind.TK_COLON:
+        while self.peek() == TokenKind.TK_IDENT:
             let out_name_sym = self.intern_current()
             self.advance()
+            var this_out_type: NodeId = 0 as NodeId
+            var is_rw = false
             if self.peek() == TokenKind.TK_L_PAREN:
                 self.advance()
                 if self.peek() == TokenKind.TK_STRING_LIT:
                     let out_raw = self.source.slice(self.current_start() as i64, self.current_end() as i64)
                     let out_reg = strip_string_token_text(out_raw)
-                    // Read-write constraint: "+r" passes through directly.
-                    // The variable is both input and output.
-                    if out_reg.len() > 1 and out_reg.byte_at(0) == 43:  // '+'
-                        constraints_str = out_reg
+                    if out_reg.len() > 1 and out_reg.byte_at(0) == 43:  // '+' read-write
+                        is_rw = true
+                        if output_count > 0:
+                            self.emit_error("read-write asm output '+...' must be the only output")
+                        constraints_str = constraints_str ++ (if first_constraint: "" else: ",") ++ out_reg
                         rw_output_sym = out_name_sym
                     else:
-                        constraints_str = "={" ++ out_reg ++ "}"
+                        constraints_str = constraints_str ++ (if first_constraint: "" else: ",") ++ "={" ++ out_reg ++ "}"
                     first_constraint = false
                     self.advance()
                 self.expect(TokenKind.TK_R_PAREN)
-            if rw_output_sym != 0:
-                // Read-write: the variable is the output, infer type as i64,
-                // and add the variable as an implicit input expression.
+            if is_rw:
+                // Read-write: variable is both output and the sole call argument;
+                // type is inferred from it. No explicit `-> type`.
                 has_output = true
                 flags = flags | 2
             else if self.peek() == TokenKind.TK_ARROW:
                 self.advance()
-                output_type_node = self.parse_type_expr()
+                this_out_type = self.parse_type_expr()
                 has_output = true
                 flags = flags | 2  // bit 1 = has_output
+            operand_names.push(out_name_sym)
+            output_type_nodes.push(this_out_type)
+            output_count = output_count + 1
+            if self.peek() == TokenKind.TK_COMMA:
+                self.advance()
+            else:
+                break
         // Section 2: inputs
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             // Parse inputs: ident("constraint") expr, ...
             while self.peek() == TokenKind.TK_IDENT:
+                let in_name_sym = self.intern_current()
                 self.advance()  // consume input name
                 if self.peek() == TokenKind.TK_L_PAREN:
                     self.advance()
@@ -5062,9 +5127,12 @@ fn Parser.parse_asm_expr(self: Parser) -> NodeId:
                         first_constraint = false
                         self.advance()
                     self.expect(TokenKind.TK_R_PAREN)
+                if rw_output_sym != 0:
+                    self.emit_error("read-write asm operand cannot be combined with explicit inputs")
                 // Parse the input value expression
                 let in_expr = self.parse_expr()
                 input_exprs.push(in_expr)
+                operand_names.push(in_name_sym)
                 if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
             // Section 3: clobbers
@@ -5081,14 +5149,19 @@ fn Parser.parse_asm_expr(self: Parser) -> NodeId:
                     if self.peek() == TokenKind.TK_COMMA:
                         self.advance()
     self.expect(TokenKind.TK_R_PAREN)
-    // For read-write constraints: add the variable as an implicit input
+    // For read-write constraints: add the variable as the implicit input value.
+    // Its name already occupies the output operand slot, so it is not added to
+    // operand_names again.
     if rw_output_sym != 0:
         let rw_ident = self.pool.add_node(NodeKind.NK_IDENT, start, self.prev_end(), rw_output_sym, 0, 0)
         input_exprs.push(rw_ident)
+    let tmpl_sym = self.intern.intern(self.rewrite_asm_template(tmpl_text, &operand_names))
     let constr_sym = self.intern.intern(constraints_str)
-    // Store input expressions and output type in extras
+    // Extras layout: [output_count, out_type_0.., input_count, in_expr_0..]
     let extra_start = self.pool.extra_len()
-    self.pool.add_extra(output_type_node as i32)
+    self.pool.add_extra(output_count)
+    for i in 0..output_type_nodes.len() as i32:
+        self.pool.add_extra(output_type_nodes.get(i as i64) as i32)
     self.pool.add_extra(input_exprs.len() as i32)
     for i in 0..input_exprs.len() as i32:
         self.pool.add_extra(input_exprs.get(i as i64) as i32)

@@ -8051,38 +8051,55 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: &MirBody, i
             let asm_packed_d2 = self.pool.get_data2(asm_node)
             let asm_flags = asm_packed_d2 & 0xFF
             let asm_extra_start = asm_packed_d2 >> 8
-            let asm_tmpl = self.intern.resolve(asm_tmpl_sym)
+            // Decode string escapes (e.g. \n between instructions) — the
+            // template is interned raw at parse time. {name}->$N substitution
+            // already happened in the parser.
+            let asm_tmpl = self.decode_string_escapes(self.intern.resolve(asm_tmpl_sym))
             let asm_constr = self.intern.resolve(asm_constr_sym)
             let asm_is_volatile = (asm_flags & 1) != 0
             let asm_has_output = (asm_flags & 2) != 0
-            // Determine return type and collect input values
+            // Determine return type and collect input values.
+            // Extras: [output_count, out_type_0.., input_count, in_expr_0..]
             var asm_ret_ty = wl_void_type(self.context)
             let asm_input_vals: Vec[i64] = Vec.new()
             let asm_param_tys: Vec[i64] = Vec.new()
             if asm_extra_start > 0:
-                let asm_out_type_node = self.pool.get_extra(asm_extra_start)
-                let asm_input_count = self.pool.get_extra(asm_extra_start + 1)
-                if asm_has_output and asm_out_type_node != 0:
-                    asm_ret_ty = self.resolve_type(asm_out_type_node)
-                    if asm_ret_ty == 0:
-                        asm_ret_ty = wl_i64_type(self.context)
+                let asm_out_count = self.pool.get_extra(asm_extra_start)
+                let asm_in_base = asm_extra_start + 1 + asm_out_count
+                let asm_input_count = self.pool.get_extra(asm_in_base)
                 // Collect input values from MIR args
                 for asm_ii in 0..asm_input_count:
                     let asm_in_val = self.mir_intrinsic_arg(body, args_id, asm_ii)
                     asm_input_vals.push(asm_in_val)
                     asm_param_tys.push(wl_type_of(asm_in_val))
-                // Read-write constraint ("+r"): infer return type from the
-                // input value type when no explicit output type was given.
-                if asm_has_output and asm_out_type_node == 0 and asm_input_vals.len() > 0:
-                    asm_ret_ty = wl_type_of(asm_input_vals.get(0))
+                if asm_out_count == 1:
+                    let asm_out_type_node = self.pool.get_extra(asm_extra_start + 1)
+                    if asm_out_type_node != 0:
+                        asm_ret_ty = self.resolve_type(asm_out_type_node)
+                        if asm_ret_ty == 0:
+                            asm_ret_ty = wl_i64_type(self.context)
+                    else if asm_input_vals.len() > 0:
+                        // Read-write ("+r"): return type is the input value type.
+                        asm_ret_ty = wl_type_of(asm_input_vals.get(0))
+                if asm_out_count > 1:
+                    // Multiple outputs: LLVM returns an anonymous struct
+                    // {T0, T1, ...}, which is identical to the With tuple type
+                    // (Codegen lowers tuples to the same struct), so the call
+                    // result stores directly into the tuple destination.
+                    let asm_out_tys: Vec[i64] = Vec.new()
+                    for asm_oi in 0..asm_out_count:
+                        var asm_ot = self.resolve_type(self.pool.get_extra(asm_extra_start + 1 + asm_oi))
+                        if asm_ot == 0:
+                            asm_ot = wl_i64_type(self.context)
+                        asm_out_tys.push(asm_ot)
+                    asm_ret_ty = wl_struct_type(self.context, vec_data_i64(&asm_out_tys), asm_out_count, 0)
             let asm_fn_ty = wl_function_type(asm_ret_ty, vec_data_i64(&asm_param_tys), asm_param_tys.len() as i32, 0)
             let asm_val = wl_get_inline_asm(asm_fn_ty, asm_tmpl, asm_constr, if asm_is_volatile: 1 else: 0, 0)
             let asm_call_result = wl_build_call(self.builder, asm_fn_ty, asm_val, vec_data_i64(&asm_input_vals), asm_input_vals.len() as i32)
             if asm_has_output:
                 result = asm_call_result
-        // Branch to next bb
-        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
-            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+        // Store the output (if any) into the destination place and branch.
+        self.mir_finish_intrinsic_call(body, dest_place, next_bb, result)
         return true
 
     else if intrinsic == MirIntrinsic.MULTI_INDEX:

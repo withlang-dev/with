@@ -4537,7 +4537,30 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_ASM_EXPR:
         self.require_unsafe_operation("asm requires unsafe context", node)
-        return self.ty_void
+        // Extras: [output_count, out_type_0.., input_count, in_expr_0..]
+        let asm_extra_start = self.ast.get_data2(node) >> 8
+        var asm_result_ty = self.ty_void as i32
+        if asm_extra_start > 0:
+            let asm_out_count = self.ast.get_extra(asm_extra_start)
+            let asm_in_base = asm_extra_start + 1 + asm_out_count
+            let asm_in_count = self.ast.get_extra(asm_in_base)
+            // Type-check input expressions so MIR lowering has their types.
+            for asm_ii in 0..asm_in_count:
+                let _ = self.check_expr(self.ast.get_extra(asm_in_base + 1 + asm_ii))
+            if asm_out_count == 1:
+                let asm_out_node = self.ast.get_extra(asm_extra_start + 1)
+                if asm_out_node != 0:
+                    asm_result_ty = self.resolve_type_expr(asm_out_node) as i32
+                else if asm_in_count > 0:
+                    // Read-write "+r": output type is the (last) input's type.
+                    asm_result_ty = self.check_expr(self.ast.get_extra(asm_in_base + 1 + asm_in_count - 1)) as i32
+            if asm_out_count > 1:
+                let asm_elems: Vec[i32] = Vec.new()
+                for asm_oi in 0..asm_out_count:
+                    asm_elems.push(self.resolve_type_expr(self.ast.get_extra(asm_extra_start + 1 + asm_oi)) as i32)
+                asm_result_ty = self.ensure_tuple_type(asm_elems, asm_out_count) as i32
+        self.typed_expr_types.insert(node, asm_result_ty)
+        return asm_result_ty as TypeId
 
     if kind == NodeKind.NK_COMPTIME_ERROR:
         if self.in_concrete_generic_body != 0:
