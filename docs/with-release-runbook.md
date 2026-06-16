@@ -100,13 +100,16 @@ with-bootstrap-c-vX.Y.Z.tar.zst              # emitted-C bootstrap bundle
 with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst   # static LLVM SDK (Darwin arm64)
 with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst     # static LLVM SDK (Linux x86_64)
 with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.zst   # static LLVM SDK (Windows x86_64)
-install.sh
-install.ps1
-install.cmd
 ```
 
 Do not publish a binary asset named `main`. `src/main` is the local seed path;
 it is not the release asset name.
+
+Installer scripts are not part of the required post-seed release contract. A
+release may temporarily attach shell, PowerShell, or CMD convenience installers
+while the With-native installer path is being built, but normal release
+verification and post-seed updates use `with build :install-user` and
+`with build :update-seed`, not `scripts/install.*`.
 
 ### Static LLVM SDK asset
 
@@ -205,7 +208,7 @@ build-state files, stale retained test-graph compiler copies, stale
 issue61-regression fixture directories, seed archives beyond the retention
 window, and versioned release byproducts in `out/release/` beyond the five most
 recent release versions. It does not remove `.deps/`, unversioned release
-binaries, `install.sh`, or platform SDK archives.
+binaries, transitional installer byproducts, or platform SDK archives.
 
 `with build :emit-c-fixpoint` is optional manual verification for emit-C feature
 work. Do not treat it as a normal release gate unless the release scope
@@ -444,7 +447,9 @@ and clang builtin headers.
 scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-llvm-sdk-*-linux-x86_64.tar.zst out/release/
 ```
 
-This produces platform assets under `out/release/` plus `install.sh`.
+This produces platform assets under `out/release/`. Current packaging scripts
+may also produce transitional installer byproducts; those are not required
+release assets and must not be used for post-seed update instructions.
 Each public binary is the verified compiler copied under its platform asset
 name and stripped with the With-owned SDK `llvm-strip`. It must not have dynamic
 LLVM, Clang, zlib, zstd, or libxml2 load commands, and it must contain static
@@ -469,9 +474,6 @@ gh release create v0.14.3 \
   out/release/with-llvm-sdk-*-darwin-aarch64.tar.zst \
   out/release/with-llvm-sdk-*-linux-x86_64.tar.zst \
   out/release/with-llvm-sdk-*-windows-x86_64.tar.zst \
-  out/release/install.sh \
-  out/release/install.ps1 \
-  out/release/install.cmd \
   --repo withlang-dev/with \
   --title "v0.14.3: <release title>" \
   --notes-file <release-notes.md>
@@ -504,9 +506,6 @@ gh release view v0.14.3 \
 Expected asset list:
 
 ```text
-install.sh
-install.ps1
-install.cmd
 with-bootstrap-c-v0.14.3.tar.zst
 with-darwin-aarch64
 with-linux-x86_64

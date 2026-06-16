@@ -102,7 +102,10 @@ Still blocking Makefile and script removal:
   directly until the installed seed embeds that API. PCRE2 has moved from the
   shared `out/pcre2_tmp` path to the action-scratch path convention with
   explicit transitional write scopes for old-seed compatibility.
-- The active runbooks still describe scripts as normal release and SDK tools.
+- The active runbooks still describe release packaging and SDK packaging
+  scripts as normal release tools. Installer scripts are no longer required
+  release assets in the release runbook, but the scripts still exist as
+  transitional byproducts until a With-native installer path lands.
 - Some std.build / build-cache behavior is not strong enough to be the final
   script-free contract.
 
@@ -201,6 +204,10 @@ and script dependency are gone.
 - 2026-06-15: Added native uncompressed USTAR creation/extraction to
   `ToolFs.write_tar()` / `ToolFs.extract_tar()` with build.w selfhost coverage
   for directory entries, text files, and binary payloads.
+- 2026-06-15: Removed installer scripts from the required release asset and
+  upload lists in the release runbook, and clarified in the bootstrap runbook
+  that `scripts/install.*` is not the post-seed handoff path; post-seed updates
+  use `with build :install-user` / `with build :update-seed`.
 
 ## Implementation Tasks
 

@@ -55,7 +55,13 @@ On Windows/MSVC the required static C API archive is:
 lib/libclang.lib
 ```
 
-Use the repo scripts to build this SDK:
+Until SDK construction is moved into `build.w`, use the repo scripts below only
+inside this first-platform bootstrap boundary. They are not normal post-seed
+release tools: once the first seed and static SDK exist for a platform,
+`docs/with-release-runbook.md` reuses those artifacts and updates the local
+compiler with `with build :install-user` / `with build :update-seed`.
+
+Use the repo scripts to build this initial SDK:
 
 ```sh
 command -v clang
@@ -124,6 +130,10 @@ Publish that asset with the platform's release (see `docs/with-release-runbook.m
 → *Static LLVM SDK asset*). Thereafter `with build :deps` fetches it; LLVM is
 built from source only when `COMPILER_LLVM_VERSION` bumps to an SDK no release
 has published yet.
+
+Do not use `scripts/install.*` as the handoff from bootstrap to normal
+development. After the seed exists and the gates pass, use the graph-owned
+install/update targets from Path A.
 
 ## Bootstrap Paths
 
