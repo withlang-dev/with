@@ -2472,6 +2472,24 @@ fn Sema.emit_no_await_guard_may_suspend_expr(self: Sema, node: i32, expr: i32):
     // where NLL liveness at the actual suspension point is available.
     return
 
+fn Sema.callable_node_may_suspend(self: Sema, node: i32) -> i32:
+    if node <= 0:
+        return 0
+    if self.ast.kind(node) != NodeKind.NK_CLOSURE:
+        return self.expr_may_suspend(node)
+    self.expr_may_suspend(self.ast.get_data0(node))
+
+fn Sema.check_indirect_may_suspend_context(self: Sema, node: i32, closure_node: i32):
+    if closure_node <= 0:
+        return
+    if self.callable_node_may_suspend(closure_node) == 0:
+        return
+    if self.no_suspend_scope_depth > 0:
+        self.emit_error_code("same-fiber callable may suspend inside no_suspend block", node, "E0702")
+        return
+    if self.has_live_await_guard() != 0:
+        self.emit_error_code("same-fiber callable may suspend while a no_await_guard value is live", node, "E0701")
+
 fn Sema.alloc_construct_label(self: Sema, kind: AllocConstructKind) -> str:
     if kind == AllocConstructKind.EXPLICIT_API: return "explicit allocation API"
     if kind == AllocConstructKind.VEC_NEW: return "Vec.new"
@@ -2628,13 +2646,22 @@ fn Sema.expr_may_suspend(self: Sema, node: i32) -> i32:
         return 1
     if kind == NodeKind.NK_ASYNC_BLOCK:
         return 0
+    if kind == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(node)
+        if self.binding_closure_nodes.contains(sym):
+            return self.callable_node_may_suspend(self.binding_closure_nodes.get(sym).unwrap())
+        return 0
     if kind == NodeKind.NK_CALL:
         if self.comp_resolved.contains(node):
             if self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()) != 0:
                 return 1
         let callee = self.ast.get_data0(node)
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
-            if self.fn_symbol_may_suspend(self.ast.get_data0(callee)) != 0:
+            let callee_sym = self.ast.get_data0(callee)
+            if self.binding_closure_nodes.contains(callee_sym):
+                if self.callable_node_may_suspend(self.binding_closure_nodes.get(callee_sym).unwrap()) != 0:
+                    return 1
+            if self.fn_symbol_may_suspend(callee_sym) != 0:
                 return 1
         else if self.expr_may_suspend(callee) != 0:
             return 1
@@ -4538,7 +4565,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_NO_SUSPEND:
         let body = self.ast.get_data0(node)
+        self.no_suspend_scope_depth = self.no_suspend_scope_depth + 1
         let result = if self.has_expected_type != 0: self.check_expr_with_expected(body, self.expected_expr_type) else: self.check_expr(body)
+        self.no_suspend_scope_depth = self.no_suspend_scope_depth - 1
         if result != 0:
             self.typed_expr_types.insert(node, result as i32)
         return result
@@ -10694,6 +10723,7 @@ fn Sema.try_unit_elide_call_arg(self: Sema, call_node: i32, arg_count: i32, expe
 fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closure_node: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: &Vec[i32]) -> i32:
     if closure_node > 0:
         self.emit_no_await_guard_may_suspend_expr(node, closure_node)
+        self.check_indirect_may_suspend_context(node, closure_node)
     let expected = self.get_type_d1(fn_tid)
     let actual = arg_count + param_offset
     if self.ast.has_call_named_args(node) == 0 and self.has_resolved_call_args(node) == 0:
@@ -14124,6 +14154,21 @@ fn Sema.sender_send_element_type(self: Sema, recv_type: i32, field: i32, arg_ind
         return 0
     self.get_generic_inst_arg(resolved as i32, 0)
 
+fn Sema.method_may_suspend_current_fiber(self: Sema, recv_type: i32, field: i32) -> i32:
+    if recv_type == 0:
+        return 0
+    let resolved = self.resolve_alias(recv_type as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let owner_sym = self.get_generic_inst_base(resolved as i32)
+    let owner_name = self.pool_resolve(owner_sym)
+    let method_name = self.pool_resolve(field)
+    if owner_name == "Sender" and method_name == "send":
+        return 1
+    if owner_name == "Receiver" and method_name == "recv":
+        return 1
+    0
+
 fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
     if type_node == 0:
         return 0
@@ -14481,6 +14526,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if static_type_sym != 0 and self.is_pending_generic_collection_base(static_type_sym) != 0 and (field == self.syms.new or (static_type_sym == self.syms.vec and early_method_name == "with_capacity")):
         self.note_allocation_site(node, AllocConstructKind.VEC_NEW, 0, 0)
     obj_type = self.adjust_static_receiver_type(expr, obj_type as i32)
+    if self.no_suspend_scope_depth > 0 and self.method_may_suspend_current_fiber(obj_type as i32, field) != 0:
+        self.emit_error_code("direct fiber-aware runtime operation may suspend inside no_suspend block", node, "E0702")
 
     if obj_type != 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
         if self.is_tool_capability_type(obj_type as i32) and self.pool_resolve(field) == "__driver_new" and not self.can_access_tool_capability_internals():

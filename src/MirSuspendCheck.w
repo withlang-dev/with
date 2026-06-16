@@ -256,6 +256,8 @@ fn suspend_compute_live_out_for_block(body: &MirBody, live_in: SuspendBits, loca
     out_bits
 
 fn suspend_is_scheduler_yield_intrinsic(intrinsic: MirIntrinsic) -> i32:
+    // Closed current-fiber suspension set. Update this helper whenever a
+    // runtime intrinsic can park/yield the caller instead of returning a Task.
     if intrinsic == MirIntrinsic.FIBER_AWAIT:
         return 1
     if intrinsic == MirIntrinsic.FIBER_CLEANUP_AWAIT:
@@ -265,6 +267,10 @@ fn suspend_is_scheduler_yield_intrinsic(intrinsic: MirIntrinsic) -> i32:
     if intrinsic == MirIntrinsic.FIBER_SELECT_BIASED:
         return 1
     if intrinsic == MirIntrinsic.SCOPE_AWAIT_ALL:
+        return 1
+    if intrinsic == MirIntrinsic.CHAN_SEND:
+        return 1
+    if intrinsic == MirIntrinsic.CHAN_RECV:
         return 1
     0
 

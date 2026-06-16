@@ -632,6 +632,7 @@ type Sema {
     with_enter_methods: HashMap[i32, i32],
     with_exit_methods: HashMap[i32, i32],
     no_await_guard_scope_depth: i32,
+    no_suspend_scope_depth: i32,
 
     // For-comprehension resolved variants: node → resolved variant sym.
     // Maps _Payload/_Empty marker nodes to Some/None or Ok/Err.
@@ -1593,6 +1594,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         with_enter_methods: sema_new_map_i32_i32(),
         with_exit_methods: sema_new_map_i32_i32(),
         no_await_guard_scope_depth: 0,
+        no_suspend_scope_depth: 0,
         comp_resolved: sema_new_map_i32_i32(),
         comptime_selected_branches: sema_new_map_i32_i32(),
         pipeline_method_calls: sema_new_map_i32_i32(),

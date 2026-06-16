@@ -25,4 +25,9 @@ fn main:
         make_task(41)
     assert(task.await == 42)
 
+    let make_task_closure = () => make_task(41)
+    let task_from_closure = no_suspend:
+        make_task_closure()
+    assert(task_from_closure.await == 42)
+
     print("ok")
