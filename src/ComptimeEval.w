@@ -240,6 +240,8 @@ type ComptimeEvaluator {
     runtime_env_names: Vec[str],
     runtime_env_values: Vec[str],
     effect_records: Vec[str],
+    tool_identity_paths: Vec[str],
+    tool_identity_values: Vec[str],
     strict_effects: i32,
     has_pending_diag: i32,
     pending_diag: Diagnostic,
@@ -305,6 +307,8 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         runtime_env_names: Vec.new(),
         runtime_env_values: Vec.new(),
         effect_records: Vec.new(),
+        tool_identity_paths: Vec.new(),
+        tool_identity_values: Vec.new(),
         strict_effects: 0,
         has_pending_diag: 0,
         pending_diag: Diagnostic.err("", Span { file: 0, start: 0, end: 0 }),
@@ -1348,14 +1352,24 @@ fn ComptimeEvaluator.effect_argv_parts_from_value(self: ComptimeEvaluator, value
             parts.push(item.text)
     parts
 
-fn comptime_effect_tool_identity(parts: &Vec[str]) -> str:
+fn ComptimeEvaluator.effect_tool_identity(self: ComptimeEvaluator, parts: &Vec[str]) -> str:
     if parts.len() == 0:
         return ""
     let exe = parts.get(0)
     let resolved = comptime_effect_resolve_executable(exe)
+    let key = if resolved.len() > 0: resolved else: exe
+    for i in 0..self.tool_identity_paths.len() as i32:
+        if self.tool_identity_paths.get(i as i64) == key:
+            return self.tool_identity_values.get(i as i64)
     if resolved.len() > 0:
-        return comptime_effect_escape(resolved) ++ ":" ++ comptime_sha256_text(with_fs_read_file(resolved))
-    comptime_effect_escape(exe) ++ ":unresolved"
+        let identity = comptime_effect_escape(resolved) ++ ":" ++ comptime_sha256_text(with_fs_read_file(resolved))
+        self.tool_identity_paths.push(key)
+        self.tool_identity_values.push(identity)
+        return identity
+    let identity = comptime_effect_escape(exe) ++ ":unresolved"
+    self.tool_identity_paths.push(key)
+    self.tool_identity_values.push(identity)
+    identity
 
 fn comptime_effect_contains_slash(text: str) -> bool:
     for i in 0..text.len() as i32:
@@ -1415,7 +1429,7 @@ fn ComptimeEvaluator.record_process_effect(self: ComptimeEvaluator, record: &Com
     line = line ++ "\tstdout=" ++ comptime_effect_escape(stdout_path)
     line = line ++ "\tstderr=" ++ comptime_effect_escape(stderr_path)
     line = line ++ "\tenv=" ++ env_text
-    line = line ++ "\ttool=" ++ comptime_effect_tool_identity(parts)
+    line = line ++ "\ttool=" ++ self.effect_tool_identity(parts)
     self.record_effect(line)
 
 fn ComptimeEvaluator.require_network_tool_allowed(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, method: str, parts: &Vec[str], node: i32) -> i32:
