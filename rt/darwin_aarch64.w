@@ -465,10 +465,15 @@ fn rt_copy_file(src: *const u8, dst: *const u8, mode: i32) -> i32:
     if out_fd < 0:
         let _close_in_on_open = rt_close(in_fd)
         return out_fd
-    var buf: [65536]u8 = [0 as u8; 65536]
+    let buf = with_alloc(65536)
+    if buf as i64 == 0:
+        let _close_in_on_alloc = rt_close(in_fd)
+        let _close_out_on_alloc = rt_close(out_fd)
+        return -12
     while true:
-        let read_count = rt_read(in_fd, &buf as *mut [65536]u8 as *mut u8, 65536)
+        let read_count = rt_read(in_fd, buf, 65536)
         if read_count < 0:
+            with_free(buf)
             let _close_in_on_read = rt_close(in_fd)
             let _close_out_on_read = rt_close(out_fd)
             return read_count as i32
@@ -476,16 +481,19 @@ fn rt_copy_file(src: *const u8, dst: *const u8, mode: i32) -> i32:
             break
         var written: i64 = 0
         while written < read_count:
-            let write_count = rt_write(out_fd, (&buf as i64 + written) as *const u8, read_count - written)
+            let write_count = rt_write(out_fd, (buf as i64 + written) as *const u8, read_count - written)
             if write_count < 0:
+                with_free(buf)
                 let _close_in_on_write = rt_close(in_fd)
                 let _close_out_on_write = rt_close(out_fd)
                 return write_count as i32
             if write_count == 0:
+                with_free(buf)
                 let _close_in_on_zero = rt_close(in_fd)
                 let _close_out_on_zero = rt_close(out_fd)
                 return -5
             written = written + write_count
+    with_free(buf)
     let close_in = rt_close(in_fd)
     let close_out = rt_close(out_fd)
     if close_in != 0:

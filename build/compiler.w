@@ -7,6 +7,17 @@ use std.sysinfo
 const COMPILER_LLVM_VERSION: str = "22.1.6"
 const COMPILER_FALLBACK_LLVM_PREFIX: str = "/usr/local/llvm"
 
+type StackBudgetReport {
+    path: str,
+    format: str,
+    frame_count: i32,
+    max_frame: i32,
+    ge_16k: i32,
+    ge_64k: i32,
+    ge_128k: i32,
+    ge_256k: i32,
+}
+
 fn comp_fail(ctx: &ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
@@ -290,6 +301,12 @@ fn comp_host_exe_suffix() -> str:
         return ".exe"
     ""
 
+fn comp_llvm_readobj_tool(llvm_prefix: str) -> str:
+    comp_tool_from_env("WITH_LLVM_READOBJ", "LLVM_READOBJ", llvm_prefix ++ "/bin/llvm-readobj" ++ comp_host_exe_suffix())
+
+fn comp_llvm_dwarfdump_tool(llvm_prefix: str) -> str:
+    comp_tool_from_env("WITH_LLVM_DWARFDUMP", "LLVM_DWARFDUMP", llvm_prefix ++ "/bin/llvm-dwarfdump" ++ comp_host_exe_suffix())
+
 fn comp_path_separator() -> i32:
     if os() == "Windows":
         return 59
@@ -410,6 +427,120 @@ fn comp_run_first_line(ctx: &ActionCtx, capture_dir: str, label: str, argv: Vec[
     if result.rc != 0:
         return ""
     comp_first_trimmed_line(result.stdout)
+
+fn comp_parse_nonnegative_i32(text: str) -> i32:
+    if text.len() == 0:
+        return -1
+    var value = 0
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        value = value * 10 + (ch - 48)
+    value
+
+fn comp_stack_binary_format(bytes: Vec[u8]) -> str:
+    if bytes.len() >= 2:
+        if bytes.get(0) == 77 as u8 and bytes.get(1) == 90 as u8:
+            return "pe"
+    if bytes.len() >= 4:
+        let b0 = bytes.get(0)
+        let b1 = bytes.get(1)
+        let b2 = bytes.get(2)
+        let b3 = bytes.get(3)
+        if b0 == 127 as u8 and b1 == 69 as u8 and b2 == 76 as u8 and b3 == 70 as u8:
+            return "elf"
+        if b0 == 254 as u8 and b1 == 237 as u8 and b2 == 250 as u8 and b3 == 207 as u8:
+            return "macho"
+        if b0 == 207 as u8 and b1 == 250 as u8 and b2 == 237 as u8 and b3 == 254 as u8:
+            return "macho"
+        if b0 == 202 as u8 and b1 == 254 as u8 and b2 == 186 as u8 and b3 == 190 as u8:
+            return "macho"
+        if b0 == 190 as u8 and b1 == 186 as u8 and b2 == 254 as u8 and b3 == 202 as u8:
+            return "macho"
+    "unknown"
+
+fn comp_stack_collect_after_marker(text: str, marker: str, sizes: Vec[i32]) -> Vec[i32]:
+    var out = sizes
+    var start = 0
+    while start < text.len() as i32:
+        let at = comp_find_from(text, marker, start)
+        if at < 0:
+            break
+        var pos = at + marker.len() as i32
+        while pos < text.len() as i32:
+            let ch = text.byte_at(pos as i64)
+            if ch != 9 and ch != 32:
+                break
+            pos = pos + 1
+        var sign = 1
+        if pos < text.len() as i32:
+            let sign_ch = text.byte_at(pos as i64)
+            if sign_ch == 43:
+                pos = pos + 1
+            else if sign_ch == 45:
+                sign = -1
+                pos = pos + 1
+        var value = 0
+        var seen_digit = false
+        while pos < text.len() as i32:
+            let ch = text.byte_at(pos as i64)
+            if ch < 48 or ch > 57:
+                break
+            value = value * 10 + (ch - 48)
+            seen_digit = true
+            pos = pos + 1
+        if seen_digit:
+            let signed_value = value * sign
+            if signed_value >= 0:
+                out.push(signed_value)
+        start = pos + 1
+    out
+
+fn comp_stack_summarize(path: str, format: str, sizes: Vec[i32]) -> StackBudgetReport:
+    var max_frame = 0
+    var ge_16k = 0
+    var ge_64k = 0
+    var ge_128k = 0
+    var ge_256k = 0
+    for i in 0..sizes.len() as i32:
+        let size = sizes.get(i as i64)
+        if size > max_frame:
+            max_frame = size
+        if size >= 16 * 1024:
+            ge_16k = ge_16k + 1
+        if size >= 64 * 1024:
+            ge_64k = ge_64k + 1
+        if size >= 128 * 1024:
+            ge_128k = ge_128k + 1
+        if size >= 256 * 1024:
+            ge_256k = ge_256k + 1
+    StackBudgetReport {
+        path,
+        format,
+        frame_count: sizes.len() as i32,
+        max_frame,
+        ge_16k,
+        ge_64k,
+        ge_128k,
+        ge_256k,
+    }
+
+fn comp_stack_report_text(report: StackBudgetReport, max_frame_budget: i32) -> str:
+    "path: " ++ report.path ++ "\n" ++
+    "format: " ++ report.format ++ "\n" ++
+    f"frame_count: {report.frame_count}\n" ++
+    f"max_frame: {report.max_frame}\n" ++
+    f"frames_ge_16k: {report.ge_16k}\n" ++
+    f"frames_ge_64k: {report.ge_64k}\n" ++
+    f"frames_ge_128k: {report.ge_128k}\n" ++
+    f"frames_ge_256k: {report.ge_256k}\n" ++
+    f"max_frame_budget: {max_frame_budget}\n"
+
+fn comp_stack_tool_process_path(root: str, tool: str) -> str:
+    if comp_is_absolute_path(tool):
+        return tool
+    comp_abs(root, tool)
 
 fn comp_count_actual_c_export_attrs(text: str) -> i32:
     var count = 0
@@ -964,6 +1095,79 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error(comp_inventory_error_text(errors))
         return 1
     comp_write_ok_output(ctx)
+
+pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return comp_fail(ctx, "requires a binary input")
+    let binary_path = inputs.get(0)
+    let fs = ctx.fs()
+    if not fs.exists(binary_path):
+        return comp_fail(ctx, "missing binary: " ++ binary_path)
+
+    var max_frame_budget = 64 * 1024
+    let budget_arg = comp_arg_value(ctx.args(), "max-frame=")
+    if budget_arg.len() > 0:
+        max_frame_budget = comp_parse_nonnegative_i32(budget_arg)
+        if max_frame_budget < 0:
+            return comp_fail(ctx, "invalid max-frame value: " ++ budget_arg)
+
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return comp_fail(ctx, "requires an output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return comp_fail(ctx, "could not clear output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return comp_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let bytes = fs.read_binary(binary_path)
+    let format = comp_stack_binary_format(bytes)
+    if format == "unknown":
+        return comp_fail(ctx, "unsupported binary format: " ++ binary_path)
+
+    let root = ctx.project_info().project_root()
+    let llvm_prefix = comp_llvm_prefix_for_root(root)
+    let tool = if format == "pe": comp_llvm_readobj_tool(llvm_prefix) else: comp_llvm_dwarfdump_tool(llvm_prefix)
+    let tool_path = comp_stack_tool_process_path(root, tool)
+    if not fs.host_exists(tool_path):
+        return comp_fail(ctx, "missing LLVM stack inspection tool: " ++ tool_path)
+
+    let stdout_path = comp_abs(root, comp_join(output_dir, "tool.stdout"))
+    let stderr_path = comp_abs(root, comp_join(output_dir, "tool.stderr"))
+    let argv: Vec[str] = Vec.new()
+    argv.push(tool_path)
+    if format == "pe":
+        argv.push("--unwind")
+    else:
+        argv.push("--eh-frame")
+    argv.push(comp_abs(root, binary_path))
+
+    let result = ctx.process_runner().run_capture(argv, stdout_path, stderr_path, 120000)
+    if result.rc == 124:
+        return comp_fail(ctx, "stack inspection timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    if result.rc != 0:
+        if result.stderr.len() > 0:
+            ctx.diagnostics().error(result.stderr)
+        return comp_fail(ctx, f"stack inspection failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+
+    var sizes: Vec[i32] = Vec.new()
+    if format == "pe":
+        sizes = comp_stack_collect_after_marker(result.stdout, "ALLOC_SMALL size=", sizes)
+        sizes = comp_stack_collect_after_marker(result.stdout, "ALLOC_LARGE size=", sizes)
+    else:
+        sizes = comp_stack_collect_after_marker(result.stdout, "DW_CFA_def_cfa_offset:", sizes)
+
+    let report = comp_stack_summarize(binary_path, format, sizes)
+    let max_frame = report.max_frame
+    let report_text = comp_stack_report_text(report, max_frame_budget)
+    let report_path = comp_join(output_dir, "report.txt")
+    if fs.write_text(report_path, report_text) != 0:
+        return comp_fail(ctx, "could not write: " ++ report_path)
+    print(report_text)
+
+    if max_frame > max_frame_budget:
+        return comp_fail(ctx, f"max frame {max_frame} exceeds budget {max_frame_budget}; report=" ++ report_path)
+    0
 
 fn comp_json_escape(text: str) -> str:
     var out = ""

@@ -90,8 +90,9 @@ Still blocking Makefile and script removal:
   - `tools/build-static-llvm.sh`
   - `tools/build-static-llvm.ps1`
 - Build-system maintenance still relies on host utilities for release/SDK
-  packaging work. Repository build evidence, compiler seed hashes, and generic
-  `std.build` download checksum verification use With-owned SHA-256.
+  packaging work. Repository build evidence, compiler seed hashes, generic
+  `std.build` download checksum verification, and optional stack-budget
+  inspection use With-owned tools or explicit With-owned SDK tool paths.
 - `ToolFs.scratch_dir()` exists, but repository build modules cannot call it
   directly until the installed seed embeds that API. PCRE2 has moved from the
   shared `out/pcre2_tmp` path to the action-scratch path convention with
@@ -128,7 +129,6 @@ and script dependency are gone.
 | `scripts/install.sh` | post-seed blocker | Replace release installer behavior with a With-owned installer or direct `with build :install-user` flow. |
 | `scripts/install.ps1` | post-seed blocker | Same as `scripts/install.sh` for PowerShell hosts. |
 | `scripts/install.cmd` | post-seed blocker | Same as `scripts/install.sh` for CMD hosts. |
-| `scripts/check-stack-budget.py` | post-seed blocker | Replace with a With build action or delete if no live target/runbook references it. |
 | `scripts/generate-requirements.py` | post-seed blocker | Replace with a With docs-generation target or delete if requirements generation is obsolete. |
 | `tools/build-ninja.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
 | `tools/build-ninja.ps1` | bootstrap-only | Windows first-SDK bootstrap counterpart. |
@@ -188,6 +188,11 @@ and script dependency are gone.
 - 2026-06-15: Replaced `test/lsp/run_lsp_tests.sh` with the
   `with build :cli-selfhost-lsp-tests` action target and wired it into
   `with build :test`.
+- 2026-06-15: Replaced `scripts/check-stack-budget.py` with the explicit
+  `with build :stack-budget-check` target. The action classifies PE/ELF/Mach-O
+  binaries, invokes the pinned LLVM SDK `llvm-readobj` / `llvm-dwarfdump`
+  paths, writes `out/test-graph/stack-budget-check/report.txt`, and enforces
+  the previous 64 KiB default budget when run.
 
 ## Implementation Tasks
 
@@ -269,6 +274,9 @@ depending on scripts or shell fragments for normal maintenance.
 - [x] Move `scripts/check-spec-inventory.py` into a With build action.
 - [x] Move `test/lsp/run_lsp_tests.sh` into a With build action and delete the
   shell wrapper.
+- [x] Move `scripts/check-stack-budget.py` into an explicit With build action
+  that uses declared SDK-owned LLVM tools instead of Python and host tool
+  discovery.
 - [x] Audit `build/`, `src/`, `lib/`, `rt/`, `build.w`, `scripts/`, and `tools/`
   for `sh -c`, `bash -c`, `powershell`, `.py`, `.sh`, `.ps1`, `.cmd`, pipes,
   redirects, and shell utility names. Every post-seed hit must be eliminated or

@@ -795,6 +795,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     build_handoff = build_handoff.dep("build")
     out = out.add_target(build_handoff)
 
+    var stack_budget_check = target_new(.Action, "stack-budget-check", "").output("out/test-graph/stack-budget-check")
+    stack_budget_check.action = run_stack_budget_check_action
+    stack_budget_check = stack_budget_check.input(release_compiler_bin("with"))
+    stack_budget_check = stack_budget_check.dep("build")
+    out = out.add_target(stack_budget_check)
+
     var emit_c_test = target_new(.Action, "emit-c-test", "").output("out/gen/.emit-c-test-stamp")
     emit_c_test.action = run_emit_c_test_action
     emit_c_test = emit_c_test.input(release_compiler_bin("with"))
