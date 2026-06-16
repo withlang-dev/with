@@ -137,7 +137,7 @@ and script dependency are gone.
 | `scripts/install.sh` | post-seed blocker | Replace release installer behavior with a With-owned installer or direct `with build :install-user` flow. |
 | `scripts/install.ps1` | post-seed blocker | Same as `scripts/install.sh` for PowerShell hosts. |
 | `scripts/install.cmd` | post-seed blocker | Same as `scripts/install.sh` for CMD hosts. |
-| `scripts/generate-requirements.py` | post-seed blocker | Replace with a With docs-generation target or delete if requirements generation is obsolete. |
+| `scripts/generate-requirements.py` | post-seed blocker | Triaged live manual generator for `docs/requirements.md`; replace with a With docs-generation target or explicitly retire the generated matrix (#593). |
 | `tools/build-ninja.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
 | `tools/build-ninja.ps1` | bootstrap-only | Windows first-SDK bootstrap counterpart. |
 | `tools/build-cmake.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
@@ -208,6 +208,11 @@ and script dependency are gone.
   upload lists in the release runbook, and clarified in the bootstrap runbook
   that `scripts/install.*` is not the post-seed handoff path; post-seed updates
   use `with build :install-user` / `with build :update-seed`.
+- 2026-06-15: Triaged `scripts/generate-requirements.py`. It is not wired into
+  `build.w` or current runbooks, but it remains the only known generator for
+  `docs/requirements.md` and does not reproduce the committed matrix as a
+  no-op. Filed #593 to replace it with a With docs-generation target or
+  explicitly retire the generated requirements matrix.
 
 ## Implementation Tasks
 
