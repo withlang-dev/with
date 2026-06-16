@@ -19,6 +19,11 @@ var g_cimport_last_error: str = ""
 var g_cimport_untranslated_macros: str = ""
 var g_cimport_omitted_symbol_names: Vec[str] = Vec.new()
 var g_cimport_omitted_symbol_reasons: Vec[str] = Vec.new()
+// §16.2: each omission also records a source location (when libclang gives
+// one) and a directional category: "raw-modelable" (ABI-expressible, usable
+// via a manual extern under unsafe) or "inexpressible" (no With representation).
+var g_cimport_omitted_symbol_locations: Vec[str] = Vec.new()
+var g_cimport_omitted_symbol_categories: Vec[str] = Vec.new()
 var g_cimport_included_files: str = ""
 var g_cimport_raw_function_names: str = ""
 var g_cimport_report_untranslated_macros: i32 = 0
@@ -229,6 +234,8 @@ fn c_import_untranslated_macros() -> str:
 fn c_import_omitted_symbols_clear():
     g_cimport_omitted_symbol_names = Vec.new()
     g_cimport_omitted_symbol_reasons = Vec.new()
+    g_cimport_omitted_symbol_locations = Vec.new()
+    g_cimport_omitted_symbol_categories = Vec.new()
     return
 
 fn c_import_omitted_symbols() -> str:
@@ -331,6 +338,11 @@ fn ci_object_macro_is_function_alias(type_session: i64, value: str) -> bool:
     ci_lookup_c_function_return_type(type_session, t).len() > 0
 
 fn ci_record_omitted_symbol(name: str, reason: str):
+    // Default category: no With representation. Use ci_record_omitted_symbol_cat
+    // for ABI-expressible constructs that can be reached via the raw surface.
+    ci_record_omitted_symbol_cat(name, "", "inexpressible", reason)
+
+fn ci_record_omitted_symbol_cat(name: str, location: str, category: str, reason: str):
     if name.len() == 0:
         return
     for i in 0..g_cimport_omitted_symbol_names.len() as i32:
@@ -338,6 +350,19 @@ fn ci_record_omitted_symbol(name: str, reason: str):
             return
     g_cimport_omitted_symbol_names.push(name)
     g_cimport_omitted_symbol_reasons.push(reason)
+    g_cimport_omitted_symbol_locations.push(location)
+    g_cimport_omitted_symbol_categories.push(category)
+
+// If `reason` names an already-omitted symbol, append the originating
+// reason chain (§16.2 dependent bindings carry the same reason chain).
+fn ci_omitted_chain_reason(reason: str) -> str:
+    var out = reason
+    for i in 0..g_cimport_omitted_symbol_names.len() as i32:
+        let dep = g_cimport_omitted_symbol_names.get(i as i64)
+        if dep.len() > 0 and ci_str_contains(reason, dep):
+            out = out ++ "; depends on omitted '" ++ dep ++ "': " ++ g_cimport_omitted_symbol_reasons.get(i as i64)
+            break
+    out
 
 fn ci_omitted_symbol_recorded(name: str) -> bool:
     if name.len() == 0:
@@ -353,8 +378,13 @@ fn ci_omitted_manifest_comments() -> str:
     var out = StringBuilder.new()
     let count = g_cimport_omitted_symbol_names.len() as i32
     for i in 0..count:
+        // Format: |name|location|category|reason
         out.push_str("// @with-cimport-omitted|")
         out.push_str(g_cimport_omitted_symbol_names.get(i as i64))
+        out.push_str("|")
+        out.push_str(g_cimport_omitted_symbol_locations.get(i as i64))
+        out.push_str("|")
+        out.push_str(g_cimport_omitted_symbol_categories.get(i as i64))
         out.push_str("|")
         out.push_str(g_cimport_omitted_symbol_reasons.get(i as i64))
         out.push_str("\n")
@@ -1260,7 +1290,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
                 si_params = si_params ++ actual_pname ++ ": " ++ sptype
             let si_ret = with_cimport_fn_return_type_translated(session, idx)
             if ci_starts_with(si_ret, "extern \"C\" fn(") or ci_starts_with(si_ret, "fn("):
-                ci_record_omitted_symbol(name, "inline function returning function pointer not modeled")
+                ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline function returning function pointer not modeled")
                 return ""
             if ci_cimport_type_is_raw_abi(si_ret):
                 si_raw = true
@@ -1268,7 +1298,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
             if si_raw:
                 ci_record_raw_function_name(name)
             return ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret, body)
-        ci_record_omitted_symbol(name, "inline body translation failed")
+        ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline body translation failed")
         return ""
     if storage == CX_SC_STATIC and is_inline == 0:
         return ""
@@ -1332,7 +1362,9 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     with_cimport_mark_name_emitted(name)
 
     if has_unsupported:
-        ci_record_omitted_symbol(name, "untranslatable: " ++ unsupported_reason)
+        // ABI-expressible function whose contract we can't model — reachable
+        // via a manual extern "C" binding under unsafe (§16.1).
+        ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", ci_omitted_chain_reason("untranslatable: " ++ unsupported_reason))
         return ""
     if raw_fn:
         ci_record_raw_function_name(name)
@@ -1962,7 +1994,7 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: str) -> str:
     // manifest instead of emitted as callable failure stubs.
     if ci_starts_with(var_type, "__UNSUPPORTED:"):
         let reason = var_type.slice(14, var_type.len())
-        ci_record_omitted_symbol(name, "untranslatable: " ++ reason)
+        ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", ci_omitted_chain_reason("untranslatable: " ++ reason))
         return ""
 
     let is_const = with_cimport_var_is_const(session, idx)

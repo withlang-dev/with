@@ -4997,6 +4997,30 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
 // ── Expression checking helpers ──────────────────────────────────
 
+// Split a structured omission record "location|category|reason" into fields.
+// Field 0 = location, 1 = category, 2 = reason (the remainder, so a reason may
+// contain '|'). A record with fewer than two '|' is treated as a bare reason.
+fn ci_omitted_field(record: str, idx: i32) -> str:
+    var first = -1
+    var second = -1
+    var i = 0
+    let n = record.len() as i32
+    while i < n:
+        if record.byte_at(i as i64) == 124:
+            if first < 0:
+                first = i
+            else if second < 0:
+                second = i
+                break
+        i = i + 1
+    if second < 0:
+        // Not a structured record — whole string is the reason.
+        if idx == 2: return record
+        return ""
+    if idx == 0: return record.slice(0, first as i64)
+    if idx == 1: return record.slice((first + 1) as i64, second as i64)
+    record.slice((second + 1) as i64, n as i64)
+
 fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     if sym == self.syms.file_magic:
         self.magic_ident_kinds.insert(node, SemaMagicIdentKind.FILE)
@@ -5095,9 +5119,18 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     // pretending the user misspelled an ordinary local name.
     let target_name = self.pool_resolve(sym)
     if self.ci_omitted_symbols.contains(target_name):
-        let reason = self.ci_omitted_symbols.get(target_name).unwrap()
-        let detail = if reason.len() > 0: reason else: "untranslated C construct"
-        self.emit_error(f"c_import symbol '{target_name}' was omitted: {detail}", node)
+        // Value is "location|category|reason" (§16.2 structured manifest).
+        let record = self.ci_omitted_symbols.get(target_name).unwrap()
+        let loc = ci_omitted_field(record, 0)
+        let category = ci_omitted_field(record, 1)
+        let reason_raw = ci_omitted_field(record, 2)
+        let detail = if reason_raw.len() > 0: reason_raw else: "untranslated C construct"
+        let at = if loc.len() > 0: f" (at {loc})" else: ""
+        let direction = if category == "raw-modelable":
+            "; this contract can be used via the raw surface — declare a manual extern \"C\" binding and call it under unsafe (§16.1)"
+        else:
+            "; this C construct has no With representation — wrap it in a C shim or use allow_untranslated to acknowledge the omission (§16.2)"
+        self.emit_error(f"c_import symbol '{target_name}' was omitted: {detail}{at}{direction}", node)
         return 0
 
     // Unknown identifier — suggest close matches
