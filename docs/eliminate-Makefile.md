@@ -13,11 +13,14 @@ targets, package releases, install/update seeds, and run CI through the
 self-hosted `build.w` framework. No normal post-seed workflow may depend on a
 repository shell, PowerShell, CMD, Python, or host utility script.
 
-Bootstrap exception: bringing up the first seed on a new platform may use
-external commands and bootstrap-only scripts, because no self-hosted compiler
-exists yet. That exception ends once the platform has a seed. Further releases
-for that platform must use only functionality provided by the seed, the
-self-hosted build graph, and explicitly fetched With-owned toolchain artifacts.
+Bootstrap exception: bringing up the first seed on a new platform may use any
+system dependencies it needs: shell, PowerShell, CMD, Python, host compilers,
+host archive tools, package managers, host CMake/Ninja/Make, and other external
+commands. Bootstrap is the only process with that permission, because no
+self-hosted seed exists yet. That exception ends once the platform has a seed.
+All other workflows -- build, test, release, package, install, deps, CI,
+cross, and post-seed seed/SDK refresh -- must depend only on the seed,
+self-hosted With code, With-owned fetched artifacts, and OS system calls.
 
 ## Policy
 
@@ -46,6 +49,27 @@ archive creation, checksums, binary inspection, stripping, subprocess
 execution, or install-path mutation, that capability belongs in With code and
 must be exposed through `std.build` / project-local build modules with declared
 inputs, outputs, and effects.
+
+### Bootstrap Boundary
+
+`docs/with-bootstrap-runbook.md` is the canonical place for system-dependent
+first-seed and first-SDK instructions. It may name external tools and host
+commands freely, as long as the instructions are explicitly inside the
+bootstrap boundary.
+
+`docs/with-release-runbook.md`, `with build`, tests, package targets, normal
+SDK/seed refresh, and CI after seed acquisition are not bootstrap. They must not
+depend on repository scripts or host utility behavior outside the seed and OS
+system calls.
+
+Hidden directories are maintainer-owned by default. Files under any path segment
+whose name begins with `.` are outside the agent-actionable scope of this plan
+unless the maintainer explicitly names them. The one standing exception is
+`.github/workflows/`, which is repository CI configuration and is in scope for
+Makefile-elimination work. Audits may mention other hidden-directory
+dependencies as external state, but agents must not edit, delete, move, or
+classify other hidden-directory contents such as `.demo/` as cleanup work
+without a direct instruction.
 
 ## Current State
 
@@ -82,7 +106,9 @@ Still blocking Makefile and script removal:
   - `scripts/install.sh`
   - `scripts/install.ps1`
   - `scripts/install.cmd`
-- SDK bootstrap and rebuild flows are script-driven:
+- First-platform SDK bootstrap flows are allowed to be script-driven inside the
+  bootstrap runbook. Post-seed SDK rebuild and packaging flows still need graph
+  replacements for:
   - `tools/build-ninja.sh`
   - `tools/build-ninja.ps1`
   - `tools/build-cmake.sh`
@@ -114,11 +140,14 @@ Still blocking Makefile and script removal:
 Audit source command:
 
 ```sh
-git ls-files | rg '(\.sh$|\.ps1$|\.cmd$|\.py$|(^|/)Makefile$|^\.github/workflows/)'
+git ls-files | rg -v '(^|/)\.[^/]+/' | rg '(\.sh$|\.ps1$|\.cmd$|\.py$|(^|/)Makefile$)'
+git ls-files .github/workflows
 ```
 
 This intentionally ignores untracked build outputs, `.deps`, `.reference`, and
-vendored dependency trees. Classification is for post-seed policy: a
+vendored dependency trees. It also excludes maintainer-owned hidden directories
+such as `.demo/`. `.github/workflows/` is the explicit hidden-directory
+exception and remains in scope. Classification is for post-seed policy: a
 `bootstrap-only` file may remain only behind the first-seed/new-platform
 boundary; a `post-seed blocker` must be replaced or deleted before the Makefile
 and script dependency are gone.
@@ -145,7 +174,6 @@ and script dependency are gone.
 | `tools/build-static-llvm.sh` | bootstrap-only | Keep only for first With-owned LLVM SDK creation on a platform; repeat SDK production must be graph-owned. |
 | `tools/build-static-llvm.ps1` | bootstrap-only | Windows first-LLVM-SDK bootstrap counterpart. |
 | `memlimit.sh` | historical/non-build | Delete or move to developer notes unless a live test/release target still references it. |
-| `.demo/demo.sh` | historical/non-build | Demo convenience, not a normal build path; delete or replace separately from Makefile removal. |
 
 ## Progress
 
@@ -218,6 +246,54 @@ and script dependency are gone.
   declarations, `ProcessRunner` capture paths must stay within declared action
   outputs/write scopes, and build.w selfhost covers undeclared process capture
   output denial plus an allowed-network process case.
+
+## Next Work Queue
+
+Do not stack new Makefile-elimination implementation work on top of unrelated
+compiler/backend fixes. If the worktree contains a verified compiler fix, commit
+that logical change first, then continue with this queue.
+
+1. **Retire top-level historical script noise.**
+   Verify `memlimit.sh` has no live build, test, runbook, or release references,
+   then delete it or move its content to maintainer-approved notes. Do not touch
+   `.demo/`; hidden directories are maintainer-owned unless explicitly named.
+
+2. **Clean post-seed runbooks away from normal script paths.**
+   Update `docs/with-release-runbook.md` so ordinary release instructions do
+   not present `scripts/package-*`, `scripts/install.*`, host `tar`, host
+   checksums, `otool`, `ldd`, or PowerShell packaging as the canonical path.
+   Leave `docs/with-bootstrap-runbook.md` free to use system dependencies, but
+   make sure those instructions are clearly labeled as bootstrap-only.
+
+3. **Make build-cache fingerprints cryptographic and stateful.**
+   Replace remaining `with_str_hash` freshness fingerprints with native
+   SHA-256-backed fingerprints. Include file kind, executable bit where
+   relevant, symlink target, and absent state in the cache key. Add tests for
+   changed inputs, changed outputs, changed declared environment, and unchanged
+   target skips.
+
+4. **Make `--explain <target>` explain freshness.**
+   Extend explain output beyond target shape so it reports why a target is fresh
+   or stale: first changed input, missing/changed output, dependency, tool,
+   environment variable, or action signature mismatch.
+
+5. **Triage and replace `make cross`.**
+   Decide whether cross compilation is live, experimental, or unsupported. Then
+   either migrate the workflow to `with build :cross --target <target>` /
+   `cross-<target>` graph targets and replace `scripts/generate_wl_stubs.sh`, or
+   delete the stale Make-only path behind a loud unsupported diagnostic.
+
+6. **Migrate CI after seed acquisition is explicit.**
+   `.github/workflows/` is in scope. Replace `make build` with direct
+   `with build`, `with build :fixpoint`, and `with build :test` only once the
+   bootstrap-boundary seed acquisition step is explicit and does not smuggle the
+   normal workflow back through installer scripts.
+
+7. **Defer release and SDK packaging until archive/package capabilities mature.**
+   Package targets still need native compression, symlink archive metadata,
+   deterministic manifests, package-format decisions, binary inspection, and
+   With-owned strip/symbol checks. Start those after the cache/explain/runbook
+   groundwork makes failures diagnosable.
 
 ## Implementation Tasks
 
@@ -342,22 +418,24 @@ diagnostic and removal of the stale script path.
 ### 5. Make seed acquisition script-free after bootstrap
 
 A completely fresh platform cannot run `with build :seed` until it has a With
-binary. That is the bootstrap exception. Once a platform has a seed, seed
+binary. That is the bootstrap exception, and it may use whatever system
+dependencies the bootstrap runbook requires. Once a platform has a seed, seed
 updates are normal build graph work.
 
 - Define the official first-seed bootstrap boundary. It may be a documented
   direct release-asset download or a bootstrap-only helper under a clearly named
-  `tools/bootstrap/` path. It must not be described as part of normal release
-  or development flow.
+  `tools/bootstrap/` path. It may depend on system tools, but it must not be
+  described as part of normal release, development, test, package, deps, or CI
+  flow.
 - Ensure post-seed seed refresh is only `with build :seed`, implemented in With
   code with declared network access, host asset selection, checksum
   verification, executable-bit handling, and loud unsupported-host diagnostics.
 - Ensure the path downloads the host-named release asset (`with-darwin-aarch64`,
   `with-linux-x86_64`, `with-windows-x86_64.exe`) into `src/main`.
 - Ensure the path does not publish or depend on an asset named `main`.
-- Remove installer-script dependency from CI and runbooks. A user or CI job
-  that already has a seed must not use `install.sh`, PowerShell, CMD, `curl |
-  sh`, or equivalent script bootstrap.
+- Remove installer-script dependency from CI and post-seed runbooks. A user or
+  CI job that already has a seed must not use `install.sh`, PowerShell, CMD,
+  `curl | sh`, or equivalent script bootstrap.
 
 Defense: deleting Make without defining the bootstrap boundary breaks clean CI
 and new contributor checkout flows. Leaving installer scripts in the normal
@@ -521,9 +599,11 @@ graph and make later deletion risky.
   `with build` graph targets. Remove normal release instructions for
   `scripts/package-*`, `scripts/install.*`, host `tar`, host checksum tools,
   host binary-inspection tools, and PowerShell packaging.
-- Update `docs/with-bootstrap-runbook.md` to isolate first-platform bootstrap
-  scripts from normal post-seed release work. The runbook should state exactly
-  when the bootstrap exception applies and when it stops applying.
+- Update `docs/with-bootstrap-runbook.md` only to isolate and label
+  first-platform bootstrap scripts and system dependencies. Do not remove host
+  dependency instructions from bootstrap; bootstrap is the permitted exception.
+  The runbook should state exactly when the bootstrap exception applies and when
+  it stops applying.
 - Update `AGENTS.md` build/toolchain/release language once Make and scripts are
   gone.
 - Archive or delete stale docs that describe Make or scripts as a live
@@ -623,13 +703,17 @@ with build :test-green
 Then run the script audit:
 
 ```sh
-find . -path ./.git -prune -o -type f \( -name '*.sh' -o -name '*.ps1' -o -name '*.cmd' \) -print
+find . -mindepth 1 -type d -name '.*' -prune -o -type f \( -name '*.sh' -o -name '*.ps1' -o -name '*.cmd' \) -print
 rg -n "Makefile|make |sh -c|bash -c|powershell|scripts/package-|scripts/install|generate_wl_stubs|check-no-c-export.py|check-requirements-informative.py|check-spec-inventory.py"
+rg -n "make |scripts/|Makefile" .github/workflows
 ```
 
-The first command should return only bootstrap-boundary files, if any. The
-second command should return only historical archive text, bootstrap-only
-documentation, or intentional fixtures.
+The first command should return only bootstrap-boundary files outside
+maintainer-owned hidden directories, if any. The second command should return
+only historical archive text, bootstrap-only documentation, intentional
+fixtures, or hidden-directory references that the maintainer has not brought
+into scope. The third command should return nothing once CI migration is
+complete.
 
 ## Acceptance Criteria
 
@@ -639,7 +723,8 @@ Makefile and post-seed script elimination is complete only when:
 - no documented normal build/test/install/seed/deps/cross/package/release
   command invokes Make, shell, PowerShell, CMD, Python helpers, or host utility
   scripts;
-- first-platform bootstrap is clearly isolated from normal post-seed workflows;
+- first-platform bootstrap is clearly isolated from normal post-seed workflows
+  and remains the only system-dependent process;
 - a checkout with an existing seed can refresh seed and SDK dependencies through
   `with build` only;
 - all live Make targets have direct `with` / `with build` equivalents or have
