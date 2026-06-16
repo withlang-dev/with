@@ -1389,6 +1389,7 @@ pub type Download {
 pub fn Build.download(self: Build, name: str, spec: Download) -> Build:
     var target = target_new(.Action, name, "").output(spec.output_path)
     target.action = build_download_action
+    target = target.allow_network()
     target = target.write_scope(build_path_dirname(spec.output_path))
     target = target.write_scope("out/command/" ++ name)
     target = target.arg(spec.url)

@@ -1664,7 +1664,22 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: str, case_dir: s
     let strict = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-strict", strict_args, 120000, strict_dir, env_strict)
     if strict.rc == 0:
         return bs_fail(ctx, "strict effects build unexpectedly succeeded")
-    bs_assert_contains(ctx, strict.stderr, "no declared action inputs or outputs in strict mode", "effects_strict_process")
+    rc = bs_assert_contains(ctx, strict.stderr, "no declared action inputs or outputs in strict mode", "effects_strict_process")
+    if rc != 0: return rc
+
+    let strict_env_dir = bs_join(case_dir, "strict_env")
+    rc = bs_write_project_manifest(ctx, strict_env_dir, "effectstrictenv")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(strict_env_dir, "build.w"), "use std.build\nuse std.os\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let _ = env(\"WITH_UNDECLARED_GRAPH_ENV\")\n    ctx.new_build()\n", "strict env effects build")
+    if rc != 0: return rc
+    let strict_env_args: Vec[str] = Vec.new()
+    strict_env_args |> push("build")
+    strict_env_args |> push("--strict-effects")
+    strict_env_args |> push(":bad")
+    let strict_env = bs_run_cli_capture_cwd(ctx, compiler_path, "effects-strict-env", strict_env_args, 120000, strict_env_dir)
+    if strict_env.rc == 0:
+        return bs_fail(ctx, "strict env effects build unexpectedly succeeded")
+    bs_assert_contains(ctx, strict_env.stderr, "comptime can only call comptime functions", "effects_strict_env")
 
 pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
@@ -5132,6 +5147,31 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: str, base_di
     rc = bs_assert_contains(ctx, undeclared.stderr, "not a declared action output", "build_w_action_undeclared_output")
     if rc != 0: return rc
 
+    let install_path_dir = bs_join(base_dir, "install_path_denied")
+    rc = bs_write_project_manifest(ctx, install_path_dir, "actioninstallpath")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(install_path_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action install path source")
+    if rc != 0: return rc
+    let install_path_build =
+        "use std.build\n\n" ++
+        "fn bad_install_write(ctx: &ActionCtx) -> i32:\n" ++
+        "    assert(ctx.fs().write_text(\"$HOME/.local/bin/with-bad\", \"bad\") == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"bad-install-write\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = bad_install_write\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"bad-install-write\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(install_path_dir, "build.w"), install_path_build, ctx.target_name(), "action install path build.w")
+    if rc != 0: return rc
+    let install_path = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-install-path-denied", bs_blob_to_args(bs_argv_append("", "build")), 120000, install_path_dir)
+    if install_path.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_install_path_denied unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, install_path.stderr, "not a declared action output", "build_w_action_install_path_denied")
+    if rc != 0: return rc
+
     let escape_dir = bs_join(base_dir, "escape_output")
     rc = bs_write_project_manifest(ctx, escape_dir, "actionescape")
     if rc != 0: return rc
@@ -5155,6 +5195,55 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: str, base_di
         ctx.diagnostics().error("error: build_w_action_escape_output unexpectedly succeeded")
         return 1
     rc = bs_assert_contains(ctx, escape.stderr, "ToolFs path escapes project root", "build_w_action_escape_output")
+    if rc != 0: return rc
+
+    let network_dir = bs_join(base_dir, "network_denied")
+    rc = bs_write_project_manifest(ctx, network_dir, "actionnetwork")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(network_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action network source")
+    if rc != 0: return rc
+    let network_build =
+        "use std.build\n\n" ++
+        "fn bad_network(ctx: &ActionCtx) -> i32:\n" ++
+        "    let args: Vec[str] = Vec.new()\n" ++
+        "    args.push(\"curl\")\n" ++
+        "    args.push(\"--version\")\n" ++
+        "    let _ = ctx.process_runner().run_capture(args, \"out/action/stdout.txt\", \"out/action/stderr.txt\", 120000)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"bad-network\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = bad_network\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"bad-network\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(network_dir, "build.w"), network_build, ctx.target_name(), "action network build.w")
+    if rc != 0: return rc
+    let network = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-network-denied", bs_blob_to_args(bs_argv_append("", "build")), 120000, network_dir)
+    if network.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_network_denied unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, network.stderr, "without target.allow_network()", "build_w_action_network_denied")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, network.stderr, "network tool 'curl'", "build_w_action_network_denied")
+    if rc != 0: return rc
+
+    let download_dir = bs_join(base_dir, "download_network")
+    rc = bs_write_project_manifest(ctx, download_dir, "downloadnetwork")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(download_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "download network source")
+    if rc != 0: return rc
+    let download_build =
+        "use std.build\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    out = out.download(\"fixture-download\", Download { url: \"https://example.invalid/file\", sha256: \"\", output_path: \"out/download/file.txt\" })\n" ++
+        "    out.default(\"fixture-download\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(download_dir, "build.w"), download_build, ctx.target_name(), "download network build.w")
+    if rc != 0: return rc
+    let download_explain_args = bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), "--explain"), "fixture-download"))
+    let download_explain = bs_build_w_expect_success(ctx, compiler_path, download_dir, "build-w-download-network-explain", download_explain_args)
+    if download_explain.rc != 0: return download_explain.rc
+    rc = bs_assert_contains(ctx, download_explain.stdout, "network: true", "build_w_download_network_explain")
     if rc != 0: return rc
 
     let bad_spec_dir = bs_join(base_dir, "unsupported_process_spec")

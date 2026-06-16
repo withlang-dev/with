@@ -100,6 +100,46 @@ Still blocking Makefile and script removal:
 - Some std.build / build-cache behavior is not strong enough to be the final
   script-free contract.
 
+## Script/Shell Dependency Audit
+
+Audit source command:
+
+```sh
+git ls-files | rg '(\.sh$|\.ps1$|\.cmd$|\.py$|(^|/)Makefile$|^\.github/workflows/)'
+```
+
+This intentionally ignores untracked build outputs, `.deps`, `.reference`, and
+vendored dependency trees. Classification is for post-seed policy: a
+`bootstrap-only` file may remain only behind the first-seed/new-platform
+boundary; a `post-seed blocker` must be replaced or deleted before the Makefile
+and script dependency are gone.
+
+| Path | Classification | Disposition |
+| --- | --- | --- |
+| `.github/workflows/ci.yml` | post-seed blocker | Replace `make build` dispatch with explicit `with build` targets and declared setup steps. |
+| `Makefile` | post-seed blocker | Delete after all listed aliases, cross, seed, CI, release, SDK, and install roles have With graph replacements. |
+| `scripts/generate_wl_stubs.sh` | post-seed blocker | Replace as part of the `make cross` migration or delete if the cross workflow no longer needs generated stubs. |
+| `scripts/package-bootstrap-c.sh` | post-seed blocker | Replace with a self-hosted packaging target. |
+| `scripts/package-darwin-aarch64.sh` | post-seed blocker | Replace with a self-hosted Darwin release packaging target. |
+| `scripts/package-linux-x86_64.sh` | post-seed blocker | Replace with a self-hosted Linux release packaging target. |
+| `scripts/package-windows-x86_64.ps1` | post-seed blocker | Replace with a self-hosted Windows release packaging target. |
+| `scripts/package-llvm-sdk.sh` | post-seed blocker | Replace with self-hosted SDK packaging once archive creation/signing/validation capabilities exist. |
+| `scripts/package-llvm-sdk-windows-x86_64.ps1` | post-seed blocker | Replace with self-hosted Windows SDK packaging once archive creation/signing/validation capabilities exist. |
+| `scripts/install.sh` | post-seed blocker | Replace release installer behavior with a With-owned installer or direct `with build :install-user` flow. |
+| `scripts/install.ps1` | post-seed blocker | Same as `scripts/install.sh` for PowerShell hosts. |
+| `scripts/install.cmd` | post-seed blocker | Same as `scripts/install.sh` for CMD hosts. |
+| `scripts/check-stack-budget.py` | post-seed blocker | Replace with a With build action or delete if no live target/runbook references it. |
+| `scripts/generate-requirements.py` | post-seed blocker | Replace with a With docs-generation target or delete if requirements generation is obsolete. |
+| `test/lsp/run_lsp_tests.sh` | post-seed blocker | Replace with a With test target so LSP tests do not require shell dispatch. |
+| `tools/build-ninja.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
+| `tools/build-ninja.ps1` | bootstrap-only | Windows first-SDK bootstrap counterpart. |
+| `tools/build-cmake.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
+| `tools/build-cmake.ps1` | bootstrap-only | Windows first-SDK bootstrap counterpart. |
+| `tools/build-static-llvm.sh` | bootstrap-only | Keep only for first With-owned LLVM SDK creation on a platform; repeat SDK production must be graph-owned. |
+| `tools/build-static-llvm.ps1` | bootstrap-only | Windows first-LLVM-SDK bootstrap counterpart. |
+| `memlimit.sh` | historical/non-build | Delete or move to developer notes unless a live test/release target still references it. |
+| `.demo/demo.sh` | historical/non-build | Demo convenience, not a normal build path; delete or replace separately from Makefile removal. |
+
 ## Progress
 
 - 2026-06-14: Fixed `ToolFs.write_binary` so it writes the provided byte
@@ -143,6 +183,9 @@ Still blocking Makefile and script removal:
   `std.crypto.sha256` implementation, wired the tool-mode evaluator to hash
   files natively, and removed host `shasum` from `Build.download`
   verification.
+- 2026-06-15: Audited tracked repository shell, PowerShell, CMD, Python,
+  Makefile, and workflow files into bootstrap-only, post-seed blocker, and
+  historical/non-build buckets.
 
 ## Implementation Tasks
 
@@ -222,7 +265,7 @@ depending on scripts or shell fragments for normal maintenance.
   files directly and reports the same violations.
 - [x] Move `scripts/check-requirements-informative.py` into a With build action.
 - [x] Move `scripts/check-spec-inventory.py` into a With build action.
-- Audit `build/`, `src/`, `lib/`, `rt/`, `build.w`, `scripts/`, and `tools/`
+- [x] Audit `build/`, `src/`, `lib/`, `rt/`, `build.w`, `scripts/`, and `tools/`
   for `sh -c`, `bash -c`, `powershell`, `.py`, `.sh`, `.ps1`, `.cmd`, pipes,
   redirects, and shell utility names. Every post-seed hit must be eliminated or
   moved behind the explicit bootstrap-only boundary.

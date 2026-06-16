@@ -1155,6 +1155,18 @@ fn comptime_effect_join_argv_parts(parts: &Vec[str]) -> str:
         out = out ++ comptime_effect_escape(parts.get(i as i64))
     out
 
+fn comptime_process_basename(path: str) -> str:
+    var start = 0
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
+            start = i + 1
+    path.slice(start as i64, path.len())
+
+fn comptime_process_requires_network(exe: str) -> bool:
+    let name = comptime_process_basename(exe)
+    name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe"
+
 fn ComptimeEvaluator.effect_argv_parts_from_value(self: ComptimeEvaluator, value: ComptimeValue) -> Vec[str]:
     let parts: Vec[str] = Vec.new()
     if value.kind != ComptimeValueKind.CV_VEC and value.kind != ComptimeValueKind.CV_ARRAY:
@@ -1234,6 +1246,19 @@ fn ComptimeEvaluator.record_process_effect(self: ComptimeEvaluator, record: &Com
     line = line ++ "\tenv=" ++ env_text
     line = line ++ "\ttool=" ++ comptime_effect_tool_identity(parts)
     self.record_effect(line)
+
+fn ComptimeEvaluator.require_network_tool_allowed(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, method: str, parts: &Vec[str], node: i32) -> i32:
+    if parts.len() == 0:
+        return 0
+    let exe = parts.get(0)
+    if not comptime_process_requires_network(exe):
+        return 0
+    if record.network != 0:
+        return 0
+    let tool = comptime_process_basename(exe)
+    let target = if record.target_name.len() > 0: record.target_name else: "<build>"
+    let _ = self.fail(node, "ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()")
+    1
 
 fn ComptimeEvaluator.lookup_slot_index(self: ComptimeEvaluator, sym: i32) -> i32:
     var i = self.slot_syms.len() as i32 - 1
@@ -4026,6 +4051,8 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         if has_stdin and (has_cwd or has_env):
             return self.fail(node, "ProcessRunner.run_spec: stdin cannot yet be combined with cwd or env")
         let effect_env = if has_env: self.effect_env_text_from_process_env_value(spec_env) else: ""
+        if self.require_network_tool_allowed(record, method, argv_parts, node) != 0:
+            return comptime_control_error()
         self.record_process_effect(record, method, argv_parts, spec_cwd.text, timeout_ms, spec_stdin.text, stdout_path, stderr_path, effect_env)
         if self.had_error != 0:
             return comptime_control_error()
@@ -4079,6 +4106,8 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
     if self.had_error != 0:
         return comptime_control_error()
     let argv_parts = self.effect_argv_parts_from_value(argv_value)
+    if self.require_network_tool_allowed(record, method, argv_parts, node) != 0:
+        return comptime_control_error()
 
     if method == "run":
         self.record_process_effect(record, method, argv_parts, "", 0, "", "", "", "")
