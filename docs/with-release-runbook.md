@@ -21,11 +21,11 @@ feature/sprint targets. They are not normal release gates. The default
 ## Toolchain: reuse what bootstrap built — never rebuild, never trust the system
 
 A release **reuses** the static LLVM/Clang/lld SDK that the *bootstrap* runbook
-already built from source (`tools/build-static-llvm.sh` →
-`.deps/llvm-<ver>-<host>`), together with the resources the seed already carries
-embedded (stdlib, runtime objects, and clang's builtin headers). Building LLVM
-from source is **bootstrap's** job, for a brand-new
-platform that has no seed yet. A release does not. Specifically, a release:
+already built from source into `.deps/llvm-<ver>-<host>`, together with the
+resources the seed already carries embedded (stdlib, runtime objects, and
+clang's builtin headers). Building LLVM from source is **bootstrap's** job, for
+a brand-new platform that has no seed yet. A release does not. Specifically, a
+release:
 
 - does **not** rebuild LLVM from source;
 - does **not** fetch, link against, or otherwise trust a system-installed LLVM —
@@ -43,7 +43,7 @@ never a runtime dependency.
 The reused SDK must itself have been built by the bootstrap runbook with Clang
 from the pinned LLVM source tag. Do not release from an SDK whose CMake cache
 names GCC, `/usr/bin/cc`, `/usr/bin/c++`, or MSVC `cl.exe` as the compiler.
-Packaging scripts enforce this:
+The release package verification target must enforce this before publishing:
 
 - Unix SDK package: `CMAKE_C_COMPILER=clang`, `CMAKE_CXX_COMPILER=clang++`.
 - Windows SDK package: `CMAKE_C_COMPILER=clang-cl`,
@@ -59,34 +59,13 @@ policy where the object format supports it. If one platform's `.text` is much
 larger, investigate the SDK compiler, linker folding, and strip policy before
 publishing.
 
-If an SDK package script rejects the local SDK, stop before publishing that
+If SDK package verification rejects the local SDK, stop before publishing that
 platform's SDK. Do not upload an older or stale SDK just because the compiler
 binary packaged cleanly. Refresh the SDK with the bootstrap toolchain flow, then
-rerun the package script with `LLVM_PREFIX` and `LLVM_BUILD_CACHE` pointed at
-the refreshed prefix/cache. On Darwin, clear ambient linker flags while
-bootstrapping the SDK tools and LLVM itself:
-
-```sh
-env -u LDFLAGS ROOT="$PWD/.deps" HOST_TAG=darwin-arm64 \
-  INSTALL_PREFIX="$PWD/.deps/llvm-22.1.6-darwin-arm64" \
-  NINJA_BOOTSTRAP_CXX=/usr/bin/clang++ \
-  tools/build-ninja.sh
-
-env -u LDFLAGS ROOT="$PWD/.deps" HOST_TAG=darwin-arm64 \
-  INSTALL_PREFIX="$PWD/.deps/llvm-22.1.6-darwin-arm64" \
-  CMAKE_BOOTSTRAP_CC=/usr/bin/clang \
-  CMAKE_BOOTSTRAP_CXX=/usr/bin/clang++ \
-  tools/build-cmake.sh
-
-env -u LDFLAGS ROOT="$PWD/.deps" HOST_TAG=darwin-arm64 \
-  INSTALL_PREFIX="$PWD/.deps/llvm-22.1.6-darwin-arm64" \
-  SDK_CMAKE="$PWD/.deps/llvm-22.1.6-darwin-arm64/bin/cmake" \
-  SDK_NINJA="$PWD/.deps/llvm-22.1.6-darwin-arm64/bin/ninja" \
-  LLVM_BOOTSTRAP_CC=/usr/bin/clang \
-  LLVM_BOOTSTRAP_CXX=/usr/bin/clang++ \
-  LLVM_BOOTSTRAP_LD=ld64.lld \
-  tools/build-static-llvm.sh
-```
+rerun the release packaging target with `LLVM_PREFIX` and `LLVM_BUILD_CACHE`
+pointed at the refreshed prefix/cache. The bootstrap runbook owns the
+system-dependent first-SDK commands; this release runbook only consumes the
+resulting With-owned SDK.
 
 ## Release Asset
 
@@ -120,11 +99,13 @@ it as a per-platform asset and let the build fetch it the same way it fetches
 the seed (issue #313):
 
 - **Package** (per platform, after the SDK exists in `.deps`):
-  `scripts/package-llvm-sdk.sh` → `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst`.
-  On Windows, use `scripts/package-llvm-sdk-windows-x86_64.ps1`.
-  The package scripts refuse SDKs not built with Clang/clang-cl by
-  `tools/build-static-llvm.{sh,ps1}`.
-  It ships only what the build links against — `lib/*.a`, `lib/clang/<v>/include/`,
+  produce `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst` through the
+  With-native release packaging target. Until that target exists, SDK package
+  publishing is deferred by `docs/eliminate-Makefile.md`; shell or PowerShell
+  packaging helpers are not the post-seed release contract. The packaging
+  target must refuse SDKs not built with Clang/clang-cl by the bootstrap SDK
+  flow. It ships only what the build links against — `lib/*.a`,
+  `lib/clang/<v>/include/`,
   `bin/ninja`, `bin/cmake`, `bin/clang`, `bin/lld` (+ driver symlinks),
   `bin/llvm-ml`/`bin/llvm-ml64` on Windows, `bin/llvm-nm`, and
   `bin/llvm-strip` — not the LLVM C++ `include/` tree, so the asset remains
@@ -297,7 +278,7 @@ WITH_VERSION=$WITH_VERSION "$RELEASE_SEED" build
 ```
 
 After the first build creates `out/release/bin/with`, use that verified
-compiler for the remaining Darwin gates and packaging:
+compiler for the remaining Darwin gates:
 
 ```sh
 export WITH=$PWD/out/release/bin/with
@@ -307,15 +288,13 @@ WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test-green
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :last-green
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with version
-WITH_VERSION=$WITH_VERSION scripts/package-darwin-aarch64.sh
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :release-uat
-WITH_VERSION=$WITH_VERSION scripts/package-llvm-sdk.sh
 ```
 
-The Darwin binary package script copies `out/release/bin/with`, verifies the
-reported version, checks that LLVM/Clang/support libraries are not dynamically
-loaded, confirms static libclang symbols before stripping, strips with the
-With-owned SDK `llvm-strip`, and rechecks dynamic dependencies after stripping.
+The Darwin release package target must copy `out/release/bin/with`, verify the
+reported version, check that LLVM/Clang/support libraries are not dynamically
+loaded, confirm static libclang symbols before stripping, strip with the
+With-owned SDK `llvm-strip`, and recheck dynamic dependencies after stripping.
 
 ### Linux Release Host
 
@@ -352,8 +331,8 @@ export WITH=$RELEASE_SEED
 WITH_VERSION=$WITH_VERSION $RELEASE_SEED build
 ```
 
-After the first build creates `out/release/bin/with` in the release worktree, use that
-compiler for the remaining Linux gates and packaging:
+After the first build creates `out/release/bin/with` in the release worktree,
+use that compiler for the remaining Linux gates:
 
 ```sh
 export WITH=$PWD/out/release/bin/with
@@ -363,7 +342,6 @@ WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :test-green
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with build :last-green
 WITH_VERSION=$WITH_VERSION ./out/release/bin/with version
-WITH_VERSION=$WITH_VERSION scripts/package-linux-x86_64.sh
 ```
 
 Copy the Linux asset back to the macOS release checkout before creating the
@@ -420,44 +398,38 @@ git push origin main
 git push origin v0.14.3
 ```
 
-Prepare the platform-named assets on their native platforms:
+Prepare the platform-named assets on their native platforms with the
+With-native release package targets. These targets do not exist yet; until they
+do, release/SDK packaging remains deferred by `docs/eliminate-Makefile.md` and
+must not be treated as a normal post-seed script workflow.
 
-```sh
-scripts/package-darwin-aarch64.sh
-scripts/package-linux-x86_64.sh
-scripts/package-windows-x86_64.ps1
-scripts/package-bootstrap-c.sh
-scripts/package-llvm-sdk.sh
-scripts/package-llvm-sdk-windows-x86_64.ps1
-```
-
-`scripts/package-llvm-sdk.sh` runs on each native platform and packages that
-host's `.deps/llvm-<ver>-<host>` static SDK into
+The SDK package target runs on each native platform and packages that host's
+`.deps/llvm-<ver>-<host>` static SDK into
 `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst`. Copy the Linux SDK
 asset back alongside the Linux binary:
 
-On Windows, `scripts/package-llvm-sdk-windows-x86_64.ps1` packages the
+On Windows, the SDK package target packages the
 `.deps\llvm-<ver>-windows-x86_64-msvc` SDK and includes the required CMake,
-Clang/lld, and LLVM utility tools (`ninja.exe`, `cmake.exe`, `clang.exe`, `clang++.exe`,
-`clang-cl.exe`, `lld-link.exe`, `llvm-lib.exe`, `llvm-ml.exe`, `llvm-ml64.exe`,
-`llvm-nm.exe`, `llvm-readobj.exe`, `llvm-strip.exe`), static `.lib` archives,
-and clang builtin headers.
+Clang/lld, and LLVM utility tools (`ninja.exe`, `cmake.exe`, `clang.exe`,
+`clang++.exe`, `clang-cl.exe`, `lld-link.exe`, `llvm-lib.exe`, `llvm-ml.exe`,
+`llvm-ml64.exe`, `llvm-nm.exe`, `llvm-readobj.exe`, `llvm-strip.exe`), static
+`.lib` archives, and clang builtin headers.
 
 ```sh
 scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-llvm-sdk-*-linux-x86_64.tar.zst out/release/
 ```
 
-This produces platform assets under `out/release/`. Current packaging scripts
-may also produce transitional installer byproducts; those are not required
-release assets and must not be used for post-seed update instructions.
+This produces platform assets under `out/release/`. Transitional installer
+byproducts are not required release assets and must not be used for post-seed
+update instructions.
 Each public binary is the verified compiler copied under its platform asset
 name and stripped with the With-owned SDK `llvm-strip`. It must not have dynamic
 LLVM, Clang, zlib, zstd, or libxml2 load commands, and it must contain static
 libclang symbols before stripping. Linux release binaries must also avoid
 dynamic `libstdc++` and `libgcc_s`; `libc`, `libm`, and the platform dynamic
-loader are the only expected Linux runtime libraries. The Darwin package script
-checks this with `otool -L` and `nm`; the Linux package script checks with `ldd`
-and `nm`.
+loader are the only expected Linux runtime libraries. The release package
+targets must check those properties with With-owned binary inspection tools, not
+host loader or symbol utilities.
 
 The bootstrap-C package produces
 `out/release/with-bootstrap-c-$WITH_VERSION.tar.zst`. It is an emitted-C source

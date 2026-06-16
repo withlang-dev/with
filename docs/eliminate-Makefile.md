@@ -129,9 +129,10 @@ Still blocking Makefile and script removal:
   shared `out/pcre2_tmp` path to the action-scratch path convention with
   explicit transitional write scopes for old-seed compatibility.
 - The active runbooks still describe release packaging and SDK packaging
-  scripts as normal release tools. Installer scripts are no longer required
-  release assets in the release runbook, but the scripts still exist as
-  transitional byproducts until a With-native installer path lands.
+  as deferred until With-native release package targets exist. Installer
+  scripts are no longer required release assets in the release runbook, but the
+  scripts still exist as transitional byproducts until a With-native installer
+  path lands.
 - Some std.build / build-cache behavior is not strong enough to be the final
   script-free contract.
 
@@ -173,7 +174,6 @@ and script dependency are gone.
 | `tools/build-cmake.ps1` | bootstrap-only | Windows first-SDK bootstrap counterpart. |
 | `tools/build-static-llvm.sh` | bootstrap-only | Keep only for first With-owned LLVM SDK creation on a platform; repeat SDK production must be graph-owned. |
 | `tools/build-static-llvm.ps1` | bootstrap-only | Windows first-LLVM-SDK bootstrap counterpart. |
-| `memlimit.sh` | historical/non-build | Delete or move to developer notes unless a live test/release target still references it. |
 
 ## Progress
 
@@ -246,6 +246,12 @@ and script dependency are gone.
   declarations, `ProcessRunner` capture paths must stay within declared action
   outputs/write scopes, and build.w selfhost covers undeclared process capture
   output denial plus an allowed-network process case.
+- 2026-06-16: Deleted the unused top-level `memlimit.sh` historical script.
+- 2026-06-16: Cleaned the release runbook away from normal post-seed package
+  script paths. Release and SDK packaging are now documented as deferred until
+  With-native package targets provide archive creation, validation, stripping,
+  and binary inspection without host shell, PowerShell, `tar`, `zstd`, `otool`,
+  `ldd`, or symbol utilities.
 
 ## Next Work Queue
 
@@ -253,43 +259,31 @@ Do not stack new Makefile-elimination implementation work on top of unrelated
 compiler/backend fixes. If the worktree contains a verified compiler fix, commit
 that logical change first, then continue with this queue.
 
-1. **Retire top-level historical script noise.**
-   Verify `memlimit.sh` has no live build, test, runbook, or release references,
-   then delete it or move its content to maintainer-approved notes. Do not touch
-   `.demo/`; hidden directories are maintainer-owned unless explicitly named.
-
-2. **Clean post-seed runbooks away from normal script paths.**
-   Update `docs/with-release-runbook.md` so ordinary release instructions do
-   not present `scripts/package-*`, `scripts/install.*`, host `tar`, host
-   checksums, `otool`, `ldd`, or PowerShell packaging as the canonical path.
-   Leave `docs/with-bootstrap-runbook.md` free to use system dependencies, but
-   make sure those instructions are clearly labeled as bootstrap-only.
-
-3. **Make build-cache fingerprints cryptographic and stateful.**
+1. **Make build-cache fingerprints cryptographic and stateful.**
    Replace remaining `with_str_hash` freshness fingerprints with native
    SHA-256-backed fingerprints. Include file kind, executable bit where
    relevant, symlink target, and absent state in the cache key. Add tests for
    changed inputs, changed outputs, changed declared environment, and unchanged
    target skips.
 
-4. **Make `--explain <target>` explain freshness.**
+2. **Make `--explain <target>` explain freshness.**
    Extend explain output beyond target shape so it reports why a target is fresh
    or stale: first changed input, missing/changed output, dependency, tool,
    environment variable, or action signature mismatch.
 
-5. **Triage and replace `make cross`.**
+3. **Triage and replace `make cross`.**
    Decide whether cross compilation is live, experimental, or unsupported. Then
    either migrate the workflow to `with build :cross --target <target>` /
    `cross-<target>` graph targets and replace `scripts/generate_wl_stubs.sh`, or
    delete the stale Make-only path behind a loud unsupported diagnostic.
 
-6. **Migrate CI after seed acquisition is explicit.**
+4. **Migrate CI after seed acquisition is explicit.**
    `.github/workflows/` is in scope. Replace `make build` with direct
    `with build`, `with build :fixpoint`, and `with build :test` only once the
    bootstrap-boundary seed acquisition step is explicit and does not smuggle the
    normal workflow back through installer scripts.
 
-7. **Defer release and SDK packaging until archive/package capabilities mature.**
+5. **Defer release and SDK packaging until archive/package capabilities mature.**
    Package targets still need native compression, symlink archive metadata,
    deterministic manifests, package-format decisions, binary inspection, and
    With-owned strip/symbol checks. Start those after the cache/explain/runbook
