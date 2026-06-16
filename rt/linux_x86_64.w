@@ -315,6 +315,7 @@ extern fn rename(old_path: *const u8, new_path: *const u8) -> i32
 extern fn symlink(target: *const u8, link_path: *const u8) -> i32
 extern fn access(path: *const u8, mode: i32) -> i32
 extern fn lstat(path: *const u8, st: *mut u8) -> i32
+extern fn readlink(path: *const u8, buf: *mut u8, bufsize: u64) -> i64
 extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
@@ -382,6 +383,13 @@ fn rt_lstat_is_dir(path: *const u8) -> bool:
     if rt_lstat_mode(path, &mode as *mut i32) != 0:
         return false
     (mode & S_IFMT) == S_IFDIR
+
+pub fn rt_file_mode(path: *const u8) -> i32:
+    var mode: i32 = 0
+    let rc = rt_lstat_mode(path, &mode as *mut i32)
+    if rc != 0:
+        return rc
+    mode
 
 pub fn rt_mkdir(path: *const u8, mode: i32) -> i32:
     var r: i32 = 0
@@ -534,6 +542,14 @@ pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
     if r < 0:
         return -get_errno()
     0
+
+pub fn rt_readlink(path: *const u8) -> str:
+    var buf: [4096]u8 = [0 as u8; 4096]
+    let n = readlink(path, &buf as *mut [4096]u8 as *mut u8, 4095 as u64)
+    if n < 0:
+        return rt_empty_str()
+    unsafe *((&buf as i64 + n) as *mut u8) = 0
+    with_str_from_cstr(&buf as *const [4096]u8 as *const u8)
 
 fn rt_empty_str() -> str:
     var empty: [1]u8 = [0 as u8; 1]

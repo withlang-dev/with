@@ -59,7 +59,6 @@ extern fn with_str_from_byte(byte: i32) -> str
 extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_ends_with(s: str, suffix: str) -> i32
 extern fn with_str_replace(s: str, old: str, new_s: str) -> str
-extern fn with_str_hash(s: str) -> i64
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 extern fn with_sysinfo_hostname() -> str
@@ -1317,7 +1316,7 @@ fn ComptimeEvaluator.record_effect(self: ComptimeEvaluator, line: str):
 
 fn ComptimeEvaluator.record_env_input_effect(self: ComptimeEvaluator, target_name: str, name: str):
     let value = with_getenv_str(name)
-    self.record_effect("env\t" ++ comptime_effect_escape(target_name) ++ "\t" ++ comptime_effect_escape(name) ++ "\t" ++ f"{with_str_hash(value)}")
+    self.record_effect("env\t" ++ comptime_effect_escape(target_name) ++ "\t" ++ comptime_effect_escape(name) ++ "\t" ++ comptime_sha256_text(value))
 
 fn comptime_effect_join_argv_parts(parts: &Vec[str]) -> str:
     var out = ""
@@ -1355,7 +1354,7 @@ fn comptime_effect_tool_identity(parts: &Vec[str]) -> str:
     let exe = parts.get(0)
     let resolved = comptime_effect_resolve_executable(exe)
     if resolved.len() > 0:
-        return comptime_effect_escape(resolved) ++ ":" ++ f"{with_str_hash(with_fs_read_file(resolved))}"
+        return comptime_effect_escape(resolved) ++ ":" ++ comptime_sha256_text(with_fs_read_file(resolved))
     comptime_effect_escape(exe) ++ ":unresolved"
 
 fn comptime_effect_contains_slash(text: str) -> bool:
@@ -1398,7 +1397,7 @@ fn ComptimeEvaluator.effect_env_text_from_process_env_value(self: ComptimeEvalua
         if name.kind == ComptimeValueKind.CV_STR and env_value.kind == ComptimeValueKind.CV_STR:
             if out.len() > 0:
                 out = out ++ ","
-            out = out ++ comptime_effect_escape(name.text) ++ ":" ++ f"{with_str_hash(env_value.text)}"
+            out = out ++ comptime_effect_escape(name.text) ++ ":" ++ comptime_sha256_text(env_value.text)
     out
 
 fn ComptimeEvaluator.record_process_effect(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, method: str, parts: &Vec[str], cwd: str, timeout_ms: i32, stdin_path: str, stdout_path: str, stderr_path: str, env_text: str):

@@ -67,6 +67,15 @@ fn run_write_empty_file_action(ctx: ActionCtx) -> i32:
         return 1
     0
 
+fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    let target = if args.len() > 0: args.get(0) else: ""
+    if target.len() == 0:
+        ctx.diagnostics().error("cross: cross-target compilation is not implemented yet; set CROSS_TARGET=<triple> or use `with build --target <triple>` for the compiler diagnostic")
+    else:
+        ctx.diagnostics().error("cross: cross-target compilation for '" ++ target ++ "' is not implemented yet")
+    1
+
 fn empty_file_target(name: str, output: str) -> Target:
     var target = target_new(.Action, name, "").output(output)
     target.action = run_write_empty_file_action
@@ -1218,6 +1227,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     deps = deps.arg(llvm_sdk_asset_for_host())
     deps = deps.arg(llvm_sdk_dir_basename())
     out = out.add_target(deps)
+
+    var cross = target_new(.Action, "cross", "").output("out/command/cross/unsupported")
+    cross.action = run_cross_unsupported_action
+    cross = cross.arg(env("CROSS_TARGET"))
+    cross = cross.write_scope("out/command/cross")
+    out = out.add_target(cross)
 
     out = out.add_target(install_file_target("update-seed", release_compiler_bin("with"), "src/main", "0755", "require-last-green"))
 

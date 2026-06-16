@@ -1960,6 +1960,8 @@ fn bs_check_build_cache_tracks_compiler(ctx: &ActionCtx, compiler_path: str, cas
 
     let result = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-compiler", bs_project_args("build"))
     if result.rc != 0: return result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/cachecompiler.state"), "v2\n", "build cache state version")
+    if rc != 0: return rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/cachecompiler.state"), "compiler:", "build cache compiler fingerprint")
 
 fn bs_check_build_cache_tracks_action_source(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
@@ -1983,6 +1985,25 @@ fn bs_check_build_cache_tracks_action_source(ctx: &ActionCtx, compiler_path: str
     let second = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-action-second", bs_project_args("build"))
     if second.rc != 0: return second.rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "second", "build cache action source invalidation")
+
+fn bs_check_build_cache_tracks_declared_input(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "cacheinput")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/input.txt"), "first", "cache input first")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn copy_input(ctx: &ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let text = fs.read_text(ctx.inputs().get(0))\n    if fs.write_text(ctx.output(), text) != 0:\n        return 1\n    0\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    var stamp = target_new(.Action, \"stamp\", \"\").output(\"out/stamp.txt\")\n    stamp.action = copy_input\n    stamp = stamp.input(\"src/input.txt\")\n    stamp = stamp.write_scope(\"out\")\n    out = out.add_target(stamp)\n    out.default(\"stamp\")\n", "cache input build")
+    if rc != 0: return rc
+
+    let first = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-input-first", bs_project_args("build"))
+    if first.rc != 0: return first.rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "first", "build cache input first output")
+    if rc != 0: return rc
+
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/input.txt"), "second", "cache input second")
+    if rc != 0: return rc
+    let second = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-input-second", bs_project_args("build"))
+    if second.rc != 0: return second.rc
+    bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "second", "build cache input invalidation")
 
 fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "embedcache")
@@ -2153,6 +2174,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_cache_tracks_compiler(ctx, compiler_path, bs_join(output_dir, "build_cache_compiler_case"))
     if rc != 0: return rc
     rc = bs_check_build_cache_tracks_action_source(ctx, compiler_path, bs_join(output_dir, "build_cache_action_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_cache_tracks_declared_input(ctx, compiler_path, bs_join(output_dir, "build_cache_input_case"))
     if rc != 0: return rc
     rc = bs_check_build_cache_tracks_embed_file(ctx, compiler_path, bs_join(output_dir, "build_cache_embed_case"))
     if rc != 0: return rc
@@ -5479,6 +5502,8 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, explain.stdout, "network: true", "build_w_action_explain_network")
     if rc != 0: return rc
+    rc = bs_assert_contains(ctx, explain.stdout, "freshness: stale: no cache state", "build_w_action_explain_no_state")
+    if rc != 0: return rc
     let result = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-target", bs_blob_to_args(bs_argv_append("", "build")))
     if result.rc != 0: return result.rc
     rc = bs_assert_contains(ctx, result.stdout, "streamed-process-run", "build_w_action_process_run")
@@ -5487,8 +5512,24 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/extra.txt"), "extra:hello", "build_w_action_extra_output")
     if rc != 0: return rc
+    let fresh_explain = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-explain-fresh", explain_args)
+    if fresh_explain.rc != 0: return fresh_explain.rc
+    rc = bs_assert_contains(ctx, fresh_explain.stdout, "freshness: fresh", "build_w_action_explain_fresh")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/input.txt"), "changed", ctx.target_name(), "action changed input")
+    if rc != 0: return rc
+    let stale_input_explain = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-explain-input-stale", explain_args)
+    if stale_input_explain.rc != 0: return stale_input_explain.rc
+    rc = bs_assert_contains(ctx, stale_input_explain.stdout, "freshness: stale: input changed: src/input.txt", "build_w_action_explain_input_stale")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/input.txt"), "input", ctx.target_name(), "action restored input")
+    if rc != 0: return rc
     let _remove_value = ctx.fs().remove_file(bs_join(case_dir, "out/action/value.txt"))
     let _remove_extra = ctx.fs().remove_file(bs_join(case_dir, "out/action/extra.txt"))
+    let missing_output_explain = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-explain-output-stale", explain_args)
+    if missing_output_explain.rc != 0: return missing_output_explain.rc
+    rc = bs_assert_contains(ctx, missing_output_explain.stdout, "freshness: stale: output missing: out/action/value.txt", "build_w_action_explain_output_stale")
+    if rc != 0: return rc
     let rerun = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-target-rerun", bs_blob_to_args(bs_argv_append("", "build")))
     if rerun.rc != 0: return rerun.rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/value.txt"), "action:hello", "build_w_action_scratch_rerun")

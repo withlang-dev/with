@@ -1240,7 +1240,7 @@ fn explain_kind_name(kind: i32) -> str:
     if kind == 23: return "Action"
     f"Unknown({kind})"
 
-fn explain_build_target(graph: &BuildGraph, name: str) -> i32:
+fn explain_build_target(root: str, graph: &BuildGraph, name: str) -> i32:
     var found = false
     for i in 0..graph.targets.len() as i32:
         let target = graph.targets.get(i as i64)
@@ -1278,6 +1278,7 @@ fn explain_build_target(graph: &BuildGraph, name: str) -> i32:
                     with_write("    - " ++ target.env.get(j as i64) ++ "\n")
             if target.network != 0:
                 with_write("  network: true\n")
+            with_write("  freshness: " ++ build_cache_freshness_reason(root, &target, false) ++ "\n")
             break
     if not found:
         with_eprint("error: target '" ++ name ++ "' not found in build graph\n")
@@ -1427,7 +1428,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
                     with_eprint("error: --no-deps is only supported for build.w action targets")
                     return 1
             if graph_options.explain_target.len() > 0:
-                return explain_build_target(&graph, graph_options.explain_target)
+                return explain_build_target(root, &graph, graph_options.explain_target)
             if graph_options.graph_only or graph_options.dry_run:
                 with_write(selected_graph.raw_text)
                 return 0

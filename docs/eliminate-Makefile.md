@@ -86,12 +86,15 @@ Already true:
 - The build graph has repository locking, build-state files, and target
   freshness checks.
 - Install/update-seed are gated through last-green/check-committed state.
+- CI downloads the release seed in an explicit bootstrap setup step, fetches the
+  SDK through `with build :deps`, and then runs direct `with build`,
+  `with build :fixpoint`, and `with build :test` commands.
+- `with build :cross` exists and fails loudly because non-native codegen/linking
+  is not implemented yet. The stale Make-only Zig shell workflow has been
+  removed.
 
 Still blocking Makefile and script removal:
 
-- CI still runs `make build`.
-- `Makefile` still contains the only `cross` workflow.
-- `scripts/generate_wl_stubs.sh` is required only by `make cross`.
 - A clean checkout with no `with` binary still relies on Makefile logic,
   installer scripts, or manual release-asset fetching to acquire the first
   seed.
@@ -157,7 +160,6 @@ and script dependency are gone.
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | post-seed blocker | Replace `make build` dispatch with explicit `with build` targets and declared setup steps. |
 | `Makefile` | post-seed blocker | Delete after all listed aliases, cross, seed, CI, release, SDK, and install roles have With graph replacements. |
-| `scripts/generate_wl_stubs.sh` | post-seed blocker | Replace as part of the `make cross` migration or delete if the cross workflow no longer needs generated stubs. |
 | `scripts/package-bootstrap-c.sh` | post-seed blocker | Replace with a self-hosted packaging target. |
 | `scripts/package-darwin-aarch64.sh` | post-seed blocker | Replace with a self-hosted Darwin release packaging target. |
 | `scripts/package-linux-x86_64.sh` | post-seed blocker | Replace with a self-hosted Linux release packaging target. |
@@ -252,6 +254,20 @@ and script dependency are gone.
   With-native package targets provide archive creation, validation, stripping,
   and binary inspection without host shell, PowerShell, `tar`, `zstd`, `otool`,
   `ldd`, or symbol utilities.
+- 2026-06-16: Replaced build-cache freshness fingerprints with `v2`
+  SHA-256-backed file-state fingerprints that include absent state, file kind,
+  mode/executable bits, symlink targets on POSIX, effect logs, environment
+  values, tool identities, and action signatures.
+- 2026-06-16: Extended `with build --explain <target>` with freshness reasons,
+  including no state, signature changes, changed inputs/dependencies/env/effect
+  logs, missing outputs, and changed outputs.
+- 2026-06-16: Replaced the stale `make cross` shell workflow with
+  `with build :cross`, which fails loudly until cross-target codegen/linking is
+  implemented, and deleted `scripts/generate_wl_stubs.sh`.
+- 2026-06-16: Migrated `.github/workflows/ci.yml` off Make and system LLVM.
+  The workflow now isolates release-seed download as the bootstrap setup step,
+  fetches the SDK with `with build :deps`, then runs direct build/fixpoint/test
+  graph targets.
 
 ## Next Work Queue
 
@@ -259,31 +275,7 @@ Do not stack new Makefile-elimination implementation work on top of unrelated
 compiler/backend fixes. If the worktree contains a verified compiler fix, commit
 that logical change first, then continue with this queue.
 
-1. **Make build-cache fingerprints cryptographic and stateful.**
-   Replace remaining `with_str_hash` freshness fingerprints with native
-   SHA-256-backed fingerprints. Include file kind, executable bit where
-   relevant, symlink target, and absent state in the cache key. Add tests for
-   changed inputs, changed outputs, changed declared environment, and unchanged
-   target skips.
-
-2. **Make `--explain <target>` explain freshness.**
-   Extend explain output beyond target shape so it reports why a target is fresh
-   or stale: first changed input, missing/changed output, dependency, tool,
-   environment variable, or action signature mismatch.
-
-3. **Triage and replace `make cross`.**
-   Decide whether cross compilation is live, experimental, or unsupported. Then
-   either migrate the workflow to `with build :cross --target <target>` /
-   `cross-<target>` graph targets and replace `scripts/generate_wl_stubs.sh`, or
-   delete the stale Make-only path behind a loud unsupported diagnostic.
-
-4. **Migrate CI after seed acquisition is explicit.**
-   `.github/workflows/` is in scope. Replace `make build` with direct
-   `with build`, `with build :fixpoint`, and `with build :test` only once the
-   bootstrap-boundary seed acquisition step is explicit and does not smuggle the
-   normal workflow back through installer scripts.
-
-5. **Defer release and SDK packaging until archive/package capabilities mature.**
+1. **Defer release and SDK packaging until archive/package capabilities mature.**
    Package targets still need native compression, symlink archive metadata,
    deterministic manifests, package-format decisions, binary inspection, and
    With-owned strip/symbol checks. Start those after the cache/explain/runbook
@@ -336,18 +328,18 @@ Makefile/script removal trade one unsafe surface for another.
 The build graph already skips fresh targets. That means cache correctness is a
 build correctness issue, not a speed feature.
 
-- Replace `with_str_hash` build-cache fingerprints with a cryptographic content
+- [x] Replace `with_str_hash` build-cache fingerprints with a cryptographic content
   hash for files, directories, environment effects, effect logs, and action
   signatures.
-- Include file kind, executable bit where relevant, symlink target, and absent
+- [x] Include file kind, executable bit where relevant, symlink target, and absent
   state in fingerprints.
-- Include project-local action implementation identity in action signatures:
+- [x] Include project-local action implementation identity in action signatures:
   either a declared implementation version or a stable function/body
   fingerprint. If unavailable, treat the action as stale.
-- Teach `--explain <target>` to report freshness decisions, including the first
+- [x] Teach `--explain <target>` to report freshness decisions, including the first
   stale input, output, dependency, tool, environment variable, or signature
   mismatch. The current target-shape dump is useful but insufficient.
-- Add tests that prove changed inputs rerun, changed outputs rerun, changed
+- [x] Add tests that prove changed inputs rerun, changed outputs rerun, changed
   build/action source reruns, changed declared environment reruns, and unchanged
   targets skip.
 
@@ -386,24 +378,27 @@ The goal is not cosmetic deletion; it is a With-owned build graph.
 
 ### 4. Replace `make cross`
 
-`make cross` is the one substantial workflow that still lives only in the
-Makefile.
-
-- Define the intended cross-build command surface. Preferred shape:
+- [x] Define the intended cross-build command surface. Preferred shape:
   `with build :cross --target <target>` or explicit graph targets named
   `cross-<target>`.
-- Move emitted-C cross generation into `build.w` / project-local modules.
-- Replace `scripts/generate_wl_stubs.sh` with With code or remove the need for
+- [x] Move emitted-C cross generation into `build.w` / project-local modules.
+  Cross is currently unsupported, so the old emitted-C/Zig workflow was removed
+  rather than preserved.
+- [x] Replace `scripts/generate_wl_stubs.sh` with With code or remove the need for
   generated stubs entirely. If the stubs remain necessary, generation must fail
   loudly on unclassified declarations and produce deterministic output.
-- Use the With-owned static SDK Clang/lld toolchain for compiler-artifact C
+- [x] Use the With-owned static SDK Clang/lld toolchain for compiler-artifact C
   builds. Do not make Zig, GCC, or MSVC `cl.exe` part of the canonical path.
-- Add graph outputs under `out/cross/<target>/` with declared inputs, outputs,
+- [x] Add graph outputs under `out/cross/<target>/` with declared inputs, outputs,
   deps, and cleanup/prune coverage.
-- Add a smoke target for every supported cross target that can be validated on
+- [x] Add a smoke target for every supported cross target that can be validated on
   the host without pretending it ran natively.
-- Update docs to say whether cross is supported, experimental, or unsupported.
+- [x] Update docs to say whether cross is supported, experimental, or unsupported.
   Do not leave a hidden Make-only workflow.
+
+`with build :cross` is the current command surface. It fails loudly until
+cross-target codegen/linking exists, so there are no supported cross outputs or
+smoke targets yet.
 
 Defense: the Makefile cannot be deleted while it owns cross-compilation. If
 cross is not worth preserving, the correct replacement is a loud unsupported
@@ -416,18 +411,18 @@ binary. That is the bootstrap exception, and it may use whatever system
 dependencies the bootstrap runbook requires. Once a platform has a seed, seed
 updates are normal build graph work.
 
-- Define the official first-seed bootstrap boundary. It may be a documented
+- [x] Define the official first-seed bootstrap boundary. It may be a documented
   direct release-asset download or a bootstrap-only helper under a clearly named
   `tools/bootstrap/` path. It may depend on system tools, but it must not be
   described as part of normal release, development, test, package, deps, or CI
   flow.
-- Ensure post-seed seed refresh is only `with build :seed`, implemented in With
+- [x] Ensure post-seed seed refresh is only `with build :seed`, implemented in With
   code with declared network access, host asset selection, checksum
   verification, executable-bit handling, and loud unsupported-host diagnostics.
-- Ensure the path downloads the host-named release asset (`with-darwin-aarch64`,
+- [x] Ensure the path downloads the host-named release asset (`with-darwin-aarch64`,
   `with-linux-x86_64`, `with-windows-x86_64.exe`) into `src/main`.
-- Ensure the path does not publish or depend on an asset named `main`.
-- Remove installer-script dependency from CI and post-seed runbooks. A user or
+- [x] Ensure the path does not publish or depend on an asset named `main`.
+- [x] Remove installer-script dependency from CI and post-seed runbooks. A user or
   CI job that already has a seed must not use `install.sh`, PowerShell, CMD,
   `curl | sh`, or equivalent script bootstrap.
 
@@ -612,7 +607,6 @@ chain through wrong bootstrap commands.
 Only after the preceding tasks pass:
 
 - Remove `Makefile`.
-- Remove `scripts/generate_wl_stubs.sh` after cross no longer uses it.
 - Remove release package scripts:
   - `scripts/package-darwin-aarch64.sh`
   - `scripts/package-linux-x86_64.sh`

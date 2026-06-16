@@ -11,9 +11,11 @@ extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
 extern fn with_fs_chmod(path: str, mode: i32) -> i32
 extern fn with_fs_file_exists(path: str) -> i32
+extern fn with_fs_file_mode(path: str) -> i32
 extern fn with_fs_is_dir(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_readlink(path: str) -> str
 extern fn with_fs_remove_dir(path: str) -> i32
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_tree(path: str) -> i32
@@ -57,6 +59,9 @@ pub fn build_graph_rt_setenv(name: str, value: str) -> i32:
 pub fn build_graph_rt_file_exists(path: str) -> i32:
     with_fs_file_exists(path)
 
+pub fn build_graph_rt_file_mode(path: str) -> i32:
+    with_fs_file_mode(path)
+
 pub fn build_graph_rt_is_dir(path: str) -> i32:
     with_fs_is_dir(path)
 
@@ -65,6 +70,9 @@ pub fn build_graph_rt_mkdir_p(path: str) -> i32:
 
 pub fn build_graph_rt_read_file(path: str) -> str:
     with_fs_read_file(path)
+
+pub fn build_graph_rt_readlink(path: str) -> str:
+    with_fs_readlink(path)
 
 pub fn build_graph_rt_remove_file(path: str) -> i32:
     with_fs_remove_file(path)

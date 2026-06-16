@@ -180,6 +180,8 @@ int32_t with_fs_mkdir(with_str path);
 int32_t with_fs_is_dir(with_str path);
 int32_t with_fs_remove_file(with_str path);
 int32_t with_fs_chmod(with_str path, int32_t mode);
+int32_t with_fs_file_mode(with_str path);
+with_str with_fs_readlink(with_str path);
 int32_t with_fs_rename_file(with_str old_path, with_str new_path);
 int32_t with_fs_create_dir(with_str path);
 int32_t with_fs_remove_dir(with_str path);

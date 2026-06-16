@@ -290,26 +290,9 @@ __seed:
 	chmod +x "$$dest"; \
 	echo "seed installed: $$dest"
 
-# Cross-compile via emit-c + zig cc. Requires a working build.
+# Cross-target compilation is graph-owned and currently fails loudly until the
+# compiler has real non-native codegen/link support.
 CROSS_TARGET ?=
 
-cross: build
-	@if [ -z "$(CROSS_TARGET)" ]; then \
-		echo "usage: make cross CROSS_TARGET=aarch64-linux"; \
-		exit 1; \
-	fi
-	@echo "=== cross-compile: $(CROSS_TARGET) ==="
-	mkdir -p out/cross/$(CROSS_TARGET)
-	$(WITH_BUILD_ENV) ./out/release/bin/with build out/gen/main.w --emit-c -o out/cross/$(CROSS_TARGET)/with.c
-	@bash "$(ROOT_DIR)/scripts/generate_wl_stubs.sh" runtime/llvm_bridge.c out/cross/$(CROSS_TARGET)/with.c $(OUT_GEN_DIR)
-	cd out/cross/$(CROSS_TARGET) && zig cc \
-		-target $(CROSS_TARGET) \
-		-o with \
-		with.c \
-		../../../$(OUT_GEN_DIR)/wl_stubs.c \
-		../../../runtime/with_runtime.c \
-		-I../../../runtime \
-		-include ../../../$(OUT_GEN_DIR)/wl_decls.h \
-		-lc
-	@echo "=== built: out/cross/$(CROSS_TARGET)/with ==="
-	@file out/cross/$(CROSS_TARGET)/with
+cross:
+	$(WITH_BUILD_ENV) CROSS_TARGET="$(CROSS_TARGET)" $(STAGE0_BIN) build :cross

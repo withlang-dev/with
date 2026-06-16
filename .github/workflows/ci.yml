@@ -10,18 +10,41 @@ jobs:
     runs-on: macos-latest
     env:
       WITH_OUT_DIR: ${{ github.workspace }}/out
+      WITH: ${{ github.workspace }}/src/main
+      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-darwin-arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install LLVM
-        run: brew install llvm
+      - name: Bootstrap seed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WITH_SEED_REPO: withlang-dev/with
+          WITH_SEED_ASSET: with-darwin-aarch64
+        run: |
+          set -euo pipefail
+          tag="${WITH_SEED_VERSION:-}"
+          if [ -z "$tag" ]; then
+            while IFS= read -r candidate; do
+              if gh release view "$candidate" --repo "$WITH_SEED_REPO" --json assets --jq '.assets[].name' | grep -qx "$WITH_SEED_ASSET"; then
+                tag="$candidate"
+                break
+              fi
+            done < <(gh release list --repo "$WITH_SEED_REPO" --limit 50 --json tagName --jq '.[].tagName')
+          fi
+          if [ -z "$tag" ]; then
+            echo "error: could not find a release with $WITH_SEED_ASSET" >&2
+            exit 1
+          fi
+          curl -fL -o src/main "https://github.com/$WITH_SEED_REPO/releases/download/$tag/$WITH_SEED_ASSET"
+          chmod +x src/main
+          src/main version
 
-      - name: Export LLVM_PREFIX
-        run: echo "LLVM_PREFIX=$(brew --prefix llvm)" >> "$GITHUB_ENV"
+      - name: Fetch SDK
+        run: src/main build :deps
 
       - name: Build
-        run: make build
+        run: src/main build
 
       - name: Fixpoint
         run: ./out/bin/with build :fixpoint

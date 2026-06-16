@@ -3,11 +3,15 @@
 use BuildGraphModel
 use BuildGraphRuntime
 use compiler.TrackedInputs
+use std.crypto.sha256
 
-extern fn with_str_hash(s: str) -> i64
+const BUILD_CACHE_S_IFMT: i32 = 61440
+const BUILD_CACHE_S_IFDIR: i32 = 16384
+const BUILD_CACHE_S_IFREG: i32 = 32768
+const BUILD_CACHE_S_IFLNK: i32 = 40960
 
 var build_cache_compiler_fingerprint_ready: i32 = 0
-var build_cache_compiler_fingerprint: i64 = 0
+var build_cache_compiler_fingerprint: str = ""
 
 pub fn build_cache_state_dir(root: str) -> str:
     root ++ "/out/.build-state"
@@ -50,28 +54,39 @@ pub fn build_cache_is_cacheable(kind: i32) -> bool:
     if kind == 23: return true
     false
 
-fn build_cache_fingerprint_regular_file(path: str) -> i64:
-    if build_graph_rt_file_exists(path) == 0:
-        return 0
-    let contents = build_graph_rt_read_file(path)
-    with_str_hash(contents)
+fn build_cache_sha256_text(data: str) -> str:
+    var digest: [32]u8 = [0 as u8; 32]
+    sha256_hash_str(data, &raw mut digest[0] as *mut u8)
+    sha256_hex(&digest[0] as *const u8)
 
-fn build_cache_fingerprint_directory(path: str) -> i64:
+fn build_cache_fingerprint_regular_file(path: str, mode: i32) -> str:
+    let exec = if (mode & 0o111) != 0: "x" else: "-"
+    build_cache_sha256_text("file\nmode:" ++ f"{mode & 0o777}" ++ "\nexec:" ++ exec ++ "\ncontent:" ++ build_graph_rt_read_file(path))
+
+fn build_cache_fingerprint_directory(path: str, mode: i32) -> str:
     let listing = build_graph_rt_list_files(path)
     let files = build_cache_sorted_strings(build_cache_split_lines(listing))
-    var combined = "dir\n"
+    var combined = "dir\nmode:" ++ f"{mode & 0o777}" ++ "\n"
     for i in 0..files.len() as i32:
         let file = files.get(i as i64)
-        if build_graph_rt_is_dir(file) == 0:
-            combined = combined ++ file ++ ":" ++ f"{build_cache_fingerprint_regular_file(file)}" ++ "\n"
-    with_str_hash(combined)
+        combined = combined ++ file ++ ":" ++ build_cache_fingerprint_file(file) ++ "\n"
+    build_cache_sha256_text(combined)
 
-pub fn build_cache_fingerprint_file(path: str) -> i64:
-    if build_graph_rt_file_exists(path) == 0:
-        return 0
-    if build_graph_rt_is_dir(path) != 0:
-        return build_cache_fingerprint_directory(path)
-    build_cache_fingerprint_regular_file(path)
+fn build_cache_fingerprint_symlink(path: str, mode: i32) -> str:
+    build_cache_sha256_text("symlink\nmode:" ++ f"{mode & 0o777}" ++ "\ntarget:" ++ build_graph_rt_readlink(path))
+
+pub fn build_cache_fingerprint_file(path: str) -> str:
+    let mode = build_graph_rt_file_mode(path)
+    if mode < 0:
+        return build_cache_sha256_text("absent\n")
+    let kind = mode & BUILD_CACHE_S_IFMT
+    if kind == BUILD_CACHE_S_IFDIR:
+        return build_cache_fingerprint_directory(path, mode)
+    if kind == BUILD_CACHE_S_IFLNK:
+        return build_cache_fingerprint_symlink(path, mode)
+    if kind == BUILD_CACHE_S_IFREG:
+        return build_cache_fingerprint_regular_file(path, mode)
+    build_cache_sha256_text("other\nmode:" ++ f"{mode}" ++ "\n")
 
 fn build_cache_str_contains_byte(text: str, target: i32) -> bool:
     for i in 0..text.len() as i32:
@@ -105,13 +120,13 @@ fn build_cache_resolve_executable_path(argv0: str) -> str:
         i = i + 1
     ""
 
-fn build_cache_current_compiler_fingerprint() -> i64:
+fn build_cache_current_compiler_fingerprint() -> str:
     if build_cache_compiler_fingerprint_ready != 0:
         return build_cache_compiler_fingerprint
     build_cache_compiler_fingerprint_ready = 1
     let compiler_path = build_cache_resolve_executable_path(build_graph_rt_arg_at(0))
     if compiler_path.len() == 0:
-        return 0
+        return build_cache_sha256_text("compiler:unresolved\n")
     build_cache_compiler_fingerprint = build_cache_fingerprint_file(compiler_path)
     build_cache_compiler_fingerprint
 
@@ -260,20 +275,19 @@ fn build_cache_effects_text(effects: &Vec[str]) -> str:
         out = out ++ sorted.get(i as i64) ++ "\n"
     out
 
-pub fn build_cache_hash_directory_w_files(root: str, dir: str) -> i64:
+pub fn build_cache_hash_directory_w_files(root: str, dir: str) -> str:
     let files = build_cache_list_w_files(root, dir)
     var combined = ""
     for i in 0..files.len() as i32:
         let path = files.get(i as i64)
-        let contents = build_graph_rt_read_file(path)
-        combined = combined ++ path ++ ":" ++ f"{with_str_hash(contents)}" ++ "\n"
-    with_str_hash(combined)
+        combined = combined ++ path ++ ":" ++ build_cache_fingerprint_file(path) ++ "\n"
+    build_cache_sha256_text(combined)
 
-fn build_cache_hash_build_graph_sources(root: str) -> i64:
-    var combined = "build.w:" ++ f"{build_cache_fingerprint_file(root ++ "/build.w")}" ++ "\n"
-    combined = combined ++ "build:" ++ f"{build_cache_hash_directory_w_files(root, "build")}" ++ "\n"
-    combined = combined ++ "std.build:" ++ f"{build_cache_fingerprint_file(root ++ "/lib/std/build.w")}" ++ "\n"
-    with_str_hash(combined)
+fn build_cache_hash_build_graph_sources(root: str) -> str:
+    var combined = "build.w:" ++ build_cache_fingerprint_file(root ++ "/build.w") ++ "\n"
+    combined = combined ++ "build:" ++ build_cache_hash_directory_w_files(root, "build") ++ "\n"
+    combined = combined ++ "std.build:" ++ build_cache_fingerprint_file(root ++ "/lib/std/build.w") ++ "\n"
+    build_cache_sha256_text(combined)
 
 fn build_cache_test_success_manifest(root: str, target: &BuildGraphTarget, test_files: &Vec[str], test_compiler: str) -> str:
     var text = "v1\n"
@@ -312,7 +326,7 @@ pub fn build_cache_record_test_success(root: str, target: &BuildGraphTarget, tes
     let marker = build_cache_test_success_manifest(root, target, test_files, test_compiler)
     let _write = build_graph_rt_write_file(marker_path, marker)
 
-fn build_cache_compute_signature(target: &BuildGraphTarget, root: str) -> i64:
+fn build_cache_compute_signature(target: &BuildGraphTarget, root: str) -> str:
     var sig = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
     sig = sig ++ f":{target.optimize_mode}:{target.target_kind}"
     for i in 0..target.args.len() as i32:
@@ -324,17 +338,17 @@ fn build_cache_compute_signature(target: &BuildGraphTarget, root: str) -> i64:
     for i in 0..target.system_libs.len() as i32:
         sig = sig ++ ":L:" ++ target.system_libs.get(i as i64)
     if build_cache_target_uses_current_compiler(target):
-        sig = sig ++ f":WITH:{build_cache_current_compiler_fingerprint()}"
+        sig = sig ++ ":WITH:" ++ build_cache_current_compiler_fingerprint()
     if target.kind == 23:
-        sig = sig ++ f":BUILD_GRAPH:{build_cache_hash_build_graph_sources(root)}"
+        sig = sig ++ ":BUILD_GRAPH:" ++ build_cache_hash_build_graph_sources(root)
     if build_cache_is_stage_target(target):
         let src_hash = build_cache_hash_directory_w_files(root, "src")
-        sig = sig ++ f":SRC:{src_hash}"
+        sig = sig ++ ":SRC:" ++ src_hash
         let compiler_path = build_cache_target_compiler_path(root, target)
         if compiler_path.len() > 0:
             let compiler_hash = build_cache_fingerprint_file(compiler_path)
-            sig = sig ++ f":COMPILER:{compiler_hash}"
-    with_str_hash(sig)
+            sig = sig ++ ":COMPILER:" ++ compiler_hash
+    build_cache_sha256_text(sig)
 
 fn build_cache_collect_input_paths(root: str, target: &BuildGraphTarget) -> Vec[str]:
     var paths: Vec[str] = Vec.new()
@@ -356,36 +370,41 @@ fn build_cache_collect_output_paths(root: str, target: &BuildGraphTarget) -> Vec
             paths.push(root ++ "/" ++ extra)
     paths
 
-pub fn build_cache_check_fresh(root: str, target: &BuildGraphTarget, dep_rebuilt: bool) -> bool:
+pub fn build_cache_freshness_reason(root: str, target: &BuildGraphTarget, dep_rebuilt: bool) -> str:
+    if not build_cache_is_cacheable(target.kind):
+        return "not cacheable"
     if target.name == "prune" or target.name == "prune-apply":
-        return false
+        return "stale: target is always run"
     if target.name == "last-green" or target.name == "test-green" or target.name == "require-last-green" or target.name == "check-committed-state" or target.name == "print-version":
-        return false
+        return "stale: target is always run"
     if dep_rebuilt:
-        return false
+        return "stale: dependency rebuilt"
     let state_path = build_cache_state_path(root, target.name)
     if build_graph_rt_file_exists(state_path) == 0:
-        return false
+        return "stale: no cache state"
     let state_text = build_graph_rt_read_file(state_path)
     if state_text.len() == 0:
-        return false
+        return "stale: empty cache state"
     let expected_sig = build_cache_compute_signature(target, root)
-    var state_sig: i64 = 0
-    var effect_hash: i64 = 0
+    var state_sig = ""
+    var effect_hash = ""
     var input_hashes: Vec[str] = Vec.new()
     var dep_hashes: Vec[str] = Vec.new()
     var env_hashes: Vec[str] = Vec.new()
     var output_hashes: Vec[str] = Vec.new()
+    var saw_v2 = false
     var line_start = 0
     var i = 0
     while i < state_text.len() as i32:
         let byte = state_text.byte_at(i as i64)
         if byte == 10:
             let line = state_text.slice(line_start as i64, i as i64)
-            if line.starts_with("sig:"):
-                state_sig = parse_i64_from_str(line.slice(4, line.len()))
+            if line == "v2":
+                saw_v2 = true
+            else if line.starts_with("sig:"):
+                state_sig = line.slice(4, line.len())
             else if line.starts_with("effects:"):
-                effect_hash = parse_i64_from_str(line.slice(8, line.len()))
+                effect_hash = line.slice(8, line.len())
             else if line.starts_with("in:"):
                 input_hashes.push(line.slice(3, line.len()))
             else if line.starts_with("dep:"):
@@ -398,10 +417,12 @@ pub fn build_cache_check_fresh(root: str, target: &BuildGraphTarget, dep_rebuilt
         i = i + 1
     if line_start < state_text.len() as i32:
         let line = state_text.slice(line_start as i64, state_text.len())
-        if line.starts_with("sig:"):
-            state_sig = parse_i64_from_str(line.slice(4, line.len()))
+        if line == "v2":
+            saw_v2 = true
+        else if line.starts_with("sig:"):
+            state_sig = line.slice(4, line.len())
         else if line.starts_with("effects:"):
-            effect_hash = parse_i64_from_str(line.slice(8, line.len()))
+            effect_hash = line.slice(8, line.len())
         else if line.starts_with("in:"):
             input_hashes.push(line.slice(3, line.len()))
         else if line.starts_with("dep:"):
@@ -410,85 +431,88 @@ pub fn build_cache_check_fresh(root: str, target: &BuildGraphTarget, dep_rebuilt
             env_hashes.push(line.slice(4, line.len()))
         else if line.starts_with("out:"):
             output_hashes.push(line.slice(4, line.len()))
+    if not saw_v2:
+        return "stale: cache state version changed"
     if state_sig != expected_sig:
-        return false
+        return "stale: action signature changed"
     let input_paths = build_cache_collect_input_paths(root, target)
     if input_paths.len() != input_hashes.len():
-        return false
+        return "stale: input set changed"
     for idx in 0..input_paths.len() as i32:
         let path = input_paths.get(idx as i64)
         let current_hash = build_cache_fingerprint_file(path)
         let stored = input_hashes.get(idx as i64)
-        let expected_entry = path ++ ":" ++ f"{current_hash}"
+        let expected_entry = path ++ ":" ++ current_hash
         if stored != expected_entry:
-            return false
+            return "stale: input changed: " ++ build_cache_project_relative(root, path)
     for idx in 0..dep_hashes.len() as i32:
         let stored = dep_hashes.get(idx as i64)
         let split = build_cache_last_colon(stored)
         if split < 0:
-            return false
+            return "stale: malformed dependency state"
         let stored_path = stored.slice(0, split as i64)
         let path = build_cache_dep_path(root, stored_path)
-        if build_graph_rt_file_exists(path) == 0:
-            return false
         let current_hash = build_cache_fingerprint_file(path)
-        let expected_entry = stored_path ++ ":" ++ f"{current_hash}"
+        let expected_entry = stored_path ++ ":" ++ current_hash
         if stored != expected_entry:
-            return false
+            return "stale: discovered dependency changed: " ++ stored_path
     for idx in 0..env_hashes.len() as i32:
         let stored = env_hashes.get(idx as i64)
         let split = build_cache_last_colon(stored)
         if split < 0:
-            return false
+            return "stale: malformed environment state"
         let name = stored.slice(0, split as i64)
-        let current_hash = with_str_hash(build_graph_rt_getenv(name))
-        let expected_entry = name ++ ":" ++ f"{current_hash}"
+        let current_hash = build_cache_sha256_text(build_graph_rt_getenv(name))
+        let expected_entry = name ++ ":" ++ current_hash
         if stored != expected_entry:
-            return false
-    if effect_hash != 0:
+            return "stale: environment variable changed: " ++ name
+    if effect_hash.len() > 0:
         let effects_path = build_cache_effects_path(root, target.name)
         if build_graph_rt_file_exists(effects_path) == 0:
-            return false
-        if with_str_hash(build_graph_rt_read_file(effects_path)) != effect_hash:
-            return false
+            return "stale: effect log missing"
+        if build_cache_sha256_text(build_graph_rt_read_file(effects_path)) != effect_hash:
+            return "stale: effect log changed"
     let output_paths = build_cache_collect_output_paths(root, target)
     if output_paths.len() != output_hashes.len():
-        return false
+        return "stale: output set changed"
     for idx in 0..output_paths.len() as i32:
         let path = output_paths.get(idx as i64)
         if build_graph_rt_file_exists(path) == 0:
-            return false
+            return "stale: output missing: " ++ build_cache_project_relative(root, path)
         let current_hash = build_cache_fingerprint_file(path)
         let stored = output_hashes.get(idx as i64)
-        let expected_entry = path ++ ":" ++ f"{current_hash}"
+        let expected_entry = path ++ ":" ++ current_hash
         if stored != expected_entry:
-            return false
-    true
+            return "stale: output changed: " ++ build_cache_project_relative(root, path)
+    "fresh"
+
+pub fn build_cache_check_fresh(root: str, target: &BuildGraphTarget, dep_rebuilt: bool) -> bool:
+    build_cache_freshness_reason(root, target, dep_rebuilt) == "fresh"
 
 pub fn build_cache_record(root: str, target: &BuildGraphTarget, discovered_deps: Vec[str], effects: Vec[str]) -> Unit:
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)
     let sig = build_cache_compute_signature(target, root)
-    var content = f"v1\nsig:{sig}\n"
+    var content = "v2\nsig:" ++ sig ++ "\n"
     if build_cache_target_uses_current_compiler(target):
-        content = content ++ f"compiler:{build_cache_current_compiler_fingerprint()}\n"
+        content = content ++ "compiler:" ++ build_cache_current_compiler_fingerprint() ++ "\n"
     let input_paths = build_cache_collect_input_paths(root, target)
     for idx in 0..input_paths.len() as i32:
         let path = input_paths.get(idx as i64)
         let hash = build_cache_fingerprint_file(path)
-        content = content ++ f"in:{path}:{hash}\n"
+        content = content ++ "in:" ++ path ++ ":" ++ hash ++ "\n"
     let dep_paths = build_cache_sorted_unique_strings(discovered_deps)
     for idx in 0..dep_paths.len() as i32:
         let path = dep_paths.get(idx as i64)
         let hash = build_cache_fingerprint_file(path)
         let rel_path = build_cache_project_relative(root, path)
-        content = content ++ f"dep:{rel_path}:{hash}\n"
+        content = content ++ "dep:" ++ rel_path ++ ":" ++ hash ++ "\n"
     let effects_text = build_cache_effects_text(effects)
     if effects_text.len() > 0:
         let effects_path = build_cache_effects_path(root, target.name)
         let _write_effects = build_graph_rt_write_file(effects_path, effects_text)
-        content = content ++ f"effects:{with_str_hash(effects_text)}\n"
+        content = content ++ "effects:" ++ build_cache_sha256_text(effects_text) ++ "\n"
         let sorted_effects = build_cache_sorted_unique_strings(effects)
         for idx in 0..sorted_effects.len() as i32:
             let env_line = build_cache_effect_env_state_line(sorted_effects.get(idx as i64))
@@ -500,7 +524,7 @@ pub fn build_cache_record(root: str, target: &BuildGraphTarget, discovered_deps:
     for idx in 0..output_paths.len() as i32:
         let path = output_paths.get(idx as i64)
         let hash = build_cache_fingerprint_file(path)
-        content = content ++ f"out:{path}:{hash}\n"
+        content = content ++ "out:" ++ path ++ ":" ++ hash ++ "\n"
     let _ = build_graph_rt_write_file(state_path, content)
 
 pub fn build_cache_record_build_effects(root: str, effects: Vec[str]) -> Unit:
@@ -550,19 +574,3 @@ pub fn build_cache_print_effects(root: str, graph: &BuildGraph, target_filter: s
             build_graph_rt_write("  reproducible: yes\n")
             build_graph_rt_write(effects)
     0
-
-fn parse_i64_from_str(s: str) -> i64:
-    var result: i64 = 0
-    var negative = false
-    var start = 0
-    if s.len() > 0 and s.byte_at(0) == 45:
-        negative = true
-        start = 1
-    var i = start
-    while i < s.len() as i32:
-        let digit = s.byte_at(i as i64) - 48
-        if digit < 0 or digit > 9:
-            break
-        result = result * 10 + digit as i64
-        i = i + 1
-    if negative: -result else: result

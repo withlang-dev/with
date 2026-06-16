@@ -92,13 +92,15 @@ The repository `Makefile` is a transitional compatibility layer. Prefer direct
 | `make emit-c-test` | `with build :emit-c-test` |
 | `make emit-c-fixpoint` | `with build :emit-c-fixpoint` |
 | `make emit-c-roundtrip` | `with build :emit-c-roundtrip` |
+| `make cross` | `with build :cross` |
 
 Known exceptions:
 
 - A clean checkout with no `with` binary still needs a bootstrap-only first
   seed acquisition path before `with build :seed` can run.
-- `make cross` still owns the stale cross-compile workflow and must be replaced
-  before the Makefile can be deleted.
+- `with build :cross` currently fails loudly because cross-target
+  codegen/linking is not implemented yet. The old Make-only Zig shell workflow
+  has been removed.
 
 ---
 

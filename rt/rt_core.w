@@ -44,6 +44,8 @@ extern fn rt_symlink(target: *const u8, link_path: *const u8) -> i32
 extern fn rt_list_files(path: *const u8) -> str
 extern fn rt_access(path: *const u8, mode: i32) -> i32
 extern fn rt_chmod(path: *const u8, mode: i32) -> i32
+extern fn rt_file_mode(path: *const u8) -> i32
+extern fn rt_readlink(path: *const u8) -> str
 // stat is in the core 13 but declared with a different name to avoid confusion
 extern fn rt_stat(path: *const u8, out: *mut u8) -> i32
 
@@ -2459,6 +2461,14 @@ pub fn with_fs_remove_file(path: str) -> i32:
 pub fn with_fs_chmod(path: str, mode: i32) -> i32:
     let cpath = str_to_cstr(path)
     rt_chmod(cpath, mode)
+
+pub fn with_fs_file_mode(path: str) -> i32:
+    let cpath = str_to_cstr(path)
+    rt_file_mode(cpath)
+
+pub fn with_fs_readlink(path: str) -> str:
+    let cpath = str_to_cstr(path)
+    rt_readlink(cpath)
 
 pub fn with_fs_rename_file(old_path: str, new_path: str) -> i32:
     let cold = str_to_cstr(old_path)

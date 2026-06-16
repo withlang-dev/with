@@ -257,6 +257,17 @@ pub unsafe fn rt_stat(path: *const u8, out: *mut RtStatBuf) -> i32:
     (unsafe *out).modified_ns = win_filetime_to_ns(write_low, write_high)
     0
 
+pub unsafe fn rt_file_mode(path: *const u8) -> i32:
+    var wpath: [4096]u16 = [0 as u16; 4096]
+    if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
+        return -1
+    let attrs = GetFileAttributesW(&wpath as *const [4096]u16 as *const u16)
+    if attrs == 0xffffffff as u32:
+        return win_neg_error()
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0:
+        return 0o040755
+    0o100644
+
 pub unsafe fn rt_chmod(path: *const u8, mode: i32) -> i32:
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
@@ -560,6 +571,10 @@ pub unsafe fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
     if CreateSymbolicLinkW(&linkw as *const [4096]u16 as *const u16, &targetw as *const [4096]u16 as *const u16, flags | (2 as u32)) == 0:
         return win_neg_error()
     0
+
+pub unsafe fn rt_readlink(path: *const u8) -> str:
+    let _ = path
+    win_empty_str()
 
 unsafe fn win_empty_str() -> str:
     with_str_from_cstr(c"".ptr)
