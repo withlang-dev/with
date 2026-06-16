@@ -432,6 +432,13 @@ type Sema {
     disc_has_payload: HashMap[i32, i32],
     bitpacked_types: HashMap[i32, i32],  // type_id → 1 if bitpacked
     packed_types: HashMap[i32, i32],     // type_id → 1 if repr(packed)/@[packed]
+    // §16.4 union last-written tracking. Maps a local union variable's name
+    // sym → the last-written field sym (0 = tracked-but-unknown after control
+    // flow). Absent = untracked (never literal-initialized/assigned) and never
+    // flagged, which keeps raw/uninitialized union access build-safe.
+    union_last_written: HashMap[i32, i32],
+    union_tracked_syms: Vec[i32],   // insertion-ordered tracked union var syms
+    union_in_assign_target: i32,
 
     // Trait declarations
     trait_method_names: Vec[i32],
@@ -1429,6 +1436,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         disc_has_payload,
         bitpacked_types: sema_new_map_i32_i32(),
         packed_types: sema_new_map_i32_i32(),
+        union_last_written: sema_new_map_i32_i32(),
+        union_tracked_syms: Vec.new(),
+        union_in_assign_target: 0,
         trait_method_names: Vec.new(),
         trait_method_starts: Vec.new(),
         trait_method_counts: Vec.new(),

@@ -972,6 +972,10 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
     let flags = self.ast.get_data2(node)
     if sig_idx < 0:
         return
+    // §16.4 union last-written tracking is per-function-body.
+    self.union_last_written = sema_new_map_i32_i32()
+    self.union_tracked_syms = Vec.new()
+    self.union_in_assign_target = 0
     let saved_body_file_id = self.local_file_id
     let saved_body_module_path = self.current_module_path
     let saved_body_module_has_ci = self.current_module_has_ci
@@ -4339,6 +4343,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_assign(node) as TypeId
 
     if kind == NodeKind.NK_WHILE:
+        // §16.4: a loop body may not run, or may run repeatedly — union
+        // last-written is not statically known across iterations.
+        self.union_clear_last_written()
         let cond = self.ast.get_data0(node)
         let body = self.ast.get_data1(node)
         let label = self.ast.get_data2(node)
@@ -4386,6 +4393,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.ty_void
 
     if kind == NodeKind.NK_LOOP:
+        self.union_clear_last_written()
         self.loop_depth = self.loop_depth + 1
         self.push_scope()
         self.push_label_frame(self.ast.get_data1(node), LabelFrameKind.LFK_LOOP, node)
@@ -6619,6 +6627,11 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
             if blen > 0:
                 self.borrow_refs.set_i32((blen - 1) as i64, name)
 
+    // §16.4 union last-written: a union literal initializer establishes the
+    // last-written field for this local.
+    if self.type_is_union(bind_type as i32):
+        self.union_set_last_written(name, self.union_literal_single_field(value))
+
     self.ty_void as i32
 
 fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
@@ -6695,6 +6708,9 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
         let then_is_never = self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER
         if in_value_context and self.current_statement_expr_root == 0 and then_is_never == 0:
             self.emit_error("if expression requires an else branch unless the then branch diverges", node)
+    // §16.4: a union's last-written field is not known on all paths after a
+    // branch — conservatively mark tracked unions unknown.
+    self.union_clear_last_written()
     if result_type != 0 and result_type != self.ty_void:
         self.typed_expr_types.insert(node, result_type as i32)
     result_type as i32
@@ -7235,9 +7251,20 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
     var assign_revive_saved = self.assign_target_revive_sym
     if self.ast.kind(target) == NodeKind.NK_IDENT:
         self.assign_target_revive_sym = self.ast.get_data0(target)
+    // Writing a union field is always safe — suppress the union read-check
+    // while checking the assignment target.
+    self.union_in_assign_target = self.union_in_assign_target + 1
     let target_type = self.check_expr(target)
+    self.union_in_assign_target = self.union_in_assign_target - 1
     self.assign_target_revive_sym = assign_revive_saved
     let value_type = if target_type != 0: self.check_expr_with_expected(value, target_type) else: self.check_expr(value)
+    // §16.4 union last-written tracking.
+    if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
+        let u_recv = self.ast.get_data0(target)
+        if self.ast.kind(u_recv) == NodeKind.NK_IDENT and self.type_is_union(self.check_expr(u_recv) as i32):
+            self.union_set_last_written(self.ast.get_data0(u_recv), self.ast.get_data1(target))
+    else if self.ast.kind(target) == NodeKind.NK_IDENT and self.type_is_union(target_type as i32):
+        self.union_set_last_written(self.ast.get_data0(target), self.union_literal_single_field(value))
 
     // If assignment target's root is a parameter, record EFF_WRITE
     self.note_place_effect(target, EFF_WRITE)
@@ -7353,6 +7380,7 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     let iterable = self.ast.get_data1(node)
     let body = self.ast.get_data2(node)
 
+    self.union_clear_last_written()
     let iter_type = self.check_expr(iterable)
     let elem_type = self.infer_for_element_type(iter_type as i32)
 
@@ -7765,6 +7793,40 @@ fn Sema.auto_deref_ref_ptr_type(self: Sema, tid: TypeId) -> TypeId:
         depth = depth + 1
     current
 
+// True when tid resolves to a union (TY_STRUCT with Union sub-kind).
+fn Sema.type_is_union(self: Sema, tid: i32) -> bool:
+    if tid == 0:
+        return false
+    let resolved = self.resolve_alias(tid as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return false
+    self.type_layout_struct_sub_kind(self.get_type_d0(resolved)) == TypeDeclKind.Union
+
+// For a union struct literal with exactly one named field, return that field's
+// sym; otherwise 0 (tracked-but-unknown).
+fn Sema.union_literal_single_field(self: Sema, node: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_STRUCT_LIT:
+        return 0
+    if self.ast.get_data2(node) != 1:
+        return 0
+    let lit_extra = self.ast.get_data1(node)
+    self.ast.get_extra(lit_extra)
+
+// Record (or update) the last-written union field for a tracked variable.
+fn Sema.union_set_last_written(self: Sema, var_sym: i32, field_sym: i32):
+    if not self.union_last_written.contains(var_sym):
+        self.union_tracked_syms.push(var_sym)
+    self.union_last_written.insert(var_sym, field_sym)
+
+// §16.4: after control flow, the last-written union field of any tracked
+// variable is no longer known on all paths — mark every tracked entry unknown
+// (0) so subsequent reads conservatively require unsafe. Entries stay present
+// (tracked) rather than removed, so the unknown state is enforced. Iteration is
+// over the insertion-ordered Vec to keep codegen deterministic.
+fn Sema.union_clear_last_written(self: Sema):
+    for i in 0..self.union_tracked_syms.len() as i32:
+        self.union_last_written.insert(self.union_tracked_syms.get(i as i64), 0)
+
 fn Sema.check_field_access(self: Sema, node: i32) -> i32:
     let expr = self.ast.get_data0(node)
     let field = self.ast.get_data1(node)
@@ -7780,6 +7842,14 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
             return self.ty_str as i32
 
     var obj_type = self.check_expr(expr)
+    // §16.4: reading a union field other than the last-written one requires
+    // unsafe. Only tracked local union variables (literal-initialized or
+    // directly assigned) are checked; untracked unions are never flagged.
+    if self.union_in_assign_target == 0 and self.ast.kind(expr) == NodeKind.NK_IDENT:
+        let union_recv_sym = self.ast.get_data0(expr)
+        if self.union_last_written.contains(union_recv_sym):
+            if self.union_last_written.get(union_recv_sym).unwrap() != field:
+                self.require_unsafe_operation("reading a union field other than the last-written field requires unsafe", node)
     let static_type_sym = self.static_receiver_base_sym(expr)
     let static_expr_kind = self.ast.kind(expr)
     if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0 and (static_expr_kind == NodeKind.NK_IDENT or static_expr_kind == NodeKind.NK_TYPE_NAMED):
@@ -8335,6 +8405,15 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
     if tid != 0:
         let resolved = self.resolve_alias(tid as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_STRUCT:
+            // §16.4: a union is constructed by initializing exactly one field,
+            // named. Zero, positional, or multiple initializers are errors.
+            if self.type_layout_struct_sub_kind(name) == TypeDeclKind.Union:
+                if field_count != 1:
+                    self.emit_error("union literal requires exactly one named field initializer", node)
+                    return 0
+                if self.ast.get_extra(extra_start) == 0:
+                    self.emit_error("union literal requires a named field initializer, not a positional one", node)
+                    return 0
             var expected_struct_ty: TypeId = 0 as TypeId
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
                 let expected_resolved = self.resolve_alias(self.expected_expr_type)
@@ -8536,6 +8615,8 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
     if not match_is_value and require_exhaustive == 0 and result_type == self.ty_never:
         result_type = self.ty_void
 
+    // §16.4: union last-written is not known on all arms after a match.
+    self.union_clear_last_written()
     if result_type != 0:
         self.typed_expr_types.insert(node, result_type as i32)
     result_type as i32
