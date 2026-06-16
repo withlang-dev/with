@@ -243,6 +243,7 @@ fn emitc_c_type(with_type: str) -> str:
     if with_type == "*mut i32": return "int32_t *"
     if with_type == "*mut i64": return "int64_t *"
     if with_type == "*mut f64": return "double *"
+    if with_type == "Unit": return "void"
     if with_type == "void": return "void"
     ""
 
