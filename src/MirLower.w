@@ -7397,6 +7397,8 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         type_name = self.pool.resolve_symbol(type_name_sym)
     if type_name == "Task" or type_name == "ScopedTask":
         if method_name == "cancel": return MirIntrinsic.FIBER_CANCEL
+        if method_name == "is_done": return MirIntrinsic.FIBER_IS_DONE
+        if method_name == "was_cancelled": return MirIntrinsic.FIBER_WAS_CANCELLED_RETURN
         return MirIntrinsic.NONE
     if type_name == "Vec":
         if method_name == "new": return MirIntrinsic.VEC_NEW
@@ -7871,17 +7873,22 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
     if not is_static:
         let recv_ty = self.expr_type(self_expr)
         recv_type_for_args = self.autoderef_result_type_for_method(recv_ty, method_sym)
-        let recv_resolved = if recv_ty != 0: self.sema.resolve_alias(recv_ty as TypeId) else: 0
-        let recv_kind = self.sema.get_type_kind(recv_resolved)
-        let raw_pointer_option_receiver = recv_kind == TypeKind.TY_PTR and (intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT or intrinsic == MirIntrinsic.OPT_IS_SOME or intrinsic == MirIntrinsic.OPT_IS_NONE or intrinsic == MirIntrinsic.OPT_FILTER)
-        var recv_op = 0
-        if raw_pointer_option_receiver:
-            recv_op = self.lower_expr(self_expr)
+        if intrinsic == MirIntrinsic.FIBER_IS_DONE or intrinsic == MirIntrinsic.FIBER_WAS_CANCELLED_RETURN:
+            let recv_place = self.materialize_operand(self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym), recv_type_for_args, self.ast.get_start(self_expr))
+            let fid_place = self.body.new_field_place(recv_place, 0, self.sema.ty_i32 as i32)
+            call_args.push(self.body.new_operand(OperandKind.OK_COPY, fid_place))
         else:
-            recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
-        if intrinsic != MirIntrinsic.FIBER_CANCEL:
-            self.consume_moved_operand(recv_op)
-        call_args.push(recv_op)
+            let recv_resolved = if recv_ty != 0: self.sema.resolve_alias(recv_ty as TypeId) else: 0
+            let recv_kind = self.sema.get_type_kind(recv_resolved)
+            let raw_pointer_option_receiver = recv_kind == TypeKind.TY_PTR and (intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_EXPECT or intrinsic == MirIntrinsic.OPT_IS_SOME or intrinsic == MirIntrinsic.OPT_IS_NONE or intrinsic == MirIntrinsic.OPT_FILTER)
+            var recv_op = 0
+            if raw_pointer_option_receiver:
+                recv_op = self.lower_expr(self_expr)
+            else:
+                recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
+            if intrinsic != MirIntrinsic.FIBER_CANCEL:
+                self.consume_moved_operand(recv_op)
+            call_args.push(recv_op)
     for i in 0..arg_count:
         let arg_node = self.ast.get_extra(arg_start + i)
         let arg_op = self.lower_method_arg_with_expected(recv_type_for_args, method_sym, arg_node, i)

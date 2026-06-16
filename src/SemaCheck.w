@@ -3274,7 +3274,7 @@ fn Sema.task_param_expr_disposition(self: Sema, node: i32, target_sym: i32) -> i
             if self.task_param_expr_is_target(recv, target_sym) != 0:
                 if method == self.syms.cancel:
                     return 1
-                if method == self.syms.is_done:
+                if method == self.syms.is_done or method == self.syms.was_cancelled:
                     return 0
                 return -1
         var resolved_fn_sym = 0
@@ -14647,8 +14647,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if mc_order_type != 0:
         self.validate_atomic_ordering(field, extra_start, arg_count, node)
 
-    // Task/ScopedTask surface methods (spec §14.7): cancel(), is_done().
-    if field == self.syms.cancel or field == self.syms.is_done:
+    // Task/ScopedTask surface methods (spec §14.7): cancel(), is_done(), was_cancelled().
+    if field == self.syms.cancel or field == self.syms.is_done or field == self.syms.was_cancelled:
         if self.expr_is_awaitable_task_value(expr) == 0:
             return 0
         if mc_resolved_arg_count != 0:

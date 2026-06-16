@@ -142,6 +142,7 @@ type SemaBuiltinSymbols {
     close: i32,
     cancel: i32,
     is_done: i32,
+    was_cancelled: i32,
     todo: i32,
     unreachable: i32,
     track: i32,
@@ -1158,6 +1159,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         close: 0,
         cancel: 0,
         is_done: 0,
+        was_cancelled: 0,
         todo: 0,
         unreachable: 0,
         track: 0,
@@ -2096,6 +2098,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.close = self.pool_intern("close")
     self.syms.cancel = self.pool_intern("cancel")
     self.syms.is_done = self.pool_intern("is_done")
+    self.syms.was_cancelled = self.pool_intern("was_cancelled")
     self.syms.todo = self.pool_intern("todo")
     self.syms.unreachable = self.pool_intern("unreachable")
     self.syms.track = self.pool_intern("track")

@@ -9347,6 +9347,24 @@ fn Codegen.mir_emit_ext_channel_scope_intrinsic_call(self: Codegen, body: &MirBo
         let icft2 = wl_global_get_value_type(ic_fn)
         result = wl_build_call(self.builder, icft2, ic_fn, 0, 0)
 
+    else if intrinsic == MirIntrinsic.FIBER_IS_DONE:
+        let done_fid = self.mir_intrinsic_arg(body, args_id, 0)
+        var done_fn = wl_get_named_function(self.llmod, "with_runtime_fiber_is_completed")
+        if done_fn == 0:
+            let done_params: Vec[i64] = Vec.new()
+            done_params.push(wl_i32_type(self.context))
+            let done_ft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&done_params), 1, 0)
+            done_fn = wl_add_function(self.llmod, "with_runtime_fiber_is_completed", done_ft)
+        let done_ft2 = wl_global_get_value_type(done_fn)
+        let done_args: Vec[i64] = Vec.new()
+        done_args.push(done_fid)
+        let done_raw = wl_build_call(self.builder, done_ft2, done_fn, vec_data_i64(&done_args), 1)
+        let done_dest = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        result = if done_dest == self.sema.ty_bool as i32:
+            wl_build_icmp(self.builder, wl_int_ne(), done_raw, wl_const_int(wl_i32_type(self.context), 0, 0))
+        else:
+            done_raw
+
     else if intrinsic == MirIntrinsic.FIBER_WAS_CANCELLED_RETURN:
         let wcr_fid = self.mir_intrinsic_arg(body, args_id, 0)
         var wcr_fn = wl_get_named_function(self.llmod, "with_fiber_was_cancelled_return")
@@ -9358,7 +9376,12 @@ fn Codegen.mir_emit_ext_channel_scope_intrinsic_call(self: Codegen, body: &MirBo
         let wcrft2 = wl_global_get_value_type(wcr_fn)
         let wcra: Vec[i64] = Vec.new()
         wcra.push(wcr_fid)
-        result = wl_build_call(self.builder, wcrft2, wcr_fn, vec_data_i64(&wcra), 1)
+        let wcr_raw = wl_build_call(self.builder, wcrft2, wcr_fn, vec_data_i64(&wcra), 1)
+        let wcr_dest = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        result = if wcr_dest == self.sema.ty_bool as i32:
+            wl_build_icmp(self.builder, wl_int_ne(), wcr_raw, wl_const_int(wl_i32_type(self.context), 0, 0))
+        else:
+            wcr_raw
 
     else if intrinsic == MirIntrinsic.FIBER_SET_CANCELLED_RETURN:
         var scr_fn = wl_get_named_function(self.llmod, "with_fiber_set_cancelled_return")
