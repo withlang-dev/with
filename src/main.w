@@ -492,6 +492,47 @@ fn cli_indent_code(code: str, indent: str) -> str:
             out.push_str(indent)
     out.to_str()
 
+// §16.5: the C header path beside an artifact (libfoo.a -> libfoo.h).
+fn c_header_path_for(artifact_path: str) -> str:
+    var dot = -1
+    var i = 0
+    while i < artifact_path.len() as i32:
+        let c = artifact_path.byte_at(i as i64)
+        if c == 46: dot = i
+        if c == 47: dot = -1
+        i = i + 1
+    let stem = if dot < 0: artifact_path else: artifact_path.slice(0, dot as i64)
+    stem ++ ".h"
+
+// A valid, unique C include-guard derived from the header's basename.
+fn c_header_guard_for(h_path: str) -> str:
+    var start = 0
+    var i = 0
+    while i < h_path.len() as i32:
+        if h_path.byte_at(i as i64) == 47: start = i + 1
+        i = i + 1
+    var g = StringBuilder.new()
+    g.push_str("WITH_CHDR_")
+    var j = start
+    while j < h_path.len() as i32:
+        let c = h_path.byte_at(j as i64)
+        if (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122):
+            g.push_byte(c as u8)
+        else:
+            g.push_byte(95 as u8)
+        j = j + 1
+    g.push_str("_")
+    g.to_str()
+
+// Write `<artifact>.h` for the module's @[c_export] symbols, if any.
+fn emit_c_header_next_to(comp: &Compilation, artifact_path: str) -> Unit:
+    let h_path = c_header_path_for(artifact_path)
+    let sema = comp.zcu.last_sema
+    let header = sema.cheader_generate(c_header_guard_for(h_path))
+    if header.len() == 0:
+        return
+    let _ = with_fs_write_file(h_path, header)
+
 fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
     let name = cli_one_liner_mode_name(mode)
     if count == 1:
@@ -1185,6 +1226,7 @@ unsafe fn run_build_graph(root: str, cfg: ProjectConfig, graph: &BuildGraph, act
                 with_eprint("error: build.w library target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
+            emit_c_header_next_to(&comp, ar_path)
             build_cache_record(root, target, comp.tracked_input_paths(), Vec.new())
             completed_targets.push(target.name)
             continue
@@ -1200,6 +1242,7 @@ unsafe fn run_build_graph(root: str, cfg: ProjectConfig, graph: &BuildGraph, act
                 with_eprint("error: build.w object target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
+            emit_c_header_next_to(&comp, obj_path)
             build_cache_record(root, target, comp.tracked_input_paths(), Vec.new())
             completed_targets.push(target.name)
             continue
@@ -1215,6 +1258,7 @@ unsafe fn run_build_graph(root: str, cfg: ProjectConfig, graph: &BuildGraph, act
                 with_eprint("error: build.w archive target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
+            emit_c_header_next_to(&comp, ar_path)
             build_cache_record(root, target, comp.tracked_input_paths(), Vec.new())
             completed_targets.push(target.name)
             continue
