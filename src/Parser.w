@@ -4509,6 +4509,18 @@ fn Parser.parse_index_or_slice(self: Parser, lhs: i32) -> NodeId:
         self.expect(TokenKind.TK_R_BRACKET)
         return self.pool.add_node(NodeKind.NK_SLICE, self.pool.get_start(lhs), self.prev_end(), lhs, 0, end_expr)
 
+    // A type-arg builtin like `sizeof[T]` / `alignof[T]` is parsed as `name`
+    // indexed by `[T]`; the sizeof/alignof sema path resolves NK_INDEX.data1 as
+    // a type. Most types double as valid index expressions, but a
+    // function-pointer type (`extern "C" fn(...) -> T` or `fn(...) -> T`) begins
+    // with a token that cannot start an expression. Indexing a value by such a
+    // token is never valid, so parse a type and store it as the index node.
+    if self.peek() == TokenKind.TK_KW_EXTERN or self.peek() == TokenKind.TK_KW_FN:
+        let ty = self.parse_type_expr()
+        self.skip_newlines()
+        self.expect(TokenKind.TK_R_BRACKET)
+        return self.pool.add_node(NodeKind.NK_INDEX, self.pool.get_start(lhs), self.prev_end(), lhs, ty, 0 as NodeId)
+
     let index = self.parse_index_expr()
     self.skip_newlines()
 
