@@ -23,6 +23,7 @@ extern fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
+extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_sysinfo_os() -> str
 
@@ -566,6 +567,11 @@ var g_emitted_cap: i32 = 0
 
 var g_cimport_include_paths: [32]*mut u8 = [0 as *mut u8; 32]
 var g_cimport_include_count: i32 = 0
+// §16.1: target SDK sysroot from with.toml [c_import] sdk_path (empty = none).
+var g_cimport_sdk_path: str = ""
+
+pub fn with_cimport_set_sdk_path(path: str) -> Unit:
+    g_cimport_sdk_path = path
 
 var sdk_path_buf: [1024]u8 = [0 as u8; 1024]
 var sdk_path_resolved: i32 = 0
@@ -653,23 +659,50 @@ unsafe fn append_cc_common_args(argv: str) -> str:
 
 // ── SDK path detection ──────────────────────────────────────────
 
+// §16.1: the target macOS SDK is a *target input*, resolved without spawning a
+// host tool. Order: explicit env (WITH_SDKROOT / Xcode-populated SDKROOT) →
+// with.toml [c_import] sdk_path → well-known Command-Line-Tools / Xcode SDK
+// paths (existence stat, never a process spawn). Pure-local-header imports keep
+// working with no SDK at all (returns 0 → no -isysroot).
 unsafe fn get_sdk_path() -> *const u8:
     if with_sysinfo_os() != "Macos":
         return 0 as *const u8
     if sdk_path_resolved == 0:
         sdk_path_resolved = 1
-        var out_template: [4096]u8 = [0 as u8; 4096]
-        let tmpl = "/tmp/with_xcrun_XXXXXX\0"
-        let tp = *(&tmpl as *const *const u8)
-        with_memcpy(&raw mut out_template as *mut [4096]u8 as *mut u8, tp, 24)
-        var argv = ""
-        argv = append_argv_arg(argv, "xcrun")
-        argv = append_argv_arg(argv, "--show-sdk-path")
-        let output = capture_command_stdout(argv, &raw mut out_template as *mut [4096]u8 as *mut u8, 30000)
-        let _copied = copy_first_line_to_buf(output, &raw mut sdk_path_buf as *mut [1024]u8 as *mut u8, 1024)
+        let resolved = resolve_target_sdk_path()
+        if resolved.len() > 0:
+            let _copied = copy_first_line_to_buf(resolved, &raw mut sdk_path_buf as *mut [1024]u8 as *mut u8, 1024)
     if sdk_path_buf[0] != 0:
         return &sdk_path_buf as *const [1024]u8 as *const u8
     0 as *const u8
+
+unsafe fn resolve_target_sdk_path() -> str:
+    let with_sdkroot = with_getenv_str("WITH_SDKROOT")
+    if with_sdkroot.len() > 0:
+        return with_sdkroot
+    let sdkroot = with_getenv_str("SDKROOT")
+    if sdkroot.len() > 0:
+        return sdkroot
+    let configured = g_cimport_sdk_path
+    if configured.len() > 0:
+        return configured
+    let clt = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+    if with_fs_file_exists(clt) != 0:
+        return clt
+    let xcode = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+    if with_fs_file_exists(xcode) != 0:
+        return xcode
+    ""
+
+// 1 when this is macOS and no target SDK could be resolved — used to add a
+// directional hint to a c_import header-parse failure (§16.1).
+pub fn with_cimport_macos_sdk_missing() -> i32:
+    unsafe:
+        if with_sysinfo_os() != "Macos":
+            return 0
+        if get_sdk_path() as i64 == 0:
+            return 1
+    0
 
 // (Removed: find_clang_resource_dir_under / find_clang_resource_dir_from_llvm_config.
 // The seed no longer probes LLVM_PREFIX / llvm-config / /usr/local/llvm for an

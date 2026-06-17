@@ -202,6 +202,9 @@ fn ci_set_include_paths(paths: Vec[str]):
     for i in 0..paths.len() as i32:
         with_cimport_add_include_path(paths.get(i as i64))
 
+fn ci_set_sdk_path(path: str):
+    with_cimport_set_sdk_path(path)
+
 fn ci_build_define_prefix(defines: Vec[str]) -> str:
     var out = StringBuilder.new()
     for i in 0..defines.len() as i32:

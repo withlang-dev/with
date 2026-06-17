@@ -272,6 +272,8 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     // Pass project config include paths to clang bridge
     if self.project_config.c_import_include_paths.len() > 0:
         ci_set_include_paths(self.project_config.c_import_include_paths)
+    // §16.1: pass the configured target SDK sysroot (empty resets any prior).
+    ci_set_sdk_path(self.project_config.c_import_sdk_path)
 
     for i in 0..base_count:
         let decl = out.get_decl(i)
@@ -661,7 +663,11 @@ fn Zcu.c_import_emit_header_error_detail_frontend(self: Zcu, decl: i32, header_s
         "failed to compile C header snippet: " ++ header_spec
     else:
         "failed to compile C header snippet"
-    let full_msg = if detail.len() > 0: msg ++ ": " ++ detail else: msg
+    var full_msg = if detail.len() > 0: msg ++ ": " ++ detail else: msg
+    // §16.1: if the target macOS SDK could not be resolved, name the missing
+    // target input and the remedies (never a host tool — none is used).
+    if with_cimport_macos_sdk_missing() != 0:
+        full_msg = full_msg ++ "; no macOS SDK found for target headers — set SDKROOT/WITH_SDKROOT, configure [c_import] sdk_path in with.toml, or install the Command Line Tools"
     self.diagnostics.emit(Diagnostic.err(full_msg, span))
 
 fn Zcu.c_import_emit_header_error_frontend(self: Zcu, decl: i32, header_spec: str):

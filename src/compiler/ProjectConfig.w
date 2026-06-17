@@ -10,6 +10,7 @@ type ProjectConfig {
     package_version: str,
     c_import_include_paths: Vec[str],
     c_import_defines: Vec[str],
+    c_import_sdk_path: str,
     link_libs: Vec[str],
     link_search_paths: Vec[str],
     dep_link_libs: Vec[str],
@@ -42,6 +43,7 @@ fn project_config_default -> ProjectConfig:
         package_version: "",
         c_import_include_paths: Vec.new(),
         c_import_defines: Vec.new(),
+        c_import_sdk_path: "",
         link_libs: Vec.new(),
         link_search_paths: Vec.new(),
         dep_link_libs: Vec.new(),
@@ -85,6 +87,7 @@ pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         package_version: project_config_clone_str(cfg.package_version),
         c_import_include_paths: project_config_clone_str_vec(&cfg.c_import_include_paths),
         c_import_defines: project_config_clone_str_vec(&cfg.c_import_defines),
+        c_import_sdk_path: project_config_clone_str(cfg.c_import_sdk_path),
         link_libs: project_config_clone_str_vec(&cfg.link_libs),
         link_search_paths: project_config_clone_str_vec(&cfg.link_search_paths),
         dep_link_libs: project_config_clone_str_vec(&cfg.dep_link_libs),
@@ -261,6 +264,8 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
         out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
     else if section == "c_import" and key == "defines":
         out.c_import_defines = project_config_parse_string_array(value)
+    else if section == "c_import" and key == "sdk_path":
+        out.c_import_sdk_path = project_config_resolve_path(out.root_dir, project_config_strip_quotes(value))
     else if section == "link" and key == "libs":
         if not project_config_is_string_array_value(value):
             if out.manifest_error.len() == 0:
@@ -477,6 +482,8 @@ fn project_config_wants_key(section: str, key: str) -> bool:
     if section == "c_import" and key == "include_paths":
         return true
     if section == "c_import" and key == "defines":
+        return true
+    if section == "c_import" and key == "sdk_path":
         return true
     if section == "link" and key == "libs":
         return true
