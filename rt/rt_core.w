@@ -2477,6 +2477,30 @@ pub fn with_fs_remove_file(path: str) -> i32:
     let cpath = str_to_cstr(path)
     rt_unlink(cpath)
 
+pub fn with_libc_open(path: *const i8, flags: i32, mode: i32) -> i32:
+    let r = rt_open(path, flags, mode)
+    if r < 0: -1 else: r
+
+pub fn with_libc_read(fd: i32, buf: *mut u8, count: u64) -> i64:
+    let r = rt_read(fd, buf, count)
+    if r < 0: -1 else: r
+
+pub fn with_libc_write(fd: i32, buf: *const u8, count: u64) -> i64:
+    let r = rt_write(fd, buf, count)
+    if r < 0: -1 else: r
+
+pub fn with_libc_close(fd: i32) -> i32:
+    let r = rt_close(fd)
+    if r < 0: -1 else: r
+
+pub fn with_libc_lseek(fd: i32, offset: i64, whence: i32) -> i64:
+    let r = rt_seek(fd, offset, whence)
+    if r < 0: -1 else: r
+
+pub fn with_libc_unlink(path: *const i8) -> i32:
+    let r = rt_unlink(path)
+    if r < 0: -1 else: r
+
 pub fn with_fs_chmod(path: str, mode: i32) -> i32:
     let cpath = str_to_cstr(path)
     rt_chmod(cpath, mode)

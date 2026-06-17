@@ -1411,7 +1411,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
         self.type_extra.push(self.sig_params.get((sig_param_start + pi) as i64))
     let fn_tid = self.add_type(TypeKind.TY_FN, fn_extra_start, param_count, sig_ret_type)
 
-    self.add_sig(fn_name, fn_tid, sig_ret_type, sig_param_start, param_count, 0)
+    let is_variadic = (flags / FnFlags.VARIADIC) % 2
+    self.add_sig(fn_name, fn_tid, sig_ret_type, sig_param_start, param_count, is_variadic)
     let fn_sig_idx = self.get_sig(fn_name)
     if fn_sig_idx >= 0:
         for pi in 0..param_count:

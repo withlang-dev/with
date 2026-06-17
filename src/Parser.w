@@ -1188,6 +1188,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     var params_start = 0
     var param_count = 0
     var required_param_count = 0
+    var is_variadic = 0
     self.last_param_pattern_start = self.pool.fn_param_patterns_len()
     self.last_param_pattern_count = 0
     let pending_capability_param_count = self.pending_comptime_with_names.len() as i32
@@ -1198,6 +1199,9 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
         if param_count > 0:
             params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
         self.clear_pending_comptime_with_params()
+        if self.peek() == TokenKind.TK_DOT_DOT_DOT:
+            is_variadic = 1
+            self.advance()
         if self.expect(TokenKind.TK_R_PAREN) == 0:
             return self.poisoned_expr()
     else if pending_capability_param_count > 0:
@@ -1255,6 +1259,8 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
         flags = flags + FnFlags.AFTER
     if self.pending_bench != 0:
         flags = flags + FnFlags.BENCH
+    if is_variadic != 0:
+        flags = flags + FnFlags.VARIADIC
 
     // Store extra: type params then params already in extra from parsing.
     // We encode: d0=name, d1=body, d2=flags

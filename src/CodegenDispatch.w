@@ -3038,6 +3038,33 @@ fn Codegen.try_emit_llvm_math_intrinsic(self: Codegen, fn_sym: i32, args: &Vec[i
         wl_build_br(self.builder, next_val)
     true
 
+fn Codegen.try_emit_llvm_va_intrinsic(self: Codegen, fn_sym: i32, args: &Vec[i64], next_bb: i32) -> bool:
+    if fn_sym == 0 or args.len() != 1:
+        return false
+    let name = self.intern.resolve(fn_sym)
+    var intrinsic_name = ""
+    if name == "with_va_start":
+        intrinsic_name = "llvm.va_start"
+    if name == "with_va_end":
+        intrinsic_name = "llvm.va_end"
+    if intrinsic_name.len() == 0:
+        return false
+
+    let ptr_ty = wl_ptr_type(self.context)
+    let void_ty = wl_void_type(self.context)
+    let pts: Vec[i64] = Vec.new()
+    pts.push(ptr_ty)
+    let ft = wl_function_type(void_ty, vec_data_i64(&pts), 1, 0)
+    var func = wl_get_named_function(self.llmod, intrinsic_name)
+    if func == 0:
+        func = wl_add_function(self.llmod, intrinsic_name, ft)
+    let call_args: Vec[i64] = Vec.new()
+    call_args.push(args.get(0))
+    let _ = wl_build_call(self.builder, ft, func, vec_data_i64(&call_args), 1)
+    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+    true
+
 // ── FmtBuffer codegen helpers ────────────────────────────────────
 
 fn Codegen.ensure_fmt_buf_fn(self: Codegen, name: str, param_types: Vec[i64], param_count: i32, ret_ty: i64) -> i64:
@@ -13614,6 +13641,10 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
         for di in 0..args.len() as i32:
             let a = args.get(di as i64)
             with_eprint(f"[mir-call]   arg[{di}] ty_kind={wl_get_type_kind(wl_type_of(a))}")
+    let va_intrinsic_result = self.try_emit_llvm_va_intrinsic(callee_fn_sym, args, next_bb)
+    if va_intrinsic_result:
+        self.free_call_temp_ptrs(call_temp_cleanups)
+        return true
     // LLVM intrinsic recognition: emit hardware instructions for known math functions.
     let llvm_intrinsic_result = self.try_emit_llvm_math_intrinsic(callee_fn_sym, args, dest_place, body, next_bb)
     if llvm_intrinsic_result:

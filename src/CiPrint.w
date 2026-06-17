@@ -422,7 +422,7 @@ fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
         let ret = (types.get_d0(id)) as CiTypeId
         let ps = types.get_d1(id)
         let pc = types.get_d2(id)
-        let fn_kw = if ci_type_has_raw_pointer(types, id): "unsafe fn(" else: "fn("
+        let fn_kw = if ci_type_has_raw_pointer(types, id): "unsafe extern \"C\" fn(" else: "extern \"C\" fn("
         var out = fn_kw
         var i: i32 = 0
         while i < pc:
@@ -463,8 +463,13 @@ fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
     let kind = types.kind(ty)
     if kind == CiTypeKind.CT_STRUCT or kind == CiTypeKind.CT_ARRAY:
         return true
+    if kind == CiTypeKind.CT_FN_PTR:
+        return false
     if kind == CiTypeKind.CT_NAMED:
         let name = types.get_string(types.get_d0(ty))
+        let printed = ci_print_type(types, ty)
+        if ci_starts_with_str(printed, "extern ") or ci_starts_with_str(printed, "unsafe extern "):
+            return false
         return not ci_named_type_is_scalar(name) and not ci_starts_with_str(name, "*")
     false
 

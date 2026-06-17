@@ -546,7 +546,9 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> *i8\n"
     p = p ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> *i8\n"
     p = p ++ "extern fn with_memset(ptr: *i8, c: i32, n: i64) -> *i8\n"
-    p = p ++ "extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32\n\n"
+    p = p ++ "extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32\n"
+    p = p ++ "extern fn with_va_start(ap: *mut i8) -> Unit\n"
+    p = p ++ "extern fn with_va_end(ap: *mut i8) -> Unit\n\n"
     p
 
 // ── Migrate entry points (moved from CImport.w in D3) ─────────
@@ -1324,18 +1326,14 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
             eprint(msg)
             ci_migrate_set_error(msg)
             return ""
-
-    if is_variadic != 0 and fn_cursor >= 0 and with_ci_cursor_is_definition(session, fn_cursor) != 0:
-        if name == "cfprintf" and ci_str_contains(g_migrate_current_input_path, "pcre2test.c"):
-            with_cimport_mark_name_emitted(name)
-            g_migrate_fn_translated = g_migrate_fn_translated + 1
-            return "// Variadic C helper cfprintf is inlined at statement call sites.\n\n"
-        let loc = with_ci_cursor_location(session, fn_cursor)
-        let loc_suffix = if loc.len() > 0: " at " ++ loc else: ""
-        let msg = f"migrate: untranslatable function '{name}': variadic function definitions are not supported{loc_suffix}"
-        eprint(msg)
-        ci_migrate_set_error(msg)
-        return ""
+        let fn_source = with_ci_cursor_source_text(session, fn_cursor)
+        if ci_str_contains(fn_source, "va_arg(") or ci_str_contains(fn_source, "__builtin_va_arg"):
+            let va_loc = with_ci_cursor_location(session, fn_cursor)
+            let loc_suffix = if va_loc.len() > 0: " at " ++ va_loc else: ""
+            let msg = f"migrate: untranslatable function '{name}': va_arg is not supported{loc_suffix}"
+            eprint(msg)
+            ci_migrate_set_error(msg)
+            return ""
 
     var params = ""
     var has_unsupported = false
@@ -1430,7 +1428,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         let loc_suffix = if bail_loc.len() > 0: " at " ++ bail_loc else: ""
         let msg = f"migrate: untranslatable function '{name}': {loud_bail}{loc_suffix}"
         eprint(msg)
-        if ci_str_contains(loud_bail, "computed or unresolved goto") or ci_str_contains(loud_bail, "setjmp/longjmp"):
+        if ci_str_contains(loud_bail, "computed or unresolved goto") or ci_str_contains(loud_bail, "setjmp/longjmp") or ci_str_contains(loud_bail, "va_arg"):
             ci_migrate_set_error(msg)
             return ""
         g_migrate_fn_untranslatable = g_migrate_fn_untranslatable + 1

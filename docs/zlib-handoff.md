@@ -26,15 +26,15 @@ This handoff covers deliverable 1 (the migration). Packaging is later phases.
 - **Fix `with migrate` (the migrator) and re-migrate. NEVER hand-edit generated
   `.w`.** Loop until all of zlib migrates AND compiles.
 - **Migrator bugs are fixed in THIS work, not filed** as issues.
-- **Validate** via zlib's own migrated test suite (eventually).
+- **Validate** via zlib's own migrated test suite.
 - **Compiler-owned code (`src/`, `rt/`, `lib/std/`, `build.w`, `build/`) must
   NEVER `c_import`.** Packaging needs migrated `std.zlib`, never `c_import zlib`.
 - **Commit discipline:** `with build` + `with build :fixpoint` + `with build
   :test` all green before every commit. Eric Hartford is the SOLE author — never
   add AI/co-author trailers.
-- **Sequencing:** the 11 codec files first; the 4 `gz*` file-I/O files
-  (gzclose, gzlib, gzread, gzwrite — need `lseek`/POSIX bindings in `std.libc`)
-  are deferred. Packaging comes after the codec compiles + tests.
+- **Sequencing:** migrate and check all 15 zlib library sources together.
+  Packaging comes after the migrated library has a real module/link surface and
+  zlib's migrated tests pass against it.
 
 ## 3. How to drive migration (fast loop, no compiler rebuild)
 
@@ -51,12 +51,11 @@ cd /Users/eric/with && rm -rf out/zlib_src && mkdir -p out/zlib_src
 cp out/zlib_reference/zlib-1.3.2/*.c out/zlib_reference/zlib-1.3.2/*.h out/zlib_src/
 ```
 
-Migrate the codec subset (the `with migrate` CLI is fully scriptable — runs in
+Migrate the full library (the `with migrate` CLI is fully scriptable — runs in
 seconds; only *changing the migrator* needs a ~5-min `with build`):
 ```sh
 ./out/release/bin/with migrate out/zlib_src -o out/zlib_migrated \
-  --shared-defs std.zlib.defs --no-c-export -I out/zlib_src \
-  --exclude gzclose.c --exclude gzlib.c --exclude gzread.c --exclude gzwrite.c
+  --shared-defs std.zlib.defs --no-c-export -I out/zlib_src
 ```
 
 `with migrate` CLI flags (handler `run_migrate_command`, `src/main.w:~2402`):
@@ -87,9 +86,14 @@ All three verified green (build + fixpoint + test):
 | `7b44d300` | `calloc` IR-path lowering (CImport.w `build_libc_call_value_expr`, `~7862`) now mirrors `malloc`: cast args to i64, `unsafe` wrap, cast `*i8` result to `*c_void`, call `with_alloc_zeroed`; and the migrate preamble (CiMigrate.w `~516`) declares `extern fn with_alloc_zeroed(count: i64, size: i64) -> *i8`. |
 | `445a45f1` | Parser: `sizeof[T]`/`alignof[T]` accept function-pointer types. In `Parser.parse_index_or_slice`, when the bracket starts with `extern`/`fn` (tokens that can't begin an index expression), parse a TYPE and store it as `NK_INDEX.data1` (sema's `sizeof_alignof_type_arg_node` resolves it as a type). |
 
-## 5. Migration and synthetic compile bar: DONE for codec subset
+## 5. Migration and synthetic compile bar: DONE for all 15 library files
 
-As of 2026-06-17, the 11 codec files migrate with 0 untranslatable files and the
+As of 2026-06-17, all 15 zlib library files migrate with 0 untranslatable files
+and the inlined-defs synthetic per-module compile check is clean. This is not
+yet the same as "zlib's migrated tests pass against the migrated library";
+packaging/linkage still needs a real module surface instead of per-file extern
+references to sibling zlib functions.
+
 synthetic per-module compile check is clean:
 
 | Module | Errors |
@@ -98,6 +102,10 @@ synthetic per-module compile check is clean:
 | compress | 0 |
 | crc32 | 0 |
 | deflate | 0 |
+| gzclose | 0 |
+| gzlib | 0 |
+| gzread | 0 |
+| gzwrite | 0 |
 | infback | 0 |
 | inffast | 0 |
 | inflate | 0 |
@@ -110,8 +118,7 @@ Latest evidence command:
 ```sh
 rm -rf out/zlib_migrated out/zcheck
 ./out/release/bin/with migrate out/zlib_src -o out/zlib_migrated \
-  --shared-defs std.zlib.defs --no-c-export -I out/zlib_src \
-  --exclude gzclose.c --exclude gzlib.c --exclude gzread.c --exclude gzwrite.c
+  --shared-defs std.zlib.defs --no-c-export -I out/zlib_src
 mkdir -p out/zcheck
 for f in out/zlib_migrated/*.w; do
   mod=$(basename "$f" .w); [ "$mod" = defs ] && continue
@@ -123,6 +130,18 @@ done
 
 ## 6. Fixed compile-bar gaps in the current working tree
 
+- Full-library zlib migration now includes `gzclose.c`, `gzlib.c`, `gzread.c`,
+  and `gzwrite.c`.
+- `std.libc` exposes the POSIX/file APIs zlib's gzip path needs (`open`,
+  `read`, `write`, `close`, `lseek`, `unlink`, `fcntl`) through runtime-backed
+  wrappers where necessary.
+- Normal With function declarations can carry `...` variadic signatures, and
+  migrated C variadic definitions lower `va_start` / `va_end` to LLVM stdarg
+  intrinsics through compiler-recognized `with_va_start` / `with_va_end` calls.
+- `vsnprintf` is part of the explicit libc surface.
+- C function pointer types are reconstructed/printed as `extern "C" fn(...)`
+  and C zero/null assignments into pointer/function-pointer typed targets lower
+  to `null`.
 - Shared defs now upgrade an already-recorded opaque type when a later file
   provides the concrete body. The positive signal is `type <name> {` or
   `type <name> = union {`, so anonymous nested opaque declarations do not block
@@ -168,9 +187,10 @@ functions `pub`). This is a Phase-C generalization target, not a per-lib list.
   a hardcoded dependency injection list. zlib should drive a generic solution
   that derives `use std.zlib.<module>` imports from referenced sibling symbols
   and makes defining functions `pub`.
-- Defer the four file-I/O sources (`gzclose.c`, `gzlib.c`, `gzread.c`,
-  `gzwrite.c`) until the POSIX/libc surface needed for `lseek` and friends is
-  available in `std.libc`.
+- Run zlib's migrated upstream tests against the migrated library after the
+  module/link surface is real. Current status: the library files migrate and
+  typecheck with inlined defs, but the migrated tests do not yet pass against a
+  packaged migrated library.
 - Cosmetic cleanup remains: redundant `unsafe` warnings and old PCRE2 wording in
   generic migration messages.
 
@@ -206,12 +226,12 @@ functions `pub`). This is a Phase-C generalization target, not a per-lib list.
   generalize — do NOT clone its per-lib knobs: hardcoded file-rank table, import
   injection, width-slice, test-output normalization)
 
-## 9. After the codec compiles
+## 9. After the library files compile
 
 1. **`:zlib-test`-equivalent validation:** migrate zlib's OWN test suite
    (`out/zlib_src` has `test/example.c`, `test/minigzip.c` upstream — re-stage
    from `out/zlib_reference/zlib-1.3.2/test/`) and run it against the migrated
-   codec. This is the acceptance gate ("migrates AND compiles AND its tests
+   library. This is the acceptance gate ("migrates AND compiles AND its tests
    pass"), like `:pcre2-test` runs upstream RunTest.
 2. **`build/zlib.w` graph targets:** `:zlib-reference` (pin v1.3.2 + enforce the
    sha256 above via `ToolFs.sha256_file`), `:zlib-migrate`, `:zlib-build`,
@@ -221,9 +241,7 @@ functions `pub`). This is a Phase-C generalization target, not a per-lib list.
    `gzip_decompress(bytes) -> Vec[u8]` over the migrated internals (zero
    gzip-header mtime for determinism). Pure With — no `c_import`, no extern to
    system libz.
-4. **`gz*` family** (deferred): gzclose/gzlib/gzread/gzwrite do file I/O
-   (`lseek`/`open`/`read`/`write`) — need POSIX bindings in `std.libc`.
-5. **Packaging** (plan Phases B/D/E): native compiler-binary packages (no
+4. **Packaging** (plan Phases B/D/E): native compiler-binary packages (no
    compression; SDK `llvm-readobj`/`llvm-nm`/`llvm-strip` inspection), `.tar.gz`
    via `std.zlib`, SDK/bootstrap packaging.
 

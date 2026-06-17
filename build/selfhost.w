@@ -3524,12 +3524,12 @@ fn bs_check_migrate_sizeof_pointer_width(ctx: &ActionCtx, compiler_path: str, ca
     if check.rc != 0: return check.rc
     0
 
-fn bs_check_migrate_variadic_definition_rejected(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
-    let src = bs_join(case_dir, "variadic_definition.c")
-    let out_w = bs_join(case_dir, "variadic_definition.w")
-    let c_text = "#include <stdarg.h>\n\nint total(int count, ...) {\n  va_list ap;\n  va_start(ap, count);\n  int sum = 0;\n  for (int i = 0; i < count; i++) {\n    sum += va_arg(ap, int);\n  }\n  va_end(ap);\n  return sum;\n}\n"
-    var rc = bs_write_fixture(ctx, src, c_text, "variadic definition")
+    let src = bs_join(case_dir, "variadic_stdarg.c")
+    let out_w = bs_join(case_dir, "variadic_stdarg.w")
+    let c_text = "#include <stdarg.h>\n\nint touch(int count, ...) {\n  va_list ap;\n  va_start(ap, count);\n  va_end(ap);\n  return count;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "variadic stdarg definition")
     if rc != 0: return rc
     var args: Vec[str] = Vec.new()
     args |> push("migrate")
@@ -3537,14 +3537,40 @@ fn bs_check_migrate_variadic_definition_rejected(ctx: &ActionCtx, compiler_path:
     args |> push("--no-c-export")
     args |> push("-o")
     args |> push(bs_abs(root, out_w))
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-variadic-definition-rejected", args, 180000, case_dir)
-    if result.rc == 0:
-        return bs_fail(ctx, "variadic definition migration unexpectedly succeeded")
-    rc = bs_assert_contains(ctx, result.stderr, "migrate: untranslatable function 'total': variadic function definitions are not supported", "variadic_definition_rejected")
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-variadic-stdarg", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "fn touch(__param_count: c_int, ...) -> c_int:", "variadic_stdarg")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, result.stderr, "variadic_definition.c:", "variadic_definition_rejected")
+    rc = bs_assert_contains(ctx, out_text, "with_va_start", "variadic_stdarg")
     if rc != 0: return rc
-    bs_expect_absent(ctx, out_w, "variadic definition rejected output")
+    rc = bs_assert_contains(ctx, out_text, "with_va_end", "variadic_stdarg")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-variadic-stdarg", check_args)
+    if check.rc != 0: return check.rc
+
+    let va_arg_src = bs_join(case_dir, "variadic_va_arg.c")
+    let va_arg_out = bs_join(case_dir, "variadic_va_arg.w")
+    let va_arg_text = "#include <stdarg.h>\n\nint total(int count, ...) {\n  va_list ap;\n  va_start(ap, count);\n  int value = va_arg(ap, int);\n  va_end(ap);\n  return value;\n}\n"
+    rc = bs_write_fixture(ctx, va_arg_src, va_arg_text, "variadic va_arg definition")
+    if rc != 0: return rc
+    var va_arg_args: Vec[str] = Vec.new()
+    va_arg_args |> push("migrate")
+    va_arg_args |> push(bs_abs(root, va_arg_src))
+    va_arg_args |> push("--no-c-export")
+    va_arg_args |> push("-o")
+    va_arg_args |> push(bs_abs(root, va_arg_out))
+    let va_arg_result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-variadic-va-arg-rejected", va_arg_args, 180000, case_dir)
+    if va_arg_result.rc == 0:
+        return bs_fail(ctx, "va_arg migration unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, va_arg_result.stderr, "migrate: untranslatable function 'total': va_arg is not supported", "variadic_va_arg_rejected")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, va_arg_result.stderr, "variadic_va_arg.c:", "variadic_va_arg_rejected")
+    if rc != 0: return rc
+    bs_expect_absent(ctx, va_arg_out, "variadic va_arg rejected output")
 
 fn bs_check_migrate_setjmp_rejected(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3627,7 +3653,7 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_migrate_sizeof_pointer_width(ctx, compiler_path, bs_join(output_dir, "sizeof_pointer_width"))
     if rc != 0: return rc
-    rc = bs_check_migrate_variadic_definition_rejected(ctx, compiler_path, bs_join(output_dir, "variadic_definition_rejected"))
+    rc = bs_check_migrate_variadic_stdarg(ctx, compiler_path, bs_join(output_dir, "variadic_stdarg"))
     if rc != 0: return rc
     rc = bs_check_migrate_setjmp_rejected(ctx, compiler_path, bs_join(output_dir, "setjmp_rejected"))
     if rc != 0: return rc

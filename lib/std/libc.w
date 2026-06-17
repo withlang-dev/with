@@ -3,8 +3,6 @@
 // This module intentionally exposes concrete target ABI symbols. Migrated C
 // output is target-specific and should be regenerated for a different target.
 
-use std.builtins
-
 pub type rlimit {
     rlim_cur: u64,
     rlim_max: u64,
@@ -34,6 +32,7 @@ pub extern fn fprintf(stream: *mut c_void, fmt: *const i8, ...) -> i32
 pub extern fn printf(fmt: *const i8, ...) -> i32
 pub extern fn snprintf(dst: *mut i8, size: u64, fmt: *const i8, ...) -> i32
 pub extern fn sprintf(dst: *mut i8, fmt: *const i8, ...) -> i32
+pub extern fn vsnprintf(dst: *mut i8, size: u64, fmt: *const i8, va: *mut i8) -> i32
 pub extern fn fopen(path: *const i8, mode: *const i8) -> *mut c_void
 pub extern fn fclose(stream: *mut c_void) -> i32
 pub extern fn fflush(stream: *mut c_void) -> i32
@@ -61,6 +60,25 @@ pub extern fn exit(code: i32) -> Never
 pub extern fn clock() -> u64
 pub extern fn time(tloc: *mut i64) -> i64
 pub extern fn isatty(fd: i32) -> i32
+extern fn with_libc_open(path: *const i8, flags: i32, mode: i32) -> i32
+extern fn with_libc_read(fd: i32, buf: *mut u8, count: u64) -> i64
+extern fn with_libc_write(fd: i32, buf: *const u8, count: u64) -> i64
+extern fn with_libc_close(fd: i32) -> i32
+extern fn with_libc_lseek(fd: i32, offset: i64, whence: i32) -> i64
+extern fn with_libc_unlink(path: *const i8) -> i32
+pub fn open(path: *const i8, flags: i32, mode: i32) -> i32:
+    with_libc_open(path, flags, mode)
+pub fn read(fd: i32, buf: *mut c_void, count: u64) -> i64:
+    with_libc_read(fd, buf as *mut u8, count)
+pub fn write(fd: i32, buf: *const c_void, count: u64) -> i64:
+    with_libc_write(fd, buf as *const u8, count)
+pub fn close(fd: i32) -> i32:
+    with_libc_close(fd)
+pub fn lseek(fd: i32, offset: i64, whence: i32) -> i64:
+    with_libc_lseek(fd, offset, whence)
+pub fn unlink(path: *const i8) -> i32:
+    with_libc_unlink(path)
+pub extern fn fcntl(fd: i32, cmd: i32, ...) -> i32
 pub extern fn getrlimit(resource: i32, rlp: *mut rlimit) -> i32
 pub extern fn setrlimit(resource: i32, rlp: *const rlimit) -> i32
 

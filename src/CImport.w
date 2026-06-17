@@ -5844,6 +5844,8 @@ fn CiTypePool.type_from_libclang(self: CiTypePool, session: i64, cxtype: i32) ->
         // spelling — build CT_NAMED("c_void") for the pointee so the
         // printed form matches.
         let pointee_kind = with_ci_type_kind(session, pointee_idx)
+        if pointee_kind == CXT_FunctionProto or pointee_kind == CXT_FunctionNoProto:
+            return self.type_from_libclang(session, pointee_idx)
         if pointee_kind == CXT_Void:
             let c_void_idx = self.add_string("c_void")
             let c_void_ty = self.ty_named(c_void_idx)
@@ -5921,6 +5923,17 @@ fn CiTypePool.type_from_libclang(self: CiTypePool, session: i64, cxtype: i32) ->
         return 0 as CiTypeId
     let name_idx = self.add_string(name)
     self.ty_named(name_idx)
+
+fn CiTypePool.pointer_type_from_libclang_or_canonical(self: CiTypePool, session: i64, cxtype: i32) -> CiTypeId:
+    var ty = self.type_from_libclang(session, cxtype)
+    if (ty as i32) != 0 and (self.kind(ty) == CiTypeKind.CT_POINTER or self.kind(ty) == CiTypeKind.CT_FN_PTR):
+        return ty
+    let canonical = with_ci_type_canonical(session, cxtype)
+    if canonical >= 0 and canonical != cxtype:
+        let canonical_ty = self.type_from_libclang(session, canonical)
+        if (canonical_ty as i32) != 0 and (self.kind(canonical_ty) == CiTypeKind.CT_POINTER or self.kind(canonical_ty) == CiTypeKind.CT_FN_PTR):
+            return canonical_ty
+    ty
 
 fn CiTypePool.type_from_translated_text(self: CiTypePool, ty: str) -> CiTypeId:
     if ty.len() == 0:
@@ -6714,7 +6727,7 @@ fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, t
     let lhs_expr_ty = self.get_type(lhs_id)
     let lhs_expr_is_ptr = (lhs_expr_ty as i32) != 0 and types.kind(lhs_expr_ty) == CiTypeKind.CT_POINTER
     if op == BO_ASSIGN and (ci_cursor_type_is_pointerish(session, lhs_cursor) or lhs_expr_is_ptr):
-        var lhs_ty_id = types.type_from_libclang(session, with_ci_cursor_type(session, lhs_cursor))
+        var lhs_ty_id = types.pointer_type_from_libclang_or_canonical(session, with_ci_cursor_type(session, lhs_cursor))
         if ((lhs_ty_id as i32) == 0 or types.kind(lhs_ty_id) != CiTypeKind.CT_POINTER) and lhs_expr_is_ptr:
             lhs_ty_id = lhs_expr_ty
         if (lhs_ty_id as i32) == 0:
@@ -7399,6 +7412,8 @@ fn ci_call_name_from_source_text(src: str) -> str:
 fn CiExprPool.coerce_value_expr_for_target(self: CiExprPool, session: i64, target_ty_id: CiTypeId, value_cursor: i32, value_id: CiExprId, types: CiTypePool) -> CiExprId:
     if (target_ty_id as i32) == 0 or (value_id as i32) == 0:
         return value_id
+    if types.kind(target_ty_id) == CiTypeKind.CT_FN_PTR and ci_expr_is_zero_int_lit(self.val(), value_id):
+        return self.null_ptr(target_ty_id)
     if types.kind(target_ty_id) != CiTypeKind.CT_POINTER:
         return value_id
     // Skip if already coerced
@@ -7744,7 +7759,8 @@ fn CiTypePool.member_field_type_from_base(self: CiTypePool, session: i64, base_t
     let count = ci_type_field_count(session, record_name)
     var i = 0
     while i < count:
-        if ci_type_field_name(session, record_name, i) == field:
+        let c_field = ci_type_field_name(session, record_name, i)
+        if c_field == field or ci_escape_reserved(c_field) == field:
             let field_ty = ci_type_field_type(session, record_name, i)
             if field_ty.len() == 0:
                 return 0 as CiTypeId
@@ -7782,6 +7798,7 @@ fn ci_migrate_preamble_extern_call_requires_unsafe(name: str) -> bool:
     if name == "with_clzl" or name == "with_clzll" or name == "with_ctzl" or name == "with_ctzll": return true
     if name == "with_abs" or name == "with_alloc" or name == "with_realloc" or name == "with_free": return true
     if name == "with_memcpy" or name == "with_memmove" or name == "with_memset" or name == "with_memcmp": return true
+    if name == "with_va_start" or name == "with_va_end": return true
     false
 
 fn CiExprPool.decay_array_value_expr(self: CiExprPool, session: i64, original_cursor: i32, value_id: CiExprId, target_ty: CiTypeId, types: CiTypePool) -> CiExprId:
@@ -8496,7 +8513,7 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
                 let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
                 let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
                 let rhs_peeled = ci_peel_transparent(session, rhs_cursor)
-                var lhs_ty_id = types.type_from_libclang(session, with_ci_cursor_type(session, lhs_cursor))
+                var lhs_ty_id = types.pointer_type_from_libclang_or_canonical(session, with_ci_cursor_type(session, lhs_cursor))
                 let lhs_expr_ty = exprs.get_type(lhs.value_expr)
                 let lhs_expr_is_ptr = (lhs_expr_ty as i32) != 0 and types.kind(lhs_expr_ty) == CiTypeKind.CT_POINTER
                 if ((lhs_ty_id as i32) == 0 or types.kind(lhs_ty_id) != CiTypeKind.CT_POINTER) and lhs_expr_is_ptr:
@@ -8724,6 +8741,35 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         return ci_value_ir_invalid()
 
     if kind == CXK_CALL_EXPR and nc > 0:
+        let direct_callee_name = ci_call_name_from_source_text(with_ci_cursor_source_text(session, cursor))
+        let direct_cursor_name = ci_call_callee_name(session, with_ci_child(session, cursor, 0))
+        var stdarg_name = direct_callee_name
+        if stdarg_name.len() == 0:
+            stdarg_name = direct_cursor_name
+        if stdarg_name == "va_arg" or stdarg_name == "__builtin_va_arg":
+            if g_ci_bail_message.len() == 0:
+                g_ci_bail_message = "va_arg is not supported"
+                g_ci_bail_location = with_ci_cursor_location(session, cursor)
+                g_ci_bail_kind = kind
+            return ci_value_ir_invalid()
+        if stdarg_name == "va_start" or stdarg_name == "__builtin_va_start" or stdarg_name == "va_end" or stdarg_name == "__builtin_va_end":
+            let va_arg_index = if nc > 1: 1 else: 0
+            let va_arg_cursor = with_ci_child(session, cursor, va_arg_index)
+            let va_arg = self.lower_value_expr_ir(session, va_arg_cursor, exprs, types, scope)
+            if not ci_value_ir_valid(va_arg):
+                return ci_value_ir_invalid()
+            let addr_e = exprs.add(CiExprKind.CIE_ADDR_OF, va_arg.value_expr as i32, 1, 0, 0 as CiTypeId)
+            let va_ptr_ty = types.type_from_translated_text("*mut i8")
+            if (va_ptr_ty as i32) == 0:
+                return ci_value_ir_invalid()
+            let cast_e = exprs.cast(va_ptr_ty, addr_e)
+            let arg_ids: Vec[i32] = Vec.new()
+            arg_ids.push(cast_e as i32)
+            let with_name = if stdarg_name == "va_start" or stdarg_name == "__builtin_va_start": "with_va_start" else: "with_va_end"
+            return CiValueExprIR {
+                setup_stmt: va_arg.setup_stmt,
+                value_expr: exprs.build_named_call_expr(with_name, &arg_ids),
+            }
         var callee = self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
         var callee_text = ""
         var setup: CiStmtId = 0 as CiStmtId
@@ -14177,6 +14223,7 @@ fn ci_libc_symbol_kind_mask(name: str) -> i32:
     if name == "rlimit": return CI_LIBC_KIND_TYPE
     if name == "__stdinp" or name == "__stdoutp" or name == "__stderrp": return CI_LIBC_KIND_VAR
     if name == "fprintf" or name == "printf" or name == "snprintf" or name == "sprintf": return CI_LIBC_KIND_FN
+    if name == "vsnprintf": return CI_LIBC_KIND_FN
     if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno": return CI_LIBC_KIND_FN
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
     if name == "putc" or name == "feof" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
@@ -14188,6 +14235,9 @@ fn ci_libc_symbol_kind_mask(name: str) -> i32:
     if name == "tolower" or name == "toupper": return CI_LIBC_KIND_FN
     if ci_is_libm_fn(name): return CI_LIBC_KIND_FN
     if name == "exit" or name == "clock" or name == "time" or name == "isatty": return CI_LIBC_KIND_FN
+    if name == "open" or name == "read" or name == "write" or name == "close": return CI_LIBC_KIND_FN
+    if name == "lseek" or name == "unlink": return CI_LIBC_KIND_FN
+    if name == "fcntl": return CI_LIBC_KIND_FN
     if name == "getrlimit" or name == "setrlimit" or name == "__error": return CI_LIBC_KIND_FN
     0
 
