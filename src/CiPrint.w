@@ -113,6 +113,25 @@ fn ci_strip_one_outer_paren(s: str) -> str:
         return s
     s.slice(1, s.len() - 1)
 
+fn ci_stmt_ir_ends_with_terminator(stmts: CiStmtPool, id: CiStmtId) -> bool:
+    if (id as i32) == 0:
+        return false
+    let kind = stmts.kind(id)
+    if kind == CiStmtKind.CIS_RETURN or kind == CiStmtKind.CIS_BREAK or kind == CiStmtKind.CIS_CONTINUE:
+        return true
+    if kind == CiStmtKind.CIS_BLOCK:
+        let count = stmts.get_d1(id)
+        if count <= 0:
+            return false
+        let start = stmts.get_d0(id)
+        let last = (stmts.get_extra(start + count - 1)) as CiStmtId
+        return ci_stmt_ir_ends_with_terminator(stmts, last)
+    if kind == CiStmtKind.CIS_IF:
+        let then_b = (stmts.get_d1(id)) as CiStmtId
+        let else_b = (stmts.get_d2(id)) as CiStmtId
+        return (else_b as i32) != 0 and ci_stmt_ir_ends_with_terminator(stmts, then_b) and ci_stmt_ir_ends_with_terminator(stmts, else_b)
+    false
+
 // Operator precedence table. Larger = binds tighter. Used by Phase-B
 // B3 to decide when to drop redundant parens; Phase A always wraps
 // binary / unary expressions in explicit parentheses.
@@ -248,6 +267,13 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         if (else_b as i32) != 0:
+            if ci_stmt_ir_ends_with_terminator(stmts, then_b):
+                if brace:
+                    out = out ++ indent ++ "}\n"
+                let else_text = ci_print_compact_stmt_local(stmts, exprs, types, else_b, depth)
+                if else_text.len() > 0:
+                    out = out ++ else_text
+                return out
             out = out ++ indent ++ (if brace: "} else {\n" else: "else:\n")
             let else_text = ci_print_compact_stmt_local(stmts, exprs, types, else_b, depth + 4)
             if else_text.len() > 0:
@@ -278,24 +304,20 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
         let body = (stmts.get_d0(id)) as CiStmtId
         let cond = (stmts.get_d1(id)) as CiExprId
         let cond_setup = (stmts.get_d2(id)) as CiStmtId
-        let brace = migrate_prefer_brace()
-        var out = indent ++ (if brace: "do {\n" else: "do:\n")
+        var out = indent ++ "loop {\n"
         let body_text = ci_print_compact_stmt_local(stmts, exprs, types, body, depth + 4)
         if body_text.len() > 0:
             out = out ++ body_text
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         let cond_text = ci_print_expr(exprs, types, cond, 0, 0)
-        var while_cond = ""
         if (cond_setup as i32) != 0:
-            let setup_text = ci_print_compact_stmt_local(stmts, exprs, types, cond_setup, depth + 4)
-            while_cond = "{ " ++ setup_text.trim() ++ "; " ++ cond_text ++ " }"
-        else:
-            while_cond = cond_text
-        if brace:
-            out = out ++ indent ++ "} while " ++ while_cond ++ "\n"
-        else:
-            out = out ++ indent ++ "while " ++ while_cond ++ "\n"
+            out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, cond_setup, depth + 4)
+        let inner_indent = ci_make_indent(depth + 4)
+        out = out ++ inner_indent ++ "if not (" ++ cond_text ++ ") {\n"
+        out = out ++ inner_indent ++ "    break\n"
+        out = out ++ inner_indent ++ "}\n"
+        out = out ++ indent ++ "}\n"
         return out
 
     if kind == CiStmtKind.CIS_VAR_DECL:
@@ -579,7 +601,10 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         return "(" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ " as " ++ ci_print_type(types, target) ++ ")"
     if kind == CiExprKind.CIE_DEREF:
         let operand = (exprs.get_d0(id)) as CiExprId
-        return ci_wrap_unsafe("*" ++ ci_print_expr(exprs, types, operand, 0, 0))
+        let operand_text = ci_print_expr(exprs, types, operand, 0, 0)
+        if exprs.kind(operand) == CiExprKind.CIE_FIELD or exprs.kind(operand) == CiExprKind.CIE_INDEX or exprs.kind(operand) == CiExprKind.CIE_CALL:
+            return ci_wrap_unsafe("*(" ++ operand_text ++ ")")
+        return ci_wrap_unsafe("*" ++ operand_text)
     if kind == CiExprKind.CIE_ADDR_OF:
         let operand = (exprs.get_d0(id)) as CiExprId
         let is_mut = exprs.get_d1(id)
@@ -784,6 +809,12 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         if (else_b as i32) != 0:
+            if ci_stmt_ir_ends_with_terminator(stmts, then_b):
+                out = out ++ indent ++ "}\n"
+                let else_text = ci_print_stmt(stmts, exprs, types, else_b, 0)
+                if else_text.len() > 0:
+                    out = out ++ ci_reindent_spaces(else_text, depth)
+                return out
             out = out ++ indent ++ "} else {\n"
             let else_text = ci_print_stmt(stmts, exprs, types, else_b, 0)
             if else_text.len() > 0:
@@ -813,20 +844,20 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
         let body = (stmts.get_d0(id)) as CiStmtId
         let cond = (stmts.get_d1(id)) as CiExprId
         let cond_setup = (stmts.get_d2(id)) as CiStmtId
-        var out = indent ++ "do {\n"
+        var out = indent ++ "loop {\n"
         let body_text = ci_print_stmt(stmts, exprs, types, body, 0)
         if body_text.len() > 0:
             out = out ++ ci_reindent_spaces(body_text, 4)
         else:
             out = out ++ ci_make_indent(depth + 4) ++ "0\n"
         let cond_text = ci_print_expr(exprs, types, cond, 0, 0)
-        var while_cond = ""
         if (cond_setup as i32) != 0:
             let setup_text = ci_print_stmt(stmts, exprs, types, cond_setup, 0)
-            while_cond = "{ " ++ setup_text.trim() ++ "; " ++ cond_text ++ " }"
-        else:
-            while_cond = cond_text
-        out = out ++ indent ++ "} while " ++ while_cond ++ "\n"
+            out = out ++ ci_reindent_spaces(setup_text, 4)
+        out = out ++ ci_make_indent(depth + 4) ++ "if not (" ++ cond_text ++ ") {\n"
+        out = out ++ ci_make_indent(depth + 8) ++ "break\n"
+        out = out ++ ci_make_indent(depth + 4) ++ "}\n"
+        out = out ++ indent ++ "}\n"
         return out
 
     if kind == CiStmtKind.CIS_FOR:

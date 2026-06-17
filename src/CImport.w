@@ -1111,12 +1111,12 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: s
 
     if field_count == 0:
         if is_union:
-            return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = union { __pad0: u8 = 0 }\n"
-        return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " { __pad0: u8 = 0 }\n"
+            return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = union { __pad0: u8 = 0 }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
+        return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " { __pad0: u8 = 0 }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
 
     if is_union:
-        return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = union { " ++ fields ++ " }\n"
-    nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " { " ++ fields ++ " }\n"
+        return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = union { " ++ fields ++ " }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
+    nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " { " ++ fields ++ " }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
 
 // ── Opaque demotion pre-scan ─────────────────────────────────
 // Two-pass analysis: first collect directly demoted types (bitfield, forward
@@ -1870,7 +1870,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
         // Empty struct definition → emit with padding byte for ABI compatibility
         ci_mark_type_name_emitted(name)
         let safe_name = ci_escape_reserved(name)
-        let empty_rendered = if is_union: "type " ++ safe_name ++ " = union \{ __pad0: u8 = 0 }\n" else: "type " ++ safe_name ++ " \{ __pad0: u8 = 0 }\n"
+        let empty_rendered = if is_union: "type " ++ safe_name ++ " = union \{ __pad0: u8 = 0 }\nimpl Copy for " ++ safe_name ++ "\n" else: "type " ++ safe_name ++ " \{ __pad0: u8 = 0 }\nimpl Copy for " ++ safe_name ++ "\n"
         if ci_migrate_shared_decl_add("type", name, empty_rendered):
             return ""
         return empty_rendered
@@ -1944,7 +1944,8 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
     let part2 = if is_union: part1 ++ " = union \{ " else: part1 ++ " \{ "
     let part3 = part2 ++ field_str
     let decl = part3 ++ " }\n"
-    let rendered = anon_decls ++ packed_prefix ++ decl ++ flex_accessor
+    let copy_impl = "impl Copy for " ++ safe_name ++ "\n"
+    let rendered = anon_decls ++ packed_prefix ++ decl ++ copy_impl ++ flex_accessor
     if ci_migrate_shared_decl_add("type", name, rendered):
         return ""
     rendered
@@ -5946,6 +5947,109 @@ fn ci_expr_is_zero_int_lit(exprs: CiExprPool, id: CiExprId) -> bool:
         return false
     exprs.get_string(exprs.get_d0(id)) == "0"
 
+fn ci_type_is_fn_ptr(types: CiTypePool, ty: CiTypeId) -> bool:
+    if (ty as i32) == 0:
+        return false
+    if types.kind(ty) == CiTypeKind.CT_FN_PTR:
+        return true
+    if types.kind(ty) == CiTypeKind.CT_NAMED:
+        let text = types.get_string(types.get_d0(ty))
+        return ci_starts_with(text, "fn(") or ci_starts_with(text, "extern \"C\" fn(")
+    false
+
+fn CiExprPool.char_array_init_from_string_literal(self: CiExprPool, types: CiTypePool, array_ty: CiTypeId, literal: str) -> CiExprId:
+    if (array_ty as i32) == 0 or types.kind(array_ty) != CiTypeKind.CT_ARRAY:
+        return 0 as CiExprId
+    let elem_ty = (types.get_d0(array_ty)) as CiTypeId
+    let elem_text = ci_print_type(types, elem_ty)
+    if elem_text != "c_char" and elem_text != "i8" and elem_text != "u8":
+        return 0 as CiExprId
+    var text = ci_trim(literal)
+    if ci_is_concatenated_string(text):
+        text = ci_concat_strings(text)
+    if not ci_is_string_literal(text):
+        return 0 as CiExprId
+    var start = 0
+    if ci_starts_with(text, "u8\""):
+        start = 3
+    else if text.byte_at(0) == 76 or text.byte_at(0) == 85 or text.byte_at(0) == 117:
+        start = 2
+    else:
+        start = 1
+    let end = text.len() as i32 - 1
+    let items_start = self.extra_len()
+    var item_count = 0
+    var i = start
+    while i < end:
+        var value = text.byte_at(i as i64)
+        if value == 92:
+            if i + 1 >= end:
+                return 0 as CiExprId
+            let esc = text.byte_at((i + 1) as i64)
+            if esc == 120 or esc == 88:
+                var hex_value = 0
+                var j = i + 2
+                var digits = 0
+                while j < end:
+                    let d = text.byte_at(j as i64)
+                    if not ci_is_hex_digit(d):
+                        break
+                    hex_value = hex_value * 16 + ci_hex_digit_value(d)
+                    digits = digits + 1
+                    j = j + 1
+                if digits == 0:
+                    return 0 as CiExprId
+                value = hex_value & 255
+                i = j
+            else if esc >= 48 and esc <= 55:
+                var oct_value = 0
+                var j2 = i + 1
+                var oct_digits = 0
+                while j2 < end and oct_digits < 3:
+                    let d2 = text.byte_at(j2 as i64)
+                    if d2 < 48 or d2 > 55:
+                        break
+                    oct_value = oct_value * 8 + (d2 - 48)
+                    oct_digits = oct_digits + 1
+                    j2 = j2 + 1
+                value = oct_value & 255
+                i = j2
+            else:
+                if esc == 110: value = 10
+                else if esc == 116: value = 9
+                else if esc == 48: value = 0
+                else if esc == 92: value = 92
+                else if esc == 34: value = 34
+                else if esc == 39: value = 39
+                else if esc == 114: value = 13
+                else if esc == 97: value = 7
+                else if esc == 98: value = 8
+                else if esc == 102: value = 12
+                else if esc == 118: value = 11
+                else: value = esc
+                i = i + 2
+        else:
+            i = i + 1
+        let value_idx = self.add_string(i64_to_string(value as i64))
+        let value_lit = self.int_lit(value_idx, 0 as CiTypeId)
+        let value_cast = self.cast(elem_ty, value_lit)
+        let _ = self.add_extra(value_cast as i32)
+        item_count = item_count + 1
+    let array_size = types.get_d1(array_ty)
+    if array_size == CI_SIZE_INCOMPLETE or item_count < array_size:
+        let zero_idx = self.add_string("0")
+        let zero_lit = self.int_lit(zero_idx, 0 as CiTypeId)
+        let zero_cast = self.cast(elem_ty, zero_lit)
+        let _ = self.add_extra(zero_cast as i32)
+        item_count = item_count + 1
+    while array_size != CI_SIZE_INCOMPLETE and item_count < array_size:
+        let pad_idx = self.add_string("0")
+        let pad_lit = self.int_lit(pad_idx, 0 as CiTypeId)
+        let pad_cast = self.cast(elem_ty, pad_lit)
+        let _ = self.add_extra(pad_cast as i32)
+        item_count = item_count + 1
+    self.init_list(items_start, item_count, array_ty)
+
 fn ci_expr_strip_casts_and_parens(exprs: CiExprPool, id: CiExprId) -> CiExprId:
     var cur = id
     var depth = 0
@@ -6042,6 +6146,11 @@ fn CiExprPool.coerce_init_expr_to_type(self: CiExprPool, types: CiTypePool, valu
         return self.null_ptr(ty_id)
     if ci_expr_is_string_lit(self.val(), value_id) and ci_starts_with(ty, "*"):
         return value_id
+    let value_kind = self.kind(value_id)
+    if value_kind == CiExprKind.CIE_INIT_LIST or value_kind == CiExprKind.CIE_DESIGNATED_INIT:
+        let ty_id = types.type_from_translated_text(ty)
+        if (ty_id as i32) != 0:
+            self.set_type(value_id, ty_id)
     value_id
 
 fn ci_record_decl_cursor_for_type(session: i64, ty: i32) -> i32:
@@ -6100,7 +6209,25 @@ fn ci_record_type_field_type(session: i64, ty: i32, field_idx: i32) -> str:
     let field = ci_decl_field_cursor(session, decl, field_idx)
     if field < 0:
         return ""
+    let anon_decl = ci_field_cursor_anon_record_decl(session, field)
+    if anon_decl >= 0:
+        let parent_name = with_ci_cursor_spelling(session, decl)
+        let raw_name = with_ci_cursor_spelling(session, field)
+        if parent_name.len() > 0:
+            if raw_name.len() > 0:
+                return ci_escape_reserved(parent_name ++ "_" ++ raw_name)
+            return ci_escape_reserved(parent_name ++ "_anon_" ++ i64_to_string(field_idx as i64))
     with_ci_type_translated(session, with_ci_cursor_type(session, field))
+
+fn ci_initializer_normalize_anon_field_type(session: i64, parent_ty: str, field_idx: i32, field_ty: str) -> str:
+    if parent_ty.len() == 0 or field_ty.len() == 0:
+        return field_ty
+    if not ci_str_contains(field_ty, "(unnamed at ") and not ci_str_contains(field_ty, "::("):
+        return field_ty
+    let field_name = ci_type_field_name(session, parent_ty, field_idx)
+    if field_name.len() == 0:
+        return field_ty
+    ci_escape_reserved(parent_ty ++ "_" ++ field_name)
 
 fn ci_record_type_field_cxtype(session: i64, ty: i32, field_idx: i32) -> i32:
     let decl = ci_record_decl_cursor_for_type(session, ty)
@@ -6191,6 +6318,7 @@ fn ci_init_list_record_field_name(session: i64, ty_text: str, ty: i32, field_idx
         name = ci_type_field_name(session, ty_text, field_idx)
     if field_ty.len() == 0:
         field_ty = ci_type_field_type(session, ty_text, field_idx)
+    field_ty = ci_initializer_normalize_anon_field_type(session, ty_text, field_idx, field_ty)
     ci_record_field_cache_store(key, name, field_ty)
     name
 
@@ -6206,6 +6334,7 @@ fn ci_init_list_record_field_type(session: i64, ty_text: str, ty: i32, field_idx
         name = ci_type_field_name(session, ty_text, field_idx)
     if field_ty.len() == 0:
         field_ty = ci_type_field_type(session, ty_text, field_idx)
+    field_ty = ci_initializer_normalize_anon_field_type(session, ty_text, field_idx, field_ty)
     ci_record_field_cache_store(key, name, field_ty)
     field_ty
 
@@ -6403,7 +6532,9 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
             if (base_id as i32) != 0 and field.len() > 0:
                 let escaped = ci_escape_reserved(field)
                 let field_idx = self.add_string(escaped)
-                let field_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                var field_ty = types.member_field_type_from_base(session, self.get_type(base_id), field)
+                if (field_ty as i32) == 0:
+                    field_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                 return self.add(CiExprKind.CIE_FIELD, base_id as i32, field_idx, 0, field_ty)
         return 0 as CiExprId
 
@@ -6580,8 +6711,12 @@ fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, t
     if (rhs_id as i32) == 0:
         return 0 as CiExprId
 
-    if op == BO_ASSIGN and ci_cursor_type_is_pointerish(session, lhs_cursor):
-        let lhs_ty_id = types.type_from_libclang(session, with_ci_cursor_type(session, lhs_cursor))
+    let lhs_expr_ty = self.get_type(lhs_id)
+    let lhs_expr_is_ptr = (lhs_expr_ty as i32) != 0 and types.kind(lhs_expr_ty) == CiTypeKind.CT_POINTER
+    if op == BO_ASSIGN and (ci_cursor_type_is_pointerish(session, lhs_cursor) or lhs_expr_is_ptr):
+        var lhs_ty_id = types.type_from_libclang(session, with_ci_cursor_type(session, lhs_cursor))
+        if ((lhs_ty_id as i32) == 0 or types.kind(lhs_ty_id) != CiTypeKind.CT_POINTER) and lhs_expr_is_ptr:
+            lhs_ty_id = lhs_expr_ty
         if (lhs_ty_id as i32) == 0:
             return 0 as CiExprId
         var rhs_value = self.coerce_value_expr_for_target(session, lhs_ty_id, rhs_cursor, rhs_id, types)
@@ -6654,6 +6789,12 @@ fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, t
             if (rhs_value as i32) == 0:
                 return 0 as CiExprId
             if with_ci_type_is_unsigned(session, cursor) != 0:
+                let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                if (result_ty as i32) == 0:
+                    return 0 as CiExprId
+                lhs_value = self.cast(result_ty, lhs_value)
+                rhs_value = self.cast(result_ty, rhs_value)
+            else if op == BO_AND or op == BO_OR or op == BO_XOR:
                 let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                 if (result_ty as i32) == 0:
                     return 0 as CiExprId
@@ -7264,6 +7405,15 @@ fn CiExprPool.coerce_value_expr_for_target(self: CiExprPool, session: i64, targe
     if self.kind(value_id) == CiExprKind.CIE_ARRAY_DECAY or self.kind(value_id) == CiExprKind.CIE_CAST:
         return value_id
     let peeled = ci_peel_transparent(session, value_cursor)
+    if with_ci_cursor_kind(session, peeled) == CXK_STRING_LITERAL and self.kind(value_id) == CiExprKind.CIE_STRING_LIT and ci_cimport_type_is_const_c_string_input(ci_print_type(types, target_ty_id)):
+        let lit_text = self.get_string(self.get_d0(value_id))
+        let c_lit_text = if ci_starts_with(lit_text, "c\""): lit_text else: "c" ++ lit_text
+        let c_lit_idx = self.add_string(c_lit_text)
+        let c_lit_id = self.add(CiExprKind.CIE_STRING_LIT, c_lit_idx, 0, 0, 0 as CiTypeId)
+        let ptr_idx = self.add_string("ptr")
+        return self.add(CiExprKind.CIE_FIELD, c_lit_id as i32, ptr_idx, 0, target_ty_id)
+    if ci_expr_is_zero_int_lit(self.val(), value_id):
+        return self.null_ptr(target_ty_id)
     if with_ci_cursor_kind(session, peeled) != CXK_STRING_LITERAL and ci_cursor_is_array_type(session, peeled):
         let elem_ty = types.named_type_from_text(ci_array_elem_type_from_cursor(session, peeled))
         if (elem_ty as i32) == 0:
@@ -7279,6 +7429,17 @@ fn CiExprPool.coerce_value_expr_for_target(self: CiExprPool, session: i64, targe
         if value_str.len() > 0 and value_str != target_str:
             return self.cast(target_ty_id, value_id)
     value_id
+
+fn ci_lookup_c_function_decl_idx(session: i64, name: str) -> i32:
+    if session == 0 or name.len() == 0:
+        return -1
+    let count = with_cimport_decl_count(session)
+    var i = 0
+    while i < count:
+        if with_cimport_decl_kind(session, i) == CK_FUNCTION and ci_escape_reserved(with_cimport_decl_name(session, i)) == name:
+            return i
+        i = i + 1
+    -1
 
 fn ci_call_callee_name(session: i64, cursor: i32) -> str:
     // Walk through transparent wrappers (IMPLICIT_CAST, PAREN_EXPR,
@@ -7564,6 +7725,33 @@ fn CiTypePool.named_type_from_text(self: CiTypePool, text: str) -> CiTypeId:
     let idx = self.add_string(ci_normalize_translated_type_name(text))
     self.ty_named(idx)
 
+fn ci_record_name_from_ci_type(types: CiTypePool, ty: CiTypeId) -> str:
+    if (ty as i32) == 0:
+        return ""
+    var cur = ty
+    if types.kind(cur) == CiTypeKind.CT_POINTER:
+        cur = (types.get_d0(cur)) as CiTypeId
+    if (cur as i32) == 0:
+        return ""
+    if types.kind(cur) == CiTypeKind.CT_STRUCT or types.kind(cur) == CiTypeKind.CT_NAMED:
+        return types.get_string(types.get_d0(cur))
+    ""
+
+fn CiTypePool.member_field_type_from_base(self: CiTypePool, session: i64, base_ty: CiTypeId, field: str) -> CiTypeId:
+    let record_name = ci_record_name_from_ci_type(self, base_ty)
+    if record_name.len() == 0:
+        return 0 as CiTypeId
+    let count = ci_type_field_count(session, record_name)
+    var i = 0
+    while i < count:
+        if ci_type_field_name(session, record_name, i) == field:
+            let field_ty = ci_type_field_type(session, record_name, i)
+            if field_ty.len() == 0:
+                return 0 as CiTypeId
+            return self.type_from_translated_text(field_ty)
+        i = i + 1
+    0 as CiTypeId
+
 fn CiExprPool.build_named_call_expr(self: CiExprPool, name: str, arg_ids: &Vec[i32]) -> CiExprId:
     let callee_idx = self.add_string(name)
     let callee_id = self.ident(callee_idx, 0 as CiTypeId)
@@ -7810,6 +7998,12 @@ fn CiExprPool.build_binary_value_expr_from_ids(self: CiExprPool, session: i64, c
                 return 0 as CiExprId
             lhs_value = self.cast(result_ty, lhs_value)
             rhs_value = self.cast(result_ty, rhs_value)
+        else if op == BO_AND or op == BO_OR or op == BO_XOR:
+            let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+            if (result_ty as i32) == 0:
+                return 0 as CiExprId
+            lhs_value = self.cast(result_ty, lhs_value)
+            rhs_value = self.cast(result_ty, rhs_value)
     if op == BO_SHL or op == BO_SHR:
         rhs_value = self.cast_shift_count_expr(types, rhs_value)
         if (rhs_value as i32) == 0:
@@ -7862,6 +8056,8 @@ fn CiExprPool.build_unary_value_expr_from_id(self: CiExprPool, session: i64, cur
     if op == UO_DEREF:
         var deref_ty = 0 as CiTypeId
         let child_ty = self.get_type(child_id)
+        if ci_type_is_fn_ptr(types, child_ty):
+            return child_id
         if (child_ty as i32) != 0 and types.kind(child_ty) == CiTypeKind.CT_POINTER:
             deref_ty = (types.get_d0(child_ty)) as CiTypeId
         return self.add(CiExprKind.CIE_DEREF, child_id as i32, 0, 0, deref_ty)
@@ -8186,7 +8382,9 @@ fn CiStmtPool.lower_lvalue_expr_ir(self: CiStmtPool, session: i64, cursor: i32, 
         let field = with_ci_member_field_name(session, cursor)
         if ci_value_ir_valid(base) and field.len() > 0:
             let field_idx = exprs.add_string(ci_escape_reserved(field))
-            let field_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+            var field_ty = types.member_field_type_from_base(session, exprs.get_type(base.value_expr), field)
+            if (field_ty as i32) == 0:
+                field_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
             let field_id = exprs.add(CiExprKind.CIE_FIELD, base.value_expr as i32, field_idx, 0, field_ty)
             return CiValueExprIR {
                 setup_stmt: base.setup_stmt,
@@ -8213,6 +8411,8 @@ fn CiStmtPool.lower_lvalue_expr_ir(self: CiStmtPool, session: i64, cursor: i32, 
         if ci_value_ir_valid(operand):
             var deref_ty = 0 as CiTypeId
             let operand_ty = exprs.get_type(operand.value_expr)
+            if ci_type_is_fn_ptr(types, operand_ty):
+                return operand
             if (operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER:
                 deref_ty = (types.get_d0(operand_ty)) as CiTypeId
             let deref_id = exprs.add(CiExprKind.CIE_DEREF, operand.value_expr as i32, 0, 0, deref_ty)
@@ -8296,8 +8496,12 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
                 let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
                 let rhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, rhs_cursor))
                 let rhs_peeled = ci_peel_transparent(session, rhs_cursor)
-                let lhs_ty_id = types.type_from_libclang(session, with_ci_cursor_type(session, lhs_cursor))
-                let lhs_is_ptr = ci_cursor_type_is_pointerish(session, lhs_cursor)
+                var lhs_ty_id = types.type_from_libclang(session, with_ci_cursor_type(session, lhs_cursor))
+                let lhs_expr_ty = exprs.get_type(lhs.value_expr)
+                let lhs_expr_is_ptr = (lhs_expr_ty as i32) != 0 and types.kind(lhs_expr_ty) == CiTypeKind.CT_POINTER
+                if ((lhs_ty_id as i32) == 0 or types.kind(lhs_ty_id) != CiTypeKind.CT_POINTER) and lhs_expr_is_ptr:
+                    lhs_ty_id = lhs_expr_ty
+                let lhs_is_ptr = ci_cursor_type_is_pointerish(session, lhs_cursor) or lhs_expr_is_ptr
                 let rhs_is_ptr = ci_cursor_type_is_pointerish(session, rhs_cursor) or ci_cursor_type_is_pointerish(session, rhs_peeled)
                 if lhs_is_ptr and with_ci_cursor_kind(session, rhs_peeled) != CXK_STRING_LITERAL and ci_cursor_is_array_type(session, rhs_peeled):
                     if exprs.kind(rhs_value) != CiExprKind.CIE_ARRAY_DECAY and exprs.kind(rhs_value) != CiExprKind.CIE_CAST:
@@ -8408,6 +8612,12 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
                 if ci_type_is_small_int(lhs_ty_str) or ci_is_large_decimal(ci_print_expr(exprs, types, lhs.value_expr, 0, 0)):
                     lhs_value = exprs.cast(c_uint_ty, lhs_value)
                 rhs_value = exprs.cast(c_uint_ty, rhs_value)
+            else if ci_op == CiBinOp.CIBO_BIT_AND or ci_op == CiBinOp.CIBO_BIT_OR or ci_op == CiBinOp.CIBO_BIT_XOR:
+                let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                if (result_ty as i32) == 0:
+                    return ci_value_ir_invalid()
+                lhs_value = exprs.cast(result_ty, lhs_value)
+                rhs_value = exprs.cast(result_ty, rhs_value)
             let rhs_expr = exprs.binary(ci_op, lhs_value, rhs_value, 0 as CiTypeId)
             let assign_stmt = self.assign(lhs.value_expr, rhs_expr)
             return CiValueExprIR {
@@ -8557,6 +8767,8 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
                 }
             return ci_value_ir_invalid()
         var arg_ids: Vec[i32] = Vec.new()
+        let callee_decl_idx = ci_lookup_c_function_decl_idx(session, callee_text)
+        let callee_param_count = if callee_decl_idx >= 0: with_cimport_fn_param_count(session, callee_decl_idx) else: 0
         var ai = first_arg
         while ai < nc:
             let arg_cursor = with_ci_child(session, cursor, ai)
@@ -8576,6 +8788,14 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
             let arg_src = with_ci_cursor_source_text(session, arg_cursor)
             if ci_expand_string_macro_sequence(session, arg_src).len() > 0 and exprs.kind(arg_id) != CiExprKind.CIE_STRING_LIT:
                 return ci_value_ir_invalid()
+            let param_index = ai - first_arg
+            if callee_decl_idx >= 0 and param_index >= 0 and param_index < callee_param_count:
+                let raw_param_ty = with_cimport_fn_param_type_translated(session, callee_decl_idx, param_index)
+                let target_ty = types.type_from_translated_text(ci_pointer_type_explicit_mut(raw_param_ty))
+                if (target_ty as i32) != 0:
+                    arg_id = exprs.coerce_value_expr_for_target(session, target_ty, arg_cursor, arg_id, types)
+                    if (arg_id as i32) == 0:
+                        return ci_value_ir_invalid()
             arg_ids.push(arg_id as i32)
             ai = ai + 1
         let has_mapped_call = callee_text.len() > 0 and ci_has_value_libc_call_mapping(callee_text)
@@ -10068,10 +10288,11 @@ fn CiStmtPool.lower_decl_stmt_structural(self: CiStmtPool, session: i64, cursor:
             let init_cursor = ci_find_var_init_cursor(session, child)
             var init_id: CiExprId = 0 as CiExprId
             var init_setup_id: CiStmtId = 0 as CiStmtId
+            var source_init_expr = ""
             if init_cursor >= 0:
                 let init_src = ci_var_initializer_text_from_cursor(session, child)
                 let init_has_macro = init_src.len() > 0 and ci_initializer_text_has_macro_reference(session, init_src)
-                var source_init_expr = init_src
+                source_init_expr = init_src
                 if init_has_macro:
                     let preprocessed_init = ci_var_init_expr_from_preprocessed_cursor_for_type(session, child, with_ci_type_translated(session, vty))
                     if preprocessed_init.len() > 0:
@@ -10109,6 +10330,13 @@ fn CiStmtPool.lower_decl_stmt_structural(self: CiStmtPool, session: i64, cursor:
             //   var is *T, init is array T[N] → (&init[0] as *T)
             //   var is *T, init is *U (U != T) → (init as *T)
             if (init_id as i32) != 0 and init_cursor >= 0:
+                if types.kind(vty_id) == CiTypeKind.CT_ARRAY and exprs.kind(init_id) == CiExprKind.CIE_STRING_LIT:
+                    var literal_init = source_init_expr
+                    if not ci_is_string_literal(literal_init) and not ci_is_concatenated_string(literal_init):
+                        literal_init = exprs.get_string(exprs.get_d0(init_id))
+                    let array_init = exprs.char_array_init_from_string_literal(types, vty_id, literal_init)
+                    if (array_init as i32) != 0:
+                        init_id = array_init
                 if types.kind(vty_id) == CiTypeKind.CT_POINTER:
                     let init_peeled = ci_peel_transparent(session, init_cursor)
                     let init_peeled_kind = with_ci_cursor_kind(session, init_peeled)
@@ -12374,7 +12602,8 @@ fn ci_body_assigns_to(session: i64, cursor: i32, name: str) -> bool:
                 let lhs = with_ci_child(session, cursor, 0)
                 // Check if LHS is a DeclRefExpr with the param name
                 if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF:
-                    if with_ci_cursor_spelling(session, lhs) == name:
+                    let lhs_name = with_ci_cursor_spelling(session, lhs)
+                    if lhs_name == name or ci_escape_reserved(lhs_name) == name:
                         return true
     // Compound assignment (kind 115)
     if kind == CXK_COMPOUND_ASSIGN_OP:
@@ -12382,7 +12611,8 @@ fn ci_body_assigns_to(session: i64, cursor: i32, name: str) -> bool:
         if nc >= 1:
             let lhs = with_ci_child(session, cursor, 0)
             if with_ci_cursor_kind(session, lhs) == CXK_DECL_REF:
-                if with_ci_cursor_spelling(session, lhs) == name:
+                let lhs_name = with_ci_cursor_spelling(session, lhs)
+                if lhs_name == name or ci_escape_reserved(lhs_name) == name:
                     return true
     // Unary increment/decrement (pre/post)
     if kind == CXK_UNARY_OP:
@@ -12392,7 +12622,8 @@ fn ci_body_assigns_to(session: i64, cursor: i32, name: str) -> bool:
             if nc >= 1:
                 let operand = with_ci_child(session, cursor, 0)
                 if with_ci_cursor_kind(session, operand) == CXK_DECL_REF:
-                    if with_ci_cursor_spelling(session, operand) == name:
+                    let operand_name = with_ci_cursor_spelling(session, operand)
+                    if operand_name == name or ci_escape_reserved(operand_name) == name:
                         return true
     // Recurse into children
     let nc = with_ci_num_children(session, cursor)
@@ -13786,6 +14017,11 @@ fn ci_type_field_type(session: i64, ty_name: str, field_idx: i32) -> str:
                 continue
             if field_idx >= count:
                 return ""
+            if with_cimport_struct_field_is_anonymous_record(session, i, field_idx) != 0:
+                let fname = with_cimport_struct_field_name(session, i, field_idx)
+                if fname.len() > 0:
+                    return ci_escape_reserved(decl_name ++ "_" ++ fname)
+                return ci_escape_reserved(decl_name ++ "_anon_" ++ i64_to_string(field_idx as i64))
             return with_cimport_struct_field_type_translated(session, i, field_idx)
         if kind == CK_TYPEDEF and ci_decl_name_matches_type(decl_name, ty_name):
             let anon_count = with_cimport_typedef_anon_record_field_count(session, i)

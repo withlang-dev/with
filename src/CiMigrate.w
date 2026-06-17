@@ -132,6 +132,10 @@ fn ci_migrate_shared_defs_reset:
 fn ci_migrate_shared_decl_key(kind: str, name: str) -> str:
     "|" ++ kind ++ ":" ++ name ++ "|"
 
+fn ci_migrate_type_render_has_concrete_body(name: str, rendered: str) -> bool:
+    let safe_name = ci_escape_reserved(name)
+    ci_str_contains(rendered, "type " ++ safe_name ++ " {") or ci_str_contains(rendered, "type " ++ safe_name ++ " = union {")
+
 // Single dedup entry point for every declaration kind that the migrator
 // emits into a shared buffer. `kind` is a short disambiguating prefix
 // ("let", "type", "fn", "extern_fn", "extern_var", "extern_let");
@@ -140,11 +144,33 @@ fn ci_migrate_shared_decl_key(kind: str, name: str) -> str:
 // declaration was redirected to the shared buffer (caller must skip
 // per-file emit). Returns false when shared-defs mode is off OR when
 // the declaration was already seen (caller's per-file emit is a no-op).
+fn ci_migrate_shared_decl_upgrade_opaque_type(name: str, rendered: str):
+    let opaque_marker = "type " ++ ci_escape_reserved(name) ++ " = opaque"
+    var i = 0
+    while i < g_migrate_shared_decl_buf.len() as i32:
+        if ci_str_contains(g_migrate_shared_decl_buf.get(i as i64), opaque_marker):
+            let idx = i as i64
+            with g_migrate_shared_decl_buf.slot(idx) as mut entry:
+                entry.set(rendered ++ "\n")
+            break
+        i = i + 1
+    var j = 0
+    while j < g_migrate_shared_decl_records.len() as i32:
+        let rec = g_migrate_shared_decl_records.get(j as i64)
+        if ci_str_contains(rec, "@@DECL|type|" ++ name ++ "\n") and ci_str_contains(rec, opaque_marker):
+            let idx = j as i64
+            with g_migrate_shared_decl_records.slot(idx) as mut entry:
+                entry.set(f"@@DECL|type|{name}\n{rendered}\n@@END\n")
+            break
+        j = j + 1
+
 fn ci_migrate_shared_decl_add(kind: str, name: str, rendered: str) -> bool:
     if not ci_migrate_shared_defs_active():
         return false
     let key = ci_migrate_shared_decl_key(kind, name)
     if ci_find_str(g_migrate_shared_decl_keys, key) >= 0:
+        if kind == "type" and ci_migrate_type_render_has_concrete_body(name, rendered):
+            ci_migrate_shared_decl_upgrade_opaque_type(name, rendered)
         return true
     g_migrate_shared_decl_keys = g_migrate_shared_decl_keys ++ key
     g_migrate_shared_decl_buf.push(rendered ++ "\n")
