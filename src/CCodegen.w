@@ -136,6 +136,16 @@ enum CcBuiltin: i32:
     ATOMIC_LOAD
     ATOMIC_STORE
     ATOMIC_SWAP
+    ATOMIC_FETCH_ADD
+    ATOMIC_FETCH_SUB
+    ATOMIC_FETCH_AND
+    ATOMIC_FETCH_OR
+    ATOMIC_FETCH_XOR
+    ATOMIC_FETCH_MIN
+    ATOMIC_FETCH_MAX
+    ATOMIC_CAS
+    ATOMIC_CAS_WEAK
+    ATOMIC_FENCE
     VEC_GET_DISJOINT
     DYN_CALL
     SLOTMAP
@@ -2122,10 +2132,10 @@ fn CCodegen.local_direct_call_return_tid(self: CCodegen, body: &MirBody, local_i
             intrinsic_kind
         else:
             self.call_builtin_kind(body, callee_operand, args_id, dest_place)
-        if kind != CcBuiltin.MAP_GET:
-            continue
         let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
         if ret_tid == 0 or self.is_void_tid(ret_tid) != 0:
+            continue
+        if self.type_is_payload_enum(ret_tid) == 0:
             continue
         if out == 0:
             out = ret_tid
@@ -4660,6 +4670,42 @@ fn CCodegen.call_builtin_kind(self: CCodegen, body: &MirBody, callee_operand: i3
         if recv_is_atomic != 0:
             return CcBuiltin.ATOMIC_SWAP
         return CcBuiltin.NONE
+    if method == "fetch_add":
+        if recv_is_atomic != 0:
+            return CcBuiltin.ATOMIC_FETCH_ADD
+        return CcBuiltin.NONE
+    if method == "fetch_sub":
+        if recv_is_atomic != 0:
+            return CcBuiltin.ATOMIC_FETCH_SUB
+        return CcBuiltin.NONE
+    if method == "fetch_and":
+        if recv_is_atomic != 0:
+            return CcBuiltin.ATOMIC_FETCH_AND
+        return CcBuiltin.NONE
+    if method == "fetch_or":
+        if recv_is_atomic != 0:
+            return CcBuiltin.ATOMIC_FETCH_OR
+        return CcBuiltin.NONE
+    if method == "fetch_xor":
+        if recv_is_atomic != 0:
+            return CcBuiltin.ATOMIC_FETCH_XOR
+        return CcBuiltin.NONE
+    if method == "fetch_min":
+        if recv_is_atomic != 0:
+            return CcBuiltin.ATOMIC_FETCH_MIN
+        return CcBuiltin.NONE
+    if method == "fetch_max":
+        if recv_is_atomic != 0:
+            return CcBuiltin.ATOMIC_FETCH_MAX
+        return CcBuiltin.NONE
+    if method == "compare_exchange":
+        if recv_is_atomic != 0:
+            return CcBuiltin.ATOMIC_CAS
+        return CcBuiltin.NONE
+    if method == "compare_exchange_weak":
+        if recv_is_atomic != 0:
+            return CcBuiltin.ATOMIC_CAS_WEAK
+        return CcBuiltin.NONE
 
     if method == "slot":
         if recv_kind_is_vec != 0:
@@ -4902,9 +4948,23 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: &MirBody, callee_operand:
         if dst != 0 and self.is_void_tid(dst) == 0:
             return dst
         return self.sema.ty_i64 as i32
-    if kind == CcBuiltin.ATOMIC_LOAD or kind == CcBuiltin.ATOMIC_SWAP:
+    if kind == CcBuiltin.ATOMIC_LOAD or kind == CcBuiltin.ATOMIC_SWAP or kind == CcBuiltin.ATOMIC_FETCH_ADD or kind == CcBuiltin.ATOMIC_FETCH_SUB or kind == CcBuiltin.ATOMIC_FETCH_AND or kind == CcBuiltin.ATOMIC_FETCH_OR or kind == CcBuiltin.ATOMIC_FETCH_XOR or kind == CcBuiltin.ATOMIC_FETCH_MIN or kind == CcBuiltin.ATOMIC_FETCH_MAX:
         return self.atomic_recv_value_tid(body, args_id)
+    if kind == CcBuiltin.ATOMIC_CAS or kind == CcBuiltin.ATOMIC_CAS_WEAK:
+        let hinted_atomic = self.call_dest_expected_tid(body, dest_place)
+        if hinted_atomic != 0 and self.is_void_tid(hinted_atomic) == 0:
+            return hinted_atomic
+        let dst_atomic = self.place_local_tid(body, dest_place)
+        if dst_atomic != 0 and self.is_void_tid(dst_atomic) == 0:
+            return dst_atomic
+        let payload = self.atomic_recv_value_tid(body, args_id)
+        let args: Vec[i32] = Vec.new()
+        args.push(payload)
+        args.push(payload)
+        return self.sema.ensure_generic_inst_type(self.sema.syms.result, args, 2) as i32
     if kind == CcBuiltin.ATOMIC_STORE:
+        return self.sema.ty_void as i32
+    if kind == CcBuiltin.ATOMIC_FENCE:
         return self.sema.ty_void as i32
     if kind == CcBuiltin.STR_LEN:
         return self.sema.ty_usize as i32
@@ -5515,6 +5575,16 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.ATOMIC_LOAD: return CcBuiltin.ATOMIC_LOAD
     if intrinsic == MirIntrinsic.ATOMIC_STORE: return CcBuiltin.ATOMIC_STORE
     if intrinsic == MirIntrinsic.ATOMIC_SWAP: return CcBuiltin.ATOMIC_SWAP
+    if intrinsic == MirIntrinsic.ATOMIC_FETCH_ADD: return CcBuiltin.ATOMIC_FETCH_ADD
+    if intrinsic == MirIntrinsic.ATOMIC_FETCH_SUB: return CcBuiltin.ATOMIC_FETCH_SUB
+    if intrinsic == MirIntrinsic.ATOMIC_FETCH_AND: return CcBuiltin.ATOMIC_FETCH_AND
+    if intrinsic == MirIntrinsic.ATOMIC_FETCH_OR: return CcBuiltin.ATOMIC_FETCH_OR
+    if intrinsic == MirIntrinsic.ATOMIC_FETCH_XOR: return CcBuiltin.ATOMIC_FETCH_XOR
+    if intrinsic == MirIntrinsic.ATOMIC_FETCH_MIN: return CcBuiltin.ATOMIC_FETCH_MIN
+    if intrinsic == MirIntrinsic.ATOMIC_FETCH_MAX: return CcBuiltin.ATOMIC_FETCH_MAX
+    if intrinsic == MirIntrinsic.ATOMIC_CAS: return CcBuiltin.ATOMIC_CAS
+    if intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK: return CcBuiltin.ATOMIC_CAS_WEAK
+    if intrinsic == MirIntrinsic.ATOMIC_FENCE: return CcBuiltin.ATOMIC_FENCE
     if intrinsic == MirIntrinsic.STR_LEN: return CcBuiltin.STR_LEN
     if intrinsic == MirIntrinsic.STR_LEN32: return CcBuiltin.STR_LEN32
     if intrinsic == MirIntrinsic.STR_LEN64: return CcBuiltin.STR_LEN64
@@ -6058,6 +6128,84 @@ fn CCodegen.emit_builtin_atomic_call_term(self: CCodegen, body: &MirBody, kind: 
             out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = __atomic_exchange_n(&((" ++ recv_ptr ++ ")->val), " ++ val ++ ", " ++ order ++ ");\n"
         else:
             out = out ++ "    (void)__atomic_exchange_n(&((" ++ recv_ptr ++ ")->val), " ++ val ++ ", " ++ order ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == CcBuiltin.ATOMIC_FETCH_ADD or kind == CcBuiltin.ATOMIC_FETCH_SUB or kind == CcBuiltin.ATOMIC_FETCH_AND or kind == CcBuiltin.ATOMIC_FETCH_OR or kind == CcBuiltin.ATOMIC_FETCH_XOR:
+        if argc < 3:
+            self.fail("Atomic.fetch_* expects three arguments")
+            return "    abort();"
+        let recv_ptr = self.atomic_recv_ptr_text(body, args_id)
+        let val = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let order = self.atomic_order_text(self.operand_text(body, self.call_arg_operand(body, args_id, 2)))
+        let op =
+            if kind == CcBuiltin.ATOMIC_FETCH_ADD: "__atomic_fetch_add"
+            else if kind == CcBuiltin.ATOMIC_FETCH_SUB: "__atomic_fetch_sub"
+            else if kind == CcBuiltin.ATOMIC_FETCH_AND: "__atomic_fetch_and"
+            else if kind == CcBuiltin.ATOMIC_FETCH_OR: "__atomic_fetch_or"
+            else: "__atomic_fetch_xor"
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ op ++ "(&((" ++ recv_ptr ++ ")->val), " ++ val ++ ", " ++ order ++ ");\n"
+        else:
+            out = out ++ "    (void)" ++ op ++ "(&((" ++ recv_ptr ++ ")->val), " ++ val ++ ", " ++ order ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == CcBuiltin.ATOMIC_FETCH_MIN or kind == CcBuiltin.ATOMIC_FETCH_MAX:
+        if argc < 3:
+            self.fail("Atomic.fetch_min/fetch_max expects three arguments")
+            return "    abort();"
+        let recv_ptr = self.atomic_recv_ptr_text(body, args_id)
+        let val = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let order = self.atomic_order_text(self.operand_text(body, self.call_arg_operand(body, args_id, 2)))
+        let fail_order = "(" ++ order ++ " == __ATOMIC_RELEASE ? __ATOMIC_RELAXED : (" ++ order ++ " == __ATOMIC_ACQ_REL ? __ATOMIC_ACQUIRE : " ++ order ++ "))"
+        let tmp = f"__with_atomic_{args_id}"
+        let cmp = if kind == CcBuiltin.ATOMIC_FETCH_MIN: "<" else: ">"
+        var out = "    __typeof__(((" ++ recv_ptr ++ ")->val)) " ++ tmp ++ "_old = __atomic_load_n(&((" ++ recv_ptr ++ ")->val), " ++ order ++ ");\n"
+        out = out ++ "    for (;;) " ++ cc_lbrace() ++ "\n"
+        out = out ++ "        __typeof__(" ++ tmp ++ "_old) " ++ tmp ++ "_desired = ((" ++ val ++ ") " ++ cmp ++ " " ++ tmp ++ "_old) ? (" ++ val ++ ") : " ++ tmp ++ "_old;\n"
+        out = out ++ "        if (" ++ tmp ++ "_desired == " ++ tmp ++ "_old || __atomic_compare_exchange_n(&((" ++ recv_ptr ++ ")->val), &" ++ tmp ++ "_old, " ++ tmp ++ "_desired, 0, " ++ order ++ ", " ++ fail_order ++ ")) break;\n"
+        out = out ++ "    " ++ cc_rbrace() ++ "\n"
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ tmp ++ "_old;\n"
+        else:
+            out = out ++ "    (void)" ++ tmp ++ "_old;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == CcBuiltin.ATOMIC_CAS or kind == CcBuiltin.ATOMIC_CAS_WEAK:
+        if argc < 5:
+            self.fail("Atomic.compare_exchange expects five arguments")
+            return "    abort();"
+        let recv_ptr = self.atomic_recv_ptr_text(body, args_id)
+        let expected = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let desired = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
+        let success_order = self.atomic_order_text(self.operand_text(body, self.call_arg_operand(body, args_id, 3)))
+        let failure_order = self.atomic_order_text(self.operand_text(body, self.call_arg_operand(body, args_id, 4)))
+        let ret_ty = self.place_local_tid(body, dest_place)
+        let ok_variant = self.payload_enum_named_variant(ret_ty, self.sema.syms.ok)
+        let err_variant = self.payload_enum_named_variant(ret_ty, self.sema.syms.err)
+        if ok_variant < 0 or err_variant < 0:
+            self.fail("Atomic.compare_exchange requires Result[T, T] destination")
+            return "    abort();"
+        let tmp = f"__with_atomic_cas_{args_id}"
+        let weak = if kind == CcBuiltin.ATOMIC_CAS_WEAK: "1" else: "0"
+        var out = "    __typeof__(((" ++ recv_ptr ++ ")->val)) " ++ tmp ++ "_expected = " ++ expected ++ ";\n"
+        out = out ++ "    int " ++ tmp ++ "_ok = __atomic_compare_exchange_n(&((" ++ recv_ptr ++ ")->val), &" ++ tmp ++ "_expected, " ++ desired ++ ", " ++ weak ++ ", " ++ success_order ++ ", " ++ failure_order ++ ");\n"
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ tmp ++ "_ok ? " ++ self.payload_enum_literal(ret_ty, ok_variant, tmp ++ "_expected") ++ " : " ++ self.payload_enum_literal(ret_ty, err_variant, tmp ++ "_expected") ++ ";\n"
+        else:
+            out = out ++ "    (void)" ++ tmp ++ "_ok;\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == CcBuiltin.ATOMIC_FENCE:
+        if argc < 1:
+            self.fail("fence expects one argument")
+            return "    abort();"
+        let order = self.atomic_order_text(self.operand_text(body, self.call_arg_operand(body, args_id, 0)))
+        var out = "    __atomic_thread_fence(" ++ order ++ ");\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 

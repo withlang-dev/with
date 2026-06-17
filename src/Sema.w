@@ -1037,7 +1037,7 @@ fn Sema.symbol_requires_std_tier(self: Sema, sym: i32) -> i32:
         return 1
     if name == "Sender" or name == "Receiver" or name == "chan":
         return 1
-    if name == "Mutex" or name == "RwLock" or name == "AtomicI64":
+    if name == "Mutex" or name == "RwLock" or name == "Atomic" or name == "AtomicI64" or name == "Order":
         return 1
     if name == "MutexGuard" or name == "MutexGuardMut" or name == "RwReadGuard" or name == "RwWriteGuard":
         return 1
@@ -2842,6 +2842,26 @@ fn Sema.preregister_mir_types(self: Sema):
 // TypeKind.TY_GENERIC_INST: d0=base_sym, d1=extra_start, d2=arg_count
 // Type args stored in type_extra[extra_start..extra_start+arg_count] as TypeIds.
 
+fn Sema.atomic_payload_type_is_valid(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    let kind = self.get_type_kind(resolved)
+    if kind == TypeKind.TY_INT or kind == TypeKind.TY_PTR:
+        return 1
+    0
+
+fn Sema.validate_atomic_payload_type(self: Sema, base_sym: i32, args: &Vec[i32], arg_count: i32, node: i32) -> i32:
+    if self.pool_resolve_symbol(base_sym) != "Atomic":
+        return 1
+    if arg_count != 1:
+        self.emit_error("Atomic[T] expects exactly one type argument", node)
+        return 0
+    if self.atomic_payload_type_is_valid(args.get(0)) == 0:
+        self.emit_error("Atomic[T] requires integer or pointer T", node)
+        return 0
+    1
+
 fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
     var gi_base_sym = self.ast.get_data0(node)
     if self.is_fixed_string_symbol(gi_base_sym) != 0:
@@ -2890,6 +2910,8 @@ fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
         if gi_arg_tid == 0:
             return 0
         gi_args.push(gi_arg_tid as i32)
+    if self.validate_atomic_payload_type(gi_base_sym, &gi_args, gi_arg_count, node) == 0:
+        return 0
     self.ensure_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
 
 fn Sema.get_generic_inst_base(self: Sema, tid: i32) -> i32:

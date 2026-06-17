@@ -2699,6 +2699,21 @@ fn Sema.atomic_method_expected_arg_type(self: Sema, order_type: i32, method_sym:
         return order_type
     0
 
+fn Sema.atomic_order_stronger_than(self: Sema, left: i32, right: i32) -> i32:
+    if left < 0 or right < 0:
+        return 0
+    let left_rank =
+        if left == 0: 0
+        else if left == 1 or left == 2: 1
+        else if left == 3: 2
+        else: 3
+    let right_rank =
+        if right == 0: 0
+        else if right == 1 or right == 2: 1
+        else if right == 3: 2
+        else: 3
+    if left_rank > right_rank: 1 else: 0
+
 // Validate ordering constraints for Atomic methods.
 // Checks disc enum variant value at sema time.
 fn Sema.validate_atomic_ordering(self: Sema, method_sym: i32, extra_start: i32, arg_count: i32, node: i32):
@@ -2715,6 +2730,15 @@ fn Sema.validate_atomic_ordering(self: Sema, method_sym: i32, extra_start: i32, 
         let order_val = self.try_resolve_disc_enum_value(order_node)
         if order_val == 2 or order_val == 3:
             self.emit_error("load cannot use Release or AcqRel ordering", order_node)
+    if (method_name == "compare_exchange" or method_name == "compare_exchange_weak") and arg_count >= 4:
+        let success_node = self.ast.get_extra(extra_start + 2)
+        let failure_node = self.ast.get_extra(extra_start + 3)
+        let success_val = self.try_resolve_disc_enum_value(success_node)
+        let failure_val = self.try_resolve_disc_enum_value(failure_node)
+        if failure_val == 2 or failure_val == 3:
+            self.emit_error("compare_exchange failure ordering cannot be Release or AcqRel", failure_node)
+        if self.atomic_order_stronger_than(failure_val, success_val) != 0:
+            self.emit_error("compare_exchange failure ordering cannot be stronger than success ordering", failure_node)
 
 // Try to resolve the discriminant value of a disc enum variant expression.
 // Returns -1 if the node is not a resolvable variant.

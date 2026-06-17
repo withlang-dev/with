@@ -14058,9 +14058,13 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
             return self.generic_constructor_return_type(owner_sym, recv_type)
         if method_name == "store":
             return self.ty_void as i32
-        if method_name == "load" or method_name == "swap" or method_name == "fetch_add" or method_name == "fetch_sub" or method_name == "fetch_and" or method_name == "fetch_or" or method_name == "fetch_xor" or method_name == "fetch_min" or method_name == "fetch_max" or method_name == "compare_exchange" or method_name == "compare_exchange_weak":
+        if method_name == "load" or method_name == "swap" or method_name == "fetch_add" or method_name == "fetch_sub" or method_name == "fetch_and" or method_name == "fetch_or" or method_name == "fetch_xor" or method_name == "fetch_min" or method_name == "fetch_max":
             if tk == TypeKind.TY_GENERIC_INST:
                 return self.get_generic_inst_arg(resolved as i32, 0)
+        if method_name == "compare_exchange" or method_name == "compare_exchange_weak":
+            if tk == TypeKind.TY_GENERIC_INST:
+                let atomic_payload = self.get_generic_inst_arg(resolved as i32, 0)
+                return self.ensure_result_type_for(atomic_payload, atomic_payload)
     if self.pool_resolve(owner_sym) == "Sender":
         if method_name == "send" or method_name == "close":
             return self.ty_void as i32

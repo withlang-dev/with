@@ -1323,7 +1323,8 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                     return self.sema.get_generic_inst_arg(resolved, 0)
             if method_name == "compare_exchange" or method_name == "compare_exchange_weak":
                 if tk == TypeKind.TY_GENERIC_INST:
-                    return self.sema.get_generic_inst_arg(resolved, 0)
+                    let atomic_payload = self.sema.get_generic_inst_arg(resolved, 0)
+                    return self.sema.ensure_result_type_for(atomic_payload, atomic_payload)
             return self.sema.ty_void as i32
     if tk == TypeKind.TY_STR:
         if len_method_ret != 0: return len_method_ret

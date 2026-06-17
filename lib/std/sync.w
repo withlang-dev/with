@@ -1,6 +1,6 @@
 // std.sync — synchronization primitives.
 //
-// Provides Mutex, RwLock, and AtomicI64 for concurrent access.
+// Provides Mutex, RwLock, and Atomic for concurrent access.
 
 /// A mutual exclusion lock protecting an i64 value.
 type Mutex  {
@@ -36,9 +36,22 @@ type RwWriteGuard ephemeral {
     value: i64
 }
 
-/// An atomic i64 for lock-free concurrent access.
-type AtomicI64  {
-    value: i64
+/// Memory ordering for atomic operations.
+pub enum Order: i32:
+    Relaxed = 0
+    Acquire = 1
+    Release = 2
+    AcqRel = 3
+    SeqCst = 4
+
+/// Atomic memory fence. Enforces ordering without an associated operation.
+pub fn fence(order: Order) -> Unit:
+    // Compiler intrinsic: MIR lowering replaces this body.
+    0
+
+/// Lock-free atomic operations on integer and pointer types.
+pub type Atomic[T] {
+    val: T,
 }
 
 /// Create a new Mutex with the given initial value.
@@ -111,19 +124,17 @@ pub fn rwlock_read(rw: RwLock) -> i64:
 pub fn RwLock.write(mut self: RwLock, value: i64) -> Unit:
     self.value = value
 
+/// Compatibility alias for old code; prefer `Atomic[i64]`.
+pub type AtomicI64 = Atomic[i64]
+
 /// Create a new AtomicI64 with the given initial value.
 pub fn atomic_new(value: i64) -> AtomicI64:
-    AtomicI64 { value }
+    AtomicI64 { val: value }
 
 /// Load the current value atomically.
-pub fn atomic_load(a: AtomicI64) -> i64:
-    a.value
+pub fn atomic_load(a: &AtomicI64) -> i64:
+    a.load(.SeqCst)
 
-/// Store a new value atomically (mutating receiver).
-pub fn AtomicI64.store(mut self: AtomicI64, value: i64) -> Unit:
-    self.value = value
-
-/// Add `delta` atomically and return the new value (mutating receiver).
-pub fn AtomicI64.add(mut self: AtomicI64, delta: i64) -> i64:
-    self.value = self.value + delta
-    self.value
+/// Add `delta` atomically and return the new value.
+pub fn Atomic.add(mut self: Atomic[i64], delta: i64) -> i64:
+    self.fetch_add(delta, .SeqCst) + delta

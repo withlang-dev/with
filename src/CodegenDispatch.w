@@ -8102,12 +8102,30 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: &MirBody, i
         let ar_val = if wl_type_of(ar_val_raw) != ar_elem_ty: self.coerce_value_to_type(ar_val_raw, ar_elem_ty) else: ar_val_raw
         let ar_val_ptr = wl_build_struct_gep(self.builder, ar_recv_ty, ar_recv_ptr, 0)
         let ar_order = if self.is_const_int_value(ar_order_raw): wl_const_int_sext_val(ar_order_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let ar_recv_op = body.call_arg_operands.get(arg_start as i64)
+        var ar_payload_sema = 0
+        var ar_recv_sema = self.mir_operand_sema_type(body, ar_recv_op)
+        var ar_recv_resolved = if ar_recv_sema > 0: self.mir_input.mir_resolve_alias(ar_recv_sema) else: 0
+        if ar_recv_resolved > 0:
+            let ar_recv_tk = self.mir_input.mir_get_type_kind(ar_recv_resolved)
+            if ar_recv_tk == TypeKind.TY_PTR or ar_recv_tk == TypeKind.TY_REF:
+                ar_recv_sema = self.mir_input.mir_get_type_d0(ar_recv_resolved)
+                ar_recv_resolved = self.mir_input.mir_resolve_alias(ar_recv_sema)
+        let ar_recv_base_sym = if ar_recv_resolved > 0 and self.mir_input.mir_get_type_kind(ar_recv_resolved) == TypeKind.TY_GENERIC_INST: self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(ar_recv_resolved)) else: 0
+        if ar_recv_resolved > 0 and self.mir_input.mir_get_type_kind(ar_recv_resolved) == TypeKind.TY_GENERIC_INST and self.intern.resolve(ar_recv_base_sym) == "Atomic":
+            let ar_te = self.mir_input.mir_get_type_d1(ar_recv_resolved)
+            if self.mir_input.mir_get_type_d2(ar_recv_resolved) > 0:
+                ar_payload_sema = self.mir_input.mir_get_type_extra(ar_te)
+        let ar_payload_resolved = if ar_payload_sema > 0: self.mir_input.mir_resolve_alias(ar_payload_sema) else: 0
+        let ar_payload_unsigned = ar_payload_resolved > 0 and self.mir_input.mir_get_type_kind(ar_payload_resolved) == TypeKind.TY_INT and self.mir_input.mir_get_type_d1(ar_payload_resolved) == 0
         let ar_rmw_op = if intrinsic == MirIntrinsic.ATOMIC_SWAP: AtomicRmwOp.XCHG
             else if intrinsic == MirIntrinsic.ATOMIC_FETCH_ADD: AtomicRmwOp.ADD
             else if intrinsic == MirIntrinsic.ATOMIC_FETCH_SUB: AtomicRmwOp.SUB
             else if intrinsic == MirIntrinsic.ATOMIC_FETCH_AND: AtomicRmwOp.AND
             else if intrinsic == MirIntrinsic.ATOMIC_FETCH_OR: AtomicRmwOp.OR
             else if intrinsic == MirIntrinsic.ATOMIC_FETCH_XOR: AtomicRmwOp.XOR
+            else if intrinsic == MirIntrinsic.ATOMIC_FETCH_MIN and ar_payload_unsigned: AtomicRmwOp.UMIN
+            else if intrinsic == MirIntrinsic.ATOMIC_FETCH_MAX and ar_payload_unsigned: AtomicRmwOp.UMAX
             else if intrinsic == MirIntrinsic.ATOMIC_FETCH_MIN: AtomicRmwOp.MIN
             else if intrinsic == MirIntrinsic.ATOMIC_FETCH_MAX: AtomicRmwOp.MAX
             else: AtomicRmwOp.XCHG
@@ -8129,8 +8147,25 @@ fn Codegen.mir_emit_atomic_fiber_intrinsic_call(self: Codegen, body: &MirBody, i
         let cas_failure_order = if self.is_const_int_value(cas_failure_raw): wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
         let cas_is_weak = if intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK: 1 else: 0
         let cas_result = wl_build_cmpxchg(self.builder, cas_val_ptr, cas_expected, cas_desired, cas_success_order, cas_failure_order, cas_is_weak)
-        // Extract old value (index 0) from {T, i1} result
-        result = wl_extract_value(self.builder, cas_result, 0)
+        let cas_old = wl_extract_value(self.builder, cas_result, 0)
+        let cas_ok = wl_extract_value(self.builder, cas_result, 1)
+        let cas_result_ty = self.mir_dest_llvm_type(body, dest_place)
+        if cas_result_ty != 0 and wl_get_type_kind(cas_result_ty) == wl_struct_type_kind():
+            let cas_out = self.create_entry_alloca(cas_result_ty)
+            let cas_ok_bb = wl_append_bb(self.context, self.current_function, "atomic.cas.ok")
+            let cas_err_bb = wl_append_bb(self.context, self.current_function, "atomic.cas.err")
+            let cas_join_bb = wl_append_bb(self.context, self.current_function, "atomic.cas.join")
+            wl_build_cond_br(self.builder, cas_ok, cas_ok_bb, cas_err_bb)
+            wl_position_at_end(self.builder, cas_ok_bb)
+            wl_build_store(self.builder, self.build_result_ok(cas_old, cas_result_ty), cas_out)
+            wl_build_br(self.builder, cas_join_bb)
+            wl_position_at_end(self.builder, cas_err_bb)
+            wl_build_store(self.builder, self.build_result_err(cas_old, cas_result_ty), cas_out)
+            wl_build_br(self.builder, cas_join_bb)
+            wl_position_at_end(self.builder, cas_join_bb)
+            result = wl_build_load(self.builder, cas_result_ty, cas_out)
+        else:
+            result = cas_old
 
     else if intrinsic == MirIntrinsic.ATOMIC_FENCE:
         let fence_order_raw = self.mir_intrinsic_arg(body, args_id, 0)
@@ -11779,6 +11814,32 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                 return self.mir_emit_box_new_call(body, args_id, dest_place, next_bb)
             if (gc_callee_name_for_box == "Box.into_inner" or self.intern.resolve(gc_callee_sym) == "Box.into_inner") and self.sema.fn_symbol_is_std_box_member(gc_callee_sym) != 0:
                 return self.mir_emit_box_into_inner_call(body, args_id, dest_place, next_bb)
+            if gc_callee_name_for_box == "new" or self.intern.resolve(gc_callee_sym) == "new":
+                let gc_atomic_dest_sema = self.mir_place_sema_type(body, dest_place)
+                let gc_atomic_resolved = if gc_atomic_dest_sema > 0: self.mir_input.mir_resolve_alias(gc_atomic_dest_sema) else: 0
+                let gc_atomic_base = if gc_atomic_resolved > 0 and self.mir_input.mir_get_type_kind(gc_atomic_resolved) == TypeKind.TY_GENERIC_INST: self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(gc_atomic_resolved)) else: 0
+                let gc_atomic_mir_start = body.call_arg_starts.get(args_id as i64)
+                let gc_atomic_mir_count = body.call_arg_counts.get(args_id as i64)
+                if self.intern.resolve(gc_atomic_base) == "Atomic" and gc_atomic_mir_count == 1:
+                    let gc_atomic_ty = self.mir_sema_type_to_llvm(gc_atomic_dest_sema)
+                    let gc_atomic_elem_ty = wl_struct_get_type_at(gc_atomic_ty, 0)
+                    let gc_atomic_arg_op = body.call_arg_operands.get(gc_atomic_mir_start as i64)
+                    let gc_atomic_arg_raw = self.mir_eval_operand(body, gc_atomic_arg_op, 0)
+                    let gc_atomic_arg = if wl_type_of(gc_atomic_arg_raw) != gc_atomic_elem_ty: self.coerce_value_to_type(gc_atomic_arg_raw, gc_atomic_elem_ty) else: gc_atomic_arg_raw
+                    var gc_atomic_result = wl_get_undef(gc_atomic_ty)
+                    gc_atomic_result = wl_build_insert_value(self.builder, gc_atomic_result, gc_atomic_arg, 0)
+                    let gc_atomic_dst = self.mir_place_ptr(body, dest_place, true, gc_atomic_ty)
+                    if gc_atomic_dst != 0:
+                        wl_build_store(self.builder, gc_atomic_result, gc_atomic_dst)
+                    else if dest_place >= 0 and dest_place < body.place_locals.len() as i32:
+                        let gc_atomic_local = body.place_locals.get(dest_place as i64)
+                        let gc_atomic_alloca = self.create_entry_alloca(gc_atomic_ty)
+                        wl_build_store(self.builder, gc_atomic_result, gc_atomic_alloca)
+                        self.mir_local_ptrs.insert(gc_atomic_local, gc_atomic_alloca)
+                        self.mir_local_types.insert(gc_atomic_local, gc_atomic_ty)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                    return true
 
             // Generic methods on generic structs are also generic functions in
             // sema, but they need receiver-owner bindings and receiver
