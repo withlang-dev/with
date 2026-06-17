@@ -6880,17 +6880,32 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
         self.lower_pattern_match(scrutinee_place, pat_node, arm_bb, fail_bb)
 
         self.switch_to(arm_bb)
+        // Scope the arm's pattern bindings: a binding (e.g. `Ok(b)`) must only
+        // be dropped on the path that actually bound it. Without this, the
+        // binding's drop is scheduled in the enclosing scope and runs on every
+        // path leaving the match — dropping uninitialized garbage when a
+        // different arm was taken (memory corruption for Drop-typed payloads).
+        self.push_scope()
         let _ = self.lower_pattern(pat_node, scrutinee_place)
 
         if guard_node != 0:
             let guard_op = self.lower_expr(guard_node)
             let guard_pass_bb = self.new_block()
+            let guard_fail_bb = self.new_block()
             let vals: Vec[i32] = Vec.new()
             vals.push(1)
             let targets: Vec[i32] = Vec.new()
             targets.push(guard_pass_bb as i32)
             let table = self.body.new_switch_table(vals, targets)
-            self.terminate(TermKind.TK_SWITCH_INT, guard_op, table, fail_bb, 0)
+            self.terminate(TermKind.TK_SWITCH_INT, guard_op, table, guard_fail_bb, 0)
+            // Guard failed: the pattern already bound this arm's variables, so
+            // drop them before falling through to the next arm (without popping
+            // the scope — that happens once on the guard-pass path below).
+            self.switch_to(guard_fail_bb)
+            let gscope_idx = self.drop_scope_starts.len() as i32 - 1
+            let gdrop_start = self.drop_scope_starts.get(gscope_idx as i64)
+            self.emit_drops_for_range(gdrop_start, self.drop_local_ids.len() as i32)
+            self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
             self.switch_to(guard_pass_bb)
 
         if result_is_void != 0:
@@ -6902,7 +6917,7 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
             let arm_value = self.lower_expr(body_node)
             self.expected_type = saved_arm_expected
             self.assign_operand_to_place(result_place, arm_value, self.ast.get_start(body_node))
-        self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+        self.pop_scope_with_goto(join_bb)
 
         dispatch_bb = fail_bb
 
