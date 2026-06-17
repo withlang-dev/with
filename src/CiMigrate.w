@@ -595,9 +595,37 @@ fn ci_migrate_prepare_include_path(input_path: str):
     for i in 0..g_migrate_include_paths.len() as i32:
         with_cimport_add_include_path(g_migrate_include_paths.get(i as i64))
 
+// Portable-baseline migration preamble: undefine host CPU-feature macros so C
+// libraries select their generic, portable code path instead of host-specific
+// SIMD / inline-asm fast paths (e.g. zlib's __ARM_FEATURE_CRC32 hardware-CRC
+// path, which is inline ARM assembly with no portable With representation).
+// Migration targets a portable baseline, not the host CPU; mandatory baseline
+// features (SSE2 on x86-64, NEON on aarch64) are intentionally left defined.
+// `#undef` of an undefined macro is a legal no-op, so this block is uniform and
+// architecture-agnostic. Emitted before the file's #line directive, so it never
+// shifts source line numbers.
+fn ci_migrate_portable_baseline_preamble() -> str:
+    "#undef __ARM_FEATURE_CRC32\n" ++
+    "#undef __ARM_FEATURE_CRYPTO\n" ++
+    "#undef __ARM_FEATURE_AES\n" ++
+    "#undef __ARM_FEATURE_SHA2\n" ++
+    "#undef __ARM_FEATURE_SHA3\n" ++
+    "#undef __ARM_FEATURE_SHA512\n" ++
+    "#undef __ARM_FEATURE_SVE\n" ++
+    "#undef __ARM_FEATURE_SVE2\n" ++
+    "#undef __SSE3__\n" ++
+    "#undef __SSSE3__\n" ++
+    "#undef __SSE4_1__\n" ++
+    "#undef __SSE4_2__\n" ++
+    "#undef __AVX__\n" ++
+    "#undef __AVX2__\n" ++
+    "#undef __AVX512F__\n" ++
+    "#undef __PCLMUL__\n" ++
+    "#undef __VPCLMULQDQ__\n"
+
 fn ci_migrate_source_prefix() -> str:
     let compat_preamble = migrate_host_compat_preamble()
-    var prefix = g_migrate_defines ++ compat_preamble
+    var prefix = ci_migrate_portable_baseline_preamble() ++ g_migrate_defines ++ compat_preamble
     for i in 0..g_migrate_forced_includes.len() as i32:
         prefix = prefix ++ "#include \"" ++ g_migrate_forced_includes.get(i as i64) ++ "\"\n"
     prefix
@@ -1340,7 +1368,13 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
 
     // Try to translate the function body.
     let body = ci_try_translate_fn_body(session, idx)
-    if body.len() > 0:
+    // A genuinely empty C body ({}) translates to the empty string — that is a
+    // successful translation of a no-op function (common: feature-gated stubs
+    // such as zlib's tr_static_init once STDC selects the precomputed tables),
+    // not a translation failure. Detect it via the body compound having no
+    // statements and emit an empty `return` body (handled by body_for_emit).
+    let empty_c_body = ret == "Unit" and fn_body_cursor >= 0 and with_ci_num_children(session, fn_body_cursor) == 0
+    if body.len() > 0 or empty_c_body:
         g_migrate_fn_translated = g_migrate_fn_translated + 1
         let ret_render = ci_unsafe_fn_ptr_type(ret)
         let ret_suffix = " -> " ++ ret_render
