@@ -434,6 +434,9 @@ type Sema {
     disc_has_payload: HashMap[i32, i32],
     bitpacked_types: HashMap[i32, i32],  // type_id → 1 if bitpacked
     packed_types: HashMap[i32, i32],     // type_id → 1 if repr(packed)/@[packed]
+    // §16.11: TY_FN/TY_EXTERN_FN type_id → 1 when the callable is unsafe to
+    // call (carries a raw-pointer-validity precondition). Part of type identity.
+    unsafe_fn_type_set: HashMap[i32, i32],
     // §16.4 union last-written tracking. Maps a local union variable's name
     // sym → the last-written field sym (0 = tracked-but-unknown after control
     // flow). Absent = untracked (never literal-initialized/assigned) and never
@@ -1441,6 +1444,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         disc_has_payload,
         bitpacked_types: sema_new_map_i32_i32(),
         packed_types: sema_new_map_i32_i32(),
+        unsafe_fn_type_set: sema_new_map_i32_i32(),
         union_last_written: sema_new_map_i32_i32(),
         union_tracked_syms: Vec.new(),
         union_in_assign_target: 0,
@@ -2550,6 +2554,11 @@ fn Sema.ensure_tuple_type(self: Sema, elems: Vec[i32], elem_count: i32) -> TypeI
     self.add_type(TypeKind.TY_TUPLE, te_start, elem_count, 0)
 
 fn Sema.find_fn_type_of_kind(self: Sema, kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
+    self.find_fn_type_of_kind_u(kind, params, param_count, ret, 0)
+
+// §16.11: unsafe-ness is part of callable type identity, so two signatures
+// that differ only in unsafe-ness are distinct types.
+fn Sema.find_fn_type_of_kind_u(self: Sema, kind: i32, params: &Vec[i32], param_count: i32, ret: TypeId, is_unsafe: i32) -> TypeId:
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) != kind:
@@ -2558,30 +2567,28 @@ fn Sema.find_fn_type_of_kind(self: Sema, kind: i32, params: &Vec[i32], param_cou
             continue
         if self.type_d2.get(ti as i64) != ret as i32:
             continue
+        let ti_unsafe = if self.unsafe_fn_type_set.contains(ti): 1 else: 0
+        if ti_unsafe != is_unsafe:
+            continue
         let te_start = self.type_d0.get(ti as i64)
         if self.type_extra_matches(te_start, params, param_count) != 0:
             return ti as TypeId
     0 as TypeId
 
 fn Sema.find_fn_type(self: Sema, params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
-    self.find_fn_type_of_kind(TypeKind.TY_FN, params, param_count, ret)
+    self.find_fn_type_of_kind_u(TypeKind.TY_FN, params, param_count, ret, 0)
 
 fn Sema.find_extern_fn_type(self: Sema, params: &Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
-    self.find_fn_type_of_kind(TypeKind.TY_EXTERN_FN, params, param_count, ret)
+    self.find_fn_type_of_kind_u(TypeKind.TY_EXTERN_FN, params, param_count, ret, 0)
 
 fn Sema.ensure_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
-    let existing = self.find_fn_type(params, param_count, ret)
-    if existing != 0:
-        return existing
-    if self.types_frozen != 0:
-        return 0 as TypeId
-    let te_start = self.type_extra.len() as i32
-    for pi in 0..param_count:
-        self.type_extra.push(params.get(pi as i64))
-    self.add_type(TypeKind.TY_FN, te_start, param_count, ret as i32)
+    self.ensure_callable_type(TypeKind.TY_FN, params, param_count, ret, 0)
 
 fn Sema.ensure_extern_fn_type(self: Sema, params: Vec[i32], param_count: i32, ret: TypeId) -> TypeId:
-    let existing = self.find_extern_fn_type(params, param_count, ret)
+    self.ensure_callable_type(TypeKind.TY_EXTERN_FN, params, param_count, ret, 0)
+
+fn Sema.ensure_callable_type(self: Sema, kind: i32, params: Vec[i32], param_count: i32, ret: TypeId, is_unsafe: i32) -> TypeId:
+    let existing = self.find_fn_type_of_kind_u(kind, &params, param_count, ret, is_unsafe)
     if existing != 0:
         return existing
     if self.types_frozen != 0:
@@ -2589,7 +2596,16 @@ fn Sema.ensure_extern_fn_type(self: Sema, params: Vec[i32], param_count: i32, re
     let te_start = self.type_extra.len() as i32
     for pi in 0..param_count:
         self.type_extra.push(params.get(pi as i64))
-    self.add_type(TypeKind.TY_EXTERN_FN, te_start, param_count, ret as i32)
+    let tid = self.add_type(kind, te_start, param_count, ret as i32)
+    if is_unsafe != 0:
+        self.unsafe_fn_type_set.insert(tid as i32, 1)
+    tid
+
+// True when a callable type is an unsafe fn/extern fn type.
+fn Sema.fn_type_is_unsafe(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    if self.unsafe_fn_type_set.contains(self.resolve_alias(tid as TypeId) as i32): 1 else: 0
 
 fn Sema.callable_fn_type(self: Sema, tid: TypeId) -> i32:
     var current = tid as i32
@@ -2629,6 +2645,13 @@ fn Sema.callable_fn_param_type(self: Sema, tid: TypeId, param_i: i32) -> i32:
 
 fn Sema.callable_any_fn_param_type(self: Sema, tid: TypeId, param_i: i32) -> i32:
     self.fn_type_param_type(self.callable_any_fn_type(tid), param_i)
+
+// §16.11: a safe callable type cannot accept an unsafe callable value; safe→
+// unsafe widening and same-unsafe-ness are allowed.
+fn Sema.callable_unsafe_coercion_ok(self: Sema, expected: i32, actual: i32) -> i32:
+    if self.fn_type_is_unsafe(expected) == 0 and self.fn_type_is_unsafe(actual) != 0:
+        return 0
+    1
 
 fn Sema.fn_types_compatible(self: Sema, expected: i32, actual: i32) -> i32:
     if self.get_type_d1(expected) != self.get_type_d1(actual):
@@ -4297,8 +4320,10 @@ fn Sema.types_compatible_fast(self: Sema, expected: TypeId, actual: TypeId) -> i
     if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_FLOAT:
         return 1
     if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
-        return 1
+        return self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32)
     if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
+        if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
+            return 0
         return self.fn_types_compatible(exp_r, act_r)
     if (exp_k == TypeKind.TY_PTR or exp_k == TypeKind.TY_REF) and act_k == TypeKind.TY_FN:
         return 1
@@ -4368,7 +4393,11 @@ fn Sema.types_compatible(self: Sema, expected: TypeId, actual: TypeId) -> i32:
         return self.pointer_pointees_compatible(exp_r, act_r)
     if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_PTR:
         return self.pointer_pointees_compatible(exp_r, act_r)
+    if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
+        return self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32)
     if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
+        if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
+            return 0
         return self.fn_types_compatible(exp_r, act_r)
     if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
         if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:

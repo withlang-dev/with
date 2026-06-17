@@ -175,6 +175,8 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
             out.state.fn_stack_sizes.insert(ni, src.state.fn_stack_sizes.get(ni).unwrap())
         if src.state.fn_weak_flags.contains(ni):
             out.state.fn_weak_flags.insert(ni, src.state.fn_weak_flags.get(ni).unwrap())
+        if src.state.unsafe_fn_type_nodes.contains(ni):
+            out.state.unsafe_fn_type_nodes.insert(ni, 1)
         let effect_pin_count = src.fn_effect_pin_count(node)
         for pi in 0..effect_pin_count:
             out.add_fn_effect_pin(node, src.fn_effect_pin_param(node, pi), src.fn_effect_pin_bits(node, pi))

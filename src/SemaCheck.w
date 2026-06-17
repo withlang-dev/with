@@ -368,9 +368,9 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
             let p_node = self.ast.get_extra(extra_start + pi)
             param_types.push(self.resolve_type_expr(p_node) as i32)
         let ret = self.resolve_type_expr(ret_node)
-        if kind == NodeKind.NK_TYPE_EXTERN_FN:
-            return self.ensure_extern_fn_type(param_types, param_count, ret)
-        return self.ensure_fn_type(param_types, param_count, ret)
+        let fn_kind = if kind == NodeKind.NK_TYPE_EXTERN_FN: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
+        let is_unsafe = self.ast.is_unsafe_fn_type_node(node)
+        return self.ensure_callable_type(fn_kind, param_types, param_count, ret, is_unsafe)
 
     if kind == NodeKind.NK_TYPE_ARRAY:
         let elem = self.resolve_type_expr(self.ast.get_data0(node))
@@ -5160,9 +5160,14 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     let sig_idx = self.get_sig(sym)
     if sig_idx >= 0 and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
         let fn_tid = self.sig_type_ids.get(sig_idx as i64)
+        let fn_is_unsafe = self.fn_symbol_is_unsafe(sym)
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected = self.resolve_alias(self.expected_expr_type)
             if self.get_type_kind(expected) == TypeKind.TY_EXTERN_FN and self.fn_types_compatible(expected, fn_tid) != 0:
+                // §16.11: an unsafe fn may not coerce to a safe callable type.
+                if fn_is_unsafe != 0 and self.fn_type_is_unsafe(expected as i32) == 0:
+                    self.emit_error("cannot use unsafe fn where a safe function type is expected; mark the target type 'unsafe fn' or wrap the contract in a safe function", node)
+                    return 0
                 self.typed_expr_types.insert(node, expected as i32)
                 return expected as i32
         self.typed_expr_types.insert(node, fn_tid)
@@ -10979,6 +10984,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         let recv_ty = self.adjust_static_receiver_type(recv_expr, self.check_expr(recv_expr) as i32)
         let callable_tid = self.callable_any_fn_type(self.field_access_type_from_obj(recv_ty, recv_field) as TypeId)
         if callable_tid != 0:
+            // §16.11: calling an unsafe callback field requires an unsafe context.
+            if self.fn_type_is_unsafe(callable_tid) != 0:
+                self.require_unsafe_operation("call to unsafe function pointer requires unsafe context", node)
             if self.ast.has_call_named_args(node) != 0:
                 self.emit_error("named arguments are not supported for closures or function pointers", node)
             let arg_types_for_callable: Vec[i32] = Vec.new()
@@ -11047,6 +11055,10 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         callable_value_tid = self.callable_any_fn_type(self.check_expr(callee) as TypeId)
         if self.ast.kind(callee) == NodeKind.NK_CLOSURE:
             callable_closure_node = callee
+
+    // §16.11: calling an unsafe callable value requires an unsafe context.
+    if callable_value_tid != 0 and self.fn_type_is_unsafe(callable_value_tid) != 0:
+        self.require_unsafe_operation("call to unsafe function pointer requires unsafe context", node)
 
     // Reject named args on closures and function pointers (spec §F4 rule 7)
     if self.ast.has_call_named_args(node) != 0:

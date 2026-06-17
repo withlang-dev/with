@@ -7097,6 +7097,31 @@ fn Parser.parse_type_expr(self: Parser) -> NodeId:
         let inner = self.parse_type_expr()
         return self.pool.add_node(NodeKind.NK_TYPE_OPTIONAL, start, self.prev_end(), inner, 0, 0)
 
+    if t == TokenKind.TK_KW_UNSAFE:
+        // §16.11 unsafe callable types: `unsafe fn(...)` / `unsafe extern "C" fn(...)`.
+        self.advance()
+        if self.peek() == TokenKind.TK_KW_FN:
+            let node = self.parse_fn_type_node(start, NodeKind.NK_TYPE_FN)
+            self.pool.mark_unsafe_fn_type(node)
+            return node
+        if self.peek() == TokenKind.TK_KW_EXTERN:
+            self.advance()
+            if self.peek() != TokenKind.TK_STRING_LIT:
+                self.emit_error("expected ABI string in extern function pointer type, e.g. unsafe extern \"C\" fn(...) -> T")
+                return self.poisoned_expr()
+            let uabi = strip_string_token_text(self.source.slice(self.current_start() as i64, self.current_end() as i64))
+            if uabi != "C":
+                self.emit_error("only extern \"C\" function pointer types are supported")
+            self.advance()
+            if self.peek() != TokenKind.TK_KW_FN:
+                self.emit_error("expected fn after extern ABI string in function pointer type")
+                return self.poisoned_expr()
+            let enode = self.parse_fn_type_node(start, NodeKind.NK_TYPE_EXTERN_FN)
+            self.pool.mark_unsafe_fn_type(enode)
+            return enode
+        self.emit_error("expected 'fn' or 'extern' after 'unsafe' in type position")
+        return self.poisoned_expr()
+
     if t == TokenKind.TK_KW_EXTERN:
         self.advance()
         if self.peek() != TokenKind.TK_STRING_LIT:

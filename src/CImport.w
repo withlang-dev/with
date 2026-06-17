@@ -1098,10 +1098,11 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: s
             if field_count > 0:
                 fields = fields ++ ", "
             let default_val = ci_default_for_type(field_ty)
+            let field_ty_render = ci_unsafe_fn_ptr_type(field_ty)
             if default_val.len() > 0:
-                fields = fields ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty ++ " = " ++ default_val
+                fields = fields ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty_render ++ " = " ++ default_val
             else:
-                fields = fields ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty
+                fields = fields ++ ci_escape_reserved(actual_name) ++ ": " ++ field_ty_render
             field_count = field_count + 1
         i = i + 1
 
@@ -1205,6 +1206,16 @@ fn ci_has_demoted_field(session: i64, idx: i32, demoted: str) -> bool:
                 return true
         fi = fi + 1
     false
+
+// §16.11/§16.7: a C function-pointer type whose signature carries a raw
+// pointer is an unmodeled callback contract — emit it as `unsafe` so calling
+// the slot honestly requires an unsafe context. Value-only signatures stay safe.
+fn ci_unsafe_fn_ptr_type(t: str) -> str:
+    if ci_starts_with(t, "unsafe "):
+        return t
+    if (ci_starts_with(t, "extern \"C\" fn(") or ci_starts_with(t, "fn(")) and (ci_str_contains(t, "*mut ") or ci_str_contains(t, "*const ")):
+        return "unsafe " ++ t
+    t
 
 fn ci_field_type_is_demoted(ftype: str, demoted: str) -> bool:
     if ftype.len() == 0:
@@ -1336,7 +1347,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
             has_unsupported = true
             unsupported_reason = "opaque type passed by value (parameter " ++ pname ++ ")"
 
-        params = params ++ ci_param_signature_name(ci_escape_reserved(pname), pi) ++ ": " ++ ptype
+        params = params ++ ci_param_signature_name(ci_escape_reserved(pname), pi) ++ ": " ++ ci_unsafe_fn_ptr_type(ptype)
 
     if is_variadic != 0:
         if param_count > 0:
@@ -1879,10 +1890,11 @@ fn ci_build_one_field(session: i64, idx: i32, fi: i32, known_structs: str) -> st
     let actual_name = if fname.len() == 0: f"unnamed_{fi}" else: fname
     let safe_fname = ci_escape_reserved(actual_name)
     let default_val = ci_default_for_type(ftype)
+    let ftype_render = ci_unsafe_fn_ptr_type(ftype)
     if default_val.len() > 0:
-        safe_fname ++ ": " ++ ftype ++ " = " ++ default_val
+        safe_fname ++ ": " ++ ftype_render ++ " = " ++ default_val
     else:
-        safe_fname ++ ": " ++ ftype
+        safe_fname ++ ": " ++ ftype_render
 
 fn ci_default_for_type(ty: str) -> str:
     if ty == "i8" or ty == "u8" or ty == "i16" or ty == "u16": return "0"
@@ -2125,10 +2137,11 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
             let ftype = with_cimport_typedef_anon_field_type(session, idx, afi)
             let actual_fname = if fname.len() == 0: f"unnamed_{afi}" else: fname
             let default_val = ci_default_for_type(ftype)
+            let ftype_render = ci_unsafe_fn_ptr_type(ftype)
             if default_val.len() > 0:
-                fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype ++ " = " ++ default_val
+                fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype_render ++ " = " ++ default_val
             else:
-                fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype
+                fields = fields ++ ci_escape_reserved(actual_fname) ++ ": " ++ ftype_render
             afi = afi + 1
         with_cimport_mark_name_emitted(name)
         ci_mark_type_name_emitted(name)

@@ -477,6 +477,7 @@ type AstPoolState {
     fn_stack_sizes: HashMap[i32, i32],
     fn_weak_flags: HashMap[i32, i32],
     fn_target_arch: HashMap[i32, i32],   // fn_node → @[target("arch")] arch name sym
+    unsafe_fn_type_nodes: HashMap[i32, i32],  // NK_TYPE_FN/EXTERN_FN node → 1 if `unsafe fn(...)`
     fn_effect_pin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_effect_pin_*
     fn_effect_pin_counts: HashMap[i32, i32],   // fn_node → entry count
     fn_effect_pin_params: Vec[i32],            // param_name_sym
@@ -558,6 +559,7 @@ fn AstPool.new -> AstPool:
             fn_stack_sizes: HashMap.new(),
             fn_weak_flags: HashMap.new(),
             fn_target_arch: HashMap.new(),
+            unsafe_fn_type_nodes: HashMap.new(),
             fn_effect_pin_starts: HashMap.new(),
             fn_effect_pin_counts: HashMap.new(),
             fn_effect_pin_params: Vec.new(),
@@ -1302,6 +1304,14 @@ fn AstPool.mark_fn_target_arch(self: AstPool, node: NodeId, arch_sym: i32):
 fn AstPool.fn_target_arch_of(self: AstPool, node: NodeId) -> i32:
     let v = self.state.fn_target_arch.get(node as i32)
     if v.is_some(): v.unwrap() else: 0
+
+// §16.11: mark an NK_TYPE_FN/NK_TYPE_EXTERN_FN node as `unsafe fn(...)`.
+fn AstPool.mark_unsafe_fn_type(self: AstPool, node: NodeId):
+    self.state.unsafe_fn_type_nodes.insert(node as i32, 1)
+
+fn AstPool.is_unsafe_fn_type_node(self: AstPool, node: NodeId) -> i32:
+    if self.state.unsafe_fn_type_nodes.contains(node as i32): return 1
+    0
 
 fn AstPool.mark_iter_of_self_fn(self: AstPool, node: NodeId):
     self.state.iter_of_self_fn_nodes.push(node as i32)
