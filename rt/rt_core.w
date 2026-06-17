@@ -667,7 +667,26 @@ fn rt_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
     new_ptr
 
 // Null-terminate a str for syscalls
+fn str_has_interior_nul(s: str) -> bool:
+    let p = str_data(s)
+    let n = str_length(s)
+    if p as i64 == 0:
+        return false
+    var i: i64 = 0
+    while i < n:
+        if (unsafe p[i]) == 0:
+            return true
+        i = i + 1
+    false
+
+// Safe call-scoped str -> C-string conversion. A `str` may carry interior NUL
+// bytes (§16.3c), which C would silently truncate at; that is forbidden, so the
+// conversion fails loudly instead of producing a poisoned C string. Raw interop
+// (`str_data(s) as *const c_char`) is unaffected and stays explicit/unsafe.
 fn str_to_cstr(s: str) -> *const u8:
+    if str_has_interior_nul(s):
+        let empty = make_str("" as *const u8, 0)
+        with_panic_core("str to C string conversion: interior NUL byte", empty, 0)
     let slen = str_length(s)
     let buf = rt_alloc(slen + 1)
     rt_memcpy(buf, str_data(s), slen)

@@ -212,6 +212,38 @@ fn Sema.builtin_arg_type_compatible(self: Sema, expected: i32, actual: i32) -> i
             return 1
     0
 
+// §16.3c: a `*const c_char` (i.e. `*const i8`) parameter is the modeled
+// input-C-string boundary that a `str` argument auto-coerces across.
+fn Sema.sema_type_is_c_char_pointer(self: Sema, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.resolve_alias(sema_ty as TypeId) as i32
+    if self.get_type_kind(resolved) != TypeKind.TY_PTR:
+        return 0
+    if self.get_type_d1(resolved) != 0:
+        return 0
+    let pointee = self.resolve_alias(self.get_type_d0(resolved) as TypeId) as i32
+    if pointee == self.ty_i8 as i32:
+        return 1
+    0
+
+// §16.3c: a string literal provably containing a NUL must not coerce to a C
+// string — C would truncate at the NUL. Decode the literal's escapes and scan
+// the bytes.
+fn Sema.string_literal_has_interior_nul(self: Sema, node: i32) -> i32:
+    if node <= 0:
+        return 0
+    if self.ast.kind(node) != NodeKind.NK_STRING_LIT:
+        return 0
+    let decoded = sema_regex_decode_literal_escapes(self.pool_resolve(self.ast.get_data0(node)))
+    let n = decoded.len() as i32
+    var i = 0
+    while i < n:
+        if decoded[i] == 0:
+            return 1
+        i = i + 1
+    0
+
 fn Sema.can_auto_ref_arg(self: Sema, expected: i32, actual: i32) -> i32:
     if expected == 0 or actual == 0:
         return 0
@@ -11284,6 +11316,11 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         if is_closure_arg:
             self.closure_direct_arg_escape_flags.pop()
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
+        // §16.3c: a string literal that provably contains an interior NUL must
+        // not coerce to a C string at an FFI boundary — C would truncate.
+        if expected_ty != 0 and self.sema_type_is_c_char_pointer(expected_ty) != 0 and (self.extern_fn_names.contains(fn_sym) or self.ci_syms.contains(fn_sym)):
+            if self.string_literal_has_interior_nul(arg_node) != 0:
+                self.emit_error("string literal has an interior NUL byte and cannot coerce to a C string (`*const c_char`); the conversion would truncate at the NUL (§16.3c)", arg_node)
         if sig_idx >= 0 and self.extern_fn_names.contains(fn_sym) and expected_ty != 0:
             let callback_expected = self.resolve_alias(expected_ty as TypeId)
             if self.get_type_kind(callback_expected) == TypeKind.TY_EXTERN_FN:
