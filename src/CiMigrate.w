@@ -1302,7 +1302,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
             pname = ci_get_nth_pipe_entry(cursor_param_names, pi)
         let escaped_pname = if pname.len() > 0: ci_escape_reserved(pname) else: ""
         let sig_pname = ci_param_signature_name(escaped_pname, pi)
-        params = params ++ sig_pname ++ ": " ++ ptype
+        params = params ++ sig_pname ++ ": " ++ ci_unsafe_fn_ptr_type(ptype)
 
     if is_variadic != 0:
         if param_count > 0:
@@ -1332,7 +1332,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         g_migrate_fn_translated = g_migrate_fn_translated + 1
         let cc = with_cimport_fn_calling_conv(session, idx)
         let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
-        return cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+        let ret_render = ci_unsafe_fn_ptr_type(ret)
+        return cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret_render ++ "\n"
 
     // @[c_export] for non-static functions (preserves C ABI)
     let export_prefix = if (g_migrate_no_c_export != 0 and g_migrate_export_function_defs == 0) or storage == CX_SC_STATIC: "" else: "@[c_export(\"" ++ name ++ "\")]\n"
@@ -1341,7 +1342,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     let body = ci_try_translate_fn_body(session, idx)
     if body.len() > 0:
         g_migrate_fn_translated = g_migrate_fn_translated + 1
-        let ret_suffix = " -> " ++ ret
+        let ret_render = ci_unsafe_fn_ptr_type(ret)
+        let ret_suffix = " -> " ++ ret_render
         let body_for_emit = if ret == "Unit" and ci_migrate_text_is_blank(body): "    return\n" else: body
         let fn_keyword = if ci_migrate_extern_fn_call_requires_unsafe(safe_name): "unsafe fn " else: "fn "
         if migrate_prefer_brace():

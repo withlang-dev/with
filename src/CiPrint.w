@@ -344,6 +344,27 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
 
 // ── CiType printing ──────────────────────────────────────────
 
+fn ci_type_has_raw_pointer(types: CiTypePool, id: CiTypeId) -> bool:
+    if (id as i32) == 0:
+        return false
+    let kind = types.kind(id)
+    if kind == CiTypeKind.CT_POINTER:
+        return true
+    if kind == CiTypeKind.CT_ARRAY:
+        return ci_type_has_raw_pointer(types, (types.get_d0(id)) as CiTypeId)
+    if kind == CiTypeKind.CT_FN_PTR:
+        let ret = (types.get_d0(id)) as CiTypeId
+        if ci_type_has_raw_pointer(types, ret):
+            return true
+        let ps = types.get_d1(id)
+        let pc = types.get_d2(id)
+        var i = 0
+        while i < pc:
+            if ci_type_has_raw_pointer(types, (types.get_extra(ps + i)) as CiTypeId):
+                return true
+            i = i + 1
+    false
+
 fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
     if (id as i32) == 0:
         return "<ci:ty:0>"
@@ -379,7 +400,8 @@ fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
         let ret = (types.get_d0(id)) as CiTypeId
         let ps = types.get_d1(id)
         let pc = types.get_d2(id)
-        var out = "fn("
+        let fn_kw = if ci_type_has_raw_pointer(types, id): "unsafe fn(" else: "fn("
+        var out = fn_kw
         var i: i32 = 0
         while i < pc:
             if i > 0:

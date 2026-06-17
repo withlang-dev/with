@@ -1499,6 +1499,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
 
     if self.peek() == TokenKind.TK_KW_FN or
        self.peek() == TokenKind.TK_KW_EXTERN or
+       self.peek() == TokenKind.TK_KW_UNSAFE or
        self.peek() == TokenKind.TK_IDENT or
        self.peek() == TokenKind.TK_AMPERSAND or
        self.peek() == TokenKind.TK_L_PAREN or

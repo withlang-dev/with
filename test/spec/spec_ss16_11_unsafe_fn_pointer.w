@@ -6,9 +6,11 @@
 unsafe fn bump(p: *mut i32) -> Unit:
     *p = *p + 1
 
+type RawCallback = unsafe extern "C" fn(*mut i32) -> Unit
+
 fn main:
     var x: i32 = 5
-    let cb: unsafe extern "C" fn(*mut i32) -> Unit = bump
+    let cb: RawCallback = bump
     unsafe:
         cb(&raw mut x)
     if x == 6:

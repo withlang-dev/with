@@ -3779,6 +3779,8 @@ fn bs_check_migrate_noop_pointer_casts(ctx: &ActionCtx, compiler_path: str, case
     required |> push("return ((&raw mut g as *mut ctx))")
     required |> push("var __local_local: *mut ctx = ((&raw mut g as *mut ctx))")
     required |> push("(&raw mut g as *mut ctx)")
+    required |> push("type callback_fn = unsafe extern \"C\" fn(*mut c_void) -> Unit")
+    required |> push("fn ret_callback() -> unsafe extern \"C\" fn(*mut c_void) -> Unit:")
     required |> push("return callback")
     for i in 0..required.len() as i32:
         rc = bs_assert_contains(ctx, out_text, required.get(i as i64), "noop_pointer_cast_exprs")

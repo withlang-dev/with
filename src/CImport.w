@@ -1308,7 +1308,8 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
             let fn_kw = if si_raw: "unsafe fn " else: "fn "
             if si_raw:
                 ci_record_raw_function_name(name)
-            return ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret, body)
+            let si_ret_render = ci_unsafe_fn_ptr_type(si_ret)
+            return ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret_render, body)
         ci_record_omitted_symbol_cat(name, ci_get_decl_location(session, name), "raw-modelable", "inline body translation failed")
         return ""
     if storage == CX_SC_STATIC and is_inline == 0:
@@ -1382,7 +1383,8 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
 
     let cc = with_cimport_fn_calling_conv(session, idx)
     let cc_prefix = if cc != "c" and cc.len() > 0: "@[callconv(\"" ++ cc ++ "\")]\n" else: ""
-    cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret ++ "\n"
+    let ret_render = ci_unsafe_fn_ptr_type(ret)
+    cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ") -> " ++ ret_render ++ "\n"
 
 // ── Member function detection (Zig-style) ───────────────────
 // Scan all functions. If a function's first parameter is *StructType (pointer
@@ -2198,7 +2200,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
     let safe_name = ci_escape_reserved(name)
     with_cimport_mark_name_emitted(name)
     ci_mark_type_name_emitted(name)
-    let rendered = "type " ++ safe_name ++ " = " ++ translated ++ "\n"
+    let rendered = "type " ++ safe_name ++ " = " ++ ci_unsafe_fn_ptr_type(translated) ++ "\n"
     if ci_migrate_shared_decl_add("type", name, rendered):
         return ""
     rendered
