@@ -2335,6 +2335,9 @@ fn Sema.expr_is_tuple_of_tasks(self: Sema, node: i32) -> i32:
 fn Sema.expr_is_task_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
+    if self.typed_expr_types.contains(node):
+        if self.type_is_awaitable_task(self.typed_expr_types.get(node).unwrap()) != 0:
+            return 1
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_is_task_value(self.ast.get_data0(node))
@@ -6374,6 +6377,9 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         if self.in_defer != 0:
             self.emit_error_code("? operator not allowed in defer", node, "E0901")
             return 0
+        let tuple_await_question_ty = self.tuple_await_question_type(operand_node, node)
+        if tuple_await_question_ty != 0:
+            return tuple_await_question_ty
         let unwrapped = self.try_unwrapped_type(operand as i32)
         if unwrapped == 0:
             let try_info = self.resolve_user_try_info(operand as i32)
@@ -9049,6 +9055,43 @@ fn Sema.result_error_type(self: Sema, result_tid: i32) -> i32:
     if self.get_generic_inst_arg_count(resolved as i32) != 2:
         return 0
     self.get_generic_inst_arg(resolved as i32, 1)
+
+fn Sema.tuple_await_question_type(self: Sema, await_node: i32, question_node: i32) -> i32:
+    if await_node == 0 or self.ast.kind(await_node) != NodeKind.NK_AWAIT:
+        return 0
+    let inner = self.ast.get_data0(await_node)
+    if inner == 0 or self.ast.kind(inner) != NodeKind.NK_TUPLE:
+        return 0
+    let await_ty = if self.typed_expr_types.contains(await_node): self.typed_expr_types.get(await_node).unwrap() else: self.check_expr(await_node) as i32
+    let resolved = self.resolve_alias(await_ty)
+    if self.get_type_kind(resolved) != TypeKind.TY_TUPLE:
+        self.emit_error("tuple await? requires Task[Result[...]] elements", question_node)
+        return 0
+    let elem_count = self.get_type_d1(resolved)
+    let elem_start = self.get_type_d0(resolved)
+    let target_err_ty = self.result_error_type(self.current_return_type as i32)
+    if target_err_ty == 0:
+        self.emit_error("tuple await? requires the enclosing function to return Result", question_node)
+        return 0
+    let payloads: Vec[i32] = Vec.new()
+    for ei in 0..elem_count:
+        let elem_ty = self.type_extra.get((elem_start + ei) as i64)
+        let payload_ty = self.try_unwrapped_type(elem_ty)
+        let source_err_ty = self.result_error_type(elem_ty)
+        if payload_ty == 0 or source_err_ty == 0:
+            self.emit_error("tuple await? requires Task[Result[...]] elements", question_node)
+            return 0
+        let conversion_chain = self.error_conversion_chain(target_err_ty, source_err_ty)
+        if conversion_chain.ambiguous != 0:
+            self.emit_error("ambiguous error conversion from '" ++ self.type_name(source_err_ty) ++ "' to '" ++ self.type_name(target_err_ty) ++ "': via variants '" ++ self.pool_resolve(conversion_chain.first_variant) ++ "' and '" ++ self.pool_resolve(conversion_chain.other_variant) ++ "'", question_node)
+            return 0
+        if conversion_chain.found == 0:
+            self.emit_error("? cannot convert error type '" ++ self.type_name(source_err_ty) ++ "' to '" ++ self.type_name(target_err_ty) ++ "'", question_node)
+            return 0
+        payloads.push(payload_ty)
+    let tuple_ty = self.ensure_tuple_type(payloads, elem_count) as i32
+    self.typed_expr_types.insert(question_node, tuple_ty)
+    tuple_ty
 
 fn Sema.option_payload_type_for_try(self: Sema, option_tid: i32) -> i32:
     if option_tid <= 0:

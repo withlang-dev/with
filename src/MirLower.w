@@ -8172,13 +8172,16 @@ fn MirBuilder.lower_enum_accessor_call(self: MirBuilder, self_expr: i32, method_
     self.forget_string_flow_facts()
     self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, result_place)
 
-fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32:
-    if self.sema.try_branch_fns.contains(node):
-        return self.lower_user_try_question_mark(expr, node)
+fn MirBuilder.emit_cleanup_awaits_from(self: MirBuilder, task_ops: &Vec[i32], start_idx: i32, node: i32):
+    var ci = start_idx
+    while ci < task_ops.len() as i32:
+        let task_op = task_ops.get(ci as i64)
+        self.emit_task_cancel_call(task_op, MirIntrinsic.FIBER_CANCEL, node)
+        self.lower_cleanup_await(task_op, node)
+        ci = ci + 1
 
-    let value_op = self.lower_expr(expr)
-    let value_ty = self.expr_type(expr)
-    let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(expr))
+fn MirBuilder.lower_question_mark_value(self: MirBuilder, value_op: i32, value_ty: i32, result_ty_hint: i32, node: i32, span_node: i32, cleanup_task_ops: &Vec[i32], cleanup_start_idx: i32) -> i32:
+    let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(span_node))
 
     let pass_bb = self.new_block()
     let fail_bb = self.new_block()
@@ -8222,30 +8225,33 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
                         let wrapped_err_place = self.place_for_local(wrapped_err_local)
                         let wrapped_fields: Vec[i32] = Vec.new()
                         wrapped_fields.push(target_err_op)
-                        self.assign_enum_variant_to_place(wrapped_err_place, wrapped_ty, conversion_variant, wrapped_fields, self.ast.get_start(expr))
+                        self.assign_enum_variant_to_place(wrapped_err_place, wrapped_ty, conversion_variant, wrapped_fields, self.ast.get_start(span_node))
                         target_err_op = self.operand_for_place(wrapped_err_place, wrapped_ty)
                         if ci == 0:
                             break
                         ci = ci - 1
                     let err_fields: Vec[i32] = Vec.new()
                     err_fields.push(target_err_op)
-                    self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.err, err_fields, self.ast.get_start(expr))
+                    self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.err, err_fields, self.ast.get_start(span_node))
     else if source_option_ty != 0:
         if target_option_ty == 0:
             self.mark_unsupported()
         else:
             let none_fields: Vec[i32] = Vec.new()
-            self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.none, none_fields, self.ast.get_start(expr))
+            self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.none, none_fields, self.ast.get_start(span_node))
     else:
         let fail_op = self.body.new_operand(OperandKind.OK_MOVE, value_place)
-        self.assign_operand_to_place(ret_place, fail_op, self.ast.get_start(expr))
+        self.assign_operand_to_place(ret_place, fail_op, self.ast.get_start(span_node))
+    self.emit_cleanup_awaits_from(cleanup_task_ops, cleanup_start_idx, node)
     self.emit_errdefers_for_return()
     self.emit_defers_for_return()
     self.emit_drops_for_return()
     self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
 
     // Extract Ok payload via ProjKind.PK_DOWNCAST + field access
-    var result_ty = self.expr_type(node)
+    var result_ty = result_ty_hint
+    if result_ty == 0 or result_ty == self.sema.ty_void:
+        result_ty = self.sema.try_unwrapped_type(value_ty)
     if result_ty == 0 or result_ty == self.sema.ty_void:
         result_ty = value_ty
     self.switch_to(pass_bb)
@@ -8254,7 +8260,7 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
     let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), value_ty)
     let payload_place = self.body.new_field_place(downcast_place, 0, result_ty)
     let pass_op = self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
-    self.assign_operand_to_place(result_place, pass_op, self.ast.get_start(expr))
+    self.assign_operand_to_place(result_place, pass_op, self.ast.get_start(span_node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
@@ -8262,6 +8268,53 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+fn MirBuilder.lower_tuple_await_question_mark(self: MirBuilder, await_node: i32, question_node: i32) -> i32:
+    let inner = self.ast.get_data0(await_node)
+    if inner == 0 or self.ast.kind(inner) != NodeKind.NK_TUPLE:
+        return self.unit_operand()
+    let extra = self.ast.get_data0(inner)
+    let count = self.ast.get_data1(inner)
+    let await_tuple_ty = self.expr_type(await_node)
+    let result_tuple_ty = self.expr_type(question_node)
+
+    let task_ops: Vec[i32] = Vec.new()
+    for i in 0..count:
+        let elem = self.ast.get_extra(extra + i)
+        self.cancel_scheduled_value_drop_for_receiver_expr(elem)
+        task_ops.push(self.lower_expr(elem))
+
+    let fields: Vec[i32] = Vec.new()
+    let names: Vec[i32] = Vec.new()
+    for i in 0..count:
+        let elem_node = self.ast.get_extra(extra + i)
+        let task_ty = self.expr_type(elem_node)
+        let result_ty = self.tuple_elem_type(await_tuple_ty, i)
+        let payload_ty = self.tuple_elem_type(result_tuple_ty, i)
+        let awaited = self.lower_single_await(task_ops.get(i as i64), result_ty, task_ty, await_node)
+        let payload = self.lower_question_mark_value(awaited, result_ty, payload_ty, question_node, await_node, &task_ops, i + 1)
+        fields.push(payload)
+        names.push(0)
+
+    let fid = self.body.new_agg_fields(fields, names)
+    let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
+    let tmp = self.new_temp(result_tuple_ty)
+    let place = self.place_for_local(tmp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(question_node))
+    self.body.new_operand(if self.sema.is_copy(result_tuple_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, place)
+
+fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32:
+    if self.sema.try_branch_fns.contains(node):
+        return self.lower_user_try_question_mark(expr, node)
+    if self.ast.kind(expr) == NodeKind.NK_AWAIT:
+        let await_inner = self.ast.get_data0(expr)
+        if await_inner != 0 and self.ast.kind(await_inner) == NodeKind.NK_TUPLE:
+            return self.lower_tuple_await_question_mark(expr, node)
+
+    let cleanup_task_ops: Vec[i32] = Vec.new()
+    let value_op = self.lower_expr(expr)
+    let value_ty = self.expr_type(expr)
+    self.lower_question_mark_value(value_op, value_ty, self.expr_type(node), node, expr, &cleanup_task_ops, cleanup_task_ops.len() as i32)
 
 fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i32, node: i32) -> i32:
     let value_op = self.lower_expr(expr)
