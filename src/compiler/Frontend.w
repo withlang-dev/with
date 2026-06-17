@@ -376,13 +376,35 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         // Mark all c_import-synthesized declarations
         let ci_owner_path = self.decl_source_path_frontend(i)
         let ci_owner_file_id = self.decl_source_file_id_frontend(i)
+
+        // §16.2 selective import: keep only the requested symbols (and their
+        // auto-methods); strict completeness is validated below.
+        let only_count = self.c_import_only_count_frontend(out, decl)
         var di = before
         while di < after:
-            ordered.push(out.get_decl(di) as i32)
-            ordered_paths.push(frontend_owned_text(ci_owner_path))
-            ordered_file_ids.push(ci_owner_file_id)
-            ordered_ci.push(1)  // c_import origin
+            let dnode = out.get_decl(di)
+            var include = true
+            if only_count > 0:
+                let dname = self.c_import_decl_bound_name_frontend(out, dnode)
+                include = frontend_is_cimport_support_name(dname) or self.c_import_only_matches_frontend(out, decl, dname)
+            if include:
+                ordered.push(dnode as i32)
+                ordered_paths.push(frontend_owned_text(ci_owner_path))
+                ordered_file_ids.push(ci_owner_file_id)
+                ordered_ci.push(1)  // c_import origin
             di = di + 1
+
+        // A requested symbol that was never produced (omitted, untranslated, or
+        // absent from the header) is a loud failure (§16.2).
+        if only_count > 0:
+            for oi in 0..only_count:
+                let oname = self.c_import_only_name_frontend(out, decl, oi)
+                if not self.c_import_produced_name_frontend(out, before, after, oname):
+                    self.c_import_emit_selective_missing_frontend(out, decl, oname)
+
+        // strict: any unacknowledged omission turns the whole import non-zero.
+        if self.c_import_is_strict_frontend(out, decl):
+            self.c_import_emit_strict_omissions_frontend(out, decl, synthetic)
 
     while out.decl_count() > 0:
         out.state.decls.pop()
@@ -412,6 +434,13 @@ fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_s
     for ni in 0..nm_count:
         let nm_sym = pool.get_extra(link_start + link_count + allow_count + ni)
         key = key ++ "|" ++ self.pool.resolve(nm_sym)
+    // §16.2 selective/strict imports must not share cached output with a
+    // permissive whole import of the same header.
+    let strict_flag = if self.c_import_is_strict_frontend(pool, decl): 1 else: 0
+    key = key ++ "\n#strict:" ++ f"{strict_flag}" ++ "\n#only:"
+    let only_count = self.c_import_only_count_frontend(pool, decl)
+    for oi in 0..only_count:
+        key = key ++ "|" ++ self.c_import_only_name_frontend(pool, decl, oi)
     key = key ++ "\n#defines:"
     for di in 0..self.project_config.c_import_defines.len() as i32:
         key = key ++ "|" ++ self.project_config.c_import_defines.get(di as i64)
@@ -646,6 +675,99 @@ fn Zcu.c_import_emit_untranslated_error_frontend(self: Zcu, pool: AstPool, decl:
         end: pool.get_end(decl),
     }
     self.diagnostics.emit(Diagnostic.err("c_import: untranslated " ++ kind ++ " '" ++ display_name ++ "'; add it to allow_untranslated to acknowledge omission", span))
+
+// §16.2 selective-import record, appended to the extra array after the
+// no_methods group: [strict_flag, only_count, only_name_0, ...].
+fn Zcu.c_import_select_base_frontend(self: Zcu, pool: AstPool, decl: i32) -> i32:
+    let link_start = pool.get_data1(decl)
+    let packed = pool.get_data2(decl)
+    link_start + c_import_link_count(packed) + c_import_allow_count(packed) + c_import_no_methods_count(packed)
+
+fn Zcu.c_import_is_strict_frontend(self: Zcu, pool: AstPool, decl: i32) -> bool:
+    pool.get_extra(self.c_import_select_base_frontend(pool, decl)) != 0
+
+fn Zcu.c_import_only_count_frontend(self: Zcu, pool: AstPool, decl: i32) -> i32:
+    pool.get_extra(self.c_import_select_base_frontend(pool, decl) + 1)
+
+fn Zcu.c_import_only_name_frontend(self: Zcu, pool: AstPool, decl: i32, idx: i32) -> str:
+    self.pool.resolve(pool.get_extra(self.c_import_select_base_frontend(pool, decl) + 2 + idx))
+
+// A produced declaration's bound name (fn/type/const/extern all store the
+// name symbol in d0). For `Type.method` names, the leading segment before the
+// dot is the type a selective import would have requested.
+fn Zcu.c_import_decl_bound_name_frontend(self: Zcu, pool: AstPool, decl: i32) -> str:
+    self.pool.resolve(pool.get_data0(decl))
+
+// Foundational scaffolding a selective import must always keep: the unnamed
+// helper decls and the `c_*` C-primitive typedefs (c_int, c_char, …) that the
+// requested symbols resolve through. (A header type a requested symbol depends
+// on must itself be listed in `only`.)
+fn frontend_is_cimport_support_name(name: str) -> bool:
+    if name.len() == 0:
+        return true
+    name.len() as i32 >= 2 and name.byte_at(0) == 99 and name.byte_at(1) == 95
+
+// True when `dname` is `want` or a `want.member` method of it — so selecting a
+// type keeps its auto-generated methods.
+fn frontend_name_selects(want: str, dname: str) -> bool:
+    if dname == want:
+        return true
+    let wl = want.len() as i32
+    if dname.len() as i32 > wl and dname.byte_at(wl as i64) == 46:
+        return dname.slice(0, wl as i64) == want
+    false
+
+fn Zcu.c_import_only_matches_frontend(self: Zcu, pool: AstPool, decl: i32, dname: str) -> bool:
+    let n = self.c_import_only_count_frontend(pool, decl)
+    for oi in 0..n:
+        if frontend_name_selects(self.c_import_only_name_frontend(pool, decl, oi), dname):
+            return true
+    false
+
+fn Zcu.c_import_produced_name_frontend(self: Zcu, pool: AstPool, before: i32, after: i32, want: str) -> bool:
+    var di = before
+    while di < after:
+        if frontend_name_selects(want, self.c_import_decl_bound_name_frontend(pool, pool.get_decl(di))):
+            return true
+        di = di + 1
+    false
+
+fn Zcu.c_import_emit_selective_missing_frontend(self: Zcu, pool: AstPool, decl: i32, name: str):
+    let span = Span { file: 0, start: pool.get_start(decl), end: pool.get_end(decl) }
+    var msg = "c_import: requested symbol '" ++ name ++ "' is not available"
+    if self.c_import_omitted_symbols.contains(name):
+        msg = msg ++ " (omitted: " ++ self.c_import_omitted_symbols.get(name).unwrap() ++ ")"
+    else:
+        msg = msg ++ " (no such declaration in the header, or it was not translated)"
+    self.diagnostics.emit(Diagnostic.err(msg, span))
+
+// strict: every omission recorded in `synthetic` that is not acknowledged via
+// allow_untranslated becomes a non-zero import failure.
+fn Zcu.c_import_emit_strict_omissions_frontend(self: Zcu, pool: AstPool, decl: i32, synthetic: str):
+    let prefix = "// @with-cimport-omitted|"
+    var pos = 0
+    let total = synthetic.len() as i32
+    while pos <= total:
+        let line_start = pos
+        var line_end = pos
+        while line_end < total and synthetic.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        if line_end > line_start:
+            let line = synthetic.slice(line_start as i64, line_end as i64)
+            if c_import_starts_with(line, prefix):
+                let rest = line.slice(prefix.len(), line.len())
+                var sep = -1
+                for ri in 0..rest.len() as i32:
+                    if rest.byte_at(ri as i64) == 124:
+                        sep = ri
+                        break
+                let name = if sep > 0: rest.slice(0, sep as i64) else: rest
+                if name.len() > 0 and not self.c_import_decl_allows_untranslated_frontend(pool, decl, name):
+                    let span = Span { file: 0, start: pool.get_start(decl), end: pool.get_end(decl) }
+                    self.diagnostics.emit(Diagnostic.err("c_import: strict import omitted '" ++ name ++ "'; add it to allow_untranslated to acknowledge omission, or drop strict", span))
+        if line_end >= total:
+            break
+        pos = line_end + 1
 
 fn Zcu.c_import_decl_allows_untranslated_frontend(self: Zcu, pool: AstPool, decl: i32, name: str) -> bool:
     if name.len() == 0:

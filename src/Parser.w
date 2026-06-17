@@ -2418,6 +2418,8 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
     let allow_untranslated: Vec[i32] = Vec.new()
     let no_methods_types: Vec[i32] = Vec.new()
     var no_methods_all = 0
+    let only_names: Vec[i32] = Vec.new()
+    var strict_flag = 0
 
     while self.peek() == TokenKind.TK_COMMA:
         self.advance()
@@ -2501,6 +2503,43 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
                 self.advance()
             else:
                 self.emit_error("expected true, a string literal, or a string array for no_methods")
+        else if key == "only":
+            // §16.2: only: ["foo", "Bar"] — selective import; requested but
+            // inexpressible symbols fail loudly in the frontend.
+            if self.peek() == TokenKind.TK_L_BRACKET:
+                self.advance()
+                self.skip_newlines()
+                while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
+                    if self.peek() == TokenKind.TK_STRING_LIT:
+                        let os = self.current_start()
+                        let oe = self.current_end()
+                        only_names.push(self.intern.intern(self.source.slice((os + 1) as i64, (oe - 1) as i64)))
+                        self.advance()
+                    else:
+                        self.emit_error("expected string literal in only")
+                        self.advance()
+                    self.skip_newlines()
+                    if self.peek() == TokenKind.TK_COMMA:
+                        self.advance()
+                        self.skip_newlines()
+                self.expect(TokenKind.TK_R_BRACKET)
+            else if self.peek() == TokenKind.TK_STRING_LIT:
+                let os = self.current_start()
+                let oe = self.current_end()
+                only_names.push(self.intern.intern(self.source.slice((os + 1) as i64, (oe - 1) as i64)))
+                self.advance()
+            else:
+                self.emit_error("expected a string literal or a string array for only")
+        else if key == "strict":
+            // §16.2: strict: true — any unacknowledged omission is a non-zero
+            // import failure.
+            if self.peek() == TokenKind.TK_TRUE:
+                strict_flag = 1
+                self.advance()
+            else if self.peek() == TokenKind.TK_FALSE:
+                self.advance()
+            else:
+                self.emit_error("expected true or false for strict")
         else:
             self.emit_error("unknown c_import option")
             while self.peek() != TokenKind.TK_COMMA and self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
@@ -2514,6 +2553,13 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
         self.pool.add_extra(allow_untranslated.get(i as i64))
     for i in 0..no_methods_types.len() as i32:
         self.pool.add_extra(no_methods_types.get(i as i64))
+    // §16.2 selective-import record (d2 is full): [strict, only_count, only...]
+    // appended after the no_methods group. Existing readers use the packed
+    // counts and stop before this; only the selective-import path reads it.
+    self.pool.add_extra(strict_flag)
+    self.pool.add_extra(only_names.len() as i32)
+    for i in 0..only_names.len() as i32:
+        self.pool.add_extra(only_names.get(i as i64))
     self.pool.add_node(NodeKind.NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, pack_c_import_counts_ex(links.len() as i32, allow_untranslated.len() as i32, no_methods_types.len() as i32, no_methods_all))
 
 // ── let decl ─────────────────────────────────────────────────────
