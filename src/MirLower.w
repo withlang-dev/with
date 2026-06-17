@@ -309,11 +309,32 @@ fn MirBuilder.push_stmt_temp_frame(self: MirBuilder) -> i32:
 fn MirBuilder.stmt_temp_needs_drop(self: MirBuilder, type_id: i32) -> i32:
     if type_id == 0 or type_id == self.sema.ty_void as i32 or type_id == self.sema.ty_never as i32:
         return 0
+    if self.type_is_channel_endpoint(type_id) != 0:
+        return 1
     if self.sema.is_copy(type_id as TypeId) != 0:
         return 0
     if self.sema.type_is_task(type_id) != 0 or self.sema.type_is_scoped_task(type_id) != 0 or self.sema.type_is_scoped_join_handle(type_id) != 0:
         return 0
     1
+
+fn MirBuilder.type_is_channel_endpoint(self: MirBuilder, type_id: i32) -> i32:
+    if type_id == 0:
+        return 0
+    let resolved = self.sema.resolve_alias(type_id)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let base = self.sema.get_generic_inst_base(resolved as i32)
+    let base_name = self.sema.pool_resolve(base)
+    if base_name == "Sender" or base_name == "Receiver":
+        return 1
+    0
+
+fn MirBuilder.type_needs_value_drop(self: MirBuilder, type_id: i32) -> i32:
+    if self.type_is_channel_endpoint(type_id) != 0:
+        return 1
+    if self.sema.is_copy(type_id) == 0:
+        return 1
+    0
 
 fn MirBuilder.register_stmt_temp(self: MirBuilder, local_id: i32, type_id: i32) -> Unit:
     if self.stmt_temp_starts.len() as i32 == 0:
@@ -4457,8 +4478,10 @@ fn MirBuilder.lower_tuple_destructure(self: MirBuilder, node: i32):
         let local_id = self.body.new_local(elem_ty, 0, n_sym, 1)
         self.bind_local(n_sym, local_id)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(node))
+        if self.type_needs_value_drop(elem_ty) != 0:
+            self.schedule_drop(local_id, DropKind.DK_VALUE)
         let field_place = self.body.new_field_place(rhs_place, ni, elem_ty)
-        let field_op = self.body.new_operand(OperandKind.OK_COPY, field_place)
+        let field_op = self.body.new_operand(if self.type_needs_value_drop(elem_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
         let dst_place = self.place_for_local(local_id)
         self.assign_operand_to_place(dst_place, field_op, self.ast.get_start(node))
 
@@ -6597,9 +6620,9 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let local_id = self.body.new_local(bind_ty, 0, sym, 1)
         self.bind_local(sym, local_id)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
-        if self.sema.is_copy(bind_ty) == 0:
+        if self.type_needs_value_drop(bind_ty) != 0:
             self.schedule_drop(local_id, DropKind.DK_VALUE)
-        let src_op = self.body.new_operand(if self.sema.is_copy(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, scrutinee_place)
+        let src_op = self.body.new_operand(if self.type_needs_value_drop(bind_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, scrutinee_place)
         self.assign_operand_to_place(self.place_for_local(local_id), src_op, self.ast.get_start(pat_node))
         out.push(local_id)
         out.push(scrutinee_place)
@@ -6611,9 +6634,9 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let outer_local = self.body.new_local(outer_ty, 0, outer_sym, 1)
         self.bind_local(outer_sym, outer_local)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, outer_local, 0, self.ast.get_start(pat_node))
-        if self.sema.is_copy(outer_ty) == 0:
+        if self.type_needs_value_drop(outer_ty) != 0:
             self.schedule_drop(outer_local, DropKind.DK_VALUE)
-        let outer_op = self.body.new_operand(if self.sema.is_copy(outer_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, scrutinee_place)
+        let outer_op = self.body.new_operand(if self.type_needs_value_drop(outer_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, scrutinee_place)
         self.assign_operand_to_place(self.place_for_local(outer_local), outer_op, self.ast.get_start(pat_node))
         out.push(outer_local)
         out.push(scrutinee_place)
@@ -7918,7 +7941,8 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
                 recv_op = self.lower_expr(self_expr)
             else:
                 recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
-            if intrinsic != MirIntrinsic.FIBER_CANCEL:
+            let channel_endpoint_method = intrinsic == MirIntrinsic.CHAN_SEND or intrinsic == MirIntrinsic.CHAN_RECV or intrinsic == MirIntrinsic.CHAN_CLOSE
+            if intrinsic != MirIntrinsic.FIBER_CANCEL and not channel_endpoint_method:
                 self.consume_moved_operand(recv_op)
             call_args.push(recv_op)
     for i in 0..arg_count:
@@ -9409,10 +9433,10 @@ fn MirBuilder.lower_with_tuple(self: MirBuilder, node: i32) -> i32:
         let local_id = self.body.new_local(elem_ty, is_mut, n_sym, 1)
         self.bind_local(n_sym, local_id)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(node))
-        if self.sema.is_copy(elem_ty) == 0:
+        if self.type_needs_value_drop(elem_ty) != 0:
             self.schedule_drop(local_id, DropKind.DK_VALUE)
         let field_place = self.body.new_field_place(rhs_place, ni, elem_ty)
-        let field_op = self.body.new_operand(OperandKind.OK_COPY, field_place)
+        let field_op = self.body.new_operand(if self.type_needs_value_drop(elem_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
         let dst_place = self.place_for_local(local_id)
         self.assign_operand_to_place(dst_place, field_op, self.ast.get_start(node))
     let result = self.lower_expr(body)

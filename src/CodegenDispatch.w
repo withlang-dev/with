@@ -129,6 +129,12 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
                 if de_opt.is_some():
                     return self.disc_enum_repr_types.get(de_opt.unwrap() as i64)
     if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        let base_name = self.sema_symbol_text(base_sym)
+        if base_name == "Sender" or base_name == "Receiver":
+            let fields: Vec[i64] = Vec.new()
+            fields.push(wl_i64_type(self.context))
+            return wl_struct_type(self.context, vec_data_i64(&fields), 1, 0)
         return self.sema_type_to_llvm(resolved)
     if tk == TypeKind.TY_TUPLE:
         let te_start = self.mir_input.mir_get_type_d0(resolved)
@@ -3615,6 +3621,8 @@ fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> Unit:
 fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> Unit:
     if ptr == 0 or ty == 0 or sema_ty <= 0:
         return
+    if self.mir_emit_channel_endpoint_release_ptr(ptr, ty, sema_ty):
+        return
     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
     let tk = self.mir_input.mir_get_type_kind(resolved)
     var type_sym = 0
@@ -3639,6 +3647,79 @@ fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sem
             args.push(value)
         let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
     self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
+
+fn Codegen.mir_channel_endpoint_kind(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let base_sym = self.mir_input.mir_get_type_d0(resolved)
+    let base_name = self.sema_symbol_text(base_sym)
+    if base_name == "Sender":
+        return 1
+    if base_name == "Receiver":
+        return 2
+    0
+
+fn Codegen.mir_emit_channel_endpoint_release_ptr(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> bool:
+    let endpoint_kind = self.mir_channel_endpoint_kind(sema_ty)
+    if endpoint_kind == 0:
+        return false
+    if wl_get_type_kind(ty) != wl_struct_type_kind():
+        return false
+    let handle_ptr = wl_build_struct_gep(self.builder, ty, ptr, 0)
+    let handle = wl_build_load(self.builder, wl_i64_type(self.context), handle_ptr)
+    let fn_name = if endpoint_kind == 1: "with_channel_release_sender" else: "with_channel_release_receiver"
+    var release_fn = wl_get_named_function(self.llmod, fn_name)
+    if release_fn == 0:
+        let params: Vec[i64] = Vec.new()
+        params.push(wl_i64_type(self.context))
+        let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+        release_fn = wl_add_function(self.llmod, fn_name, fn_ty)
+    let args: Vec[i64] = Vec.new()
+    args.push(handle)
+    let _ = wl_build_call(self.builder, wl_global_get_value_type(release_fn), release_fn, vec_data_i64(&args), 1)
+    true
+
+fn Codegen.ensure_channel_drop_fn_for_type(self: Codegen, sema_ty: i32, llvm_ty: i64) -> i64:
+    if sema_ty <= 0 or llvm_ty == 0:
+        return wl_const_null(wl_ptr_type(self.context))
+    let fn_name = "__with_channel_drop_" ++ f"{sema_ty}"
+    let existing = wl_get_named_function(self.llmod, fn_name)
+    if existing != 0:
+        return existing
+
+    let ptr_ty = wl_ptr_type(self.context)
+    let params: Vec[i64] = Vec.new()
+    params.push(ptr_ty)
+    let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 1, 0)
+    let drop_fn = wl_add_function(self.llmod, fn_name, fn_ty)
+
+    let saved_fn = self.current_function
+    let saved_fn_name_sym = self.current_function_name_sym
+    let saved_fn_node = self.current_function_node
+    let saved_ret_ty = self.current_ret_type
+    let saved_bb = wl_get_insert_block(self.builder)
+
+    self.current_function = drop_fn
+    self.current_function_name_sym = 0
+    self.current_function_node = 0
+    self.current_ret_type = wl_void_type(self.context)
+
+    let entry = wl_append_bb(self.context, drop_fn, "entry")
+    wl_position_at_end(self.builder, entry)
+    self.mir_emit_drop_ptr_for_sema_type(wl_get_param(drop_fn, 0), llvm_ty, sema_ty)
+    let _ = wl_build_ret_void(self.builder)
+
+    self.current_function = saved_fn
+    self.current_function_name_sym = saved_fn_name_sym
+    self.current_function_node = saved_fn_node
+    self.current_ret_type = saved_ret_ty
+    if saved_bb != 0:
+        wl_position_at_end(self.builder, saved_bb)
+
+    drop_fn
 
 fn Codegen.mir_sema_type_is_box(self: Codegen, sema_ty: i32) -> bool:
     if sema_ty <= 0:
@@ -4021,7 +4102,10 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: &MirBody, stmt_id: i32) -> bool:
             ptr = self.mir_place_ptr(body, d0, true, drop_ty)
         if ptr != 0:
             if drop_ty != 0:
-                self.mir_emit_drop_ptr(ptr, drop_ty)
+                if self.mir_channel_endpoint_kind(drop_sema_ty) != 0:
+                    self.mir_emit_drop_ptr_for_sema_type(ptr, drop_ty, drop_sema_ty)
+                else:
+                    self.mir_emit_drop_ptr(ptr, drop_ty)
         return true
 
     if sk == StmtKind.Nop:
@@ -9193,6 +9277,7 @@ fn Codegen.mir_emit_ext_channel_scope_intrinsic_call(self: Codegen, body: &MirBo
         let create_cap = self.mir_intrinsic_arg(body, args_id, 0)
         // Determine element size from destination type (Channel[T])
         var chan_elem_size: i64 = 8  // default for i64
+        var chan_elem_sema_ty = 0
         let dest_sema_ch = self.mir_intrinsic_dest_sema_type(body, dest_place)
         if dest_sema_ch > 0:
             let resolved_ch = self.mir_input.mir_resolve_alias(dest_sema_ch)
@@ -9202,23 +9287,31 @@ fn Codegen.mir_emit_ext_channel_scope_intrinsic_call(self: Codegen, body: &MirBo
                     let args_start_ch = self.mir_input.mir_get_type_d1(resolved_ch)
                     let elem_tid = self.mir_input.mir_get_type_extra(args_start_ch)
                     if elem_tid > 0:
-                        let elem_llvm = self.mir_sema_type_to_llvm(elem_tid)
-                        if elem_llvm != 0:
-                            chan_elem_size = self.abi_size_of(elem_llvm)
-        // Call with_channel_create(capacity, elem_size) -> i64
+                        chan_elem_sema_ty = elem_tid
+                        let sema_size = self.sema.type_layout_size_of(elem_tid)
+                        if sema_size > 0:
+                            chan_elem_size = sema_size
+        var chan_drop_fn = wl_const_null(ptr_ty)
+        if chan_elem_sema_ty > 0:
+            let elem_llvm_ty = self.mir_sema_type_to_llvm(chan_elem_sema_ty)
+            if elem_llvm_ty != 0:
+                chan_drop_fn = self.ensure_channel_drop_fn_for_type(chan_elem_sema_ty, elem_llvm_ty)
+        // Call with_channel_create(capacity, elem_size, drop_fn) -> i64
         let ccr_fn_name = "with_channel_create"
         var ccr_fn = wl_get_named_function(self.llmod, ccr_fn_name)
         if ccr_fn == 0:
             let ccrp: Vec[i64] = Vec.new()
             ccrp.push(wl_i32_type(self.context))   // capacity
             ccrp.push(wl_i32_type(self.context))   // elem_size
-            let ccrft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&ccrp), 2, 0)
+            ccrp.push(ptr_ty)                       // drop_fn
+            let ccrft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&ccrp), 3, 0)
             ccr_fn = wl_add_function(self.llmod, ccr_fn_name, ccrft)
         let ccrft2 = wl_global_get_value_type(ccr_fn)
         let ccra: Vec[i64] = Vec.new()
         ccra.push(create_cap)
         ccra.push(wl_const_int(wl_i32_type(self.context), chan_elem_size, 0))
-        let chan_handle = wl_build_call(self.builder, ccrft2, ccr_fn, vec_data_i64(&ccra), 2)
+        ccra.push(chan_drop_fn)
+        let chan_handle = wl_build_call(self.builder, ccrft2, ccr_fn, vec_data_i64(&ccra), 3)
         // Wrap in Channel { handle } struct
         let chan_struct_fields: Vec[i64] = Vec.new()
         chan_struct_fields.push(wl_i64_type(self.context))
@@ -11910,24 +12003,15 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                     self.ensure_async_runtime_declared()
                     // Extract element type from generic call's type argument
                     var chan_elem_size: i64 = 4  // default for i32
-                    let chan_gc_node = gc_node
-                    let chan_type_args_node = self.pool.get_data0(chan_gc_node)
-                    if chan_type_args_node > 0:
-                        let chan_ta_kind = self.pool.kind(chan_type_args_node)
-                        if chan_ta_kind == NodeKind.NK_INDEX:
-                            let chan_type_node = self.pool.get_data1(chan_type_args_node)
-                            if chan_type_node > 0:
-                                let chan_type_llvm = self.resolve_type(chan_type_node)
-                                if chan_type_llvm != 0:
-                                    chan_elem_size = self.abi_size_of(chan_type_llvm)
+                    var chan_elem_sema_ty = 0
                     // Also try sema typed_expr_types for the call node
                     let chan_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
                     if chan_dest_sema > 0:
                         let chan_resolved = self.mir_input.mir_resolve_alias(chan_dest_sema)
                         if self.mir_input.mir_get_type_kind(chan_resolved) == TypeKind.TY_TUPLE:
-                            let chan_tc = self.mir_input.mir_get_type_d2(chan_resolved)
+                            let chan_tc = self.mir_input.mir_get_type_d1(chan_resolved)
                             if chan_tc > 0:
-                                let chan_ts = self.mir_input.mir_get_type_d1(chan_resolved)
+                                let chan_ts = self.mir_input.mir_get_type_d0(chan_resolved)
                                 let chan_elem_tid = self.mir_input.mir_get_type_extra(chan_ts)
                                 if chan_elem_tid > 0:
                                     // This is Sender[T] — extract T
@@ -11938,24 +12022,32 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: &MirBody, callee_operand: i32
                                             let chan_gi_start = self.mir_input.mir_get_type_d1(chan_sender_resolved)
                                             let chan_t_tid = self.mir_input.mir_get_type_extra(chan_gi_start)
                                             if chan_t_tid > 0:
-                                                let chan_t_llvm = self.mir_sema_type_to_llvm(chan_t_tid)
-                                                if chan_t_llvm != 0:
-                                                    chan_elem_size = self.abi_size_of(chan_t_llvm)
+                                                chan_elem_sema_ty = chan_t_tid
+                                                let chan_t_size = self.sema.type_layout_size_of(chan_t_tid)
+                                                if chan_t_size > 0:
+                                                    chan_elem_size = chan_t_size
                     // Get capacity argument
                     let chan_cap_val = self.mir_intrinsic_arg(body, args_id, 0)
-                    // Call with_channel_create(capacity, elem_size)
+                    var chan_drop_fn = wl_const_null(wl_ptr_type(self.context))
+                    if chan_elem_sema_ty > 0:
+                        let chan_elem_llvm_ty = self.mir_sema_type_to_llvm(chan_elem_sema_ty)
+                        if chan_elem_llvm_ty != 0:
+                            chan_drop_fn = self.ensure_channel_drop_fn_for_type(chan_elem_sema_ty, chan_elem_llvm_ty)
+                    // Call with_channel_create(capacity, elem_size, drop_fn)
                     var chan_create_fn = wl_get_named_function(self.llmod, "with_channel_create")
                     if chan_create_fn == 0:
                         let ccp: Vec[i64] = Vec.new()
                         ccp.push(wl_i32_type(self.context))
                         ccp.push(wl_i32_type(self.context))
-                        let ccft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&ccp), 2, 0)
+                        ccp.push(wl_ptr_type(self.context))
+                        let ccft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&ccp), 3, 0)
                         chan_create_fn = wl_add_function(self.llmod, "with_channel_create", ccft)
                     let ccft2 = wl_global_get_value_type(chan_create_fn)
                     let cca: Vec[i64] = Vec.new()
                     cca.push(chan_cap_val)
                     cca.push(wl_const_int(wl_i32_type(self.context), chan_elem_size, 0))
-                    let chan_handle = wl_build_call(self.builder, ccft2, chan_create_fn, vec_data_i64(&cca), 2)
+                    cca.push(chan_drop_fn)
+                    let chan_handle = wl_build_call(self.builder, ccft2, chan_create_fn, vec_data_i64(&cca), 3)
                     // Construct tuple (Sender{handle}, Receiver{handle})
                     // Sender = { i64 }, Receiver = { i64 }
                     // Tuple = { {i64}, {i64} }
@@ -13280,7 +13372,10 @@ fn Codegen.mir_emit_term(self: Codegen, body: &MirBody, bb: i32) -> bool:
                 ptr = self.mir_place_ptr(body, d0, true, drop_ty)
             if ptr != 0:
                 if drop_ty != 0:
-                    self.mir_emit_drop_ptr(ptr, drop_ty)
+                    if self.mir_channel_endpoint_kind(drop_sema_ty) != 0:
+                        self.mir_emit_drop_ptr_for_sema_type(ptr, drop_ty, drop_sema_ty)
+                    else:
+                        self.mir_emit_drop_ptr(ptr, drop_ty)
         if d1 < 0 or d1 >= self.mir_bb_values.len() as i32:
             return false
         let target_bb = self.mir_bb_values.get(d1 as i64)

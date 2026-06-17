@@ -14,6 +14,7 @@ extern fn with_runtime_has_fibers() -> i32
 extern fn with_runtime_run_one_step() -> Unit
 
 let CHAN_INITIAL_CAPACITY: i32 = 16
+type ChannelDropFn = *const fn(*mut u8) -> Unit
 
 // Packed channel layout:
 //   0  *mut u8 buffer
@@ -24,7 +25,10 @@ let CHAN_INITIAL_CAPACITY: i32 = 16
 //   24 i32 capacity
 //   28 i32 bounded_capacity
 //   32 i32 closed
-// Total size rounded to 40 bytes for 8-byte alignment.
+//   40 drop_fn
+//   48 i32 senders
+//   52 i32 receivers
+// Total size rounded to 56 bytes for 8-byte alignment.
 let CHAN_OFF_BUFFER: i64 = 0
 let CHAN_OFF_ELEM_SIZE: i64 = 8
 let CHAN_OFF_HEAD: i64 = 12
@@ -33,7 +37,10 @@ let CHAN_OFF_COUNT: i64 = 20
 let CHAN_OFF_CAPACITY: i64 = 24
 let CHAN_OFF_BOUNDED_CAPACITY: i64 = 28
 let CHAN_OFF_CLOSED: i64 = 32
-let CHAN_SIZE: i64 = 40
+let CHAN_OFF_DROP_FN: i64 = 40
+let CHAN_OFF_SENDERS: i64 = 48
+let CHAN_OFF_RECEIVERS: i64 = 52
+let CHAN_SIZE: i64 = 56
 
 fn chan_field_i32(ch: i64, offset: i64) -> i32:
     unsafe:
@@ -50,6 +57,45 @@ fn chan_buffer(ch: i64) -> *mut u8:
 fn chan_set_buffer(ch: i64, value: *mut u8):
     unsafe:
         *((ch + CHAN_OFF_BUFFER) as *mut *mut u8) = value
+
+fn chan_drop_fn(ch: i64) -> ChannelDropFn:
+    unsafe:
+        *((ch + CHAN_OFF_DROP_FN) as *const ChannelDropFn)
+
+fn chan_set_drop_fn(ch: i64, value: ChannelDropFn):
+    unsafe:
+        *((ch + CHAN_OFF_DROP_FN) as *mut ChannelDropFn) = value
+
+fn channel_drop_queued(handle: i64):
+    let drop_fn = chan_drop_fn(handle)
+    if drop_fn as i64 == 0:
+        return
+    let buffer = chan_buffer(handle)
+    if buffer as i64 == 0:
+        return
+    let elem_size = chan_field_i32(handle, CHAN_OFF_ELEM_SIZE)
+    let cap = chan_field_i32(handle, CHAN_OFF_CAPACITY)
+    let count = chan_field_i32(handle, CHAN_OFF_COUNT)
+    let head = chan_field_i32(handle, CHAN_OFF_HEAD)
+    var i = 0
+    while i < count:
+        let idx = (head + i) % cap
+        let slot = (buffer as i64 + idx as i64 * elem_size as i64) as *mut u8
+        drop_fn(slot)
+        i = i + 1
+    chan_set_i32(handle, CHAN_OFF_COUNT, 0)
+
+fn channel_free(handle: i64):
+    channel_drop_queued(handle)
+    let buffer = chan_buffer(handle)
+    if buffer as i64 != 0:
+        with_free(buffer)
+        chan_set_buffer(handle, null)
+    with_free(handle as *mut u8)
+
+fn channel_release_if_unreferenced(handle: i64):
+    if chan_field_i32(handle, CHAN_OFF_SENDERS) <= 0 and chan_field_i32(handle, CHAN_OFF_RECEIVERS) <= 0:
+        channel_free(handle)
 
 fn channel_grow(handle: i64) -> i32:
     if handle == 0:
@@ -92,7 +138,7 @@ fn channel_block_until_progress():
     if with_runtime_has_fibers() != 0:
         with_runtime_run_one_step()
 
-pub fn with_channel_create(capacity: i32, elem_size: i32) -> i64:
+pub fn with_channel_create(capacity: i32, elem_size: i32, drop_fn: ChannelDropFn) -> i64:
     let ch = with_alloc(CHAN_SIZE)
     if ch as i64 == 0:
         return 0
@@ -109,6 +155,9 @@ pub fn with_channel_create(capacity: i32, elem_size: i32) -> i64:
     chan_set_i32(ch as i64, CHAN_OFF_ELEM_SIZE, actual_elem_size)
     chan_set_i32(ch as i64, CHAN_OFF_CAPACITY, actual_cap)
     chan_set_i32(ch as i64, CHAN_OFF_BOUNDED_CAPACITY, if capacity > 0: capacity else: 0)
+    chan_set_drop_fn(ch as i64, drop_fn)
+    chan_set_i32(ch as i64, CHAN_OFF_SENDERS, 1)
+    chan_set_i32(ch as i64, CHAN_OFF_RECEIVERS, 1)
     ch as i64
 
 pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8) -> Unit:
@@ -186,7 +235,24 @@ pub fn with_channel_close(ch_handle: i64) -> Unit:
 pub fn with_channel_destroy(ch_handle: i64) -> Unit:
     if ch_handle == 0:
         return
-    let buffer = chan_buffer(ch_handle)
-    if buffer as i64 != 0:
-        with_free(buffer)
-    with_free(ch_handle as *mut u8)
+    channel_free(ch_handle)
+
+pub fn with_channel_release_sender(ch_handle: i64) -> Unit:
+    if ch_handle == 0:
+        return
+    let senders = chan_field_i32(ch_handle, CHAN_OFF_SENDERS)
+    if senders > 0:
+        chan_set_i32(ch_handle, CHAN_OFF_SENDERS, senders - 1)
+    if chan_field_i32(ch_handle, CHAN_OFF_SENDERS) <= 0:
+        chan_set_i32(ch_handle, CHAN_OFF_CLOSED, 1)
+    channel_release_if_unreferenced(ch_handle)
+
+pub fn with_channel_release_receiver(ch_handle: i64) -> Unit:
+    if ch_handle == 0:
+        return
+    let receivers = chan_field_i32(ch_handle, CHAN_OFF_RECEIVERS)
+    if receivers > 0:
+        chan_set_i32(ch_handle, CHAN_OFF_RECEIVERS, receivers - 1)
+    if chan_field_i32(ch_handle, CHAN_OFF_RECEIVERS) <= 0:
+        chan_set_i32(ch_handle, CHAN_OFF_CLOSED, 1)
+    channel_release_if_unreferenced(ch_handle)

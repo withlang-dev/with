@@ -2595,6 +2595,11 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         let base_sym = self.sema.get_type_d0(resolved_tid)
         let cg_base_sym = self.sema_sym_to_codegen_sym(base_sym)
         let arg_count = self.sema.get_generic_inst_arg_count(resolved_tid)
+        let base_name = self.sema_symbol_text(base_sym)
+        if base_name == "Sender" or base_name == "Receiver":
+            let ch_fields: Vec[i64] = Vec.new()
+            ch_fields.push(wl_i64_type(self.context))
+            return wl_struct_type(self.context, vec_data_i64(&ch_fields), 1, 0)
         if self.sema.type_symbol_is_std_box(base_sym) != 0 and arg_count == 1:
             let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let elem_resolved = self.sema.resolve_alias(elem_tid)

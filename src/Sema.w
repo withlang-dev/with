@@ -4548,7 +4548,11 @@ fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
     if tk == TypeKind.TY_SLICE:
         return 1
     if tk == TypeKind.TY_GENERIC_INST:
-        if self.get_generic_inst_base(resolved as i32) == self.syms.handle:
+        let generic_base = self.get_generic_inst_base(resolved as i32)
+        let generic_base_name = self.pool_resolve(generic_base)
+        if generic_base_name == "Sender" or generic_base_name == "Receiver":
+            return 0
+        if generic_base == self.syms.handle:
             return 1
         // Generic instances (Vec[T], etc.) are non-Copy by default.
         // Copy iff there is an explicit `impl[T: Copy] Copy for Base[T]` registered.

@@ -14227,6 +14227,8 @@ fn Sema.method_arg_stores_value(self: Sema, recv_type: i32, field: i32, arg_inde
             return 1
     if owner_sym == self.syms.slotmapslot and method_name == "set" and arg_index == 0:
         return 1
+    if self.pool_resolve(owner_sym) == "Sender" and method_name == "send" and arg_index == 0:
+        return 1
     0
 
 fn Sema.sender_send_element_type(self: Sema, recv_type: i32, field: i32, arg_index: i32) -> i32:
@@ -14713,8 +14715,11 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             self.check_ephemeral_task_storage(mc_arg_node, "generic container")
         let mc_sender_elem_ty = self.sender_send_element_type(obj_type as i32, field, ai)
         if mc_sender_elem_ty != 0:
+            if mc_arg_ty as i32 != 0 and self.types_compatible(mc_sender_elem_ty, mc_arg_ty as i32) == 0 and self.arithmetic_result_type(mc_sender_elem_ty, mc_arg_ty as i32) == 0:
+                self.emit_argument_type_mismatch("Sender.send", 0, ai, ai, mc_sender_elem_ty, mc_arg_ty as i32, mc_arg_node)
             if self.type_is_send(mc_sender_elem_ty) == 0 or self.type_is_send(mc_arg_ty as i32) == 0 or self.expr_is_ephemeral_value(mc_arg_node) != 0 or self.expr_is_ephemeral_task(mc_arg_node) != 0 or self.expr_creates_non_send_task(mc_arg_node) != 0:
                 self.emit_task_sendability_error(mc_arg_node, "channel send requires Send value")
+            self.mark_moved_if_consumed(mc_arg_node)
         if mc_is_closure:
             self.closure_direct_arg_escape_flags.pop()
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
