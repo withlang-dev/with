@@ -1374,6 +1374,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
                 struct_kind = struct_kind + TDK_FLAG_PACKED
             if self.pending_bitpacked != 0:
                 struct_kind = struct_kind + TDK_FLAG_BITPACKED
+            if self.pending_repr_c != 0:
+                struct_kind = struct_kind + TDK_FLAG_REPR_C
             let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
             return self.finish_type_decl(node)
         repr_type_node = self.parse_type_expr()
@@ -1390,6 +1392,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
                     struct_kind = struct_kind + TDK_FLAG_PACKED
                 if self.pending_bitpacked != 0:
                     struct_kind = struct_kind + TDK_FLAG_BITPACKED
+                if self.pending_repr_c != 0:
+                    struct_kind = struct_kind + TDK_FLAG_REPR_C
                 let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
                 self.queue_synthetic_copy_impl(name, tp_start, tp_count, start, self.prev_end())
                 return self.finish_type_decl(node)
@@ -1405,6 +1409,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
             struct_kind = struct_kind + TDK_FLAG_PACKED
         if self.pending_bitpacked != 0:
             struct_kind = struct_kind + TDK_FLAG_BITPACKED
+        if self.pending_repr_c != 0:
+            struct_kind = struct_kind + TDK_FLAG_REPR_C
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
         if copy_opt_in != 0:
             self.queue_synthetic_copy_impl(name, tp_start, tp_count, start, self.prev_end())
@@ -1446,6 +1452,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
             struct_kind = struct_kind + TDK_FLAG_PACKED
         if self.pending_bitpacked != 0:
             struct_kind = struct_kind + TDK_FLAG_BITPACKED
+        if self.pending_repr_c != 0:
+            struct_kind = struct_kind + TDK_FLAG_REPR_C
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
         return self.finish_type_decl(node)
 

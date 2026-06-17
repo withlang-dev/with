@@ -568,6 +568,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             self.bitpacked_types.insert(tid as i32, 1)
         if type_decl_is_packed(packed_kind) != 0:
             self.packed_types.insert(tid as i32, 1)
+        if type_decl_is_repr_c(packed_kind) != 0:
+            self.repr_c_types.insert(tid as i32, 1)
         // §16.4 @[align(N)] validation: power of two, ≤ 65536, ≥ natural.
         for fi in 0..field_count:
             let f_align = self.ast.get_extra(align_base + fi)

@@ -189,6 +189,7 @@ const TDK_FLAG_PACKED: i32 = 16
 const TDK_FLAG_BITPACKED: i32 = 32
 const TDK_FLAG_SPECIFIED: i32 = 64
 const TDK_FLAG_ERROR: i32 = 128
+const TDK_FLAG_REPR_C: i32 = 256
 
 fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
     if is_ephemeral != 0:
@@ -206,6 +207,12 @@ fn type_decl_is_packed(packed: i32) -> i32:
 
 fn type_decl_is_bitpacked(packed: i32) -> i32:
     (packed / TDK_FLAG_BITPACKED) % 2
+
+// @[repr(C)] layout. @[repr(packed)] implies repr(C) per §16.4.
+fn type_decl_is_repr_c(packed: i32) -> i32:
+    if (packed / TDK_FLAG_REPR_C) % 2 != 0:
+        return 1
+    type_decl_is_packed(packed)
 
 fn type_decl_is_specified(packed: i32) -> i32:
     (packed / TDK_FLAG_SPECIFIED) % 2

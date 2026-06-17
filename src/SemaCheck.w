@@ -1020,6 +1020,7 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
         self.record_global_concurrency_evidence(node, "async function")
     if self.fn_decl_has_c_export(node) != 0:
         self.record_global_concurrency_evidence(node, "@[c_export]")
+        self.validate_c_export_signature(node, sig_idx, fn_name)
     let saved_no_alloc_depth = self.current_no_alloc_depth
     let saved_fn_may_alloc = self.current_fn_may_alloc
     let saved_current_fn_symbol = self.current_fn_symbol
@@ -1837,6 +1838,45 @@ fn Sema.fn_decl_has_c_export(self: Sema, fn_node: i32) -> i32:
     if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
         return 1
     0
+
+// §16.5: which types may cross a C ABI boundary. A raw pointer is always a C
+// pointer; an `extern "C" fn` is a C function pointer; scalars map to stdint
+// spellings; `@[repr(C)]` structs/enums have a defined C layout. Everything
+// else (str, slices, tuples, With `&T`, Option/Result/Vec and other generics,
+// closures, plain non-repr(C) structs) has no C-ABI representation and would
+// be silently miscompiled if exported.
+fn Sema.type_is_c_abi_expressible(self: Sema, tid: i32, allow_void: i32) -> i32:
+    if tid == 0:
+        return allow_void
+    let r = self.resolve_alias(tid as TypeId) as i32
+    let k = self.get_type_kind(r)
+    if k == TypeKind.TY_INT or k == TypeKind.TY_FLOAT or k == TypeKind.TY_BOOL:
+        return 1
+    if k == TypeKind.TY_VOID:
+        return allow_void
+    if k == TypeKind.TY_PTR:
+        return 1
+    if k == TypeKind.TY_EXTERN_FN:
+        return 1
+    if k == TypeKind.TY_STRUCT or k == TypeKind.TY_ENUM:
+        if self.repr_c_types.contains(r):
+            return 1
+        return 0
+    0
+
+// §16.5: a `@[c_export]` function must have a C-ABI-expressible signature, or
+// it is silently miscompiled at the ABI. Flag it at the declaration.
+fn Sema.validate_c_export_signature(self: Sema, node: i32, sig_idx: i32, fn_sym: i32):
+    if sig_idx < 0:
+        return
+    let fn_name = self.pool_resolve(fn_sym)
+    for pi in 0..self.sig_get_param_count(sig_idx):
+        let pt = self.sig_param_type(sig_idx, pi)
+        if self.type_is_c_abi_expressible(pt, 0) == 0:
+            self.emit_error("@[c_export] function '" ++ fn_name ++ "' parameter type '" ++ self.type_name(pt) ++ "' is not C-ABI-expressible; use a scalar, a raw pointer (e.g. *const c_char), or a @[repr(C)] type", node)
+    let rt = self.sig_return_type(sig_idx)
+    if self.type_is_c_abi_expressible(rt, 1) == 0:
+        self.emit_error("@[c_export] function '" ++ fn_name ++ "' return type '" ++ self.type_name(rt) ++ "' is not C-ABI-expressible; use a scalar, a raw pointer, or a @[repr(C)] type", node)
 
 fn Sema.fn_decl_is_comptime_error_root(self: Sema, fn_node: i32) -> i32:
     let fn_sym = self.ast.get_data0(fn_node)

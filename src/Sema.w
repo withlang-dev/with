@@ -434,6 +434,7 @@ type Sema {
     disc_has_payload: HashMap[i32, i32],
     bitpacked_types: HashMap[i32, i32],  // type_id → 1 if bitpacked
     packed_types: HashMap[i32, i32],     // type_id → 1 if repr(packed)/@[packed]
+    repr_c_types: HashMap[i32, i32],     // type_id → 1 if @[repr(C)] (or repr(packed))
     // §16.11: TY_FN/TY_EXTERN_FN type_id → 1 when the callable is unsafe to
     // call (carries a raw-pointer-validity precondition). Part of type identity.
     unsafe_fn_type_set: HashMap[i32, i32],
@@ -1444,6 +1445,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         disc_has_payload,
         bitpacked_types: sema_new_map_i32_i32(),
         packed_types: sema_new_map_i32_i32(),
+        repr_c_types: sema_new_map_i32_i32(),
         unsafe_fn_type_set: sema_new_map_i32_i32(),
         union_last_written: sema_new_map_i32_i32(),
         union_tracked_syms: Vec.new(),
