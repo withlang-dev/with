@@ -1878,6 +1878,176 @@ fn Sema.validate_c_export_signature(self: Sema, node: i32, sig_idx: i32, fn_sym:
     if self.type_is_c_abi_expressible(rt, 1) == 0:
         self.emit_error("@[c_export] function '" ++ fn_name ++ "' return type '" ++ self.type_name(rt) ++ "' is not C-ABI-expressible; use a scalar, a raw pointer, or a @[repr(C)] type", node)
 
+// ── §16.5 C header generation for @[c_export] symbols ──────────────────
+
+// Spell a C-ABI-expressible With type as C (validation guarantees the inputs
+// are expressible). Pointers, scalars (stdint), bool, void, repr(C) aggregates.
+fn Sema.cheader_type_to_c(self: Sema, tid: i32) -> str:
+    if tid == 0:
+        return "void"
+    let r = self.resolve_alias(tid as TypeId) as i32
+    let k = self.get_type_kind(r)
+    if k == TypeKind.TY_VOID:
+        return "void"
+    if k == TypeKind.TY_BOOL:
+        return "bool"
+    if k == TypeKind.TY_FLOAT:
+        if self.get_type_d0(r) == 32:
+            return "float"
+        return "double"
+    if k == TypeKind.TY_INT:
+        let w = self.get_type_d0(r)
+        let signed = self.get_type_d1(r)
+        if self.get_type_d2(r) != 0:
+            if signed != 0: return "ptrdiff_t"
+            return "size_t"
+        if w == 8: return if signed != 0: "int8_t" else: "uint8_t"
+        if w == 16: return if signed != 0: "int16_t" else: "uint16_t"
+        if w == 32: return if signed != 0: "int32_t" else: "uint32_t"
+        if w == 64: return if signed != 0: "int64_t" else: "uint64_t"
+        if signed != 0: return "intptr_t"
+        return "uintptr_t"
+    if k == TypeKind.TY_PTR:
+        let pointee = self.get_type_d0(r)
+        let pr = self.resolve_alias(pointee as TypeId) as i32
+        var inner = self.cheader_type_to_c(pointee)
+        if self.get_type_kind(pr) == TypeKind.TY_VOID or self.type_name(pr) == "c_void":
+            inner = "void"
+        if self.get_type_d1(r) != 0:
+            return inner ++ "*"
+        return "const " ++ inner ++ "*"
+    if k == TypeKind.TY_STRUCT or k == TypeKind.TY_ENUM:
+        return self.type_name(r)
+    "void"
+
+// Render a `type name` declarator, spelling function pointers as
+// `ret (*name)(args)`.
+fn Sema.cheader_decl_with_name(self: Sema, tid: i32, name: str) -> str:
+    let r = self.resolve_alias(tid as TypeId) as i32
+    let k = self.get_type_kind(r)
+    if k == TypeKind.TY_EXTERN_FN or k == TypeKind.TY_FN:
+        let pc = self.get_type_d1(r)
+        var args = ""
+        if pc == 0:
+            args = "void"
+        else:
+            for pi in 0..pc:
+                if pi > 0:
+                    args = args ++ ", "
+                args = args ++ self.cheader_type_to_c(self.fn_type_param_type(r, pi))
+        return self.cheader_type_to_c(self.get_type_d2(r)) ++ " (*" ++ name ++ ")(" ++ args ++ ")"
+    self.cheader_type_to_c(tid) ++ " " ++ name
+
+// The exported C symbol name for a @[c_export] fn (after the "c_export:"
+// prefix); falls back to the With name when no explicit name was given.
+fn Sema.cheader_export_name(self: Sema, fn_node: i32) -> str:
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta >= 0:
+        let cc = self.pool_resolve(self.ast.fn_meta_tp_start(meta))
+        if cc.len() > 9 and cc.slice(0, 9) == "c_export:":
+            let nm = cc.slice(9, cc.len())
+            if nm.len() > 0:
+                return nm
+    self.pool_resolve(self.ast.get_data0(fn_node))
+
+fn cheader_vec_has(v: &Vec[i32], x: i32) -> bool:
+    for i in 0..v.len() as i32:
+        if v.get(i as i64) == x:
+            return true
+    false
+
+// If `tid` is a repr(C) struct/enum (possibly behind one pointer level),
+// return its resolved type id; else 0.
+fn Sema.cheader_struct_ref(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    var r = self.resolve_alias(tid as TypeId) as i32
+    if self.get_type_kind(r) == TypeKind.TY_PTR:
+        r = self.resolve_alias(self.get_type_d0(r) as TypeId) as i32
+    let k = self.get_type_kind(r)
+    if (k == TypeKind.TY_STRUCT or k == TypeKind.TY_ENUM) and self.repr_c_types.contains(r):
+        return r
+    0
+
+fn Sema.cheader_generate(self: Sema, guard: str) -> str:
+    let exported: Vec[i32] = Vec.new()
+    for di in 0..self.ast.decl_count():
+        let d = self.ast.get_decl(di)
+        if self.ast.kind(d) == NodeKind.NK_FN_DECL and self.fn_decl_has_c_export(d) != 0:
+            exported.push(d as i32)
+    if exported.len() == 0:
+        return ""
+
+    // Collect referenced repr(C) structs (signature types + their fields),
+    // deepest first so by-value field structs are defined before their users.
+    var ordered: Vec[i32] = Vec.new()
+    for ei in 0..exported.len() as i32:
+        let fn_node = exported.get(ei as i64)
+        let sig = self.get_sig(self.ast.get_data0(fn_node))
+        if sig < 0:
+            continue
+        let pcount = self.sig_get_param_count(sig)
+        for pi in 0..pcount:
+            ordered = self.cheader_collect_struct(self.cheader_struct_ref(self.sig_param_type(sig, pi)), ordered)
+        ordered = self.cheader_collect_struct(self.cheader_struct_ref(self.sig_return_type(sig)), ordered)
+
+    var out = "#ifndef " ++ guard ++ "\n#define " ++ guard ++ "\n\n"
+    out = out ++ "#include <stdint.h>\n#include <stdbool.h>\n#include <stddef.h>\n\n"
+    out = out ++ "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
+    for si in 0..ordered.len() as i32:
+        out = out ++ self.cheader_struct_def(ordered.get(si as i64))
+    for ei in 0..exported.len() as i32:
+        out = out ++ self.cheader_prototype(exported.get(ei as i64))
+    out = out ++ "\n#ifdef __cplusplus\n}\n#endif\n\n#endif\n"
+    out
+
+// Return `ordered` with `tid` and its by-value field structs appended
+// (deepest first), deduped. Threaded by return value since Vec is value-typed.
+fn Sema.cheader_collect_struct(self: Sema, tid: i32, ordered: Vec[i32]) -> Vec[i32]:
+    if tid == 0 or cheader_vec_has(&ordered, tid):
+        return ordered
+    var result = ordered
+    let te = self.get_type_d1(tid)
+    let fc = self.get_type_d2(tid)
+    for fi in 0..fc:
+        let ftid = self.type_extra.get((te + fi * 3 + 1) as i64)
+        result = self.cheader_collect_struct(self.cheader_struct_ref(ftid), result)
+    if not cheader_vec_has(&result, tid):
+        result.push(tid)
+    result
+
+fn Sema.cheader_struct_def(self: Sema, tid: i32) -> str:
+    var out = "typedef struct {\n"
+    let te = self.get_type_d1(tid)
+    let fc = self.get_type_d2(tid)
+    for fi in 0..fc:
+        let fname = self.pool_resolve(self.type_extra.get((te + fi * 3) as i64))
+        let ftid = self.type_extra.get((te + fi * 3 + 1) as i64)
+        out = out ++ "    " ++ self.cheader_decl_with_name(ftid, fname) ++ ";\n"
+    out ++ "} " ++ self.type_name(tid) ++ ";\n\n"
+
+fn Sema.cheader_prototype(self: Sema, fn_node: i32) -> str:
+    let sig = self.get_sig(self.ast.get_data0(fn_node))
+    if sig < 0:
+        return ""
+    let ret = self.cheader_type_to_c(self.sig_return_type(sig))
+    var params = ""
+    let pcount = self.sig_get_param_count(sig)
+    let meta = self.ast.find_fn_meta(fn_node)
+    let param_start = if meta >= 0: self.ast.fn_meta_param_start(meta) else: 0
+    if pcount == 0:
+        params = "void"
+    else:
+        for pi in 0..pcount:
+            if pi > 0:
+                params = params ++ ", "
+            let pname_sym = if meta >= 0: self.ast.fn_param_name(param_start, pi) else: 0
+            var pname = if pname_sym != 0: self.pool_resolve(pname_sym) else: ""
+            if pname.len() == 0:
+                pname = f"arg{pi}"
+            params = params ++ self.cheader_decl_with_name(self.sig_param_type(sig, pi), pname)
+    ret ++ " " ++ self.cheader_export_name(fn_node) ++ "(" ++ params ++ ");\n"
+
 fn Sema.fn_decl_is_comptime_error_root(self: Sema, fn_node: i32) -> i32:
     let fn_sym = self.ast.get_data0(fn_node)
     let fn_name = self.pool_resolve(fn_sym)

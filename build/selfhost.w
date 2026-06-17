@@ -2285,6 +2285,40 @@ fn bs_check_unsafe_prefix_redundant_warning(ctx: &ActionCtx, compiler_path: str,
     if result.rc != 0: return result.rc
     bs_assert_contains(ctx, result.stderr, "warning: redundant unsafe prefix inside unsafe context", "unsafe_prefix_redundant_warning")
 
+fn bs_check_c_export_header(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    // §16.5: `emit-c-header` renders a compilable C header for @[c_export]
+    // symbols — include guard, extern "C", stdint spellings, dependent
+    // @[repr(C)] struct definitions, and prototypes with preserved param names.
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "c_export_header.w")
+    let source =
+        "@[repr(C)]\n" ++
+        "type Config { width: i32, height: i32 }\n\n" ++
+        "@[c_export(\"lib_area\")]\n" ++
+        "unsafe fn lib_area(c: *const Config) -> i32:\n" ++
+        "    (*c).width * (*c).height\n\n" ++
+        "@[c_export(\"lib_add\")]\n" ++
+        "fn lib_add(a: i32, b: i32) -> i32:\n" ++
+        "    a + b\n\n" ++
+        "fn main:\n" ++
+        "    print(\"ok\")\n"
+    var rc = bs_write_fixture(ctx, src, source, "c_export header source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("emit-c-header")
+    args |> push(bs_abs(root, src))
+    let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "c-export-header", args)
+    if result.rc != 0: return result.rc
+    rc = bs_assert_contains(ctx, result.stdout, "#ifndef WITH_C_EXPORT_H", "c_export_header")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stdout, "extern \"C\" {", "c_export_header")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stdout, "} Config;", "c_export_header")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stdout, "int32_t lib_area(const Config* c);", "c_export_header")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, result.stdout, "int32_t lib_add(int32_t a, int32_t b);", "c_export_header")
+
 fn bs_check_loop_string_concat_warning(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "loop_string_concat_warning.w")
@@ -3075,6 +3109,8 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     rc = bs_check_unit_tail_value_not_returned(ctx, compiler_path, bs_join(output_dir, "unit_tail_value_not_returned_case"))
     if rc != 0: return rc
     rc = bs_check_unsafe_prefix_redundant_warning(ctx, compiler_path, bs_join(output_dir, "unsafe_prefix_redundant_warning_case"))
+    if rc != 0: return rc
+    rc = bs_check_c_export_header(ctx, compiler_path, bs_join(output_dir, "c_export_header_case"))
     if rc != 0: return rc
     rc = bs_check_loop_string_concat_warning(ctx, compiler_path, bs_join(output_dir, "loop_string_concat_warning_case"))
     if rc != 0: return rc

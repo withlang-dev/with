@@ -654,6 +654,24 @@ fn run_cli(argc: i32) -> i32:
             with_eprint("error: '--emit-c' is only supported with 'build'")
             return 1
         return run_run_command(source, find_target_selector_arg(argc), opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
+    if cli_command(argc) == "emit-c-header":
+        // §16.5: print the generated C header for this module's @[c_export]
+        // symbols to stdout.
+        if source == "":
+            with_eprint("error: 'emit-c-header' requires a source file argument")
+            return 1
+        var comp = Compilation.init()
+        comp.configure(opt_level, no_std, alloc_mode, runtime_available)
+        comp.set_prelude_mode(prelude_mode)
+        comp.set_overflow_mode(driver_internal_overflow_mode())
+        let pool = comp.compile_file(source)
+        if pool.decl_count() == 0 or comp.has_errors():
+            comp.print_warnings()
+            with_eprint("error: emit-c-header: compilation failed")
+            return 1
+        let sema = comp.zcu.last_sema
+        with_write(sema.cheader_generate("WITH_C_EXPORT_H"))
+        return 0
     if cli_command(argc) == "ir":
         if source == "":
             with_eprint("error: 'ir' requires a source file argument")
