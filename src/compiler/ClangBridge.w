@@ -3542,6 +3542,37 @@ unsafe fn cursor_spelling_text_from_cursor(s: *mut CImportSession, cursor: CXCur
     with_free(text)
     result
 
+unsafe fn cursor_spelling_head_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
+    // Read only the leading identifier/keyword token at the cursor's spelling
+    // START location. Unlike cursor_spelling_text_from_cursor (which needs the
+    // whole extent in one file), this works when a macro-expanded cursor's range
+    // straddles files — operator keyword in the macro body, operand type in a
+    // header. Used to recover `sizeof`/`alignof` under macro expansion.
+    let range = clang_getCursorExtent(cursor)
+    var file: *mut u8 = 0 as *mut u8
+    var start_off: u32 = 0
+    source_location_spelling_offset(clang_getRangeStart(range), &raw mut file, &raw mut start_off)
+    if file as i64 == 0: return ""
+    var buf_size: u64 = 0
+    let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
+    if contents as i64 == 0 or start_off as u64 >= buf_size: return ""
+    let base = contents as i64 + start_off as i64
+    let maxn = (buf_size - start_off as u64) as i64
+    var n: i64 = 0
+    while n < maxn:
+        let c = *((base + n) as *const u8)
+        let is_ident = (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95
+        if not is_ident:
+            break
+        n = n + 1
+    if n == 0: return ""
+    let text = with_alloc(n + 1)
+    with_memcpy(text, base as *const u8, n)
+    *((text as i64 + n) as *mut u8) = 0
+    let result = session_make_str(s, text as *const u8)
+    with_free(text)
+    result
+
 unsafe fn cursor_token_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let tu = clang_Cursor_getTranslationUnit(cursor)
     if tu as i64 == 0:
@@ -3621,6 +3652,13 @@ pub fn with_ci_cursor_spelling_text(session: i64, cursor_idx: i32) -> str:
         if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         cursor_spelling_text_from_cursor(s, cursor)
+
+pub fn with_ci_cursor_spelling_head(session: i64, cursor_idx: i32) -> str:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        cursor_spelling_head_from_cursor(s, cursor)
 
 pub fn with_ci_cursor_token_text(session: i64, cursor_idx: i32) -> str:
     unsafe:

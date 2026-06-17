@@ -6296,7 +6296,19 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
     // sizeof expression. Structurally builds CIE_SIZEOF_TYPE on
     // the argument's libclang type via ci_type_from_libclang.
     if kind == CXK_UNARY_EXPR:
-        let src = with_ci_cursor_source_text(session, cursor)
+        var src = with_ci_cursor_source_text(session, cursor)
+        // Under a function-like macro expansion the cursor's expansion text is
+        // the macro invocation (e.g. "deflateInit(...)"), so the operator is
+        // invisible. Recover `sizeof(T)` from the spelling location, which points
+        // into the macro body where the operator is literally written.
+        if not ci_starts_with(src, "sizeof"):
+            // Macro-expanded sizeof: the expansion text is the macro call, and the
+            // full spelling range can straddle files (operator in the macro body,
+            // operand type in a header), so read just the leading keyword token at
+            // the spelling-start location to recover the operator. The AST subpath
+            // below computes the size from the operand's libclang type.
+            if ci_starts_with(with_ci_cursor_spelling_head(session, cursor), "sizeof"):
+                src = "sizeof"
         if ci_starts_with(src, "sizeof"):
             let rest = ci_trim(src.slice(6, src.len()))
             if rest.len() > 0 and rest.byte_at(0) == 40:
@@ -7328,7 +7340,7 @@ fn ci_rvalue_needs_lowering(session: i64, cursor: i32) -> bool:
         return false
 
     if kind == CXK_UNARY_EXPR:
-        if ci_starts_with(with_ci_cursor_source_text(session, cursor), "sizeof"):
+        if ci_starts_with(with_ci_cursor_source_text(session, cursor), "sizeof") or ci_starts_with(with_ci_cursor_spelling_text(session, cursor), "sizeof"):
             return false
         var i = 0
         while i < nc:
