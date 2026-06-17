@@ -8025,7 +8025,22 @@ fn CiExprPool.build_libc_call_value_expr(self: CiExprPool, session: i64, cursor:
         let _ = self.add_extra(arg_cast as i32)
         return self.unsafe_expr(self.add(CiExprKind.CIE_CALL, wf_callee as i32, args_start, 1, 0 as CiTypeId))
     if callee_text == "calloc":
-        return self.build_named_call_expr("alloc_zeroed", arg_ids)
+        if arg_ids.len() != 2:
+            return 0 as CiExprId
+        let i64_ty = types.named_type_from_text("i64")
+        let c_void_ty = types.named_type_from_text("c_void")
+        if (i64_ty as i32) == 0 or (c_void_ty as i32) == 0:
+            return 0 as CiExprId
+        let count_as_i64 = self.cast(i64_ty, (arg_ids.get(0)) as CiExprId)
+        let size_as_i64 = self.cast(i64_ty, (arg_ids.get(1)) as CiExprId)
+        let wz_idx = self.add_string("with_alloc_zeroed")
+        let wz_callee = self.ident(wz_idx, 0 as CiTypeId)
+        let args_start = self.extra_len() as i32
+        let _ = self.add_extra(count_as_i64 as i32)
+        let _ = self.add_extra(size_as_i64 as i32)
+        let call_id = self.unsafe_expr(self.add(CiExprKind.CIE_CALL, wz_callee as i32, args_start, 2, 0 as CiTypeId))
+        let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
+        return self.cast(void_ptr_ty, call_id)
     if callee_text == "realloc":
         if arg_ids.len() != 2:
             return 0 as CiExprId
