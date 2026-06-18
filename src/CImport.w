@@ -1261,6 +1261,145 @@ fn ci_local_storage_name(escaped: str, cursor: i32) -> str:
         return f"__local_{escaped}"
     f"__local_{cursor}"
 
+// ── #379 buf_in / buf_out: curated byte-buffer contracts ────────────────────
+// A buffer parameter is a (ptr, len) C pair the overlay collapses into one With
+// slice: `[]u8` for inputs (buf_in), `[]mut u8` for outputs (buf_out). The
+// slice's length invariant makes the (ptr, len) call memory-safe, so the
+// generated wrapper is a safe `fn` that takes the public name; only the raw
+// extern it calls (renamed via @[link_name], hidden) is unsafe. The len
+// parameter(s) are dropped from the wrapper and supplied from `slice.len()`.
+//
+// Config is keyed by (function, buffer index). Keep ordered for deterministic
+// codegen. Two buffers may share one length parameter (e.g. memcmp); the
+// wrapper then requires equal lengths and panics on mismatch.
+fn ci_buf_count(name: str) -> i32:
+    if name == "memchr": return 1
+    if name == "memcmp": return 2
+    0
+
+fn ci_buf_ptr_idx(name: str, bi: i32) -> i32:
+    if name == "memchr": return 0
+    if name == "memcmp":
+        if bi == 0: return 0
+        return 1
+    -1
+
+fn ci_buf_len_idx(name: str, bi: i32) -> i32:
+    if name == "memchr": return 2
+    if name == "memcmp": return 2
+    -1
+
+// buf_out (mutable []mut u8) targets are intentionally not curated yet: With
+// cannot currently construct a []mut u8 argument, so a buf_out wrapper (e.g.
+// memset) would be uncallable and would regress the raw surface. Tracked as the
+// buf_out prerequisite; the generator below already handles is_mut so adding
+// entries is all that remains once []mut arguments exist.
+fn ci_buf_is_mut(name: str, bi: i32) -> i32:
+    0
+
+// Buffer index whose ptr parameter is at position pi, or -1.
+fn ci_buf_ptr_buffer_at(name: str, pi: i32) -> i32:
+    let n = ci_buf_count(name)
+    for bi in 0..n:
+        if ci_buf_ptr_idx(name, bi) == pi:
+            return bi
+    -1
+
+// 1 if pi is some buffer's length parameter.
+fn ci_buf_is_len_param(name: str, pi: i32) -> i32:
+    let n = ci_buf_count(name)
+    for bi in 0..n:
+        if ci_buf_len_idx(name, bi) == pi:
+            return 1
+    0
+
+// First buffer whose length parameter is pi (the slice that supplies that len).
+fn ci_buf_first_buffer_for_len(name: str, pi: i32) -> i32:
+    let n = ci_buf_count(name)
+    for bi in 0..n:
+        if ci_buf_len_idx(name, bi) == pi:
+            return bi
+    -1
+
+fn ci_buf_param_name(session: i64, idx: i32, pi: i32) -> str:
+    let n = with_cimport_fn_param_name(session, idx, pi)
+    if n.len() > 0:
+        return ci_escape_reserved(n)
+    f"a{pi}"
+
+// Emit a raw extern (renamed, @[link_name]) plus a safe slice-taking wrapper.
+fn ci_emit_buf_wrapper(session: i64, idx: i32, name: str) -> str:
+    let bufcount = ci_buf_count(name)
+    if bufcount == 0:
+        return ""
+    if with_cimport_fn_is_variadic(session, idx) != 0:
+        return ""
+    let safe_name = ci_escape_reserved(name)
+    let param_count = with_cimport_fn_param_count(session, idx)
+    let ret = ci_pointer_type_explicit_mut(with_cimport_fn_return_type_translated(session, idx))
+    if ci_starts_with(ret, "__UNSUPPORTED:"):
+        return ""
+    let ret_render = ci_unsafe_fn_ptr_type(ret)
+
+    var raw_params = ""
+    var wrapper_params = ""
+    var ptr_lets = ""
+    var call_args = ""
+
+    for pi in 0..param_count:
+        let pname = ci_buf_param_name(session, idx, pi)
+        let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
+        if ci_starts_with(ptype, "__UNSUPPORTED:"):
+            return ""
+        if pi > 0:
+            raw_params = raw_params ++ ", "
+        raw_params = raw_params ++ pname ++ ": " ++ ptype
+
+        let bi = ci_buf_ptr_buffer_at(name, pi)
+        if bi >= 0:
+            let is_mut = ci_buf_is_mut(name, bi)
+            let slicety = if is_mut != 0: "[]mut u8" else: "[]u8"
+            if wrapper_params.len() > 0:
+                wrapper_params = wrapper_params ++ ", "
+            wrapper_params = wrapper_params ++ pname ++ ": " ++ slicety
+            let addr = if is_mut != 0: "&raw mut " ++ pname ++ "[0]" else: "&raw const " ++ pname ++ "[0]"
+            ptr_lets = ptr_lets ++ "    let " ++ pname ++ "_p: " ++ ptype ++ " = if " ++ pname ++ ".len() == 0: null else: " ++ addr ++ " as " ++ ptype ++ "\n"
+            if call_args.len() > 0:
+                call_args = call_args ++ ", "
+            call_args = call_args ++ pname ++ "_p"
+        else if ci_buf_is_len_param(name, pi) != 0:
+            let prov_bi = ci_buf_first_buffer_for_len(name, pi)
+            let prov_name = ci_buf_param_name(session, idx, ci_buf_ptr_idx(name, prov_bi))
+            if call_args.len() > 0:
+                call_args = call_args ++ ", "
+            call_args = call_args ++ "(" ++ prov_name ++ ".len() as " ++ ptype ++ ")"
+        else:
+            if wrapper_params.len() > 0:
+                wrapper_params = wrapper_params ++ ", "
+            wrapper_params = wrapper_params ++ pname ++ ": " ++ ptype
+            if call_args.len() > 0:
+                call_args = call_args ++ ", "
+            call_args = call_args ++ pname
+
+    // Equal-length checks for any length parameter shared by more than one buffer.
+    var checks = ""
+    for pi in 0..param_count:
+        if ci_buf_is_len_param(name, pi) != 0:
+            var first_name = ""
+            for bi in 0..bufcount:
+                if ci_buf_len_idx(name, bi) == pi:
+                    let bn = ci_buf_param_name(session, idx, ci_buf_ptr_idx(name, bi))
+                    if first_name.len() == 0:
+                        first_name = bn
+                    else:
+                        checks = checks ++ "    if " ++ first_name ++ ".len() != " ++ bn ++ ".len():\n        panic(\"" ++ name ++ ": buffer arguments must have equal length\")\n"
+
+    let raw_name = "__wc_buf_" ++ safe_name
+    let raw_decl = "@[link_name(\"" ++ name ++ "\")]\nextern fn " ++ raw_name ++ "(" ++ raw_params ++ ") -> " ++ ret_render ++ "\n"
+    let ret_prefix = if ret == "Unit": "" else: "return "
+    let body = checks ++ ptr_lets ++ "    " ++ ret_prefix ++ "unsafe { " ++ raw_name ++ "(" ++ call_args ++ ") }\n"
+    raw_decl ++ "fn " ++ safe_name ++ "(" ++ wrapper_params ++ ") -> " ++ ret_render ++ ":\n" ++ body
+
 fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     // B9: fresh per-function temp counter.
     ci_temp_reset()
@@ -1317,6 +1456,14 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
         return ""
     if storage == CX_SC_STATIC and is_inline == 0:
         return ""
+
+    // #379 buf_in/buf_out: curated byte-buffer functions are emitted as a safe
+    // slice-taking wrapper over a renamed raw extern.
+    if ci_buf_count(name) > 0:
+        let bw = ci_emit_buf_wrapper(session, idx, name)
+        if bw.len() > 0:
+            with_cimport_mark_name_emitted(name)
+            return bw
 
     let param_count = with_cimport_fn_param_count(session, idx)
     let is_variadic = with_cimport_fn_is_variadic(session, idx)

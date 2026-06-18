@@ -543,6 +543,14 @@ fn Sema.ci_function_requires_raw_abi(self: Sema, fn_sym: i32) -> i32:
         return 0
     if self.sig_is_variadic(sig_idx) != 0:
         return 1
+    // A generated buf_in/buf_out wrapper (#379) is the only c_import function
+    // with a slice parameter — C has no slices, so the bridge never produces
+    // one. Such a wrapper is a safe abstraction over a renamed raw extern;
+    // never classify it raw regardless of its slice params or pointer return.
+    let param_count = self.sig_get_param_count(sig_idx)
+    for spi in 0..param_count:
+        if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig_idx, spi) as TypeId)) == TypeKind.TY_SLICE:
+            return 0
     let name = self.safe_symbol_text(fn_sym)
     // A pointer/fn return is raw unless the overlay vouches a borrowed nullable
     // pointer return. Such a return stays a raw (natively nullable) pointer;
@@ -551,7 +559,6 @@ fn Sema.ci_function_requires_raw_abi(self: Sema, fn_sym: i32) -> i32:
         if ci_overlay_return_is_borrowed_ptr(name) == 0:
             return 1
     let cstr_n = ci_overlay_cstr_in_param_count(name)
-    let param_count = self.sig_get_param_count(sig_idx)
     for pi in 0..param_count:
         let pty = self.sig_param_type(sig_idx, pi)
         if self.ci_type_requires_raw_contract(pty) != 0:
