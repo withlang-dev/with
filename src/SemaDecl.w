@@ -498,14 +498,34 @@ fn ci_overlay_cstr_in_param_count(name: str) -> i32:
     if name == "atoi": return 1
     if name == "atol": return 1
     if name == "atoll": return 1
+    if name == "getenv": return 1
     if name == "strcasecmp": return 2
+    if name == "strchr": return 1
     if name == "strcmp": return 2
     if name == "strcspn": return 2
     if name == "strlen": return 1
     if name == "strncasecmp": return 2
     if name == "strncmp": return 2
+    if name == "strpbrk": return 2
+    if name == "strrchr": return 1
     if name == "strspn": return 2
+    if name == "strstr": return 2
     -1
+
+// #379: curated functions whose pointer RETURN is a borrowed, nullable handle.
+// Raw C pointers (`*T`) are natively nullable in With — `== None` and
+// `.unwrap()` work directly (e.g. malloc returns a plain `*mut c_void`), so the
+// return is left as a raw pointer and NOT wrapped in `Option`. This fact only
+// says the *call* is safe; the returned pointer is borrowed (non-owning) and
+// dereferencing it stays `unsafe`. Owning constructors (fopen, strdup) are NOT
+// here — they belong to #357's owning-wrapper mechanism.
+fn ci_overlay_return_is_borrowed_ptr(name: str) -> i32:
+    if name == "getenv": return 1
+    if name == "strchr": return 1
+    if name == "strpbrk": return 1
+    if name == "strrchr": return 1
+    if name == "strstr": return 1
+    0
 
 fn Sema.ci_function_requires_raw_abi(self: Sema, fn_sym: i32) -> i32:
     let sig_idx = self.get_sig(fn_sym)
@@ -519,10 +539,14 @@ fn Sema.ci_function_requires_raw_abi(self: Sema, fn_sym: i32) -> i32:
         return 0
     if self.sig_is_variadic(sig_idx) != 0:
         return 1
-    // Day-one overlay carries no return facts: any pointer/fn return is raw.
+    let name = self.safe_symbol_text(fn_sym)
+    // A pointer/fn return is raw unless the overlay vouches a borrowed nullable
+    // pointer return. Such a return stays a raw (natively nullable) pointer;
+    // calling is safe and the deref stays unsafe.
     if self.ci_type_requires_raw_contract(self.sig_return_type(sig_idx)) != 0:
-        return 1
-    let cstr_n = ci_overlay_cstr_in_param_count(self.safe_symbol_text(fn_sym))
+        if ci_overlay_return_is_borrowed_ptr(name) == 0:
+            return 1
+    let cstr_n = ci_overlay_cstr_in_param_count(name)
     let param_count = self.sig_get_param_count(sig_idx)
     for pi in 0..param_count:
         let pty = self.sig_param_type(sig_idx, pi)
