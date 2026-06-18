@@ -5188,6 +5188,71 @@ fn CiStmtPool.for_continue_runs_inc_ir(self: CiStmtPool, stmt_id: CiStmtId, inc_
         return stmt_id
     stmt_id
 
+fn CiStmtPool.do_continue_runs_cond_ir(self: CiStmtPool, stmt_id: CiStmtId, cond_setup_id: CiStmtId, cond_id: CiExprId) -> CiStmtId:
+    if (stmt_id as i32) == 0 or (cond_id as i32) == 0:
+        return stmt_id
+    let kind = self.kind(stmt_id)
+    if kind == CiStmtKind.CIS_CONTINUE:
+        let cond_continue = self.continue_()
+        let cond_break = self.break_()
+        let cond_branch = self.if_stmt(cond_id, cond_continue, cond_break)
+        return self.merge_ir( cond_setup_id, cond_branch)
+    if kind == CiStmtKind.CIS_BLOCK:
+        let extra_start = self.get_d0(stmt_id)
+        let count = self.get_d1(stmt_id)
+        var rewritten_ids: Vec[i32] = Vec.new()
+        var i: i32 = 0
+        while i < count:
+            let child_id = (self.get_extra(extra_start + i)) as CiStmtId
+            let rewritten = self.do_continue_runs_cond_ir(child_id, cond_setup_id, cond_id)
+            rewritten_ids.push(rewritten as i32)
+            i = i + 1
+        let new_start = self.extra_len()
+        var ri: i64 = 0
+        while ri < rewritten_ids.len():
+            let _ = self.add_extra(rewritten_ids.get(ri))
+            ri = ri + 1
+        return self.block(new_start, count)
+    if kind == CiStmtKind.CIS_IF:
+        let test_id = (self.get_d0(stmt_id)) as CiExprId
+        let then_id = (self.get_d1(stmt_id)) as CiStmtId
+        let else_id = (self.get_d2(stmt_id)) as CiStmtId
+        let rewritten_then = self.do_continue_runs_cond_ir(then_id, cond_setup_id, cond_id)
+        var rewritten_else: CiStmtId = 0 as CiStmtId
+        if (else_id as i32) != 0:
+            rewritten_else = self.do_continue_runs_cond_ir(else_id, cond_setup_id, cond_id)
+        return self.if_stmt(test_id, rewritten_then, rewritten_else)
+    if kind == CiStmtKind.CIS_MATCH:
+        let subject_id = self.get_d0(stmt_id)
+        let arms_start = self.get_d1(stmt_id)
+        let arm_count = self.get_d2(stmt_id)
+        var rewritten_records: Vec[i32] = Vec.new()
+        var cursor = arms_start
+        var ai: i32 = 0
+        while ai < arm_count:
+            let value_count = self.get_extra(cursor)
+            rewritten_records.push(value_count)
+            cursor = cursor + 1
+            var vi: i32 = 0
+            while vi < value_count:
+                rewritten_records.push(self.get_extra(cursor))
+                cursor = cursor + 1
+                vi = vi + 1
+            let body_id = (self.get_extra(cursor)) as CiStmtId
+            cursor = cursor + 1
+            let rewritten_body = self.do_continue_runs_cond_ir(body_id, cond_setup_id, cond_id)
+            rewritten_records.push(rewritten_body as i32)
+            ai = ai + 1
+        let new_start = self.extra_len()
+        var ri: i64 = 0
+        while ri < rewritten_records.len():
+            let _ = self.add_extra(rewritten_records.get(ri))
+            ri = ri + 1
+        return self.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
+    if kind == CiStmtKind.CIS_WHILE or kind == CiStmtKind.CIS_DO_WHILE or kind == CiStmtKind.CIS_FOR:
+        return stmt_id
+    stmt_id
+
 fn CiExprPool.default_expr_from_text(self: CiExprPool, default_text: str) -> CiExprId:
     if default_text.len() == 0:
         return 0 as CiExprId
@@ -5635,7 +5700,11 @@ fn CiStmtPool.lower_effect_expr_ir(self: CiStmtPool, session: i64, cursor: i32, 
                 return 0 as CiStmtId
             let one_idx = exprs.add_string("1")
             let one = exprs.int_lit(one_idx, 0 as CiTypeId)
-            let delta_op = if op == UO_PRE_INC or op == UO_POST_INC: CiBinOp.CIBO_ADD else: CiBinOp.CIBO_SUB
+            let operand_ty = exprs.get_type(operand.value_expr)
+            var operand_is_ptr = 0
+            if ci_cursor_type_is_pointerish(session, operand_cursor) or ((operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER):
+                operand_is_ptr = 1
+            let delta_op = ci_incdec_binop(op, with_ci_type_is_unsigned(session, cursor), operand_is_ptr)
             let rhs_expr = exprs.binary(delta_op, operand.value_expr, one, 0 as CiTypeId)
             let assign_stmt = self.assign(operand.value_expr, rhs_expr)
             return self.merge_ir( operand.setup_stmt, assign_stmt)
@@ -7095,6 +7164,24 @@ fn ci_compound_to_ci_binop(op: i32) -> i32:
     if op == BO_SHR_ASSIGN: return CiBinOp.CIBO_SHR
     -1
 
+fn ci_compound_wrap_binop(op: i32, is_unsigned: i32) -> i32:
+    if is_unsigned != 0:
+        if op == BO_ADD_ASSIGN: return CiBinOp.CIBO_ADD_WRAP
+        if op == BO_SUB_ASSIGN: return CiBinOp.CIBO_SUB_WRAP
+        if op == BO_MUL_ASSIGN: return CiBinOp.CIBO_MUL_WRAP
+    ci_compound_to_ci_binop(op)
+
+fn ci_incdec_binop(op: i32, is_unsigned: i32, is_pointer: i32) -> i32:
+    if op == UO_PRE_INC or op == UO_POST_INC:
+        if is_unsigned != 0 and is_pointer == 0:
+            return CiBinOp.CIBO_ADD_WRAP
+        return CiBinOp.CIBO_ADD
+    if op == UO_PRE_DEC or op == UO_POST_DEC:
+        if is_unsigned != 0 and is_pointer == 0:
+            return CiBinOp.CIBO_SUB_WRAP
+        return CiBinOp.CIBO_SUB
+    -1
+
 fn CiExprPool.cast_shift_count_expr(self: CiExprPool, types: CiTypePool, rhs: CiExprId) -> CiExprId:
     let c_uint_ty = types.named_type_from_text("c_uint")
     if (c_uint_ty as i32) == 0:
@@ -7106,7 +7193,7 @@ fn CiExprPool.lower_compound_assign(self: CiExprPool, session: i64, cursor: i32,
     if nc < 2:
         return 0 as CiExprId
     let op = with_ci_binary_op(session, cursor)
-    let base_op = ci_compound_to_ci_binop(op)
+    let base_op = ci_compound_wrap_binop(op, with_ci_type_is_unsigned(session, cursor))
     if base_op < 0:
         return 0 as CiExprId
     let lhs_cursor = with_ci_child(session, cursor, 0)
@@ -7120,7 +7207,7 @@ fn CiExprPool.lower_compound_assign(self: CiExprPool, session: i64, cursor: i32,
     var rhs_value = rhs_id
     let lhs_ty = self.get_type(lhs_id)
     let lhs_is_ptr = ci_cursor_type_is_pointerish(session, lhs_cursor) or ((lhs_ty as i32) != 0 and types.kind(lhs_ty) == CiTypeKind.CT_POINTER)
-    if lhs_is_ptr and (base_op == CiBinOp.CIBO_ADD or base_op == CiBinOp.CIBO_SUB):
+    if lhs_is_ptr and (base_op == CiBinOp.CIBO_ADD or base_op == CiBinOp.CIBO_SUB or base_op == CiBinOp.CIBO_ADD_WRAP or base_op == CiBinOp.CIBO_SUB_WRAP):
         rhs_value = self.cast_pointer_index_expr(session, rhs_cursor, rhs_value, types)
         if (rhs_value as i32) == 0:
             return 0 as CiExprId
@@ -7145,7 +7232,11 @@ fn CiExprPool.lower_unary_simple(self: CiExprPool, session: i64, cursor: i32, ty
             return 0 as CiExprId
         let one_idx = self.add_string("1")
         let one = self.int_lit(one_idx, 0 as CiTypeId)
-        let delta_op = if op == UO_PRE_INC or op == UO_POST_INC: CiBinOp.CIBO_ADD else: CiBinOp.CIBO_SUB
+        let child_ty = self.get_type(child_id)
+        var child_is_ptr = 0
+        if ci_cursor_type_is_pointerish(session, child_cursor) or ((child_ty as i32) != 0 and types.kind(child_ty) == CiTypeKind.CT_POINTER):
+            child_is_ptr = 1
+        let delta_op = ci_incdec_binop(op, with_ci_type_is_unsigned(session, cursor), child_is_ptr)
         let rhs_id = self.binary(delta_op, child_id, one, 0 as CiTypeId)
         let assign_id = self.add(CiExprKind.CIE_ASSIGN, child_id as i32, rhs_id as i32, 0, 0 as CiTypeId)
         return self.add(CiExprKind.CIE_PAREN, assign_id as i32, 0, 0, 0 as CiTypeId)
@@ -7532,6 +7623,7 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
         let expansion_src = with_ci_cursor_expansion_text(session, cursor)
         let expansion_arg = ci_string_macro_arg_from_expansion(session, cursor)
         let spelling_src = with_ci_cursor_spelling_text(session, cursor)
+        let spelling_literal = ci_string_literal_at_source_location(with_ci_cursor_spelling_location(session, cursor))
         let source_src = with_ci_cursor_source_text(session, cursor)
         let eval_src = with_ci_eval_as_str(session, cursor)
         let eval_text = ci_quote_evaluated_c_string(eval_src)
@@ -7546,7 +7638,17 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
         let source_expanded = ci_expand_string_macro_sequence(session, source_src)
         var preprocessed_expanded = ""
         var text = literal_src
-        if expansion_expanded.len() > 0:
+        if ci_is_string_literal(spelling_literal):
+            text = spelling_literal
+        else if ci_is_concatenated_string(spelling_src):
+            text = ci_concat_strings(spelling_src)
+        else if ci_is_string_literal(spelling_src):
+            text = spelling_src
+        else if ci_is_concatenated_string(source_src):
+            text = ci_concat_strings(source_src)
+        else if ci_is_string_literal(source_src):
+            text = source_src
+        else if expansion_expanded.len() > 0:
             text = expansion_expanded
         else if expansion_arg_expanded.len() > 0:
             text = expansion_arg_expanded
@@ -8632,13 +8734,14 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         let rhs_cursor = with_ci_child(session, cursor, 1)
         let lhs = self.lower_lvalue_expr_ir(session, lhs_cursor, exprs, types, scope)
         let rhs = self.lower_value_expr_ir(session, rhs_cursor, exprs, types, scope)
-        let ci_op = ci_compound_to_ci_binop(with_ci_binary_op(session, cursor))
+        let compound_op = with_ci_binary_op(session, cursor)
+        let ci_op = ci_compound_wrap_binop(compound_op, with_ci_type_is_unsigned(session, cursor))
         if ci_value_ir_valid(lhs) and ci_value_ir_valid(rhs) and ci_op >= 0:
             var lhs_value = lhs.value_expr
             var rhs_value = rhs.value_expr
             let lhs_ty = exprs.get_type(lhs.value_expr)
             let lhs_is_ptr = ci_cursor_type_is_pointerish(session, lhs_cursor) or ((lhs_ty as i32) != 0 and types.kind(lhs_ty) == CiTypeKind.CT_POINTER)
-            if lhs_is_ptr and (ci_op == CiBinOp.CIBO_ADD or ci_op == CiBinOp.CIBO_SUB):
+            if lhs_is_ptr and (ci_op == CiBinOp.CIBO_ADD or ci_op == CiBinOp.CIBO_SUB or ci_op == CiBinOp.CIBO_ADD_WRAP or ci_op == CiBinOp.CIBO_SUB_WRAP):
                 rhs_value = exprs.cast_pointer_index_expr(session, rhs_cursor, rhs_value, types)
                 if (rhs_value as i32) == 0:
                     return ci_value_ir_invalid()
@@ -8672,7 +8775,11 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
             if ci_value_ir_valid(operand):
                 let one_idx = exprs.add_string("1")
                 let one = exprs.int_lit(one_idx, 0 as CiTypeId)
-                let delta_op = if op == UO_PRE_INC or op == UO_POST_INC: CiBinOp.CIBO_ADD else: CiBinOp.CIBO_SUB
+                let operand_ty = exprs.get_type(operand.value_expr)
+                var operand_is_ptr = 0
+                if ci_cursor_type_is_pointerish(session, operand_cursor) or ((operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER):
+                    operand_is_ptr = 1
+                let delta_op = ci_incdec_binop(op, with_ci_type_is_unsigned(session, cursor), operand_is_ptr)
                 let rhs_expr = exprs.binary(delta_op, operand.value_expr, one, 0 as CiTypeId)
                 let assign_stmt = self.assign(operand.value_expr, rhs_expr)
                 if op == UO_PRE_INC or op == UO_PRE_DEC:
@@ -9659,8 +9766,9 @@ fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: 
             let prepared_cond = self.prepare_stmt_condition_ir(session, cond_cursor, exprs, types, scope)
             if ci_value_ir_valid(prepared_cond):
                 ci_trace_port("STRUCTURAL[b11.1.do_stmt_ir]")
-                let body_id = self.lower_stmt_ir(session, body_cursor, exprs, types, 0, scope)
+                var body_id = self.lower_stmt_ir(session, body_cursor, exprs, types, 0, scope)
                 if (body_id as i32) != 0:
+                    body_id = self.do_continue_runs_cond_ir(body_id, prepared_cond.setup_stmt, prepared_cond.value_expr)
                     return self.do_while_stmt(body_id, prepared_cond.value_expr, prepared_cond.setup_stmt)
 
     // Compound statement with gotos. Lower the whole function body
@@ -11890,6 +11998,17 @@ fn ci_c_initializer_is_identifier(s: str) -> bool:
         i = i + 1
     true
 
+fn ci_c_initializer_decay_array_identifier(session: i64, init_src: str, ty: str) -> str:
+    let trimmed = ci_trim(init_src)
+    if ty.len() == 0 or ty.byte_at(0) != 42 or not ci_c_initializer_is_identifier(trimmed):
+        return ""
+    let decl = ci_find_var_cursor(session, trimmed)
+    if decl < 0 or not ci_cursor_is_array_type(session, decl):
+        return ""
+    let target_is_mut = ty.len() > 0 and ty.byte_at(0) == 42 and not ci_starts_with(ty, "*const")
+    let raw_kw = if target_is_mut: "&raw mut " else: "&raw const "
+    "(" ++ raw_kw ++ trimmed ++ "[0] as " ++ ty ++ ")"
+
 fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: str, ty: str, cxtype: i32) -> str:
     let trimmed = ci_trim(init_src)
     if trimmed.len() == 0:
@@ -11903,11 +12022,10 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: str, ty: s
             return "null"
         return "0"
     if trimmed.byte_at(0) != 123:
+        let decayed = ci_c_initializer_decay_array_identifier(session, trimmed, ty)
+        if decayed.len() > 0:
+            return decayed
         var translated = ci_translate_c_expr(trimmed, "", "")
-        if translated.len() == 0 and ty.len() > 0 and ty.byte_at(0) == 42 and ci_c_initializer_is_identifier(trimmed):
-            let decl = ci_find_var_cursor(session, trimmed)
-            if decl >= 0 and ci_cursor_is_array_type(session, decl):
-                translated = "(&" ++ trimmed ++ "[0] as " ++ ty ++ ")"
         if translated.len() == 0:
             return ""
         if ci_starts_with(translated, ".{") and ty.len() > 0 and ty.byte_at(0) != 91:
@@ -12168,6 +12286,48 @@ fn ci_source_line_at(path: str, line_no: i32) -> str:
             start = pos + 1
         pos = pos + 1
     ""
+
+fn ci_string_literal_at_source_location(loc: str) -> str:
+    let last_colon = ci_find_last_char(loc, 58)
+    if last_colon < 0:
+        return ""
+    let path_and_line = loc.slice(0, last_colon as i64)
+    let second_colon = ci_find_last_char(path_and_line, 58)
+    if second_colon < 0:
+        return ""
+    let path = path_and_line.slice(0, second_colon as i64)
+    let line_no = ci_parse_i64(path_and_line.slice((second_colon + 1) as i64, path_and_line.len())) as i32
+    let col_no = ci_parse_i64(loc.slice((last_colon + 1) as i64, loc.len())) as i32
+    let line = ci_source_line_at(path, line_no)
+    if line.len() == 0:
+        return ""
+    let llen = line.len() as i32
+    var pos = if col_no > 0: col_no - 1 else: 0
+    if pos >= llen:
+        pos = llen - 1
+    while pos >= 0:
+        if line.byte_at(pos as i64) == 34:
+            var slash_count = 0
+            var back = pos - 1
+            while back >= 0 and line.byte_at(back as i64) == 92:
+                slash_count = slash_count + 1
+                back = back - 1
+            if slash_count % 2 == 0:
+                break
+        pos = pos - 1
+    if pos < 0:
+        return ""
+    var start = pos
+    if start >= 2 and line.byte_at((start - 2) as i64) == 117 and line.byte_at((start - 1) as i64) == 56:
+        start = start - 2
+    else if start >= 1:
+        let prefix = line.byte_at((start - 1) as i64)
+        if prefix == 76 or prefix == 85 or prefix == 117:
+            start = start - 1
+    let end = ci_find_string_literal_end(line, start)
+    if end <= start:
+        return ""
+    line.slice(start as i64, end as i64)
 
 fn ci_macro_arg_for_initializer_param(session: i64, var_cursor: i32, param_name: str) -> str:
     let param = ci_trim(param_name)

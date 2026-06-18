@@ -3979,7 +3979,8 @@ fn Codegen.declare_function_at(self: Codegen, fn_node: i32, decl_index: i32):
                 byval_types.push(0)
                 direct_types.push(0)
     let actual_param_count = actual_param_types.len() as i32
-    let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_param_types), actual_param_count, 0)
+    let is_variadic = (flags / FnFlags.VARIADIC) % 2
+    let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_param_types), actual_param_count, is_variadic)
 
     // Use "main" for @[entry] functions
     var effective_name = if sema_name_str.len() > 0: sema_name_str else: self.function_symbol_name(name_sym)

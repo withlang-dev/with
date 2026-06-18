@@ -1178,6 +1178,8 @@ fn Codegen.emit_module_runtime_init_fn(self: Codegen, name_sym: i32, value_node:
     let saved_tail_allocas = self.tailrec_param_allocas
     let saved_loops = self.capture_loop_state()
     let saved_bb = wl_get_insert_block(self.builder)
+    let saved_mir_values = self.mir_local_values
+    let saved_mir_memory_locals = self.mir_memory_locals
 
     let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
     let fresh_local_types: HashMap[i32, i64] = HashMap.new()
@@ -1232,6 +1234,8 @@ fn Codegen.emit_module_runtime_init_fn(self: Codegen, name_sym: i32, value_node:
     let saved_mir_bbs = self.mir_bb_values
     let saved_mir_unreachable = self.mir_default_unreachable_bbs
     self.mir_local_ptrs = HashMap.new()
+    self.mir_local_values = HashMap.new()
+    self.mir_memory_locals = HashMap.new()
     self.mir_local_types = HashMap.new()
     self.mir_bb_values = Vec.new()
     self.mir_default_unreachable_bbs = Vec.new()
@@ -1247,6 +1251,7 @@ fn Codegen.emit_module_runtime_init_fn(self: Codegen, name_sym: i32, value_node:
     init_builder.pop_scope_inline()
     init_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     let init_body = init_builder.body
+    self.mir_scan_memory_locals(init_body)
 
     let ret_alloca = self.create_entry_alloca(ret_ty)
     self.mir_local_ptrs.insert(0, ret_alloca)
@@ -1290,6 +1295,8 @@ fn Codegen.emit_module_runtime_init_fn(self: Codegen, name_sym: i32, value_node:
                     let _ = wl_build_ret(self.builder, wl_const_null(ret_ty))
 
     self.mir_local_ptrs = saved_mir_locals
+    self.mir_local_values = saved_mir_values
+    self.mir_memory_locals = saved_mir_memory_locals
     self.mir_local_types = saved_mir_local_types
     self.mir_bb_values = saved_mir_bbs
     self.mir_default_unreachable_bbs = saved_mir_unreachable
@@ -1604,6 +1611,24 @@ fn Codegen.try_eval_const_struct_llvm(self: Codegen, node: i32, expected_tid: i3
 
     let te_start = self.sema.get_type_d1(resolved)
     let source_field_count = self.sema.get_type_d2(resolved)
+    if self.is_union_struct_index(struct_idx):
+        for fi in 0..source_field_count:
+            let field_name = self.sema.type_extra.get((te_start + fi * 3) as i64)
+            let field_tid = self.sema.type_extra.get((te_start + fi * 3 + 1) as i64)
+            let value_node = self.struct_literal_field_value_node(cur, field_name, fi)
+            if value_node == 0:
+                continue
+            let llvm_idx = self.get_llvm_field_index(struct_ty, fi)
+            if llvm_idx < 0 or llvm_idx >= llvm_field_count:
+                return 0
+            let storage_ty = wl_struct_get_type_at(struct_ty, llvm_idx)
+            let field_val = self.try_eval_const_llvm(value_node, field_tid)
+            let coerced = self.coerce_const_value_to_type(field_val, storage_ty)
+            if coerced == 0:
+                return 0
+            fields[llvm_idx] = coerced
+            return wl_const_named_struct(struct_ty, vec_data_i64(&fields), llvm_field_count)
+        return wl_const_named_struct(struct_ty, vec_data_i64(&fields), llvm_field_count)
     for fi in 0..source_field_count:
         let field_name = self.sema.type_extra.get((te_start + fi * 3) as i64)
         let field_tid = self.sema.type_extra.get((te_start + fi * 3 + 1) as i64)

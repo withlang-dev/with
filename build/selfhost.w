@@ -3253,7 +3253,7 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: str, case_d
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "initlist.c")
     let out_w = bs_join(case_dir, "initlist.w")
-    var rc = bs_write_fixture(ctx, src, "typedef int (*callback_t)(int);\ntypedef struct inner { callback_t cb; void *data; } inner;\ntypedef struct outer { inner in; int limit; } outer;\nint add1(int x) { return x + 1; }\nouter g = { { add1, 0 }, 7 };\n", "migrate global init list")
+    var rc = bs_write_fixture(ctx, src, "typedef int (*callback_t)(int);\ntypedef unsigned short ushort_t;\ntypedef struct inner { callback_t cb; void *data; } inner;\ntypedef struct outer { inner in; int limit; } outer;\ntypedef struct config_s { int good_length; int max_lazy; int nice_length; int max_chain; callback_t func; } config_s;\ntypedef struct desc_s { const int *values; int *mutable_values; int count; } desc_s;\ntypedef union code_len { ushort_t code; ushort_t len; } code_len;\ntypedef struct tree_entry { code_len fc; code_len dl; } tree_entry;\nint add1(int x) { return x + 1; }\nconst int static_values[3] = {1, 2, 3};\nint mutable_values[2] = {4, 5};\nouter g = { { add1, 0 }, 7 };\nconfig_s table[10] = {{0, 0, 0, 0, add1}, {4, 4, 8, 4, add1}, {4, 5, 16, 8, add1}, {4, 6, 32, 32, add1}, {4, 4, 16, 16, add1}, {8, 16, 32, 32, add1}, {8, 16, 128, 128, add1}, {8, 32, 128, 256, add1}, {32, 128, 258, 1024, add1}, {32, 258, 258, 4096, add1}};\ndesc_s desc = {static_values, mutable_values, 3};\nconst tree_entry static_tree[2] = {{{12}, {8}}, {{140}, {9}}};\n", "migrate global init list")
     if rc != 0: return rc
     var args: Vec[str] = Vec.new()
     args |> push("migrate")
@@ -3264,7 +3264,22 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: str, case_d
     args |> push(bs_abs(root, out_w))
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-global-init-list", args)
     if result.rc != 0: return result.rc
-    bs_file_contains(ctx, out_w, "var g: outer = outer { in_: inner { cb: add1, data: null }, limit: 7 }", "global_init_list")
+    rc = bs_file_contains(ctx, out_w, "var g: outer = outer { in_: inner { cb: add1, data: null }, limit: 7 }", "global_init_list")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "var table: [10]config_s", "global_init_list")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "values: (&raw const static_values[0] as *const c_int)", "global_init_list")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "mutable_values: (&raw const mutable_values[0] as *mut c_int)", "global_init_list")
+    if rc != 0: return rc
+    var ir_args: Vec[str] = Vec.new()
+    ir_args |> push("ir")
+    ir_args |> push(bs_abs(root, out_w))
+    let ir = bs_migrate_expect_success(ctx, compiler_path, case_dir, "ir-global-init-list", ir_args)
+    if ir.rc != 0: return ir.rc
+    rc = bs_assert_contains(ctx, ir.stdout, "@static_tree = internal constant [2 x %tree_entry] [%tree_entry { %code_len { i16 12 }, %code_len { i16 8 } }, %tree_entry { %code_len { i16 140 }, %code_len { i16 9 } }]", "global_init_list_union_ir")
+    if rc != 0: return rc
+    0
 
 fn bs_check_migrate_host_header_compat(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3292,7 +3307,7 @@ fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: str, case_
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "assignments.c")
     let out_w = bs_join(case_dir, "assignments.w")
-    let c_text = "typedef unsigned int c_uint;\ntypedef struct {\n  c_uint *groupinfo;\n  c_uint *parsed_pattern;\n} compile_block;\n\nvoid f(void) {\n  compile_block cb;\n  c_uint stack_groupinfo[32];\n  c_uint stack_parsed_pattern[64];\n  c_uint pp = 0;\n  c_uint skipatstart = 0;\n  cb.groupinfo = stack_groupinfo;\n  cb.parsed_pattern = stack_parsed_pattern;\n  skipatstart = (pp = pp + 1);\n}\n"
+    let c_text = "typedef unsigned int c_uint;\ntypedef unsigned long c_ulong;\ntypedef struct {\n  c_uint *groupinfo;\n  c_uint *parsed_pattern;\n} compile_block;\n\nvoid f(void) {\n  compile_block cb;\n  c_uint stack_groupinfo[32];\n  c_uint stack_parsed_pattern[64];\n  c_uint pp = 0;\n  c_uint skipatstart = 0;\n  c_ulong total = 0;\n  c_ulong chunk = 1;\n  cb.groupinfo = stack_groupinfo;\n  cb.parsed_pattern = stack_parsed_pattern;\n  skipatstart = (pp = pp + 1);\n  total += chunk;\n  while (chunk--) {\n    total += chunk;\n  }\n  chunk = 3;\n  do {\n    if (total == 0) {\n      continue;\n    }\n    total += chunk;\n  } while (--chunk != 0);\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate assignment compat")
     if rc != 0: return rc
     var args: Vec[str] = Vec.new()
@@ -3316,6 +3331,14 @@ fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: str, case_
     if pp_index < 0 or skip_index < 0 or pp_index >= skip_index:
         return bs_fail(ctx, "assignment_compat did not preserve assignment sequencing")
     rc = bs_assert_not_contains(ctx, out_text, "(__local_skipatstart = ((__local_pp) =", "assignment_compat")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(__local_total = (__local_total +% __local_chunk))", "assignment_compat")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(__local_chunk = (__local_chunk -% 1))", "assignment_compat")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "if ((if __local_chunk != 0: 1 else: 0) != 0) {\n                continue", "assignment_compat")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "                continue\n            }\n            break", "assignment_compat")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")
@@ -3601,6 +3624,11 @@ fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: str, case_di
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-variadic-stdarg", check_args)
     if check.rc != 0: return check.rc
+    var ir_args: Vec[str] = Vec.new()
+    ir_args |> push("ir")
+    ir_args |> push(bs_abs(root, out_w))
+    let ir = bs_migrate_expect_success(ctx, compiler_path, case_dir, "ir-variadic-stdarg", ir_args)
+    if ir.rc != 0: return ir.rc
 
     let va_arg_src = bs_join(case_dir, "variadic_va_arg.c")
     let va_arg_out = bs_join(case_dir, "variadic_va_arg.w")
@@ -3666,6 +3694,34 @@ fn bs_check_migrate_longjmp_rejected(ctx: &ActionCtx, compiler_path: str, case_d
     if rc != 0: return rc
     bs_expect_absent(ctx, out_w, "longjmp rejected output")
 
+fn bs_check_migrate_macro_body_string_literal(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "macro_body_string_literal.c")
+    let out_w = bs_join(case_dir, "macro_body_string_literal.w")
+    let c_text = "#include <stdio.h>\n#define CHECK_ERR(err, msg) { if ((err) != 0) { fprintf(stderr, \"%s error: %d\\n\", msg, err); } }\nvoid f(int err) { CHECK_ERR(err, \"compress\"); }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "macro body string literal")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-macro-body-string-literal", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "fprintf(__stderrp, c\"%s error: %d\\n\".ptr, \"compress\", __param_err)", "macro_body_string_literal")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "fprintf(__stderrp, c\"compress\".ptr", "macro_body_string_literal")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-macro-body-string-literal", check_args)
+    if check.rc != 0: return check.rc
+    0
+
 pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -3702,6 +3758,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_shared_defs_cross_module_test(ctx, compiler_path, bs_join(output_dir, "shared_defs_cross_module_test"))
     if rc != 0: return rc
     rc = bs_check_migrate_switch_macro_case_values(ctx, compiler_path, bs_join(output_dir, "switch_macro_case_values"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_macro_body_string_literal(ctx, compiler_path, bs_join(output_dir, "macro_body_string_literal"))
     if rc != 0: return rc
     rc = bs_check_migrate_sizeof_pointer_width(ctx, compiler_path, bs_join(output_dir, "sizeof_pointer_width"))
     if rc != 0: return rc

@@ -701,6 +701,21 @@ fn Codegen.mir_push_successors(self: Codegen, body: &MirBody, bb: i32, stack: Mi
                 self.mir_add_successor(body, stack, visited, body.switch_table_targets.get((start + ti) as i64))
         self.mir_add_successor(body, stack, visited, d2)
 
+fn Codegen.mir_reachable_blocks(self: Codegen, body: &MirBody) -> Vec[i32]:
+    let visited = self.mir_i32_vec_fill(body.block_count(), 0)
+    let stack = MirBlockStack.new()
+    if body.block_count() > 0:
+        stack.push(0)
+    while stack.len() > 0:
+        let cur = stack.pop_top()
+        if cur < 0 or cur >= body.block_count():
+            continue
+        if visited.get(cur as i64) != 0:
+            continue
+        visited.set_i32(cur, 1)
+        self.mir_push_successors(body, cur, stack, &visited)
+    visited
+
 fn Codegen.mir_reaches_block_avoiding(self: Codegen, body: &MirBody, target_bb: i32, avoid_bb: i32) -> bool:
     if target_bb < 0 or target_bb >= body.block_count():
         return false
@@ -3044,9 +3059,9 @@ fn Codegen.try_emit_llvm_va_intrinsic(self: Codegen, fn_sym: i32, args: &Vec[i64
     let name = self.intern.resolve(fn_sym)
     var intrinsic_name = ""
     if name == "with_va_start":
-        intrinsic_name = "llvm.va_start"
+        intrinsic_name = "llvm.va_start.p0"
     if name == "with_va_end":
-        intrinsic_name = "llvm.va_end"
+        intrinsic_name = "llvm.va_end.p0"
     if intrinsic_name.len() == 0:
         return false
 
@@ -3366,6 +3381,8 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: &MirBody, rval_id: i32, dest_ty:
             if d0 == 1 and struct_ty != 0 and wl_get_type_kind(struct_ty) != wl_struct_type_kind() and wl_get_type_kind(struct_ty) != wl_pointer_type_kind() and self.current_ret_type != 0 and wl_get_type_kind(self.current_ret_type) == wl_struct_type_kind():
                 struct_ty = self.current_ret_type
             if (struct_ty == 0 or wl_get_type_kind(struct_ty) == wl_void_type_kind()) and self.current_ret_type != 0 and wl_get_type_kind(self.current_ret_type) == wl_struct_type_kind():
+                struct_ty = self.current_ret_type
+            if (struct_ty == 0 or wl_get_type_kind(struct_ty) == wl_void_type_kind()) and self.current_ret_type != 0 and wl_get_type_kind(self.current_ret_type) == wl_array_type_kind():
                 struct_ty = self.current_ret_type
             if self.debug_mir_codegen_enabled():
                 with_eprint(f"[mir-agg] fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count} dest_ty_kind={if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1} dest_ty_fields={if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1}")
@@ -14252,6 +14269,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: &MirBody):
         else:
             let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
 
+    let reachable_bbs = self.mir_reachable_blocks(body)
     let saved_fn_scope = self.di_current_scope
     for bb in 0..body.block_count():
         if bb < 0 or bb >= self.mir_bb_values.len() as i32:
@@ -14260,6 +14278,9 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: &MirBody):
         if self.debug_mir_codegen_enabled():
             with_eprint(f"[mir-cg] fn={name_str} bb={bb} llbb={llbb}")
         wl_position_at_end(self.builder, llbb)
+        if reachable_bbs.get(bb as i64) == 0:
+            wl_build_unreachable(self.builder)
+            continue
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
         let stmt_count = body.bb_stmt_counts.get(bb as i64)
         // Push a lexical block scope for non-entry BBs
@@ -14685,11 +14706,15 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
         else:
             let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
 
+    let reachable_bbs = self.mir_reachable_blocks(body)
     for bb in 0..body.block_count():
         if bb < 0 or bb >= self.mir_bb_values.len() as i32:
             continue
         let llbb = self.mir_bb_values.get(bb as i64)
         wl_position_at_end(self.builder, llbb)
+        if reachable_bbs.get(bb as i64) == 0:
+            wl_build_unreachable(self.builder)
+            continue
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
         let stmt_count = body.bb_stmt_counts.get(bb as i64)
         for si in 0..stmt_count:
