@@ -9659,6 +9659,7 @@ with doc [--open]                            # generate documentation
 with repl                                    # interactive session
 with init                                    # create a new project
 with migrate <c-sources>                     # translate C to With (§13.5b, §16)
+with emit-c-header <file>                    # emit C declarations for @[c_export] (§16.5)
 with version | with help
 with -e <code> | -n <code> | -p <code>      # one-liners (§18.5b)
 ```
@@ -10003,6 +10004,7 @@ what users import.
 | `std.hash` | Hasher trait, DefaultHasher | — |
 | `std.fmt` | Debug trait, f-string internals | `stdio.h` (sprintf) |
 | `std.testing` | assert, require, check, assert_eq, assert_matches, panic, todo, unreachable | — |
+| `std.ffi` | C callback context boxing and raw FFI helper types | `void*` context plumbing |
 | `std.regex` | `Regex`, `Match`, `Captures`; engine behind §15.8 literals and `=~` | PCRE2 (migrated) |
 | `std.json` | JSON parse/serialize | — |
 | `std.http` | HTTP client | libcurl |
