@@ -4631,7 +4631,13 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     let actual_param_count = param_types.len() as i32
     let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&param_types), actual_param_count, is_variadic)
 
-    let link_name = self.canonical_extern_name(name_str)
+    // @[link_name("symbol")] overrides the C symbol this extern links against
+    // (stored as a "link_name:" callconv prefix). Otherwise canonicalize the
+    // With name. Lets a generated wrapper take the public name while the raw
+    // binding is renamed but still resolves to the real C symbol.
+    var link_name = self.canonical_extern_name(name_str)
+    if cc_name.len() > 10 and cc_name.slice(0, 10) == "link_name:":
+        link_name = cc_name.slice(10, cc_name.len() as i64)
 
     // Check if already declared
     let existing = wl_get_named_function(self.llmod, link_name)
@@ -4651,7 +4657,10 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
 
     // Apply calling convention or c_export if specified
     if cc_name.len() > 0:
-        if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
+        if cc_name.len() > 10 and cc_name.slice(0, 10) == "link_name:":
+            // @[link_name(...)] — symbol already applied above; keep C ABI.
+            0
+        else if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:":
             // @[c_export("name")] — set external linkage for C visibility
             // External linkage = 0 in LLVM (default for non-internal functions)
             wl_set_linkage(function, 0)

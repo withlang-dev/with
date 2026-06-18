@@ -654,6 +654,20 @@ fn Parser.skip_attributes(self: Parser):
                     self.advance()
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
+        else if self.is_ident_named("link_name"):
+            // @[link_name("symbol")] — the C symbol an extern fn links against,
+            // when its With name differs (e.g. a generated wrapper takes the
+            // public name and the raw binding is renamed). Stored as callconv
+            // with a "link_name:" prefix for codegen to apply.
+            self.advance()
+            if self.peek() == TokenKind.TK_L_PAREN:
+                self.advance()
+                if self.peek() == TokenKind.TK_STRING_LIT:
+                    let ln = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
+                    self.pending_callconv = self.intern.intern("link_name:" ++ ln)
+                    self.advance()
+                if self.peek() == TokenKind.TK_R_PAREN:
+                    self.advance()
         else if self.is_ident_named("callconv"):
             self.advance()
             if self.peek() == TokenKind.TK_L_PAREN:
