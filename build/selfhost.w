@@ -3462,8 +3462,58 @@ fn bs_check_migrate_shared_defs_ownerless_extern(ctx: &ActionCtx, compiler_path:
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, defs_text, "issue140_unused_external", "shared_defs_ownerless_extern")
     if rc != 0: return rc
-    if bs_count_occurrences(defs_text, "fn string_find_char(") != 1:
-        return bs_fail(ctx, "shared_defs_ownerless_extern emitted duplicate or missing string_find_char helper")
+    rc = bs_assert_contains(ctx, defs_text, "pub extern fn strlen", "shared_defs_ownerless_extern")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, defs_text, "fn string_find_char(", "shared_defs_ownerless_extern")
+    if rc != 0: return rc
+    0
+
+fn bs_check_migrate_shared_defs_cross_module_test(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let generated_dir = bs_join(case_dir, "generated")
+    let check_dir = bs_join(case_dir, "check_project")
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "api.h"), "int issue141_add(int x);\n", "shared defs cross module header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "lib.c"), "#include \"api.h\"\n\nint issue141_add(int x) {\n  return x + 1;\n}\n", "shared defs cross module lib")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "example.c"), "#include \"api.h\"\n#include <string.h>\n\nint main(void) {\n  return issue141_add((int)strlen(\"abc\")) == 4 ? 0 : 1;\n}\n", "shared defs cross module example")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, case_dir))
+    args |> push("--no-c-export")
+    args |> push("--shared-defs")
+    args |> push("testpkg.defs")
+    args |> push("-I")
+    args |> push(bs_abs(root, case_dir))
+    args |> push("-o")
+    args |> push(bs_abs(root, generated_dir))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-shared-defs-cross-module-test", args)
+    if result.rc != 0: return result.rc
+    let lib_w = bs_join(generated_dir, "lib.w")
+    let example_w = bs_join(generated_dir, "example.w")
+    rc = bs_file_contains(ctx, lib_w, "pub fn issue141_add", "shared_defs_cross_module_test lib")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, example_w, "use testpkg.lib", "shared_defs_cross_module_test example import")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, example_w, "extern fn issue141_add", "shared_defs_cross_module_test example extern")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, example_w, "strlen(c\"abc\".ptr)", "shared_defs_cross_module_test direct strlen")
+    if rc != 0: return rc
+    let fs = ctx.fs()
+    if fs.mkdir_all(bs_join(check_dir, "lib/testpkg")) != 0:
+        return bs_fail(ctx, "could not create shared_defs_cross_module_test check project")
+    if fs.write_text(bs_join(check_dir, "lib/testpkg/defs.w"), fs.read_text(bs_join(generated_dir, "defs.w"))) != 0:
+        return bs_fail(ctx, "could not write shared_defs_cross_module_test defs")
+    if fs.write_text(bs_join(check_dir, "lib/testpkg/lib.w"), fs.read_text(lib_w)) != 0:
+        return bs_fail(ctx, "could not write shared_defs_cross_module_test lib")
+    if fs.write_text(bs_join(check_dir, "main.w"), fs.read_text(example_w)) != 0:
+        return bs_fail(ctx, "could not write shared_defs_cross_module_test main")
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push("main.w")
+    let check = bs_migrate_expect_success(ctx, compiler_path, check_dir, "check-shared-defs-cross-module-test", check_args)
+    if check.rc != 0: return check.rc
     0
 
 fn bs_check_migrate_switch_macro_case_values(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
@@ -3648,6 +3698,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_cross_file_global_owner_arrays(ctx, compiler_path, bs_join(output_dir, "cross_file_global_owner_arrays"))
     if rc != 0: return rc
     rc = bs_check_migrate_shared_defs_ownerless_extern(ctx, compiler_path, bs_join(output_dir, "shared_defs_ownerless_extern"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_shared_defs_cross_module_test(ctx, compiler_path, bs_join(output_dir, "shared_defs_cross_module_test"))
     if rc != 0: return rc
     rc = bs_check_migrate_switch_macro_case_values(ctx, compiler_path, bs_join(output_dir, "switch_macro_case_values"))
     if rc != 0: return rc
