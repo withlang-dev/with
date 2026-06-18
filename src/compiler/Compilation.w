@@ -1126,6 +1126,12 @@ fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
 
     var sema = zcu.configure_tracked_input_sema(Sema.init(zcu.pool, zcu.diagnostics, typed_pool))
     sema.source_text = zcu.current_source_text
+    sema.decl_source_paths = zcu.decl_source_paths
+    sema.decl_source_file_ids = zcu.decl_source_file_ids
+    sema.decl_is_c_import = zcu.decl_is_c_import
+    sema.source_text_file_ids = zcu.source_text_file_ids
+    sema.source_text_names = zcu.source_text_names
+    sema.source_texts = zcu.source_texts
     sema.tool_mode_entry_path = zcu.tool_mode_entry_path
     sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
     sema.runtime_fiber_stack_size = zcu.project_config.runtime_fiber_stack_size
@@ -1215,6 +1221,9 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     sema.decl_source_paths = self.zcu.decl_source_paths
     sema.decl_source_file_ids = self.zcu.decl_source_file_ids
     sema.decl_is_c_import = self.zcu.decl_is_c_import
+    sema.source_text_file_ids = self.zcu.source_text_file_ids
+    sema.source_text_names = self.zcu.source_text_names
+    sema.source_texts = self.zcu.source_texts
     sema.tool_mode_entry_path = self.zcu.tool_mode_entry_path
     sema.runtime_available = if self.zcu.project_config.runtime_available: 1 else: 0
     sema.runtime_fiber_stack_size = self.zcu.project_config.runtime_fiber_stack_size

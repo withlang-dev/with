@@ -211,6 +211,24 @@ fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32) -> 
     self.drop_local_ids.push(local_id)
     self.drop_kinds.push(drop_kind)
 
+fn MirBuilder.fn_node_is_drop_body(self: MirBuilder, fn_node: i32) -> i32:
+    let raw_sym = self.ast.get_data0(fn_node)
+    let decl_index = self.sema.find_decl_index(fn_node)
+    let semantic_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, raw_sym, decl_index)
+    if self.sema.drop_owner_for_fn_symbol(semantic_sym) != 0:
+        return 1
+    let raw_name = self.symbol_text(raw_sym)
+    if raw_name.len() == 0:
+        return 0
+    if raw_name == "drop":
+        return 1
+    if raw_name.len() > 5 and raw_name.slice(raw_name.len() - 5, raw_name.len()) == ".drop":
+        return 1
+    let sema_sym = self.sema.pool_lookup_symbol(raw_name)
+    if sema_sym != 0 and self.sema.drop_owner_for_fn_symbol(sema_sym) != 0:
+        return 1
+    0
+
 fn MirBuilder.schedule_with_guard_cleanup(self: MirBuilder, guard_local: i32, payload_local: i32, method_sym: i32, drop_kind: i32) -> Unit:
     self.with_cleanup_guard_locals.push(guard_local)
     self.with_cleanup_payload_locals.push(payload_local)
@@ -252,6 +270,10 @@ fn MirBuilder.emit_with_guard_cleanup(self: MirBuilder, guard_local: i32, drop_k
         let payload_expected = if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 1: self.sema.sig_param_type(sig_idx, 1) else: 0
         args.push(self.operand_for_place_arg(payload_place, payload_ty, payload_expected, 0))
     let args_id = self.body.new_call_args(args)
+    let cleanup_generic_node = self.generic_fn_node_for_sym(method_sym)
+    if cleanup_generic_node != 0:
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
+        self.body.set_call_ast_node(args_id, cleanup_generic_node)
     let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void as i32)
     let cleanup_ret_ty = if sig_idx >= 0: self.sema.sig_return_type(sig_idx) else: self.sema.ty_void as i32
     let cleanup_ret_local = self.new_temp(cleanup_ret_ty)
@@ -875,10 +897,33 @@ fn MirBuilder.bind_alias_place(self: MirBuilder, sym: i32, place: i32, ty: i32) 
     self.alias_places.push(place)
     self.alias_types.push(ty)
 
+fn MirBuilder.symbol_text(self: MirBuilder, sym: i32) -> str:
+    let pool_text = self.pool.resolve_symbol(sym)
+    if pool_text.len() > 0:
+        return pool_text
+    self.sema.pool_resolve(sym)
+
+fn MirBuilder.symbols_match(self: MirBuilder, a: i32, b: i32) -> bool:
+    if a == b:
+        return true
+    let a_text = self.symbol_text(a)
+    a_text.len() > 0 and a_text == self.symbol_text(b)
+
+fn MirBuilder.sema_symbol_for_ast_symbol(self: MirBuilder, sym: i32) -> i32:
+    if sym == 0:
+        return 0
+    let text = self.pool.resolve_symbol(sym)
+    if text.len() == 0:
+        return sym
+    let sema_sym = self.sema.pool_lookup_symbol(text)
+    if sema_sym != 0:
+        return sema_sym
+    sym
+
 fn MirBuilder.lookup_local(self: MirBuilder, sym: i32) -> i32:
     var i = self.bind_syms.len() as i32 - 1
     while i >= 0:
-        if self.bind_syms.get(i as i64) == sym:
+        if self.symbols_match(self.bind_syms.get(i as i64), sym):
             return self.bind_local_ids.get(i as i64)
         i = i - 1
     -1
@@ -886,7 +931,7 @@ fn MirBuilder.lookup_local(self: MirBuilder, sym: i32) -> i32:
 fn MirBuilder.lookup_alias_place(self: MirBuilder, sym: i32) -> i32:
     var i = self.alias_syms.len() as i32 - 1
     while i >= 0:
-        if self.alias_syms.get(i as i64) == sym:
+        if self.symbols_match(self.alias_syms.get(i as i64), sym):
             return self.alias_places.get(i as i64)
         i = i - 1
     -1
@@ -894,10 +939,18 @@ fn MirBuilder.lookup_alias_place(self: MirBuilder, sym: i32) -> i32:
 fn MirBuilder.lookup_alias_type(self: MirBuilder, sym: i32) -> i32:
     var i = self.alias_syms.len() as i32 - 1
     while i >= 0:
-        if self.alias_syms.get(i as i64) == sym:
+        if self.symbols_match(self.alias_syms.get(i as i64), sym):
             return self.alias_types.get(i as i64)
         i = i - 1
     0
+
+fn MirBuilder.concrete_type(self: MirBuilder, type_id: i32) -> i32:
+    if type_id <= 0:
+        return type_id
+    let subst_count = self.sema.generic_subst_param_syms.len() as i32
+    if subst_count == 0:
+        return type_id
+    self.sema.substitute_type(type_id, self.sema.generic_subst_param_syms, self.sema.generic_subst_type_ids, subst_count)
 
 fn MirBuilder.expr_type(self: MirBuilder, node: i32) -> i32:
     if node == 0:
@@ -905,9 +958,10 @@ fn MirBuilder.expr_type(self: MirBuilder, node: i32) -> i32:
     if self.sema.typed_expr_types.contains(node):
         let typed = self.sema.typed_expr_types.get(node).unwrap()
         if typed != 0:
-            if typed == self.sema.ty_void as i32 and self.ast.kind(node) == NodeKind.NK_FIELD_ACCESS:
+            let node_kind = self.ast.kind(node)
+            if typed == self.sema.ty_void as i32 and (node_kind == NodeKind.NK_IDENT or node_kind == NodeKind.NK_FIELD_ACCESS or node_kind == NodeKind.NK_BINARY):
                 return self.fallback_expr_type(node)
-            return typed as i32
+            return self.concrete_type(typed as i32)
     self.fallback_expr_type(node)
 
 fn MirBuilder.mir_const_int_width(self: MirBuilder, type_id: i32) -> i32:
@@ -928,18 +982,18 @@ fn MirBuilder.binding_type(self: MirBuilder, node: i32) -> i32:
     if self.sema.typed_binding_types.contains(node):
         let typed = self.sema.typed_binding_types.get(node).unwrap()
         if typed != 0:
-            return typed as i32
+            return self.concrete_type(typed as i32)
     let flags = self.ast.get_data2(node)
     let ann_extra = self.sema.local_let_type_ann_extra(flags)
     if ann_extra >= 0:
         let ann_node = self.ast.get_extra(ann_extra)
         let ann_type = self.sema.resolve_type_expr(ann_node)
         if ann_type != 0:
-            return ann_type as i32
+            return self.concrete_type(ann_type as i32)
     let rhs = self.ast.get_data1(node)
     let rhs_ty = self.expr_type(rhs)
     if rhs_ty != 0:
-        return rhs_ty
+        return self.concrete_type(rhs_ty)
     self.sema.ty_void as i32
 
 fn MirBuilder.local_type(self: MirBuilder, local_id: i32) -> i32:
@@ -966,6 +1020,9 @@ fn MirBuilder.ident_type(self: MirBuilder, sym: i32) -> i32:
         return self.sema.named_types.get(sym).unwrap() as i32
     if self.sema.variant_lookup.contains(sym):
         return self.sema.variant_type_ids.get(sym).unwrap() as i32
+    let module_const_ty = self.try_resolve_module_const_type(sym)
+    if module_const_ty != 0:
+        return module_const_ty
     self.sema.ty_void as i32
 
 fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
@@ -1719,6 +1776,19 @@ fn MirBuilder.place_local_type(self: MirBuilder, place_id: i32) -> i32:
 
     current_ty
 
+fn MirBuilder.operand_type(self: MirBuilder, operand_id: i32) -> i32:
+    if operand_id < 0 or operand_id >= self.body.operand_kinds.len() as i32:
+        return self.sema.ty_void as i32
+    let kind = self.body.operand_kinds.get(operand_id as i64)
+    let data = self.body.operand_d0.get(operand_id as i64)
+    if kind == OperandKind.OK_CONSTANT:
+        if data >= 0 and data < self.body.const_types.len() as i32:
+            return self.body.const_types.get(data as i64)
+        return self.sema.ty_void as i32
+    if kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE:
+        return self.place_local_type(data)
+    self.sema.ty_void as i32
+
 fn MirBuilder.variant_index(self: MirBuilder, variant_sym: i32) -> i32:
     if variant_sym == 0:
         return 0
@@ -1922,11 +1992,13 @@ fn MirBuilder.try_resolve_module_float_const(self: MirBuilder, sym: i32) -> i32:
     -1
 
 fn MirBuilder.try_resolve_module_const_type(self: MirBuilder, sym: i32) -> i32:
+    let target_name = self.pool.resolve_symbol(sym)
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
             continue
-        if self.ast.get_data0(decl) != sym:
+        let decl_sym = self.ast.get_data0(decl)
+        if decl_sym != sym and self.pool.resolve_symbol(decl_sym) != target_name:
             continue
         if self.sema.typed_binding_types.contains(decl as i32):
             return self.sema.typed_binding_types.get(decl as i32).unwrap() as i32
@@ -1937,6 +2009,13 @@ fn MirBuilder.try_resolve_module_const_type(self: MirBuilder, sym: i32) -> i32:
             let resolved = self.sema.resolve_type_expr(type_ann_node) as i32
             if resolved != 0:
                 return resolved
+        var value_node = self.ast.get_data1(decl)
+        if value_node != 0:
+            if self.ast.kind(value_node) == NodeKind.NK_COMPTIME:
+                value_node = self.ast.get_data0(value_node)
+            let value_ty = self.expr_type(value_node)
+            if value_ty != 0 and value_ty != self.sema.ty_void as i32:
+                return value_ty
     0
 
 fn MirBuilder.mark_unsupported(self: MirBuilder):
@@ -2560,14 +2639,22 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32, node_id: i32) 
             self.mark_string_base_fields_may_alias(self.place_base_local(alias_place))
         return self.body.new_operand(OperandKind.OK_COPY, alias_place)
 
-    let sig_idx = self.sema.get_sig(sym)
+    let fn_sym = self.sema_symbol_for_ast_symbol(sym)
+    let sig_idx = self.call_sig_for_sym(fn_sym)
     if sig_idx >= 0:
+        var resolved_fn_sym = fn_sym
+        if self.sema.get_sig(resolved_fn_sym) < 0:
+            let fn_name = self.pool.resolve_symbol(fn_sym)
+            if fn_name.len() > 0:
+                let sema_fn_sym = self.sema.pool_lookup_symbol(fn_name)
+                if sema_fn_sym != 0 and self.sema.get_sig(sema_fn_sym) >= 0:
+                    resolved_fn_sym = sema_fn_sym
         let fn_ty = if type_id != 0: type_id else: self.sema.sig_type_ids.get(sig_idx as i64)
-        return self.const_operand(ConstKind.CK_FN, sym, fn_ty)
+        return self.const_operand(ConstKind.CK_FN, resolved_fn_sym, fn_ty)
 
     // Generic function reference (monomorphized at codegen time)
-    if self.sema.generic_fn_nodes.contains(sym):
-        return self.const_operand(ConstKind.CK_FN, sym, type_id)
+    if self.sema.generic_fn_node_for_symbol(fn_sym) != 0:
+        return self.const_operand(ConstKind.CK_FN, fn_sym, type_id)
 
     let const_node = self.try_resolve_module_const_node(sym)
     if const_node != 0:
@@ -3319,7 +3406,18 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
     let rhs = self.lower_expr(rhs_expr)
     self.expected_type = saved_expected
     let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs, rhs)
-    let ty = self.expr_type(node)
+    var ty = self.expr_type(node)
+    if ty == 0 or ty == self.sema.ty_void as i32:
+        let lhs_op_ty = self.operand_type(lhs)
+        let rhs_op_ty = self.operand_type(rhs)
+        if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE or op == BinaryOp.OP_AND or op == BinaryOp.OP_OR:
+            ty = self.sema.ty_bool as i32
+        else if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
+            ty = lhs_op_ty
+        else:
+            let arith_ty = self.sema.arithmetic_result_type(lhs_op_ty as TypeId, rhs_op_ty as TypeId)
+            if arith_ty != 0:
+                ty = arith_ty as i32
     let temp = self.new_temp(ty)
     let place = self.place_for_local(temp)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
@@ -3720,7 +3818,7 @@ fn MirBuilder.lower_fn_address(self: MirBuilder, expr: i32, type_id: i32) -> i32
         return -1
     if self.lookup_alias_place(sym) >= 0:
         return -1
-    if self.sema.get_sig(sym) >= 0 or self.sema.generic_fn_nodes.contains(sym):
+    if self.sema.get_sig(sym) >= 0 or self.sym_is_generic_fn(sym):
         return self.lower_var(sym, type_id, expr)
     -1
 
@@ -3780,7 +3878,7 @@ fn MirBuilder.lower_field_access(self: MirBuilder, node: i32) -> i32:
 fn MirBuilder.lower_user_deref_result_place(self: MirBuilder, place: i32, current_ty: i32, deref_info: SemaDerefInfo, node: i32) -> i32:
     let result_ref_ty = if deref_info.target_ty != 0: self.sema.ensure_exact_type(TypeKind.TY_REF, deref_info.target_ty, 0, 0) as i32 else: deref_info.result_ref_ty
     var recv_ref_ty = 0
-    if not self.sema.generic_fn_nodes.contains(deref_info.deref_fn):
+    if self.sema.generic_fn_node_for_symbol(deref_info.deref_fn) == 0:
         let sig_idx = self.sema.get_sig(deref_info.deref_fn)
         if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0:
             recv_ref_ty = self.sema.sig_param_type(sig_idx, 0)
@@ -6933,6 +7031,11 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
     let fn_op = self.lower_expr(fn_expr)
     let sig_idx = self.call_sig_for_expr(fn_expr)
     let callable_fn_tid = if sig_idx >= 0: 0 else: self.callable_fn_type_for_expr(fn_expr)
+    var actual_ret_type_id = ret_type_id
+    if (actual_ret_type_id == 0 or actual_ret_type_id == self.sema.ty_void as i32) and sig_idx >= 0:
+        let sig_ret = self.sema.sig_return_type(sig_idx)
+        if sig_ret != 0:
+            actual_ret_type_id = sig_ret
 
     let args: Vec[i32] = Vec.new()
     // Use sema-resolved arg order for named-arg and implicit-arg calls
@@ -6972,21 +7075,26 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
 
     let args_id = self.body.new_call_args(args)
     self.body.set_call_ast_node(args_id, node)
-    let result_local = self.new_temp(ret_type_id)
+    let result_local = self.new_temp(actual_ret_type_id)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()
 
     self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
     self.switch_to(next_bb)
-    self.register_stmt_temp(result_local, ret_type_id)
+    self.register_stmt_temp(result_local, actual_ret_type_id)
 
-    if self.sema.is_copy(ret_type_id) != 0:
+    if self.sema.is_copy(actual_ret_type_id) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
 // Callable type redirect: like lower_call but uses a pre-resolved fn operand and symbol.
 fn MirBuilder.lower_call_redirected(self: MirBuilder, fn_op: i32, fn_sym: i32, arg_exprs_start: i32, arg_exprs_count: i32, ret_type_id: i32, node: i32) -> i32:
     let sig_idx = self.call_sig_for_sym(fn_sym)
+    var actual_ret_type_id = ret_type_id
+    if (actual_ret_type_id == 0 or actual_ret_type_id == self.sema.ty_void as i32) and sig_idx >= 0:
+        let sig_ret = self.sema.sig_return_type(sig_idx)
+        if sig_ret != 0:
+            actual_ret_type_id = sig_ret
     let args: Vec[i32] = Vec.new()
     for i in 0..arg_exprs_count:
         let arg_node = self.ast.get_extra(arg_exprs_start + i)
@@ -6995,13 +7103,13 @@ fn MirBuilder.lower_call_redirected(self: MirBuilder, fn_op: i32, fn_sym: i32, a
     self.body.set_call_ast_node(args_id, node)
     if self.sym_is_generic_fn(fn_sym):
         self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
-    let result_local = self.new_temp(ret_type_id)
+    let result_local = self.new_temp(actual_ret_type_id)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()
     self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
     self.switch_to(next_bb)
-    self.register_stmt_temp(result_local, ret_type_id)
-    if self.sema.is_copy(ret_type_id) != 0:
+    self.register_stmt_temp(result_local, actual_ret_type_id)
+    if self.sema.is_copy(actual_ret_type_id) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -7010,6 +7118,11 @@ fn MirBuilder.lower_call_redirected(self: MirBuilder, fn_op: i32, fn_sym: i32, a
 // Vec realloc and invalidate other copies' pointers — use-after-free).
 fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, callee_sym: i32, arg_node_vec: Vec[i32], ret_type_id: i32, node: i32) -> i32:
     let sig_idx = self.call_sig_for_sym(callee_sym)
+    var actual_ret_type_id = ret_type_id
+    if (actual_ret_type_id == 0 or actual_ret_type_id == self.sema.ty_void as i32) and sig_idx >= 0:
+        let sig_ret = self.sema.sig_return_type(sig_idx)
+        if sig_ret != 0:
+            actual_ret_type_id = sig_ret
     let args: Vec[i32] = Vec.new()
     for i in 0..arg_node_vec.len() as i32:
         let arg_node = arg_node_vec.get(i as i64)
@@ -7021,13 +7134,13 @@ fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, callee_sym
     self.body.set_call_ast_node(args_id, node)
     if self.sym_is_generic_fn(callee_sym):
         self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
-    let result_local = self.new_temp(ret_type_id)
+    let result_local = self.new_temp(actual_ret_type_id)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()
     self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
     self.switch_to(next_bb)
-    self.register_stmt_temp(result_local, ret_type_id)
-    if self.sema.is_copy(ret_type_id) != 0:
+    self.register_stmt_temp(result_local, actual_ret_type_id)
+    if self.sema.is_copy(actual_ret_type_id) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
@@ -7059,22 +7172,38 @@ fn MirBuilder.call_sig_for_sym(self: MirBuilder, sym: i32) -> i32:
 fn MirBuilder.sym_is_generic_fn(self: MirBuilder, sym: i32) -> bool:
     if sym == 0:
         return false
-    if self.sema.generic_fn_nodes.contains(sym):
+    if self.call_sig_for_sym(sym) >= 0:
+        return false
+    if self.sema.generic_fn_node_for_symbol(sym) != 0:
         return true
     let name = self.pool.resolve_symbol(sym)
     if name.len() == 0:
         return false
     let sema_sym = self.sema.pool_lookup_symbol(name)
-    sema_sym != 0 and self.sema.generic_fn_nodes.contains(sema_sym)
+    sema_sym != 0 and self.sema.get_sig(sema_sym) < 0 and self.sema.generic_fn_node_for_symbol(sema_sym) != 0
+
+fn MirBuilder.generic_fn_node_for_sym(self: MirBuilder, sym: i32) -> i32:
+    if not self.sym_is_generic_fn(sym):
+        return 0
+    let direct = self.sema.generic_fn_node_for_symbol(sym)
+    if direct != 0:
+        return direct
+    let name = self.pool.resolve_symbol(sym)
+    if name.len() == 0:
+        return 0
+    let sema_sym = self.sema.pool_lookup_symbol(name)
+    if sema_sym != 0:
+        return self.sema.generic_fn_node_for_symbol(sema_sym)
+    0
 
 fn MirBuilder.callee_has_move_self(self: MirBuilder, fn_sym: i32) -> bool:
     var fn_node = 0
     if self.sema.fn_decl_nodes.contains(fn_sym):
         fn_node = self.sema.fn_decl_nodes.get(fn_sym).unwrap()
-    else if self.sema.generic_fn_nodes.contains(fn_sym):
-        fn_node = self.sema.generic_fn_nodes.get(fn_sym).unwrap()
     else:
-        return false
+        fn_node = self.generic_fn_node_for_sym(fn_sym)
+        if fn_node == 0:
+            return false
     let meta = self.ast.find_fn_meta(fn_node)
     if meta < 0 or self.ast.fn_meta_param_count(meta) == 0:
         return false
@@ -7853,7 +7982,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     // method instead of looking for an eager function body.
     // Route through MirIntrinsic.GENERIC_CALL so codegen's gen_call handles it
     // (disc enums, from_int, Option methods, concrete/generic struct methods, etc.).
-    if callee_sym == method_sym or self.sema.generic_fn_nodes.contains(callee_sym):
+    if callee_sym == method_sym or self.sym_is_generic_fn(callee_sym):
             let gc_fn_op = self.const_operand(ConstKind.CK_FN, callee_sym, 0)
             let gc_args: Vec[i32] = Vec.new()
             // Lower self + method args so the handler can eval them.
@@ -9433,6 +9562,8 @@ fn MirBuilder.lower_with_guarded(self: MirBuilder, node: i32) -> i32:
     let enter_args: Vec[i32] = Vec.new()
     enter_args.push(self.operand_for_place_arg(self.place_for_local(guard_local), source_ty, guard_expected, span))
     let enter_args_id = self.body.new_call_args(enter_args)
+    if self.sym_is_generic_fn(enter_fn):
+        self.body.set_call_intrinsic(enter_args_id, MirIntrinsic.GENERIC_CALL)
     self.body.set_call_ast_node(enter_args_id, node)
     let enter_op = self.const_operand(ConstKind.CK_FN, enter_fn, self.sema.ty_void as i32)
     let after_enter = self.new_block()
@@ -9606,12 +9737,31 @@ fn MirBuilder.lower_implicit_ok(self: MirBuilder, expr: i32, ok_type_id: i32) ->
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(expr))
     self.body.new_operand(OperandKind.OK_COPY, place)
 
-fn MirBuilder.lower_implicit_default_return(self: MirBuilder, type_id: i32) -> i32:
+fn MirBuilder.lower_implicit_default_value(self: MirBuilder, type_id: i32, span: i32) -> i32:
     if type_id == self.sema.ty_void:
         return self.unit_operand()
-    if self.sema.get_type_kind(type_id) == TypeKind.TY_BOOL:
-        return self.lower_bool_lit(0)
-    self.lower_int_lit(0, type_id)
+    let resolved = self.sema.resolve_alias(type_id as TypeId)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        let base = self.sema.get_generic_inst_base(resolved as i32)
+        if base == self.sema.syms.option:
+            let tmp = self.new_temp(type_id)
+            let place = self.place_for_local(tmp)
+            let fields: Vec[i32] = Vec.new()
+            self.assign_enum_variant_to_place(place, type_id, self.sema.syms.none, fields, span)
+            return self.body.new_operand(OperandKind.OK_COPY, place)
+        if base == self.sema.syms.result and self.sema.get_generic_inst_arg_count(resolved as i32) == 2:
+            let ok_type = self.sema.get_generic_inst_arg(resolved as i32, 0)
+            let ok_value = self.lower_implicit_default_value(ok_type, span)
+            let tmp = self.new_temp(type_id)
+            let place = self.place_for_local(tmp)
+            let fields: Vec[i32] = Vec.new()
+            fields.push(ok_value)
+            self.assign_enum_variant_to_place(place, type_id, self.sema.syms.ok, fields, span)
+            return self.body.new_operand(OperandKind.OK_COPY, place)
+    self.const_operand(ConstKind.CK_UNIT, 0, type_id)
+
+fn MirBuilder.lower_implicit_default_return(self: MirBuilder, type_id: i32, span: i32) -> i32:
+    self.lower_implicit_default_value(type_id, span)
 
 fn MirBuilder.option_payload_type(self: MirBuilder, option_ty: i32) -> i32:
     if option_ty == 0:
@@ -9721,7 +9871,7 @@ fn MirBuilder.lower_resolved_call_with_operand_args(self: MirBuilder, fn_sym: i3
         self.consume_moved_operand(args.get(ai as i64))
     let args_id = self.body.new_call_args(args)
     self.body.set_call_ast_node(args_id, node)
-    if self.sema.generic_fn_nodes.contains(fn_sym):
+    if self.sym_is_generic_fn(fn_sym):
         self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
     let result_local = self.new_temp(ret_type)
     let result_place = self.place_for_local(result_local)
@@ -10313,12 +10463,16 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         // Generic function call — delegate to codegen's monomorphize_generic_call
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let gc_sym = self.ast.get_data0(callee)
+            if gc_sym == self.sema.syms.src:
+                return self.source_location_operand(node)
+            let gc_fn_sym = self.sema_symbol_for_ast_symbol(gc_sym)
             if self.sema.fn_symbol_is_std_builtins_drop(gc_sym) != 0:
                 return self.lower_std_drop_call(node)
-            if self.sema.generic_fn_nodes.contains(gc_sym):
+            let gc_fn_node = self.generic_fn_node_for_sym(gc_fn_sym)
+            if gc_fn_node != 0:
                 // Lower args and emit call. Codegen intercepts via MirIntrinsic.GENERIC_CALL
                 // and routes to monomorphize_generic_call_core with pre-evaluated MIR args.
-                let gc_fn_op = self.const_operand(ConstKind.CK_FN, gc_sym, 0)
+                let gc_fn_op = self.const_operand(ConstKind.CK_FN, gc_fn_sym, 0)
                 let gc_args: Vec[i32] = Vec.new()
                 let gc_as = self.ast.get_data1(node)
                 let gc_ac = self.ast.get_data2(node)
@@ -10327,7 +10481,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                     gc_args.push(self.lower_expr(gc_arg_node))
                 // Fill default values for omitted trailing parameters, the same
                 // as non-generic calls do in lower_call (#302).
-                let gc_meta = self.ast.find_fn_meta(self.sema.generic_fn_nodes.get(gc_sym).unwrap())
+                let gc_meta = self.ast.find_fn_meta(gc_fn_node)
                 if gc_meta >= 0:
                     let gc_ps = self.ast.fn_meta_param_start(gc_meta)
                     let gc_pc = self.ast.fn_meta_param_count(gc_meta)
@@ -10971,6 +11125,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     if meta >= 0:
         let param_start = builder.ast.fn_meta_param_start(meta)
         let param_count = builder.ast.fn_meta_param_count(meta)
+        let drop_body = builder.fn_node_is_drop_body(fn_node)
 
         // Parameter locals must occupy locals 1..n contiguously (codegen binds
         // incoming arguments to them in order), so create them all first and
@@ -10993,7 +11148,8 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
             builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, builder.ast.get_start(fn_node))
             if builder.local_type_is_str(local_id) != 0:
                 builder.set_string_local_flags(local_id, 1)
-            if builder.sema.is_copy(p_ty) == 0:
+            let drop_receiver_self = drop_body != 0 and i == 0 and builder.symbol_text(p_name) == "self"
+            if builder.sema.is_copy(p_ty) == 0 and drop_receiver_self == 0:
                 builder.schedule_drop(local_id, DropKind.DK_VALUE)
             param_locals.push(local_id)
         builder.body.n_params = param_count
@@ -11020,7 +11176,11 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     var result = if ret_is_void:
         builder.lower_expr_discard(body_expr)
     else:
-        builder.lower_expr(body_expr)
+        let body_result = builder.lower_expr(body_expr)
+        if builder.sema.body_can_fall_through(body_expr) != 0 and builder.operand_type(body_result) == builder.sema.ty_void:
+            builder.lower_implicit_default_return(ret_ty, builder.ast.get_end(fn_node))
+        else:
+            body_result
 
     // Implicit Ok wrapping: if return type is Result[T, E] and body type is T,
     // wrap the result in Ok(value) — an enum variant construction with tag 0.
@@ -11028,10 +11188,10 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     if not ret_is_void and builder.sema.get_type_kind(ret_resolved) == TypeKind.TY_GENERIC_INST:
         let ret_base = builder.sema.get_generic_inst_base(ret_resolved)
         if builder.sema.pool_resolve(ret_base) == "Result" and builder.sema.get_generic_inst_arg_count(ret_resolved) == 2:
-            let body_ty = builder.expr_type(body_expr)
+            let result_body_ty = builder.expr_type(body_expr)
             let ok_type = builder.sema.get_generic_inst_arg(ret_resolved, 0)
-            if body_ty != 0 and body_ty != ret_ty:
-                if builder.sema.types_compatible(ok_type, body_ty) != 0 or builder.sema.arithmetic_result_type(ok_type, body_ty) != 0:
+            if result_body_ty != 0 and result_body_ty != ret_ty:
+                if builder.sema.types_compatible(ok_type, result_body_ty) != 0 or builder.sema.arithmetic_result_type(ok_type, result_body_ty) != 0:
                     // Wrap in Ok variant (tag=0)
                     let ok_fields: Vec[i32] = Vec.new()
                     let ok_names: Vec[i32] = Vec.new()
@@ -11580,10 +11740,14 @@ fn mir_fn_is_generic_template_at(sema: &Sema, ast_pool: AstPool, pool: InternPoo
     if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
         return true
     let fn_sym = sema.fn_decl_semantic_symbol_at(fn_node, ast_pool.get_data0(fn_node), decl_index)
-    if sema.generic_fn_nodes.contains(fn_sym):
+    if sema.fn_node_is_generic_template(fn_node, fn_sym) != 0:
+        return true
+    if sema.get_sig(fn_sym) >= 0:
+        return false
+    if sema.generic_fn_node_for_symbol(fn_sym) != 0:
         return true
     let sema_sym = sema.pool_lookup_symbol(pool.resolve_symbol(fn_sym))
-    sema_sym != 0 and sema.generic_fn_nodes.contains(sema_sym)
+    sema_sym != 0 and sema.get_sig(sema_sym) < 0 and sema.generic_fn_node_for_symbol(sema_sym) != 0
 
 fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
     var mir_mod = MirModule.init()
@@ -11620,7 +11784,7 @@ fn lower_module(mut sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModul
 
     for gi in 0..sema.fn_clause_group_count():
         let dispatch_sym = sema.fn_clause_group_name(gi)
-        if sema.generic_fn_nodes.contains(dispatch_sym):
+        if sema.generic_fn_node_for_symbol(dispatch_sym) != 0:
             continue
         mir_mod.add_body(lower_fn_clause_dispatcher(&sema, ast_pool, pool, gi))
 

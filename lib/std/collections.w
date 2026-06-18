@@ -343,6 +343,16 @@ type HashMapEntry[K, V] ephemeral { map_ptr: i64, key: K }
 /// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
 type VecIter[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
 
+/// Conversion to iterator for allocation-backed collection types.
+pub trait IntoIter[T]:
+    fn iter(self) -> VecIter[T]
+
+// IntoIter for Vec — enables collection-level async combinators and
+// explicit trait dispatch over Vec-backed collections.
+impl[T] IntoIter[T] for Vec[T]:    fn iter(self:
+    Vec[T]) -> VecIter[T]:
+        self.iter()
+
 /// Lazy iterator adapter produced by `.map(f)`.
 type MapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> U }
 

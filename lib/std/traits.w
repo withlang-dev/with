@@ -102,10 +102,6 @@ pub trait Drop:
 pub trait Iter[T]:    fn next(mut self:
     Self) -> Option[T]
 
-/// Conversion to iterator. Enables `for x in collection.iter()`.
-pub trait IntoIter[T]:
-    fn iter(self) -> VecIter[T]
-
 /// Membership test. Implement to enable `x in collection` and
 /// `x not in collection`.
 pub trait Contains[T]:    fn contains(self: &Self, value:
@@ -120,14 +116,6 @@ pub trait Scoped[T]:    fn with_enter(self:
 pub trait ScopedMut[T]:    fn with_enter_mut(self:
     &Self) -> T
     fn with_exit_mut(mut self: Self, value: T) -> Unit
-
-// IntoIter for Vec — enables `for x in vec.iter()` via trait dispatch.
-// docs/mut.md Rev 8 §15.8 — `@[iter_of_self]` registers a SHARED borrow on
-// the receiver place root for the duration of the enclosing call, so a
-// sibling closure that mutably captures the same place is rejected.
-impl[T] IntoIter[T] for Vec[T]:    fn iter(self:
-    Vec[T]) -> VecIter[T]:
-        self.iter()
 
 // Core trait impls for primitive types
 

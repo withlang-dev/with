@@ -2853,11 +2853,11 @@ fn Parser.parse_trait_decl(self: Parser, vis: i32):
         method_bodies.push(method_body as i32)
         var mflags = 0
         if is_async_method != 0:
-            mflags = mflags + 1
+            mflags = mflags + FnFlags.ASYNC
         if is_pub_method != 0:
-            mflags = mflags + 2
+            mflags = mflags + FnFlags.PUB
         if m_tp_count > 0:
-            mflags = mflags + 4
+            mflags = mflags + FnFlags.GEN
         method_flags.push(mflags)
         self.skip_newlines()
 

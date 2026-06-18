@@ -1,3 +1,5 @@
+//! expect-exit: 5
+
 fn main:
     var count = 0
     'outer for i in 0..3:

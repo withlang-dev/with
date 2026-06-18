@@ -1,3 +1,5 @@
+//! expect-exit: 12
+
 type Number = i32
 
 fn add(a: i32, b: i32) -> i32:

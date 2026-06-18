@@ -801,6 +801,9 @@ type Sema {
     decl_source_paths: Vec[str],     // one path per decl index (from Frontend)
     decl_source_file_ids: Vec[i32],  // one file id per decl index (from Frontend)
     decl_is_c_import: Vec[i32],      // 1 if decl came from c_import, 0 otherwise
+    source_text_file_ids: Vec[i32],  // imported/extra source text file ids
+    source_text_names: Vec[str],     // source display names aligned with source_text_file_ids
+    source_texts: Vec[str],          // source buffers aligned with source_text_file_ids
     current_module_path: str,        // module path being checked right now
     tool_mode_entry_path: str,        // compiler-generated tool runner allowed to mint capabilities
     module_paths: Vec[str],          // resolved module graph paths
@@ -1113,6 +1116,9 @@ pub fn Sema.prepare_comptime_eval_copy(mut self: Sema) -> Sema:
     self.generic_subst_param_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
     self.generic_subst_type_ids = sema_clone_i32_vec(&self.generic_subst_type_ids)
     self.tracked_input_paths = sema_clone_str_vec(&self.tracked_input_paths)
+    self.source_text_file_ids = sema_clone_i32_vec(&self.source_text_file_ids)
+    self.source_text_names = sema_clone_str_vec(&self.source_text_names)
+    self.source_texts = sema_clone_str_vec(&self.source_texts)
     self
 
 fn sema_pair_key(a: i32, b: i32) -> i64:
@@ -1711,6 +1717,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_source_paths: sema_new_vec_str(),
         decl_source_file_ids: Vec.new(),
         decl_is_c_import: Vec.new(),
+        source_text_file_ids: Vec.new(),
+        source_text_names: sema_new_vec_str(),
+        source_texts: sema_new_vec_str(),
         current_module_path: "",
         tool_mode_entry_path: "",
         module_paths: sema_new_vec_str(),
@@ -2437,10 +2446,28 @@ fn extract_fn_param_name_in_text(text: str, param_index: i32) -> str:
         i = i + 1
     ""
 
+fn Sema.source_text_for_file_id(self: Sema, file_id: i32) -> str:
+    if file_id == 0:
+        return self.source_text
+    for si in 0..self.source_text_file_ids.len() as i32:
+        if self.source_text_file_ids.get(si as i64) == file_id:
+            return self.source_texts.get(si as i64)
+    ""
+
+fn Sema.source_text_for_decl_node(self: Sema, node: i32) -> str:
+    let di = self.find_decl_index(node)
+    if di >= 0 and di < self.decl_source_file_ids.len() as i32:
+        let file_id = self.decl_source_file_ids.get(di as i64)
+        let text = self.source_text_for_file_id(file_id)
+        if text.len() > 0:
+            return text
+    self.source_text
+
 fn Sema.extract_decl_name_after(self: Sema, node: i32, keyword: str) -> str:
-    if self.source_text.len() == 0:
+    let source_text = self.source_text_for_decl_node(node)
+    if source_text.len() == 0:
         return ""
-    let source_len = self.source_text.len() as i32
+    let source_len = source_text.len() as i32
     var start = self.ast.get_start(node)
     var end = self.ast.get_end(node)
     if start < 0:
@@ -2453,7 +2480,7 @@ fn Sema.extract_decl_name_after(self: Sema, node: i32, keyword: str) -> str:
         end = source_len
     if end <= start:
         return ""
-    let snippet = self.source_text.slice(start as i64, end as i64)
+    let snippet = source_text.slice(start as i64, end as i64)
     extract_name_after_keyword_in_text(snippet, keyword)
 
 fn Sema.set_pretty_symbol(self: Sema, sym: i32, name: str):
@@ -2472,9 +2499,10 @@ fn Sema.set_pretty_symbol(self: Sema, sym: i32, name: str):
     self.pretty_symbol_names.insert(sym, sema_owned_text(name))
 
 fn Sema.extract_fn_param_name(self: Sema, node: i32, param_index: i32) -> str:
-    if self.source_text.len() == 0:
+    let source_text = self.source_text_for_decl_node(node)
+    if source_text.len() == 0:
         return ""
-    let source_len = self.source_text.len() as i32
+    let source_len = source_text.len() as i32
     var start = self.ast.get_start(node)
     var end = self.ast.get_end(node)
     if start < 0:
@@ -2483,7 +2511,7 @@ fn Sema.extract_fn_param_name(self: Sema, node: i32, param_index: i32) -> str:
         end = source_len
     if end <= start:
         return ""
-    extract_fn_param_name_in_text(self.source_text.slice(start as i64, end as i64), param_index)
+    extract_fn_param_name_in_text(source_text.slice(start as i64, end as i64), param_index)
 
 // ── Type management ──────────────────────────────────────────────
 
@@ -2680,15 +2708,19 @@ fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: &Vec[i32], arg_c
         let cached = self.generic_inst_cache.get(key).unwrap()
         if cached >= 0 and cached < self.type_kinds.len() as i32:
             if self.type_kinds.get(cached as i64) == TypeKind.TY_GENERIC_INST:
-                if self.type_d0.get(cached as i64) == base_sym and self.type_d2.get(cached as i64) == arg_count:
+                let cached_base = self.type_d0.get(cached as i64)
+                let canonical_base = self.canonical_symbol_by_text(base_sym)
+                if (cached_base == base_sym or self.canonical_symbol_by_text(cached_base) == canonical_base) and self.type_d2.get(cached as i64) == arg_count:
                     let cached_start = self.type_d1.get(cached as i64)
                     if self.type_extra_matches(cached_start, args, arg_count) != 0:
                         return cached as TypeId
+    let canonical_base2 = self.canonical_symbol_by_text(base_sym)
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) != TypeKind.TY_GENERIC_INST:
             continue
-        if self.type_d0.get(ti as i64) != base_sym:
+        let seen_base = self.type_d0.get(ti as i64)
+        if seen_base != base_sym and self.canonical_symbol_by_text(seen_base) != canonical_base2:
             continue
         if self.type_d2.get(ti as i64) != arg_count:
             continue
@@ -3111,8 +3143,21 @@ fn Sema.substitute_type(self: Sema, tid: i32, subst_syms: Vec[i32], subst_tids: 
     // Direct match: struct/enum/alias whose name matches a type param symbol
     if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_ALIAS:
         for si in 0..count:
-            if subst_syms.get(si as i64) == d0:
+            let subst_sym = subst_syms.get(si as i64)
+            if subst_sym == d0:
                 return subst_tids.get(si as i64)
+        let d0_text = self.pool_resolve_symbol(d0)
+        if d0_text.len() == 0:
+            return tid
+        var found = 0
+        var found_count = 0
+        for si2 in 0..count:
+            let subst_sym2 = subst_syms.get(si2 as i64)
+            if self.pool_resolve_symbol(subst_sym2) == d0_text:
+                found = subst_tids.get(si2 as i64)
+                found_count = found_count + 1
+        if found_count == 1:
+            return found
         return tid
     // TypeKind.TY_GENERIC_INST: substitute each type arg
     if kind == TypeKind.TY_GENERIC_INST:
@@ -4074,6 +4119,124 @@ fn Sema.get_sig(self: Sema, name: i32) -> i32:
         return self.sig_lookup.get(name).unwrap()
     -1
 
+fn Sema.get_visible_sig(self: Sema, name: i32) -> i32:
+    let direct = self.get_sig(name)
+    if direct >= 0:
+        return direct
+    let target = self.pool_resolve_symbol(name)
+    if target.len() == 0:
+        return -1
+    var i = self.sig_names.len() as i32 - 1
+    while i >= 0:
+        let sig_sym = self.sig_names.get(i as i64)
+        if sig_sym == name or self.pool_resolve_symbol(sig_sym) == target:
+            if self.symbol_visible_from_current(sig_sym) != 0:
+                return i
+        i = i - 1
+    -1
+
+fn Sema.generic_fn_node_matches_symbol(self: Sema, node: i32, sym: i32, target: str) -> i32:
+    if node == 0:
+        return 0
+    if self.ast.kind(node) != NodeKind.NK_FN_DECL:
+        return 0
+    let parsed = self.ast.get_data0(node)
+    let source_name = self.extract_decl_name_after(node, "fn")
+    if source_name.len() > 0:
+        if source_name == target:
+            return 1
+        if parsed == sym or self.pool_resolve_symbol(parsed) == target:
+            return 1
+        let di2 = self.find_decl_index(node)
+        let semantic2 = self.fn_decl_semantic_symbol_at(node, parsed, di2)
+        if semantic2 != parsed and (semantic2 == sym or self.pool_resolve_symbol(semantic2) == target):
+            return 1
+        return 0
+    if parsed == sym or self.pool_resolve_symbol(parsed) == target:
+        return 1
+    let di = self.find_decl_index(node)
+    let semantic = self.fn_decl_semantic_symbol_at(node, parsed, di)
+    if semantic == sym or self.pool_resolve_symbol(semantic) == target:
+        return 1
+    0
+
+fn Sema.fn_node_is_generic_template(self: Sema, node: i32, sym: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_FN_DECL:
+        return 0
+    let meta = self.ast.find_fn_meta(node)
+    if meta >= 0 and self.ast.fn_meta_tp_count(meta) > 0:
+        return 1
+
+    let impl_direct = self.impl_node_for_method_decl(node)
+    if impl_direct != 0:
+        let impl_direct_tp_meta = self.ast.find_impl_type_params(impl_direct)
+        if impl_direct_tp_meta >= 0:
+            let impl_direct_tp_count = self.ast.state.impl_type_params.get((impl_direct_tp_meta + 2) as i64)
+            if impl_direct_tp_count > 0:
+                return 1
+        let impl_direct_target = self.ast.find_impl_target_type_node(impl_direct as NodeId)
+        if impl_direct_target != 0:
+            let impl_direct_target_kind = self.ast.kind(impl_direct_target)
+            if impl_direct_target_kind == NodeKind.NK_INDEX or impl_direct_target_kind == NodeKind.NK_TYPE_GENERIC:
+                return self.impl_target_has_bare_type_params(impl_direct)
+
+    let decl_index = self.find_decl_index(node)
+    let parsed = self.ast.get_data0(node)
+    let semantic = self.fn_decl_semantic_symbol_at(node, parsed, decl_index)
+    let effective = if semantic != 0: semantic else: sym
+    if effective != 0 and self.method_impl_nodes.contains(effective):
+        let impl_node = self.method_impl_nodes.get(effective).unwrap()
+        let impl_tp_meta = self.ast.find_impl_type_params(impl_node)
+        if impl_tp_meta >= 0:
+            let impl_tp_count = self.ast.state.impl_type_params.get((impl_tp_meta + 2) as i64)
+            if impl_tp_count > 0:
+                return 1
+
+    var fn_name = self.extract_decl_name_after(node, "fn")
+    if fn_name.len() == 0:
+        fn_name = self.pool_resolve_symbol(parsed)
+    for ci in 0..fn_name.len() as i32:
+        if fn_name.byte_at(ci as i64) == 46:
+            let owner_name = fn_name.slice(0, ci as i64)
+            let owner_sym = self.pool_lookup_symbol(owner_name)
+            if owner_sym != 0 and self.type_decl_nodes.contains(owner_sym):
+                let type_node = self.type_decl_nodes.get(owner_sym).unwrap()
+                if self.type_decl_tp_count(type_node) > 0:
+                    return 1
+            return 0
+    0
+
+fn Sema.generic_fn_node_for_symbol(self: Sema, sym: i32) -> i32:
+    if sym == 0:
+        return 0
+    let target = self.pool_resolve_symbol(sym)
+    if target.len() == 0:
+        return 0
+    if self.generic_fn_nodes.contains(sym):
+        let node = self.generic_fn_nodes.get(sym).unwrap()
+        if self.generic_fn_node_matches_symbol(node, sym, target) != 0 and self.fn_node_is_generic_template(node, sym) != 0:
+            return node
+    let canonical = self.pool_lookup_symbol(target)
+    if canonical != 0 and canonical != sym and self.generic_fn_nodes.contains(canonical):
+        let node2 = self.generic_fn_nodes.get(canonical).unwrap()
+        if self.generic_fn_node_matches_symbol(node2, sym, target) != 0 and self.fn_node_is_generic_template(node2, canonical) != 0:
+            return node2
+    let dot = sema_str_find_char(target, 46)
+    if dot >= 0:
+        let owner_name = target.slice(0, dot as i64)
+        let method_name = target.slice((dot + 1) as i64, target.len() as i64)
+        let owner_sym = self.pool_lookup_symbol(owner_name)
+        let method_sym = self.pool_lookup_symbol(method_name)
+        if owner_sym != 0 and method_sym != 0 and self.generic_fn_nodes.contains(method_sym):
+            let method_node = self.generic_fn_nodes.get(method_sym).unwrap()
+            let impl_node = self.impl_node_for_method_decl(method_node)
+            if impl_node != 0:
+                let impl_owner_sym = self.ast.get_data0(impl_node)
+                if impl_owner_sym == owner_sym or self.canonical_symbol_by_text(impl_owner_sym) == owner_sym:
+                    if self.fn_node_is_generic_template(method_node, method_sym) != 0:
+                        return method_node
+    0
+
 fn Sema.sig_return_type(self: Sema, idx: i32) -> i32:
     self.sig_ret_types.get(idx as i64)
 
@@ -4185,7 +4348,7 @@ fn Sema.fn_is_clause_body_symbol(self: Sema, sym: i32) -> i32:
 fn Sema.check_module(self: Sema):
     self.prepare_for_comptime_transform()
     self.validate_no_std_requirements()
-    self.check_top_level_comptime_let_values()
+    self.check_top_level_let_values()
     self.check_bodies()
     self.check_reachable_comptime_errors()
 
@@ -4619,31 +4782,7 @@ fn Sema.has_drop_method(self: Sema, type_name: i32) -> i32:
     if self.drop_method_cache.contains(type_name):
         return self.drop_method_cache.get(type_name).unwrap()
 
-    let type_text = self.pool_resolve(type_name)
-    if type_text.len() == 0:
-        self.drop_method_cache.insert(type_name, 0)
-        return 0
-    if type_text.len() > 512:
-        self.drop_method_cache.insert(type_name, 0)
-        return 0
-
-    let target = if type_text.len() >= 5 and
-                    type_text[type_text.len() - 5] == 46 and // '.'
-                    type_text[type_text.len() - 4] == 100 and // d
-                    type_text[type_text.len() - 3] == 114 and // r
-                    type_text[type_text.len() - 2] == 111 and // o
-                    type_text[type_text.len() - 1] == 112: // p
-        type_text
-    else:
-        type_text ++ ".drop"
-
-    var has = 0
-    for si in 0..self.sig_names.len() as i32:
-        let sig_sym = self.sig_names.get(si as i64)
-        if with_str_eq(self.pool_resolve(sig_sym), target) != 0:
-            has = 1
-            break
-
+    let has = self.select_trait_impl(type_name, self.syms.drop)
     self.drop_method_cache.insert(type_name, has)
     has
 

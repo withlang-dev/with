@@ -1501,6 +1501,9 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         pre_sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
         pre_sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
         pre_sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
+        pre_sema.source_text_file_ids = sema_clone_i32_vec(&self.source_text_file_ids)
+        pre_sema.source_text_names = sema_clone_str_vec(&self.source_text_names)
+        pre_sema.source_texts = sema_clone_str_vec(&self.source_texts)
         pre_sema.ci_omitted_symbols = self.c_import_omitted_symbols
         pre_sema.tool_mode_entry_path = self.tool_mode_entry_path
         pre_sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
@@ -1521,6 +1524,9 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         self.decl_source_paths = sema_clone_str_vec(&pre_sema.decl_source_paths)
         self.decl_source_file_ids = sema_clone_i32_vec(&pre_sema.decl_source_file_ids)
         self.decl_is_c_import = sema_clone_i32_vec(&pre_sema.decl_is_c_import)
+        self.source_text_file_ids = sema_clone_i32_vec(&pre_sema.source_text_file_ids)
+        self.source_text_names = sema_clone_str_vec(&pre_sema.source_text_names)
+        self.source_texts = sema_clone_str_vec(&pre_sema.source_texts)
         self.c_import_omitted_symbols = pre_sema.ci_omitted_symbols
         var tracked_paths = self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &pre_sema.tracked_input_paths)
@@ -1545,6 +1551,9 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
     sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
     sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
+    sema.source_text_file_ids = sema_clone_i32_vec(&self.source_text_file_ids)
+    sema.source_text_names = sema_clone_str_vec(&self.source_text_names)
+    sema.source_texts = sema_clone_str_vec(&self.source_texts)
     sema.ci_omitted_symbols = self.c_import_omitted_symbols
     sema.tool_mode_entry_path = self.tool_mode_entry_path
     sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
@@ -1603,6 +1612,7 @@ fn Zcu.merge_resolved_modules_frontend(self: Zcu, root_pool: AstPool, root_path:
         merged_pool = parser.parse_module()
         self.pool = parser.intern
         self.diagnostics = parser.diags
+        self.add_source_text_mapping(mod.file_id, path, text)
         self.append_decl_source_paths(merged_pool.decl_count() - before, path, mod.file_id)
 
     self.strip_use_decls_frontend(merged_pool)
@@ -2197,6 +2207,7 @@ fn Zcu.parse_imported_file_frontend(self: Zcu, path: str, target_pool: AstPool) 
     let before = target_pool.decl_count()
     let file_id = self.next_file_id
     self.next_file_id = self.next_file_id + 1
+    self.add_source_text_mapping(file_id, path, text)
 
     var lexer = Lexer.init(text, file_id)
     let tokens = lexer.tokenize()

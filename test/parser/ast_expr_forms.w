@@ -1,3 +1,5 @@
+//! expect-exit: 11
+
 fn score(v: i32) -> i32:
     match v:
         0 => 1

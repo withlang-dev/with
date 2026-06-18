@@ -5,7 +5,7 @@
 // path-insensitive and the not-taken path would leak the value.
 
 type Resource { id: i32 }
-impl Resource:
+impl Drop for Resource:
     fn drop(move self: Self): ()
 
 fn take(r: Resource) -> i32:

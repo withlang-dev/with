@@ -54,6 +54,29 @@ fn sema_dyn_trait_method_missing -> SemaDynTraitMethodInfo:
         ret_node: 0,
     }
 
+type SemaTraitImplMethodContract {
+    ok: i32,
+    trait_sym: i32,
+    impl_node: i32,
+    method_sym: i32,
+    method_flags: i32,
+    ret_type: i32,
+    param_start: i32,
+    param_count: i32,
+}
+
+fn sema_trait_impl_method_contract_missing -> SemaTraitImplMethodContract:
+    SemaTraitImplMethodContract {
+        ok: 0,
+        trait_sym: 0,
+        impl_node: 0,
+        method_sym: 0,
+        method_flags: 0,
+        ret_type: 0,
+        param_start: 0,
+        param_count: 0,
+    }
+
 fn sema_node_is_zero_int_literal(ast: AstPool, node: i32) -> bool:
     if node == 0 or ast.kind(node) != NodeKind.NK_INT_LIT:
         return false
@@ -317,9 +340,6 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
                 if self.require_alloc_tier_for_symbol(canonical_sym, node) == 0:
                     return 0 as TypeId
                 return canonical_prim as TypeId
-            let canonical_subst = self.lookup_generic_subst(canonical_sym)
-            if canonical_subst != 0:
-                return canonical_subst as TypeId
             let canonical_tid = self.lookup_named_type_visible(canonical_sym)
             if canonical_tid != 0 and (self.collecting_types != 0 or self.is_ci_visible(canonical_sym) != 0):
                 if self.require_alloc_tier_for_symbol(canonical_sym, node) == 0:
@@ -660,7 +680,9 @@ fn Sema.check_bodies(self: Sema):
                 if tp_count == 0:
                     // Skip methods on generic structs (monomorphized lazily)
                     let fn_name_sym = self.ast.get_data0(decl)
-                    let fn_name_str = self.pool_resolve_symbol(fn_name_sym)
+                    var fn_name_str = self.extract_decl_name_after(decl, "fn")
+                    if fn_name_str.len() == 0 or sema_str_contains_char(fn_name_str, 46) == 0:
+                        fn_name_str = self.pool_resolve_symbol(fn_name_sym)
                     var is_generic_struct_method = false
                     for gsm_i in 0..fn_name_str.len() as i32:
                         if fn_name_str.byte_at(gsm_i as i64) == 46:
@@ -998,6 +1020,72 @@ fn Sema.emit_by_value_param_read_only_warning(self: Sema, fn_node: i32, sig_idx:
 fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     self.check_fn_body_with_sig_at(node, sig_idx, self.find_decl_index(node))
 
+fn Sema.impl_method_bare_name(self: Sema, node: i32, fn_name: i32) -> str:
+    var name = self.extract_decl_name_after(node, "fn")
+    if name.len() == 0:
+        name = self.pool_resolve(fn_name)
+    let dot = sema_str_find_char(name, 46)
+    if dot >= 0:
+        return name.slice((dot + 1) as i64, name.len() as i64)
+    name
+
+fn Sema.trait_impl_method_contract(self: Sema, node: i32, fn_name: i32) -> SemaTraitImplMethodContract:
+    if fn_name == 0 or not self.method_impl_nodes.contains(fn_name):
+        return sema_trait_impl_method_contract_missing()
+    let impl_node = self.method_impl_nodes.get(fn_name).unwrap()
+    let trait_sym = self.ast.get_data2(impl_node)
+    if trait_sym == 0 or not self.trait_lookup.contains(trait_sym):
+        return sema_trait_impl_method_contract_missing()
+    let method_name = self.impl_method_bare_name(node, fn_name)
+    if method_name.len() == 0:
+        return sema_trait_impl_method_contract_missing()
+    let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
+    let mt_start = self.trait_method_starts.get(trait_idx as i64)
+    let mt_count = self.trait_method_counts.get(trait_idx as i64)
+    for mi in 0..mt_count:
+        let mt_idx = mt_start + mi
+        let method_sym = self.trait_method_names.get(mt_idx as i64)
+        if self.pool_resolve(method_sym) != method_name:
+            continue
+        let impl_type_sym = self.ast.get_data0(impl_node)
+        var impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
+        let target_node = self.ast.find_impl_target_type_node(impl_node as NodeId)
+        if target_node != 0:
+            let target_tid = self.resolve_type_expr(target_node)
+            if target_tid != 0:
+                impl_type_tid = target_tid
+        let ret_node = self.trait_method_ret_nodes.get(mt_idx as i64)
+        let ret_tid = self.resolve_trait_default_method_type(ret_node, impl_type_sym, impl_type_tid, trait_sym, impl_node)
+        return SemaTraitImplMethodContract {
+            ok: 1,
+            trait_sym,
+            impl_node,
+            method_sym,
+            method_flags: self.trait_method_flags.get(mt_idx as i64),
+            ret_type: ret_tid,
+            param_start: self.trait_method_param_starts.get(mt_idx as i64),
+            param_count: self.trait_method_param_counts.get(mt_idx as i64),
+        }
+    sema_trait_impl_method_contract_missing()
+
+fn Sema.check_trait_impl_method_signature_contract(self: Sema, node: i32, sig_idx: i32, contract: &SemaTraitImplMethodContract):
+    if contract.ok == 0 or sig_idx < 0:
+        return
+    if contract.ret_type != 0:
+        var expected_ret = contract.ret_type
+        if (contract.method_flags / FnFlags.ASYNC) % 2 == 1:
+            let task_sym = self.pool_intern("Task")
+            let task_args: Vec[i32] = Vec.new()
+            task_args.push(contract.ret_type)
+            let task_ty = self.ensure_generic_inst_type(task_sym, task_args, 1)
+            if task_ty != 0:
+                expected_ret = task_ty as i32
+        let actual_ret = self.sig_return_type(sig_idx)
+        if actual_ret != 0 and self.return_value_type_compatible(expected_ret, actual_ret) == 0:
+            let trait_name3 = self.pool_resolve(contract.trait_sym)
+            let method_name3 = self.pool_resolve(contract.method_sym)
+            self.emit_error(f"impl method '{method_name3}' return type does not match trait '{trait_name3}'", node)
+
 fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_index: i32):
     let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
     let body = self.ast.get_data1(node)
@@ -1059,6 +1147,8 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
     // Add parameters to scope
     let meta = self.ast.find_fn_meta(node)
     let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
+    let trait_contract = self.trait_impl_method_contract(node, fn_name)
+    self.check_trait_impl_method_signature_contract(node, sig_idx, &trait_contract)
     let saved_implicit_binding_len = self.implicit_binding_syms.len()
     if meta >= 0:
         let param_start = self.ast.fn_meta_param_start(meta)
@@ -1117,6 +1207,8 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
         // For async functions, the sig return type is Task[T] but the
         // body should type-check against the unwrapped T.
         var body_ret_type = if has_ret_annotation: ret_type as TypeId else: 0 as TypeId
+        if trait_contract.ok != 0 and trait_contract.ret_type != 0:
+            body_ret_type = trait_contract.ret_type as TypeId
         if (flags / FnFlags.ASYNC) % 2 == 1:
             let resolved_ret = self.resolve_alias(ret_type as TypeId)
             if self.get_type_kind(resolved_ret) == TypeKind.TY_GENERIC_INST:
@@ -1184,8 +1276,11 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
         if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0:
             self.emit_error("return type mismatch", body)
     if not has_ret_annotation:
-        let inferred_ret = self.infer_unannotated_function_return_type(body, body_ty)
-        self.set_sig_return_type(sig_idx, inferred_ret)
+        if trait_contract.ok != 0 and trait_contract.ret_type != 0:
+            self.set_sig_return_type(sig_idx, trait_contract.ret_type)
+        else:
+            let inferred_ret = self.infer_unannotated_function_return_type(body, body_ty)
+            self.set_sig_return_type(sig_idx, inferred_ret)
     else if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
         let explicit_void_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
         if explicit_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) != 0 and self.body_can_fall_through(body) != 0:
@@ -2101,8 +2196,9 @@ fn Sema.check_reachable_call_target(self: Sema, fn_sym: i32):
         let callee = self.fn_decl_nodes.get(fn_sym).unwrap()
         self.check_fn_reachable_comptime_errors(callee)
         return
-    if self.generic_fn_nodes.contains(fn_sym):
-        let callee2 = self.generic_fn_nodes.get(fn_sym).unwrap()
+    let generic_callee = self.generic_fn_node_for_symbol(fn_sym)
+    if generic_callee != 0:
+        let callee2 = generic_callee
         self.check_fn_reachable_comptime_errors(callee2)
 
 fn Sema.check_fn_reachable_comptime_errors(self: Sema, fn_node: i32):
@@ -2798,23 +2894,23 @@ fn Sema.with_trait_payload_type(self: Sema, source_ty: i32, trait_sym: i32) -> i
     if source_ty == 0 or trait_sym == 0:
         return 0
     let recv_type = self.auto_deref_ref_ptr_type(source_ty as TypeId) as i32
-    let owner_sym = self.method_owner_symbol_for_type(recv_type)
-    if owner_sym == 0:
-        return 0
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
             continue
-        if self.ast.get_data0(decl) != owner_sym or self.ast.get_data2(decl) != trait_sym:
+        if self.ast.get_data2(decl) != trait_sym:
+            continue
+        let target_match = self.impl_target_match(decl, recv_type)
+        if target_match.ok == 0:
             continue
         let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
         if tta_idx < 0:
-            return 0
+            continue
         let arg_start = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
         let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
         if arg_count <= 0:
-            return 0
-        return self.resolve_type_expr(self.ast.get_extra(arg_start)) as i32
+            continue
+        return self.resolve_impl_trait_arg_for_source(decl, recv_type, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
     0
 
 fn Sema.validate_with_method(self: Sema, node: i32, owner_sym: i32, method_sym: i32, expected_ret: i32, expected_payload_param: i32) -> i32:
@@ -2822,6 +2918,9 @@ fn Sema.validate_with_method(self: Sema, node: i32, owner_sym: i32, method_sym: 
         return 0
     let sig_idx = self.lookup_method_sig(owner_sym, method_sym)
     if sig_idx < 0:
+        let generic_fn = self.lookup_generic_method_fn(owner_sym, method_sym)
+        if generic_fn != 0:
+            return generic_fn
         self.emit_error("guarded with type is missing required method '" ++ self.pool_resolve(method_sym) ++ "'", node)
         return 0
     let fn_sym = self.lookup_method_fn(owner_sym, method_sym)
@@ -2912,6 +3011,15 @@ fn Sema.expr_may_suspend(self: Sema, node: i32) -> i32:
                 if self.callable_node_may_suspend(self.binding_closure_nodes.get(callee_sym).unwrap()) != 0:
                     return 1
             if self.fn_symbol_may_suspend(callee_sym) != 0:
+                return 1
+        else if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let recv_expr = self.ast.get_data0(callee)
+            let field = self.ast.get_data1(callee)
+            if self.typed_expr_types.contains(recv_expr):
+                let recv_ty = self.typed_expr_types.get(recv_expr).unwrap()
+                if self.method_may_suspend_current_fiber(recv_ty, field) != 0:
+                    return 1
+            if self.expr_may_suspend(recv_expr) != 0:
                 return 1
         else if self.expr_may_suspend(callee) != 0:
             return 1
@@ -4168,6 +4276,8 @@ fn Sema.infer_unannotated_function_return_type(self: Sema, body: i32, body_ty: T
             self.emit_error("return type mismatch", info.mismatch_node)
         return self.ty_void as i32
     if info.saw_value_return != 0:
+        if self.body_can_fall_through(body) != 0 and self.type_has_default_value(info.value_type) == 0:
+            self.emit_error("return type does not implement Default", body)
         return info.value_type
     if body_ty != 0:
         return body_ty as i32
@@ -5396,10 +5506,10 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
         return final_tid
 
     // Check function names
-    if self.generic_fn_nodes.contains(sym) and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
+    if self.generic_fn_node_for_symbol(sym) != 0 and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
         return 0
 
-    let sig_idx = self.get_sig(sym)
+    let sig_idx = self.get_visible_sig(sym)
     if sig_idx >= 0 and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
         let fn_tid = self.sig_type_ids.get(sig_idx as i64)
         let fn_is_unsafe = self.fn_symbol_is_unsafe(sym)
@@ -5414,7 +5524,7 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
                 return expected as i32
         self.typed_expr_types.insert(node, fn_tid)
         return fn_tid
-    if (sig_idx >= 0 or self.generic_fn_nodes.contains(sym)) and self.symbol_visible_from_current(sym) == 0:
+    if (sig_idx >= 0 or self.generic_fn_node_for_symbol(sym) != 0) and self.symbol_visible_from_current(sym) == 0:
         self.emit_private_symbol_error(sym, node)
         return 0
 
@@ -5701,7 +5811,7 @@ fn Sema.resolve_type_node_with_subst(self: Sema, type_node: i32, self_ty: i32, s
         let sym = self.ast.get_data0(type_node)
         if sym == self.syms.self_type and self_ty != 0:
             return self_ty
-        let subst = sema_subst_vec_lookup(subst_names, subst_types, sym)
+        let subst = self.subst_vec_lookup(subst_names, subst_types, sym)
         if subst != 0:
             return subst
         return self.resolve_type_expr(type_node) as i32
@@ -5736,36 +5846,39 @@ fn Sema.resolve_type_node_with_subst(self: Sema, type_node: i32, self_ty: i32, s
         return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
     self.resolve_type_expr(type_node) as i32
 
-fn Sema.bind_try_target_type_param(self: Sema, mut subst_names: Vec[i32], mut subst_types: Vec[i32], sym: i32, actual_ty: i32) -> i32:
-    let existing = sema_subst_vec_lookup(&subst_names, &subst_types, sym)
-    if existing != 0:
-        return if self.types_compatible(existing, actual_ty) != 0: 1 else: 0
-    subst_names.push(sym)
-    subst_types.push(actual_ty)
-    1
+type SemaImplTargetMatch {
+    ok: i32,
+    subst_names: Vec[i32],
+    subst_types: Vec[i32],
+}
 
-fn Sema.try_impl_target_matches(self: Sema, impl_node: i32, carrier_ty: i32, subst_names: &Vec[i32], subst_types: &Vec[i32]) -> i32:
+fn sema_impl_target_no_match -> SemaImplTargetMatch:
+    SemaImplTargetMatch { 0, Vec.new(), Vec.new() }
+
+fn Sema.impl_target_match(self: Sema, impl_node: i32, carrier_ty: i32) -> SemaImplTargetMatch:
+    let subst_names: Vec[i32] = Vec.new()
+    let subst_types: Vec[i32] = Vec.new()
     let carrier_resolved = self.resolve_alias(carrier_ty as TypeId)
     let carrier_base = self.type_base_symbol(carrier_ty)
     if carrier_base == 0:
-        return 0
+        return sema_impl_target_no_match()
     let target_node = self.ast.find_impl_target_type_node(impl_node as NodeId)
     if target_node == 0:
         let impl_type_sym = self.canonical_symbol_by_text(self.ast.get_data0(impl_node))
         if impl_type_sym == carrier_base:
-            return 1
+            return SemaImplTargetMatch { 1, subst_names, subst_types }
         if self.pool_resolve(impl_type_sym) == self.pool_resolve(carrier_base):
-            return 1
-        return 0
+            return SemaImplTargetMatch { 1, subst_names, subst_types }
+        return sema_impl_target_no_match()
     if self.ast.kind(target_node) == NodeKind.NK_TYPE_GENERIC:
         if self.get_type_kind(carrier_resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
+            return sema_impl_target_no_match()
         let pattern_base = self.canonical_symbol_by_text(self.ast.get_data0(target_node))
         if pattern_base != carrier_base:
-            return 0
+            return sema_impl_target_no_match()
         let pattern_arg_count = self.ast.get_data2(target_node)
         if pattern_arg_count != self.get_generic_inst_arg_count(carrier_resolved as i32):
-            return 0
+            return sema_impl_target_no_match()
         let tp_meta = self.ast.find_impl_type_params(impl_node as NodeId)
         let tp_start = if tp_meta >= 0: self.ast.state.impl_type_params.get((tp_meta + 1) as i64) else: 0
         let tp_count = if tp_meta >= 0: self.ast.state.impl_type_params.get((tp_meta + 2) as i64) else: 0
@@ -5776,18 +5889,25 @@ fn Sema.try_impl_target_matches(self: Sema, impl_node: i32, carrier_ty: i32, sub
             let pattern_kind = self.ast.kind(pattern_arg)
             if pattern_kind == NodeKind.NK_TYPE_NAMED or pattern_kind == NodeKind.NK_IDENT:
                 let pattern_sym = self.ast.get_data0(pattern_arg)
-                if self.type_param_in_impl_list(tp_start, tp_count, pattern_sym) != 0:
-                    if self.bind_try_target_type_param(*subst_names, *subst_types, pattern_sym, actual_arg) == 0:
-                        return 0
+                if self.type_param_in_impl_list(tp_start, tp_count, pattern_sym) != 0 or self.impl_target_bare_type_param(impl_node, pattern_sym) != 0:
+                    let existing = self.subst_vec_lookup(&subst_names, &subst_types, pattern_sym)
+                    if existing != 0:
+                        if self.types_compatible(existing, actual_arg) == 0:
+                            return sema_impl_target_no_match()
+                    else:
+                        subst_names.push(pattern_sym)
+                        subst_types.push(actual_arg)
                     continue
             let pattern_ty = self.resolve_type_node_with_subst(pattern_arg, carrier_ty, subst_names, subst_types)
             if pattern_ty == 0 or self.types_compatible(pattern_ty, actual_arg) == 0:
-                return 0
-        return self.blanket_impl_type_bounds_satisfied(impl_node, subst_names, subst_types)
+                return sema_impl_target_no_match()
+        if self.blanket_impl_type_bounds_satisfied(impl_node, &subst_names, &subst_types) == 0:
+            return sema_impl_target_no_match()
+        return SemaImplTargetMatch { 1, subst_names, subst_types }
     let target_ty = self.resolve_type_node_with_subst(target_node, carrier_ty, subst_names, subst_types)
     if target_ty != 0 and self.types_compatible(target_ty, carrier_ty) != 0:
-        return 1
-    0
+        return SemaImplTargetMatch { 1, subst_names, subst_types }
+    sema_impl_target_no_match()
 
 fn Sema.try_method_fn(self: Sema, carrier_ty: i32, method_sym: i32) -> i32:
     let owner_sym = self.method_owner_symbol_for_type(carrier_ty)
@@ -5834,7 +5954,7 @@ fn Sema.resolve_impl_trait_arg_for_source(self: Sema, impl_node: i32, source_ty:
     let arg_kind = self.ast.kind(arg_node)
     if arg_kind == NodeKind.NK_TYPE_NAMED or arg_kind == NodeKind.NK_IDENT:
         let arg_sym = self.ast.get_data0(arg_node)
-        let subst = sema_subst_vec_lookup(subst_names, subst_types, arg_sym)
+        let subst = self.subst_vec_lookup(subst_names, subst_types, arg_sym)
         if subst != 0:
             return subst
         let target_actual = self.impl_target_actual_for_type_param(impl_node, source_ty, arg_sym)
@@ -5852,9 +5972,8 @@ fn Sema.resolve_user_deref_info(self: Sema, source_ty: i32, node: i32) -> SemaDe
             continue
         if self.pool_resolve(self.ast.get_data2(decl)) != deref_trait_name:
             continue
-        let subst_names: Vec[i32] = Vec.new()
-        let subst_types: Vec[i32] = Vec.new()
-        if self.try_impl_target_matches(decl, source_ty, subst_names, subst_types) == 0:
+        let target_match = self.impl_target_match(decl, source_ty)
+        if target_match.ok == 0:
             continue
         let deref_fn = self.deref_method_fn(source_ty)
         if deref_fn == 0:
@@ -5866,7 +5985,7 @@ fn Sema.resolve_user_deref_info(self: Sema, source_ty: i32, node: i32) -> SemaDe
             let arg_start = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
             let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
             if arg_count >= 1:
-                target_ty = self.resolve_impl_trait_arg_for_source(decl, source_ty, self.ast.get_extra(arg_start), subst_names, subst_types)
+                target_ty = self.resolve_impl_trait_arg_for_source(decl, source_ty, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
         let sig_idx = self.get_sig(deref_fn)
         var result_ref_ty = 0
         if sig_idx >= 0:
@@ -5904,9 +6023,8 @@ fn Sema.resolve_user_try_info(self: Sema, carrier_ty: i32) -> SemaTryInfo:
             continue
         if self.ast.get_data2(decl) != try_sym:
             continue
-        let subst_names: Vec[i32] = Vec.new()
-        let subst_types: Vec[i32] = Vec.new()
-        if self.try_impl_target_matches(decl, carrier_ty, subst_names, subst_types) == 0:
+        let target_match = self.impl_target_match(decl, carrier_ty)
+        if target_match.ok == 0:
             continue
         let branch_fn = self.try_method_fn(carrier_ty, branch_sym)
         let from_break_fn = self.try_method_fn(carrier_ty, from_break_sym)
@@ -5919,8 +6037,8 @@ fn Sema.resolve_user_try_info(self: Sema, carrier_ty: i32) -> SemaTryInfo:
             let arg_start = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
             let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
             if arg_count >= 2:
-                continue_ty = self.resolve_type_node_with_subst(self.ast.get_extra(arg_start), carrier_ty, subst_names, subst_types)
-                break_ty = self.resolve_type_node_with_subst(self.ast.get_extra(arg_start + 1), carrier_ty, subst_names, subst_types)
+                continue_ty = self.resolve_type_node_with_subst(self.ast.get_extra(arg_start), carrier_ty, target_match.subst_names, target_match.subst_types)
+                break_ty = self.resolve_type_node_with_subst(self.ast.get_extra(arg_start + 1), carrier_ty, target_match.subst_names, target_match.subst_types)
         if continue_ty == 0 or break_ty == 0:
             let branch_sig = self.get_sig(branch_fn)
             if branch_sig >= 0:
@@ -6836,7 +6954,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         let ret_is_void = self.current_return_type == self.ty_void or self.current_return_type == 0
         if ret_is_void and self.ast.kind(tail) == NodeKind.NK_MATCH:
             self.match_in_stmt_pos = 1
-        let tail_is_value = self.current_value_expr_root == node or (self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void)
+        let tail_is_value = self.current_value_expr_root == node or (self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void) or (self.has_expected_type != 0 and self.expected_expr_type != 0 and self.expected_expr_type != self.ty_void)
         if tail_is_value:
             self.current_value_expr_root = tail
         let tail_type = if tail_is_value: self.check_expr(tail) else: self.check_expr_statement_context(tail)
@@ -7096,9 +7214,7 @@ fn Sema.fn_symbol_is_comptime(self: Sema, fn_sym: i32) -> i32:
 fn Sema.fn_symbol_decl_node(self: Sema, fn_sym: i32) -> i32:
     if self.fn_decl_nodes.contains(fn_sym):
         return self.fn_decl_nodes.get(fn_sym).unwrap()
-    if self.generic_fn_nodes.contains(fn_sym):
-        return self.generic_fn_nodes.get(fn_sym).unwrap()
-    0
+    self.generic_fn_node_for_symbol(fn_sym)
 
 fn Sema.fn_symbol_source_path(self: Sema, fn_sym: i32) -> str:
     if self.fn_decl_source_paths.contains(fn_sym):
@@ -7147,7 +7263,7 @@ fn Sema.check_comptime_call_restriction(self: Sema, fn_sym: i32, node: i32) -> i
             return 0
         self.emit_error("runtime intrinsic is not allowed in comptime", node)
         return 1
-    if self.fn_decl_nodes.contains(fn_sym) or self.generic_fn_nodes.contains(fn_sym):
+    if self.fn_decl_nodes.contains(fn_sym) or self.generic_fn_node_for_symbol(fn_sym) != 0:
         if self.fn_symbol_is_tool_comptime_allowed(fn_sym) != 0:
             return 0
         if self.fn_symbol_is_std_string_builder_comptime_allowed(fn_sym) != 0:
@@ -7958,7 +8074,9 @@ fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
         return 0
 
     if tk == TypeKind.TY_GENERIC_INST:
-        let gi_base_sym = self.get_type_d0(resolved)
+        let gi_base_raw = self.get_type_d0(resolved)
+        let gi_base_canonical = self.canonical_symbol_by_text(gi_base_raw)
+        let gi_base_sym = if self.type_decl_nodes.contains(gi_base_raw): gi_base_raw else: gi_base_canonical
         if self.type_decl_nodes.contains(gi_base_sym):
             let td_node = self.type_decl_nodes.get(gi_base_sym).unwrap()
             let td_extra = self.ast.get_data1(td_node)
@@ -7968,20 +8086,31 @@ fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
                 let after = td_extra + 1 + fc * 4
                 let tp_start = self.ast.get_extra(after + 1)
                 let tp_count = self.ast.get_extra(after + 2)
-                if self.setup_generic_inst_substitution(resolved, gi_base_sym) != 0:
+                let saved_field_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+                let saved_field_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+                let field_setup_ok = self.setup_generic_inst_substitution(resolved, gi_base_sym)
+                var resolved_field_ty = 0
+                if field_setup_ok != 0:
+                    let canonical_field = self.canonical_symbol_by_text(field)
                     for gi_fi in 0..fc:
                         let base = td_extra + 1 + gi_fi * 3
                         let f_name = self.ast.get_extra(base)
-                        if f_name == field:
+                        if f_name == field or self.canonical_symbol_by_text(f_name) == canonical_field:
                             let f_type_node = self.ast.get_extra(base + 1)
-                            return self.resolve_generic_return_type_node(f_type_node, tp_start, tp_count)
-                else:
+                            resolved_field_ty = self.resolve_generic_return_type_node(f_type_node, tp_start, tp_count)
+                            break
+                self.generic_subst_param_syms = saved_field_subst_syms
+                self.generic_subst_type_ids = saved_field_subst_tys
+                if resolved_field_ty != 0:
+                    return resolved_field_ty
+                if field_setup_ok == 0:
                     let gi_struct_tid = self.lookup_named_type_visible(gi_base_sym)
                     if gi_struct_tid != 0:
+                        let canonical_field2 = self.canonical_symbol_by_text(field)
                         let gi_te_start = self.get_type_d1(gi_struct_tid)
                         for gi_fi in 0..fc:
                             let gi_f_name = self.type_extra.get((gi_te_start + gi_fi * 3) as i64)
-                            if gi_f_name == field:
+                            if gi_f_name == field or self.canonical_symbol_by_text(gi_f_name) == canonical_field2:
                                 return self.type_extra.get((gi_te_start + gi_fi * 3 + 1) as i64)
         return 0
 
@@ -8782,9 +8911,11 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
                 let expected_resolved = self.resolve_alias(self.expected_expr_type)
                 let expected_tk = self.get_type_kind(expected_resolved)
-                if expected_tk == TypeKind.TY_STRUCT and self.get_type_d0(expected_resolved) == name:
+                let expected_base = if expected_tk == TypeKind.TY_STRUCT or expected_tk == TypeKind.TY_GENERIC_INST: self.get_type_d0(expected_resolved) else: 0
+                let same_expected_base = expected_base != 0 and (expected_base == name or self.canonical_symbol_by_text(expected_base) == self.canonical_symbol_by_text(name))
+                if expected_tk == TypeKind.TY_STRUCT and same_expected_base:
                     expected_struct_ty = expected_resolved
-                else if expected_tk == TypeKind.TY_GENERIC_INST and self.get_type_d0(expected_resolved) == name:
+                else if expected_tk == TypeKind.TY_GENERIC_INST and same_expected_base:
                     expected_struct_ty = expected_resolved
             if expected_struct_ty == 0 and self.type_decl_nodes.contains(name):
                 let td_node = self.type_decl_nodes.get(name).unwrap()
@@ -9256,7 +9387,11 @@ fn Sema.resolve_generic_enum_payload(self: Sema, gi_tid: i32, base_sym: i32, var
     var result: Vec[i32] = Vec.new()
     if not self.type_decl_nodes.contains(base_sym):
         return result
+    let saved_payload_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+    let saved_payload_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
     if self.setup_generic_inst_substitution(gi_tid, base_sym) == 0:
+        self.generic_subst_param_syms = saved_payload_subst_syms
+        self.generic_subst_type_ids = saved_payload_subst_tys
         return result
     // Walk AST type decl to find variant and re-resolve payload type nodes
     let td_node = self.type_decl_nodes.get(base_sym).unwrap()
@@ -9264,6 +9399,8 @@ fn Sema.resolve_generic_enum_payload(self: Sema, gi_tid: i32, base_sym: i32, var
     let td_packed = self.ast.get_data2(td_node)
     let td_sub_kind = type_decl_sub_kind(td_packed)
     if td_sub_kind != TypeDeclKind.Enum:
+        self.generic_subst_param_syms = saved_payload_subst_syms
+        self.generic_subst_type_ids = saved_payload_subst_tys
         return result
     // Get type param info for resolve_generic_return_type_node
     let vc = self.ast.get_extra(td_extra_start)
@@ -9287,8 +9424,10 @@ fn Sema.resolve_generic_enum_payload(self: Sema, gi_tid: i32, base_sym: i32, var
                 let pt_node = self.ast.get_extra(epos + pi)
                 let pt_tid = self.resolve_generic_return_type_node(pt_node, tp_start, tp_count)
                 result.push(pt_tid)
-            return result
+            break
         epos = epos + pc
+    self.generic_subst_param_syms = saved_payload_subst_syms
+    self.generic_subst_type_ids = saved_payload_subst_tys
     result
 
 fn Sema.result_error_type(self: Sema, result_tid: i32) -> i32:
@@ -11131,7 +11270,7 @@ fn Sema.check_qualified_extension_call(self: Sema, recv_expr: i32, method_sym: i
     if recv_expr == 0 or self.ast.kind(recv_expr) != NodeKind.NK_IDENT:
         return -1
     let pkg_sym = self.ast.get_data0(recv_expr)
-    if self.scope_lookup(pkg_sym) >= 0 or self.lookup_named_type_visible(pkg_sym) != 0 or self.get_sig(pkg_sym) >= 0 or self.generic_fn_nodes.contains(pkg_sym):
+    if self.scope_lookup(pkg_sym) >= 0 or self.lookup_named_type_visible(pkg_sym) != 0 or self.get_visible_sig(pkg_sym) >= 0 or self.generic_fn_node_for_symbol(pkg_sym) != 0:
         return -1
     let module_path = self.direct_imported_module_path_for_alias(pkg_sym)
     if module_path.len() == 0:
@@ -11308,7 +11447,10 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             self.emit_error("named arguments are not supported for closures or function pointers", node)
 
     let param_offset = if self.in_pipeline_rhs != 0: 1 else: 0
-    let sig_idx_raw = if self.generic_fn_nodes.contains(fn_sym): -1 else: self.get_sig(fn_sym)
+    // A concrete signature wins over generic-node bookkeeping. Different
+    // symbol pools can reuse integer ids, so a stale/raw generic map hit must
+    // not turn an ordinary helper call into a generic instantiation.
+    let sig_idx_raw = self.get_visible_sig(fn_sym)
     let sig_idx = if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: -1 else: sig_idx_raw
     let variant_expected_ty = if self.variant_lookup.contains(fn_sym) and self.is_ci_visible(fn_sym) != 0: self.expected_variant_constructor_type(fn_sym) else: 0
     let imported_variant_owner_for_call = if self.imported_variant_owners.contains(fn_sym): self.imported_variant_owners.get(fn_sym).unwrap() else: 0
@@ -11475,15 +11617,16 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             let expected_variant_unit_ty = variant_payload_tys.get(0)
             if self.try_unit_elide_call_arg(node, arg_count, expected_variant_unit_ty) != 0:
                 resolved_arg_count = 1
-        else if self.generic_fn_nodes.contains(fn_sym):
-            let gen_fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
-            let gen_meta = self.ast.find_fn_meta(gen_fn_node)
-            if gen_meta >= 0 and self.ast.fn_meta_param_count(gen_meta) == 1:
-                let gen_param_start = self.ast.fn_meta_param_start(gen_meta)
-                let gen_param_ty_node = self.ast.fn_param_type(gen_param_start, 0)
-                let gen_expected_ty = if gen_param_ty_node != 0: self.resolve_type_expr(gen_param_ty_node) as i32 else: 0
-                if self.try_unit_elide_call_arg(node, arg_count, gen_expected_ty) != 0:
-                    resolved_arg_count = 1
+        else:
+            let gen_fn_node = self.generic_fn_node_for_symbol(fn_sym)
+            if gen_fn_node != 0:
+                let gen_meta = self.ast.find_fn_meta(gen_fn_node)
+                if gen_meta >= 0 and self.ast.fn_meta_param_count(gen_meta) == 1:
+                    let gen_param_start = self.ast.fn_meta_param_start(gen_meta)
+                    let gen_param_ty_node = self.ast.fn_param_type(gen_param_start, 0)
+                    let gen_expected_ty = if gen_param_ty_node != 0: self.resolve_type_expr(gen_param_ty_node) as i32 else: 0
+                    if self.try_unit_elide_call_arg(node, arg_count, gen_expected_ty) != 0:
+                        resolved_arg_count = 1
 
     // Check all arguments (with contextual expected-type propagation when
     // calling a known function signature).
@@ -11706,8 +11849,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         return 0
 
     // Generic function
-    if self.generic_fn_nodes.contains(fn_sym):
-        let fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
+    let generic_fn_node = self.generic_fn_node_for_symbol(fn_sym)
+    if generic_fn_node != 0:
+        let fn_node = generic_fn_node
         self.emit_no_await_guard_may_suspend_call(node, fn_sym)
         self.note_allocating_callee(node, fn_sym)
         let ret = self.check_generic_call(fn_sym, fn_node, arg_types, resolved_arg_count, node)
@@ -12189,6 +12333,8 @@ fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: &Ve
     if arg_count < generic_min_args or arg_count > param_count:
         self.emit_error("wrong argument count", call_node)
 
+    let saved_generic_call_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+    let saved_generic_call_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
     self.clear_generic_substitution()
 
     // Infer type parameter substitutions from call argument types.
@@ -12213,6 +12359,8 @@ fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: &Ve
     if self.generic_specialization_cache.contains(spec_key):
         let cached = self.generic_specialization_cache.get(spec_key).unwrap()
         self.typed_expr_types.insert(call_node, cached)
+        self.generic_subst_param_syms = saved_generic_call_subst_syms
+        self.generic_subst_type_ids = saved_generic_call_subst_tys
         return cached
 
     let before_errors = self.diags.count_by_severity(DiagSeverity.Error)
@@ -12235,11 +12383,15 @@ fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: &Ve
         param_concrete_tys.push(concrete_param_ty)
     let _ = self.check_fn_body_concrete(fn_node, tp_syms, tp_sema_tys, mono_sym, param_concrete_tys)
     if self.diags.count_by_severity(DiagSeverity.Error) != before_errors:
+        self.generic_subst_param_syms = saved_generic_call_subst_syms
+        self.generic_subst_type_ids = saved_generic_call_subst_tys
         return 0
 
     let resolved_ret = self.resolve_generic_return_type_node(ret_node, tp_start, tp_count)
     self.generic_specialization_cache.insert(sema_owned_text(spec_key), resolved_ret)
     self.typed_expr_types.insert(call_node, resolved_ret)
+    self.generic_subst_param_syms = saved_generic_call_subst_syms
+    self.generic_subst_type_ids = saved_generic_call_subst_tys
     resolved_ret
 
 fn Sema.clear_generic_substitution(self: Sema):
@@ -12248,19 +12400,39 @@ fn Sema.clear_generic_substitution(self: Sema):
         self.generic_subst_type_ids.pop()
 
 fn Sema.lookup_generic_subst(self: Sema, param_sym: i32) -> i32:
-    let canonical_param = self.canonical_symbol_by_text(param_sym)
     var i = self.generic_subst_param_syms.len() as i32 - 1
     while i >= 0:
-        let stored = self.generic_subst_param_syms.get(i as i64)
-        if stored == param_sym or self.canonical_symbol_by_text(stored) == canonical_param:
+        if self.generic_subst_param_syms.get(i as i64) == param_sym:
             return self.generic_subst_type_ids.get(i as i64)
         i = i - 1
+    let param_text = self.pool_resolve_symbol(param_sym)
+    if param_text.len() == 0:
+        return 0
+    var found = 0
+    var found_count = 0
+    i = self.generic_subst_param_syms.len() as i32 - 1
+    while i >= 0:
+        let stored = self.generic_subst_param_syms.get(i as i64)
+        if self.pool_resolve_symbol(stored) == param_text:
+            found = self.generic_subst_type_ids.get(i as i64)
+            found_count = found_count + 1
+        i = i - 1
+    if found_count == 1:
+        return found
     0
 
 fn Sema.put_generic_subst(self: Sema, param_sym: i32, tid: i32, node: i32) -> Unit:
     if tid == 0:
         return
-    let existing = self.lookup_generic_subst(param_sym)
+    var existing = 0
+    var existing_i = -1
+    var exact_i = self.generic_subst_param_syms.len() as i32 - 1
+    while exact_i >= 0:
+        if self.generic_subst_param_syms.get(exact_i as i64) == param_sym:
+            existing = self.generic_subst_type_ids.get(exact_i as i64)
+            existing_i = exact_i
+            break
+        exact_i = exact_i - 1
     if existing != 0:
         if self.types_compatible(existing, tid) == 0:
             if self.arithmetic_result_type(existing, tid) == 0:
@@ -12271,14 +12443,9 @@ fn Sema.put_generic_subst(self: Sema, param_sym: i32, tid: i32, node: i32) -> Un
         else:
             let existing_r = self.resolve_alias(existing as TypeId)
             if self.get_type_kind(existing_r) == TypeKind.TY_TRAIT_OBJ and self.type_implements_trait(tid, self.get_type_d0(existing_r)) != 0:
-                let canonical_param = self.canonical_symbol_by_text(param_sym)
-                var i = self.generic_subst_param_syms.len() as i32 - 1
-                while i >= 0:
-                    let stored = self.generic_subst_param_syms.get(i as i64)
-                    if stored == param_sym or self.canonical_symbol_by_text(stored) == canonical_param:
-                        self.generic_subst_type_ids.set_i32(i as i64, tid)
-                        return
-                    i = i - 1
+                if existing_i >= 0:
+                    self.generic_subst_type_ids.set_i32(existing_i as i64, tid)
+                    return
         return
 
     self.generic_subst_param_syms.push(param_sym)
@@ -12294,6 +12461,50 @@ fn Sema.type_param_exists(self: Sema, tp_start: i32, tp_count: i32, sym: i32) ->
             return 1
         pos = pos + 2 + bound_count
     0
+
+fn Sema.impl_target_bare_type_param(self: Sema, impl_node: i32, sym: i32) -> i32:
+    if impl_node == 0 or sym == 0:
+        return 0
+    if self.primitive_type_by_sym(sym) != 0:
+        return 0
+    if self.has_named_type_visible(sym) != 0:
+        return 0
+    let target_node = self.ast.find_impl_target_type_node(impl_node as NodeId)
+    if target_node == 0 or self.ast.kind(target_node) != NodeKind.NK_TYPE_GENERIC:
+        return 0
+    let canonical_sym = self.canonical_symbol_by_text(sym)
+    let arg_start = self.ast.get_data1(target_node)
+    let arg_count = self.ast.get_data2(target_node)
+    for ai in 0..arg_count:
+        let arg = self.ast.get_extra(arg_start + ai)
+        let kind = self.ast.kind(arg)
+        if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_IDENT:
+            let arg_sym = self.ast.get_data0(arg)
+            if arg_sym == sym or self.canonical_symbol_by_text(arg_sym) == canonical_sym:
+                return 1
+    0
+
+fn Sema.impl_target_has_bare_type_params(self: Sema, impl_node: i32) -> i32:
+    if impl_node == 0:
+        return 0
+    let target_node = self.ast.find_impl_target_type_node(impl_node as NodeId)
+    if target_node == 0 or self.ast.kind(target_node) != NodeKind.NK_TYPE_GENERIC:
+        return 0
+    let arg_start = self.ast.get_data1(target_node)
+    let arg_count = self.ast.get_data2(target_node)
+    for ai in 0..arg_count:
+        let arg = self.ast.get_extra(arg_start + ai)
+        let kind = self.ast.kind(arg)
+        if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(arg)
+            if self.primitive_type_by_sym(sym) == 0 and self.has_named_type_visible(sym) == 0:
+                return 1
+    0
+
+fn Sema.type_param_exists_in_impl_context(self: Sema, tp_start: i32, tp_count: i32, impl_node: i32, sym: i32) -> i32:
+    if self.type_param_exists(tp_start, tp_count, sym) != 0:
+        return 1
+    self.impl_target_bare_type_param(impl_node, sym)
 
 fn Sema.bind_type_params_from_type_expr(self: Sema, type_node: i32, arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
     if type_node == 0 or arg_tid == 0:
@@ -12380,9 +12591,8 @@ fn Sema.bind_type_params_from_type_expr(self: Sema, type_node: i32, arg_tid: i32
                 continue
             if self.ast.get_data2(decl) != trait_sym:
                 continue
-            let subst_names: Vec[i32] = Vec.new()
-            let subst_types: Vec[i32] = Vec.new()
-            if self.try_impl_target_matches(decl, arg_tid, subst_names, subst_types) == 0:
+            let target_match = self.impl_target_match(decl, arg_tid)
+            if target_match.ok == 0:
                 continue
             let impl_args_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
             if impl_args_idx < 0:
@@ -12393,7 +12603,7 @@ fn Sema.bind_type_params_from_type_expr(self: Sema, type_node: i32, arg_tid: i32
             for tai in 0..bind_count:
                 let param_trait_arg = self.ast.get_extra(trait_arg_start + tai)
                 let impl_trait_arg = self.ast.get_extra(impl_arg_start + tai)
-                let actual_trait_arg = self.resolve_impl_trait_arg_for_source(decl, arg_tid, impl_trait_arg, subst_names, subst_types)
+                let actual_trait_arg = self.resolve_impl_trait_arg_for_source(decl, arg_tid, impl_trait_arg, target_match.subst_names, target_match.subst_types)
                 self.bind_type_params_from_type_expr(param_trait_arg, actual_trait_arg, tp_start, tp_count, err_node)
             return
 
@@ -12578,10 +12788,19 @@ fn Sema.select_trait_impl(self: Sema, type_sym: i32, trait_sym: i32) -> i32:
     self.selection_cache.insert(key, found)
     found
 
-fn sema_subst_vec_lookup(names: &Vec[i32], types: &Vec[i32], name: i32) -> i32:
+fn Sema.subst_vec_lookup(self: Sema, names: &Vec[i32], types: &Vec[i32], name: i32) -> i32:
     for i in 0..names.len() as i32:
         if names.get(i as i64) == name:
             return types.get(i as i64)
+    let target_name = self.pool_resolve(name)
+    var found = 0
+    var found_count = 0
+    for i2 in 0..names.len() as i32:
+        if self.pool_resolve(names.get(i2 as i64)) == target_name:
+            found = types.get(i2 as i64)
+            found_count = found_count + 1
+    if found_count == 1:
+        return found
     0
 
 fn Sema.type_param_in_impl_list(self: Sema, tp_start: i32, tp_count: i32, sym: i32) -> i32:
@@ -12604,7 +12823,7 @@ fn Sema.blanket_impl_type_bounds_satisfied(self: Sema, impl_node: i32, subst_nam
     for ti in 0..tp_count:
         let tp_name = self.ast.get_extra(pos)
         let bound_count = self.ast.get_extra(pos + 1)
-        let concrete_tid = sema_subst_vec_lookup(subst_names, subst_types, tp_name)
+        let concrete_tid = self.subst_vec_lookup(subst_names, subst_types, tp_name)
         for bi in 0..bound_count:
             let bound_trait = self.ast.get_extra(pos + 2 + bi)
             if concrete_tid == 0:
@@ -12650,7 +12869,7 @@ fn Sema.select_blanket_impl_for_generic_inst(self: Sema, tid: i32, trait_sym: i3
             if pattern_kind == NodeKind.NK_TYPE_NAMED or pattern_kind == NodeKind.NK_IDENT:
                 let pattern_sym = self.ast.get_data0(pattern_arg)
                 if self.type_param_in_impl_list(tp_start, tp_count, pattern_sym) != 0:
-                    let existing = sema_subst_vec_lookup(subst_names, subst_types, pattern_sym)
+                    let existing = self.subst_vec_lookup(subst_names, subst_types, pattern_sym)
                     if existing != 0:
                         if self.types_compatible(existing, actual_arg) == 0:
                             matches = 0
@@ -12684,11 +12903,11 @@ fn Sema.type_implements_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
     if trait_sym == self.syms.copy_trait:
         return self.is_copy(resolved)
     if trait_sym == self.syms.drop:
-        let drop_name = self.get_type_name(resolved)
-        if drop_name != 0:
-            return self.has_drop_method(drop_name)
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             return self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym)
+        let drop_name = self.get_type_name(resolved)
+        if drop_name != 0:
+            return self.select_trait_impl(drop_name, trait_sym)
         return 0
     if trait_sym == self.syms.send_trait:
         return self.type_is_send(resolved as i32)
@@ -12971,6 +13190,8 @@ fn Sema.type_symbol_for_bounds(self: Sema, tid: i32) -> i32:
 
 fn Sema.method_owner_symbol_for_type(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        return self.get_generic_inst_base(resolved as i32)
     let named = self.get_type_name(resolved)
     if named != 0:
         return named
@@ -12978,7 +13199,7 @@ fn Sema.method_owner_symbol_for_type(self: Sema, tid: i32) -> i32:
 
 fn Sema.lookup_generic_method_fn(self: Sema, owner_sym: i32, method_sym: i32) -> i32:
     let existing = self.lookup_method_fn(owner_sym, method_sym)
-    if existing != 0 and self.generic_fn_nodes.contains(existing):
+    if existing != 0 and self.generic_fn_node_for_symbol(existing) != 0:
         return existing
     let owner_name = self.pool_resolve(owner_sym)
     let method_name = self.pool_resolve(method_sym)
@@ -12987,7 +13208,7 @@ fn Sema.lookup_generic_method_fn(self: Sema, owner_sym: i32, method_sym: i32) ->
     let qualified = self.pool_lookup_symbol(owner_name ++ "." ++ method_name)
     if qualified == 0:
         return 0
-    if self.generic_fn_nodes.contains(qualified):
+    if self.generic_fn_node_for_symbol(qualified) != 0:
         return qualified
     0
 
@@ -13123,9 +13344,11 @@ fn Sema.bind_type_params_from_method_receiver_type(self: Sema, type_node: i32, a
     self.bind_type_params_from_type_expr(type_node, arg_tid, tp_start, tp_count, err_node)
 
 fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, method_fn_sym: i32, is_static: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
-    if method_fn_sym == 0 or not self.generic_fn_nodes.contains(method_fn_sym):
+    if method_fn_sym == 0:
         return 0
-    let fn_node = self.generic_fn_nodes.get(method_fn_sym).unwrap()
+    let fn_node = self.generic_fn_node_for_symbol(method_fn_sym)
+    if fn_node == 0:
+        return 0
     let meta = self.ast.find_fn_meta(fn_node)
     if meta < 0:
         return 0
@@ -13141,6 +13364,8 @@ fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, m
     let fn_tp_start = self.ast.fn_meta_tp_start(meta)
     let fn_tp_count = self.ast.fn_meta_tp_count(meta)
 
+    let saved_generic_method_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+    let saved_generic_method_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
     self.clear_generic_substitution()
     let owner_resolved = self.resolve_alias(owner_type as TypeId)
     if owner_tp_count > 0:
@@ -13175,6 +13400,8 @@ fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, m
         let bound_count = self.ast.get_extra(pos + 1)
         if self.lookup_generic_subst(tp_name) == 0:
             self.emit_error("cannot infer generic method type parameter '" ++ self.pool_resolve(tp_name) ++ "'", node)
+            self.generic_subst_param_syms = saved_generic_method_subst_syms
+            self.generic_subst_type_ids = saved_generic_method_subst_tys
             return 0
         pos = pos + 2 + bound_count
     var fn_pos = fn_tp_start
@@ -13183,6 +13410,8 @@ fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, m
         let bound_count2 = self.ast.get_extra(fn_pos + 1)
         if self.lookup_generic_subst(tp_name2) == 0:
             self.emit_error("cannot infer generic method type parameter '" ++ self.pool_resolve(tp_name2) ++ "'", node)
+            self.generic_subst_param_syms = saved_generic_method_subst_syms
+            self.generic_subst_type_ids = saved_generic_method_subst_tys
             return 0
         fn_pos = fn_pos + 2 + bound_count2
     let concrete_owner = if owner_tp_count > 0:
@@ -13190,6 +13419,8 @@ fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, m
     else:
         if owner_type != 0: owner_type else: self.lookup_named_type_visible(owner_sym)
     if concrete_owner == 0:
+        self.generic_subst_param_syms = saved_generic_method_subst_syms
+        self.generic_subst_type_ids = saved_generic_method_subst_tys
         return 0
 
     let param_offset = if is_static != 0: 0 else: 1
@@ -13213,6 +13444,8 @@ fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, m
     let ret_ty = self.resolve_type_node_with_current_subst(ret_node, concrete_owner)
     if ret_ty != 0:
         self.typed_expr_types.insert(node, ret_ty)
+    self.generic_subst_param_syms = saved_generic_method_subst_syms
+    self.generic_subst_type_ids = saved_generic_method_subst_tys
     ret_ty
 
 fn Sema.generic_constructor_return_type(self: Sema, owner_sym: i32, recv_type: i32) -> i32:
@@ -14563,6 +14796,10 @@ fn Sema.method_may_suspend_current_fiber(self: Sema, recv_type: i32, field: i32)
         return 1
     if owner_name == "Receiver" and method_name == "recv":
         return 1
+    if owner_name == "Mutex" and (method_name == "enter" or method_name == "enter_mut"):
+        return 1
+    if owner_name == "RwLock" and (method_name == "enter" or method_name == "enter_mut"):
+        return 1
     if (owner_name == "Task" or owner_name == "ScopedTask") and method_name == "join_cleanup":
         return 1
     0
@@ -14602,6 +14839,22 @@ fn Sema.dyn_trait_symbol_for_type(self: Sema, tid: i32) -> i32:
     0
 
 fn Sema.find_dyn_trait_method_info(self: Sema, trait_sym: i32, method_sym: i32) -> SemaDynTraitMethodInfo:
+    if self.trait_lookup.contains(trait_sym):
+        let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
+        let method_start = self.trait_method_starts.get(trait_idx as i64)
+        let method_count = self.trait_method_counts.get(trait_idx as i64)
+        let want = self.pool_resolve(method_sym)
+        for mi in 0..method_count:
+            let table_i = method_start + mi
+            let cur_method_sym = self.trait_method_names.get(table_i as i64)
+            if cur_method_sym == method_sym or (want.len() > 0 and self.pool_resolve(cur_method_sym) == want):
+                return SemaDynTraitMethodInfo {
+                    ok: 1,
+                    param_start: self.trait_method_param_starts.get(table_i as i64),
+                    param_count: self.trait_method_param_counts.get(table_i as i64),
+                    ret_node: self.trait_method_ret_nodes.get(table_i as i64),
+                }
+
     let trait_node = self.find_trait_decl_node(trait_sym)
     if trait_node == 0:
         return sema_dyn_trait_method_missing()
@@ -14638,6 +14891,16 @@ fn Sema.find_dyn_trait_method_info(self: Sema, trait_sym: i32, method_sym: i32) 
             }
 
     sema_dyn_trait_method_missing()
+
+fn Sema.any_trait_method_named(self: Sema, method_sym: i32) -> i32:
+    if method_sym == 0:
+        return 0
+    let want = self.pool_resolve(method_sym)
+    for mi in 0..self.trait_method_names.len() as i32:
+        let candidate = self.trait_method_names.get(mi as i64)
+        if candidate == method_sym or (want.len() > 0 and self.pool_resolve(candidate) == want):
+            return 1
+    0
 
 fn Sema.check_dyn_trait_method_call(self: Sema, trait_sym: i32, method_sym: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
     let info = self.find_dyn_trait_method_info(trait_sym, method_sym)
@@ -14680,6 +14943,131 @@ fn Sema.check_dyn_trait_method_call(self: Sema, trait_sym: i32, method_sym: i32,
         self.typed_expr_types.insert(node, ret_ty)
     ret_ty
 
+fn Sema.impl_decl_method_fn(self: Sema, impl_node: i32, method_sym: i32) -> i32:
+    let start = self.ast.get_start(impl_node)
+    let end = self.ast.get_end(impl_node)
+    let method_name = self.pool_resolve(method_sym)
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        let decl_start = self.ast.get_start(decl)
+        let decl_end = self.ast.get_end(decl)
+        if decl_start < start or decl_end > end:
+            continue
+        let fn_sym = self.ast.get_data0(decl)
+        let fn_name = self.pool_resolve(fn_sym)
+        let dot = sema_str_find_char(fn_name, 46)
+        if dot < 0:
+            if fn_name == method_name:
+                return fn_sym
+        else:
+            let bare = fn_name.slice((dot + 1) as i64, fn_name.len() as i64)
+            if bare == method_name:
+                return fn_sym
+    0
+
+fn Sema.check_trait_receiver_mode(self: Sema, info: &SemaDynTraitMethodInfo, expr: i32, node: i32):
+    if info.param_count <= 0:
+        return
+    let pflags = self.ast.fn_param_flags(info.param_start, 0)
+    if fn_param_is_mut_self(pflags) != 0:
+        let recv_packed = self.classify_place(expr)
+        let recv_kind = unpack_place_kind(recv_packed)
+        let recv_mut_state = unpack_place_mut(recv_packed)
+        let recv_via_ro_ref = self.place_base_is_read_only_ref(expr)
+        if recv_kind == PlaceKind.PK_NotPlace:
+            self.emit_error("mutating method requires a place receiver (§15.3)", node)
+        else if recv_mut_state == PlaceMut.PM_ReadOnly or recv_via_ro_ref != 0:
+            self.emit_error("cannot call mutating method through a read-only place (§15.2)", node)
+        else:
+            self.check_mutation_against_views(expr, node)
+            self.record_global_place_write(expr, node)
+    else if fn_param_is_move_self(pflags) != 0:
+        if self.ast.kind(expr) == NodeKind.NK_IDENT:
+            let recv_sym = self.ast.get_data0(expr)
+            if self.scope_has(recv_sym) != 0:
+                self.scope_set_state(recv_sym, VarState.MOVED)
+                self.note_param_effect(recv_sym, EFF_CONSUME)
+
+fn Sema.check_concrete_trait_method_call(self: Sema, recv_type: i32, method_sym: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32, expr: i32, has_resolved_args: i32) -> i32:
+    if recv_type == 0:
+        return 0
+    if self.any_trait_method_named(method_sym) == 0:
+        return 0
+    var found_trait = 0
+    var found_impl = 0
+    var found_fn = 0
+    var found_info = sema_dyn_trait_method_missing()
+    let found_subst_names: Vec[i32] = Vec.new()
+    let found_subst_types: Vec[i32] = Vec.new()
+
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+            continue
+        let trait_sym = self.ast.get_data2(decl)
+        if trait_sym == 0:
+            continue
+        let info = self.find_dyn_trait_method_info(trait_sym, method_sym)
+        if info.ok == 0:
+            continue
+        let target_match = self.impl_target_match(decl, recv_type)
+        if target_match.ok == 0:
+            continue
+        let method_fn = self.impl_decl_method_fn(decl, method_sym)
+        if method_fn == 0:
+            continue
+        if found_trait != 0 and found_trait != trait_sym:
+            self.emit_error("ambiguous trait method '" ++ self.pool_resolve(method_sym) ++ "' for type '" ++ self.type_name(recv_type) ++ "'", node)
+            return 0
+        found_trait = trait_sym
+        found_impl = decl
+        found_fn = method_fn
+        found_info = info
+        while found_subst_names.len() > 0:
+            found_subst_names.pop()
+            found_subst_types.pop()
+        for si in 0..target_match.subst_names.len() as i32:
+            found_subst_names.push(target_match.subst_names.get(si as i64))
+            found_subst_types.push(target_match.subst_types.get(si as i64))
+
+    if found_trait == 0 or found_impl == 0 or found_fn == 0 or found_info.ok == 0:
+        return 0
+
+    if found_info.param_count <= 0:
+        self.emit_error("trait method has no self parameter", node)
+        return 0
+    let expected_args = found_info.param_count - 1
+    if arg_count != expected_args:
+        self.emit_error("wrong argument count", node)
+
+    self.check_trait_receiver_mode(&found_info, expr, node)
+    for ai in 0..arg_count:
+        let param_i = ai + 1
+        if param_i >= found_info.param_count:
+            break
+        let p_type_node = self.ast.fn_param_type(found_info.param_start, param_i)
+        let expected_ty = self.resolve_type_node_with_subst(p_type_node, recv_type, found_subst_names, found_subst_types)
+        let actual_ty = arg_types.get(ai as i64)
+        if expected_ty != 0 and actual_ty != 0:
+            if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
+                let err_arg = if has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+                self.emit_argument_type_mismatch(self.pool_resolve(found_trait) ++ "." ++ self.pool_resolve(method_sym), found_fn, ai, param_i, expected_ty, actual_ty, if err_arg > 0: err_arg else: node)
+            else:
+                let note_arg = if has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+                self.note_auto_ref_call_arg(expected_ty, actual_ty, note_arg, node)
+
+    self.comp_resolved.insert(node, found_fn)
+    if self.fn_decl_nodes.contains(found_fn) or self.generic_fn_node_for_symbol(found_fn) != 0:
+        self.emit_no_await_guard_may_suspend_call(node, found_fn)
+        self.note_allocating_callee(node, found_fn)
+    let ret_ty = self.resolve_type_node_with_subst(found_info.ret_node, recv_type, found_subst_names, found_subst_types)
+    if ret_ty != 0:
+        self.typed_expr_types.insert(node, ret_ty)
+        return ret_ty
+    self.ty_void as i32
+
 fn Sema.dyn_arg_concrete_type_symbol(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
@@ -14691,9 +15079,14 @@ fn Sema.dyn_arg_concrete_type_symbol(self: Sema, tid: i32) -> i32:
 // Maps each type param name → concrete type arg from the generic instance.
 // Returns 1 on success, 0 on failure (missing type decl, param mismatch, etc).
 fn Sema.setup_generic_inst_substitution(self: Sema, gi_tid: i32, type_sym: i32) -> i32:
-    if not self.type_decl_nodes.contains(type_sym):
+    var decl_sym = type_sym
+    if not self.type_decl_nodes.contains(decl_sym):
+        let canonical = self.canonical_symbol_by_text(type_sym)
+        if canonical != 0 and self.type_decl_nodes.contains(canonical):
+            decl_sym = canonical
+    if not self.type_decl_nodes.contains(decl_sym):
         return 0
-    let td_node = self.type_decl_nodes.get(type_sym).unwrap()
+    let td_node = self.type_decl_nodes.get(decl_sym).unwrap()
     let td_extra_start = self.ast.get_data1(td_node)
     let td_packed = self.ast.get_data2(td_node)
     let td_sub_kind = type_decl_sub_kind(td_packed)
@@ -14735,50 +15128,52 @@ fn Sema.setup_generic_inst_substitution(self: Sema, gi_tid: i32, type_sym: i32) 
     1
 
 fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_sym: i32, method_sym: i32, method_fn_sym: i32, sig_ret: i32) -> i32:
+    let saved_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+    let saved_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
+    var out = 0
     // Set up type param → concrete arg substitution
-    if self.setup_generic_inst_substitution(gi_tid, type_sym) == 0:
-        return 0
-    // Try substitute_type on the stored sig_ret first
-    if sig_ret > 0:
-        let subst_count = self.generic_subst_param_syms.len() as i32
-        let result = self.substitute_type(sig_ret, self.generic_subst_param_syms, self.generic_subst_type_ids, subst_count)
-        if result > 0:
-            return result
-    // Fallback: re-resolve from the method's return type AST node
-    if method_fn_sym == 0 or not self.fn_decl_nodes.contains(method_fn_sym):
-        return 0
-    let fn_node = self.fn_decl_nodes.get(method_fn_sym).unwrap()
-    let meta = self.ast.find_fn_meta(fn_node)
-    if meta < 0:
-        return 0
-    let ret_node = self.ast.fn_meta_ret(meta)
-    if ret_node == 0:
-        return 0
-    let td_node = self.type_decl_nodes.get(type_sym).unwrap()
-    let td_extra_start = self.ast.get_data1(td_node)
-    let td_packed = self.ast.get_data2(td_node)
-    let td_sub_kind = type_decl_sub_kind(td_packed)
-    var td_tp_start = 0
-    var td_tp_count = 0
-    if td_sub_kind == TypeDeclKind.Struct:
-        let fc = self.ast.get_extra(td_extra_start)
-        let after = td_extra_start + 1 + fc * 4
-        td_tp_start = self.ast.get_extra(after + 1)
-        td_tp_count = self.ast.get_extra(after + 2)
-    else if td_sub_kind == TypeDeclKind.Alias or td_sub_kind == TypeDeclKind.Distinct:
-        td_tp_start = self.ast.get_extra(td_extra_start + 2)
-        td_tp_count = self.ast.get_extra(td_extra_start + 3)
-    else if td_sub_kind == TypeDeclKind.Enum:
-        let vc = self.ast.get_extra(td_extra_start)
-        var epos = td_extra_start + 1
-        for vi in 0..vc:
-            epos = epos + 1
-            let pc = self.ast.get_extra(epos)
-            epos = epos + 1
-            epos = epos + pc
-        td_tp_start = self.ast.get_extra(epos + 1)
-        td_tp_count = self.ast.get_extra(epos + 2)
-    self.resolve_generic_return_type_node(ret_node, td_tp_start, td_tp_count)
+    if self.setup_generic_inst_substitution(gi_tid, type_sym) != 0:
+        // Try substitute_type on the stored sig_ret first
+        if sig_ret > 0:
+            let subst_count = self.generic_subst_param_syms.len() as i32
+            let result = self.substitute_type(sig_ret, self.generic_subst_param_syms, self.generic_subst_type_ids, subst_count)
+            if result > 0:
+                out = result
+        // Fallback: re-resolve from the method's return type AST node
+        if out == 0 and method_fn_sym != 0 and self.fn_decl_nodes.contains(method_fn_sym):
+            let fn_node = self.fn_decl_nodes.get(method_fn_sym).unwrap()
+            let meta = self.ast.find_fn_meta(fn_node)
+            if meta >= 0:
+                let ret_node = self.ast.fn_meta_ret(meta)
+                if ret_node != 0:
+                    let td_node = self.type_decl_nodes.get(type_sym).unwrap()
+                    let td_extra_start = self.ast.get_data1(td_node)
+                    let td_packed = self.ast.get_data2(td_node)
+                    let td_sub_kind = type_decl_sub_kind(td_packed)
+                    var td_tp_start = 0
+                    var td_tp_count = 0
+                    if td_sub_kind == TypeDeclKind.Struct:
+                        let fc = self.ast.get_extra(td_extra_start)
+                        let after = td_extra_start + 1 + fc * 4
+                        td_tp_start = self.ast.get_extra(after + 1)
+                        td_tp_count = self.ast.get_extra(after + 2)
+                    else if td_sub_kind == TypeDeclKind.Alias or td_sub_kind == TypeDeclKind.Distinct:
+                        td_tp_start = self.ast.get_extra(td_extra_start + 2)
+                        td_tp_count = self.ast.get_extra(td_extra_start + 3)
+                    else if td_sub_kind == TypeDeclKind.Enum:
+                        let vc = self.ast.get_extra(td_extra_start)
+                        var epos = td_extra_start + 1
+                        for vi in 0..vc:
+                            epos = epos + 1
+                            let pc = self.ast.get_extra(epos)
+                            epos = epos + 1
+                            epos = epos + pc
+                        td_tp_start = self.ast.get_extra(epos + 1)
+                        td_tp_count = self.ast.get_extra(epos + 2)
+                    out = self.resolve_generic_return_type_node(ret_node, td_tp_start, td_tp_count)
+    self.generic_subst_param_syms = saved_subst_syms
+    self.generic_subst_type_ids = saved_subst_tys
+    out
 
 // docs/mut.md Rev 8 §15.8 — builtins for which `lookup_method_fn` returns
 // nothing but whose return value retains access to the receiver. Counterpart
@@ -15384,6 +15779,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             if mc_resolved_tk == TypeKind.TY_GENERIC_INST:
                 // Check argument types against substituted parameter types
                 let mc_method_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
+                let saved_mc_subst_syms = sema_clone_i32_vec(&self.generic_subst_param_syms)
+                let saved_mc_subst_tys = sema_clone_i32_vec(&self.generic_subst_type_ids)
                 if self.setup_generic_inst_substitution(recv_type, type_name_sym) != 0:
                     let mc_subst_count = self.generic_subst_param_syms.len() as i32
                     // Check argument types via substitute_type on stored sig param types
@@ -15407,6 +15804,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                                     self.emit_argument_type_mismatch(mc_method_name, method_fn_sym, mc_ai, mc_sig_pi, exp_ty, arg_ty, if mc_err_arg > 0: mc_err_arg else: node)
                                 else:
                                     self.note_auto_ref_call_arg(exp_ty, arg_ty, mc_err_arg, node)
+                self.generic_subst_param_syms = saved_mc_subst_syms
+                self.generic_subst_type_ids = saved_mc_subst_tys
                 let mc_subst_ret = self.substitute_method_return_for_generic_inst(recv_type, type_name_sym, field, method_fn_sym, mc_ret)
                 if mc_subst_ret != 0:
                     self.propagate_method_call_param_effects(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
@@ -15415,6 +15814,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             self.propagate_method_call_param_effects(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
             self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
             return mc_ret
+
+    let concrete_trait_method_ret = self.check_concrete_trait_method_call(recv_type as i32, field, arg_types, extra_start, mc_resolved_arg_count, node, expr, mc_has_resolved_args)
+    if concrete_trait_method_ret != 0:
+        return concrete_trait_method_ret
 
     // For TypeKind.TY_GENERIC_INST receivers without a registered signature,
     // check argument types and return types for builtin generic methods
@@ -18239,8 +18642,9 @@ fn Sema.fn_symbol_is_iter_of_self(self: Sema, fn_sym: i32) -> i32:
         return 0
     if self.fn_decl_nodes.contains(fn_sym):
         return self.ast.is_iter_of_self_fn_node(self.fn_decl_nodes.get(fn_sym).unwrap())
-    if self.generic_fn_nodes.contains(fn_sym):
-        return self.ast.is_iter_of_self_fn_node(self.generic_fn_nodes.get(fn_sym).unwrap())
+    let generic_node = self.generic_fn_node_for_symbol(fn_sym)
+    if generic_node != 0:
+        return self.ast.is_iter_of_self_fn_node(generic_node)
     0
 
 fn Sema.method_is_iter_of_self_fn(self: Sema, type_sym: i32, method_sym: i32) -> i32:
@@ -18275,10 +18679,11 @@ fn Sema.method_has_move_self_flag(self: Sema, type_sym: i32, method_sym: i32) ->
     var fn_node = 0
     if self.fn_decl_nodes.contains(fn_sym):
         fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
-    else if self.generic_fn_nodes.contains(fn_sym):
-        fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
     else:
-        return 0
+        let generic_node = self.generic_fn_node_for_symbol(fn_sym)
+        if generic_node == 0:
+            return 0
+        fn_node = generic_node
     let meta = self.ast.find_fn_meta(fn_node)
     if meta < 0:
         return 0

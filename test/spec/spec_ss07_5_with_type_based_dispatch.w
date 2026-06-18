@@ -24,9 +24,9 @@ fn test_scoped_type_uses_guarded_form:
     assert(out == 12)
 
 fn test_std_sync_guard_uses_guarded_form:
-    let lock = mutex_new(3)
+    let lock = Mutex[i64].new(3 as i64)
     let out = with lock.enter() as data:
-        data * 4
+        *data * 4
     assert(out == 12)
 
 fn test_non_scoped_type_uses_builder_form:

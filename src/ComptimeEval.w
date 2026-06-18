@@ -6408,7 +6408,7 @@ fn Sema.force_eval_comptime_expr(mut self: Sema, node: i32) -> i32:
     let value = unsafe { comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, node) }
     comptime_value_is_valid(value)
 
-fn Sema.check_top_level_comptime_let_values(mut self: Sema):
+fn Sema.check_top_level_let_values(self: Sema):
     if self.diags.has_errors():
         return
     for di in 0..self.ast.decl_count():
@@ -6417,26 +6417,41 @@ fn Sema.check_top_level_comptime_let_values(mut self: Sema):
         if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
             continue
         let value = self.ast.get_data1(decl)
-        if value == 0 or self.ast.kind(value) != NodeKind.NK_COMPTIME:
+        if value == 0:
             continue
 
+        let name = self.ast.get_data0(decl)
         let flags = self.ast.get_data2(decl)
+        let is_comptime_value = if self.ast.kind(value) == NodeKind.NK_COMPTIME: 1 else: 0
+        if is_comptime_value == 0 and let_decl_is_global(flags) == 0:
+            continue
+        let type_value = if is_comptime_value != 0 and self.ast.get_data0(value) != 0: self.ast.get_data0(value) else: value
         let ann_extra = self.top_level_let_type_ann_extra(flags)
         let ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: 0 as TypeId
-        let val_type = if ann_type != 0: self.check_expr_with_expected(value, ann_type) else: self.check_expr(value)
+        let val_type = if ann_type != 0: self.check_expr_with_expected(type_value, ann_type) else: self.check_expr(type_value)
         if ann_type != 0 and val_type != 0:
             if self.types_compatible(ann_type as i32, val_type as i32) == 0:
                 if self.arithmetic_result_type(ann_type, val_type) == 0:
                     self.emit_error("type mismatch in binding", decl)
-        if val_type != 0 and ann_type == 0:
-            self.typed_binding_types.insert(decl as i32, val_type as i32)
+        let final_type = if ann_type != 0: ann_type else: val_type
+        if final_type != 0:
+            self.typed_binding_types.insert(decl as i32, final_type as i32)
+            self.scope_update_type(name, final_type as i32)
+            let canonical_name = self.pool_lookup_symbol(self.pool_resolve(name))
+            if canonical_name != 0 and canonical_name != name:
+                self.scope_update_type(canonical_name, final_type as i32)
         if ann_type != 0:
             self.typed_expr_types.insert(value, ann_type as i32)
             let inner = self.ast.get_data0(value)
             if inner != 0:
                 self.typed_expr_types.insert(inner, ann_type as i32)
+        else if final_type != 0:
+            self.typed_expr_types.insert(value, final_type as i32)
+            if type_value != value:
+                self.typed_expr_types.insert(type_value, final_type as i32)
         if self.diags.has_errors():
             return
-        let _ = self.force_eval_comptime_expr(value)
-        if self.diags.has_errors():
-            return
+        if is_comptime_value != 0:
+            let _ = self.force_eval_comptime_expr(value)
+            if self.diags.has_errors():
+                return

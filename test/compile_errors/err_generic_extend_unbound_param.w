@@ -2,8 +2,8 @@
 
 type Box[T] { value: T }
 
-extend Box[U]:
-    fn get(self: &Box[U]) -> U:
+extend Box[T]:
+    fn get(self: &Box[T]) -> U:
         self.value
 
 fn main:

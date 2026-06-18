@@ -3129,6 +3129,9 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
     transform_sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
     transform_sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
     transform_sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
+    transform_sema.source_text_file_ids = sema_clone_i32_vec(&self.source_text_file_ids)
+    transform_sema.source_text_names = sema_clone_str_vec(&self.source_text_names)
+    transform_sema.source_texts = sema_clone_str_vec(&self.source_texts)
     transform_sema.overflow_mode = self.overflow_mode
     transform_sema.copy_module_graph_parts(&saved_module_paths, &saved_module_import_starts, &saved_module_import_counts, &saved_module_import_targets, &saved_module_import_paths, &saved_global_module_paths)
     transform_sema.set_tracked_input_context(self.tracked_input_root, self.tracked_input_paths)

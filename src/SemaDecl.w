@@ -23,6 +23,8 @@ fn Sema.compute_method_origins(self: Sema):
             var origin = 0
             if trait_sym != 0:
                 origin = 1
+            let impl_start = self.ast.get_start(decl)
+            let impl_end = self.ast.get_end(decl)
             // Walk backwards finding method fn_decls
             let impl_extra = self.ast.get_data1(decl)
             // Methods are added as decls before the impl_decl
@@ -31,6 +33,8 @@ fn Sema.compute_method_origins(self: Sema):
                 j = j - 1
                 let md = self.ast.get_decl(j)
                 if self.ast.kind(md) != NodeKind.NK_FN_DECL:
+                    break
+                if self.ast.get_start(md) < impl_start or self.ast.get_end(md) > impl_end:
                     break
                 let fn_name = self.ast.get_data0(md)
                 self.method_decl_origins.insert(j, origin)
@@ -1211,8 +1215,6 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
                     let fn_name_str = self.pool_resolve(fn_name)
                     self.emit_error(f"function '{fn_name_str}' is already defined", node)
                     return
-    self.fn_decl_nodes.insert(fn_name, node)
-    self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
     if self.ast.is_no_alloc_fn_node(node as NodeId) != 0:
         self.no_alloc_fns.insert(fn_name, 1)
 
@@ -1220,6 +1222,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
     let meta = self.ast.find_fn_meta(node)
     if meta < 0:
         // No meta available — register with no params
+        self.fn_decl_nodes.insert(fn_name, node)
+        self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
         let fn_tid = self.add_type(TypeKind.TY_FN, 0, 0, self.ty_void)
         self.add_sig(fn_name, fn_tid, self.ty_void, 0, 0, 0)
         return
@@ -1250,7 +1254,9 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
     let self_sym = self.syms.self_type
     var self_type_id = 0
     var method_owner_sym = 0
-    let fn_name_str = self.pool_resolve(fn_name)
+    var fn_name_str = self.extract_decl_name_after(node, "fn")
+    if fn_name_str.len() == 0 or sema_str_contains_char(fn_name_str, 46) == 0:
+        fn_name_str = self.pool_resolve(fn_name)
     for ci in 0..fn_name_str.len() as i32:
         if fn_name_str.byte_at(ci as i64) == 46:
             let owner_name = fn_name_str.slice(0, ci as i64)
@@ -1283,17 +1289,39 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
                 self.generic_fn_nodes.insert(fn_name, node)
                 self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
                 let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                for pi in 0..param_count:
+                    self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi), self.ast.state.impl_type_params.get((bi_tp_meta + 1) as i64), bi_tp_count, bi_impl)
+                self.validate_type_expr_with_impl_type_params(ret_node, self.ast.state.impl_type_params.get((bi_tp_meta + 1) as i64), bi_tp_count, bi_impl)
                 if self_type_id != 0:
                     self.named_types.remove(self_sym)
                 return
+        else if self.impl_target_has_bare_type_params(bi_impl) != 0:
+            self.generic_fn_nodes.insert(fn_name, node)
+            self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
+            let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+            for pi2 in 0..param_count:
+                self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi2), 0, 0, bi_impl)
+            self.validate_type_expr_with_impl_type_params(ret_node, 0, 0, bi_impl)
+            if self_type_id != 0:
+                self.named_types.remove(self_sym)
+            return
 
     // Methods on generic structs: treat as generic (type params come from struct)
     if tp_count == 0 and self_type_id != 0:
+        var concrete_inst_impl_method = false
+        if self.method_impl_nodes.contains(fn_name):
+            let inst_impl = self.method_impl_nodes.get(fn_name).unwrap()
+            if self.ast.find_impl_type_params(inst_impl) < 0:
+                let inst_target = self.ast.find_impl_target_type_node(inst_impl as NodeId)
+                if inst_target != 0:
+                    let inst_target_kind = self.ast.kind(inst_target)
+                    if inst_target_kind == NodeKind.NK_INDEX or inst_target_kind == NodeKind.NK_TYPE_GENERIC:
+                        concrete_inst_impl_method = true
         for cfi in 0..fn_name_str.len() as i32:
             if fn_name_str.byte_at(cfi as i64) == 46:
                 let cf_owner = fn_name_str.slice(0, cfi as i64)
                 let cf_owner_sym = self.pool_intern(cf_owner)
-                if self.type_decl_nodes.contains(cf_owner_sym):
+                if concrete_inst_impl_method == 0 and self.type_decl_nodes.contains(cf_owner_sym):
                     let cf_td = self.type_decl_nodes.get(cf_owner_sym).unwrap()
                     if self.type_decl_tp_count(cf_td) > 0:
                         self.generic_fn_nodes.insert(fn_name, node)
@@ -1317,6 +1345,9 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
         if self_type_id != 0:
             self.named_types.remove(self_sym)
         return
+
+    self.fn_decl_nodes.insert(fn_name, node)
+    self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
 
     // Resolve param types
     let sig_param_start = self.sig_params.len() as i32
@@ -2331,6 +2362,9 @@ fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
     1
 
 fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32, tp_count: i32):
+    self.validate_type_expr_with_impl_type_params(node, tp_start, tp_count, 0)
+
+fn Sema.validate_type_expr_with_impl_type_params(self: Sema, node: i32, tp_start: i32, tp_count: i32, impl_node: i32):
     if node == 0:
         return
 
@@ -2341,7 +2375,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
             return
         if self.has_named_type_visible(sym) != 0:
             return
-        if self.type_param_exists(tp_start, tp_count, sym) != 0:
+        if self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, sym) != 0:
             return
         // Allow Self in method contexts (resolved at codegen time)
         if self.pool_resolve(sym) == "Self":
@@ -2351,7 +2385,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         return
 
     if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_ARRAY:
-        self.validate_type_expr_with_type_params(self.ast.get_data0(node), tp_start, tp_count)
+        self.validate_type_expr_with_impl_type_params(self.ast.get_data0(node), tp_start, tp_count, impl_node)
         return
 
     if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
@@ -2359,27 +2393,27 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         let param_count = self.ast.get_data1(node)
         let ret_node = self.ast.get_data2(node)
         for pi in 0..param_count:
-            self.validate_type_expr_with_type_params(self.ast.get_extra(extra_start + pi), tp_start, tp_count)
-        self.validate_type_expr_with_type_params(ret_node, tp_start, tp_count)
+            self.validate_type_expr_with_impl_type_params(self.ast.get_extra(extra_start + pi), tp_start, tp_count, impl_node)
+        self.validate_type_expr_with_impl_type_params(ret_node, tp_start, tp_count, impl_node)
         return
 
     if kind == NodeKind.NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         for ei in 0..elem_count:
-            self.validate_type_expr_with_type_params(self.ast.get_extra(extra_start + ei), tp_start, tp_count)
+            self.validate_type_expr_with_impl_type_params(self.ast.get_extra(extra_start + ei), tp_start, tp_count, impl_node)
         return
 
     if kind == NodeKind.NK_TYPE_GENERIC:
         let base_sym = self.ast.get_data0(node)
         let base_prim = self.primitive_type_by_sym(base_sym)
-        if base_prim == 0 and self.has_named_type_visible(base_sym) == 0 and self.type_param_exists(tp_start, tp_count, base_sym) == 0:
+        if base_prim == 0 and self.has_named_type_visible(base_sym) == 0 and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, base_sym) == 0:
             self.debug_unknown_type(base_sym, node, "validate_type_generic")
             self.emit_unknown_type_error(base_sym, node)
         let extra_start = self.ast.get_data1(node)
         let arg_count = self.ast.get_data2(node)
         for ai in 0..arg_count:
-            self.validate_type_expr_with_type_params(self.ast.get_extra(extra_start + ai), tp_start, tp_count)
+            self.validate_type_expr_with_impl_type_params(self.ast.get_extra(extra_start + ai), tp_start, tp_count, impl_node)
         return
 
     if kind == NodeKind.NK_TYPE_TRAIT_OBJ:

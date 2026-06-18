@@ -14,13 +14,13 @@ impl Scoped[i32] for LocalGuard:    fn with_enter(self:
         ()
 
 fn test_guarded_read_block:
-    let lock = mutex_new(40)
+    let lock = Mutex[i64].new(40 as i64)
     let val = with lock.enter() as data:
-        data + 2
+        *data + 2
     assert(val == 42)
 
 fn test_guarded_mut_block:
-    let lock = mutex_new(40)
+    let lock = Mutex[i64].new(40 as i64)
     var seen = 0
     with lock.enter_mut() as mut data:
         data = data + 2

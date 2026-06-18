@@ -3,9 +3,9 @@
 use std.sync
 
 fn test_scoped_type_binds_payload:
-    let lock = mutex_new(42)
+    let lock = Mutex[i64].new(42 as i64)
     let val = with lock.enter() as data:
-        data + 1
+        *data + 1
     assert(val == 43)
 
 fn test_non_scoped_mut_binding_is_builder:
