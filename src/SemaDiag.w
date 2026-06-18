@@ -38,14 +38,18 @@ fn Sema.argument_literal_default_help(self: Sema, arg_node: i32, expr_text: str,
         return "float literal '" ++ expr_text ++ "' defaults to f64; cast with '" ++ expr_text ++ " as " ++ expected_name ++ "'"
     ""
 
-fn Sema.try_ci_coercion(self: Sema, arg_ty: i32, param_ty: i32) -> i32:
+fn Sema.try_ci_coercion(self: Sema, fn_sym: i32, arg_ty: i32, param_ty: i32) -> i32:
     // c_import auto-coercion: allow bool → integer at ABI boundary
     let arg_resolved = self.resolve_alias(arg_ty as TypeId)
     let arg_k = self.get_type_kind(arg_resolved)
     let par_k = self.get_type_kind(self.resolve_alias(param_ty))
     if arg_k == TypeKind.TY_BOOL and par_k == TypeKind.TY_INT:
         return 1
-    if self.ci_type_is_const_c_string_input(param_ty) != 0:
+    // str → C string is evidence-driven (#379): only a modeled function (one
+    // the curated overlay vouches for) coerces a With `str` to its `cstr_in`
+    // const char* parameter. Raw functions get no string magic — the caller
+    // must pass an explicit C string under `unsafe`.
+    if self.ci_raw_syms.contains(fn_sym) == 0 and self.ci_type_is_const_c_string_input(param_ty) != 0:
         if arg_k == TypeKind.TY_STR:
             return 1
         if arg_k == TypeKind.TY_REF:

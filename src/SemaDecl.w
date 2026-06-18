@@ -482,10 +482,30 @@ fn Sema.ci_type_is_const_c_string_input(self: Sema, tid: i32) -> i32:
         return 1
     0
 
-fn Sema.ci_param_type_requires_raw_contract(self: Sema, tid: i32) -> i32:
-    if self.ci_type_is_const_c_string_input(tid) != 0:
-        return 0
-    self.ci_type_requires_raw_contract(tid)
+// Curated libc contract overlay (#379). Evidence, not exemptions: a
+// `const char*` parameter is modeled as a NUL-terminated, borrowed string
+// input (`cstr_in`) only when this overlay vouches for the specific function.
+// There is NO blanket `const char*` assumption — that would be the "strlen
+// guessing" / context reinterpretation §16.3c forbids. Functions absent here
+// import with raw surfaces (callable only under `unsafe`).
+//
+// Returns the number of leading parameters that are `cstr_in` (all remaining
+// parameters and the return are plain value types for these entries), or -1
+// when the function is not curated. Every curated entry here has its char*
+// parameters in leading position, so a count is sufficient.
+fn ci_overlay_cstr_in_param_count(name: str) -> i32:
+    if name == "atof": return 1
+    if name == "atoi": return 1
+    if name == "atol": return 1
+    if name == "atoll": return 1
+    if name == "strcasecmp": return 2
+    if name == "strcmp": return 2
+    if name == "strcspn": return 2
+    if name == "strlen": return 1
+    if name == "strncasecmp": return 2
+    if name == "strncmp": return 2
+    if name == "strspn": return 2
+    -1
 
 fn Sema.ci_function_requires_raw_abi(self: Sema, fn_sym: i32) -> i32:
     let sig_idx = self.get_sig(fn_sym)
@@ -499,11 +519,18 @@ fn Sema.ci_function_requires_raw_abi(self: Sema, fn_sym: i32) -> i32:
         return 0
     if self.sig_is_variadic(sig_idx) != 0:
         return 1
+    // Day-one overlay carries no return facts: any pointer/fn return is raw.
     if self.ci_type_requires_raw_contract(self.sig_return_type(sig_idx)) != 0:
         return 1
+    let cstr_n = ci_overlay_cstr_in_param_count(self.safe_symbol_text(fn_sym))
     let param_count = self.sig_get_param_count(sig_idx)
     for pi in 0..param_count:
-        if self.ci_param_type_requires_raw_contract(self.sig_param_type(sig_idx, pi)) != 0:
+        let pty = self.sig_param_type(sig_idx, pi)
+        if self.ci_type_requires_raw_contract(pty) != 0:
+            // A pointer parameter is modeled only when the curated overlay
+            // vouches for it as a `cstr_in` const char*. No evidence -> raw.
+            if pi < cstr_n and self.ci_type_is_const_c_string_input(pty) != 0:
+                continue
             return 1
     0
 

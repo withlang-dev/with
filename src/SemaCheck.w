@@ -11651,7 +11651,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 if self.type_is_dyn_object(exp_resolved) == 0:
                     let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                     if self.call_arg_type_compatible(expected_ty, arg_ty) == 0:
-                        if not (self.ci_syms.contains(fn_sym) and self.try_ci_coercion(arg_ty, expected_ty) != 0):
+                        if not (self.ci_syms.contains(fn_sym) and self.try_ci_coercion(fn_sym, arg_ty, expected_ty) != 0):
                             self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
                     else:
                         self.note_auto_ref_call_arg(expected_ty, arg_ty, err_arg_node, node)
