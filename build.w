@@ -2,6 +2,7 @@ use std.build
 use build.runtime
 use build.selfhost
 use build.pcre2
+use build.zlib
 use build.seed
 use build.emit_c
 use build.compiler
@@ -1321,6 +1322,57 @@ pub fn build(ctx: BuildCtx) -> Build:
     pcre2_promote = pcre2_promote.input("out/pcre2_build/lib/std/re")
     pcre2_promote = pcre2_promote.dep("pcre2-test")
     out = out.add_target(pcre2_promote)
+
+    var zlib_reference = target_new(.Action, "zlib-reference", "").output("out/zlib_reference/zlib-1.3.2")
+    zlib_reference.action = run_zlib_reference_action
+    zlib_reference = zlib_reference.extra_output("out/zlib_reference/zlib-1.3.2/.with-reference-ready")
+    zlib_reference = zlib_reference.write_scope("out/tmp/action-scratch/zlib-reference")
+    zlib_reference = zlib_reference.arg("zlib-1.3.2")
+    zlib_reference = zlib_reference.arg("https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz")
+    zlib_reference = zlib_reference.allow_network()
+    out = out.add_target(zlib_reference)
+
+    var zlib_migrate = target_new(.Action, "zlib-migrate", "").output("out/gen/.zlib-migrate-stamp")
+    zlib_migrate.action = run_zlib_migrate_action
+    zlib_migrate = zlib_migrate.extra_output("out/zlib_migrated")
+    zlib_migrate = zlib_migrate.write_scope("out/tmp/action-scratch/zlib-migrate")
+    zlib_migrate = zlib_migrate.write_scope("out/zlib_migrated")
+    zlib_migrate = zlib_migrate.write_scope("out/zlib_build")
+    zlib_migrate = zlib_migrate.write_scope("out/corpus/zlib-test")
+    zlib_migrate = zlib_migrate.input("out/zlib_reference/zlib-1.3.2")
+    zlib_migrate = zlib_migrate.arg("out/zlib_migrated")
+    zlib_migrate = zlib_migrate.dep("zlib-reference")
+    out = out.add_target(zlib_migrate)
+
+    var zlib_build = target_new(.Action, "zlib-build", "").output("out/zlib_build")
+    zlib_build.action = run_zlib_build_action
+    zlib_build = zlib_build.write_scope("out/tmp/action-scratch/zlib-build")
+    zlib_build = zlib_build.input("out/zlib_migrated")
+    zlib_build = zlib_build.dep("build")
+    zlib_build = zlib_build.dep("zlib-migrate")
+    out = out.add_target(zlib_build)
+
+    var zlib_test = target_new(.Action, "zlib-test", "").output("out/corpus/zlib-test")
+    zlib_test.action = run_zlib_test_action
+    zlib_test = zlib_test.input("out/zlib_migrated")
+    zlib_test = zlib_test.input("out/zlib_build/bin/zlib_example")
+    zlib_test = zlib_test.input("out/zlib_build/bin/minigzip")
+    zlib_test = zlib_test.dep("zlib-build")
+    out = out.add_target(zlib_test)
+
+    var zlib_check_generated = target_new(.Action, "zlib-check-generated", "").output("out/gen/.zlib-check-generated-stamp")
+    zlib_check_generated.action = run_zlib_check_generated_action
+    zlib_check_generated = zlib_check_generated.write_scope("out/tmp/action-scratch/zlib-check-generated")
+    zlib_check_generated = zlib_check_generated.input("out/zlib_migrated")
+    zlib_check_generated = zlib_check_generated.dep("zlib-migrate")
+    out = out.add_target(zlib_check_generated)
+
+    var zlib_promote = target_new(.Action, "zlib-promote", "").output("lib/std/zlib")
+    zlib_promote.action = run_zlib_promote_action
+    zlib_promote = zlib_promote.write_scope("out/tmp/action-scratch/zlib-promote")
+    zlib_promote = zlib_promote.input("out/zlib_migrated")
+    zlib_promote = zlib_promote.dep("zlib-test")
+    out = out.add_target(zlib_promote)
 
     var prune = target_new(.Action, "prune", "").output("out/.build-state/prune.always")
     prune.action = run_prune_action

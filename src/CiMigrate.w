@@ -389,7 +389,7 @@ fn ci_migrate_normalize_output(text: str) -> str:
     var end = text.len()
     while end > 0 and text.byte_at(end - 1) == 10:
         end = end - 1
-    text.slice(0, end) ++ "\n"
+    ci_str_replace(text.slice(0, end), "-> void", "-> Unit") ++ "\n"
 
 fn ci_migrate_publicize_shared_line(line: str) -> str:
     if line.starts_with("pub "):
@@ -1266,6 +1266,10 @@ fn ci_migrate_directory_filewise(input_dir: str, output_dir: str, files: Vec[str
         fragments.push(ci_migrate_shared_fragment_text())
         i = i + 1
     ci_migrate_merge_shared_fragment_texts(output_dir, fragments)
+    let fn_total = g_migrate_fn_translated_total + g_migrate_fn_untranslatable_total
+    if g_migrate_fn_untranslatable_total > 0:
+        eprint(f"migrate: {migrated}/{files.len() as i32} files, {g_migrate_fn_translated_total}/{fn_total} functions translated, {g_migrate_fn_untranslatable_total} untranslatable")
+        return 1
     eprint(f"migrate: {migrated}/{files.len() as i32} files translated from {input_dir} -> {output_dir}")
     if migrated == 0: 1 else: 0
 
@@ -1669,7 +1673,7 @@ fn ci_migrate_find_best_var_decl(session: i64, count: i32, name: str, primary_pa
 fn ci_migrate_var_owner_type(session: i64, idx: i32) -> str:
     var actual_type = with_cimport_var_storage_type_translated(session, idx)
     if actual_type.len() == 0:
-        return with_cimport_var_type_translated(session, idx)
+        return ci_unsafe_fn_ptr_type(with_cimport_var_type_translated(session, idx))
     if ci_starts_with(actual_type, "[0]"):
         let cursor = with_cimport_decl_cursor(session, idx)
         if cursor >= 0:
@@ -1681,7 +1685,7 @@ fn ci_migrate_var_owner_type(session: i64, idx: i32) -> str:
                     let init_elem = ci_array_elem_type(init_type)
                     if actual_elem.len() > 0 and actual_elem == init_elem:
                         actual_type = init_type
-    actual_type
+    ci_unsafe_fn_ptr_type(actual_type)
 
 fn ci_migrate_var_resolved_type(session: i64, idx: i32, count: i32, primary_path: str, project_active: bool, project: &CiProject) -> str:
     let name = with_cimport_decl_name(session, idx)
@@ -1696,7 +1700,7 @@ fn ci_migrate_var_resolved_type(session: i64, idx: i32, count: i32, primary_path
             return owner_type
     let decl_type = with_cimport_var_type_translated(session, idx)
     if decl_type.len() > 0:
-        return decl_type
+        return ci_unsafe_fn_ptr_type(decl_type)
     ci_migrate_var_owner_type(session, idx)
 
 // ── ci_migrate_translate_var/s (moved from CImport.w in D3) ─────

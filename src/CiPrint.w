@@ -417,7 +417,12 @@ fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
     if kind == CiTypeKind.CT_ENUM:
         return types.get_string(types.get_d0(id))
     if kind == CiTypeKind.CT_NAMED:
-        return types.get_string(types.get_d0(id))
+        let name = types.get_string(types.get_d0(id))
+        if name == "void":
+            return "Unit"
+        if ci_str_contains(name, "-> void"):
+            return ci_str_replace(name, "-> void", "-> Unit")
+        return name
     if kind == CiTypeKind.CT_FN_PTR:
         let ret = (types.get_d0(id)) as CiTypeId
         let ps = types.get_d1(id)
@@ -606,6 +611,9 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         return "(" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ " as " ++ ci_print_type(types, target) ++ ")"
     if kind == CiExprKind.CIE_DEREF:
         let operand = (exprs.get_d0(id)) as CiExprId
+        let operand_ty = exprs.get_type(operand)
+        if ci_type_is_fn_ptr(types, operand_ty):
+            return ci_print_expr(exprs, types, operand, 0, 1)
         let operand_text = ci_print_expr(exprs, types, operand, 0, 0)
         if exprs.kind(operand) == CiExprKind.CIE_FIELD or exprs.kind(operand) == CiExprKind.CIE_INDEX or exprs.kind(operand) == CiExprKind.CIE_CALL:
             return ci_wrap_unsafe("*(" ++ operand_text ++ ")")

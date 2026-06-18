@@ -10006,6 +10006,7 @@ what users import.
 | `std.testing` | assert, require, check, assert_eq, assert_matches, panic, todo, unreachable | — |
 | `std.ffi` | C callback context boxing and raw FFI helper types | `void*` context plumbing |
 | `std.regex` | `Regex`, `Match`, `Captures`; engine behind §15.8 literals and `=~` | PCRE2 (migrated) |
+| `std.zlib` | DEFLATE, zlib, and gzip compression support | zlib (migrated) |
 | `std.json` | JSON parse/serialize | — |
 | `std.http` | HTTP client | libcurl |
 | `std.crypto` | sha256, aes, chacha20, ecdsa, rsa, x509, endian, ... | OpenSSL (subset) |

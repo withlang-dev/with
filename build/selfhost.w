@@ -3326,7 +3326,12 @@ fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: str, case_
     if rc != 0: return rc
     let pp_simple = "(__local_pp = (__local_pp +% 1))"
     let pp_casted = "(__local_pp = ((__local_pp as c_uint) +% (1 as c_uint)))"
-    let pp_index = if bs_index_of(out_text, pp_simple) >= 0: bs_index_of(out_text, pp_simple) else: bs_index_of(out_text, pp_casted)
+    let pp_result_casted = "(__local_pp = ((((__local_pp as c_uint) +% (1 as c_uint)) as c_uint)))"
+    var pp_index = bs_index_of(out_text, pp_simple)
+    if pp_index < 0:
+        pp_index = bs_index_of(out_text, pp_casted)
+    if pp_index < 0:
+        pp_index = bs_index_of(out_text, pp_result_casted)
     let skip_index = bs_index_of(out_text, "(__local_skipatstart = __local_pp)")
     if pp_index < 0 or skip_index < 0 or pp_index >= skip_index:
         return bs_fail(ctx, "assignment_compat did not preserve assignment sequencing")
@@ -3371,7 +3376,7 @@ fn bs_check_migrate_rvalue_sequencing(ctx: &ActionCtx, compiler_path: str, case_
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "(unsafe *__ci_expr_old_", "rvalue_sequencing")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "((unsafe *__local_p) = __local_c)", "rvalue_sequencing")
+    rc = bs_assert_contains(ctx, out_text, "((unsafe *__local_p) = ((__local_c as u8)))", "rvalue_sequencing")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")
@@ -3835,7 +3840,7 @@ fn bs_check_migrate_macro_unsigned_minus(ctx: &ActionCtx, compiler_path: str, ca
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "__local_chkmc_length", "macro_initializer_unsigned_minus")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "= 3)", "macro_initializer_unsigned_minus")
+    rc = bs_assert_contains(ctx, out_text, "= ((3 as c_ulong))", "macro_initializer_unsigned_minus")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")

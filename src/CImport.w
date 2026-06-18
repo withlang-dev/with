@@ -1218,11 +1218,14 @@ fn ci_has_demoted_field(session: i64, idx: i32, demoted: str) -> bool:
 // pointer is an unmodeled callback contract — emit it as `unsafe` so calling
 // the slot honestly requires an unsafe context. Value-only signatures stay safe.
 fn ci_unsafe_fn_ptr_type(t: str) -> str:
-    if ci_starts_with(t, "unsafe "):
-        return t
-    if (ci_starts_with(t, "extern \"C\" fn(") or ci_starts_with(t, "fn(")) and (ci_str_contains(t, "*mut ") or ci_str_contains(t, "*const ")):
-        return "unsafe " ++ t
-    t
+    var normalized = t
+    if (ci_starts_with(normalized, "unsafe extern \"C\" fn(") or ci_starts_with(normalized, "extern \"C\" fn(") or ci_starts_with(normalized, "fn(")) and normalized.ends_with("-> void"):
+        normalized = normalized.slice(0, normalized.len() - 4) ++ "Unit"
+    if ci_starts_with(normalized, "unsafe "):
+        return normalized
+    if (ci_starts_with(normalized, "extern \"C\" fn(") or ci_starts_with(normalized, "fn(")) and (ci_str_contains(normalized, "*mut ") or ci_str_contains(normalized, "*const ")):
+        return "unsafe " ++ normalized
+    normalized
 
 fn ci_field_type_is_demoted(ftype: str, demoted: str) -> bool:
     if ftype.len() == 0:
@@ -2225,6 +2228,8 @@ fn ci_map_builtin_typedef(name: str) -> str:
 
 fn ci_normalize_translated_type_name(name: str) -> str:
     let t = ci_trim(name)
+    if (ci_starts_with(t, "unsafe extern \"C\" fn(") or ci_starts_with(t, "extern \"C\" fn(") or ci_starts_with(t, "fn(")) and t.ends_with("-> void"):
+        return t.slice(0, t.len() - 4) ++ "Unit"
     let builtin = ci_map_builtin_typedef(t)
     if builtin.len() > 0:
         return builtin
@@ -5052,7 +5057,8 @@ type CiDeclLoweringIR {
 
 type CiHoistedVarDecl {
     name: str = "",
-    ty: str = "",
+    ty: CiTypeId = 0 as CiTypeId,
+    default_text: str = "",
 }
 
 fn ci_expr_temp_name(session: i64, cursor: i32, tag: str) -> str:
@@ -5991,7 +5997,7 @@ fn CiTypePool.type_from_libclang(self: CiTypePool, session: i64, cxtype: i32) ->
     // Normalize builtin typedef spellings so C names like size_t do
     // not leak into generated With type positions.
     ci_trace_port("STRUCTURAL[b11.3.ty_named]")
-    let name = ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype))
+    let name = ci_unsafe_fn_ptr_type(ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype)))
     if name.len() == 0:
         return 0 as CiTypeId
     let name_idx = self.add_string(name)
@@ -6023,7 +6029,7 @@ fn CiTypePool.type_from_translated_text(self: CiTypePool, ty: str) -> CiTypeId:
         if (pointee as i32) == 0:
             return 0 as CiTypeId
         return self.ty_pointer(pointee, 0)
-    let name_idx = self.add_string(ty)
+    let name_idx = self.add_string(ci_unsafe_fn_ptr_type(ty))
     self.ty_named(name_idx)
 
 fn ci_expr_is_zero_int_lit(exprs: CiExprPool, id: CiExprId) -> bool:
@@ -6040,7 +6046,7 @@ fn ci_type_is_fn_ptr(types: CiTypePool, ty: CiTypeId) -> bool:
         return true
     if types.kind(ty) == CiTypeKind.CT_NAMED:
         let text = types.get_string(types.get_d0(ty))
-        return ci_starts_with(text, "fn(") or ci_starts_with(text, "extern \"C\" fn(")
+        return ci_starts_with(text, "fn(") or ci_starts_with(text, "extern \"C\" fn(") or ci_starts_with(text, "unsafe extern \"C\" fn(")
     false
 
 fn CiExprPool.char_array_init_from_string_literal(self: CiExprPool, types: CiTypePool, array_ty: CiTypeId, literal: str) -> CiExprId:
@@ -6810,7 +6816,7 @@ fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, t
             return 0 as CiExprId
         if lhs_ty_str != rhs_ty_str and ci_cursor_type_is_pointerish(session, rhs_cursor) and self.kind(rhs_value) != CiExprKind.CIE_CAST:
             rhs_value = self.cast(lhs_ty_id, rhs_value)
-        return self.binary(CiBinOp.CIBO_ASSIGN, lhs_id, rhs_value, 0 as CiTypeId)
+        return self.binary(CiBinOp.CIBO_ASSIGN, lhs_id, rhs_value, lhs_ty_id)
 
     // Pick the wrap variant for unsigned arithmetic on +, -, *.
     // Division, modulo, and bitwise ops never wrap in the legacy.
@@ -6887,7 +6893,12 @@ fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, t
                 lhs_value = self.cast(result_ty, lhs_value)
                 rhs_value = self.cast(result_ty, rhs_value)
 
-    self.binary(ci_op, lhs_value, rhs_value, 0 as CiTypeId)
+    var result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+    if op == BO_ASSIGN:
+        result_ty = self.get_type(lhs_id)
+        if (result_ty as i32) == 0:
+            result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, lhs_cursor))
+    self.binary(ci_op, lhs_value, rhs_value, result_ty)
 
 // Check if a cursor's canonical type is any form of C array —
 // constant-size `[N]T`, incomplete `[]T`, or variable-length
@@ -7486,6 +7497,9 @@ fn CiExprPool.cast_if_needed(self: CiExprPool, target_ty_id: CiTypeId, inner_id:
     if types.kind(target_ty_id) == CiTypeKind.CT_POINTER and ci_expr_is_zero_int_lit(self.val(), inner_id):
         return self.null_ptr(target_ty_id)
     let target_str = ci_print_type(types, target_ty_id)
+    let inner_ty_id = self.get_type(inner_id)
+    if (inner_ty_id as i32) != 0 and ci_print_type(types, inner_ty_id) == target_str:
+        return inner_id
     let inner_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, inner_cursor))
     if target_str == inner_ty_str:
         return inner_id
@@ -7509,8 +7523,26 @@ fn CiExprPool.coerce_value_expr_for_target(self: CiExprPool, session: i64, targe
         return value_id
     if types.kind(target_ty_id) == CiTypeKind.CT_FN_PTR and ci_expr_is_zero_int_lit(self.val(), value_id):
         return self.null_ptr(target_ty_id)
+    if types.kind(target_ty_id) == CiTypeKind.CT_FN_PTR:
+        let value_ty = self.get_type(value_id)
+        if ci_type_is_fn_ptr(types, value_ty):
+            return value_id
+        let value_text = with_ci_type_translated(session, with_ci_cursor_type(session, value_cursor))
+        if ci_starts_with(value_text, "unsafe extern \"C\" fn(") or ci_starts_with(value_text, "extern \"C\" fn(") or ci_starts_with(value_text, "fn("):
+            return value_id
+    let value_ty = self.get_type(value_id)
     if types.kind(target_ty_id) != CiTypeKind.CT_POINTER:
-        return value_id
+        if types.kind(target_ty_id) == CiTypeKind.CT_ARRAY or types.kind(target_ty_id) == CiTypeKind.CT_STRUCT:
+            return value_id
+        if types.kind(target_ty_id) == CiTypeKind.CT_NAMED:
+            let target_name = types.get_string(types.get_d0(target_ty_id))
+            if not ci_named_type_is_scalar(target_name):
+                return value_id
+            if (value_ty as i32) != 0 and ci_print_type(types, value_ty) == ci_print_type(types, target_ty_id):
+                return value_id
+            if self.kind(value_id) != CiExprKind.CIE_CAST:
+                return self.cast(target_ty_id, value_id)
+        return self.cast_if_needed(target_ty_id, value_id, value_cursor, session, types)
     // Skip if already coerced
     if self.kind(value_id) == CiExprKind.CIE_ARRAY_DECAY or self.kind(value_id) == CiExprKind.CIE_CAST:
         return value_id
@@ -7529,7 +7561,6 @@ fn CiExprPool.coerce_value_expr_for_target(self: CiExprPool, session: i64, targe
         if (elem_ty as i32) == 0:
             return 0 as CiExprId
         return self.add(CiExprKind.CIE_ARRAY_DECAY, value_id as i32, elem_ty as i32, 0, target_ty_id)
-    let value_ty = self.get_type(value_id)
     if (value_ty as i32) != 0 and types.kind(value_ty) == CiTypeKind.CT_ARRAY:
         let elem_ty = (types.get_d0(value_ty)) as CiTypeId
         return self.add(CiExprKind.CIE_ARRAY_DECAY, value_id as i32, elem_ty as i32, 0, target_ty_id)
@@ -7843,7 +7874,7 @@ fn ci_compound_to_base_op(op: i32) -> str:
 fn CiTypePool.named_type_from_text(self: CiTypePool, text: str) -> CiTypeId:
     if text.len() == 0:
         return 0 as CiTypeId
-    let idx = self.add_string(ci_normalize_translated_type_name(text))
+    let idx = self.add_string(ci_unsafe_fn_ptr_type(ci_normalize_translated_type_name(text)))
     self.ty_named(idx)
 
 fn ci_record_name_from_ci_type(types: CiTypePool, ty: CiTypeId) -> str:
@@ -8788,7 +8819,9 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
                         value_expr: operand.value_expr,
                     }
                 let old_name = ci_expr_temp_name(session, cursor, "old")
-                var old_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                var old_ty = operand_ty
+                if (old_ty as i32) == 0:
+                    old_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                 if (old_ty as i32) == 0:
                     old_ty = types.type_from_libclang(session, with_ci_cursor_type(session, operand_cursor))
                 if (old_ty as i32) == 0:
@@ -9704,24 +9737,32 @@ fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: 
             if ci_value_ir_valid(prepared_cond):
                 ci_trace_port("STRUCTURAL[b11.1.if_stmt_ir]")
                 let then_id = self.lower_stmt_ir(session, then_child, exprs, types, 0, scope)
+                var then_empty = false
                 if (then_id as i32) == 0:
-                    ci_trace_port("STRUCTURAL[b11.1.if_stmt_ir] then lowering failed")
-                else:
-                    var then_empty = false
-                    if self.kind(then_id) == CiStmtKind.CIS_BLOCK:
-                        if self.get_d1(then_id) == 0:
-                            then_empty = true
-                    var else_id: CiStmtId = 0 as CiStmtId
-                    if ifnc > 2:
-                        let else_child = with_ci_child(session, cursor, 2)
-                        else_id = self.lower_stmt_ir(session, else_child, exprs, types, 0, scope)
-                    if then_empty and (else_id as i32) != 0:
-                        let neg_cond = exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, prepared_cond.value_expr, 0 as CiTypeId)
-                        let if_id = self.if_stmt(neg_cond, else_id, 0 as CiStmtId)
-                        return self.merge_ir( prepared_cond.setup_stmt, if_id)
-                    if not then_empty:
-                        let if_id = self.if_stmt(prepared_cond.value_expr, then_id, else_id)
-                        return self.merge_ir( prepared_cond.setup_stmt, if_id)
+                    if ci_is_null_like_stmt(session, then_child):
+                        then_empty = true
+                    else:
+                        ci_trace_port("STRUCTURAL[b11.1.if_stmt_ir] then lowering failed")
+                        return 0 as CiStmtId
+                else if self.kind(then_id) == CiStmtKind.CIS_BLOCK:
+                    if self.get_d1(then_id) == 0:
+                        then_empty = true
+                var else_id: CiStmtId = 0 as CiStmtId
+                if ifnc > 2:
+                    let else_child = with_ci_child(session, cursor, 2)
+                    else_id = self.lower_stmt_ir(session, else_child, exprs, types, 0, scope)
+                    if (else_id as i32) == 0 and not ci_is_null_like_stmt(session, else_child):
+                        ci_trace_port("STRUCTURAL[b11.1.if_stmt_ir] else lowering failed")
+                        return 0 as CiStmtId
+                if then_empty and (else_id as i32) != 0:
+                    let neg_cond = exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, prepared_cond.value_expr, 0 as CiTypeId)
+                    let if_id = self.if_stmt(neg_cond, else_id, 0 as CiStmtId)
+                    return self.merge_ir( prepared_cond.setup_stmt, if_id)
+                if not then_empty:
+                    let if_id = self.if_stmt(prepared_cond.value_expr, then_id, else_id)
+                    return self.merge_ir( prepared_cond.setup_stmt, if_id)
+                if (else_id as i32) == 0:
+                    return self.merge_ir( prepared_cond.setup_stmt, self.empty_stmt_ir())
 
     // Structural while statement. Sequenced conditions are
     // desugared to `while true: <setup>; if not cond: break; body`.
@@ -10040,6 +10081,14 @@ fn ci_is_null_like_stmt(session: i64, cursor: i32) -> bool:
         let nc = with_ci_num_children(session, cursor)
         if nc > 0:
             return with_ci_cursor_kind(session, with_ci_child(session, cursor, nc - 1)) == CXK_NULL_STMT
+    if kind == CXK_COMPOUND_STMT:
+        let nc = with_ci_num_children(session, cursor)
+        var i = 0
+        while i < nc:
+            if not ci_is_null_like_stmt(session, with_ci_child(session, cursor, i)):
+                return false
+            i = i + 1
+        return true
     false
 
 // Drill through nested CaseStmt/DefaultStmt sub-statements to find the
@@ -10528,13 +10577,13 @@ fn CiStmtPool.lower_decl_stmt_structural(self: CiStmtPool, session: i64, cursor:
                             let vty_str = with_ci_type_translated(session, vty)
                             if init_ty_str.len() > 0 and init_ty_str != vty_str:
                                 init_id = exprs.cast(vty_id, init_id)
-                    let coerced_init = exprs.coerce_value_expr_for_target(session, vty_id, init_cursor, init_id, types)
-                    if (coerced_init as i32) == 0:
-                        return CiDeclLoweringIR {
-                            updated_scope: scope,
-                            stmt_id: 0 as CiStmtId,
-                        }
-                    init_id = coerced_init
+                let coerced_init = exprs.coerce_value_expr_for_target(session, vty_id, init_cursor, init_id, types)
+                if (coerced_init as i32) == 0:
+                    return CiDeclLoweringIR {
+                        updated_scope: scope,
+                        stmt_id: 0 as CiStmtId,
+                    }
+                init_id = coerced_init
             let name_idx = self.add_string(storage_name)
             if hoisted:
                 // Emit `storage_name = init` as a CIS_ASSIGN.
@@ -12929,7 +12978,7 @@ fn ci_find_hoisted_var_decl_index(decls: &Vec[CiHoistedVarDecl], name: str) -> i
         i = i + 1
     -1
 
-fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: Vec[CiHoistedVarDecl]) -> Vec[CiHoistedVarDecl]:
+fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: Vec[CiHoistedVarDecl], types: CiTypePool) -> Vec[CiHoistedVarDecl]:
     var decls = decls_in
     let kind = with_ci_cursor_kind(session, cursor)
     if kind == CXK_DECL_STMT:
@@ -12940,14 +12989,15 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: Vec[CiHoistedVarDec
             if with_ci_cursor_kind(session, child) == 9:  // CXK_VAR_DECL
                 let vname = ci_goto_hoisted_var_name(session, child)
                 let vty = with_ci_cursor_type(session, child)
+                let vty_id = types.type_from_libclang(session, vty)
                 let vty_str = with_ci_type_translated(session, vty)
                 if ci_find_hoisted_var_decl_index(decls, vname) < 0:
-                    decls.push(CiHoistedVarDecl { name: vname, ty: vty_str })
+                    decls.push(CiHoistedVarDecl { name: vname, ty: vty_id, default_text: ci_default_for_type(vty_str) })
             i = i + 1
     let nc = with_ci_num_children(session, cursor)
     var ci = 0
     while ci < nc:
-        decls = ci_collect_var_decls(session, with_ci_child(session, cursor, ci), decls)
+        decls = ci_collect_var_decls(session, with_ci_child(session, cursor, ci), decls, types)
         ci = ci + 1
     decls
 
@@ -14032,21 +14082,27 @@ fn CiGotoCfgContext.verify_labels(self: CiGotoCfgContext):
 
 fn CiStmtPool.lower_goto_body_stackify(self: CiStmtPool, session: i64, body_cursor: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
     var hoisted_decls: Vec[CiHoistedVarDecl] = Vec.new()
-    hoisted_decls = ci_collect_var_decls(session, body_cursor, hoisted_decls)
+    hoisted_decls = ci_collect_var_decls(session, body_cursor, hoisted_decls, types)
 
     var hoisted_stmt_ids: Vec[i32] = Vec.new()
     var hvi: i32 = 0
     while hvi < hoisted_decls.len() as i32:
         let decl = hoisted_decls.get(hvi as i64)
-        let default_val = ci_default_for_type(decl.ty)
         let name_idx = self.add_string(decl.name)
-        let ty_id = types.named_type_from_text(decl.ty)
+        let ty_id = decl.ty
         if (ty_id as i32) == 0:
             g_ci_bail_location = with_ci_cursor_location(session, body_cursor)
             g_ci_bail_kind = CXK_COMPOUND_STMT
             g_ci_bail_message = "unsupported hoisted local type in goto CFG"
             return 0 as CiStmtId
-        let init_id = exprs.default_expr_from_text(default_val)
+        var init_id = exprs.default_for_ci_type(ty_id, types)
+        if (init_id as i32) == 0 and decl.default_text.len() > 0:
+            init_id = exprs.default_expr_from_text(decl.default_text)
+        if (init_id as i32) == 0 and not ci_type_needs_memcpy_assignment(types, ty_id):
+            g_ci_bail_location = with_ci_cursor_location(session, body_cursor)
+            g_ci_bail_kind = CXK_COMPOUND_STMT
+            g_ci_bail_message = "unsupported hoisted local default in goto CFG"
+            return 0 as CiStmtId
         let decl_id = self.var_decl(name_idx, ty_id, init_id, 1)
         hoisted_stmt_ids.push(decl_id as i32)
         hvi = hvi + 1
@@ -14407,8 +14463,8 @@ fn ci_libc_symbol_kind_mask(name: str) -> i32:
     if name == "vsnprintf": return CI_LIBC_KIND_FN
     if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno": return CI_LIBC_KIND_FN
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
-    if name == "putc" or name == "feof" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
-    if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strerror": return CI_LIBC_KIND_FN
+    if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
+    if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strrchr" or name == "strerror": return CI_LIBC_KIND_FN
     if name == "strtol" or name == "strtoul" or name == "setlocale": return CI_LIBC_KIND_FN
     if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace": return CI_LIBC_KIND_FN
     if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint": return CI_LIBC_KIND_FN

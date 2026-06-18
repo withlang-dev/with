@@ -42,13 +42,16 @@ pub extern fn fgetc(stream: *mut c_void) -> i32
 pub extern fn fputc(c: i32, stream: *mut c_void) -> i32
 pub extern fn fputs(s: *const i8, stream: *mut c_void) -> i32
 pub extern fn putc(c: i32, stream: *mut c_void) -> i32
+pub extern fn perror(s: *const i8) -> Unit
 pub extern fn feof(stream: *mut c_void) -> i32
+pub extern fn ferror(stream: *mut c_void) -> i32
 pub extern fn fread(ptr: *mut c_void, size: u64, count: u64, stream: *mut c_void) -> u64
 pub extern fn fwrite(ptr: *const c_void, size: u64, count: u64, stream: *mut c_void) -> u64
 
 // strings / locale / conversion
 pub extern fn strcpy(dst: *mut i8, src: *const i8) -> *mut i8
 pub extern fn strncpy(dst: *mut i8, src: *const i8, n: u64) -> *mut i8
+pub extern fn strrchr(s: *const i8, c: i32) -> *mut i8
 pub extern fn strstr(haystack: *const i8, needle: *const i8) -> *mut i8
 pub extern fn strerror(errnum: i32) -> *mut i8
 pub extern fn strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
