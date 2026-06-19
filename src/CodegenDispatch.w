@@ -3860,6 +3860,75 @@ fn Codegen.mir_emit_drop_array_ptr(self: Codegen, ptr: i64, ty: i64, array_sema_
         self.mir_emit_drop_ptr_for_sema_type(elem_ptr, elem_llvm, elem_sema)
         i = i - 1
 
+// #606: drop the active variant's payloads of an enum value (including generic
+// enums like Option/Result). The enum repr is a {tag, data} struct; load the tag
+// and branch per variant, dropping each payload via the sema dispatcher. Only
+// called for enums with no explicit `impl Drop` (no per-payload consumed tracking
+// exists yet, so an explicit drop owns cleanup).
+fn Codegen.mir_emit_drop_enum_ptr(self: Codegen, ptr: i64, ty: i64, enum_sema_ty: i32) -> Unit:
+    if ptr == 0 or ty == 0:
+        return
+    // Only payload-bearing enums are {tag, data} structs; payloadless enums are
+    // bare integers with nothing to drop.
+    if wl_get_type_kind(ty) != wl_struct_type_kind() or wl_count_struct_elem_types(ty) < 2:
+        return
+    let variant_count = self.mir_enum_variant_count(enum_sema_ty)
+    if variant_count <= 0:
+        return
+    // Skip entirely if no variant carries a drop-needing payload.
+    var any_drops = false
+    var vc = 0
+    while vc < variant_count:
+        let pc = self.mir_enum_variant_payload_count(enum_sema_ty, vc)
+        var pf = 0
+        while pf < pc:
+            if self.sema.type_needs_drop(self.mir_enum_payload_sema_type(enum_sema_ty, vc, pf)) != 0:
+                any_drops = true
+            pf = pf + 1
+        vc = vc + 1
+    if not any_drops:
+        return
+    let tag_field_ty = wl_struct_get_type_at(ty, 0)
+    let tag_ptr = wl_build_struct_gep(self.builder, ty, ptr, 0)
+    let tag_val = wl_build_load(self.builder, tag_field_ty, tag_ptr)
+    let data_ptr = wl_build_bitcast(self.builder, wl_build_struct_gep(self.builder, ty, ptr, 1), wl_ptr_type(self.context))
+    let merge_bb = wl_append_bb(self.context, self.current_function, "drop.enum.merge")
+    var vi = 0
+    while vi < variant_count:
+        let pc = self.mir_enum_variant_payload_count(enum_sema_ty, vi)
+        var variant_has_drop = false
+        var pf2 = 0
+        while pf2 < pc:
+            if self.sema.type_needs_drop(self.mir_enum_payload_sema_type(enum_sema_ty, vi, pf2)) != 0:
+                variant_has_drop = true
+            pf2 = pf2 + 1
+        if variant_has_drop:
+            let case_bb = wl_append_bb(self.context, self.current_function, "drop.enum.case")
+            let next_bb = wl_append_bb(self.context, self.current_function, "drop.enum.next")
+            let disc = self.mir_enum_variant_discriminant(enum_sema_ty, vi)
+            let cond = wl_build_icmp(self.builder, wl_int_eq(), tag_val, wl_const_int(tag_field_ty, disc, 0))
+            wl_build_cond_br(self.builder, cond, case_bb, next_bb)
+            wl_position_at_end(self.builder, case_bb)
+            let payload_ty = self.mir_enum_variant_payload_llvm_type(enum_sema_ty, vi)
+            if pc == 1:
+                let psema = self.mir_enum_payload_sema_type(enum_sema_ty, vi, 0)
+                if self.sema.type_needs_drop(psema) != 0 and payload_ty != 0:
+                    self.mir_emit_drop_ptr_for_sema_type(data_ptr, payload_ty, psema)
+            else if payload_ty != 0 and wl_get_type_kind(payload_ty) == wl_struct_type_kind():
+                var pf3 = 0
+                while pf3 < pc:
+                    let psema = self.mir_enum_payload_sema_type(enum_sema_ty, vi, pf3)
+                    if self.sema.type_needs_drop(psema) != 0:
+                        let field_llvm = wl_struct_get_type_at(payload_ty, pf3)
+                        let field_ptr = wl_build_struct_gep(self.builder, payload_ty, data_ptr, pf3)
+                        self.mir_emit_drop_ptr_for_sema_type(field_ptr, field_llvm, psema)
+                    pf3 = pf3 + 1
+            wl_build_br(self.builder, merge_bb)
+            wl_position_at_end(self.builder, next_bb)
+        vi = vi + 1
+    wl_build_br(self.builder, merge_bb)
+    wl_position_at_end(self.builder, merge_bb)
+
 fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> Unit:
     if ptr == 0 or ty == 0 or sema_ty <= 0:
         return
@@ -3903,6 +3972,11 @@ fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sem
             args.push(value)
         let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
     self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
+    // #606: an enum (or generic enum like Option/Result) with no explicit Drop
+    // impl drops the active variant's payloads. Skipped when an explicit drop
+    // exists — that drop owns cleanup (no per-payload consumed tracking yet).
+    if dfv.is_none() and self.mir_enum_variant_count(resolved) > 0:
+        self.mir_emit_drop_enum_ptr(ptr, ty, resolved)
 
 fn Codegen.mir_channel_endpoint_kind(self: Codegen, sema_ty: i32) -> i32:
     if sema_ty <= 0:

@@ -4635,6 +4635,15 @@ fn MirBuilder.lower_let_else(self: MirBuilder, node: i32):
 
     self.switch_to(success_bb)
     let _ = self.lower_pattern(pat, rhs_place)
+    // #605/#606: consume the let-else subject on the success path so the enum
+    // payload-drop does not double-free the moved-out bindings (the fail path
+    // diverges, so the subject is owned only here).
+    let le_scrut_local = mir_place_plain_local(&self.body, rhs_place)
+    if le_scrut_local >= 0:
+        self.cancel_stmt_temp_for_local(le_scrut_local)
+        self.cancel_scheduled_value_drop_for_local(le_scrut_local)
+        self.mark_local_value_moved(le_scrut_local)
+    self.cancel_scheduled_value_drop_for_receiver_expr(rhs)
     self.terminate(TermKind.TK_GOTO, cont_bb, 0, 0, 0)
 
     self.switch_to(fail_bb)
@@ -4900,6 +4909,16 @@ fn MirBuilder.lower_if_let(self: MirBuilder, pat: i32, scrutinee_expr: i32, then
     let else_op = if else_expr_opt != 0: self.lower_expr(else_expr_opt) else: self.unit_operand()
     self.assign_operand_to_place(result_place, else_op, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    // #605/#606: like match, consume the if-let subject so the enum payload-drop
+    // does not double-free a moved-out binding. (Unmatched / ref-bound payloads
+    // then leak — sound.)
+    let iflet_scrut_local = mir_place_plain_local(&self.body, scrutinee_place)
+    if iflet_scrut_local >= 0:
+        self.cancel_stmt_temp_for_local(iflet_scrut_local)
+        self.cancel_scheduled_value_drop_for_local(iflet_scrut_local)
+        self.mark_local_value_moved(iflet_scrut_local)
+    self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
 
     self.switch_to(join_bb)
     self.forget_string_flow_facts()
@@ -7050,6 +7069,18 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
 
         dispatch_bb = fail_bb
 
+    // #605/#606: the match takes ownership of its subject; arms move payloads out
+    // of the materialized scrutinee. Consume the scrutinee copy and a named source
+    // so the enum's variant-aware payload drop does not double-free the moved-out
+    // bindings. Wildcard / unbound / ref-bound payloads then leak rather than
+    // double-free — sound; precise per-variant tracking is a follow-up.
+    let match_scrut_local = mir_place_plain_local(&self.body, scrutinee_place)
+    if match_scrut_local >= 0:
+        self.cancel_stmt_temp_for_local(match_scrut_local)
+        self.cancel_scheduled_value_drop_for_local(match_scrut_local)
+        self.mark_local_value_moved(match_scrut_local)
+    self.cancel_scheduled_value_drop_for_receiver_expr(scrutinee_expr)
+
     self.switch_to(join_bb)
     self.forget_string_flow_facts()
     if result_is_void != 0:
@@ -8360,6 +8391,16 @@ fn MirBuilder.emit_cleanup_awaits_from(self: MirBuilder, task_ops: &Vec[i32], st
 fn MirBuilder.lower_question_mark_value(self: MirBuilder, value_op: i32, value_ty: i32, result_ty_hint: i32, node: i32, span_node: i32, cleanup_task_ops: &Vec[i32], cleanup_start_idx: i32) -> i32:
     let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(span_node))
 
+    // #605/#606: `?` decomposes the Result/Option — its active payload is moved
+    // out on the pass path, or into the propagated error on the fail path. Consume
+    // the materialized scrutinee so the enum payload-drop does not also free the
+    // extracted value (double-free).
+    let qm_scrut_local = mir_place_plain_local(&self.body, value_place)
+    if qm_scrut_local >= 0:
+        self.cancel_stmt_temp_for_local(qm_scrut_local)
+        self.cancel_scheduled_value_drop_for_local(qm_scrut_local)
+        self.mark_local_value_moved(qm_scrut_local)
+
     let pass_bb = self.new_block()
     let fail_bb = self.new_block()
     let join_bb = self.new_block()
@@ -8491,6 +8532,9 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
     let cleanup_task_ops: Vec[i32] = Vec.new()
     let value_op = self.lower_expr(expr)
     let value_ty = self.expr_type(expr)
+    // #605/#606: `?` consumes its operand; cancel a named source's drop so its
+    // payload (now propagated/extracted) is not double-freed.
+    self.cancel_scheduled_value_drop_for_receiver_expr(expr)
     self.lower_question_mark_value(value_op, value_ty, self.expr_type(node), node, expr, &cleanup_task_ops, cleanup_task_ops.len() as i32)
 
 fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i32, node: i32) -> i32:
@@ -10857,13 +10901,21 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         for vsi in 0..vs_arg_count:
             let vs_arg = self.ast.get_extra(vs_args_start + vsi)
             let saved_expected = self.expected_type
+            var vs_payload_ty = 0
             if vsi < vs_payload_tys.len() as i32:
-                let payload_ty = vs_payload_tys.get(vsi as i64)
-                if payload_ty != 0:
-                    self.expected_type = payload_ty
-            vs_fields.push(self.lower_expr(vs_arg))
+                vs_payload_ty = vs_payload_tys.get(vsi as i64)
+                if vs_payload_ty != 0:
+                    self.expected_type = vs_payload_ty
+            let vs_arg_op = self.lower_expr(vs_arg)
+            vs_fields.push(vs_arg_op)
             self.expected_type = saved_expected
             vs_names.push(0)
+            // #605/#606: move a Drop payload into the enum variant; consume the
+            // source so it is not also dropped at scope exit. Paired with the
+            // enum's variant-aware payload drop (mir_emit_drop_enum_ptr).
+            let vs_arg_drop_ty = if vs_payload_ty != 0: vs_payload_ty else: self.expr_type(vs_arg)
+            if self.sema.type_needs_drop(vs_arg_drop_ty) != 0:
+                self.consume_moved_operand(vs_arg_op)
         let vs_fid = self.body.new_agg_fields(vs_fields, vs_names)
         let vs_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vs_fid, vs_variant_idx)
         let vs_tmp = self.new_temp(vs_result_ty)
