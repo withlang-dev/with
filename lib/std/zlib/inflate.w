@@ -3362,7 +3362,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_491 {
-        ((unsafe *__local_state__goto_475_31).back = (unsafe *__local_state__goto_475_31).back + (unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits)
+        ((unsafe *__local_state__goto_475_31).back = (unsafe *__local_state__goto_475_31).back + ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_int))
         goto '__ci_bb_477
     }
 
@@ -3381,7 +3381,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_494 {
-        ((unsafe *__local_state__goto_475_31).back = (unsafe *__local_state__goto_475_31).back + (unsafe *(&raw const __local_here__goto_484_10 as *const code)).bits)
+        ((unsafe *__local_state__goto_475_31).back = (unsafe *__local_state__goto_475_31).back + ((unsafe *(&raw const __local_here__goto_484_10 as *const code)).bits as c_int))
         ((unsafe *__local_state__goto_475_31).length = (((unsafe *(&raw const __local_here__goto_484_10 as *const code)).val as c_uint)))
         if ((if (((unsafe *(&raw const __local_here__goto_484_10 as *const code)).op as c_int)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_495
@@ -3688,7 +3688,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_545 {
-        ((unsafe *__local_state__goto_475_31).back = (unsafe *__local_state__goto_475_31).back + (unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits)
+        ((unsafe *__local_state__goto_475_31).back = (unsafe *__local_state__goto_475_31).back + ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_int))
         goto '__ci_bb_531
     }
 
@@ -3707,7 +3707,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_548 {
-        ((unsafe *__local_state__goto_475_31).back = (unsafe *__local_state__goto_475_31).back + (unsafe *(&raw const __local_here__goto_484_10 as *const code)).bits)
+        ((unsafe *__local_state__goto_475_31).back = (unsafe *__local_state__goto_475_31).back + ((unsafe *(&raw const __local_here__goto_484_10 as *const code)).bits as c_int))
         if (((((unsafe *(&raw const __local_here__goto_484_10 as *const code)).op as c_int) as c_int) & (64 as c_int)) != 0) {
             goto '__ci_bb_549
         } else {

@@ -119,12 +119,16 @@ Still blocking Makefile and script removal:
   - `tools/build-static-llvm.sh`
   - `tools/build-static-llvm.ps1`
 - Build-system maintenance still relies on host utilities for release/SDK
-  packaging work. Repository build evidence, compiler seed hashes, generic
-  `std.build` download checksum verification, and optional stack-budget
-  inspection use With-owned tools or explicit With-owned SDK tool paths.
+  packaging work. Repository build evidence, compiler seed hashes, zlib
+  reference fetching/extraction, generic `std.build` download checksum
+  verification, and optional stack-budget inspection use With-owned tools or
+  explicit With-owned SDK tool paths.
 - `ToolFs.write_tar()` and `ToolFs.extract_tar()` provide native
-  uncompressed USTAR support for regular files and directories. Release and
-  SDK packaging still need native compression, symlink metadata, archive
+  uncompressed USTAR support for regular files and directories. The migrated
+  `std.zlib` facade now supports zlib/gzip decompression, and
+  `build/zlib.w` uses a With HTTP helper plus migrated zlib gunzip helper plus
+  `ToolFs.extract_tar()` for `:zlib-reference`. Release and SDK packaging still
+  need native archive creation with compression, symlink metadata, archive
   manifests, and package-format targets before host `tar`/`zstd`/`zip` scripts
   can disappear.
 - `ToolFs.scratch_dir()` exists, but repository build modules cannot call it
@@ -268,6 +272,13 @@ and script dependency are gone.
   The workflow now isolates release-seed download as the bootstrap setup step,
   fetches the SDK with `with build :deps`, then runs direct build/fixpoint/test
   graph targets.
+- 2026-06-19: Added zlib graph pipeline targets through
+  `:zlib-reference`, `:zlib-migrate`, `:zlib-build`, `:zlib-test`,
+  `:zlib-check-generated`, and `:zlib-promote`; added a `std.zlib` facade; and
+  removed host `curl`, `shasum`, and `tar -xzf` from `build/zlib.w`.
+  `:zlib-reference` now fetches through a With HTTP helper, verifies with
+  `ToolFs.sha256_file()`, gunzips through migrated zlib, and extracts with
+  native `ToolFs.extract_tar()`.
 
 ## Next Work Queue
 
@@ -310,9 +321,11 @@ trustworthy once `build.w` owns every workflow.
   utilities.
   Binary writes, copy/chmod/tree operations, scratch dirs, repository-local
   self-hosted hashing, host file reads, and project-file SHA-256 hashing exist;
-  native uncompressed USTAR file/directory archive support exists; native
-  compression, symlink archive metadata, HTTP fetch, and richer platform path
-  handling remain.
+  native uncompressed USTAR file/directory archive support exists; zlib/gzip
+  decompression exists through `std.zlib`; `build/zlib.w` has a project-local
+  HTTP helper for its reference archive. Native archive creation with
+  compression, symlink archive metadata, first-class `std.build` HTTP(S) fetch,
+  and richer platform path handling remain.
 - [x] Implement `ToolFs.scratch_dir() -> str` as an action-scoped, driver-managed
   scratch directory. The returned path must be project-relative, private to the
   current action invocation, automatically included in that action's write

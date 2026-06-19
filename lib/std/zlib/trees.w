@@ -769,7 +769,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         ((unsafe *__param_s).bl_count[__local_bits] = ((unsafe *__param_s).bl_count[__local_bits] -% 1))
 
-        ((unsafe *__param_s).bl_count[(__local_bits + 1)] = ((unsafe *__param_s).bl_count[(__local_bits + 1)] +% 2))
+        ((unsafe *__param_s).bl_count[(__local_bits + 1)] = (((unsafe *__param_s).bl_count[(__local_bits + 1)] as c_int) +% (2 as c_ushort)))
 
         ((unsafe *__param_s).bl_count[__local_max_length] = ((unsafe *__param_s).bl_count[__local_max_length] -% 1))
 
@@ -885,7 +885,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
         ((unsafe *__param_s).opt_len = ((unsafe *__param_s).opt_len -% 1))
 
         if (__local_stree != null) {
-            ((unsafe *__param_s).static_len = ((unsafe *__param_s).static_len -% (unsafe __local_stree[__local_node]).dl.len))
+            ((unsafe *__param_s).static_len = ((unsafe *__param_s).static_len -% ((unsafe __local_stree[__local_node]).dl.len as c_int)))
         }
 
     }
@@ -1019,7 +1019,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
         }
         if ((if __local_count < __local_min_count: 1 else: 0) != 0) {
-            ((unsafe *__param_s).bl_tree[__local_curlen].fc.freq = ((unsafe *__param_s).bl_tree[__local_curlen].fc.freq +% (__local_count as c_ushort)))
+            ((unsafe *__param_s).bl_tree[__local_curlen].fc.freq = (((unsafe *__param_s).bl_tree[__local_curlen].fc.freq as c_int) +% (((__local_count as c_ushort) as c_int) as c_ushort)))
 
         } else {
             if ((if __local_curlen != 0: 1 else: 0) != 0) {

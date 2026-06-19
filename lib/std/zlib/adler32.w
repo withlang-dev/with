@@ -31,7 +31,7 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
     (__local_adler = (__local_adler as c_ulong) & (65535 as c_ulong))
 
     if ((if __local_len == 1: 1 else: 0) != 0) {
-        (__local_adler = (__local_adler +% (unsafe __local_buf[0])))
+        (__local_adler = (__local_adler +% ((unsafe __local_buf[0]) as c_int)))
 
         if ((if __local_adler >= 65521: 1 else: 0) != 0) {
             (__local_adler = (__local_adler -% 65521))
@@ -65,7 +65,7 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
 
             (__local_buf = __local_buf + 1)
 
-            (__local_adler = (__local_adler +% (unsafe *__ci_expr_old_1)))
+            (__local_adler = (__local_adler +% ((unsafe *__ci_expr_old_1) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
@@ -87,82 +87,82 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
         (__local_n = ((347 as c_uint)))
 
         loop {
-            (__local_adler = (__local_adler +% (unsafe __local_buf[0])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[0]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(0 + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(0 + 2)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 2)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((0 + 2) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(0 + 4)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 4)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((0 + 4) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 4) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((0 + 4) + 2)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 4) + 2)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(((0 + 4) + 2) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(((0 + 4) + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[8])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[8]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(8 + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(8 + 2)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 2)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((8 + 2) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(8 + 4)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 4)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((8 + 4) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 4) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((8 + 4) + 2)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 4) + 2)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(((8 + 4) + 2) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(((8 + 4) + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
@@ -185,82 +185,82 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
         while ((if __local_len >= 16: 1 else: 0) != 0) {
             (__local_len = (__local_len -% 16))
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[0])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[0]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(0 + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(0 + 2)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 2)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((0 + 2) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(0 + 4)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(0 + 4)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((0 + 4) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 4) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((0 + 4) + 2)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((0 + 4) + 2)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(((0 + 4) + 2) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(((0 + 4) + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[8])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[8]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(8 + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(8 + 2)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 2)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((8 + 2) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(8 + 4)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(8 + 4)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((8 + 4) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 4) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[((8 + 4) + 2)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[((8 + 4) + 2)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
 
-            (__local_adler = (__local_adler +% (unsafe __local_buf[(((8 + 4) + 2) + 1)])))
+            (__local_adler = (__local_adler +% ((unsafe __local_buf[(((8 + 4) + 2) + 1)]) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 
@@ -282,7 +282,7 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
 
             (__local_buf = __local_buf + 1)
 
-            (__local_adler = (__local_adler +% (unsafe *__ci_expr_old_3)))
+            (__local_adler = (__local_adler +% ((unsafe *__ci_expr_old_3) as c_int)))
 
             (__local_sum2 = (__local_sum2 +% __local_adler))
 

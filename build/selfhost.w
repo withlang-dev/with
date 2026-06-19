@@ -3444,6 +3444,37 @@ fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: str, case_
     if check_result.rc != 0: return check_result.rc
     0
 
+fn bs_check_migrate_compound_small_int_promotion(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "compound_small_int_promotion.c")
+    let out_w = bs_join(case_dir, "compound_small_int_promotion.w")
+    let c_text = "typedef unsigned short ushort;\n\nint issue_zlib_left(unsigned len) {\n  ushort count[16] = {0};\n  count[1] = 5;\n  int left = 3;\n  left -= count[len];\n  if (left < 0) return 1;\n  return 0;\n}\n\nint main(void) {\n  return issue_zlib_left(1) == 1 ? 0 : 2;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "migrate compound small-int promotion")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-compound-small-int-promotion", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "__local_left - (__local_count[__param_len] as c_int)", "compound_small_int_promotion")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-compound-small-int-promotion", check_args)
+    if check.rc != 0: return check.rc
+    var run_args: Vec[str] = Vec.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-compound-small-int-promotion", run_args)
+    if run.rc != 0: return run.rc
+    0
+
 fn bs_check_migrate_rvalue_sequencing(ctx: &ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "rvalue_sequencing.c")
@@ -3843,6 +3874,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_host_header_compat(ctx, compiler_path, bs_join(output_dir, "host_header_compat"))
     if rc != 0: return rc
     rc = bs_check_migrate_assignment_compat(ctx, compiler_path, bs_join(output_dir, "assignment_compat"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_compound_small_int_promotion(ctx, compiler_path, bs_join(output_dir, "compound_small_int_promotion"))
     if rc != 0: return rc
     rc = bs_check_migrate_rvalue_sequencing(ctx, compiler_path, bs_join(output_dir, "rvalue_sequencing"))
     if rc != 0: return rc

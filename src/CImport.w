@@ -7175,6 +7175,19 @@ fn ci_compound_to_ci_binop(op: i32) -> i32:
     if op == BO_SHR_ASSIGN: return CiBinOp.CIBO_SHR
     -1
 
+fn ci_compound_to_binary_op(op: i32) -> i32:
+    if op == BO_ADD_ASSIGN: return BO_ADD
+    if op == BO_SUB_ASSIGN: return BO_SUB
+    if op == BO_MUL_ASSIGN: return BO_MUL
+    if op == BO_DIV_ASSIGN: return BO_DIV
+    if op == BO_REM_ASSIGN: return BO_REM
+    if op == BO_AND_ASSIGN: return BO_AND
+    if op == BO_OR_ASSIGN: return BO_OR
+    if op == BO_XOR_ASSIGN: return BO_XOR
+    if op == BO_SHL_ASSIGN: return BO_SHL
+    if op == BO_SHR_ASSIGN: return BO_SHR
+    -1
+
 fn ci_compound_wrap_binop(op: i32, is_unsigned: i32) -> i32:
     if is_unsigned != 0:
         if op == BO_ADD_ASSIGN: return CiBinOp.CIBO_ADD_WRAP
@@ -7226,6 +7239,22 @@ fn CiExprPool.lower_compound_assign(self: CiExprPool, session: i64, cursor: i32,
         rhs_value = self.cast_shift_count_expr(types, rhs_value)
         if (rhs_value as i32) == 0:
             return 0 as CiExprId
+    else:
+        let binary_op = ci_compound_to_binary_op(op)
+        if ci_binary_op_uses_c_integer_promotions(binary_op):
+            rhs_value = self.promote_c_small_int_operand(session, rhs_cursor, ci_peel_transparent(session, rhs_cursor), rhs_value, types)
+            if (rhs_value as i32) == 0:
+                return 0 as CiExprId
+            if with_ci_type_is_unsigned(session, cursor) != 0:
+                let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                if (result_ty as i32) == 0:
+                    return 0 as CiExprId
+                rhs_value = self.cast_if_needed(result_ty, rhs_value, rhs_cursor, session, types)
+            else if binary_op == BO_AND or binary_op == BO_OR or binary_op == BO_XOR:
+                let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                if (result_ty as i32) == 0:
+                    return 0 as CiExprId
+                rhs_value = self.cast_if_needed(result_ty, rhs_value, rhs_cursor, session, types)
     self.add(CiExprKind.CIE_COMPOUND_ASSIGN, base_op, lhs_id as i32, rhs_value as i32, 0 as CiTypeId)
 
 fn CiExprPool.lower_unary_simple(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
@@ -8768,7 +8797,7 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         let compound_op = with_ci_binary_op(session, cursor)
         let ci_op = ci_compound_wrap_binop(compound_op, with_ci_type_is_unsigned(session, cursor))
         if ci_value_ir_valid(lhs) and ci_value_ir_valid(rhs) and ci_op >= 0:
-            var lhs_value = lhs.value_expr
+            var lhs_operand = lhs.value_expr
             var rhs_value = rhs.value_expr
             let lhs_ty = exprs.get_type(lhs.value_expr)
             let lhs_is_ptr = ci_cursor_type_is_pointerish(session, lhs_cursor) or ((lhs_ty as i32) != 0 and types.kind(lhs_ty) == CiTypeKind.CT_POINTER)
@@ -8782,15 +8811,36 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
                 if (c_uint_ty as i32) == 0:
                     return ci_value_ir_invalid()
                 if ci_type_is_small_int(lhs_ty_str) or ci_is_large_decimal(ci_print_expr(exprs, types, lhs.value_expr, 0, 0)):
-                    lhs_value = exprs.cast(c_uint_ty, lhs_value)
+                    lhs_operand = exprs.cast(c_uint_ty, lhs_operand)
                 rhs_value = exprs.cast(c_uint_ty, rhs_value)
             else if ci_op == CiBinOp.CIBO_BIT_AND or ci_op == CiBinOp.CIBO_BIT_OR or ci_op == CiBinOp.CIBO_BIT_XOR:
                 let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                 if (result_ty as i32) == 0:
                     return ci_value_ir_invalid()
-                lhs_value = exprs.cast(result_ty, lhs_value)
+                lhs_operand = exprs.cast(result_ty, lhs_operand)
                 rhs_value = exprs.cast(result_ty, rhs_value)
-            let rhs_expr = exprs.binary(ci_op, lhs_value, rhs_value, 0 as CiTypeId)
+            else:
+                let binary_op = ci_compound_to_binary_op(compound_op)
+                if ci_binary_op_uses_c_integer_promotions(binary_op):
+                    lhs_operand = exprs.promote_c_small_int_operand(session, lhs_cursor, ci_peel_transparent(session, lhs_cursor), lhs_operand, types)
+                    if (lhs_operand as i32) == 0:
+                        return ci_value_ir_invalid()
+                    rhs_value = exprs.promote_c_small_int_operand(session, rhs_cursor, ci_peel_transparent(session, rhs_cursor), rhs_value, types)
+                    if (rhs_value as i32) == 0:
+                        return ci_value_ir_invalid()
+                    if with_ci_type_is_unsigned(session, cursor) != 0:
+                        let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                        if (result_ty as i32) == 0:
+                            return ci_value_ir_invalid()
+                        lhs_operand = exprs.cast_if_needed(result_ty, lhs_operand, lhs_cursor, session, types)
+                        rhs_value = exprs.cast_if_needed(result_ty, rhs_value, rhs_cursor, session, types)
+                    else if binary_op == BO_AND or binary_op == BO_OR or binary_op == BO_XOR:
+                        let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                        if (result_ty as i32) == 0:
+                            return ci_value_ir_invalid()
+                        lhs_operand = exprs.cast_if_needed(result_ty, lhs_operand, lhs_cursor, session, types)
+                        rhs_value = exprs.cast_if_needed(result_ty, rhs_value, rhs_cursor, session, types)
+            let rhs_expr = exprs.binary(ci_op, lhs_operand, rhs_value, 0 as CiTypeId)
             let assign_stmt = self.assign(lhs.value_expr, rhs_expr)
             return CiValueExprIR {
                 setup_stmt: self.merge3_ir( lhs.setup_stmt, rhs.setup_stmt, assign_stmt),

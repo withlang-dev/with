@@ -17,6 +17,36 @@ fn assert_bytes_eq(actual: &Vec[u8], expected: &Vec[u8]):
         assert(actual.get(i) == expected.get(i))
         i = i + 1
 
+fn gzip_hello_fixture() -> Vec[u8]:
+    let out: Vec[u8] = Vec.new()
+    out.push(31 as u8)
+    out.push(139 as u8)
+    out.push(8 as u8)
+    out.push(0 as u8)
+    out.push(0 as u8)
+    out.push(0 as u8)
+    out.push(0 as u8)
+    out.push(0 as u8)
+    out.push(2 as u8)
+    out.push(255 as u8)
+    out.push(203 as u8)
+    out.push(72 as u8)
+    out.push(205 as u8)
+    out.push(201 as u8)
+    out.push(201 as u8)
+    out.push(231 as u8)
+    out.push(2 as u8)
+    out.push(0 as u8)
+    out.push(32 as u8)
+    out.push(48 as u8)
+    out.push(58 as u8)
+    out.push(54 as u8)
+    out.push(6 as u8)
+    out.push(0 as u8)
+    out.push(0 as u8)
+    out.push(0 as u8)
+    out
+
 fn test_round_trip:
     let original = bytes_from_str("hello hello hello hello hello with zlib")
     let compressed = compress(&original).unwrap()
@@ -24,6 +54,11 @@ fn test_round_trip:
     assert(compressed.len() < original.len())
     let restored = decompress(&compressed).unwrap()
     assert_bytes_eq(&restored, &original)
+
+fn test_gzip_decompress:
+    let expected = bytes_from_str("hello\n")
+    let restored = decompress_gzip(&gzip_hello_fixture()).unwrap()
+    assert_bytes_eq(&restored, &expected)
 
 fn test_levels_and_errors:
     let original = bytes_from_str("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -38,5 +73,6 @@ fn test_levels_and_errors:
 
 fn main:
     test_round_trip()
+    test_gzip_decompress()
     test_levels_and_errors()
     print("ok")

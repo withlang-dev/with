@@ -153,7 +153,7 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut c_ushort, __p
     while ((if __local_len <= 15: 1 else: 0) != 0) {
         (__local_left = __local_left << (1 as c_uint))
 
-        (__local_left = __local_left - __local_count[__local_len])
+        (__local_left = __local_left - (__local_count[__local_len] as c_int))
 
         if ((if __local_left < 0: 1 else: 0) != 0) {
             return -1
@@ -368,7 +368,7 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut c_ushort, __p
             (__local_left = ((((1 as c_int) << (__local_curr as c_uint)) as c_int)))
 
             while ((if ((__local_curr as c_uint) +% (__local_drop as c_uint)) < __local_max: 1 else: 0) != 0) {
-                (__local_left = __local_left - __local_count[((__local_curr as c_uint) +% (__local_drop as c_uint))])
+                (__local_left = __local_left - (__local_count[((__local_curr as c_uint) +% (__local_drop as c_uint))] as c_int))
 
                 if ((if __local_left <= 0: 1 else: 0) != 0) {
                     break

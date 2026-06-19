@@ -2915,25 +2915,6 @@ pub fn with_net_tcp_accept(sock: i32) -> i32:
     let _ = sock
     -1
 
-pub fn with_net_tcp_connect(host: str, port: i32) -> i32:
-    let _ = host
-    let _ = port
-    -1
-
-pub fn with_net_send(sock: i32, data: str) -> i64:
-    let _ = sock
-    let _ = data
-    -1
-
-pub fn with_net_recv(sock: i32, max_len: i64) -> str:
-    let _ = sock
-    let _ = max_len
-    make_str("" as *const u8, 0)
-
-pub fn with_net_close(sock: i32) -> i32:
-    let _ = sock
-    -1
-
 pub fn with_net_udp_bind(port: i32) -> i32:
     let _ = port
     -1

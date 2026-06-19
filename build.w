@@ -1327,9 +1327,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     zlib_reference.action = run_zlib_reference_action
     zlib_reference = zlib_reference.extra_output("out/zlib_reference/zlib-1.3.2/.with-reference-ready")
     zlib_reference = zlib_reference.write_scope("out/tmp/action-scratch/zlib-reference")
+    zlib_reference = zlib_reference.input("build/zlib_http_fetch.w")
+    zlib_reference = zlib_reference.input("build/zlib_gunzip.w")
     zlib_reference = zlib_reference.arg("zlib-1.3.2")
-    zlib_reference = zlib_reference.arg("https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz")
+    zlib_reference = zlib_reference.arg("http://zlib.net/fossils/zlib-1.3.2.tar.gz")
     zlib_reference = zlib_reference.allow_network()
+    zlib_reference = zlib_reference.dep("runtime")
     out = out.add_target(zlib_reference)
 
     var zlib_migrate = target_new(.Action, "zlib-migrate", "").output("out/gen/.zlib-migrate-stamp")

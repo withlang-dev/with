@@ -598,6 +598,137 @@ pub fn rt_access(path: *const u8, mode: i32) -> i32:
         return -get_errno()
     0
 
+extern fn socket(domain: i32, ty: i32, protocol: i32) -> i32
+extern fn connect(fd: i32, addr: *const u8, addrlen: u32) -> i32
+extern fn send(fd: i32, buf: *const u8, len: u64, flags: i32) -> i64
+extern fn recv(fd: i32, buf: *mut u8, len: u64, flags: i32) -> i64
+extern fn getaddrinfo(node: *const u8, service: *const u8, hints: *const LinuxAddrInfo, res: *mut *mut LinuxAddrInfo) -> i32
+extern fn freeaddrinfo(res: *mut LinuxAddrInfo) -> Unit
+extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
+extern fn with_free(ptr: *mut u8) -> Unit
+
+type LinuxAddrInfo:
+    ai_flags: i32
+    ai_family: i32
+    ai_socktype: i32
+    ai_protocol: i32
+    ai_addrlen: u32
+    ai_addr: *mut u8
+    ai_canonname: *mut u8
+    ai_next: *mut LinuxAddrInfo
+
+fn rt_str_data(s: str) -> *const u8:
+    let p = &s as *const *const u8
+    unsafe *p
+
+fn rt_net_copy_str_to_c_buf(s: str, out: *mut u8, cap: i64) -> i32:
+    if s.len() + 1 > cap:
+        return -1
+    var i: i64 = 0
+    while i < s.len():
+        unsafe *((out as i64 + i) as *mut u8) = s.byte_at(i) as u8
+        i = i + 1
+    unsafe *((out as i64 + i) as *mut u8) = 0
+    0
+
+fn rt_net_write_port_to_c_buf(port: i32, out: *mut u8, cap: i64) -> i32:
+    if port < 0 or port > 65535 or cap < 2:
+        return -1
+    var rev: [6]u8 = [0 as u8; 6]
+    var n = port
+    var len: i64 = 0
+    if n == 0:
+        rev[0] = 48 as u8
+        len = 1
+    else:
+        while n > 0:
+            rev[len] = (48 + (n % 10)) as u8
+            len = len + 1
+            n = n / 10
+    if len + 1 > cap:
+        return -1
+    var i: i64 = 0
+    while i < len:
+        unsafe *((out as i64 + i) as *mut u8) = rev[len - i - 1]
+        i = i + 1
+    unsafe *((out as i64 + len) as *mut u8) = 0
+    0
+
+fn rt_net_empty_str() -> str:
+    with_str_from_bytes("" as *const u8, 0)
+
+pub fn with_net_tcp_connect(host: str, port: i32) -> i32:
+    var host_buf: [256]u8 = [0 as u8; 256]
+    var port_buf: [16]u8 = [0 as u8; 16]
+    if rt_net_copy_str_to_c_buf(host, &raw mut host_buf as *mut [256]u8 as *mut u8, 256) != 0:
+        return -1
+    if rt_net_write_port_to_c_buf(port, &raw mut port_buf as *mut [16]u8 as *mut u8, 16) != 0:
+        return -1
+    var hints = LinuxAddrInfo {
+        ai_flags: 0,
+        ai_family: 0,
+        ai_socktype: 1,
+        ai_protocol: 6,
+        ai_addrlen: 0 as u32,
+        ai_addr: 0 as *mut u8,
+        ai_canonname: 0 as *mut u8,
+        ai_next: 0 as *mut LinuxAddrInfo,
+    }
+    var res: *mut LinuxAddrInfo = 0 as *mut LinuxAddrInfo
+    let gai = getaddrinfo(&host_buf as *const [256]u8 as *const u8, &port_buf as *const [16]u8 as *const u8, &hints as *const LinuxAddrInfo, &raw mut res as *mut *mut LinuxAddrInfo)
+    if gai != 0 or res as i64 == 0:
+        return -1
+    var p = res
+    while p as i64 != 0:
+        let fd = socket((unsafe *p).ai_family, (unsafe *p).ai_socktype, (unsafe *p).ai_protocol)
+        if fd >= 0:
+            let rc = connect(fd, (unsafe *p).ai_addr as *const u8, (unsafe *p).ai_addrlen)
+            if rc == 0:
+                freeaddrinfo(res)
+                return fd
+            let _close_failed = rt_close(fd)
+        p = (unsafe *p).ai_next
+    freeaddrinfo(res)
+    -1
+
+pub fn with_net_send(sock: i32, data: str) -> i64:
+    let ptr = rt_str_data(data)
+    let len = data.len()
+    var written: i64 = 0
+    while written < len:
+        var r: i64 = 0
+        loop:
+            r = send(sock, (ptr as i64 + written) as *const u8, (len - written) as u64, 0)
+            if r >= 0 or get_errno() != 4:
+                break
+        if r < 0:
+            return if written > 0: written else: -(get_errno() as i64)
+        if r == 0:
+            return written
+        written = written + r
+    written
+
+pub fn with_net_recv(sock: i32, max_len: i64) -> str:
+    if max_len <= 0:
+        return rt_net_empty_str()
+    let buf = with_alloc(max_len)
+    if buf as i64 == 0:
+        return rt_net_empty_str()
+    var r: i64 = 0
+    loop:
+        r = recv(sock, buf, max_len as u64, 0)
+        if r >= 0 or get_errno() != 4:
+            break
+    if r <= 0:
+        with_free(buf)
+        return rt_net_empty_str()
+    let out = with_str_from_bytes(buf as *const u8, r)
+    with_free(buf)
+    out
+
+pub fn with_net_close(sock: i32) -> i32:
+    rt_close(sock)
+
 type RtSysInfo:
     cpu_cores: i32
     memory_total: i64

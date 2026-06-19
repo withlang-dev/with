@@ -100,24 +100,6 @@ fn zlib_copy_w_files(ctx: &ActionCtx, source_dir: str, dest_dir: str) -> i32:
         return zlib_fail(ctx, "no .w files found in " ++ source_dir)
     0
 
-fn zlib_sha256_file(ctx: &ActionCtx, path: str) -> str:
-    let root = ctx.project_info().project_root()
-    let scratch_dir = zlib_scratch_dir(ctx)
-    let label = zlib_safe_label(zlib_basename(path))
-    let stdout_path = zlib_abs(root, zlib_join(scratch_dir, label ++ ".sha256.stdout"))
-    let stderr_path = zlib_abs(root, zlib_join(scratch_dir, label ++ ".sha256.stderr"))
-    var args: Vec[str] = Vec.new()
-    args.push("shasum")
-    args.push("-a")
-    args.push("256")
-    args.push(zlib_abs(root, path))
-    let result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, 120000)
-    if result.rc != 0:
-        return ""
-    if result.stdout.len() < 64:
-        return ""
-    result.stdout.slice(0, 64)
-
 fn zlib_source_files() -> Vec[str]:
     let files: Vec[str] = Vec.new()
     files.push("adler32.c")
@@ -266,18 +248,18 @@ pub fn run_zlib_reference_action(ctx: ActionCtx) -> i32:
         return zlib_fail(ctx, "could not create archive directory")
     if not fs.exists(archive_path):
         print("fetching " ++ release ++ " from " ++ url)
-        var curl_args: Vec[str] = Vec.new()
-        curl_args.push("curl")
-        curl_args.push("-L")
-        curl_args.push("--fail")
-        curl_args.push("--show-error")
-        curl_args.push("--output")
-        curl_args.push(zlib_abs(root, archive_path))
-        curl_args.push(url)
-        let curl_result = ctx.process_runner().run_capture(curl_args, zlib_abs(root, zlib_join(scratch_dir, release ++ ".curl.stdout")), zlib_abs(root, zlib_join(scratch_dir, release ++ ".curl.stderr")), 300000)
-        if curl_result.rc != 0:
-            return zlib_fail(ctx, f"curl failed with exit code {curl_result.rc}: " ++ curl_result.stderr)
-    let actual_sha = zlib_sha256_file(ctx, archive_path)
+        let fetch_bin = zlib_join(scratch_dir, "zlib_http_fetch")
+        var rc = zlib_compile_binary(ctx, "zlib-http-fetch-helper", "build/zlib_http_fetch.w", fetch_bin)
+        if rc != 0:
+            return rc
+        var fetch_args: Vec[str] = Vec.new()
+        fetch_args.push(zlib_abs(root, fetch_bin))
+        fetch_args.push(url)
+        fetch_args.push(zlib_abs(root, archive_path))
+        let fetch_result = ctx.process_runner().run_capture(fetch_args, zlib_abs(root, zlib_join(scratch_dir, release ++ ".fetch.stdout")), zlib_abs(root, zlib_join(scratch_dir, release ++ ".fetch.stderr")), 300000)
+        if fetch_result.rc != 0:
+            return zlib_fail(ctx, f"zlib HTTP fetch helper failed with exit code {fetch_result.rc}: " ++ fetch_result.stdout ++ fetch_result.stderr)
+    let actual_sha = fs.sha256_file(archive_path)
     if actual_sha != ZLIB_SHA256:
         return zlib_fail(ctx, "sha256 mismatch for " ++ archive_path ++ ": expected " ++ ZLIB_SHA256 ++ " got " ++ actual_sha)
     if not fs.is_dir(ref_dir):
@@ -287,15 +269,22 @@ pub fn run_zlib_reference_action(ctx: ActionCtx) -> i32:
             return zlib_fail(ctx, "could not remove old extract directory: " ++ tmp_dir)
         if fs.mkdir_all(tmp_dir) != 0:
             return zlib_fail(ctx, "could not create extract directory: " ++ tmp_dir)
-        var tar_args: Vec[str] = Vec.new()
-        tar_args.push("tar")
-        tar_args.push("-xzf")
-        tar_args.push(zlib_abs(root, archive_path))
-        tar_args.push("-C")
-        tar_args.push(zlib_abs(root, tmp_dir))
-        let tar_result = ctx.process_runner().run_capture(tar_args, zlib_abs(root, zlib_join(scratch_dir, release ++ ".tar.stdout")), zlib_abs(root, zlib_join(scratch_dir, release ++ ".tar.stderr")), 300000)
-        if tar_result.rc != 0:
-            return zlib_fail(ctx, f"tar failed with exit code {tar_result.rc}: " ++ tar_result.stderr)
+        let tar_path = zlib_join(scratch_dir, release ++ ".tar")
+        let gunzip_bin = zlib_join(scratch_dir, "zlib_gunzip")
+        if fs.mkdir_all(zlib_dirname(gunzip_bin)) != 0:
+            return zlib_fail(ctx, "could not create zlib gunzip helper directory")
+        var rc = zlib_compile_binary(ctx, "zlib-gunzip-helper", "build/zlib_gunzip.w", gunzip_bin)
+        if rc != 0:
+            return rc
+        var gunzip_args: Vec[str] = Vec.new()
+        gunzip_args.push(zlib_abs(root, gunzip_bin))
+        gunzip_args.push(zlib_abs(root, archive_path))
+        gunzip_args.push(zlib_abs(root, tar_path))
+        let gunzip_result = ctx.process_runner().run_capture(gunzip_args, zlib_abs(root, zlib_join(scratch_dir, release ++ ".gunzip.stdout")), zlib_abs(root, zlib_join(scratch_dir, release ++ ".gunzip.stderr")), 300000)
+        if gunzip_result.rc != 0:
+            return zlib_fail(ctx, f"zlib gunzip helper failed with exit code {gunzip_result.rc}: " ++ gunzip_result.stdout ++ gunzip_result.stderr)
+        if fs.extract_tar(tar_path, tmp_dir) != 0:
+            return zlib_fail(ctx, "could not extract tar archive: " ++ tar_path)
         if not fs.exists(zlib_join(extracted_dir, "zlib.h")):
             return zlib_fail(ctx, "archive did not contain expected zlib.h: " ++ extracted_dir)
         if fs.mkdir_all(zlib_dirname(ref_dir)) != 0:
