@@ -23,8 +23,8 @@ fn test_guarded_mut_block:
     let lock = Mutex[i64].new(40 as i64)
     var seen = 0
     with lock.enter_mut() as mut data:
-        data = data + 2
-        seen = data
+        *data = *data + 2
+        seen = *data
     assert(seen == 42)
 
 fn test_multi_with_nests_left_to_right:

@@ -23,8 +23,8 @@ fn test_guarded_with_blocks:
     assert(value == 42)
     var seen = 0
     with m.enter_mut() as mut data:
-        data = data + 2
-        seen = data
+        *data = *data + 2
+        seen = *data
     assert(seen == 42)
 
 fn main:

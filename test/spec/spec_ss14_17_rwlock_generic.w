@@ -57,7 +57,7 @@ fn test_legacy_i64_surface:
         *value
     assert(before == 9)
     with lock.enter_mut() as mut value:
-        value = value + 2
+        *value = *value + 2
     let after = with lock.enter() as value:
         *value
     assert(after == 11)

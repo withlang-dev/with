@@ -2799,6 +2799,9 @@ fn Sema.type_is_no_await_guard(self: Sema, tid: i32) -> i32:
 fn Sema.has_live_await_guard(self: Sema) -> i32:
     if self.no_await_guard_scope_depth > 0:
         return 1
+    self.has_live_await_guard_binding()
+
+fn Sema.has_live_await_guard_binding(self: Sema) -> i32:
     var i = self.bind_names.len() as i32 - 1
     while i >= 0:
         if self.bind_states.get(i as i64) == VarState.LIVE:
@@ -10769,10 +10772,12 @@ fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
         if had_binding == 0:
             self.register_pending_generic_binding(name, 0, source, payload_ty)
         if self.type_is_no_await_guard(source_ty as i32) != 0:
+            self.no_await_guard_origin_roots.push(self.guard_source_root_sym(source))
             self.no_await_guard_scope_depth = self.no_await_guard_scope_depth + 1
         let body_ty = self.check_expr(body)
         if self.type_is_no_await_guard(source_ty as i32) != 0:
             self.no_await_guard_scope_depth = self.no_await_guard_scope_depth - 1
+            let _ = self.no_await_guard_origin_roots.pop()
         self.pop_scope()
         if body_ty != 0 and self.type_is_ephemeral_value(body_ty as i32) != 0:
             self.emit_error("guarded with result cannot be ephemeral; clone or copy the value before it leaves the block", body)
@@ -14595,13 +14600,17 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
 fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_index: i32) -> i32:
     if recv_type == 0:
         return 0
-    let resolved = self.resolve_alias(recv_type as TypeId)
-    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+    let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
+    var owner_sym = 0
+    if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        owner_sym = self.get_generic_inst_base(resolved as i32)
+    else:
+        owner_sym = self.get_type_name(resolved)
+    if owner_sym == 0:
         return 0
-    let owner_sym = self.get_generic_inst_base(resolved as i32)
     let owner_name = self.pool_resolve(owner_sym)
     let method_name = self.pool_resolve(field)
-    let iter_elem = self.iterator_element_type(recv_type)
+    let iter_elem = self.iterator_element_type(resolved as i32)
     if iter_elem != 0:
         if (field == self.syms.map or field == self.syms.filter_map or field == self.syms.flat_map) and arg_index == 0:
             let params: Vec[i32] = Vec.new()
@@ -14786,23 +14795,59 @@ fn Sema.sender_send_element_type(self: Sema, recv_type: i32, field: i32, arg_ind
 fn Sema.method_may_suspend_current_fiber(self: Sema, recv_type: i32, field: i32) -> i32:
     if recv_type == 0:
         return 0
-    let resolved = self.resolve_alias(recv_type as TypeId)
-    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+    let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId)) as i32
+    let owner_sym = self.method_owner_symbol_for_type(resolved)
+    if owner_sym == 0:
         return 0
-    let owner_sym = self.get_generic_inst_base(resolved as i32)
     let owner_name = self.pool_resolve(owner_sym)
     let method_name = self.pool_resolve(field)
     if owner_name == "Sender" and method_name == "send":
         return 1
     if owner_name == "Receiver" and method_name == "recv":
         return 1
-    if owner_name == "Mutex" and (method_name == "enter" or method_name == "enter_mut"):
+    if owner_name == "Mutex" and (method_name == "enter" or method_name == "enter_mut" or method_name == "set"):
         return 1
-    if owner_name == "RwLock" and (method_name == "enter" or method_name == "enter_mut"):
+    if owner_name == "RwLock" and (method_name == "enter" or method_name == "enter_mut" or method_name == "write"):
+        return 1
+    if owner_name == "Once" and method_name == "call_once":
+        return 1
+    if owner_name == "Condvar" and method_name == "wait":
+        return 1
+    if owner_name == "Barrier" and method_name == "wait":
         return 1
     if (owner_name == "Task" or owner_name == "ScopedTask") and method_name == "join_cleanup":
         return 1
     0
+
+fn Sema.guard_source_root_sym(self: Sema, source: i32) -> i32:
+    if source == 0:
+        return 0
+    if self.ast.kind(source) == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(source)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            return self.place_root_sym(self.ast.get_data0(callee))
+    self.place_root_sym(source)
+
+fn Sema.condvar_wait_releases_associated_guard(self: Sema, obj_type: i32, field: i32, extra_start: i32, arg_count: i32) -> i32:
+    if obj_type == 0 or arg_count <= 0:
+        return 0
+    let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type as TypeId)) as i32
+    let owner_sym = self.method_owner_symbol_for_type(resolved)
+    if owner_sym == 0:
+        return 0
+    if self.pool_resolve(owner_sym) != "Condvar" or self.pool_resolve(field) != "wait":
+        return 0
+    if self.has_live_await_guard_binding() != 0:
+        return 0
+    let wait_root = self.place_root_sym(self.ast.get_extra(extra_start))
+    if wait_root == 0:
+        return 0
+    if self.no_await_guard_origin_roots.len() == 0:
+        return 0
+    for i in 0..self.no_await_guard_origin_roots.len() as i32:
+        if self.no_await_guard_origin_roots.get(i as i64) != wait_root:
+            return 0
+    1
 
 fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
     if type_node == 0:
@@ -15321,6 +15366,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     obj_type = self.adjust_static_receiver_type(expr, obj_type as i32)
     if self.no_suspend_scope_depth > 0 and self.method_may_suspend_current_fiber(obj_type as i32, field) != 0:
         self.emit_error_code("direct fiber-aware runtime operation may suspend inside no_suspend block", node, "E0702")
+    if self.no_await_guard_scope_depth > 0 and self.method_may_suspend_current_fiber(obj_type as i32, field) != 0 and self.condvar_wait_releases_associated_guard(obj_type as i32, field, extra_start, arg_count) == 0:
+        self.emit_error_code("direct fiber-aware runtime operation may suspend while a no_await_guard value is live", node, "E0701")
 
     if obj_type != 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
         if self.is_tool_capability_type(obj_type as i32) and self.pool_resolve(field) == "__driver_new" and not self.can_access_tool_capability_internals():

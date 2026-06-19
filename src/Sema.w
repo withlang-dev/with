@@ -637,6 +637,7 @@ type Sema {
     with_payload_types: HashMap[i32, i32],
     with_enter_methods: HashMap[i32, i32],
     with_exit_methods: HashMap[i32, i32],
+    no_await_guard_origin_roots: Vec[i32],
     no_await_guard_scope_depth: i32,
     no_suspend_scope_depth: i32,
 
@@ -1609,6 +1610,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         with_payload_types: sema_new_map_i32_i32(),
         with_enter_methods: sema_new_map_i32_i32(),
         with_exit_methods: sema_new_map_i32_i32(),
+        no_await_guard_origin_roots: Vec.new(),
         no_await_guard_scope_depth: 0,
         no_suspend_scope_depth: 0,
         comp_resolved: sema_new_map_i32_i32(),
