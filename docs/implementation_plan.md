@@ -180,23 +180,33 @@ Then land collection construction and iteration surfaces.
 This phase depends on the safety and layout substrate from earlier phases. Keep
 raw C explicit and fail loudly on unsupported translation or ABI surfaces.
 
-- `#348` c_import macro helpers still shell out to cc -E
-- `#349` Darwin c_import SDK discovery still shells out to xcrun
-- `#357` Replace heuristic c_import auto-defer with proven-ownership Drop wrappers
-- `#379` Curated libc contract overlay for c_import modeled surfaces
-- `#426` Bug: str→C-string conversion ignores interior NUL (§16.3c)
-- `#427` String conversion APIs: CString, .to_cstring()/.as_cstr(), .as_view()/.to_owned() (§15.1–§15.3)
-- `#449` Layout attribute validation: @[align] rules, packed-field refs, repr coverage (§16.4)
-- `#542` Union safety rules: single initializer, unsafe non-last-written reads (§16.4)
-- `#370` Represent unsafe function pointer and callback types
-- `#436` Stdlib helpers for boxing/unboxing C callback context (§16.7)
-- `#415` Generate C headers for @[c_export] symbols (§16.5)
-- `#416` c_import: no_methods opt-out option (§16.2a)
-- `#417` c_import omission manifest: source locations, reason chains, directional diagnostics (§16.2)
-- `#418` c_import: selective import and strict completeness flag (§16.2)
-- `#412` Inline asm: multiple outputs and {name} placeholder substitution (§16.13)
-- `#479` @[target("arch")] architecture guards (§16.13)
-- `#453` Migrator: setjmp/longjmp diagnostic (§13.5b)
+Original issues:
+
+- [ ] `#348` c_import macro helpers still shell out to cc -E (macro `-dM` path done; migrator `preprocess_text` `cc -E` remains)
+- [x] `#349` Darwin c_import SDK discovery still shells out to xcrun
+- [ ] `#357` Replace heuristic c_import auto-defer with proven-ownership Drop wrappers (removal half + regression tests done; positive owning-wrapper path remains)
+- [x] `#379` Curated libc contract overlay for c_import modeled surfaces (cstr_in + nullable_ptr + buf_in shipped; buf_out → #604, owned returns → #357)
+- [x] `#426` Bug: str→C-string conversion ignores interior NUL (§16.3c)
+- [x] `#427` String conversion APIs: CString, .to_cstring()/.as_cstr(), .as_view()/.to_owned() (§15.1–§15.3)
+- [x] `#449` Layout attribute validation: @[align] rules, packed-field refs, repr coverage (§16.4)
+- [x] `#542` Union safety rules: single initializer, unsafe non-last-written reads (§16.4)
+- [x] `#370` Represent unsafe function pointer and callback types
+- [x] `#436` Stdlib helpers for boxing/unboxing C callback context (§16.7)
+- [x] `#415` Generate C headers for @[c_export] symbols (§16.5)
+- [x] `#416` c_import: no_methods opt-out option (§16.2a)
+- [x] `#417` c_import omission manifest: source locations, reason chains, directional diagnostics (§16.2)
+- [x] `#418` c_import: selective import and strict completeness flag (§16.2)
+- [x] `#412` Inline asm: multiple outputs and {name} placeholder substitution (§16.13)
+- [x] `#479` @[target("arch")] architecture guards (§16.13)
+- [x] `#453` Migrator: setjmp/longjmp diagnostic (§13.5b)
+
+Discovered during Phase 8 (FFI safety substrate; part of this phase):
+
+- [x] `#601` Match-arm pattern bindings dropped on every path (Result/enum drop corruption)
+- [x] `#603` c_import macro collection made libclang-only (toward #348)
+- [ ] `#604` `[]mut T` arguments: collection→mutable-slice coercion missing (blocks #379 buf_out; cross-function mutable-slice mechanism — language-design item)
+- [ ] `#605` Soundness: aggregate construction copies a non-Copy value instead of moving → double-free (struct-literal case fixed; tuple/array/enum + transitive Drop remain)
+- [ ] `#606` Soundness: Drop not propagated through Option/Vec/array/tuple/enum contents → leak
 
 ## Phase 9: Async, Fibers, Channels, and Concurrency Runtime
 
