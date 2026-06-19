@@ -10299,6 +10299,20 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 self.switch_to(ip_rd_next)
                 return self.body.new_operand(OperandKind.OK_COPY, ip_rd_place)
         let place = self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
+        // #606: moving a non-Copy element out of an ARRAY by index consumes it from
+        // the source; consume the array base so its element-drop does not also free
+        // the extracted value. Conservative whole-base consume (a non-extracted Drop
+        // sibling leaks); precise per-element tracking is a follow-up. Tightly scoped
+        // to a plain array-local base — Vec/slice/map indexing is unaffected.
+        let idx_val_ty = self.expr_type(node)
+        if idx_val_ty != 0 and self.sema.is_copy(idx_val_ty as TypeId) == 0:
+            let idx_base_local = self.place_base_local(place)
+            if idx_base_local >= 0 and idx_base_local < self.body.local_type_ids.len() as i32:
+                let idx_base_ty = self.body.local_type_ids.get(idx_base_local as i64)
+                if idx_base_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(idx_base_ty as TypeId)) == TypeKind.TY_ARRAY:
+                    self.mark_local_value_moved(idx_base_local)
+                    self.cancel_scheduled_value_drop_for_local(idx_base_local)
+                    self.cancel_stmt_temp_for_local(idx_base_local)
         return self.body.new_operand(OperandKind.OK_COPY, place)
 
     if kind == NodeKind.NK_MULTI_INDEX:
@@ -10790,8 +10804,14 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let arr_names: Vec[i32] = Vec.new()
         for i in 0..elem_count:
             let elem_node = self.ast.get_extra(extra_start + i)
-            arr_fields.push(self.lower_expr(elem_node))
+            let arr_elem_op = self.lower_expr(elem_node)
+            arr_fields.push(arr_elem_op)
             arr_names.push(0)
+            // #605/#606: move a Drop element into the array; consume the source so
+            // it is not also dropped at scope exit. Paired with the array's
+            // element-drop (mir_emit_drop_array_ptr) — both land together.
+            if self.sema.type_needs_drop(self.expr_type(elem_node)) != 0:
+                self.consume_moved_operand(arr_elem_op)
         let arr_fid = self.body.new_agg_fields(arr_fields, arr_names)
         let arr_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, arr_fid, 0)
         let arr_ty = self.expr_type(node)

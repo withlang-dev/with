@@ -3840,6 +3840,26 @@ fn Codegen.mir_emit_drop_tuple_ptr(self: Codegen, ptr: i64, ty: i64, tuple_sema_
             self.mir_emit_drop_ptr_for_sema_type(elem_ptr, elem_llvm, elem_sema)
         i = i - 1
 
+// #606: drop each element of a fixed array in place (reverse order). Like tuples,
+// arrays have no named type, so the generic dispatcher cannot reach them via a
+// drop_fn; this walks the element sema type and GEPs each slot.
+fn Codegen.mir_emit_drop_array_ptr(self: Codegen, ptr: i64, ty: i64, array_sema_ty: i32) -> Unit:
+    if ptr == 0 or ty == 0:
+        return
+    let elem_sema = self.sema.get_type_d0(array_sema_ty as TypeId)
+    if elem_sema <= 0 or self.sema.type_needs_drop(elem_sema) == 0:
+        return
+    let elem_count = self.sema.get_type_d1(array_sema_ty as TypeId)
+    let elem_llvm = wl_get_element_type(ty)
+    var i = elem_count - 1
+    while i >= 0:
+        let gep_indices: Vec[i64] = Vec.new()
+        gep_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
+        gep_indices.push(wl_const_int(wl_i32_type(self.context), i as i64, 0))
+        let elem_ptr = wl_build_gep(self.builder, ty, ptr, vec_data_i64(&gep_indices), 2)
+        self.mir_emit_drop_ptr_for_sema_type(elem_ptr, elem_llvm, elem_sema)
+        i = i - 1
+
 fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> Unit:
     if ptr == 0 or ty == 0 or sema_ty <= 0:
         return
@@ -3854,6 +3874,10 @@ fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sem
     // #606: tuples have no named type or drop fn; drop each element in place.
     if tk == TypeKind.TY_TUPLE:
         self.mir_emit_drop_tuple_ptr(ptr, ty, resolved)
+        return
+    // #606: arrays likewise drop each element in place.
+    if tk == TypeKind.TY_ARRAY:
+        self.mir_emit_drop_array_ptr(ptr, ty, resolved)
         return
     var type_sym = 0
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:

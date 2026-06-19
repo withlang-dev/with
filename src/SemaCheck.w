@@ -8807,6 +8807,11 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
         self.check_ephemeral_task_storage(elem, "array")
         if elem_type == 0:
             elem_type = et as i32
+        // #605: a whole non-Copy (Drop) local moved into a plain array element is
+        // consumed (use-after-move + drop-once). Only for array targets — Vec and
+        // other collection literals manage element ownership separately.
+        if target_base == 0 and self.ast.kind(elem) == NodeKind.NK_IDENT and self.type_needs_drop(et as i32) != 0:
+            self.mark_moved_if_consumed(elem)
 
     if expected_elem != 0:
         elem_type = expected_elem
