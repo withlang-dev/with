@@ -174,15 +174,17 @@ tested; a verdict from the whole matrix is stable. If you catch
 yourself concluding-and-patching the same question twice, stop and
 enumerate.
 
-**Code is proof of intent, not just mechanics.** The spec says what
-*should* be true; it is not proof of what the design *is* when code
-contradicts it. When a spec promise and an implementation fact
-disagree (a documented coercion with no producer; a "returns X" the
-impl returns as Y), that contradiction is the load-bearing fact:
-reconcile it from code before committing to a fix shape, and surface
-it for the maintainer rather than assuming which side is canonical.
-Test the inconvenient premise first — the fact that fights your
-conclusion is the one most worth running.
+**Code settles facts; intent is the maintainer's call.** The spec says
+what *should* be true; running the code shows what *is* — what
+compiles, what's spellable, whether a feature even has a producer.
+When a spec promise and an implementation fact disagree (a documented
+coercion with no producer; a "returns X" the impl returns as Y), the
+*facts* come from running code, but *which side is canonical* is a
+design decision — not derivable from the code or the spec. Settle the
+facts by running; then surface the contradiction for the maintainer
+rather than assuming which side wins. Test the inconvenient premise
+first — the fact that fights your conclusion is the one most worth
+running.
 
 ---
 
