@@ -8343,6 +8343,11 @@ models the memory, ownership, and lifetime contract. An `unsafe` block
 around a value-only manual extern call is still permitted as an explicit
 raw-ABI-boundary acknowledgement; it is not required.
 
+`@[link_name("symbol")]` on an `extern fn` sets the exact foreign
+symbol name used for linking while keeping the With declaration name
+available for local overload avoidance, curation wrappers, or naming
+conventions. It does not change the function type or safety contract.
+
 ### 16.3b External Variables
 
 Global variables defined in C libraries can be declared with
@@ -11248,6 +11253,7 @@ not marked internal is invalid.
 | `@[repr(C)]` / `@[repr(packed)]` | §16.4 | Layout control |
 | `@[align(N)]` | §16.4 | Custom alignment |
 | `@[c_export("name")]` | §16.5 | Export a C ABI symbol |
+| `@[link_name("symbol")]` | §16.3 | Foreign symbol name for an extern function |
 | `@[effect(...)]` | §16.3d | Declared effect contracts (bodiless decls) |
 | `@[no_await_guard]` | §7.9 | Guard must not live across suspension |
 | `@[no_alloc]` | §20 | Reject hidden/ambient allocation in the function body |
