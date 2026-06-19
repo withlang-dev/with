@@ -70,11 +70,11 @@ fn main:
     let cloned_widget = original_widget.cloned()
     assert(cloned_widget.unwrap().id == 33)
 
-    var seen = 0
+    var seen_values: Vec[i32] = Vec.new()
     let inspect_source: Option[i32] = Some(44)
-    let inspected = inspect_source.inspect(_value => seen = seen + 1)
+    let inspected = inspect_source.inspect(_value => seen_values.push(1))
     assert(inspected.unwrap() == 44)
-    assert(seen == 1)
+    assert(seen_values.len32() == 1)
     let inspected_none: Option[i32] = None
     assert(inspected_none.inspect(_value => unreachable("Option.inspect ran on None")).is_none())
 

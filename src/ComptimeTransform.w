@@ -131,6 +131,8 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         out.mark_move_closure((src.state.move_closure_nodes.get(mi as i64)) as NodeId)
     for ni in 0..src.state.non_escaping_closure_nodes.len() as i32:
         out.mark_non_escaping_closure((src.state.non_escaping_closure_nodes.get(ni as i64)) as NodeId)
+    for bi in 0..src.state.by_place_closure_nodes.len() as i32:
+        out.mark_by_place_closure((src.state.by_place_closure_nodes.get(bi as i64)) as NodeId)
 
     var where_meta = 0
     while where_meta < src.state.where_meta.len() as i32:
@@ -921,6 +923,8 @@ fn AstPool.ct_clone_tree_with_subst(self: AstPool, node: i32, subst_sym: i32, su
             self.mark_move_closure(cloned as NodeId)
         if self.is_non_escaping_closure(node) != 0:
             self.mark_non_escaping_closure(cloned as NodeId)
+        if self.is_by_place_closure(node) != 0:
+            self.mark_by_place_closure(cloned as NodeId)
         return cloned
 
     self.ct_clone_leaf(node)

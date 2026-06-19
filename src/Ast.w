@@ -447,6 +447,7 @@ type AstPoolState {
     comptime_decl_nodes: Vec[i32],
     move_closure_nodes: Vec[i32],
     non_escaping_closure_nodes: Vec[i32],
+    by_place_closure_nodes: Vec[i32],
     compiler_hook_fn_nodes: Vec[i32],
     compiler_hook_phase_syms: Vec[i32],
     global_allocator_decl_nodes: Vec[i32],
@@ -477,6 +478,7 @@ type AstPoolState {
     comptime_decl_set: HashMap[i32, i32],
     move_closure_set: HashMap[i32, i32],
     non_escaping_closure_set: HashMap[i32, i32],
+    by_place_closure_set: HashMap[i32, i32],
     compiler_hook_fn_set: HashMap[i32, i32],
     compiler_hook_phase_map: HashMap[i32, i32],
     global_allocator_decl_set: HashMap[i32, i32],
@@ -532,6 +534,7 @@ fn AstPool.new -> AstPool:
             comptime_decl_nodes: Vec.new(),
             move_closure_nodes: Vec.new(),
             non_escaping_closure_nodes: Vec.new(),
+            by_place_closure_nodes: Vec.new(),
             compiler_hook_fn_nodes: Vec.new(),
             compiler_hook_phase_syms: Vec.new(),
             global_allocator_decl_nodes: Vec.new(),
@@ -559,6 +562,7 @@ fn AstPool.new -> AstPool:
             comptime_decl_set: HashMap.new(),
             move_closure_set: HashMap.new(),
             non_escaping_closure_set: HashMap.new(),
+            by_place_closure_set: HashMap.new(),
             compiler_hook_fn_set: HashMap.new(),
             compiler_hook_phase_map: HashMap.new(),
             global_allocator_decl_set: HashMap.new(),
@@ -1358,6 +1362,14 @@ fn AstPool.mark_non_escaping_closure(self: AstPool, node: NodeId):
 
 fn AstPool.is_non_escaping_closure(self: AstPool, node: NodeId) -> i32:
     if self.state.non_escaping_closure_set.contains(node as i32): return 1
+    0
+
+fn AstPool.mark_by_place_closure(self: AstPool, node: NodeId):
+    self.state.by_place_closure_nodes.push(node as i32)
+    self.state.by_place_closure_set.insert(node as i32, 1)
+
+fn AstPool.is_by_place_closure(self: AstPool, node: NodeId) -> i32:
+    if self.state.by_place_closure_set.contains(node as i32): return 1
     0
 
 fn AstPool.add_where_meta(self: AstPool, fn_node: NodeId, extra_start: i32, clause_count: i32):

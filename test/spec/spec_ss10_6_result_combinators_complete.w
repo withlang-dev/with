@@ -37,19 +37,19 @@ fn main:
     assert(err_i32("missing").ok().is_none())
     assert(err_i32("missing").err().unwrap() == "missing")
 
-    var ok_seen = 0
-    let inspected_ok = ok_i32(9).inspect(_value => ok_seen = ok_seen + 1)
+    var ok_seen: Vec[i32] = Vec.new()
+    let inspected_ok = ok_i32(9).inspect(_value => ok_seen.push(1))
     assert(inspected_ok.unwrap() == 9)
-    assert(ok_seen == 1)
+    assert(ok_seen.len32() == 1)
     match err_i32("skip").inspect(_value => unreachable("Result.inspect ran on Err")):
         Err(e) => assert(e == "skip")
         Ok(_) => assert(false)
 
-    var err_seen = 0
-    match err_i32("seen").inspect_err(_err => err_seen = err_seen + 1):
+    var err_seen: Vec[i32] = Vec.new()
+    match err_i32("seen").inspect_err(_err => err_seen.push(1)):
         Err(e) => assert(e == "seen")
         Ok(_) => assert(false)
-    assert(err_seen == 1)
+    assert(err_seen.len32() == 1)
     assert(ok_i32(10).inspect_err(_err => unreachable("Result.inspect_err ran on Ok")).unwrap() == 10)
 
     let piped_step1 = ok_i32(3).and_then(v => double_checked(v))

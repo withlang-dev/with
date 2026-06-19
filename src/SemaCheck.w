@@ -10367,9 +10367,20 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
 
     self.pop_scope()
 
+    var direct_arg_escapes = 0
+    if self.closure_direct_arg_escape_flags.len() > 0:
+        direct_arg_escapes = self.closure_direct_arg_escape_flags.get((self.closure_direct_arg_escape_flags.len() - 1) as i64)
+
+    let is_non_escaping = self.closure_direct_arg_depth > 0 and direct_arg_escapes == 0 and self.ast.is_move_closure(node) == 0
+
     let closure_capture_effs: Vec[i32] = Vec.new()
     for ci in 0..closure_capture_syms.len() as i32:
-        closure_capture_effs.push(self.current_fn_param_effs.get(ci as i64))
+        let summary_cap_sym = closure_capture_syms.get(ci as i64)
+        let summary_cap_ty = self.scope_lookup(summary_cap_sym)
+        if self.ast.is_by_place_closure(node) == 0 and self.ast.is_move_closure(node) == 0 and summary_cap_ty != 0 and self.is_copy(summary_cap_ty as TypeId) != 0:
+            closure_capture_effs.push(0)
+        else:
+            closure_capture_effs.push(self.current_fn_param_effs.get(ci as i64))
     self.set_closure_capture_summary(node, closure_capture_syms, closure_capture_effs)
     while self.current_fn_param_syms.len() > 0:
         self.current_fn_param_syms.pop()
@@ -10392,24 +10403,25 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         self.borrow_path_starts.pop()
         self.borrow_path_counts.pop()
 
-    var direct_arg_escapes = 0
-    if self.closure_direct_arg_escape_flags.len() > 0:
-        direct_arg_escapes = self.closure_direct_arg_escape_flags.get((self.closure_direct_arg_escape_flags.len() - 1) as i64)
-
     // Mark non-escaping if this closure is a direct call argument whose
     // receiving parameter does not let the closure escape the call.
-    let is_non_escaping = self.closure_direct_arg_depth > 0 and direct_arg_escapes == 0 and self.ast.is_move_closure(node) == 0
     if is_non_escaping:
         self.ast.mark_non_escaping_closure(node)
         // Register borrows for captured variables.
-        // Non-escaping closures capture by reference — register as borrows
-        // so the borrow checker can detect conflicts with other borrows.
+        // Non-escaping closures capture non-Copy values by reference —
+        // register those as borrows so the borrow checker can detect
+        // conflicts with other borrows. Copy captures are value snapshots,
+        // so mutating the closure's copy does not borrow the original place.
         // If the variable is only accessed through field paths, register
         // field-level borrows for disjoint capture checking.
         var ci = 0
         while ci < outer_count:
             let cap_sym = self.bind_names.get(ci as i64)
             if self.expr_uses_symbol(body, cap_sym) != 0:
+                let cap_ty = self.bind_types.get(ci as i64)
+                if self.ast.is_by_place_closure(node) == 0 and self.is_copy(cap_ty as TypeId) != 0:
+                    ci = ci + 1
+                    continue
                 if self.capture_is_field_only(body, cap_sym) != 0:
                     // Field-level capture: register borrow per field path
                     // Clear transient capture field storage
@@ -10465,7 +10477,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                 if self.is_copy(cap_ty as TypeId) == 0:
                     self.scope_set_state(cap_sym, VarState.MOVED)
                     self.note_param_effect(cap_sym, EFF_CONSUME)
-                if emitted_escape_warn == 0 and self.ast.is_move_closure(node) == 0 and self.expr_mutates_place(body, cap_sym) != 0:
+                if emitted_escape_warn == 0 and self.ast.is_move_closure(node) == 0 and self.ast.is_by_place_closure(node) == 0 and self.is_copy(cap_ty as TypeId) == 0 and self.expr_mutates_place(body, cap_sym) != 0:
                     self.emit_error("closure that mutates captured place cannot escape its defining scope (§15.9)", node)
                     emitted_escape_warn = 1
             ci = ci + 1
@@ -15434,6 +15446,9 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
 
         let mc_is_closure = self.ast.kind(mc_arg_node) == NodeKind.NK_CLOSURE
         var mc_closure_arg_escapes = 0
+        if mc_is_closure and field == self.syms.spawn_method and ai == 0:
+            if self.ast.kind(expr) == NodeKind.NK_IDENT and self.is_active_sync_scope_symbol(self.ast.get_data0(expr)) != 0:
+                self.ast.mark_by_place_closure(mc_arg_node)
         if mc_is_closure and mc_sig_idx_for_effect >= 0:
             let mc_param_i_for_effect = ai + 1
             if mc_param_i_for_effect < self.sig_get_param_count(mc_sig_idx_for_effect):

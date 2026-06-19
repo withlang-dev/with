@@ -15960,14 +15960,25 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         with_eprint("internal error: capturing closure reached extern C function pointer lowering")
         self.had_error = 1
 
-    // Determine if this is a non-escaping closure (reference capture)
-    let is_ref_capture = self.pool.is_non_escaping_closure(node) == 1 and self.pool.is_move_closure(node) == 0
+    let can_capture_by_ref = self.pool.is_non_escaping_closure(node) == 1 and self.pool.is_move_closure(node) == 0
+    let force_by_place_capture = self.pool.is_by_place_closure(node) == 1 and self.pool.is_move_closure(node) == 0
+    let capture_ref_modes: Vec[i32] = Vec.new()
+    for ci in 0..capture_count:
+        let sym = captures.get(ci as i64)
+        var by_ref = 0
+        if force_by_place_capture:
+            by_ref = 1
+        else if can_capture_by_ref:
+            let sema_ty = self.lookup_capture_sema_type(sym)
+            if sema_ty == 0 or self.sema.is_copy(sema_ty as TypeId) == 0:
+                by_ref = 1
+        capture_ref_modes.push(by_ref)
 
     // Build capture struct type from captured variable types
     let cap_types: Vec[i64] = Vec.new()
     for ci in 0..capture_count:
         let sym = captures.get(ci as i64)
-        if is_ref_capture:
+        if capture_ref_modes.get(ci as i64) != 0:
             cap_types.push(ptr_ty)
         else:
             let capture_ty = self.lookup_capture_type(sym)
@@ -15977,14 +15988,13 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                 cap_types.push(i32_ty)
     // Collect original types for ref capture (needed inside closure body)
     let cap_orig_types: Vec[i64] = Vec.new()
-    if is_ref_capture:
-        for ci in 0..capture_count:
-            let sym = captures.get(ci as i64)
-            let capture_ty = self.lookup_capture_type(sym)
-            if capture_ty != 0:
-                cap_orig_types.push(capture_ty)
-            else:
-                cap_orig_types.push(i32_ty)
+    for ci in 0..capture_count:
+        let sym = captures.get(ci as i64)
+        let capture_ty = self.lookup_capture_type(sym)
+        if capture_ty != 0:
+            cap_orig_types.push(capture_ty)
+        else:
+            cap_orig_types.push(i32_ty)
     var cap_struct_type: i64 = 0
     if capture_count > 0:
         cap_struct_type = wl_struct_type(self.context, vec_data_i64(&cap_types), capture_count, 0)
@@ -16055,7 +16065,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
             indices.push(wl_const_int(i32_ty, 0, 0))
             indices.push(wl_const_int(i32_ty, ci as i64, 0))
             let gep = wl_build_gep(self.builder, cap_struct_type, cap_ptr, vec_data_i64(&indices), 2)
-            if is_ref_capture:
+            if capture_ref_modes.get(ci as i64) != 0:
                 // Reference capture: keep a local slot that points at the
                 // captured binding's outer storage. MIR indirect-local
                 // metadata below defines the value stored at that outer
@@ -16191,7 +16201,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
             if cl_m_ty != 0:
                 let cl_storage_ty = cl_m_ty
                 self.mir_local_types.insert(cl_m_local_id, cl_storage_ty)
-                if is_ref_capture:
+                if capture_ref_modes.get(cl_mi as i64) != 0:
                     let cl_sem_ty = self.lookup_capture_sema_type(cl_m_sym)
                     if cl_sem_ty != 0:
                         let cl_sem_llvm_ty = self.sema_type_to_llvm(cl_sem_ty)
@@ -16295,7 +16305,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                 indices.push(wl_const_int(i32_ty, 0, 0))
                 indices.push(wl_const_int(i32_ty, ci as i64, 0))
                 let gep = wl_build_gep(self.builder, cap_struct_type, cap_alloca, vec_data_i64(&indices), 2)
-                if is_ref_capture:
+                if capture_ref_modes.get(ci as i64) != 0:
                     // Store pointer to outer alloca (not the value)
                     wl_build_store(self.builder, alloca, gep)
                 else:
