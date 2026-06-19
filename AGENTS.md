@@ -150,6 +150,42 @@ is green" means almost nothing about whether the tool works.
 
 ---
 
+## Verify by Running, Not by Reasoning
+
+The compiler's subtle, half-implemented corners — mutable aliasing,
+slice mutability, coercions, which types are even spellable — are
+exactly where reasoning from layout, signatures, or spec text goes
+wrong. Three rules, each learned by shipping a wrong verdict:
+
+**Spell it and run it.** Before concluding a type, mechanism, or API
+"works" or "is the surface," write the smallest program that uses it
+and compile it. A type that looks usable from its layout may be
+unspellable as a parameter (`VecRange`); a `mut` parameter may *move*
+rather than borrow; `&raw place` may need an explicit `const`/`mut`
+qualifier. You will not find these by reading — only by compiling. "I
+read the signature and assumed it" is how wrong conclusions ship.
+
+**Exhaust small answer-spaces in one pass.** When a question has a
+small, enumerable set of answers ("how many ways can a mutable buffer
+cross a function call?"), test all of them at once and write the
+matrix — don't conclude from the first one or two and patch later. A
+verdict from partial evidence flips every time the next case is
+tested; a verdict from the whole matrix is stable. If you catch
+yourself concluding-and-patching the same question twice, stop and
+enumerate.
+
+**Code is proof of intent, not just mechanics.** The spec says what
+*should* be true; it is not proof of what the design *is* when code
+contradicts it. When a spec promise and an implementation fact
+disagree (a documented coercion with no producer; a "returns X" the
+impl returns as Y), that contradiction is the load-bearing fact:
+reconcile it from code before committing to a fix shape, and surface
+it for the maintainer rather than assuming which side is canonical.
+Test the inconvenient premise first — the fact that fights your
+conclusion is the one most worth running.
+
+---
+
 ## Anti-Patterns
 
 These patterns are how a task looks successful while actually
