@@ -186,6 +186,19 @@ rather than assuming which side wins. Test the inconvenient premise
 first — the fact that fights your conclusion is the one most worth
 running.
 
+**And otherwise, keep moving.** These rules are about *verifying*, not
+*pausing* — they cure over-autonomy (acting past a real fork), not the
+opposite failure of hovering at every seam. The discriminator is narrow:
+stop only when there is a decision that is genuinely the maintainer's —
+intent, scope, or a go/no-go on real risk you cannot resolve yourself.
+When the path is clear and self-scoped — you already know what to do and
+can verify it by running — proceed and report as you go; do not ask
+permission to continue. Owning a decision to defer ("I'm picking this up
+fresh because X") is fine; voicing it as a permission request is the
+hover. Restraint that catches a real fork is discipline; restraint
+applied to a clear path is just the under-autonomy failure wearing
+discipline's clothes.
+
 ---
 
 ## Anti-Patterns
