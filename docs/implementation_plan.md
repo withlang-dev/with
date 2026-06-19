@@ -184,7 +184,7 @@ Original issues:
 
 - [ ] `#348` c_import macro helpers still shell out to cc -E (macro `-dM` path done; migrator `preprocess_text` `cc -E` remains)
 - [x] `#349` Darwin c_import SDK discovery still shells out to xcrun
-- [ ] `#357` Replace heuristic c_import auto-defer with proven-ownership Drop wrappers (removal half + regression tests done; positive owning-wrapper path remains)
+- [ ] `#357` Replace heuristic c_import auto-defer with proven-ownership Drop wrappers (removal half done; positive path FIRST INCREMENT shipped: curated owning-wrapper generation for strdup/strndup→free — `ci_owned_return_destructor` + `ci_emit_owning_wrapper` in CImport.w emit a `COwned_<fn>` type with `impl Drop`. Broader curated coverage (fopen/fclose…), refcount modeling, and an annotation/metadata evidence surface remain)
 - [x] `#379` Curated libc contract overlay for c_import modeled surfaces (cstr_in + nullable_ptr + buf_in shipped; buf_out → #604, owned returns → #357)
 - [x] `#426` Bug: str→C-string conversion ignores interior NUL (§16.3c)
 - [x] `#427` String conversion APIs: CString, .to_cstring()/.as_cstr(), .as_view()/.to_owned() (§15.1–§15.3)
@@ -205,8 +205,8 @@ Discovered during Phase 8 (FFI safety substrate; part of this phase):
 - [x] `#601` Match-arm pattern bindings dropped on every path (Result/enum drop corruption)
 - [x] `#603` c_import macro collection made libclang-only (toward #348)
 - [ ] `#604` `[]mut T` arguments: collection→mutable-slice coercion missing (blocks #379 buf_out; cross-function mutable-slice mechanism — language-design item)
-- [ ] `#605` Soundness: aggregate construction copies a non-Copy value instead of moving → double-free (struct-literal case fixed; tuple/array/enum + transitive Drop remain)
-- [ ] `#606` Soundness: Drop not propagated through Option/Vec/array/tuple/enum contents → leak
+- [ ] `#605` Soundness: aggregate construction copies a non-Copy value instead of moving → double-free (struct/tuple/array/enum-variant construction now MOVE Drop values; transitive `Sema.type_needs_drop` predicate added; conservative whole-base consume at tuple field-access `pair.0` and array index extraction; precise per-element partial-extraction tracking remains — see follow-ups A6/A7/A8)
+- [ ] `#606` Soundness: Drop propagated through contents (tuple/array/enum + generic enums Option/Result now drop their contents — variant-aware enum drop + move/subject-consume at construction, match, if-let, let-else, and `?`). Remaining: Vec still leaks (no `with_vec_free`; deferred — pervasive copy-sharing double-free risk), nested aggregate-in-struct-field, and wildcard/partial-extraction precise drops
 
 ## Phase 9: Async, Fibers, Channels, and Concurrency Runtime
 

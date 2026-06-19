@@ -22,21 +22,34 @@ and folded into the phase. Verify states with `gh issue view <n>` before acting
 - **#348** — c_import macro helpers shell out to `cc -E`. *Partial:* the macro
   `-dM` path is libclang-only (commit landed); the migrator-only
   `with_cimport_preprocess_text` still runs `cc -E`.
-- **#357** — proven-ownership Drop wrappers. *Partial:* removal half + regression
-  tests done; the positive owning-wrapper-generation path remains.
+- **#357** — proven-ownership Drop wrappers. *Partial:* removal half done; the
+  positive path **first increment shipped** — curated owning-wrapper generation
+  for `strdup`/`strndup`→`free` (`ci_owned_return_destructor` +
+  `ci_emit_owning_wrapper` in `src/CImport.w` emit a `COwned_<fn>` type with
+  `impl Drop` + safe constructor + `.handle()` accessor; test
+  `behav_c_import_owning_wrapper_strdup`). Remaining: broader curated coverage
+  (fopen/fclose…), refcount modeling, and an annotation/metadata evidence surface.
 - **#604** — `[]mut T` arguments: collection→mutable-slice coercion missing.
   Blocks #379 `buf_out`. Maintainer flagged this as a **language-design decision**
   (whether `[]mut T` becomes real vs `VecRange` is the model) — do not change
   `[]mut T`/`VecRange`/spec semantics without the maintainer's call.
-- **#605** — aggregate construction copies a non-Copy value instead of moving →
-  double-free. *Partial:* **struct-literal case fixed and shipped**;
-  tuple/array/enum + transitive Drop remain (needs a drop-system foundation —
-  see §4).
-- **#606** — Drop not propagated through Option/Vec/array/tuple/enum contents →
-  leak. Open; entangled with #605 (see §4).
+- **#605** — aggregate construction copied a non-Copy value instead of moving →
+  double-free. *Substantially done:* struct + **tuple + array + enum-variant**
+  construction now MOVE Drop values; transitive `Sema.type_needs_drop` predicate
+  added. Conservative whole-base consume at tuple field-access (`pair.0`) and
+  array index extraction. Remaining: precise per-element partial-extraction
+  tracking (follow-ups A6 nested-in-struct, A7 wildcard discard, A8 per-element).
+- **#606** — Drop propagation through contents. *Substantially done:*
+  tuple/array/enum and generic enums **Option/Result** now drop their contents
+  (variant-aware `mir_emit_drop_enum_ptr`; subject-consume at construction,
+  match, if-let, let-else, and `?`). Remaining: **Vec** still leaks (no
+  `with_vec_free`; A5 deferred — enabling Vec drop risks widespread double-frees
+  from pervasive Vec copy-sharing), plus nested-in-struct and wildcard drops.
 
-Last green (counts drift with concurrent work): behavior ~702,
-native-compile-error ~614, native-spec ~178; **fixpoint holds**.
+Each aggregate kind landed as its own verified commit (tuple → array → enum →
+#357), each passing `with build` + `:fixpoint` + the full behavior/error/spec
+suites. Last green: behavior 719, native-compile-error 617, native-spec 179;
+**fixpoint holds**.
 
 ---
 
@@ -329,11 +342,25 @@ metadata).
 
 ## 10. Suggested next-session order
 
-1. **#605/#606 tuple** (smallest aggregate; fix direction in §4 is de-risked) →
-   verify against channels → **array** → **enum** (reuse `gen_display_enum`).
-   Add the transitive `needs_drop` predicate along the way. This unblocks #357's
-   wrappers in containers.
-2. **#357 positive path** (owning-wrapper generation) — binding-gen, reuses
-   shipped infra; unblocked for the struct case already.
-3. **#348 preprocess_text** and **#604 `[]mut T`** — the former is a large
-   preprocessor effort; the latter awaits the maintainer's language decision.
+**Done (this session): the structural drop/move cluster + #357 first increment.**
+A0 transitive `needs_drop` → tuple → array → enum (+ Option/Result) → #357
+curated owning wrappers, each its own verified+pushed commit.
+
+Remaining, recommended order:
+1. **#348 preprocess_text** — replace the `cc -E` shell-out in
+   `with_cimport_preprocess_text` (`src/compiler/ClangBridge.w` ~2309) with
+   libclang token reconstruction. The token FFI already exists and is used
+   (`clang_tokenize`/`clang_getTokenSpelling`/`clang_getExpansionLocation`,
+   ClangBridge.w ~1474–1491). Independent of the drop codegen; substantial.
+2. **#357 expansion** — more curated owning constructors (fopen/fclose…),
+   refcount modeling (+1 ctor vs borrowing accessor), and an annotation/metadata
+   evidence surface. Reuses the shipped `ci_emit_owning_wrapper`.
+3. **A5 Vec drop** (#606 tail) — give Vec a real Drop (add `with_vec_free` +
+   compiler element-drop loop). **HIGH RISK / go-no-go:** Vec is pervasive *and*
+   copy-shared (same buffer ptr in two places), so freeing buffers can surface
+   widespread double-frees — needs a full Vec-sharing audit. It's a leak (sound),
+   not a double-free; do under maintainer go-ahead.
+4. **A6/A7/A8** (precise drop tracking) — nested aggregate-in-struct-field drop;
+   wildcard-element drop in irrefutable destructure; precise per-element
+   partial-extraction tracking to replace the conservative whole-base consume.
+5. **#604 `[]mut T`** — awaits the maintainer's `[]mut T` vs `VecRange` decision.
