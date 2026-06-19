@@ -41,5 +41,28 @@ fn test_mut_self_methods_are_object_safe:
     var c = Counter { value: 1 }
     assert(accepts_mutator(&c) == 1)
 
-// Consuming `move self: Self` through Box[dyn Trait] is tracked separately by
-// #202 because the standard Box[T] type and Box[dyn Trait] shims do not exist yet.
+trait Builder:
+    fn preview(self: &Self) -> str
+    fn build(move self: Self) -> i32
+
+type MealBuilder { seed: i32 }
+
+impl Builder for MealBuilder:
+    fn preview(self: &Self) -> str:
+        if self.seed == 40:
+            return "meal"
+        "wrong"
+
+    fn build(move self: Self) -> i32:
+        self.seed + 2
+
+fn preview_builder(b: &dyn Builder) -> str:
+    b.preview()
+
+fn test_ref_dyn_trait_allows_traits_with_consuming_methods:
+    let builder = MealBuilder { seed: 40 }
+    assert(preview_builder(&builder) == "meal")
+
+fn test_box_dyn_trait_consuming_method_shim:
+    let builder: Box[dyn Builder] = Box.new(MealBuilder { seed: 40 })
+    assert(builder.build() == 42)

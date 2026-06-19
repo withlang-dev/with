@@ -2346,11 +2346,8 @@ fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
             return 0
 
         let first_param_flags = self.ast.fn_param_flags(param_start, 0)
-        if fn_param_is_move_self(first_param_flags) != 0:
-            self.emit_trait_object_safety_error(trait_sym, method_sym, "uses consuming receiver 'move self: Self'; use Box[dyn Trait] for consuming trait-object calls", node)
-            return 0
-        if fn_param_is_ref_self(first_param_flags) == 0 and fn_param_is_mut_self(first_param_flags) == 0:
-            self.emit_trait_object_safety_error(trait_sym, method_sym, "receiver is not object-safe; use 'self: &Self' or 'mut self: Self'", node)
+        if fn_param_is_ref_self(first_param_flags) == 0 and fn_param_is_mut_self(first_param_flags) == 0 and fn_param_is_move_self(first_param_flags) == 0:
+            self.emit_trait_object_safety_error(trait_sym, method_sym, "receiver is not object-safe; use 'self: &Self', 'mut self: Self', or Box[dyn Trait] for 'move self: Self'", node)
             return 0
 
         if (method_flags / sema_trait_method_flag_generic()) % 2 == 1:

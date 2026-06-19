@@ -228,7 +228,7 @@ fn Codegen.find_impl_for_type_trait(self: Codegen, impl_type_sym: i32, trait_sym
             return decl
     0
 
-fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, impl_fn_sym: i32, method_sym: i32, method_fn: i64, method_ft: i64, dyn_ft: i64) -> i64:
+fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, impl_fn_sym: i32, method_sym: i32, method_fn: i64, method_ft: i64, dyn_ft: i64, consumes_self: i32) -> i64:
     let type_name = self.intern.resolve(impl_type_sym)
     let method_name = self.intern.resolve(method_sym)
     let wrapper_name = "__dynwrap_" ++ type_name ++ "_" ++ method_name
@@ -285,6 +285,12 @@ fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, impl_fn_sym: i3
         call_val = self.emit_async_fn_spawn_task_value(impl_fn_sym, method_fn, method_ft, &call_args, ret_ty)
     else:
         call_val = wl_build_call(self.builder, method_ft, method_fn, vec_data_i64(&call_args), orig_param_count)
+    if consumes_self != 0:
+        let free_fn = self.ensure_box_free_fn()
+        if free_fn != 0:
+            let free_args: Vec[i64] = Vec.new()
+            free_args.push(data_ptr)
+            let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&free_args), 1)
     if ret_ty == wl_void_type(self.context):
         let _ = wl_build_ret_void(self.builder)
     else:
@@ -757,6 +763,12 @@ fn Codegen.generate_trait_vtable_for_impl(self: Codegen, impl_node: i32):
     for mi in 0..method_count:
         let method_sym = self.trait_method_names.get((method_start + mi) as i64)
         let method_flags = self.trait_method_flags.get((method_start + mi) as i64)
+        let trait_method_idx = method_start + mi
+        let param_start = self.trait_method_param_starts.get(trait_method_idx as i64)
+        let param_count = self.trait_method_param_counts.get(trait_method_idx as i64)
+        let consumes_self =
+            if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
+            else: 0
         let method_name = self.intern.resolve(method_sym)
         let type_name = self.intern.resolve(impl_type_sym)
         let mangled = type_name ++ "." ++ method_name
@@ -776,7 +788,7 @@ fn Codegen.generate_trait_vtable_for_impl(self: Codegen, impl_node: i32):
                 if dyn_ft == 0:
                     entries.push(wl_const_null(wl_ptr_type(self.context)))
                     continue
-            let wrapper = self.create_dyn_wrapper(impl_type_sym, impl_fn_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64, dyn_ft)
+            let wrapper = self.create_dyn_wrapper(impl_type_sym, impl_fn_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64, dyn_ft, consumes_self)
             entries.push(wrapper)
         else:
             entries.push(wl_const_null(wl_ptr_type(self.context)))
@@ -844,6 +856,12 @@ fn Codegen.ensure_monomorphized_trait_vtable(self: Codegen, impl_type_sym: i32, 
     for mi in 0..method_count:
         let method_sym = self.trait_method_names.get((method_start + mi) as i64)
         let method_flags = self.trait_method_flags.get((method_start + mi) as i64)
+        let trait_method_idx = method_start + mi
+        let param_start = self.trait_method_param_starts.get(trait_method_idx as i64)
+        let param_count = self.trait_method_param_counts.get(trait_method_idx as i64)
+        let consumes_self =
+            if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
+            else: 0
         let method_name = self.intern.resolve(method_sym)
         let concrete_sym = self.intern.intern(type_name ++ "." ++ method_name)
         let fv = self.fn_values.get(concrete_sym)
@@ -858,7 +876,7 @@ fn Codegen.ensure_monomorphized_trait_vtable(self: Codegen, impl_type_sym: i32, 
             if dyn_ft == 0:
                 self.had_error = 1
                 return
-        let wrapper = self.create_dyn_wrapper(impl_type_sym, concrete_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64, dyn_ft)
+        let wrapper = self.create_dyn_wrapper(impl_type_sym, concrete_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64, dyn_ft, consumes_self)
         entries.push(wrapper)
 
     let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name

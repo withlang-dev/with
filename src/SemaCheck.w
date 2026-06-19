@@ -14930,6 +14930,20 @@ fn Sema.dyn_trait_symbol_for_type(self: Sema, tid: i32) -> i32:
             return self.dyn_trait_symbol_for_type(self.get_generic_inst_arg(resolved as i32, 0))
     0
 
+fn Sema.type_is_box_dyn_trait(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let base = self.get_generic_inst_base(resolved as i32)
+    if self.type_symbol_is_std_box(base) == 0 or self.get_generic_inst_arg_count(resolved as i32) != 1:
+        return 0
+    let arg = self.resolve_alias(self.get_generic_inst_arg(resolved as i32, 0) as TypeId)
+    if self.get_type_kind(arg) == TypeKind.TY_TRAIT_OBJ:
+        return 1
+    0
+
 fn Sema.find_dyn_trait_method_info(self: Sema, trait_sym: i32, method_sym: i32) -> SemaDynTraitMethodInfo:
     if self.trait_lookup.contains(trait_sym):
         let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
@@ -14996,7 +15010,7 @@ fn Sema.any_trait_method_named(self: Sema, method_sym: i32) -> i32:
             return 1
     0
 
-fn Sema.check_dyn_trait_method_call(self: Sema, trait_sym: i32, method_sym: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
+fn Sema.check_dyn_trait_method_call(self: Sema, trait_sym: i32, method_sym: i32, receiver_type: i32, receiver_expr: i32, arg_types: &Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
     let info = self.find_dyn_trait_method_info(trait_sym, method_sym)
     if info.ok == 0:
         self.emit_error("unknown method '" ++ self.pool_resolve(method_sym) ++ "' for dyn trait '" ++ self.pool_resolve(trait_sym) ++ "'", node)
@@ -15006,6 +15020,15 @@ fn Sema.check_dyn_trait_method_call(self: Sema, trait_sym: i32, method_sym: i32,
     if info.param_count <= 0:
         self.emit_error("dyn trait method has no self parameter", node)
         return 0
+
+    let receiver_flags = self.ast.fn_param_flags(info.param_start, 0)
+    if fn_param_is_move_self(receiver_flags) != 0:
+        if self.type_is_box_dyn_trait(receiver_type) == 0:
+            self.emit_error("consuming dyn trait method requires a Box[dyn Trait] receiver", node)
+            return 0
+        self.check_trait_receiver_mode(&info, receiver_expr, node)
+    else:
+        self.check_trait_receiver_mode(&info, receiver_expr, node)
 
     let expected_args = info.param_count - 1
     if arg_count != expected_args:
@@ -15609,7 +15632,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     var recv_type = self.auto_deref_method_type(resolved, field, node, expr)
     let dyn_trait_sym = self.dyn_trait_symbol_for_type(obj_type as i32)
     if dyn_trait_sym != 0:
-        let dyn_ret = self.check_dyn_trait_method_call(dyn_trait_sym, field, arg_types, extra_start, mc_resolved_arg_count, node)
+        let dyn_ret = self.check_dyn_trait_method_call(dyn_trait_sym, field, obj_type as i32, expr, arg_types, extra_start, mc_resolved_arg_count, node)
         if dyn_ret != 0:
             return dyn_ret
         return 0
