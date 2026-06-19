@@ -3824,6 +3824,22 @@ fn Codegen.mir_emit_generic_inst_drop_method(self: Codegen, ptr: i64, ty: i64, s
     let _ = self.monomorphize_struct_method_core(mono_owner, "drop", drop_decl, 0, ptr, 0, ty, 0, 0, 0, no_args)
     true
 
+// #606: drop each element of a tuple value in place (reverse order, like struct
+// fields). Tuples have no named type, so the generic dispatcher cannot reach them
+// via a drop_fn; this walks the element sema types directly.
+fn Codegen.mir_emit_drop_tuple_ptr(self: Codegen, ptr: i64, ty: i64, tuple_sema_ty: i32) -> Unit:
+    if ptr == 0 or ty == 0:
+        return
+    let elem_count = self.sema.get_type_d1(tuple_sema_ty as TypeId)
+    var i = elem_count - 1
+    while i >= 0:
+        let elem_sema = self.mir_project_field_sema_type(tuple_sema_ty, i)
+        if elem_sema > 0 and self.sema.type_needs_drop(elem_sema) != 0:
+            let elem_llvm = self.mir_sema_type_to_llvm(elem_sema)
+            let elem_ptr = wl_build_struct_gep(self.builder, ty, ptr, i)
+            self.mir_emit_drop_ptr_for_sema_type(elem_ptr, elem_llvm, elem_sema)
+        i = i - 1
+
 fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> Unit:
     if ptr == 0 or ty == 0 or sema_ty <= 0:
         return
@@ -3835,6 +3851,10 @@ fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sem
         return
     let resolved = self.sema.resolve_alias(drop_sema_ty as TypeId) as i32
     let tk = self.sema.get_type_kind(resolved as TypeId)
+    // #606: tuples have no named type or drop fn; drop each element in place.
+    if tk == TypeKind.TY_TUPLE:
+        self.mir_emit_drop_tuple_ptr(ptr, ty, resolved)
+        return
     var type_sym = 0
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
         type_sym = self.sema.get_type_d0(resolved as TypeId)

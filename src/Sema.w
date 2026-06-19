@@ -559,6 +559,7 @@ type Sema {
     method_lookup: SemaMethodLookup,
     drop_method_cache: HashMap[i32, i32],
     copy_visit_stack: Vec[i32],
+    needs_drop_visit: Vec[i32],
     current_drop_type_sym: i32,
     drop_control_flow_depth: i32,
     move_control_flow_depth: i32,
@@ -1544,6 +1545,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         method_lookup,
         drop_method_cache,
         copy_visit_stack: Vec.new(),
+        needs_drop_visit: Vec.new(),
         current_drop_type_sym: 0,
         drop_control_flow_depth: 0,
         move_control_flow_depth: 0,
@@ -3824,6 +3826,58 @@ fn Sema.type_has_drop_impl(self: Sema, tid: i32) -> i32:
             if self.impl_extra.get((start + i) as i64) == self.syms.drop:
                 return 1
     0
+
+// Transitive needs-drop: does a value of this type run any destructor effect on
+// drop? True if the type has its own `impl Drop`, is a channel endpoint, or any
+// field / tuple-or-array element / enum-variant payload transitively needs drop.
+// `type_has_drop_impl` is shallow (own impl only); this recurses so that an
+// aggregate holding a Drop value is treated as owning it (gates move-consume at
+// construction and drop emission for the contents). Pointers/refs and primitives
+// stop the recursion, so by-value type graphs (which are acyclic) terminate; the
+// visit guard is defensive insurance against an unexpected cycle.
+fn Sema.type_needs_drop(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    if self.type_has_drop_impl(resolved as i32) != 0:
+        return 1
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_name = self.pool_resolve(self.get_generic_inst_base(resolved as i32))
+        if base_name == "Sender" or base_name == "Receiver":
+            return 1
+    for vi in 0..self.needs_drop_visit.len() as i32:
+        if self.needs_drop_visit.get(vi as i64) == resolved as i32:
+            return 0
+    self.needs_drop_visit.push(resolved as i32)
+    var result = 0
+    if tk == TypeKind.TY_TUPLE:
+        let te_start = self.get_type_d0(resolved)
+        let elem_count = self.get_type_d1(resolved)
+        for ei in 0..elem_count:
+            if self.type_needs_drop(self.type_extra.get((te_start + ei) as i64)) != 0:
+                result = 1
+                break
+    else if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_RANGE:
+        result = self.type_needs_drop(self.get_type_d0(resolved))
+    else:
+        let field_count = self.type_reflection_field_count(resolved as i32)
+        for fi in 0..field_count:
+            if self.type_needs_drop(self.type_reflection_field_type(resolved as i32, fi)) != 0:
+                result = 1
+                break
+        if result == 0:
+            let variant_count = self.type_reflection_variant_count(resolved as i32)
+            var vidx = 0
+            while vidx < variant_count and result == 0:
+                let payload_count = self.type_reflection_variant_payload_count(resolved as i32, vidx)
+                for pi in 0..payload_count:
+                    if self.type_needs_drop(self.type_reflection_variant_payload_type(resolved as i32, vidx, pi)) != 0:
+                        result = 1
+                        break
+                vidx = vidx + 1
+    self.needs_drop_visit.pop()
+    result
 
 fn Sema.emit_implicit_drop_view_use_error(self: Sema, view_sym: i32, origin_sym: i32, origin_node: i32):
     let view_name = self.pool_resolve(view_sym)

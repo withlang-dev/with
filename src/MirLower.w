@@ -4565,24 +4565,43 @@ fn MirBuilder.lower_tuple_destructure(self: MirBuilder, node: i32):
     let rhs_ty = self.expr_type(rhs_expr)
     let rhs_op = self.lower_expr(rhs_expr)
     let rhs_place = self.materialize_operand(rhs_op, rhs_ty, self.ast.get_start(node))
-    // Bind each name to the corresponding tuple field
+    // Bind each name to the corresponding tuple field. Tuple destructure requires
+    // exact arity (sema rejects `..` here), so position ni == tuple element index.
     for ni in 0..name_count:
         let n_sym = self.ast.get_extra(extra_start + ni)
-        if n_sym == 0:
-            continue
-        // Negative sym means ..rest pattern — skip for now
+        // Negative sym means ..rest pattern — skip (defensive; not reachable).
         if n_sym < 0:
             continue
         let elem_ty = self.tuple_elem_type(rhs_ty, ni)
+        let move_kind = if self.type_needs_value_drop(elem_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+        let field_place = self.body.new_field_place(rhs_place, ni, elem_ty)
+        let field_op = self.body.new_operand(move_kind, field_place)
+        if n_sym == 0:
+            // Discarded `_`: a Drop element must still drop exactly once (#606).
+            // Move it into an anonymous local that drops at scope exit so it is
+            // neither leaked nor double-freed by the source-tuple consume below.
+            if self.type_needs_value_drop(elem_ty) != 0:
+                let discard_local = self.body.new_local(elem_ty, 0, 0, 1)
+                self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, discard_local, 0, self.ast.get_start(node))
+                self.schedule_drop(discard_local, DropKind.DK_VALUE)
+                self.assign_operand_to_place(self.place_for_local(discard_local), field_op, self.ast.get_start(node))
+            continue
         let local_id = self.body.new_local(elem_ty, 0, n_sym, 1)
         self.bind_local(n_sym, local_id)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(node))
         if self.type_needs_value_drop(elem_ty) != 0:
             self.schedule_drop(local_id, DropKind.DK_VALUE)
-        let field_place = self.body.new_field_place(rhs_place, ni, elem_ty)
-        let field_op = self.body.new_operand(if self.type_needs_value_drop(elem_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
         let dst_place = self.place_for_local(local_id)
         self.assign_operand_to_place(dst_place, field_op, self.ast.get_start(node))
+    // #605/#606: every element has been moved out into a binding (or an anonymous
+    // drop-local for `_`), so the source tuple owns nothing. Cancel its value drop
+    // (it is a materialized stmt temp) so the new tuple element-drop does not also
+    // free the moved-out elements. Oracle: `let (tx, rx) = channel()`.
+    let src_local = mir_place_plain_local(&self.body, rhs_place)
+    if src_local >= 0:
+        self.cancel_stmt_temp_for_local(src_local)
+        self.cancel_scheduled_value_drop_for_local(src_local)
+        self.mark_local_value_moved(src_local)
 
 fn MirBuilder.lower_let_else(self: MirBuilder, node: i32):
     let pat = self.ast.get_data0(node)
@@ -4594,6 +4613,18 @@ fn MirBuilder.lower_let_else(self: MirBuilder, node: i32):
 
     if else_body == 0:
         let _ = self.lower_pattern(pat, rhs_place)
+        // #605/#606: an irrefutable destructure (e.g. `let (a, b) = t`) moves the
+        // source's contents into the pattern bindings, which now own and drop them.
+        // Two owners must be silenced so the new aggregate element-drop does not
+        // double-free the moved-out bindings:
+        //   1. the materialized scrutinee copy (rhs_place), and
+        //   2. a named source expression (which is copied, not moved, into it).
+        let mat_local = mir_place_plain_local(&self.body, rhs_place)
+        if mat_local >= 0:
+            self.cancel_stmt_temp_for_local(mat_local)
+            self.cancel_scheduled_value_drop_for_local(mat_local)
+            self.mark_local_value_moved(mat_local)
+        self.cancel_scheduled_value_drop_for_receiver_expr(rhs)
         return
 
     let success_bb = self.new_block()
@@ -10221,6 +10252,21 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                             return self.int_const_operand(fa_disc_tag2 as i64, fa_base_ty)
         let place = self.lower_field_access(node)
         self.mark_string_place_copied(place)
+        // #606: reading a non-Copy element out of a TUPLE by value moves it out of
+        // the source (e.g. the channel idiom `let tx = pair.0; let rx = pair.1`).
+        // Consume the tuple base so its element-drop does not also free the
+        // extracted value (double-free). Conservative: it consumes the whole base,
+        // so a Drop sibling that is not also extracted leaks (precise per-element
+        // tracking is a follow-up). Scoped to a plain tuple-local base.
+        let fa_val_ty = self.expr_type(node)
+        if fa_val_ty != 0 and self.sema.is_copy(fa_val_ty as TypeId) == 0:
+            let fa_base_local = self.place_base_local(place)
+            if fa_base_local >= 0 and fa_base_local < self.body.local_type_ids.len() as i32:
+                let fa_base_local_ty = self.body.local_type_ids.get(fa_base_local as i64)
+                if fa_base_local_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(fa_base_local_ty as TypeId)) == TypeKind.TY_TUPLE:
+                    self.mark_local_value_moved(fa_base_local)
+                    self.cancel_scheduled_value_drop_for_local(fa_base_local)
+                    self.cancel_stmt_temp_for_local(fa_base_local)
         return self.body.new_operand(OperandKind.OK_COPY, place)
 
     if kind == NodeKind.NK_INDEX:
@@ -10695,11 +10741,22 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 expected_elem_start = self.sema.get_type_d0(expected_resolved)
         for i in 0..elem_count:
             let elem_node = self.ast.get_extra(extra_start + i)
+            var elem_ty = self.expr_type(elem_node)
             if expected_tuple != 0:
-                self.expected_type = self.sema.type_extra.get((expected_elem_start + i) as i64)
-            tup_fields.push(self.lower_expr(elem_node))
+                let exp_elem = self.sema.type_extra.get((expected_elem_start + i) as i64)
+                self.expected_type = exp_elem
+                if elem_ty == 0 or elem_ty == self.sema.ty_void as i32:
+                    elem_ty = exp_elem
+            let elem_op = self.lower_expr(elem_node)
+            tup_fields.push(elem_op)
             self.expected_type = saved_expected
             tup_names.push(0)
+            // #605/#606: a Drop element is moved into the tuple; consume the
+            // source so its destructor is not also run at its scope exit (which
+            // would double-free). Paired with the tuple's element-drop
+            // (mir_emit_drop_tuple_ptr) — both land together.
+            if self.sema.type_needs_drop(elem_ty) != 0:
+                self.consume_moved_operand(elem_op)
         let tup_fid = self.body.new_agg_fields(tup_fields, tup_names)
         let tup_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, tup_fid, 0)
         let tup_ty = self.expr_type(node)

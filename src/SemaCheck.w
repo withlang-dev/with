@@ -10768,6 +10768,12 @@ fn Sema.check_tuple(self: Sema, node: i32) -> i32:
         else:
             self.check_expr(elem)
         tuple_elems.push(et as i32)
+        // #605: a whole non-Copy (Drop) local moved into a tuple field is
+        // consumed (use-after-move + drop-once), mirroring struct-literal fields.
+        // Restricted to a plain identifier; projections are partial moves handled
+        // elsewhere.
+        if self.ast.kind(elem) == NodeKind.NK_IDENT and self.type_needs_drop(et as i32) != 0:
+            self.mark_moved_if_consumed(elem)
     let result = if expected_tuple != 0:
         self.expected_expr_type
     else:
