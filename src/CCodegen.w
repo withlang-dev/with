@@ -369,8 +369,8 @@ fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sem
         place_kind_cache: HashMap.new(),
         callee_hint_cache: HashMap.new(),
     }
-    for i in 0..mir_mod.body_fn_syms.len() as i32:
-        let sym = mir_mod.body_fn_syms.get(i as i64)
+    for i in 0..cg.mir_mod.body_fn_syms.len() as i32:
+        let sym = cg.mir_mod.body_fn_syms.get(i as i64)
         cg.body_fn_map.insert(sym, 1)
     let src = cg.emit_module()
     if cg.had_error != 0:

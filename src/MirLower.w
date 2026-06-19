@@ -10592,9 +10592,18 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 f_ty = self.struct_field_type(sl_struct_ty, f_name_sym)
             if f_ty != 0:
                 self.expected_type = f_ty
-            sl_fields.push(self.lower_expr(f_val_node))
+            let f_op = self.lower_expr(f_val_node)
+            sl_fields.push(f_op)
             sl_names.push(resolved_name)
             self.expected_type = saved_expected
+            // #605: a Drop-bearing field value is moved into the aggregate; mark
+            // the source consumed so it is not also dropped at its scope exit
+            // (otherwise its destructor runs twice -> double-free). Gated on a
+            // Drop impl: non-Drop value types are left to copy, which the
+            // codebase relies on to share data across constructions and which is
+            // harmless without a destructor.
+            if self.sema.type_has_drop_impl(f_ty) != 0:
+                self.consume_moved_operand(f_op)
         if self.sema.type_decl_nodes.contains(sl_name_sym):
             let sl_td_node = self.sema.type_decl_nodes.get(sl_name_sym).unwrap()
             let sl_td_extra = self.ast.get_data1(sl_td_node)
@@ -10621,9 +10630,12 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                         let decl_field_ty = (info / 4294967296) as i32
                         if decl_field_ty != 0:
                             self.expected_type = decl_field_ty
-                        sl_fields.push(self.lower_expr(decl_default))
+                        let def_op = self.lower_expr(decl_default)
+                        sl_fields.push(def_op)
                         sl_names.push(decl_field_name)
                         self.expected_type = saved_expected
+                        if self.sema.type_has_drop_impl(decl_field_ty) != 0:
+                            self.consume_moved_operand(def_op)
         let sl_fid = self.body.new_agg_fields(sl_fields, sl_names)
         let sl_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, sl_fid, 0)
         var sl_ty = self.expr_type(node)

@@ -8939,6 +8939,16 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                 let val_ty = if field_expected != 0: self.check_expr_with_expected(f_value, field_expected as TypeId) else: self.check_expr(f_value)
                 if not self.ephemeral_types.contains(name):
                     self.check_ephemeral_task_storage(f_value, "non-ephemeral struct")
+                // #605: a whole non-Copy local moved into a struct field is
+                // consumed (use-after-move + drop-once), like a let-binding
+                // value. Restricted to a plain identifier: field/index
+                // projections are partial moves governed elsewhere, and newly
+                // enforcing them here would reject existing field-read
+                // construction (e.g. `T { a: ctx.x }`). The MIR move
+                // (consume_moved_operand) handles call-result temporaries and
+                // the actual drop suppression for all forms.
+                if self.ast.kind(f_value) == NodeKind.NK_IDENT and self.type_has_drop_impl(val_ty as i32) != 0:
+                    self.mark_moved_if_consumed(f_value)
                 val_types.push(val_ty as i32)
             if self.type_decl_nodes.contains(name):
                 let defaults_td_node = self.type_decl_nodes.get(name).unwrap()
