@@ -647,11 +647,19 @@ fn comptime_tar_header_checksum(data: str, offset: i64) -> i64:
     sum
 
 fn comptime_tar_magic_ok(data: str, offset: i64) -> bool:
-    data.byte_at(offset + 257) == 117 and
+    let ustar = data.byte_at(offset + 257) == 117 and
         data.byte_at(offset + 258) == 115 and
         data.byte_at(offset + 259) == 116 and
         data.byte_at(offset + 260) == 97 and
         data.byte_at(offset + 261) == 114
+    if ustar:
+        return true
+    var i: i64 = 257
+    while i < 265:
+        if data.byte_at(offset + i) != 0:
+            return false
+        i = i + 1
+    true
 
 fn comptime_tar_archive_name_safe(name: str) -> bool:
     if name.len() == 0:
@@ -3994,10 +4002,7 @@ fn ComptimeEvaluator.toolfs_write_tar(self: ComptimeEvaluator, record: &Comptime
     out.push_str(comptime_tar_zeroes(1024))
     with_fs_write_file(resolved_output, out.to_str())
 
-fn ComptimeEvaluator.toolfs_extract_tar(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, archive_path: str, output_dir: str, method: str, node: i32) -> i32:
-    let resolved_archive = self.capability_resolve_project_path(record, archive_path, method, node)
-    if self.had_error != 0:
-        return 1
+fn ComptimeEvaluator.toolfs_extract_tar_contents(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, archive: str, output_dir: str, method: str, node: i32) -> i32:
     if not self.capability_require_mkdir_allowed(record, output_dir, method, node):
         return 1
     let resolved_output_dir = self.capability_resolve_project_path(record, output_dir, method, node)
@@ -4005,7 +4010,6 @@ fn ComptimeEvaluator.toolfs_extract_tar(self: ComptimeEvaluator, record: &Compti
         return 1
     if with_fs_mkdir_p(resolved_output_dir) != 0:
         return 1
-    let archive = with_fs_read_file(resolved_archive)
     var offset: i64 = 0
     while offset + 512 <= archive.len():
         if comptime_tar_block_is_zero(archive, offset):
@@ -4062,6 +4066,12 @@ fn ComptimeEvaluator.toolfs_extract_tar(self: ComptimeEvaluator, record: &Compti
         let padded = ((size + 511) / 512) * 512
         offset = offset + 512 + padded
     1
+
+fn ComptimeEvaluator.toolfs_extract_tar(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, archive_path: str, output_dir: str, method: str, node: i32) -> i32:
+    let resolved_archive = self.capability_resolve_project_path(record, archive_path, method, node)
+    if self.had_error != 0:
+        return 1
+    self.toolfs_extract_tar_contents(record, with_fs_read_file(resolved_archive), output_dir, method, node)
 
 fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_TOOL_FS, method, node)

@@ -17,7 +17,7 @@ set -eu
 # decls). Normal self-host builds link via lld and do not invoke clang, but
 # emitted-C bootstrap must use this With-owned clang, not GCC/MSVC/system LLVM.
 #
-# Output: out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst
+# Output: out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz
 # The archive's top-level dir is the SDK prefix basename (llvm-<ver>-<host-tag>),
 # so a fetch can extract it straight into .deps/.
 
@@ -35,7 +35,7 @@ esac
 
 prefix="${LLVM_PREFIX:-.deps/llvm-${llvm_version}-${host_tag}}"
 sdk_base="llvm-${llvm_version}-${host_tag}"
-asset="$release_dir/with-llvm-sdk-${llvm_version}-${platform}.tar.zst"
+asset="$release_dir/with-llvm-sdk-${llvm_version}-${platform}.tar.gz"
 build_cache="${LLVM_BUILD_CACHE:-.deps/build/llvm-${llvm_version}-${host_tag}/CMakeCache.txt}"
 
 if [ ! -f "$prefix/lib/libclang.a" ]; then
@@ -111,14 +111,14 @@ for tool in ld.lld ld64.lld lld-link wasm-ld llvm-nm llvm-readobj llvm-strip; do
 done
 
 mkdir -p "$release_dir"
-( cd "$stage_root" && tar -cf - "$sdk_base" ) | zstd -19 -T0 -o "$asset" -f
+tar -czf "$asset" -C "$stage_root" "$sdk_base"
 rm -rf "$stage_root"
 
 # Sanity: the archive must contain the static libclang and the builtin headers.
 # List the full archive once to a file (streaming into `grep -q` would SIGPIPE
 # the decompressor on its early exit).
 listing="$(mktemp)"
-zstd -dc "$asset" | tar -tf - > "$listing"
+tar -tf "$asset" > "$listing"
 if ! grep -q "$sdk_base/lib/libclang.a" "$listing"; then
     echo "error: packaged SDK is missing lib/libclang.a" >&2
     rm -f "$listing"

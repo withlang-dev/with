@@ -1152,11 +1152,19 @@ fn tool_tar_header_checksum(bytes: &Vec[u8], offset: i64) -> i64:
     sum
 
 fn tool_tar_magic_ok(bytes: &Vec[u8], offset: i64) -> bool:
-    bytes.get(offset + 257) == 117 as u8 and
+    let ustar = bytes.get(offset + 257) == 117 as u8 and
         bytes.get(offset + 258) == 115 as u8 and
         bytes.get(offset + 259) == 116 as u8 and
         bytes.get(offset + 260) == 97 as u8 and
         bytes.get(offset + 261) == 114 as u8
+    if ustar:
+        return true
+    var i: i64 = 257
+    while i < 265:
+        if bytes.get(offset + i) != 0 as u8:
+            return false
+        i = i + 1
+    true
 
 fn tool_tar_archive_name_safe(name: str) -> bool:
     if name.len() == 0:

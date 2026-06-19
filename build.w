@@ -330,7 +330,7 @@ fn llvm_sdk_dir_basename() -> str:
     prefix
 
 fn llvm_sdk_asset_for_host() -> str:
-    "with-llvm-sdk-" ++ compiler_llvm_version() ++ "-" ++ release_platform_tag() ++ ".tar.zst"
+    "with-llvm-sdk-" ++ compiler_llvm_version() ++ "-" ++ release_platform_tag() ++ ".tar.gz"
 
 fn install_file_target(name: str, source: str, dest: str, mode: str, dep: str) -> Target:
     var target = target_new(.Install, name, source).output(dest)
@@ -1212,7 +1212,9 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var seed = target_new(.Action, "seed", "").output("src/main")
     seed.action = run_seed_download_action
+    seed = seed.input("build/https_fetch.w")
     seed = seed.write_scope("out/tmp")
+    seed = seed.allow_network()
     seed = seed.arg("withlang-dev/with")
     seed = seed.arg(release_asset_for_host())
     out = out.add_target(seed)
@@ -1222,8 +1224,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     // so a build never rebuilds LLVM from source or trusts a system LLVM.
     var deps = target_new(.Action, "deps", "").output(compiler_default_libclang_archive_path())
     deps.action = run_deps_download_action
+    deps = deps.input("build/https_fetch.w")
+    deps = deps.input("build/zlib_gunzip.w")
     deps = deps.write_scope("out/tmp")
     deps = deps.write_scope(".deps")
+    deps = deps.allow_network()
     deps = deps.arg("withlang-dev/with")
     deps = deps.arg(llvm_sdk_asset_for_host())
     deps = deps.arg(llvm_sdk_dir_basename())
@@ -1253,7 +1258,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     var pcre2_reference = target_new(.Action, "pcre2-reference", "").output("out/pcre2_reference/pcre2-10.47")
     pcre2_reference.action = run_pcre2_reference_action
     pcre2_reference = pcre2_reference.extra_output("out/pcre2_reference/pcre2-10.47/.with-reference-ready")
+    pcre2_reference = pcre2_reference.input("build/https_fetch.w")
+    pcre2_reference = pcre2_reference.input("build/zlib_gunzip.w")
     pcre2_reference = pcre2_reference.write_scope("out/tmp/action-scratch/pcre2-reference")
+    pcre2_reference = pcre2_reference.allow_network()
     pcre2_reference = pcre2_reference.arg("pcre2-10.47")
     pcre2_reference = pcre2_reference.arg("https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.gz")
     out = out.add_target(pcre2_reference)

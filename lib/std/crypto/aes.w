@@ -142,5 +142,5 @@ unsafe fn aes128_encrypt_block(ctx: *const Aes128, block: *mut u8):
         *(block + i as u64) = *(sp + i as u64)
 
 // Public wrapper
-fn Aes128.encrypt_block(self: *const Aes128, block: *mut u8):
+unsafe fn Aes128.encrypt_block(self: *const Aes128, block: *mut u8):
     unsafe { aes128_encrypt_block(self, block) }

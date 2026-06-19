@@ -76,9 +76,9 @@ with-darwin-aarch64                          # Darwin arm64 compiler binary
 with-linux-x86_64                            # Linux x86_64 compiler binary
 with-windows-x86_64.exe                      # Windows x86_64 compiler binary
 with-bootstrap-c-vX.Y.Z.tar.zst              # emitted-C bootstrap bundle
-with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst   # static LLVM SDK (Darwin arm64)
-with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst     # static LLVM SDK (Linux x86_64)
-with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.zst   # static LLVM SDK (Windows x86_64)
+with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.gz    # static LLVM SDK (Darwin arm64)
+with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.gz      # static LLVM SDK (Linux x86_64)
+with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.gz    # static LLVM SDK (Windows x86_64)
 ```
 
 Do not publish a binary asset named `main`. `src/main` is the local seed path;
@@ -99,12 +99,12 @@ it as a per-platform asset and let the build fetch it the same way it fetches
 the seed (issue #313):
 
 - **Package** (per platform, after the SDK exists in `.deps`):
-  produce `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst` through the
+  produce `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz` through the
   With-native release packaging target. Until that target exists, SDK package
-  publishing is deferred by `docs/eliminate-Makefile.md`; shell or PowerShell
+  publishing is tracked by `docs/eliminate-Makefile.md`; shell or PowerShell
   packaging helpers are not the post-seed release contract. The packaging
   target must refuse SDKs not built with Clang/clang-cl by the bootstrap SDK
-  flow. It ships only what the build links against — `lib/*.a`,
+  flow. It ships only what the build links against: `lib/*.a`,
   `lib/clang/<v>/include/`,
   `bin/ninja`, `bin/cmake`, `bin/clang`, `bin/lld` (+ driver symlinks),
   `bin/llvm-ml`/`bin/llvm-ml64` on Windows, `bin/llvm-nm`, and
@@ -112,7 +112,7 @@ the seed (issue #313):
   small while still carrying the With-owned build tools required by SDK
   production, emitted-C bootstrap, and release packaging.
 - **Fetch**: `with build :deps` downloads
-  `with-llvm-sdk-<COMPILER_LLVM_VERSION>-<host>.tar.zst` from the matching
+  `with-llvm-sdk-<COMPILER_LLVM_VERSION>-<host>.tar.gz` from the matching
   release and extracts it into `.deps/llvm-<ver>-<host>`. `WITH_LLVM_SDK_VERSION`
   pins the release tag; otherwise the newest release carrying the asset is used.
 - The SDK bytes change only when `COMPILER_LLVM_VERSION` (`build/compiler.w`)
@@ -126,9 +126,9 @@ Seed and SDK download paths must use the host-specific asset names:
 Current per-host assets:
 
 ```text
-Darwin arm64: with-darwin-aarch64   with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst
-Linux x86_64: with-linux-x86_64     with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst
-Windows x86_64: with-windows-x86_64.exe with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.zst
+Darwin arm64: with-darwin-aarch64   with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.gz
+Linux x86_64: with-linux-x86_64     with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.gz
+Windows x86_64: with-windows-x86_64.exe with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.gz
 ```
 
 ## Verification
@@ -400,12 +400,12 @@ git push origin v0.14.3
 
 Prepare the platform-named assets on their native platforms with the
 With-native release package targets. These targets do not exist yet; until they
-do, release/SDK packaging remains deferred by `docs/eliminate-Makefile.md` and
+do, release/SDK packaging remains tracked by `docs/eliminate-Makefile.md` and
 must not be treated as a normal post-seed script workflow.
 
 The SDK package target runs on each native platform and packages that host's
 `.deps/llvm-<ver>-<host>` static SDK into
-`out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst`. Copy the Linux SDK
+`out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz`. Copy the Linux SDK
 asset back alongside the Linux binary:
 
 On Windows, the SDK package target packages the
@@ -416,7 +416,7 @@ Clang/lld, and LLVM utility tools (`ninja.exe`, `cmake.exe`, `clang.exe`,
 `.lib` archives, and clang builtin headers.
 
 ```sh
-scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-llvm-sdk-*-linux-x86_64.tar.zst out/release/
+scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-llvm-sdk-*-linux-x86_64.tar.gz out/release/
 ```
 
 This produces platform assets under `out/release/`. Transitional installer
@@ -443,9 +443,9 @@ gh release create v0.14.3 \
   out/release/with-darwin-aarch64 \
   out/release/with-linux-x86_64 \
   out/release/with-bootstrap-c-v0.14.3.tar.zst \
-  out/release/with-llvm-sdk-*-darwin-aarch64.tar.zst \
-  out/release/with-llvm-sdk-*-linux-x86_64.tar.zst \
-  out/release/with-llvm-sdk-*-windows-x86_64.tar.zst \
+  out/release/with-llvm-sdk-*-darwin-aarch64.tar.gz \
+  out/release/with-llvm-sdk-*-linux-x86_64.tar.gz \
+  out/release/with-llvm-sdk-*-windows-x86_64.tar.gz \
   --repo withlang-dev/with \
   --title "v0.14.3: <release title>" \
   --notes-file <release-notes.md>
@@ -482,9 +482,9 @@ with-bootstrap-c-v0.14.3.tar.zst
 with-darwin-aarch64
 with-linux-x86_64
 with-windows-x86_64.exe
-with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst
-with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst
-with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.zst
+with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.gz
+with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.gz
+with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.gz
 ```
 
 Confirm the tag points at the verified commit:

@@ -79,8 +79,11 @@ Already true:
 - Direct graph targets exist for stage1/stage2/stage3, runtime, build,
   selfcheck, fixpoint, test, install, install-user, seed, deps, clean, PCRE2,
   emit-C, release UAT, prune, test-green, and last-green workflows.
-- `with build :seed` and `with build :deps` are the graph targets for fetching
-  the release seed and static LLVM SDK when a With compiler already exists.
+- `with build :seed` and `with build :deps` are the graph entry points for
+  fetching the release seed and static LLVM SDK when a With compiler already
+  exists. They use With-owned HTTPS fetch helpers; `:deps` consumes `.tar.gz`
+  SDK assets, gunzips them with migrated zlib, and extracts them with native
+  `ToolFs.extract_tar()`.
 - Release and bootstrap runbooks use `with build` for compiler verification
   gates.
 - The build graph has repository locking, build-state files, and target
@@ -118,11 +121,12 @@ Still blocking Makefile and script removal:
   - `tools/build-cmake.ps1`
   - `tools/build-static-llvm.sh`
   - `tools/build-static-llvm.ps1`
-- Build-system maintenance still relies on host utilities for release/SDK
-  packaging work. Repository build evidence, compiler seed hashes, zlib
-  reference fetching/extraction, generic `std.build` download checksum
-  verification, and optional stack-budget inspection use With-owned tools or
-  explicit With-owned SDK tool paths.
+- Build-system maintenance still relies on host utilities for seed/deps
+  fetching, PCRE2 reference fetching/extraction, and release/SDK packaging
+  work. Repository build evidence, compiler seed hashes, zlib reference
+  fetching/extraction, generic `std.build` download checksum verification, and
+  optional stack-budget inspection use With-owned tools or explicit With-owned
+  SDK tool paths.
 - `ToolFs.write_tar()` and `ToolFs.extract_tar()` provide native
   uncompressed USTAR support for regular files and directories. The migrated
   `std.zlib` facade now supports zlib/gzip decompression, and
@@ -136,10 +140,10 @@ Still blocking Makefile and script removal:
   shared `out/pcre2_tmp` path to the action-scratch path convention with
   explicit transitional write scopes for old-seed compatibility.
 - The active runbooks still describe release packaging and SDK packaging
-  as deferred until With-native release package targets exist. Installer
-  scripts are no longer required release assets in the release runbook, but the
-  scripts still exist as transitional byproducts until a With-native installer
-  path lands.
+  as blocked until With-native release package targets exist. Installer scripts
+  are no longer required release assets in the release runbook, but the scripts
+  still exist as transitional byproducts until a With-native installer path
+  lands.
 - Some std.build / build-cache behavior is not strong enough to be the final
   script-free contract.
 
@@ -162,7 +166,7 @@ and script dependency are gone.
 
 | Path | Classification | Disposition |
 | --- | --- | --- |
-| `.github/workflows/ci.yml` | post-seed blocker | Replace `make build` dispatch with explicit `with build` targets and declared setup steps. |
+| `.github/workflows/ci.yml` | bootstrap-boundary CI setup | CI no longer invokes Make; it uses a bootstrap seed acquisition step, then `with build :deps`, `with build`, `with build :fixpoint`, and `with build :test`. |
 | `Makefile` | post-seed blocker | Delete after all listed aliases, cross, seed, CI, release, SDK, and install roles have With graph replacements. |
 | `scripts/package-bootstrap-c.sh` | post-seed blocker | Replace with a self-hosted packaging target. |
 | `scripts/package-darwin-aarch64.sh` | post-seed blocker | Replace with a self-hosted Darwin release packaging target. |
@@ -254,7 +258,7 @@ and script dependency are gone.
   output denial plus an allowed-network process case.
 - 2026-06-16: Deleted the unused top-level `memlimit.sh` historical script.
 - 2026-06-16: Cleaned the release runbook away from normal post-seed package
-  script paths. Release and SDK packaging are now documented as deferred until
+  script paths. Release and SDK packaging are now documented as blocked until
   With-native package targets provide archive creation, validation, stripping,
   and binary inspection without host shell, PowerShell, `tar`, `zstd`, `otool`,
   `ldd`, or symbol utilities.
@@ -279,6 +283,11 @@ and script dependency are gone.
   `:zlib-reference` now fetches through a With HTTP helper, verifies with
   `ToolFs.sha256_file()`, gunzips through migrated zlib, and extracts with
   native `ToolFs.extract_tar()`.
+- 2026-06-19: Removed host `curl`/`tar -xzf` from `:pcre2-reference` and host
+  `curl`/`zstd`/`tar` from `:seed`/`:deps`. These targets now fetch through
+  With-built HTTPS helpers; PCRE2 and SDK `.tar.gz` archives gunzip through
+  migrated zlib and extract through native `ToolFs.extract_tar()`. SDK release
+  assets are now named `with-llvm-sdk-<llvm-ver>-<platform>.tar.gz`.
 
 ## Next Work Queue
 
@@ -286,11 +295,10 @@ Do not stack new Makefile-elimination implementation work on top of unrelated
 compiler/backend fixes. If the worktree contains a verified compiler fix, commit
 that logical change first, then continue with this queue.
 
-1. **Defer release and SDK packaging until archive/package capabilities mature.**
-   Package targets still need native compression, symlink archive metadata,
-   deterministic manifests, package-format decisions, binary inspection, and
-   With-owned strip/symbol checks. Start those after the cache/explain/runbook
-   groundwork makes failures diagnosable.
+1. **Implement release and SDK package capabilities.** Package targets still
+   need native compression, symlink archive metadata, deterministic manifests,
+   package-format decisions, binary inspection, and With-owned strip/symbol
+   checks.
 
 ## Implementation Tasks
 
@@ -324,8 +332,9 @@ trustworthy once `build.w` owns every workflow.
   native uncompressed USTAR file/directory archive support exists; zlib/gzip
   decompression exists through `std.zlib`; `build/zlib.w` has a project-local
   HTTP helper for its reference archive. Native archive creation with
-  compression, symlink archive metadata, first-class `std.build` HTTP(S) fetch,
-  and richer platform path handling remain.
+  compression, symlink archive metadata, zstd compression/decompression,
+  first-class `std.build` HTTP(S) fetch, and richer platform path handling
+  remain.
 - [x] Implement `ToolFs.scratch_dir() -> str` as an action-scoped, driver-managed
   scratch directory. The returned path must be project-relative, private to the
   current action invocation, automatically included in that action's write
@@ -429,9 +438,12 @@ updates are normal build graph work.
   `tools/bootstrap/` path. It may depend on system tools, but it must not be
   described as part of normal release, development, test, package, deps, or CI
   flow.
-- [x] Ensure post-seed seed refresh is only `with build :seed`, implemented in With
-  code with declared network access, host asset selection, checksum
+- [ ] Ensure post-seed seed refresh is only `with build :seed`, implemented in
+  With code with declared network access, host asset selection, checksum
   verification, executable-bit handling, and loud unsupported-host diagnostics.
+  The graph target now uses a With-built HTTPS helper and handles the host asset
+  name, output path, and executable bit. The open part of this checklist item is
+  checksum policy for seed binary assets.
 - [x] Ensure the path downloads the host-named release asset (`with-darwin-aarch64`,
   `with-linux-x86_64`, `with-windows-x86_64.exe`) into `src/main`.
 - [x] Ensure the path does not publish or depend on an asset named `main`.
@@ -459,6 +471,9 @@ scripts.
   previously fetched With-owned CMake/Ninja/Clang/lld binaries, but must not
   discover or invoke host Make, host Ninja, host CMake, GCC, MSVC `cl.exe`, or a
   system LLVM.
+- Keep the SDK package format aligned with `:deps`: release SDK assets are
+  `.tar.gz`, because the graph can already gunzip them through migrated zlib and
+  extract the tar stream natively.
 - Keep the existing SDK build scripts only as bootstrap-new-platform helpers
   until the first platform seed/SDK asset exists, then move or label them under
   the bootstrap-only boundary.
@@ -669,6 +684,12 @@ with build :pcre2-migrate
 with build :pcre2-build
 with build :pcre2-test
 with build :pcre2-promote
+with build :zlib-reference
+with build :zlib-migrate
+with build :zlib-build
+with build :zlib-test
+with build :zlib-check-generated
+with build :zlib-promote
 with build :emit-c-test
 with build :emit-c-fixpoint
 with build :emit-c-roundtrip

@@ -5,7 +5,7 @@
 # does not build LLVM and it does not trust a system LLVM.
 #
 # Output:
-#   out\release\with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.zst
+#   out\release\with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.gz
 #
 # The archive top-level directory is the SDK prefix basename
 # (llvm-<ver>-windows-x86_64-msvc), so fetchers can extract it into .deps.
@@ -18,7 +18,7 @@ $platform = "windows-x86_64"
 $releaseDir = if ($env:WITH_RELEASE_DIR) { $env:WITH_RELEASE_DIR } else { "out\release" }
 $prefix = if ($env:LLVM_PREFIX) { $env:LLVM_PREFIX } else { ".deps\llvm-$llvmVersion-$hostTag" }
 $sdkBase = "llvm-$llvmVersion-$hostTag"
-$asset = Join-Path $releaseDir "with-llvm-sdk-$llvmVersion-$platform.tar.zst"
+$asset = Join-Path $releaseDir "with-llvm-sdk-$llvmVersion-$platform.tar.gz"
 $buildCache = if ($env:LLVM_BUILD_CACHE) { $env:LLVM_BUILD_CACHE } else { ".deps\build\llvm-$llvmVersion-$hostTag\CMakeCache.txt" }
 
 function Require-Tool($name) {
@@ -28,7 +28,6 @@ function Require-Tool($name) {
 }
 
 Require-Tool "tar.exe"
-Require-Tool "zstd.exe"
 
 $libclang = Join-Path $prefix "lib\libclang.lib"
 if (-not (Test-Path -PathType Leaf $libclang)) {
@@ -81,21 +80,18 @@ foreach ($tool in @("ctest.exe", "cpack.exe")) {
     }
 }
 
-$tarPath = Join-Path $releaseDir "with-llvm-sdk-$llvmVersion-$platform.tar"
-$tarFullPath = [System.IO.Path]::GetFullPath($tarPath)
-Remove-Item -Force -Path $tarPath, $asset -ErrorAction SilentlyContinue
+$assetFullPath = [System.IO.Path]::GetFullPath($asset)
+Remove-Item -Force -Path $asset -ErrorAction SilentlyContinue
 
 Push-Location $stageRoot
 try {
-    tar.exe -cf $tarFullPath $sdkBase
+    tar.exe -czf $assetFullPath $sdkBase
 }
 finally {
     Pop-Location
 }
 
-zstd.exe -q -19 -T0 -f $tarPath -o $asset
 Remove-Item -Recurse -Force -Path $stageRoot
-Remove-Item -Force -Path $tarPath
 
 $listing = tar.exe -tf $asset
 if (-not ($listing | Select-String -SimpleMatch "$sdkBase/lib/libclang.lib")) {

@@ -2,6 +2,8 @@ module build.pcre2
 
 use std.build
 
+const PCRE2_SHA256: str = "c08ae2388ef333e8403e670ad70c0a11f1eed021fd88308d7e02f596fcd9dc16"
+
 fn pcre2_join(left: str, right: str) -> str:
     if left.len() == 0:
         return right
@@ -453,6 +455,19 @@ fn pcre2_copy_w_files(ctx: &ActionCtx, source_dir: str, dest_dir: str) -> i32:
 fn pcre2_migrate_tmp_dir(ctx: &ActionCtx) -> str:
     pcre2_join(pcre2_scratch_dir(ctx), "migrate-" ++ f"{ctx.target_name()}")
 
+fn pcre2_compile_binary(ctx: &ActionCtx, workspace_name: str, source_path: str, output_path: str) -> i32:
+    let workspace = ctx.create_workspace(workspace_name)
+    workspace.add_file(source_path)
+    var options = workspace.options()
+    options.output_path = output_path
+    workspace.set_options(options)
+    let result = workspace.compile()
+    if result.rc != 0:
+        return pcre2_fail(ctx, workspace_name ++ f" failed with exit code {result.rc}")
+    if not ctx.fs().exists(output_path):
+        return pcre2_fail(ctx, workspace_name ++ " did not produce " ++ output_path)
+    0
+
 fn pcre2_prepare_reference_tree(ctx: &ActionCtx, ref_dir: str) -> i32:
     let fs = ctx.fs()
     let src_dir = pcre2_join(ref_dir, "src")
@@ -514,17 +529,20 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "could not create archive directory")
     if not fs.exists(archive_path):
         print("fetching " ++ release ++ " from " ++ url)
-        var curl_args: Vec[str] = Vec.new()
-        curl_args |> push("curl")
-        curl_args |> push("-L")
-        curl_args |> push("--fail")
-        curl_args |> push("--show-error")
-        curl_args |> push("--output")
-        curl_args |> push(pcre2_abs(root, archive_path))
-        curl_args |> push(url)
-        let curl_result = ctx.process_runner().run_capture(curl_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".curl.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".curl.stderr")), 300000)
-        if curl_result.rc != 0:
-            return pcre2_fail(ctx, f"curl failed with exit code {curl_result.rc}: " ++ curl_result.stderr)
+        let fetch_bin = pcre2_join(scratch_dir, "https_fetch")
+        var rc = pcre2_compile_binary(ctx, "pcre2-https-fetch-helper", "build/https_fetch.w", fetch_bin)
+        if rc != 0:
+            return rc
+        var fetch_args: Vec[str] = Vec.new()
+        fetch_args.push(pcre2_abs(root, fetch_bin))
+        fetch_args.push(url)
+        fetch_args.push(pcre2_abs(root, archive_path))
+        let fetch_result = ctx.process_runner().run_capture(fetch_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".fetch.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".fetch.stderr")), 300000)
+        if fetch_result.rc != 0:
+            return pcre2_fail(ctx, f"HTTPS fetch helper failed with exit code {fetch_result.rc}: " ++ fetch_result.stdout ++ fetch_result.stderr)
+    let actual_sha = fs.sha256_file(archive_path)
+    if actual_sha != PCRE2_SHA256:
+        return pcre2_fail(ctx, "sha256 mismatch for " ++ archive_path ++ ": expected " ++ PCRE2_SHA256 ++ " got " ++ actual_sha)
     if not fs.is_dir(ref_dir):
         let tmp_dir = pcre2_join(scratch_dir, release ++ ".extract")
         let extracted_dir = pcre2_join(tmp_dir, release)
@@ -532,15 +550,20 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
             return pcre2_fail(ctx, "could not remove old extract directory: " ++ tmp_dir)
         if fs.mkdir_all(tmp_dir) != 0:
             return pcre2_fail(ctx, "could not create extract directory: " ++ tmp_dir)
-        var tar_args: Vec[str] = Vec.new()
-        tar_args |> push("tar")
-        tar_args |> push("-xzf")
-        tar_args |> push(pcre2_abs(root, archive_path))
-        tar_args |> push("-C")
-        tar_args |> push(pcre2_abs(root, tmp_dir))
-        let tar_result = ctx.process_runner().run_capture(tar_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".tar.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".tar.stderr")), 300000)
-        if tar_result.rc != 0:
-            return pcre2_fail(ctx, f"tar failed with exit code {tar_result.rc}: " ++ tar_result.stderr)
+        let tar_path = pcre2_join(scratch_dir, release ++ ".tar")
+        let gunzip_bin = pcre2_join(scratch_dir, "zlib_gunzip")
+        var rc = pcre2_compile_binary(ctx, "pcre2-gunzip-helper", "build/zlib_gunzip.w", gunzip_bin)
+        if rc != 0:
+            return rc
+        var gunzip_args: Vec[str] = Vec.new()
+        gunzip_args.push(pcre2_abs(root, gunzip_bin))
+        gunzip_args.push(pcre2_abs(root, archive_path))
+        gunzip_args.push(pcre2_abs(root, tar_path))
+        let gunzip_result = ctx.process_runner().run_capture(gunzip_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".gunzip.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".gunzip.stderr")), 300000)
+        if gunzip_result.rc != 0:
+            return pcre2_fail(ctx, f"gunzip helper failed with exit code {gunzip_result.rc}: " ++ gunzip_result.stdout ++ gunzip_result.stderr)
+        if fs.extract_tar(tar_path, tmp_dir) != 0:
+            return pcre2_fail(ctx, "could not extract tar archive: " ++ tar_path)
         if not fs.is_dir(pcre2_join(extracted_dir, "src")):
             return pcre2_fail(ctx, "archive did not contain expected src directory: " ++ extracted_dir)
         if fs.mkdir_all(pcre2_dirname(ref_dir)) != 0:

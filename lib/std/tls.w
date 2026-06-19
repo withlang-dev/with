@@ -46,9 +46,7 @@ unsafe fn tls_send_record(fd: i32, content_type: u8, data: *const u8, data_len: 
     hdr[4] = (data_len & 0xFF) as u8
 
     // Send header
-    let hdr_str = unsafe *(&hdr[0] as *const str)
-    // Actually, we need to construct a str from ptr+len
-    // Use the with_net_send extern directly
+    // Construct a temporary str view for the record header.
     let hp = &hdr[0] as *const u8
     var hdr_s: str = ""
     // Hack: set str ptr and len directly
@@ -343,6 +341,8 @@ unsafe fn tls_recv(conn: *mut TlsConn, buf: *mut u8, buf_cap: i32) -> i32:
     if ct != TLS_APPLICATION_DATA:
         return -1
     if conn.cipher_active != 0:
+        if rec_len - 24 > buf_cap:
+            return -1
         return tls_decrypt_record(conn, ct, &rec_buf[0] as *const u8, rec_len, buf)
     // Unencrypted: copy directly
     var i = 0
