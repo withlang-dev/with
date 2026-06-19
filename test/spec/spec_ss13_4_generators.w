@@ -15,6 +15,15 @@ gen fn two_step -> i32:
     b += 10
     yield a + b
 
+gen fn values_from(source: &Vec[i32]) -> i32:
+    var i = 0
+    while i < source.len() as i32:
+        yield source.get(i as i64)
+        i += 1
+
+fn forward_values_from(source: &Vec[i32]):
+    values_from(source)
+
 fn test_next_resumes_from_each_yield:
     var iter = countdown(3)
     match iter.next():
@@ -51,8 +60,30 @@ fn test_generator_is_iterable:
         sum += n
     assert(sum == 10)
 
+fn test_ref_capturing_generator_used_in_scope:
+    let values: Vec[i32] = [4, 5, 6]
+    var iter = values_from(&values)
+    match iter.next():
+        Some(v) => assert(v == 4)
+        None => assert(false)
+    match iter.next():
+        Some(v) => assert(v == 5)
+        None => assert(false)
+
+fn test_ref_capturing_generator_return_propagates_ephemeral:
+    let values: Vec[i32] = [7, 8]
+    var iter = forward_values_from(&values)
+    match iter.next():
+        Some(v) => assert(v == 7)
+        None => assert(false)
+    match iter.next():
+        Some(v) => assert(v == 8)
+        None => assert(false)
+
 fn main:
     test_next_resumes_from_each_yield()
     test_locals_persist_across_yield()
     test_generator_is_iterable()
+    test_ref_capturing_generator_used_in_scope()
+    test_ref_capturing_generator_return_propagates_ephemeral()
     print("ok")

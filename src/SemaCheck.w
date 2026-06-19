@@ -933,10 +933,13 @@ fn Sema.finalize_generator_state_type(self: Sema, fn_node: i32, sig_idx: i32):
 
     let field_start = self.type_extra.len() as i32
     self.generator_state_field_counts.insert(state_tid, field_count)
+    var state_is_ephemeral = 0
     for fi in 0..field_count:
         let key = sema_pair_key(state_tid, fi)
         let field_sym = self.generator_state_field_names.get(key).unwrap()
         let field_ty = self.generator_state_field_types.get(key).unwrap()
+        if self.type_is_ephemeral_value(field_ty) != 0:
+            state_is_ephemeral = 1
         self.type_extra.push(field_sym)
         self.type_extra.push(field_ty)
         self.type_extra.push(0)
@@ -944,6 +947,8 @@ fn Sema.finalize_generator_state_type(self: Sema, fn_node: i32, sig_idx: i32):
         self.type_extra.push(0)
     self.type_d1.set_i32(state_tid as i64, field_start)
     self.type_d2.set_i32(state_tid as i64, field_count)
+    if state_is_ephemeral != 0:
+        self.mark_generator_state_ephemeral(state_tid)
 
 fn Sema.param_type_is_by_value(self: Sema, tid: i32) -> i32:
     if tid <= 0:
@@ -1286,6 +1291,8 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
             if body_root != 0:
                 self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), body)
             self.check_returned_view_origins(body, body)
+        else if self.type_is_ephemeral_value(body_ty as i32) != 0:
+            self.check_returned_ephemeral_value_origins(body, body)
     if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never and self.body_has_explicit_value_result(body, 1) != 0:
         if self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0:
             self.emit_error("return type mismatch", body)
@@ -7113,7 +7120,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     else:
         self.binding_closure_nodes.remove(name)
     let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
-    if bind_kind == TypeKind.TY_REF or self.type_has_drop_impl(bind_type as i32) != 0:
+    if bind_kind == TypeKind.TY_REF or self.type_has_drop_impl(bind_type as i32) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0:
         self.record_view_binding_from_expr(name, value)
     else:
         self.clear_binding_view_deps(name)
@@ -7540,6 +7547,38 @@ fn Sema.check_returned_view_origins(self: Sema, expr_node: i32, report_node: i32
             self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
             return
 
+fn Sema.expr_type_is_generator_state(self: Sema, expr_node: i32) -> i32:
+    if expr_node == 0:
+        return 0
+    var tid = 0
+    if self.typed_expr_types.contains(expr_node):
+        tid = self.typed_expr_types.get(expr_node).unwrap()
+    else if self.ast.kind(expr_node) == NodeKind.NK_IDENT:
+        tid = self.scope_lookup(self.ast.get_data0(expr_node))
+    if tid <= 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    if self.generator_state_yield_types.contains(resolved as i32):
+        return 1
+    0
+
+fn Sema.check_returned_ephemeral_value_origins(self: Sema, expr_node: i32, report_node: i32):
+    if expr_node == 0:
+        return
+    var deps: Vec[i32] = Vec.new()
+    deps = self.collect_expr_view_deps(expr_node, deps)
+    for i in 0..deps.len() as i32:
+        let origin_sym = deps.get(i as i64)
+        if origin_sym == 0:
+            continue
+        if self.view_origin_is_stack_local(origin_sym) != 0:
+            let origin_name = self.pool_resolve(origin_sym)
+            if self.expr_type_is_generator_state(expr_node) != 0:
+                self.emit_error("generator captures reference to '" ++ origin_name ++ "' that cannot escape", report_node)
+            else:
+                self.emit_error("returned ephemeral value may outlive its origin '" ++ origin_name ++ "'", report_node)
+            return
+
 fn Sema.record_call_view_origins(self: Sema, call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
     if call_node == 0 or sig_idx < 0:
         return
@@ -7568,6 +7607,33 @@ fn Sema.record_call_view_origins(self: Sema, call_node: i32, sig_idx: i32, param
                 concrete_deps = self.collect_expr_view_deps(origin_arg, concrete_deps)
                 if concrete_deps.len() as i32 == dep_len_before:
                     concrete_deps = self.push_unique_i32(concrete_deps, self.place_root_sym(origin_arg))
+    if union_mask != 0 or concrete_deps.len() > 0:
+        self.set_expr_view_deps(call_node, union_mask, concrete_deps)
+
+fn Sema.record_generator_call_ref_origins(self: Sema, call_node: i32, sig_idx: i32, param_offset: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
+    if call_node == 0 or sig_idx < 0:
+        return
+    let ret = self.sig_return_type(sig_idx)
+    if not self.generator_state_yield_types.contains(ret):
+        return
+    let param_count = self.sig_get_param_count(sig_idx)
+    var union_mask = 0
+    var concrete_deps: Vec[i32] = Vec.new()
+    for pi in 0..param_count:
+        let param_ty = self.sig_param_type(sig_idx, pi)
+        if self.type_is_ephemeral_value(param_ty) == 0:
+            continue
+        let arg_index = pi - param_offset
+        if arg_index < 0 or arg_index >= arg_count:
+            continue
+        let arg_node = if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
+        if arg_node <= 0:
+            continue
+        union_mask = union_mask | self.compute_expr_view_origin_mask(arg_node)
+        let dep_len_before = concrete_deps.len() as i32
+        concrete_deps = self.collect_expr_view_deps(arg_node, concrete_deps)
+        if concrete_deps.len() as i32 == dep_len_before:
+            concrete_deps = self.push_unique_i32(concrete_deps, self.place_root_sym(arg_node))
     if union_mask != 0 or concrete_deps.len() > 0:
         self.set_expr_view_deps(call_node, union_mask, concrete_deps)
 
@@ -7625,6 +7691,8 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
             if root != 0:
                 self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value), value)
             self.check_returned_view_origins(value, node)
+        else if self.type_is_ephemeral_value(val_type as i32) != 0:
+            self.check_returned_ephemeral_value_origins(value, node)
         if self.current_return_type != 0 and val_type != 0:
             let compat = self.types_compatible(self.current_return_type as i32, val_type as i32)
             let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1 as TypeId
@@ -7842,7 +7910,7 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         else:
             self.binding_closure_nodes.remove(target_sym)
         let tgt_kind = self.get_type_kind(self.resolve_alias(target_type as TypeId))
-        if tgt_kind == TypeKind.TY_REF or self.type_has_drop_impl(target_type as i32) != 0:
+        if tgt_kind == TypeKind.TY_REF or self.type_has_drop_impl(target_type as i32) != 0 or self.type_is_ephemeral_value(target_type as i32) != 0:
             self.record_view_binding_from_expr(target_sym, value)
         else:
             self.clear_binding_view_deps(target_sym)
@@ -11888,6 +11956,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
         self.check_dyn_trait_call_compat(fn_sym, resolved_extra_start, arg_types, resolved_arg_count, param_offset)
         self.record_call_view_origins(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
+        self.record_generator_call_ref_origins(node, sig_idx, param_offset, resolved_extra_start, resolved_arg_count, has_resolved)
         self.typed_expr_types.insert(node, ret)
         return ret
 

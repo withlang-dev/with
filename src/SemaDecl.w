@@ -1118,6 +1118,16 @@ fn Sema.ensure_generator_state_type(self: Sema, fn_sym: i32, yield_ty: i32) -> i
     self.generator_state_yield_types.insert(state_tid as i32, yield_ty)
     state_tid as i32
 
+fn Sema.mark_generator_state_ephemeral(self: Sema, state_tid: i32):
+    if state_tid <= 0:
+        return
+    let resolved = self.resolve_alias(state_tid as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return
+    let state_sym = self.get_type_d0(resolved)
+    if state_sym != 0:
+        self.ephemeral_types.insert(state_sym, 1)
+
 fn Sema.register_generator_next_method(self: Sema, fn_sym: i32, state_sym: i32, state_tid: i32, yield_ty: i32):
     if self.generator_fn_next_syms.contains(fn_sym):
         return
@@ -1392,6 +1402,10 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32, decl_index: i32):
         if ret_node == 0:
             self.emit_error("generator function requires a yield type", node)
         let state_tid = self.ensure_generator_state_type(fn_name, ret_type as i32)
+        for pi in 0..param_count:
+            let p_ty = self.sig_params.get((sig_param_start + pi) as i64)
+            if self.type_is_ephemeral_value(p_ty) != 0:
+                self.mark_generator_state_ephemeral(state_tid)
         let state_sym = self.generator_fn_state_syms.get(fn_name).unwrap()
         self.register_generator_next_method(fn_name, state_sym, state_tid, ret_type as i32)
         sig_ret_type = state_tid as TypeId
