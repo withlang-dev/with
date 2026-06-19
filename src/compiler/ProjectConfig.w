@@ -25,6 +25,7 @@ type ProjectConfig {
     target_default: str,
     runtime_fiber_stack_size: i64,
     runtime_fiber_pool_size: i32,
+    runtime_fiber_worker_count: i32,
     copy_warn_threshold: i64,
     no_std: bool,
     alloc_mode: bool,
@@ -58,6 +59,7 @@ fn project_config_default -> ProjectConfig:
         target_default: "",
         runtime_fiber_stack_size: 0,
         runtime_fiber_pool_size: 0,
+        runtime_fiber_worker_count: 0,
         copy_warn_threshold: 128,
         no_std: false,
         alloc_mode: false,
@@ -102,6 +104,7 @@ pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         target_default: project_config_clone_str(cfg.target_default),
         runtime_fiber_stack_size: cfg.runtime_fiber_stack_size,
         runtime_fiber_pool_size: cfg.runtime_fiber_pool_size,
+        runtime_fiber_worker_count: cfg.runtime_fiber_worker_count,
         copy_warn_threshold: cfg.copy_warn_threshold,
         no_std: cfg.no_std,
         alloc_mode: cfg.alloc_mode,
@@ -260,6 +263,13 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
                 out.manifest_error = "runtime.fiber_pool_size must be a positive integer"
         else:
             out.runtime_fiber_pool_size = parsed_pool as i32
+    else if section == "runtime" and key == "fiber_worker_count":
+        let parsed_workers = project_config_parse_positive_i64(value)
+        if parsed_workers <= 0 or parsed_workers > 8:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "runtime.fiber_worker_count must be a positive integer between 1 and 8"
+        else:
+            out.runtime_fiber_worker_count = parsed_workers as i32
     else if section == "c_import" and key == "include_paths":
         out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
     else if section == "c_import" and key == "defines":
@@ -493,7 +503,7 @@ fn project_config_wants_key(section: str, key: str) -> bool:
         return true
     if section == "lint" and key == "partial_statement_match":
         return true
-    if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size"):
+    if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size" or key == "fiber_worker_count"):
         return true
     if section == "features":
         return true
@@ -512,10 +522,10 @@ fn project_config_forbidden_entry(section: str, key: str) -> str:
         return ""
     if section == "lint":
         return "unknown key '" ++ key ++ "' in [lint]; expected partial_statement_match"
-    if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size"):
+    if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size" or key == "fiber_worker_count"):
         return ""
     if section == "runtime":
-        return "unknown key '" ++ key ++ "' in [runtime]; expected fiber_stack_size or fiber_pool_size"
+        return "unknown key '" ++ key ++ "' in [runtime]; expected fiber_stack_size, fiber_pool_size, or fiber_worker_count"
     if section == "target" and key == "default":
         return ""
     if section == "build" or section == "commands" or section == "scripts" or section == "targets" or section == "target":

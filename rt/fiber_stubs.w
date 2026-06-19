@@ -83,6 +83,25 @@ pub fn with_runtime_has_fibers() -> i32:
 pub fn with_fiber_in_fiber() -> i32:
     0
 
+pub fn with_fiber_steal_events() -> i64:
+    0
+
+pub fn with_fiber_steal_attempts() -> i64:
+    0
+
+pub fn with_fiber_worker_count() -> i32:
+    1
+
+pub fn with_fiber_current_worker_index() -> i32:
+    0
+
+pub fn with_fiber_cross_thread_cancels() -> i64:
+    0
+
+pub fn with_runtime_fiber_running_worker(fiber_id: i32) -> i32:
+    let _ = fiber_id
+    -1
+
 pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit:
     let _ = msg
     let _ = msg_len

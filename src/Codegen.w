@@ -5823,7 +5823,8 @@ fn Codegen.emit_runtime_fiber_config(self: Codegen, wrapper: i64) -> Unit:
         return
     let stack_size = self.sema.runtime_fiber_stack_size
     let pool_size = self.sema.runtime_fiber_pool_size
-    if stack_size <= 0 and pool_size <= 0:
+    let worker_count = self.sema.runtime_fiber_worker_count
+    if stack_size <= 0 and pool_size <= 0 and worker_count <= 0:
         return
 
     let i32_ty = wl_i32_type(self.context)
@@ -5833,13 +5834,15 @@ fn Codegen.emit_runtime_fiber_config(self: Codegen, wrapper: i64) -> Unit:
         let params: Vec[i64] = Vec.new()
         params.push(i64_ty)
         params.push(i32_ty)
-        let ft = wl_function_type(i32_ty, vec_data_i64(&params), 2, 0)
+        params.push(i32_ty)
+        let ft = wl_function_type(i32_ty, vec_data_i64(&params), 3, 0)
         config_fn = wl_add_function(self.llmod, "with_runtime_configure_fibers", ft)
     let config_ft = wl_global_get_value_type(config_fn)
     let args: Vec[i64] = Vec.new()
     args.push(wl_const_int(i64_ty, stack_size, 0))
     args.push(wl_const_int(i32_ty, pool_size as i64, 0))
-    let rc = wl_build_call(self.builder, config_ft, config_fn, vec_data_i64(&args), 2)
+    args.push(wl_const_int(i32_ty, worker_count as i64, 0))
+    let rc = wl_build_call(self.builder, config_ft, config_fn, vec_data_i64(&args), 3)
     let failed = wl_build_icmp(self.builder, wl_int_ne(), rc, wl_const_int(i32_ty, 0, 0))
     let panic_bb = wl_append_bb(self.context, wrapper, "runtime.config.panic")
     let ok_bb = wl_append_bb(self.context, wrapper, "runtime.config.ok")

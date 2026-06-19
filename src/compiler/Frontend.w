@@ -1509,6 +1509,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         pre_sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
         pre_sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
         pre_sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
+        pre_sema.runtime_fiber_worker_count = self.project_config.runtime_fiber_worker_count
         pre_sema.copy_warn_threshold = self.project_config.copy_warn_threshold
         pre_sema.emit_config_warnings = 0
         pre_sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
@@ -1559,6 +1560,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
     sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
     sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
+    sema.runtime_fiber_worker_count = self.project_config.runtime_fiber_worker_count
     sema.copy_warn_threshold = self.project_config.copy_warn_threshold
     sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
     sema.emit_config_warnings = 1

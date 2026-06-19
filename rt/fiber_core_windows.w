@@ -537,7 +537,9 @@ pub fn with_runtime_core_init() -> Unit:
         i = i + 1
     fiber_install_signal_handlers()
 
-pub fn with_runtime_configure_fibers(stack_size: i64, pool_size: i32) -> i32:
+pub fn with_runtime_configure_fibers(stack_size: i64, pool_size: i32, worker_count: i32) -> i32:
+    if worker_count > 1:
+        return -1
     let next_stack = if stack_size > 0: stack_size else: FIBER_STACK_SIZE
     let next_pool = if pool_size > 0: pool_size else: MAX_FIBERS
     if live_fiber_count != 0 or free_pool_head != 0:
@@ -755,3 +757,19 @@ pub fn with_fiber_live_fibers() -> i32:
 
 pub fn with_fiber_steal_events() -> i64:
     fiber_steal_events
+
+pub fn with_runtime_fiber_running_worker(fiber_id: i32) -> i32:
+    let _ = fiber_id
+    if current_fiber != 0: 0 else: -1
+
+pub fn with_fiber_steal_attempts() -> i64:
+    fiber_steal_events
+
+pub fn with_fiber_worker_count() -> i32:
+    1
+
+pub fn with_fiber_current_worker_index() -> i32:
+    0
+
+pub fn with_fiber_cross_thread_cancels() -> i64:
+    0

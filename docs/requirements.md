@@ -7694,7 +7694,7 @@ Generated coverage: 3074 normative requirements plus 52 informative Section 30 t
   - Source: `§14.19 L7198-L7208`
   - Related spec refs: none
 - [x] `14.19.1.7` **The reference implementation reads the optional [runtime] with.toml section...**
-  - Requirement: The reference implementation reads the optional `[runtime]` `with.toml` section: `fiber_stack_size` and `fiber_pool_size`.
+  - Requirement: The reference implementation reads the optional `[runtime]` `with.toml` section: `fiber_stack_size`, `fiber_pool_size`, and `fiber_worker_count`.
   - Source: `§14.19 L7198-L7208`
   - Related spec refs: none
 - [x] `14.19.1.8` **Growable stacks (roadmap, implementation-defined): an implementation may st...**

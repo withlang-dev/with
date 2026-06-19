@@ -1265,7 +1265,8 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: str, cas
         "default = \"native\"\n\n" ++
         "[runtime]\n" ++
         "fiber_stack_size = 131072\n" ++
-        "fiber_pool_size = 64\n\n" ++
+        "fiber_pool_size = 64\n" ++
+        "fiber_worker_count = 2\n\n" ++
         "[deps]\n" ++
         "c.fixture = \"1.0\"\n"
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), manifest, "declarative manifest")
@@ -1300,6 +1301,8 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: str, cas
     rc = bs_assert_contains(ctx, dump.stdout, "config runtime_fiber_stack_size=131072", "declarative_manifest_runtime_stack")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, dump.stdout, "config runtime_fiber_pool_size=64", "declarative_manifest_runtime_pool")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, dump.stdout, "config runtime_fiber_worker_count=2", "declarative_manifest_runtime_workers")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, dump.stdout, "config copy_warn_threshold=96", "declarative_manifest_copy_warn_threshold")
     if rc != 0: return rc
@@ -1465,6 +1468,95 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: str, case_di
     if bad_pool.rc == 0:
         return bs_fail(ctx, "negative runtime fiber pool size unexpectedly succeeded")
     rc = bs_assert_contains(ctx, bad_pool.stderr, "runtime.fiber_pool_size must be a positive integer", "runtime_manifest_bad_pool")
+    if rc != 0: return rc
+
+    let scheduler_dir = bs_join(case_dir, "runtime_workers")
+    rc = bs_write_fixture(ctx, bs_join(scheduler_dir, "with.toml"), "[package]\nname = \"runtimeworkers\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_worker_count = 2\nfiber_pool_size = 8\n", "runtime worker manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(scheduler_dir, "src/main.w"),
+        "use std.sync\n\n" ++
+        "extern fn with_fiber_yield() -> Unit\n" ++
+        "extern fn with_runtime_run_one_step() -> Unit\n" ++
+        "extern fn with_fiber_is_cancelled() -> i32\n" ++
+        "extern fn with_fiber_set_cancelled_return() -> Unit\n" ++
+        "extern fn with_fiber_worker_count() -> i32\n" ++
+        "extern fn with_fiber_current_worker_index() -> i32\n" ++
+        "extern fn with_runtime_fiber_running_worker(fiber_id: i32) -> i32\n" ++
+        "extern fn with_fiber_steal_attempts() -> i64\n" ++
+        "extern fn with_fiber_steal_events() -> i64\n" ++
+        "extern fn with_fiber_cross_thread_cancels() -> i64\n\n" ++
+        "async fn busy(seed: i32) -> i32:\n" ++
+        "    var acc = seed\n" ++
+        "    for i in 0..400:\n" ++
+        "        acc = acc + ((i + seed) % 17)\n" ++
+        "        if i % 8 == 0:\n" ++
+        "            with_fiber_yield()\n" ++
+        "    acc\n\n" ++
+        "fn marker_value(marker: &Mutex[i32]) -> i32:\n" ++
+        "    let guard = marker.enter()\n" ++
+        "    guard.exit()\n\n" ++
+        "async fn cancel_target(marker: &Mutex[i32]) -> i32:\n" ++
+        "    while with_fiber_is_cancelled() == 0:\n" ++
+        "        var spin = 0\n" ++
+        "        while spin < 20000 and with_fiber_is_cancelled() == 0:\n" ++
+        "            spin = spin + 1\n" ++
+        "        with_fiber_yield()\n" ++
+        "    marker.set(1)\n" ++
+        "    with_fiber_set_cancelled_return()\n" ++
+        "    7\n\n" ++
+        "fn main:\n" ++
+        "    assert(with_fiber_worker_count() == 2)\n" ++
+        "    let marker = Mutex.new(0)\n" ++
+        "    let victim = cancel_target(&marker)\n" ++
+        "    let a = busy(1)\n" ++
+        "    let b = busy(2)\n" ++
+        "    let c = busy(3)\n" ++
+        "    let d = busy(4)\n" ++
+        "    var guard = 0\n" ++
+        "    while with_runtime_fiber_running_worker(victim.fiber_id) < 0 and guard < 10000:\n" ++
+        "        with_runtime_run_one_step()\n" ++
+        "        guard = guard + 1\n" ++
+        "    let running_worker = with_runtime_fiber_running_worker(victim.fiber_id)\n" ++
+        "    assert(running_worker >= 0)\n" ++
+        "    guard = 0\n" ++
+        "    while with_fiber_current_worker_index() == running_worker and guard < 10000:\n" ++
+        "        with_runtime_run_one_step()\n" ++
+        "        guard = guard + 1\n" ++
+        "    assert(with_fiber_current_worker_index() != running_worker)\n" ++
+        "    let before_cancel = with_fiber_cross_thread_cancels()\n" ++
+        "    victim.cancel()\n" ++
+        "    guard = 0\n" ++
+        "    while not victim.was_cancelled() and guard < 10000:\n" ++
+        "        with_runtime_run_one_step()\n" ++
+        "        guard = guard + 1\n" ++
+        "    assert(victim.was_cancelled())\n" ++
+        "    victim.join_cleanup()\n" ++
+        "    assert(marker_value(&marker) == 1)\n" ++
+        "    assert(with_fiber_cross_thread_cancels() > before_cancel)\n" ++
+        "    let total = a.await + b.await + c.await + d.await\n" ++
+        "    assert(total > 0)\n" ++
+        "    assert(with_fiber_steal_attempts() > 0)\n" ++
+        "    assert(with_fiber_steal_events() > 0)\n" ++
+        "    print(\"runtimeworkers\")\n",
+        "runtime worker scheduler source")
+    if rc != 0: return rc
+    let workers_built = bs_project_expect_success(ctx, compiler_path, scheduler_dir, "runtime-workers-build", bs_project_args("build"))
+    if workers_built.rc != 0: return workers_built.rc
+    let workers_run = bs_run_binary_capture(ctx, bs_join(scheduler_dir, "out/bin/runtimeworkers"), "runtime-workers-run", 120000)
+    if workers_run.rc != 0:
+        return bs_fail(ctx, f"runtime worker binary failed with exit code {workers_run.rc}: " ++ workers_run.stderr)
+    rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(workers_run.stdout), "runtimeworkers", "runtime_workers", "stdout")
+    if rc != 0: return rc
+
+    let bad_workers_dir = bs_join(case_dir, "bad_workers")
+    rc = bs_write_fixture(ctx, bs_join(bad_workers_dir, "with.toml"), "[package]\nname = \"badworkers\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_worker_count = 9\n", "bad runtime worker manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(bad_workers_dir, "src/main.w"), "fn main:\n    print(\"badworkers\")\n", "bad runtime worker source")
+    if rc != 0: return rc
+    let bad_workers = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-workers", bs_project_args("build"), 120000, bad_workers_dir)
+    if bad_workers.rc == 0:
+        return bs_fail(ctx, "invalid runtime fiber worker count unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, bad_workers.stderr, "runtime.fiber_worker_count must be a positive integer between 1 and 8", "runtime_manifest_bad_workers")
     if rc != 0: return rc
 
     let unknown_dir = bs_join(case_dir, "unknown_runtime")

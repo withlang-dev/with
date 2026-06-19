@@ -7830,6 +7830,7 @@ fn MirBuilder.receiver_option_intrinsic(self: MirBuilder, recv_expr: i32) -> Mir
 fn MirBuilder.lower_task_join_cleanup_call(self: MirBuilder, self_expr: i32, method_sym: i32, node: i32) -> i32:
     let recv_ty = self.expr_type(self_expr)
     let recv_type = self.autoderef_result_type_for_method(recv_ty, method_sym)
+    self.cancel_scheduled_value_drop_for_receiver_expr(self_expr)
     let recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
     let stable_op = self.materialize_operand(recv_op, recv_type, self.ast.get_start(self_expr))
     let task_op = self.body.new_operand(OperandKind.OK_COPY, stable_op)

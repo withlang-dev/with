@@ -7264,15 +7264,21 @@ reads the optional `[runtime]` `with.toml` section:
 [runtime]
 fiber_stack_size = 131072
 fiber_pool_size = 64
+fiber_worker_count = 4
 ```
 
-Both values are positive integers. Missing keys use implementation
+All three values are positive integers. Missing keys use implementation
 defaults. `fiber_stack_size` sets the default stack size for fibers
 whose call site does not provide an explicit stack size; an explicit
 `@[stack_size(N)]` on an async function has higher priority.
 `fiber_pool_size` caps the number of completed fiber stacks retained
 for reuse; stacks completed beyond the cap are released instead of
-cached. Runtime configuration is applied before the runtime is
+cached. `fiber_worker_count` selects the number of OS-worker threads
+participating in the standard scheduler; `1` preserves single-worker
+cooperative behavior, values greater than one enable cross-thread
+work stealing. Implementations may define an upper bound and must reject
+unsupported worker counts loudly rather than silently running fewer
+workers. Runtime configuration is applied before the runtime is
 initialized and before the first fiber spawn.
 
 **Growable stacks (roadmap, implementation-defined):** an

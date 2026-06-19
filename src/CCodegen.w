@@ -8834,9 +8834,10 @@ fn CCodegen.emit_runtime_fiber_config_call(self: CCodegen) -> str:
         return ""
     let stack_size = self.sema.runtime_fiber_stack_size
     let pool_size = self.sema.runtime_fiber_pool_size
-    if stack_size <= 0 and pool_size <= 0:
+    let worker_count = self.sema.runtime_fiber_worker_count
+    if stack_size <= 0 and pool_size <= 0 and worker_count <= 0:
         return ""
-    "    if (with_runtime_configure_fibers(" ++ with_i64_to_str(stack_size) ++ "LL, " ++ with_i64_to_str(pool_size as i64) ++ ") != 0) {\n" ++
+    "    if (with_runtime_configure_fibers(" ++ with_i64_to_str(stack_size) ++ "LL, " ++ with_i64_to_str(pool_size as i64) ++ ", " ++ with_i64_to_str(worker_count as i64) ++ ") != 0) {\n" ++
     "        with_panic(WITH_STR_LIT(\"runtime fiber configuration cannot change after fibers exist\"), WITH_STR_LIT(\"\"), 0);\n" ++
     "    }\n"
 
@@ -8947,7 +8948,7 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out.write("extern void with_println_bool(int32_t);\n")
     out.write("extern void with_ewrite(with_str);\n")
     out.write("extern void with_panic(with_str, with_str, int32_t);\n")
-    out.write("extern int32_t with_runtime_configure_fibers(int64_t, int32_t);\n")
+    out.write("extern int32_t with_runtime_configure_fibers(int64_t, int32_t, int32_t);\n")
     out.write("extern int32_t with_fiber_in_fiber(void);\n")
     out.write("extern void with_fiber_await(int32_t);\n")
     out.write("extern void with_fiber_cleanup_await(int32_t);\n")
