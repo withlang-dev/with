@@ -1513,16 +1513,10 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: str, case_di
         "    let c = busy(3)\n" ++
         "    let d = busy(4)\n" ++
         "    var guard = 0\n" ++
-        "    while with_runtime_fiber_running_worker(victim.fiber_id) < 0 and guard < 10000:\n" ++
-        "        with_runtime_run_one_step()\n" ++
+        "    while with_runtime_fiber_running_worker(victim.fiber_id) != 1 and guard < 2000000:\n" ++
         "        guard = guard + 1\n" ++
         "    let running_worker = with_runtime_fiber_running_worker(victim.fiber_id)\n" ++
-        "    assert(running_worker >= 0)\n" ++
-        "    guard = 0\n" ++
-        "    while with_fiber_current_worker_index() == running_worker and guard < 10000:\n" ++
-        "        with_runtime_run_one_step()\n" ++
-        "        guard = guard + 1\n" ++
-        "    assert(with_fiber_current_worker_index() != running_worker)\n" ++
+        "    assert(running_worker == 1)\n" ++
         "    let before_cancel = with_fiber_cross_thread_cancels()\n" ++
         "    victim.cancel()\n" ++
         "    guard = 0\n" ++
