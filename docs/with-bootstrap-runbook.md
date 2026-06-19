@@ -123,7 +123,7 @@ After building the SDK from source, package it so future releases (and clean
 checkouts) can fetch it instead of rebuilding:
 
 ```sh
-scripts/package-llvm-sdk.sh   # → out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst
+scripts/package-llvm-sdk.sh   # → out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz
 ```
 
 Publish that asset with the platform's release (see `docs/with-release-runbook.md`
@@ -198,10 +198,10 @@ compiler.
 1. On a supported host, generate the compiler C output:
 
    ```sh
-   WITH_VERSION=vX.Y.Z scripts/package-bootstrap-c.sh
+   WITH_VERSION=vX.Y.Z with build :package-bootstrap-c
    ```
 
-2. Transfer or download `out/release/with-bootstrap-c-vX.Y.Z.tar.zst` and the
+2. Transfer or download `out/release/with-bootstrap-c-vX.Y.Z.tar.gz` and the
    static LLVM SDK to the target platform.
 
 3. Compile the emitted C bundle with the target platform Clang driver from the
@@ -257,8 +257,8 @@ where.exe llvm-readobj
 Required assets:
 
 ```text
-with-bootstrap-c-vX.Y.Z.tar.zst
-with-llvm-sdk-<llvm-ver>-windows-x86_64-msvc.tar.zst
+with-bootstrap-c-vX.Y.Z.tar.gz
+with-llvm-sdk-<llvm-ver>-windows-x86_64-msvc.tar.gz
 ```
 
 The static Windows SDK must contain:
@@ -303,7 +303,7 @@ Unpack the emitted-C bundle:
 $Version = "vX.Y.Z"
 $Work = "out\bootstrap-c-$Version"
 New-Item -ItemType Directory -Force $Work | Out-Null
-tar --zstd -xf "out\release\with-bootstrap-c-$Version.tar.zst" -C $Work
+tar -xzf "out\release\with-bootstrap-c-$Version.tar.gz" -C $Work
 Set-Location $Work
 ```
 

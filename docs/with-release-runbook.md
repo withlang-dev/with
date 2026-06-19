@@ -75,7 +75,7 @@ Publish, per release:
 with-darwin-aarch64                          # Darwin arm64 compiler binary
 with-linux-x86_64                            # Linux x86_64 compiler binary
 with-windows-x86_64.exe                      # Windows x86_64 compiler binary
-with-bootstrap-c-vX.Y.Z.tar.zst              # emitted-C bootstrap bundle
+with-bootstrap-c-vX.Y.Z.tar.gz               # emitted-C bootstrap bundle
 with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.gz    # static LLVM SDK (Darwin arm64)
 with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.gz      # static LLVM SDK (Linux x86_64)
 with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.gz    # static LLVM SDK (Windows x86_64)
@@ -399,9 +399,10 @@ git push origin v0.14.3
 ```
 
 Prepare the platform-named assets on their native platforms with the
-With-native release package targets. These targets do not exist yet; until they
-do, release/SDK packaging remains tracked by `docs/eliminate-Makefile.md` and
-must not be treated as a normal post-seed script workflow.
+With-native release package targets. The bootstrap-C package target exists as
+`with build :package-bootstrap-c`; platform compiler and SDK package targets
+remain tracked by `docs/eliminate-Makefile.md` and must not be treated as a
+normal post-seed script workflow until their graph replacements land.
 
 The SDK package target runs on each native platform and packages that host's
 `.deps/llvm-<ver>-<host>` static SDK into
@@ -431,10 +432,15 @@ loader are the only expected Linux runtime libraries. The release package
 targets must check those properties with With-owned binary inspection tools, not
 host loader or symbol utilities.
 
-The bootstrap-C package produces
-`out/release/with-bootstrap-c-$WITH_VERSION.tar.zst`. It is an emitted-C source
-bundle for bringing up a new native platform before a With seed exists there.
-It is not a release compiler binary.
+The bootstrap-C package is produced by:
+
+```sh
+with build :package-bootstrap-c
+```
+
+It writes `out/release/with-bootstrap-c-$WITH_VERSION.tar.gz`. It is an
+emitted-C source bundle for bringing up a new native platform before a With seed
+exists there. It is not a release compiler binary.
 
 Create the GitHub release:
 
@@ -442,7 +448,7 @@ Create the GitHub release:
 gh release create v0.14.3 \
   out/release/with-darwin-aarch64 \
   out/release/with-linux-x86_64 \
-  out/release/with-bootstrap-c-v0.14.3.tar.zst \
+  out/release/with-bootstrap-c-v0.14.3.tar.gz \
   out/release/with-llvm-sdk-*-darwin-aarch64.tar.gz \
   out/release/with-llvm-sdk-*-linux-x86_64.tar.gz \
   out/release/with-llvm-sdk-*-windows-x86_64.tar.gz \
@@ -478,7 +484,7 @@ gh release view v0.14.3 \
 Expected asset list:
 
 ```text
-with-bootstrap-c-v0.14.3.tar.zst
+with-bootstrap-c-v0.14.3.tar.gz
 with-darwin-aarch64
 with-linux-x86_64
 with-windows-x86_64.exe

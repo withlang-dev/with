@@ -9,6 +9,7 @@ use build.compiler
 use build.clang_resource
 use build.retention
 use build.release_uat
+use build.package
 use std.sysinfo
 
 fn build_project_dirname(path: str) -> str:
@@ -444,6 +445,7 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
 pub fn build(ctx: BuildCtx) -> Build:
     var out = ctx.new_build()
     let host_runtime = host_runtime_spec()
+    let release_version = build_project_trim_line(ctx.fs().read_text("src/version"))
 
     var compiler_sources = target_new(.Action, "compiler-sources", "").output("out/gen/.generated-stamp")
     compiler_sources.action = run_generate_compiler_entrypoints_action
@@ -471,6 +473,39 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/command/bootstrap-c-emit-sources")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.dep("compiler-sources")
     out = out.add_target(bootstrap_c_emit_sources)
+
+    var package_bootstrap_c = target_new(.Action, "package-bootstrap-c", "").output("out/release/with-bootstrap-c-" ++ release_version ++ ".tar.gz")
+    package_bootstrap_c.action = run_package_bootstrap_c_action
+    package_bootstrap_c = package_bootstrap_c.arg(release_compiler_bin("with"))
+    package_bootstrap_c = target_with_version_inputs(package_bootstrap_c, ctx)
+    package_bootstrap_c = package_bootstrap_c.dep("build")
+    package_bootstrap_c = package_bootstrap_c.dep("bootstrap-c-emit-sources")
+    package_bootstrap_c = package_bootstrap_c.input("src/version")
+    package_bootstrap_c = package_bootstrap_c.input("out/release/bin/with")
+    package_bootstrap_c = package_bootstrap_c.input("out/bootstrap-c/src/with_compiler.c")
+    package_bootstrap_c = package_bootstrap_c.input("out/gen/wl_decls.h")
+    package_bootstrap_c = package_bootstrap_c.input("src/compiler/LlvmBridge.w")
+    package_bootstrap_c = package_bootstrap_c.input("src/compiler/ClangBridge.w")
+    package_bootstrap_c = package_bootstrap_c.input("rt/rt_core.w")
+    package_bootstrap_c = package_bootstrap_c.input("rt/panic_runtime.w")
+    package_bootstrap_c = package_bootstrap_c.input("rt/regex_runtime.w")
+    package_bootstrap_c = package_bootstrap_c.input("rt/fiber_stubs.w")
+    package_bootstrap_c = package_bootstrap_c.input("rt/compat_runtime.w")
+    package_bootstrap_c = package_bootstrap_c.input("runtime/with_runtime.h")
+    package_bootstrap_c = package_bootstrap_c.input("runtime/unistd.h")
+    package_bootstrap_c = package_bootstrap_c.input("runtime/undef_stdio_macros.h")
+    package_bootstrap_c = package_bootstrap_c.input("runtime/sys/resource.h")
+    package_bootstrap_c = package_bootstrap_c.input("scripts/bootstrap/linux_platform.c")
+    package_bootstrap_c = package_bootstrap_c.input("scripts/bootstrap/windows_platform.c")
+    package_bootstrap_c = package_bootstrap_c.input("scripts/bootstrap/windows_compat_runtime.c")
+    package_bootstrap_c = package_bootstrap_c.input("scripts/bootstrap/empty_embedded_windows.s")
+    package_bootstrap_c = package_bootstrap_c.input("build/package.w")
+    package_bootstrap_c = package_bootstrap_c.input("build/zlib_gzip.w")
+    package_bootstrap_c = package_bootstrap_c.write_scope("out/bootstrap-c-package")
+    package_bootstrap_c = package_bootstrap_c.write_scope("out/release")
+    package_bootstrap_c = package_bootstrap_c.write_scope("out/command/package-bootstrap-c")
+    package_bootstrap_c = package_bootstrap_c.timeout(900000)
+    out = out.add_target(package_bootstrap_c)
 
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")

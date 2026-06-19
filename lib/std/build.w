@@ -314,6 +314,7 @@ pub type ProcessSpec {
 pub enum ArchiveEntryKind: i32:
     File = 0
     Directory = 1
+    Symlink = 2
 
 pub type ArchiveEntry {
     kind: ArchiveEntryKind,
@@ -334,6 +335,14 @@ pub fn archive_dir_entry(archive_path: str, mode: i32) -> ArchiveEntry:
     ArchiveEntry {
         kind: ArchiveEntryKind.Directory,
         source_path: "",
+        archive_path,
+        mode,
+    }
+
+pub fn archive_symlink_entry(target: str, archive_path: str, mode: i32) -> ArchiveEntry:
+    ArchiveEntry {
+        kind: ArchiveEntryKind.Symlink,
+        source_path: target,
         archive_path,
         mode,
     }
@@ -1048,8 +1057,15 @@ fn tool_tar_entry_name(path: str, directory: bool) -> str:
         return ""
     result
 
-fn tool_tar_build_header(name: str, mode: i32, size: i64, kind: ArchiveEntryKind) -> Vec[u8]:
-    if name.len() == 0 or name.len() > 100 or mode < 0 or size < 0:
+fn tool_tar_link_name(target: str) -> str:
+    if target.len() == 0 or target.len() > 100:
+        return ""
+    if not tool_path_is_project_relative(target):
+        return ""
+    target
+
+fn tool_tar_build_header(name: str, mode: i32, size: i64, kind: ArchiveEntryKind, link_name: str) -> Vec[u8]:
+    if name.len() == 0 or name.len() > 100 or mode < 0 or size < 0 or link_name.len() > 100:
         return Vec.new()
     var prefix: Vec[u8] = Vec.new()
     prefix = tool_tar_append_str_padded(prefix, name, 100)
@@ -1063,9 +1079,11 @@ fn tool_tar_build_header(name: str, mode: i32, size: i64, kind: ArchiveEntryKind
     var suffix: Vec[u8] = Vec.new()
     if kind == ArchiveEntryKind.Directory:
         suffix.push(53 as u8)
+    else if kind == ArchiveEntryKind.Symlink:
+        suffix.push(50 as u8)
     else:
         suffix.push(48 as u8)
-    suffix = tool_tar_append_zeroes(suffix, 100)
+    suffix = tool_tar_append_str_padded(suffix, link_name, 100)
     suffix = tool_tar_append_str_padded(suffix, "ustar", 6)
     suffix = tool_tar_append_str_padded(suffix, "00", 2)
     suffix = tool_tar_append_zeroes(suffix, 247)
@@ -1080,32 +1098,108 @@ fn tool_tar_build_header(name: str, mode: i32, size: i64, kind: ArchiveEntryKind
         return Vec.new()
     header
 
-pub fn ToolFs.write_tar(self: &Self, output_path: str, entries: Vec[ArchiveEntry]) -> i32:
-    self.require_write_file_allowed(output_path)
+fn ToolFs.tar_bytes(self: &Self, entries: &Vec[ArchiveEntry]) -> Vec[u8]:
     var out: Vec[u8] = Vec.new()
     for i in 0..entries.len() as i32:
         let entry = entries.get(i as i64)
         if entry.kind == ArchiveEntryKind.Directory:
             let name = tool_tar_entry_name(entry.archive_path, true)
-            let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Directory)
+            let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Directory, "")
             if header.len() == 0:
-                return 1
+                return Vec.new()
+            out = tool_tar_append_bytes(out, &header)
+        else if entry.kind == ArchiveEntryKind.Symlink:
+            let name = tool_tar_entry_name(entry.archive_path, false)
+            let link_name = tool_tar_link_name(entry.source_path)
+            let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Symlink, link_name)
+            if header.len() == 0:
+                return Vec.new()
             out = tool_tar_append_bytes(out, &header)
         else:
             if entry.source_path.len() == 0:
-                return 1
+                return Vec.new()
             tool_path_require_project_relative(entry.source_path)
             let name = tool_tar_entry_name(entry.archive_path, false)
             let contents = self.read_binary(entry.source_path)
-            let header = tool_tar_build_header(name, entry.mode, contents.len(), ArchiveEntryKind.File)
+            let header = tool_tar_build_header(name, entry.mode, contents.len(), ArchiveEntryKind.File, "")
             if header.len() == 0:
-                return 1
+                return Vec.new()
             out = tool_tar_append_bytes(out, &header)
             out = tool_tar_append_bytes(out, &contents)
             let padding = (512 - (contents.len() % 512)) % 512
             out = tool_tar_append_zeroes(out, padding)
     out = tool_tar_append_zeroes(out, 1024)
+    out
+
+fn tool_gzip_append_u16_le(mut out: Vec[u8], value: i32) -> Vec[u8]:
+    out.push((value & 0xff) as u8)
+    out.push(((value >> 8) & 0xff) as u8)
+    out
+
+fn tool_gzip_append_u32_le(mut out: Vec[u8], value: u32) -> Vec[u8]:
+    out.push((value & (0xff as u32)) as u8)
+    out.push(((value >> (8 as u32)) & (0xff as u32)) as u8)
+    out.push(((value >> (16 as u32)) & (0xff as u32)) as u8)
+    out.push(((value >> (24 as u32)) & (0xff as u32)) as u8)
+    out
+
+fn tool_gzip_crc32(bytes: &Vec[u8]) -> u32:
+    var crc = 0xffffffff as u32
+    for i in 0..bytes.len() as i32:
+        var c = (crc ^ (bytes.get(i as i64) as u32)) & (0xff as u32)
+        var bit = 0
+        while bit < 8:
+            if (c & (1 as u32)) != 0 as u32:
+                c = (c >> (1 as u32)) ^ (0xedb88320 as u32)
+            else:
+                c = c >> (1 as u32)
+            bit = bit + 1
+        crc = (crc >> (8 as u32)) ^ c
+    crc ^ (0xffffffff as u32)
+
+fn tool_gzip_stored(bytes: &Vec[u8]) -> Vec[u8]:
+    var out: Vec[u8] = Vec.new()
+    out.push(31 as u8)
+    out.push(139 as u8)
+    out.push(8 as u8)
+    out.push(0 as u8)
+    out = tool_gzip_append_u32_le(out, 0 as u32)
+    out.push(0 as u8)
+    out.push(255 as u8)
+    var offset: i64 = 0
+    if bytes.len() == 0:
+        out.push(1 as u8)
+        out = tool_gzip_append_u16_le(out, 0)
+        out = tool_gzip_append_u16_le(out, 0xffff)
+    while offset < bytes.len():
+        let remaining = bytes.len() - offset
+        let chunk = if remaining > 65535: 65535 else: remaining
+        let final_block = offset + chunk == bytes.len()
+        out.push(if final_block: 1 as u8 else: 0 as u8)
+        out = tool_gzip_append_u16_le(out, chunk as i32)
+        out = tool_gzip_append_u16_le(out, 0xffff - chunk as i32)
+        var i: i64 = 0
+        while i < chunk:
+            out.push(bytes.get(offset + i))
+            i = i + 1
+        offset = offset + chunk
+    out = tool_gzip_append_u32_le(out, tool_gzip_crc32(bytes))
+    out = tool_gzip_append_u32_le(out, bytes.len() as u32)
+    out
+
+pub fn ToolFs.write_tar(self: &Self, output_path: str, entries: &Vec[ArchiveEntry]) -> i32:
+    self.require_write_file_allowed(output_path)
+    let out = self.tar_bytes(entries)
+    if out.len() == 0:
+        return 1
     self.write_binary(output_path, out)
+
+pub fn ToolFs.write_tar_gz(self: &Self, output_path: str, entries: &Vec[ArchiveEntry]) -> i32:
+    self.require_write_file_allowed(output_path)
+    let tar = self.tar_bytes(entries)
+    if tar.len() == 0:
+        return 1
+    self.write_binary(output_path, tool_gzip_stored(&tar))
 
 fn tool_tar_block_is_zero(bytes: &Vec[u8], offset: i64) -> bool:
     if offset + 512 > bytes.len():
@@ -1200,6 +1294,17 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: str, output_dir: str) -> i3
                 return 1
             if mode > 0:
                 let _ = self.chmod(output_path, mode as i32)
+        else if typeflag == 50 as u8:
+            let link_name = tool_tar_field_str(&archive, offset + 157, 100)
+            if tool_tar_link_name(link_name).len() == 0:
+                return 1
+            let output_parent = tool_path_dirname(output_path)
+            if output_parent != "." and self.mkdir_all(output_parent) != 0:
+                return 1
+            if not self.write_file_allowed(output_path):
+                return 1
+            if with_fs_symlink(link_name, self.resolve_path(output_path)) != 0:
+                return 1
         else if typeflag == 48 as u8 or typeflag == 0 as u8:
             let content_start = offset + 512
             if content_start + size > archive.len():

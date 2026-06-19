@@ -5417,6 +5417,21 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: str, base_d
         ctx.diagnostics().error("error: build_w_toolfs_ok missing sandboxed ToolFs output")
         return 1
 
+    let toolfs_archive_dir = bs_join(base_dir, "toolfs_archive")
+    rc = bs_write_project_manifest(ctx, toolfs_archive_dir, "buildwtoolfsarchive")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "src/main.w"), "fn main:\n    print(\"toolfs archive ok\")\n", ctx.target_name(), "toolfs archive source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "fixtures/tree/a.txt"), "tree", ctx.target_name(), "toolfs archive fixture")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/archive\") == 0)\n    let entries: Vec[ArchiveEntry] = Vec.new()\n    entries.push(archive_dir_entry(\"pkg\", 0o755))\n    entries.push(archive_dir_entry(\"pkg/nested\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    entries.push(archive_symlink_entry(\"nested/a.txt\", \"pkg/link-a.txt\", 0o777))\n    assert(fs.write_tar(\"out/archive/sample.tar\", entries) == 0)\n    assert(fs.write_tar_gz(\"out/archive/sample.tar.gz\", entries) == 0)\n    let gzip = fs.read_binary(\"out/archive/sample.tar.gz\")\n    assert(gzip.len() > 10)\n    assert(gzip.get(0) == 31 as u8)\n    assert(gzip.get(1) == 139 as u8)\n    assert(fs.extract_tar(\"out/archive/sample.tar\", \"out/archive/extracted\") == 0)\n    assert(fs.read_text(\"out/archive/extracted/pkg/nested/a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/link-a.txt\") == \"tree\")\n    ctx.new_build().executable(\"toolfs-archive\", \"src/main.w\")\n", ctx.target_name(), "toolfs archive build.w")
+    if rc != 0: return rc
+    let toolfs_archive = bs_build_w_expect_success(ctx, compiler_path, toolfs_archive_dir, "build-w-toolfs-archive", bs_blob_to_args(bs_argv_append("", "build")))
+    if toolfs_archive.rc != 0: return toolfs_archive.rc
+    if not ctx.fs().exists(bs_join(toolfs_archive_dir, "out/archive/sample.tar.gz")):
+        ctx.diagnostics().error("error: build_w_toolfs_archive missing gzip archive output")
+        return 1
+
     let toolfs_escape_dir = bs_join(base_dir, "toolfs_escape")
     rc = bs_write_project_manifest(ctx, toolfs_escape_dir, "buildwtoolfsescape")
     if rc != 0: return rc

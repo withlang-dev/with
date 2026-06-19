@@ -4,6 +4,7 @@ use std.collections
 use std.result
 use std.zlib.defs
 use std.zlib.compress
+use std.zlib.deflate
 use std.zlib.uncompr
 use std.zlib.inflate
 
@@ -56,6 +57,43 @@ pub fn compress_level(data: &Vec[u8], level: i32) -> Result[Vec[u8], ZlibError]:
         with_free(out_ptr as *i8)
         return Err(zlib_code_error(rc))
     let out = zlib_copy_from_raw(out_ptr as *const u8, out_len as i64)
+    with_free(out_ptr as *i8)
+    Ok(out)
+
+pub fn compress_gzip(data: &Vec[u8]) -> Result[Vec[u8], ZlibError]:
+    compress_gzip_level(data, Z_DEFAULT_COMPRESSION)
+
+pub fn compress_gzip_level(data: &Vec[u8], level: i32) -> Result[Vec[u8], ZlibError]:
+    if level < Z_DEFAULT_COMPRESSION or level > Z_BEST_COMPRESSION:
+        return Err(zlib_error(Z_STREAM_ERROR, "zlib compression level must be -1..9"))
+    if data.len() as c_ulong > UINT_MAX as c_ulong:
+        return Err(zlib_error(Z_BUF_ERROR, "zlib gzip input is too large"))
+    var stream: z_stream_s
+    let init_rc = unsafe { deflateInit2_(&raw mut stream as *mut z_stream_s, level as c_int, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
+    if init_rc != Z_OK:
+        return Err(zlib_code_error(init_rc))
+    let out_len = unsafe { deflateBound(&raw mut stream as *mut z_stream_s, data.len() as c_ulong) }
+    if out_len > UINT_MAX as c_ulong:
+        let _ = unsafe { deflateEnd(&raw mut stream as *mut z_stream_s) }
+        return Err(zlib_error(Z_BUF_ERROR, "zlib gzip output is too large"))
+    let out_ptr = with_alloc(out_len as i64) as *mut u8
+    if out_ptr as i64 == 0:
+        let _ = unsafe { deflateEnd(&raw mut stream as *mut z_stream_s) }
+        return Err(zlib_code_error(Z_MEM_ERROR))
+    stream.next_in = zlib_vec_data(data) as *mut u8
+    stream.avail_in = data.len() as c_uint
+    stream.next_out = out_ptr
+    stream.avail_out = out_len as c_uint
+    let rc = unsafe { deflate(&raw mut stream as *mut z_stream_s, Z_FINISH) }
+    let total_out = stream.total_out
+    let end_rc = unsafe { deflateEnd(&raw mut stream as *mut z_stream_s) }
+    if rc != Z_STREAM_END:
+        with_free(out_ptr as *i8)
+        return Err(zlib_code_error(rc))
+    if end_rc != Z_OK:
+        with_free(out_ptr as *i8)
+        return Err(zlib_code_error(end_rc))
+    let out = zlib_copy_from_raw(out_ptr as *const u8, total_out as i64)
     with_free(out_ptr as *i8)
     Ok(out)
 

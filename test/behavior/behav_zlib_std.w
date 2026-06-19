@@ -60,6 +60,15 @@ fn test_gzip_decompress:
     let restored = decompress_gzip(&gzip_hello_fixture()).unwrap()
     assert_bytes_eq(&restored, &expected)
 
+fn test_gzip_round_trip:
+    let original = bytes_from_str("gzip gzip gzip gzip gzip with zlib")
+    let compressed = compress_gzip(&original).unwrap()
+    assert(compressed.len() > 10)
+    assert(compressed.get(0) == 31 as u8)
+    assert(compressed.get(1) == 139 as u8)
+    let restored = decompress_gzip(&compressed).unwrap()
+    assert_bytes_eq(&restored, &original)
+
 fn test_levels_and_errors:
     let original = bytes_from_str("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     let fast = compress_level(&original, 1).unwrap()
@@ -74,5 +83,6 @@ fn test_levels_and_errors:
 fn main:
     test_round_trip()
     test_gzip_decompress()
+    test_gzip_round_trip()
     test_levels_and_errors()
     print("ok")

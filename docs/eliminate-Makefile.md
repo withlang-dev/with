@@ -78,7 +78,8 @@ Already true:
 - `with build` is the authoritative stage-chain build.
 - Direct graph targets exist for stage1/stage2/stage3, runtime, build,
   selfcheck, fixpoint, test, install, install-user, seed, deps, clean, PCRE2,
-  emit-C, release UAT, prune, test-green, and last-green workflows.
+  zlib, emit-C, release UAT, bootstrap-C packaging, prune, test-green, and
+  last-green workflows.
 - `with build :seed` and `with build :deps` are the graph entry points for
   fetching the release seed and static LLVM SDK when a With compiler already
   exists. They use With-owned HTTPS fetch helpers; `:deps` consumes `.tar.gz`
@@ -105,7 +106,6 @@ Still blocking Makefile and script removal:
   - `scripts/package-darwin-aarch64.sh`
   - `scripts/package-linux-x86_64.sh`
   - `scripts/package-windows-x86_64.ps1`
-  - `scripts/package-bootstrap-c.sh`
   - `scripts/package-llvm-sdk.sh`
   - `scripts/package-llvm-sdk-windows-x86_64.ps1`
 - Release installer assets are scripts:
@@ -121,20 +121,19 @@ Still blocking Makefile and script removal:
   - `tools/build-cmake.ps1`
   - `tools/build-static-llvm.sh`
   - `tools/build-static-llvm.ps1`
-- Build-system maintenance still relies on host utilities for seed/deps
-  fetching, PCRE2 reference fetching/extraction, and release/SDK packaging
-  work. Repository build evidence, compiler seed hashes, zlib reference
-  fetching/extraction, generic `std.build` download checksum verification, and
-  optional stack-budget inspection use With-owned tools or explicit With-owned
-  SDK tool paths.
-- `ToolFs.write_tar()` and `ToolFs.extract_tar()` provide native
-  uncompressed USTAR support for regular files and directories. The migrated
-  `std.zlib` facade now supports zlib/gzip decompression, and
-  `build/zlib.w` uses a With HTTP helper plus migrated zlib gunzip helper plus
-  `ToolFs.extract_tar()` for `:zlib-reference`. Release and SDK packaging still
-  need native archive creation with compression, symlink metadata, archive
-  manifests, and package-format targets before host `tar`/`zstd`/`zip` scripts
-  can disappear.
+- Build-system maintenance no longer relies on host `curl`, `tar`, or `zstd`
+  for seed/deps fetching or PCRE2/zlib reference fetching/extraction. Remaining
+  host-utility reliance is concentrated in platform release packaging, SDK
+  packaging/provenance checks, and binary inspection/stripping.
+- `ToolFs.write_tar()` and `ToolFs.extract_tar()` provide native USTAR support
+  for regular files, directories, and symlinks. `ToolFs.write_tar_gz()` provides
+  deterministic gzip-wrapped tar output. The migrated `std.zlib` facade supports
+  zlib/gzip decompression and gzip compression; `build/zlib.w` uses a With HTTP
+  helper plus migrated zlib gunzip helper plus `ToolFs.extract_tar()` for
+  `:zlib-reference`. Bootstrap-C packaging is graph-owned. Platform release and
+  SDK packaging still need native package targets, binary inspection,
+  stripping, and SDK provenance validation before host packaging scripts can
+  disappear.
 - `ToolFs.scratch_dir()` exists, but repository build modules cannot call it
   directly until the installed seed embeds that API. PCRE2 has moved from the
   shared `out/pcre2_tmp` path to the action-scratch path convention with
@@ -168,7 +167,6 @@ and script dependency are gone.
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | bootstrap-boundary CI setup | CI no longer invokes Make; it uses a bootstrap seed acquisition step, then `with build :deps`, `with build`, `with build :fixpoint`, and `with build :test`. |
 | `Makefile` | post-seed blocker | Delete after all listed aliases, cross, seed, CI, release, SDK, and install roles have With graph replacements. |
-| `scripts/package-bootstrap-c.sh` | post-seed blocker | Replace with a self-hosted packaging target. |
 | `scripts/package-darwin-aarch64.sh` | post-seed blocker | Replace with a self-hosted Darwin release packaging target. |
 | `scripts/package-linux-x86_64.sh` | post-seed blocker | Replace with a self-hosted Linux release packaging target. |
 | `scripts/package-windows-x86_64.ps1` | post-seed blocker | Replace with a self-hosted Windows release packaging target. |
@@ -288,6 +286,12 @@ and script dependency are gone.
   With-built HTTPS helpers; PCRE2 and SDK `.tar.gz` archives gunzip through
   migrated zlib and extract through native `ToolFs.extract_tar()`. SDK release
   assets are now named `with-llvm-sdk-<llvm-ver>-<platform>.tar.gz`.
+- 2026-06-19: Added symlink USTAR entries and deterministic gzip tar writing
+  to `std.build`/tool-mode evaluation, added gzip compression to `std.zlib`,
+  and replaced `scripts/package-bootstrap-c.sh` with
+  `with build :package-bootstrap-c`, which stages emitted C sources and
+  bootstrap platform shims, writes `SHA256SUMS`, and produces
+  `out/release/with-bootstrap-c-<version>.tar.gz`.
 
 ## Next Work Queue
 
@@ -295,10 +299,10 @@ Do not stack new Makefile-elimination implementation work on top of unrelated
 compiler/backend fixes. If the worktree contains a verified compiler fix, commit
 that logical change first, then continue with this queue.
 
-1. **Implement release and SDK package capabilities.** Package targets still
-   need native compression, symlink archive metadata, deterministic manifests,
-   package-format decisions, binary inspection, and With-owned strip/symbol
-   checks.
+1. **Implement platform release and SDK package targets.** Bootstrap-C packaging
+   is graph-owned. Platform compiler packages and SDK packages still need
+   binary inspection, With-owned strip/symbol checks, SDK provenance validation,
+   and platform-specific package targets.
 
 ## Implementation Tasks
 
@@ -329,12 +333,11 @@ trustworthy once `build.w` owns every workflow.
   utilities.
   Binary writes, copy/chmod/tree operations, scratch dirs, repository-local
   self-hosted hashing, host file reads, and project-file SHA-256 hashing exist;
-  native uncompressed USTAR file/directory archive support exists; zlib/gzip
-  decompression exists through `std.zlib`; `build/zlib.w` has a project-local
-  HTTP helper for its reference archive. Native archive creation with
-  compression, symlink archive metadata, zstd compression/decompression,
-  first-class `std.build` HTTP(S) fetch, and richer platform path handling
-  remain.
+  native USTAR file/directory/symlink archive support exists; deterministic
+  gzip tar creation exists; zlib/gzip compression and decompression exist
+  through `std.zlib`; named repository fetch targets use project-local With
+  HTTPS helpers. First-class `std.build` HTTP(S) fetch and richer platform path
+  handling remain.
 - [x] Implement `ToolFs.scratch_dir() -> str` as an action-scoped, driver-managed
   scratch directory. The returned path must be project-relative, private to the
   current action invocation, automatically included in that action's write
@@ -504,11 +507,13 @@ build, fixpoint, and tests.
   - `with build :package-linux-x86_64`
   - `with build :package-windows-x86_64`
   - `with build :package-current-host`
-- Add a graph target for bootstrap-C source packaging:
+- [x] Add a graph target for bootstrap-C source packaging:
   - `with build :package-bootstrap-c`
 - Reimplement the behavior of `scripts/package-darwin-aarch64.sh`,
-  `scripts/package-linux-x86_64.sh`, `scripts/package-windows-x86_64.ps1`, and
-  `scripts/package-bootstrap-c.sh` in With build modules.
+  `scripts/package-linux-x86_64.sh`, and
+  `scripts/package-windows-x86_64.ps1` in With build modules.
+- [x] Reimplement the behavior of `scripts/package-bootstrap-c.sh` in
+  `build/package.w` and delete the script.
 - Implement release staging in With: copy binaries and resources, preserve
   executable bits, write manifests, write checksums, and produce deterministic
   archives.
@@ -520,8 +525,11 @@ build, fixpoint, and tests.
 - Implement strip/symbol checks through embedded or SDK-provided With-owned
   LLVM tools. Do not call host `strip`, `nm`, `otool`, `ldd`, `dumpbin`, or
   PowerShell.
-- Make package targets depend on completed build, fixpoint, test, release UAT,
-  SDK provenance checks, and clean release staging directories.
+- Make platform compiler package targets depend on completed build, fixpoint,
+  test, release UAT, SDK provenance checks, and clean release staging
+  directories. Bootstrap-C packaging depends on the release compiler build and
+  emitted-C source generation, because it is a source bundle for new-platform
+  bring-up rather than a publishable compiler binary.
 - Make package targets fail loudly if a platform package cannot be correctly
   produced. Do not emit partial archives or placeholder manifests.
 
@@ -639,7 +647,6 @@ Only after the preceding tasks pass:
   - `scripts/package-darwin-aarch64.sh`
   - `scripts/package-linux-x86_64.sh`
   - `scripts/package-windows-x86_64.ps1`
-  - `scripts/package-bootstrap-c.sh`
   - `scripts/package-llvm-sdk.sh`
   - `scripts/package-llvm-sdk-windows-x86_64.ps1`
 - Remove installer scripts:
