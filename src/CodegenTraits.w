@@ -49,7 +49,7 @@ fn Codegen.collect_trait_info(self: Codegen, trait_node: i32):
     for mi in 0..method_count:
         let method_sym = self.pool.get_extra(pos)
         pos = pos + 1
-        let _method_flags = self.pool.get_extra(pos)
+        let method_flags = self.pool.get_extra(pos)
         pos = pos + 1
         let method_param_start = self.pool.get_extra(pos)
         pos = pos + 1
@@ -61,6 +61,7 @@ fn Codegen.collect_trait_info(self: Codegen, trait_node: i32):
         pos = pos + 1
 
         self.trait_method_names.push(method_sym)
+        self.trait_method_flags.push(method_flags)
         self.trait_method_param_starts.push(method_param_start)
         // Trait signatures may mention Self, associated types, or the trait's
         // own type parameters. Those only become concrete in an impl-specific
@@ -136,6 +137,7 @@ fn Codegen.dyn_trait_method_fn_type(self: Codegen, trait_sym: i32, method_sym: i
         self.had_error = 1
         return 0
     let method_idx = self.trait_method_starts.get(trait_idx as i64) + method_offset
+    let method_flags = self.trait_method_flags.get(method_idx as i64)
     let param_start = self.trait_method_param_starts.get(method_idx as i64)
     let param_count = self.trait_method_param_counts.get(method_idx as i64)
     let ret_node = self.trait_method_ret_nodes.get(method_idx as i64)
@@ -158,17 +160,26 @@ fn Codegen.dyn_trait_method_fn_type(self: Codegen, trait_sym: i32, method_sym: i
         param_types.push(p_ty)
         pi = pi + 1
 
-    var ret_ty = wl_void_type(self.context)
+    var ret_sema_ty = self.sema.ty_void as i32
     if ret_node != 0:
         if codegen_type_node_mentions_self(self.pool, self.sym_Self, ret_node) != 0:
             with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because its return type mentions Self")
             self.had_error = 1
             return 0
-        ret_ty = self.resolve_type(ret_node)
-        if ret_ty == 0:
+        ret_sema_ty = self.sema.resolve_type_expr(ret_node) as i32
+        if ret_sema_ty == 0:
             with_eprint("error: cannot resolve return type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
             self.had_error = 1
             return 0
+    if (method_flags / FnFlags.ASYNC) % 2 == 1:
+        let task_args: Vec[i32] = Vec.new()
+        task_args.push(ret_sema_ty)
+        ret_sema_ty = self.sema.ensure_generic_inst_type(self.sema.syms.task, task_args, 1) as i32
+    let ret_ty = self.sema_type_to_llvm(ret_sema_ty)
+    if ret_ty == 0:
+        with_eprint("error: cannot lower return type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
+        self.had_error = 1
+        return 0
 
     wl_function_type(ret_ty, vec_data_i64(&param_types), param_types.len() as i32, 0)
 
@@ -217,7 +228,7 @@ fn Codegen.find_impl_for_type_trait(self: Codegen, impl_type_sym: i32, trait_sym
             return decl
     0
 
-fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, method_sym: i32, method_fn: i64, method_ft: i64) -> i64:
+fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, impl_fn_sym: i32, method_sym: i32, method_fn: i64, method_ft: i64, dyn_ft: i64) -> i64:
     let type_name = self.intern.resolve(impl_type_sym)
     let method_name = self.intern.resolve(method_sym)
     let wrapper_name = "__dynwrap_" ++ type_name ++ "_" ++ method_name
@@ -236,7 +247,7 @@ fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, method_sym: i32
         let pval = wl_get_param(method_fn, pi)
         wrapper_param_types.push(wl_type_of(pval))
         pi = pi + 1
-    let ret_ty = wl_get_return_type(method_ft)
+    let ret_ty = wl_get_return_type(dyn_ft)
     let wrapper_ft = wl_function_type(ret_ty, vec_data_i64(&wrapper_param_types), orig_param_count, 0)
     let wrapper_fn = wl_add_function(self.llmod, wrapper_name, wrapper_ft)
     wl_set_linkage(wrapper_fn, wl_internal_linkage())
@@ -268,7 +279,12 @@ fn Codegen.create_dyn_wrapper(self: Codegen, impl_type_sym: i32, method_sym: i32
         call_args.push(self.coerce_value_to_type(p, target_ty))
         pi = pi + 1
 
-    let call_val = wl_build_call(self.builder, method_ft, method_fn, vec_data_i64(&call_args), orig_param_count)
+    let is_async_method = if impl_fn_sym != 0 and self.async_fn_ret_types.get(impl_fn_sym).is_some(): 1 else: 0
+    var call_val: i64 = 0
+    if is_async_method != 0:
+        call_val = self.emit_async_fn_spawn_task_value(impl_fn_sym, method_fn, method_ft, &call_args, ret_ty)
+    else:
+        call_val = wl_build_call(self.builder, method_ft, method_fn, vec_data_i64(&call_args), orig_param_count)
     if ret_ty == wl_void_type(self.context):
         let _ = wl_build_ret_void(self.builder)
     else:
@@ -740,6 +756,7 @@ fn Codegen.generate_trait_vtable_for_impl(self: Codegen, impl_node: i32):
     let entries: Vec[i64] = Vec.new()
     for mi in 0..method_count:
         let method_sym = self.trait_method_names.get((method_start + mi) as i64)
+        let method_flags = self.trait_method_flags.get((method_start + mi) as i64)
         let method_name = self.intern.resolve(method_sym)
         let type_name = self.intern.resolve(impl_type_sym)
         let mangled = type_name ++ "." ++ method_name
@@ -753,7 +770,13 @@ fn Codegen.generate_trait_vtable_for_impl(self: Codegen, impl_node: i32):
                 fv = self.fn_values.get(impl_fn_sym)
                 ft = self.fn_fn_types.get(impl_fn_sym)
         if fv.is_some() and ft.is_some():
-            let wrapper = self.create_dyn_wrapper(impl_type_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64)
+            var dyn_ft = ft.unwrap() as i64
+            if (method_flags / FnFlags.ASYNC) % 2 == 1:
+                dyn_ft = self.dyn_trait_method_fn_type(trait_sym, method_sym)
+                if dyn_ft == 0:
+                    entries.push(wl_const_null(wl_ptr_type(self.context)))
+                    continue
+            let wrapper = self.create_dyn_wrapper(impl_type_sym, impl_fn_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64, dyn_ft)
             entries.push(wrapper)
         else:
             entries.push(wl_const_null(wl_ptr_type(self.context)))
@@ -820,6 +843,7 @@ fn Codegen.ensure_monomorphized_trait_vtable(self: Codegen, impl_type_sym: i32, 
     let entries: Vec[i64] = Vec.new()
     for mi in 0..method_count:
         let method_sym = self.trait_method_names.get((method_start + mi) as i64)
+        let method_flags = self.trait_method_flags.get((method_start + mi) as i64)
         let method_name = self.intern.resolve(method_sym)
         let concrete_sym = self.intern.intern(type_name ++ "." ++ method_name)
         let fv = self.fn_values.get(concrete_sym)
@@ -828,7 +852,13 @@ fn Codegen.ensure_monomorphized_trait_vtable(self: Codegen, impl_type_sym: i32, 
             with_eprint("error: missing monomorphized trait method '" ++ type_name ++ "." ++ method_name ++ "' for trait '" ++ trait_name ++ "'")
             self.had_error = 1
             return
-        let wrapper = self.create_dyn_wrapper(impl_type_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64)
+        var dyn_ft = ft.unwrap() as i64
+        if (method_flags / FnFlags.ASYNC) % 2 == 1:
+            dyn_ft = self.dyn_trait_method_fn_type(trait_sym, method_sym)
+            if dyn_ft == 0:
+                self.had_error = 1
+                return
+        let wrapper = self.create_dyn_wrapper(impl_type_sym, concrete_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64, dyn_ft)
         entries.push(wrapper)
 
     let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name

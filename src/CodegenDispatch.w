@@ -17020,6 +17020,83 @@ fn Codegen.gen_nameof(self: Codegen, node: i32) -> i64:
 
 // ── Async function spawn codegen ──────────────────────────────────
 
+fn Codegen.emit_async_fn_spawn_task_value(self: Codegen, fn_sym: i32, callee: i64, call_ft: i64, args: &Vec[i64], task_ty: i64) -> i64:
+    let ctx = self.context
+    let ptr_ty = wl_ptr_type(ctx)
+    let i32_ty = wl_i32_type(ctx)
+    let i64_ty = wl_i64_type(ctx)
+    let void_ty = wl_void_type(ctx)
+    let arg_count = args.len() as i32
+
+    var ret_ty = wl_get_return_type(call_ft)
+    let actual_ret_opt = self.async_fn_ret_types.get(fn_sym)
+    if actual_ret_opt.is_some():
+        ret_ty = actual_ret_opt.unwrap() as i64
+
+    let arg_types: Vec[i64] = Vec.new()
+    for ai in 0..arg_count:
+        arg_types.push(wl_type_of(args.get(ai as i64)))
+    let args_struct_ty = if arg_count > 0:
+        wl_struct_type(ctx, vec_data_i64(&arg_types), arg_count, 0)
+    else:
+        wl_struct_type(ctx, 0, 0, 0)
+
+    let args_size = if arg_count > 0: wl_abi_size_of(wl_get_module_data_layout(self.llmod), args_struct_ty) else: 8
+    var alloc_fn = wl_get_named_function(self.llmod, "with_alloc")
+    if alloc_fn == 0:
+        let alloc_params: Vec[i64] = Vec.new()
+        alloc_params.push(i64_ty)
+        let alloc_ft = wl_function_type(ptr_ty, vec_data_i64(&alloc_params), 1, 0)
+        alloc_fn = wl_add_function(self.llmod, "with_alloc", alloc_ft)
+    let alloc_ft = wl_global_get_value_type(alloc_fn)
+    let alloc_args: Vec[i64] = Vec.new()
+    alloc_args.push(wl_const_int(i64_ty, args_size, 0))
+    let env_ptr = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&alloc_args), 1)
+
+    for ai in 0..arg_count:
+        let field_ptr = wl_build_struct_gep(self.builder, args_struct_ty, env_ptr, ai)
+        wl_build_store(self.builder, args.get(ai as i64), field_ptr)
+
+    let result_size = if ret_ty != void_ty: wl_abi_size_of(wl_get_module_data_layout(self.llmod), ret_ty) else: 0
+    let rbuf_alloc_args: Vec[i64] = Vec.new()
+    rbuf_alloc_args.push(wl_const_int(i64_ty, if result_size > 0: result_size else: 1, 0))
+    let result_buf = wl_build_call(self.builder, alloc_ft, alloc_fn, vec_data_i64(&rbuf_alloc_args), 1)
+
+    var trampoline = 0 as i64
+    if self.async_trampolines.contains(fn_sym):
+        trampoline = self.async_trampolines.get(fn_sym).unwrap() as i64
+    else:
+        trampoline = self.generate_async_trampoline(fn_sym, callee, call_ft, args_struct_ty, arg_types)
+        self.async_trampolines.insert(fn_sym, trampoline)
+
+    var spawn_fn = wl_get_named_function(self.llmod, "with_fiber_spawn")
+    if spawn_fn == 0:
+        let spawn_params: Vec[i64] = Vec.new()
+        spawn_params.push(ptr_ty)
+        spawn_params.push(ptr_ty)
+        spawn_params.push(ptr_ty)
+        spawn_params.push(i32_ty)
+        spawn_params.push(i32_ty)
+        let spawn_ft = wl_function_type(i32_ty, vec_data_i64(&spawn_params), 5, 0)
+        spawn_fn = wl_add_function(self.llmod, "with_fiber_spawn", spawn_ft)
+    let spawn_ft = wl_global_get_value_type(spawn_fn)
+    let spawn_args: Vec[i64] = Vec.new()
+    spawn_args.push(trampoline)
+    spawn_args.push(env_ptr)
+    spawn_args.push(result_buf)
+    spawn_args.push(wl_const_int(i32_ty, result_size, 0))
+    var spawn_stack_size = 0
+    if self.sema.fn_stack_sizes.contains(fn_sym):
+        spawn_stack_size = self.sema.fn_stack_sizes.get(fn_sym).unwrap()
+    spawn_args.push(wl_const_int(i32_ty, spawn_stack_size as i64, 0))
+    let fiber_id = wl_build_call(self.builder, spawn_ft, spawn_fn, vec_data_i64(&spawn_args), 5)
+
+    var task_value = wl_get_undef(task_ty)
+    task_value = wl_build_insert_value(self.builder, task_value, fiber_id, 0)
+    task_value = wl_build_insert_value(self.builder, task_value, result_buf, 1)
+    self.last_async_spawn_ret_ty = ret_ty
+    task_value
+
 fn Codegen.emit_async_fn_spawn(self: Codegen, fn_sym: i32, callee: i64, call_ft: i64, args: &Vec[i64], dest_place: i32, body: &MirBody, next_bb: i32) -> bool:
     let ctx = self.context
     let ptr_ty = wl_ptr_type(ctx)

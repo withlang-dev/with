@@ -41,6 +41,7 @@ fn Sema.require_async_runtime(self: Sema, node: i32, feature: str):
 
 type SemaDynTraitMethodInfo {
     ok: i32,
+    method_flags: i32,
     param_start: i32,
     param_count: i32,
     ret_node: i32,
@@ -49,10 +50,23 @@ type SemaDynTraitMethodInfo {
 fn sema_dyn_trait_method_missing -> SemaDynTraitMethodInfo:
     SemaDynTraitMethodInfo {
         ok: 0,
+        method_flags: 0,
         param_start: 0,
         param_count: 0,
         ret_node: 0,
     }
+
+fn Sema.trait_method_effective_return_type(self: Sema, method_flags: i32, ret_node: i32) -> i32:
+    var ret_ty = self.ty_void as i32
+    if ret_node != 0:
+        ret_ty = self.resolve_type_expr(ret_node) as i32
+    if ret_ty == 0:
+        return 0
+    if (method_flags / FnFlags.ASYNC) % 2 == 0:
+        return ret_ty
+    let task_args: Vec[i32] = Vec.new()
+    task_args.push(ret_ty)
+    self.ensure_generic_inst_type(self.syms.task, task_args, 1) as i32
 
 type SemaTraitImplMethodContract {
     ok: i32,
@@ -14917,6 +14931,7 @@ fn Sema.find_dyn_trait_method_info(self: Sema, trait_sym: i32, method_sym: i32) 
             if cur_method_sym == method_sym or (want.len() > 0 and self.pool_resolve(cur_method_sym) == want):
                 return SemaDynTraitMethodInfo {
                     ok: 1,
+                    method_flags: self.trait_method_flags.get(table_i as i64),
                     param_start: self.trait_method_param_starts.get(table_i as i64),
                     param_count: self.trait_method_param_counts.get(table_i as i64),
                     ret_node: self.trait_method_ret_nodes.get(table_i as i64),
@@ -14940,7 +14955,7 @@ fn Sema.find_dyn_trait_method_info(self: Sema, trait_sym: i32, method_sym: i32) 
     for mi in 0..method_count:
         let cur_method_sym = self.ast.get_extra(pos)
         pos = pos + 1
-        let _method_flags = self.ast.get_extra(pos)
+        let method_flags = self.ast.get_extra(pos)
         pos = pos + 1
         let param_start = self.ast.get_extra(pos)
         pos = pos + 1
@@ -14952,6 +14967,7 @@ fn Sema.find_dyn_trait_method_info(self: Sema, trait_sym: i32, method_sym: i32) 
         if cur_method_sym == method_sym:
             return SemaDynTraitMethodInfo {
                 ok: 1,
+                method_flags,
                 param_start,
                 param_count,
                 ret_node,
@@ -14999,13 +15015,10 @@ fn Sema.check_dyn_trait_method_call(self: Sema, trait_sym: i32, method_sym: i32,
                 if self.arithmetic_result_type(expected_ty as TypeId, actual_ty as TypeId) == 0:
                     self.emit_argument_type_mismatch(self.pool_resolve(method_sym), method_sym, ai, param_i, expected_ty, actual_ty, self.ast.get_extra(extra_start + ai))
 
-    if info.ret_node == 0:
-        self.typed_expr_types.insert(node, self.ty_void as i32)
-        return self.ty_void as i32
-    if self.ast.kind(info.ret_node) == NodeKind.NK_TYPE_NAMED and self.ast.get_data0(info.ret_node) == self.syms.self_type:
+    if info.ret_node != 0 and self.ast.kind(info.ret_node) == NodeKind.NK_TYPE_NAMED and self.ast.get_data0(info.ret_node) == self.syms.self_type:
         self.emit_error("dyn trait method return type cannot be Self", node)
         return 0
-    let ret_ty = self.resolve_type_expr(info.ret_node) as i32
+    let ret_ty = self.trait_method_effective_return_type(info.method_flags, info.ret_node)
     if ret_ty != 0:
         self.typed_expr_types.insert(node, ret_ty)
     ret_ty
