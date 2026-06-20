@@ -5704,6 +5704,166 @@ fn Sema.regex_bind_capture_scope(self: Sema, regex_node: i32):
             self.scope_put(sym, self.ty_str as i32, 0)
         ni = ni + 1
 
+fn Sema.expr_tree_contains_fstring(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_FSTRING:
+        return 1
+    if kind == NodeKind.NK_CALL:
+        if self.expr_tree_contains_fstring(self.ast.get_data0(node)) != 0:
+            return 1
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai in 0..arg_count:
+            if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + ai)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
+        let extra_start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        for ei in 0..count:
+            if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + ei)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_RECORD_UPDATE:
+        if kind == NodeKind.NK_RECORD_UPDATE and self.expr_tree_contains_fstring(self.ast.get_data0(node)) != 0:
+            return 1
+        let extra_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + fi * 2 + 1)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_ENUM_VARIANT:
+        let extra_start = self.ast.get_data2(node)
+        if extra_start == 0:
+            return 0
+        let arg_count = self.ast.get_extra(extra_start)
+        for ai in 0..arg_count:
+            if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + 1 + ai)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_VARIANT_SHORTHAND:
+        let extra_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai in 0..arg_count:
+            if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + ai)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + si)) != 0:
+                return 1
+        return self.expr_tree_contains_fstring(self.ast.get_data2(node))
+    if kind == NodeKind.NK_IF_EXPR:
+        if self.expr_tree_contains_fstring(self.ast.get_data0(node)) != 0:
+            return 1
+        if self.expr_tree_contains_fstring(self.ast.get_data1(node)) != 0:
+            return 1
+        return self.expr_tree_contains_fstring(self.ast.get_data2(node))
+    if kind == NodeKind.NK_MATCH:
+        if self.expr_tree_contains_fstring(self.ast.get_data0(node)) != 0:
+            return 1
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            if self.expr_tree_contains_fstring(self.ast.get_extra(arm_start + ai)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_MATCH_ARM:
+        if self.expr_tree_contains_fstring(self.ast.get_data1(node)) != 0:
+            return 1
+        return self.expr_tree_contains_fstring(self.ast.get_data2(node))
+    if kind == NodeKind.NK_MAP_LIT:
+        let extra_start = self.ast.get_data0(node)
+        let pair_count = self.ast.get_data1(node)
+        for pi in 0..pair_count:
+            if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + pi * 2)) != 0:
+                return 1
+            if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + pi * 2 + 1)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_MAP_COMPREHENSION:
+        let extra_start = self.ast.get_data0(node)
+        let clause_count = self.ast.get_data1(node)
+        if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start)) != 0:
+            return 1
+        if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + 1)) != 0:
+            return 1
+        for ci in 0..clause_count:
+            let base = extra_start + 2 + ci * 3
+            if self.expr_tree_contains_fstring(self.ast.get_extra(base + 1)) != 0:
+                return 1
+            if self.expr_tree_contains_fstring(self.ast.get_extra(base + 2)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+        if self.expr_tree_contains_fstring(self.ast.get_data0(node)) != 0:
+            return 1
+        let extra_start = self.ast.get_data1(node)
+        let clause_count = self.ast.get_data2(node)
+        for ci in 0..clause_count:
+            let base = extra_start + ci * 3
+            if self.expr_tree_contains_fstring(self.ast.get_extra(base + 1)) != 0:
+                return 1
+            if self.expr_tree_contains_fstring(self.ast.get_extra(base + 2)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_OPTIONAL_CHAIN:
+        if self.expr_tree_contains_fstring(self.ast.get_data0(node)) != 0:
+            return 1
+        let extra_start = self.ast.get_data2(node)
+        if extra_start == 0:
+            return 0
+        let has_call = self.ast.get_extra(extra_start)
+        if has_call == 0:
+            return 0
+        let arg_count = self.ast.get_extra(extra_start + 1)
+        for ai in 0..arg_count:
+            if self.expr_tree_contains_fstring(self.ast.get_extra(extra_start + 2 + ai)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_ASM_EXPR:
+        return 0
+    if kind == NodeKind.NK_CLOSURE:
+        return self.expr_tree_contains_fstring(self.ast.get_data0(node))
+    if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
+        return self.expr_tree_contains_fstring(self.ast.get_data1(node))
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_BREAK or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+        return self.expr_tree_contains_fstring(self.ast.get_data0(node))
+    if kind == NodeKind.NK_UNARY:
+        return self.expr_tree_contains_fstring(self.ast.get_data1(node))
+    if kind == NodeKind.NK_BINARY:
+        if self.expr_tree_contains_fstring(self.ast.get_data1(node)) != 0:
+            return 1
+        return self.expr_tree_contains_fstring(self.ast.get_data2(node))
+    if kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP or kind == NodeKind.NK_INDEX:
+        if self.expr_tree_contains_fstring(self.ast.get_data0(node)) != 0:
+            return 1
+        return self.expr_tree_contains_fstring(self.ast.get_data1(node))
+    if kind == NodeKind.NK_SLICE:
+        if self.expr_tree_contains_fstring(self.ast.get_data0(node)) != 0:
+            return 1
+        if self.expr_tree_contains_fstring(self.ast.get_data1(node)) != 0:
+            return 1
+        return self.expr_tree_contains_fstring(self.ast.get_data2(node))
+    if kind == NodeKind.NK_LET_ELSE:
+        if self.expr_tree_contains_fstring(self.ast.get_data1(node)) != 0:
+            return 1
+        return self.expr_tree_contains_fstring(self.ast.get_data2(node))
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        return self.expr_tree_contains_fstring(self.ast.get_data0(node))
+    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT:
+        if self.expr_tree_contains_fstring(self.ast.get_data0(node)) != 0:
+            return 1
+        return self.expr_tree_contains_fstring(self.ast.get_data1(node))
+    if kind == NodeKind.NK_SCOPE or kind == NodeKind.NK_LABEL:
+        return self.expr_tree_contains_fstring(self.ast.get_data1(node))
+    0
+
 fn Sema.check_fstring(self: Sema, node: i32) -> i32:
     // Type-check each expression segment. Result type is always str.
     self.note_allocation_site(node, AllocConstructKind.FSTRING, 0, 0)
@@ -5718,6 +5878,8 @@ fn Sema.check_fstring(self: Sema, node: i32) -> i32:
         else if seg_kind == FStringSegmentKind.EXPR:
             let expr_node = self.ast.get_extra(pos + 1)
             let spec_node = self.ast.get_extra(pos + 2)
+            if self.expr_tree_contains_fstring(expr_node) != 0:
+                self.emit_error("nested f-strings are not allowed; bind the inner f-string to a name first", expr_node)
             // Type-check the expression
             let expr_ty = self.check_expr(expr_node)
             // Validate format spec against expression type
