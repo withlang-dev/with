@@ -43,13 +43,62 @@ and folded into the phase. Verify states with `gh issue view <n>` before acting
   tuple/array/enum and generic enums **Option/Result** now drop their contents
   (variant-aware `mir_emit_drop_enum_ptr`; subject-consume at construction,
   match, if-let, let-else, and `?`). Remaining: **Vec** still leaks (no
-  `with_vec_free`; A5 deferred — enabling Vec drop risks widespread double-frees
-  from pervasive Vec copy-sharing), plus nested-in-struct and wildcard drops.
+  `with_vec_free`; A5 is active and must be finished), plus nested-in-struct and
+  wildcard drops.
 
 Each aggregate kind landed as its own verified commit (tuple → array → enum →
 #357), each passing `with build` + `:fixpoint` + the full behavior/error/spec
 suites. Last green: behavior 719, native-compile-error 617, native-spec 179;
 **fixpoint holds**.
+
+### A5 reset note — Vec drop backend ownership root cause
+
+The first A5 attempt turned on real `Vec` drop and exposed a backend ownership
+bug. Do **not** resume from a backend Sema clone or site-by-site symbol text
+fallbacks.
+
+Five whys:
+1. Focused A5 tests failed in backend codegen with unresolved return types and
+   misleading names (`CString.drop`, `Regex.drop`, `W.drop`,
+   `Holder.replace_tail`; typed dumps showed `CString.drop` as `bool.drop`).
+2. Those were not independent return/signature/primitive bugs; codegen was
+   comparing symbol IDs from different pools.
+3. The pool split was introduced after real `Vec` drop exposed
+   double-free/invalid-free in backend-owned state cleanup.
+4. The attempted workaround made the backend path copy/prepare Sema for Codegen
+   (`backend_sema = backend_sema.prepare_comptime_eval_copy()`), while also
+   using pools/intern tables from `last_sema`/frontend snapshots.
+5. Codegen assumes one coherent symbol-ID domain in many places. A cloned or
+   rematerialized Sema without either preserving exact pool identity or
+   remapping all IDs breaks that invariant globally.
+
+Ruled out:
+- Parser/sema for the focused test: `with-stage2 check
+  behav_mut_self_field_assign_vec_tail.w` passed before the failing run.
+- A single missing primitive fallback: adding text fallback for primitive names
+  did not fix the focused tests.
+- A single sig lookup gap: sema signatures were present (`sema.sigs=174` in
+  debug flow), and the issue persisted across several declaration sites.
+- LLVM verifier as first failure: `wl_verify_module` did not hit; backend failed
+  earlier, then cleanup hit invalid free.
+
+Correct fix shape:
+- Preferred: make Codegen not drop state it borrows, while keeping one
+  symbol-pool/AST/Sema ID domain through backend Codegen.
+- Audit Codegen fields that currently store borrowed ZCU/Sema vectors/strings.
+  Clone only true leaf owned data where symbol IDs are not affected; do not
+  clone symbol-bearing Sema/AST state as a workaround.
+- If backend truly must own/mutate Sema, handle the pool boundary once by
+  remapping every symbol-bearing structure or by adding one centralized
+  cross-pool symbol resolver/equality abstraction. Do not patch individual call
+  sites with ad hoc text fallback.
+
+The dirty first attempt was reset. Its untracked tests were lost; rewrite the
+A5/A6/A7 tests first from this behavior list before touching ownership:
+`behav_drop_vec_elements`, `behav_mut_self_field_assign_vec_tail`,
+`behav_mut_self_vec_owner_receiver`, `behav_drop_struct_field_move_reinit`,
+`err_use_after_move_struct_field`, and
+`err_use_after_move_vec_into_struct_field`.
 
 ---
 
@@ -346,21 +395,20 @@ metadata).
 A0 transitive `needs_drop` → tuple → array → enum (+ Option/Result) → #357
 curated owning wrappers, each its own verified+pushed commit.
 
-Remaining, recommended order:
-1. **#348 preprocess_text** — replace the `cc -E` shell-out in
+Remaining, required order unless the maintainer redirects:
+1. **A5 Vec drop** (#606 tail) — give Vec a real Drop (add `with_vec_free` +
+   compiler element-drop loop). Start by rewriting the focused tests listed in
+   the A5 reset note, then fix backend Codegen ownership/borrowing so enabling
+   Vec drop does not clone Sema or split symbol pools.
+2. **A6/A7/A8** (precise drop tracking) — nested aggregate-in-struct-field drop;
+   wildcard-element drop in irrefutable destructure; precise per-element
+   partial-extraction tracking to replace the conservative whole-base consume.
+3. **#348 preprocess_text** — replace the `cc -E` shell-out in
    `with_cimport_preprocess_text` (`src/compiler/ClangBridge.w` ~2309) with
    libclang token reconstruction. The token FFI already exists and is used
    (`clang_tokenize`/`clang_getTokenSpelling`/`clang_getExpansionLocation`,
    ClangBridge.w ~1474–1491). Independent of the drop codegen; substantial.
-2. **#357 expansion** — more curated owning constructors (fopen/fclose…),
+4. **#357 expansion** — more curated owning constructors (fopen/fclose…),
    refcount modeling (+1 ctor vs borrowing accessor), and an annotation/metadata
    evidence surface. Reuses the shipped `ci_emit_owning_wrapper`.
-3. **A5 Vec drop** (#606 tail) — give Vec a real Drop (add `with_vec_free` +
-   compiler element-drop loop). **HIGH RISK / go-no-go:** Vec is pervasive *and*
-   copy-shared (same buffer ptr in two places), so freeing buffers can surface
-   widespread double-frees — needs a full Vec-sharing audit. It's a leak (sound),
-   not a double-free; do under maintainer go-ahead.
-4. **A6/A7/A8** (precise drop tracking) — nested aggregate-in-struct-field drop;
-   wildcard-element drop in irrefutable destructure; precise per-element
-   partial-extraction tracking to replace the conservative whole-base consume.
 5. **#604 `[]mut T`** — awaits the maintainer's `[]mut T` vs `VecRange` decision.
