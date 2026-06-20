@@ -10,6 +10,8 @@ use build.clang_resource
 use build.retention
 use build.release_uat
 use build.package
+use build.sdk
+use build.requirements
 use std.sysinfo
 
 fn build_project_dirname(path: str) -> str:
@@ -385,6 +387,159 @@ fn package_current_host_target() -> Target:
         return target.dep("package-windows-x86_64")
     target.dep("package-darwin-aarch64")
 
+fn package_llvm_sdk_platform_target(name: str, platform: str, prefix: str, build_cache: str) -> Target:
+    let asset = sdk_asset_for_platform(platform)
+    let sdk_base = "llvm-" ++ compiler_llvm_version() ++ "-" ++ sdk_host_tag_for_platform(platform)
+    var target = target_new(.Action, name, "").output("out/release/" ++ name ++ ".passed")
+    target.action = run_package_llvm_sdk_action
+    target = target.arg(platform)
+    target = target.arg(prefix)
+    target = target.arg(build_cache)
+    target = target.arg(asset)
+    target = target.arg(sdk_base)
+    target = target.input(prefix)
+    target = target.input(build_cache)
+    target = target.input("build/sdk.w")
+    target = target.extra_output("out/release/" ++ asset)
+    target = target.extra_output("out/release/" ++ asset ++ ".sha256")
+    target = target.extra_output("out/release/" ++ asset ++ ".manifest")
+    target = target.write_scope("out/release")
+    target = target.write_scope("out/command/" ++ name)
+    target.timeout(1800000)
+
+fn package_llvm_sdk_current_host_target() -> Target:
+    var target = target_new(.Group, "package-llvm-sdk", "")
+    let platform = sdk_current_platform()
+    if platform == "darwin-aarch64":
+        return target.dep("package-llvm-sdk-darwin-aarch64")
+    if platform == "linux-x86_64":
+        return target.dep("package-llvm-sdk-linux-x86_64")
+    if platform == "windows-x86_64":
+        return target.dep("package-llvm-sdk-windows-x86_64")
+    target.dep("package-llvm-sdk-darwin-aarch64")
+
+fn sdk_source_target(name: str, url: str, sha256: str, archive: str, source_root: str, source_dir: str, marker: str) -> Target:
+    var target = target_new(.Action, name, "").output(marker)
+    target.action = run_sdk_source_tar_gz_action
+    target = target.arg(url)
+    target = target.arg(sha256)
+    target = target.arg(archive)
+    target = target.arg(source_root)
+    target = target.arg(source_dir)
+    target = target.input("build/https_fetch.w")
+    target = target.input("build/zlib_gunzip.w")
+    target = target.write_scope(source_root)
+    target = target.write_scope("out/command/" ++ name)
+    target = target.allow_network()
+    target.timeout(1800000)
+
+fn sdk_bootstrap_prefix_arg(ctx: &BuildCtx, platform: str) -> str:
+    let explicit = ctx.env_input("SDK_BOOTSTRAP_PREFIX")
+    if explicit.len() > 0:
+        return explicit
+    let llvm_prefix = ctx.env_input("LLVM_PREFIX")
+    if llvm_prefix.len() > 0:
+        return llvm_prefix
+    sdk_default_prefix_for_platform(platform)
+
+fn sdk_output_prefix_arg(ctx: &BuildCtx, platform: str) -> str:
+    let explicit = ctx.env_input("SDK_OUTPUT_PREFIX")
+    if explicit.len() > 0:
+        return explicit
+    sdk_output_prefix_for_platform(platform)
+
+fn sdk_build_root_arg(ctx: &BuildCtx, platform: str) -> str:
+    let explicit = ctx.env_input("SDK_BUILD_ROOT")
+    if explicit.len() > 0:
+        return explicit
+    sdk_output_build_root_for_platform(platform)
+
+fn sdk_jobs_arg(ctx: &BuildCtx) -> str:
+    ctx.env_input("PARALLEL_JOBS")
+
+fn sdk_ninja_target(ctx: &BuildCtx) -> Target:
+    let platform = sdk_current_platform()
+    let bootstrap_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
+    let output_prefix = sdk_output_prefix_arg(ctx, platform)
+    let build_root = sdk_build_root_arg(ctx, platform)
+    var target = target_new(.Action, "sdk-ninja", "").output(output_prefix ++ "/bin/ninja" ++ host_exe_suffix())
+    target.action = run_sdk_ninja_action
+    target = target.arg(bootstrap_prefix)
+    target = target.arg(output_prefix)
+    target = target.arg(sdk_ninja_source_dir())
+    target = target.arg(build_root ++ "/ninja-" ++ sdk_host_tag_for_platform(platform))
+    target = target.arg(sdk_jobs_arg(ctx))
+    target = target.input(sdk_ninja_source_marker())
+    target = target.input(bootstrap_prefix)
+    target = target.input("build/sdk.w")
+    target = target.write_scope(output_prefix)
+    target = target.write_scope(build_root)
+    target = target.write_scope("out/command/sdk-ninja")
+    target = target.dep("sdk-ninja-source")
+    target.timeout(1800000)
+
+fn sdk_cmake_target(ctx: &BuildCtx) -> Target:
+    let platform = sdk_current_platform()
+    let bootstrap_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
+    let output_prefix = sdk_output_prefix_arg(ctx, platform)
+    let build_root = sdk_build_root_arg(ctx, platform)
+    var target = target_new(.Action, "sdk-cmake", "").output(output_prefix ++ "/bin/cmake" ++ host_exe_suffix())
+    target.action = run_sdk_cmake_action
+    target = target.arg(bootstrap_prefix)
+    target = target.arg(output_prefix)
+    target = target.arg(sdk_cmake_source_dir())
+    target = target.arg(build_root ++ "/cmake-" ++ sdk_host_tag_for_platform(platform))
+    target = target.arg(sdk_jobs_arg(ctx))
+    target = target.input(sdk_cmake_source_marker())
+    target = target.input(output_prefix ++ "/bin/ninja" ++ host_exe_suffix())
+    target = target.input(bootstrap_prefix)
+    target = target.input("build/sdk.w")
+    target = target.write_scope(output_prefix)
+    target = target.write_scope(build_root)
+    target = target.write_scope("out/command/sdk-cmake")
+    target = target.dep("sdk-ninja")
+    target = target.dep("sdk-cmake-source")
+    target.timeout(3600000)
+
+fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
+    let platform = sdk_current_platform()
+    let bootstrap_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
+    let output_prefix = sdk_output_prefix_arg(ctx, platform)
+    let build_root = sdk_build_root_arg(ctx, platform)
+    var target = target_new(.Action, "sdk-llvm", "").output(if platform == "windows-x86_64": output_prefix ++ "/lib/libclang.lib" else: output_prefix ++ "/lib/libclang.a")
+    target.action = run_sdk_llvm_action
+    target = target.arg(bootstrap_prefix)
+    target = target.arg(output_prefix)
+    target = target.arg(sdk_llvm_source_dir())
+    target = target.arg(build_root ++ "/llvm-" ++ compiler_llvm_version() ++ "-" ++ sdk_host_tag_for_platform(platform))
+    target = target.arg(sdk_jobs_arg(ctx))
+    target = target.arg(ctx.env_input("LLVM_TARGETS_TO_BUILD"))
+    target = target.arg(ctx.env_input("SDKROOT"))
+    target = target.arg(ctx.env_input("MACOSX_DEPLOYMENT_TARGET"))
+    target = target.arg(ctx.env_input("SDK_WINDOWS_MT"))
+    target = target.input(sdk_llvm_source_marker())
+    target = target.input(output_prefix ++ "/bin/cmake" ++ host_exe_suffix())
+    target = target.input(output_prefix ++ "/bin/ninja" ++ host_exe_suffix())
+    target = target.input(bootstrap_prefix)
+    target = target.input("build/sdk.w")
+    target = target.write_scope(output_prefix)
+    target = target.write_scope(build_root)
+    target = target.write_scope("out/command/sdk-llvm")
+    target = target.dep("sdk-cmake")
+    target = target.dep("sdk-llvm-source")
+    target.timeout(21600000)
+
+fn sdk_group_target() -> Target:
+    var target = target_new(.Group, "sdk", "")
+    target = target.dep("sdk-ninja")
+    target = target.dep("sdk-cmake")
+    target.dep("sdk-llvm")
+
+fn sdk_package_target(ctx: &BuildCtx) -> Target:
+    let platform = sdk_current_platform()
+    var target = package_llvm_sdk_platform_target("sdk-package", platform, sdk_output_prefix_arg(ctx, platform), sdk_output_llvm_cache_for_platform(platform))
+    target.dep("sdk")
+
 fn install_file_target(name: str, source: str, dest: str, mode: str, dep: str) -> Target:
     var target = target_new(.Install, name, source).output(dest)
     target = target.input(source)
@@ -563,6 +718,19 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(package_platform_target("package-linux-x86_64", "linux-x86_64", ctx))
     out = out.add_target(package_platform_target("package-windows-x86_64", "windows-x86_64", ctx))
     out = out.add_target(package_current_host_target())
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-darwin-aarch64", "darwin-aarch64", sdk_default_prefix_for_platform("darwin-aarch64"), sdk_default_build_cache_for_platform("darwin-aarch64")))
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-x86_64", "linux-x86_64", sdk_default_prefix_for_platform("linux-x86_64"), sdk_default_build_cache_for_platform("linux-x86_64")))
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-windows-x86_64", "windows-x86_64", sdk_default_prefix_for_platform("windows-x86_64"), sdk_default_build_cache_for_platform("windows-x86_64")))
+    out = out.add_target(package_llvm_sdk_current_host_target())
+
+    out = out.add_target(sdk_source_target("sdk-ninja-source", sdk_ninja_source_url(), sdk_ninja_source_sha256(), sdk_ninja_archive(), sdk_source_root(), sdk_ninja_source_dir(), sdk_ninja_source_marker()))
+    out = out.add_target(sdk_source_target("sdk-cmake-source", sdk_cmake_source_url(), sdk_cmake_source_sha256(), sdk_cmake_archive(), sdk_source_root(), sdk_cmake_source_dir(), sdk_cmake_source_marker()))
+    out = out.add_target(sdk_source_target("sdk-llvm-source", sdk_llvm_source_url(), sdk_llvm_source_sha256(), sdk_llvm_archive(), sdk_source_root(), sdk_llvm_source_dir(), sdk_llvm_source_marker()))
+    out = out.add_target(sdk_ninja_target(ctx))
+    out = out.add_target(sdk_cmake_target(ctx))
+    out = out.add_target(sdk_llvm_target(ctx))
+    out = out.add_target(sdk_group_target())
+    out = out.add_target(sdk_package_target(ctx))
 
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
@@ -588,6 +756,22 @@ pub fn build(ctx: BuildCtx) -> Build:
     requirements_informative = requirements_informative.write_scope("out/.build-state")
     requirements_informative = requirements_informative.input("docs/requirements.md")
     out = out.add_target(requirements_informative)
+
+    var requirements_generate = target_new(.Action, "requirements", "").output("docs/requirements.md")
+    requirements_generate.action = run_requirements_generate_action
+    requirements_generate = requirements_generate.input("docs/with-specification.md")
+    requirements_generate = requirements_generate.input("docs/requirements.md")
+    requirements_generate = requirements_generate.input("build/requirements.w")
+    requirements_generate = requirements_generate.write_scope("docs")
+    out = out.add_target(requirements_generate)
+
+    var requirements_check = target_new(.Action, "requirements-check", "").output("out/.build-state/requirements-check.txt")
+    requirements_check.action = run_requirements_check_action
+    requirements_check = requirements_check.input("docs/with-specification.md")
+    requirements_check = requirements_check.input("docs/requirements.md")
+    requirements_check = requirements_check.input("build/requirements.w")
+    requirements_check = requirements_check.write_scope("out/.build-state")
+    out = out.add_target(requirements_check)
 
     var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
     spec_inventory.action = run_check_spec_inventory_action
@@ -1101,6 +1285,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("emit-c-smoke")
+    tests = tests.dep("requirements-check")
     tests = tests.dep("requirements-informative-check")
     tests = tests.dep("spec-inventory-check")
     tests = tests.dep("test-green")

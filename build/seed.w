@@ -156,6 +156,50 @@ fn seed_release_from_api(ctx: &ActionCtx, repo: str, asset_name: str) -> str:
             return current_tag
     ""
 
+fn seed_is_space(ch: i32) -> bool:
+    ch == 9 or ch == 10 or ch == 13 or ch == 32
+
+fn seed_is_hex(ch: i32) -> bool:
+    (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 70) or (ch >= 97 and ch <= 102)
+
+fn seed_parse_sha256_sidecar(text: str) -> str:
+    var start = 0
+    while start < text.len() as i32 and seed_is_space(text.byte_at(start as i64)):
+        start = start + 1
+    var end = start
+    while end < text.len() as i32 and not seed_is_space(text.byte_at(end as i64)):
+        if not seed_is_hex(text.byte_at(end as i64)):
+            return ""
+        end = end + 1
+    if end - start != 64:
+        return ""
+    text.slice(start as i64, end as i64)
+
+fn seed_fetch_expected_sha256(ctx: &ActionCtx, tmp_dir: str, label: str, asset_url: str) -> str:
+    let fs = ctx.fs()
+    let sidecar_path = seed_join(tmp_dir, label ++ ".sha256")
+    let _remove_sidecar = fs.remove_file(sidecar_path)
+    let rc = seed_fetch_to_file(ctx, tmp_dir, label ++ "-sha256", asset_url ++ ".sha256", sidecar_path, 120000)
+    if rc != 0:
+        return ""
+    let expected = seed_parse_sha256_sidecar(fs.read_text(sidecar_path))
+    let _cleanup_sidecar = fs.remove_file(sidecar_path)
+    if expected.len() == 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": invalid SHA-256 sidecar for " ++ asset_url)
+    expected
+
+fn seed_verify_download_sha256(ctx: &ActionCtx, tmp_dir: str, label: str, asset_url: str, path: str) -> i32:
+    let expected = seed_fetch_expected_sha256(ctx, tmp_dir, label, asset_url)
+    if expected.len() == 0:
+        return seed_fail(ctx, "missing or invalid SHA-256 sidecar: " ++ asset_url ++ ".sha256")
+    let actual = ctx.fs().sha256_file(path)
+    if actual.len() == 0:
+        return seed_fail(ctx, "could not hash downloaded asset: " ++ path)
+    if actual != expected:
+        let _remove_bad = ctx.fs().remove_file(path)
+        return seed_fail(ctx, "sha256 mismatch for " ++ asset_url ++ ": expected " ++ expected ++ " got " ++ actual)
+    0
+
 pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let args = ctx.args()
@@ -190,6 +234,9 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
     let fetch_rc = seed_fetch_to_file(ctx, tmp_dir, "seed-asset", url, tmp_path, 300000)
     if fetch_rc != 0:
         return fetch_rc
+    let verify_rc = seed_verify_download_sha256(ctx, tmp_dir, "seed-asset", url, tmp_path)
+    if verify_rc != 0:
+        return verify_rc
     if fs.rename(tmp_path, output_path) != 0:
         return seed_fail(ctx, "could not publish seed: " ++ output_path)
     if fs.chmod(output_path, 0o755) != 0:
@@ -234,6 +281,9 @@ pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
     let fetch_rc = seed_fetch_to_file(ctx, tmp_dir, "deps-asset", url, archive_path, 900000)
     if fetch_rc != 0:
         return fetch_rc
+    let verify_rc = seed_verify_download_sha256(ctx, tmp_dir, "deps-asset", url, archive_path)
+    if verify_rc != 0:
+        return verify_rc
 
     if not asset_name.ends_with(".tar.gz"):
         return seed_fail(ctx, "unsupported SDK archive format (expected .tar.gz): " ++ asset_name)

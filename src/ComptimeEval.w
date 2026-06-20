@@ -39,6 +39,12 @@ extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
+extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
+extern fn rt_read(fd: i32, buf: *mut u8, len: u64) -> i64
+extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
+extern fn rt_close(fd: i32) -> i32
+extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn with_println_str(s: str) -> Unit
 extern fn with_println_i32(n: i32) -> Unit
 extern fn with_println_i64(n: i64) -> Unit
@@ -642,6 +648,26 @@ fn comptime_tar_link_name(target: str) -> str:
         return ""
     target
 
+fn comptime_tar_link_target_safe(output_dir: str, output_path: str, target: str) -> bool:
+    if target.len() == 0:
+        return false
+    if target.byte_at(0) == 47 or target.byte_at(0) == 92:
+        return false
+    if target.len() >= 3 and target.byte_at(1) == 58 and (target.byte_at(2) == 47 or target.byte_at(2) == 92):
+        return false
+    for i in 0..target.len() as i32:
+        let ch = target.byte_at(i as i64)
+        if ch == 0 or ch == 9 or ch == 10 or ch == 13:
+            return false
+    let parent = comptime_tool_path_dirname(output_path)
+    let resolved = comptime_tool_path_normalize(parent ++ "/" ++ target)
+    if not comptime_tool_path_is_project_relative(resolved):
+        return false
+    let root = comptime_tool_path_normalize(output_dir)
+    if root == ".":
+        return true
+    comptime_tool_path_is_same_or_child(resolved, root)
+
 fn comptime_tar_build_header(name: str, mode: i32, size: i64, kind: i32, link_name: str) -> str:
     if name.len() == 0 or name.len() > 100 or mode < 0 or size < 0 or link_name.len() > 100:
         return ""
@@ -730,6 +756,236 @@ fn comptime_tar_archive_name_safe(name: str) -> bool:
     if name.len() == 0:
         return false
     comptime_tool_path_is_project_relative(name)
+
+fn comptime_tar_header_name(data: str, offset: i64) -> str:
+    let name = comptime_tar_field_str(data, offset, 100)
+    let prefix = comptime_tar_field_str(data, offset + 345, 155)
+    if prefix.len() == 0:
+        return name
+    prefix ++ "/" ++ name
+
+fn comptime_tar_trim_payload_name(text: str) -> str:
+    var end = text.len() as i32
+    while end > 0:
+        let ch = text.byte_at((end - 1) as i64)
+        if ch != 0 and ch != 10 and ch != 13:
+            break
+        end = end - 1
+    text.slice(0, end as i64)
+
+fn comptime_pax_parse_decimal(text: str, start: i32, end: i32) -> i32:
+    if start >= end:
+        return -1
+    var value = 0
+    var i = start
+    while i < end:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        value = value * 10 + (ch - 48)
+        i = i + 1
+    value
+
+fn comptime_pax_value(text: str, key: str) -> str:
+    var pos = 0
+    while pos < text.len() as i32:
+        var space = pos
+        while space < text.len() as i32 and text.byte_at(space as i64) != 32:
+            space = space + 1
+        if space >= text.len() as i32:
+            return ""
+        let record_len = comptime_pax_parse_decimal(text, pos, space)
+        if record_len <= 0 or pos + record_len > text.len() as i32:
+            return ""
+        let record_start = space + 1
+        let record_end = pos + record_len
+        var eq = record_start
+        while eq < record_end and text.byte_at(eq as i64) != 61:
+            eq = eq + 1
+        if eq < record_end:
+            let name = text.slice(record_start as i64, eq as i64)
+            if name == key:
+                var value_end = record_end
+                while value_end > eq + 1:
+                    let ch = text.byte_at((value_end - 1) as i64)
+                    if ch != 10 and ch != 13:
+                        break
+                    value_end = value_end - 1
+                return text.slice((eq + 1) as i64, value_end as i64)
+        pos = record_end
+    ""
+
+fn comptime_tar_extract_fail(message: str) -> i32:
+    with_eprint("error: ToolFs.extract_tar: " ++ message ++ "\n")
+    1
+
+const COMPTIME_TAR_COPY_CHUNK: i64 = 1024 * 1024
+const COMPTIME_O_RDONLY: i32 = 0
+const COMPTIME_O_WRONLY: i32 = 1
+const COMPTIME_O_CREAT: i32 = 0x200
+const COMPTIME_O_TRUNC: i32 = 0x400
+const COMPTIME_SEEK_CUR: i32 = 1
+
+type ComptimeTarPayloadText {
+    ok: bool,
+    text: str,
+}
+
+unsafe fn comptime_alloc_cstr(text: str) -> *mut u8:
+    let out = with_alloc(text.len() + 1)
+    if out as i64 == 0:
+        return null
+    var i: i64 = 0
+    while i < text.len():
+        *((out as i64 + i) as *mut u8) = text.byte_at(i) as u8
+        i = i + 1
+    *((out as i64 + text.len()) as *mut u8) = 0 as u8
+    out
+
+unsafe fn comptime_open_path(path: str, flags: i32, mode: i32) -> i32:
+    let cpath = comptime_alloc_cstr(path)
+    if cpath as i64 == 0:
+        return -1
+    let fd = rt_open(cpath as *const u8, flags, mode)
+    with_free(cpath)
+    fd
+
+unsafe fn comptime_read_exact(fd: i32, buf: *mut u8, len: i64) -> bool:
+    var total: i64 = 0
+    while total < len:
+        let r = rt_read(fd, (buf as i64 + total) as *mut u8, (len - total) as u64)
+        if r <= 0:
+            return false
+        total = total + r
+    true
+
+unsafe fn comptime_write_exact(fd: i32, buf: *const u8, len: i64) -> bool:
+    var total: i64 = 0
+    while total < len:
+        let r = rt_write(fd, (buf as i64 + total) as *const u8, (len - total) as u64)
+        if r <= 0:
+            return false
+        total = total + r
+    true
+
+unsafe fn comptime_skip_exact(fd: i32, len: i64) -> bool:
+    if len <= 0:
+        return true
+    rt_seek(fd, len, COMPTIME_SEEK_CUR) >= 0
+
+unsafe fn comptime_tar_ptr_byte(ptr: *const u8, offset: i64) -> i32:
+    *((ptr as i64 + offset) as *const u8) as i32
+
+unsafe fn comptime_tar_ptr_block_is_zero(ptr: *const u8) -> bool:
+    var i: i64 = 0
+    while i < 512:
+        if comptime_tar_ptr_byte(ptr, i) != 0:
+            return false
+        i = i + 1
+    true
+
+unsafe fn comptime_tar_ptr_field_str(ptr: *const u8, offset: i64, width: i64) -> str:
+    var out = StringBuilder.new()
+    var i: i64 = 0
+    while i < width:
+        let b = comptime_tar_ptr_byte(ptr, offset + i)
+        if b == 0:
+            return out.to_str()
+        out.push_byte(b as u8)
+        i = i + 1
+    out.to_str()
+
+unsafe fn comptime_tar_ptr_parse_octal(ptr: *const u8, offset: i64, width: i64) -> i64:
+    var value: i64 = 0
+    var i: i64 = 0
+    while i < width:
+        let b = comptime_tar_ptr_byte(ptr, offset + i)
+        if b != 0 and b != 32:
+            if b < 48 or b > 55:
+                return -1
+            value = value * 8 + (b as i64 - 48)
+        i = i + 1
+    value
+
+unsafe fn comptime_tar_ptr_header_checksum(ptr: *const u8) -> i64:
+    var sum: i64 = 0
+    var i: i64 = 0
+    while i < 512:
+        if i >= 148 and i < 156:
+            sum = sum + 32
+        else:
+            sum = sum + comptime_tar_ptr_byte(ptr, i) as i64
+        i = i + 1
+    sum
+
+unsafe fn comptime_tar_ptr_magic_ok(ptr: *const u8) -> bool:
+    let ustar = comptime_tar_ptr_byte(ptr, 257) == 117 and
+        comptime_tar_ptr_byte(ptr, 258) == 115 and
+        comptime_tar_ptr_byte(ptr, 259) == 116 and
+        comptime_tar_ptr_byte(ptr, 260) == 97 and
+        comptime_tar_ptr_byte(ptr, 261) == 114
+    if ustar:
+        return true
+    var i: i64 = 257
+    while i < 265:
+        if comptime_tar_ptr_byte(ptr, i) != 0:
+            return false
+        i = i + 1
+    true
+
+unsafe fn comptime_tar_ptr_header_name(ptr: *const u8) -> str:
+    let name = comptime_tar_ptr_field_str(ptr, 0, 100)
+    let prefix = comptime_tar_ptr_field_str(ptr, 345, 155)
+    if prefix.len() == 0:
+        return name
+    prefix ++ "/" ++ name
+
+unsafe fn comptime_tar_read_payload_text(fd: i32, size: i64) -> ComptimeTarPayloadText:
+    if size < 0:
+        return ComptimeTarPayloadText { ok: false, text: "" }
+    let buf_size = if size > 16384: 16384 else if size > 0: size else: 1
+    let buf = with_alloc(buf_size)
+    if buf as i64 == 0:
+        return ComptimeTarPayloadText { ok: false, text: "" }
+    var out = StringBuilder.new()
+    var remaining = size
+    while remaining > 0:
+        let chunk = if remaining > buf_size: buf_size else: remaining
+        if not comptime_read_exact(fd, buf, chunk):
+            with_free(buf)
+            return ComptimeTarPayloadText { ok: false, text: "" }
+        var i: i64 = 0
+        while i < chunk:
+            out.push_byte(comptime_tar_ptr_byte(buf as *const u8, i) as u8)
+            i = i + 1
+        remaining = remaining - chunk
+    with_free(buf)
+    ComptimeTarPayloadText { ok: true, text: out.to_str() }
+
+unsafe fn comptime_tar_extract_file_payload(fd: i32, resolved_file: str, output_path: str, size: i64) -> i32:
+    let out_fd = comptime_open_path(resolved_file, COMPTIME_O_WRONLY | COMPTIME_O_CREAT | COMPTIME_O_TRUNC, 0o644)
+    if out_fd < 0:
+        return comptime_tar_extract_fail("could not open file entry for writing: " ++ output_path)
+    let buf = with_alloc(COMPTIME_TAR_COPY_CHUNK)
+    if buf as i64 == 0:
+        let _close = rt_close(out_fd)
+        return comptime_tar_extract_fail("could not allocate tar extraction buffer")
+    var remaining = size
+    while remaining > 0:
+        let chunk = if remaining > COMPTIME_TAR_COPY_CHUNK: COMPTIME_TAR_COPY_CHUNK else: remaining
+        if not comptime_read_exact(fd, buf, chunk):
+            with_free(buf)
+            let _close = rt_close(out_fd)
+            return comptime_tar_extract_fail("file payload is truncated for " ++ output_path)
+        if not comptime_write_exact(out_fd, buf as *const u8, chunk):
+            with_free(buf)
+            let _close = rt_close(out_fd)
+            return comptime_tar_extract_fail("could not write file entry: " ++ output_path)
+        remaining = remaining - chunk
+    with_free(buf)
+    if rt_close(out_fd) != 0:
+        return comptime_tar_extract_fail("could not close file entry: " ++ output_path)
+    0
 
 fn comptime_glob_split_by_slash(path: str) -> Vec[str]:
     let parts: Vec[str] = Vec.new()
@@ -4084,25 +4340,49 @@ fn ComptimeEvaluator.toolfs_extract_tar_contents(self: ComptimeEvaluator, record
     if self.had_error != 0:
         return 1
     if with_fs_mkdir_p(resolved_output_dir) != 0:
-        return 1
+        return comptime_tar_extract_fail("could not create output directory: " ++ output_dir)
     var offset: i64 = 0
+    var pending_path = ""
+    var pending_link = ""
     while offset + 512 <= archive.len():
         if comptime_tar_block_is_zero(archive, offset):
             return 0
         if not comptime_tar_magic_ok(archive, offset):
-            return 1
+            return comptime_tar_extract_fail(f"invalid tar magic at offset {offset}")
         let stored_checksum = comptime_tar_parse_octal(archive, offset + 148, 8)
         if stored_checksum < 0 or stored_checksum != comptime_tar_header_checksum(archive, offset):
-            return 1
-        let raw_name = comptime_tar_field_str(archive, offset, 100)
-        if not comptime_tar_archive_name_safe(raw_name):
-            return 1
-        let name = comptime_tool_path_normalize(raw_name)
+            return comptime_tar_extract_fail(f"invalid header checksum at offset {offset}")
         let mode = comptime_tar_parse_octal(archive, offset + 100, 8)
         let size = comptime_tar_parse_octal(archive, offset + 124, 12)
         if mode < 0 or size < 0:
-            return 1
+            return comptime_tar_extract_fail(f"invalid numeric field at offset {offset}")
         let typeflag = archive.byte_at(offset + 156)
+        let content_start = offset + 512
+        if content_start + size > archive.len():
+            return comptime_tar_extract_fail(f"entry payload extends past archive at offset {offset}")
+        let padded = ((size + 511) / 512) * 512
+        if typeflag == 120:
+            let pax = archive.slice(content_start, content_start + size)
+            let pax_path = comptime_pax_value(pax, "path")
+            let pax_link = comptime_pax_value(pax, "linkpath")
+            if pax_path.len() > 0:
+                pending_path = pax_path
+            if pax_link.len() > 0:
+                pending_link = pax_link
+            offset = offset + 512 + padded
+            continue
+        if typeflag == 103:
+            offset = offset + 512 + padded
+            continue
+        if typeflag == 76:
+            pending_path = comptime_tar_trim_payload_name(archive.slice(content_start, content_start + size))
+            offset = offset + 512 + padded
+            continue
+        let raw_name = if pending_path.len() > 0: pending_path else: comptime_tar_header_name(archive, offset)
+        pending_path = ""
+        if not comptime_tar_archive_name_safe(raw_name):
+            return comptime_tar_extract_fail("unsafe archive path: " ++ raw_name)
+        let name = comptime_tool_path_normalize(raw_name)
         let output_path = if output_dir.ends_with("/"): output_dir ++ name else: output_dir ++ "/" ++ name
         if typeflag == 53:
             if not self.capability_require_mkdir_allowed(record, output_path, method, node):
@@ -4111,13 +4391,14 @@ fn ComptimeEvaluator.toolfs_extract_tar_contents(self: ComptimeEvaluator, record
             if self.had_error != 0:
                 return 1
             if with_fs_mkdir_p(resolved_dir) != 0:
-                return 1
+                return comptime_tar_extract_fail("could not create directory entry: " ++ output_path)
             if mode > 0:
                 let _ = with_fs_chmod(resolved_dir, mode as i32)
         else if typeflag == 50:
-            let link_name = comptime_tar_field_str(archive, offset + 157, 100)
-            if comptime_tar_link_name(link_name).len() == 0:
-                return 1
+            let link_name = if pending_link.len() > 0: pending_link else: comptime_tar_field_str(archive, offset + 157, 100)
+            pending_link = ""
+            if not comptime_tar_link_target_safe(output_dir, output_path, link_name):
+                return comptime_tar_extract_fail("unsafe symlink target for " ++ output_path ++ ": " ++ link_name)
             if not self.capability_require_write_file_allowed(record, output_path, method, node):
                 return 1
             let output_parent = comptime_tool_path_dirname(output_path)
@@ -4128,16 +4409,13 @@ fn ComptimeEvaluator.toolfs_extract_tar_contents(self: ComptimeEvaluator, record
                 if self.had_error != 0:
                     return 1
                 if with_fs_mkdir_p(resolved_parent) != 0:
-                    return 1
+                    return comptime_tar_extract_fail("could not create parent directory for symlink: " ++ output_parent)
             let resolved_link = self.capability_resolve_project_path(record, output_path, method, node)
             if self.had_error != 0:
                 return 1
             if with_fs_symlink(link_name, resolved_link) != 0:
-                return 1
+                return comptime_tar_extract_fail("could not create symlink: " ++ output_path)
         else if typeflag == 48 or typeflag == 0:
-            let content_start = offset + 512
-            if content_start + size > archive.len():
-                return 1
             if not self.capability_require_write_file_allowed(record, output_path, method, node):
                 return 1
             let output_parent = comptime_tool_path_dirname(output_path)
@@ -4148,25 +4426,180 @@ fn ComptimeEvaluator.toolfs_extract_tar_contents(self: ComptimeEvaluator, record
                 if self.had_error != 0:
                     return 1
                 if with_fs_mkdir_p(resolved_parent) != 0:
-                    return 1
+                    return comptime_tar_extract_fail("could not create parent directory for file: " ++ output_parent)
             let resolved_file = self.capability_resolve_project_path(record, output_path, method, node)
             if self.had_error != 0:
                 return 1
             if with_fs_write_file(resolved_file, archive.slice(content_start, content_start + size)) != 0:
-                return 1
+                return comptime_tar_extract_fail("could not write file entry: " ++ output_path)
             if mode > 0:
                 let _ = with_fs_chmod(resolved_file, mode as i32)
         else:
-            return 1
-        let padded = ((size + 511) / 512) * 512
+            return comptime_tar_extract_fail(f"unsupported tar entry type {typeflag} for " ++ raw_name)
         offset = offset + 512 + padded
-    1
+    comptime_tar_extract_fail("archive ended without two zero blocks")
 
 fn ComptimeEvaluator.toolfs_extract_tar(self: ComptimeEvaluator, record: &ComptimeCapabilityRecord, archive_path: str, output_dir: str, method: str, node: i32) -> i32:
     let resolved_archive = self.capability_resolve_project_path(record, archive_path, method, node)
     if self.had_error != 0:
         return 1
-    self.toolfs_extract_tar_contents(record, with_fs_read_file(resolved_archive), output_dir, method, node)
+    if not self.capability_require_mkdir_allowed(record, output_dir, method, node):
+        return 1
+    let resolved_output_dir = self.capability_resolve_project_path(record, output_dir, method, node)
+    if self.had_error != 0:
+        return 1
+    if with_fs_mkdir_p(resolved_output_dir) != 0:
+        return comptime_tar_extract_fail("could not create output directory: " ++ output_dir)
+    let fd = unsafe { comptime_open_path(resolved_archive, COMPTIME_O_RDONLY, 0) }
+    if fd < 0:
+        return comptime_tar_extract_fail("could not open archive: " ++ archive_path)
+    var offset: i64 = 0
+    var pending_path = ""
+    var pending_link = ""
+    var header: [512]u8 = [0 as u8; 512]
+    let header_ptr = &raw mut header as *mut [512]u8 as *mut u8
+    while true:
+        if not unsafe { comptime_read_exact(fd, header_ptr, 512) }:
+            let _close = rt_close(fd)
+            return comptime_tar_extract_fail("archive ended without two zero blocks")
+        if unsafe { comptime_tar_ptr_block_is_zero(header_ptr as *const u8) }:
+            let _close = rt_close(fd)
+            return 0
+        if not unsafe { comptime_tar_ptr_magic_ok(header_ptr as *const u8) }:
+            let _close = rt_close(fd)
+            return comptime_tar_extract_fail(f"invalid tar magic at offset {offset}")
+        let stored_checksum = unsafe { comptime_tar_ptr_parse_octal(header_ptr as *const u8, 148, 8) }
+        if stored_checksum < 0 or stored_checksum != unsafe { comptime_tar_ptr_header_checksum(header_ptr as *const u8) }:
+            let _close = rt_close(fd)
+            return comptime_tar_extract_fail(f"invalid header checksum at offset {offset}")
+        let mode = unsafe { comptime_tar_ptr_parse_octal(header_ptr as *const u8, 100, 8) }
+        let size = unsafe { comptime_tar_ptr_parse_octal(header_ptr as *const u8, 124, 12) }
+        if mode < 0 or size < 0:
+            let _close = rt_close(fd)
+            return comptime_tar_extract_fail(f"invalid numeric field at offset {offset}")
+        let typeflag = unsafe { comptime_tar_ptr_byte(header_ptr as *const u8, 156) }
+        let padded = ((size + 511) / 512) * 512
+        if typeflag == 120:
+            let payload = unsafe { comptime_tar_read_payload_text(fd, size) }
+            if not payload.ok:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail(f"could not read PAX header payload at offset {offset}")
+            let pax_path = comptime_pax_value(payload.text, "path")
+            let pax_link = comptime_pax_value(payload.text, "linkpath")
+            if pax_path.len() > 0:
+                pending_path = pax_path
+            if pax_link.len() > 0:
+                pending_link = pax_link
+            if not unsafe { comptime_skip_exact(fd, padded - size) }:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail(f"PAX header padding is truncated at offset {offset}")
+            offset = offset + 512 + padded
+            continue
+        if typeflag == 103:
+            if not unsafe { comptime_skip_exact(fd, padded) }:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail(f"global PAX payload is truncated at offset {offset}")
+            offset = offset + 512 + padded
+            continue
+        if typeflag == 76:
+            let payload = unsafe { comptime_tar_read_payload_text(fd, size) }
+            if not payload.ok:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail(f"could not read GNU long name payload at offset {offset}")
+            pending_path = comptime_tar_trim_payload_name(payload.text)
+            if not unsafe { comptime_skip_exact(fd, padded - size) }:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail(f"GNU long name padding is truncated at offset {offset}")
+            offset = offset + 512 + padded
+            continue
+        let raw_name = if pending_path.len() > 0: pending_path else: unsafe { comptime_tar_ptr_header_name(header_ptr as *const u8) }
+        let raw_link = pending_link
+        pending_path = ""
+        pending_link = ""
+        if not comptime_tar_archive_name_safe(raw_name):
+            let _close = rt_close(fd)
+            return comptime_tar_extract_fail("unsafe archive path: " ++ raw_name)
+        let name = comptime_tool_path_normalize(raw_name)
+        let output_path = if output_dir.ends_with("/"): output_dir ++ name else: output_dir ++ "/" ++ name
+        if typeflag == 53:
+            if not self.capability_require_mkdir_allowed(record, output_path, method, node):
+                let _close = rt_close(fd)
+                return 1
+            let resolved_dir = self.capability_resolve_project_path(record, output_path, method, node)
+            if self.had_error != 0:
+                let _close = rt_close(fd)
+                return 1
+            if with_fs_mkdir_p(resolved_dir) != 0:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail("could not create directory entry: " ++ output_path)
+            if mode > 0:
+                let _ = with_fs_chmod(resolved_dir, mode as i32)
+            if not unsafe { comptime_skip_exact(fd, padded) }:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail("directory payload is truncated for " ++ output_path)
+        else if typeflag == 50:
+            let link_name = if raw_link.len() > 0: raw_link else: unsafe { comptime_tar_ptr_field_str(header_ptr as *const u8, 157, 100) }
+            if not comptime_tar_link_target_safe(output_dir, output_path, link_name):
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail("unsafe symlink target for " ++ output_path ++ ": " ++ link_name)
+            if not self.capability_require_write_file_allowed(record, output_path, method, node):
+                let _close = rt_close(fd)
+                return 1
+            let output_parent = comptime_tool_path_dirname(output_path)
+            if output_parent != ".":
+                if not self.capability_require_mkdir_allowed(record, output_parent, method, node):
+                    let _close = rt_close(fd)
+                    return 1
+                let resolved_parent = self.capability_resolve_project_path(record, output_parent, method, node)
+                if self.had_error != 0:
+                    let _close = rt_close(fd)
+                    return 1
+                if with_fs_mkdir_p(resolved_parent) != 0:
+                    let _close = rt_close(fd)
+                    return comptime_tar_extract_fail("could not create parent directory for symlink: " ++ output_parent)
+            let resolved_link = self.capability_resolve_project_path(record, output_path, method, node)
+            if self.had_error != 0:
+                let _close = rt_close(fd)
+                return 1
+            if with_fs_symlink(link_name, resolved_link) != 0:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail("could not create symlink: " ++ output_path)
+            if not unsafe { comptime_skip_exact(fd, padded) }:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail("symlink payload is truncated for " ++ output_path)
+        else if typeflag == 48 or typeflag == 0:
+            if not self.capability_require_write_file_allowed(record, output_path, method, node):
+                let _close = rt_close(fd)
+                return 1
+            let output_parent = comptime_tool_path_dirname(output_path)
+            if output_parent != ".":
+                if not self.capability_require_mkdir_allowed(record, output_parent, method, node):
+                    let _close = rt_close(fd)
+                    return 1
+                let resolved_parent = self.capability_resolve_project_path(record, output_parent, method, node)
+                if self.had_error != 0:
+                    let _close = rt_close(fd)
+                    return 1
+                if with_fs_mkdir_p(resolved_parent) != 0:
+                    let _close = rt_close(fd)
+                    return comptime_tar_extract_fail("could not create parent directory for file: " ++ output_parent)
+            let resolved_file = self.capability_resolve_project_path(record, output_path, method, node)
+            if self.had_error != 0:
+                let _close = rt_close(fd)
+                return 1
+            let extract_rc = unsafe { comptime_tar_extract_file_payload(fd, resolved_file, output_path, size) }
+            if extract_rc != 0:
+                let _close = rt_close(fd)
+                return extract_rc
+            if mode > 0:
+                let _ = with_fs_chmod(resolved_file, mode as i32)
+            if not unsafe { comptime_skip_exact(fd, padded - size) }:
+                let _close = rt_close(fd)
+                return comptime_tar_extract_fail("file padding is truncated for " ++ output_path)
+        else:
+            let _close = rt_close(fd)
+            return comptime_tar_extract_fail(f"unsupported tar entry type {typeflag} for " ++ raw_name)
+        offset = offset + 512 + padded
 
 fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_TOOL_FS, method, node)

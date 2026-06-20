@@ -55,11 +55,13 @@ On Windows/MSVC the required static C API archive is:
 lib/libclang.lib
 ```
 
-Until SDK construction is moved into `build.w`, use the repo scripts below only
-inside this first-platform bootstrap boundary. They are not normal post-seed
-release tools: once the first seed and static SDK exist for a platform,
-`docs/with-release-runbook.md` reuses those artifacts and updates the local
-compiler with `with build :install-user` / `with build :update-seed`.
+Use the repo scripts below only inside this first-platform bootstrap boundary.
+They are not normal post-seed release tools: once the first seed and static SDK
+exist for a platform, repeat SDK production is graph-owned by
+`with build :sdk-ninja`, `with build :sdk-cmake`, `with build :sdk-llvm`, and
+`with build :sdk`. `docs/with-release-runbook.md` reuses the published SDK
+asset and updates the local compiler with `with build :install-user` /
+`with build :update-seed`.
 
 Use the repo scripts to build this initial SDK:
 
@@ -108,8 +110,8 @@ but that Clang is only a host compiler used to produce the pinned With-owned
 LLVM/Clang SDK from the exact `llvmorg-<version>` source tag. All later With
 compiler, emitted-C, bootstrap, and release builds use the Clang inside that
 SDK. External Python and CMake are permitted only to bootstrap the SDK's own
-Ninja and CMake binaries; package scripts must reject SDK archives that do not
-include `bin/ninja` and `bin/cmake`.
+Ninja and CMake binaries; SDK package targets must reject SDK archives that do
+not include `bin/ninja` and `bin/cmake`.
 
 **This is the only runbook that builds the static SDK from LLVM source.**
 Building the `.a` archives and clang's builtin headers from source is a
@@ -119,11 +121,11 @@ already-built SDK and the resources the seed embeds; it never rebuilds LLVM and
 never falls back to a system LLVM. If you find yourself building LLVM during a
 release, you are in the wrong runbook.
 
-After building the SDK from source, package it so future releases (and clean
-checkouts) can fetch it instead of rebuilding:
+After building the SDK from source, package it so future releases and clean
+checkouts can fetch it instead of rebuilding:
 
 ```sh
-scripts/package-llvm-sdk.sh   # → out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz
+with build :package-llvm-sdk
 ```
 
 Publish that asset with the platform's release (see `docs/with-release-runbook.md`

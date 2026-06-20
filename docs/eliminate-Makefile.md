@@ -1,9 +1,9 @@
 # Eliminate Makefile
 
-Status: active plan.
+Status: implemented; retained as the post-Makefile verification record.
 
 This document replaces the stale `docs/build-plan.md` / `docs/build-spec.md`
-pair as the active cleanup plan for removing the repository Makefile and all
+pair as the cleanup record for removing the repository Makefile and all
 post-seed repository scripts. The historical build-system plan and final-state
 spec are archived under `docs/completed/`.
 
@@ -78,18 +78,19 @@ without a direct instruction.
 
 ## Current State
 
-Already true:
+Implemented:
 
 - `with build` is the authoritative stage-chain build.
 - Direct graph targets exist for stage1/stage2/stage3, runtime, build,
   selfcheck, fixpoint, test, install, install-user, seed, deps, clean, PCRE2,
-  zlib, emit-C, release UAT, bootstrap-C packaging, prune, test-green, and
-  last-green workflows.
+  zlib, emit-C, release UAT, bootstrap-C packaging, platform compiler
+  packaging, SDK source/rebuild/package, requirements generation, prune,
+  test-green, and last-green workflows.
 - `with build :seed` and `with build :deps` are the graph entry points for
   fetching the release seed and static LLVM SDK when a With compiler already
   exists. They use With-owned HTTPS fetch helpers; `:deps` consumes `.tar.gz`
   SDK assets, gunzips them with migrated zlib, and extracts them with native
-  `ToolFs.extract_tar()`.
+  `ToolFs.extract_tar()`. Both paths verify published `.sha256` sidecars.
 - Release and bootstrap runbooks use `with build` for compiler verification
   gates.
 - The build graph has repository locking, build-state files, and target
@@ -101,29 +102,30 @@ Already true:
 - `with build :cross` exists and fails loudly because non-native codegen/linking
   is not implemented yet. The stale Make-only Zig shell workflow has been
   removed.
-
-Still blocking Makefile and post-seed script removal:
-
-- A clean checkout with no `with` binary still relies on Makefile logic,
-  direct release-asset fetching, or retained convenience installers to acquire
-  the first seed. This is the bootstrap boundary, not a post-seed build path;
-  Makefile-owned seed acquisition still needs to disappear.
-- Obsolete platform release package scripts still exist but now have graph
-  replacements and must be deleted after cross-platform verification:
-  - `scripts/package-darwin-aarch64.sh`
-  - `scripts/package-linux-x86_64.sh`
-  - `scripts/package-windows-x86_64.ps1`
-- SDK packaging is still script-driven:
-  - `scripts/package-llvm-sdk.sh`
-  - `scripts/package-llvm-sdk-windows-x86_64.ps1`
+- `with build :package-current-host`, `:package-darwin-aarch64`,
+  `:package-linux-x86_64`, and `:package-windows-x86_64` produce platform
+  compiler assets through With graph actions.
+- `with build :package-llvm-sdk`,
+  `:package-llvm-sdk-darwin-aarch64`,
+  `:package-llvm-sdk-linux-x86_64`, and
+  `:package-llvm-sdk-windows-x86_64` produce static SDK `.tar.gz` assets,
+  `.sha256` sidecars, and manifests through With graph actions. The actions
+  validate required SDK contents and reject invalid CMake-cache provenance.
+- `with build :sdk-ninja`, `:sdk-cmake`, `:sdk-llvm`, and `:sdk` are the
+  post-seed SDK rebuild path. They use previously fetched With-owned
+  CMake/Ninja/Clang/lld tools instead of discovering host build tools.
+- `with build :requirements` and `:requirements-check` replace the old Python
+  requirements generator. `:test` includes the check target.
+- The repository `Makefile`, release package scripts, SDK package scripts, and
+  Python requirements generator have graph replacements and are removed by this
+  change.
 - Release convenience installers are scripts and are intentionally retained
   outside the build graph:
   - `scripts/install.sh`
   - `scripts/install.ps1`
   - `scripts/install.cmd`
 - First-platform SDK bootstrap flows are allowed to be script-driven inside the
-  bootstrap runbook. Post-seed SDK rebuild and packaging flows still need graph
-  replacements for:
+  bootstrap runbook. They are not the post-seed SDK rebuild or packaging path:
   - `tools/build-ninja.sh`
   - `tools/build-ninja.ps1`
   - `tools/build-cmake.sh`
@@ -132,31 +134,43 @@ Still blocking Makefile and post-seed script removal:
   - `tools/build-static-llvm.ps1`
 - Build-system maintenance no longer relies on host `curl`, `tar`, or `zstd`
   for seed/deps fetching, PCRE2/zlib reference fetching/extraction, or generic
-  `std.build` download/tar.gz extraction actions. Remaining host-utility
-  reliance is concentrated in SDK packaging/provenance checks.
+  `std.build` download/tar.gz extraction actions.
 - `ToolFs.write_tar()` and `ToolFs.extract_tar()` provide native USTAR support
-  for regular files, directories, and symlinks. `ToolFs.write_tar_gz()` provides
-  deterministic gzip-wrapped tar output. The migrated `std.zlib` facade supports
-  zlib/gzip decompression and gzip compression; `build/zlib.w` uses a With HTTP
-  helper plus migrated zlib gunzip helper plus `ToolFs.extract_tar()` for
-  `:zlib-reference`. Bootstrap-C packaging is graph-owned. Platform compiler
-  packages are graph-owned through `:package-current-host` and explicit native
-  platform aliases; they copy the release compiler, verify its version, inspect
-  dynamic dependencies with SDK LLVM tools, check libclang symbols where
-  supported, strip with SDK `llvm-strip`, and write SHA-256 sidecar files. SDK
-  packaging still needs native package targets and SDK provenance validation
-  before host SDK packaging scripts can disappear.
+  for regular files, directories, symlinks, GNU long names, and PAX path
+  metadata. Build-action tar extraction streams file payloads, so large SDK
+  source archives such as the LLVM source tar do not have to fit in a `str` or
+  `Vec[u8]`. Symlink validation allows relative links that normalize inside the
+  extraction root and rejects escaping targets. `ToolFs.write_tar_gz()` provides
+  deterministic gzip-wrapped tar output. The migrated `std.zlib` facade
+  supports zlib/gzip decompression and gzip compression; `build/zlib.w` uses a
+  With HTTP helper plus migrated zlib gunzip helper plus `ToolFs.extract_tar()`
+  for `:zlib-reference`. Bootstrap-C, platform compiler, and SDK packaging are
+  graph-owned.
 - `ToolFs.scratch_dir()` exists, but repository build modules cannot call it
   directly until the installed seed embeds that API. PCRE2 has moved from the
   shared `out/pcre2_tmp` path to the action-scratch path convention with
   explicit transitional write scopes for old-seed compatibility.
-- The active runbooks still describe SDK packaging as blocked until With-native
-  SDK package targets exist. Installer scripts are retained as convenience
-  first-install downloaders only; they are not blockers for Makefile
-  elimination and must not be used by post-seed CI, release packaging, seed
-  refresh, SDK refresh, or repository install/update flows.
-- Some std.build / build-cache behavior is not strong enough to be the final
-  script-free contract.
+- The active runbooks describe SDK packaging through With-native SDK package
+  targets. Installer scripts are retained as convenience first-install
+  downloaders only; they are not blockers for Makefile elimination and must not
+  be used by post-seed CI, release packaging, seed refresh, SDK refresh, or
+  repository install/update flows.
+
+Remaining verification and follow-up:
+
+- Local verification from this change passed: focused source checks for the
+  touched build/compiler modules, `git diff --check`, `with build`,
+  `with build :fixpoint`, `with build :test`, `with build :test-green`,
+  `with build :sdk-ninja-source --no-deps`,
+  `with build :sdk-cmake-source --no-deps`, and
+  `with build :sdk-llvm-source --no-deps`.
+- Run native SDK packaging on each supported host with a valid SDK built by the
+  Clang/clang-cl bootstrap flow. The local Darwin `.deps` SDK used during this
+  change was intentionally rejected because its CMake cache names `/usr/bin/cc`;
+  that is the provenance tripwire working, not a packaging fallback.
+- Run the long SDK rebuild targets when intentionally producing a new SDK asset
+  or bumping `COMPILER_LLVM_VERSION`. They are not normal release rebuild
+  steps.
 
 ## Script/Shell Dependency Audit
 
@@ -167,27 +181,19 @@ git ls-files | rg -v '(^|/)\.[^/]+/' | rg '(\.sh$|\.ps1$|\.cmd$|\.py$|(^|/)Makef
 git ls-files .github/workflows
 ```
 
-This intentionally ignores untracked build outputs, `.deps`, `.reference`, and
-vendored dependency trees. It also excludes maintainer-owned hidden directories
-such as `.demo/`. `.github/workflows/` is the explicit hidden-directory
-exception and remains in scope. Classification is for post-seed policy: a
-`bootstrap-only` file may remain only behind the first-seed/new-platform
-boundary; a `post-seed blocker` must be replaced or deleted before the Makefile
-and script dependency are gone.
+Run this audit after the deletion commit. It intentionally ignores untracked
+build outputs, `.deps`, `.reference`, and vendored dependency trees. It also
+excludes maintainer-owned hidden directories such as `.demo/`. `.github/workflows/`
+is the explicit hidden-directory exception and remains in scope. Classification
+is for post-seed policy: a `bootstrap-only` file may remain only behind the
+first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
 
 | Path | Classification | Disposition |
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | bootstrap-boundary CI setup | CI no longer invokes Make; it uses a bootstrap seed acquisition step, then `with build :deps`, `with build`, `with build :fixpoint`, and `with build :test`. |
-| `Makefile` | post-seed blocker | Delete after all listed aliases, cross, seed, CI, release packaging, SDK, and repository install/update roles have With graph replacements. |
-| `scripts/package-darwin-aarch64.sh` | post-seed blocker | Replace with a self-hosted Darwin release packaging target. |
-| `scripts/package-linux-x86_64.sh` | post-seed blocker | Replace with a self-hosted Linux release packaging target. |
-| `scripts/package-windows-x86_64.ps1` | post-seed blocker | Replace with a self-hosted Windows release packaging target. |
-| `scripts/package-llvm-sdk.sh` | post-seed blocker | Replace with self-hosted SDK packaging once archive creation/signing/validation capabilities exist. |
-| `scripts/package-llvm-sdk-windows-x86_64.ps1` | post-seed blocker | Replace with self-hosted Windows SDK packaging once archive creation/signing/validation capabilities exist. |
 | `scripts/install.sh` | retained convenience installer | Keep as the Unix first-install downloader for the latest published platform compiler binary. It must not be invoked by CI, package targets, seed refresh, SDK refresh, or repository post-seed install/update flows. |
 | `scripts/install.ps1` | retained convenience installer | Keep as the PowerShell first-install downloader for the latest published Windows compiler binary, with the same build-graph boundary as `scripts/install.sh`. |
 | `scripts/install.cmd` | retained convenience installer | Keep as the CMD wrapper for the PowerShell first-install downloader, with the same build-graph boundary as `scripts/install.sh`. |
-| `scripts/generate-requirements.py` | post-seed blocker | Triaged live manual generator for `docs/requirements.md`; replace with a With docs-generation target or explicitly retire the generated matrix (#593). |
 | `tools/build-ninja.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
 | `tools/build-ninja.ps1` | bootstrap-only | Windows first-SDK bootstrap counterpart. |
 | `tools/build-cmake.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
@@ -315,17 +321,43 @@ and script dependency are gone.
   action enforces host/platform matching, exact `WITH_VERSION` evidence,
   SDK-owned binary dependency inspection, SDK `llvm-strip`, static libclang
   symbol checks where supported, and SHA-256 sidecar output.
+- 2026-06-19: Added SDK source, rebuild, and package graph targets:
+  `:sdk-ninja-source`, `:sdk-cmake-source`, `:sdk-llvm-source`,
+  `:sdk-ninja`, `:sdk-cmake`, `:sdk-llvm`, `:sdk`, `:package-llvm-sdk`, and
+  native platform package aliases. SDK package actions validate required tools,
+  clang builtin headers, static archives, lld driver links, and CMake-cache
+  compiler provenance before producing `.tar.gz`, `.sha256`, and manifest
+  outputs.
+- 2026-06-19: Extended native tar extraction for upstream PAX metadata and GNU
+  long names so GitHub source archives used by SDK source targets extract
+  without host `tar`.
+- 2026-06-20: Changed build-action tar extraction to stream from disk instead
+  of reading the archive into `str`, fixed migrated zlib gunzip to stream large
+  decompressed tar output, and accepted relative symlink targets that normalize
+  inside the extraction root. Verified `with build :sdk-llvm-source --no-deps`
+  against the 2.16 GiB LLVM source tar, including the CUDA symlink fixture that
+  uses `../../opt/cuda/bin/ptxas`.
+- 2026-06-19: Added `.sha256` sidecar verification to `with build :seed` and
+  `with build :deps`.
+- 2026-06-19: Replaced `scripts/generate-requirements.py` with
+  `with build :requirements` and `with build :requirements-check`, and wired
+  the check into `with build :test`.
+- 2026-06-19: Deleted the repository `Makefile`, release package scripts, SDK
+  package scripts, and the Python requirements generator after their graph
+  replacements landed.
 
 ## Next Work Queue
 
-Do not stack new Makefile-elimination implementation work on top of unrelated
-compiler/backend fixes. If the worktree contains a verified compiler fix, commit
-that logical change first, then continue with this queue.
+Do not stack unrelated compiler/backend fixes on top of this cleanup. The
+remaining work for this document is verification:
 
-1. **Implement SDK package and SDK rebuild targets.** Bootstrap-C packaging and
-   platform compiler packaging are graph-owned. SDK packages still need native
-   package targets, SDK provenance validation, and graph replacements for
-   post-seed SDK rebuild flows.
+1. Run any optional release-matrix targets not covered by the local checklist
+   above when preparing the deletion commit/release.
+2. Run `with build :package-llvm-sdk` natively on each supported platform with a
+   valid SDK. If a target rejects the local SDK provenance, rebuild the SDK
+   through `with build :sdk` or the bootstrap runbook and package that result.
+3. Commit the logical Makefile/post-seed-script removal only after verification
+   is recorded.
 
 ## Implementation Tasks
 
@@ -465,12 +497,12 @@ updates are normal build graph work.
   `tools/bootstrap/` path. It may depend on system tools, but it must not be
   described as part of normal release, development, test, package, deps, or CI
   flow.
-- [ ] Ensure post-seed seed refresh is only `with build :seed`, implemented in
+- [x] Ensure post-seed seed refresh is only `with build :seed`, implemented in
   With code with declared network access, host asset selection, checksum
   verification, executable-bit handling, and loud unsupported-host diagnostics.
-  The graph target now uses a With-built HTTPS helper and handles the host asset
-  name, output path, and executable bit. The open part of this checklist item is
-  checksum policy for seed binary assets.
+  The graph target uses a With-built HTTPS helper, fetches and verifies the
+  published `.sha256` sidecar, handles the host asset name, output path, and
+  executable bit, and fails loudly on unsupported hosts or checksum mismatch.
 - [x] Ensure the path downloads the host-named release asset (`with-darwin-aarch64`,
   `with-linux-x86_64`, `with-windows-x86_64.exe`) into `src/main`.
 - [x] Ensure the path does not publish or depend on an asset named `main`.
@@ -488,32 +520,32 @@ The static LLVM/Clang/lld SDK is a With-owned toolchain artifact. Its post-seed
 construction and packaging must be graph targets, not shell or PowerShell
 scripts.
 
-- Add graph targets for SDK bootstrap-tool production after a seed exists:
+- [x] Add graph targets for SDK bootstrap-tool production after a seed exists:
   - `with build :sdk-ninja`
   - `with build :sdk-cmake`
   - `with build :sdk-llvm`
   - `with build :sdk`
-- Reimplement the behavior of `tools/build-ninja.*`, `tools/build-cmake.*`,
+- [x] Reimplement the behavior of `tools/build-ninja.*`, `tools/build-cmake.*`,
   and `tools/build-static-llvm.*` in With build modules. The graph may invoke
   previously fetched With-owned CMake/Ninja/Clang/lld binaries, but must not
   discover or invoke host Make, host Ninja, host CMake, GCC, MSVC `cl.exe`, or a
   system LLVM.
-- Keep the SDK package format aligned with `:deps`: release SDK assets are
+- [x] Keep the SDK package format aligned with `:deps`: release SDK assets are
   `.tar.gz`, because the graph can already gunzip them through migrated zlib and
   extract the tar stream natively.
-- Keep the existing SDK build scripts only as bootstrap-new-platform helpers
+- [x] Keep the existing SDK build scripts only as bootstrap-new-platform helpers
   until the first platform seed/SDK asset exists, then move or label them under
   the bootstrap-only boundary.
-- Add graph targets for SDK packaging:
+- [x] Add graph targets for SDK packaging:
   - `with build :package-llvm-sdk`
   - explicit platform aliases where useful, such as
     `:package-llvm-sdk-darwin-aarch64`, `:package-llvm-sdk-linux-x86_64`, and
     `:package-llvm-sdk-windows-x86_64`
-- Reimplement the behavior of `scripts/package-llvm-sdk.sh` and
+- [x] Reimplement the behavior of `scripts/package-llvm-sdk.sh` and
   `scripts/package-llvm-sdk-windows-x86_64.ps1` in With. Validate required SDK
   contents, CMake cache provenance, Clang/lld/nm/strip tools, builtin headers,
   archive libraries, and platform driver symlinks.
-- Implement or reuse With-owned archive, compression, and checksum support.
+- [x] Implement or reuse With-owned archive, compression, and checksum support.
   Release packaging must not call host `tar`, `zip`, `zstd`, `sha256sum`,
   `shasum`, or PowerShell archive APIs.
 
@@ -550,14 +582,13 @@ build, fixpoint, and tests.
 - [x] Implement strip/symbol checks through embedded or SDK-provided With-owned
   LLVM tools. Do not call host `strip`, `nm`, `otool`, `ldd`, `dumpbin`, or
   PowerShell.
-- Make platform compiler package targets depend on completed build, fixpoint,
-  release UAT, SDK provenance checks, and clean release staging directories.
-  The graph targets depend on build, fixpoint, and release UAT today; SDK
-  provenance checks remain open until SDK package validation targets exist.
-  Bootstrap-C packaging depends on the release compiler build and emitted-C
-  source generation, because it is a source bundle for new-platform bring-up
-  rather than a publishable compiler binary.
-- Make package targets fail loudly if a platform package cannot be correctly
+- [x] Make platform compiler package targets depend on completed build, fixpoint,
+  release UAT, SDK-owned tool checks, and clean release staging directories.
+  SDK provenance is enforced by the SDK package targets. Bootstrap-C packaging
+  depends on the release compiler build and emitted-C source generation,
+  because it is a source bundle for new-platform bring-up rather than a
+  publishable compiler binary.
+- [x] Make package targets fail loudly if a platform package cannot be correctly
   produced. Do not emit partial archives or placeholder manifests.
 
 Defense: release scripts are not less important than build scripts. A release
@@ -666,24 +697,25 @@ chain through wrong bootstrap commands.
 
 ### 12. Delete Makefile and post-seed scripts
 
-Only after the preceding tasks pass:
+Completed after the graph replacements landed:
 
-- Remove `Makefile`.
-- Remove release package scripts:
+- [x] Remove `Makefile`.
+- [x] Remove release package scripts:
   - `scripts/package-darwin-aarch64.sh`
   - `scripts/package-linux-x86_64.sh`
   - `scripts/package-windows-x86_64.ps1`
   - `scripts/package-llvm-sdk.sh`
   - `scripts/package-llvm-sdk-windows-x86_64.ps1`
-- Remove or move SDK build scripts behind the bootstrap-only boundary:
+- [x] Keep SDK build scripts behind the bootstrap-only boundary:
   - `tools/build-ninja.sh`
   - `tools/build-ninja.ps1`
   - `tools/build-cmake.sh`
   - `tools/build-cmake.ps1`
   - `tools/build-static-llvm.sh`
   - `tools/build-static-llvm.ps1`
-- Remove Python build checker scripts after their With replacements land.
-- Run a repository audit:
+- [x] Remove Python build checker/generator scripts after their With replacements
+  land.
+- [ ] Run a repository audit after committing the deletions:
   - `Makefile`
   - `.sh`
   - `.ps1`
@@ -702,7 +734,7 @@ Defense: this is the mechanical final step, not the migration itself.
 
 ## Verification Matrix
 
-Before deleting Makefile and scripts:
+Full verification:
 
 ```sh
 with build
@@ -741,7 +773,7 @@ with build :package-windows-x86_64
 with build :package-bootstrap-c
 ```
 
-After deleting Makefile and post-seed scripts:
+Post-delete verification:
 
 ```sh
 git diff --check
@@ -754,13 +786,13 @@ with build :test-green
 Then run the script audit:
 
 ```sh
-find . -mindepth 1 -type d -name '.*' -prune -o -type f \( -name '*.sh' -o -name '*.ps1' -o -name '*.cmd' \) -print
+git ls-files | rg -v '(^|/)\.[^/]+/' | rg '(\.sh$|\.ps1$|\.cmd$|\.py$|(^|/)Makefile$)'
 rg -n "Makefile|make |sh -c|bash -c|powershell|scripts/package-|scripts/install|generate_wl_stubs|check-no-c-export.py|check-requirements-informative.py|check-spec-inventory.py"
 rg -n "make |scripts/|Makefile" .github/workflows
 ```
 
 The first command should return only retained convenience installers and
-bootstrap-boundary files outside maintainer-owned hidden directories, if any.
+bootstrap-boundary files outside maintainer-owned hidden directories.
 The second command should return only historical archive text, bootstrap-only
 documentation, retained convenience-installer references, intentional fixtures,
 or hidden-directory references that the maintainer has not brought into scope.

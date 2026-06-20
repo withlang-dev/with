@@ -99,12 +99,14 @@ it as a per-platform asset and let the build fetch it the same way it fetches
 the seed (issue #313):
 
 - **Package** (per platform, after the SDK exists in `.deps`):
-  produce `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz` through the
-  With-native release packaging target. Until that target exists, SDK package
-  publishing is tracked by `docs/eliminate-Makefile.md`; shell or PowerShell
-  packaging helpers are not the post-seed release contract. The packaging
-  target must refuse SDKs not built with Clang/clang-cl by the bootstrap SDK
-  flow. It ships only what the build links against: `lib/*.a`,
+  run `WITH_VERSION=$WITH_VERSION with build :package-llvm-sdk` on that native
+  host, or the explicit platform target
+  `:package-llvm-sdk-darwin-aarch64`,
+  `:package-llvm-sdk-linux-x86_64`, or
+  `:package-llvm-sdk-windows-x86_64`. The target produces
+  `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz`, a `.sha256`
+  sidecar, and a manifest. It refuses SDKs not built with Clang/clang-cl by the
+  bootstrap SDK flow. It ships only what the build links against: `lib/*.a`,
   `lib/clang/<v>/include/`,
   `bin/ninja`, `bin/cmake`, `bin/clang`, `bin/lld` (+ driver symlinks),
   `bin/llvm-ml`/`bin/llvm-ml64` on Windows, `bin/llvm-nm`, and
@@ -421,18 +423,14 @@ the platform format supports it, strips with SDK `llvm-strip`, and writes a
 `.sha256` sidecar. It does not copy or invoke `scripts/install.*`.
 
 The bootstrap-C package target exists as `with build :package-bootstrap-c`.
-SDK package targets remain tracked by `docs/eliminate-Makefile.md` and must not
-be treated as a normal post-seed script workflow until their graph replacements
-land.
+The SDK package target exists as `with build :package-llvm-sdk`. It packages the
+native host's `.deps/llvm-<ver>-<host>` static SDK into
+`out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz` and rejects invalid SDK
+provenance instead of publishing an ambiguous asset. If it rejects the local
+SDK, rebuild the SDK through the bootstrap runbook or the graph-owned
+post-seed SDK targets before publishing.
 
-Until the SDK package targets land, SDK packaging remains tracked by
-`docs/eliminate-Makefile.md` and must stay inside the documented transition
-state. The intended graph target will run on each native platform and package
-that host's `.deps/llvm-<ver>-<host>` static SDK into
-`out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz`. Copy the Linux SDK
-asset back alongside the Linux binary once that graph target exists:
-
-On Windows, the SDK package target will package the
+On Windows, the SDK package target packages the
 `.deps\llvm-<ver>-windows-x86_64-msvc` SDK and includes the required CMake,
 Clang/lld, and LLVM utility tools (`ninja.exe`, `cmake.exe`, `clang.exe`,
 `clang++.exe`, `clang-cl.exe`, `lld-link.exe`, `llvm-lib.exe`, `llvm-ml.exe`,

@@ -1065,6 +1065,30 @@ fn tool_tar_link_name(target: str) -> str:
         return ""
     target
 
+fn tool_tar_link_target_safe(output_dir: str, output_path: str, target: str) -> bool:
+    if target.len() == 0:
+        return false
+    if target.byte_at(0) == 47 or target.byte_at(0) == 92:
+        return false
+    if target.len() >= 3 and target.byte_at(1) == 58 and (target.byte_at(2) == 47 or target.byte_at(2) == 92):
+        return false
+    for i in 0..target.len() as i32:
+        let ch = target.byte_at(i as i64)
+        if ch == 0 or ch == 9 or ch == 10 or ch == 13:
+            return false
+    let parent = tool_path_dirname(output_path)
+    let resolved = tool_path_normalize(parent ++ "/" ++ target)
+    if not tool_path_is_project_relative(resolved):
+        return false
+    let root = tool_path_normalize(output_dir)
+    if root == ".":
+        return true
+    tool_path_is_same_or_child(resolved, root)
+
+fn tool_tar_extract_fail(message: str) -> i32:
+    with_eprint("error: ToolFs.extract_tar: " ++ message ++ "\n")
+    1
+
 fn tool_tar_build_header(name: str, mode: i32, size: i64, kind: ArchiveEntryKind, link_name: str) -> Vec[u8]:
     if name.len() == 0 or name.len() > 100 or mode < 0 or size < 0 or link_name.len() > 100:
         return Vec.new()
@@ -1266,67 +1290,154 @@ fn tool_tar_archive_name_safe(name: str) -> bool:
         return false
     tool_path_is_project_relative(name)
 
+fn tool_tar_header_name(bytes: &Vec[u8], offset: i64) -> str:
+    let name = tool_tar_field_str(bytes, offset, 100)
+    let prefix = tool_tar_field_str(bytes, offset + 345, 155)
+    if prefix.len() == 0:
+        return name
+    prefix ++ "/" ++ name
+
+fn tool_tar_payload_text(bytes: &Vec[u8], offset: i64, size: i64) -> str:
+    var out = StringBuilder.with_capacity(size)
+    var i: i64 = 0
+    while i < size:
+        out.push_byte(bytes.get(offset + i))
+        i = i + 1
+    out.to_str()
+
+fn tool_tar_trim_payload_name(text: str) -> str:
+    var end = text.len() as i32
+    while end > 0:
+        let ch = text.byte_at((end - 1) as i64)
+        if ch != 0 and ch != 10 and ch != 13:
+            break
+        end = end - 1
+    text.slice(0, end as i64)
+
+fn tool_pax_parse_decimal(text: str, start: i32, end: i32) -> i32:
+    if start >= end:
+        return -1
+    var value = 0
+    var i = start
+    while i < end:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        value = value * 10 + (ch - 48)
+        i = i + 1
+    value
+
+fn tool_pax_value(text: str, key: str) -> str:
+    var pos = 0
+    while pos < text.len() as i32:
+        var space = pos
+        while space < text.len() as i32 and text.byte_at(space as i64) != 32:
+            space = space + 1
+        if space >= text.len() as i32:
+            return ""
+        let record_len = tool_pax_parse_decimal(text, pos, space)
+        if record_len <= 0 or pos + record_len > text.len() as i32:
+            return ""
+        let record_start = space + 1
+        let record_end = pos + record_len
+        var eq = record_start
+        while eq < record_end and text.byte_at(eq as i64) != 61:
+            eq = eq + 1
+        if eq < record_end:
+            let name = text.slice(record_start as i64, eq as i64)
+            if name == key:
+                var value_end = record_end
+                while value_end > eq + 1:
+                    let ch = text.byte_at((value_end - 1) as i64)
+                    if ch != 10 and ch != 13:
+                        break
+                    value_end = value_end - 1
+                return text.slice((eq + 1) as i64, value_end as i64)
+        pos = record_end
+    ""
+
 pub fn ToolFs.extract_tar(self: &Self, archive_path: str, output_dir: str) -> i32:
     tool_path_require_project_relative(archive_path)
     if self.mkdir_all(output_dir) != 0:
-        return 1
+        return tool_tar_extract_fail("could not create output directory: " ++ output_dir)
     let archive = self.read_binary(archive_path)
     var offset: i64 = 0
+    var pending_path = ""
+    var pending_link = ""
     while offset + 512 <= archive.len():
         if tool_tar_block_is_zero(&archive, offset):
             return 0
         if not tool_tar_magic_ok(&archive, offset):
-            return 1
+            return tool_tar_extract_fail(f"invalid tar magic at offset {offset}")
         let stored_checksum = tool_tar_parse_octal(&archive, offset + 148, 8)
         if stored_checksum < 0 or stored_checksum != tool_tar_header_checksum(&archive, offset):
-            return 1
-        let raw_name = tool_tar_field_str(&archive, offset, 100)
-        if not tool_tar_archive_name_safe(raw_name):
-            return 1
-        let name = tool_path_normalize(raw_name)
+            return tool_tar_extract_fail(f"invalid header checksum at offset {offset}")
         let mode = tool_tar_parse_octal(&archive, offset + 100, 8)
         let size = tool_tar_parse_octal(&archive, offset + 124, 12)
         if mode < 0 or size < 0:
-            return 1
+            return tool_tar_extract_fail(f"invalid numeric field at offset {offset}")
         let typeflag = archive.get(offset + 156)
+        let content_start = offset + 512
+        if content_start + size > archive.len():
+            return tool_tar_extract_fail(f"entry payload extends past archive at offset {offset}")
+        let padded = ((size + 511) / 512) * 512
+        if typeflag == 120 as u8:
+            let pax = tool_tar_payload_text(&archive, content_start, size)
+            let pax_path = tool_pax_value(pax, "path")
+            let pax_link = tool_pax_value(pax, "linkpath")
+            if pax_path.len() > 0:
+                pending_path = pax_path
+            if pax_link.len() > 0:
+                pending_link = pax_link
+            offset = offset + 512 + padded
+            continue
+        if typeflag == 103 as u8:
+            offset = offset + 512 + padded
+            continue
+        if typeflag == 76 as u8:
+            pending_path = tool_tar_trim_payload_name(tool_tar_payload_text(&archive, content_start, size))
+            offset = offset + 512 + padded
+            continue
+        let raw_name = if pending_path.len() > 0: pending_path else: tool_tar_header_name(&archive, offset)
+        pending_path = ""
+        if not tool_tar_archive_name_safe(raw_name):
+            return tool_tar_extract_fail("unsafe archive path: " ++ raw_name)
+        let name = tool_path_normalize(raw_name)
         let output_path = self.join(output_dir, name)
         if typeflag == 53 as u8:
             if self.mkdir_all(output_path) != 0:
-                return 1
+                return tool_tar_extract_fail("could not create directory entry: " ++ output_path)
             if mode > 0:
                 let _ = self.chmod(output_path, mode as i32)
         else if typeflag == 50 as u8:
-            let link_name = tool_tar_field_str(&archive, offset + 157, 100)
-            if tool_tar_link_name(link_name).len() == 0:
-                return 1
+            let link_name = if pending_link.len() > 0: pending_link else: tool_tar_field_str(&archive, offset + 157, 100)
+            pending_link = ""
+            if not tool_tar_link_target_safe(output_dir, output_path, link_name):
+                return tool_tar_extract_fail("unsafe symlink target for " ++ output_path ++ ": " ++ link_name)
             let output_parent = tool_path_dirname(output_path)
             if output_parent != "." and self.mkdir_all(output_parent) != 0:
-                return 1
+                return tool_tar_extract_fail("could not create parent directory for symlink: " ++ output_parent)
             if not self.write_file_allowed(output_path):
-                return 1
+                return tool_tar_extract_fail("symlink path is outside declared write scope: " ++ output_path)
             if with_fs_symlink(link_name, self.resolve_path(output_path)) != 0:
-                return 1
+                return tool_tar_extract_fail("could not create symlink: " ++ output_path)
         else if typeflag == 48 as u8 or typeflag == 0 as u8:
-            let content_start = offset + 512
-            if content_start + size > archive.len():
-                return 1
             let output_parent = tool_path_dirname(output_path)
             if output_parent != "." and self.mkdir_all(output_parent) != 0:
-                return 1
+                return tool_tar_extract_fail("could not create parent directory for file: " ++ output_parent)
             var payload: Vec[u8] = Vec[u8].with_capacity(size)
             var pi: i64 = 0
             while pi < size:
                 payload.push(archive.get(content_start + pi))
                 pi = pi + 1
             if self.write_binary(output_path, payload) != 0:
-                return 1
+                return tool_tar_extract_fail("could not write file entry: " ++ output_path)
             if mode > 0:
                 let _ = self.chmod(output_path, mode as i32)
         else:
-            return 1
-        let padded = ((size + 511) / 512) * 512
+            return tool_tar_extract_fail(f"unsupported tar entry type {typeflag as i32} for " ++ raw_name)
         offset = offset + 512 + padded
-    1
+    tool_tar_extract_fail("archive ended without two zero blocks")
 
 pub fn ToolFs.copy_file(self: &Self, src: str, dst: str) -> i32:
     tool_path_require_project_relative(src)

@@ -3,9 +3,9 @@
 Status: current user documentation.
 
 This document describes how to create, configure, and build With projects.
-The active repository plan to remove the remaining Makefile compatibility layer
-is [eliminate-Makefile.md](eliminate-Makefile.md). Historical build-system plan
-and spec documents are archived under `docs/completed/`.
+The repository Makefile has been removed; the cleanup record is
+[eliminate-Makefile.md](eliminate-Makefile.md). Historical build-system plan and
+spec documents are archived under `docs/completed/`.
 
 ---
 
@@ -63,10 +63,10 @@ with init --name foo   # override project name
 
 ---
 
-## Make Compatibility Aliases
+## Removed Make Aliases
 
-The repository `Makefile` is a transitional compatibility layer. Prefer direct
-`with build` targets for normal development:
+The repository no longer ships a `Makefile`. These are the direct `with build`
+commands that replaced the old Make aliases:
 
 | Old Make target | Direct command |
 |-----------------|----------------|

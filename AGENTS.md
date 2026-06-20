@@ -297,13 +297,16 @@ malformed. Users reach regex through `std.regex`, never through
 **After bootstrap the seed depends on nothing external from LLVM.**
 This is a hard invariant, not an aspiration.
 
-*We* build the entire static LLVM/Clang/lld SDK from source via
-`tools/build-static-llvm.sh` (`cmake --build --target install` into
-`.deps/llvm-<ver>-<host>` = `LLVM_PREFIX`). CMake and its generator backend are
-also With-owned SDK tools: build Ninja from source with `tools/build-ninja.*`,
-then build CMake from source with `tools/build-cmake.*`, installing both into
-the same SDK prefix before the LLVM build. That SDK produces every static
-resource the compiler needs:
+*We* build the entire static LLVM/Clang/lld SDK from source. First-platform
+bootstrap may use the `tools/build-ninja.*`, `tools/build-cmake.*`, and
+`tools/build-static-llvm.*` scripts inside the bootstrap runbook boundary. After
+a seed exists, repeat SDK production is graph-owned through
+`with build :sdk-ninja`, `with build :sdk-cmake`, `with build :sdk-llvm`, and
+`with build :sdk`, installing into `.deps/llvm-<ver>-<host>` or the staged SDK
+prefix selected by the build graph. CMake and its generator backend are also
+With-owned SDK tools: build Ninja from source, then build CMake from source,
+installing both into the same SDK prefix before the LLVM build. That SDK
+produces every static resource the compiler needs:
 
 - `lib/libclang.a`, `lib/libLLVM*.a`, `lib/liblld*.a` — the archives.
 - `lib/clang/<v>/include/` — clang's **builtin headers** (`stddef.h`,
@@ -325,8 +328,8 @@ linked; the final binary loads **no** `libclang`/`libLLVM` dylib (the
 bootstrap runbook's Failure Policy enforces this). `LLVM_PREFIX` and
 `WITH_LIBCLANG` are **build-time link inputs only** — never a runtime
 dependency. The static SDK they point at is published per-platform per
-release and fetched with `with build :deps` (#313); LLVM is
-built from source (`tools/build-static-llvm.sh`) only when bringing up a new
+release and fetched with `with build :deps` (#313); LLVM is rebuilt from source
+through the bootstrap runbook or `with build :sdk` only when bringing up a new
 platform or bumping `COMPILER_LLVM_VERSION`. Never rebuild it or point at a
 system LLVM during a normal build.
 
@@ -394,9 +397,10 @@ SDK. Packaging scripts must reject SDKs whose CMake cache names GCC,
 The first SDK build may use external Python and an external CMake only to build
 the SDK's own `bin/ninja` and `bin/cmake`, because these tools bootstrap the SDK
 build system. After that point, repeat LLVM SDK production uses
-`LLVM_PREFIX/bin/cmake` and `LLVM_PREFIX/bin/ninja`; SDK packaging must reject
-archives that do not include both tools. Do not depend on a host Ninja, Make,
-MSBuild, or Visual Studio generator for repeat SDK production.
+`LLVM_PREFIX/bin/cmake` and `LLVM_PREFIX/bin/ninja` through the graph-owned SDK
+targets; SDK packaging must reject archives that do not include both tools. Do
+not depend on a host Ninja, Make, MSBuild, or Visual Studio generator for repeat
+SDK production.
 
 Release binary size parity is a toolchain-parity check. Large `.text`
 differences between platforms are not harmless until explained; first verify
