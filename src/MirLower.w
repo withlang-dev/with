@@ -1184,8 +1184,7 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if type_name == "Vec":
             if len_method_ret != 0: return len_method_ret
             if method_name == "new": return recv_type
-            if method_name == "push": return recv_type
-            if method_name == "set_i32" or method_name == "remove" or method_name == "clear":
+            if method_name == "push" or method_name == "set_i32" or method_name == "remove" or method_name == "clear":
                 return self.sema.ty_void as i32
             if method_name == "get" or method_name == "pop":
                 if tk == TypeKind.TY_GENERIC_INST:

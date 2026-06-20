@@ -14747,6 +14747,8 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
     if owner_sym == self.syms.vec:
         if field == self.syms.new or method_name == "with_capacity":
             return self.generic_constructor_return_type(owner_sym, recv_type)
+        if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.clear:
+            return self.ty_void as i32
     if owner_sym == self.syms.hashmap:
         if field == self.syms.new:
             return self.generic_constructor_return_type(owner_sym, recv_type)
