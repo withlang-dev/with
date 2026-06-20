@@ -1413,7 +1413,7 @@ fn comptime_process_basename(path: str) -> str:
 
 fn comptime_process_requires_network(exe: str) -> bool:
     let name = comptime_process_basename(exe)
-    name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe"
+    name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe" or name == "https_fetch" or name == "https_fetch.exe"
 
 fn ComptimeEvaluator.effect_argv_parts_from_value(self: ComptimeEvaluator, value: ComptimeValue) -> Vec[str]:
     let parts: Vec[str] = Vec.new()

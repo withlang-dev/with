@@ -9,7 +9,7 @@ spec are archived under `docs/completed/`.
 
 Goal: after a platform has its first working With seed, the With repository can
 build, test, verify, fetch/update SDK dependencies, cross-build supported
-targets, package releases, install/update seeds, and run CI through the
+targets, package releases, update/install seeds from a checkout, and run CI through the
 self-hosted `build.w` framework. No normal post-seed workflow may depend on a
 repository shell, PowerShell, CMD, Python, or host utility script.
 
@@ -18,9 +18,12 @@ system dependencies it needs: shell, PowerShell, CMD, Python, host compilers,
 host archive tools, package managers, host CMake/Ninja/Make, and other external
 commands. Bootstrap is the only process with that permission, because no
 self-hosted seed exists yet. That exception ends once the platform has a seed.
-All other workflows -- build, test, release, package, install, deps, CI,
-cross, and post-seed seed/SDK refresh -- must depend only on the seed,
+All other repository workflows -- build, test, release packaging, deps, CI,
+cross, and post-seed seed/SDK refresh/install -- must depend only on the seed,
 self-hosted With code, With-owned fetched artifacts, and OS system calls.
+The retained `scripts/install.*` files are outside that repository build graph:
+they are convenience first-install downloaders for published compiler binaries,
+not build, package, CI, seed-refresh, or SDK-refresh steps.
 
 ## Policy
 
@@ -35,8 +38,9 @@ Allowed after first seed:
 Forbidden after first seed:
 
 - `Makefile` as build dispatch or compatibility glue;
-- `.sh`, `.ps1`, or `.cmd` scripts for build, test, release, package, install,
-  seed, SDK, or cross workflows;
+- `.sh`, `.ps1`, or `.cmd` scripts for build, test, release packaging,
+  package production, post-seed repository install/update, seed, SDK, or cross
+  workflows;
 - Python helper scripts as build logic;
 - shell command strings such as `sh -c`, `bash -c`, pipes, globbing, `find`,
   `sed`, `wc`, `cp`, `chmod`, `tar`, `zip`, `curl`, `shasum`, `otool`, `ldd`,
@@ -60,7 +64,8 @@ bootstrap boundary.
 `docs/with-release-runbook.md`, `with build`, tests, package targets, normal
 SDK/seed refresh, and CI after seed acquisition are not bootstrap. They must not
 depend on repository scripts or host utility behavior outside the seed and OS
-system calls.
+system calls. Standalone installer scripts may be documented only as optional
+published-binary downloaders; they are not a repository build path.
 
 Hidden directories are maintainer-owned by default. Files under any path segment
 whose name begins with `.` are outside the agent-actionable scope of this plan
@@ -97,18 +102,22 @@ Already true:
   is not implemented yet. The stale Make-only Zig shell workflow has been
   removed.
 
-Still blocking Makefile and script removal:
+Still blocking Makefile and post-seed script removal:
 
 - A clean checkout with no `with` binary still relies on Makefile logic,
-  installer scripts, or manual release-asset fetching to acquire the first
-  seed.
-- Release packaging is script-driven:
+  direct release-asset fetching, or retained convenience installers to acquire
+  the first seed. This is the bootstrap boundary, not a post-seed build path;
+  Makefile-owned seed acquisition still needs to disappear.
+- Obsolete platform release package scripts still exist but now have graph
+  replacements and must be deleted after cross-platform verification:
   - `scripts/package-darwin-aarch64.sh`
   - `scripts/package-linux-x86_64.sh`
   - `scripts/package-windows-x86_64.ps1`
+- SDK packaging is still script-driven:
   - `scripts/package-llvm-sdk.sh`
   - `scripts/package-llvm-sdk-windows-x86_64.ps1`
-- Release installer assets are scripts:
+- Release convenience installers are scripts and are intentionally retained
+  outside the build graph:
   - `scripts/install.sh`
   - `scripts/install.ps1`
   - `scripts/install.cmd`
@@ -122,27 +131,30 @@ Still blocking Makefile and script removal:
   - `tools/build-static-llvm.sh`
   - `tools/build-static-llvm.ps1`
 - Build-system maintenance no longer relies on host `curl`, `tar`, or `zstd`
-  for seed/deps fetching or PCRE2/zlib reference fetching/extraction. Remaining
-  host-utility reliance is concentrated in platform release packaging, SDK
-  packaging/provenance checks, and binary inspection/stripping.
+  for seed/deps fetching, PCRE2/zlib reference fetching/extraction, or generic
+  `std.build` download/tar.gz extraction actions. Remaining host-utility
+  reliance is concentrated in SDK packaging/provenance checks.
 - `ToolFs.write_tar()` and `ToolFs.extract_tar()` provide native USTAR support
   for regular files, directories, and symlinks. `ToolFs.write_tar_gz()` provides
   deterministic gzip-wrapped tar output. The migrated `std.zlib` facade supports
   zlib/gzip decompression and gzip compression; `build/zlib.w` uses a With HTTP
   helper plus migrated zlib gunzip helper plus `ToolFs.extract_tar()` for
-  `:zlib-reference`. Bootstrap-C packaging is graph-owned. Platform release and
-  SDK packaging still need native package targets, binary inspection,
-  stripping, and SDK provenance validation before host packaging scripts can
-  disappear.
+  `:zlib-reference`. Bootstrap-C packaging is graph-owned. Platform compiler
+  packages are graph-owned through `:package-current-host` and explicit native
+  platform aliases; they copy the release compiler, verify its version, inspect
+  dynamic dependencies with SDK LLVM tools, check libclang symbols where
+  supported, strip with SDK `llvm-strip`, and write SHA-256 sidecar files. SDK
+  packaging still needs native package targets and SDK provenance validation
+  before host SDK packaging scripts can disappear.
 - `ToolFs.scratch_dir()` exists, but repository build modules cannot call it
   directly until the installed seed embeds that API. PCRE2 has moved from the
   shared `out/pcre2_tmp` path to the action-scratch path convention with
   explicit transitional write scopes for old-seed compatibility.
-- The active runbooks still describe release packaging and SDK packaging
-  as blocked until With-native release package targets exist. Installer scripts
-  are no longer required release assets in the release runbook, but the scripts
-  still exist as transitional byproducts until a With-native installer path
-  lands.
+- The active runbooks still describe SDK packaging as blocked until With-native
+  SDK package targets exist. Installer scripts are retained as convenience
+  first-install downloaders only; they are not blockers for Makefile
+  elimination and must not be used by post-seed CI, release packaging, seed
+  refresh, SDK refresh, or repository install/update flows.
 - Some std.build / build-cache behavior is not strong enough to be the final
   script-free contract.
 
@@ -166,15 +178,15 @@ and script dependency are gone.
 | Path | Classification | Disposition |
 | --- | --- | --- |
 | `.github/workflows/ci.yml` | bootstrap-boundary CI setup | CI no longer invokes Make; it uses a bootstrap seed acquisition step, then `with build :deps`, `with build`, `with build :fixpoint`, and `with build :test`. |
-| `Makefile` | post-seed blocker | Delete after all listed aliases, cross, seed, CI, release, SDK, and install roles have With graph replacements. |
+| `Makefile` | post-seed blocker | Delete after all listed aliases, cross, seed, CI, release packaging, SDK, and repository install/update roles have With graph replacements. |
 | `scripts/package-darwin-aarch64.sh` | post-seed blocker | Replace with a self-hosted Darwin release packaging target. |
 | `scripts/package-linux-x86_64.sh` | post-seed blocker | Replace with a self-hosted Linux release packaging target. |
 | `scripts/package-windows-x86_64.ps1` | post-seed blocker | Replace with a self-hosted Windows release packaging target. |
 | `scripts/package-llvm-sdk.sh` | post-seed blocker | Replace with self-hosted SDK packaging once archive creation/signing/validation capabilities exist. |
 | `scripts/package-llvm-sdk-windows-x86_64.ps1` | post-seed blocker | Replace with self-hosted Windows SDK packaging once archive creation/signing/validation capabilities exist. |
-| `scripts/install.sh` | post-seed blocker | Replace release installer behavior with a With-owned installer or direct `with build :install-user` flow. |
-| `scripts/install.ps1` | post-seed blocker | Same as `scripts/install.sh` for PowerShell hosts. |
-| `scripts/install.cmd` | post-seed blocker | Same as `scripts/install.sh` for CMD hosts. |
+| `scripts/install.sh` | retained convenience installer | Keep as the Unix first-install downloader for the latest published platform compiler binary. It must not be invoked by CI, package targets, seed refresh, SDK refresh, or repository post-seed install/update flows. |
+| `scripts/install.ps1` | retained convenience installer | Keep as the PowerShell first-install downloader for the latest published Windows compiler binary, with the same build-graph boundary as `scripts/install.sh`. |
+| `scripts/install.cmd` | retained convenience installer | Keep as the CMD wrapper for the PowerShell first-install downloader, with the same build-graph boundary as `scripts/install.sh`. |
 | `scripts/generate-requirements.py` | post-seed blocker | Triaged live manual generator for `docs/requirements.md`; replace with a With docs-generation target or explicitly retire the generated matrix (#593). |
 | `tools/build-ninja.sh` | bootstrap-only | Keep only for first SDK bootstrap until With-owned bootstrap tooling exists. |
 | `tools/build-ninja.ps1` | bootstrap-only | Windows first-SDK bootstrap counterpart. |
@@ -292,6 +304,17 @@ and script dependency are gone.
   `with build :package-bootstrap-c`, which stages emitted C sources and
   bootstrap platform shims, writes `SHA256SUMS`, and produces
   `out/release/with-bootstrap-c-<version>.tar.gz`.
+- 2026-06-19: Replaced generic `std.build` host `curl` and `tar xzf` actions.
+  `Build.download()` now compiles and runs a With HTTPS helper, and
+  `Build.extract_tar_gz()` compiles and runs a With zlib gunzip helper before
+  extracting with native `ToolFs.extract_tar()`. Added build.w selfhost coverage
+  for `Build.extract_tar_gz()`.
+- 2026-06-19: Added platform compiler package targets:
+  `:package-current-host`, `:package-darwin-aarch64`,
+  `:package-linux-x86_64`, and `:package-windows-x86_64`. The native package
+  action enforces host/platform matching, exact `WITH_VERSION` evidence,
+  SDK-owned binary dependency inspection, SDK `llvm-strip`, static libclang
+  symbol checks where supported, and SHA-256 sidecar output.
 
 ## Next Work Queue
 
@@ -299,10 +322,10 @@ Do not stack new Makefile-elimination implementation work on top of unrelated
 compiler/backend fixes. If the worktree contains a verified compiler fix, commit
 that logical change first, then continue with this queue.
 
-1. **Implement platform release and SDK package targets.** Bootstrap-C packaging
-   is graph-owned. Platform compiler packages and SDK packages still need
-   binary inspection, With-owned strip/symbol checks, SDK provenance validation,
-   and platform-specific package targets.
+1. **Implement SDK package and SDK rebuild targets.** Bootstrap-C packaging and
+   platform compiler packaging are graph-owned. SDK packages still need native
+   package targets, SDK provenance validation, and graph replacements for
+   post-seed SDK rebuild flows.
 
 ## Implementation Tasks
 
@@ -336,8 +359,9 @@ trustworthy once `build.w` owns every workflow.
   native USTAR file/directory/symlink archive support exists; deterministic
   gzip tar creation exists; zlib/gzip compression and decompression exist
   through `std.zlib`; named repository fetch targets use project-local With
-  HTTPS helpers. First-class `std.build` HTTP(S) fetch and richer platform path
-  handling remain.
+  HTTPS helpers; generic `Build.download()` and `Build.extract_tar_gz()` no
+  longer invoke host `curl` or host `tar`. Richer platform path handling
+  remains.
 - [x] Implement `ToolFs.scratch_dir() -> str` as an action-scoped, driver-managed
   scratch directory. The returned path must be project-relative, private to the
   current action invocation, automatically included in that action's write
@@ -455,8 +479,8 @@ updates are normal build graph work.
   `curl | sh`, or equivalent script bootstrap.
 
 Defense: deleting Make without defining the bootstrap boundary breaks clean CI
-and new contributor checkout flows. Leaving installer scripts in the normal
-path preserves the external dependency under another name.
+and new contributor checkout flows. Using installer scripts in the normal
+post-seed path would preserve the external dependency under another name.
 
 ### 6. Move SDK build and SDK packaging into `build.w`
 
@@ -502,34 +526,37 @@ depends on host functionality outside the seed.
 Release assets are compiler outputs. They need the same graph ownership as
 build, fixpoint, and tests.
 
-- Add graph targets for platform compiler packages:
+- [x] Add graph targets for platform compiler packages:
   - `with build :package-darwin-aarch64`
   - `with build :package-linux-x86_64`
   - `with build :package-windows-x86_64`
   - `with build :package-current-host`
 - [x] Add a graph target for bootstrap-C source packaging:
   - `with build :package-bootstrap-c`
-- Reimplement the behavior of `scripts/package-darwin-aarch64.sh`,
+- [x] Reimplement the behavior of `scripts/package-darwin-aarch64.sh`,
   `scripts/package-linux-x86_64.sh`, and
   `scripts/package-windows-x86_64.ps1` in With build modules.
 - [x] Reimplement the behavior of `scripts/package-bootstrap-c.sh` in
   `build/package.w` and delete the script.
-- Implement release staging in With: copy binaries and resources, preserve
+- [x] Implement release staging in With: copy binaries and resources, preserve
   executable bits, write manifests, write checksums, and produce deterministic
-  archives.
-- Implement platform binary inspection in With or via embedded/fetched
+  archives. Platform compiler packages copy the release binary and write
+  SHA-256 sidecars; archive production applies to bootstrap-C and SDK packages.
+- [x] Implement platform binary inspection in With or via embedded/fetched
   With-owned tools:
   - Mach-O dylib load-command checks for Darwin;
   - ELF `DT_NEEDED` / interpreter checks for Linux;
   - PE import-table checks for Windows.
-- Implement strip/symbol checks through embedded or SDK-provided With-owned
+- [x] Implement strip/symbol checks through embedded or SDK-provided With-owned
   LLVM tools. Do not call host `strip`, `nm`, `otool`, `ldd`, `dumpbin`, or
   PowerShell.
 - Make platform compiler package targets depend on completed build, fixpoint,
-  test, release UAT, SDK provenance checks, and clean release staging
-  directories. Bootstrap-C packaging depends on the release compiler build and
-  emitted-C source generation, because it is a source bundle for new-platform
-  bring-up rather than a publishable compiler binary.
+  release UAT, SDK provenance checks, and clean release staging directories.
+  The graph targets depend on build, fixpoint, and release UAT today; SDK
+  provenance checks remain open until SDK package validation targets exist.
+  Bootstrap-C packaging depends on the release compiler build and emitted-C
+  source generation, because it is a source bundle for new-platform bring-up
+  rather than a publishable compiler binary.
 - Make package targets fail loudly if a platform package cannot be correctly
   produced. Do not emit partial archives or placeholder manifests.
 
@@ -537,26 +564,25 @@ Defense: release scripts are not less important than build scripts. A release
 artifact built by shell glue is still a release that depends on host behavior
 outside the seed.
 
-### 8. Replace script installers with a With-native install path
+### 8. Retain convenience installers outside the build graph
 
-The release currently publishes shell, PowerShell, and CMD installers. Those
-are external script dependencies and must leave the normal release surface.
+The release keeps shell, PowerShell, and CMD convenience installers for first
+install. They are not repository build/release logic: their only job is to
+download the latest host platform compiler binary from GitHub and place it on
+the user's PATH.
 
-- Remove `install.sh`, `install.ps1`, and `install.cmd` from required release
-  assets.
 - Define the supported install flow:
   - first install: download the host binary asset directly and place it on
-    `PATH`, or run a future With-native installer binary;
+    `PATH`, optionally through the retained convenience installer;
   - later updates: `with build :install-user` / `with build :update-seed` from
     a checked-out repository, guarded by test-green evidence.
-- If a convenience installer remains desirable, implement it as a With program
-  compiled and packaged as a binary release asset, not as a shell/PowerShell/CMD
-  script.
-- Update docs and release notes to stop recommending `curl | sh`,
+- Ensure CI, package targets, seed refresh, SDK refresh, and post-seed
+  repository install/update docs do not invoke `scripts/install.*`, `curl | sh`,
   PowerShell-downloaded `.ps1`, or CMD wrappers.
 
-Defense: installer scripts are executable build/release logic delivered to
-users. Keeping them would contradict the post-seed self-hosting rule.
+Defense: the post-seed self-hosting rule applies to repository build graph
+workflows. A standalone first-install downloader is acceptable only while it
+stays outside those workflows and does not become package production logic.
 
 ### 9. Migrate CI to `with build`
 
@@ -622,7 +648,7 @@ graph and make later deletion risky.
   state in current runbooks and user-facing docs.
 - Update `docs/with-release-runbook.md` so release packaging uses only
   `with build` graph targets. Remove normal release instructions for
-  `scripts/package-*`, `scripts/install.*`, host `tar`, host checksum tools,
+  `scripts/package-*`, host `tar`, host checksum tools,
   host binary-inspection tools, and PowerShell packaging.
 - Update `docs/with-bootstrap-runbook.md` only to isolate and label
   first-platform bootstrap scripts and system dependencies. Do not remove host
@@ -649,10 +675,6 @@ Only after the preceding tasks pass:
   - `scripts/package-windows-x86_64.ps1`
   - `scripts/package-llvm-sdk.sh`
   - `scripts/package-llvm-sdk-windows-x86_64.ps1`
-- Remove installer scripts:
-  - `scripts/install.sh`
-  - `scripts/install.ps1`
-  - `scripts/install.cmd`
 - Remove or move SDK build scripts behind the bootstrap-only boundary:
   - `tools/build-ninja.sh`
   - `tools/build-ninja.ps1`
@@ -719,7 +741,7 @@ with build :package-windows-x86_64
 with build :package-bootstrap-c
 ```
 
-After deleting Makefile and scripts:
+After deleting Makefile and post-seed scripts:
 
 ```sh
 git diff --check
@@ -737,12 +759,12 @@ rg -n "Makefile|make |sh -c|bash -c|powershell|scripts/package-|scripts/install|
 rg -n "make |scripts/|Makefile" .github/workflows
 ```
 
-The first command should return only bootstrap-boundary files outside
-maintainer-owned hidden directories, if any. The second command should return
-only historical archive text, bootstrap-only documentation, intentional
-fixtures, or hidden-directory references that the maintainer has not brought
-into scope. The third command should return nothing once CI migration is
-complete.
+The first command should return only retained convenience installers and
+bootstrap-boundary files outside maintainer-owned hidden directories, if any.
+The second command should return only historical archive text, bootstrap-only
+documentation, retained convenience-installer references, intentional fixtures,
+or hidden-directory references that the maintainer has not brought into scope.
+The third command should return nothing once CI migration is complete.
 
 ## Acceptance Criteria
 
@@ -765,7 +787,8 @@ Makefile and post-seed script elimination is complete only when:
   driver-managed scratch authority instead of shared/manual scratch paths;
 - release compiler packages, SDK packages, bootstrap-C packages, checksums,
   manifests, and binary dependency checks are produced by graph targets;
-- installer scripts are no longer required release assets;
+- installer scripts remain only as optional first-install convenience
+  downloaders and are not invoked by any post-seed repository workflow;
 - public build capabilities do not silently discard data or hide privilege use;
 - target freshness uses collision-resistant fingerprints and has actionable
   explanation output;

@@ -323,6 +323,15 @@ fn release_platform_tag() -> str:
         return tag
     asset
 
+fn supported_release_platform_tag() -> str:
+    if os() == "Linux" and arch() == "x86_64":
+        return "linux-x86_64"
+    if os() == "Macos" and (arch() == "armv8" or arch() == "aarch64"):
+        return "darwin-aarch64"
+    if os() == "Windows" and arch() == "x86_64":
+        return "windows-x86_64"
+    ""
+
 // ".deps/llvm-<ver>-<host>" -> "llvm-<ver>-<host>"
 fn llvm_sdk_dir_basename() -> str:
     let prefix = compiler_default_llvm_prefix()
@@ -332,6 +341,49 @@ fn llvm_sdk_dir_basename() -> str:
 
 fn llvm_sdk_asset_for_host() -> str:
     "with-llvm-sdk-" ++ compiler_llvm_version() ++ "-" ++ release_platform_tag() ++ ".tar.gz"
+
+fn release_package_asset_for_platform(platform: str) -> str:
+    if platform == "darwin-aarch64":
+        return "with-darwin-aarch64"
+    if platform == "linux_x86_64" or platform == "linux-x86_64":
+        return "with-linux-x86_64"
+    if platform == "windows_x86_64" or platform == "windows-x86_64":
+        return "with-windows-x86_64.exe"
+    "with-unsupported"
+
+fn package_platform_target(name: str, platform: str, ctx: &BuildCtx) -> Target:
+    let asset = release_package_asset_for_platform(platform)
+    var target = target_new(.Action, name, "").output("out/release/" ++ name ++ ".passed")
+    target.action = run_package_platform_release_action
+    target = target.arg(asset)
+    target = target.arg(platform)
+    target = target.arg(release_compiler_bin("with"))
+    target = target.arg(compiler_default_llvm_prefix())
+    target = target.input("src/version")
+    target = target.input(release_compiler_bin("with"))
+    target = target.input("build/package.w")
+    target = target.extra_output("out/release/" ++ asset)
+    target = target.extra_output("out/release/" ++ asset ++ ".sha256")
+    target = target.write_scope("out/release")
+    target = target.write_scope("out/command/" ++ name)
+    target = target.timeout(600000)
+    target = target_with_version_inputs(target, ctx)
+    if supported_release_platform_tag() == platform:
+        target = target.dep("build")
+        target = target.dep("fixpoint")
+        target = target.dep("release-uat")
+    target
+
+fn package_current_host_target() -> Target:
+    var target = target_new(.Group, "package-current-host", "")
+    let platform = supported_release_platform_tag()
+    if platform == "darwin-aarch64":
+        return target.dep("package-darwin-aarch64")
+    if platform == "linux-x86_64":
+        return target.dep("package-linux-x86_64")
+    if platform == "windows-x86_64":
+        return target.dep("package-windows-x86_64")
+    target.dep("package-darwin-aarch64")
 
 fn install_file_target(name: str, source: str, dest: str, mode: str, dep: str) -> Target:
     var target = target_new(.Install, name, source).output(dest)
@@ -506,6 +558,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     package_bootstrap_c = package_bootstrap_c.write_scope("out/command/package-bootstrap-c")
     package_bootstrap_c = package_bootstrap_c.timeout(900000)
     out = out.add_target(package_bootstrap_c)
+
+    out = out.add_target(package_platform_target("package-darwin-aarch64", "darwin-aarch64", ctx))
+    out = out.add_target(package_platform_target("package-linux-x86_64", "linux-x86_64", ctx))
+    out = out.add_target(package_platform_target("package-windows-x86_64", "windows-x86_64", ctx))
+    out = out.add_target(package_current_host_target())
 
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")

@@ -399,17 +399,40 @@ git push origin v0.14.3
 ```
 
 Prepare the platform-named assets on their native platforms with the
-With-native release package targets. The bootstrap-C package target exists as
-`with build :package-bootstrap-c`; platform compiler and SDK package targets
-remain tracked by `docs/eliminate-Makefile.md` and must not be treated as a
-normal post-seed script workflow until their graph replacements land.
+With-native release package targets:
 
-The SDK package target runs on each native platform and packages that host's
-`.deps/llvm-<ver>-<host>` static SDK into
+```sh
+WITH_VERSION=$WITH_VERSION with build :package-current-host
+```
+
+Use the explicit native aliases when packaging a named platform on that native
+host:
+
+```sh
+WITH_VERSION=$WITH_VERSION with build :package-darwin-aarch64
+WITH_VERSION=$WITH_VERSION with build :package-linux-x86_64
+WITH_VERSION=$WITH_VERSION with build :package-windows-x86_64
+```
+
+The platform compiler package target copies the verified release compiler to
+its public asset name, checks the exact release version, inspects dynamic
+dependencies with SDK-owned LLVM tools, checks static libclang symbols where
+the platform format supports it, strips with SDK `llvm-strip`, and writes a
+`.sha256` sidecar. It does not copy or invoke `scripts/install.*`.
+
+The bootstrap-C package target exists as `with build :package-bootstrap-c`.
+SDK package targets remain tracked by `docs/eliminate-Makefile.md` and must not
+be treated as a normal post-seed script workflow until their graph replacements
+land.
+
+Until the SDK package targets land, SDK packaging remains tracked by
+`docs/eliminate-Makefile.md` and must stay inside the documented transition
+state. The intended graph target will run on each native platform and package
+that host's `.deps/llvm-<ver>-<host>` static SDK into
 `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.gz`. Copy the Linux SDK
-asset back alongside the Linux binary:
+asset back alongside the Linux binary once that graph target exists:
 
-On Windows, the SDK package target packages the
+On Windows, the SDK package target will package the
 `.deps\llvm-<ver>-windows-x86_64-msvc` SDK and includes the required CMake,
 Clang/lld, and LLVM utility tools (`ninja.exe`, `cmake.exe`, `clang.exe`,
 `clang++.exe`, `clang-cl.exe`, `lld-link.exe`, `llvm-lib.exe`, `llvm-ml.exe`,

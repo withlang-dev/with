@@ -5424,13 +5424,15 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: str, base_d
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "fixtures/tree/a.txt"), "tree", ctx.target_name(), "toolfs archive fixture")
     if rc != 0: return rc
-    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/archive\") == 0)\n    let entries: Vec[ArchiveEntry] = Vec.new()\n    entries.push(archive_dir_entry(\"pkg\", 0o755))\n    entries.push(archive_dir_entry(\"pkg/nested\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    entries.push(archive_symlink_entry(\"nested/a.txt\", \"pkg/link-a.txt\", 0o777))\n    assert(fs.write_tar(\"out/archive/sample.tar\", entries) == 0)\n    assert(fs.write_tar_gz(\"out/archive/sample.tar.gz\", entries) == 0)\n    let gzip = fs.read_binary(\"out/archive/sample.tar.gz\")\n    assert(gzip.len() > 10)\n    assert(gzip.get(0) == 31 as u8)\n    assert(gzip.get(1) == 139 as u8)\n    assert(fs.extract_tar(\"out/archive/sample.tar\", \"out/archive/extracted\") == 0)\n    assert(fs.read_text(\"out/archive/extracted/pkg/nested/a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/link-a.txt\") == \"tree\")\n    ctx.new_build().executable(\"toolfs-archive\", \"src/main.w\")\n", ctx.target_name(), "toolfs archive build.w")
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_archive_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/archive\") == 0)\n    let entries: Vec[ArchiveEntry] = Vec.new()\n    entries.push(archive_dir_entry(\"pkg\", 0o755))\n    entries.push(archive_dir_entry(\"pkg/nested\", 0o755))\n    entries.push(archive_file_entry(\"fixtures/tree/a.txt\", \"pkg/nested/a.txt\", 0o644))\n    entries.push(archive_symlink_entry(\"nested/a.txt\", \"pkg/link-a.txt\", 0o777))\n    assert(fs.write_tar(\"out/archive/sample.tar\", entries) == 0)\n    assert(fs.write_tar_gz(\"out/archive/sample.tar.gz\", entries) == 0)\n    let gzip = fs.read_binary(\"out/archive/sample.tar.gz\")\n    assert(gzip.len() > 10)\n    assert(gzip.get(0) == 31 as u8)\n    assert(gzip.get(1) == 139 as u8)\n    assert(fs.extract_tar(\"out/archive/sample.tar\", \"out/archive/extracted\") == 0)\n    assert(fs.read_text(\"out/archive/extracted/pkg/nested/a.txt\") == \"tree\")\n    assert(fs.read_text(\"out/archive/extracted/pkg/link-a.txt\") == \"tree\")\n    var out = ctx.new_build().executable(\"toolfs-archive\", \"src/main.w\")\n    out = out.extract_tar_gz(\"extract-gzip\", \"out/archive/sample.tar.gz\", \"out/archive/extracted-gz\")\n    var all = target_new(.Group, \"all\", \"\")\n    all = all.dep(\"toolfs-archive\")\n    all = all.dep(\"extract-gzip\")\n    out = out.add_target(all)\n    out.default(\"all\")\n", ctx.target_name(), "toolfs archive build.w")
     if rc != 0: return rc
     let toolfs_archive = bs_build_w_expect_success(ctx, compiler_path, toolfs_archive_dir, "build-w-toolfs-archive", bs_blob_to_args(bs_argv_append("", "build")))
     if toolfs_archive.rc != 0: return toolfs_archive.rc
     if not ctx.fs().exists(bs_join(toolfs_archive_dir, "out/archive/sample.tar.gz")):
         ctx.diagnostics().error("error: build_w_toolfs_archive missing gzip archive output")
         return 1
+    rc = bs_expect_file_contains(ctx, bs_join(toolfs_archive_dir, "out/archive/extracted-gz/pkg/nested/a.txt"), "tree", "build_w_extract_tar_gz")
+    if rc != 0: return rc
 
     let toolfs_escape_dir = bs_join(base_dir, "toolfs_escape")
     rc = bs_write_project_manifest(ctx, toolfs_escape_dir, "buildwtoolfsescape")
@@ -6050,6 +6052,37 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: str, base_di
     rc = bs_assert_contains(ctx, network.stderr, "without target.allow_network()", "build_w_action_network_denied")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, network.stderr, "network tool 'curl'", "build_w_action_network_denied")
+    if rc != 0: return rc
+
+    let network_helper_dir = bs_join(base_dir, "network_helper_denied")
+    rc = bs_write_project_manifest(ctx, network_helper_dir, "actionnetworkhelper")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(network_helper_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action network helper source")
+    if rc != 0: return rc
+    let network_helper_build =
+        "use std.build\n\n" ++
+        "fn bad_network(ctx: &ActionCtx) -> i32:\n" ++
+        "    let args: Vec[str] = Vec.new()\n" ++
+        "    args.push(\"out/tools/https_fetch\")\n" ++
+        "    args.push(\"https://example.invalid/file\")\n" ++
+        "    args.push(\"out/action/download\")\n" ++
+        "    let _ = ctx.process_runner().run_capture(args, \"out/action/stdout.txt\", \"out/action/stderr.txt\", 120000)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"bad-network-helper\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = bad_network\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"bad-network-helper\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(network_helper_dir, "build.w"), network_helper_build, ctx.target_name(), "action network helper build.w")
+    if rc != 0: return rc
+    let network_helper = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-network-helper-denied", bs_blob_to_args(bs_argv_append("", "build")), 120000, network_helper_dir)
+    if network_helper.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_network_helper_denied unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, network_helper.stderr, "without target.allow_network()", "build_w_action_network_helper_denied")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, network_helper.stderr, "network tool 'https_fetch'", "build_w_action_network_helper_denied")
     if rc != 0: return rc
 
     let network_allowed_dir = bs_join(base_dir, "network_allowed")

@@ -9,6 +9,7 @@ extern fn with_eprint(s: str) -> Unit
 extern fn exit(code: i32) -> Unit
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
+extern fn with_sysinfo_os() -> str
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_fs_is_dir(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
@@ -1542,7 +1543,7 @@ fn tool_process_requires_network(args: &Vec[str]) -> bool:
     if args.len() == 0:
         return false
     let name = tool_process_basename(args.get(0))
-    name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe"
+    name == "curl" or name == "curl.exe" or name == "wget" or name == "wget.exe" or name == "https_fetch" or name == "https_fetch.exe"
 
 fn ProcessRunner.project_relative_path(self: &Self, path: str) -> str:
     let normalized = tool_path_normalize(path)
@@ -1882,6 +1883,71 @@ fn build_path_dirname(path: str) -> str:
         return "/"
     path.slice(0, last_slash as i64)
 
+fn build_host_exe_suffix() -> str:
+    if with_sysinfo_os() == "Windows":
+        return ".exe"
+    ""
+
+fn build_timeout_or(timeout: i32, fallback: i32) -> i32:
+    if timeout > 0:
+        return timeout
+    fallback
+
+fn build_https_fetch_source() -> str:
+    "use std.http\n" ++
+    "use std.process\n\n" ++
+    "fn main -> i32:\n" ++
+    "    let argv = args()\n" ++
+    "    if argv.len() < 3:\n" ++
+    "        print(\"usage: https_fetch <url> <output>\")\n" ++
+    "        return 2\n" ++
+    "    let rc = https_download(argv.get(1), argv.get(2))\n" ++
+    "    if rc != 0:\n" ++
+    "        print(\"HTTPS download failed: \" ++ argv.get(1))\n" ++
+    "        return 1\n" ++
+    "    0\n"
+
+fn build_zlib_gunzip_source() -> str:
+    "use std.fs\n" ++
+    "use std.process\n" ++
+    "use std.zlib\n\n" ++
+    "const MAX_OUTPUT: i64 = 8589934592\n\n" ++
+    "fn bytes_from_str(data: str) -> Vec[u8]:\n" ++
+    "    let out: Vec[u8] = Vec.new()\n" ++
+    "    var i: i64 = 0\n" ++
+    "    while i < data.len():\n" ++
+    "        out.push(data.byte_at(i) as u8)\n" ++
+    "        i = i + 1\n" ++
+    "    out\n\n" ++
+    "fn bytes_to_str(data: &Vec[u8]) -> str:\n" ++
+    "    var out = StringBuilder.with_capacity(data.len())\n" ++
+    "    var i: i64 = 0\n" ++
+    "    while i < data.len():\n" ++
+    "        out.push_byte(data.get(i))\n" ++
+    "        i = i + 1\n" ++
+    "    out.to_str()\n\n" ++
+    "fn main -> i32:\n" ++
+    "    let argv = args()\n" ++
+    "    if argv.len() < 3:\n" ++
+    "        print(\"usage: zlib_gunzip <input.tar.gz> <output.tar>\")\n" ++
+    "        return 2\n" ++
+    "    let input = read_file(argv.get(1))\n" ++
+    "    if input.len() == 0:\n" ++
+    "        print(\"could not read input archive\")\n" ++
+    "        return 1\n" ++
+    "    let input_bytes = bytes_from_str(input)\n" ++
+    "    match decompress_gzip_with_limit(&input_bytes, MAX_OUTPUT):\n" ++
+    "        Ok(tar_bytes) => {\n" ++
+    "            if write_file(argv.get(2), bytes_to_str(&tar_bytes)) != 0:\n" ++
+    "                print(\"could not write output tar\")\n" ++
+    "                return 1\n" ++
+    "        }\n" ++
+    "        Err(err) => {\n" ++
+    "            print(err.message)\n" ++
+    "            return 1\n" ++
+    "        }\n" ++
+    "    0\n"
+
 fn build_download_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let proc = ctx.process_runner()
@@ -1897,21 +1963,33 @@ fn build_download_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create directory: " ++ output_dir)
         return 1
     let cmd_dir = "out/command/" ++ ctx.target_name()
-    fs.mkdir_all(cmd_dir)
+    if fs.mkdir_all(cmd_dir) != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not create command directory: " ++ cmd_dir)
+        return 1
     let tmp_path = output_path ++ ".download.tmp"
-    let curl_args: Vec[str] = Vec.new()
-    curl_args.push("curl")
-    curl_args.push("-L")
-    curl_args.push("--fail")
-    curl_args.push("--show-error")
-    curl_args.push("--output")
-    curl_args.push(tmp_path)
-    curl_args.push(url)
-    let stdout_path = cmd_dir ++ "/stdout"
-    let stderr_path = cmd_dir ++ "/stderr"
-    let result = proc.run_capture(curl_args, stdout_path, stderr_path, 300000)
+    let helper = cmd_dir ++ "/https_fetch" ++ build_host_exe_suffix()
+    let ws = ctx.create_workspace(ctx.target_name() ++ "-https_fetch")
+    ws.add_string(cmd_dir ++ "/https_fetch.w", build_https_fetch_source())
+    var opts = ws.options()
+    opts.output_path = helper
+    opts.debug_info = false
+    ws.set_options(opts)
+    let compile_result = ws.compile()
+    if compile_result.status != BuildStatus.ok or compile_result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": failed to compile https_fetch helper")
+        return 1
+    let fetch_args: Vec[str] = Vec.new()
+    fetch_args.push(helper)
+    fetch_args.push(url)
+    fetch_args.push(tmp_path)
+    let result = proc.run_capture(fetch_args, cmd_dir ++ "/https_fetch.stdout", cmd_dir ++ "/https_fetch.stderr", build_timeout_or(ctx.timeout(), 300000))
     if result.rc != 0:
-        ctx.diagnostics().error(ctx.target_name() ++ ": curl failed (rc=" ++ f"{result.rc}" ++ ")")
+        var detail = ""
+        if result.stderr.len() > 0:
+            detail = ": " ++ result.stderr
+        else if result.stdout.len() > 0:
+            detail = ": " ++ result.stdout
+        ctx.diagnostics().error(ctx.target_name() ++ ": HTTPS download failed for " ++ url ++ " (rc=" ++ f"{result.rc}" ++ ")" ++ detail)
         return 1
     if sha256.len() > 0:
         let actual = fs.sha256_file(tmp_path)
@@ -1938,18 +2016,40 @@ fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error(ctx.target_name() ++ ": extract requires archive input and output dir")
         return 1
     let archive = inputs.get(0)
-    fs.mkdir_all(output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ output_dir)
+        return 1
     let cmd_dir = "out/command/" ++ ctx.target_name()
-    fs.mkdir_all(cmd_dir)
-    let tar_args: Vec[str] = Vec.new()
-    tar_args.push("tar")
-    tar_args.push("xzf")
-    tar_args.push(archive)
-    tar_args.push("-C")
-    tar_args.push(output_dir)
-    let result = proc.run_capture(tar_args, cmd_dir ++ "/stdout", cmd_dir ++ "/stderr", 120000)
+    if fs.mkdir_all(cmd_dir) != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not create command directory: " ++ cmd_dir)
+        return 1
+    let helper = cmd_dir ++ "/zlib_gunzip" ++ build_host_exe_suffix()
+    let ws = ctx.create_workspace(ctx.target_name() ++ "-zlib_gunzip")
+    ws.add_string(cmd_dir ++ "/zlib_gunzip.w", build_zlib_gunzip_source())
+    var opts = ws.options()
+    opts.output_path = helper
+    opts.debug_info = false
+    ws.set_options(opts)
+    let compile_result = ws.compile()
+    if compile_result.status != BuildStatus.ok or compile_result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": failed to compile zlib_gunzip helper")
+        return 1
+    let tar_path = cmd_dir ++ "/archive.tar"
+    let gunzip_args: Vec[str] = Vec.new()
+    gunzip_args.push(helper)
+    gunzip_args.push(archive)
+    gunzip_args.push(tar_path)
+    let result = proc.run_capture(gunzip_args, cmd_dir ++ "/zlib_gunzip.stdout", cmd_dir ++ "/zlib_gunzip.stderr", build_timeout_or(ctx.timeout(), 300000))
     if result.rc != 0:
-        ctx.diagnostics().error(ctx.target_name() ++ ": tar extraction failed (rc=" ++ f"{result.rc}" ++ ")")
+        var detail = ""
+        if result.stderr.len() > 0:
+            detail = ": " ++ result.stderr
+        else if result.stdout.len() > 0:
+            detail = ": " ++ result.stdout
+        ctx.diagnostics().error(ctx.target_name() ++ ": gzip decompression failed for " ++ archive ++ " (rc=" ++ f"{result.rc}" ++ ")" ++ detail)
+        return 1
+    if fs.extract_tar(tar_path, output_dir) != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": tar extraction failed for " ++ tar_path)
         return 1
     0
 
