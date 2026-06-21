@@ -3929,6 +3929,131 @@ fn Codegen.mir_emit_drop_enum_ptr(self: Codegen, ptr: i64, ty: i64, enum_sema_ty
     wl_build_br(self.builder, merge_bb)
     wl_position_at_end(self.builder, merge_bb)
 
+// #606: recognize a std Vec[T] sema type (one type arg, base symbol == Vec),
+// using the MIR snapshot when available and falling back to live sema tables.
+fn Codegen.mir_sema_type_is_std_vec(self: Codegen, sema_ty: i32) -> bool:
+    if sema_ty <= 0:
+        return false
+    var resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        resolved = self.sema.resolve_alias(resolved as TypeId) as i32
+        tk = self.sema.get_type_kind(resolved as TypeId)
+    if tk != TypeKind.TY_GENERIC_INST:
+        return false
+    let arg_count = if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        self.sema.get_generic_inst_arg_count(resolved)
+    else:
+        self.mir_input.mir_get_type_d2(resolved)
+    if arg_count != 1:
+        return false
+    let base_sym = if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        self.sema.get_generic_inst_base(resolved)
+    else:
+        self.mir_input.mir_get_type_d0(resolved)
+    base_sym == self.sema.syms.vec
+
+// #606: element sema type of a std Vec[T] (peeling one ref/ptr), or 0.
+fn Codegen.mir_vec_elem_sema_type_from_sema_type(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    var resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        resolved = self.mir_input.mir_resolve_alias(self.mir_input.mir_get_type_d0(resolved))
+        tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        resolved = self.sema.resolve_alias(resolved as TypeId) as i32
+        tk = self.sema.get_type_kind(resolved as TypeId)
+    if tk != TypeKind.TY_GENERIC_INST:
+        return 0
+    let base_sym = if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        self.sema.get_generic_inst_base(resolved)
+    else:
+        self.mir_input.mir_get_type_d0(resolved)
+    if base_sym != self.sema.syms.vec:
+        return 0
+    if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        return self.sema.get_generic_inst_arg(resolved, 0)
+    let te_start = self.mir_input.mir_get_type_d1(resolved)
+    self.mir_input.mir_get_type_extra(te_start)
+
+// #606: emit a [0..len) loop that drops each live element of a Vec via the
+// runtime accessors, then leaves the buffer for mir_emit_vec_free_ptr.
+fn Codegen.mir_emit_vec_element_drops_ptr(self: Codegen, ptr: i64, vec_sema_ty: i32) -> Unit:
+    if ptr == 0 or vec_sema_ty <= 0:
+        return
+    let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(vec_sema_ty)
+    if elem_sema <= 0 or self.sema.type_needs_drop(elem_sema) == 0:
+        return
+    let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
+    if elem_ty == 0:
+        return
+    let i64_ty = wl_i64_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
+    let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
+    let len_args: Vec[i64] = Vec.new()
+    len_args.push(ptr)
+    let len_val = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&len_args), 1)
+    let zero = wl_const_int(i64_ty, 0, 0)
+    let has_elems = wl_build_icmp(self.builder, wl_int_sgt(), len_val, zero)
+    let entry_bb = wl_get_insert_block(self.builder)
+    let loop_bb = wl_append_bb(self.context, self.current_function, "drop.vec.loop")
+    let done_bb = wl_append_bb(self.context, self.current_function, "drop.vec.done")
+    wl_build_cond_br(self.builder, has_elems, loop_bb, done_bb)
+
+    wl_position_at_end(self.builder, loop_bb)
+    let idx_phi = wl_build_phi(self.builder, i64_ty)
+    let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+    let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+    let get_args: Vec[i64] = Vec.new()
+    get_args.push(ptr)
+    get_args.push(idx_phi)
+    let elem_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 2)
+    self.mir_emit_drop_ptr_for_sema_type(elem_ptr, elem_ty, elem_sema)
+    let one = wl_const_int(i64_ty, 1, 0)
+    let next_idx = wl_build_add(self.builder, idx_phi, one)
+    let more = wl_build_icmp(self.builder, wl_int_slt(), next_idx, len_val)
+    wl_build_cond_br(self.builder, more, loop_bb, done_bb)
+    let loop_end_bb = wl_get_insert_block(self.builder)
+
+    let phi_vals: Vec[i64] = Vec.new()
+    phi_vals.push(zero)
+    phi_vals.push(next_idx)
+    let phi_bbs: Vec[i64] = Vec.new()
+    phi_bbs.push(entry_bb)
+    phi_bbs.push(loop_end_bb)
+    wl_add_incoming(idx_phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+
+    wl_position_at_end(self.builder, done_bb)
+
+// #606: free a Vec's heap buffer via the runtime helper.
+fn Codegen.mir_emit_vec_free_ptr(self: Codegen, ptr: i64) -> Unit:
+    if ptr == 0:
+        return
+    let void_ty = wl_void_type(self.context)
+    let free_fn = self.ensure_vec_runtime_fn("with_vec_free", void_ty, 1)
+    let free_ty = self.get_vec_fn_type("with_vec_free", void_ty, 1)
+    let args: Vec[i64] = Vec.new()
+    args.push(ptr)
+    let _ = wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&args), 1)
+
+// #606 (A5 narrow): drop a Vec value at scope exit. Only Vec whose element needs
+// drop gets element-drop + buffer free; POD-element Vecs (Vec[i32], Vec[str], …)
+// return false and fall through to the no-op default — freeing those buffers is
+// the separate wide flip, and doing it here would double-free the copyable POD
+// Vec headers the compiler shares as cheap handles.
+fn Codegen.mir_emit_drop_vec_ptr(self: Codegen, ptr: i64, sema_ty: i32) -> bool:
+    if not self.mir_sema_type_is_std_vec(sema_ty):
+        return false
+    let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(sema_ty)
+    if elem_sema <= 0 or self.sema.type_needs_drop(elem_sema) == 0:
+        return false
+    self.mir_emit_vec_element_drops_ptr(ptr, sema_ty)
+    self.mir_emit_vec_free_ptr(ptr)
+    true
+
 fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> Unit:
     if ptr == 0 or ty == 0 or sema_ty <= 0:
         return
@@ -3947,6 +4072,10 @@ fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sem
     // #606: arrays likewise drop each element in place.
     if tk == TypeKind.TY_ARRAY:
         self.mir_emit_drop_array_ptr(ptr, ty, resolved)
+        return
+    // #606 (A5 narrow): a std Vec[T] with a Drop element drops each element then
+    // frees the buffer. POD-element Vecs return false here and fall through.
+    if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_drop_vec_ptr(ptr, drop_sema_ty):
         return
     var type_sym = 0
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:

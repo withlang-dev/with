@@ -1796,6 +1796,18 @@ pub fn with_vec_len(v: *mut u8) -> i64:
 pub fn with_vec_clear(v: *mut u8) -> Unit:
     vec_set_len(v, 0)
 
+// #606: free a Vec's heap buffer and zero its header. Called by the codegen
+// scope-exit drop path for Drop-element Vecs (after element dtors have run).
+pub fn with_vec_free(v: *mut u8) -> Unit:
+    let p = vec_get_ptr_field(v)
+    let cap = vec_get_cap(v)
+    let es = vec_get_elem_size(v)
+    if p as i64 != 0 and cap > 0 and es > 0:
+        rt_free_sized(p, cap * es)
+    vec_set_ptr_field(v, 0 as *mut u8)
+    vec_set_len(v, 0)
+    vec_set_cap(v, 0)
+
 pub fn with_vec_push_i32(v: *mut u8, val: i32) -> Unit:
     with_vec_push(v, &val as *const u8)
 
