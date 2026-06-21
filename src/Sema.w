@@ -3843,7 +3843,13 @@ fn Sema.type_needs_drop(self: Sema, tid: i32) -> i32:
         return 1
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_GENERIC_INST:
-        let base_name = self.pool_resolve(self.get_generic_inst_base(resolved as i32))
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        // A5 (#606): a std Vec[T] needs drop iff its element T needs drop. POD-element
+        // Vecs (Vec[i32], Vec[str], …) stay non-drop — freeing those buffers is the
+        // separate wide flip, not element drop. str is Copy, so Vec[str] is non-drop.
+        if base_sym == self.syms.vec:
+            return self.type_needs_drop(self.get_generic_inst_arg(resolved as i32, 0))
+        let base_name = self.pool_resolve(base_sym)
         if base_name == "Sender" or base_name == "Receiver":
             return 1
     for vi in 0..self.needs_drop_visit.len() as i32:
