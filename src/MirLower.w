@@ -8161,6 +8161,16 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
             let channel_endpoint_method = intrinsic == MirIntrinsic.CHAN_SEND or intrinsic == MirIntrinsic.CHAN_RECV or intrinsic == MirIntrinsic.CHAN_CLOSE
             if intrinsic != MirIntrinsic.FIBER_CANCEL and not channel_endpoint_method:
                 self.consume_moved_operand(recv_op)
+            // #606: a self-aliasing push returns the receiver. If the receiver is an
+            // intermediate stmt-temp (e.g. a pipeline stage `… |> push(x)`), its
+            // stmt-temp would be flushed-as-drop and double-free the buffer the result
+            // carries forward into the next stage / binding. Cancel that temp's drop so
+            // the final owner drops it once. No-op for named-local receivers (not
+            // stmt-temps) — those stay live for statement reuse.
+            if intrinsic == MirIntrinsic.VEC_PUSH:
+                let push_recv_local = mir_place_plain_local(&self.body, self.body.operand_d0.get(recv_op as i64))
+                if push_recv_local >= 0:
+                    self.cancel_stmt_temp_for_local(push_recv_local)
             call_args.push(recv_op)
     for i in 0..arg_count:
         let arg_node = self.ast.get_extra(arg_start + i)
