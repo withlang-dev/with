@@ -10748,7 +10748,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let sl_place = self.place_for_local(sl_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, sl_place, sl_rv, self.ast.get_start(node))
         self.update_string_fields_after_aggregate(sl_place, sl_fid)
-        return self.body.new_operand(OperandKind.OK_COPY, sl_place)
+        return self.body.new_operand(if self.type_needs_value_drop(sl_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, sl_place)
 
     if kind == NodeKind.NK_RECORD_UPDATE:
         return self.lower_record_update(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
@@ -10820,7 +10820,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let tup_tmp = self.new_temp(tup_ty)
         let tup_place = self.place_for_local(tup_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, tup_place, tup_rv, self.ast.get_start(node))
-        return self.body.new_operand(OperandKind.OK_COPY, tup_place)
+        return self.body.new_operand(if self.type_needs_value_drop(tup_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, tup_place)
 
     if kind == NodeKind.NK_ARRAY_LIT:
         let collection_op = self.lower_collection_seq_literal(node)
@@ -10861,7 +10861,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let arr_tmp = self.new_temp(arr_ty)
         let arr_place = self.place_for_local(arr_tmp)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, arr_place, arr_rv, self.ast.get_start(node))
-        return self.body.new_operand(OperandKind.OK_COPY, arr_place)
+        return self.body.new_operand(if self.type_needs_value_drop(arr_ty) == 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, arr_place)
 
     if kind == NodeKind.NK_MAP_LIT:
         return self.lower_map_literal(node)
