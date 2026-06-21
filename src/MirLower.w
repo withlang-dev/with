@@ -1184,9 +1184,9 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if type_name == "Vec":
             if len_method_ret != 0: return len_method_ret
             if method_name == "new": return recv_type
-            if method_name == "push" or method_name == "set_i32" or method_name == "remove" or method_name == "clear":
+            if method_name == "push" or method_name == "set_i32" or method_name == "clear":
                 return self.sema.ty_void as i32
-            if method_name == "get" or method_name == "pop":
+            if method_name == "get" or method_name == "remove" or method_name == "pop":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 0)
             if method_name == "join": return self.sema.ty_str as i32
@@ -4549,6 +4549,10 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
         let rhs_op = self.lower_expr(rhs_expr)
         self.expected_type = saved_expected
         self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
+        // #606: `let y = xs.push(a)` moves the self-aliasing result into y; cancel
+        // the receiver's drop so the pair (y, xs) drops exactly once. No-op for
+        // non-aliasing RHS; idempotent for already-consumed moved idents.
+        self.cancel_scheduled_value_drop_for_receiver_expr(rhs_expr)
     if is_discard_binding != 0:
         if self.sema.is_copy(bind_ty) == 0:
             self.emit_drop_entry(local_id, scheduled_drop_kind)
@@ -7308,6 +7312,12 @@ fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, call
     let lowered = self.lower_expr(arg_node)
     self.expected_type = saved_expected
     self.consume_moved_operand(lowered)
+    // #606: a by-value `xs.push(a)` arg carries the receiver's buffer; cancel the
+    // receiver's drop so it isn't double-freed with the callee's. Gated to NK_CALL
+    // args so the receiver-cancel only flows through self-aliasing push chains —
+    // bare-ident/borrowed args are unaffected (handled by consume_moved_operand).
+    if self.ast.kind(arg_node) == NodeKind.NK_CALL:
+        self.cancel_scheduled_value_drop_for_receiver_expr(arg_node)
     lowered
 
 fn MirBuilder.lower_method_arg_with_expected(self: MirBuilder, recv_type: i32, method_sym: i32, arg_node: i32, arg_index: i32) -> i32:
@@ -8223,6 +8233,19 @@ fn MirBuilder.cancel_scheduled_value_drop_for_receiver_expr(self: MirBuilder, ex
     let kind = self.ast.kind(expr)
     if kind == NodeKind.NK_GROUPED:
         self.cancel_scheduled_value_drop_for_receiver_expr(self.ast.get_data0(expr))
+        return
+    // #606: a self-aliasing mut-self call (`xs.push(a)` returns `xs`) whose result
+    // escapes (returned/bound/moved out) carries the receiver's buffer with it. The
+    // call node is not an ident, so recurse into the receiver and cancel ITS drop —
+    // otherwise the receiver stays drop-scheduled while its aliasing result also
+    // drops -> double-free. Gated to `push` whose result type == receiver type, so
+    // non-aliasing methods (len/get/pop/remove -> different type) never match.
+    if kind == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(expr)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and self.ast.get_data1(callee) == self.sema.syms.push:
+            let recv = self.ast.get_data0(callee)
+            if self.expr_type(expr) != 0 and self.expr_type(expr) == self.expr_type(recv):
+                self.cancel_scheduled_value_drop_for_receiver_expr(recv)
         return
     if kind != NodeKind.NK_IDENT:
         return

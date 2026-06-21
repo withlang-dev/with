@@ -7013,18 +7013,38 @@ fn Codegen.mir_emit_vec_core_intrinsic_call(self: Codegen, body: &MirBody, intri
         result = wl_build_call(self.builder, set_ty, set_fn, vec_data_i64(&args), 3)
 
     else if intrinsic == MirIntrinsic.VEC_REMOVE:
+        // #606: materialize element[idx] as the result (moved into the caller's
+        // binding so it drops exactly once), THEN compact the vector. The compaction
+        // shifts the tail down over the removed slot, so the removed element lives
+        // only in `result` and is never re-dropped from the buffer.
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let idx = self.mir_intrinsic_arg(body, args_id, 1)
         let idx64 = self.coerce_int(idx, i64_ty)
+        let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let get_args: Vec[i64] = Vec.new()
+        get_args.push(recv_ptr)
+        get_args.push(idx64)
+        let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 2)
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let elem_ty = self.mir_vec_elem_type(body, recv_op)
+        if elem_ty != 0:
+            result = wl_build_load(self.builder, elem_ty, raw_ptr)
+        else:
+            result = wl_build_load(self.builder, i64_ty, raw_ptr)
         let remove_fn = self.ensure_vec_runtime_fn("with_vec_remove", void_ty, 2)
         let remove_ty = self.get_vec_fn_type("with_vec_remove", void_ty, 2)
-        let args: Vec[i64] = Vec.new()
-        args.push(recv_ptr)
-        args.push(idx64)
-        result = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&args), 2)
+        let rm_args: Vec[i64] = Vec.new()
+        rm_args.push(recv_ptr)
+        rm_args.push(idx64)
+        let _ = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&rm_args), 2)
 
     else if intrinsic == MirIntrinsic.VEC_CLEAR:
+        // #606: drop each live element before resetting len. No-op for POD elements
+        // (mir_emit_vec_element_drops_ptr gates on element-needs-drop internally).
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let clear_recv_op = body.call_arg_operands.get(arg_start as i64)
+        self.mir_emit_vec_element_drops_ptr(recv_ptr, self.mir_operand_sema_type(body, clear_recv_op))
         let clear_fn = self.ensure_vec_runtime_fn("with_vec_clear", void_ty, 1)
         let clear_ty = self.get_vec_fn_type("with_vec_clear", void_ty, 1)
         let args: Vec[i64] = Vec.new()
