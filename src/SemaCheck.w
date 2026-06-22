@@ -9196,7 +9196,7 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                 // construction (e.g. `T { a: ctx.x }`). The MIR move
                 // (consume_moved_operand) handles call-result temporaries and
                 // the actual drop suppression for all forms.
-                if self.ast.kind(f_value) == NodeKind.NK_IDENT and self.type_has_drop_impl(val_ty as i32) != 0:
+                if self.ast.kind(f_value) == NodeKind.NK_IDENT and self.type_needs_drop(val_ty as i32) != 0:
                     self.mark_moved_if_consumed(f_value)
                 val_types.push(val_ty as i32)
             if self.type_decl_nodes.contains(name):
