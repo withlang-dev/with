@@ -8114,6 +8114,18 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     let iter_type = self.check_expr(iterable)
     let elem_type = self.infer_for_element_type(iter_type as i32)
 
+    // #607: consuming (by-value) iteration of a Vec whose elements need drop is unsound
+    // — the loop variable copies each Drop element, so it is dropped twice (the copy and
+    // the Vec's own element-drop). Reject pending real move semantics; the sound form is
+    // borrow-iteration. Gated exactly like Path C (type_needs_drop && !type_has_drop_impl)
+    // on the Vec, so own-Drop structs and POD-element Vecs are untouched, and the borrow
+    // forms — `for w in &vec` (TY_REF) and `.iter_ref()` (VecIterRef) — pass through.
+    let cfor_it_res = self.resolve_alias(iter_type as TypeId)
+    if self.get_type_kind(cfor_it_res) == TypeKind.TY_GENERIC_INST:
+        let cfor_base = self.pool_resolve(self.get_type_d0(cfor_it_res))
+        if cfor_base == "Vec" and self.type_needs_drop(iter_type as i32) != 0 and self.type_has_drop_impl(iter_type as i32) == 0:
+            self.emit_error("consuming iteration of a Vec whose elements need drop is not yet supported (#607); iterate by borrow instead: `for w in &vec`", iterable)
+
     // docs/mut.md Rev 8 §11.4 / §15.17 — when the iterable is a .iter()
     // call (or any iter_of_self method), the iterator yields &T views.
     // Mark the binding as a view-bound variable so check_assign can emit
@@ -10435,6 +10447,18 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                     field_ty = self.type_extra.get((field_start + fi * 3 + 1) as i64)
                     break
             let binding_ty = self.pattern_child_subject_type(subject_type, field_ty)
+            // #607: destructuring a Vec[Drop] field out of a by-value struct moves it
+            // out (the binding owns the buffer while the struct still does) → double
+            // free. Reject pending real move semantics; matching a borrow (`match &h`)
+            // gives a `&Vec` binding_ty (TY_REF) and is exempt, as is a `_` wildcard
+            // (no move). Same Path C gate (type_needs_drop && !type_has_drop_impl).
+            let sp_is_wildcard = f_pat != 0 and self.ast.kind(f_pat) == NodeKind.NK_PAT_WILDCARD
+            if not sp_is_wildcard:
+                let sp_bt_res = self.resolve_alias(binding_ty as TypeId)
+                if self.get_type_kind(sp_bt_res) == TypeKind.TY_GENERIC_INST:
+                    let sp_bt_base = self.pool_resolve(self.get_type_d0(sp_bt_res))
+                    if sp_bt_base == "Vec" and self.type_needs_drop(binding_ty) != 0 and self.type_has_drop_impl(binding_ty) == 0:
+                        self.emit_error("moving a field that needs drop out of a struct by destructuring is not yet supported (#607); match a borrow (`match &x`) or move the whole struct", node)
             if f_pat != 0:
                 self.check_pattern(f_pat, binding_ty)
             else:
