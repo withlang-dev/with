@@ -1276,6 +1276,9 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
     self.expected_expr_type = saved_expected_et
     self.has_expected_type = saved_has_et
     self.typed_expr_types.insert(body, body_ty as i32)
+    // Path (C)/#607: a non-void body returning a moved-out transitive-Drop field.
+    if ret_type != 0 and ret_type != self.ty_void as i32:
+        self.reject_returned_drop_field_move(body)
     if is_gen == 1:
         self.finalize_generator_state_type(node, sig_idx)
     // Tail expression bodies participate in effect inference the same way an
@@ -18562,6 +18565,16 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
                     self.record_drop_consumed_field(owner_sym, field_sym)
                 else:
                     self.emit_error("partial move from Drop type", node)
+            else:
+                // Path (C)/#607: moving a transitive-Drop field (needs drop but has no
+                // own Drop impl — Vec[T] and the like) out of a struct that has no own
+                // Drop impl double-frees the shared buffer under the current
+                // non-consuming move model. Reject it honestly until #607 gives move
+                // real source-consuming semantics. Own-Drop fields are deliberately
+                // spared (type_has_drop_impl): their move-out double-runs a destructor
+                // but does not crash a buffer — a separate, milder issue on #607.
+                if self.type_needs_drop(field_ty) != 0 and self.type_has_drop_impl(field_ty) == 0:
+                    self.emit_error("moving a field that needs drop out of a struct is not yet supported (#607); clone the field or move the whole struct instead", node)
         return
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
@@ -18589,6 +18602,31 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
     // move: binding already invalidated in check_expr; avoid double-processing.
     if kind == NodeKind.NK_MOVE_ARG:
         return
+
+// Path (C)/#607: Sema's return path is not a mark_moved_if_consumed site, so a body
+// that returns a transitive-Drop field moved out of a struct (`fn into_values(move
+// self) -> Vec[W]: self.values`, or `...; h.field` as a block tail) is not otherwise
+// reject-checked. Navigate to the returned tail and emit the same #607 reject (only —
+// not the E0509 partial-move path, so we add no new rejections for Drop-impl owners).
+fn Sema.reject_returned_drop_field_move(self: Sema, expr: i32):
+    if expr == 0:
+        return
+    let k = self.ast.kind(expr)
+    if k == NodeKind.NK_BLOCK:
+        self.reject_returned_drop_field_move(self.ast.get_data2(expr))
+        return
+    if k == NodeKind.NK_GROUPED or k == NodeKind.NK_NO_SUSPEND:
+        self.reject_returned_drop_field_move(self.ast.get_data0(expr))
+        return
+    if k != NodeKind.NK_FIELD_ACCESS:
+        return
+    let owner_sym = self.drop_owner_for_field_access(expr)
+    if owner_sym != 0 and self.has_drop_method(owner_sym) != 0:
+        return
+    let field_ty_opt = self.typed_expr_types.get(expr)
+    let field_ty = if field_ty_opt.is_some(): field_ty_opt.unwrap() else: self.field_access_type_no_diagnostic(expr)
+    if field_ty != 0 and self.is_copy(field_ty as TypeId) == 0 and self.type_needs_drop(field_ty) != 0 and self.type_has_drop_impl(field_ty) == 0:
+        self.emit_error("moving a field that needs drop out of a struct is not yet supported (#607); clone the field or move the whole struct instead", expr)
 
 fn Sema.drop_owner_for_fn_symbol(self: Sema, fn_sym: i32) -> i32:
     let text = self.pool_resolve(fn_sym)
