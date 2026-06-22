@@ -18509,6 +18509,17 @@ fn Sema.infer_for_element_type(self: Sema, iter_type: i32) -> i32:
         return self.get_type_d0(resolved)
     if tk == TypeKind.TY_SLICE:
         return self.get_type_d0(resolved)
+    if tk == TypeKind.TY_REF:
+        // #607: `for w in &vec` / `for w in &h.field` borrow-iterates — the loop var
+        // is `&T` (each element borrowed, no copy/move). Mirrors VecIterRef[T] below.
+        let ref_pointee = self.get_type_d0(resolved)
+        let ref_pointee_resolved = self.resolve_alias(ref_pointee as TypeId)
+        if self.get_type_kind(ref_pointee_resolved) == TypeKind.TY_GENERIC_INST:
+            let ref_base = self.pool_resolve(self.get_type_d0(ref_pointee_resolved))
+            if ref_base == "Vec" and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
+                let ref_elem = self.get_generic_inst_arg(ref_pointee_resolved as i32, 0)
+                return self.ensure_exact_type(TypeKind.TY_REF, ref_elem, 0, 0) as i32
+        return 0
     if tk == TypeKind.TY_GENERIC_INST:
         let base_name = self.pool_resolve(self.get_type_d0(resolved))
         if base_name == "Vec" and self.get_generic_inst_arg_count(resolved as i32) > 0:

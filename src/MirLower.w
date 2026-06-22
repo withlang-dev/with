@@ -5040,6 +5040,19 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
     if self.ast.kind(iter_expr) == NodeKind.NK_RANGE:
         return self.lower_for_range(for_node, pat_or_sym, iter_expr, body_expr)
 
+    // #607: `for w in &vec` / `for w in &h.field` → borrow-iterate (loop var &T) via
+    // the iter_ref path, which borrows the receiver in place (no element copy, no
+    // drop-scheduled header copy). The `&` operand is the Vec place itself.
+    if self.ast.kind(iter_expr) == NodeKind.NK_UNARY and self.ast.get_data0(iter_expr) == UnaryOp.UOP_REF:
+        let ref_inner = self.ast.get_data1(iter_expr)
+        let ref_inner_ty = self.expr_type(ref_inner)
+        if ref_inner_ty != 0:
+            let ref_inner_resolved = self.sema.resolve_alias(ref_inner_ty)
+            if self.sema.get_type_kind(ref_inner_resolved) == TypeKind.TY_GENERIC_INST:
+                let rin_sym = self.sema.get_type_name(ref_inner_resolved)
+                if rin_sym != 0 and self.pool.resolve(rin_sym) == "Vec":
+                    return self.lower_for_iter_ref(for_node, pat_or_sym, ref_inner, body_expr)
+
     // Range variable: iter_expr is an ident/expr whose type is TY_RANGE
     let iter_ty = self.expr_type(iter_expr)
     if iter_ty != 0:
@@ -6125,9 +6138,19 @@ fn MirBuilder.lower_for_iter_place(self: MirBuilder, for_node: i32, pat_or_sym: 
     self.unit_operand()
 
 fn MirBuilder.lower_for_iter_ref(self: MirBuilder, for_node: i32, pat_or_sym: i32, vec_expr: i32, body_expr: i32) -> i32:
-    let vec_op = self.lower_expr(vec_expr)
     let vec_ty = self.expr_type(vec_expr)
-    let vec_place = self.materialize_operand(vec_op, vec_ty, self.ast.get_start(vec_expr))
+    // #607: borrow-iteration. If the receiver is a place (local/field/index), read len
+    // and element refs through that place directly — do NOT materialize a (drop-
+    // scheduled) copy of the Vec header. For a Drop-element field/local that copy would
+    // be a second live header and double-free the shared buffer at scope exit; iter_ref
+    // only borrows (VEC_GET_REF), so the receiver keeps sole ownership. Non-place
+    // receivers (e.g. a call result) get a genuine owning temp as before.
+    let vk = self.ast.kind(vec_expr)
+    var vec_place = 0
+    if vk == NodeKind.NK_IDENT or vk == NodeKind.NK_FIELD_ACCESS or vk == NodeKind.NK_INDEX:
+        vec_place = self.lower_expr_place(vec_expr)
+    else:
+        vec_place = self.materialize_operand(self.lower_expr(vec_expr), vec_ty, self.ast.get_start(vec_expr))
     let resolved_vec = self.sema.resolve_alias(vec_ty)
     var ref_elem_ty = 0
     if self.sema.get_type_kind(resolved_vec) == TypeKind.TY_GENERIC_INST:
