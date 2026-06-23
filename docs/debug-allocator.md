@@ -94,8 +94,12 @@ All additive to `rt/rt_core.w`; pure `.w`.
   **double-free**, print `debug-alloc: DOUBLE FREE addr=<a> size=<n>` and abort (exit 134);
   else mark freed. This sees freelist double-pushes the existing
   `rt_payload_start_can_be_owned` panic can miss.
-- **Scribble on free.** Freed small payloads are overwritten with `0xDE` so use-after-free
-  reads corrupt loudly. The freelist link lives in the header word (`payload-16`), untouched.
+- **Scribble on free (opt-in: `WITH_DEBUG_ALLOC_SCRIBBLE`).** Freed small payloads are
+  overwritten with `0xDE` so use-after-free reads corrupt loudly. It is **off by default**
+  because, for a `Vec[Drop]` buffer, poisoning the freed payload turns a subsequent
+  double-drop's element read into a use-after-free crash *before* the ledger reports the
+  buffer's double-free — masking the clean verdict. Enable it to hunt use-after-free
+  specifically. The freelist link lives in the header word (`payload-16`), untouched.
   (Not "never-reuse" — that would break the slab; a never-reuse UAF mode is a later refinement.)
 - **Leak at exit.** `with_runtime_shutdown` (on the native `with run`/`build` exit path)
   prints `debug-alloc: LEAK addr=<a> size=<n>` for every still-live entry, then a

@@ -541,6 +541,7 @@ let DBG_CAP: i64 = 65536            // hash slots (power of two)
 let DBG_ENTRY_WORDS: i64 = 4        // addr, size, freed, reserved
 
 var dbg_state: i32 = 0              // 0=unread, 1=off, 2=on (cached, read once)
+var dbg_scribble_state: i32 = 0    // 0=unread, 1=off, 2=on (cached, read once)
 var dbg_base: i64 = 0              // mmap'd ledger table, 0 = uninitialised
 var dbg_full_warned: i32 = 0
 
@@ -552,6 +553,22 @@ fn dbg_on() -> i32:
         else:
             dbg_state = 1
     if dbg_state == 2:
+        return 1
+    0
+
+// Scribble-on-free (use-after-free poisoning) is opt-in via WITH_DEBUG_ALLOC_SCRIBBLE.
+// It is OFF by default because, for a Vec[Drop] buffer, poisoning the freed payload
+// turns a subsequent double-drop's element read into a use-after-free crash *before*
+// the ledger reports the buffer's double-free — so it would mask the clean
+// double-free verdict. Turn it on to hunt use-after-free specifically.
+fn dbg_scribble_on() -> i32:
+    if dbg_scribble_state == 0:
+        let v = rt_getenv(c"WITH_DEBUG_ALLOC_SCRIBBLE".ptr)
+        if v as i64 != 0 and (unsafe *v) != 0:
+            dbg_scribble_state = 2
+        else:
+            dbg_scribble_state = 1
+    if dbg_scribble_state == 2:
         return 1
     0
 
@@ -741,9 +758,10 @@ fn rt_free_unlocked(ptr: *mut u8):
     if dbg_on() != 0:
         if dbg_mark_free(ptr as i64) != 0:
             dbg_report_double_free(ptr as i64, dbg_ledger_size(ptr as i64))
-        let dbg_size = alloc_payload_size(ptr as *const u8)
-        if dbg_size <= RT_LARGE_THRESHOLD:
-            dbg_scribble(ptr as i64, dbg_size)
+        if dbg_scribble_on() != 0:
+            let dbg_size = alloc_payload_size(ptr as *const u8)
+            if dbg_size <= RT_LARGE_THRESHOLD:
+                dbg_scribble(ptr as i64, dbg_size)
     if rt_payload_start_can_be_owned(ptr as *const u8) == 0:
         with_panic_core(make_str("invalid free: pointer is not an allocated payload start" as *const u8, 55), make_str("" as *const u8, 0), 0)
     let block = alloc_header_ptr(ptr as *const u8) as i64
