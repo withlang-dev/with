@@ -369,6 +369,7 @@ fn cli_one_liner_known_flag(arg: str) -> bool:
     arg == "-O0" or arg == "-O1" or arg == "-O2" or arg == "-O3" or
     arg == "--release" or arg == "--alloc" or arg == "--no-std" or
     arg == "--no-runtime" or arg == "--freestanding" or arg == "--no-prelude" or
+    arg == "--debug-alloc" or
     arg == "-g0" or arg == "-h" or arg == "--help"
 
 fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
@@ -668,6 +669,12 @@ fn run_cli(argc: i32) -> i32:
     let dump_mir_flag = cli_has_flag(argc, "--dump-mir")
     let dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
     let debug_info = not cli_has_flag(argc, "-g0") and not cli_has_flag(argc, "--release")
+
+    // --debug-alloc: enable the native debug allocator (see docs/debug-allocator.md)
+    // in the program we are about to run. Runtime-gated via WITH_DEBUG_ALLOC; the
+    // flag is just a discoverable front door that sets it for the child process.
+    if cli_has_flag(argc, "--debug-alloc"):
+        let _ = with_setenv_str("WITH_DEBUG_ALLOC", "1")
 
     // Cache source and output paths — scanned once, used by all subcommands.
     let source = find_source_arg(argc)
@@ -3014,6 +3021,8 @@ fn print_usage:
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
+    with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
+    with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
     with_write("  --overflow=<mode>\n")
     with_write("                   Select overflow mode for builds: panic, wrap, saturate\n")
@@ -3032,6 +3041,8 @@ fn print_doc_usage:
     with_write("  -o, --output     Write documentation to path (default: out/doc/index.md)\n")
     with_write("  --open           Best-effort open after successful generation\n")
     with_write("  --no-std         Disable standard library support while checking docs\n")
+    with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
+    with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
 
 fn print_repl_usage:
@@ -3080,6 +3091,8 @@ fn print_build_usage:
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
+    with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
+    with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
     with_write("  --overflow=<mode>\n")
     with_write("                   Select overflow mode: panic, wrap, saturate\n")
@@ -3111,6 +3124,8 @@ fn print_test_usage:
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
+    with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
+    with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
     with_write("  --freestanding   Alias for --no-std --no-runtime --prelude=core\n")
 

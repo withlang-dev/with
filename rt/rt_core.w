@@ -529,6 +529,156 @@ fn free_small_block(block: i64, idx: i32):
     unsafe *(block as *mut i64) = old_head
     set_freelist(idx, block)
 
+// ── Debug allocator (issue #606 instrument) ────────────────────────
+// A pure-With memory-error ledger gated at runtime by --debug-alloc /
+// WITH_DEBUG_ALLOC. It does DETECTION only: per-payload-address tracking that
+// aborts loudly on a double-free and lists un-freed blocks at exit. Source SITES
+// (which alloc/free call) are resolved out-of-process by the harness via lldb
+// conditioned on the address reported here — With codegen does not maintain a
+// walkable frame-pointer chain, so in-process backtraces are not used.
+// All ledger ops run under the allocator lock (called from rt_alloc/rt_free).
+let DBG_CAP: i64 = 65536            // hash slots (power of two)
+let DBG_ENTRY_WORDS: i64 = 4        // addr, size, freed, reserved
+
+var dbg_state: i32 = 0              // 0=unread, 1=off, 2=on (cached, read once)
+var dbg_base: i64 = 0              // mmap'd ledger table, 0 = uninitialised
+var dbg_full_warned: i32 = 0
+
+fn dbg_on() -> i32:
+    if dbg_state == 0:
+        let v = rt_getenv(c"WITH_DEBUG_ALLOC".ptr)
+        if v as i64 != 0 and (unsafe *v) != 0:
+            dbg_state = 2
+        else:
+            dbg_state = 1
+    if dbg_state == 2:
+        return 1
+    0
+
+fn dbg_puts(s: *const u8, n: i64):
+    let _ = rt_write(2, s, n as u64)
+
+fn dbg_put_i64(v: i64):
+    var buf: [24]u8 = [0 as u8; 24]
+    let len = i64_to_buf(v, &buf as *mut u8)
+    let _ = rt_write(2, &buf as *const u8, len as u64)
+
+fn dbg_ledger_init():
+    if dbg_base != 0:
+        return
+    let bytes = DBG_CAP * DBG_ENTRY_WORDS * 8
+    let p = rt_mmap(bytes as u64)
+    if p as i64 == 0:
+        dbg_state = 1                // mmap failed: disable rather than crash
+        return
+    dbg_base = p as i64             // MAP_ANON is zero-filled; no memset needed
+
+fn dbg_entry_addr(slot: i64) -> i64:
+    dbg_base + slot * DBG_ENTRY_WORDS * 8
+
+// Record (or reset, on address reuse) a live allocation.
+fn dbg_record_alloc(addr: i64, size: i64):
+    if dbg_base == 0:
+        dbg_ledger_init()
+    if dbg_base == 0:
+        return
+    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var probes: i64 = 0
+    while probes < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a == 0 or a == addr:
+            unsafe *(e as *mut i64) = addr
+            unsafe *((e + 8) as *mut i64) = size
+            unsafe *((e + 16) as *mut i64) = 0      // freed flag clear (reuse-safe)
+            return
+        slot = (slot + 1) & (DBG_CAP - 1)
+        probes = probes + 1
+    if dbg_full_warned == 0:
+        dbg_full_warned = 1
+        dbg_puts("debug-alloc: ledger full, tracking truncated\n" as *const u8, 45)
+
+// Mark a free. Returns 1 if this is a double free (already freed, not reused).
+fn dbg_mark_free(addr: i64) -> i32:
+    if dbg_base == 0:
+        return 0
+    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var probes: i64 = 0
+    while probes < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a == 0:
+            return 0                 // untracked address
+        if a == addr:
+            let freed = unsafe *((e + 16) as *const i64)
+            if freed != 0:
+                return 1
+            unsafe *((e + 16) as *mut i64) = 1
+            return 0
+        slot = (slot + 1) & (DBG_CAP - 1)
+        probes = probes + 1
+    0
+
+// Authoritative payload size from the ledger (the freed header word is reused as
+// the freelist link, so it can't be trusted on a double-free).
+fn dbg_ledger_size(addr: i64) -> i64:
+    if dbg_base == 0:
+        return 0
+    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var probes: i64 = 0
+    while probes < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a == 0:
+            return 0
+        if a == addr:
+            return unsafe *((e + 8) as *const i64)
+        slot = (slot + 1) & (DBG_CAP - 1)
+        probes = probes + 1
+    0
+
+fn dbg_report_double_free(addr: i64, size: i64):
+    dbg_puts("debug-alloc: DOUBLE FREE addr=" as *const u8, 30)
+    dbg_put_i64(addr)
+    dbg_puts(" size=" as *const u8, 6)
+    dbg_put_i64(size)
+    dbg_puts("\n" as *const u8, 1)
+    rt_exit(134)
+
+// Poison a freed small-block payload so use-after-free reads corrupt loudly.
+// The freelist link lives in the header word (payload-16), untouched here.
+fn dbg_scribble(ptr: i64, size: i64):
+    var i: i64 = 0
+    while i < size:
+        unsafe *((ptr + i) as *mut u8) = 0xDE as u8
+        i = i + 1
+
+// Called from with_runtime_shutdown on normal program exit.
+pub fn with_debug_alloc_report_leaks() -> Unit:
+    if dbg_on() == 0:
+        return
+    if dbg_base == 0:
+        return
+    var slot: i64 = 0
+    var leaks: i64 = 0
+    while slot < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a != 0:
+            let freed = unsafe *((e + 16) as *const i64)
+            if freed == 0:
+                let size = unsafe *((e + 8) as *const i64)
+                dbg_puts("debug-alloc: LEAK addr=" as *const u8, 23)
+                dbg_put_i64(a)
+                dbg_puts(" size=" as *const u8, 6)
+                dbg_put_i64(size)
+                dbg_puts("\n" as *const u8, 1)
+                leaks = leaks + 1
+        slot = slot + 1
+    dbg_puts("debug-alloc: leak count=" as *const u8, 24)
+    dbg_put_i64(leaks)
+    dbg_puts("\n" as *const u8, 1)
+
 fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
     let size = alloc_align_size(size_arg)
 
@@ -576,6 +726,8 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
 fn rt_alloc(size_arg: i64) -> *mut u8:
     rt_allocator_lock()
     let ptr = rt_alloc_unlocked(size_arg)
+    if dbg_on() != 0 and ptr as i64 != 0:
+        dbg_record_alloc(ptr as i64, alloc_payload_size(ptr as *const u8))
     rt_allocator_unlock()
     if rt_payload_start_can_be_owned(ptr as *const u8) == 0:
         with_panic_core(make_str("allocator returned invalid payload" as *const u8, 34), make_str("" as *const u8, 0), 0)
@@ -584,6 +736,14 @@ fn rt_alloc(size_arg: i64) -> *mut u8:
 fn rt_free_unlocked(ptr: *mut u8):
     if ptr as i64 == 0:
         return
+    // #606 debug allocator: detect double-free before the generic ownership
+    // panic so the report names the address; poison freed small payloads.
+    if dbg_on() != 0:
+        if dbg_mark_free(ptr as i64) != 0:
+            dbg_report_double_free(ptr as i64, dbg_ledger_size(ptr as i64))
+        let dbg_size = alloc_payload_size(ptr as *const u8)
+        if dbg_size <= RT_LARGE_THRESHOLD:
+            dbg_scribble(ptr as i64, dbg_size)
     if rt_payload_start_can_be_owned(ptr as *const u8) == 0:
         with_panic_core(make_str("invalid free: pointer is not an allocated payload start" as *const u8, 55), make_str("" as *const u8, 0), 0)
     let block = alloc_header_ptr(ptr as *const u8) as i64

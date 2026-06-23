@@ -5,6 +5,7 @@ extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_yield() -> Unit
 extern fn with_runtime_core_init() -> Unit
 extern fn with_runtime_core_shutdown() -> Unit
+extern fn with_debug_alloc_report_leaks() -> Unit
 extern fn with_runtime_core_has_fibers() -> i32
 extern fn with_runtime_core_run_one_step() -> Unit
 extern fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32
@@ -72,6 +73,7 @@ pub fn with_runtime_init() -> Unit:
 pub fn with_runtime_shutdown() -> Unit:
     fiber_drain_detached_ready()
     fiber_clear_detached_buffers()
+    with_debug_alloc_report_leaks()
     with_runtime_core_shutdown()
 
 pub fn with_runtime_has_fibers() -> i32:

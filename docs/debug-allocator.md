@@ -68,31 +68,42 @@ emitted Drop**, so a double-free abort names *which drop* double-freed — colla
 multi-day characterization into one line. No external sanitizer can do this. That is
 **drop-origin MIR tagging**, the high-value follow-on (its own session; out of scope here).
 
-## Architecture (first cut)
+## Architecture (first cut): detection in-process, sites via lldb
 
-All additive to `rt/rt_core.w`; pure `.w` + inline asm.
+All additive to `rt/rt_core.w`; pure `.w`.
 
-- **Frame-pointer backtrace walker.** `rt_current_fp()` reads the frame-pointer register via
-  inline asm (`asm("mov {out}, x29" ...)` on aarch64, `rbp` on x86_64; spec §16.13). The
-  walk follows the fp chain with plain unsafe pointer reads (aarch64: `ret = *(fp+8);
-  fp = *fp`), filling a fixed-size return-address buffer (depth-capped). Frame pointers are
-  preserved (Apple arm64 ABI mandates them; no `-fomit-frame-pointer`).
+> **Why no in-process backtraces.** The original design captured alloc/free backtraces by
+> walking the frame-pointer chain (read `x29` via inline asm, follow `*(fp)` / `*(fp+8)`).
+> Verified by running, this **does not work** in the current With codegen: `x29` does not
+> point to a standard aarch64 frame record (reading `[fp]`/`[fp+8]` yields 0 even inside a
+> framed, `@[noinline]` function). With's codegen does not maintain a walkable fp chain at
+> the opt levels `with run` uses. Rather than chase a codegen change (out of scope), the
+> first cut splits the work: the **ledger does detection in-process** (cheap, robust, pure
+> `.w`), and **lldb resolves source sites out-of-process**, conditioned on the address the
+> ledger reports — lldb uses real DWARF/compact-unwind unwinding that actually works. This
+> is a cleaner separation, and drop-origin MIR tagging (the follow-on) will give precise
+> sites natively without any unwinding at all.
+
 - **Ledger.** A side table backed by a direct `rt_mmap` region (never recursing through the
-  instrumented allocator), keyed by payload address: `{size, alloc_trace, free_trace,
-  freed_flag}`. Guarded by the existing allocator lock.
-- **Instrumented alloc/free.** `rt_alloc` records an entry with the alloc backtrace.
+  instrumented allocator), an open-addressing hash keyed by payload address:
+  `{addr, size, freed_flag}`. Guarded by the existing allocator lock. The gate is read once
+  via the non-allocating `rt_getenv` (`with_getenv_str` would deadlock the non-reentrant
+  allocator lock) and cached.
+- **Instrumented alloc/free.** `rt_alloc` records (or, on address reuse, resets) an entry.
   `rt_free` looks up the entry *before* the existing ownership check: if already freed →
-  **double-free**, print alloc + first-free + this-free traces and abort; else record the
-  free trace and mark freed. This sees freelist double-pushes the existing
-  `rt_payload_start_can_be_owned` panic can miss, and supplies the first-free site it never had.
-- **Scribble on free.** Freed payloads are overwritten with a poison pattern so
-  use-after-free reads corrupt loudly. (Not "never-reuse" — that would break the slab; a
-  never-reuse UAF mode is a possible later refinement.)
+  **double-free**, print `debug-alloc: DOUBLE FREE addr=<a> size=<n>` and abort (exit 134);
+  else mark freed. This sees freelist double-pushes the existing
+  `rt_payload_start_can_be_owned` panic can miss.
+- **Scribble on free.** Freed small payloads are overwritten with `0xDE` so use-after-free
+  reads corrupt loudly. The freelist link lives in the header word (`payload-16`), untouched.
+  (Not "never-reuse" — that would break the slab; a never-reuse UAF mode is a later refinement.)
 - **Leak at exit.** `with_runtime_shutdown` (on the native `with run`/`build` exit path)
-  reports every still-live ledger entry with its size and alloc backtrace. The ledger
-  records an *intended* free even where the slab merely recycles via freelist, so a
-  field-drop that never fires shows up as a leak-with-site, distinguished from the
-  allocator's freelist recycling.
+  prints `debug-alloc: LEAK addr=<a> size=<n>` for every still-live entry, then a
+  `leak count=<k>`. A field-drop that never fires shows up as a live entry (the slab's
+  freelist recycle is recorded as a free, so it is *not* a false leak).
+- **Site resolution (harness).** Given the address from a double-free abort or a leak line,
+  the driver runs lldb conditioned on that address (break on `rt_alloc` returning it / on
+  `rt_free` / `with_vec_free` taking it, `bt` at each) to name the alloc and free call sites.
 
 ## Gating: runtime-gated, two discoverable front doors
 
@@ -123,9 +134,10 @@ are independent axes.
 ## Harness driver
 
 `tools/debug_drop.w` (pure `.w`, no shell script): builds and runs a repro under the debug
-allocator, parses the ledger/abort/leak output into a verdict, and — for the codegen branch
-— emits a **plain-text lldb command file** (the lldb on the dev box has no script
-interpreter, so no Python) and runs `lldb --batch` on the compiler to surface the exact
+allocator, parses the ledger/abort/leak output into a verdict, then drives lldb (plain
+command files — the lldb on the dev box has no script interpreter, so no Python) for two
+purposes: (1) resolve the alloc/free **source sites** for the address the ledger flagged,
+and (2) for the codegen branch, run `lldb --batch` on the compiler to surface the exact
 `mir_emit_drop_fields_ptr` branch that routes an inline-drop field to the no-free path.
 
 ## Known first-cut limitations
@@ -134,9 +146,9 @@ interpreter, so no Python) and runs `lldb --batch` on the compiler to surface th
   strings, arg buffers), so the raw leak list has a baseline. Each leak prints its alloc
   backtrace; the driver symbolizes and filters to blocks whose alloc site resolves into the
   repro. A built-in "user-frame filter" is an easy follow-on.
-- **Platform.** Frame-pointer walking is reliable on Darwin arm64 (the primary platform);
-  Linux x86_64 may omit frame pointers at `-O1`/`-O2`. Treat Linux fp-walk as best-effort
-  until addressed.
+- **Sites need a second (lldb) pass.** The ledger names the *block* (address + size) and the
+  *verdict* (double-free / leak) in-process; the *source sites* come from the harness's lldb
+  pass conditioned on that address. In-process backtraces are not used (see the note above).
 - **Abnormal exit.** Leak-at-exit fires on normal termination via `with_runtime_shutdown`;
   exits via `rt_exit`/panic skip the report.
 
