@@ -649,6 +649,54 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
         return issue61_fail(ctx, "check produced unexpected output: " ++ output)
     0
 
+// Debug-allocator fixture lane: build tools/debug_drop.w, then run it in `check`
+// mode over test/debug_alloc/*.w. Gives the floor eyes for the over/under-drop
+// blind spot it is structurally unable to see. See docs/debug-allocator.md.
+fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        ctx.diagnostics().error("debug-alloc-tests: missing compiler input")
+        return 1
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("debug-alloc-tests: could not create output dir: " ++ out_dir)
+        return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, inputs.get(0))
+    let driver_bin = build_project_abs(root, build_project_join(out_dir, "debug_drop"))
+
+    var build_args: Vec[str] = Vec.new()
+    build_args.push(compiler)
+    build_args.push("build")
+    build_args.push("tools/debug_drop.w")
+    build_args.push("-o")
+    build_args.push(driver_bin)
+    let bout = build_project_abs(root, build_project_join(out_dir, "build.stdout"))
+    let berr = build_project_abs(root, build_project_join(out_dir, "build.stderr"))
+    let br = ctx.process_runner().run_capture_cwd(build_args, bout, berr, 180000, root)
+    if br.rc != 0:
+        ctx.diagnostics().error(f"debug-alloc-tests: driver build failed rc={br.rc}; stderr={berr}")
+        return 1
+
+    let fixtures = fs.list_files("test/debug_alloc")
+    var check_args: Vec[str] = Vec.new()
+    check_args.push(driver_bin)
+    check_args.push("check")
+    check_args.push(compiler)
+    for i in 0..fixtures.len() as i32:
+        let p = fixtures.get(i as i64)
+        if p.ends_with(".w"):
+            check_args.push(build_project_abs(root, p))
+    let cout = build_project_abs(root, build_project_join(out_dir, "check.stdout"))
+    let cerr = build_project_abs(root, build_project_join(out_dir, "check.stderr"))
+    let cr = ctx.process_runner().run_capture_cwd(check_args, cout, cerr, 240000, root)
+    if cr.rc != 0:
+        ctx.diagnostics().error(f"debug-alloc-tests: lane failed rc={cr.rc}\n" ++ cr.stdout)
+        return 1
+    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    0
+
 pub fn build(ctx: BuildCtx) -> Build:
     var out = ctx.new_build()
     let host_runtime = host_runtime_spec()
@@ -1120,6 +1168,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     behavior_tests = behavior_tests.arg("compiler=" ++ release_compiler_bin("with"))
     behavior_tests = behavior_tests.dep("build")
     out = out.add_target(behavior_tests)
+
+    // Debug-allocator fixture lane (custom //! expect-debug-alloc directive; run
+    // via tools/debug_drop.w, not the built-in test runner). See docs/debug-allocator.md.
+    var debug_alloc_tests = target_new(.Action, "debug-alloc-tests", "").output("out/debug-alloc-tests")
+    debug_alloc_tests.action = run_debug_alloc_tests_action
+    debug_alloc_tests = debug_alloc_tests.input(release_compiler_bin("with"))
+    debug_alloc_tests = debug_alloc_tests.dep("build")
+    debug_alloc_tests = debug_alloc_tests.write_scope("out/debug-alloc-tests")
+    out = out.add_target(debug_alloc_tests)
 
     var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
     native_compile_error_tests = native_compile_error_tests.arg("compiler=" ++ release_compiler_bin("with"))

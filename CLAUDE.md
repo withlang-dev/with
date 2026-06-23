@@ -52,6 +52,27 @@ you. If you can answer the question with `grep`, `nm`, `otool`,
 a single breakpoint answers in seconds what print-and-rebuild
 answers in minutes. Stop adding debug prints and rebuilding.
 
+**"Root cause" means the exact line.** A root cause is complete only
+when you can name the exact function + branch + condition producing
+the wrong state, *observed in the debugger or the debug allocator* —
+not inferred from run-counts, output tables, or `--dump-mir` greps.
+Probes form a hypothesis; the debugger confirms it. Do not propose a
+fix *or* a deferral from a characterization alone. Deferring a bug is
+valid only after locating it at the instruction level and showing the
+fix needs foundation work you can point to.
+
+**Self-check trip-wire.** If your last three actions were "run
+something and read the output" and you still can't name the exact
+wrong line, you are characterizing, not debugging — switch tools
+before the next probe.
+
+**Workflow default for memory bugs.** Any drop/lifetime/double-free/
+leak bug → run it under the debug allocator first (`--debug-alloc`,
+or `WITH_DEBUG_ALLOC=1`; see `docs/debug-allocator.md`) to get the
+block address + verdict, then `lldb` for the codegen branch. The
+debug allocator says which memory was mishandled; `lldb` says why
+codegen emitted it that way.
+
 ---
 
 ## Language Design Philosophy

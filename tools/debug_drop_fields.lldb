@@ -1,0 +1,29 @@
+# tools/debug_drop_fields.lldb — surface the codegen branch behind the #606 leak.
+#
+# A struct's scope-exit drop recurses over its fields in
+# Codegen.mir_emit_drop_fields_ptr, which dispatches each field to the LLVM-typed
+# Codegen.mir_emit_drop_ptr. That path only emits a free for types with a
+# REGISTERED drop fn (own-Drop structs/enums). An inline-drop field — Vec[Drop],
+# [N]Drop, (Drop,..) — has no registered drop fn; its free is emitted only by the
+# SEMA-typed Codegen.mir_emit_drop_ptr_for_sema_type, which the field recursion
+# never calls. So inline-drop fields are silently skipped → the #606 leak.
+#
+# This command file makes that visible: it breaks on the field recursion and on
+# both drop paths, with hit counts, while the compiler CODEGENS a leaky repro
+# (use `build`, not `check` — check is Sema-only and reaches no codegen).
+#
+# Usage:
+#   lldb --batch -s tools/debug_drop_fields.lldb \
+#       -o "run build <leaky-repro.w> -o /tmp/x" \
+#       -o "breakpoint list" -o "quit" -- out/release/bin/with
+#
+# The `bt 4` on mir_emit_drop_ptr shows its caller is mir_emit_drop_fields_ptr —
+# i.e. the field is taking the no-free LLVM path. To pin the H-field specifically,
+# set a condition on the field-recursion frame's owner once drop-origin MIR tags
+# land (the planned follow-on); until then the hit counts + backtrace show the route.
+
+breakpoint set --name Codegen.mir_emit_drop_fields_ptr --auto-continue true
+breakpoint set --name Codegen.mir_emit_drop_ptr_for_sema_type --auto-continue true
+
+breakpoint set --name Codegen.mir_emit_drop_ptr
+breakpoint command add --one-liner "bt 4" --one-liner "continue"
