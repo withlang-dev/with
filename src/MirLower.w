@@ -46,6 +46,10 @@ type MirBuilder = ephemeral {
     drop_kinds: Vec[i32],
     drop_scope_starts: Vec[i32],
     moved_value_local_ids: Vec[i32],
+    moved_field_base_locals: Vec[i32],
+    moved_field_path_starts: Vec[i32],
+    moved_field_path_counts: Vec[i32],
+    moved_field_path_syms: Vec[i32],
     stmt_temp_locals: Vec[i32],
     stmt_temp_starts: Vec[i32],
     with_cleanup_guard_locals: Vec[i32],
@@ -120,6 +124,10 @@ fn MirBuilder.init(sema: &Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> 
         drop_kinds: Vec.new(),
         drop_scope_starts: Vec.new(),
         moved_value_local_ids: Vec.new(),
+        moved_field_base_locals: Vec.new(),
+        moved_field_path_starts: Vec.new(),
+        moved_field_path_counts: Vec.new(),
+        moved_field_path_syms: Vec.new(),
         stmt_temp_locals: Vec.new(),
         stmt_temp_starts: Vec.new(),
         with_cleanup_guard_locals: Vec.new(),
@@ -323,6 +331,174 @@ fn MirBuilder.cancel_scheduled_value_drop_for_local(self: MirBuilder, local_id: 
             return
         i = i - 1
 
+fn MirBuilder.moved_field_path_matches(self: MirBuilder, idx: i32, base_local: i32, path_start: i32, path_count: i32) -> i32:
+    if idx < 0 or idx >= self.moved_field_base_locals.len() as i32:
+        return 0
+    if self.moved_field_base_locals.get(idx as i64) != base_local:
+        return 0
+    if self.moved_field_path_counts.get(idx as i64) != path_count:
+        return 0
+    let stored_start = self.moved_field_path_starts.get(idx as i64)
+    for pi in 0..path_count:
+        if self.moved_field_path_syms.get((stored_start + pi) as i64) != self.body.proj_d0.get((path_start + pi) as i64):
+            return 0
+    1
+
+fn MirBuilder.moved_field_path_has_prefix(self: MirBuilder, idx: i32, base_local: i32, path_start: i32, path_count: i32) -> i32:
+    if idx < 0 or idx >= self.moved_field_base_locals.len() as i32:
+        return 0
+    if self.moved_field_base_locals.get(idx as i64) != base_local:
+        return 0
+    let stored_count = self.moved_field_path_counts.get(idx as i64)
+    if stored_count < path_count:
+        return 0
+    let stored_start = self.moved_field_path_starts.get(idx as i64)
+    for pi in 0..path_count:
+        if self.moved_field_path_syms.get((stored_start + pi) as i64) != self.body.proj_d0.get((path_start + pi) as i64):
+            return 0
+    1
+
+fn MirBuilder.local_has_moved_fields(self: MirBuilder, local_id: i32) -> i32:
+    for i in 0..self.moved_field_base_locals.len() as i32:
+        if self.moved_field_base_locals.get(i as i64) == local_id:
+            return 1
+    0
+
+fn MirBuilder.place_moved_field_exact(self: MirBuilder, place: i32) -> i32:
+    let path_count = self.place_field_projection_count(place)
+    if path_count <= 0:
+        return 0
+    let base_local = self.place_base_local(place)
+    let path_start = self.body.place_proj_starts.get(place as i64)
+    for i in 0..self.moved_field_base_locals.len() as i32:
+        if self.moved_field_path_matches(i, base_local, path_start, path_count) != 0:
+            return 1
+    0
+
+fn MirBuilder.place_has_moved_field_descendant(self: MirBuilder, place: i32) -> i32:
+    let path_count = self.place_field_projection_count(place)
+    if path_count < 0:
+        return 0
+    let base_local = self.place_base_local(place)
+    let path_start = if path_count > 0: self.body.place_proj_starts.get(place as i64) else: 0
+    for i in 0..self.moved_field_base_locals.len() as i32:
+        if self.moved_field_base_locals.get(i as i64) != base_local:
+            continue
+        let stored_count = self.moved_field_path_counts.get(i as i64)
+        if stored_count <= path_count:
+            continue
+        if path_count == 0 or self.moved_field_path_has_prefix(i, base_local, path_start, path_count) != 0:
+            return 1
+    0
+
+fn MirBuilder.mark_place_field_moved(self: MirBuilder, place: i32) -> Unit:
+    let path_count = self.place_field_projection_count(place)
+    if path_count <= 0:
+        return
+    let base_local = self.place_base_local(place)
+    if base_local < 0:
+        return
+    let path_start = self.body.place_proj_starts.get(place as i64)
+    for i in 0..self.moved_field_base_locals.len() as i32:
+        if self.moved_field_path_matches(i, base_local, path_start, path_count) != 0:
+            return
+    let stored_start = self.moved_field_path_syms.len() as i32
+    for pi in 0..path_count:
+        self.moved_field_path_syms.push(self.body.proj_d0.get((path_start + pi) as i64))
+    self.moved_field_base_locals.push(base_local)
+    self.moved_field_path_starts.push(stored_start)
+    self.moved_field_path_counts.push(path_count)
+
+fn MirBuilder.remove_moved_field_entry(self: MirBuilder, idx: i32) -> Unit:
+    let last = self.moved_field_base_locals.len() as i32 - 1
+    if idx < 0 or idx > last:
+        return
+    if idx != last:
+        self.moved_field_base_locals.set_i32(idx as i64, self.moved_field_base_locals.get(last as i64))
+        self.moved_field_path_starts.set_i32(idx as i64, self.moved_field_path_starts.get(last as i64))
+        self.moved_field_path_counts.set_i32(idx as i64, self.moved_field_path_counts.get(last as i64))
+    self.moved_field_base_locals.pop()
+    self.moved_field_path_starts.pop()
+    self.moved_field_path_counts.pop()
+
+fn MirBuilder.clear_moved_fields_for_local(self: MirBuilder, local_id: i32) -> Unit:
+    var i = self.moved_field_base_locals.len() as i32 - 1
+    while i >= 0:
+        if self.moved_field_base_locals.get(i as i64) == local_id:
+            self.remove_moved_field_entry(i)
+        i = i - 1
+
+fn MirBuilder.clear_moved_fields_for_place(self: MirBuilder, place: i32) -> Unit:
+    let path_count = self.place_field_projection_count(place)
+    if path_count < 0:
+        return
+    let base_local = self.place_base_local(place)
+    if path_count == 0:
+        self.clear_moved_fields_for_local(base_local)
+        return
+    let path_start = self.body.place_proj_starts.get(place as i64)
+    var i = self.moved_field_base_locals.len() as i32 - 1
+    while i >= 0:
+        if self.moved_field_path_has_prefix(i, base_local, path_start, path_count) != 0:
+            self.remove_moved_field_entry(i)
+        i = i - 1
+
+fn MirBuilder.partial_drop_field_count(self: MirBuilder, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
+    let tk = self.sema.get_type_kind(resolved as TypeId)
+    if tk == TypeKind.TY_TUPLE:
+        return self.sema.get_type_d1(resolved as TypeId)
+    self.sema.type_reflection_field_count(resolved)
+
+fn MirBuilder.partial_drop_field_token(self: MirBuilder, sema_ty: i32, field_index: i32) -> i32:
+    if sema_ty <= 0 or field_index < 0:
+        return 0
+    let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
+    if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_TUPLE:
+        // Tuple field access is represented in AST/MIR as the interned symbols
+        // `"0"`, `"1"`, ... (`pair.0`), not as raw numeric indexes. Use the
+        // same token here so per-field move records match the synthesized
+        // partial-drop field places.
+        return self.pool.intern(f"{field_index}")
+    self.sema.type_reflection_field_name(resolved, field_index)
+
+fn MirBuilder.partial_drop_field_type(self: MirBuilder, sema_ty: i32, field_index: i32) -> i32:
+    if sema_ty <= 0 or field_index < 0:
+        return 0
+    let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
+    let tk = self.sema.get_type_kind(resolved as TypeId)
+    if tk == TypeKind.TY_TUPLE:
+        let elem_start = self.sema.get_type_d0(resolved as TypeId)
+        let elem_count = self.sema.get_type_d1(resolved as TypeId)
+        if field_index >= elem_count:
+            return 0
+        return self.sema.type_extra.get((elem_start + field_index) as i64)
+    self.sema.type_reflection_field_type(resolved, field_index)
+
+fn MirBuilder.emit_drop_place_respecting_moved_fields(self: MirBuilder, place: i32, sema_ty: i32):
+    if sema_ty <= 0 or sema_ty == self.sema.ty_void as i32 or sema_ty == self.sema.ty_never as i32:
+        return
+    if self.place_moved_field_exact(place) != 0:
+        return
+    if self.place_has_moved_field_descendant(place) != 0:
+        let field_count = self.partial_drop_field_count(sema_ty)
+        if field_count <= 0:
+            return
+        var fi = field_count - 1
+        while fi >= 0:
+            let field_ty = self.partial_drop_field_type(sema_ty, fi)
+            if field_ty > 0 and self.sema.type_needs_drop(field_ty) != 0:
+                let field_token = self.partial_drop_field_token(sema_ty, fi)
+                if field_token != 0 or self.sema.get_type_kind(self.sema.resolve_alias(sema_ty as TypeId)) == TypeKind.TY_TUPLE:
+                    let field_place = self.body.new_field_place(place, field_token, field_ty)
+                    self.emit_drop_place_respecting_moved_fields(field_place, field_ty)
+            fi = fi - 1
+        return
+    if self.sema.type_needs_drop(sema_ty) != 0:
+        self.body.push_stmt(self.cur_bb, StmtKind.Drop, place, 0, 0)
+
 fn MirBuilder.push_stmt_temp_frame(self: MirBuilder) -> i32:
     let depth = self.stmt_temp_starts.len() as i32
     self.stmt_temp_starts.push(self.stmt_temp_locals.len() as i32)
@@ -380,11 +556,14 @@ fn MirBuilder.consume_moved_operand(self: MirBuilder, operand_id: i32) -> Unit:
         return
     let place = self.body.operand_d0.get(operand_id as i64)
     let local_id = mir_place_plain_local(&self.body, place)
-    if local_id < 0:
+    if local_id >= 0:
+        self.mark_local_value_moved(local_id)
+        self.cancel_scheduled_value_drop_for_local(local_id)
+        self.cancel_stmt_temp_for_local(local_id)
+        self.clear_moved_fields_for_local(local_id)
         return
-    self.mark_local_value_moved(local_id)
-    self.cancel_scheduled_value_drop_for_local(local_id)
-    self.cancel_stmt_temp_for_local(local_id)
+    if self.place_field_projection_count(place) > 0:
+        self.mark_place_field_moved(place)
 
 fn MirBuilder.flush_stmt_temp_frame(self: MirBuilder) -> Unit:
     if self.stmt_temp_starts.len() as i32 == 0:
@@ -426,6 +605,11 @@ fn MirBuilder.emit_task_cancel_call(self: MirBuilder, task_op: i32, intrinsic: M
 
 fn MirBuilder.emit_drop_entry(self: MirBuilder, local_id: i32, drop_kind: i32):
     if self.drop_kind_owns_value(drop_kind) != 0 and self.local_value_moved(local_id) != 0:
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
+        return
+    if drop_kind == DropKind.DK_VALUE and self.local_has_moved_fields(local_id) != 0:
+        let place = self.place_for_local(local_id)
+        self.emit_drop_place_respecting_moved_fields(place, self.local_type(local_id))
         self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
         return
     if drop_kind == DropKind.DK_WITH_GUARD or drop_kind == DropKind.DK_WITH_GUARD_MUT:
@@ -2740,6 +2924,9 @@ fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: 
     let dest_local = mir_place_plain_local(&self.body, place)
     if dest_local >= 0:
         self.clear_local_value_moved(dest_local)
+        self.clear_moved_fields_for_local(dest_local)
+    else:
+        self.clear_moved_fields_for_place(place)
 
 fn MirBuilder.direct_place_local(self: MirBuilder, place: i32) -> i32:
     if place < 0 or place >= self.body.place_locals.len() as i32:
@@ -4407,14 +4594,8 @@ fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
         self.expected_type = dest_ty
     let rhs = self.lower_expr(rhs_expr)
     self.expected_type = saved_expected
-    // Drop the old value before reassignment if the type implements Drop.
-    if dest_ty != 0 and self.sema.is_copy(dest_ty) == 0:
-        let resolved_ty = self.sema.resolve_alias(dest_ty)
-        let tk = self.sema.get_type_kind(resolved_ty)
-        if tk == TypeKind.TY_STRUCT:
-            let type_name = self.sema.get_type_d0(resolved_ty)
-            if self.sema.has_drop_method(type_name) != 0:
-                self.body.push_stmt(self.cur_bb, StmtKind.Drop, place, 0, self.ast.get_start(place_expr))
+    if dest_ty != 0 and self.sema.is_copy(dest_ty) == 0 and self.sema.type_needs_drop(dest_ty) != 0:
+        self.emit_drop_place_respecting_moved_fields(place, dest_ty)
     self.assign_operand_to_place(place, rhs, self.ast.get_start(place_expr))
 
 fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
@@ -8280,6 +8461,13 @@ fn MirBuilder.cancel_scheduled_value_drop_for_receiver_expr(self: MirBuilder, ex
             if self.expr_type(expr) != 0 and self.expr_type(expr) == self.expr_type(recv):
                 self.cancel_scheduled_value_drop_for_receiver_expr(recv)
         return
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        let root_sym = self.place_expr_root_symbol(expr)
+        if root_sym == 0 or self.lookup_local(root_sym) < 0:
+            return
+        let recv_place = self.lower_expr_place(expr)
+        self.mark_place_field_moved(recv_place)
+        return
     if kind != NodeKind.NK_IDENT:
         return
     let sym = self.ast.get_data0(expr)
@@ -10351,21 +10539,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                             return self.int_const_operand(fa_disc_tag2 as i64, fa_base_ty)
         let place = self.lower_field_access(node)
         self.mark_string_place_copied(place)
-        // #606: reading a non-Copy element out of a TUPLE by value moves it out of
-        // the source (e.g. the channel idiom `let tx = pair.0; let rx = pair.1`).
-        // Consume the tuple base so its element-drop does not also free the
-        // extracted value (double-free). Conservative: it consumes the whole base,
-        // so a Drop sibling that is not also extracted leaks (precise per-element
-        // tracking is a follow-up). Scoped to a plain tuple-local base.
         let fa_val_ty = self.expr_type(node)
-        if fa_val_ty != 0 and self.sema.is_copy(fa_val_ty as TypeId) == 0:
-            let fa_base_local = self.place_base_local(place)
-            if fa_base_local >= 0 and fa_base_local < self.body.local_type_ids.len() as i32:
-                let fa_base_local_ty = self.body.local_type_ids.get(fa_base_local as i64)
-                if fa_base_local_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(fa_base_local_ty as TypeId)) == TypeKind.TY_TUPLE:
-                    self.mark_local_value_moved(fa_base_local)
-                    self.cancel_scheduled_value_drop_for_local(fa_base_local)
-                    self.cancel_stmt_temp_for_local(fa_base_local)
+        if fa_val_ty != 0 and self.sema.type_needs_drop(fa_val_ty) != 0:
+            return self.body.new_operand(OperandKind.OK_MOVE, place)
         return self.body.new_operand(OperandKind.OK_COPY, place)
 
     if kind == NodeKind.NK_INDEX:
@@ -10477,13 +10653,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let rhs_op = self.lower_expr(rhs_node)
         self.expected_type = saved_expected
         let place = self.lower_expr_place(target)
-        if target_ty != 0 and self.sema.is_copy(target_ty) == 0:
-            let resolved_ty = self.sema.resolve_alias(target_ty)
-            let tk = self.sema.get_type_kind(resolved_ty)
-            if tk == TypeKind.TY_STRUCT:
-                let type_name = self.sema.get_type_d0(resolved_ty)
-                if self.sema.has_drop_method(type_name) != 0:
-                    self.body.push_stmt(self.cur_bb, StmtKind.Drop, place, 0, self.ast.get_start(target))
+        if target_ty != 0 and self.sema.is_copy(target_ty) == 0 and self.sema.type_needs_drop(target_ty) != 0:
+            self.emit_drop_place_respecting_moved_fields(place, target_ty)
         self.assign_operand_to_place(place, rhs_op, self.ast.get_start(target))
         return rhs_op
 
@@ -10761,7 +10932,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             // Drop impl: non-Drop value types are left to copy, which the
             // codebase relies on to share data across constructions and which is
             // harmless without a destructor.
-            if self.sema.type_has_drop_impl(f_ty) != 0:
+            if self.sema.type_needs_drop(f_ty) != 0:
                 self.consume_moved_operand(f_op)
         if self.sema.type_decl_nodes.contains(sl_name_sym):
             let sl_td_node = self.sema.type_decl_nodes.get(sl_name_sym).unwrap()

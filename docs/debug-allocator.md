@@ -147,6 +147,12 @@ purposes: (1) resolve the alloc/free **source sites** for the address the ledger
 and (2) for the codegen branch, run `lldb --batch` on the compiler to surface the exact
 `mir_emit_drop_fields_ptr` branch that routes an inline-drop field to the no-free path.
 
+`test/debug_alloc/` is also the regression gate for #607. Its inline-drop field
+fixtures must all report `leak count=0` and never `DOUBLE FREE`, including the
+field-receiver push-tail and field-chaining cases that the ordinary floor cannot
+see. `da_manual_double_free` intentionally remains a `DOUBLE FREE` fixture, and
+`da_pod_vec` intentionally remains `leak count=1` for #608.
+
 ## Known first-cut limitations
 
 - **Leak-report noise.** The runtime intentionally never-frees some allocations (interned

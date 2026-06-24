@@ -3751,7 +3751,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: &MirBody, rval_id: i32, dest_ty:
 
     wl_get_undef(fallback_ty)
 
-fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym: i32) -> Unit:
+fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym: i32, owner_sema_ty: i32) -> Unit:
     if ptr == 0 or ty == 0:
         return
     if wl_get_type_kind(ty) != wl_struct_type_kind():
@@ -3773,7 +3773,13 @@ fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym:
         let field_ty = self.struct_field_types.get(field_slot as i64)
         let llvm_fi = self.get_llvm_field_index(ty, fi)
         let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, llvm_fi)
-        self.mir_emit_drop_ptr(field_ptr, field_ty)
+        var field_sema_ty = 0
+        if owner_sema_ty > 0:
+            field_sema_ty = self.mir_project_field_sema_type(owner_sema_ty, field_sym)
+        if field_sema_ty > 0:
+            self.mir_emit_drop_ptr_for_sema_type(field_ptr, field_ty, field_sema_ty)
+        else:
+            self.mir_emit_drop_ptr(field_ptr, field_ty)
         fi = fi - 1
 
 fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> Unit:
@@ -3802,7 +3808,7 @@ fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> Unit:
             let value = wl_build_load(self.builder, ty, ptr)
             args.push(value)
         let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
-    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
+    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym, 0)
 
 fn Codegen.mir_emit_generic_inst_drop_method(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> bool:
     if ptr == 0 or ty == 0 or sema_ty <= 0:
@@ -4100,7 +4106,7 @@ fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sem
             let value = wl_build_load(self.builder, ty, ptr)
             args.push(value)
         let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
-    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
+    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym, resolved)
     // #606: an enum (or generic enum like Option/Result) with no explicit Drop
     // impl drops the active variant's payloads. Skipped when an explicit drop
     // exists — that drop owns cleanup (no per-payload consumed tracking yet).
@@ -5315,8 +5321,23 @@ fn Codegen.mir_project_field_sema_type(self: Codegen, agg_ty: i32, field_token: 
     if tk == TypeKind.TY_TUPLE:
         let elem_start = self.mir_input.mir_get_type_d0(resolved)
         let elem_count = self.mir_input.mir_get_type_d1(resolved)
-        if field_token >= 0 and field_token < elem_count:
-            return self.mir_input.mir_get_type_extra(elem_start + field_token)
+        var tuple_idx = field_token
+        if tuple_idx < 0 or tuple_idx >= elem_count:
+            var field_text = self.intern.resolve(field_token)
+            if field_text.len() == 0:
+                field_text = self.sema_symbol_text(field_token)
+            var valid_index = if field_text.len() > 0: 1 else: 0
+            tuple_idx = 0
+            for vi in 0..field_text.len() as i32:
+                let ch = field_text.byte_at(vi)
+                if ch >= 48 and ch <= 57:
+                    tuple_idx = tuple_idx * 10 + (ch - 48) as i32
+                else:
+                    valid_index = 0
+            if valid_index == 0:
+                tuple_idx = -1
+        if tuple_idx >= 0 and tuple_idx < elem_count:
+            return self.mir_input.mir_get_type_extra(elem_start + tuple_idx)
         return 0
     if tk == TypeKind.TY_GENERIC_INST:
         // Preserve generic substitutions when projecting fields through a

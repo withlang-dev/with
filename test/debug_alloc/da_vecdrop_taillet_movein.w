@@ -1,4 +1,4 @@
-//! expect-debug-alloc: leak count=1
+//! expect-debug-alloc: leak count=0
 type W { slot: *mut i32 }
 impl Drop for W:
     fn drop(move self: Self):
