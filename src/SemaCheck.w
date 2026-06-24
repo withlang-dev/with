@@ -1276,6 +1276,11 @@ fn Sema.check_fn_body_with_sig_at(self: Sema, node: i32, sig_idx: i32, decl_inde
     self.expected_expr_type = saved_expected_et
     self.has_expected_type = saved_has_et
     self.typed_expr_types.insert(body, body_ty as i32)
+    // #607: user-visible move-out of a transitive-Drop field stays rejected.
+    // Returns do not all route through mark_moved_if_consumed, so check the
+    // returned tail explicitly.
+    if ret_type != 0 and ret_type != self.ty_void as i32:
+        self.reject_returned_drop_field_move(body)
     if is_gen == 1:
         self.finalize_generator_state_type(node, sig_idx)
     // Tail expression bodies participate in effect inference the same way an
@@ -4291,6 +4296,18 @@ fn Sema.body_return_type_info(self: Sema, node: i32) -> BodyReturnTypeInfo:
         return self.body_return_type_info(self.ast.get_data0(node))
     info
 
+fn Sema.tail_expr_is_assignment(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_ASSIGN:
+        return 1
+    if kind == NodeKind.NK_GROUPED:
+        return self.tail_expr_is_assignment(self.ast.get_data0(node))
+    if kind == NodeKind.NK_BLOCK:
+        return self.tail_expr_is_assignment(self.ast.get_data2(node))
+    0
+
 fn Sema.infer_unannotated_function_return_type(self: Sema, body: i32, body_ty: TypeId) -> i32:
     let info = self.body_return_type_info(body)
     if info.mismatch != 0:
@@ -4303,6 +4320,8 @@ fn Sema.infer_unannotated_function_return_type(self: Sema, body: i32, body_ty: T
         if self.body_can_fall_through(body) != 0 and self.type_has_default_value(info.value_type) == 0:
             self.emit_error("return type does not implement Default", body)
         return info.value_type
+    if self.tail_expr_is_assignment(body) != 0:
+        return self.ty_void as i32
     if body_ty != 0:
         return body_ty as i32
     self.ty_void as i32
@@ -8076,6 +8095,8 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
             self.record_view_binding_from_expr(target_sym, value)
         else:
             self.clear_binding_view_deps(target_sym)
+    else if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
+        self.clear_moved_fields_for_place_expr(target)
 
     if target_type != 0:
         return target_type as i32
@@ -8110,6 +8131,18 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     self.union_clear_last_written()
     let iter_type = self.check_expr(iterable)
     let elem_type = self.infer_for_element_type(iter_type as i32)
+
+    // #607: consuming (by-value) iteration of a Vec whose elements need drop is unsound
+    // — the loop variable copies each Drop element, so it is dropped twice (the copy and
+    // the Vec's own element-drop). Reject pending real move semantics; the sound form is
+    // borrow-iteration. Gated exactly like Path C (type_needs_drop && !type_has_drop_impl)
+    // on the Vec, so own-Drop structs and POD-element Vecs are untouched, and the borrow
+    // forms — `for w in &vec` (TY_REF) and `.iter_ref()` (VecIterRef) — pass through.
+    let cfor_it_res = self.resolve_alias(iter_type as TypeId)
+    if self.get_type_kind(cfor_it_res) == TypeKind.TY_GENERIC_INST:
+        let cfor_base = self.pool_resolve(self.get_type_d0(cfor_it_res))
+        if cfor_base == "Vec" and self.type_needs_drop(iter_type as i32) != 0 and self.type_has_drop_impl(iter_type as i32) == 0:
+            self.emit_error("consuming iteration of a Vec whose elements need drop is not yet supported (#607); iterate by borrow instead: `for w in &vec`", iterable)
 
     // docs/mut.md Rev 8 §11.4 / §15.17 — when the iterable is a .iter()
     // call (or any iter_of_self method), the iterator yields &T views.
@@ -8582,6 +8615,8 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
             return self.ty_str as i32
 
     var obj_type = self.check_expr(expr)
+    if self.union_in_assign_target == 0 and self.field_is_moved(node) != 0:
+        self.emit_error("use of moved value", node)
     // §16.4: reading a union field other than the last-written one requires
     // unsafe. Only tracked local union variables (literal-initialized or
     // directly assigned) are checked; untracked unions are never flagged.
@@ -9196,7 +9231,7 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                 // construction (e.g. `T { a: ctx.x }`). The MIR move
                 // (consume_moved_operand) handles call-result temporaries and
                 // the actual drop suppression for all forms.
-                if self.ast.kind(f_value) == NodeKind.NK_IDENT and self.type_has_drop_impl(val_ty as i32) != 0:
+                if self.ast.kind(f_value) == NodeKind.NK_IDENT and self.type_needs_drop(val_ty as i32) != 0:
                     self.mark_moved_if_consumed(f_value)
                 val_types.push(val_ty as i32)
             if self.type_decl_nodes.contains(name):
@@ -10432,6 +10467,18 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                     field_ty = self.type_extra.get((field_start + fi * 3 + 1) as i64)
                     break
             let binding_ty = self.pattern_child_subject_type(subject_type, field_ty)
+            // #607: destructuring a Vec[Drop] field out of a by-value struct moves it
+            // out (the binding owns the buffer while the struct still does) → double
+            // free. Reject pending real move semantics; matching a borrow (`match &h`)
+            // gives a `&Vec` binding_ty (TY_REF) and is exempt, as is a `_` wildcard
+            // (no move). Same Path C gate (type_needs_drop && !type_has_drop_impl).
+            let sp_is_wildcard = f_pat != 0 and self.ast.kind(f_pat) == NodeKind.NK_PAT_WILDCARD
+            if not sp_is_wildcard:
+                let sp_bt_res = self.resolve_alias(binding_ty as TypeId)
+                if self.get_type_kind(sp_bt_res) == TypeKind.TY_GENERIC_INST:
+                    let sp_bt_base = self.pool_resolve(self.get_type_d0(sp_bt_res))
+                    if sp_bt_base == "Vec" and self.type_needs_drop(binding_ty) != 0 and self.type_has_drop_impl(binding_ty) == 0:
+                        self.emit_error("moving a field that needs drop out of a struct by destructuring is not yet supported (#607); match a borrow (`match &x`) or move the whole struct", node)
             if f_pat != 0:
                 self.check_pattern(f_pat, binding_ty)
             else:
@@ -14747,6 +14794,8 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
     if owner_sym == self.syms.vec:
         if field == self.syms.new or method_name == "with_capacity":
             return self.generic_constructor_return_type(owner_sym, recv_type)
+        if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.clear:
+            return self.ty_void as i32
     if owner_sym == self.syms.hashmap:
         if field == self.syms.new:
             return self.generic_constructor_return_type(owner_sym, recv_type)
@@ -18504,6 +18553,17 @@ fn Sema.infer_for_element_type(self: Sema, iter_type: i32) -> i32:
         return self.get_type_d0(resolved)
     if tk == TypeKind.TY_SLICE:
         return self.get_type_d0(resolved)
+    if tk == TypeKind.TY_REF:
+        // #607: `for w in &vec` / `for w in &h.field` borrow-iterates — the loop var
+        // is `&T` (each element borrowed, no copy/move). Mirrors VecIterRef[T] below.
+        let ref_pointee = self.get_type_d0(resolved)
+        let ref_pointee_resolved = self.resolve_alias(ref_pointee as TypeId)
+        if self.get_type_kind(ref_pointee_resolved) == TypeKind.TY_GENERIC_INST:
+            let ref_base = self.pool_resolve(self.get_type_d0(ref_pointee_resolved))
+            if ref_base == "Vec" and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
+                let ref_elem = self.get_generic_inst_arg(ref_pointee_resolved as i32, 0)
+                return self.ensure_exact_type(TypeKind.TY_REF, ref_elem, 0, 0) as i32
+        return 0
     if tk == TypeKind.TY_GENERIC_INST:
         let base_name = self.pool_resolve(self.get_type_d0(resolved))
         if base_name == "Vec" and self.get_generic_inst_arg_count(resolved as i32) > 0:
@@ -18550,7 +18610,7 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
         let field_ty_opt = self.typed_expr_types.get(node)
         let field_ty = if field_ty_opt.is_some(): field_ty_opt.unwrap() else: self.field_access_type_no_diagnostic(node)
         let owner_sym = self.drop_owner_for_field_access(node)
-        if field_ty != 0 and self.is_copy(field_ty as TypeId) == 0:
+        if field_ty != 0 and self.type_needs_drop(field_ty) != 0:
             if owner_sym != 0 and self.has_drop_method(owner_sym) != 0:
                 let field_sym = self.ast.get_data1(node)
                 if self.current_drop_type_sym == owner_sym:
@@ -18560,6 +18620,14 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
                     self.record_drop_consumed_field(owner_sym, field_sym)
                 else:
                     self.emit_error("partial move from Drop type", node)
+            else:
+                if self.type_needs_drop(field_ty) != 0 and self.type_has_drop_impl(field_ty) == 0:
+                    self.emit_error("moving a field that needs drop out of a struct is not yet supported (#607); clone the field or move the whole struct instead", node)
+                else:
+                    if self.move_control_flow_depth != 0:
+                        self.emit_error("conditional move of Drop field requires drop-state tracking", node)
+                        return
+                    self.mark_field_moved(node)
         return
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
@@ -18587,6 +18655,29 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
     // move: binding already invalidated in check_expr; avoid double-processing.
     if kind == NodeKind.NK_MOVE_ARG:
         return
+
+// #607: return-tail field moves do not all flow through mark_moved_if_consumed.
+// Keep the user-facing language boundary: moving a transitive-Drop field out of
+// an aggregate is rejected until the language decision explicitly changes.
+fn Sema.reject_returned_drop_field_move(self: Sema, expr: i32):
+    if expr == 0:
+        return
+    let k = self.ast.kind(expr)
+    if k == NodeKind.NK_BLOCK:
+        self.reject_returned_drop_field_move(self.ast.get_data2(expr))
+        return
+    if k == NodeKind.NK_GROUPED or k == NodeKind.NK_NO_SUSPEND:
+        self.reject_returned_drop_field_move(self.ast.get_data0(expr))
+        return
+    if k != NodeKind.NK_FIELD_ACCESS:
+        return
+    let owner_sym = self.drop_owner_for_field_access(expr)
+    if owner_sym != 0 and self.has_drop_method(owner_sym) != 0:
+        return
+    let field_ty_opt = self.typed_expr_types.get(expr)
+    let field_ty = if field_ty_opt.is_some(): field_ty_opt.unwrap() else: self.field_access_type_no_diagnostic(expr)
+    if field_ty != 0 and self.is_copy(field_ty as TypeId) == 0 and self.type_needs_drop(field_ty) != 0 and self.type_has_drop_impl(field_ty) == 0:
+        self.emit_error("moving a field that needs drop out of a struct is not yet supported (#607); clone the field or move the whole struct instead", expr)
 
 fn Sema.drop_owner_for_fn_symbol(self: Sema, fn_sym: i32) -> i32:
     let text = self.pool_resolve(fn_sym)

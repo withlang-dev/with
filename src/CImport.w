@@ -1288,6 +1288,12 @@ fn ci_local_storage_name(escaped: str, cursor: i32) -> str:
 fn ci_owned_return_destructor(name: str) -> str:
     if name == "strdup": return "free"
     if name == "strndup": return "free"
+    // #357: stdio/dirent owning constructors — each returns an owned opaque handle
+    // (FILE*/DIR*) released by a paired destructor that takes exactly that pointer.
+    if name == "fopen": return "fclose"
+    if name == "fdopen": return "fclose"
+    if name == "tmpfile": return "fclose"
+    if name == "opendir": return "closedir"
     ""
 
 fn ci_buf_count(name: str) -> i32:

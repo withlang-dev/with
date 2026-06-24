@@ -78,7 +78,7 @@ The stack stopped at `with_panic_core`, through `with_vec_free` in
 
 - The next attempt is maintainer-directed: narrow the drop gate from "is std Vec" to "is std Vec and the element type needs drop". `[maintainer's-call]`
 - In `Sema.type_needs_drop`, `Vec[i32]`, `Vec[i64]`, and other POD-element Vecs must remain non-drop. `[maintainer's-call]`
-- `Vec[str]`, `Vec[DropType]`, and `Vec` whose element recursively needs drop are the real A5 surface. `[maintainer's-call]`
+- `Vec[DropType]` and `Vec` whose element recursively needs drop are the real A5 surface. `str` is **Copy** (`is_copy` and `type_needs_drop` both return 0 for it), so `Vec[str]` is **not** in the element-drop surface — freeing POD-element buffers (`Vec[i32]`, `Vec[str]`, …) is the separate wide flip, not A5. The gate now in `Sema.type_needs_drop` (#606) resolves the tension: `Vec[T]` needs drop iff `type_needs_drop(T)`. `[verified-by-test]`
 - Rationale: every concrete crash chased above came from POD `Vec` state; narrowing makes those vectors non-drop and removes the need for the wide audit sprawl. `[inferred]`
 - After narrowing, reset to clean `main` and re-apply only the keepers below from `wip-a5-wide-audit`; do not continue the WIP branch itself. `[maintainer's-call]`
 - After re-applying the narrow keepers, rebuild and rerun the A5 subset before touching A6/A8. `[maintainer's-call]`

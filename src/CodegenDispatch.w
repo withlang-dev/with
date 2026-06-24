@@ -3751,7 +3751,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: &MirBody, rval_id: i32, dest_ty:
 
     wl_get_undef(fallback_ty)
 
-fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym: i32) -> Unit:
+fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym: i32, owner_sema_ty: i32) -> Unit:
     if ptr == 0 or ty == 0:
         return
     if wl_get_type_kind(ty) != wl_struct_type_kind():
@@ -3773,7 +3773,13 @@ fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym:
         let field_ty = self.struct_field_types.get(field_slot as i64)
         let llvm_fi = self.get_llvm_field_index(ty, fi)
         let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, llvm_fi)
-        self.mir_emit_drop_ptr(field_ptr, field_ty)
+        var field_sema_ty = 0
+        if owner_sema_ty > 0:
+            field_sema_ty = self.mir_project_field_sema_type(owner_sema_ty, field_sym)
+        if field_sema_ty > 0:
+            self.mir_emit_drop_ptr_for_sema_type(field_ptr, field_ty, field_sema_ty)
+        else:
+            self.mir_emit_drop_ptr(field_ptr, field_ty)
         fi = fi - 1
 
 fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> Unit:
@@ -3802,7 +3808,7 @@ fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> Unit:
             let value = wl_build_load(self.builder, ty, ptr)
             args.push(value)
         let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
-    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
+    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym, 0)
 
 fn Codegen.mir_emit_generic_inst_drop_method(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> bool:
     if ptr == 0 or ty == 0 or sema_ty <= 0:
@@ -3929,6 +3935,131 @@ fn Codegen.mir_emit_drop_enum_ptr(self: Codegen, ptr: i64, ty: i64, enum_sema_ty
     wl_build_br(self.builder, merge_bb)
     wl_position_at_end(self.builder, merge_bb)
 
+// #606: recognize a std Vec[T] sema type (one type arg, base symbol == Vec),
+// using the MIR snapshot when available and falling back to live sema tables.
+fn Codegen.mir_sema_type_is_std_vec(self: Codegen, sema_ty: i32) -> bool:
+    if sema_ty <= 0:
+        return false
+    var resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        resolved = self.sema.resolve_alias(resolved as TypeId) as i32
+        tk = self.sema.get_type_kind(resolved as TypeId)
+    if tk != TypeKind.TY_GENERIC_INST:
+        return false
+    let arg_count = if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        self.sema.get_generic_inst_arg_count(resolved)
+    else:
+        self.mir_input.mir_get_type_d2(resolved)
+    if arg_count != 1:
+        return false
+    let base_sym = if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        self.sema.get_generic_inst_base(resolved)
+    else:
+        self.mir_input.mir_get_type_d0(resolved)
+    base_sym == self.sema.syms.vec
+
+// #606: element sema type of a std Vec[T] (peeling one ref/ptr), or 0.
+fn Codegen.mir_vec_elem_sema_type_from_sema_type(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    var resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        resolved = self.mir_input.mir_resolve_alias(self.mir_input.mir_get_type_d0(resolved))
+        tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        resolved = self.sema.resolve_alias(resolved as TypeId) as i32
+        tk = self.sema.get_type_kind(resolved as TypeId)
+    if tk != TypeKind.TY_GENERIC_INST:
+        return 0
+    let base_sym = if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        self.sema.get_generic_inst_base(resolved)
+    else:
+        self.mir_input.mir_get_type_d0(resolved)
+    if base_sym != self.sema.syms.vec:
+        return 0
+    if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+        return self.sema.get_generic_inst_arg(resolved, 0)
+    let te_start = self.mir_input.mir_get_type_d1(resolved)
+    self.mir_input.mir_get_type_extra(te_start)
+
+// #606: emit a [0..len) loop that drops each live element of a Vec via the
+// runtime accessors, then leaves the buffer for mir_emit_vec_free_ptr.
+fn Codegen.mir_emit_vec_element_drops_ptr(self: Codegen, ptr: i64, vec_sema_ty: i32) -> Unit:
+    if ptr == 0 or vec_sema_ty <= 0:
+        return
+    let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(vec_sema_ty)
+    if elem_sema <= 0 or self.sema.type_needs_drop(elem_sema) == 0:
+        return
+    let elem_ty = self.mir_sema_type_to_llvm(elem_sema)
+    if elem_ty == 0:
+        return
+    let i64_ty = wl_i64_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
+    let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
+    let len_args: Vec[i64] = Vec.new()
+    len_args.push(ptr)
+    let len_val = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&len_args), 1)
+    let zero = wl_const_int(i64_ty, 0, 0)
+    let has_elems = wl_build_icmp(self.builder, wl_int_sgt(), len_val, zero)
+    let entry_bb = wl_get_insert_block(self.builder)
+    let loop_bb = wl_append_bb(self.context, self.current_function, "drop.vec.loop")
+    let done_bb = wl_append_bb(self.context, self.current_function, "drop.vec.done")
+    wl_build_cond_br(self.builder, has_elems, loop_bb, done_bb)
+
+    wl_position_at_end(self.builder, loop_bb)
+    let idx_phi = wl_build_phi(self.builder, i64_ty)
+    let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+    let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+    let get_args: Vec[i64] = Vec.new()
+    get_args.push(ptr)
+    get_args.push(idx_phi)
+    let elem_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 2)
+    self.mir_emit_drop_ptr_for_sema_type(elem_ptr, elem_ty, elem_sema)
+    let one = wl_const_int(i64_ty, 1, 0)
+    let next_idx = wl_build_add(self.builder, idx_phi, one)
+    let more = wl_build_icmp(self.builder, wl_int_slt(), next_idx, len_val)
+    wl_build_cond_br(self.builder, more, loop_bb, done_bb)
+    let loop_end_bb = wl_get_insert_block(self.builder)
+
+    let phi_vals: Vec[i64] = Vec.new()
+    phi_vals.push(zero)
+    phi_vals.push(next_idx)
+    let phi_bbs: Vec[i64] = Vec.new()
+    phi_bbs.push(entry_bb)
+    phi_bbs.push(loop_end_bb)
+    wl_add_incoming(idx_phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
+
+    wl_position_at_end(self.builder, done_bb)
+
+// #606: free a Vec's heap buffer via the runtime helper.
+fn Codegen.mir_emit_vec_free_ptr(self: Codegen, ptr: i64) -> Unit:
+    if ptr == 0:
+        return
+    let void_ty = wl_void_type(self.context)
+    let free_fn = self.ensure_vec_runtime_fn("with_vec_free", void_ty, 1)
+    let free_ty = self.get_vec_fn_type("with_vec_free", void_ty, 1)
+    let args: Vec[i64] = Vec.new()
+    args.push(ptr)
+    let _ = wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&args), 1)
+
+// #606 (A5 narrow): drop a Vec value at scope exit. Only Vec whose element needs
+// drop gets element-drop + buffer free; POD-element Vecs (Vec[i32], Vec[str], …)
+// return false and fall through to the no-op default — freeing those buffers is
+// the separate wide flip, and doing it here would double-free the copyable POD
+// Vec headers the compiler shares as cheap handles.
+fn Codegen.mir_emit_drop_vec_ptr(self: Codegen, ptr: i64, sema_ty: i32) -> bool:
+    if not self.mir_sema_type_is_std_vec(sema_ty):
+        return false
+    let elem_sema = self.mir_vec_elem_sema_type_from_sema_type(sema_ty)
+    if elem_sema <= 0 or self.sema.type_needs_drop(elem_sema) == 0:
+        return false
+    self.mir_emit_vec_element_drops_ptr(ptr, sema_ty)
+    self.mir_emit_vec_free_ptr(ptr)
+    true
+
 fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sema_ty: i32) -> Unit:
     if ptr == 0 or ty == 0 or sema_ty <= 0:
         return
@@ -3947,6 +4078,10 @@ fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sem
     // #606: arrays likewise drop each element in place.
     if tk == TypeKind.TY_ARRAY:
         self.mir_emit_drop_array_ptr(ptr, ty, resolved)
+        return
+    // #606 (A5 narrow): a std Vec[T] with a Drop element drops each element then
+    // frees the buffer. POD-element Vecs return false here and fall through.
+    if tk == TypeKind.TY_GENERIC_INST and self.mir_emit_drop_vec_ptr(ptr, drop_sema_ty):
         return
     var type_sym = 0
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
@@ -3971,7 +4106,7 @@ fn Codegen.mir_emit_drop_ptr_for_sema_type(self: Codegen, ptr: i64, ty: i64, sem
             let value = wl_build_load(self.builder, ty, ptr)
             args.push(value)
         let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
-    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
+    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym, resolved)
     // #606: an enum (or generic enum like Option/Result) with no explicit Drop
     // impl drops the active variant's payloads. Skipped when an explicit drop
     // exists — that drop owns cleanup (no per-payload consumed tracking yet).
@@ -5186,8 +5321,23 @@ fn Codegen.mir_project_field_sema_type(self: Codegen, agg_ty: i32, field_token: 
     if tk == TypeKind.TY_TUPLE:
         let elem_start = self.mir_input.mir_get_type_d0(resolved)
         let elem_count = self.mir_input.mir_get_type_d1(resolved)
-        if field_token >= 0 and field_token < elem_count:
-            return self.mir_input.mir_get_type_extra(elem_start + field_token)
+        var tuple_idx = field_token
+        if tuple_idx < 0 or tuple_idx >= elem_count:
+            var field_text = self.intern.resolve(field_token)
+            if field_text.len() == 0:
+                field_text = self.sema_symbol_text(field_token)
+            var valid_index = if field_text.len() > 0: 1 else: 0
+            tuple_idx = 0
+            for vi in 0..field_text.len() as i32:
+                let ch = field_text.byte_at(vi)
+                if ch >= 48 and ch <= 57:
+                    tuple_idx = tuple_idx * 10 + (ch - 48) as i32
+                else:
+                    valid_index = 0
+            if valid_index == 0:
+                tuple_idx = -1
+        if tuple_idx >= 0 and tuple_idx < elem_count:
+            return self.mir_input.mir_get_type_extra(elem_start + tuple_idx)
         return 0
     if tk == TypeKind.TY_GENERIC_INST:
         // Preserve generic substitutions when projecting fields through a
@@ -6884,18 +7034,38 @@ fn Codegen.mir_emit_vec_core_intrinsic_call(self: Codegen, body: &MirBody, intri
         result = wl_build_call(self.builder, set_ty, set_fn, vec_data_i64(&args), 3)
 
     else if intrinsic == MirIntrinsic.VEC_REMOVE:
+        // #606: materialize element[idx] as the result (moved into the caller's
+        // binding so it drops exactly once), THEN compact the vector. The compaction
+        // shifts the tail down over the removed slot, so the removed element lives
+        // only in `result` and is never re-dropped from the buffer.
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let idx = self.mir_intrinsic_arg(body, args_id, 1)
         let idx64 = self.coerce_int(idx, i64_ty)
+        let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let get_args: Vec[i64] = Vec.new()
+        get_args.push(recv_ptr)
+        get_args.push(idx64)
+        let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&get_args), 2)
+        let recv_op = body.call_arg_operands.get(arg_start as i64)
+        let elem_ty = self.mir_vec_elem_type(body, recv_op)
+        if elem_ty != 0:
+            result = wl_build_load(self.builder, elem_ty, raw_ptr)
+        else:
+            result = wl_build_load(self.builder, i64_ty, raw_ptr)
         let remove_fn = self.ensure_vec_runtime_fn("with_vec_remove", void_ty, 2)
         let remove_ty = self.get_vec_fn_type("with_vec_remove", void_ty, 2)
-        let args: Vec[i64] = Vec.new()
-        args.push(recv_ptr)
-        args.push(idx64)
-        result = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&args), 2)
+        let rm_args: Vec[i64] = Vec.new()
+        rm_args.push(recv_ptr)
+        rm_args.push(idx64)
+        let _ = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&rm_args), 2)
 
     else if intrinsic == MirIntrinsic.VEC_CLEAR:
+        // #606: drop each live element before resetting len. No-op for POD elements
+        // (mir_emit_vec_element_drops_ptr gates on element-needs-drop internally).
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let clear_recv_op = body.call_arg_operands.get(arg_start as i64)
+        self.mir_emit_vec_element_drops_ptr(recv_ptr, self.mir_operand_sema_type(body, clear_recv_op))
         let clear_fn = self.ensure_vec_runtime_fn("with_vec_clear", void_ty, 1)
         let clear_ty = self.get_vec_fn_type("with_vec_clear", void_ty, 1)
         let args: Vec[i64] = Vec.new()

@@ -571,6 +571,10 @@ type Sema {
     bind_types: Vec[i32],
     bind_muts: Vec[i32],
     bind_states: Vec[i32],
+    moved_field_base_syms: Vec[i32],
+    moved_field_path_starts: Vec[i32],
+    moved_field_path_counts: Vec[i32],
+    moved_field_path_syms: Vec[i32],
     bind_is_task: Vec[i32],
     bind_task_used: Vec[i32],
     bind_is_scoped_task: Vec[i32],
@@ -1555,6 +1559,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bind_types: Vec.new(),
         bind_muts: Vec.new(),
         bind_states: Vec.new(),
+        moved_field_base_syms: Vec.new(),
+        moved_field_path_starts: Vec.new(),
+        moved_field_path_counts: Vec.new(),
+        moved_field_path_syms: Vec.new(),
         bind_is_task: Vec.new(),
         bind_task_used: Vec.new(),
         bind_is_scoped_task: Vec.new(),
@@ -3338,6 +3346,7 @@ fn Sema.pop_scope(self: Sema):
             self.pending_generic_binding_base.remove(removed_sym)
             self.pending_generic_binding_call.remove(removed_sym)
             self.pending_generic_binding_decl.remove(removed_sym)
+        self.clear_moved_fields_for_binding(removed_sym)
         self.scope_name_map.remove(removed_sym)
         self.bind_names.pop()
         self.bind_types.pop()
@@ -3493,6 +3502,106 @@ fn Sema.scope_lookup_state(self: Sema, sym: i32) -> i32:
         return self.bind_states.get(opt.unwrap() as i64)
     VarState.LIVE
 
+fn Sema.moved_field_path_matches(self: Sema, idx: i32, base_sym: i32, path_start: i32, path_count: i32) -> i32:
+    if idx < 0 or idx >= self.moved_field_base_syms.len() as i32:
+        return 0
+    if self.moved_field_base_syms.get(idx as i64) != base_sym:
+        return 0
+    if self.moved_field_path_counts.get(idx as i64) != path_count:
+        return 0
+    let stored_start = self.moved_field_path_starts.get(idx as i64)
+    for pi in 0..path_count:
+        if self.moved_field_path_syms.get((stored_start + pi) as i64) != self.borrow_path_data.get((path_start + pi) as i64):
+            return 0
+    1
+
+fn Sema.moved_field_path_has_prefix(self: Sema, idx: i32, base_sym: i32, path_start: i32, path_count: i32) -> i32:
+    if idx < 0 or idx >= self.moved_field_base_syms.len() as i32:
+        return 0
+    if self.moved_field_base_syms.get(idx as i64) != base_sym:
+        return 0
+    let stored_count = self.moved_field_path_counts.get(idx as i64)
+    if stored_count < path_count:
+        return 0
+    let stored_start = self.moved_field_path_starts.get(idx as i64)
+    for pi in 0..path_count:
+        if self.moved_field_path_syms.get((stored_start + pi) as i64) != self.borrow_path_data.get((path_start + pi) as i64):
+            return 0
+    1
+
+fn Sema.field_move_path_for_expr(self: Sema, node: i32) -> i64:
+    let base_sym = self.place_root_sym(node)
+    if base_sym == 0:
+        return 0
+    if self.scope_has(base_sym) == 0:
+        return 0
+    let path_start = self.borrow_path_data.len() as i32
+    let path_count = self.borrow_collect_path(node)
+    if path_count <= 0:
+        return 0
+    (base_sym as i64) | ((path_start as i64) << 32) | ((path_count as i64) << 48)
+
+fn Sema.mark_field_moved(self: Sema, node: i32):
+    let packed = self.field_move_path_for_expr(node)
+    if packed == 0:
+        return
+    let base_sym = (packed & 4294967295) as i32
+    let path_start = ((packed >> 32) & 65535) as i32
+    let path_count = ((packed >> 48) & 65535) as i32
+    for i in 0..self.moved_field_base_syms.len() as i32:
+        if self.moved_field_path_matches(i, base_sym, path_start, path_count) != 0:
+            return
+    let stored_start = self.moved_field_path_syms.len() as i32
+    for pi in 0..path_count:
+        self.moved_field_path_syms.push(self.borrow_path_data.get((path_start + pi) as i64))
+    self.moved_field_base_syms.push(base_sym)
+    self.moved_field_path_starts.push(stored_start)
+    self.moved_field_path_counts.push(path_count)
+
+fn Sema.field_is_moved(self: Sema, node: i32) -> i32:
+    let packed = self.field_move_path_for_expr(node)
+    if packed == 0:
+        return 0
+    let base_sym = (packed & 4294967295) as i32
+    let path_start = ((packed >> 32) & 65535) as i32
+    let path_count = ((packed >> 48) & 65535) as i32
+    for i in 0..self.moved_field_base_syms.len() as i32:
+        if self.moved_field_path_matches(i, base_sym, path_start, path_count) != 0:
+            return 1
+    0
+
+fn Sema.remove_moved_field_entry(self: Sema, idx: i32):
+    let last = self.moved_field_base_syms.len() as i32 - 1
+    if idx < 0 or idx > last:
+        return
+    if idx != last:
+        self.moved_field_base_syms.set_i32(idx as i64, self.moved_field_base_syms.get(last as i64))
+        self.moved_field_path_starts.set_i32(idx as i64, self.moved_field_path_starts.get(last as i64))
+        self.moved_field_path_counts.set_i32(idx as i64, self.moved_field_path_counts.get(last as i64))
+    self.moved_field_base_syms.pop()
+    self.moved_field_path_starts.pop()
+    self.moved_field_path_counts.pop()
+
+fn Sema.clear_moved_fields_for_binding(self: Sema, sym: i32):
+    var i = self.moved_field_base_syms.len() as i32 - 1
+    while i >= 0:
+        if self.moved_field_base_syms.get(i as i64) == sym:
+            self.remove_moved_field_entry(i)
+        i = i - 1
+
+fn Sema.clear_moved_fields_for_place_expr(self: Sema, node: i32):
+    let packed = self.field_move_path_for_expr(node)
+    if packed == 0:
+        return
+    let base_sym = (packed & 4294967295) as i32
+    let path_start = ((packed >> 32) & 65535) as i32
+    let path_count = ((packed >> 48) & 65535) as i32
+    var i = self.moved_field_base_syms.len() as i32 - 1
+    while i >= 0:
+        if self.moved_field_path_has_prefix(i, base_sym, path_start, path_count) != 0:
+            self.remove_moved_field_entry(i)
+        i = i - 1
+
 fn Sema.scope_lookup_is_task(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)
     if opt.is_some():
@@ -3606,6 +3715,9 @@ fn Sema.scope_set_state(self: Sema, sym: i32, state: i32):
     if opt.is_some():
         if state == VarState.MOVED:
             self.check_live_views_for_origin(sym, sym)
+            self.clear_moved_fields_for_binding(sym)
+        else if state == VarState.LIVE:
+            self.clear_moved_fields_for_binding(sym)
         self.bind_states.set_i32(opt.unwrap() as i64, state)
 
 fn Sema.scope_has(self: Sema, sym: i32) -> i32:
@@ -3843,7 +3955,13 @@ fn Sema.type_needs_drop(self: Sema, tid: i32) -> i32:
         return 1
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_GENERIC_INST:
-        let base_name = self.pool_resolve(self.get_generic_inst_base(resolved as i32))
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        // A5 (#606): a std Vec[T] needs drop iff its element T needs drop. POD-element
+        // Vecs (Vec[i32], Vec[str], …) stay non-drop — freeing those buffers is the
+        // separate wide flip, not element drop. str is Copy, so Vec[str] is non-drop.
+        if base_sym == self.syms.vec:
+            return self.type_needs_drop(self.get_generic_inst_arg(resolved as i32, 0))
+        let base_name = self.pool_resolve(base_sym)
         if base_name == "Sender" or base_name == "Receiver":
             return 1
     for vi in 0..self.needs_drop_visit.len() as i32:

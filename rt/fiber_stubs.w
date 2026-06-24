@@ -3,6 +3,7 @@
 // Linked only when fiber.o is not present, so these can be strong definitions.
 
 extern fn abort() -> Unit
+extern fn with_debug_alloc_report_leaks() -> Unit
 
 pub fn with_runtime_init() -> Unit:
     let _ = 0
@@ -11,7 +12,7 @@ pub fn with_runtime_run() -> Unit:
     let _ = 0
 
 pub fn with_runtime_shutdown() -> Unit:
-    let _ = 0
+    with_debug_alloc_report_leaks()
 
 pub fn with_runtime_run_one_step() -> Unit:
     let _ = 0

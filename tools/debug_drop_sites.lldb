@@ -1,0 +1,25 @@
+# tools/debug_drop_sites.lldb — resolve alloc/free SOURCE SITES for an address.
+#
+# The debug allocator (--debug-alloc) reports WHICH block double-freed or leaked
+# (its address). This lldb command file resolves WHERE that block was allocated
+# and freed, by breaking on the allocator entry points with backtraces. (The lldb
+# on the dev box has no script interpreter, so this is plain commands — no Python.)
+#
+# Usage — run the repro under lldb and grep the log for the flagged address:
+#
+#   lldb --batch -s tools/debug_drop_sites.lldb \
+#       -o "run run <repro.w>" -o "quit" -- out/release/bin/with \
+#     2>&1 | grep -A6 "<addr-from-debug-alloc>"
+#
+# For a standalone repro binary (built with `with build <repro> -o bin`), use
+# `-- ./bin` and `-o run`. Each alloc/free prints x0 (the payload/arg pointer)
+# and a short backtrace; match x0 against the address the ledger reported.
+
+breakpoint set --name rt_alloc
+breakpoint command add --one-liner "register read x0" --one-liner "bt 6" --one-liner "continue"
+
+breakpoint set --name rt_free
+breakpoint command add --one-liner "register read x0" --one-liner "bt 6" --one-liner "continue"
+
+breakpoint set --name with_vec_free
+breakpoint command add --one-liner "register read x0" --one-liner "bt 6" --one-liner "continue"
