@@ -538,7 +538,13 @@ fn free_small_block(block: i64, idx: i32):
 // walkable frame-pointer chain, so in-process backtraces are not used.
 // All ledger ops run under the allocator lock (called from rt_alloc/rt_free).
 let DBG_CAP: i64 = 65536            // hash slots (power of two)
-let DBG_ENTRY_WORDS: i64 = 4        // addr, size, freed, reserved
+let DBG_ENTRY_WORDS: i64 = 4        // addr, size, freed, alloc_origin
+
+let DBG_ORIGIN_UNKNOWN: i64 = 0
+let DBG_ORIGIN_WITH_ALLOC: i64 = 1
+let DBG_ORIGIN_VEC: i64 = 2
+let DBG_ORIGIN_CHANNEL: i64 = 3
+let DBG_ORIGIN_FIBER: i64 = 4
 
 var dbg_state: i32 = 0              // 0=unread, 1=off, 2=on (cached, read once)
 var dbg_scribble_state: i32 = 0    // 0=unread, 1=off, 2=on (cached, read once)
@@ -594,7 +600,7 @@ fn dbg_entry_addr(slot: i64) -> i64:
     dbg_base + slot * DBG_ENTRY_WORDS * 8
 
 // Record (or reset, on address reuse) a live allocation.
-fn dbg_record_alloc(addr: i64, size: i64):
+fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
     if dbg_base == 0:
         dbg_ledger_init()
     if dbg_base == 0:
@@ -608,6 +614,7 @@ fn dbg_record_alloc(addr: i64, size: i64):
             unsafe *(e as *mut i64) = addr
             unsafe *((e + 8) as *mut i64) = size
             unsafe *((e + 16) as *mut i64) = 0      // freed flag clear (reuse-safe)
+            unsafe *((e + 24) as *mut i64) = origin
             return
         slot = (slot + 1) & (DBG_CAP - 1)
         probes = probes + 1
@@ -654,11 +661,41 @@ fn dbg_ledger_size(addr: i64) -> i64:
         probes = probes + 1
     0
 
-fn dbg_report_double_free(addr: i64, size: i64):
+fn dbg_ledger_origin(addr: i64) -> i64:
+    if dbg_base == 0:
+        return DBG_ORIGIN_UNKNOWN
+    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var probes: i64 = 0
+    while probes < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a == 0:
+            return DBG_ORIGIN_UNKNOWN
+        if a == addr:
+            return unsafe *((e + 24) as *const i64)
+        slot = (slot + 1) & (DBG_CAP - 1)
+        probes = probes + 1
+    DBG_ORIGIN_UNKNOWN
+
+fn dbg_put_origin(origin: i64):
+    if origin == DBG_ORIGIN_WITH_ALLOC:
+        dbg_puts("with_alloc" as *const u8, 10)
+    else if origin == DBG_ORIGIN_VEC:
+        dbg_puts("Vec" as *const u8, 3)
+    else if origin == DBG_ORIGIN_CHANNEL:
+        dbg_puts("channel" as *const u8, 7)
+    else if origin == DBG_ORIGIN_FIBER:
+        dbg_puts("fiber" as *const u8, 5)
+    else:
+        dbg_puts("unknown" as *const u8, 7)
+
+fn dbg_report_double_free(addr: i64, size: i64, origin: i64):
     dbg_puts("debug-alloc: DOUBLE FREE addr=" as *const u8, 30)
     dbg_put_i64(addr)
     dbg_puts(" size=" as *const u8, 6)
     dbg_put_i64(size)
+    dbg_puts(" origin=" as *const u8, 8)
+    dbg_put_origin(origin)
     dbg_puts("\n" as *const u8, 1)
     rt_exit(134)
 
@@ -685,10 +722,13 @@ pub fn with_debug_alloc_report_leaks() -> Unit:
             let freed = unsafe *((e + 16) as *const i64)
             if freed == 0:
                 let size = unsafe *((e + 8) as *const i64)
+                let origin = unsafe *((e + 24) as *const i64)
                 dbg_puts("debug-alloc: LEAK addr=" as *const u8, 23)
                 dbg_put_i64(a)
                 dbg_puts(" size=" as *const u8, 6)
                 dbg_put_i64(size)
+                dbg_puts(" origin=" as *const u8, 8)
+                dbg_put_origin(origin)
                 dbg_puts("\n" as *const u8, 1)
                 leaks = leaks + 1
         slot = slot + 1
@@ -740,15 +780,18 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
     alloc_store_small_header(block, cls_size)
     small_block_ptr(block)
 
-fn rt_alloc(size_arg: i64) -> *mut u8:
+fn rt_alloc_with_origin(size_arg: i64, origin: i64) -> *mut u8:
     rt_allocator_lock()
     let ptr = rt_alloc_unlocked(size_arg)
     if dbg_on() != 0 and ptr as i64 != 0:
-        dbg_record_alloc(ptr as i64, alloc_payload_size(ptr as *const u8))
+        dbg_record_alloc(ptr as i64, alloc_payload_size(ptr as *const u8), origin)
     rt_allocator_unlock()
     if rt_payload_start_can_be_owned(ptr as *const u8) == 0:
         with_panic_core(make_str("allocator returned invalid payload" as *const u8, 34), make_str("" as *const u8, 0), 0)
     ptr
+
+fn rt_alloc(size_arg: i64) -> *mut u8:
+    rt_alloc_with_origin(size_arg, DBG_ORIGIN_UNKNOWN)
 
 fn rt_free_unlocked(ptr: *mut u8):
     if ptr as i64 == 0:
@@ -757,7 +800,7 @@ fn rt_free_unlocked(ptr: *mut u8):
     // panic so the report names the address; poison freed small payloads.
     if dbg_on() != 0:
         if dbg_mark_free(ptr as i64) != 0:
-            dbg_report_double_free(ptr as i64, dbg_ledger_size(ptr as i64))
+            dbg_report_double_free(ptr as i64, dbg_ledger_size(ptr as i64), dbg_ledger_origin(ptr as i64))
         if dbg_scribble_on() != 0:
             let dbg_size = alloc_payload_size(ptr as *const u8)
             if dbg_size <= RT_LARGE_THRESHOLD:
@@ -877,11 +920,14 @@ pub fn with_str_to_cstr(s: str) -> *mut u8:
 // ── Exported allocator/memory API for std/mem.w ───────────────────
 
 pub fn with_alloc(size: i64) -> *mut u8:
-    rt_alloc(size)
+    rt_alloc_with_origin(size, DBG_ORIGIN_WITH_ALLOC)
+
+pub fn with_alloc_origin(size: i64, origin: i64) -> *mut u8:
+    rt_alloc_with_origin(size, origin)
 
 pub fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8:
     let total = count * size
-    let ptr = rt_alloc(total)
+    let ptr = rt_alloc_with_origin(total, DBG_ORIGIN_WITH_ALLOC)
     if ptr as i64 != 0 and total > 0:
         rt_memset(ptr, 0, total)
     ptr
@@ -1933,7 +1979,7 @@ pub fn with_vec_new_with_capacity_out(out: *mut u8, elem_size: i64, cap: i64) ->
     vec_set_len(out, 0)
     vec_set_cap(out, cap)
     if cap > 0:
-        vec_set_ptr_field(out, rt_alloc(cap * elem_size))
+        vec_set_ptr_field(out, rt_alloc_with_origin(cap * elem_size, DBG_ORIGIN_VEC))
     else:
         vec_set_ptr_field(out, 0 as *mut u8)
 
@@ -1941,7 +1987,7 @@ fn vec_grow(v: *mut u8):
     let old_cap = vec_get_cap(v)
     let new_cap = if old_cap < 8: 8 as i64 else: old_cap * 2
     let es = vec_get_elem_size(v)
-    let new_ptr = rt_alloc(new_cap * es)
+    let new_ptr = rt_alloc_with_origin(new_cap * es, DBG_ORIGIN_VEC)
     let old_ptr = vec_get_ptr_field(v)
     let vlen = vec_get_len(v)
     if old_ptr as i64 != 0 and vlen > 0:

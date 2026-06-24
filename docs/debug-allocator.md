@@ -86,12 +86,14 @@ All additive to `rt/rt_core.w`; pure `.w`.
 
 - **Ledger.** A side table backed by a direct `rt_mmap` region (never recursing through the
   instrumented allocator), an open-addressing hash keyed by payload address:
-  `{addr, size, freed_flag}`. Guarded by the existing allocator lock. The gate is read once
-  via the non-allocating `rt_getenv` (`with_getenv_str` would deadlock the non-reentrant
-  allocator lock) and cached.
+  `{addr, size, freed_flag, alloc_origin}`. Guarded by the existing allocator lock. The
+  gate is read once via the non-allocating `rt_getenv` (`with_getenv_str` would deadlock
+  the non-reentrant allocator lock) and cached.
 - **Instrumented alloc/free.** `rt_alloc` records (or, on address reuse, resets) an entry.
-  `rt_free` looks up the entry *before* the existing ownership check: if already freed →
-  **double-free**, print `debug-alloc: DOUBLE FREE addr=<a> size=<n>` and abort (exit 134);
+  Tagged front doors such as `with_alloc`, Vec buffer growth, channel allocation, and fiber
+  record allocation store a coarse allocation-origin token. `rt_free` looks up the entry
+  *before* the existing ownership check: if already freed → **double-free**, print
+  `debug-alloc: DOUBLE FREE addr=<a> size=<n> origin=<site>` and abort (exit 134);
   else mark freed. This sees freelist double-pushes the existing
   `rt_payload_start_can_be_owned` panic can miss.
 - **Scribble on free (opt-in: `WITH_DEBUG_ALLOC_SCRIBBLE`).** Freed small payloads are
@@ -102,12 +104,13 @@ All additive to `rt/rt_core.w`; pure `.w`.
   specifically. The freelist link lives in the header word (`payload-16`), untouched.
   (Not "never-reuse" — that would break the slab; a never-reuse UAF mode is a later refinement.)
 - **Leak at exit.** `with_runtime_shutdown` (on the native `with run`/`build` exit path)
-  prints `debug-alloc: LEAK addr=<a> size=<n>` for every still-live entry, then a
-  `leak count=<k>`. A field-drop that never fires shows up as a live entry (the slab's
-  freelist recycle is recorded as a free, so it is *not* a false leak).
-- **Site resolution (harness).** Given the address from a double-free abort or a leak line,
-  the driver runs lldb conditioned on that address (break on `rt_alloc` returning it / on
-  `rt_free` / `with_vec_free` taking it, `bt` at each) to name the alloc and free call sites.
+  prints `debug-alloc: LEAK addr=<a> size=<n> origin=<site>` for every still-live entry,
+  then a `leak count=<k>`. A field-drop that never fires shows up as a live entry (the
+  slab's freelist recycle is recorded as a free, so it is *not* a false leak).
+- **Site resolution (harness).** The in-process report names the coarse origin token
+  directly. When an exact source line is needed, the driver can still run lldb conditioned
+  on the address (break on `rt_alloc` returning it / on `rt_free` / `with_vec_free` taking
+  it, `bt` at each) to name precise alloc and free call sites.
 
 ## Gating: runtime-gated, two discoverable front doors
 

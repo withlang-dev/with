@@ -5,6 +5,7 @@
 // native compiler runtime and embedded runtime payload.
 
 extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_alloc_origin(size: i64, origin: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> Unit
 extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> Unit
@@ -14,6 +15,7 @@ extern fn with_runtime_has_fibers() -> i32
 extern fn with_runtime_run_one_step() -> Unit
 
 let CHAN_INITIAL_CAPACITY: i32 = 16
+let DBG_ALLOC_ORIGIN_CHANNEL: i64 = 3
 type ChannelDropFn = *const fn(*mut u8) -> Unit
 
 // Packed channel layout:
@@ -109,7 +111,7 @@ fn channel_grow(handle: i64) -> i32:
         new_cap = CHAN_INITIAL_CAPACITY
 
     let elem_size = chan_field_i32(handle, CHAN_OFF_ELEM_SIZE)
-    let new_buf = with_alloc(elem_size as i64 * new_cap as i64)
+    let new_buf = with_alloc_origin(elem_size as i64 * new_cap as i64, DBG_ALLOC_ORIGIN_CHANNEL)
     if new_buf as i64 == 0:
         return 0
 
@@ -139,14 +141,14 @@ fn channel_block_until_progress():
         with_runtime_run_one_step()
 
 pub fn with_channel_create(capacity: i32, elem_size: i32, drop_fn: ChannelDropFn) -> i64:
-    let ch = with_alloc(CHAN_SIZE)
+    let ch = with_alloc_origin(CHAN_SIZE, DBG_ALLOC_ORIGIN_CHANNEL)
     if ch as i64 == 0:
         return 0
     with_memset(ch, 0, CHAN_SIZE)
 
     let actual_elem_size = if elem_size > 0: elem_size else: 1
     let actual_cap = if capacity > 0: capacity else: CHAN_INITIAL_CAPACITY
-    let buffer = with_alloc(actual_elem_size as i64 * actual_cap as i64)
+    let buffer = with_alloc_origin(actual_elem_size as i64 * actual_cap as i64, DBG_ALLOC_ORIGIN_CHANNEL)
     if buffer as i64 == 0:
         with_free(ch)
         return 0

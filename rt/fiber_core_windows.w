@@ -4,6 +4,7 @@
 // ABI declarations instead of c_import so the runtime stays self-contained.
 
 extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_alloc_origin(size: i64, origin: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> Unit
@@ -23,6 +24,7 @@ extern fn with_fiber_switch(save: *mut u8, restore: *mut u8) -> Unit
 extern fn with_fiber_prepare_initial_context(ctx: *mut u8, stack: *mut u8, stack_size: i64) -> Unit
 
 let MAX_FIBERS: i32 = 1024
+let DBG_ALLOC_ORIGIN_FIBER: i64 = 4
 let FIBER_STACK_SIZE: i64 = 65536
 let FIBER_SLOT_BITS: i32 = 10
 let FIBER_SLOT_MASK: i32 = 1023
@@ -375,7 +377,7 @@ fn acquire_fiber() -> i64:
         fiber_pool_reuse_count = fiber_pool_reuse_count + 1
         return f
 
-    let f = with_alloc(FIBER_SIZE) as i64
+    let f = with_alloc_origin(FIBER_SIZE, DBG_ALLOC_ORIGIN_FIBER) as i64
     if f == 0:
         return 0
     with_memset(f as *mut u8, 0, FIBER_SIZE)
