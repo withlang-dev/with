@@ -697,6 +697,160 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
+fn run_fixpoint_diff_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let output = ctx.output()
+    let out_dir = build_project_dirname(output)
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("fixpoint-diff: could not create output dir: " ++ out_dir)
+        return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, stage_compiler_bin("with-stage2"))
+    let left = build_project_abs(root, stage_compiler_obj("with-stage2-fixpoint.o"))
+    let right = build_project_abs(root, stage_compiler_obj("with-stage3-fixpoint.o"))
+    let err_path = build_project_abs(root, build_project_join(out_dir, "stderr.txt"))
+    var args: Vec[str] = Vec.new()
+    args.push(compiler)
+    args.push("fixpoint-diff")
+    args.push(left)
+    args.push(right)
+    let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, output), err_path, 120000, root)
+    if result.rc != 0:
+        ctx.diagnostics().error("fixpoint-diff: report command failed; stderr=" ++ err_path)
+        return result.rc
+    0
+
+fn deep_debug_tool_expect(ctx: &ActionCtx, root: str, compiler: str, source_path: str, out_dir: str, name: str, opt_a: str, opt_b: str, needle: str) -> i32:
+    var args: Vec[str] = Vec.new()
+    args.push(compiler)
+    args.push("check")
+    if opt_a.len() > 0:
+        args.push(opt_a)
+    if opt_b.len() > 0:
+        args.push(opt_b)
+    args.push(source_path)
+
+    let stdout_rel = build_project_join(out_dir, name ++ ".stdout")
+    let stderr_rel = build_project_join(out_dir, name ++ ".stderr")
+    let stdout_path = build_project_abs(root, stdout_rel)
+    let stderr_path = build_project_abs(root, stderr_rel)
+    let result = ctx.process_runner().run_capture_cwd(args, stdout_path, stderr_path, 120000, root)
+    if result.rc != 0:
+        ctx.diagnostics().error(f"deep-debug-tool-tests: {name} failed rc={result.rc}; stdout={stdout_path} stderr={stderr_path}")
+        return result.rc
+    if not ctx.fs().read_text(stdout_rel).contains(needle):
+        ctx.diagnostics().error("deep-debug-tool-tests: " ++ name ++ " report missing '" ++ needle ++ "'; stdout=" ++ stdout_path)
+        return 1
+    0
+
+fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: missing compiler input")
+        return 1
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not create output dir: " ++ out_dir)
+        return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, inputs.get(0))
+    let reduce_input = build_project_join(out_dir, "reduce-input.w")
+    let reduce_output = build_project_join(out_dir, "reduce-output.w")
+    let reduce_source =
+        "fn unused:\n" ++
+        "    let ok = 1\n" ++
+        "    let _ = ok\n\n" ++
+        "fn main:\n" ++
+        "    missing_symbol\n"
+    if fs.write_text(reduce_input, reduce_source) != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not write reducer fixture")
+        return 1
+    var reduce_args: Vec[str] = Vec.new()
+    reduce_args.push(compiler)
+    reduce_args.push("reduce")
+    reduce_args.push(build_project_abs(root, reduce_input))
+    reduce_args.push("--out")
+    reduce_args.push(build_project_abs(root, reduce_output))
+    reduce_args.push("--contains")
+    reduce_args.push("undefined variable")
+    reduce_args.push("--")
+    reduce_args.push(compiler)
+    reduce_args.push("check")
+    reduce_args.push("{file}")
+    let reduce_stdout = build_project_abs(root, build_project_join(out_dir, "reduce.stdout"))
+    let reduce_stderr = build_project_abs(root, build_project_join(out_dir, "reduce.stderr"))
+    let reduce_result = ctx.process_runner().run_capture_cwd(reduce_args, reduce_stdout, reduce_stderr, 120000, root)
+    if reduce_result.rc != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: reduce failed; stderr=" ++ reduce_stderr)
+        return reduce_result.rc
+    let reduced_text = fs.read_text(reduce_output)
+    if not reduced_text.contains("missing_symbol"):
+        ctx.diagnostics().error("deep-debug-tool-tests: reducer output lost predicate line")
+        return 1
+
+    let left = build_project_join(out_dir, "left.bin")
+    let right = build_project_join(out_dir, "right.bin")
+    let report = build_project_join(out_dir, "fixpoint-diff.txt")
+    if fs.write_text(left, "abc") != 0 or fs.write_text(right, "abd") != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not write diff fixtures")
+        return 1
+    var diff_args: Vec[str] = Vec.new()
+    diff_args.push(compiler)
+    diff_args.push("fixpoint-diff")
+    diff_args.push(build_project_abs(root, left))
+    diff_args.push(build_project_abs(root, right))
+    let diff_stderr = build_project_abs(root, build_project_join(out_dir, "fixpoint-diff.stderr"))
+    let diff_result = ctx.process_runner().run_capture_cwd(diff_args, build_project_abs(root, report), diff_stderr, 120000, root)
+    if diff_result.rc != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: fixpoint-diff failed; stderr=" ++ diff_stderr)
+        return diff_result.rc
+    if not fs.read_text(report).contains("first-different-offset"):
+        ctx.diagnostics().error("deep-debug-tool-tests: fixpoint-diff report missing offset")
+        return 1
+
+    let ownership_input = build_project_join(out_dir, "ownership-input.w")
+    let ownership_source =
+        "type Resource { id: i32 }\n\n" ++
+        "type Plain { id: i32 }\n\n" ++
+        "impl Drop for Resource:\n" ++
+        "    fn drop(move self: Self):\n" ++
+        "        let _ = self.id\n\n" ++
+        "fn consume(r: Resource):\n" ++
+        "    let _ = r.id\n\n" ++
+        "fn choose(flag: bool):\n" ++
+        "    if flag:\n" ++
+        "        let x = 1\n" ++
+        "        let _ = x\n" ++
+        "    else:\n" ++
+        "        let y = 2\n" ++
+        "        let _ = y\n\n" ++
+        "fn main:\n" ++
+        "    let p = Plain { id: 3 }\n" ++
+        "    let value = p.id\n" ++
+        "    let _ = value\n" ++
+        "    let r = Resource { id: 7 }\n" ++
+        "    consume(r)\n" ++
+        "    choose(true)\n"
+    if fs.write_text(ownership_input, ownership_source) != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not write ownership fixture")
+        return 1
+    let ownership_abs = build_project_abs(root, ownership_input)
+    if deep_debug_tool_expect(ctx, root, compiler, ownership_abs, out_dir, "trace-ownership", "--trace-ownership", "main:", "event=") != 0:
+        return 1
+    if deep_debug_tool_expect(ctx, root, compiler, ownership_abs, out_dir, "dump-drop-plan", "--dump-drop-plan", "", "drop-plan module") != 0:
+        return 1
+    if deep_debug_tool_expect(ctx, root, compiler, ownership_abs, out_dir, "validate-ownership", "--validate-ownership", "", "validate-ownership: ok") != 0:
+        return 1
+    if deep_debug_tool_expect(ctx, root, compiler, ownership_abs, out_dir, "dump-place-map", "--dump-place-map", "", "projections=[Field") != 0:
+        return 1
+    if deep_debug_tool_expect(ctx, root, compiler, ownership_abs, out_dir, "trace-cleanup-edge", "--trace-cleanup-edge", "choose:bb0->bb1", "edge=bb0->bb1") != 0:
+        return 1
+    if deep_debug_tool_expect(ctx, root, compiler, ownership_abs, out_dir, "dump-drop-flags", "--dump-drop-flags", "", "drop-flags module") != 0:
+        return 1
+    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    0
+
 pub fn build(ctx: BuildCtx) -> Build:
     var out = ctx.new_build()
     let host_runtime = host_runtime_spec()
@@ -1045,6 +1199,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     fixpoint = fixpoint.dep("bless-manifest")
     out = out.add_target(fixpoint)
 
+    var fixpoint_diff = target_new(.Action, "fixpoint-diff", "").output("out/fixpoint-diff/report.txt")
+    fixpoint_diff.action = run_fixpoint_diff_action
+    fixpoint_diff = fixpoint_diff.dep("stage2")
+    fixpoint_diff = fixpoint_diff.dep("stage2-fixpoint-object")
+    fixpoint_diff = fixpoint_diff.dep("stage3-fixpoint-object")
+    fixpoint_diff = fixpoint_diff.write_scope("out/fixpoint-diff")
+    out = out.add_target(fixpoint_diff)
+
     var verified = target_new(.Group, "verified-existing-stage", "")
     verified = verified.dep("selfcheck")
     verified = verified.dep("fixpoint")
@@ -1177,6 +1339,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     debug_alloc_tests = debug_alloc_tests.dep("build")
     debug_alloc_tests = debug_alloc_tests.write_scope("out/debug-alloc-tests")
     out = out.add_target(debug_alloc_tests)
+
+    var deep_debug_tool_tests = target_new(.Action, "deep-debug-tool-tests", "").output("out/deep-debug-tool-tests")
+    deep_debug_tool_tests.action = run_deep_debug_tool_tests_action
+    deep_debug_tool_tests = deep_debug_tool_tests.input(release_compiler_bin("with"))
+    deep_debug_tool_tests = deep_debug_tool_tests.dep("build")
+    deep_debug_tool_tests = deep_debug_tool_tests.write_scope("out/deep-debug-tool-tests")
+    out = out.add_target(deep_debug_tool_tests)
 
     var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
     native_compile_error_tests = native_compile_error_tests.arg("compiler=" ++ release_compiler_bin("with"))
@@ -1330,6 +1499,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("internals-tests")
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")
+    tests = tests.dep("deep-debug-tool-tests")
     tests = tests.dep("cli-selfhost-smoke-tests")
     tests = tests.dep("cli-selfhost-one-liner-tests")
     tests = tests.dep("cli-selfhost-object-symbol-tests")

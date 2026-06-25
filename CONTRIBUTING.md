@@ -8,7 +8,6 @@
 
 - macOS ARM64 (primary development platform)
 - LLVM installed at `/usr/local/llvm` (override with `LLVM_PREFIX` env var)
-- Zig (optional, for cross-compilation via `--emit-c`)
 
 ### Clone and Build
 
@@ -18,19 +17,20 @@ cd with
 with build
 ```
 
-If you don't have `with` on PATH, first download the seed:
+If you don't have `with` on PATH, first install a published compiler binary:
 
 ```bash
-make seed
+scripts/install.sh
 ```
 
-Then `with build` compiles the full compiler. The output is `out/bin/with`.
+Then `with build` compiles the full compiler. The release compiler output is
+`out/release/bin/with`; intermediate stage compilers live under `out/stage/bin/`.
 
 ### Verify It Works
 
 ```bash
 echo 'fn main: println("Hello, World!")' > /tmp/hello.w
-./out/bin/with-stage2 build /tmp/hello.w
+./out/stage/bin/with-stage2 build /tmp/hello.w
 /tmp/hello
 ```
 
@@ -65,7 +65,7 @@ source.w
 
 Each phase has a `--dump-*` flag that prints its output and stops:
 `--dump-tokens`, `--dump-ast`, `--dump-resolved`, `--dump-typed`,
-`--dump-mir`.
+`--dump-mir`, `--dump-drop-state`, `--dump-async-mir`.
 
 ### Directory Map
 
@@ -118,7 +118,7 @@ test/
 ### Key Concepts
 
 **Self-hosting.** The With compiler is written in With. Stage 2
-(`out/bin/with-stage2`) compiles itself into Stage 3. They're
+(`out/stage/bin/with-stage2`) compiles itself into Stage 3. They're
 byte-identical — that's the fixpoint. When you change the
 compiler, you're changing the program that compiles itself.
 
@@ -222,31 +222,73 @@ produces.
 
 ## Debugging
 
+Debugging must identify the exact failing line or allocator event. Avoid
+edit/compile/trace loops: trace output and `--dump-*` files are useful for
+narrowing a hypothesis, but root cause needs `lldb`, the native debug
+allocator, or another direct observation tool.
+
 ### Reproduce First
 
 Before reaching for any tool, get a minimal reproducing command
 and narrow it to a compiler phase:
 
 ```bash
-time ./out/bin/with-stage2 check your_file.w
+time ./out/stage/bin/with-stage2 check your_file.w
 
 # Narrow by phase
-./out/bin/with-stage2 check your_file.w --dump-tokens    # lexer
-./out/bin/with-stage2 check your_file.w --dump-ast       # parser
-./out/bin/with-stage2 check your_file.w --dump-resolved  # resolver
-./out/bin/with-stage2 check your_file.w --dump-typed     # sema
-./out/bin/with-stage2 check your_file.w --dump-mir       # MIR lowering
-./out/bin/with-stage2 build your_file.w                  # full pipeline
+./out/stage/bin/with-stage2 check your_file.w --dump-tokens    # lexer
+./out/stage/bin/with-stage2 check your_file.w --dump-ast       # parser
+./out/stage/bin/with-stage2 check your_file.w --dump-resolved  # resolver
+./out/stage/bin/with-stage2 check your_file.w --dump-typed     # sema
+./out/stage/bin/with-stage2 check your_file.w --dump-mir       # MIR lowering
+./out/stage/bin/with-stage2 check your_file.w --dump-drop-state # MIR ownership state
+./out/stage/bin/with-stage2 check your_file.w --dump-drop-plan  # MIR cleanup plan
+./out/stage/bin/with-stage2 build your_file.w                  # full pipeline
 ```
 
 If `--dump-tokens` works but `--dump-ast` crashes, the bug is in
 the parser. If `--dump-resolved` works but `--dump-typed` crashes,
 it's in sema. Narrow it down before diving deeper.
 
+When a repro is larger than the failure needs, reduce it before editing:
+
+```bash
+./out/stage/bin/with-stage2 reduce your_file.w \
+    --contains "diagnostic text" \
+    -- ./out/stage/bin/with-stage2 check {file}
+```
+
+### MIR And Fixpoint Debugging
+
+For MIR lowering, ownership, and codegen bugs, use the targeted MIR tools before
+adding trace prints:
+
+```bash
+./out/stage/bin/with-stage2 check your_file.w --trace-place main:_1
+./out/stage/bin/with-stage2 check your_file.w --explain-mir-origin main:_1
+./out/stage/bin/with-stage2 check your_file.w --trace-ownership main:_1
+./out/stage/bin/with-stage2 check your_file.w --dump-drop-plan
+./out/stage/bin/with-stage2 check your_file.w --dump-place-map
+./out/stage/bin/with-stage2 check your_file.w --trace-cleanup-edge 'main:bb0->bb1'
+./out/stage/bin/with-stage2 check your_file.w --dump-drop-flags
+./out/stage/bin/with-stage2 check your_file.w --validate-all
+./out/stage/bin/with-stage2 check your_file.w --validate-ownership
+```
+
+For fixpoint failures, generate the byte-level diff report:
+
+```bash
+with build :fixpoint-diff
+cat out/fixpoint-diff/report.txt
+```
+
+See [docs/deep-debugging-tools.md](docs/deep-debugging-tools.md) for the exact
+command syntax and limits.
+
 ### Crashes: LLDB
 
 ```bash
-lldb -- ./out/bin/with-stage2 check your_file.w
+lldb -- ./out/stage/bin/with-stage2 check your_file.w
 ```
 
 Inside LLDB:
@@ -267,11 +309,44 @@ Set breakpoints for targeted debugging:
 (lldb) step / next / continue
 ```
 
-### Heap Corruption
+### Drop, Lifetime, And With-Allocator Bugs
+
+For double-free, use-after-free, leak, or suspicious drop behavior, start with
+the native debug allocator. The With runtime uses its own slab allocator, so
+libc malloc tools do not see most With allocations.
+
+```bash
+./out/stage/bin/with-stage2 run --debug-alloc repro.w
+./out/stage/bin/with-stage2 run --debug-alloc --debug-alloc-filter=non-root repro.w
+./out/stage/bin/with-stage2 check repro.w --dump-drop-state
+./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
+./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
+WITH_DEBUG_ALLOC=1 ./path/to/already-built-repro
+with build :debug-alloc-tests
+```
+
+The report prints allocator verdicts such as `DOUBLE FREE`, `LEAK`, and
+`origin=Vec/channel/fiber/with_alloc`. Compiler-emitted drops also report
+`first_drop=` and `second_drop=` tags when a double-free is observed. To
+resolve source sites for a flagged address:
+
+```bash
+./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
+out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.w
+lldb --batch -s tools/debug_drop_sites.lldb \
+    -o "run run repro.w" -o "quit" -- ./out/release/bin/with
+```
+
+Use `tools/debug_drop_fields.lldb` when the allocator verdict points at a
+drop/codegen bug and you need to observe which codegen drop path fired. See
+[docs/debug-allocator.md](docs/debug-allocator.md) and
+[test/debug_alloc/README.md](test/debug_alloc/README.md).
+
+### Host Heap Corruption
 
 ```bash
 MallocScribble=1 MallocGuardEdges=1 \
-    ./out/bin/with-stage2 check your_file.w
+    ./out/stage/bin/with-stage2 check your_file.w
 ```
 
 - **MallocScribble** fills freed memory with `0x55` and new
@@ -284,18 +359,18 @@ To see where a corrupted allocation was created:
 
 ```bash
 MallocScribble=1 MallocGuardEdges=1 MallocStackLogging=1 \
-    ./out/bin/with-stage2 check your_file.w
+    ./out/stage/bin/with-stage2 check your_file.w
 ```
 
 ### Memory Leaks
 
 ```bash
-leaks --atExit -- ./out/bin/with-stage2 check your_file.w
+leaks --atExit -- ./out/stage/bin/with-stage2 check your_file.w
 ```
 
-Arena allocations freed at process exit show up as leaks but aren't
-bugs. Focus on leaks that grow proportionally to input size — those
-indicate missing cleanup in a loop or phase transition.
+Use this for host/libc-level leaks. For With runtime allocations, prefer
+`--debug-alloc`, because `leaks` cannot classify logical allocations inside the
+runtime slab.
 
 ### Deep Memory Analysis: Instruments
 
@@ -303,7 +378,7 @@ indicate missing cleanup in a loop or phase transition.
 xcrun xctrace record \
     --template "Leaks" \
     --output /tmp/with-leaks.trace \
-    --launch -- ./out/bin/with-stage2 check your_file.w
+    --launch -- ./out/stage/bin/with-stage2 check your_file.w
 
 open /tmp/with-leaks.trace
 ```
@@ -315,13 +390,13 @@ Other useful templates: **Allocations** (track every allocation),
 
 ```bash
 # Quick timing
-time ./out/bin/with-stage2 check src/main.w
+time ./out/stage/bin/with-stage2 check src/main.w
 
 # Instruments
 xcrun xctrace record \
     --template "Time Profiler" \
     --output /tmp/with-profile.trace \
-    --launch -- ./out/bin/with-stage2 check src/main.w
+    --launch -- ./out/stage/bin/with-stage2 check src/main.w
 
 open /tmp/with-profile.trace
 ```
@@ -329,7 +404,7 @@ open /tmp/with-profile.trace
 For a quick command-line sample without Instruments:
 
 ```bash
-./out/bin/with-stage2 check src/main.w &
+./out/stage/bin/with-stage2 check src/main.w &
 sample $(pgrep -n with-stage2) 5 -file /tmp/with-sample.txt
 cat /tmp/with-sample.txt
 ```
@@ -352,7 +427,7 @@ cat > /tmp/debug.entitlements <<'EOF'
 EOF
 
 codesign -s - --entitlements /tmp/debug.entitlements --force \
-    ./out/bin/with-stage2
+    ./out/stage/bin/with-stage2
 ```
 
 Re-sign after every rebuild. One-time machine setup:
@@ -367,8 +442,12 @@ sudo dseditgroup -o edit -a "$USER" -t user _developer
 | Problem | Tool | Overhead |
 |---|---|---|
 | Crash / segfault | `lldb` | None |
-| Use-after-free / overflow | `MallocScribble` + `MallocGuardEdges` | ~1.2x |
-| Memory leaks | `leaks --atExit` | ~1.5x |
+| Large repro | `with reduce` | Predicate cost |
+| MIR ownership/codegen bug | `--trace-place`, `--explain-mir-origin`, `--trace-ownership`, `--dump-place-map`, `--validate-all`, `--validate-ownership` | Check-only |
+| Fixpoint nondeterminism | `with build :fixpoint-diff` | Stage-object build |
+| With double-free / leak / drop bug | `--debug-alloc`, `--dump-drop-state`, `--dump-drop-plan`, `--trace-cleanup-edge`, `tools/debug_drop.w`, `tools/debug_drop*.lldb` | Runtime-gated |
+| Host use-after-free / overflow | `MallocScribble` + `MallocGuardEdges` | ~1.2x |
+| Host memory leaks | `leaks --atExit` | ~1.5x |
 | Allocation tracking | `MallocStackLogging` | ~3x |
 | Deep memory analysis | Instruments (Leaks / Allocations) | ~2x |
 | Performance bottleneck | Instruments (Time Profiler) or `sample` | ~1.5x |
@@ -379,6 +458,7 @@ sudo dseditgroup -o edit -a "$USER" -t user _developer
 
 Include:
 
-1. The minimal `.w` file that reproduces it.
-2. Which `--dump-*` flag narrows it to a phase.
+1. The minimal `.w` file that reproduces it, preferably reduced with `with reduce`.
+2. Which `--dump-*` flag or targeted MIR tool narrows it to a phase; include `--dump-drop-state`, `--trace-ownership`, or `--dump-drop-plan` for ownership/drop bugs.
 3. The LLDB backtrace if it crashes.
+4. The `--debug-alloc` verdict for drop/lifetime/double-free/leak bugs.

@@ -1,8 +1,8 @@
 # Build System Completion Plan
 
-Archived: historical build-system completion plan. The active Makefile-removal
-plan is `docs/eliminate-Makefile.md`. This file is retained as project history,
-not as the current implementation queue.
+Archived: historical build-system completion plan. The Makefile-removal record
+is `docs/completed/eliminate-Makefile.md`. This file is retained as project
+history, not as the current implementation queue.
 
 Status: complete. All phases implemented and verified.
 

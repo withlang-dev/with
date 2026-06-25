@@ -52,6 +52,40 @@ you. If you can answer the question with `grep`, `nm`, `otool`,
 a single breakpoint answers in seconds what print-and-rebuild
 answers in minutes. Stop adding debug prints and rebuilding.
 
+**"Root cause" means the exact line.** A root cause is complete only
+when you can name the exact function, branch, and condition producing
+the wrong state, observed in `lldb` or the debug allocator. Output
+tables, run counts, raw `--dump-mir`/`--dump-drop-state` greps, and
+added trace prints are hypotheses, not proof. Do not propose a fix or
+deferral from a characterization alone.
+
+**Self-check trip-wire.** If your last three actions were editing,
+compiling, and reading trace output, and you still cannot name the exact
+wrong line, stop the loop and switch tools. Use a breakpoint, an
+allocator verdict, `with reduce`, `--trace-place`,
+`--explain-mir-origin`, `--trace-ownership`, `--dump-drop-plan`,
+`--trace-cleanup-edge`, `--validate-all`, `nm`/`otool`, or a smaller checked
+repro before the next edit.
+
+**Workflow default for deep compiler bugs.** If the repro is not already
+minimal, run `with reduce` with the failing command as the predicate. For
+MIR lowering, ownership, and codegen bugs, use `with check --trace-place`,
+`with check --explain-mir-origin`, `with check --trace-ownership`,
+`with check --dump-drop-plan`, `with check --dump-place-map`,
+`with check --trace-cleanup-edge`, and `with check --validate-all` before
+adding temporary trace prints. For fixpoint failures, run
+`with build :fixpoint-diff` before inspecting generated objects by hand.
+
+**Workflow default for memory bugs.** Any drop, lifetime, double-free,
+use-after-free, or leak bug starts with the native debug allocator:
+`--debug-alloc` or `WITH_DEBUG_ALLOC=1`; see `docs/debug-allocator.md`.
+Use `tools/debug_drop.w` and `tools/debug_drop*.lldb` to turn the
+allocator verdict into allocation/free sites, inspect `--dump-drop-state`,
+`--trace-ownership`, and `--dump-drop-plan` for MIR ownership state, then use
+`lldb` on the compiler branch that emitted the bad drop. The allocator says
+which memory was mishandled; the dumps say which places the compiler thinks are
+live and scheduled for cleanup; the debugger says why codegen emitted it.
+
 ---
 
 ## Language Design Philosophy
@@ -595,13 +629,48 @@ old_string doesn't match due to stale context.
 ### Quick repro
 ```
 time ./out/stage/bin/with-stage2 check src/main.w
+./out/stage/bin/with-stage2 check repro.w --dump-drop-state
 ```
+
+### Deep compiler tools
+Use these before edit/compile/trace loops on MIR, ownership, codegen, or
+fixpoint bugs:
+```
+./out/stage/bin/with-stage2 reduce repro.w --contains "diagnostic" -- ./out/stage/bin/with-stage2 check {file}
+./out/stage/bin/with-stage2 check repro.w --trace-place main:_1
+./out/stage/bin/with-stage2 check repro.w --explain-mir-origin main:_1
+./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
+./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
+./out/stage/bin/with-stage2 check repro.w --dump-place-map
+./out/stage/bin/with-stage2 check repro.w --trace-cleanup-edge 'main:bb0->bb1'
+./out/stage/bin/with-stage2 check repro.w --dump-drop-flags
+./out/stage/bin/with-stage2 check repro.w --validate-all
+./out/stage/bin/with-stage2 check repro.w --validate-ownership
+with build :fixpoint-diff
+```
+See `docs/deep-debugging-tools.md`.
 
 ### LLDB (preferred)
 ```
 lldb -- ./out/stage/bin/with-stage2 check src/main.w
 (lldb) run
 (lldb) bt all
+```
+
+### Native Debug Allocator
+Use this before any edit/compile/trace loop for drop, lifetime,
+double-free, use-after-free, and leak bugs:
+```
+./out/stage/bin/with-stage2 run --debug-alloc repro.w
+./out/stage/bin/with-stage2 run --debug-alloc --debug-alloc-filter=non-root repro.w
+./out/stage/bin/with-stage2 check repro.w --dump-drop-state
+./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
+./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
+with build :debug-alloc-tests
+./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
+out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.w
+lldb --batch -s tools/debug_drop_sites.lldb \
+  -o "run run repro.w" -o "quit" -- ./out/release/bin/with
 ```
 
 ### Heap corruption

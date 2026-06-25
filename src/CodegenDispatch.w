@@ -1139,7 +1139,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: &MirBody, place_id: i32
     for i in 0..p_count:
         let pk = body.proj_kinds.get((p_start + i) as i64)
         let pd = body.proj_d0.get((p_start + i) as i64)
-        if pk == 0: // ProjKind.PK_FIELD
+        if pk == ProjKind.PK_FIELD or pk == ProjKind.PK_TUPLE_INDEX:
             if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
                 let pointee_sema = self.mir_unwrap_ref_like_sema_type(cur_sema_ty)
                 if pointee_sema > 0 and pointee_sema != cur_sema_ty:
@@ -1312,7 +1312,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: &MirBody, place_id: i32, create_ba
     for i in 0..p_count:
         let pk = body.proj_kinds.get((p_start + i) as i64)
         let pd = body.proj_d0.get((p_start + i) as i64)
-        if pk == 0: // ProjKind.PK_FIELD
+        if pk == ProjKind.PK_FIELD or pk == ProjKind.PK_TUPLE_INDEX:
             if cur_ty == 0 or wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
                 // Base is a pointer (e.g., self param) — load the pointer first
                 if cur_ty == 0:
@@ -1935,7 +1935,7 @@ fn Codegen.mir_current_owner_projected_nominal_sym(self: Codegen, body: &MirBody
     for pi in 0..p_count:
         let pk = body.proj_kinds.get((p_start + pi) as i64)
         let pd = body.proj_d0.get((p_start + pi) as i64)
-        if pk == ProjKind.PK_FIELD:
+        if pk == ProjKind.PK_FIELD or pk == ProjKind.PK_TUPLE_INDEX:
             if wl_get_type_kind(cur_ty) != wl_struct_type_kind():
                 return 0
             let fi = self.mir_resolve_field_index(cur_ty, pd)
@@ -3782,6 +3782,62 @@ fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym:
             self.mir_emit_drop_ptr(field_ptr, field_ty)
         fi = fi - 1
 
+fn Codegen.mir_drop_origin_active(self: Codegen) -> bool:
+    self.current_drop_origin_ptr != 0 and self.current_drop_origin_len != 0
+
+fn Codegen.mir_set_current_drop_origin(self: Codegen, origin_sym: i32):
+    self.current_drop_origin_ptr = 0
+    self.current_drop_origin_len = 0
+    if origin_sym == 0:
+        return
+    let text = self.intern.resolve(origin_sym)
+    if text.len() == 0:
+        return
+    self.current_drop_origin_ptr = self.const_c_string_pointer(text, wl_ptr_type(self.context))
+    self.current_drop_origin_len = wl_const_int(wl_i64_type(self.context), text.len(), 0)
+
+fn Codegen.ensure_with_free_drop_origin_fn(self: Codegen) -> i64:
+    var free_fn = wl_get_named_function(self.llmod, "with_free_drop_origin")
+    if free_fn != 0:
+        return free_fn
+    let params: Vec[i64] = Vec.new()
+    params.push(wl_ptr_type(self.context))
+    params.push(wl_ptr_type(self.context))
+    params.push(wl_i64_type(self.context))
+    let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 3, 0)
+    wl_add_function(self.llmod, "with_free_drop_origin", fn_ty)
+
+fn Codegen.ensure_with_vec_free_drop_origin_fn(self: Codegen) -> i64:
+    var free_fn = wl_get_named_function(self.llmod, "with_vec_free_drop_origin")
+    if free_fn != 0:
+        return free_fn
+    let params: Vec[i64] = Vec.new()
+    params.push(wl_ptr_type(self.context))
+    params.push(wl_ptr_type(self.context))
+    params.push(wl_i64_type(self.context))
+    let fn_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 3, 0)
+    wl_add_function(self.llmod, "with_vec_free_drop_origin", fn_ty)
+
+fn Codegen.mir_emit_with_free_ptr(self: Codegen, ptr: i64):
+    if ptr == 0:
+        return
+    if self.mir_drop_origin_active():
+        let free_fn = self.ensure_with_free_drop_origin_fn()
+        if free_fn == 0:
+            return
+        let args: Vec[i64] = Vec.new()
+        args.push(ptr)
+        args.push(self.current_drop_origin_ptr)
+        args.push(self.current_drop_origin_len)
+        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args), 3)
+        return
+    let free_fn = self.ensure_box_free_fn()
+    if free_fn == 0:
+        return
+    let args2: Vec[i64] = Vec.new()
+    args2.push(ptr)
+    let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args2), 1)
+
 fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> Unit:
     if ptr == 0 or ty == 0:
         return
@@ -4038,6 +4094,16 @@ fn Codegen.mir_emit_vec_element_drops_ptr(self: Codegen, ptr: i64, vec_sema_ty: 
 fn Codegen.mir_emit_vec_free_ptr(self: Codegen, ptr: i64) -> Unit:
     if ptr == 0:
         return
+    if self.mir_drop_origin_active():
+        let free_fn = self.ensure_with_vec_free_drop_origin_fn()
+        if free_fn == 0:
+            return
+        let args_tagged: Vec[i64] = Vec.new()
+        args_tagged.push(ptr)
+        args_tagged.push(self.current_drop_origin_ptr)
+        args_tagged.push(self.current_drop_origin_len)
+        let _tagged = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args_tagged), 3)
+        return
     let void_ty = wl_void_type(self.context)
     let free_fn = self.ensure_vec_runtime_fn("with_vec_free", void_ty, 1)
     let free_ty = self.get_vec_fn_type("with_vec_free", void_ty, 1)
@@ -4275,14 +4341,8 @@ fn Codegen.mir_emit_refcount_drop_place(self: Codegen, body: &MirBody, place_id:
     let payload_ptr_slot = wl_build_struct_gep(self.builder, inner_ty, heap_ptr, 1)
     let payload_ptr = wl_build_load(self.builder, ptr_ty, payload_ptr_slot)
     self.mir_emit_drop_ptr_for_sema_type(payload_ptr, payload_ty, payload_sema_ty)
-    let free_fn = self.ensure_box_free_fn()
-    if free_fn != 0:
-        let payload_free_args: Vec[i64] = Vec.new()
-        payload_free_args.push(payload_ptr)
-        let _payload_free = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&payload_free_args), 1)
-        let free_args: Vec[i64] = Vec.new()
-        free_args.push(heap_ptr)
-        let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&free_args), 1)
+    self.mir_emit_with_free_ptr(payload_ptr)
+    self.mir_emit_with_free_ptr(heap_ptr)
     wl_build_br(self.builder, done_bb)
     wl_position_at_end(self.builder, done_bb)
     true
@@ -4313,9 +4373,34 @@ fn Codegen.mir_emit_box_drop_place(self: Codegen, body: &MirBody, place_id: i32,
         payload_ty = self.mir_sema_type_to_llvm(payload_sema_ty)
     if payload_ty != 0:
         self.mir_emit_drop_ptr(heap_ptr, payload_ty)
-    let args: Vec[i64] = Vec.new()
-    args.push(heap_ptr)
-    let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, vec_data_i64(&args), 1)
+    self.mir_emit_with_free_ptr(heap_ptr)
+    true
+
+fn Codegen.mir_emit_drop_place_current_origin(self: Codegen, body: &MirBody, place_id: i32) -> bool:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return false
+    let drop_sema_ty = self.mir_place_sema_type(body, place_id)
+    if self.mir_emit_box_drop_place(body, place_id, drop_sema_ty):
+        return true
+    if self.mir_emit_refcount_drop_place(body, place_id, drop_sema_ty):
+        return true
+    var drop_ty = self.mir_place_projected_type(body, place_id)
+    let drop_proj_count = body.place_proj_counts.get(place_id as i64)
+    if drop_ty == 0 and drop_proj_count > 0:
+        if drop_sema_ty > 0:
+            drop_ty = self.mir_sema_type_to_llvm(drop_sema_ty)
+    if drop_ty == 0:
+        let local_id = body.place_locals.get(place_id as i64)
+        drop_ty = self.mir_local_llvm_type(body, local_id)
+    var ptr = self.mir_place_ptr(body, place_id, false, 0)
+    if ptr == 0 and drop_ty != 0:
+        ptr = self.mir_place_ptr(body, place_id, true, drop_ty)
+    if ptr != 0:
+        if drop_ty != 0:
+            if drop_sema_ty > 0:
+                self.mir_emit_drop_ptr_for_sema_type(ptr, drop_ty, drop_sema_ty)
+            else:
+                self.mir_emit_drop_ptr(ptr, drop_ty)
     true
 
 fn Codegen.mir_emit_stmt(self: Codegen, body: &MirBody, stmt_id: i32) -> bool:
@@ -4547,31 +4632,13 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: &MirBody, stmt_id: i32) -> bool:
         return true
 
     if sk == StmtKind.Drop:
-        if d0 < 0 or d0 >= body.place_locals.len() as i32:
-            return false
-        let drop_sema_ty = self.mir_place_sema_type(body, d0)
-        if self.mir_emit_box_drop_place(body, d0, drop_sema_ty):
-            return true
-        if self.mir_emit_refcount_drop_place(body, d0, drop_sema_ty):
-            return true
-        var drop_ty = self.mir_place_projected_type(body, d0)
-        let drop_proj_count = body.place_proj_counts.get(d0 as i64)
-        if drop_ty == 0 and drop_proj_count > 0:
-            if drop_sema_ty > 0:
-                drop_ty = self.mir_sema_type_to_llvm(drop_sema_ty)
-        if drop_ty == 0:
-            let local_id = body.place_locals.get(d0 as i64)
-            drop_ty = self.mir_local_llvm_type(body, local_id)
-        var ptr = self.mir_place_ptr(body, d0, false, 0)
-        if ptr == 0 and drop_ty != 0:
-            ptr = self.mir_place_ptr(body, d0, true, drop_ty)
-        if ptr != 0:
-            if drop_ty != 0:
-                if drop_sema_ty > 0:
-                    self.mir_emit_drop_ptr_for_sema_type(ptr, drop_ty, drop_sema_ty)
-                else:
-                    self.mir_emit_drop_ptr(ptr, drop_ty)
-        return true
+        let saved_origin_ptr = self.current_drop_origin_ptr
+        let saved_origin_len = self.current_drop_origin_len
+        self.mir_set_current_drop_origin(d1)
+        let ok = self.mir_emit_drop_place_current_origin(body, d0)
+        self.current_drop_origin_ptr = saved_origin_ptr
+        self.current_drop_origin_len = saved_origin_len
+        return ok
 
     if sk == StmtKind.Nop:
         return true
@@ -5402,7 +5469,7 @@ fn Codegen.mir_place_sema_type(self: Codegen, body: &MirBody, place_id: i32) -> 
     for pi in 0..p_count:
         let pk = body.proj_kinds.get((p_start + pi) as i64)
         let pd = body.proj_d0.get((p_start + pi) as i64)
-        if pk == ProjKind.PK_FIELD:
+        if pk == ProjKind.PK_FIELD or pk == ProjKind.PK_TUPLE_INDEX:
             let field_ty = if active_variant_idx >= 0:
                 self.mir_enum_payload_sema_type(ty, active_variant_idx, pd)
             else:
@@ -14169,29 +14236,8 @@ fn Codegen.mir_emit_term(self: Codegen, body: &MirBody, bb: i32) -> bool:
         return call_ok
 
     if tk == TermKind.TK_DROP_AND_GOTO:
-        if d0 < 0 or d0 >= body.place_locals.len() as i32:
+        if not self.mir_emit_drop_place_current_origin(body, d0):
             return false
-        let drop_sema_ty = self.mir_place_sema_type(body, d0)
-        let emitted_box_drop = self.mir_emit_box_drop_place(body, d0, drop_sema_ty)
-        let emitted_refcount_drop = if emitted_box_drop: false else: self.mir_emit_refcount_drop_place(body, d0, drop_sema_ty)
-        var drop_ty = self.mir_place_projected_type(body, d0)
-        if not emitted_box_drop and not emitted_refcount_drop:
-            let drop_term_proj_count = body.place_proj_counts.get(d0 as i64)
-            if drop_ty == 0 and drop_term_proj_count > 0:
-                if drop_sema_ty > 0:
-                    drop_ty = self.mir_sema_type_to_llvm(drop_sema_ty)
-            if drop_ty == 0:
-                let local_id = body.place_locals.get(d0 as i64)
-                drop_ty = self.mir_local_llvm_type(body, local_id)
-            var ptr = self.mir_place_ptr(body, d0, false, 0)
-            if ptr == 0 and drop_ty != 0:
-                ptr = self.mir_place_ptr(body, d0, true, drop_ty)
-            if ptr != 0:
-                if drop_ty != 0:
-                    if drop_sema_ty > 0:
-                        self.mir_emit_drop_ptr_for_sema_type(ptr, drop_ty, drop_sema_ty)
-                    else:
-                        self.mir_emit_drop_ptr(ptr, drop_ty)
         if d1 < 0 or d1 >= self.mir_bb_values.len() as i32:
             return false
         let target_bb = self.mir_bb_values.get(d1 as i64)

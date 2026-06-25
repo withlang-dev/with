@@ -100,6 +100,8 @@ type Codegen {
     current_function_name_sym: i32,
     current_function_node: i32,
     current_method_owner_sym: i32,
+    current_drop_origin_ptr: i64,
+    current_drop_origin_len: i64,
 
     // Pre-interned symbols for O(1) dispatch (avoid string comparisons)
     sym_vec: i32,
@@ -551,6 +553,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         current_function_name_sym: 0,
         current_function_node: 0,
         current_method_owner_sym: 0,
+        current_drop_origin_ptr: 0,
+        current_drop_origin_len: 0,
         sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
         sym_hashset: 0, sym_btreemap: 0, sym_btreeset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
         sym_vecslot: 0, sym_vecrange: 0, sym_veciterref: 0, sym_veciterplace: 0,

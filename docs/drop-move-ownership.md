@@ -70,6 +70,26 @@ delete or shelve:
 
 Also revert or isolate the generator-state clear edit unless it is separately proven. The previous evidence showed it did **not** fix the channel double-free; the path-sensitivity fix did.
 
+### Diagnostic tools to use before substrate edits
+
+Before changing MIR ownership lowering, cleanup emission, or drop glue, capture
+the current facts with the diagnostic-only `with check` tools:
+
+```text
+--dump-place-map
+--trace-ownership <fn:place>
+--dump-drop-state
+--dump-drop-plan
+--trace-cleanup-edge '<fn:bbA->bbB>'
+--dump-drop-flags
+--validate-ownership
+--validate-all
+```
+
+These reports show what MIR currently believes about places, moves, cleanup
+edges, and planned drops. They do not prove the root cause by themselves; use
+them to choose the exact lowering or codegen branch to inspect in `lldb`.
+
 ---
 
 ## Non-Goals
@@ -562,7 +582,9 @@ h.items = Init
 
 This preserves chaining and keeps `h.items` usable afterward.
 
-The project must decide which model is intended. Do not rely on accidental tail-expression behavior.
+Decision: use Model B. Field receiver chains reinitialize the field after the
+chain, so `h.items` remains usable afterward. Do not rely on accidental
+tail-expression behavior.
 
 The substrate should support both; language lowering should choose one deliberately.
 
@@ -709,6 +731,12 @@ Gate:
 with check src/main.w
 with build
 ```
+
+Status: implemented. MIR now has `ProjKind.PK_TUPLE_INDEX`; source tuple field
+access, tuple destructuring, tuple patterns, tuple `with` bindings, and
+partial-drop synthesized tuple fields construct canonical tuple-index
+projections. Flow-fact tables compare projection kind and projection payload, so
+`Field(0)` and `TupleIndex(0)` cannot alias.
 
 ### Milestone 3: Sema-typed drop glue
 

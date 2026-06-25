@@ -1,7 +1,7 @@
 # zlib Migration — Handoff
 
-Status doc for an agent taking over the zlib-into-With migration. Updated
-2026-06-17. Branch: **`main`**.
+Status: completed; archived as the zlib migration handoff and verification
+record. Originally updated 2026-06-17 on branch **`main`**.
 
 ---
 
@@ -14,10 +14,32 @@ Two intertwined deliverables (full plan:
    **all of zlib** with zero per-library design attention. The real target is
    ~50 such libraries; zlib is the second instance after pcre2.
 2. **A native `std.zlib`** (migrated, pure With) to provide gzip/DEFLATE for
-   `.tar.gz` packaging in `docs/eliminate-Makefile.md` (the build system must not
-   shell out to host `tar`/`zstd`, and compiler-owned code may not `c_import`).
+   `.tar.gz` packaging in `docs/completed/eliminate-Makefile.md` (the build
+   system must not shell out to host `tar`/`zstd`, and compiler-owned code may
+   not `c_import`).
 
-This handoff covers deliverable 1 (the migration). Packaging is later phases.
+This handoff originally covered deliverable 1. The follow-up build graph,
+stdlib facade, gzip/gunzip helper, packaging integration, and migrated zlib
+tests have since landed.
+
+## Completion evidence
+
+As of 2026-06-24:
+
+- `build/zlib.w` defines graph-owned `:zlib-reference`, `:zlib-migrate`,
+  `:zlib-build`, `:zlib-test`, `:zlib-check-generated`, and `:zlib-promote`
+  actions.
+- `build.w` wires those targets into the project graph.
+- `lib/std/zlib.w` provides the safe in-memory facade:
+  `compress`, `compress_level`, `compress_gzip`, `compress_gzip_level`,
+  `decompress`, `decompress_with_limit`, `decompress_gzip`, and
+  `decompress_gzip_with_limit`.
+- `lib/std/zlib/` contains the promoted migrated modules, including the
+  upstream `example` and `minigzip` test programs.
+- `build/zlib_gzip.w` and `build/zlib_gunzip.w` use the migrated `std.zlib`
+  implementation for build/package archive flows.
+- `run_zlib_test_action` compiles and runs migrated `example` and `minigzip`
+  round-trip checks.
 
 ## 2. Methodology — NON-NEGOTIABLE RULES
 
@@ -161,14 +183,11 @@ done
 - `do while` output is desugared into an explicit loop, and terminating
   `if`-then branches print in guard form to avoid false unreachable diagnostics.
 
-### Cross-module linkage (after the per-module errors clear)
-Migrated modules reference siblings via `extern fn` (e.g. `compress.w` externs
-`deflate`), because those functions are declared in `zlib.h`. With `--no-c-export`
-they won't link cross-module. The pcre2 pipeline solves this with
-`pcre2_ensure_generated_dependencies` (build/pcre2.w) — a HARDCODED per-module
-`use std.re.X` injection list. For zlib this must be **generalized** (auto-derive
-`use std.zlib.X` imports from referenced sibling symbols; make the defining
-functions `pub`). This is a Phase-C generalization target, not a per-lib list.
+### Cross-module linkage
+
+Completed. Promoted zlib modules now carry `use std.zlib.X` sibling imports and
+public definitions where needed, so `--no-c-export` migrated modules compile
+and link as normal With modules.
 
 ### Cosmetic / generalization residue
 - Migrator emits redundant `unsafe` (warnings only).
@@ -176,29 +195,22 @@ functions `pub`). This is a Phase-C generalization target, not a per-lib list.
   `src/CiMigrate.w:~338, ~341, ~830` — genericize (derive from the lib /
   shared-defs prefix).
 
-## 7. Remaining work
+## 7. Completion status
 
-- Keep green: `with build`, `with build :fixpoint`, `with build :test`, and
-  `with build :test-green`.
-- Commit the current migrator/printer fixes on `main` after the full checklist
-  is green.
-- Generalize cross-module imports for migrated libraries. Migrated modules still
-  reference sibling functions via declarations from headers; the pcre2 path uses
-  a hardcoded dependency injection list. zlib should drive a generic solution
-  that derives `use std.zlib.<module>` imports from referenced sibling symbols
-  and makes defining functions `pub`.
-- Run zlib's migrated upstream tests against the migrated library after the
-  module/link surface is real. Current status: the library files migrate and
-  typecheck with inlined defs, but the migrated tests do not yet pass against a
-  packaged migrated library.
-- Cosmetic cleanup remains: redundant `unsafe` warnings and old PCRE2 wording in
-  generic migration messages.
+- Migrator/printer fixes are in history.
+- The zlib graph targets are implemented and wired.
+- Cross-module imports for promoted zlib modules are present.
+- Migrated upstream `example` and `minigzip` are compiled and run by
+  `:zlib-test`.
+- The `std.zlib` facade and gzip/gunzip build helpers are implemented.
+- Package flows use migrated zlib for `.tar.gz` archive compression and
+  decompression.
 
 ## 8. Key files / functions / line numbers
 
 - `src/CiMigrate.w`
   - `ci_migrate_shared_decl_add` (143) — shared-defs dedup (first-sighting)
-  - `ci_migrate_shared_decl_upgrade_opaque_type` (WIP, added) — opaque→concrete
+  - `ci_migrate_shared_decl_upgrade_opaque_type` — opaque→concrete
   - `ci_migrate_write_shared_defs` (337; reads `g_migrate_shared_decl_buf` @354)
   - `ci_migrate_shared_defs_reset` (126); globals `g_migrate_shared_decl_buf`
     (60, `Vec[str]`), `_keys` (61, str), `_records` (62, `Vec[str]`)
@@ -226,24 +238,20 @@ functions `pub`). This is a Phase-C generalization target, not a per-lib list.
   generalize — do NOT clone its per-lib knobs: hardcoded file-rank table, import
   injection, width-slice, test-output normalization)
 
-## 9. After the library files compile
+## 9. Implemented follow-up
 
-1. **`:zlib-test`-equivalent validation:** migrate zlib's OWN test suite
-   (`out/zlib_src` has `test/example.c`, `test/minigzip.c` upstream — re-stage
-   from `out/zlib_reference/zlib-1.3.2/test/`) and run it against the migrated
-   library. This is the acceptance gate ("migrates AND compiles AND its tests
-   pass"), like `:pcre2-test` runs upstream RunTest.
-2. **`build/zlib.w` graph targets:** `:zlib-reference` (pin v1.3.2 + enforce the
-   sha256 above via `ToolFs.sha256_file`), `:zlib-migrate`, `:zlib-build`,
-   `:zlib-check-generated`, `:zlib-test`, `:zlib-promote` → `lib/std/zlib/`.
-   Mirror `build/pcre2.w` but config-minimal + generalized.
-3. **Thin `lib/std/zlib.w` facade:** `gzip_compress(bytes, level) -> Vec[u8]` /
-   `gzip_decompress(bytes) -> Vec[u8]` over the migrated internals (zero
-   gzip-header mtime for determinism). Pure With — no `c_import`, no extern to
-   system libz.
-4. **Packaging** (plan Phases B/D/E): native compiler-binary packages (no
-   compression; SDK `llvm-readobj`/`llvm-nm`/`llvm-strip` inspection), `.tar.gz`
-   via `std.zlib`, SDK/bootstrap packaging.
+1. **`:zlib-test` validation:** `run_zlib_test_action` migrates zlib's upstream
+   `example.c` and `minigzip.c`, compiles them against the migrated library, and
+   runs example plus gzip/decompress round-trip checks.
+2. **`build/zlib.w` graph targets:** `:zlib-reference`, `:zlib-migrate`,
+   `:zlib-build`, `:zlib-check-generated`, `:zlib-test`, and `:zlib-promote`
+   are implemented.
+3. **Thin `lib/std/zlib.w` facade:** `std.zlib` exposes in-memory zlib and gzip
+   compression/decompression over the migrated internals. It is pure With: no
+   `c_import` and no extern dependency on system libz.
+4. **Packaging:** build/package flows use `build/zlib_gzip.w` and
+   `build/zlib_gunzip.w` helpers backed by `std.zlib` for `.tar.gz` archive
+   creation and extraction.
 
 ## 10. Verification before any commit
 ```sh

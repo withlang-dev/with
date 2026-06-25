@@ -1,8 +1,8 @@
 # Eliminate Makefile
 
-Status: implemented; retained as the post-Makefile verification record.
+Status: completed; archived as the post-Makefile verification record.
 
-This document replaces the stale `docs/build-plan.md` / `docs/build-spec.md`
+This document replaced the stale `docs/build-plan.md` / `docs/build-spec.md`
 pair as the cleanup record for removing the repository Makefile and all
 post-seed repository scripts. The historical build-system plan and final-state
 spec are archived under `docs/completed/`.
@@ -156,7 +156,7 @@ Implemented:
   be used by post-seed CI, release packaging, seed refresh, SDK refresh, or
   repository install/update flows.
 
-Remaining verification and follow-up:
+Verification record and release-only follow-up:
 
 - Local verification from this change passed: focused source checks for the
   touched build/compiler modules, `git diff --check`, `with build`,
@@ -164,11 +164,16 @@ Remaining verification and follow-up:
   `with build :sdk-ninja-source --no-deps`,
   `with build :sdk-cmake-source --no-deps`, and
   `with build :sdk-llvm-source --no-deps`.
-- Run native SDK packaging on each supported host with a valid SDK built by the
-  Clang/clang-cl bootstrap flow. The local Darwin `.deps` SDK used during this
-  change was intentionally rejected because its CMake cache names `/usr/bin/cc`;
-  that is the provenance tripwire working, not a packaging fallback.
-- Run the long SDK rebuild targets when intentionally producing a new SDK asset
+- Final repository audit passed on 2026-06-24: `Makefile` is absent; the tracked
+  script audit returns only retained convenience installers and first-SDK
+  bootstrap scripts; CI has no Make or repository script invocation; remaining
+  PowerShell hits are bootstrap-runbook examples and installer internals.
+- Native SDK packaging on each supported host remains release-matrix
+  verification when producing SDK assets. The local Darwin `.deps` SDK used
+  during this change was intentionally rejected because its CMake cache names
+  `/usr/bin/cc`; that is the provenance tripwire working, not a packaging
+  fallback.
+- The long SDK rebuild targets run when intentionally producing a new SDK asset
   or bumping `COMPILER_LLVM_VERSION`. They are not normal release rebuild
   steps.
 
@@ -345,19 +350,10 @@ first-seed/new-platform boundary; no `post-seed blocker` paths should remain.
 - 2026-06-19: Deleted the repository `Makefile`, release package scripts, SDK
   package scripts, and the Python requirements generator after their graph
   replacements landed.
-
-## Next Work Queue
-
-Do not stack unrelated compiler/backend fixes on top of this cleanup. The
-remaining work for this document is verification:
-
-1. Run any optional release-matrix targets not covered by the local checklist
-   above when preparing the deletion commit/release.
-2. Run `with build :package-llvm-sdk` natively on each supported platform with a
-   valid SDK. If a target rejects the local SDK provenance, rebuild the SDK
-   through `with build :sdk` or the bootstrap runbook and package that result.
-3. Commit the logical Makefile/post-seed-script removal only after verification
-   is recorded.
+- 2026-06-24: Re-ran the final repository audit. The Makefile remains absent,
+  tracked scripts are limited to retained installer and bootstrap-boundary
+  files, CI does not invoke Make or repository scripts, and remaining
+  PowerShell references are bootstrap-runbook examples or installer internals.
 
 ## Implementation Tasks
 
@@ -715,7 +711,7 @@ Completed after the graph replacements landed:
   - `tools/build-static-llvm.ps1`
 - [x] Remove Python build checker/generator scripts after their With replacements
   land.
-- [ ] Run a repository audit after committing the deletions:
+- [x] Run a repository audit after committing the deletions:
   - `Makefile`
   - `.sh`
   - `.ps1`

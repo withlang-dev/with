@@ -3,8 +3,9 @@
 // Runs a repro (or a corpus of fixtures) under the native debug allocator
 // (WITH_DEBUG_ALLOC) and reports the verdict. See docs/debug-allocator.md.
 //
-//   with run tools/debug_drop.w -- run   <with-bin> <repro.w>
-//   with run tools/debug_drop.w -- check <with-bin> <fixture.w> [more...]
+//   ./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
+//   out/debug-alloc-tests/debug_drop run   <with-bin> <repro.w>
+//   out/debug-alloc-tests/debug_drop check <with-bin> <fixture.w> [more...]
 //
 // `run`   prints the debug-alloc verdict lines (DOUBLE FREE / LEAK / count).
 // `check` runs each fixture under the debug allocator and asserts the captured
@@ -36,11 +37,18 @@ fn contains(s: str, needle: str) -> bool:
 fn argv4(a: str, b: str, c: str, d: str) -> str:
     a ++ "\0" ++ b ++ "\0" ++ c ++ "\0" ++ d ++ "\0"
 
+fn argv5(a: str, b: str, c: str, d: str, e: str) -> str:
+    a ++ "\0" ++ b ++ "\0" ++ c ++ "\0" ++ d ++ "\0" ++ e ++ "\0"
+
 // Run `<with-bin> run --debug-alloc <repro>`; return captured stderr+stdout text.
-fn run_under_debug_alloc(with_bin: str, repro: str) -> str:
+fn run_under_debug_alloc(with_bin: str, repro: str, filter: str) -> str:
     let outp = "/tmp/debug_drop_out.txt"
     let errp = "/tmp/debug_drop_err.txt"
-    let _ = exec_capture(argv4(with_bin, "run", "--debug-alloc", repro), outp, errp, 60000)
+    let argv = if filter.len() > 0:
+        argv5(with_bin, "run", "--debug-alloc", "--debug-alloc-filter=" ++ filter, repro)
+    else:
+        argv4(with_bin, "run", "--debug-alloc", repro)
+    let _ = exec_capture(argv, outp, errp, 60000)
     read_file(errp) ++ "\n" ++ read_file(outp)
 
 // Index of `sub` in `s`, or -1.
@@ -87,7 +95,8 @@ fn main:
 
     if mode == "run":
         let repro = a.get(3)
-        let report = run_under_debug_alloc(with_bin, repro)
+        let filter = line_after_prefix(read_file(repro), "debug-alloc-filter:")
+        let report = run_under_debug_alloc(with_bin, repro, filter)
         print("=== debug-alloc: " ++ repro ++ " ===")
         if contains(report, "DOUBLE FREE"):
             print(line_after_prefix(report, "debug-alloc: DOUBLE FREE"))
@@ -105,7 +114,8 @@ fn main:
         while i < a.len():
             let fx = a.get(i)
             let want = line_after_prefix(read_file(fx), "expect-debug-alloc:")
-            let report = run_under_debug_alloc(with_bin, fx)
+            let filter = line_after_prefix(read_file(fx), "debug-alloc-filter:")
+            let report = run_under_debug_alloc(with_bin, fx, filter)
             if want.len() > 0 and contains(report, want):
                 print("PASS " ++ fx)
             else:

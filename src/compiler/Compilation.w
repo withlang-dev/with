@@ -1180,6 +1180,138 @@ fn Compilation.print_mir_file(self: Compilation, source_path: str) -> bool:
         return false
     self.print_mir(pool)
 
+fn Compilation.dump_drop_state(self: Compilation, pool: AstPool) -> str:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        return ""
+    dump_drop_state_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
+
+fn Compilation.dump_drop_state_file(self: Compilation, source_path: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.dump_drop_state(pool)
+
+fn Compilation.trace_place(self: Compilation, pool: AstPool, spec: str) -> str:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        return ""
+    trace_place_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
+
+fn Compilation.trace_place_file(self: Compilation, source_path: str, spec: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.trace_place(pool, spec)
+
+fn Compilation.explain_mir_origin(self: Compilation, pool: AstPool, spec: str) -> str:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        return ""
+    explain_mir_origin_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
+
+fn Compilation.explain_mir_origin_file(self: Compilation, source_path: str, spec: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.explain_mir_origin(pool, spec)
+
+fn Compilation.trace_ownership(self: Compilation, pool: AstPool, spec: str) -> str:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        return ""
+    trace_ownership_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
+
+fn Compilation.trace_ownership_file(self: Compilation, source_path: str, spec: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.trace_ownership(pool, spec)
+
+fn Compilation.dump_drop_plan(self: Compilation, pool: AstPool) -> str:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        return ""
+    dump_drop_plan_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
+
+fn Compilation.dump_drop_plan_file(self: Compilation, source_path: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.dump_drop_plan(pool)
+
+fn Compilation.dump_place_map(self: Compilation, pool: AstPool) -> str:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        return ""
+    dump_place_map_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
+
+fn Compilation.dump_place_map_file(self: Compilation, source_path: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.dump_place_map(pool)
+
+fn Compilation.trace_cleanup_edge(self: Compilation, pool: AstPool, spec: str) -> str:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        return ""
+    trace_cleanup_edge_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
+
+fn Compilation.trace_cleanup_edge_file(self: Compilation, source_path: str, spec: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.trace_cleanup_edge(pool, spec)
+
+fn Compilation.dump_drop_flags(self: Compilation, pool: AstPool) -> str:
+    if self.zcu.last_mir_module.body_count() == 0:
+        let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        return ""
+    dump_drop_flags_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
+
+fn Compilation.dump_drop_flags_file(self: Compilation, source_path: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.dump_drop_flags(pool)
+
+fn Compilation.validate_ownership_file(self: Compilation, source_path: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return "compile failed before ownership validation"
+    let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        if self.zcu.diagnostics.has_errors():
+            return "diagnostics present before ownership validation"
+        return "MIR lowering produced no bodies"
+    let err = validate_ownership_mir_module(self.zcu.last_mir_module)
+    if err.len() > 0:
+        return err
+    "ok"
+
+fn Compilation.validate_all_file(self: Compilation, source_path: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return "compile failed before validation"
+    let _ = self.run_mir_lower(pool)
+    if self.zcu.last_mir_module.body_count() == 0:
+        if self.zcu.diagnostics.has_errors():
+            return "diagnostics present before MIR validation"
+        return "MIR lowering produced no bodies"
+    let mir_err = validate_all_mir_module(self.zcu.last_mir_module)
+    if mir_err.len() > 0:
+        return mir_err
+    "ok"
+
 fn Compilation.dump_async_mir(self: Compilation, pool: AstPool) -> str:
     if self.zcu.last_async_mir_module.body_count() == 0:
         let _ = self.run_async_mir_lower(pool)

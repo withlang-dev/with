@@ -93,6 +93,7 @@ type CliOptions {
     dump_typed_flag: bool,
     dump_project_info_flag: bool,
     dump_mir_flag: bool,
+    dump_drop_state_flag: bool,
     dump_async_mir_flag: bool,
     deterministic_mode: bool,
     emit_c_mode: bool,
@@ -190,6 +191,7 @@ fn cli_options_default -> CliOptions:
         dump_typed_flag: false,
         dump_project_info_flag: false,
         dump_mir_flag: false,
+        dump_drop_state_flag: false,
         dump_async_mir_flag: false,
         deterministic_mode: false,
         emit_c_mode: false,
@@ -219,6 +221,32 @@ fn cli_has_flag(argc: i32, flag: str) -> bool:
             return true
         i = i + 1
     false
+
+fn cli_has_prefix(argc: i32, prefix: str) -> bool:
+    var i = 2
+    while i < argc:
+        if with_str_starts_with(with_arg_at(i), prefix) != 0:
+            return true
+        i = i + 1
+    false
+
+fn cli_value_or_prefix(argc: i32, flag: str, prefix: str) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == flag and i + 1 < argc:
+            return with_arg_at(i + 1)
+        if with_str_starts_with(arg, prefix) != 0:
+            return arg.slice(prefix.len(), arg.len())
+        i = i + 1
+    ""
+
+fn cli_option_takes_value(arg: str) -> bool:
+    arg == "-o" or arg == "--output" or arg == "--target" or
+    arg == "--trace-place" or arg == "--explain-mir-origin" or
+    arg == "--trace-ownership" or arg == "--trace-cleanup-edge" or
+    arg == "--contains" or arg == "--exit-code" or
+    arg == "--debug-alloc-filter" or arg == "--out"
 
 fn cli_default_opt_level(argc: i32) -> i32:
     if argc >= 2:
@@ -323,6 +351,7 @@ fn parse_cli_options(argc: i32) -> CliOptions:
     opts.dump_typed_flag = cli_has_flag(argc, "--dump-typed")
     opts.dump_project_info_flag = cli_has_flag(argc, "--dump-project-info")
     opts.dump_mir_flag = cli_has_flag(argc, "--dump-mir")
+    opts.dump_drop_state_flag = cli_has_flag(argc, "--dump-drop-state")
     opts.dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
     opts.deterministic_mode = cli_has_flag(argc, "--deterministic")
     opts.emit_c_mode = cli_has_flag(argc, "--emit-c")
@@ -667,7 +696,17 @@ fn run_cli(argc: i32) -> i32:
     let dump_typed_flag = cli_has_flag(argc, "--dump-typed")
     let dump_project_info_flag = cli_has_flag(argc, "--dump-project-info")
     let dump_mir_flag = cli_has_flag(argc, "--dump-mir")
+    let dump_drop_state_flag = cli_has_flag(argc, "--dump-drop-state")
     let dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
+    let trace_place_spec = cli_value_or_prefix(argc, "--trace-place", "--trace-place=")
+    let explain_mir_origin_spec = cli_value_or_prefix(argc, "--explain-mir-origin", "--explain-mir-origin=")
+    let trace_ownership_spec = cli_value_or_prefix(argc, "--trace-ownership", "--trace-ownership=")
+    let dump_drop_plan_flag = cli_has_flag(argc, "--dump-drop-plan")
+    let validate_ownership_flag = cli_has_flag(argc, "--validate-ownership")
+    let dump_place_map_flag = cli_has_flag(argc, "--dump-place-map")
+    let trace_cleanup_edge_spec = cli_value_or_prefix(argc, "--trace-cleanup-edge", "--trace-cleanup-edge=")
+    let dump_drop_flags_flag = cli_has_flag(argc, "--dump-drop-flags")
+    let validate_all_flag = cli_has_flag(argc, "--validate-all")
     let debug_info = not cli_has_flag(argc, "-g0") and not cli_has_flag(argc, "--release")
 
     // --debug-alloc: enable the native debug allocator (see docs/debug-allocator.md)
@@ -675,6 +714,9 @@ fn run_cli(argc: i32) -> i32:
     // flag is just a discoverable front door that sets it for the child process.
     if cli_has_flag(argc, "--debug-alloc"):
         let _ = with_setenv_str("WITH_DEBUG_ALLOC", "1")
+    let debug_alloc_filter = cli_value_or_prefix(argc, "--debug-alloc-filter", "--debug-alloc-filter=")
+    if debug_alloc_filter.len() > 0:
+        let _ = with_setenv_str("WITH_DEBUG_ALLOC_FILTER", debug_alloc_filter)
 
     // Cache source and output paths — scanned once, used by all subcommands.
     let source = find_source_arg(argc)
@@ -697,6 +739,16 @@ fn run_cli(argc: i32) -> i32:
             with_eprint("error: " ++ parsed_build.error_msg)
             return 1
         return run_build_command(parsed_build.build, parsed_build.graph)
+    if cli_command(argc) == "reduce":
+        if cli_has_flag(argc, "--help") or cli_has_flag(argc, "-h"):
+            print_reduce_usage()
+            return 0
+        return run_reduce_command(argc)
+    if cli_command(argc) == "fixpoint-diff":
+        if cli_has_flag(argc, "--help") or cli_has_flag(argc, "-h"):
+            print_fixpoint_diff_usage()
+            return 0
+        return run_fixpoint_diff_command(argc)
     if cli_command(argc) == "run":
         if emit_c_mode:
             with_eprint("error: '--emit-c' is only supported with 'build'")
@@ -761,6 +813,26 @@ fn run_cli(argc: i32) -> i32:
             return dump_project_info_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         if dump_mir_flag:
             return dump_mir_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
+        if dump_drop_state_flag:
+            return dump_drop_state_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
+        if trace_place_spec.len() > 0:
+            return trace_place_artifact(source, trace_place_spec, no_std, alloc_mode, runtime_available, prelude_mode)
+        if explain_mir_origin_spec.len() > 0:
+            return explain_mir_origin_artifact(source, explain_mir_origin_spec, no_std, alloc_mode, runtime_available, prelude_mode)
+        if trace_ownership_spec.len() > 0:
+            return trace_ownership_artifact(source, trace_ownership_spec, no_std, alloc_mode, runtime_available, prelude_mode)
+        if dump_drop_plan_flag:
+            return dump_drop_plan_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
+        if validate_ownership_flag:
+            return validate_ownership_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
+        if dump_place_map_flag:
+            return dump_place_map_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
+        if trace_cleanup_edge_spec.len() > 0:
+            return trace_cleanup_edge_artifact(source, trace_cleanup_edge_spec, no_std, alloc_mode, runtime_available, prelude_mode)
+        if dump_drop_flags_flag:
+            return dump_drop_flags_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
+        if validate_all_flag:
+            return validate_all_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         if dump_async_mir_flag:
             return dump_async_mir_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         var comp = Compilation.init()
@@ -854,10 +926,12 @@ fn find_source_arg(argc: i32) -> str:
         let arg = with_arg_at(i)
         var step = 1
         var skip = false
-        if str_eq_text(arg, "-o"):
+        if cli_option_takes_value(arg):
             step = 2
             skip = true
         if not skip and has_output_prefix(arg):
+            skip = true
+        if not skip and (arg.starts_with("--trace-place=") or arg.starts_with("--explain-mir-origin=") or arg.starts_with("--trace-ownership=") or arg.starts_with("--trace-cleanup-edge=") or arg.starts_with("--contains=") or arg.starts_with("--exit-code=") or arg.starts_with("--debug-alloc-filter=") or arg.starts_with("--out=")):
             skip = true
         if not skip:
             if with_str_len(arg) > 0:
@@ -893,6 +967,230 @@ fn cleanup_binary_artifacts(bin_path: str):
         return
     let _bin = build_graph_rt_remove_file(bin_path)
     let _dsym = build_graph_rt_remove_tree(bin_path ++ ".dSYM")
+
+// ── Deep debug commands ─────────────────────────────────────────
+
+fn cli_double_dash_index(argc: i32) -> i32:
+    var i = 2
+    while i < argc:
+        if with_arg_at(i) == "--":
+            return i
+        i = i + 1
+    -1
+
+fn reduce_source_arg(argc: i32) -> str:
+    if argc >= 3:
+        return with_arg_at(2)
+    ""
+
+fn reduce_output_arg(argc: i32, source: str) -> str:
+    let out = cli_value_or_prefix(argc, "--out", "--out=")
+    if out.len() > 0:
+        return out
+    let normal_out = find_output_arg(argc)
+    if normal_out.len() > 0:
+        return normal_out
+    source ++ ".reduced.w"
+
+fn reduce_exit_mode(argc: i32) -> i32:
+    let v = cli_value_or_prefix(argc, "--exit-code", "--exit-code=")
+    if v.len() == 0:
+        return 0
+    if v == "nonzero":
+        return 1
+    2
+
+fn reduce_exit_want(argc: i32) -> i32:
+    let v = cli_value_or_prefix(argc, "--exit-code", "--exit-code=")
+    if v.len() == 0 or v == "nonzero":
+        return 0
+    test_parse_i32(v)
+
+fn reduce_split_lines_keep_empty(text: str) -> Vec[str]:
+    let lines: Vec[str] = Vec.new()
+    var start = 0
+    var i = 0
+    while i <= text.len() as i32:
+        let at_end = i == text.len() as i32
+        let ch = if at_end: 10 else: text.byte_at(i as i64)
+        if ch == 10:
+            var line = text.slice(start as i64, i as i64)
+            if line.len() > 0 and line.byte_at(line.len() - 1) == 13:
+                line = line.slice(0, line.len() - 1)
+            lines.push(line)
+            start = i + 1
+        i = i + 1
+    lines
+
+fn reduce_join_lines(lines: &Vec[str], skip_idx: i32) -> str:
+    var out = ""
+    for i in 0..lines.len() as i32:
+        if i == skip_idx:
+            continue
+        out = out ++ lines.get(i as i64)
+        out = out ++ "\n"
+    out
+
+fn reduce_make_argv(argc: i32, dashdash: i32, candidate: str) -> str:
+    var argv = ""
+    var used_placeholder = false
+    if dashdash < 0 or dashdash + 1 >= argc:
+        argv = build_graph_argv_append(argv, with_arg_at(0))
+        argv = build_graph_argv_append(argv, "check")
+        argv = build_graph_argv_append(argv, candidate)
+        return argv
+    var i = dashdash + 1
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "{file}":
+            argv = build_graph_argv_append(argv, candidate)
+            used_placeholder = true
+        else:
+            argv = build_graph_argv_append(argv, arg)
+        i = i + 1
+    if not used_placeholder:
+        argv = build_graph_argv_append(argv, candidate)
+    argv
+
+fn reduce_exit_matches(mode: i32, want: i32, original_rc: i32, rc: i32) -> bool:
+    if mode == 1:
+        return rc != 0
+    if mode == 2:
+        return rc == want
+    rc == original_rc
+
+fn reduce_candidate_matches(argc: i32, dashdash: i32, candidate_path: str, contains: str, exit_mode: i32, exit_want: i32, original_rc: i32, timeout_ms: i32) -> bool:
+    let out_path = "out/reduce/stdout.txt"
+    let err_path = "out/reduce/stderr.txt"
+    let _rm_out = with_fs_remove_file(out_path)
+    let _rm_err = with_fs_remove_file(err_path)
+    let argv = reduce_make_argv(argc, dashdash, candidate_path)
+    let rc = with_exec_argv_capture(argv, out_path, err_path, timeout_ms)
+    if not reduce_exit_matches(exit_mode, exit_want, original_rc, rc):
+        return false
+    if contains.len() > 0:
+        let combined = with_fs_read_file(out_path) ++ "\n" ++ with_fs_read_file(err_path)
+        if with_str_contains(combined, contains) == 0:
+            return false
+    true
+
+fn run_reduce_command(argc: i32) -> i32:
+    let source = reduce_source_arg(argc)
+    if source.len() == 0 or source.starts_with("-"):
+        with_eprint("error: reduce requires a source file")
+        return 1
+    let original = with_fs_read_file(source)
+    if original.len() == 0:
+        with_eprint("error: reduce could not read source: " ++ source)
+        return 1
+    let dashdash = cli_double_dash_index(argc)
+    let contains = cli_value_or_prefix(argc, "--contains", "--contains=")
+    let exit_mode = reduce_exit_mode(argc)
+    let exit_want = reduce_exit_want(argc)
+    let _mkdir = with_fs_mkdir_p("out/reduce")
+    let candidate_path = "out/reduce/candidate.w"
+    if with_fs_write_file(candidate_path, original) != 0:
+        with_eprint("error: reduce could not write candidate path")
+        return 1
+    let original_argv = reduce_make_argv(argc, dashdash, candidate_path)
+    let out_path = "out/reduce/original.stdout.txt"
+    let err_path = "out/reduce/original.stderr.txt"
+    let original_rc = with_exec_argv_capture(original_argv, out_path, err_path, 120000)
+    if exit_mode == 0 and original_rc == 0 and contains.len() == 0:
+        with_eprint("error: reduce default predicate needs a failing command or --contains/--exit-code")
+        return 1
+    if not reduce_candidate_matches(argc, dashdash, candidate_path, contains, exit_mode, exit_want, original_rc, 120000):
+        with_eprint("error: reduce predicate does not hold for original input")
+        return 1
+
+    var lines = reduce_split_lines_keep_empty(original)
+    var changed = true
+    while changed:
+        changed = false
+        var i = 0
+        while i < lines.len() as i32:
+            let candidate = reduce_join_lines(&lines, i)
+            if with_fs_write_file(candidate_path, candidate) != 0:
+                with_eprint("error: reduce could not write candidate")
+                return 1
+            if reduce_candidate_matches(argc, dashdash, candidate_path, contains, exit_mode, exit_want, original_rc, 120000):
+                let next_lines = reduce_split_lines_keep_empty(candidate)
+                if next_lines.len() < lines.len():
+                    lines = next_lines
+                    changed = true
+                else:
+                    i = i + 1
+            else:
+                i = i + 1
+    let final_text = reduce_join_lines(&lines, -1)
+    let output = reduce_output_arg(argc, source)
+    if with_fs_write_file(output, final_text) != 0:
+        with_eprint("error: reduce could not write output: " ++ output)
+        return 1
+    with_write("reduce: wrote " ++ output ++ f" ({lines.len() as i32} lines)\n")
+    0
+
+fn fixpoint_default_left() -> str:
+    "out/stage/bin/with-stage2-fixpoint.o"
+
+fn fixpoint_default_right() -> str:
+    "out/stage/bin/with-stage3-fixpoint.o"
+
+fn fixpoint_arg(argc: i32, index: i32, fallback: str) -> str:
+    if argc > index:
+        let v = with_arg_at(index)
+        if not v.starts_with("-"):
+            return v
+    fallback
+
+fn fixpoint_byte_at(text: str, idx: i32) -> i32:
+    if idx < 0 or idx >= text.len() as i32:
+        return -1
+    text.byte_at(idx as i64)
+
+fn fixpoint_diff_report(left_path: str, right_path: str) -> str:
+    let left = with_fs_read_file(left_path)
+    let right = with_fs_read_file(right_path)
+    if left.len() == 0:
+        return "fixpoint-diff: could not read left file: " ++ left_path ++ "\n"
+    if right.len() == 0:
+        return "fixpoint-diff: could not read right file: " ++ right_path ++ "\n"
+    var out = "fixpoint-diff\n"
+    out = out ++ "left: " ++ left_path ++ f" bytes={left.len() as i32}\n"
+    out = out ++ "right: " ++ right_path ++ f" bytes={right.len() as i32}\n"
+    if left == right:
+        return out ++ "classification: exact match\n"
+    let min_len = if left.len() < right.len(): left.len() else: right.len()
+    var first = -1
+    for i in 0..min_len as i32:
+        if left.byte_at(i as i64) != right.byte_at(i as i64):
+            first = i
+            break
+    if first < 0:
+        first = min_len as i32
+    out = out ++ f"first-different-offset: {first}\n"
+    if left.len() != right.len():
+        out = out ++ "classification: size mismatch\n"
+    else:
+        out = out ++ "classification: same size, content bytes differ\n"
+    let start = if first > 8: first - 8 else: 0
+    var end = first + 9
+    let max_len = if left.len() > right.len(): left.len() else: right.len()
+    if end > max_len as i32:
+        end = max_len as i32
+    out = out ++ "window:\n"
+    for i in start..end:
+        out = out ++ f"  @{i}: {fixpoint_byte_at(left, i)} / {fixpoint_byte_at(right, i)}\n"
+    out
+
+fn run_fixpoint_diff_command(argc: i32) -> i32:
+    let left = fixpoint_arg(argc, 2, fixpoint_default_left())
+    let right = fixpoint_arg(argc, 3, fixpoint_default_right())
+    let report = fixpoint_diff_report(left, right)
+    with_write(report)
+    if with_str_contains(report, "could not read") != 0:
+        return 1
+    0
 
 fn test_unique_binary_path(source_file: str) -> str:
     let base = link_stage_output_path_for_source(source_file)
@@ -1754,6 +2052,116 @@ fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_a
     if not mir_ok:
         with_eprint("error: mir dump failed during compilation or mir lowering")
         return 1
+    0
+
+fn dump_drop_state_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let text = comp.dump_drop_state_file(source_file)
+    if text.len() == 0:
+        with_eprint("error: drop-state dump failed during compilation or mir lowering")
+        return 1
+    with_write(text)
+    0
+
+fn trace_place_artifact(source_file: str, spec: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let text = comp.trace_place_file(source_file, spec)
+    if text.len() == 0:
+        with_eprint("error: trace-place failed during compilation or mir lowering")
+        return 1
+    with_write(text)
+    0
+
+fn explain_mir_origin_artifact(source_file: str, spec: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let text = comp.explain_mir_origin_file(source_file, spec)
+    if text.len() == 0:
+        with_eprint("error: explain-mir-origin failed during compilation or mir lowering")
+        return 1
+    with_write(text)
+    0
+
+fn trace_ownership_artifact(source_file: str, spec: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let text = comp.trace_ownership_file(source_file, spec)
+    if text.len() == 0:
+        with_eprint("error: trace-ownership failed during compilation or mir lowering")
+        return 1
+    with_write(text)
+    0
+
+fn dump_drop_plan_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let text = comp.dump_drop_plan_file(source_file)
+    if text.len() == 0:
+        with_eprint("error: drop-plan dump failed during compilation or mir lowering")
+        return 1
+    with_write(text)
+    0
+
+fn validate_ownership_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let result = comp.validate_ownership_file(source_file)
+    if result != "ok":
+        with_eprint("error: validate-ownership failed: " ++ result)
+        return 1
+    with_write("validate-ownership: ok\n")
+    0
+
+fn dump_place_map_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let text = comp.dump_place_map_file(source_file)
+    if text.len() == 0:
+        with_eprint("error: place-map dump failed during compilation or mir lowering")
+        return 1
+    with_write(text)
+    0
+
+fn trace_cleanup_edge_artifact(source_file: str, spec: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let text = comp.trace_cleanup_edge_file(source_file, spec)
+    if text.len() == 0:
+        with_eprint("error: trace-cleanup-edge failed during compilation or mir lowering")
+        return 1
+    with_write(text)
+    0
+
+fn dump_drop_flags_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let text = comp.dump_drop_flags_file(source_file)
+    if text.len() == 0:
+        with_eprint("error: drop-flags dump failed during compilation or mir lowering")
+        return 1
+    with_write(text)
+    0
+
+fn validate_all_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode, runtime_available)
+    comp.set_prelude_mode(prelude_mode)
+    let result = comp.validate_all_file(source_file)
+    if result != "ok":
+        with_eprint("error: validate-all failed: " ++ result)
+        return 1
+    with_write("validate-all: ok\n")
     0
 
 fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
@@ -2998,6 +3406,8 @@ fn print_usage:
     with_write("  ast              Parse and print the AST\n")
     with_write("  tokens           Lex and print tokens\n")
     with_write("  ir               Compile and print LLVM IR\n")
+    with_write("  reduce           Minimize a single-file compiler repro\n")
+    with_write("  fixpoint-diff    Explain the first differing fixpoint-object byte\n")
     with_write("\n")
     with_write("  version          Print version number and exit\n")
     with_write("  help             Print this help and exit\n")
@@ -3018,11 +3428,30 @@ fn print_usage:
     with_write("  --emit-obj       Emit an object file instead of a binary\n")
     with_write("  --dump-project-info\n")
     with_write("                   Print resolved project metadata from 'check'\n")
+    with_write("  --dump-drop-state\n")
+    with_write("                   Print MIR ownership state from 'check'\n")
+    with_write("  --trace-place <fn:place>\n")
+    with_write("                   Print MIR lines mentioning a place from 'check'\n")
+    with_write("  --explain-mir-origin <fn:item>\n")
+    with_write("                   Print MIR locals/statements/terms that mention an item\n")
+    with_write("  --trace-ownership <fn:place>\n")
+    with_write("                   Print ownership transitions for a MIR place\n")
+    with_write("  --dump-drop-plan Print planned MIR drops/skips from 'check'\n")
+    with_write("  --validate-ownership\n")
+    with_write("                   Run MIR ownership-debug validators from 'check'\n")
+    with_write("  --dump-place-map Print canonical MIR place/projection map from 'check'\n")
+    with_write("  --trace-cleanup-edge <fn:from->to>\n")
+    with_write("                   Print ownership state across one MIR CFG edge\n")
+    with_write("  --dump-drop-flags\n")
+    with_write("                   Print runtime drop-flag wiring from 'check'\n")
+    with_write("  --validate-all   Run all MIR validators from 'check'\n")
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
     with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("  --debug-alloc-filter=<mode>\n")
+    with_write("                   Leak report filter: all, non-root, roots\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
     with_write("  --overflow=<mode>\n")
     with_write("                   Select overflow mode for builds: panic, wrap, saturate\n")
@@ -3043,6 +3472,8 @@ fn print_doc_usage:
     with_write("  --no-std         Disable standard library support while checking docs\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
     with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("  --debug-alloc-filter=<mode>\n")
+    with_write("                   Leak report filter: all, non-root, roots\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
 
 fn print_repl_usage:
@@ -3071,6 +3502,7 @@ fn print_build_usage:
     with_write("  with build src/main.w\n")
     with_write("  with build :test\n")
     with_write("  with build :fixpoint\n")
+    with_write("  with build :fixpoint-diff\n")
     with_write("\n")
     with_write("Build Options:\n")
     with_write("\n")
@@ -3093,6 +3525,8 @@ fn print_build_usage:
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
     with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("  --debug-alloc-filter=<mode>\n")
+    with_write("                   Leak report filter: all, non-root, roots\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
     with_write("  --overflow=<mode>\n")
     with_write("                   Select overflow mode: panic, wrap, saturate\n")
@@ -3126,13 +3560,54 @@ fn print_test_usage:
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --debug-alloc    Run under the native debug allocator (double-free/leak\n")
     with_write("                   detection; see docs/debug-allocator.md). Also WITH_DEBUG_ALLOC.\n")
+    with_write("  --debug-alloc-filter=<mode>\n")
+    with_write("                   Leak report filter: all, non-root, roots\n")
     with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
     with_write("  --freestanding   Alias for --no-std --no-runtime --prelude=core\n")
+
+fn print_reduce_usage:
+    with_write("Usage: with reduce <source.w> [options] [-- <predicate argv...>]\n")
+    with_write("\n")
+    with_write("Minimizes a single-file repro by deleting source lines while the predicate still holds.\n")
+    with_write("The source file must immediately follow 'reduce'. Use {file} in the predicate argv\n")
+    with_write("for the candidate path; without {file}, the candidate path is appended.\n")
+    with_write("\n")
+    with_write("Examples:\n")
+    with_write("\n")
+    with_write("  with reduce repro.w --contains \"undefined variable\" -- ./out/stage/bin/with-stage2 check {file}\n")
+    with_write("  with reduce repro.w --exit-code nonzero --out out/reduced.w\n")
+    with_write("\n")
+    with_write("Reduce Options:\n")
+    with_write("\n")
+    with_write("  -h, --help       Print this help and exit\n")
+    with_write("  --out <path>     Write the reduced repro here (default: <source>.reduced.w)\n")
+    with_write("  --contains <txt> Require predicate stdout/stderr to contain text\n")
+    with_write("  --exit-code <n|nonzero>\n")
+    with_write("                   Require an exact exit code or any non-zero exit\n")
+
+fn print_fixpoint_diff_usage:
+    with_write("Usage: with fixpoint-diff [left-object] [right-object]\n")
+    with_write("\n")
+    with_write("Reports size and first-byte differences between two fixpoint objects.\n")
+    with_write("Defaults are out/stage/bin/with-stage2-fixpoint.o and\n")
+    with_write("out/stage/bin/with-stage3-fixpoint.o. The build target writes the same\n")
+    with_write("report to out/fixpoint-diff/report.txt.\n")
+    with_write("\n")
+    with_write("Examples:\n")
+    with_write("\n")
+    with_write("  with build :fixpoint-diff\n")
+    with_write("  ./out/stage/bin/with-stage2 fixpoint-diff\n")
 
 fn run_help_command(argc: i32) -> i32:
     let topic = cli_help_topic(argc)
     if topic == "":
         print_usage()
+        return 0
+    if topic == "reduce":
+        print_reduce_usage()
+        return 0
+    if topic == "fixpoint-diff":
+        print_fixpoint_diff_usage()
         return 0
     if topic == "use":
         print_help_use()
@@ -3159,7 +3634,7 @@ fn run_help_command(argc: i32) -> i32:
         print_help_attributes()
         return 0
     with_eprint("error: unknown help topic '" ++ topic ++ "'")
-    with_eprint("available help topics: use, fn, type, let, extern, keywords, operators, attributes")
+    with_eprint("available help topics: reduce, fixpoint-diff, use, fn, type, let, extern, keywords, operators, attributes")
     1
 
 fn print_help_use:

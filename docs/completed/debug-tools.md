@@ -1,3 +1,34 @@
+# Debug Tools Plan
+
+Status: completed 2026-06-24. Archived in `docs/completed/`.
+
+Completed state:
+
+- Session A allocation-origin tagging is implemented in the native debug
+  allocator. Reports include coarse origins such as `Vec`, `channel`, `fiber`,
+  and `with_alloc`; see `docs/debug-allocator.md`, `tools/debug_drop.w`, and
+  `test/debug_alloc/README.md`.
+- Session B drop-origin MIR tagging is implemented. MIR `Drop` statements carry
+  a stable `drop#...` origin string, codegen threads it into runtime frees, and
+  debug allocator double-free reports print `first_drop=` and `second_drop=`.
+- Session C `--dump-drop-state` is implemented as a conservative MIR ownership
+  state dump (`Init`, `Moved`, `Uninit`, `Maybe`) available from `with check`.
+
+The debug allocator is now the default first tool for drop, lifetime,
+double-free, use-after-free, and leak bugs. Use `--debug-alloc`,
+`with build :debug-alloc-tests`, `tools/debug_drop.w`, and
+`tools/debug_drop*.lldb` before entering any edit/compile/trace loop.
+
+Verification from completion run:
+
+- `with build`
+- `with build :debug-alloc-tests`
+- `with build :fixpoint`
+- `with build :test`
+- `with build :test-green`
+
+## Original Plan
+
 Tooling plan — three tools, bounded sessions, oracle-first
 The governing principle, learned the hard way this arc: build each tool as its own session, validate it against answers you already know before trusting it on open ones, and land it before the work that needs it — not after. These are the oracles for the ownership substrate; they go in first.
 

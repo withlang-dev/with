@@ -13,6 +13,8 @@ impl Copy for BlockId
 extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_write(s: str) -> Unit
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_str_contains(s: str, needle: str) -> i32
 
 fn lbrace -> str:
     str_from_byte(123)
@@ -356,6 +358,7 @@ enum ProjKind: i32:
     PK_INDEX = 1
     PK_DEREF = 2
     PK_DOWNCAST = 3
+    PK_TUPLE_INDEX = 4
 
 // ── Drop kind tags for scope scheduling ──────────────────────────
 
@@ -742,6 +745,9 @@ fn MirBody.new_place_with_projection(mut self: MirBody, base: i32, proj_kind: i3
 fn MirBody.new_field_place(mut self: MirBody, base: i32, field_idx: i32, sema_ty: i32) -> i32:
     self.new_place_with_projection(base, ProjKind.PK_FIELD, field_idx, sema_ty)
 
+fn MirBody.new_tuple_index_place(mut self: MirBody, base: i32, elem_idx: i32, sema_ty: i32) -> i32:
+    self.new_place_with_projection(base, ProjKind.PK_TUPLE_INDEX, elem_idx, sema_ty)
+
 fn MirBody.new_index_place(mut self: MirBody, base: i32, idx_local: i32, sema_ty: i32) -> i32:
     self.new_place_with_projection(base, ProjKind.PK_INDEX, idx_local, sema_ty)
 
@@ -1015,6 +1021,8 @@ fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: &InternPool, sema: &Sema) -
     if kind == StmtKind.StorageDead:
         return f"StorageDead(_{d0});"
     if kind == StmtKind.Drop:
+        if d1 != 0:
+            return "drop(" ++ mir_place_text(body, d0) ++ ") @ " ++ pool.resolve(d1) ++ ";"
         return "drop(" ++ mir_place_text(body, d0) ++ ");"
     if kind == StmtKind.Nop:
         return "nop;"
@@ -1095,6 +1103,9 @@ fn mir_place_text(body: &MirBody, place_id: i32) -> str:
 
         if pk == ProjKind.PK_FIELD:
             out = out ++ f".f{pd}"
+            continue
+        if pk == ProjKind.PK_TUPLE_INDEX:
+            out = out ++ f".{pd}"
             continue
         if pk == ProjKind.PK_INDEX:
             out = out ++ f"[_{pd}]"
@@ -1297,6 +1308,878 @@ fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Se
             out = out ++ ", "
         out = out ++ "..."
     out
+
+// ── Drop-state dump (--dump-drop-state) ──────────────────────────
+
+enum MirDropState: i32:
+    Uninit = 0
+    Init = 1
+    Moved = 2
+    Maybe = 3
+
+type MirDropStateMapState {
+    keys: Vec[str],
+    states: Vec[i32],
+}
+
+type MirDropStateMap {
+    state: *mut MirDropStateMapState,
+}
+impl Copy for MirDropStateMap
+
+fn mir_drop_state_map_new() -> MirDropStateMap:
+    let ptr = with_alloc(128) as *mut MirDropStateMapState
+    unsafe *ptr = MirDropStateMapState { keys: Vec.new(), states: Vec.new() }
+    MirDropStateMap { state: ptr }
+
+fn mir_drop_state_map_len(map: MirDropStateMap) -> i32:
+    let st = map.state
+    unsafe { st.keys.len() as i32 }
+
+fn mir_drop_state_map_key(map: MirDropStateMap, idx: i32) -> str:
+    let st = map.state
+    unsafe { st.keys.get(idx as i64) }
+
+fn mir_drop_state_map_state(map: MirDropStateMap, idx: i32) -> i32:
+    let st = map.state
+    unsafe { st.states.get(idx as i64) }
+
+fn mir_drop_state_map_find(map: MirDropStateMap, key: str) -> i32:
+    let count = mir_drop_state_map_len(map)
+    for i in 0..count:
+        if mir_drop_state_map_key(map, i) == key:
+            return i
+    -1
+
+fn mir_drop_state_map_set(map: MirDropStateMap, key: str, state: i32):
+    let st = map.state
+    let idx = mir_drop_state_map_find(map, key)
+    if idx >= 0:
+        unsafe { st.states.set_i32(idx as i64, state) }
+        return
+    unsafe { st.keys.push(key) }
+    unsafe { st.states.push(state) }
+
+fn mir_drop_state_map_clone(map: MirDropStateMap) -> MirDropStateMap:
+    let out = mir_drop_state_map_new()
+    let count = mir_drop_state_map_len(map)
+    for i in 0..count:
+        mir_drop_state_map_set(out, mir_drop_state_map_key(map, i), mir_drop_state_map_state(map, i))
+    out
+
+fn mir_drop_state_join(a: i32, b: i32) -> i32:
+    if a == b:
+        return a
+    MirDropState.Maybe
+
+fn mir_drop_state_join_into(dst: MirDropStateMap, src: MirDropStateMap):
+    let count = mir_drop_state_map_len(src)
+    for i in 0..count:
+        let key = mir_drop_state_map_key(src, i)
+        let state = mir_drop_state_map_state(src, i)
+        let existing = mir_drop_state_map_find(dst, key)
+        if existing < 0:
+            mir_drop_state_map_set(dst, key, state)
+        else:
+            mir_drop_state_map_set(dst, key, mir_drop_state_join(mir_drop_state_map_state(dst, existing), state))
+
+fn mir_drop_state_name(state: i32) -> str:
+    if state == MirDropState.Init:
+        return "Init"
+    if state == MirDropState.Moved:
+        return "Moved"
+    if state == MirDropState.Maybe:
+        return "Maybe"
+    "Uninit"
+
+fn mir_drop_state_local_key(local_id: i32) -> str:
+    f"_{local_id}"
+
+fn mir_drop_state_key_is_descendant(key: str, local_key: str) -> bool:
+    if key == local_key:
+        return true
+    if not key.starts_with(local_key):
+        return false
+    if key.len() <= local_key.len():
+        return false
+    let ch = key.byte_at(local_key.len() as i64)
+    ch == 46 or ch == 91 or ch == 60
+
+fn mir_drop_state_mark_local(map: MirDropStateMap, local_id: i32, state: i32):
+    let key = mir_drop_state_local_key(local_id)
+    mir_drop_state_map_set(map, key, state)
+    let count = mir_drop_state_map_len(map)
+    for i in 0..count:
+        let child = mir_drop_state_map_key(map, i)
+        if mir_drop_state_key_is_descendant(child, key):
+            mir_drop_state_map_set(map, child, state)
+
+fn mir_drop_state_place_base_local(body: &MirBody, place_id: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return -1
+    body.place_locals.get(place_id as i64)
+
+fn mir_drop_state_mark_place(map: MirDropStateMap, body: &MirBody, place_id: i32, state: i32):
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return
+    let key = mir_place_text(body, place_id)
+    mir_drop_state_map_set(map, key, state)
+    let base_local = mir_drop_state_place_base_local(body, place_id)
+    if base_local < 0:
+        return
+    let proj_count = body.place_proj_counts.get(place_id as i64)
+    if proj_count == 0:
+        mir_drop_state_mark_local(map, base_local, state)
+    else:
+        let base_key = mir_drop_state_local_key(base_local)
+        let old_idx = mir_drop_state_map_find(map, base_key)
+        let old_state = if old_idx >= 0: mir_drop_state_map_state(map, old_idx) else: MirDropState.Uninit
+        mir_drop_state_map_set(map, base_key, mir_drop_state_join(old_state, state))
+
+fn mir_drop_state_initial(body: &MirBody) -> MirDropStateMap:
+    let map = mir_drop_state_map_new()
+    let local_count = body.local_count()
+    for li in 0..local_count:
+        let state = if li > 0 and li <= body.n_params: MirDropState.Init else: MirDropState.Uninit
+        mir_drop_state_map_set(map, mir_drop_state_local_key(li), state)
+    map
+
+fn mir_drop_state_note_operand(map: MirDropStateMap, body: &MirBody, operand_id: i32):
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return
+    let kind = body.operand_kinds.get(operand_id as i64)
+    if kind != OperandKind.OK_MOVE:
+        return
+    let place = body.operand_d0.get(operand_id as i64)
+    mir_drop_state_mark_place(map, body, place, MirDropState.Moved)
+
+fn mir_drop_state_note_call_args(map: MirDropStateMap, body: &MirBody, args_id: i32):
+    if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        return
+    let start = body.call_arg_starts.get(args_id as i64)
+    let count = body.call_arg_counts.get(args_id as i64)
+    for i in 0..count:
+        mir_drop_state_note_operand(map, body, body.call_arg_operands.get((start + i) as i64))
+
+fn mir_drop_state_note_agg_fields(map: MirDropStateMap, body: &MirBody, fields_id: i32):
+    if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
+        return
+    let start = body.agg_field_starts.get(fields_id as i64)
+    let count = body.agg_field_counts.get(fields_id as i64)
+    for i in 0..count:
+        mir_drop_state_note_operand(map, body, body.agg_field_operands.get((start + i) as i64))
+
+fn mir_drop_state_note_rvalue(map: MirDropStateMap, body: &MirBody, rval_id: i32):
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return
+    let kind = body.rval_kinds.get(rval_id as i64)
+    let d0 = body.rval_d0.get(rval_id as i64)
+    let d1 = body.rval_d1.get(rval_id as i64)
+    let d2 = body.rval_d2.get(rval_id as i64)
+    if kind == RvalueKind.RK_USE:
+        mir_drop_state_note_operand(map, body, d0)
+    else if kind == RvalueKind.RK_BIN_OP:
+        mir_drop_state_note_operand(map, body, d1)
+        mir_drop_state_note_operand(map, body, d2)
+    else if kind == RvalueKind.RK_UN_OP:
+        mir_drop_state_note_operand(map, body, d1)
+    else if kind == RvalueKind.RK_CAST:
+        mir_drop_state_note_operand(map, body, d0)
+    else if kind == RvalueKind.RK_AGGREGATE:
+        mir_drop_state_note_agg_fields(map, body, d1)
+    else if kind == RvalueKind.RK_STR_CONCAT_N:
+        mir_drop_state_note_call_args(map, body, d0)
+    else if kind == RvalueKind.RK_SLICE:
+        mir_drop_state_note_operand(map, body, d1)
+        mir_drop_state_note_operand(map, body, d2)
+
+fn mir_drop_state_transfer_stmt(map: MirDropStateMap, body: &MirBody, stmt_id: i32):
+    let kind = body.stmt_kind(stmt_id)
+    let d0 = body.stmt_data0(stmt_id)
+    let d1 = body.stmt_data1(stmt_id)
+    if kind == StmtKind.StorageLive:
+        mir_drop_state_mark_local(map, d0, MirDropState.Uninit)
+    else if kind == StmtKind.StorageDead:
+        mir_drop_state_mark_local(map, d0, MirDropState.Uninit)
+    else if kind == StmtKind.Assign:
+        mir_drop_state_note_rvalue(map, body, d1)
+        mir_drop_state_mark_place(map, body, d0, MirDropState.Init)
+    else if kind == StmtKind.Drop:
+        mir_drop_state_mark_place(map, body, d0, MirDropState.Uninit)
+
+fn mir_drop_state_transfer_term(map: MirDropStateMap, body: &MirBody, bb: i32):
+    let kind = body.term_kind(bb)
+    let d0 = body.term_data0(bb)
+    let d1 = body.term_data1(bb)
+    let d2 = body.term_data2(bb)
+    if kind == TermKind.TK_SWITCH_INT:
+        mir_drop_state_note_operand(map, body, d0)
+    else if kind == TermKind.TK_CALL:
+        mir_drop_state_note_operand(map, body, d0)
+        mir_drop_state_note_call_args(map, body, d1)
+        mir_drop_state_mark_place(map, body, d2, MirDropState.Init)
+    else if kind == TermKind.TK_DROP_AND_GOTO:
+        mir_drop_state_mark_place(map, body, d0, MirDropState.Uninit)
+
+fn mir_drop_state_block_has_successor(body: &MirBody, pred: i32, target: i32) -> bool:
+    let kind = body.term_kind(pred)
+    let d0 = body.term_data0(pred)
+    let d1 = body.term_data1(pred)
+    let d2 = body.term_data2(pred)
+    let d3 = body.term_data3(pred)
+    if kind == TermKind.TK_GOTO:
+        return d0 == target
+    if kind == TermKind.TK_SWITCH_INT:
+        if d2 == target:
+            return true
+        if d1 >= 0 and d1 < body.switch_table_starts.len() as i32:
+            let start = body.switch_table_starts.get(d1 as i64)
+            let count = body.switch_table_counts.get(d1 as i64)
+            for i in 0..count:
+                if body.switch_table_targets.get((start + i) as i64) == target:
+                    return true
+        return false
+    if kind == TermKind.TK_CALL:
+        return d3 == target
+    if kind == TermKind.TK_DROP_AND_GOTO:
+        return d1 == target
+    false
+
+type MirDropStateBlocksState {
+    starts: Vec[i32],
+    counts: Vec[i32],
+    keys: Vec[str],
+    states: Vec[i32],
+}
+
+type MirDropStateBlocks {
+    state: *mut MirDropStateBlocksState,
+}
+impl Copy for MirDropStateBlocks
+
+fn mir_drop_state_blocks_new(bb_count: i32) -> MirDropStateBlocks:
+    let ptr = with_alloc(256) as *mut MirDropStateBlocksState
+    unsafe *ptr = MirDropStateBlocksState {
+        starts: Vec.new(),
+        counts: Vec.new(),
+        keys: Vec.new(),
+        states: Vec.new(),
+    }
+    for _ in 0..bb_count:
+        unsafe { ptr.starts.push(0) }
+        unsafe { ptr.counts.push(0) }
+    MirDropStateBlocks { state: ptr }
+
+fn mir_drop_state_store_block(blocks: MirDropStateBlocks, bb: i32, map: MirDropStateMap):
+    let st = blocks.state
+    unsafe { st.starts.set_i32(bb as i64, st.keys.len() as i32) }
+    unsafe { st.counts.set_i32(bb as i64, mir_drop_state_map_len(map)) }
+    for i in 0..mir_drop_state_map_len(map):
+        unsafe { st.keys.push(mir_drop_state_map_key(map, i)) }
+        unsafe { st.states.push(mir_drop_state_map_state(map, i)) }
+
+fn mir_drop_state_load_block(blocks: MirDropStateBlocks, bb: i32) -> MirDropStateMap:
+    let map = mir_drop_state_map_new()
+    let st = blocks.state
+    if bb < 0 or bb >= unsafe { st.starts.len() as i32 }:
+        return map
+    let start = unsafe { st.starts.get(bb as i64) }
+    let count = unsafe { st.counts.get(bb as i64) }
+    for i in 0..count:
+        mir_drop_state_map_set(map, unsafe { st.keys.get((start + i) as i64) }, unsafe { st.states.get((start + i) as i64) })
+    map
+
+fn mir_drop_state_block_input(body: &MirBody, blocks: MirDropStateBlocks, bb: i32) -> MirDropStateMap:
+    if bb == 0:
+        return mir_drop_state_initial(body)
+    var seen = 0
+    var out = mir_drop_state_map_new()
+    for pred in 0..bb:
+        if not mir_drop_state_block_has_successor(body, pred, bb):
+            continue
+        let pred_map = mir_drop_state_load_block(blocks, pred)
+        if seen == 0:
+            out = mir_drop_state_map_clone(pred_map)
+            seen = 1
+        else:
+            mir_drop_state_join_into(out, pred_map)
+    if seen == 0:
+        return mir_drop_state_initial(body)
+    out
+
+fn mir_drop_state_format(map: MirDropStateMap) -> str:
+    var out = ""
+    let count = mir_drop_state_map_len(map)
+    var emitted = 0
+    for i in 0..count:
+        let key = mir_drop_state_map_key(map, i)
+        if key.len() == 0:
+            continue
+        if emitted > 0:
+            out = out ++ ", "
+        out = out ++ key ++ "=" ++ mir_drop_state_name(mir_drop_state_map_state(map, i))
+        emitted = emitted + 1
+        if emitted >= 96 and count > emitted:
+            out = out ++ ", ..."
+            break
+    if out.len() == 0:
+        return "<empty>"
+    out
+
+fn dump_drop_state_body(body: &MirBody, pool: &InternPool) -> str:
+    var out = ""
+    let fn_name = if body.fn_sym != 0:
+        f"sym{body.fn_sym}({pool.resolve(body.fn_sym)})"
+    else:
+        "<anon>"
+    out = out ++ "fn " ++ fn_name ++ " " ++ lbrace() ++ "\n"
+    let bb_count = body.block_count()
+    let blocks = mir_drop_state_blocks_new(bb_count)
+    for bb in 0..bb_count:
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        out = out ++ f"  bb{bb} in: " ++ mir_drop_state_format(state) ++ "\n"
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            mir_drop_state_transfer_stmt(state, body, stmt_start + si)
+        mir_drop_state_transfer_term(state, body, bb)
+        out = out ++ f"  bb{bb} out: " ++ mir_drop_state_format(state) ++ "\n"
+        mir_drop_state_store_block(blocks, bb, state)
+    out ++ rbrace() ++ "\n"
+
+fn dump_drop_state_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+    let _ = sema
+    var out = f"drop-state module functions={mir_mod.bodies.len() as i32}\n"
+    for i in 0..mir_mod.bodies.len() as i32:
+        if i > 0:
+            out = out ++ "\n"
+        let body: MirBody = mir_mod.bodies.get(i as i64)
+        out = out ++ dump_drop_state_body(body, pool)
+    out
+
+fn mir_drop_state_get_key(map: MirDropStateMap, key: str) -> i32:
+    let idx = mir_drop_state_map_find(map, key)
+    if idx < 0:
+        return MirDropState.Uninit
+    mir_drop_state_map_state(map, idx)
+
+fn mir_drop_state_get_place(map: MirDropStateMap, body: &MirBody, place_id: i32) -> i32:
+    mir_drop_state_get_key(map, mir_place_text(body, place_id))
+
+fn mir_ownership_key_matches(key: str, target: str) -> bool:
+    if target.len() == 0:
+        return true
+    if key == target:
+        return true
+    mir_drop_state_key_is_descendant(key, target)
+
+fn mir_drop_state_selected_format(map: MirDropStateMap, target: str) -> str:
+    if target.len() == 0:
+        return mir_drop_state_format(map)
+    var out = ""
+    var emitted = 0
+    let count = mir_drop_state_map_len(map)
+    for i in 0..count:
+        let key = mir_drop_state_map_key(map, i)
+        if not mir_ownership_key_matches(key, target):
+            continue
+        if emitted > 0:
+            out = out ++ ", "
+        out = out ++ key ++ "=" ++ mir_drop_state_name(mir_drop_state_map_state(map, i))
+        emitted = emitted + 1
+    if emitted == 0:
+        return target ++ "=" ++ mir_drop_state_name(MirDropState.Uninit)
+    out
+
+fn mir_ownership_place_matches(body: &MirBody, place_id: i32, target: str) -> bool:
+    if target.len() == 0:
+        return true
+    mir_ownership_key_matches(mir_place_text(body, place_id), target)
+
+fn mir_ownership_operand_move_matches(body: &MirBody, operand_id: i32, target: str) -> bool:
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return false
+    if body.operand_kinds.get(operand_id as i64) != OperandKind.OK_MOVE:
+        return false
+    mir_ownership_place_matches(body, body.operand_d0.get(operand_id as i64), target)
+
+fn mir_ownership_call_args_move_matches(body: &MirBody, args_id: i32, target: str) -> bool:
+    if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        return false
+    let start = body.call_arg_starts.get(args_id as i64)
+    let count = body.call_arg_counts.get(args_id as i64)
+    for i in 0..count:
+        if mir_ownership_operand_move_matches(body, body.call_arg_operands.get((start + i) as i64), target):
+            return true
+    false
+
+fn mir_ownership_agg_fields_move_matches(body: &MirBody, fields_id: i32, target: str) -> bool:
+    if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
+        return false
+    let start = body.agg_field_starts.get(fields_id as i64)
+    let count = body.agg_field_counts.get(fields_id as i64)
+    for i in 0..count:
+        if mir_ownership_operand_move_matches(body, body.agg_field_operands.get((start + i) as i64), target):
+            return true
+    false
+
+fn mir_ownership_rvalue_move_matches(body: &MirBody, rval_id: i32, target: str) -> bool:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return false
+    let kind = body.rval_kinds.get(rval_id as i64)
+    let d0 = body.rval_d0.get(rval_id as i64)
+    let d1 = body.rval_d1.get(rval_id as i64)
+    let d2 = body.rval_d2.get(rval_id as i64)
+    if kind == RvalueKind.RK_USE:
+        return mir_ownership_operand_move_matches(body, d0, target)
+    if kind == RvalueKind.RK_BIN_OP:
+        return mir_ownership_operand_move_matches(body, d1, target) or mir_ownership_operand_move_matches(body, d2, target)
+    if kind == RvalueKind.RK_UN_OP:
+        return mir_ownership_operand_move_matches(body, d1, target)
+    if kind == RvalueKind.RK_CAST:
+        return mir_ownership_operand_move_matches(body, d0, target)
+    if kind == RvalueKind.RK_AGGREGATE:
+        return mir_ownership_agg_fields_move_matches(body, d1, target)
+    if kind == RvalueKind.RK_STR_CONCAT_N:
+        return mir_ownership_call_args_move_matches(body, d0, target)
+    if kind == RvalueKind.RK_SLICE:
+        return mir_ownership_operand_move_matches(body, d1, target) or mir_ownership_operand_move_matches(body, d2, target)
+    false
+
+fn mir_ownership_stmt_event(body: &MirBody, stmt_id: i32, target: str) -> str:
+    let kind = body.stmt_kind(stmt_id)
+    if kind == StmtKind.Assign:
+        if mir_ownership_rvalue_move_matches(body, body.stmt_data1(stmt_id), target):
+            return "move"
+        return "assign"
+    if kind == StmtKind.StorageLive:
+        return "storage-live"
+    if kind == StmtKind.StorageDead:
+        return "storage-dead"
+    if kind == StmtKind.Drop:
+        return "drop"
+    "nop"
+
+fn mir_ownership_term_event(body: &MirBody, bb: i32, target: str) -> str:
+    let kind = body.term_kind(bb)
+    if kind == TermKind.TK_CALL:
+        if mir_ownership_operand_move_matches(body, body.term_data0(bb), target) or mir_ownership_call_args_move_matches(body, body.term_data1(bb), target):
+            return "move"
+        return "call"
+    if kind == TermKind.TK_DROP_AND_GOTO:
+        return "drop"
+    if kind == TermKind.TK_SWITCH_INT:
+        if mir_ownership_operand_move_matches(body, body.term_data0(bb), target):
+            return "move"
+        return "switch"
+    if kind == TermKind.TK_RETURN:
+        return "return"
+    if kind == TermKind.TK_GOTO:
+        return "goto"
+    "term"
+
+fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
+    let bb_count = body.block_count()
+    let blocks = mir_drop_state_blocks_new(bb_count)
+    for bb in 0..bb_count:
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            mir_drop_state_transfer_stmt(state, body, stmt_start + si)
+        mir_drop_state_transfer_term(state, body, bb)
+        mir_drop_state_store_block(blocks, bb, state)
+    blocks
+
+fn trace_ownership_body(body: &MirBody, pool: &InternPool, sema: &Sema, spec: str, target: str) -> str:
+    var out = ""
+    out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
+    var hits = 0
+    let blocks = mir_drop_state_blocks_new(body.block_count())
+    for bb in 0..body.block_count():
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            let before = mir_drop_state_selected_format(state, target)
+            let text = mir_stmt_text(body, stmt_id, pool, sema)
+            let event = mir_ownership_stmt_event(body, stmt_id, target)
+            mir_drop_state_transfer_stmt(state, body, stmt_id)
+            let after = mir_drop_state_selected_format(state, target)
+            if before != after or mir_debug_mentions(text, target):
+                out = out ++ f"  bb{bb}.stmt{stmt_id} event={event} before=" ++ before ++ " after=" ++ after ++ " text=\"" ++ text ++ "\"\n"
+                hits = hits + 1
+        let before_term = mir_drop_state_selected_format(state, target)
+        let term_text = mir_term_text(body, bb, pool, sema)
+        let term_event = mir_ownership_term_event(body, bb, target)
+        mir_drop_state_transfer_term(state, body, bb)
+        let after_term = mir_drop_state_selected_format(state, target)
+        if before_term != after_term or mir_debug_mentions(term_text, target):
+            out = out ++ f"  bb{bb}.term event={term_event} before=" ++ before_term ++ " after=" ++ after_term ++ " text=\"" ++ term_text ++ "\"\n"
+            hits = hits + 1
+        mir_drop_state_store_block(blocks, bb, state)
+    if hits == 0:
+        out = out ++ "  <no ownership transitions>\n"
+    out
+
+fn trace_ownership_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: str) -> str:
+    let wanted_fn = mir_debug_spec_fn(spec)
+    let target = mir_debug_spec_target(spec)
+    var out = "trace-ownership " ++ spec ++ "\n"
+    var hits = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body: MirBody = mir_mod.bodies.get(bi as i64)
+        if not mir_debug_body_matches(&body, pool, wanted_fn):
+            continue
+        out = out ++ trace_ownership_body(&body, pool, sema, spec, target)
+        hits = hits + 1
+    if hits == 0:
+        out = out ++ "  <no matching function>\n"
+    out
+
+fn mir_drop_plan_action(state: i32) -> str:
+    if state == MirDropState.Init:
+        return "drop"
+    if state == MirDropState.Maybe:
+        return "conditional"
+    if state == MirDropState.Moved:
+        return "skip"
+    "skip"
+
+fn mir_drop_plan_place_line(body: &MirBody, pool: &InternPool, sema: &Sema, place_id: i32, state: i32, label: str, text: str) -> str:
+    let ty = if place_id >= 0 and place_id < body.place_sema_types.len() as i32: body.place_sema_types.get(place_id as i64) else: 0
+    label ++ " place=" ++ mir_place_text(body, place_id) ++ f" ty=ty{ty} state_before=" ++ mir_drop_state_name(state) ++ " action=" ++ mir_drop_plan_action(state) ++ " text=\"" ++ text ++ "\"\n"
+
+fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
+    var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
+    var hits = 0
+    let blocks = mir_drop_state_blocks_new(body.block_count())
+    for bb in 0..body.block_count():
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            let kind = body.stmt_kind(stmt_id)
+            if kind == StmtKind.Drop:
+                let place_id = body.stmt_data0(stmt_id)
+                out = out ++ mir_drop_plan_place_line(body, pool, sema, place_id, mir_drop_state_get_place(state, body, place_id), f"  bb{bb}.stmt{stmt_id}", mir_stmt_text(body, stmt_id, pool, sema))
+                hits = hits + 1
+            else if kind == StmtKind.StorageDead:
+                let local_key = mir_drop_state_local_key(body.stmt_data0(stmt_id))
+                out = out ++ f"  bb{bb}.stmt{stmt_id} storage-dead local=" ++ local_key ++ " remaining=" ++ mir_drop_state_selected_format(state, local_key) ++ "\n"
+                hits = hits + 1
+            mir_drop_state_transfer_stmt(state, body, stmt_id)
+        if body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
+            let place_id = body.term_data0(bb)
+            out = out ++ mir_drop_plan_place_line(body, pool, sema, place_id, mir_drop_state_get_place(state, body, place_id), f"  bb{bb}.term", mir_term_text(body, bb, pool, sema))
+            hits = hits + 1
+        mir_drop_state_transfer_term(state, body, bb)
+        mir_drop_state_store_block(blocks, bb, state)
+    if hits == 0:
+        out = out ++ "  <no drop sites>\n"
+    out
+
+fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+    var out = f"drop-plan module functions={mir_mod.bodies.len() as i32}\n"
+    for i in 0..mir_mod.bodies.len() as i32:
+        if i > 0:
+            out = out ++ "\n"
+        let body: MirBody = mir_mod.bodies.get(i as i64)
+        out = out ++ dump_drop_plan_body(&body, pool, sema)
+    out
+
+fn mir_projection_debug_name(mir_mod: &MirModule, current_ty: i32, proj_kind: i32, proj_data: i32) -> str:
+    if proj_kind == ProjKind.PK_TUPLE_INDEX:
+        return f"TupleIndex({proj_data})"
+    if proj_kind == ProjKind.PK_FIELD:
+        let resolved = mir_mod.mir_resolve_alias(current_ty)
+        if mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_TUPLE:
+            return f"TupleIndex({proj_data})"
+        return f"Field({proj_data})"
+    if proj_kind == ProjKind.PK_INDEX:
+        return f"Index(_{proj_data})"
+    if proj_kind == ProjKind.PK_DEREF:
+        return "Deref"
+    if proj_kind == ProjKind.PK_DOWNCAST:
+        return f"Downcast({proj_data})"
+    f"Projection({proj_kind},{proj_data})"
+
+fn mir_projection_next_type(mir_mod: &MirModule, current_ty: i32, proj_kind: i32, proj_data: i32) -> i32:
+    let resolved = mir_mod.mir_resolve_alias(current_ty)
+    if proj_kind == ProjKind.PK_TUPLE_INDEX:
+        return mir_validate_tuple_elem_type(mir_mod, resolved, proj_data)
+    if proj_kind == ProjKind.PK_FIELD:
+        if mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_TUPLE:
+            return mir_validate_tuple_elem_type(mir_mod, resolved, proj_data)
+        return mir_validate_struct_field_type(mir_mod, resolved, proj_data)
+    if proj_kind == ProjKind.PK_INDEX:
+        return mir_validate_indexed_element_type(mir_mod, resolved)
+    if proj_kind == ProjKind.PK_DEREF:
+        if mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_PTR or mir_mod.mir_get_type_kind(resolved) == TypeKind.TY_REF:
+            return mir_mod.mir_get_type_d0(resolved)
+    if proj_kind == ProjKind.PK_DOWNCAST:
+        return current_ty
+    0
+
+fn mir_place_projection_debug_list(mir_mod: &MirModule, body: &MirBody, place_id: i32) -> str:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return "[]"
+    var out = "["
+    let p_start = body.place_proj_starts.get(place_id as i64)
+    let p_count = body.place_proj_counts.get(place_id as i64)
+    let local_id = body.place_locals.get(place_id as i64)
+    var current_ty = if local_id >= 0 and local_id < body.local_type_ids.len() as i32: body.local_type_ids.get(local_id as i64) else: 0
+    for i in 0..p_count:
+        if i > 0:
+            out = out ++ ", "
+        let pk = body.proj_kinds.get((p_start + i) as i64)
+        let pd = body.proj_d0.get((p_start + i) as i64)
+        out = out ++ mir_projection_debug_name(mir_mod, current_ty, pk, pd)
+        current_ty = mir_projection_next_type(mir_mod, current_ty, pk, pd)
+    out ++ "]"
+
+fn dump_place_map_body(mir_mod: &MirModule, body: &MirBody, pool: &InternPool) -> str:
+    var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
+    for place_id in 0..body.place_locals.len() as i32:
+        let local_id = body.place_locals.get(place_id as i64)
+        let ty = body.place_sema_types.get(place_id as i64)
+        out = out ++ f"  place#{place_id} path=" ++ mir_place_text(body, place_id) ++ f" base=_{local_id} ty=ty{ty} projections=" ++ mir_place_projection_debug_list(mir_mod, body, place_id) ++ "\n"
+    out
+
+fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+    let _ = sema
+    var out = f"place-map module functions={mir_mod.bodies.len() as i32}\n"
+    for i in 0..mir_mod.bodies.len() as i32:
+        if i > 0:
+            out = out ++ "\n"
+        let body: MirBody = mir_mod.bodies.get(i as i64)
+        out = out ++ dump_place_map_body(mir_mod, &body, pool)
+    out
+
+fn mir_parse_positive_i32(text: str) -> i32:
+    if text.len() == 0:
+        return -1
+    var out = 0
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        out = out * 10 + (ch - 48)
+    out
+
+fn mir_parse_block_id(text: str) -> i32:
+    if text.starts_with("bb"):
+        return mir_parse_positive_i32(text.slice(2, text.len()))
+    mir_parse_positive_i32(text)
+
+fn mir_cleanup_edge_from(target: str) -> i32:
+    for i in 0..target.len() as i32:
+        if target.byte_at(i as i64) == 45 and i + 1 < target.len() as i32 and target.byte_at((i + 1) as i64) == 62:
+            return mir_parse_block_id(target.slice(0, i as i64))
+    -1
+
+fn mir_cleanup_edge_to(target: str) -> i32:
+    for i in 0..target.len() as i32:
+        if target.byte_at(i as i64) == 45 and i + 1 < target.len() as i32 and target.byte_at((i + 1) as i64) == 62:
+            return mir_parse_block_id(target.slice((i + 2) as i64, target.len()))
+    -1
+
+fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: str) -> str:
+    let wanted_fn = mir_debug_spec_fn(spec)
+    let target = mir_debug_spec_target(spec)
+    let from_bb = mir_cleanup_edge_from(target)
+    let to_bb = mir_cleanup_edge_to(target)
+    var out = "trace-cleanup-edge " ++ spec ++ "\n"
+    if from_bb < 0 or to_bb < 0:
+        return out ++ "  <invalid edge spec; expected fn:from->to>\n"
+    var hits = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body: MirBody = mir_mod.bodies.get(bi as i64)
+        if not mir_debug_body_matches(&body, pool, wanted_fn):
+            continue
+        if from_bb >= body.block_count() or to_bb >= body.block_count():
+            continue
+        if not mir_drop_state_block_has_successor(&body, from_bb, to_bb):
+            continue
+        let blocks = mir_drop_state_compute_blocks(&body)
+        let from_out = mir_drop_state_load_block(blocks, from_bb)
+        let to_in = mir_drop_state_block_input(&body, blocks, to_bb)
+        out = out ++ "fn " ++ mir_debug_body_label(&body, pool) ++ f" edge=bb{from_bb}->bb{to_bb}\n"
+        out = out ++ "  from_out: " ++ mir_drop_state_format(from_out) ++ "\n"
+        out = out ++ "  to_in: " ++ mir_drop_state_format(to_in) ++ "\n"
+        out = out ++ "  term: " ++ mir_term_text(&body, from_bb, pool, sema) ++ "\n"
+        if body.term_kind(from_bb) == TermKind.TK_DROP_AND_GOTO and body.term_data1(from_bb) == to_bb:
+            let place_id = body.term_data0(from_bb)
+            out = out ++ "  edge_drop: " ++ mir_drop_plan_place_line(&body, pool, sema, place_id, mir_drop_state_get_place(from_out, &body, place_id), f"bb{from_bb}.term", mir_term_text(&body, from_bb, pool, sema))
+        hits = hits + 1
+    if hits == 0:
+        out = out ++ "  <no matching cleanup edge>\n"
+    out
+
+fn dump_drop_flags_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
+    let _ = pool
+    let _ = sema
+    f"drop-flags module functions={mir_mod.bodies.len() as i32}\n<no drop flags>\n"
+
+fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
+    let blocks = mir_drop_state_blocks_new(body.block_count())
+    for bb in 0..body.block_count():
+        let state = mir_drop_state_block_input(body, blocks, bb)
+        let stmt_start = body.bb_stmt_starts.get(bb as i64)
+        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..stmt_count:
+            let stmt_id = stmt_start + si
+            let kind = body.stmt_kind(stmt_id)
+            let d0 = body.stmt_data0(stmt_id)
+            let span = body.stmt_spans.get(stmt_id as i64)
+            if kind == StmtKind.Assign or kind == StmtKind.Drop:
+                if d0 < 0 or d0 >= body.place_locals.len() as i32:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: ownership target place out of range"
+                if mir_validate_place_type(mir_mod, body, d0) == 0:
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: ownership target has no concrete MIR type"
+            mir_drop_state_transfer_stmt(state, body, stmt_id)
+        if body.term_kind(bb) == TermKind.TK_CALL or body.term_kind(bb) == TermKind.TK_DROP_AND_GOTO:
+            let place_id = if body.term_kind(bb) == TermKind.TK_CALL: body.term_data2(bb) else: body.term_data0(bb)
+            if place_id < 0 or place_id >= body.place_locals.len() as i32:
+                return f"fn sym{body.fn_sym} bb{bb}: ownership terminator place out of range"
+            if mir_validate_place_type(mir_mod, body, place_id) == 0:
+                return f"fn sym{body.fn_sym} bb{bb}: ownership terminator place has no concrete MIR type"
+        mir_drop_state_transfer_term(state, body, bb)
+        mir_drop_state_store_block(blocks, bb, state)
+    ""
+
+fn validate_ownership_mir_module(mir_mod: &MirModule) -> str:
+    let shape = validate_mir_module(mir_mod)
+    if shape.len() > 0:
+        return "MIR shape: " ++ shape
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body = mir_mod.bodies.get(bi as i64)
+        if body.lowering_failed != 0:
+            continue
+        let err = validate_ownership_body(mir_mod, &body)
+        if err.len() > 0:
+            return err
+    ""
+
+fn mir_debug_spec_fn(spec: str) -> str:
+    for i in 0..spec.len() as i32:
+        if spec.byte_at(i as i64) == 58:
+            return spec.slice(0, i as i64)
+    ""
+
+fn mir_debug_spec_target(spec: str) -> str:
+    for i in 0..spec.len() as i32:
+        if spec.byte_at(i as i64) == 58:
+            return spec.slice((i + 1) as i64, spec.len())
+    spec
+
+fn mir_debug_body_name(body: &MirBody, pool: &InternPool) -> str:
+    if body.fn_sym != 0:
+        return pool.resolve(body.fn_sym)
+    "<anon>"
+
+fn mir_debug_body_label(body: &MirBody, pool: &InternPool) -> str:
+    if body.fn_sym != 0:
+        return f"sym{body.fn_sym}(" ++ pool.resolve(body.fn_sym) ++ ")"
+    "<anon>"
+
+fn mir_debug_body_matches(body: &MirBody, pool: &InternPool, wanted_fn: str) -> bool:
+    if wanted_fn.len() == 0:
+        return true
+    let name = mir_debug_body_name(body, pool)
+    if name == wanted_fn:
+        return true
+    if body.fn_sym != 0 and f"sym{body.fn_sym}" == wanted_fn:
+        return true
+    false
+
+fn mir_debug_mentions(text: str, target: str) -> bool:
+    target.len() == 0 or with_str_contains(text, target) != 0
+
+fn trace_place_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: str) -> str:
+    let wanted_fn = mir_debug_spec_fn(spec)
+    let target = mir_debug_spec_target(spec)
+    var out = "trace-place " ++ spec ++ "\n"
+    var hits = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body: MirBody = mir_mod.bodies.get(bi as i64)
+        if not mir_debug_body_matches(&body, pool, wanted_fn):
+            continue
+        var body_header_emitted = false
+        for bb in 0..body.block_count():
+            let stmt_start = body.bb_stmt_starts.get(bb as i64)
+            let stmt_count = body.bb_stmt_counts.get(bb as i64)
+            for si in 0..stmt_count:
+                let stmt_id = stmt_start + si
+                let text = mir_stmt_text(&body, stmt_id, pool, sema)
+                if mir_debug_mentions(text, target):
+                    if not body_header_emitted:
+                        out = out ++ "fn " ++ mir_debug_body_label(&body, pool) ++ "\n"
+                        body_header_emitted = true
+                    out = out ++ f"  bb{bb}.stmt{stmt_id}: " ++ text ++ "\n"
+                    hits = hits + 1
+            let term_text = mir_term_text(&body, bb, pool, sema)
+            if mir_debug_mentions(term_text, target):
+                if not body_header_emitted:
+                    out = out ++ "fn " ++ mir_debug_body_label(&body, pool) ++ "\n"
+                    body_header_emitted = true
+                out = out ++ f"  bb{bb}.term: " ++ term_text ++ "\n"
+                hits = hits + 1
+    if hits == 0:
+        out = out ++ "  <no matching MIR events>\n"
+    out
+
+fn explain_mir_origin_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: str) -> str:
+    let wanted_fn = mir_debug_spec_fn(spec)
+    let target = mir_debug_spec_target(spec)
+    var out = "mir-origin " ++ spec ++ "\n"
+    var hits = 0
+    for bi in 0..mir_mod.bodies.len() as i32:
+        let body: MirBody = mir_mod.bodies.get(bi as i64)
+        if not mir_debug_body_matches(&body, pool, wanted_fn):
+            continue
+        for li in 0..body.local_count():
+            let local_label = f"_{li}"
+            if mir_debug_mentions(local_label, target):
+                out = out ++ "fn " ++ mir_debug_body_label(&body, pool) ++ f" local _{li}"
+                let info = body.get_local(li)
+                out = out ++ f" type=ty{info.type_id}"
+                if info.name_sym != 0:
+                    out = out ++ " name=" ++ pool.resolve(info.name_sym)
+                out = out ++ "\n"
+                hits = hits + 1
+        for bb in 0..body.block_count():
+            let stmt_start = body.bb_stmt_starts.get(bb as i64)
+            let stmt_count = body.bb_stmt_counts.get(bb as i64)
+            for si in 0..stmt_count:
+                let stmt_id = stmt_start + si
+                let text = mir_stmt_text(&body, stmt_id, pool, sema)
+                let span = body.stmt_spans.get(stmt_id as i64)
+                if mir_debug_mentions(text, target) or target == f"stmt{stmt_id}":
+                    out = out ++ "fn " ++ mir_debug_body_label(&body, pool) ++ f" bb{bb}.stmt{stmt_id} span={span}: " ++ text ++ "\n"
+                    hits = hits + 1
+            let term_text = mir_term_text(&body, bb, pool, sema)
+            let term_span = body.bb_term_spans.get(bb as i64)
+            if mir_debug_mentions(term_text, target) or target == f"term{bb}":
+                out = out ++ "fn " ++ mir_debug_body_label(&body, pool) ++ f" bb{bb}.term span={term_span}: " ++ term_text ++ "\n"
+                hits = hits + 1
+    if hits == 0:
+        out = out ++ "  <no matching MIR origin>\n"
+    out
+
+fn validate_all_mir_module(mir_mod: &MirModule) -> str:
+    let shape = validate_mir_module(mir_mod)
+    if shape.len() > 0:
+        return "MIR shape: " ++ shape
+    let typed = validate_typed_mir_module(mir_mod)
+    if mir_validation_has_error(typed):
+        return "typed MIR: " ++ typed.message
+    let ownership = validate_ownership_mir_module(mir_mod)
+    if ownership.len() > 0:
+        return "ownership MIR: " ++ ownership
+    ""
 
 fn mir_binop_name(op: i32) -> str:
     if op == BinaryOp.OP_ADD: return "add"
@@ -1535,6 +2418,10 @@ fn validate_mir_body(body: &MirBody) -> str:
             if proj_kind == ProjKind.PK_FIELD:
                 if proj_d0 < 0:
                     return f"place{pi}: field projection has negative index"
+                continue
+            if proj_kind == ProjKind.PK_TUPLE_INDEX:
+                if proj_d0 < 0:
+                    return f"place{pi}: tuple projection has negative index"
                 continue
             if proj_kind == ProjKind.PK_INDEX:
                 if not mir_index_in_range(proj_d0, local_count):
@@ -1936,6 +2823,14 @@ fn mir_validate_place_type(mir_mod: &MirModule, body: &MirBody, place_id: i32) -
                 field_ty = mir_validate_tuple_elem_type(mir_mod, current_ty, proj_d0)
             else:
                 field_ty = mir_validate_struct_field_type(mir_mod, current_ty, proj_d0)
+            if field_ty == 0:
+                return 0
+            current_ty = field_ty
+            active_variant_idx = -1
+            continue
+
+        if proj_kind == ProjKind.PK_TUPLE_INDEX:
+            let field_ty = mir_validate_tuple_elem_type(mir_mod, current_ty, proj_d0)
             if field_ty == 0:
                 return 0
             current_ty = field_ty

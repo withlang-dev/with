@@ -538,7 +538,7 @@ fn free_small_block(block: i64, idx: i32):
 // walkable frame-pointer chain, so in-process backtraces are not used.
 // All ledger ops run under the allocator lock (called from rt_alloc/rt_free).
 let DBG_CAP: i64 = 65536            // hash slots (power of two)
-let DBG_ENTRY_WORDS: i64 = 4        // addr, size, freed, alloc_origin
+let DBG_ENTRY_WORDS: i64 = 9        // addr, size, freed, alloc_origin, first_drop_ptr, first_drop_len, root_flag, root_reason_ptr, root_reason_len
 
 let DBG_ORIGIN_UNKNOWN: i64 = 0
 let DBG_ORIGIN_WITH_ALLOC: i64 = 1
@@ -548,6 +548,7 @@ let DBG_ORIGIN_FIBER: i64 = 4
 
 var dbg_state: i32 = 0              // 0=unread, 1=off, 2=on (cached, read once)
 var dbg_scribble_state: i32 = 0    // 0=unread, 1=off, 2=on (cached, read once)
+var dbg_filter_state: i32 = 0      // 0=unread, 1=all, 2=non-root, 3=roots
 var dbg_base: i64 = 0              // mmap'd ledger table, 0 = uninitialised
 var dbg_full_warned: i32 = 0
 
@@ -577,6 +578,29 @@ fn dbg_scribble_on() -> i32:
     if dbg_scribble_state == 2:
         return 1
     0
+
+fn dbg_cstr_eq_lit(p: *const u8, lit: *const u8, len: i64) -> i32:
+    if p as i64 == 0:
+        return 0
+    var i: i64 = 0
+    while i < len:
+        if unsafe *((p as i64 + i) as *const u8) != unsafe *((lit as i64 + i) as *const u8):
+            return 0
+        i = i + 1
+    if unsafe *((p as i64 + len) as *const u8) != 0:
+        return 0
+    1
+
+fn dbg_filter_mode() -> i32:
+    if dbg_filter_state == 0:
+        let v = rt_getenv(c"WITH_DEBUG_ALLOC_FILTER".ptr)
+        if dbg_cstr_eq_lit(v, c"non-root".ptr, 8) != 0:
+            dbg_filter_state = 2
+        else if dbg_cstr_eq_lit(v, c"roots".ptr, 5) != 0:
+            dbg_filter_state = 3
+        else:
+            dbg_filter_state = 1
+    dbg_filter_state
 
 fn dbg_puts(s: *const u8, n: i64):
     let _ = rt_write(2, s, n as u64)
@@ -615,6 +639,11 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
             unsafe *((e + 8) as *mut i64) = size
             unsafe *((e + 16) as *mut i64) = 0      // freed flag clear (reuse-safe)
             unsafe *((e + 24) as *mut i64) = origin
+            unsafe *((e + 32) as *mut i64) = 0
+            unsafe *((e + 40) as *mut i64) = 0
+            unsafe *((e + 48) as *mut i64) = 0
+            unsafe *((e + 56) as *mut i64) = 0
+            unsafe *((e + 64) as *mut i64) = 0
             return
         slot = (slot + 1) & (DBG_CAP - 1)
         probes = probes + 1
@@ -623,7 +652,7 @@ fn dbg_record_alloc(addr: i64, size: i64, origin: i64):
         dbg_puts("debug-alloc: ledger full, tracking truncated\n" as *const u8, 45)
 
 // Mark a free. Returns 1 if this is a double free (already freed, not reused).
-fn dbg_mark_free(addr: i64) -> i32:
+fn dbg_mark_free(addr: i64, drop_origin_ptr: i64, drop_origin_len: i64) -> i32:
     if dbg_base == 0:
         return 0
     var slot = (addr >> 4) & (DBG_CAP - 1)
@@ -638,6 +667,8 @@ fn dbg_mark_free(addr: i64) -> i32:
             if freed != 0:
                 return 1
             unsafe *((e + 16) as *mut i64) = 1
+            unsafe *((e + 32) as *mut i64) = drop_origin_ptr
+            unsafe *((e + 40) as *mut i64) = drop_origin_len
             return 0
         slot = (slot + 1) & (DBG_CAP - 1)
         probes = probes + 1
@@ -677,6 +708,66 @@ fn dbg_ledger_origin(addr: i64) -> i64:
         probes = probes + 1
     DBG_ORIGIN_UNKNOWN
 
+fn dbg_ledger_first_drop_ptr(addr: i64) -> i64:
+    if dbg_base == 0:
+        return 0
+    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var probes: i64 = 0
+    while probes < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a == 0:
+            return 0
+        if a == addr:
+            return unsafe *((e + 32) as *const i64)
+        slot = (slot + 1) & (DBG_CAP - 1)
+        probes = probes + 1
+    0
+
+fn dbg_ledger_first_drop_len(addr: i64) -> i64:
+    if dbg_base == 0:
+        return 0
+    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var probes: i64 = 0
+    while probes < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a == 0:
+            return 0
+        if a == addr:
+            return unsafe *((e + 40) as *const i64)
+        slot = (slot + 1) & (DBG_CAP - 1)
+        probes = probes + 1
+    0
+
+fn dbg_mark_root(addr: i64, reason_ptr: i64, reason_len: i64):
+    if dbg_base == 0:
+        return
+    var slot = (addr >> 4) & (DBG_CAP - 1)
+    var probes: i64 = 0
+    while probes < DBG_CAP:
+        let e = dbg_entry_addr(slot)
+        let a = unsafe *(e as *const i64)
+        if a == 0:
+            return
+        if a == addr:
+            unsafe *((e + 48) as *mut i64) = 1
+            unsafe *((e + 56) as *mut i64) = reason_ptr
+            unsafe *((e + 64) as *mut i64) = reason_len
+            return
+        slot = (slot + 1) & (DBG_CAP - 1)
+        probes = probes + 1
+
+fn dbg_ledger_root_flag_entry(e: i64) -> i64:
+    unsafe *((e + 48) as *const i64)
+
+fn dbg_put_root_reason(e: i64):
+    let ptr = unsafe *((e + 56) as *const i64)
+    let len = unsafe *((e + 64) as *const i64)
+    if ptr != 0 and len > 0:
+        dbg_puts(" root=" as *const u8, 6)
+        dbg_puts(ptr as *const u8, len)
+
 fn dbg_put_origin(origin: i64):
     if origin == DBG_ORIGIN_WITH_ALLOC:
         dbg_puts("with_alloc" as *const u8, 10)
@@ -689,13 +780,23 @@ fn dbg_put_origin(origin: i64):
     else:
         dbg_puts("unknown" as *const u8, 7)
 
-fn dbg_report_double_free(addr: i64, size: i64, origin: i64):
+fn dbg_put_drop_origin(ptr: i64, len: i64):
+    if ptr != 0 and len > 0:
+        dbg_puts(ptr as *const u8, len)
+    else:
+        dbg_puts("<untagged>" as *const u8, 10)
+
+fn dbg_report_double_free(addr: i64, size: i64, origin: i64, first_drop_ptr: i64, first_drop_len: i64, second_drop_ptr: i64, second_drop_len: i64):
     dbg_puts("debug-alloc: DOUBLE FREE addr=" as *const u8, 30)
     dbg_put_i64(addr)
     dbg_puts(" size=" as *const u8, 6)
     dbg_put_i64(size)
     dbg_puts(" origin=" as *const u8, 8)
     dbg_put_origin(origin)
+    dbg_puts(" first_drop=" as *const u8, 12)
+    dbg_put_drop_origin(first_drop_ptr, first_drop_len)
+    dbg_puts(" second_drop=" as *const u8, 13)
+    dbg_put_drop_origin(second_drop_ptr, second_drop_len)
     dbg_puts("\n" as *const u8, 1)
     rt_exit(134)
 
@@ -715,12 +816,24 @@ pub fn with_debug_alloc_report_leaks() -> Unit:
         return
     var slot: i64 = 0
     var leaks: i64 = 0
+    var suppressed: i64 = 0
+    let filter = dbg_filter_mode()
     while slot < DBG_CAP:
         let e = dbg_entry_addr(slot)
         let a = unsafe *(e as *const i64)
         if a != 0:
             let freed = unsafe *((e + 16) as *const i64)
             if freed == 0:
+                let is_root = dbg_ledger_root_flag_entry(e)
+                var show = 1
+                if filter == 2 and is_root != 0:
+                    show = 0
+                if filter == 3 and is_root == 0:
+                    show = 0
+                if show == 0:
+                    suppressed = suppressed + 1
+                    slot = slot + 1
+                    continue
                 let size = unsafe *((e + 8) as *const i64)
                 let origin = unsafe *((e + 24) as *const i64)
                 dbg_puts("debug-alloc: LEAK addr=" as *const u8, 23)
@@ -729,12 +842,26 @@ pub fn with_debug_alloc_report_leaks() -> Unit:
                 dbg_put_i64(size)
                 dbg_puts(" origin=" as *const u8, 8)
                 dbg_put_origin(origin)
+                dbg_put_root_reason(e)
                 dbg_puts("\n" as *const u8, 1)
                 leaks = leaks + 1
         slot = slot + 1
     dbg_puts("debug-alloc: leak count=" as *const u8, 24)
     dbg_put_i64(leaks)
     dbg_puts("\n" as *const u8, 1)
+    if suppressed > 0:
+        dbg_puts("debug-alloc: suppressed leak count=" as *const u8, 35)
+        dbg_put_i64(suppressed)
+        dbg_puts("\n" as *const u8, 1)
+
+pub fn with_debug_alloc_mark_root(ptr: *mut u8, reason: *const u8, reason_len: i64) -> Unit:
+    if dbg_on() == 0:
+        return
+    if ptr as i64 == 0:
+        return
+    if dbg_base == 0:
+        return
+    dbg_mark_root(ptr as i64, reason as i64, reason_len)
 
 fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
     let size = alloc_align_size(size_arg)
@@ -793,14 +920,14 @@ fn rt_alloc_with_origin(size_arg: i64, origin: i64) -> *mut u8:
 fn rt_alloc(size_arg: i64) -> *mut u8:
     rt_alloc_with_origin(size_arg, DBG_ORIGIN_UNKNOWN)
 
-fn rt_free_unlocked(ptr: *mut u8):
+fn rt_free_unlocked_with_drop_origin(ptr: *mut u8, drop_origin_ptr: i64, drop_origin_len: i64):
     if ptr as i64 == 0:
         return
     // #606 debug allocator: detect double-free before the generic ownership
     // panic so the report names the address; poison freed small payloads.
     if dbg_on() != 0:
-        if dbg_mark_free(ptr as i64) != 0:
-            dbg_report_double_free(ptr as i64, dbg_ledger_size(ptr as i64), dbg_ledger_origin(ptr as i64))
+        if dbg_mark_free(ptr as i64, drop_origin_ptr, drop_origin_len) != 0:
+            dbg_report_double_free(ptr as i64, dbg_ledger_size(ptr as i64), dbg_ledger_origin(ptr as i64), dbg_ledger_first_drop_ptr(ptr as i64), dbg_ledger_first_drop_len(ptr as i64), drop_origin_ptr, drop_origin_len)
         if dbg_scribble_on() != 0:
             let dbg_size = alloc_payload_size(ptr as *const u8)
             if dbg_size <= RT_LARGE_THRESHOLD:
@@ -816,14 +943,26 @@ fn rt_free_unlocked(ptr: *mut u8):
     let idx = size_class_index(size)
     free_small_block(block, idx)
 
+fn rt_free_unlocked(ptr: *mut u8):
+    rt_free_unlocked_with_drop_origin(ptr, 0, 0)
+
 fn rt_free(ptr: *mut u8):
     rt_allocator_lock()
     rt_free_unlocked(ptr)
     rt_allocator_unlock()
 
+fn rt_free_with_drop_origin(ptr: *mut u8, drop_origin: *const u8, drop_origin_len: i64):
+    rt_allocator_lock()
+    rt_free_unlocked_with_drop_origin(ptr, drop_origin as i64, drop_origin_len)
+    rt_allocator_unlock()
+
 fn rt_free_sized(ptr: *mut u8, size_arg: i64):
     let _ = size_arg
     rt_free(ptr)
+
+fn rt_free_sized_with_drop_origin(ptr: *mut u8, size_arg: i64, drop_origin: *const u8, drop_origin_len: i64):
+    let _ = size_arg
+    rt_free_with_drop_origin(ptr, drop_origin, drop_origin_len)
 
 fn rt_thread_entry(arg: *mut u8) -> *mut u8:
     let start = arg as *mut RtThreadStart
@@ -938,8 +1077,14 @@ pub fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
 pub fn with_free(ptr: *mut u8) -> Unit:
     rt_free(ptr)
 
+pub fn with_free_drop_origin(ptr: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
+    rt_free_with_drop_origin(ptr, drop_origin, drop_origin_len)
+
 pub fn with_free_sized(ptr: *mut u8, size: i64) -> Unit:
     rt_free_sized(ptr, size)
+
+pub fn with_free_sized_drop_origin(ptr: *mut u8, size: i64, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
+    rt_free_sized_with_drop_origin(ptr, size, drop_origin, drop_origin_len)
 
 pub fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8:
     rt_memcpy(dst, src, n)
@@ -2028,6 +2173,16 @@ pub fn with_vec_free(v: *mut u8) -> Unit:
     let es = vec_get_elem_size(v)
     if p as i64 != 0 and cap > 0 and es > 0:
         rt_free_sized(p, cap * es)
+    vec_set_ptr_field(v, 0 as *mut u8)
+    vec_set_len(v, 0)
+    vec_set_cap(v, 0)
+
+pub fn with_vec_free_drop_origin(v: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
+    let p = vec_get_ptr_field(v)
+    let cap = vec_get_cap(v)
+    let es = vec_get_elem_size(v)
+    if p as i64 != 0 and cap > 0 and es > 0:
+        rt_free_sized_with_drop_origin(p, cap * es, drop_origin, drop_origin_len)
     vec_set_ptr_field(v, 0 as *mut u8)
     vec_set_len(v, 0)
     vec_set_cap(v, 0)

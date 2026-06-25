@@ -1,8 +1,8 @@
 # With Integrated Build System Specification
 
-Archived: historical final-state build-system specification. The active
-Makefile-removal plan is `docs/eliminate-Makefile.md`. This file is retained as
-project history, not as the current implementation contract.
+Archived: historical final-state build-system specification. The
+Makefile-removal record is `docs/completed/eliminate-Makefile.md`. This file is
+retained as project history, not as the current implementation contract.
 
 Status: final-state specification.
 

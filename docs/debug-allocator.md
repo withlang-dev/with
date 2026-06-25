@@ -1,6 +1,6 @@
 # Debug Allocator — native, zero-C memory-error instrument
 
-Status: design + first cut. Audience: compiler/runtime contributors.
+Status: implemented. Audience: compiler/runtime contributors.
 
 ## Why this exists
 
@@ -63,12 +63,12 @@ only the hard way.
 
 ## The payoff we get that ASan/Valgrind structurally cannot
 
-Because we own codegen too, the ledger can eventually carry the **MIR origin of each
-emitted Drop**, so a double-free abort names *which drop* double-freed — collapsing a
-multi-day characterization into one line. No external sanitizer can do this. That is
-**drop-origin MIR tagging**, the high-value follow-on (its own session; out of scope here).
+Because we own codegen too, the ledger carries the **MIR origin of each emitted Drop**, so
+a double-free abort names *which drop* freed the block first and which drop freed it again
+-- collapsing a multi-day characterization into one line. No external sanitizer can do
+this.
 
-## Architecture (first cut): detection in-process, sites via lldb
+## Architecture: detection in-process, origin tags in reports
 
 All additive to `rt/rt_core.w`; pure `.w`.
 
@@ -78,24 +78,25 @@ All additive to `rt/rt_core.w`; pure `.w`.
 > point to a standard aarch64 frame record (reading `[fp]`/`[fp+8]` yields 0 even inside a
 > framed, `@[noinline]` function). With's codegen does not maintain a walkable fp chain at
 > the opt levels `with run` uses. Rather than chase a codegen change (out of scope), the
-> first cut splits the work: the **ledger does detection in-process** (cheap, robust, pure
+> first cut split the work: the **ledger does detection in-process** (cheap, robust, pure
 > `.w`), and **lldb resolves source sites out-of-process**, conditioned on the address the
-> ledger reports — lldb uses real DWARF/compact-unwind unwinding that actually works. This
-> is a cleaner separation, and drop-origin MIR tagging (the follow-on) will give precise
-> sites natively without any unwinding at all.
+> ledger reports — lldb uses real DWARF/compact-unwind unwinding that actually works.
+> Compiler-emitted Drop sites now also carry MIR-origin tags directly into the free path,
+> so double-free reports name both drops without requiring unwinding.
 
 - **Ledger.** A side table backed by a direct `rt_mmap` region (never recursing through the
   instrumented allocator), an open-addressing hash keyed by payload address:
-  `{addr, size, freed_flag, alloc_origin}`. Guarded by the existing allocator lock. The
-  gate is read once via the non-allocating `rt_getenv` (`with_getenv_str` would deadlock
-  the non-reentrant allocator lock) and cached.
+  `{addr, size, freed_flag, alloc_origin, first_drop_ptr, first_drop_len, root_flag,
+  root_reason}`. Guarded by the existing allocator lock. The gate is read once via the
+  non-allocating `rt_getenv` (`with_getenv_str` would deadlock the non-reentrant allocator
+  lock) and cached.
 - **Instrumented alloc/free.** `rt_alloc` records (or, on address reuse, resets) an entry.
   Tagged front doors such as `with_alloc`, Vec buffer growth, channel allocation, and fiber
   record allocation store a coarse allocation-origin token. `rt_free` looks up the entry
-  *before* the existing ownership check: if already freed → **double-free**, print
-  `debug-alloc: DOUBLE FREE addr=<a> size=<n> origin=<site>` and abort (exit 134);
-  else mark freed. This sees freelist double-pushes the existing
-  `rt_payload_start_can_be_owned` panic can miss.
+  *before* the existing ownership check: if already freed -> **double-free**, print
+  `debug-alloc: DOUBLE FREE addr=<a> size=<n> origin=<site> first_drop=<tag> second_drop=<tag>`
+  and abort (exit 134); else mark freed and remember the first drop tag. This sees freelist
+  double-pushes the existing `rt_payload_start_can_be_owned` panic can miss.
 - **Scribble on free (opt-in: `WITH_DEBUG_ALLOC_SCRIBBLE`).** Freed small payloads are
   overwritten with `0xDE` so use-after-free reads corrupt loudly. It is **off by default**
   because, for a `Vec[Drop]` buffer, poisoning the freed payload turns a subsequent
@@ -105,12 +106,17 @@ All additive to `rt/rt_core.w`; pure `.w`.
   (Not "never-reuse" — that would break the slab; a never-reuse UAF mode is a later refinement.)
 - **Leak at exit.** `with_runtime_shutdown` (on the native `with run`/`build` exit path)
   prints `debug-alloc: LEAK addr=<a> size=<n> origin=<site>` for every still-live entry,
-  then a `leak count=<k>`. A field-drop that never fires shows up as a live entry (the
-  slab's freelist recycle is recorded as a free, so it is *not* a false leak).
+  then a `leak count=<k>`. Runtime code can call
+  `with_debug_alloc_mark_root(ptr, reason_ptr, reason_len)` to label an intentional
+  process-lifetime root. `WITH_DEBUG_ALLOC_FILTER=all|non-root|roots` controls whether
+  all leaks, only non-root leaks, or only root leaks are printed. A field-drop that never
+  fires shows up as a live non-root entry (the slab's freelist recycle is recorded as a
+  free, so it is *not* a false leak).
 - **Site resolution (harness).** The in-process report names the coarse origin token
-  directly. When an exact source line is needed, the driver can still run lldb conditioned
-  on the address (break on `rt_alloc` returning it / on `rt_free` / `with_vec_free` taking
-  it, `bt` at each) to name precise alloc and free call sites.
+  directly, and double-free reports name first/second compiler Drop tags when the free came
+  through generated drop code. When an exact source line is needed, the driver can still run
+  lldb conditioned on the address (break on `rt_alloc` returning it / on `rt_free` /
+  `with_vec_free` taking it, `bt` at each) to name precise alloc and free call sites.
 
 ## Gating: runtime-gated, two discoverable front doors
 
@@ -129,6 +135,10 @@ Two front doors set the same cached bool:
 - **`WITH_DEBUG_ALLOC`** — the env var, for the harness driver and for toggling an
   already-built binary without re-launching.
 
+Leak filtering is controlled separately by **`--debug-alloc-filter=<mode>`** or
+`WITH_DEBUG_ALLOC_FILTER`, where mode is `all`, `non-root`, or `roots`. The default is
+`all`. Use `non-root` when process-lifetime roots would otherwise hide a real leak.
+
 The gate is read **once and cached** (never `getenv` per allocation — that would be a
 hot-path regression fixpoint cannot catch). When off, the cost is one cached-bool branch in
 the alloc/free path; the dormant instrumentation is byte-identical at build time (the build
@@ -140,34 +150,44 @@ are independent axes.
 
 ## Harness driver
 
-`tools/debug_drop.w` (pure `.w`, no shell script): builds and runs a repro under the debug
-allocator, parses the ledger/abort/leak output into a verdict, then drives lldb (plain
-command files — the lldb on the dev box has no script interpreter, so no Python) for two
-purposes: (1) resolve the alloc/free **source sites** for the address the ledger flagged,
-and (2) for the codegen branch, run `lldb --batch` on the compiler to surface the exact
-`mir_emit_drop_fields_ptr` branch that routes an inline-drop field to the no-free path.
+`tools/debug_drop.w` (pure `.w`, no shell script): runs a repro or fixture corpus under the
+debug allocator and parses the ledger/abort/leak output into a verdict. The
+`:debug-alloc-tests` target builds it to `out/debug-alloc-tests/debug_drop` and runs it in
+`check` mode over the committed corpus. For one-off repros:
+
+```sh
+./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
+out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.w
+```
+
+Source sites are resolved separately with lldb command files (the lldb on the dev box has
+no script interpreter, so no Python): `tools/debug_drop_sites.lldb` for alloc/free sites and
+`tools/debug_drop_fields.lldb` when the allocator verdict points at a drop/codegen bug.
 
 `test/debug_alloc/` is also the regression gate for #607. Its inline-drop field
 fixtures must all report `leak count=0` and never `DOUBLE FREE`, including the
 field-receiver push-tail and field-chaining cases that the ordinary floor cannot
 see. `da_manual_double_free` intentionally remains a `DOUBLE FREE` fixture, and
-`da_pod_vec` intentionally remains `leak count=1` for #608.
+`da_drop_origin_double_free` intentionally checks that generated drops report
+`first_drop=`/`second_drop=` tags. `da_root_filter` marks a live allocation as a root and
+runs under `//! debug-alloc-filter: non-root`, proving root leaks can be suppressed without
+suppressing ordinary leaks. `da_pod_vec` intentionally remains `leak count=1` for #608.
 
 ## Known first-cut limitations
 
 - **Leak-report noise.** The runtime intentionally never-frees some allocations (interned
-  strings, arg buffers), so the raw leak list has a baseline. Each leak prints its alloc
-  backtrace; the driver symbolizes and filters to blocks whose alloc site resolves into the
-  repro. A built-in "user-frame filter" is an easy follow-on.
-- **Sites need a second (lldb) pass.** The ledger names the *block* (address + size) and the
-  *verdict* (double-free / leak) in-process; the *source sites* come from the harness's lldb
-  pass conditioned on that address. In-process backtraces are not used (see the note above).
+  strings, arg buffers). Marked roots plus `--debug-alloc-filter=non-root` suppress known
+  process-lifetime roots, but unmarked roots still appear in the raw leak list until they
+  are classified.
+- **Exact source sites still need a second (lldb) pass.** The ledger names the *block*
+  (address + size), the *verdict* (double-free / leak), the allocation-origin token, and
+  generated Drop tags in-process; exact source lines still come from the harness's lldb pass
+  conditioned on that address. In-process backtraces are not used (see the note above).
 - **Abnormal exit.** Leak-at-exit fires on normal termination via `with_runtime_shutdown`;
   exits via `rt_exit`/panic skip the report.
 
 ## Follow-ons (not in the first cut)
 
-- Drop-origin MIR tagging (the abort names *which* drop) — the highest-value next step.
 - A user-frame filter for clean leak attribution.
 - No-C ASan-shadow emission for sanitizer-ecosystem interop (the hard-way path above).
 - Never-reuse-address UAF mode.

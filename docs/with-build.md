@@ -4,8 +4,8 @@ Status: current user documentation.
 
 This document describes how to create, configure, and build With projects.
 The repository Makefile has been removed; the cleanup record is
-[eliminate-Makefile.md](eliminate-Makefile.md). Historical build-system plan and
-spec documents are archived under `docs/completed/`.
+[completed/eliminate-Makefile.md](completed/eliminate-Makefile.md). Historical
+build-system plan and spec documents are archived under `docs/completed/`.
 
 ---
 

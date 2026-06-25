@@ -120,6 +120,38 @@ nondeterminism bug.
 with build :fixpoint
 ```
 
+### Debugging Compiler And Runtime Issues
+
+For crashes, use `lldb` on the smallest reproducing command. For deep compiler
+bugs, reduce the input and use the targeted MIR/debug tools before adding trace
+prints:
+
+```sh
+./out/stage/bin/with-stage2 reduce repro.w --contains "panic" -- ./out/stage/bin/with-stage2 check {file}
+./out/stage/bin/with-stage2 check repro.w --trace-place main:_1
+./out/stage/bin/with-stage2 check repro.w --explain-mir-origin main:_1
+./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
+./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
+./out/stage/bin/with-stage2 check repro.w --validate-all
+with build :fixpoint-diff
+```
+
+For drop, lifetime, double-free, use-after-free, or leak bugs in With-allocated
+memory, start with the native debug allocator:
+
+```sh
+./out/stage/bin/with-stage2 run --debug-alloc repro.w
+./out/stage/bin/with-stage2 run --debug-alloc --debug-alloc-filter=non-root repro.w
+./out/stage/bin/with-stage2 check repro.w --dump-drop-state
+./out/stage/bin/with-stage2 check repro.w --dump-place-map
+with build :debug-alloc-tests
+```
+
+The tools are documented in
+[docs/deep-debugging-tools.md](docs/deep-debugging-tools.md) and
+[docs/debug-allocator.md](docs/debug-allocator.md). Contributor workflow details
+are in [CONTRIBUTING.md](CONTRIBUTING.md#debugging).
+
 ## Editor Support
 
 The compiler includes a built-in language server (`with lsp`) with diagnostics,
