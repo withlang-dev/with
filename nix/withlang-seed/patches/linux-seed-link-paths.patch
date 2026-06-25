@@ -1,0 +1,446 @@
+--- a/src/with_compiler.c
++++ b/src/with_compiler.c
+@@ -710689,10 +710689,4 @@
+-    with_str _0 __attribute__((unused)) = {0};
+-    bool _1 __attribute__((unused)) = {0};
+-    bool _2 __attribute__((unused)) = {0};
+-    goto bb0;
+-bb0:
+-    _1 = link_stage_file_exists__9494(WITH_STR_LIT("/lib64/ld-linux-x86-64.so.2"));
+-    goto bb1;
+-bb1:
+-    if (_1 == 1) {
+-        goto bb2;
++    with_str override = runtime_getenv__9004(WITH_STR_LIT("WITH_LINUX_DYNAMIC_LINKER"));
++    if (override.len > 0) return override;
++    if (link_stage_file_exists__9494(WITH_STR_LIT("/lib64/ld-linux-x86-64.so.2"))) {
++        return WITH_STR_LIT("/lib64/ld-linux-x86-64.so.2");
+@@ -710700,2 +710694,2 @@
+-    else {
+-        goto bb3;
++    if (link_stage_file_exists__9494(WITH_STR_LIT("/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"))) {
++        return WITH_STR_LIT("/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2");
+@@ -710703,30 +710697 @@
+-bb2:
+-#line 297 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("/lib64/ld-linux-x86-64.so.2");
+-    return _0;
+-bb3:
+-    goto bb4;
+-bb4:
+-    _2 = link_stage_file_exists__9494(WITH_STR_LIT("/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"));
+-    goto bb6;
+-bb5:
+-    goto bb4;
+-bb6:
+-    if (_2 == 1) {
+-        goto bb7;
+-    }
+-    else {
+-        goto bb8;
+-    }
+-bb7:
+-#line 299 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2");
+-    return _0;
+-bb8:
+-    goto bb9;
+-bb9:
+-#line 303 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("");
+-    return _0;
+-bb10:
+-    goto bb9;
++    return WITH_STR_LIT("");
+@@ -710734,0 +710700 @@
++
+@@ -710736,58 +710702,11 @@
+-    with_str _0 __attribute__((unused)) = {0};
+-    with_str _2 __attribute__((unused)) = {0};
+-    with_str _3 __attribute__((unused)) = {0};
+-    bool _4 __attribute__((unused)) = {0};
+-    with_str _5 __attribute__((unused)) = {0};
+-    with_str _6 __attribute__((unused)) = {0};
+-    bool _7 __attribute__((unused)) = {0};
+-    goto bb0;
+-bb0:
+-    /* StorageLive(_1); */
+-#line 304 "out/gen/main.w"
+-    /* StorageLive(_2); */
+-    _3 = with_str_concat(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/"), _1);
+-    _2 = _3;
+-    _4 = link_stage_file_exists__9494(_2);
+-    goto bb1;
+-bb1:
+-    if (_4 == 1) {
+-        goto bb2;
+-    }
+-    else {
+-        goto bb3;
+-    }
+-bb2:
+-#line 306 "out/gen/main.w"
+-    _0 = _2;
+-    return _0;
+-bb3:
+-    goto bb4;
+-bb4:
+-    /* StorageLive(_5); */
+-#line 307 "out/gen/main.w"
+-    _6 = with_str_concat(WITH_STR_LIT("/lib/x86_64-linux-gnu/"), _1);
+-#line 306 "out/gen/main.w"
+-    _5 = _6;
+-    _7 = link_stage_file_exists__9494(_5);
+-    goto bb6;
+-bb5:
+-    goto bb4;
+-bb6:
+-    if (_7 == 1) {
+-        goto bb7;
+-    }
+-    else {
+-        goto bb8;
+-    }
+-bb7:
+-#line 309 "out/gen/main.w"
+-    _0 = _5;
+-    return _0;
+-bb8:
+-    goto bb9;
+-bb9:
+-    _0 = WITH_STR_LIT("");
+-    return _0;
+-bb10:
+-    goto bb9;
+-bb11: ;
++    with_str dir = runtime_getenv__9004(WITH_STR_LIT("WITH_LINUX_CRT_DIR"));
++    if (dir.len > 0) {
++        with_str path = with_str_concat(with_str_concat(dir, WITH_STR_LIT("/")), _1);
++        if (link_stage_file_exists__9494(path)) return path;
++        return WITH_STR_LIT("");
++    }
++    with_str usr = with_str_concat(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/"), _1);
++    if (link_stage_file_exists__9494(usr)) return usr;
++    with_str lib = with_str_concat(WITH_STR_LIT("/lib/x86_64-linux-gnu/"), _1);
++    if (link_stage_file_exists__9494(lib)) return lib;
++    return WITH_STR_LIT("");
+@@ -710795,0 +710715 @@
++
+@@ -710797,62 +710717,14 @@
+-    with_str _0 __attribute__((unused)) = {0};
+-    with_vec _1 __attribute__((unused)) = {0};
+-    with_vec _2 __attribute__((unused)) = {0};
+-    int32_t _3 __attribute__((unused)) = {0};
+-    int32_t _4 __attribute__((unused)) = {0};
+-    int32_t _5 __attribute__((unused)) = {0};
+-    int32_t _6 __attribute__((unused)) = {0};
+-    int32_t _7 __attribute__((unused)) = {0};
+-    int32_t _8 __attribute__((unused)) = {0};
+-    int32_t _9 __attribute__((unused)) = {0};
+-    uint64_t _10 __attribute__((unused)) = {0};
+-    int32_t _11 __attribute__((unused)) = {0};
+-    int32_t _12 __attribute__((unused)) = {0};
+-    int32_t _13 __attribute__((unused)) = {0};
+-    bool _14 __attribute__((unused)) = {0};
+-    int32_t _15 __attribute__((unused)) = {0};
+-    with_str _16 __attribute__((unused)) = {0};
+-    int64_t _17 __attribute__((unused)) = {0};
+-    with_str _18 __attribute__((unused)) = {0};
+-    with_str _19 __attribute__((unused)) = {0};
+-    bool _20 __attribute__((unused)) = {0};
+-    goto bb0;
+-bb0:
+-#line 310 "out/gen/main.w"
+-    /* StorageLive(_1); */
+-    _2 = (with_vec){ .ptr = NULL, .len = 0, .cap = 0, .elem_size = sizeof(with_str) };
+-    goto bb1;
+-bb1:
+-    _1 = _2;
+-    { with_str __with_tmp = WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/15"); with_vec_push(&(_1), &__with_tmp); }
+-    goto bb2;
+-bb2:
+-    { with_str __with_tmp = WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/14"); with_vec_push(&(_1), &__with_tmp); }
+-    goto bb3;
+-bb3:
+-    { with_str __with_tmp = WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/13"); with_vec_push(&(_1), &__with_tmp); }
+-    goto bb4;
+-bb4:
+-    { with_str __with_tmp = WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/12"); with_vec_push(&(_1), &__with_tmp); }
+-    goto bb5;
+-bb5:
+-    { with_str __with_tmp = WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/11"); with_vec_push(&(_1), &__with_tmp); }
+-    goto bb6;
+-bb6:
+-    { with_str __with_tmp = WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/10"); with_vec_push(&(_1), &__with_tmp); }
+-    goto bb7;
+-bb7:
+-    { with_str __with_tmp = WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/9"); with_vec_push(&(_1), &__with_tmp); }
+-    goto bb8;
+-bb8:
+-    { int64_t __with_len = (int64_t)(with_vec_len(&(_1))); _10 = (uint64_t)__with_len; }
+-    goto bb9;
+-bb9:
+-#line 317 "out/gen/main.w"
+-    _11 = ((int32_t)(_10));
+-    _12 = 0;
+-    _13 = _11;
+-    goto bb10;
+-bb10:
+-    _14 = (_12 < _13);
+-    if (_14 == 1) {
+-        goto bb11;
++    with_str override = runtime_getenv__9004(WITH_STR_LIT("WITH_LINUX_GCC_DIR"));
++    if (override.len > 0) return override;
++    const with_str candidates[] = {
++        WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/15"),
++        WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/14"),
++        WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/13"),
++        WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/12"),
++        WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/11"),
++        WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/10"),
++        WITH_STR_LIT("/usr/lib/gcc/x86_64-linux-gnu/9"),
++    };
++    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
++        with_str crtbegin = with_str_concat(candidates[i], WITH_STR_LIT("/crtbegin.o"));
++        if (link_stage_file_exists__9494(crtbegin)) return candidates[i];
+@@ -710860,56 +710732 @@
+-    else {
+-        goto bb13;
+-    }
+-bb11:
+-#line 318 "out/gen/main.w"
+-    /* StorageLive(_15); */
+-    _15 = _12;
+-    /* StorageLive(_16); */
+-    _17 = ((int64_t)(_15));
+-    memset(&(_18), 0, sizeof(_18));
+-    if ((int64_t)(_17) >= 0 && (int64_t)(_17) < with_vec_len(&(_1))) { memcpy(&(_18), with_vec_get_ptr(&(_1), (int64_t)(_17)), sizeof(_18)); }
+-    goto bb14;
+-bb12:
+-#line 317 "out/gen/main.w"
+-    _12 = __with_checked_add_i32((int32_t)(_12), (int32_t)(1));
+-    goto bb10;
+-bb13:
+-    /* drop(_1); */
+-#line 320 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("");
+-    return _0;
+-bb14:
+-#line 318 "out/gen/main.w"
+-    _16 = _18;
+-#line 319 "out/gen/main.w"
+-    _19 = with_str_concat(_16, WITH_STR_LIT("/crtbegin.o"));
+-    _20 = link_stage_file_exists__9494(_19);
+-    goto bb15;
+-bb15:
+-    if (_20 == 1) {
+-        goto bb16;
+-    }
+-    else {
+-        goto bb17;
+-    }
+-bb16:
+-    _0 = _16;
+-    /* drop(_1); */
+-    return _0;
+-bb17:
+-    goto bb18;
+-bb18:
+-    goto bb12;
+-bb19:
+-    goto bb18;
+-bb20: ;
+-bb21: ;
+-bb22: ;
+-bb23: ;
+-bb24: ;
+-bb25: ;
+-bb26: ;
+-bb27: ;
+-bb28: ;
+-bb29: ;
+-bb30: ;
++    return WITH_STR_LIT("");
+@@ -710917,0 +710735 @@
++
+@@ -710919,35 +710737,13 @@
+-    with_str _0 __attribute__((unused)) = {0};
+-    bool _2 __attribute__((unused)) = {0};
+-    bool _3 __attribute__((unused)) = {0};
+-    bool _4 __attribute__((unused)) = {0};
+-    bool _5 __attribute__((unused)) = {0};
+-    bool _6 __attribute__((unused)) = {0};
+-    bool _7 __attribute__((unused)) = {0};
+-    bool _8 __attribute__((unused)) = {0};
+-    bool _9 __attribute__((unused)) = {0};
+-    bool _10 __attribute__((unused)) = {0};
+-    goto bb0;
+-bb0:
+-#line 320 "out/gen/main.w"
+-    /* StorageLive(_1); */
+-#line 321 "out/gen/main.w"
+-    { __typeof__(with_str_eq(_1, WITH_STR_LIT("z"))) __tmp = with_str_eq(_1, WITH_STR_LIT("z")); memcpy(&(_2), &__tmp, sizeof(_2) < sizeof(__tmp) ? sizeof(_2) : sizeof(__tmp)); }
+-    if (_2 == 1) {
+-        goto bb1;
+-    }
+-    else {
+-        goto bb2;
+-    }
+-bb1:
+-    _3 = link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libz.so"));
+-    goto bb4;
+-bb2:
+-    goto bb3;
+-bb3:
+-#line 327 "out/gen/main.w"
+-    { __typeof__(with_str_eq(_1, WITH_STR_LIT("zstd"))) __tmp = with_str_eq(_1, WITH_STR_LIT("zstd")); memcpy(&(_5), &__tmp, sizeof(_5) < sizeof(__tmp) ? sizeof(_5) : sizeof(__tmp)); }
+-    if (_5 == 1) {
+-        goto bb14;
+-    }
+-    else {
+-        goto bb15;
++    with_str syslib_dir = runtime_getenv__9004(WITH_STR_LIT("WITH_LINUX_SYSLIB_DIR"));
++    if (syslib_dir.len > 0) return WITH_STR_LIT("");
++    if (with_str_eq(_1, WITH_STR_LIT("z"))) {
++        if (link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libz.so"))) return WITH_STR_LIT("");
++        if (link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libz.so.1"))) return WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libz.so.1");
++    }
++    if (with_str_eq(_1, WITH_STR_LIT("zstd"))) {
++        if (link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libzstd.so"))) return WITH_STR_LIT("");
++        if (link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libzstd.so.1"))) return WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libzstd.so.1");
++    }
++    if (with_str_eq(_1, WITH_STR_LIT("xml2"))) {
++        if (link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libxml2.so"))) return WITH_STR_LIT("");
++        if (link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libxml2.so.16"))) return WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libxml2.so.16");
+@@ -710955,128 +710751 @@
+-bb4:
+-    if (_3 == 1) {
+-        goto bb5;
+-    }
+-    else {
+-        goto bb6;
+-    }
+-bb5:
+-#line 322 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("");
+-    return _0;
+-bb6:
+-    goto bb7;
+-bb7:
+-    _4 = link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libz.so.1"));
+-    goto bb9;
+-bb8:
+-    goto bb7;
+-bb9:
+-    if (_4 == 1) {
+-        goto bb10;
+-    }
+-    else {
+-        goto bb11;
+-    }
+-bb10:
+-#line 324 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libz.so.1");
+-    return _0;
+-bb11:
+-    goto bb12;
+-bb12:
+-    goto bb3;
+-bb13:
+-    goto bb12;
+-bb14:
+-    _6 = link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libzstd.so"));
+-    goto bb17;
+-bb15:
+-    goto bb16;
+-bb16:
+-#line 336 "out/gen/main.w"
+-    { __typeof__(with_str_eq(_1, WITH_STR_LIT("xml2"))) __tmp = with_str_eq(_1, WITH_STR_LIT("xml2")); memcpy(&(_8), &__tmp, sizeof(_8) < sizeof(__tmp) ? sizeof(_8) : sizeof(__tmp)); }
+-    if (_8 == 1) {
+-        goto bb27;
+-    }
+-    else {
+-        goto bb28;
+-    }
+-bb17:
+-    if (_6 == 1) {
+-        goto bb18;
+-    }
+-    else {
+-        goto bb19;
+-    }
+-bb18:
+-#line 331 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("");
+-    return _0;
+-bb19:
+-    goto bb20;
+-bb20:
+-    _7 = link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libzstd.so.1"));
+-    goto bb22;
+-bb21:
+-    goto bb20;
+-bb22:
+-    if (_7 == 1) {
+-        goto bb23;
+-    }
+-    else {
+-        goto bb24;
+-    }
+-bb23:
+-#line 334 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libzstd.so.1");
+-    return _0;
+-bb24:
+-    goto bb25;
+-bb25:
+-    goto bb16;
+-bb26:
+-    goto bb25;
+-bb27:
+-    _9 = link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libxml2.so"));
+-    goto bb30;
+-bb28:
+-    goto bb29;
+-bb29:
+-#line 346 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("");
+-    return _0;
+-bb30:
+-    if (_9 == 1) {
+-        goto bb31;
+-    }
+-    else {
+-        goto bb32;
+-    }
+-bb31:
+-#line 339 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("");
+-    return _0;
+-bb32:
+-    goto bb33;
+-bb33:
+-    _10 = link_stage_file_exists__9494(WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libxml2.so.16"));
+-    goto bb35;
+-bb34:
+-    goto bb33;
+-bb35:
+-    if (_10 == 1) {
+-        goto bb36;
+-    }
+-    else {
+-        goto bb37;
+-    }
+-bb36:
+-#line 344 "out/gen/main.w"
+-    _0 = WITH_STR_LIT("/usr/lib/x86_64-linux-gnu/libxml2.so.16");
+-    return _0;
+-bb37:
+-    goto bb38;
+-bb38:
+-    goto bb29;
+-bb39:
+-    goto bb38;
++    return WITH_STR_LIT("");
+@@ -711083,0 +710753 @@
++
