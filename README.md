@@ -84,6 +84,44 @@ with run examples/hello.w
 All release binaries are listed on the
 [releases page](https://github.com/withlang-dev/with/releases).
 
+## Quick Start with Nix
+
+Run `with` from anywhere:
+
+```sh
+$ nix run github:withlang-dev/with# -- -e 'print("hello!")'
+hello!
+```
+
+Hack on `with`, then use Nix to build and run tests locally:
+
+```sh
+nix build # rebuilds from local sources
+nix flake check # also runs full suite of tests
+```
+
+Add `with` to a NixOS flake configuration:
+
+```nix
+# flake.nix
+{
+  inputs.with.url = "github:withlang-dev/with";
+
+  outputs = { nixpkgs, with, ... }: {
+    nixosConfigurations.my-host = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ({ pkgs, ... }: {
+          environment.systemPackages = [
+            with.packages.${pkgs.system}.withlang
+          ];
+        })
+      ];
+    };
+  };
+}
+```
+
 ## Building from Source
 
 Requirements:
