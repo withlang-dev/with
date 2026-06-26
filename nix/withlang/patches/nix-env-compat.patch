@@ -1,0 +1,987 @@
+diff --git a/build.w b/build.w
+index 005f98ac..ebf8744c 100644
+--- a/build.w
++++ b/build.w
+@@ -437 +437 @@ fn sdk_bootstrap_prefix_arg(ctx: &BuildCtx, platform: str) -> str:
+-    let explicit = ctx.env_input("SDK_BOOTSTRAP_PREFIX")
++    let explicit = env("SDK_BOOTSTRAP_PREFIX")
+@@ -440 +440 @@ fn sdk_bootstrap_prefix_arg(ctx: &BuildCtx, platform: str) -> str:
+-    let llvm_prefix = ctx.env_input("LLVM_PREFIX")
++    let llvm_prefix = env("LLVM_PREFIX")
+@@ -446 +446 @@ fn sdk_output_prefix_arg(ctx: &BuildCtx, platform: str) -> str:
+-    let explicit = ctx.env_input("SDK_OUTPUT_PREFIX")
++    let explicit = env("SDK_OUTPUT_PREFIX")
+@@ -452 +452 @@ fn sdk_build_root_arg(ctx: &BuildCtx, platform: str) -> str:
+-    let explicit = ctx.env_input("SDK_BUILD_ROOT")
++    let explicit = env("SDK_BUILD_ROOT")
+@@ -458 +458 @@ fn sdk_jobs_arg(ctx: &BuildCtx) -> str:
+-    ctx.env_input("PARALLEL_JOBS")
++    env("PARALLEL_JOBS")
+@@ -516,4 +516,4 @@ fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
+-    target = target.arg(ctx.env_input("LLVM_TARGETS_TO_BUILD"))
+-    target = target.arg(ctx.env_input("SDKROOT"))
+-    target = target.arg(ctx.env_input("MACOSX_DEPLOYMENT_TARGET"))
+-    target = target.arg(ctx.env_input("SDK_WINDOWS_MT"))
++    target = target.arg(env("LLVM_TARGETS_TO_BUILD"))
++    target = target.arg(env("SDKROOT"))
++    target = target.arg(env("MACOSX_DEPLOYMENT_TARGET"))
++    target = target.arg(env("SDK_WINDOWS_MT"))
+diff --git a/build/compiler.w b/build/compiler.w
+index 2363259f..586e364e 100644
+--- a/build/compiler.w
++++ b/build/compiler.w
+@@ -90,0 +91,2 @@ fn comp_linux_system_lib_arg(fs: &ToolFs, name: str) -> str:
++    if env("WITH_LINUX_SYSLIB_DIR").len() > 0:
++        return "-l" ++ name
+@@ -358,0 +361,6 @@ fn comp_path_for_process(root: str, path: str) -> str:
++fn comp_forward_env(base: ProcessEnv, name: str) -> ProcessEnv:
++    let value = env(name)
++    if value.len() > 0:
++        return base.set(name, value)
++    base
++
+@@ -383,0 +392,14 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: str, argv: Vec[str], stdout
++    process_env = comp_forward_env(process_env, "SDKROOT")
++    process_env = comp_forward_env(process_env, "WITH_DARWIN_CXX_LIB_DIR")
++    process_env = comp_forward_env(process_env, "WITH_TMPDIR")
++    process_env = comp_forward_env(process_env, "TMPDIR")
++    process_env = comp_forward_env(process_env, "TEMP")
++    process_env = comp_forward_env(process_env, "TMP")
++    process_env = comp_forward_env(process_env, "WITH_CIMPORT_ISYSTEM")
++    process_env = comp_forward_env(process_env, "WITH_LINK_CC")
++    process_env = comp_forward_env(process_env, "WITH_LINUX_DYNAMIC_STDCXX")
++    process_env = comp_forward_env(process_env, "WITH_LINUX_DYNAMIC_LINKER")
++    process_env = comp_forward_env(process_env, "WITH_LINUX_CRT_DIR")
++    process_env = comp_forward_env(process_env, "WITH_LINUX_GCC_DIR")
++    process_env = comp_forward_env(process_env, "WITH_LINUX_SYSLIB_DIR")
++    process_env = comp_forward_env(process_env, "WITH_PCRE2_SOURCE")
+@@ -1201,0 +1224,3 @@ fn comp_sha256_file(ctx: &ActionCtx, capture_dir: str, label: str, path: str) ->
++    let seed_hash = env("WITH_SEED_INPUT_SHA256")
++    if label == "seed-input" and seed_hash.len() >= 64:
++        return seed_hash.slice(0, 64)
+@@ -1398,0 +1424,4 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
++        let cxx_lib_dir = env("WITH_DARWIN_CXX_LIB_DIR")
++        if cxx_lib_dir.len() > 0:
++            rsp = rsp ++ "-L" ++ cxx_lib_dir ++ "\n"
++            ld_rsp = ld_rsp ++ "-L" ++ cxx_lib_dir ++ "\n"
+@@ -1400,0 +1430 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
++        rsp = rsp ++ "-lc++abi\n"
+@@ -1402,0 +1433 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
++        ld_rsp = ld_rsp ++ "-lc++abi\n"
+@@ -1403,0 +1435,13 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
++        let dynamic_stdcxx = env("WITH_LINUX_DYNAMIC_STDCXX").len() > 0
++        let linux_syslib_dir = env("WITH_LINUX_SYSLIB_DIR")
++        if linux_syslib_dir.len() > 0:
++            rsp = rsp ++ "-L" ++ linux_syslib_dir ++ "\n"
++            ld_rsp = ld_rsp ++ "-L" ++ linux_syslib_dir ++ "\n"
++        let linux_crt_dir = env("WITH_LINUX_CRT_DIR")
++        if linux_crt_dir.len() > 0:
++            rsp = rsp ++ "-L" ++ linux_crt_dir ++ "\n"
++            ld_rsp = ld_rsp ++ "-L" ++ linux_crt_dir ++ "\n"
++        let linux_gcc_dir = env("WITH_LINUX_GCC_DIR")
++        if linux_gcc_dir.len() > 0:
++            rsp = rsp ++ "-L" ++ linux_gcc_dir ++ "\n"
++            ld_rsp = ld_rsp ++ "-L" ++ linux_gcc_dir ++ "\n"
+@@ -1407,2 +1451,6 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
+-        rsp = rsp ++ "-static-libstdc++\n"
+-        rsp = rsp ++ "-static-libgcc\n"
++        if dynamic_stdcxx:
++            rsp = rsp ++ "-lstdc++\n"
++            rsp = rsp ++ "-lgcc\n"
++        else:
++            rsp = rsp ++ "-static-libstdc++\n"
++            rsp = rsp ++ "-static-libgcc\n"
+@@ -1412 +1460,2 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
+-        ld_rsp = ld_rsp ++ "-Bstatic\n"
++        if not dynamic_stdcxx:
++            ld_rsp = ld_rsp ++ "-Bstatic\n"
+@@ -1416 +1465,2 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
+-        ld_rsp = ld_rsp ++ "-Bdynamic\n"
++        if not dynamic_stdcxx:
++            ld_rsp = ld_rsp ++ "-Bdynamic\n"
+diff --git a/build/package.w b/build/package.w
+index a335e8eb..18956f06 100644
+--- a/build/package.w
++++ b/build/package.w
+@@ -149 +149 @@ fn pkg_env_or(ctx: &ActionCtx, name: str, fallback: str) -> str:
+-    let value = ctx.env_input(name)
++    let value = env(name)
+@@ -155 +155 @@ fn pkg_tool_from_env(ctx: &ActionCtx, primary: str, legacy: str, fallback: str)
+-    let explicit = ctx.env_input(primary)
++    let explicit = env(primary)
+@@ -158 +158 @@ fn pkg_tool_from_env(ctx: &ActionCtx, primary: str, legacy: str, fallback: str)
+-    let old = ctx.env_input(legacy)
++    let old = env(legacy)
+@@ -288,4 +288 @@ fn pkg_write_release_checksum(ctx: &ActionCtx, asset_path: str) -> i32:
+-    let sha = ctx.fs().sha256_file(asset_path)
+-    if sha.len() == 0:
+-        return pkg_fail(ctx, "could not hash release asset: " ++ asset_path)
+-    pkg_write_text(ctx, asset_path ++ ".sha256", sha ++ "  " ++ asset_path ++ "\n")
++    pkg_fail(ctx, "release checksums require ToolFs.sha256_file; unavailable in the Nix v0.15.1 bootstrap package")
+@@ -393,13 +390 @@ fn pkg_write_sha256sums(ctx: &ActionCtx, stage_root: str) -> i32:
+-    let fs = ctx.fs()
+-    let files = pkg_sort_strings(fs.list_files(stage_root))
+-    var manifest = ""
+-    for i in 0..files.len() as i32:
+-        let path = files.get(i as i64)
+-        let rel = pkg_rel_path(stage_root, path)
+-        if rel.len() == 0:
+-            return pkg_fail(ctx, "package file is outside stage root: " ++ path)
+-        let sha = fs.sha256_file(path)
+-        if sha.len() == 0:
+-            return pkg_fail(ctx, "could not hash package file: " ++ path)
+-        manifest = manifest ++ sha ++ "  ./" ++ rel ++ "\n"
+-    pkg_write_text(ctx, pkg_join(stage_root, "SHA256SUMS"), manifest)
++    pkg_fail(ctx, "bootstrap C package checksums require ToolFs.sha256_file; unavailable in the Nix v0.15.1 bootstrap package")
+@@ -449,30 +434 @@ fn pkg_write_archive(ctx: &ActionCtx, compiler_path: str, stage_root: str, top_d
+-    let fs = ctx.fs()
+-    let files = pkg_sort_strings(fs.list_files(stage_root))
+-    var dirs: Vec[str] = Vec.new()
+-    for i in 0..files.len() as i32:
+-        let rel = pkg_rel_path(stage_root, files.get(i as i64))
+-        if rel.len() == 0:
+-            return pkg_fail(ctx, "package file is outside stage root: " ++ files.get(i as i64))
+-        dirs = pkg_add_parent_dirs(dirs, top_dir, rel)
+-    dirs = pkg_sort_strings(dirs)
+-    let entries: Vec[ArchiveEntry] = Vec.new()
+-    for i in 0..dirs.len() as i32:
+-        entries.push(archive_dir_entry(dirs.get(i as i64), 0o755))
+-    for i in 0..files.len() as i32:
+-        let source = files.get(i as i64)
+-        let rel = pkg_rel_path(stage_root, source)
+-        entries.push(archive_file_entry(source, top_dir ++ "/" ++ rel, 0o644))
+-    let tmp_tar = pkg_join("out/bootstrap-c-package", top_dir ++ ".tar")
+-    if fs.write_tar(tmp_tar, entries) != 0:
+-        return pkg_fail(ctx, "could not write intermediate tar archive")
+-    if not fs.exists(tmp_tar):
+-        return pkg_fail(ctx, "intermediate tar archive is empty")
+-    let helper_bin = pkg_join("out/bootstrap-c-package", "zlib_gzip" ++ pkg_host_exe_suffix())
+-    var rc = pkg_compile_gzip_helper(ctx, compiler_path, helper_bin)
+-    if rc != 0:
+-        return rc
+-    rc = pkg_run_gzip_helper(ctx, helper_bin, tmp_tar, output_path)
+-    if rc != 0:
+-        return rc
+-    let _remove_tmp = fs.remove_file(tmp_tar)
+-    0
++    pkg_fail(ctx, "bootstrap C archive packaging requires ArchiveEntry and ToolFs.write_tar; unavailable in the Nix v0.15.1 bootstrap package")
+@@ -481 +437 @@ fn pkg_version(ctx: &ActionCtx) -> str:
+-    let version = ctx.env_input("WITH_VERSION")
++    let version = env("WITH_VERSION")
+diff --git a/build/pcre2.w b/build/pcre2.w
+index 43af27ac..6aa97fe2 100644
+--- a/build/pcre2.w
++++ b/build/pcre2.w
+@@ -3,0 +4 @@ use std.build
++use std.process
+@@ -54,0 +56,10 @@ fn pcre2_abs(root: str, path: str) -> str:
++fn pcre2_project_relative(root: str, path: str) -> str:
++    if path.len() == 0 or path.byte_at(0) != 47:
++        return path
++    if root.len() == 0:
++        return path
++    let prefix = if root.ends_with("/"): root else: root ++ "/"
++    if path.starts_with(prefix):
++        return path.slice(prefix.len(), path.len())
++    path
++
+@@ -525,21 +536,3 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
+-    let root = ctx.project_info().project_root()
+-    let scratch_dir = pcre2_scratch_dir(ctx)
+-    let archive_path = pcre2_join(scratch_dir, release ++ ".tar.gz")
+-    if fs.mkdir_all(pcre2_dirname(archive_path)) != 0:
+-        return pcre2_fail(ctx, "could not create archive directory")
+-    if not fs.exists(archive_path):
+-        print("fetching " ++ release ++ " from " ++ url)
+-        let fetch_bin = pcre2_join(scratch_dir, "https_fetch")
+-        var rc = pcre2_compile_binary(ctx, "pcre2-https-fetch-helper", "build/https_fetch.w", fetch_bin)
+-        if rc != 0:
+-            return rc
+-        var fetch_args: Vec[str] = Vec.new()
+-        fetch_args.push(pcre2_abs(root, fetch_bin))
+-        fetch_args.push(url)
+-        fetch_args.push(pcre2_abs(root, archive_path))
+-        let fetch_result = ctx.process_runner().run_capture(fetch_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".fetch.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".fetch.stderr")), 300000)
+-        if fetch_result.rc != 0:
+-            return pcre2_fail(ctx, f"HTTPS fetch helper failed with exit code {fetch_result.rc}: " ++ fetch_result.stdout ++ fetch_result.stderr)
+-    let actual_sha = fs.sha256_file(archive_path)
+-    if actual_sha != PCRE2_SHA256:
+-        return pcre2_fail(ctx, "sha256 mismatch for " ++ archive_path ++ ": expected " ++ PCRE2_SHA256 ++ " got " ++ actual_sha)
++    let source_override = env("WITH_PCRE2_SOURCE")
++    if source_override.len() == 0:
++        return pcre2_fail(ctx, "WITH_PCRE2_SOURCE is required to prepare " ++ release ++ " with the Nix v0.15.1 bootstrap package")
+@@ -547,22 +540,3 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
+-        let tmp_dir = pcre2_join(scratch_dir, release ++ ".extract")
+-        let extracted_dir = pcre2_join(tmp_dir, release)
+-        if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:
+-            return pcre2_fail(ctx, "could not remove old extract directory: " ++ tmp_dir)
+-        if fs.mkdir_all(tmp_dir) != 0:
+-            return pcre2_fail(ctx, "could not create extract directory: " ++ tmp_dir)
+-        let tar_path = pcre2_join(scratch_dir, release ++ ".tar")
+-        let gunzip_bin = pcre2_join(scratch_dir, "zlib_gunzip")
+-        var rc = pcre2_compile_binary(ctx, "pcre2-gunzip-helper", "build/zlib_gunzip.w", gunzip_bin)
+-        if rc != 0:
+-            return rc
+-        var gunzip_args: Vec[str] = Vec.new()
+-        gunzip_args.push(pcre2_abs(root, gunzip_bin))
+-        gunzip_args.push(pcre2_abs(root, archive_path))
+-        gunzip_args.push(pcre2_abs(root, tar_path))
+-        let gunzip_result = ctx.process_runner().run_capture(gunzip_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".gunzip.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".gunzip.stderr")), 300000)
+-        if gunzip_result.rc != 0:
+-            return pcre2_fail(ctx, f"gunzip helper failed with exit code {gunzip_result.rc}: " ++ gunzip_result.stdout ++ gunzip_result.stderr)
+-        if fs.extract_tar(tar_path, tmp_dir) != 0:
+-            return pcre2_fail(ctx, "could not extract tar archive: " ++ tar_path)
+-        if not fs.is_dir(pcre2_join(extracted_dir, "src")):
+-            return pcre2_fail(ctx, "archive did not contain expected src directory: " ++ extracted_dir)
++        let source_dir = pcre2_project_relative(ctx.project_info().project_root(), source_override)
++        if not fs.is_dir(source_dir):
++            return pcre2_fail(ctx, "WITH_PCRE2_SOURCE is not a directory: " ++ source_override)
+@@ -571,3 +545,2 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
+-        if fs.rename(extracted_dir, ref_dir) != 0:
+-            return pcre2_fail(ctx, "could not move extracted tree to: " ++ ref_dir)
+-        let _remove_extract_root = fs.remove_tree(tmp_dir)
++        if fs.copy_tree(source_dir, ref_dir) != 0:
++            return pcre2_fail(ctx, "could not copy WITH_PCRE2_SOURCE to: " ++ ref_dir)
+@@ -715 +688,2 @@ pub fn run_pcre2_test_smoke_action(ctx: ActionCtx) -> i32:
+-    run_args |> push("/bin/bash")
++    let bash_bin = env("BASH")
++    run_args |> push(if bash_bin.len() > 0: bash_bin else: "/bin/bash")
+@@ -807 +781,2 @@ pub fn run_pcre2_test_action(ctx: ActionCtx) -> i32:
+-    run_args |> push("/bin/bash")
++    let bash_bin = env("BASH")
++    run_args |> push(if bash_bin.len() > 0: bash_bin else: "/bin/bash")
+diff --git a/build/requirements.w b/build/requirements.w
+index c7fab5ce..a0a6a66e 100644
+--- a/build/requirements.w
++++ b/build/requirements.w
+@@ -220 +220 @@ fn req_flush_paragraph(items: Vec[ReqItem], sections: &Vec[ReqSection], section_
+-                out = req_add_item(out, sections, section_index, text.slice(start as i64, (i + 1) as i64), start_line, end_line)
++                out = req_add_item(move out, sections, section_index, text.slice(start as i64, (i + 1) as i64), start_line, end_line)
+@@ -226 +226 @@ fn req_flush_paragraph(items: Vec[ReqItem], sections: &Vec[ReqSection], section_
+-        out = req_add_item(out, sections, section_index, text.slice(start as i64, text.len()), start_line, end_line)
++        out = req_add_item(move out, sections, section_index, text.slice(start as i64, text.len()), start_line, end_line)
+@@ -232 +232 @@ fn req_flush_bullet(items: Vec[ReqItem], sections: &Vec[ReqSection], section_ind
+-    req_add_item(items, sections, section_index, req_pending_text(pending), pending.lines.get(0), pending.lines.get(pending.lines.len() - 1))
++    req_add_item(move items, sections, section_index, req_pending_text(pending), pending.lines.get(0), pending.lines.get(pending.lines.len() - 1))
+@@ -272 +272 @@ fn req_heading_chapter(line: str, existing: str) -> str:
+-    let after = req_parse_heading(line, 0, existing, before)
++    let after = req_parse_heading(line, 0, existing, move before)
+@@ -340 +340 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_bullet(items, sections, current_section, bullet)
++            items = req_flush_bullet(move items, sections, current_section, bullet)
+@@ -342 +342 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_paragraph(items, sections, current_section, paragraph)
++            items = req_flush_paragraph(move items, sections, current_section, paragraph)
+@@ -349 +349 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_bullet(items, sections, current_section, bullet)
++            items = req_flush_bullet(move items, sections, current_section, bullet)
+@@ -351 +351 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_paragraph(items, sections, current_section, paragraph)
++            items = req_flush_paragraph(move items, sections, current_section, paragraph)
+@@ -354 +354 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            sections = req_parse_heading(stripped, line_no, current_chapter, sections)
++            sections = req_parse_heading(stripped, line_no, current_chapter, move sections)
+@@ -360 +360 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_bullet(items, sections, current_section, bullet)
++            items = req_flush_bullet(move items, sections, current_section, bullet)
+@@ -362 +362 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_paragraph(items, sections, current_section, paragraph)
++            items = req_flush_paragraph(move items, sections, current_section, paragraph)
+@@ -366 +366 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_bullet(items, sections, current_section, bullet)
++            items = req_flush_bullet(move items, sections, current_section, bullet)
+@@ -368 +368 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_paragraph(items, sections, current_section, paragraph)
++            items = req_flush_paragraph(move items, sections, current_section, paragraph)
+@@ -372 +372 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-                items = req_add_item(items, sections, current_section, table_text, line_no, line_no)
++                items = req_add_item(move items, sections, current_section, table_text, line_no, line_no)
+@@ -375 +375 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_bullet(items, sections, current_section, bullet)
++            items = req_flush_bullet(move items, sections, current_section, bullet)
+@@ -377 +377 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-            items = req_flush_paragraph(items, sections, current_section, paragraph)
++            items = req_flush_paragraph(move items, sections, current_section, paragraph)
+@@ -385,2 +385,2 @@ fn req_parse_spec(spec_text: str) -> ReqParseResult:
+-    items = req_flush_bullet(items, sections, current_section, bullet)
+-    items = req_flush_paragraph(items, sections, current_section, paragraph)
++    items = req_flush_bullet(move items, sections, current_section, bullet)
++    items = req_flush_paragraph(move items, sections, current_section, paragraph)
+diff --git a/build/sdk.w b/build/sdk.w
+index 1fa3fb7e..86735174 100644
+--- a/build/sdk.w
++++ b/build/sdk.w
+@@ -411,36 +411,6 @@ fn sdk_file_mode(rel: str) -> i32:
+-fn sdk_package_entries(ctx: &ActionCtx, prefix: str, sdk_base: str, platform: str) -> Vec[ArchiveEntry]:
+-    let fs = ctx.fs()
+-    let files = sdk_select_package_files(fs, prefix, platform)
+-    var dirs: Vec[str] = Vec.new()
+-    for i in 0..files.len() as i32:
+-        let rel = sdk_rel_path(prefix, files.get(i as i64))
+-        dirs = sdk_add_parent_dirs(dirs, sdk_base, rel)
+-    if platform != "windows-x86_64":
+-        let aliases: Vec[str] = Vec.new()
+-        aliases.push("ld.lld")
+-        aliases.push("ld64.lld")
+-        aliases.push("lld-link")
+-        aliases.push("wasm-ld")
+-        for i in 0..aliases.len() as i32:
+-            let alias = aliases.get(i as i64)
+-            if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
+-                dirs = sdk_add_parent_dirs(dirs, sdk_base, "bin/" ++ alias)
+-    dirs = sdk_sort_strings(dirs)
+-    let entries: Vec[ArchiveEntry] = Vec.new()
+-    for i in 0..dirs.len() as i32:
+-        entries.push(archive_dir_entry(dirs.get(i as i64), 0o755))
+-    for i in 0..files.len() as i32:
+-        let path = files.get(i as i64)
+-        let rel = sdk_rel_path(prefix, path)
+-        entries.push(archive_file_entry(path, sdk_base ++ "/" ++ rel, sdk_file_mode(rel)))
+-    if platform != "windows-x86_64":
+-        let aliases: Vec[str] = Vec.new()
+-        aliases.push("ld.lld")
+-        aliases.push("ld64.lld")
+-        aliases.push("lld-link")
+-        aliases.push("wasm-ld")
+-        for i in 0..aliases.len() as i32:
+-            let alias = aliases.get(i as i64)
+-            if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
+-                entries.push(archive_symlink_entry("lld", sdk_base ++ "/bin/" ++ alias, 0o777))
+-    entries
++fn sdk_package_entries(ctx: &ActionCtx, prefix: str, sdk_base: str, platform: str) -> Vec[str]:
++    let _ = ctx
++    let _ = prefix
++    let _ = sdk_base
++    let _ = platform
++    Vec.new()
+@@ -457 +427 @@ fn sdk_write_text(ctx: &ActionCtx, path: str, text: str) -> i32:
+-fn sdk_archive_manifest(entries: &Vec[ArchiveEntry]) -> str:
++fn sdk_archive_manifest(entries: &Vec[str]) -> str:
+@@ -460,2 +430 @@ fn sdk_archive_manifest(entries: &Vec[ArchiveEntry]) -> str:
+-        let entry = entries.get(i as i64)
+-        out = out ++ entry.archive_path ++ "\n"
++        out = out ++ entries.get(i as i64) ++ "\n"
+@@ -465,32 +434 @@ pub fn run_package_llvm_sdk_action(ctx: ActionCtx) -> i32:
+-    let args = ctx.args()
+-    if args.len() < 5:
+-        return sdk_fail(ctx, "requires platform, prefix, build-cache, asset, and sdk-base args")
+-    let platform = args.get(0)
+-    let prefix = args.get(1)
+-    let build_cache = args.get(2)
+-    let asset = args.get(3)
+-    let sdk_base = args.get(4)
+-    var rc = sdk_validate_package_prefix(ctx, platform, prefix, build_cache)
+-    if rc != 0:
+-        return rc
+-    let output_path = sdk_join("out/release", asset)
+-    let entries = sdk_package_entries(ctx, prefix, sdk_base, platform)
+-    if entries.len() == 0:
+-        return sdk_fail(ctx, "SDK package would be empty")
+-    if ctx.fs().mkdir_all("out/release") != 0:
+-        return sdk_fail(ctx, "could not create out/release")
+-    if ctx.fs().write_tar_gz(output_path, entries) != 0:
+-        return sdk_fail(ctx, "could not write SDK archive: " ++ output_path)
+-    let sha = ctx.fs().sha256_file(output_path)
+-    if sha.len() == 0:
+-        return sdk_fail(ctx, "could not hash SDK archive: " ++ output_path)
+-    rc = sdk_write_text(ctx, output_path ++ ".sha256", sha ++ "  " ++ output_path ++ "\n")
+-    if rc != 0:
+-        return rc
+-    rc = sdk_write_text(ctx, output_path ++ ".manifest", sdk_archive_manifest(entries))
+-    if rc != 0:
+-        return rc
+-    let stamp = ctx.output()
+-    if stamp.len() > 0:
+-        return sdk_write_text(ctx, stamp, "ok\n")
+-    0
++    sdk_fail(ctx, "sdk-package requires a seed with ArchiveEntry support; unavailable in the Nix v0.15.1 bootstrap package")
+@@ -544,38 +482 @@ pub fn run_sdk_source_tar_gz_action(ctx: ActionCtx) -> i32:
+-    let args = ctx.args()
+-    let marker = ctx.output()
+-    if args.len() < 5 or marker.len() == 0:
+-        return sdk_fail(ctx, "requires url, sha256, archive, source-root, and source-dir args")
+-    let url = args.get(0)
+-    let expected_sha = args.get(1)
+-    let archive = args.get(2)
+-    let source_root = args.get(3)
+-    let source_dir = args.get(4)
+-    if expected_sha.len() == 0:
+-        return sdk_fail(ctx, "source download requires pinned SHA-256")
+-    let fs = ctx.fs()
+-    if fs.exists(marker):
+-        return 0
+-    if fs.mkdir_all(source_root) != 0:
+-        return sdk_fail(ctx, "could not create source root: " ++ source_root)
+-    let scratch = sdk_join("out/command", ctx.target_name())
+-    if fs.mkdir_all(scratch) != 0:
+-        return sdk_fail(ctx, "could not create command directory: " ++ scratch)
+-    if not fs.exists(archive):
+-        var rc = sdk_fetch(ctx, scratch, "source", url, archive, 1800000)
+-        if rc != 0:
+-            return rc
+-    let actual = fs.sha256_file(archive)
+-    if actual.len() == 0:
+-        return sdk_fail(ctx, "could not hash source archive: " ++ archive)
+-    if actual != expected_sha:
+-        return sdk_fail(ctx, "source archive sha256 mismatch for " ++ archive ++ ": expected " ++ expected_sha ++ " got " ++ actual)
+-    let tar_path = sdk_join(scratch, sdk_basename(source_dir) ++ ".tar")
+-    let _remove_tar = fs.remove_file(tar_path)
+-    var rc = sdk_gunzip(ctx, scratch, archive, tar_path)
+-    if rc != 0:
+-        return rc
+-    if fs.extract_tar(tar_path, source_root) != 0:
+-        return sdk_fail(ctx, "tar extraction failed for " ++ tar_path)
+-    if not fs.is_dir(source_dir):
+-        return sdk_fail(ctx, "source archive did not contain expected directory: " ++ source_dir)
+-    sdk_write_text(ctx, marker, "ok\n")
++    sdk_fail(ctx, "sdk-source requires a seed with ToolFs.sha256_file and ToolFs.extract_tar; unavailable in the Nix v0.15.1 bootstrap package")
+diff --git a/build/seed.w b/build/seed.w
+index c9be7059..956cbca9 100644
+--- a/build/seed.w
++++ b/build/seed.w
+@@ -192,10 +192 @@ fn seed_verify_download_sha256(ctx: &ActionCtx, tmp_dir: str, label: str, asset_
+-    let expected = seed_fetch_expected_sha256(ctx, tmp_dir, label, asset_url)
+-    if expected.len() == 0:
+-        return seed_fail(ctx, "missing or invalid SHA-256 sidecar: " ++ asset_url ++ ".sha256")
+-    let actual = ctx.fs().sha256_file(path)
+-    if actual.len() == 0:
+-        return seed_fail(ctx, "could not hash downloaded asset: " ++ path)
+-    if actual != expected:
+-        let _remove_bad = ctx.fs().remove_file(path)
+-        return seed_fail(ctx, "sha256 mismatch for " ++ asset_url ++ ": expected " ++ expected ++ " got " ++ actual)
+-    0
++    seed_fail(ctx, "download verification requires ToolFs.sha256_file; unavailable in the Nix v0.15.1 bootstrap package")
+@@ -253,67 +244 @@ pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
+-    let fs = ctx.fs()
+-    let args = ctx.args()
+-    let marker = ctx.output()
+-    if args.len() < 3 or marker.len() == 0:
+-        return seed_fail(ctx, "requires repo arg, asset arg, sdk-base arg, and marker output")
+-    let repo = args.get(0)
+-    let asset_name = args.get(1)
+-    let sdk_base = args.get(2)
+-    if fs.exists(marker):
+-        print("static LLVM SDK already present: " ++ seed_join(".deps", sdk_base))
+-        return 0
+-
+-    var tag = env("WITH_LLVM_SDK_VERSION")
+-    if tag.len() == 0:
+-        tag = seed_release_from_api(ctx, repo, asset_name)
+-        if tag.len() == 0:
+-            ctx.diagnostics().error("deps: could not find a release containing asset '" ++ asset_name ++ "'")
+-            ctx.diagnostics().error("set WITH_LLVM_SDK_VERSION to a release tag, or build it from source: tools/build-static-llvm.sh")
+-            return 1
+-        print("latest SDK release: " ++ tag)
+-
+-    let url = "https://github.com/" ++ repo ++ "/releases/download/" ++ tag ++ "/" ++ asset_name
+-    let tmp_dir = seed_join("out/tmp", "deps-download")
+-    if fs.mkdir_all(tmp_dir) != 0:
+-        return seed_fail(ctx, "could not create temp directory: " ++ tmp_dir)
+-    let archive_path = seed_join(tmp_dir, asset_name)
+-    let _remove_archive = fs.remove_file(archive_path)
+-    print("downloading static LLVM SDK from: " ++ url)
+-    let fetch_rc = seed_fetch_to_file(ctx, tmp_dir, "deps-asset", url, archive_path, 900000)
+-    if fetch_rc != 0:
+-        return fetch_rc
+-    let verify_rc = seed_verify_download_sha256(ctx, tmp_dir, "deps-asset", url, archive_path)
+-    if verify_rc != 0:
+-        return verify_rc
+-
+-    if not asset_name.ends_with(".tar.gz"):
+-        return seed_fail(ctx, "unsupported SDK archive format (expected .tar.gz): " ++ asset_name)
+-    let tar_path = seed_join(tmp_dir, sdk_base ++ ".tar")
+-    let _remove_tar = fs.remove_file(tar_path)
+-    let gunzip_rc = seed_gunzip_to_tar(ctx, tmp_dir, archive_path, tar_path)
+-    if gunzip_rc != 0:
+-        return gunzip_rc
+-
+-    let extract_dir = seed_join(tmp_dir, "extract")
+-    if fs.exists(extract_dir) and fs.remove_tree(extract_dir) != 0:
+-        return seed_fail(ctx, "could not remove old extract directory: " ++ extract_dir)
+-    if fs.mkdir_all(extract_dir) != 0:
+-        return seed_fail(ctx, "could not create extract directory: " ++ extract_dir)
+-    if fs.extract_tar(tar_path, extract_dir) != 0:
+-        return seed_fail(ctx, "tar extraction failed for " ++ tar_path)
+-
+-    let extracted_sdk = seed_join(extract_dir, sdk_base)
+-    if not fs.is_dir(extracted_sdk):
+-        return seed_fail(ctx, "archive did not contain expected SDK directory: " ++ sdk_base)
+-    let target_dir = seed_join(".deps", sdk_base)
+-    if fs.mkdir_all(".deps") != 0:
+-        return seed_fail(ctx, "could not create .deps directory")
+-    if fs.exists(target_dir) and fs.remove_tree(target_dir) != 0:
+-        return seed_fail(ctx, "could not remove existing SDK directory: " ++ target_dir)
+-    if fs.rename(extracted_sdk, target_dir) != 0:
+-        return seed_fail(ctx, "could not move SDK into place: " ++ target_dir)
+-    let _cleanup_tar = fs.remove_file(tar_path)
+-    let _cleanup_extract = fs.remove_tree(extract_dir)
+-    if not fs.exists(marker):
+-        return seed_fail(ctx, "SDK installed but missing expected archive: " ++ marker)
+-    print("static LLVM SDK installed: " ++ target_dir)
+-    0
++    seed_fail(ctx, "deps-download requires a seed with ToolFs.sha256_file and ToolFs.extract_tar; unavailable in the Nix v0.15.1 bootstrap package")
+diff --git a/build/selfhost.w b/build/selfhost.w
+index 0460343d..6b5b31f2 100644
+--- a/build/selfhost.w
++++ b/build/selfhost.w
+@@ -4750 +4750 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: str, base_dir:
+-        "                replacement.linker = \"/bin/false\"\n" ++
++        "                replacement.linker = \"with-forbidden-linker\"\n" ++
+@@ -5736,0 +5737,2 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
++    let env_tool = bs_build_w_tool_from_env("WITH_ENV", "/usr/bin/env")
++    let echo_tool = bs_build_w_tool_from_env("WITH_ECHO", "/bin/echo")
+@@ -5760 +5762 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
+-        "    env_args |> push(\"/usr/bin/env\")\n" ++
++        "    env_args |> push(\"" ++ env_tool ++ "\")\n" ++
+@@ -5772 +5774 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
+-        "    let spec = process_spec(\"/usr/bin/env\").env_var(\"WITH_RUN_SPEC_TEST\", \"present\").timeout(120000)\n" ++
++        "    let spec = process_spec(\"" ++ env_tool ++ "\").env_var(\"WITH_RUN_SPEC_TEST\", \"present\").timeout(120000)\n" ++
+@@ -5785 +5787 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: str, case_dir:
+-        "    direct_args |> push(\"/bin/echo\")\n" ++
++        "    direct_args |> push(\"" ++ echo_tool ++ "\")\n" ++
+diff --git a/build/zlib.w b/build/zlib.w
+index 3b3294de..0a18c707 100644
+--- a/build/zlib.w
++++ b/build/zlib.w
+@@ -237,64 +237 @@ pub fn run_zlib_reference_action(ctx: ActionCtx) -> i32:
+-    let args = ctx.args()
+-    let ref_dir = ctx.output()
+-    if args.len() < 2 or ref_dir.len() == 0:
+-        return zlib_fail(ctx, "requires release and URL args plus reference tree output")
+-    let release = args.get(0)
+-    let url = args.get(1)
+-    let fs = ctx.fs()
+-    let root = ctx.project_info().project_root()
+-    let scratch_dir = zlib_scratch_dir(ctx)
+-    let archive_path = zlib_join(scratch_dir, release ++ ".tar.gz")
+-    if fs.mkdir_all(zlib_dirname(archive_path)) != 0:
+-        return zlib_fail(ctx, "could not create archive directory")
+-    if not fs.exists(archive_path):
+-        print("fetching " ++ release ++ " from " ++ url)
+-        let fetch_bin = zlib_join(scratch_dir, "zlib_http_fetch")
+-        var rc = zlib_compile_binary(ctx, "zlib-http-fetch-helper", "build/zlib_http_fetch.w", fetch_bin)
+-        if rc != 0:
+-            return rc
+-        var fetch_args: Vec[str] = Vec.new()
+-        fetch_args.push(zlib_abs(root, fetch_bin))
+-        fetch_args.push(url)
+-        fetch_args.push(zlib_abs(root, archive_path))
+-        let fetch_result = ctx.process_runner().run_capture(fetch_args, zlib_abs(root, zlib_join(scratch_dir, release ++ ".fetch.stdout")), zlib_abs(root, zlib_join(scratch_dir, release ++ ".fetch.stderr")), 300000)
+-        if fetch_result.rc != 0:
+-            return zlib_fail(ctx, f"zlib HTTP fetch helper failed with exit code {fetch_result.rc}: " ++ fetch_result.stdout ++ fetch_result.stderr)
+-    let actual_sha = fs.sha256_file(archive_path)
+-    if actual_sha != ZLIB_SHA256:
+-        return zlib_fail(ctx, "sha256 mismatch for " ++ archive_path ++ ": expected " ++ ZLIB_SHA256 ++ " got " ++ actual_sha)
+-    if not fs.is_dir(ref_dir):
+-        let tmp_dir = zlib_join(scratch_dir, release ++ ".extract")
+-        let extracted_dir = zlib_join(tmp_dir, release)
+-        if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:
+-            return zlib_fail(ctx, "could not remove old extract directory: " ++ tmp_dir)
+-        if fs.mkdir_all(tmp_dir) != 0:
+-            return zlib_fail(ctx, "could not create extract directory: " ++ tmp_dir)
+-        let tar_path = zlib_join(scratch_dir, release ++ ".tar")
+-        let gunzip_bin = zlib_join(scratch_dir, "zlib_gunzip")
+-        if fs.mkdir_all(zlib_dirname(gunzip_bin)) != 0:
+-            return zlib_fail(ctx, "could not create zlib gunzip helper directory")
+-        var rc = zlib_compile_binary(ctx, "zlib-gunzip-helper", "build/zlib_gunzip.w", gunzip_bin)
+-        if rc != 0:
+-            return rc
+-        var gunzip_args: Vec[str] = Vec.new()
+-        gunzip_args.push(zlib_abs(root, gunzip_bin))
+-        gunzip_args.push(zlib_abs(root, archive_path))
+-        gunzip_args.push(zlib_abs(root, tar_path))
+-        let gunzip_result = ctx.process_runner().run_capture(gunzip_args, zlib_abs(root, zlib_join(scratch_dir, release ++ ".gunzip.stdout")), zlib_abs(root, zlib_join(scratch_dir, release ++ ".gunzip.stderr")), 300000)
+-        if gunzip_result.rc != 0:
+-            return zlib_fail(ctx, f"zlib gunzip helper failed with exit code {gunzip_result.rc}: " ++ gunzip_result.stdout ++ gunzip_result.stderr)
+-        if fs.extract_tar(tar_path, tmp_dir) != 0:
+-            return zlib_fail(ctx, "could not extract tar archive: " ++ tar_path)
+-        if not fs.exists(zlib_join(extracted_dir, "zlib.h")):
+-            return zlib_fail(ctx, "archive did not contain expected zlib.h: " ++ extracted_dir)
+-        if fs.mkdir_all(zlib_dirname(ref_dir)) != 0:
+-            return zlib_fail(ctx, "could not create reference parent: " ++ zlib_dirname(ref_dir))
+-        if fs.rename(extracted_dir, ref_dir) != 0:
+-            return zlib_fail(ctx, "could not move extracted tree to: " ++ ref_dir)
+-        let _remove_extract_root = fs.remove_tree(tmp_dir)
+-    if fs.write_text(zlib_join(ref_dir, ".with-reference-url"), url ++ "\n") != 0:
+-        return zlib_fail(ctx, "could not write reference URL marker")
+-    let ready_stamp = if ctx.outputs().len() > 1: ctx.outputs().get(1) else: zlib_join(ref_dir, ".with-reference-ready")
+-    if fs.write_text(ready_stamp, "ok\n") != 0:
+-        return zlib_fail(ctx, "could not write ready stamp: " ++ ready_stamp)
+-    0
++    zlib_fail(ctx, "zlib-reference requires a seed with ToolFs.sha256_file and ToolFs.extract_tar; unavailable in the Nix v0.15.1 bootstrap package")
+diff --git a/src/CImport.w b/src/CImport.w
+index ee222dd1..47a8f645 100644
+--- a/src/CImport.w
++++ b/src/CImport.w
+@@ -17,0 +18,2 @@ var g_ci_realpath_cache_values: Vec[str] = Vec.new()
++var g_ci_extra_system_dirs: Vec[str] = Vec.new()
++var g_ci_extra_system_dirs_loaded: bool = false
+@@ -10892,0 +10895,29 @@ fn ci_str_contains(text: str, needle: str) -> bool:
++fn ci_path_under_dir(loc: str, raw_dir: str) -> bool:
++    var dir = raw_dir
++    while dir.len() > 0 and dir.byte_at(dir.len() - 1) == 47:
++        dir = dir.slice(0, dir.len() - 1)
++    if dir.len() == 0:
++        return false
++    if not ci_starts_with(loc, dir):
++        return false
++    if loc.len() == dir.len():
++        return true
++    let next = loc.byte_at(dir.len())
++    next == 47 or next == 92 or next == 58
++
++fn ci_load_extra_system_dirs():
++    if g_ci_extra_system_dirs_loaded:
++        return
++    g_ci_extra_system_dirs_loaded = true
++    let value = with_getenv_str("WITH_CIMPORT_ISYSTEM")
++    if value.len() == 0:
++        return
++    var start = 0
++    let value_len = value.len() as i32
++    for i in 0..(value_len + 1):
++        let at_end = i == value_len
++        if at_end or value.byte_at(i as i64) == 58:
++            if i > start:
++                g_ci_extra_system_dirs.push(value.slice(start as i64, i as i64))
++            start = i + 1
++
+@@ -14551,0 +14583,4 @@ fn ci_is_system_path(loc: str) -> bool:
++    ci_load_extra_system_dirs()
++    for i in 0..g_ci_extra_system_dirs.len() as i32:
++        let dir = g_ci_extra_system_dirs.get(i as i64)
++        if ci_path_under_dir(loc, dir): return true
+diff --git a/src/CiMigrate.w b/src/CiMigrate.w
+index bda01c33..c6f7aaa1 100644
+--- a/src/CiMigrate.w
++++ b/src/CiMigrate.w
+@@ -123,0 +124,25 @@ pub fn migrate_reset_options() -> Unit:
++fn ci_migrate_join_output_parts(parts: &Vec[str]) -> str:
++    var out = StringBuilder.new()
++    for i in 0..parts.len() as i32:
++        out.push_str(parts.get(i as i64))
++    out.to_str()
++
++fn ci_migrate_replace_sparse(text: str, needle: str, replacement: str) -> str:
++    if needle.len() == 0 or needle.len() > text.len():
++        return text
++    var out = StringBuilder.new()
++    var start: i64 = 0
++    let tlen = text.len()
++    let nlen = needle.len()
++    while start < tlen:
++        let tail = text.slice(start, tlen)
++        let rel = ci_find_str(tail, needle)
++        if rel < 0:
++            out.push_str(tail)
++            return out.to_str()
++        let abs_idx = start + rel as i64
++        out.push_str(text.slice(start, abs_idx))
++        out.push_str(replacement)
++        start = abs_idx + nlen
++    out.to_str()
++
+@@ -351,16 +376 @@ fn ci_replace_sparse(text: str, needle: str, replacement: str) -> str:
+-    if needle.len() == 0 or needle.len() > text.len():
+-        return text
+-    var result = ""
+-    var start: i64 = 0
+-    let tlen = text.len()
+-    let nlen = needle.len()
+-    while start < tlen:
+-        let tail = text.slice(start, tlen)
+-        let rel = ci_find_str(tail, needle)
+-        if rel < 0:
+-            result = result ++ tail
+-            return result
+-        let abs_idx = start + rel as i64
+-        result = result ++ text.slice(start, abs_idx) ++ replacement
+-        start = abs_idx + nlen
+-    result
++    ci_migrate_replace_sparse(text, needle, replacement)
+@@ -392 +402 @@ fn ci_migrate_normalize_output(text: str) -> str:
+-    ci_str_replace(text.slice(0, end), "-> void", "-> Unit") ++ "\n"
++    ci_migrate_replace_sparse(text.slice(0, end), "-> void", "-> Unit") ++ "\n"
+@@ -1052 +1062 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
+-    var output = output_parts.join("")
++    var output = ci_migrate_join_output_parts(output_parts)
+diff --git a/src/Sema.w b/src/Sema.w
+index 4276e823..d429811c 100644
+--- a/src/Sema.w
++++ b/src/Sema.w
+@@ -69,0 +70,7 @@ impl Copy for BindingProvenance
++type SemaDerefInfo {
++    ok: i32,
++    target_ty: i32,
++    result_ref_ty: i32,
++    deref_fn: i32,
++}
++
+diff --git a/src/SemaCheck.w b/src/SemaCheck.w
+index b5215318..4d2a1c06 100644
+--- a/src/SemaCheck.w
++++ b/src/SemaCheck.w
+@@ -5992,7 +5991,0 @@ fn sema_try_info_none -> SemaTryInfo:
+-type SemaDerefInfo {
+-    ok: i32,
+-    target_ty: i32,
+-    result_ref_ty: i32,
+-    deref_fn: i32,
+-}
+-
+diff --git a/src/compiler/ClangBridge.w b/src/compiler/ClangBridge.w
+index f48b432f..8da350b1 100644
+--- a/src/compiler/ClangBridge.w
++++ b/src/compiler/ClangBridge.w
+@@ -569,0 +570,3 @@ var g_cimport_include_count: i32 = 0
++var g_cimport_isystem_paths: [64]*mut u8 = [0 as *mut u8; 64]
++var g_cimport_isystem_count: i32 = 0
++var g_cimport_isystem_loaded: i32 = 0
+@@ -628,0 +632,83 @@ unsafe fn append_argv_arg(argv: str, arg: str) -> str:
++unsafe fn bridge_tmp_dir() -> str:
++    let with_tmp = with_getenv_str("WITH_TMPDIR")
++    if with_tmp.len() > 0:
++        return with_tmp
++    let tmpdir = with_getenv_str("TMPDIR")
++    if tmpdir.len() > 0:
++        return tmpdir
++    let temp = with_getenv_str("TEMP")
++    if temp.len() > 0:
++        return temp
++    let tmp = with_getenv_str("TMP")
++    if tmp.len() > 0:
++        return tmp
++    "/tmp"
++
++unsafe fn tmp_template_to_buf(buf: *mut u8, cap: i64, name: str):
++    if cap <= 0:
++        return
++    let dir = bridge_tmp_dir()
++    let path = if dir.ends_with("/"): dir ++ name else: dir ++ "/" ++ name
++    let data = str_data_ptr(path)
++    var i: i64 = 0
++    while i < path.len() and i < cap - 1:
++        *((buf as i64 + i) as *mut u8) = *((data as i64 + i) as *const u8)
++        i = i + 1
++    *((buf as i64 + i) as *mut u8) = 0
++
++unsafe fn add_cimport_isystem_path(path: str) -> i32:
++    if g_cimport_isystem_count >= 64 or path.len() <= 0:
++        return 0
++    let buf = with_alloc(path.len() + 1)
++    if buf as i64 == 0:
++        return 0
++    let sp = str_data_ptr(path)
++    with_memcpy(buf, sp, path.len())
++    *((buf as i64 + path.len()) as *mut u8) = 0
++    g_cimport_isystem_paths[g_cimport_isystem_count as i64] = buf
++    g_cimport_isystem_count = g_cimport_isystem_count + 1
++    0
++
++unsafe fn load_cimport_isystem_paths():
++    if g_cimport_isystem_loaded != 0:
++        return
++    g_cimport_isystem_loaded = 1
++    let value = with_getenv_str("WITH_CIMPORT_ISYSTEM")
++    if value.len() == 0:
++        return
++    var start = 0
++    let value_len = value.len() as i32
++    for i in 0..(value_len + 1):
++        let at_end = i == value_len
++        if at_end or value.byte_at(i as i64) == 58:
++            if i > start:
++                let _ = add_cimport_isystem_path(value.slice(start as i64, i as i64))
++            start = i + 1
++
++unsafe fn append_cimport_isystem_args(args: *mut *const u8, nargs: i32, max_args: i32) -> i32:
++    var out = nargs
++    load_cimport_isystem_paths()
++    var i: i32 = 0
++    while i < g_cimport_isystem_count:
++        if out + 3 >= max_args:
++            return out
++        *((args as i64 + out as i64 * 8) as *mut *const u8) = "-isystem\0" as *const u8
++        out = out + 1
++        *((args as i64 + out as i64 * 8) as *mut *const u8) = g_cimport_isystem_paths[i as i64] as *const u8
++        out = out + 1
++        i = i + 1
++    out
++
++unsafe fn cstr_path_under_dir(path: *const u8, dir: *const u8) -> bool:
++    if path as i64 == 0 or dir as i64 == 0:
++        return false
++    var dir_len = c_strlen(dir)
++    while dir_len > 0 and *((dir as i64 + dir_len - 1) as *const u8) == 47:
++        dir_len = dir_len - 1
++    if dir_len <= 0:
++        return false
++    if c_strncmp(path, dir, dir_len) != 0:
++        return false
++    let next = *((path as i64 + dir_len) as *const u8)
++    next == 0 or next == 47 or next == 92 or next == 58
++
+@@ -652,0 +739,6 @@ unsafe fn append_cc_common_args(argv: str) -> str:
++    load_cimport_isystem_paths()
++    var sp: i32 = 0
++    while sp < g_cimport_isystem_count:
++        out = append_argv_arg(out, "-isystem")
++        out = append_argv_arg(out, make_str(g_cimport_isystem_paths[sp as i64] as *const u8))
++        sp = sp + 1
+@@ -1192,3 +1284 @@ pub fn with_cimport_parse(header_code: str) -> i64:
+-        let tmpl = "/tmp/with_cimport_XXXXXX\0"
+-        let tp = *(&tmpl as *const *const u8)
+-        with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
++        tmp_template_to_buf(&raw mut template_path as *mut [4096]u8 as *mut u8, 4096, "with_cimport_XXXXXX")
+@@ -1207 +1297 @@ pub fn with_cimport_parse(header_code: str) -> i64:
+-        var args: [64]*const u8 = [0 as *const u8; 64]
++        var args: [128]*const u8 = [0 as *const u8; 128]
+@@ -1224,0 +1315 @@ pub fn with_cimport_parse(header_code: str) -> i64:
++        nargs = append_cimport_isystem_args(&raw mut args as *mut [128]*const u8 as *mut *const u8, nargs, 128)
+@@ -1226 +1317 @@ pub fn with_cimport_parse(header_code: str) -> i64:
+-        while ip < g_cimport_include_count and nargs < 62:
++        while ip < g_cimport_include_count and nargs < 126:
+@@ -1234 +1325 @@ pub fn with_cimport_parse(header_code: str) -> i64:
+-        (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
++        (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [128]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
+@@ -1324,0 +1416,7 @@ var g_bridge_inclusion_files: str = ""
++unsafe fn bridge_is_synthetic_cimport_path(path: str) -> bool:
++    if path.starts_with("/tmp/with_cimport_") or path.starts_with("/private/tmp/with_cimport_"):
++        return true
++    let dir = bridge_tmp_dir()
++    let prefix = if dir.ends_with("/"): dir ++ "with_cimport_" else: dir ++ "/with_cimport_"
++    path.starts_with(prefix)
++
+@@ -1336 +1434 @@ unsafe fn collect_inclusion(included_file: *mut u8, inclusion_stack: *mut u8, in
+-    if path.starts_with("/tmp/with_cimport_") or path.starts_with("/private/tmp/with_cimport_"):
++    if bridge_is_synthetic_cimport_path(path):
+@@ -1969,0 +2068,6 @@ unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
++    load_cimport_isystem_paths()
++    var isystem_i: i32 = 0
++    while isystem_i < g_cimport_isystem_count:
++        if cstr_path_under_dir(path, g_cimport_isystem_paths[isystem_i as i64] as *const u8):
++            return 1
++        isystem_i = isystem_i + 1
+@@ -2244,3 +2348 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
+-    let tmpl = "/tmp/with_cimport_macro_XXXXXX\0"
+-    let tp = *(&tmpl as *const *const u8)
+-    with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 31)
++    tmp_template_to_buf(&raw mut template_path as *mut [4096]u8 as *mut u8, 4096, "with_cimport_macro_XXXXXX")
+@@ -2257 +2359 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
+-    var args: [64]*const u8 = [0 as *const u8; 64]
++    var args: [128]*const u8 = [0 as *const u8; 128]
+@@ -2274,0 +2377 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
++    nargs = append_cimport_isystem_args(&raw mut args as *mut [128]*const u8 as *mut *const u8, nargs, 128)
+@@ -2276 +2379 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
+-    while ip < g_cimport_include_count and nargs < 62:
++    while ip < g_cimport_include_count and nargs < 126:
+@@ -2284 +2387 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
+-    (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, CXTranslationUnit_DetailedPreprocessingRecord)
++    (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [128]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, CXTranslationUnit_DetailedPreprocessingRecord)
+@@ -2312,3 +2415 @@ pub fn with_cimport_preprocess_text(source_code: str) -> str:
+-        let tmpl = "/tmp/with_cimport_pp_XXXXXX\0"
+-        let tp = *(&tmpl as *const *const u8)
+-        with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 28)
++        tmp_template_to_buf(&raw mut template_path as *mut [4096]u8 as *mut u8, 4096, "with_cimport_pp_XXXXXX")
+@@ -2333,3 +2434 @@ pub fn with_cimport_preprocess_text(source_code: str) -> str:
+-        let out_tmpl = "/tmp/with_cimport_ppout_XXXXXX\0"
+-        let out_tp = *(&out_tmpl as *const *const u8)
+-        with_memcpy(&raw mut out_template as *mut [4096]u8 as *mut u8, out_tp, 31)
++        tmp_template_to_buf(&raw mut out_template as *mut [4096]u8 as *mut u8, 4096, "with_cimport_ppout_XXXXXX")
+@@ -2353,3 +2452 @@ pub fn with_cimport_collect_object_macro_types(header_code: str, macro_names: st
+-        let tmpl = "/tmp/with_cimport_XXXXXX\0"
+-        let tp = *(&tmpl as *const *const u8)
+-        with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
++        tmp_template_to_buf(&raw mut template_path as *mut [4096]u8 as *mut u8, 4096, "with_cimport_XXXXXX")
+@@ -2380 +2477 @@ pub fn with_cimport_collect_object_macro_types(header_code: str, macro_names: st
+-        var args: [64]*const u8 = [0 as *const u8; 64]
++        var args: [128]*const u8 = [0 as *const u8; 128]
+@@ -2397,0 +2495 @@ pub fn with_cimport_collect_object_macro_types(header_code: str, macro_names: st
++        nargs = append_cimport_isystem_args(&raw mut args as *mut [128]*const u8 as *mut *const u8, nargs, 128)
+@@ -2399 +2497 @@ pub fn with_cimport_collect_object_macro_types(header_code: str, macro_names: st
+-        while ip < g_cimport_include_count and nargs < 62:
++        while ip < g_cimport_include_count and nargs < 126:
+@@ -2407 +2505 @@ pub fn with_cimport_collect_object_macro_types(header_code: str, macro_names: st
+-        (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
++        (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [128]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
+@@ -2447,3 +2545 @@ pub fn with_cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64:
+-        let tmpl = "/tmp/with_cimport_XXXXXX\0"
+-        let tp = *(&tmpl as *const *const u8)
+-        with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
++        tmp_template_to_buf(&raw mut template_path as *mut [4096]u8 as *mut u8, 4096, "with_cimport_XXXXXX")
+@@ -2464 +2560 @@ pub fn with_cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64:
+-        var args: [64]*const u8 = [0 as *const u8; 64]
++        var args: [128]*const u8 = [0 as *const u8; 128]
+@@ -2481,0 +2578 @@ pub fn with_cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64:
++        nargs = append_cimport_isystem_args(&raw mut args as *mut [128]*const u8 as *mut *const u8, nargs, 128)
+@@ -2483 +2580 @@ pub fn with_cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64:
+-        while ip < g_cimport_include_count and nargs < 62:
++        while ip < g_cimport_include_count and nargs < 126:
+@@ -2491 +2588 @@ pub fn with_cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64:
+-        (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
++        (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [128]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
+diff --git a/src/compiler/Link.w b/src/compiler/Link.w
+index b419d5c8..1beac0a3 100644
+--- a/src/compiler/Link.w
++++ b/src/compiler/Link.w
+@@ -282,0 +283,3 @@ fn link_stage_linux_dynamic_linker() -> str:
++    let override = runtime_getenv("WITH_LINUX_DYNAMIC_LINKER")
++    if override.len() > 0:
++        return override
+@@ -289,0 +293,6 @@ fn link_stage_linux_crt_object(name: str) -> str:
++    let dir_override = runtime_getenv("WITH_LINUX_CRT_DIR")
++    if dir_override.len() > 0:
++        let path = dir_override ++ "/" ++ name
++        if link_stage_file_exists(path):
++            return path
++        return ""
+@@ -298,0 +308,3 @@ fn link_stage_linux_gcc_dir() -> str:
++    let override = runtime_getenv("WITH_LINUX_GCC_DIR")
++    if override.len() > 0:
++        return override
+@@ -313,0 +326,2 @@ fn link_stage_linux_system_lib_path(name: str) -> str:
++    if runtime_getenv("WITH_LINUX_SYSLIB_DIR").len() > 0:
++        return ""
+@@ -405,4 +419,11 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
+-    args.push("-L/usr/lib/x86_64-linux-gnu")
+-    args.push("-L/lib/x86_64-linux-gnu")
+-    args.push("-L/usr/lib")
+-    args.push("-L/lib")
++    let crt_dir_override = runtime_getenv("WITH_LINUX_CRT_DIR")
++    if crt_dir_override.len() > 0:
++        args.push("-L" ++ crt_dir_override)
++    let syslib_dir = runtime_getenv("WITH_LINUX_SYSLIB_DIR")
++    if syslib_dir.len() > 0:
++        args.push("-L" ++ syslib_dir)
++    if crt_dir_override.len() == 0 and syslib_dir.len() == 0:
++        args.push("-L/usr/lib/x86_64-linux-gnu")
++        args.push("-L/lib/x86_64-linux-gnu")
++        args.push("-L/usr/lib")
++        args.push("-L/lib")
+@@ -568,0 +590,6 @@ fn link_stage_link_with_extras_and_libs_plan(obj_path: str, bin_path: str, extra
++fn link_stage_cc_linker() -> str:
++    let override = runtime_getenv("WITH_LINK_CC")
++    if override.len() > 0:
++        return override
++    "cc"
++
+@@ -577 +604 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: str, bin_path: str, extr
+-    let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs, link_args)
++    let command = link_stage_make_link_command(link_stage_cc_linker(), obj_path, bin_path, extras, link_libs, link_args)
+diff --git a/test/behavior/behav_std_process_command.w b/test/behavior/behav_std_process_command.w
+index 34329cd6..8b147ad0 100644
+--- a/test/behavior/behav_std_process_command.w
++++ b/test/behavior/behav_std_process_command.w
+@@ -6 +6,3 @@ fn main:
+-    assert(command("/usr/bin/true").run() == 0)
++    let true_bin = env("WITH_TRUE")
++    let true_path = if true_bin.len() > 0: true_bin else: "/usr/bin/true"
++    assert(command(true_path).run() == 0)
+@@ -8 +10,3 @@ fn main:
+-    let eq = command("/bin/test").arg("with").arg("=").arg("with")
++    let test_bin = env("WITH_TEST")
++    let test_path = if test_bin.len() > 0: test_bin else: "/bin/test"
++    let eq = command(test_path).arg("with").arg("=").arg("with")
+@@ -11 +15 @@ fn main:
+-    let ne = command("/bin/test").arg("with").arg("=").arg("shell")
++    let ne = command(test_path).arg("with").arg("=").arg("shell")
