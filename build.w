@@ -112,7 +112,7 @@ fn cross_object_target(tag: str, name: str, source: str, opt: str) -> Target:
 
 fn cross_fiber_asm_source(tag: str) -> str:
     if tag == "linux_aarch64":
-        return "runtime/fiber_asm_aarch64.s"
+        return "runtime/fiber_asm_linux_aarch64.s"
     "runtime/fiber_asm_linux_x86_64.s"
 
 // Register the full cross runtime/bridge/embed/rsp target set for one
