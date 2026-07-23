@@ -105,4 +105,4 @@ pub fn target_spec_name() -> str:
 // binaries for today. Gate is checked by the driver; anything else
 // non-native must fail loudly (§18.5: never fall back to native).
 pub fn target_spec_cross_supported(kind: i32) -> bool:
-    kind == 1
+    kind == 1 or kind == 2

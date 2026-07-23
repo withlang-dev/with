@@ -325,7 +325,7 @@ fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extra
 fn link_stage_file_exists(path: str) -> bool:
     runtime_file_exists(path) != 0
 
-// Sysroot prefix for Linux x86_64 link inputs. Native Linux hosts link
+// Sysroot prefix for Linux link inputs. Native Linux hosts link
 // against the real root (""); a cross host must supply a Linux sysroot
 // (crt objects, libc, libgcc) via WITH_LINUX_SYSROOT.
 fn link_stage_linux_sysroot() -> str:
@@ -334,7 +334,31 @@ fn link_stage_linux_sysroot() -> str:
         return explicit
     ""
 
+// The Linux target arch this link is for: the --target selection when
+// cross, else the host arch (native Linux links).
+fn link_stage_linux_arch() -> str:
+    if not target_spec_is_native():
+        return target_spec_arch()
+    runtime_sysinfo_arch()
+
+// Debian-style multiarch directory name for the Linux target arch.
+fn link_stage_linux_multiarch() -> str:
+    if link_stage_linux_arch() == "aarch64":
+        return "aarch64-linux-gnu"
+    "x86_64-linux-gnu"
+
+fn link_stage_linux_emulation() -> str:
+    if link_stage_linux_arch() == "aarch64":
+        return "aarch64linux"
+    "elf_x86_64"
+
 fn link_stage_linux_dynamic_linker(sysroot: str) -> str:
+    if link_stage_linux_arch() == "aarch64":
+        if link_stage_file_exists(sysroot ++ "/lib/ld-linux-aarch64.so.1"):
+            return "/lib/ld-linux-aarch64.so.1"
+        if link_stage_file_exists(sysroot ++ "/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"):
+            return "/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"
+        return ""
     if link_stage_file_exists(sysroot ++ "/lib64/ld-linux-x86-64.so.2"):
         return "/lib64/ld-linux-x86-64.so.2"
     if link_stage_file_exists(sysroot ++ "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"):
@@ -342,23 +366,25 @@ fn link_stage_linux_dynamic_linker(sysroot: str) -> str:
     ""
 
 fn link_stage_linux_crt_object(sysroot: str, name: str) -> str:
-    let usr = sysroot ++ "/usr/lib/x86_64-linux-gnu/" ++ name
+    let multiarch = link_stage_linux_multiarch()
+    let usr = sysroot ++ "/usr/lib/" ++ multiarch ++ "/" ++ name
     if link_stage_file_exists(usr):
         return usr
-    let lib = sysroot ++ "/lib/x86_64-linux-gnu/" ++ name
+    let lib = sysroot ++ "/lib/" ++ multiarch ++ "/" ++ name
     if link_stage_file_exists(lib):
         return lib
     ""
 
 fn link_stage_linux_gcc_dir(sysroot: str) -> str:
+    let base = sysroot ++ "/usr/lib/gcc/" ++ link_stage_linux_multiarch() ++ "/"
     let candidates: Vec[str] = Vec.new()
-    candidates.push(sysroot ++ "/usr/lib/gcc/x86_64-linux-gnu/15")
-    candidates.push(sysroot ++ "/usr/lib/gcc/x86_64-linux-gnu/14")
-    candidates.push(sysroot ++ "/usr/lib/gcc/x86_64-linux-gnu/13")
-    candidates.push(sysroot ++ "/usr/lib/gcc/x86_64-linux-gnu/12")
-    candidates.push(sysroot ++ "/usr/lib/gcc/x86_64-linux-gnu/11")
-    candidates.push(sysroot ++ "/usr/lib/gcc/x86_64-linux-gnu/10")
-    candidates.push(sysroot ++ "/usr/lib/gcc/x86_64-linux-gnu/9")
+    candidates.push(base ++ "15")
+    candidates.push(base ++ "14")
+    candidates.push(base ++ "13")
+    candidates.push(base ++ "12")
+    candidates.push(base ++ "11")
+    candidates.push(base ++ "10")
+    candidates.push(base ++ "9")
     for i in 0..candidates.len() as i32:
         let dir = candidates.get(i as i64)
         if link_stage_file_exists(dir ++ "/crtbegin.o"):
@@ -366,21 +392,22 @@ fn link_stage_linux_gcc_dir(sysroot: str) -> str:
     ""
 
 fn link_stage_linux_system_lib_path(sysroot: str, name: str) -> str:
+    let libdir = sysroot ++ "/usr/lib/" ++ link_stage_linux_multiarch()
     if name == "z":
-        if link_stage_file_exists(sysroot ++ "/usr/lib/x86_64-linux-gnu/libz.so"):
+        if link_stage_file_exists(libdir ++ "/libz.so"):
             return ""
-        if link_stage_file_exists(sysroot ++ "/usr/lib/x86_64-linux-gnu/libz.so.1"):
-            return sysroot ++ "/usr/lib/x86_64-linux-gnu/libz.so.1"
+        if link_stage_file_exists(libdir ++ "/libz.so.1"):
+            return libdir ++ "/libz.so.1"
     if name == "zstd":
-        if link_stage_file_exists(sysroot ++ "/usr/lib/x86_64-linux-gnu/libzstd.so"):
+        if link_stage_file_exists(libdir ++ "/libzstd.so"):
             return ""
-        if link_stage_file_exists(sysroot ++ "/usr/lib/x86_64-linux-gnu/libzstd.so.1"):
-            return sysroot ++ "/usr/lib/x86_64-linux-gnu/libzstd.so.1"
+        if link_stage_file_exists(libdir ++ "/libzstd.so.1"):
+            return libdir ++ "/libzstd.so.1"
     if name == "xml2":
-        if link_stage_file_exists(sysroot ++ "/usr/lib/x86_64-linux-gnu/libxml2.so"):
+        if link_stage_file_exists(libdir ++ "/libxml2.so"):
             return ""
-        if link_stage_file_exists(sysroot ++ "/usr/lib/x86_64-linux-gnu/libxml2.so.16"):
-            return sysroot ++ "/usr/lib/x86_64-linux-gnu/libxml2.so.16"
+        if link_stage_file_exists(libdir ++ "/libxml2.so.16"):
+            return libdir ++ "/libxml2.so.16"
     ""
 
 fn link_stage_make_darwin_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
@@ -428,15 +455,15 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
     let gcc_dir = link_stage_linux_gcc_dir(sysroot)
     if dynamic_linker.len() == 0 or crt1.len() == 0 or crti.len() == 0 or crtn.len() == 0 or gcc_dir.len() == 0:
         if sysroot.len() > 0:
-            with_eprint("error: could not locate Linux x86_64 crt/linker files under sysroot " ++ sysroot)
+            with_eprint("error: could not locate Linux " ++ link_stage_linux_arch() ++ " crt/linker files under sysroot " ++ sysroot)
         else if runtime_sysinfo_os() == "Linux":
-            with_eprint("error: could not locate Linux x86_64 crt/linker files for direct ld.lld link")
+            with_eprint("error: could not locate Linux " ++ link_stage_linux_arch() ++ " crt/linker files for direct ld.lld link")
         else:
-            with_eprint("error: linking a Linux x86_64 binary from this host needs a Linux sysroot (crt1.o, libc, libgcc); set WITH_LINUX_SYSROOT=<dir>")
+            with_eprint("error: linking a Linux " ++ link_stage_linux_arch() ++ " binary from this host needs a Linux sysroot (crt1.o, libc, libgcc); set WITH_LINUX_SYSROOT=<dir>")
         return LinkStageCommand { linker: "", args, cwd: "", env, inputs, outputs, cleanup_files: Vec.new() }
 
     args.push("-m")
-    args.push("elf_x86_64")
+    args.push(link_stage_linux_emulation())
     args.push("--eh-frame-hdr")
     args.push("--hash-style=gnu")
     args.push("--build-id")
@@ -469,8 +496,8 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
         inputs.push(extra)
 
     args.push("-L" ++ gcc_dir)
-    args.push("-L" ++ sysroot ++ "/usr/lib/x86_64-linux-gnu")
-    args.push("-L" ++ sysroot ++ "/lib/x86_64-linux-gnu")
+    args.push("-L" ++ sysroot ++ "/usr/lib/" ++ link_stage_linux_multiarch())
+    args.push("-L" ++ sysroot ++ "/lib/" ++ link_stage_linux_multiarch())
     args.push("-L" ++ sysroot ++ "/usr/lib")
     args.push("-L" ++ sysroot ++ "/lib")
     for i in 0..link_libs.len() as i32:
@@ -567,7 +594,8 @@ fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str,
     // A --target selection overrides the host: pick the target's link
     // recipe and lld flavor (§18.5 — cross-compilation is a normal mode).
     if not target_spec_is_native():
-        if target_spec_active_kind() == 1:
+        let cross_kind = target_spec_active_kind()
+        if cross_kind == 1 or cross_kind == 2:
             let elf_ld = link_stage_elf_lld_for(llvm_ld)
             if elf_ld.len() == 0:
                 with_eprint("error: cross link needs the ELF lld driver (ld.lld) next to " ++ llvm_ld)
@@ -908,6 +936,8 @@ fn link_stage_platform_runtime_object() -> str:
     if not target_spec_is_native():
         if target_spec_active_kind() == 1:
             return "rt_linux_x86_64.o"
+        if target_spec_active_kind() == 2:
+            return "rt_linux_aarch64.o"
         with_eprint("error: unsupported cross runtime platform: " ++ target_spec_name())
         return ""
     link_stage_host_platform_runtime_object()
@@ -917,6 +947,10 @@ fn link_stage_host_platform_runtime_object() -> str:
     let arch = runtime_sysinfo_arch()
     if os == "Linux" and arch == "x86_64":
         return "rt_linux_x86_64.o"
+    if os == "Linux" and (arch == "armv8" or arch == "aarch64"):
+        // No embedded slot yet — resolved from the on-disk runtime root
+        // only (see link_stage_embedded_runtime_object).
+        return "rt_linux_aarch64.o"
     if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
         return "rt_darwin_aarch64.o"
     if os == "Windows" and arch == "x86_64":

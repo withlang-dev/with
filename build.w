@@ -66,40 +66,157 @@ fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("cross: cross-target compilation for '" ++ target ++ "' is not implemented yet")
     1
 
-// ── Cross-target (linux_x86_64) helpers ─────────────────────────────
+// ── Cross-target (linux) helpers ────────────────────────────────────
+// Two supported cross tags: "linux_x86_64" and "linux_aarch64". Each
+// gets a full runtime/bridge/embed/rsp target set under
+// out/lib/cross/<tag>/ and a group (":cross-rt" / ":cross-rt-arm").
 
-fn cross_linux_dir() -> str:
-    "out/lib/cross/linux_x86_64"
+fn cross_dir(tag: str) -> str:
+    "out/lib/cross/" ++ tag
 
-fn cross_linux_triple() -> str:
+fn cross_triple(tag: str) -> str:
+    if tag == "linux_aarch64":
+        return "aarch64-unknown-linux-gnu"
     "x86_64-unknown-linux-gnu"
 
-fn cross_linux_llvm_prefix() -> str:
-    ".deps/llvm-" ++ compiler_llvm_version() ++ "-linux-x86_64"
+fn cross_platform_source(tag: str) -> str:
+    if tag == "linux_aarch64":
+        return "rt/linux_aarch64.w"
+    "rt/linux_x86_64.w"
 
-// A runtime/bridge object compiled FOR linux_x86_64 by the freshly
-// built native compiler (dep "build"), landing in cross_linux_dir().
-fn cross_object_target_named(name: str, source: str, obj_name: str, opt: str) -> Target:
-    var target = with_object_target(name, release_compiler_bin("with"), source, cross_linux_dir() ++ "/" ++ obj_name, opt, "build")
-    target = target.arg("--target=" ++ cross_linux_triple())
+fn cross_platform_obj(tag: str) -> str:
+    if tag == "linux_aarch64":
+        return "rt_linux_aarch64.o"
+    "rt_linux_x86_64.o"
+
+fn cross_platform_symbol(tag: str) -> str:
+    if tag == "linux_aarch64":
+        return "rt_linux_aarch64_o"
+    "rt_linux_x86_64_o"
+
+fn cross_llvm_prefix(tag: str) -> str:
+    let arch_tag = if tag == "linux_aarch64": "linux-aarch64" else: "linux-x86_64"
+    ".deps/llvm-" ++ compiler_llvm_version() ++ "-" ++ arch_tag
+
+// A runtime/bridge object compiled FOR the cross tag by the freshly
+// built native compiler (dep "build"), landing in cross_dir(tag).
+fn cross_object_target_named(tag: str, name: str, source: str, obj_name: str, opt: str) -> Target:
+    var target = with_object_target(name, release_compiler_bin("with"), source, cross_dir(tag) ++ "/" ++ obj_name, opt, "build")
+    target = target.arg("--target=" ++ cross_triple(tag))
     target
 
-fn cross_object_target(name: str, source: str, opt: str) -> Target:
+fn cross_object_target(tag: str, name: str, source: str, opt: str) -> Target:
     let base = comp_path_basename(source)
     let stem = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
-    cross_object_target_named(name, source, stem ++ ".o", opt)
+    cross_object_target_named(tag, name, source, stem ++ ".o", opt)
 
-// Generate cross/linux_x86_64/llvm_ld.rsp: the linux LLVM SDK's static
+fn cross_fiber_asm_source(tag: str) -> str:
+    if tag == "linux_aarch64":
+        return "runtime/fiber_asm_aarch64.s"
+    "runtime/fiber_asm_linux_x86_64.s"
+
+// Register the full cross runtime/bridge/embed/rsp target set for one
+// cross tag under name prefix `p`, grouped as `group_name`.
+fn add_cross_rt_targets(out0: Build, tag: str, p: str, group_name: str) -> Build:
+    var out = out0
+    let dir = cross_dir(tag)
+    let triple = cross_triple(tag)
+    out = out.add_target(cross_object_target(tag, p ++ "rt-core-object", "rt/rt_core.w", "-O2"))
+    out = out.add_target(cross_object_target_named(tag, p ++ "rt-platform-object", cross_platform_source(tag), cross_platform_obj(tag), "-O2"))
+    out = out.add_target(cross_object_target(tag, p ++ "cimport-stubs-object", "rt/cimport_stubs.w", "-O1"))
+    var cross_compat = cross_object_target_named(tag, p ++ "compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
+    cross_compat = cross_compat.dep("compat-runtime-source")
+    out = out.add_target(cross_compat)
+    out = out.add_target(cross_object_target(tag, p ++ "panic-runtime-object", "rt/panic_runtime.w", "-O1"))
+    out = out.add_target(cross_object_target(tag, p ++ "fiber-stubs-object", "rt/fiber_stubs.w", "-O1"))
+    out = out.add_target(cross_object_target(tag, p ++ "channel-runtime-object", "rt/channel_runtime.w", "-O1"))
+    out = out.add_target(cross_object_target(tag, p ++ "fiber-runtime-object", "rt/fiber_runtime.w", "-O1"))
+    out = out.add_target(cross_object_target_named(tag, p ++ "fiber-core-object", "rt/fiber_core_darwin.w", "fiber.o", "-O1"))
+    out = out.add_target(cross_object_target_named(tag, p ++ "llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
+    out = out.add_target(cross_object_target_named(tag, p ++ "clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
+
+    // regex: whole-module IR (like the native regex-runtime-ir path) so
+    // the migrated pcre2 modules land in one object; the IR carries the
+    // target triple and CompileLlvmIrObject compiles it as written.
+    var cross_regex_ir = with_ir_target_overflow(p ++ "regex-runtime-ir", release_compiler_bin("with"), "rt/regex_runtime.w", "out/tmp/" ++ tag ++ "_regex_runtime.ll", "build", "wrap")
+    cross_regex_ir = cross_regex_ir.arg("--target=" ++ triple)
+    out = out.add_target(cross_regex_ir)
+    var cross_regex = target_new(.CompileLlvmIrObject, p ++ "regex-runtime-object", "out/tmp/" ++ tag ++ "_regex_runtime.ll").output(dir ++ "/regex_runtime.o")
+    cross_regex = cross_regex.dep(p ++ "regex-runtime-ir")
+    out = out.add_target(cross_regex)
+
+    var cross_fiber_asm = target_new(.CompileAsmObject, p ++ "fiber-asm-object", cross_fiber_asm_source(tag)).output(dir ++ "/fiber_asm.o")
+    cross_fiber_asm = cross_fiber_asm.arg("triple=" ++ triple)
+    out = out.add_target(cross_fiber_asm)
+
+    var cross_embedded = target_new(.EmbedObjectFiles, p ++ "embedded-objects-asm", tag).output(dir ++ "/embedded_objects.s")
+    cross_embedded = cross_embedded.input(dir ++ "/cimport_stubs.o")
+    cross_embedded = cross_embedded.arg("cimport_stubs_o")
+    cross_embedded = cross_embedded.input(dir ++ "/compat_runtime.o")
+    cross_embedded = cross_embedded.arg("compat_runtime_o")
+    cross_embedded = cross_embedded.input(dir ++ "/panic_runtime.o")
+    cross_embedded = cross_embedded.arg("panic_runtime_o")
+    cross_embedded = cross_embedded.input(dir ++ "/regex_runtime.o")
+    cross_embedded = cross_embedded.arg("regex_runtime_o")
+    cross_embedded = cross_embedded.input(dir ++ "/fiber_stubs.o")
+    cross_embedded = cross_embedded.arg("fiber_stubs_o")
+    cross_embedded = cross_embedded.input(dir ++ "/channel_runtime.o")
+    cross_embedded = cross_embedded.arg("channel_runtime_o")
+    cross_embedded = cross_embedded.input(dir ++ "/fiber_runtime.o")
+    cross_embedded = cross_embedded.arg("fiber_runtime_o")
+    cross_embedded = cross_embedded.input(dir ++ "/fiber.o")
+    cross_embedded = cross_embedded.arg("fiber_o")
+    cross_embedded = cross_embedded.input(dir ++ "/fiber_asm.o")
+    cross_embedded = cross_embedded.arg("fiber_asm_o")
+    cross_embedded = cross_embedded.input(dir ++ "/rt_core.o")
+    cross_embedded = cross_embedded.arg("rt_core_o")
+    cross_embedded = cross_embedded.input(dir ++ "/" ++ cross_platform_obj(tag))
+    cross_embedded = cross_embedded.arg(cross_platform_symbol(tag))
+    cross_embedded = cross_embedded.dep(p ++ "cimport-stubs-object")
+    cross_embedded = cross_embedded.dep(p ++ "compat-runtime-object")
+    cross_embedded = cross_embedded.dep(p ++ "panic-runtime-object")
+    cross_embedded = cross_embedded.dep(p ++ "regex-runtime-object")
+    cross_embedded = cross_embedded.dep(p ++ "fiber-stubs-object")
+    cross_embedded = cross_embedded.dep(p ++ "channel-runtime-object")
+    cross_embedded = cross_embedded.dep(p ++ "fiber-runtime-object")
+    cross_embedded = cross_embedded.dep(p ++ "fiber-core-object")
+    cross_embedded = cross_embedded.dep(p ++ "fiber-asm-object")
+    cross_embedded = cross_embedded.dep(p ++ "rt-core-object")
+    cross_embedded = cross_embedded.dep(p ++ "rt-platform-object")
+    out = out.add_target(cross_embedded)
+
+    var cross_embedded_obj = target_new(.CompileAsmObject, p ++ "embedded-objects-object", dir ++ "/embedded_objects.s").output(dir ++ "/embedded_objects.o")
+    cross_embedded_obj = cross_embedded_obj.arg("triple=" ++ triple)
+    cross_embedded_obj = cross_embedded_obj.dep(p ++ "embedded-objects-asm")
+    out = out.add_target(cross_embedded_obj)
+
+    var cross_ld_rsp = target_new(.Action, p ++ "llvm-link-metadata", "").output(dir ++ "/llvm_ld.rsp")
+    cross_ld_rsp.action = run_cross_linux_llvm_link_metadata_action
+    cross_ld_rsp = cross_ld_rsp.arg(tag)
+    cross_ld_rsp = cross_ld_rsp.write_scope(dir)
+    cross_ld_rsp = cross_ld_rsp.write_scope("out/command/" ++ p ++ "llvm-link-metadata")
+    out = out.add_target(cross_ld_rsp)
+
+    var cross_rt = target_new(.Group, group_name, "")
+    cross_rt = cross_rt.dep(p ++ "embedded-objects-object")
+    cross_rt = cross_rt.dep(p ++ "llvm-bridge-object")
+    cross_rt = cross_rt.dep(p ++ "clang-bridge-object")
+    cross_rt = cross_rt.dep(p ++ "llvm-link-metadata")
+    out.add_target(cross_rt)
+
+// Generate cross/<tag>/llvm_ld.rsp: the tag's linux LLVM SDK static
 // clang+LLVM archives plus the linux system libraries, mirroring what
 // the native linux ld_rsp branch of run_generate_llvm_link_metadata_action
-// writes. Fails loudly when the linux SDK is not in .deps.
+// writes. Fails loudly when that SDK is not in .deps.
 fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
+    let args = ctx.args()
+    let tag = if args.len() > 0: args.get(0) else: "linux_x86_64"
     let output_path = ctx.output()
-    let lib_dir = cross_linux_llvm_prefix() ++ "/lib"
+    let lib_dir = cross_llvm_prefix(tag) ++ "/lib"
     let libclang = lib_dir ++ "/libclang.a"
     if not fs.host_exists(libclang):
-        ctx.diagnostics().error("cross-llvm-link-metadata: missing " ++ libclang ++ "; extract the with-llvm-sdk-" ++ compiler_llvm_version() ++ "-linux-x86_64 release asset into .deps/")
+        ctx.diagnostics().error("cross-llvm-link-metadata: missing " ++ libclang ++ "; extract or build the " ++ cross_llvm_prefix(tag) ++ " LLVM SDK first")
         return 1
     let lib_files = fs.host_list_files(lib_dir)
     if lib_files.len() == 0:
@@ -1559,92 +1676,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     runtime = runtime.dep("empty-second-opposite-runtime-blob")
     out = out.add_target(runtime)
 
-    // ── Cross-target runtime (linux_x86_64) ─────────────────────────
-    // `with build :cross-rt` builds the full linux_x86_64 runtime +
-    // compiler link inputs into out/lib/cross/linux_x86_64/ using the
-    // freshly built native compiler's --target support. The link stage
-    // resolves cross links exclusively from that directory (§18.5).
-    out = out.add_target(cross_object_target("cross-rt-core-object", "rt/rt_core.w", "-O2"))
-    out = out.add_target(cross_object_target("cross-rt-platform-object", "rt/linux_x86_64.w", "-O2"))
-    out = out.add_target(cross_object_target("cross-cimport-stubs-object", "rt/cimport_stubs.w", "-O1"))
-    var cross_compat = cross_object_target_named("cross-compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
-    cross_compat = cross_compat.dep("compat-runtime-source")
-    out = out.add_target(cross_compat)
-    out = out.add_target(cross_object_target("cross-panic-runtime-object", "rt/panic_runtime.w", "-O1"))
-    out = out.add_target(cross_object_target("cross-fiber-stubs-object", "rt/fiber_stubs.w", "-O1"))
-    out = out.add_target(cross_object_target("cross-channel-runtime-object", "rt/channel_runtime.w", "-O1"))
-    out = out.add_target(cross_object_target("cross-fiber-runtime-object", "rt/fiber_runtime.w", "-O1"))
-    out = out.add_target(cross_object_target_named("cross-fiber-core-object", "rt/fiber_core_darwin.w", "fiber.o", "-O1"))
-    out = out.add_target(cross_object_target_named("cross-llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
-    out = out.add_target(cross_object_target_named("cross-clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
-
-    // regex: whole-module IR (like the native regex-runtime-ir path) so
-    // the migrated pcre2 modules land in one object; the IR carries the
-    // linux triple and CompileLlvmIrObject compiles it as written.
-    var cross_regex_ir = with_ir_target_overflow("cross-regex-runtime-ir", release_compiler_bin("with"), "rt/regex_runtime.w", "out/tmp/cross_regex_runtime.ll", "build", "wrap")
-    cross_regex_ir = cross_regex_ir.arg("--target=" ++ cross_linux_triple())
-    out = out.add_target(cross_regex_ir)
-    var cross_regex = target_new(.CompileLlvmIrObject, "cross-regex-runtime-object", "out/tmp/cross_regex_runtime.ll").output(cross_linux_dir() ++ "/regex_runtime.o")
-    cross_regex = cross_regex.dep("cross-regex-runtime-ir")
-    out = out.add_target(cross_regex)
-
-    var cross_fiber_asm = target_new(.CompileAsmObject, "cross-fiber-asm-object", "runtime/fiber_asm_linux_x86_64.s").output(cross_linux_dir() ++ "/fiber_asm.o")
-    cross_fiber_asm = cross_fiber_asm.arg("triple=" ++ cross_linux_triple())
-    out = out.add_target(cross_fiber_asm)
-
-    var cross_embedded = target_new(.EmbedObjectFiles, "cross-embedded-objects-asm", "linux_x86_64").output(cross_linux_dir() ++ "/embedded_objects.s")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/cimport_stubs.o")
-    cross_embedded = cross_embedded.arg("cimport_stubs_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/compat_runtime.o")
-    cross_embedded = cross_embedded.arg("compat_runtime_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/panic_runtime.o")
-    cross_embedded = cross_embedded.arg("panic_runtime_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/regex_runtime.o")
-    cross_embedded = cross_embedded.arg("regex_runtime_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/fiber_stubs.o")
-    cross_embedded = cross_embedded.arg("fiber_stubs_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/channel_runtime.o")
-    cross_embedded = cross_embedded.arg("channel_runtime_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/fiber_runtime.o")
-    cross_embedded = cross_embedded.arg("fiber_runtime_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/fiber.o")
-    cross_embedded = cross_embedded.arg("fiber_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/fiber_asm.o")
-    cross_embedded = cross_embedded.arg("fiber_asm_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/rt_core.o")
-    cross_embedded = cross_embedded.arg("rt_core_o")
-    cross_embedded = cross_embedded.input(cross_linux_dir() ++ "/rt_linux_x86_64.o")
-    cross_embedded = cross_embedded.arg("rt_linux_x86_64_o")
-    cross_embedded = cross_embedded.dep("cross-cimport-stubs-object")
-    cross_embedded = cross_embedded.dep("cross-compat-runtime-object")
-    cross_embedded = cross_embedded.dep("cross-panic-runtime-object")
-    cross_embedded = cross_embedded.dep("cross-regex-runtime-object")
-    cross_embedded = cross_embedded.dep("cross-fiber-stubs-object")
-    cross_embedded = cross_embedded.dep("cross-channel-runtime-object")
-    cross_embedded = cross_embedded.dep("cross-fiber-runtime-object")
-    cross_embedded = cross_embedded.dep("cross-fiber-core-object")
-    cross_embedded = cross_embedded.dep("cross-fiber-asm-object")
-    cross_embedded = cross_embedded.dep("cross-rt-core-object")
-    cross_embedded = cross_embedded.dep("cross-rt-platform-object")
-    out = out.add_target(cross_embedded)
-
-    var cross_embedded_obj = target_new(.CompileAsmObject, "cross-embedded-objects-object", cross_linux_dir() ++ "/embedded_objects.s").output(cross_linux_dir() ++ "/embedded_objects.o")
-    cross_embedded_obj = cross_embedded_obj.arg("triple=" ++ cross_linux_triple())
-    cross_embedded_obj = cross_embedded_obj.dep("cross-embedded-objects-asm")
-    out = out.add_target(cross_embedded_obj)
-
-    var cross_ld_rsp = target_new(.Action, "cross-llvm-link-metadata", "").output(cross_linux_dir() ++ "/llvm_ld.rsp")
-    cross_ld_rsp.action = run_cross_linux_llvm_link_metadata_action
-    cross_ld_rsp = cross_ld_rsp.write_scope(cross_linux_dir())
-    cross_ld_rsp = cross_ld_rsp.write_scope("out/command/cross-llvm-link-metadata")
-    out = out.add_target(cross_ld_rsp)
-
-    var cross_rt = target_new(.Group, "cross-rt", "")
-    cross_rt = cross_rt.dep("cross-embedded-objects-object")
-    cross_rt = cross_rt.dep("cross-llvm-bridge-object")
-    cross_rt = cross_rt.dep("cross-clang-bridge-object")
-    cross_rt = cross_rt.dep("cross-llvm-link-metadata")
-    out = out.add_target(cross_rt)
+    // ── Cross-target runtime (linux) ────────────────────────────────
+    // `with build :cross-rt` (linux_x86_64) / `:cross-rt-arm`
+    // (linux_aarch64) build the full cross runtime + compiler link
+    // inputs into out/lib/cross/<tag>/ using the freshly built native
+    // compiler's --target support. The link stage resolves cross links
+    // exclusively from that directory (§18.5). Note: these graph
+    // actions must be driven by a --target-capable compiler
+    // (WITH=out/release/bin/with) until the seed is updated.
+    out = add_cross_rt_targets(move out, "linux_x86_64", "cross-", "cross-rt")
+    out = add_cross_rt_targets(move out, "linux_aarch64", "cross-arm-", "cross-rt-arm")
 
     // The compiler links to an UNSTAMPED intermediate whose inputs (out/gen/main.w
     // + src) are commit-independent, so it caches across commits (#650). A cheap
