@@ -212,6 +212,8 @@ fn comp_default_llvm_prefix() -> str:
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-darwin-arm64"
     if host_os == "Linux" and host_arch == "x86_64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-linux-x86_64"
+    if host_os == "Linux" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-linux-aarch64"
     if host_os == "Windows" and host_arch == "x86_64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-windows-x86_64-msvc"
     COMPILER_FALLBACK_LLVM_PREFIX
@@ -302,6 +304,22 @@ fn comp_arg_value(args: &Vec[str], prefix: str) -> str:
 
 fn comp_arg_allowed_for_compiler(arg: str) -> bool:
     not arg.starts_with("compiler=") and not arg.starts_with("overflow=")
+
+// Wall-clock budget for one compiler build/ir step. The 10-minute
+// default fits native hosts; emulated hosts (e.g. an x86_64 bootstrap
+// under qemu-user) override via WITH_BUILD_STEP_TIMEOUT_MS.
+fn comp_step_timeout_ms() -> i32:
+    let raw = env("WITH_BUILD_STEP_TIMEOUT_MS")
+    var parsed = 0
+    for i in 0..raw.len() as i32:
+        let ch = raw.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            parsed = 0
+            break
+        parsed = parsed * 10 + (ch - 48)
+    if parsed > 0:
+        return parsed
+    600000
 
 fn comp_host_exe_suffix() -> str:
     if os() == "Windows":
@@ -1647,7 +1665,7 @@ pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
             return seed_rc
     let stdout_path = comp_join(capture_dir, "stdout.txt")
     let stderr_path = comp_join(capture_dir, "stderr.txt")
-    let rc = comp_run_compiler_capture(ctx, "build", argv, stdout_path, stderr_path, 600000)
+    let rc = comp_run_compiler_capture(ctx, "build", argv, stdout_path, stderr_path, comp_step_timeout_ms())
     if rc != 0:
         let _cleanup_tmp_bin = comp_remove_file_if_exists(fs, tmp_output)
         let _cleanup_tmp_obj = comp_remove_file_if_exists(fs, tmp_output ++ ".o")
@@ -1698,7 +1716,7 @@ pub fn run_with_compiler_ir_action(ctx: ActionCtx) -> i32:
     let _remove_tmp = comp_remove_file_if_exists(fs, tmp_output)
     let _remove_stderr = comp_remove_file_if_exists(fs, stderr_path)
     let argv = comp_compile_args(ctx, "ir", compiler_path, source_path)
-    let rc = comp_run_compiler_capture(ctx, "ir", argv, tmp_output, stderr_path, 600000)
+    let rc = comp_run_compiler_capture(ctx, "ir", argv, tmp_output, stderr_path, comp_step_timeout_ms())
     if rc != 0:
         return rc
     if not fs.exists(tmp_output):
