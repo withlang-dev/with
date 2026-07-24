@@ -607,6 +607,8 @@ fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str,
     let arch = runtime_sysinfo_arch()
     if os == "Linux" and arch == "x86_64":
         return link_stage_make_linux_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
+    if os == "Linux" and (arch == "armv8" or arch == "aarch64"):
+        return link_stage_make_linux_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
         return link_stage_make_darwin_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     if os == "Windows" and arch == "x86_64":
