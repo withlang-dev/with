@@ -5279,7 +5279,13 @@ impl Sema:
                 let keyword = if required_mode == "mut": "mut fn" else: "move fn"
                 self.emit_error(f"read receiver is too weak; compiler effects require `{keyword}` for '{name}'", node)
             else if declared == ReceiverMode.Mut and required_mode == "move":
-                self.emit_error(f"mut receiver is too weak; compiler effects require `move fn` for '{name}'", node)
+                // BOOTSTRAP-BRIDGE: accept mut fn with escaping effects — D21
+                // (e5c84325) relaxes this rule and head's source relies on it;
+                // lowering is unchanged (receiver stays a place; D17
+                // field-consumption-writes-root is already present). This branch
+                // is the "rule lands before first use" bridge rung: it lets this
+                // pre-D21 compiler compile D21-and-later source. NOT for main.
+                let _bridge_accept_d21_mut = name
 
 fn receiver_required_mode_text(eff: i32) -> str:
     if (eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: return "move"
@@ -5470,7 +5476,11 @@ impl Sema:
             if self.sig_param_uses_value_ref_abi(callee_sig, callee_pi) != 0:
                 continue
             self.local_file_id = file_id
-            self.emit_error("this parameter takes ownership of a non-Copy value (it is consumed or escapes the call); pass `move x` to transfer ownership, or `copy x` for an independent copy (§3.8)", arg_node)
+            // BOOTSTRAP-BRIDGE: accept implicit move into a consuming param —
+            // head's D5-supersession semantics; the ownership-transfer lowering
+            // is already decided above, this check only enforced the call-site
+            // `move` spelling. Part of the bridge rung; NOT for main.
+            let _bridge_accept_implicit_move = arg_node
 
     fn get_sig(name: i32) -> i32:
         if self.sig_lookup.contains(name):
