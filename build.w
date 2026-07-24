@@ -395,6 +395,23 @@ fn release_uat_platform_asset_dep(t: Target) -> Target:
     t
 
 fn host_runtime_spec() -> HostRuntimeSpec:
+    if os() == "Linux" and (arch() == "armv8" or arch() == "aarch64"):
+        return HostRuntimeSpec {
+            platform_source: "rt/linux_aarch64.w",
+            compat_source: "rt/compat_runtime.w",
+            bootstrap_platform_object: "out/bootstrap-lib/rt_linux_aarch64.o",
+            platform_object: "out/lib/rt_linux_aarch64.o",
+            platform_install_object: "rt_linux_aarch64.o",
+            platform_symbol: "rt_linux_aarch64_o",
+            opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_darwin_aarch64.bin",
+            opposite_platform_blob: "out/lib/empty_rt_darwin_aarch64.bin",
+            opposite_platform_symbol: "rt_darwin_aarch64_o",
+            second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
+            second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
+            second_opposite_platform_symbol: "rt_linux_x86_64_o",
+            fiber_core_source: "rt/fiber_core_darwin.w",
+            fiber_asm_source: "runtime/fiber_asm_linux_aarch64.s",
+        }
     if os() == "Linux" and arch() == "x86_64":
         return HostRuntimeSpec {
             platform_source: "rt/linux_x86_64.w",
