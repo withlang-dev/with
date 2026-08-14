@@ -2450,13 +2450,11 @@ impl Sema:
     fn find_trait_decl_node(trait_sym: i32) -> NodeId:
         if self.trait_decl_node_cache.contains(trait_sym):
             return self.trait_decl_node_cache.get(trait_sym).unwrap() as NodeId
-        // Fallback scan for callers that run before collection has seen the
-        // trait; post-collection callers (the hot check-time path) always hit
-        // the cache filled by collect_trait_decl.
-        for di in 0..self.ast.decl_count():
-            let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) == NodeKind.NK_TRAIT_DECL and self.ast.get_data0(decl) == trait_sym:
-                return decl
+        // trait_decl_node_cache is authoritative: collect_trait_decl inserts
+        // every NK_TRAIT_DECL keyed by the same data0 symbol this lookup uses,
+        // so a cache miss means `trait_sym` is not a trait. (The former O(n)
+        // decl-order fallback scan never matched over a full self-compile — it
+        // only re-derived the miss at whole-program cost.)
         0 as NodeId
 
     mut fn emit_trait_object_safety_error(trait_sym: i32, method_sym: i32, reason: &str, node: i32):
