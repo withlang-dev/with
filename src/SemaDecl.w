@@ -1716,26 +1716,14 @@ impl Sema:
         let decl_index = self.find_decl_index(decl)
         if decl_index >= 0 and self.method_decl_impl_nodes.contains(decl_index):
             return self.method_decl_impl_nodes.get(decl_index).unwrap()
-        if decl_index < 0:
-            return 0
-        let start = self.ast.get_start(decl)
-        let end = self.ast.get_end(decl)
-        var best_span = 0
-        var best_node = 0
-        for di in 0..self.ast.decl_count():
-            if self.decls_share_source_file(decl_index, di) == 0:
-                continue
-            let cand = self.ast.get_decl(di)
-            if self.ast.kind(cand) != NodeKind.NK_IMPL_DECL:
-                continue
-            let impl_start = self.ast.get_start(cand)
-            let impl_end = self.ast.get_end(cand)
-            if impl_start <= start and end <= impl_end:
-                let span = impl_end - impl_start
-                if best_node == 0 or span < best_span:
-                    best_span = span
-                    best_node = cand
-        best_node
+        // method_decl_impl_nodes is authoritative: compute_method_origins walks
+        // every impl's contiguous in-span method FN_DECLs (impl bodies hold only
+        // methods, so the backward-walk is complete) and records each method's
+        // enclosing impl. A cache miss therefore means `decl` has no enclosing
+        // impl. The former O(n) decl-order span-containment scan never resolved
+        // an impl the cache lacked over a full self-compile — it only re-derived
+        // the 0 at whole-program cost.
+        0
 
 fn sema_extension_path_hash(path: &str) -> i64:
     var h: i64 = 17
