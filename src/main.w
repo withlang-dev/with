@@ -50,7 +50,6 @@ extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn with_str_len(s: &str) -> i64
 extern fn with_str_byte_at(s: str, index: i64) -> i32
-extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_contains(s: str, needle: str) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_eprint(s: &str) -> Unit
@@ -314,7 +313,7 @@ fn cli_test_filter(argc: i32) -> str:
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
-        if with_str_starts_with(arg, "--filter=") != 0:
+        if arg.starts_with("--filter="):
             return with_str_slice(arg, 9, with_str_len(arg))
         if (arg == "--filter" or arg == "-f") and i + 1 < argc:
             return with_arg_at(i + 1)
@@ -330,7 +329,7 @@ fn cli_prelude_mode(argc: i32) -> i32:
             mode = PreludeMode.NoneMode
         else if arg == "--freestanding":
             mode = PreludeMode.CoreMode
-        else if with_str_starts_with(arg, "--prelude=") != 0:
+        else if arg.starts_with("--prelude="):
             let value = with_str_slice(arg, 10, with_str_len(arg))
             if value == "core":
                 mode = PreludeMode.CoreMode
@@ -481,7 +480,7 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
         if cli_one_liner_known_value_option(arg):
             i = i + 2
             continue
-        if has_output_prefix(arg) or cli_one_liner_known_flag(arg) or with_str_starts_with(arg, "--prelude=") != 0:
+        if has_output_prefix(arg) or cli_one_liner_known_flag(arg) or arg.starts_with("--prelude="):
             i = i + 1
             continue
         if with_str_len(arg) > 0 and with_str_byte_at(arg, 0) != 45:
@@ -2898,30 +2897,30 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
             var line = text.slice(start as i64, i as i64)
             if line.len() > 0 and line.byte_at(line.len() as i64 - 1) == 13:
                 line = line.slice(0, line.len() - 1)
-            if with_str_starts_with(line, expect_stdout_prefix) != 0:
+            if line.starts_with(expect_stdout_prefix):
                 result.expect_stdout.push(line.slice(expect_stdout_prefix.len(), line.len()))
-            else if with_str_starts_with(line, expect_stderr_prefix) != 0:
+            else if line.starts_with(expect_stderr_prefix):
                 result.expect_stderr.push(line.slice(expect_stderr_prefix.len(), line.len()))
-            else if with_str_starts_with(line, expect_exit_prefix) != 0:
+            else if line.starts_with(expect_exit_prefix):
                 result.has_expect_exit = true
                 result.expect_exit = test_parse_i32(line.slice(expect_exit_prefix.len(), line.len()))
-            else if with_str_starts_with(line, expect_check_stdout_prefix) != 0:
+            else if line.starts_with(expect_check_stdout_prefix):
                 result.expect_check_stdout.push(line.slice(expect_check_stdout_prefix.len(), line.len()))
-            else if with_str_starts_with(line, expect_check_stdout_not_prefix) != 0:
+            else if line.starts_with(expect_check_stdout_not_prefix):
                 result.expect_check_stdout_not.push(line.slice(expect_check_stdout_not_prefix.len(), line.len()))
-            else if with_str_starts_with(line, expect_check_fail_prefix) != 0:
+            else if line.starts_with(expect_check_fail_prefix):
                 result.expect_check_fail = line.slice(expect_check_fail_prefix.len(), line.len())
-            else if with_str_starts_with(line, expect_error_prefix) != 0:
+            else if line.starts_with(expect_error_prefix):
                 result.expect_check_fail = line.slice(expect_error_prefix.len(), line.len())
-            else if with_str_starts_with(line, expect_build_fail_prefix) != 0:
+            else if line.starts_with(expect_build_fail_prefix):
                 result.expect_build_fail = line.slice(expect_build_fail_prefix.len(), line.len())
-            else if with_str_starts_with(line, args_prefix) != 0:
+            else if line.starts_with(args_prefix):
                 result.extra_args = line.slice(args_prefix.len(), line.len())
-            else if with_str_starts_with(line, skip_prefix) != 0:
+            else if line.starts_with(skip_prefix):
                 result.skip = true
                 result.skip_reason = line.slice(skip_prefix.len(), line.len())
                 return result
-            else if with_str_starts_with(line, skip_windows_prefix) != 0:
+            else if line.starts_with(skip_windows_prefix):
                 if with_sysinfo_os() == "Windows":
                     result.skip = true
                     result.skip_reason = line.slice(skip_windows_prefix.len(), line.len())
@@ -2932,9 +2931,9 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 return result
             else if line == "//! check-only":
                 result.check_only = true
-            else if with_str_starts_with(line, known_issue_prefix) != 0:
+            else if line.starts_with(known_issue_prefix):
                 result.known_issue = line.slice(known_issue_prefix.len(), line.len())
-            else if with_str_starts_with(line, "//!") != 0:
+            else if line.starts_with("//!"):
                 let _ = 0
             else:
                 return result
@@ -3928,7 +3927,7 @@ fn run_fmt_command(argc: i32) -> i32:
         if arg == "-w" or arg == "-l" or arg == "--check" or arg == "--prefer-brace" or arg == "--prefer-colon":
             i = i + 1
             continue
-        if with_str_starts_with(arg, "-") != 0:
+        if arg.starts_with("-"):
             i = i + 1
             continue
         files.push(arg)

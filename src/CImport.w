@@ -4450,7 +4450,7 @@ fn ci_trim_float_literal_zeros(raw: &str) -> str:
         end = end - 1
     if end > 0 and raw.byte_at((end - 1) as i64) == 46:
         end = end + 1
-    raw.slice(0, end as i64)
+    with_str_clone_ref(raw.slice(0, end as i64))
 
 fn ci_f64_decimal_literal(value: f64) -> str:
     var v = value

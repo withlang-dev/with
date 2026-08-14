@@ -17779,16 +17779,16 @@ impl Codegen:
     mut fn gen_embed_file(node: i32) -> i64:
         let args_start = self.pool.get_data1(node)
         let arg_node = self.pool.get_extra(args_start)
-        let current_source_file = with_str_clone(self.current_decl_source_file)
+        let current_source_file = with_str_clone_ref(self.current_decl_source_file)
         let path_value = self.try_eval_const_string(arg_node, current_source_file, 0)
         if not path_value.ok:
             with_eprint("error: embed_file() argument must be a compile-time string")
             self.had_error = 1
             return wl_get_undef(wl_i32_type(self.context))
         let base_path = if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
-            with_str_clone(self.current_decl_source_file)
+            with_str_clone_ref(self.current_decl_source_file)
         else:
-            with_str_clone(self.source_file)
+            with_str_clone_ref(self.source_file)
         let read_result = self.read_tracked_embed_file(base_path, path_value.text)
         if not read_result.ok:
             with_eprint("error: " ++ read_result.error_msg)

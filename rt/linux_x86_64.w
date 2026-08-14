@@ -327,7 +327,6 @@ extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
 extern fn with_str_from_cstr(s: *const u8) -> str
-extern fn with_str_concat(a: str, b: str) -> str
 
 let LINUX_DIRENT_NAME_OFFSET: i64 = 19
 let RT_PATH_MAX: i64 = 4096
@@ -562,12 +561,9 @@ fn rt_empty_str() -> str:
     var empty: [1]u8 = [0 as u8; 1]
     with_str_from_cstr(&empty as *const [1]u8 as *const u8)
 
-fn rt_newline_str() -> str:
-    var newline: [2]u8 = [10 as u8, 0 as u8]
-    with_str_from_cstr(&newline as *const [2]u8 as *const u8)
-
 fn rt_list_files_append_line(out: str, path: *const u8) -> str:
-    with_str_concat(with_str_concat(out, with_str_from_cstr(path)), rt_newline_str())
+    let path_text = with_str_from_cstr(path)
+    out ++ path_text ++ "\n"
 
 fn rt_list_files_walk(path: *const u8, out: str) -> str:
     var mode: i32 = 0

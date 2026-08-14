@@ -72,53 +72,53 @@ fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
 // gets a full runtime/bridge/embed/rsp target set under
 // out/lib/cross/<tag>/ and a group (":cross-rt" / ":cross-rt-arm").
 
-fn cross_dir(tag: str) -> str:
+fn cross_dir(tag: &str) -> str:
     "out/lib/cross/" ++ tag
 
-fn cross_triple(tag: str) -> str:
+fn cross_triple(tag: &str) -> str:
     if tag == "linux_aarch64":
         return "aarch64-unknown-linux-gnu"
     "x86_64-unknown-linux-gnu"
 
-fn cross_platform_source(tag: str) -> str:
+fn cross_platform_source(tag: &str) -> str:
     if tag == "linux_aarch64":
         return "rt/linux_aarch64.w"
     "rt/linux_x86_64.w"
 
-fn cross_platform_obj(tag: str) -> str:
+fn cross_platform_obj(tag: &str) -> str:
     if tag == "linux_aarch64":
         return "rt_linux_aarch64.o"
     "rt_linux_x86_64.o"
 
-fn cross_platform_symbol(tag: str) -> str:
+fn cross_platform_symbol(tag: &str) -> str:
     if tag == "linux_aarch64":
         return "rt_linux_aarch64_o"
     "rt_linux_x86_64_o"
 
-fn cross_llvm_prefix(tag: str) -> str:
+fn cross_llvm_prefix(tag: &str) -> str:
     let arch_tag = if tag == "linux_aarch64": "linux-aarch64" else: "linux-x86_64"
     ".deps/llvm-" ++ compiler_llvm_version() ++ "-" ++ arch_tag
 
 // A runtime/bridge object compiled FOR the cross tag by the freshly
 // built native compiler (dep "build"), landing in cross_dir(tag).
-fn cross_object_target_named(tag: str, name: str, source: str, obj_name: str, opt: str) -> Target:
+fn cross_object_target_named(tag: &str, name: &str, source: &str, obj_name: &str, opt: &str) -> Target:
     var target = with_object_target(name, release_compiler_bin("with"), source, cross_dir(tag) ++ "/" ++ obj_name, opt, "build")
     target = target.arg("--target=" ++ cross_triple(tag))
     target
 
-fn cross_object_target(tag: str, name: str, source: str, opt: str) -> Target:
+fn cross_object_target(tag: &str, name: &str, source: &str, opt: &str) -> Target:
     let base = comp_path_basename(source)
     let stem = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
     cross_object_target_named(tag, name, source, stem ++ ".o", opt)
 
-fn cross_fiber_asm_source(tag: str) -> str:
+fn cross_fiber_asm_source(tag: &str) -> str:
     if tag == "linux_aarch64":
         return "runtime/fiber_asm_linux_aarch64.s"
     "runtime/fiber_asm_linux_x86_64.s"
 
 // Register the full cross runtime/bridge/embed/rsp target set for one
 // cross tag under name prefix `p`, grouped as `group_name`.
-fn add_cross_rt_targets(out0: Build, tag: str, p: str, group_name: str) -> Build:
+fn add_cross_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str) -> Build:
     var out = out0
     let dir = cross_dir(tag)
     let triple = cross_triple(tag)
@@ -150,7 +150,7 @@ fn add_cross_rt_targets(out0: Build, tag: str, p: str, group_name: str) -> Build
     cross_fiber_asm = cross_fiber_asm.arg("triple=" ++ triple)
     out = out.add_target(cross_fiber_asm)
 
-    var cross_embedded = target_new(.EmbedObjectFiles, p ++ "embedded-objects-asm", tag).output(dir ++ "/embedded_objects.s")
+    var cross_embedded = target_new(.EmbedObjectFiles, p ++ "embedded-objects-asm", build_owned_text(tag)).output(dir ++ "/embedded_objects.s")
     cross_embedded = cross_embedded.input(dir ++ "/cimport_stubs.o")
     cross_embedded = cross_embedded.arg("cimport_stubs_o")
     cross_embedded = cross_embedded.input(dir ++ "/compat_runtime.o")
@@ -193,12 +193,12 @@ fn add_cross_rt_targets(out0: Build, tag: str, p: str, group_name: str) -> Build
 
     var cross_ld_rsp = target_new(.Action, p ++ "llvm-link-metadata", "").output(dir ++ "/llvm_ld.rsp")
     cross_ld_rsp.action = run_cross_linux_llvm_link_metadata_action
-    cross_ld_rsp = cross_ld_rsp.arg(tag)
+    cross_ld_rsp = cross_ld_rsp.arg(build_owned_text(tag))
     cross_ld_rsp = cross_ld_rsp.write_scope(dir)
     cross_ld_rsp = cross_ld_rsp.write_scope("out/command/" ++ p ++ "llvm-link-metadata")
     out = out.add_target(cross_ld_rsp)
 
-    var cross_rt = target_new(.Group, group_name, "")
+    var cross_rt = target_new(.Group, build_owned_text(group_name), "")
     cross_rt = cross_rt.dep(p ++ "embedded-objects-object")
     cross_rt = cross_rt.dep(p ++ "llvm-bridge-object")
     cross_rt = cross_rt.dep(p ++ "clang-bridge-object")
@@ -212,7 +212,7 @@ fn add_cross_rt_targets(out0: Build, tag: str, p: str, group_name: str) -> Build
 fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let args = ctx.args()
-    let tag = if args.len() > 0: args.get(0) else: "linux_x86_64"
+    let tag = if args.len() > 0: build_owned_text(args.get(0)) else: "linux_x86_64"
     let output_path = ctx.output()
     let lib_dir = cross_llvm_prefix(tag) ++ "/lib"
     let libclang = lib_dir ++ "/libclang.a"
@@ -230,10 +230,10 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         let name = comp_path_basename(path)
         if name.ends_with(".a"):
             if name.starts_with("libclang") and path != libclang:
-                clang_archives.push(path)
+                clang_archives.push(build_owned_text(path))
             else:
                 if name.starts_with("libLLVM"):
-                    llvm_archives.push(path)
+                    llvm_archives.push(build_owned_text(path))
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
     for i in 0..sorted_clang.len() as i32:
@@ -258,12 +258,12 @@ fn cross_windows_triple() -> str:
 fn cross_windows_llvm_prefix() -> str:
     ".deps/llvm-" ++ compiler_llvm_version() ++ "-windows-x86_64-msvc"
 
-fn cross_windows_object_target_named(name: str, source: str, obj_name: str, opt: str) -> Target:
+fn cross_windows_object_target_named(name: &str, source: &str, obj_name: &str, opt: &str) -> Target:
     var target = with_object_target(name, release_compiler_bin("with"), source, cross_windows_dir() ++ "/" ++ obj_name, opt, "build")
     target = target.arg("--target=" ++ cross_windows_triple())
     target
 
-fn cross_windows_object_target(name: str, source: str, opt: str) -> Target:
+fn cross_windows_object_target(name: &str, source: &str, opt: &str) -> Target:
     let base = comp_path_basename(source)
     let stem = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
     cross_windows_object_target_named(name, source, stem ++ ".o", opt)
@@ -293,10 +293,10 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         let name = comp_path_basename(path)
         if name.ends_with(".lib"):
             if (name.starts_with("clang") or name.starts_with("libclang")) and path != libclang:
-                clang_archives.push(path)
+                clang_archives.push(build_owned_text(path))
             else:
                 if name.starts_with("LLVM") and name != "LLVM-C.lib":
-                    llvm_archives.push(path)
+                    llvm_archives.push(build_owned_text(path))
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
     for i in 0..sorted_clang.len() as i32:
@@ -1616,6 +1616,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = stage3.extra_output("out/command/stage3")
     stage3 = stage3.write_scope("out/stage/bin")
     stage3 = stage3.dep("stage2")
+    stage3 = stage3.dep("compiler-main-source")
     stage3 = stage3.dep("compat-runtime-source")
     stage3 = stage3.dep("embedded-clang-resource-source")
     out = out.add_target(stage3)

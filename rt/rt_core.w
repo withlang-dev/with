@@ -2781,6 +2781,9 @@ pub fn with_vec_get_i64(v: *mut u8, idx: i64) -> i64:
 
 pub fn with_vec_push_str(v: *mut u8, val: str) -> Unit:
     with_vec_push(v, &val as *const u8)
+    // with_vec_push bit-copies raw element bytes. The Vec now owns this str
+    // header, so disarm the by-value local before its scope cleanup runs.
+    unsafe *(&raw mut val as *mut str) = make_str("" as *const u8, 0)
 
 pub fn with_vec_get_str(v: *mut u8, idx: i64) -> str:
     let p = with_vec_get_ptr(v, idx)
@@ -3658,12 +3661,12 @@ fn with_lines_data_out(out: *mut u8, sp: *const u8, sl: i64) -> Unit:
     while i < sl:
         if (unsafe sp[i]) == 10:  // '\n'
             let line = alloc_str((sp as i64 + start) as *const u8, i - start)
-            with_vec_push(out, &line as *const u8)
+            with_vec_push_str(out, move line)
             start = i + 1
         i = i + 1
     if start < sl:
         let line = alloc_str((sp as i64 + start) as *const u8, sl - start)
-        with_vec_push(out, &line as *const u8)
+        with_vec_push_str(out, move line)
 
 pub fn with_lines_out(out: *mut u8, s: str) -> Unit:
     with_lines_data_out(out, str_data(s), str_length(s))
@@ -3728,7 +3731,7 @@ fn str_split_vec_ref(out: *mut u8, s: &str, delim: &str) -> Unit:
     let dl = str_length(delim)
     if dl == 0:
         let whole = alloc_str(str_data(s), sl)
-        with_vec_push(out, &whole as *const u8)
+        with_vec_push_str(out, move whole)
         return
     let sp = str_data(s)
     let dp = str_data(delim)
@@ -3737,13 +3740,13 @@ fn str_split_vec_ref(out: *mut u8, s: &str, delim: &str) -> Unit:
     while i <= sl - dl:
         if rt_memcmp((sp as i64 + i) as *const u8, dp, dl) == 0:
             let part = alloc_str((sp as i64 + start) as *const u8, i - start)
-            with_vec_push(out, &part as *const u8)
+            with_vec_push_str(out, move part)
             start = i + dl
             i = start
         else:
             i = i + 1
     let last = alloc_str((sp as i64 + start) as *const u8, sl - start)
-    with_vec_push(out, &last as *const u8)
+    with_vec_push_str(out, move last)
 
 pub fn with_str_split_vec(out: *mut u8, s: str, delim: str) -> Unit:
     str_split_vec_ref(out, s, delim)

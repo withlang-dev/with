@@ -2,7 +2,6 @@
 
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: &str) -> str
-extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_len(s: &str) -> i64
 extern fn with_str_byte_at(s: str, index: i64) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
@@ -286,7 +285,7 @@ pub fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
             value = with_arg_at(i + 1)
             seen = true
             i = i + 2
-        else if with_str_starts_with(arg, "--target=") != 0:
+        else if arg.starts_with("--target="):
             value = with_str_slice(arg, 9, with_str_len(arg))
             seen = true
             i = i + 1
@@ -349,7 +348,7 @@ fn driver_parse_prelude_mode(argc: i32) -> DriverPreludeParseResult:
             mode = DriverPreludeMode.None
         else if arg == "--freestanding":
             mode = DriverPreludeMode.Core
-        else if with_str_starts_with(arg, "--prelude=") != 0:
+        else if arg.starts_with("--prelude="):
             let value = with_str_slice(arg, 10, with_str_len(arg))
             if value == "core":
                 mode = DriverPreludeMode.Core
@@ -369,7 +368,7 @@ fn driver_parse_overflow_mode(argc: i32) -> DriverOverflowParseResult:
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
-        if with_str_starts_with(arg, "--overflow=") != 0:
+        if arg.starts_with("--overflow="):
             let value = with_str_slice(arg, 11, with_str_len(arg))
             let parsed = overflow_mode_parse(value)
             if not overflow_mode_valid(parsed):

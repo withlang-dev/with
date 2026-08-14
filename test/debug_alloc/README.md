@@ -57,6 +57,9 @@ construction and escape shape: `leak count=0`, never `DOUBLE FREE`.
 - `da_drop_origin_double_free` duplicates a `Vec[Drop]` header and explicitly
   drops both values; it expects `first_drop=drop#` so generated drop tags stay
   wired through MIR, codegen, and the allocator ledger.
+- `da_str_split_lines_owned_parts` forces allocator reuse while `split` and
+  `lines` results remain live, proving their raw runtime pushes transfer each
+  owned string into the result Vec instead of freeing a retained header.
 - `da_root_filter` marks a deliberately leaked allocation as a process-lifetime
   root and runs with `debug-alloc-filter: non-root`; it expects `leak count=0`.
 - `da_pod_vec` expects `leak count=1` — a POD `Vec[i32]` buffer is not freed under

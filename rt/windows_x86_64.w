@@ -45,7 +45,6 @@ extern fn GetTempPathA(size: u32, buf: *mut u8) -> u32
 extern fn GetTempFileNameA(path: *const u8, prefix: *const u8, unique: u32, buf: *mut u8) -> u32
 extern fn GetFullPathNameA(path: *const u8, size: u32, buf: *mut u8, file_part: *mut *mut u8) -> u32
 extern fn with_str_from_cstr(s: *const u8) -> str
-extern fn with_str_concat(a: str, b: str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
@@ -586,11 +585,9 @@ pub unsafe fn rt_readlink(path: *const u8) -> str:
 unsafe fn win_empty_str() -> str:
     with_str_from_cstr(c"".ptr)
 
-unsafe fn win_newline_str() -> str:
-    with_str_from_cstr(c"\n".ptr)
-
 unsafe fn win_list_append(out: str, path: *const u8) -> str:
-    with_str_concat(with_str_concat(out, with_str_from_cstr(path)), win_newline_str())
+    let path_text = with_str_from_cstr(path)
+    out ++ path_text ++ "\n"
 
 unsafe fn win_list_files_walk(path: *const u8, out: str) -> str:
     if not win_is_dir(path):
