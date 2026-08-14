@@ -1460,6 +1460,12 @@ impl Codegen:
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_mir_values = self.mir_local_values
         let saved_mir_memory_locals = self.mir_memory_locals
+        // The return terminator lowering reads current_function_name_sym to look
+        // up this function's sret ABI (extern_fn_has_sret). If we leave the
+        // previously-emitted function's sym here, an init fn inherits that
+        // function's sret decision — on windows that means storing to a null
+        // sret param (there is none) and `ret void` against a value return.
+        let saved_fn_name_sym = self.current_function_name_sym
 
         let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
         let fresh_local_types: HashMap[i32, i64] = HashMap.new()
@@ -1521,6 +1527,10 @@ impl Codegen:
         self.mir_default_unreachable_bbs = Vec.new()
 
         let init_sym = self.intern.intern(init_name)
+        // This function is declared with a direct value return (no sret param),
+        // so its return-lowering must read its own (absent) sret status, not the
+        // stale predecessor's.
+        self.current_function_name_sym = init_sym
         var init_builder = MirBuilder.init(self.sema, self.pool, self.intern, init_sym)
         init_builder.body.local_type_ids.set_i32(0, result_tid)
         init_builder.push_scope()
@@ -1596,6 +1606,7 @@ impl Codegen:
 
         self.current_function = saved_fn
         self.current_ret_type = saved_ret
+        self.current_function_name_sym = saved_fn_name_sym
         self.current_method_owner_sym = saved_owner
         self.local_allocas = saved_allocas
         self.local_types = saved_types
