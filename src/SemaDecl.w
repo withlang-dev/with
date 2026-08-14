@@ -1308,7 +1308,6 @@ impl Sema:
     mut fn collect_fn_decl(node: i32, is_local: i32, decl_index: i32):
         let parsed_fn_name = self.ast.get_data0(node)
         let method_owner_sym = self.method_decl_owner_symbol(node, parsed_fn_name)
-        let method_impl_node = self.impl_node_for_method_decl(node)
         let method_base_sym = self.method_decl_base_symbol(node, parsed_fn_name)
         var fn_name = method_base_sym
         var dispatch_fn_name = 0
@@ -1320,6 +1319,10 @@ impl Sema:
         // distinct pools and the same slot names unrelated declarations.
         self.fn_decl_effective_syms.insert(node, fn_name)
         if method_owner_sym != 0:
+            // Only methods need their enclosing impl. Computing it eagerly for
+            // every fn scanned all decls (O(n) miss) for non-methods and threw
+            // the result away — O(n^2) over the decl table.
+            let method_impl_node = self.impl_node_for_method_decl(node)
             if method_impl_node != 0:
                 self.method_impl_nodes.insert(fn_name, method_impl_node)
             self.method_symbol_flags.insert(fn_name, 1)
