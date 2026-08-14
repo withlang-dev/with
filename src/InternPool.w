@@ -90,16 +90,6 @@ fn intern_new_map_str_i32 -> HashMap[str, i32]:
     let map: HashMap[str, i32] = HashMap.new()
     map
 
-fn intern_text_eq(a: &str, b: &str) -> bool:
-    if a.len() != b.len():
-        return false
-    var i = 0
-    while i < a.len() as i32:
-        if a.byte_at(i as i64) != b.byte_at(i as i64):
-            return false
-        i = i + 1
-    true
-
 fn InternPool.init -> InternPool:
     intern_debug_init("InternPool.init:start")
     let ptr = with_alloc(256) as *mut InternPoolState
@@ -132,16 +122,9 @@ impl InternPool:
         if existing.is_some():
             return existing.unwrap()
 
-        // Compare through element views; clone only for the map insert on the
-        // (at most one) match. A clone per scanned element made every miss —
-        // and every NEW symbol misses — allocate the whole symbol table.
-        var i = 1
-        while i < st.symbol_texts.len() as i32:
-            if intern_text_eq(st.symbol_texts.get(i as i64), s):
-                st.symbol_map.insert(with_str_clone_ref(st.symbol_texts.get(i as i64)), i)
-                return i
-            i = i + 1
-
+        // symbol_map is authoritative: every symbol_texts entry is inserted
+        // into symbol_map at this same site, so a map miss means the symbol is
+        // new. (No linear-scan fallback — it never matched over a full compile.)
         let id = st.symbol_texts.len() as i32
         let owned = st.strings.store(s)
         st.symbol_map.insert(with_str_clone_ref(owned), id)

@@ -1157,16 +1157,6 @@ fn sema_debug_move_enabled -> i32:
         return 0
     1
 
-fn sema_str_eq(a: &str, b: &str) -> i32:
-    if a.len() != b.len():
-        return 0
-    var i = 0
-    while i < a.len() as i32:
-        if a[i as i64] != b[i as i64]:
-            return 0
-        i = i + 1
-    1
-
 impl Sema:
     fn debug_unknown_type(sym: i32, node: i32, context: &str):
         if sema_debug_stage1_enabled() == 0:
@@ -1185,16 +1175,12 @@ impl Sema:
     fn pool_lookup_symbol(name: &str) -> i32:
         if name.len() == 0:
             return 0
+        // symbol_map is authoritative: every symbol_texts entry is inserted
+        // into symbol_map at the same site it is pushed (see pool_intern /
+        // InternPool.intern_str), so a map miss means the symbol is absent.
         let existing = self.pool.state.symbol_map.get(name)
         if existing.is_some():
             return existing.unwrap()
-
-        var i = 1
-        while i < self.pool.state.symbol_texts.len() as i32:
-            let existing_text = self.pool.state.symbol_texts.get(i as i64)
-            if sema_str_eq(existing_text, name) != 0:
-                return i
-            i = i + 1
         0
 
     mut fn pool_intern(name: &str) -> i32:
@@ -1207,16 +1193,6 @@ impl Sema:
         let existing = self.pool.state.symbol_map.get(name)
         if existing.is_some():
             return existing.unwrap()
-
-        // Compare through element views; clone only for the map insert on the
-        // (at most one) match. A clone per scanned element made every miss —
-        // and every NEW symbol misses — allocate the whole symbol table.
-        var i = 1
-        while i < self.pool.state.symbol_texts.len() as i32:
-            if sema_str_eq(self.pool.state.symbol_texts.get(i as i64), name) != 0:
-                self.pool.state.symbol_map.insert(with_str_clone_ref(self.pool.state.symbol_texts.get(i as i64)), i)
-                return i
-            i = i + 1
 
         let id = self.pool.state.symbol_texts.len() as i32
         let owned = sema_owned_text(name)
