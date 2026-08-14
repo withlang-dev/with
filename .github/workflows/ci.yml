@@ -18,25 +18,15 @@ jobs:
 
       - name: Bootstrap seed
         env:
-          GH_TOKEN: ${{ github.token }}
           WITH_SEED_REPO: withlang-dev/with
+          WITH_SEED_VERSION: seed-darwin-aarch64-e4c60c99
           WITH_SEED_ASSET: with-darwin-aarch64
+          WITH_SEED_SHA256: e4c60c993c8a164ea1131e1b02ba33aef25c76787bd910eb28e804a3d71c350f
         run: |
           set -euo pipefail
-          tag="${WITH_SEED_VERSION:-}"
-          if [ -z "$tag" ]; then
-            while IFS= read -r candidate; do
-              if gh release view "$candidate" --repo "$WITH_SEED_REPO" --json assets --jq '.assets[].name' | grep -qx "$WITH_SEED_ASSET"; then
-                tag="$candidate"
-                break
-              fi
-            done < <(gh release list --repo "$WITH_SEED_REPO" --limit 50 --json tagName --jq '.[].tagName')
-          fi
-          if [ -z "$tag" ]; then
-            echo "error: could not find a release with $WITH_SEED_ASSET" >&2
-            exit 1
-          fi
-          curl -fL -o src/main "https://github.com/$WITH_SEED_REPO/releases/download/$tag/$WITH_SEED_ASSET"
+          curl -fL -o src/main \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | shasum -a 256 -c -
           chmod +x src/main
           src/main version
 
