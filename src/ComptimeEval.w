@@ -70,7 +70,7 @@ extern fn with_str_concat_n(parts: *const str, count: i64) -> str
 extern fn with_str_from_byte(byte: i32) -> str
 extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_ends_with(s: str, suffix: str) -> i32
-extern fn with_str_replace(s: str, old: str, new_s: str) -> str
+extern fn with_str_replace_ref(s: &str, old: &str, new_s: &str) -> str
 extern fn with_sysinfo_hostname() -> str
 
 const COMPTIME_RECURSION_LIMIT: i32 = 256
@@ -3368,7 +3368,7 @@ impl ComptimeEvaluator:
                 return new_signal
             if old_signal.value.kind != ComptimeValueKind.CV_STR or new_signal.value.kind != ComptimeValueKind.CV_STR:
                 return self.fail(node, "str.replace() arguments must be strings")
-            return comptime_control_value(comptime_value_str(with_str_replace(text, old_signal.value.text, new_signal.value.text)))
+            return comptime_control_value(comptime_value_str(with_str_replace_ref(text, old_signal.value.text, new_signal.value.text)))
         if method == "split":
             if arg_count != 1:
                 return self.fail(node, "str.split() expects exactly one argument")
