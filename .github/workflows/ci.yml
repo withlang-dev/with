@@ -21,7 +21,7 @@ jobs:
           WITH_SEED_REPO: withlang-dev/with
           WITH_SEED_VERSION: with-darwin-aarch64
           WITH_SEED_ASSET: with-darwin-aarch64
-          WITH_SEED_SHA256: e4c60c993c8a164ea1131e1b02ba33aef25c76787bd910eb28e804a3d71c350f
+          WITH_SEED_SHA256: 7223e03b2fd5f0153c1932f51c4be2fe1a98589cf853a535f715742af1039dc3
         run: |
           set -euo pipefail
           curl -fL -o src/main \
