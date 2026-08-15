@@ -446,7 +446,11 @@ fn build_graph_name_vec_contains(names: &Vec[str], name: &str) -> bool:
 
 fn build_graph_find_target_index(graph: &BuildGraph, name: &str) -> i32:
     for i in 0..graph.targets.len() as i32:
-        if graph.targets.get(i as i64).name == name:
+        // Borrow the stored target. Vec.get currently materializes an owned
+        // aggregate here, so merely searching would drop aliases of its nine
+        // owned vectors and corrupt the graph before dependency traversal.
+        let candidate = &graph.targets[i as i64]
+        if candidate.name == name:
             return i
     -1
 
@@ -482,13 +486,15 @@ fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: 
             return out
     let entry_producer = build_graph_find_output_producer_index(graph, target.entry, target.name)
     if entry_producer >= 0:
-        out = build_graph_selected_targets_add(move out, graph, graph.targets.get(entry_producer as i64).name)
+        let producer = &graph.targets[entry_producer as i64]
+        out = build_graph_selected_targets_add(move out, graph, producer.name)
         if not out.ok:
             return out
     for ii in 0..target.inputs.len() as i32:
         let input_producer = build_graph_find_output_producer_index(graph, target.inputs.get(ii as i64), target.name)
         if input_producer >= 0:
-            out = build_graph_selected_targets_add(move out, graph, graph.targets.get(input_producer as i64).name)
+            let producer = &graph.targets[input_producer as i64]
+            out = build_graph_selected_targets_add(move out, graph, producer.name)
             if not out.ok:
                 return out
     out.selected_names.push(with_str_clone_ref(name))
