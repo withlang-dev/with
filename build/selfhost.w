@@ -2950,7 +2950,7 @@ fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path:
     var ar_args: Vec[str] = Vec.new()
     ar_args |> push("ar")
     ar_args |> push("rcs")
-    ar_args |> push(regex_ar)
+    ar_args |> push(selfhost_owned_text(regex_ar))
     ar_args |> push(bs_abs(root, "out/lib/regex_runtime.o"))
     let ar_result = ctx.process_runner().run_capture(ar_args, stdout_path, stderr_path, 120000)
     if ar_result.rc != 0:
@@ -3386,7 +3386,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     var ar_args: Vec[str] = Vec.new()
     ar_args |> push("ar")
     ar_args |> push("rcs")
-    ar_args |> push(regex_ar)
+    ar_args |> push(selfhost_owned_text(regex_ar))
     ar_args |> push(bs_abs(root, "out/lib/regex_runtime.o"))
     let ar_result = ctx.process_runner().run_capture(ar_args, compile_stdout, compile_stderr, 120000)
     if ar_result.rc != 0:
