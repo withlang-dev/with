@@ -346,8 +346,12 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         tools.push("cmake")
         tools.push("ninja")
         tools.push("lld")
+        tools.push("llvm-ar")
+        tools.push("llvm-config")
+        tools.push("llvm-dwarfdump")
         tools.push("llvm-nm")
         tools.push("llvm-objcopy")
+        tools.push("llvm-ranlib")
         tools.push("llvm-readobj")
         tools.push("llvm-strip")
         for i in 0..tools.len() as i32:
@@ -382,12 +386,13 @@ fn sdk_optional_tool_exists(fs: &ToolFs, prefix: &str, name: &str) -> bool:
     fs.exists(sdk_required_tool(prefix, name))
 
 fn sdk_is_unix_tool_alias(rel: &str) -> bool:
-    rel == "bin/clang" or rel == "bin/clang++" or rel == "bin/llvm-strip" or rel == "bin/ld.lld" or rel == "bin/ld64.lld" or rel == "bin/lld-link" or rel == "bin/wasm-ld"
+    rel == "bin/clang" or rel == "bin/clang++" or rel == "bin/llvm-ranlib" or rel == "bin/llvm-strip" or rel == "bin/ld.lld" or rel == "bin/ld64.lld" or rel == "bin/lld-link" or rel == "bin/wasm-ld"
 
 fn sdk_unix_tool_aliases() -> Vec[str]:
     let aliases: Vec[str] = Vec.new()
     aliases.push("clang")
     aliases.push("clang++")
+    aliases.push("llvm-ranlib")
     aliases.push("llvm-strip")
     aliases.push("ld.lld")
     aliases.push("ld64.lld")
@@ -400,6 +405,8 @@ fn sdk_unix_tool_alias_target(alias: &str) -> str:
         return "clang-" ++ sdk_llvm_major_version()
     if alias == "clang++":
         return "clang"
+    if alias == "llvm-ranlib":
+        return "llvm-ar"
     if alias == "llvm-strip":
         return "llvm-objcopy"
     "lld"
@@ -453,6 +460,9 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         tools.push("bin/ctest")
         tools.push("bin/cpack")
         tools.push("bin/lld")
+        tools.push("bin/llvm-ar")
+        tools.push("bin/llvm-config")
+        tools.push("bin/llvm-dwarfdump")
         tools.push("bin/llvm-nm")
         tools.push("bin/llvm-objcopy")
         tools.push("bin/llvm-readobj")
