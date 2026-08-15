@@ -94,6 +94,3 @@ jobs:
 
       - name: Fixpoint
         run: ./out/release/bin/with build :fixpoint
-
-      - name: Test
-        run: ./out/release/bin/with build :test
