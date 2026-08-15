@@ -306,8 +306,8 @@ fn comp_arg_value(args: &Vec[str], prefix: &str) -> str:
 fn comp_arg_allowed_for_compiler(arg: &str) -> bool:
     not arg.starts_with("compiler=") and not arg.starts_with("overflow=")
 
-// Wall-clock budget for one compiler build/ir step. The 10-minute
-// default fits native hosts; emulated hosts (e.g. an x86_64 bootstrap
+// Wall-clock budget for one compiler build/ir step. Cold CI hosts can take
+// more than 10 minutes for stage1; emulated hosts (e.g. an x86_64 bootstrap
 // under qemu-user) override via WITH_BUILD_STEP_TIMEOUT_MS.
 fn comp_step_timeout_ms() -> i32:
     let raw = env("WITH_BUILD_STEP_TIMEOUT_MS")
@@ -320,7 +320,7 @@ fn comp_step_timeout_ms() -> i32:
         parsed = parsed * 10 + (ch - 48)
     if parsed > 0:
         return parsed
-    600000
+    1800000
 
 fn comp_host_exe_suffix() -> str:
     if os() == "Windows":
