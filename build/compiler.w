@@ -407,6 +407,19 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let libclang_file = env("LIBCLANG_FILE")
     if libclang_file.len() > 0:
         process_env = process_env.set("LIBCLANG_FILE", libclang_file)
+    // Windows COFF link import-library search paths (MSVC CRT + Windows SDK).
+    // The child compiler that links a stage exe reads these via Link.w's
+    // link_stage_windows_libpath; without explicit forwarding it falls back to
+    // baked-in VS2019/Kit paths that do not exist on the runner.
+    let win_msvc_libdir = env("WITH_WINDOWS_MSVC_LIBDIR")
+    if win_msvc_libdir.len() > 0:
+        process_env = process_env.set("WITH_WINDOWS_MSVC_LIBDIR", win_msvc_libdir)
+    let win_ucrt_libdir = env("WITH_WINDOWS_UCRT_LIBDIR")
+    if win_ucrt_libdir.len() > 0:
+        process_env = process_env.set("WITH_WINDOWS_UCRT_LIBDIR", win_ucrt_libdir)
+    let win_um_libdir = env("WITH_WINDOWS_UM_LIBDIR")
+    if win_um_libdir.len() > 0:
+        process_env = process_env.set("WITH_WINDOWS_UM_LIBDIR", win_um_libdir)
     let overflow_mode = comp_arg_value(ctx.args(), "overflow=")
     if overflow_mode.len() > 0:
         process_env = process_env.set("WITH_INTERNAL_OVERFLOW_MODE", overflow_mode)
