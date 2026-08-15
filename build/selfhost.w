@@ -5364,7 +5364,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "                    saw_prelink = true\n" ++
         "            var replacement = command\n" ++
         "            replacement.args.push(\"" ++ message_link_flag ++ "\")\n" ++
-        "            replacement.cwd = ctx.project_info().project_root()\n" ++
+        "            replacement.cwd = ctx.project_info().project_root().to_owned()\n" ++
         "            replacement.env.push(EnvVar { name: \"WITH_LINK_COMMAND_ENV_TEST\", value: \"1\" })\n" ++
         "            ws.set_link_command(replacement)\n" ++
         "        _ => saw_prelink = false\n" ++

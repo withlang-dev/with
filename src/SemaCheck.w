@@ -9346,6 +9346,10 @@ impl Sema:
             return 0
         sema_is_string_builder_comptime_method_name(self.pool_resolve(fn_sym))
 
+    fn fn_symbol_is_std_str_comptime_allowed(fn_sym: i32) -> i32:
+        let source_path = self.fn_symbol_source_path(fn_sym)
+        if source_path.ends_with("string.w") and self.pool_resolve(fn_sym) == "str.to_owned": 1 else: 0
+
     // The comptime evaluator implements the Vec core (push/pop/get/set/
     // clear/len/is_empty) directly; the flip's method registration exposed
     // these builtin methods to the callability check, breaking D21
@@ -9373,6 +9377,8 @@ impl Sema:
                 return 0
             if self.fn_symbol_is_std_string_builder_comptime_allowed(fn_sym) != 0:
                 return 0
+            if self.fn_symbol_is_std_str_comptime_allowed(fn_sym) != 0:
+                return 0
             if self.fn_symbol_is_builtin_vec_comptime_allowed(fn_sym) != 0:
                 return 0
             if self.fn_symbol_is_comptime(fn_sym) == 0:
@@ -9387,6 +9393,8 @@ impl Sema:
         if self.fn_symbol_is_tool_comptime_allowed(method_sym) != 0:
             return 0
         if self.fn_symbol_is_std_string_builder_comptime_allowed(method_sym) != 0:
+            return 0
+        if self.fn_symbol_is_std_str_comptime_allowed(method_sym) != 0:
             return 0
         if self.fn_symbol_is_builtin_vec_comptime_allowed(method_sym) != 0:
             return 0

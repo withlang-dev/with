@@ -3313,6 +3313,10 @@ impl ComptimeEvaluator:
             if arg_count != 0:
                 return self.fail(node, "str.len() takes no arguments")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), text.len()))
+        if method == "to_owned":
+            if arg_count != 0:
+                return self.fail(node, "str.to_owned() takes no arguments")
+            return comptime_control_value(comptime_value_str(text))
         if method == "byte_at":
             if arg_count != 1:
                 return self.fail(node, "str.byte_at() expects exactly one argument")
@@ -7463,6 +7467,13 @@ impl ComptimeEvaluator:
         let fn_name: str = with_str_clone_ref(self.pool.resolve(fn_sym))
         if fn_name == "parallel":
             return self.eval_parallel_workspaces_call(arg_values, node)
+        if fn_name == "str.to_owned":
+            if arg_values.len() as i32 != 1:
+                return self.fail(node, "str.to_owned() takes no arguments")
+            let receiver = arg_values.get(0)
+            if receiver.kind != ComptimeValueKind.CV_STR:
+                return self.fail(node, "str.to_owned() receiver must be a string")
+            return comptime_control_value(comptime_value_str(receiver.text))
         let string_builder_constructor = comptime_string_builder_constructor_method(fn_name)
         if string_builder_constructor.len() > 0:
             var result_type = self.node_type_or(node, 0)
