@@ -16,7 +16,7 @@ jobs:
       # Native Windows self-host: the published Windows seed compiler builds
       # stage1 -> stage2 -> stage3 and we assert stage2 == stage3 (fixpoint).
       WITH_SEED_REPO: withlang-dev/with
-      WITH_SEED_VERSION: seed-windows-x86_64-47c931a1
+      WITH_SEED_VERSION: seed-windows-x86_64-01932a7f
       WITH_SEED_ASSET: with-windows-x86_64.exe
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: v0.15.1
