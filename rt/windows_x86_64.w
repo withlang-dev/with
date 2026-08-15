@@ -90,7 +90,6 @@ var rt_argc: i32 = 0
 var rt_argv_raw: i64 = 0
 var rt_handles: [256]i64 = [0 as i64; 256]
 var qpc_freq: i64 = 0
-var env_result_buf: [32768]u8 = [0 as u8; 32768]
 var process_handles: [256]i64 = [0 as i64; 256]
 var process_ids: [256]i32 = [0 as i32; 256]
 var process_next_slot: i32 = 1
@@ -658,8 +657,18 @@ pub unsafe fn rt_getenv(name: *const u8) -> *const u8:
     let n = GetEnvironmentVariableW(&wname as *const [1024]u16 as *const u16, &raw mut wvalue as *mut [16384]u16 as *mut u16, 16384 as u32)
     if n == 0:
         return 0 as *const u8
-    let _ = win_utf16_to_utf8_buf(&wvalue as *const [16384]u16 as *const u16, &raw mut env_result_buf as *mut [32768]u8 as *mut u8, 32768)
-    &env_result_buf as *const [32768]u8 as *const u8
+    // Each returned value gets its own allocation so retained `env()`/
+    // `with_getenv_str` results never alias. Linux/darwin satisfy this for
+    // free because libc `getenv` hands out stable per-variable `environ`
+    // pointers; Windows `GetEnvironmentVariableW` copies into a caller buffer,
+    // so a single shared static buffer would make every retained result alias
+    // the last read. The converter writes one byte per UTF-16 code unit, so the
+    // returned unit count `n` is the exact UTF-8 length; `with_alloc(n + 1)`
+    // covers value + NUL. This is an owned allocator payload (drop-safe if ever
+    // freed) that lives for the process, the same lifetime model as `environ`.
+    let buf = with_alloc(n as i64 + 1)
+    let _ = win_utf16_to_utf8_buf(&wvalue as *const [16384]u16 as *const u16, buf, n as i64 + 1)
+    buf as *const u8
 
 pub unsafe fn gethostname(name: *mut u8, len: u64) -> i32:
     var wname: [256]u16 = [0 as u16; 256]
