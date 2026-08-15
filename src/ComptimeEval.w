@@ -4429,7 +4429,7 @@ impl ComptimeEvaluator:
             out.messages.push(message)
         out
 
-    mut fn enqueue_workspace_compile_result(record: ComptimeWorkspaceRecord, result: ComptimeValue, messages: &Vec[ComptimeValue], node: i32) -> ComptimeWorkspaceRecord:
+    mut fn enqueue_workspace_compile_result(record: ComptimeWorkspaceRecord, result: &ComptimeValue, messages: &Vec[ComptimeValue], node: i32) -> ComptimeWorkspaceRecord:
         var out = record
         for mi in 0..messages.len() as i32:
             out.messages.push(comptime_value_clone(messages.get(mi as i64)))
@@ -4447,9 +4447,9 @@ impl ComptimeEvaluator:
         out.intercept_terminal = 1
         out
 
-    mut fn compiler_message_complete_value(result: ComptimeValue, node: i32) -> ComptimeValue:
+    mut fn compiler_message_complete_value(result: &ComptimeValue, node: i32) -> ComptimeValue:
         let payloads: Vec[ComptimeValue] = Vec.new()
-        payloads.push(result)
+        payloads.push(comptime_value_clone(result))
         self.compiler_message_value("Complete", payloads, node)
 
     mut fn compiler_message_error_value(code: i32, message: &str, node: i32) -> ComptimeValue:
