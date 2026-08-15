@@ -34,6 +34,7 @@ llvm-static-sdk/
     clang++
     ld64.lld or ld.lld or lld-link
     llvm-nm
+    llvm-objcopy
     llvm-strip
   include/
   lib/
@@ -41,6 +42,7 @@ llvm-static-sdk/
     libLLVM*.a
     libclang*.a
     clang/<v>/include/      # clang builtin headers (stddef.h, stdarg.h, …)
+  share/cmake-<version>/
 ```
 
 The `lib/clang/<v>/include/` tree is **part of the SDK we build**, not an

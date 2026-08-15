@@ -180,6 +180,13 @@ pub fn sdk_llvm_source_url() -> str:
 pub fn sdk_llvm_source_sha256() -> str:
     SDK_LLVM_TAG_TAR_GZ_SHA256
 
+fn sdk_llvm_major_version() -> str:
+    let version = compiler_llvm_version()
+    let dot = version.find(".")
+    if dot < 0:
+        return sdk_owned_text(version)
+    version.slice(0, dot)
+
 fn sdk_str_compare(a: &str, b: &str) -> i32:
     let n = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
@@ -195,22 +202,39 @@ fn sdk_str_compare(a: &str, b: &str) -> i32:
         return -1
     1
 
+fn sdk_merge_sorted_strings(left: &Vec[str], right: &Vec[str]) -> Vec[str]:
+    let merged: Vec[str] = Vec.new()
+    var li = 0
+    var ri = 0
+    while li < left.len() as i32 and ri < right.len() as i32:
+        if sdk_str_compare(left.get(li as i64), right.get(ri as i64)) <= 0:
+            merged.push(sdk_owned_text(left.get(li as i64)))
+            li = li + 1
+        else:
+            merged.push(sdk_owned_text(right.get(ri as i64)))
+            ri = ri + 1
+    while li < left.len() as i32:
+        merged.push(sdk_owned_text(left.get(li as i64)))
+        li = li + 1
+    while ri < right.len() as i32:
+        merged.push(sdk_owned_text(right.get(ri as i64)))
+        ri = ri + 1
+    merged
+
 fn sdk_sort_strings(items: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
+    if items.len() < 2:
+        return items
+    let middle = items.len() / 2
+    let left: Vec[str] = Vec.new()
+    let right: Vec[str] = Vec.new()
     for i in 0..items.len() as i32:
-        let item = items.get(i as i64)
-        var inserted = false
-        var out: Vec[str] = Vec.new()
-        for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
-            if not inserted and sdk_str_compare(item, existing) < 0:
-                out.push(sdk_owned_text(item))
-                inserted = true
-            out.push(sdk_owned_text(existing))
-        if not inserted:
-            out.push(sdk_owned_text(item))
-        sorted = out
-    sorted
+        if i as i64 < middle:
+            left.push(sdk_owned_text(items.get(i as i64)))
+        else:
+            right.push(sdk_owned_text(items.get(i as i64)))
+    let sorted_left = sdk_sort_strings(move left)
+    let sorted_right = sdk_sort_strings(move right)
+    sdk_merge_sorted_strings(&sorted_left, &sorted_right)
 
 fn sdk_add_unique(items: Vec[str], item: &str) -> Vec[str]:
     var out = items
@@ -314,6 +338,8 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
     else:
         rc = sdk_check_file(ctx, sdk_join(prefix, "lib/libclang.a"), "static libclang archive")
         if rc != 0: return rc
+        rc = sdk_check_file(ctx, sdk_join(prefix, "bin/clang-" ++ sdk_llvm_major_version()), "versioned clang driver")
+        if rc != 0: return rc
         let tools: Vec[str] = Vec.new()
         tools.push("clang")
         tools.push("clang++")
@@ -321,6 +347,7 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         tools.push("ninja")
         tools.push("lld")
         tools.push("llvm-nm")
+        tools.push("llvm-objcopy")
         tools.push("llvm-readobj")
         tools.push("llvm-strip")
         for i in 0..tools.len() as i32:
@@ -331,6 +358,8 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         return sdk_fail(ctx, "missing clang builtin header tree: " ++ sdk_join(prefix, "lib/clang"))
     if not sdk_package_has_builtin_stddef(fs, prefix):
         return sdk_fail(ctx, "clang builtin header tree is missing include/stddef.h")
+    if not sdk_package_has_cmake_modules(fs, prefix):
+        return sdk_fail(ctx, "CMake runtime tree is missing share/cmake-*/Modules/CMake.cmake")
     0
 
 fn sdk_package_has_builtin_stddef(fs: &ToolFs, prefix: &str) -> bool:
@@ -341,36 +370,64 @@ fn sdk_package_has_builtin_stddef(fs: &ToolFs, prefix: &str) -> bool:
             return true
     false
 
+fn sdk_package_has_cmake_modules(fs: &ToolFs, prefix: &str) -> bool:
+    let files = fs.list_files(sdk_join(prefix, "share"))
+    for i in 0..files.len() as i32:
+        let path = sdk_normalize(files.get(i as i64))
+        if path.contains("/share/cmake-") and path.ends_with("/Modules/CMake.cmake"):
+            return true
+    false
+
 fn sdk_optional_tool_exists(fs: &ToolFs, prefix: &str, name: &str) -> bool:
     fs.exists(sdk_required_tool(prefix, name))
 
-fn sdk_is_unix_lld_alias(rel: &str) -> bool:
-    rel == "bin/ld.lld" or rel == "bin/ld64.lld" or rel == "bin/lld-link" or rel == "bin/wasm-ld"
+fn sdk_is_unix_tool_alias(rel: &str) -> bool:
+    rel == "bin/clang" or rel == "bin/clang++" or rel == "bin/llvm-strip" or rel == "bin/ld.lld" or rel == "bin/ld64.lld" or rel == "bin/lld-link" or rel == "bin/wasm-ld"
+
+fn sdk_unix_tool_aliases() -> Vec[str]:
+    let aliases: Vec[str] = Vec.new()
+    aliases.push("clang")
+    aliases.push("clang++")
+    aliases.push("llvm-strip")
+    aliases.push("ld.lld")
+    aliases.push("ld64.lld")
+    aliases.push("lld-link")
+    aliases.push("wasm-ld")
+    aliases
+
+fn sdk_unix_tool_alias_target(alias: &str) -> str:
+    if alias == "clang":
+        return "clang-" ++ sdk_llvm_major_version()
+    if alias == "clang++":
+        return "clang"
+    if alias == "llvm-strip":
+        return "llvm-objcopy"
+    "lld"
+
+fn sdk_package_file_selected(rel: &str, platform: &str) -> bool:
+    if rel.len() == 0:
+        return false
+    if platform != "windows-x86_64" and sdk_is_unix_tool_alias(rel):
+        return false
+    if rel.starts_with("lib/clang/") or rel.starts_with("share/cmake-"):
+        return true
+    if rel.starts_with("lib/"):
+        let lib_rel = rel.slice(4, rel.len())
+        if sdk_has_slash(lib_rel):
+            return false
+        if platform == "windows-x86_64":
+            return rel.ends_with(".lib")
+        return rel.ends_with(".a")
+    rel.starts_with("bin/") and sdk_package_tool_selected(rel, platform)
 
 fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> Vec[str]:
     let selected: Vec[str] = Vec.new()
-    let all = sdk_sort_strings(fs.list_files(prefix))
+    let all = fs.list_files(prefix)
     for i in 0..all.len() as i32:
         let path = all.get(i as i64)
-        let rel = sdk_rel_path(prefix, path)
-        if rel.len() == 0:
-            continue
-        if platform != "windows-x86_64" and sdk_is_unix_lld_alias(rel):
-            continue
-        if rel.starts_with("lib/clang/"):
+        if sdk_package_file_selected(sdk_rel_path(prefix, path), platform):
             selected.push(sdk_owned_text(path))
-        else if rel.starts_with("lib/"):
-            let lib_rel = rel.slice(4, rel.len())
-            if not sdk_has_slash(lib_rel):
-                if platform == "windows-x86_64":
-                    if rel.ends_with(".lib"):
-                        selected.push(sdk_owned_text(path))
-                else if rel.ends_with(".a"):
-                    selected.push(sdk_owned_text(path))
-        else if rel.starts_with("bin/"):
-            if sdk_package_tool_selected(rel, platform):
-                selected.push(sdk_owned_text(path))
-    selected
+    sdk_sort_strings(move selected)
 
 fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
     let tools: Vec[str] = Vec.new()
@@ -390,16 +447,15 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         tools.push("bin/ctest.exe")
         tools.push("bin/cpack.exe")
     else:
-        tools.push("bin/clang")
-        tools.push("bin/clang++")
+        tools.push("bin/clang-" ++ sdk_llvm_major_version())
         tools.push("bin/cmake")
         tools.push("bin/ninja")
         tools.push("bin/ctest")
         tools.push("bin/cpack")
         tools.push("bin/lld")
         tools.push("bin/llvm-nm")
+        tools.push("bin/llvm-objcopy")
         tools.push("bin/llvm-readobj")
-        tools.push("bin/llvm-strip")
     for i in 0..tools.len() as i32:
         if rel == tools.get(i as i64):
             return true
@@ -418,11 +474,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         let rel = sdk_rel_path(prefix, files.get(i as i64))
         dirs = sdk_add_parent_dirs(move dirs, sdk_base, rel)
     if platform != "windows-x86_64":
-        let aliases: Vec[str] = Vec.new()
-        aliases.push("ld.lld")
-        aliases.push("ld64.lld")
-        aliases.push("lld-link")
-        aliases.push("wasm-ld")
+        let aliases = sdk_unix_tool_aliases()
         for i in 0..aliases.len() as i32:
             let alias = aliases.get(i as i64)
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
@@ -436,15 +488,11 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         let rel = sdk_rel_path(prefix, path)
         entries.push(archive_file_entry(sdk_owned_text(path), sdk_base ++ "/" ++ rel, sdk_file_mode(rel)))
     if platform != "windows-x86_64":
-        let aliases: Vec[str] = Vec.new()
-        aliases.push("ld.lld")
-        aliases.push("ld64.lld")
-        aliases.push("lld-link")
-        aliases.push("wasm-ld")
+        let aliases = sdk_unix_tool_aliases()
         for i in 0..aliases.len() as i32:
             let alias = aliases.get(i as i64)
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
-                entries.push(archive_symlink_entry("lld", sdk_base ++ "/bin/" ++ alias, 0o777))
+                entries.push(archive_symlink_entry(sdk_unix_tool_alias_target(alias), sdk_base ++ "/bin/" ++ alias, 0o777))
     entries
 
 fn sdk_write_text(ctx: &ActionCtx, path: &str, text: &str) -> i32:

@@ -108,9 +108,11 @@ the seed (issue #313):
   sidecar, and a manifest. It refuses SDKs not built with Clang/clang-cl by the
   bootstrap SDK flow. It ships only what the build links against: `lib/*.a`,
   `lib/clang/<v>/include/`,
-  `bin/ninja`, `bin/cmake`, `bin/clang`, `bin/lld` (+ driver symlinks),
-  `bin/llvm-ml`/`bin/llvm-ml64` on Windows, `bin/llvm-nm`, and
-  `bin/llvm-strip` — not the LLVM C++ `include/` tree, so the asset remains
+  `bin/ninja`, `bin/cmake` plus its `share/cmake-<version>/` runtime tree,
+  `bin/clang`, `bin/lld` (+ driver symlinks),
+  `bin/llvm-ml`/`bin/llvm-ml64` on Windows, `bin/llvm-nm`, `bin/llvm-objcopy`
+  on Unix (the executable behind `llvm-strip`), and `bin/llvm-strip` — not the
+  LLVM C++ `include/` tree, so the asset remains
   small while still carrying the With-owned build tools required by SDK
   production, emitted-C bootstrap, and release packaging.
 - **Fetch**: `with build :deps` downloads
