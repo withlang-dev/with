@@ -322,9 +322,9 @@ fn analysis_fact_field(fact: &AnalysisFact, field: &str) -> str:
     if field == "end": return f"{fact.end}"
     if field == "line": return f"{fact.line}"
     if field == "column": return f"{fact.column}"
-    if field == "path": return fact.path
-    if field == "name": return fact.name
-    if field == "detail": return fact.detail
+    if field == "path": return with_str_clone_ref(fact.path)
+    if field == "name": return with_str_clone_ref(fact.name)
+    if field == "detail": return with_str_clone_ref(fact.detail)
     ""
 
 fn analysis_term_matches(fact: &AnalysisFact, term: &str) -> bool:
