@@ -93,7 +93,7 @@ jobs:
         run: src/main build
 
       - name: Fixpoint
-        run: ./out/bin/with build :fixpoint
+        run: ./out/release/bin/with build :fixpoint
 
       - name: Test
-        run: ./out/bin/with build :test
+        run: ./out/release/bin/with build :test
