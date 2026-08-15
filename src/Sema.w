@@ -1131,6 +1131,8 @@ type Sema {
     named_type_candidate_tids: Vec[i32],       // parallel type id for candidate
     named_type_candidate_paths: Vec[str],      // defining module path or "" for global
     named_type_candidate_pub: Vec[i32],        // parallel public flag
+    named_type_candidate_heads: HashMap[i32, i32], // symbol -> newest candidate index
+    named_type_candidate_next: Vec[i32],       // previous candidate for the same symbol
     decl_visibility_syms: Vec[i32],            // top-level symbol visibility candidates
     decl_visibility_paths: Vec[str],           // parallel declaring module path
     decl_visibility_pub: Vec[i32],             // parallel public flag
@@ -1485,6 +1487,7 @@ impl Sema:
         self.type_d2 = sema_clone_i32_vec(&self.type_d2)
         self.type_extra = sema_clone_i32_vec(&self.type_extra)
         self.rebuild_exact_type_cache()
+        self.rebuild_named_type_candidate_index()
         self.generic_inst_cache = sema_new_map_i64_i32()
         self.layout_size_cache = HashMap.new()
         self.layout_align_cache = HashMap.new()
@@ -2274,6 +2277,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         named_type_candidate_tids: Vec.new(),
         named_type_candidate_paths: sema_new_vec_str(),
         named_type_candidate_pub: Vec.new(),
+        named_type_candidate_heads: sema_new_map_i32_i32(),
+        named_type_candidate_next: Vec.new(),
         decl_visibility_syms: Vec.new(),
         decl_visibility_paths: sema_new_vec_str(),
         decl_visibility_pub: Vec.new(),
@@ -2480,8 +2485,27 @@ impl Sema:
     mut fn record_named_type(sym: i32, tid: i32) -> Unit:
         self.record_named_type_with_pub(sym, tid, 1)
 
+    fn named_type_candidate_head(sym: i32) -> i32:
+        if self.named_type_candidate_heads.contains(sym):
+            return self.named_type_candidate_heads.get(sym).unwrap()
+        -1
+
+    fn index_named_type_candidate(sym: i32, candidate_index: i32):
+        self.named_type_candidate_next.push(self.named_type_candidate_head(sym))
+        self.named_type_candidate_heads.insert(sym, candidate_index)
+
+    mut fn rebuild_named_type_candidate_index():
+        self.named_type_candidate_heads = sema_new_map_i32_i32()
+        self.named_type_candidate_next = Vec.new()
+        for candidate_index in 0..self.named_type_candidate_syms.len() as i32:
+            self.index_named_type_candidate(
+                self.named_type_candidate_syms.get(candidate_index as i64),
+                candidate_index,
+            )
+
     mut fn record_named_type_with_pub(sym: i32, tid: i32, is_pub: i32) -> Unit:
         self.named_types.insert(sym, tid)
+        self.index_named_type_candidate(sym, self.named_type_candidate_syms.len() as i32)
         self.named_type_candidate_syms.push(sym)
         self.named_type_candidate_tids.push(tid)
         let path = if self.current_module_path.len() > 0: self.current_module_path else: ""
@@ -2753,15 +2777,14 @@ impl Sema:
     // codegen runs after checking and needs the layout of a specific tier's
     // decl, not a context-relative resolution.
     fn lookup_named_type_for_tier(sym: i32, want_std: i32) -> i32:
-        var i = self.named_type_candidate_syms.len() as i32 - 1
+        var i = self.named_type_candidate_head(sym)
         while i >= 0:
-            if self.named_type_candidate_syms.get(i as i64) == sym:
-                let path = self.named_type_candidate_paths.get(i as i64)
-                if path.len() > 0:
-                    let cand_std = if sema_tier_path_is_std_implementation(path) != 0: 1 else: 0
-                    if cand_std == want_std:
-                        return self.named_type_candidate_tids.get(i as i64)
-            i = i - 1
+            let path = self.named_type_candidate_paths.get(i as i64)
+            if path.len() > 0:
+                let cand_std = if sema_tier_path_is_std_implementation(path) != 0: 1 else: 0
+                if cand_std == want_std:
+                    return self.named_type_candidate_tids.get(i as i64)
+            i = self.named_type_candidate_next.get(i as i64)
         if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
 
     fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
@@ -2769,22 +2792,21 @@ impl Sema:
         var global_tid = 0
         var saw_recorded = 0
         var saw_named_tid = 0
-        var i = self.named_type_candidate_syms.len() as i32 - 1
+        var i = self.named_type_candidate_head(sym)
         while i >= 0:
-            if self.named_type_candidate_syms.get(i as i64) == sym:
-                saw_recorded = 1
-                let candidate_tid = self.named_type_candidate_tids.get(i as i64)
-                let candidate_path = self.named_type_candidate_paths.get(i as i64)
-                let candidate_pub = self.named_type_candidate_pub.get(i as i64)
-                if named_tid != 0 and candidate_tid == named_tid:
-                    saw_named_tid = 1
-                let candidate_visible = if gated != 0: self.decl_visible_from_current_gated(candidate_path, candidate_pub, sym) else: self.decl_visible_from_current(candidate_path, candidate_pub)
-                if candidate_path.len() == 0:
-                    if global_tid == 0:
-                        global_tid = candidate_tid
-                else if candidate_visible != 0:
-                    return candidate_tid
-            i = i - 1
+            saw_recorded = 1
+            let candidate_tid = self.named_type_candidate_tids.get(i as i64)
+            let candidate_path = self.named_type_candidate_paths.get(i as i64)
+            let candidate_pub = self.named_type_candidate_pub.get(i as i64)
+            if named_tid != 0 and candidate_tid == named_tid:
+                saw_named_tid = 1
+            let candidate_visible = if gated != 0: self.decl_visible_from_current_gated(candidate_path, candidate_pub, sym) else: self.decl_visible_from_current(candidate_path, candidate_pub)
+            if candidate_path.len() == 0:
+                if global_tid == 0:
+                    global_tid = candidate_tid
+            else if candidate_visible != 0:
+                return candidate_tid
+            i = self.named_type_candidate_next.get(i as i64)
         if named_tid != 0 and (saw_recorded == 0 or saw_named_tid == 0):
             return named_tid
         if global_tid != 0:

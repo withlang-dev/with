@@ -198,11 +198,11 @@ impl Sema:
         self.tool_mode_entry_path.len() > 0 and self.current_module_path == self.tool_mode_entry_path
 
     fn named_type_path_for(sym: i32, tid: i32) -> str:
-        var i = self.named_type_candidate_syms.len() as i32 - 1
+        var i = self.named_type_candidate_head(sym)
         while i >= 0:
-            if self.named_type_candidate_syms.get(i as i64) == sym and self.named_type_candidate_tids.get(i as i64) == tid:
+            if self.named_type_candidate_tids.get(i as i64) == tid:
                 return with_str_clone_ref(self.named_type_candidate_paths.get(i as i64))
-            i = i - 1
+            i = self.named_type_candidate_next.get(i as i64)
         ""
 
     fn tool_capability_kind_for_type(tid: i32) -> i32:
