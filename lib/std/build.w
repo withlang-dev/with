@@ -1026,9 +1026,22 @@ fn tool_tar_entry_name(path: &str, directory: bool) -> str:
         return ""
     tool_path_require_project_relative(normalized)
     let result = if directory: normalized ++ "/" else: normalized
-    if result.len() > 100:
+    if result.len() > 256:
         return ""
     result
+
+fn tool_tar_path_field(path: &str, prefix: bool) -> str:
+    if path.len() <= 100:
+        return if prefix: "" else: with_str_clone_ref(path)
+    var split = -1
+    for i in 1..path.len() as i32:
+        if path.byte_at(i as i64) == 47 and i <= 155 and i + 1 < path.len() as i32 and path.len() - i as i64 - 1 <= 100:
+            split = i
+    if split < 0:
+        return ""
+    if prefix:
+        return path.slice(0, split as i64)
+    path.slice((split + 1) as i64, path.len())
 
 fn tool_tar_link_name(target: &str) -> str:
     if target.len() == 0 or target.len() > 100:
@@ -1062,10 +1075,14 @@ fn tool_tar_extract_fail(message: &str) -> i32:
     1
 
 fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKind, link_name: &str) -> Vec[u8]:
-    if name.len() == 0 or name.len() > 100 or mode < 0 or size < 0 or link_name.len() > 100:
+    if name.len() == 0 or mode < 0 or size < 0 or link_name.len() > 100:
+        return Vec.new()
+    let path_name = tool_tar_path_field(name, false)
+    let path_prefix = tool_tar_path_field(name, true)
+    if path_name.len() == 0:
         return Vec.new()
     var prefix: Vec[u8] = Vec.new()
-    prefix = tool_tar_append_str_padded(move prefix, name, 100)
+    prefix = tool_tar_append_str_padded(move prefix, path_name, 100)
     prefix = tool_tar_append_octal_nul(move prefix, mode as i64, 8)
     prefix = tool_tar_append_octal_nul(move prefix, 0, 8)
     prefix = tool_tar_append_octal_nul(move prefix, 0, 8)
@@ -1083,7 +1100,9 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
     suffix = tool_tar_append_str_padded(move suffix, link_name, 100)
     suffix = tool_tar_append_str_padded(move suffix, "ustar", 6)
     suffix = tool_tar_append_str_padded(move suffix, "00", 2)
-    suffix = tool_tar_append_zeroes(move suffix, 247)
+    suffix = tool_tar_append_zeroes(move suffix, 80)
+    suffix = tool_tar_append_str_padded(move suffix, path_prefix, 155)
+    suffix = tool_tar_append_zeroes(move suffix, 12)
     if suffix.len() == 0:
         return Vec.new()
     let checksum = tool_tar_sum(&prefix) + 256 + tool_tar_sum(&suffix)

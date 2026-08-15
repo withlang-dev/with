@@ -665,9 +665,22 @@ fn comptime_tar_entry_name(path: &str, directory: bool) -> str:
     if normalized == "." or not comptime_tool_path_is_project_relative(normalized):
         return ""
     let result = if directory: normalized ++ "/" else: normalized
-    if result.len() > 100:
+    if result.len() > 256:
         return ""
     result
+
+fn comptime_tar_path_field(path: &str, prefix: bool) -> str:
+    if path.len() <= 100:
+        return if prefix: "" else: with_str_clone_ref(path)
+    var split = -1
+    for i in 1..path.len() as i32:
+        if path.byte_at(i as i64) == 47 and i <= 155 and i + 1 < path.len() as i32 and path.len() - i as i64 - 1 <= 100:
+            split = i
+    if split < 0:
+        return ""
+    if prefix:
+        return path.slice(0, split as i64)
+    path.slice((split + 1) as i64, path.len())
 
 fn comptime_tar_link_name(target: &str) -> str:
     if target.len() == 0 or target.len() > 100:
@@ -697,9 +710,13 @@ fn comptime_tar_link_target_safe(output_dir: &str, output_path: &str, target: &s
     comptime_tool_path_is_same_or_child(resolved, root)
 
 fn comptime_tar_build_header(name: &str, mode: i32, size: i64, kind: i32, link_name: &str) -> str:
-    if name.len() == 0 or name.len() > 100 or mode < 0 or size < 0 or link_name.len() > 100:
+    if name.len() == 0 or mode < 0 or size < 0 or link_name.len() > 100:
         return ""
-    let name_field = comptime_tar_padded_str(name, 100)
+    let path_name = comptime_tar_path_field(name, false)
+    let path_prefix = comptime_tar_path_field(name, true)
+    if path_name.len() == 0:
+        return ""
+    let name_field = comptime_tar_padded_str(path_name, 100)
     let mode_field = comptime_tar_octal_nul(mode as i64, 8)
     let uid_field = comptime_tar_octal_nul(0, 8)
     let gid_field = comptime_tar_octal_nul(0, 8)
@@ -709,7 +726,7 @@ fn comptime_tar_build_header(name: &str, mode: i32, size: i64, kind: i32, link_n
         return ""
     let prefix = name_field ++ mode_field ++ uid_field ++ gid_field ++ size_field ++ mtime_field
     let typeflag = if kind == 1: 53 else: (if kind == 2: 50 else: 48)
-    let suffix = with_str_from_byte(typeflag) ++ comptime_tar_padded_str(link_name, 100) ++ comptime_tar_padded_str("ustar", 6) ++ comptime_tar_padded_str("00", 2) ++ comptime_tar_zeroes(247)
+    let suffix = with_str_from_byte(typeflag) ++ comptime_tar_padded_str(link_name, 100) ++ comptime_tar_padded_str("ustar", 6) ++ comptime_tar_padded_str("00", 2) ++ comptime_tar_zeroes(80) ++ comptime_tar_padded_str(path_prefix, 155) ++ comptime_tar_zeroes(12)
     if suffix.len() != 356:
         return ""
     let checksum = comptime_tar_sum(prefix) + 256 + comptime_tar_sum(suffix)

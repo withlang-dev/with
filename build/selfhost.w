@@ -6131,6 +6131,20 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     rc = bs_expect_file_contains(ctx, bs_join(toolfs_archive_dir, "out/archive/extracted-gz/pkg/nested/a.txt"), "tree", "build_w_extract_tar_gz")
     if rc != 0: return rc
 
+    let toolfs_ustar_dir = bs_join(base_dir, "toolfs_ustar")
+    rc = bs_write_project_manifest(ctx, toolfs_ustar_dir, "buildwtoolfsustar")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ustar_dir, "src/main.w"), "fn main:\n    print(\"toolfs ustar ok\")\n", ctx.target_name(), "toolfs ustar source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ustar_dir, "fixtures/a.txt"), "tree", ctx.target_name(), "toolfs ustar fixture")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ustar_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/archive\") == 0)\n    let entries: Vec[ArchiveEntry] = Vec.new()\n    entries.push(archive_file_entry(\"fixtures/a.txt\", \"pkg/this-directory-name-is-intentionally-long-for-ustar-prefix-validation-abcdefghijklmnopqrstuvwxyz0123456789/nested/a.txt\", 0o644))\n    assert(fs.write_tar(\"out/archive/long.tar\", entries) == 0)\n    assert(fs.extract_tar(\"out/archive/long.tar\", \"out/archive/extracted\") == 0)\n    assert(fs.read_text(\"out/archive/extracted/pkg/this-directory-name-is-intentionally-long-for-ustar-prefix-validation-abcdefghijklmnopqrstuvwxyz0123456789/nested/a.txt\") == \"tree\")\n    ctx.new_build().executable(\"toolfs-ustar\", \"src/main.w\")\n", ctx.target_name(), "toolfs ustar build.w")
+    if rc != 0: return rc
+    let toolfs_ustar = bs_build_w_expect_success(ctx, compiler_path, toolfs_ustar_dir, "build-w-toolfs-ustar", bs_blob_to_args(bs_argv_append("", "build")))
+    if toolfs_ustar.rc != 0: return toolfs_ustar.rc
+    rc = bs_expect_file_contains(ctx, bs_join(toolfs_ustar_dir, "out/archive/extracted/pkg/this-directory-name-is-intentionally-long-for-ustar-prefix-validation-abcdefghijklmnopqrstuvwxyz0123456789/nested/a.txt"), "tree", "build_w_toolfs_ustar")
+    if rc != 0: return rc
+
     let toolfs_escape_dir = bs_join(base_dir, "toolfs_escape")
     rc = bs_write_project_manifest(ctx, toolfs_escape_dir, "buildwtoolfsescape")
     if rc != 0: return rc
