@@ -425,6 +425,10 @@ type Sema {
     type_d1: Vec[i32],
     type_d2: Vec[i32],
     type_extra: Vec[i32],
+    // Exact structural type lookup. Hash buckets point into a collision chain
+    // indexed by TypeId; component checks keep hash collisions harmless.
+    exact_type_cache_heads: HashMap[i64, i32],
+    exact_type_cache_next: Vec[i32],
 
     // Named type lookup: sym → TypeId
     named_types: HashMap[i32, i32],
@@ -1480,6 +1484,7 @@ impl Sema:
         self.type_d1 = sema_clone_i32_vec(&self.type_d1)
         self.type_d2 = sema_clone_i32_vec(&self.type_d2)
         self.type_extra = sema_clone_i32_vec(&self.type_extra)
+        self.rebuild_exact_type_cache()
         self.generic_inst_cache = sema_new_map_i64_i32()
         self.layout_size_cache = HashMap.new()
         self.layout_align_cache = HashMap.new()
@@ -1504,6 +1509,13 @@ impl Sema:
 
 fn sema_pair_key(a: i32, b: i32) -> i64:
     (a as i64) * 4294967296 + (b as i64)
+
+fn sema_exact_type_hash(kind: i32, d0: i32, d1: i32, d2: i32) -> i64:
+    var h: u64 = 14695981039346656037
+    h = (h ^ kind as u64) *% 1099511628211
+    h = (h ^ d0 as u64) *% 1099511628211
+    h = (h ^ d1 as u64) *% 1099511628211
+    ((h ^ d2 as u64) *% 1099511628211) as i64
 
 fn sema_pair_hi(key: i64): (key / 4294967296) as i32
 fn sema_pair_lo(key: i64): (key % 4294967296) as i32
@@ -1722,6 +1734,7 @@ fn sema_visibility_cache_key(from_path: &str, to_path: &str) -> str:
 
 fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     let named_types = sema_new_map_i32_i32()
+    let exact_type_cache_heads = sema_new_map_i64_i32()
     let type_decl_nodes = sema_new_map_i32_i32()
     let trait_decl_node_cache = sema_new_map_i32_i32()
     let type_decl_tids = sema_new_map_i32_i32()
@@ -1819,6 +1832,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         type_d1: Vec.new(),
         type_d2: Vec.new(),
         type_extra: Vec.new(),
+        exact_type_cache_heads,
+        exact_type_cache_next: Vec.new(),
         named_types,
         type_decl_nodes,
         trait_decl_node_cache,
@@ -3332,6 +3347,40 @@ impl Sema:
 
     // ── Type management ──────────────────────────────────────────────
 
+    fn exact_type_components_match(tid: i32, kind: i32, d0: i32, d1: i32, d2: i32) -> bool:
+        self.type_kinds.get(tid as i64) == kind and
+            self.type_d0.get(tid as i64) == d0 and
+            self.type_d1.get(tid as i64) == d1 and
+            self.type_d2.get(tid as i64) == d2
+
+    fn index_exact_type(tid: i32, kind: i32, d0: i32, d1: i32, d2: i32):
+        let key = sema_exact_type_hash(kind, d0, d1, d2)
+        var head = -1
+        if self.exact_type_cache_heads.contains(key):
+            head = self.exact_type_cache_heads.get(key).unwrap()
+        var existing = head
+        while existing >= 0:
+            if self.exact_type_components_match(existing, kind, d0, d1, d2):
+                // Preserve find_exact_type's original first-TypeId result when
+                // identical rows exist in the type table.
+                self.exact_type_cache_next.push(-1)
+                return
+            existing = self.exact_type_cache_next.get(existing as i64)
+        self.exact_type_cache_next.push(head)
+        self.exact_type_cache_heads.insert(key, tid)
+
+    mut fn rebuild_exact_type_cache():
+        self.exact_type_cache_heads = sema_new_map_i64_i32()
+        self.exact_type_cache_next = Vec.new()
+        for tid in 0..self.type_kinds.len() as i32:
+            self.index_exact_type(
+                tid,
+                self.type_kinds.get(tid as i64),
+                self.type_d0.get(tid as i64),
+                self.type_d1.get(tid as i64),
+                self.type_d2.get(tid as i64),
+            )
+
     mut fn freeze_symbols():
         self.symbols_frozen = 1
 
@@ -3345,6 +3394,7 @@ impl Sema:
         self.type_d0.push(d0)
         self.type_d1.push(d1)
         self.type_d2.push(d2)
+        self.index_exact_type(id, kind, d0, d1, d2)
         id as TypeId
 
     // Mark type tables as immutable. Any subsequent add_type will error.
@@ -3358,17 +3408,14 @@ impl Sema:
         1
 
     fn find_exact_type(kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
-        let type_count = self.type_kinds.len() as i32
-        for ti in 0..type_count:
-            if self.type_kinds.get(ti as i64) != kind:
-                continue
-            if self.type_d0.get(ti as i64) != d0:
-                continue
-            if self.type_d1.get(ti as i64) != d1:
-                continue
-            if self.type_d2.get(ti as i64) != d2:
-                continue
-            return ti as TypeId
+        let key = sema_exact_type_hash(kind, d0, d1, d2)
+        if not self.exact_type_cache_heads.contains(key):
+            return 0 as TypeId
+        var ti = self.exact_type_cache_heads.get(key).unwrap()
+        while ti >= 0:
+            if self.exact_type_components_match(ti, kind, d0, d1, d2):
+                return ti as TypeId
+            ti = self.exact_type_cache_next.get(ti as i64)
         0 as TypeId
 
     fn ensure_exact_type(kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
