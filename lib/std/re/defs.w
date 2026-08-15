@@ -3169,10 +3169,6 @@ type regoff_t = c_int
 
 type regmatch_t { rm_so: c_int = 0, rm_eo: c_int = 0 }
 
-let PCRE2regcomp = pcre2_regcomp
-let PCRE2regerror = pcre2_regerror
-let PCRE2regexec = pcre2_regexec
-let PCRE2regfree = pcre2_regfree
 let REG_DOTALL: c_int = 0x0010
 let REG_EXTENDED: c_int = 0
 let REG_ICASE: c_int = 0x0001
@@ -3187,10 +3183,6 @@ let REG_STARTEND: c_int = 0x0080
 let REG_UCP: c_int = 0x0400
 let REG_UNGREEDY: c_int = 0x0200
 let REG_UTF: c_int = 0x0040
-let regcomp = pcre2_regcomp
-let regerror = pcre2_regerror
-let regexec = pcre2_regexec
-let regfree = pcre2_regfree
 let PR_OK: c_uint = 0
 let PR_SKIP: c_uint = 1
 let PR_ABEND: c_uint = 2
