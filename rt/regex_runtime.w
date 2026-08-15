@@ -36,9 +36,7 @@ use std.re.pcre2_convert
 use std.re.pcre2_script_run
 
 extern fn with_panic(msg: str, file: str, line: i32) -> Unit
-extern fn with_str_clone(s: str) -> str
 extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 
 fn regex_runtime_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
@@ -61,13 +59,21 @@ fn regex_to_cstr(s: &str) -> *const u8:
 fn regex_str_data(s: &str) -> *const u8:
     unsafe { **(&s as *const *const *const u8) }
 
+fn regex_owned_cstr(s: *const u8) -> str:
+    if s as i64 == 0:
+        return ""
+    var len: i64 = 0
+    while (unsafe s[len]) != 0:
+        len = len + 1
+    with_str_from_bytes(s, len)
+
 pub fn with_regex_error_message(code: i32) -> str:
     let buf = with_alloc(256)
     let rc = pcre2_get_error_message_8(code, buf as *mut u8, 256)
     if rc < 0:
         with_free(buf)
         return "regex error"
-    let text = with_str_clone(with_str_from_cstr(buf as *const u8))
+    let text = regex_owned_cstr(buf as *const u8)
     with_free(buf)
     text
 
@@ -228,7 +234,7 @@ pub fn with_regex_capture_name_at(code: *const i8, index: i32) -> str:
         with_panic("with_regex_capture_name_at(): name table lookup failed", "", 0)
         return ""
     let entry = (table as i64 + index as i64 * entry_size as i64 + 2) as *const u8
-    with_str_clone(with_str_from_cstr(entry))
+    regex_owned_cstr(entry)
 
 pub fn with_regex_group_name_to_index(code: *const i8, name: &str) -> i32:
     if code as i64 == 0:
