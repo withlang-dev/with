@@ -418,6 +418,9 @@ type Sema {
     pool: InternPool,
     diags: DiagnosticList,
     ast: AstPool,
+    // Reverse index for the AST declaration table. The first declaration for
+    // a node wins, matching find_decl_index's original forward scan.
+    decl_index_by_node: HashMap[i32, i32],
 
     // Type table (SoA parallel arrays)
     type_kinds: Vec[i32],
@@ -1481,6 +1484,9 @@ fn sema_clone_str_str_hashmap(src: &HashMap[str, str]) -> HashMap[str, str]:
 
 impl Sema:
     pub move fn prepare_comptime_eval_copy() -> Sema:
+        // Comptime callers replace `ast` before copying Sema. Rebuild this
+        // owning map for that AST instead of sharing the source map header.
+        self.rebuild_decl_index()
         self.type_kinds = sema_clone_i32_vec(&self.type_kinds)
         self.type_d0 = sema_clone_i32_vec(&self.type_d0)
         self.type_d1 = sema_clone_i32_vec(&self.type_d1)
@@ -1830,6 +1836,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pool: pool,
         diags: diags,
         ast: ast,
+        decl_index_by_node: sema_new_map_i32_i32(),
         type_kinds: Vec.new(),
         type_d0: Vec.new(),
         type_d1: Vec.new(),
@@ -2293,6 +2300,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         reachable_visiting: sema_new_map_i32_i32(),
         reachable_decl_indices: sema_new_map_i32_i32(),
     }
+    s.rebuild_decl_index()
     return s
 
 fn Sema.placeholder(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:

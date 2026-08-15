@@ -351,7 +351,19 @@ impl Sema:
             return 1
         0
 
+    mut fn rebuild_decl_index():
+        self.decl_index_by_node = sema_new_map_i32_i32()
+        for di in 0..self.ast.decl_count():
+            let node = self.ast.get_decl(di) as i32
+            if not self.decl_index_by_node.contains(node):
+                self.decl_index_by_node.insert(node, di)
+
     fn find_decl_index(node: i32) -> i32:
+        if self.decl_index_by_node.contains(node):
+            return self.decl_index_by_node.get(node).unwrap()
+        // Comptime transformation can append generated declarations after
+        // Sema construction. Preserve the old lookup behavior for those
+        // uncommon misses without making every established lookup O(decls).
         for di in 0..self.ast.decl_count():
             if self.ast.get_decl(di) == node:
                 return di
