@@ -928,10 +928,16 @@ fn link_stage_read_file_trimmed(path: &str) -> str:
     let content = runtime_read_file(path)
     if content.len() == 0:
         return ""
-    // Trim trailing newline
+    // Trim trailing whitespace: CR and LF (a CRLF-authored metadata file on
+    // Windows must not leave a stray \r in the linker path — CreateProcessW
+    // cannot launch "…lld-link.exe\r"), plus spaces/tabs.
     var end = content.len() as i32
-    while end > 0 and content.byte_at((end - 1) as i64) == 10:
-        end = end - 1
+    while end > 0:
+        let b = content.byte_at((end - 1) as i64)
+        if b == 10 or b == 13 or b == 32 or b == 9:
+            end = end - 1
+        else:
+            break
     content.slice(0, end as i64)
 
 fn link_stage_artifact_root() -> str:
