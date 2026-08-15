@@ -5258,11 +5258,7 @@ impl Sema:
             self.emit_error("cannot create value of opaque type; use a pointer or reference", node)
         1
 
-    mut fn expr_mutates_any_current_binding(node: i32) -> i32:
-        for bi in 0..self.bind_names.len() as i32:
-            if self.expr_mutates_place(node, self.bind_names.get(bi as i64)) != 0:
-                return 1
-        0
+    mut fn expr_mutates_any_current_binding(node: i32): self.expr_mutates_place(node, 0)
 
     mut fn body_has_explicit_value_result(node: i32, value_path: i32) -> i32:
         if node == 0:
@@ -22025,7 +22021,19 @@ impl Sema:
             self.check_sync_scope_spawn_expr_captures(tail, scope_sym, 0, extra_start, stmt_count, stmt_count, 0)
 
     // Check if an expression mutates a variable rooted at `sym`.
+    // A zero `sym` matches any binding in the current scope, allowing callers
+    // that need only an any-mutation verdict to walk the expression once.
     // Returns 1 if any subexpression assigns to or takes &mut of the variable.
+    fn expr_mutation_root_matches(root: i32, sym: i32) -> i32:
+        if root == 0:
+            return 0
+        if sym != 0:
+            return if root == sym: 1 else: 0
+        for bi in 0..self.bind_names.len() as i32:
+            if self.bind_names.get(bi as i64) == root:
+                return 1
+        0
+
     mut fn expr_mutates_place(node: i32, sym: i32) -> i32:
         if node == 0:
             return 0
@@ -22033,7 +22041,7 @@ impl Sema:
         // Assignment: check if target is rooted at sym
         if kind == NodeKind.NK_ASSIGN:
             let target = self.ast.get_data0(node)
-            if self.place_root_sym(target) == sym:
+            if self.expr_mutation_root_matches(self.place_root_sym(target), sym) != 0:
                 return 1
             // Also check value side for nested mutations
             return self.expr_mutates_place(self.ast.get_data1(node), sym)
@@ -22042,7 +22050,7 @@ impl Sema:
             let op = self.ast.get_data0(node)
             if op == UnaryOp.UOP_RAW_REF_MUT:
                 let operand = self.ast.get_data1(node)
-                if self.place_root_sym(operand) == sym:
+                if self.expr_mutation_root_matches(self.place_root_sym(operand), sym) != 0:
                     return 1
             return self.expr_mutates_place(self.ast.get_data1(node), sym)
         // Recursive cases
@@ -22080,21 +22088,23 @@ impl Sema:
             let callee = self.ast.get_data0(node)
             if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
                 let cbase = self.ast.get_data0(callee)
-                if self.ast.kind(cbase) == NodeKind.NK_IDENT and self.ast.get_data0(cbase) == sym:
-                    let method_sym = self.ast.get_data1(callee)
-                    let cap_ty = self.scope_lookup(sym)
-                    if cap_ty >= 0:
-                        let recv_resolved = self.resolve_alias(cap_ty as TypeId)
-                        var recv_inner = recv_resolved
-                        let recv_tk = self.get_type_kind(recv_inner)
-                        if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
-                            recv_inner = self.resolve_alias(self.get_type_d0(recv_inner) as TypeId)
-                        let owner_sym = self.method_owner_symbol_for_type(recv_inner as i32)
-                        if owner_sym != 0:
-                            if self.builtin_method_requires_mutable_receiver(owner_sym, method_sym) != 0:
-                                return 1
-                            if self.method_has_mut_self_flag(owner_sym, method_sym) != 0:
-                                return 1
+                if self.ast.kind(cbase) == NodeKind.NK_IDENT:
+                    let cbase_sym = self.ast.get_data0(cbase)
+                    if self.expr_mutation_root_matches(cbase_sym, sym) != 0:
+                        let method_sym = self.ast.get_data1(callee)
+                        let cap_ty = self.scope_lookup(cbase_sym)
+                        if cap_ty >= 0:
+                            let recv_resolved = self.resolve_alias(cap_ty as TypeId)
+                            var recv_inner = recv_resolved
+                            let recv_tk = self.get_type_kind(recv_inner)
+                            if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
+                                recv_inner = self.resolve_alias(self.get_type_d0(recv_inner) as TypeId)
+                            let owner_sym = self.method_owner_symbol_for_type(recv_inner as i32)
+                            if owner_sym != 0:
+                                if self.builtin_method_requires_mutable_receiver(owner_sym, method_sym) != 0:
+                                    return 1
+                                if self.method_has_mut_self_flag(owner_sym, method_sym) != 0:
+                                    return 1
             if self.expr_mutates_place(callee, sym) != 0:
                 return 1
             let ea = self.ast.get_data1(node)
