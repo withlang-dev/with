@@ -1549,7 +1549,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var sha256_tool = target_new(.Executable, "with-sha256", "tools/with-sha256.w").output(host_bin("out/bin/with-sha256"))
     sha256_tool = sha256_tool.compiler("seed")
     sha256_tool = sha256_tool.dep("prepare-bootstrap-link-root")
-    out = out.add_target(sha256_tool)
+    out = out.add_target(move sha256_tool)
 
     out = out.add_target(with_object_target("llvm-bridge-object", stage_compiler_bin("with-stage2"), "src/compiler/LlvmBridge.w", "out/lib/llvm_bridge.o", "-O1", "stage2"))
     out = out.add_target(with_object_target("clang-bridge-object", stage_compiler_bin("with-stage2"), "src/compiler/ClangBridge.w", "out/lib/clang_bridge.o", "-O1", "stage2"))
