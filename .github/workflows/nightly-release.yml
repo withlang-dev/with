@@ -1,0 +1,204 @@
+name: Nightly release
+
+on:
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - nightly
+  # Prototype-only trigger. Removed after the fork test proves publication.
+  push:
+    branches:
+      - ci/nightly-release-prototype
+
+concurrency:
+  group: nightly-release-${{ github.repository }}-${{ github.event_name == 'schedule' && 'nightly' || inputs.channel || 'test' }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  WITH_VERSION: v0.15.1
+  WITH_SEED_REPO: withlang-dev/with
+  WITH_SEED_VERSION: with-darwin-aarch64
+  WITH_SEED_ASSET: with-darwin-aarch64
+  WITH_SEED_SHA256: 7223e03b2fd5f0153c1932f51c4be2fe1a98589cf853a535f715742af1039dc3
+  WITH_SDK_REPO: withlang-dev/with
+  WITH_SDK_VERSION: v0.15.1
+  WITH_SDK_ASSET: with-llvm-sdk-22.1.6-darwin-aarch64.tar.zst
+  WITH_SDK_SHA256: aae25a6d115051061afa7249d3ce590296f4695bb23ccb04bdf6e2d8c530a7c2
+  LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-darwin-arm64
+
+jobs:
+  build:
+    name: Verify and package Darwin arm64
+    runs-on: macos-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Verify release version
+        run: test "$(tr -d '\r\n' < src/version)" = "$WITH_VERSION"
+
+      - name: Fetch verified bootstrap seed
+        run: |
+          set -euo pipefail
+          curl -fL -o src/main \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | shasum -a 256 -c -
+          chmod +x src/main
+          src/main version
+
+      - name: Fetch verified static LLVM SDK
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/$WITH_SDK_ASSET"
+          curl -fL -o "$archive" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          printf '%s  %s\n' "$WITH_SDK_SHA256" "$archive" | shasum -a 256 -c -
+          mkdir -p .deps
+          if tar --help 2>&1 | grep -q -- --zstd; then
+            tar --zstd -xf "$archive" -C .deps
+          else
+            zstd -d -c "$archive" | tar -xf - -C .deps
+          fi
+          test -f "$LLVM_PREFIX/lib/libclang.a"
+          test -x "$LLVM_PREFIX/bin/llvm-strip"
+
+      - name: Verify dependency graph
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build :deps
+
+      - name: Build seed to release compiler
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build
+
+      - name: Select rebuilt compiler
+        run: echo "WITH=$GITHUB_WORKSPACE/out/release/bin/with" >> "$GITHUB_ENV"
+
+      - name: Verify fixpoint
+        run: ./out/release/bin/with build :fixpoint
+
+      - name: Run test suite
+        run: ./out/release/bin/with build :test
+
+      - name: Record current test evidence
+        run: ./out/release/bin/with build :test-green
+
+      - name: Record verified compiler provenance
+        run: ./out/release/bin/with build :last-green
+
+      - name: Run release UAT
+        run: ./out/release/bin/with build :release-uat
+
+      - name: Package graph-owned release asset
+        run: ./out/release/bin/with build :package-current-host
+
+      - name: Verify packaged checksum
+        run: shasum -a 256 -c out/release/with-darwin-aarch64.sha256
+
+      - name: Upload verified release inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nightly-darwin-aarch64-${{ github.sha }}
+          path: |
+            out/release/with-darwin-aarch64
+            out/release/with-darwin-aarch64.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    name: Publish immutable prerelease
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - name: Download verified release inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: nightly-darwin-aarch64-${{ github.sha }}
+          path: out/release
+
+      - name: Verify transferred checksum
+        run: shasum -a 256 -c out/release/with-darwin-aarch64.sha256
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-path: out/release/with-darwin-aarch64
+
+      - name: Select immutable release tag
+        id: release
+        env:
+          REQUESTED_CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          channel="$REQUESTED_CHANNEL"
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then
+            channel=nightly
+          elif [ "$GITHUB_EVENT_NAME" = push ]; then
+            channel=test
+          fi
+          if [ "$channel" = test ]; then
+            tag="nightly-test-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            title="Disposable nightly release test ${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          elif [ "$channel" = nightly ]; then
+            tag="nightly-$(date -u +%Y%m%d)-${GITHUB_RUN_ID}-${GITHUB_SHA:0:12}"
+            title="With nightly $(date -u +%Y-%m-%d) (${GITHUB_SHA:0:12})"
+          else
+            echo "unsupported release channel: $channel" >&2
+            exit 1
+          fi
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.release.outputs.title }}
+        run: |
+          set -euo pipefail
+          notes="Automated ${{ steps.release.outputs.channel }} compiler prerelease."$'\n\n'"Source commit: $GITHUB_SHA"$'\n'"Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"$'\n'"Compiler version: $WITH_VERSION"$'\n\n'"Verification gates:"$'\n'"- with build"$'\n'"- with build :fixpoint"$'\n'"- with build :test"$'\n'"- with build :test-green"$'\n'"- with build :last-green"$'\n'"- with build :release-uat"$'\n'"- with build :package-current-host"
+          gh release create "$RELEASE_TAG" \
+            out/release/with-darwin-aarch64 \
+            out/release/with-darwin-aarch64.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TITLE" \
+            --notes "$notes" \
+            --prerelease
+
+      - name: Verify published tag, assets, and digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq .object.sha)"
+          test "$tag_sha" = "$GITHUB_SHA"
+          checksum_line="$(<out/release/with-darwin-aarch64.sha256)"
+          expected="${checksum_line%% *}"
+          published="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | select(.name == "with-darwin-aarch64") | .digest')"
+          test "$published" = "sha256:$expected"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json url,tagName,isPrerelease,targetCommitish,assets
