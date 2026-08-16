@@ -631,8 +631,12 @@ pub unsafe fn rt_access(path: *const u8, mode: i32) -> i32:
 pub unsafe fn rt_sysinfo(out: *mut RtSysInfo) -> i32:
     var info: [64]u8 = [0 as u8; 64]
     GetSystemInfo(&raw mut info as *mut [64]u8 as *mut u8)
-    let page_size = unsafe *((&info as i64 + 8) as *const u32)
-    let processors = unsafe *((&info as i64 + 36) as *const u32)
+    // SYSTEM_INFO (x64): dwPageSize @4, dwNumberOfProcessors @32.
+    // (@8 is lpMinimumApplicationAddress, @36 is the obsolete dwProcessorType
+    // which reads ~8664 on x64 — reading it as the core count oversubscribed
+    // the build worker pool 16-wide on small runners.)
+    let page_size = unsafe *((&info as i64 + 4) as *const u32)
+    let processors = unsafe *((&info as i64 + 32) as *const u32)
     var mem: [64]u8 = [0 as u8; 64]
     unsafe *((&raw mut mem) as *mut [64]u8 as *mut u32) = 64 as u32
     var total: i64 = 0
