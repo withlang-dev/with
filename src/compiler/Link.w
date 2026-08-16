@@ -1086,7 +1086,13 @@ fn link_stage_sanitize_relative_dir(path: &str) -> str:
                     if segment == "..":
                         out = out ++ "__up__"
                     else:
-                        out = out ++ segment
+                        // A Windows source carries a drive-letter segment ("C:")
+                        // whose colon is illegal in a path component; left intact
+                        // it yields an uncreatable artifact dir (out/C:/wt/...) and
+                        // mkdir fails before the program runs. Colons never appear
+                        // in this compiler's own source paths, so stripping them is
+                        // a no-op off Windows — fixpoint output stays byte-identical.
+                        out = out ++ segment.replace(":", "")
             segment_start = i + 1
         i = i + 1
     out
