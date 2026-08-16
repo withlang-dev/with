@@ -21,6 +21,12 @@ jobs:
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: v0.15.1
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.zst
+      # windows-latest is a 4-vCPU runner. The build worker pool sizes itself
+      # from the CPU count; pin it to the real core count so the pool does not
+      # oversubscribe (the seed's rt_sysinfo miscounts cores as ~8664 -> 16-wide
+      # pool -> 4x oversubscription -> thrash). build_pool_width honours this env
+      # before the core probe, so it takes effect on the frozen seed with no reseed.
+      WITH_BUILD_JOBS: "4"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
