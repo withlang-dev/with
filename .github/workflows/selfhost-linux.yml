@@ -14,12 +14,11 @@ jobs:
     env:
       WITH_OUT_DIR: ${{ github.workspace }}/out
       LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-linux-x86_64
-      # Pre-flip (+187-era) seed carrying the globaldce fix from this branch's
-      # first commit. Tip's build.w requires a str=Copy compiler to run, so the
-      # seed cannot be tip's own stage3 — by design tip is never its own seed.
-      WITH_SEED_REPO: ${{ github.repository }}
+      # Fixpoint-verified stable release seed for this platform.
+      WITH_SEED_REPO: withlang-dev/with
       WITH_SEED_ASSET: with-linux-x86_64
-      WITH_SEED_VERSION: seed-linux-tip-368c81bf
+      WITH_SEED_VERSION: v0.15.1.3
+      WITH_SEED_SHA256: 0556c80c0acc44545c77e1dac77ffb677fe53c4cdbefba4aa7d36eb63b27b595
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: v0.15.1
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.zst
@@ -72,6 +71,7 @@ jobs:
           set -euo pipefail
           curl -fL -o with-seed \
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" with-seed | sha256sum -c -
           chmod +x with-seed
           LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed version
 
@@ -89,8 +89,8 @@ jobs:
           WITH: ${{ github.workspace }}/with-seed
         run: |
           set -euo pipefail
-          # Drive :fixpoint with the seed, not ./out/bin/with: the freshly built
-          # tip compiler is post-str-flip and would reject this era's build.w.
+          # Drive the build graph with the pinned stable seed; the graph compares
+          # the newly built stage2 and stage3 compiler outputs.
           export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           "$WITH" build :fixpoint
@@ -106,11 +106,9 @@ jobs:
           # asserts `analyze audit:all` + `audit:storage`), CLI self-host, and
           # c-migrator suites, then records `test-green` evidence.
           #
-          # Driven with the seed for the same reason as :build/:fixpoint above:
-          # the freshly built tip compiler is post-str-flip and cannot run this
-          # era's build.w. The seed runs build.w, whose test actions invoke the
-          # already-built out/release/bin/with on the fixtures (no rebuild — the
-          # build step above populated the cache).
+          # The stable seed runs build.w, whose test actions invoke the already-
+          # built out/release/bin/with on the fixtures (no rebuild — the build
+          # step above populated the cache).
           export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           "$WITH" build :test
