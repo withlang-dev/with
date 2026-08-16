@@ -4283,9 +4283,12 @@ fn bs_check_migrate_macro_body_string_literal(ctx: &ActionCtx, compiler_path: &s
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-macro-body-string-literal", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "fprintf(__stderrp, c\"%s error: %d\\n\".ptr, \"compress\", __param_err)", "macro_body_string_literal")
+    // The migrator emits the target's stdio-global spelling verbatim: Darwin's
+    // headers macro-expand stderr to __stderrp, glibc's stay stderr.
+    let stderr_sym = if os() == "Macos": "__stderrp" else: "stderr"
+    rc = bs_assert_contains(ctx, out_text, "fprintf(" ++ stderr_sym ++ ", c\"%s error: %d\\n\".ptr, \"compress\", __param_err)", "macro_body_string_literal")
     if rc != 0: return rc
-    rc = bs_assert_not_contains(ctx, out_text, "fprintf(__stderrp, c\"compress\".ptr", "macro_body_string_literal")
+    rc = bs_assert_not_contains(ctx, out_text, "fprintf(" ++ stderr_sym ++ ", c\"compress\".ptr", "macro_body_string_literal")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")

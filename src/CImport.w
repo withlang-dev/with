@@ -6343,6 +6343,24 @@ impl CiTypePool:
                 i = i + 1
             return self.ty_fn_ptr(ret_ty, params_start, arg_count)
 
+        // Aggregate `va_list` (glibc/aarch64 `__va_list_tag[N]`) has no
+        // spellable field layout, so the bridge demotes it to `c_void` —
+        // which `check` rejects as a value type, breaking every migrated
+        // variadic function. LLVM's `llvm.va_start`/`va_end` only need
+        // correctly-sized storage, so lower it to a `[u8; N]` buffer sized
+        // to the target's actual va_list. Detection is structural: the
+        // canonical type is an array whose element record is `__va_list_tag`
+        // — target-independent, and Darwin's `char*` va_list never reaches
+        // here (it lowers through the CXT_Pointer path above).
+        let va_canon = with_ci_type_canonical(session, cxtype)
+        if va_canon >= 0 and with_ci_type_kind(session, va_canon) == CXT_ConstantArray:
+            let va_elem = with_ci_type_array_element(session, va_canon)
+            if va_elem >= 0 and ci_str_contains(with_ci_type_spelling(session, va_elem), "__va_list_tag"):
+                let va_size = with_ci_type_sizeof(session, cxtype) as i32
+                if va_size > 0:
+                    let u8_idx = self.add_string("u8")
+                    return self.ty_array(self.ty_named(u8_idx), va_size)
+
         // Typedef, elaborated, atomic, and other named wrappers.
         // Normalize builtin typedef spellings so C names like size_t do
         // not leak into generated With type positions.
@@ -15579,6 +15597,9 @@ fn ci_is_libm_fn(name: &str) -> bool:
 fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "rlimit": return CI_LIBC_KIND_TYPE
     if name == "__stdinp" or name == "__stdoutp" or name == "__stderrp": return CI_LIBC_KIND_VAR
+    // glibc spells the stdio globals stdin/stdout/stderr (Darwin uses the
+    // __std*p forms above). std.libc exposes both target surfaces.
+    if name == "stdin" or name == "stdout" or name == "stderr": return CI_LIBC_KIND_VAR
     if name == "fprintf" or name == "printf" or name == "snprintf" or name == "sprintf": return CI_LIBC_KIND_FN
     if name == "vsnprintf": return CI_LIBC_KIND_FN
     if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno": return CI_LIBC_KIND_FN

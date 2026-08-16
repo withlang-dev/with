@@ -1240,6 +1240,11 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
         nargs = nargs + 1
         args[nargs as i64] = "c\0" as *const u8
         nargs = nargs + 1
+        // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
+        // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
+        // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
+        args[nargs as i64] = "-D_DEFAULT_SOURCE\0" as *const u8
+        nargs = nargs + 1
         var ip: i32 = 0
         while ip < g_cimport_include_count and nargs < 62:
             args[nargs as i64] = "-I\0" as *const u8
@@ -2322,6 +2327,11 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
     nargs = nargs + 1
     args[nargs as i64] = "c\0" as *const u8
     nargs = nargs + 1
+    // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
+    // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
+    // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
+    args[nargs as i64] = "-D_DEFAULT_SOURCE\0" as *const u8
+    nargs = nargs + 1
     var ip: i32 = 0
     while ip < g_cimport_include_count and nargs < 62:
         args[nargs as i64] = "-I\0" as *const u8
@@ -2413,6 +2423,11 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
         nargs = nargs + 1
         args[nargs as i64] = "c\0" as *const u8
         nargs = nargs + 1
+        // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
+        // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
+        // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
+        args[nargs as i64] = "-D_DEFAULT_SOURCE\0" as *const u8
+        nargs = nargs + 1
         var ip: i32 = 0
         while ip < g_cimport_include_count and nargs < 62:
             args[nargs as i64] = "-I\0" as *const u8
@@ -2496,6 +2511,11 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_name: &str) -> i6
         args[nargs as i64] = "-x\0" as *const u8
         nargs = nargs + 1
         args[nargs as i64] = "c\0" as *const u8
+        nargs = nargs + 1
+        // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
+        // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
+        // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
+        args[nargs as i64] = "-D_DEFAULT_SOURCE\0" as *const u8
         nargs = nargs + 1
         var ip: i32 = 0
         while ip < g_cimport_include_count and nargs < 62:

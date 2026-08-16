@@ -14,6 +14,15 @@ pub extern var __stdinp: *mut c_void
 pub extern var __stdoutp: *mut c_void
 pub extern var __stderrp: *mut c_void
 
+// glibc stdio globals. These are the names produced by the Linux headers
+// (stdin/stdout/stderr are the real exported symbols; the macros expand to
+// themselves). Migrated output is target-specific, so only the target's set
+// is ever referenced — the other set stays an unreferenced extern and forces
+// no link resolution.
+pub extern var stdin: *mut c_void
+pub extern var stdout: *mut c_void
+pub extern var stderr: *mut c_void
+
 extern fn rt_libc_stdin() -> *mut c_void
 extern fn rt_libc_stdout() -> *mut c_void
 extern fn rt_libc_stderr() -> *mut c_void
