@@ -17,7 +17,7 @@ on:
       version:
         description: Compiler version; must exactly match src/version
         required: false
-        default: v0.15.1
+        default: v0.15.1.2
         type: string
 
 concurrency:
