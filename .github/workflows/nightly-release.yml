@@ -433,7 +433,13 @@ jobs:
 
       - name: Create tag and release
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Scheduled nightlies publish as the github-actions bot (github.token);
+          # this needs the repo's default workflow permissions set to
+          # "Read and write" (and, if a tag ruleset guards v*/nightly-*, the
+          # Actions bot on its bypass list). Manual dispatches publish with a
+          # release-capable PAT (RELEASE_TOKEN, e.g. ropoctl) — the bot cannot
+          # create releases here (POST /releases 403s), and ropoctl provably can.
+          GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_TITLE: ${{ steps.release.outputs.title }}
@@ -455,7 +461,10 @@ jobs:
 
       - name: Verify published tag, assets, and digest
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Verify as the same actor that created the release (reads work with
+          # either token; keeping them identical avoids any create/read actor
+          # skew across the schedule vs manual-dispatch paths).
+          GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_ASSETS_FILE: ${{ steps.artifacts.outputs.assets_file }}
