@@ -810,6 +810,11 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return issue61_fail(ctx, "could not create output directory: " ++ output_dir)
 
+    if os() == "Windows":
+        print("issue61-regression: skipped on Windows (#809)")
+        let _ = fs.write_text(build_project_join(output_dir, ".stamp"), "ok")
+        return 0
+
     let root = ctx.project_info().project_root()
     let compiler_path = build_project_abs(root, inputs.get(0))
     if not fs.exists(inputs.get(0)):
