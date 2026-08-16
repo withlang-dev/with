@@ -1,4 +1,4 @@
-name: selfhost (linux x86_64)
+name: green battery (linux x86_64)
 
 on:
   push:
@@ -6,8 +6,11 @@ on:
 
 jobs:
   selfhost-linux:
-    name: selfhost (linux x86_64)
+    name: green battery (linux x86_64)
     runs-on: ubuntu-latest
+    # The full battery (seed bootstrap + build + fixpoint + :test) is longer than
+    # the bare self-host check; give it headroom on the shared runner.
+    timeout-minutes: 180
     env:
       WITH_OUT_DIR: ${{ github.workspace }}/out
       LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-linux-x86_64
@@ -91,3 +94,23 @@ jobs:
           export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
           export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
           "$WITH" build :fixpoint
+
+      - name: Green battery (build :test — behavior/native/cli/deep-debug/alloc + audit:all)
+        env:
+          WITH: ${{ github.workspace }}/with-seed
+        run: |
+          set -euo pipefail
+          # The standing green battery. `:test` is a Group target that runs the
+          # behavior, native compile-error/codegen/spec/phase, comptime-diff,
+          # debug-alloc, lexer/parser/internals, deep-debug-tool (which itself
+          # asserts `analyze audit:all` + `audit:storage`), CLI self-host, and
+          # c-migrator suites, then records `test-green` evidence.
+          #
+          # Driven with the seed for the same reason as :build/:fixpoint above:
+          # the freshly built tip compiler is post-str-flip and cannot run this
+          # era's build.w. The seed runs build.w, whose test actions invoke the
+          # already-built out/release/bin/with on the fixtures (no rebuild — the
+          # build step above populated the cache).
+          export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
+          export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
+          "$WITH" build :test
