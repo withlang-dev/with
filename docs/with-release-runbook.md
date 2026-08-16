@@ -395,10 +395,17 @@ set and stop before publishing.
 Create an annotated tag at the verified commit:
 
 ```sh
-git tag -a v0.14.3 -m "v0.14.3"
 git push origin main
+git tag -a v0.14.3 -m "v0.14.3"
 git push origin v0.14.3
 ```
+
+Pushing a `v*` tag runs the official Release workflow at the tag's exact commit.
+The tag must match `src/version`; a mismatch fails before the build. The workflow
+uses the tag name as `WITH_VERSION`, builds and verifies each platform at the tag
+event's `GITHUB_SHA`, creates the stable GitHub release for the existing tag, and
+then verifies that the published tag resolves back to that same SHA. Do not run a
+second manual `gh release create` for a tag handled by this workflow.
 
 Prepare the platform-named assets on their native platforms with the
 With-native release package targets:

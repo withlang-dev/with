@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - "v*"
   schedule:
     - cron: "17 8 * * *"
   workflow_dispatch:
@@ -17,17 +20,17 @@ on:
       version:
         description: Compiler version; must exactly match src/version
         required: false
-        default: v0.15.1.2
+        default: v0.15.1.3
         type: string
 
 concurrency:
-  group: nightly-release-${{ github.repository }}-${{ github.event_name == 'schedule' && 'nightly' || inputs.channel || 'test' }}
+  group: nightly-release-${{ github.repository }}-${{ github.event_name == 'push' && github.ref_name || github.event_name == 'schedule' && 'nightly' || inputs.channel || 'test' }}
   cancel-in-progress: false
 
 permissions: {}
 
 env:
-  WITH_VERSION: ${{ inputs.version || 'v0.15.1' }}
+  WITH_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version || 'v0.15.1.3' }}
 
 jobs:
   build:
@@ -387,7 +390,7 @@ jobs:
       - name: Generate immutable release metadata
         id: release
         env:
-          REQUESTED_CHANNEL: ${{ inputs.channel }}
+          REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
           SUCCESSFUL_PLATFORMS: ${{ steps.artifacts.outputs.platforms }}
         run: |
           set -euo pipefail
@@ -436,9 +439,10 @@ jobs:
           # Scheduled nightlies publish as the github-actions bot (github.token);
           # this needs the repo's default workflow permissions set to
           # "Read and write" (and, if a tag ruleset guards v*/nightly-*, the
-          # Actions bot on its bypass list). Manual dispatches publish with a
-          # release-capable PAT (RELEASE_TOKEN, e.g. ropoctl) — the bot cannot
-          # create releases here (POST /releases 403s), and ropoctl provably can.
+          # Actions bot on its bypass list). Manual dispatches and version-tag
+          # pushes publish with a release-capable PAT (RELEASE_TOKEN, e.g.
+          # ropoctl) — the bot cannot create releases here (POST /releases
+          # 403s), and ropoctl provably can.
           GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
