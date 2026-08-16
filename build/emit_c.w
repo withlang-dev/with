@@ -138,18 +138,43 @@ fn emitc_push_host_c_flags(argv: Vec[str]) -> Vec[str]:
         argv |> push("-D_CRT_SECURE_NO_WARNINGS")
         argv |> push("-fuse-ld=lld")
         argv |> push("-Wl,/stack:8388608")
-        argv |> push("-Wl,/libpath:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64")
-        argv |> push("-Wl,/libpath:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64")
-        argv |> push("-Wl,/libpath:C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64")
+        argv |> push("-Wl,/libpath:" ++ emitc_windows_um_libdir())
+        argv |> push("-Wl,/libpath:" ++ emitc_windows_ucrt_libdir())
+        argv |> push("-Wl,/libpath:" ++ emitc_windows_msvc_libdir())
     argv
 
+fn emitc_windows_um_libdir():
+    let dir = env("WITH_WINDOWS_UM_LIBDIR")
+    if dir.len() > 0: return dir
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64"
+
+fn emitc_windows_ucrt_libdir():
+    let dir = env("WITH_WINDOWS_UCRT_LIBDIR")
+    if dir.len() > 0: return dir
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64"
+
+fn emitc_windows_msvc_libdir():
+    let dir = env("WITH_WINDOWS_MSVC_LIBDIR")
+    if dir.len() > 0: return dir
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64"
+
+// Windows import-library paths. Honour the explicit libdir env override
+// (set by the runner / cross-build SDK) before the baked-in VS2019/Windows-Kit
+// paths, which do not exist on a clean runner or a self-hosting VM that carries
+// its own .deps/winsdk. Mirrors Link.w's link_stage_windows_libpath.
 fn emitc_windows_sdk_um_lib(name: &str) -> str:
+    let dir = env("WITH_WINDOWS_UM_LIBDIR")
+    if dir.len() > 0: return dir ++ "/" ++ name
     "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64/" ++ name
 
 fn emitc_windows_sdk_ucrt_lib(name: &str) -> str:
+    let dir = env("WITH_WINDOWS_UCRT_LIBDIR")
+    if dir.len() > 0: return dir ++ "/" ++ name
     "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64/" ++ name
 
 fn emitc_windows_msvc_lib(name: &str) -> str:
+    let dir = env("WITH_WINDOWS_MSVC_LIBDIR")
+    if dir.len() > 0: return dir ++ "/" ++ name
     "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64/" ++ name
 
 fn emitc_push_system_libs(argv: Vec[str]) -> Vec[str]:

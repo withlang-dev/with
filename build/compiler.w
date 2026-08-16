@@ -86,13 +86,24 @@ pub fn comp_rsp_path(path: &str) -> str:
         return "\"" ++ normalized ++ "\""
     normalized
 
+// Windows import-library paths for the LLVM link-metadata rsp. Honour the
+// explicit libdir env override (set by the runner / cross-build SDK) before the
+// baked-in VS2019/Windows-Kit paths, which do not exist on a clean runner or a
+// self-hosting VM that carries its own .deps/winsdk. Mirrors emit_c.w's
+// emitc_windows_*_lib and Link.w's link_stage_windows_libpath.
 fn comp_windows_sdk_um_lib(name: &str) -> str:
+    let dir = env("WITH_WINDOWS_UM_LIBDIR")
+    if dir.len() > 0: return comp_rsp_path(dir ++ "/" ++ name)
     comp_rsp_path("C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64/" ++ name)
 
 fn comp_windows_sdk_ucrt_lib(name: &str) -> str:
+    let dir = env("WITH_WINDOWS_UCRT_LIBDIR")
+    if dir.len() > 0: return comp_rsp_path(dir ++ "/" ++ name)
     comp_rsp_path("C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64/" ++ name)
 
 fn comp_windows_msvc_lib(name: &str) -> str:
+    let dir = env("WITH_WINDOWS_MSVC_LIBDIR")
+    if dir.len() > 0: return comp_rsp_path(dir ++ "/" ++ name)
     comp_rsp_path("C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64/" ++ name)
 
 fn comp_linux_system_lib_arg(fs: &ToolFs, name: &str) -> str:
