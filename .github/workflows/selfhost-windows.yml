@@ -100,3 +100,23 @@ jobs:
 
       - name: Fixpoint (stage2 == stage3)
         run: ./src/main.exe build :fixpoint
+
+      - name: Green battery (build :test)
+        run: |
+          set -euo pipefail
+          # The standing Windows green battery. `:test` runs the behavior,
+          # native, comptime-diff, debug-alloc, internals, deep-debug-tool, CLI
+          # self-host and c-migrator suites, then records `test-green` evidence.
+          # It is driven with the seed (WITH) for the same reason as build /
+          # fixpoint above: build.w's test actions invoke the already-built
+          # out/release/bin/with on the fixtures (no rebuild — the build step
+          # populated the cache).
+          #
+          # Tests that cannot pass natively on Windows yet are gated in-source
+          # with `//! skip-windows: <reason>` (e.g. behav_async_stack_overflow,
+          # which needs a native Windows fiber backend / VEH guard-page trap,
+          # #369). This is the lazy per-test gate the harness already supports;
+          # a general target_os predicate is proposed separately. As each
+          # underlying gap is fixed the skip is removed, greening more of the
+          # battery over time.
+          ./src/main.exe build :test
