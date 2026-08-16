@@ -17929,9 +17929,17 @@ impl Codegen:
     // Windows. Spill each str value to a slot and pass its address.
     fn emit_runtime_panic_value(msg: i64, loc: i64) -> Unit:
         let str_ty = self.str_llvm_type()
-        let msg_slot = self.create_entry_alloca(str_ty)
+        // Spill into the function the builder is *actually* positioned in, not
+        // self.current_function: a compiler-emitted panic can be lowered into a
+        // locally-built wrapper (e.g. emit_runtime_fiber_config's config panic
+        // block) where current_function is still the previous body, and an
+        // alloca placed there would be referenced across functions ("instruction
+        // in another function" verify error). The builder's insert function is
+        // authoritative and equals current_function on the normal body path.
+        let host_fn = wl_get_insert_function(self.builder)
+        let msg_slot = wl_create_entry_alloca(self.builder, host_fn, str_ty)
         wl_build_store(self.builder, msg, msg_slot)
-        let loc_slot = self.create_entry_alloca(str_ty)
+        let loc_slot = wl_create_entry_alloca(self.builder, host_fn, str_ty)
         wl_build_store(self.builder, loc, loc_slot)
         let panic_fn = self.ensure_panic_ref_fn()
         let panic_ty = self.panic_ref_fn_type()

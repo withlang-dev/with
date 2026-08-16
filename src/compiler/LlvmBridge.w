@@ -809,6 +809,11 @@ pub fn wl_position_before(b: i64, instr: i64) -> Unit:
         LLVMPositionBuilderBefore(b as *mut u8, instr as *mut u8)
 
 pub fn wl_get_insert_block(b: i64) -> i64: unsafe { LLVMGetInsertBlock(b as *mut u8) as i64 }
+// Parent function of the builder's current insertion block. This is the
+// authoritative "function currently being built" — unlike a cached field it
+// cannot go stale when codegen emits into a locally-constructed wrapper.
+pub fn wl_get_insert_function(b: i64) -> i64:
+    unsafe { LLVMGetBasicBlockParent(LLVMGetInsertBlock(b as *mut u8)) as i64 }
 pub fn wl_get_bb_terminator(bb: i64) -> i64: unsafe { LLVMGetBasicBlockTerminator(bb as *mut u8) as i64 }
 pub fn wl_get_entry_bb(fn_val: i64) -> i64: unsafe { LLVMGetEntryBasicBlock(fn_val as *mut u8) as i64 }
 pub fn wl_get_first_instr(bb: i64) -> i64: unsafe { LLVMGetFirstInstruction(bb as *mut u8) as i64 }
