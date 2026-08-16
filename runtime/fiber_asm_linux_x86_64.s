@@ -47,7 +47,14 @@ with_fiber_prepare_initial_context:
 .globl with_fiber_start
 .p2align 4
 with_fiber_start:
-    subq $32, %rsp
+    // Entry rsp ≡ 8 (mod 16): prepare_initial_context sets rsp = (top & -16) - 8,
+    // a fake post-call frame. SysV requires each callee be entered at rsp ≡ 8
+    // (mod 16) so its first stack `movaps` hits a 16-aligned slot. A `call`
+    // pushes 8, so rsp must be ≡ 0 (mod 16) *before* the call. Subtract 24
+    // (≡ 8 mod 16): 8 - 8 ≡ 0, and 24 bytes still covers the three 8-byte
+    // out-slots at 0/8/16. (The old `subq $32` left rsp ≡ 8, entering the async
+    // trampoline at ≡ 0 — misaligned by 8, faulting the body's `movaps`.)
+    subq $24, %rsp
     movq %rsp, %rdi
     leaq 8(%rsp), %rsi
     leaq 16(%rsp), %rdx
