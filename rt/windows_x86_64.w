@@ -663,10 +663,23 @@ pub unsafe fn rt_getenv(name: *const u8) -> *const u8:
     // pointers; Windows `GetEnvironmentVariableW` copies into a caller buffer,
     // so a single shared static buffer would make every retained result alias
     // the last read. The converter writes one byte per UTF-16 code unit, so the
-    // returned unit count `n` is the exact UTF-8 length; `with_alloc(n + 1)`
-    // covers value + NUL. This is an owned allocator payload (drop-safe if ever
-    // freed) that lives for the process, the same lifetime model as `environ`.
-    let buf = with_alloc(n as i64 + 1)
+    // returned unit count `n` is the exact UTF-8 length; the buffer covers
+    // value + NUL (rt_mmap pages are zero-filled, so byte `n` is already NUL).
+    //
+    // The buffer MUST come from rt_mmap, not with_alloc: rt_getenv is called
+    // from inside the allocator lock. The allocator's own config checks
+    // (dbg_on/alloc_system_on/rt_alloc_effective_limit_unlocked reading
+    // WITH_MEMORY_LIMIT_BYTES) run in rt_alloc_unlocked while rt_alloc_lock_word
+    // is held; a with_alloc here would re-enter rt_allocator_lock() on the same
+    // thread and deadlock on the non-recursive spinlock. Linux/darwin never hit
+    // this because their rt_getenv returns environ pointers and allocates
+    // nothing. rt_mmap (VirtualAlloc) is thread-safe and takes no allocator
+    // lock, mirroring dbg_ledger_init's raw-page pattern. This is an owned,
+    // non-aliasing, process-lifetime region — the same lifetime model as
+    // `environ` — so "non-allocating rt_getenv" (rt_core.w) holds on Windows too.
+    let buf = rt_mmap(n as i64 + 1)
+    if buf as i64 == 0:
+        return 0 as *const u8
     let _ = win_utf16_to_utf8_buf(&wvalue as *const [16384]u16 as *const u16, buf, n as i64 + 1)
     buf as *const u8
 
