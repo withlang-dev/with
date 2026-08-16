@@ -1,4 +1,4 @@
-name: selfhost (windows x86_64)
+name: selfhost+tests
 
 on:
   # Restrict push to main so a PR-branch push does not trigger BOTH a push run
@@ -9,13 +9,16 @@ on:
   pull_request:
 
 # Cancel a superseded in-progress run when the same PR branch is re-pushed.
+# Hardcode the platform token (not ${{ github.workflow }}) so the three
+# same-named "selfhost+tests" workflows get distinct groups and do not cancel
+# each other across platforms.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: selfhost-tests-windows-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
   selfhost-windows:
-    name: selfhost (windows x86_64)
+    name: windows x86_64
     runs-on: windows-latest
     timeout-minutes: 120
     defaults:
