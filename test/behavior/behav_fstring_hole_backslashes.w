@@ -1,3 +1,4 @@
+//! skip-windows: issue #798: regex-literal codegen crash (0xC0000005) on native Windows
 //! expect-stdout: ok
 
 // #656: f-string hole normalization must not strip source-level

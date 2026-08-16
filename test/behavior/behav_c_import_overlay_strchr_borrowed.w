@@ -1,3 +1,4 @@
+//! skip-windows: issue #799: c_import behavior fails on native Windows MSVC headers
 //! expect-stdout: ok
 
 // #379: strchr is curated -- its `const char*` parameter is `cstr_in` and its

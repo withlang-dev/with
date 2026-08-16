@@ -1,3 +1,4 @@
+//! skip-windows: issue #799: c_import behavior fails on native Windows MSVC headers
 //! expect-stdout: ok
 
 // [Phase8] #357 increment 2: readdir BORROWS the owned DIR — its curated

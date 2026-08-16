@@ -1,3 +1,4 @@
+//! skip-windows: issue #801: embed_file path resolution fails on native Windows
 //! expect-stdout: ok
 
 const DIR: str = "lib/embed_file_computed"

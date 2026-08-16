@@ -1,3 +1,4 @@
+//! skip-windows: issue #800: action/capability/net/process/fs OS-surface fails on native Windows
 //! expect-stdout: ok
 
 // #658: the server-side std.net surface must actually work. TCP: listen

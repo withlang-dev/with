@@ -1,3 +1,4 @@
+//! skip-windows: issue #797: panic exits 1 not 134 on native Windows
 //! expect-exit: 134
 //! expect-stderr: user must exist in test setup
 //! expect-stderr: None

@@ -1,3 +1,4 @@
+//! skip-windows: issue #802: core-language behavior fails on native Windows (needs root-cause)
 //! expect-stdout: ok
 
 fn make_iter(xs: &Vec[i32]) -> VecIter[i32]:

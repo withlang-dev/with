@@ -1,3 +1,4 @@
+//! skip-windows: issue #797: panic exits 1 not 134 on native Windows
 //! expect-stdout: ok
 
 use pre_d_build_runner

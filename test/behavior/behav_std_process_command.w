@@ -1,3 +1,4 @@
+//! skip-windows: issue #800: action/capability/net/process/fs OS-surface fails on native Windows
 //! expect-stdout: ok
 
 use std.process

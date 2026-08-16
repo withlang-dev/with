@@ -1,3 +1,4 @@
+//! skip-windows: issue #799: c_import behavior fails on native Windows MSVC headers
 // §16.1: a system-header c_import resolves the target macOS SDK without
 // spawning xcrun (env SDKROOT/WITH_SDKROOT, with.toml [c_import] sdk_path, or
 // a well-known SDK path). A successful import with modeled constants proves

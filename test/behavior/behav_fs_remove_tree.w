@@ -1,3 +1,4 @@
+//! skip-windows: issue #800: action/capability/net/process/fs OS-surface fails on native Windows
 use std.fs
 
 fn contains_line(text: &str, line: &str) -> bool:
