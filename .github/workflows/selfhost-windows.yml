@@ -1,8 +1,17 @@
 name: selfhost (windows x86_64)
 
 on:
+  # Restrict push to main so a PR-branch push does not trigger BOTH a push run
+  # and a pull_request run (the double-run that doubles runner usage). PRs are
+  # covered by pull_request; main pushes (merges) by push.
   push:
+    branches: [main]
   pull_request:
+
+# Cancel a superseded in-progress run when the same PR branch is re-pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   selfhost-windows:
