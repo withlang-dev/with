@@ -1,4 +1,5 @@
 //! expect-stdout: ok
+//! requires-arch: aarch64
 
 // §16.13 {name} placeholder substitution. aarch64 host: x0 output, x1 input.
 

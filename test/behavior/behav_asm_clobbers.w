@@ -1,4 +1,5 @@
 //! expect-stdout: ok
+//! requires-arch: aarch64
 // §16: an asm block's 4th section lists clobbered registers.
 fn main:
     let v: i64 = 21

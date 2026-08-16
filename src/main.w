@@ -76,6 +76,7 @@ extern fn exit(code: i32) -> Unit
 extern fn with_install_interrupt_handlers() -> Unit
 extern fn with_raise_stack_limit() -> Unit
 extern fn with_sysinfo_os() -> str
+extern fn with_sysinfo_arch() -> str
 
 enum PreludeMode: i32:
     FullMode = 0
@@ -2870,6 +2871,19 @@ fn test_parse_i32(text: &str) -> i32:
         i = i + 1
     value * sign
 
+fn test_arch_is_aarch64(arch: &str) -> bool:
+    arch == "aarch64" or arch == "armv8" or arch == "arm64"
+
+fn test_arch_is_x86_64(arch: &str) -> bool:
+    arch == "x86_64" or arch == "amd64" or arch == "x64"
+
+fn test_arch_matches(required: &str, host: &str) -> bool:
+    // Canonicalize the ISA spellings the runtime and directives may use so a
+    // `requires-arch: aarch64` gate also matches an "armv8"/"arm64" host.
+    if test_arch_is_aarch64(required): return test_arch_is_aarch64(host)
+    if test_arch_is_x86_64(required): return test_arch_is_x86_64(host)
+    required == host
+
 fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     var result = empty_test_directives()
     let text = with_fs_read_file(target)
@@ -2888,6 +2902,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let args_prefix = "//! args: "
     let skip_prefix = "//! skip: "
     let skip_windows_prefix = "//! skip-windows: "
+    let requires_arch_prefix = "//! requires-arch: "
     let known_issue_prefix = "//! known-issue: "
     var start = 0
     var i = 0
@@ -2926,6 +2941,14 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 if with_sysinfo_os() == "Windows":
                     result.skip = true
                     result.skip_reason = line.slice(skip_windows_prefix.len(), line.len())
+                    return result
+            else if line.starts_with(requires_arch_prefix):
+                // Arch-specific test (e.g. inline asm hardcoding one ISA's
+                // registers). Runs only on the named arch; skipped elsewhere.
+                let required = line.slice(requires_arch_prefix.len(), line.len())
+                if not test_arch_matches(required, with_sysinfo_arch()):
+                    result.skip = true
+                    result.skip_reason = "requires-arch " ++ required
                     return result
             else if line == "//! skip":
                 result.skip = true

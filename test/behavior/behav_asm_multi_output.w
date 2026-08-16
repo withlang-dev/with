@@ -1,4 +1,5 @@
 //! expect-stdout: ok
+//! requires-arch: aarch64
 
 // §16.13 multiple outputs surface as a tuple. aarch64 host.
 
