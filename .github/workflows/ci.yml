@@ -6,8 +6,9 @@ on:
 
 jobs:
   selfhost-macos:
-    name: selfhost (macOS)
+    name: green battery (macOS arm64)
     runs-on: macos-latest
+    timeout-minutes: 180
     env:
       WITH_OUT_DIR: ${{ github.workspace }}/out
       WITH: ${{ github.workspace }}/src/main
@@ -94,3 +95,6 @@ jobs:
 
       - name: Fixpoint
         run: ./out/release/bin/with build :fixpoint
+
+      - name: Green battery (build :test)
+        run: src/main build :test
