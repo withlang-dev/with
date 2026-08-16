@@ -109,7 +109,9 @@ fn fiber_take_detached_completed(fiber_id: i32, result_buf: *mut u8) -> i32:
     if panic_msg as i64 != 0 and panic_msg_len > 0:
         with_ewrite(make_str(panic_msg, panic_msg_len as i64))
         with_ewrite("\n")
-        abort()
+        // Propagated fiber panic: terminate with the panic convention (134),
+        // same as with_panic. libc abort() diverges per platform (Windows → 3).
+        _exit(134)
     1
 
 fn fiber_remove_detached_at(index: i32):
@@ -189,7 +191,9 @@ pub fn with_fiber_await(fiber_id: i32) -> Unit:
             if panic_msg as i64 != 0 and panic_msg_len > 0:
                 with_ewrite(make_str(panic_msg, panic_msg_len as i64))
                 with_ewrite("\n")
-                abort()
+                // Propagated fiber panic: exit 134 like with_panic, not libc
+                // abort() (which is 134 on Unix but 3 on Windows).
+                _exit(134)
             return
         if with_runtime_fiber_is_live(fiber_id) == 0:
             last_await_fiber_id = fiber_id
@@ -220,7 +224,9 @@ pub fn with_fiber_cleanup_await(fiber_id: i32) -> Unit:
             if panic_msg as i64 != 0 and panic_msg_len > 0:
                 with_ewrite(make_str(panic_msg, panic_msg_len as i64))
                 with_ewrite("\n")
-                abort()
+                // Propagated fiber panic: exit 134 like with_panic, not libc
+                // abort() (which is 134 on Unix but 3 on Windows).
+                _exit(134)
             return
         if with_runtime_fiber_is_live(fiber_id) == 0:
             last_await_fiber_id = fiber_id
