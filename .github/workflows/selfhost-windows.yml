@@ -120,3 +120,12 @@ jobs:
           # underlying gap is fixed the skip is removed, greening more of the
           # battery over time.
           ./src/main.exe build :test
+
+      - name: Upload test captures on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-captures
+          path: out/test-graph/**
+          if-no-files-found: ignore
+          retention-days: 7
