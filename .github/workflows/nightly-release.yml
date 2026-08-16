@@ -1,0 +1,285 @@
+name: Nightly release
+
+on:
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        required: true
+        default: test
+        type: choice
+        options:
+          - test
+          - nightly
+
+concurrency:
+  group: nightly-release-${{ github.repository }}-${{ github.event_name == 'schedule' && 'nightly' || inputs.channel || 'test' }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  WITH_VERSION: v0.15.1
+
+jobs:
+  build:
+    name: Verify and package ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin-aarch64
+            runner: macos-latest
+            sdk_host_tag: darwin-arm64
+            seed_repo: withlang-dev/with
+            seed_version: with-darwin-aarch64
+            seed_asset: with-darwin-aarch64
+            seed_sha256: 7223e03b2fd5f0153c1932f51c4be2fe1a98589cf853a535f715742af1039dc3
+            sdk_version: nightly-sdk-test-20260815-680aa139
+            sdk_asset: with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
+            sdk_sha256: 4f99fc99a933ee3cf0578336a4fbbbcaaedbbe89112cd49454ea64149c188e6d
+            sdk_sidecar_sha256: 0df49017de4631cdc6367eb66dd39f15657b793757a65d743393898f9d848a75
+            sdk_manifest_sha256: 96e84c9b27a6d0dfbfe33cc221aebabdc2daaaeea04dc0b04721c61109a53623
+            release_asset: with-darwin-aarch64
+          - platform: linux-x86_64
+            runner: ubuntu-latest
+            sdk_host_tag: linux-x86_64
+            seed_repo: withlang-dev/with
+            seed_version: seed-linux-tip-368c81bf
+            seed_asset: with-linux-x86_64
+            seed_sha256: bd3a76844f23f9ecbe23cc1a4138087bd80ece2df41db2408e59a60b180c2019
+            sdk_version: nightly-sdk-test-20260815-680aa139
+            sdk_asset: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
+            sdk_sha256: c7747403c3556ba9ca6e8f47c5db023798c7c5828c807c4a3b474f0c87db24db
+            sdk_sidecar_sha256: e706ecf5c187a47fe908193093a4c0b07042c15308a1ecef365bc8bc2c34d32b
+            sdk_manifest_sha256: c9771032305fa37289f2344a18aa8d8bfbc45c2b5c1e5348a3f64264095e793d
+            release_asset: with-linux-x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    env:
+      WITH_SEED_REPO: ${{ matrix.seed_repo }}
+      WITH_SEED_VERSION: ${{ matrix.seed_version }}
+      WITH_SEED_ASSET: ${{ matrix.seed_asset }}
+      WITH_SEED_SHA256: ${{ matrix.seed_sha256 }}
+      WITH_SDK_REPO: ${{ github.repository }}
+      WITH_SDK_VERSION: ${{ matrix.sdk_version }}
+      WITH_SDK_ASSET: ${{ matrix.sdk_asset }}
+      WITH_SDK_SHA256: ${{ matrix.sdk_sha256 }}
+      WITH_SDK_SIDECAR_SHA256: ${{ matrix.sdk_sidecar_sha256 }}
+      WITH_SDK_MANIFEST_SHA256: ${{ matrix.sdk_manifest_sha256 }}
+      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-${{ matrix.sdk_host_tag }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Verify release version
+        run: test "$(tr -d '\r\n' < src/version)" = "$WITH_VERSION"
+
+      - name: Fetch verified bootstrap seed
+        run: |
+          set -euo pipefail
+          curl -fL -o src/main \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | shasum -a 256 -c -
+          chmod +x src/main
+          src/main version
+
+      - name: Fetch verified static LLVM SDK
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/$WITH_SDK_ASSET"
+          curl -fL -o "$archive" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          curl -fL -o "$archive.sha256" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.sha256"
+          curl -fL -o "$archive.manifest" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET.manifest"
+          printf '%s  %s\n' "$WITH_SDK_SHA256" "$archive" | shasum -a 256 -c -
+          printf '%s  %s\n' "$WITH_SDK_SIDECAR_SHA256" "$archive.sha256" | shasum -a 256 -c -
+          printf '%s  %s\n' "$WITH_SDK_MANIFEST_SHA256" "$archive.manifest" | shasum -a 256 -c -
+          mkdir -p .deps
+          tar -xzf "$archive" -C .deps
+          test -f "$LLVM_PREFIX/lib/libclang.a"
+          test -f "$LLVM_PREFIX/lib/clang/22/include/stddef.h"
+          test -f "$LLVM_PREFIX/share/cmake-4.2/Modules/CMake.cmake"
+          for tool in clang clang++ cmake ninja lld llvm-ar llvm-config llvm-dwarfdump llvm-nm llvm-objcopy llvm-ranlib llvm-readobj llvm-strip; do
+            test -x "$LLVM_PREFIX/bin/$tool"
+          done
+          dangling="$(find -L "$LLVM_PREFIX/bin" -type l -print -quit)"
+          if [ -n "$dangling" ]; then
+            echo "dangling SDK symlink: $dangling" >&2
+            exit 1
+          fi
+          "$LLVM_PREFIX/bin/clang" --version
+          "$LLVM_PREFIX/bin/cmake" --version
+          export PATH="$LLVM_PREFIX/bin:$PATH"
+          symbol="$("$LLVM_PREFIX/bin/llvm-nm" -g "$LLVM_PREFIX/lib/libclang.a" | ./src/main -n 'if line.ends_with("clang_createIndex"): print(line)')"
+          test -n "$symbol"
+          printf '%s\n' "$LLVM_PREFIX/bin" >> "$GITHUB_PATH"
+
+      - name: Verify dependency graph
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build :deps
+
+      - name: Build seed to release compiler
+        env:
+          WITH: ${{ github.workspace }}/src/main
+        run: src/main build
+
+      - name: Select rebuilt compiler
+        run: echo "WITH=$GITHUB_WORKSPACE/out/release/bin/with" >> "$GITHUB_ENV"
+
+      - name: Verify fixpoint
+        run: ./out/release/bin/with build :fixpoint
+
+      - name: Package fixpoint-verified release asset
+        run: |
+          set -euo pipefail
+          test "$(./out/release/bin/with version)" = "with $WITH_VERSION"
+          cp out/release/bin/with "out/release/${{ matrix.release_asset }}"
+          chmod +x "out/release/${{ matrix.release_asset }}"
+          shasum -a 256 "out/release/${{ matrix.release_asset }}" > "out/release/${{ matrix.release_asset }}.sha256"
+          cp "$RUNNER_TEMP/$WITH_SDK_ASSET" "out/release/$WITH_SDK_ASSET"
+          cp "$RUNNER_TEMP/$WITH_SDK_ASSET.sha256" "out/release/$WITH_SDK_ASSET.sha256"
+          cp "$RUNNER_TEMP/$WITH_SDK_ASSET.manifest" "out/release/$WITH_SDK_ASSET.manifest"
+
+      - name: Verify packaged checksums
+        run: |
+          shasum -a 256 -c "out/release/${{ matrix.release_asset }}.sha256"
+          shasum -a 256 -c "out/release/$WITH_SDK_ASSET.sha256"
+
+      - name: Upload verified release inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nightly-${{ matrix.platform }}-${{ github.sha }}
+          path: |
+            out/release/${{ matrix.release_asset }}
+            out/release/${{ matrix.release_asset }}.sha256
+            out/release/${{ matrix.sdk_asset }}
+            out/release/${{ matrix.sdk_asset }}.sha256
+            out/release/${{ matrix.sdk_asset }}.manifest
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    name: Publish immutable prerelease
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout release metadata generator
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Download verified release inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: nightly-*-${{ github.sha }}
+          path: out/release
+          merge-multiple: true
+
+      - name: Verify transferred checksums
+        run: |
+          shasum -a 256 -c out/release/with-darwin-aarch64.sha256
+          shasum -a 256 -c out/release/with-linux-x86_64.sha256
+          shasum -a 256 -c out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256
+          shasum -a 256 -c out/release/with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-path: |
+            out/release/with-darwin-aarch64
+            out/release/with-linux-x86_64
+
+      - name: Generate immutable release metadata
+        id: release
+        env:
+          REQUESTED_CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          # Native `with run` delegates to `cc -fuse-ld=lld`.
+          metadata_sdk="$RUNNER_TEMP/nightly-metadata-sdk"
+          mkdir -p "$metadata_sdk"
+          tar -xzf out/release/with-llvm-sdk-22.1.6-linux-x86_64.tar.gz -C "$metadata_sdk"
+          metadata_sdk_bin="$metadata_sdk/llvm-22.1.6-linux-x86_64/bin"
+          ln -s clang "$metadata_sdk_bin/cc"
+          export PATH="$metadata_sdk_bin:$PATH"
+          test -x "$metadata_sdk_bin/cc"
+          test -x "$metadata_sdk_bin/ld.lld"
+          chmod +x out/release/with-linux-x86_64
+          out/release/with-linux-x86_64 run tools/nightly_release_metadata.w \
+            "$GITHUB_EVENT_NAME" \
+            "$REQUESTED_CHANNEL" \
+            "$(date -u +%Y%m%d)" \
+            "$(date -u +%Y-%m-%d)" \
+            "$GITHUB_RUN_ID" \
+            "$GITHUB_RUN_ATTEMPT" \
+            "$GITHUB_SHA" \
+            "$GITHUB_SERVER_URL" \
+            "$GITHUB_REPOSITORY" \
+            "$WITH_VERSION" \
+            "$GITHUB_OUTPUT" \
+            out/release/nightly-release-notes.md
+
+      - name: Create tag and prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.release.outputs.title }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            out/release/with-darwin-aarch64 \
+            out/release/with-darwin-aarch64.sha256 \
+            out/release/with-linux-x86_64 \
+            out/release/with-linux-x86_64.sha256 \
+            out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz \
+            out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256 \
+            out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest \
+            out/release/with-llvm-sdk-22.1.6-linux-x86_64.tar.gz \
+            out/release/with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256 \
+            out/release/with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.manifest \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TITLE" \
+            --notes-file out/release/nightly-release-notes.md \
+            --prerelease
+
+      - name: Verify published tag, assets, and digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
+          test "$tag_sha" = "$GITHUB_SHA"
+          for asset in \
+            with-darwin-aarch64 \
+            with-darwin-aarch64.sha256 \
+            with-linux-x86_64 \
+            with-linux-x86_64.sha256 \
+            with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz \
+            with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256 \
+            with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest \
+            with-llvm-sdk-22.1.6-linux-x86_64.tar.gz \
+            with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256 \
+            with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.manifest
+          do
+            checksum_line="$(shasum -a 256 "out/release/$asset")"
+            expected="${checksum_line%% *}"
+            published="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq ".assets[] | select(.name == \"$asset\") | .digest")"
+            test "$published" = "sha256:$expected"
+          done
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json url,tagName,isPrerelease,targetCommitish,assets
