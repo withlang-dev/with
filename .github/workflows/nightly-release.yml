@@ -167,9 +167,118 @@ jobs:
           compression-level: 0
           retention-days: 7
 
+  build-windows:
+    name: Verify and package windows-x86_64
+    runs-on: windows-latest
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: read
+    env:
+      # Native Windows self-host mirrors .github/workflows/selfhost-windows.yml:
+      # the published Windows seed builds stage1 -> stage2 -> stage3, we assert
+      # stage2 == stage3 (fixpoint), then package the fixpoint-verified with.exe.
+      # The unix matrix build above cannot cover Windows -- its steps use shasum,
+      # tar -xzf, libclang.a and POSIX paths -- so Windows is a sibling job.
+      WITH_SEED_REPO: withlang-dev/with
+      # ae12ec95 carries the rt_getenv deadlock fix (rt_mmap return buffer). Older
+      # pins self-deadlocked under `build` at the allocator's WITH_MEMORY_LIMIT_BYTES
+      # cold-read (rt_getenv -> with_alloc re-entering the non-recursive spinlock).
+      WITH_SEED_VERSION: seed-windows-x86_64-ae12ec95
+      WITH_SEED_ASSET: with-windows-x86_64.exe
+      WITH_SEED_SHA256: 6d604a38fa487de416ee68729b61e56543eecc0ff6ffe1277fbcdf8f55466f80
+      # The Windows LLVM SDK is versioned independently of the nightly-sdk-* used
+      # by darwin/linux and ships without .sha256/.manifest sidecars, so we pin the
+      # archive digest directly here rather than fetching sidecar files.
+      WITH_SDK_REPO: withlang-dev/with
+      WITH_SDK_VERSION: v0.15.1
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.zst
+      WITH_SDK_SHA256: 0c4f9860cf528b3821781d89e5b42947ef8ee2249327cffa64fb9fb5eac09a4a
+      # windows-latest is a 4-vCPU runner; pin the worker pool to the real core
+      # count (the seed's rt_sysinfo reads the wrong SYSTEM_INFO offset, which would
+      # otherwise oversubscribe the pool). Honoured before the core probe.
+      WITH_BUILD_JOBS: "4"
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Verify release version
+        run: test "$(tr -d '\r\n' < src/version)" = "$WITH_VERSION"
+
+      - name: Fetch verified Windows LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          # git-bash GNU tar treats "D:\..." as host:path (the drive colon looks
+          # like host:path), so keep the archive on an msys path.
+          sdk="$(cygpath -u "$RUNNER_TEMP")/sdk.tar.zst"
+          curl -fL -o "$sdk" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          printf '%s  %s\n' "$WITH_SDK_SHA256" "$sdk" | shasum -a 256 -c -
+          tar --zstd -xf "$sdk" -C .deps
+          prefix=".deps/llvm-22.1.6-windows-x86_64-msvc"
+          test -f "$prefix/lib/libclang.lib" || { echo "SDK libclang.lib missing"; exit 1; }
+          test -f "$prefix/bin/lld-link.exe" || { echo "SDK lld-link.exe missing"; exit 1; }
+
+      - name: Fetch verified Windows seed
+        run: |
+          set -euo pipefail
+          curl -fL -o src/main.exe \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main.exe | shasum -a 256 -c -
+          ./src/main.exe version
+
+      - name: Configure native toolchain env
+        run: |
+          set -euo pipefail
+          # The compiler and every child link process are native Windows exes, so
+          # they need Windows-form paths (cygpath -m keeps forward slashes, which
+          # both the file APIs and lld-link accept).
+          echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
+          echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-x86_64-msvc")" >> "$GITHUB_ENV"
+          # MSVC CRT + Windows SDK import libs (Link.w reads WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR).
+          vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          vs_root="$(cygpath -u "$("$vswhere" -latest -products '*' -property installationPath)")"
+          msvc_ver="$(ls "$vs_root/VC/Tools/MSVC" | sort -V | tail -1)"
+          echo "WITH_WINDOWS_MSVC_LIBDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/lib/x64")" >> "$GITHUB_ENV"
+          kit_root="/c/Program Files (x86)/Windows Kits/10/Lib"
+          kit_ver="$(ls "$kit_root" | sort -V | tail -1)"
+          echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/x64")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/x64")" >> "$GITHUB_ENV"
+          echo "$PWD/.deps/llvm-22.1.6-windows-x86_64-msvc/bin" >> "$GITHUB_PATH"
+
+      - name: Build seed to release compiler
+        run: ./src/main.exe build
+
+      - name: Verify fixpoint
+        run: ./src/main.exe build :fixpoint
+
+      - name: Package fixpoint-verified release asset
+        run: |
+          set -euo pipefail
+          test "$(./out/release/bin/with.exe version)" = "with $WITH_VERSION"
+          cp out/release/bin/with.exe out/release/with-windows-x86_64.exe
+          shasum -a 256 out/release/with-windows-x86_64.exe > out/release/with-windows-x86_64.exe.sha256
+
+      - name: Verify packaged checksum
+        run: shasum -a 256 -c out/release/with-windows-x86_64.exe.sha256
+
+      - name: Upload verified release inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nightly-windows-x86_64-${{ github.sha }}
+          path: |
+            out/release/with-windows-x86_64.exe
+            out/release/with-windows-x86_64.exe.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
   publish:
     name: Publish immutable prerelease
-    needs: build
+    needs: [build, build-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -192,6 +301,7 @@ jobs:
         run: |
           shasum -a 256 -c out/release/with-darwin-aarch64.sha256
           shasum -a 256 -c out/release/with-linux-x86_64.sha256
+          shasum -a 256 -c out/release/with-windows-x86_64.exe.sha256
           shasum -a 256 -c out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256
           shasum -a 256 -c out/release/with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256
 
@@ -201,6 +311,7 @@ jobs:
           subject-path: |
             out/release/with-darwin-aarch64
             out/release/with-linux-x86_64
+            out/release/with-windows-x86_64.exe
 
       - name: Generate immutable release metadata
         id: release
@@ -244,6 +355,8 @@ jobs:
             out/release/with-darwin-aarch64.sha256 \
             out/release/with-linux-x86_64 \
             out/release/with-linux-x86_64.sha256 \
+            out/release/with-windows-x86_64.exe \
+            out/release/with-windows-x86_64.exe.sha256 \
             out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz \
             out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256 \
             out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest \
@@ -269,6 +382,8 @@ jobs:
             with-darwin-aarch64.sha256 \
             with-linux-x86_64 \
             with-linux-x86_64.sha256 \
+            with-windows-x86_64.exe \
+            with-windows-x86_64.exe.sha256 \
             with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz \
             with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256 \
             with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest \
