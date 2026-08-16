@@ -542,6 +542,17 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     if ptr as i64 == 0:
         return 0
     let payload = ptr as i64
+    // A valid owned payload starts at least RT_ALLOC_HEADER_SIZE bytes above 0
+    // (its header sits just below it). By signed-i64 comparison this also
+    // rejects non-canonical high-half addresses (which read as negative) — the
+    // slab tables and their binary searches all assume positive addresses, so a
+    // negative pointer is definitionally not owned. Rejecting here keeps the
+    // `payload - RT_ALLOC_HEADER_SIZE` below from a signed-underflow trap on
+    // garbage bytes: codegen emits discriminant-independent str-drops (see the
+    // drop-architecture note) and relies on this guard to no-op — never trap —
+    // on any non-owned slot content, blanked or not.
+    if payload < RT_ALLOC_HEADER_SIZE:
+        return 0
     let header = payload - RT_ALLOC_HEADER_SIZE
     // Binary-search the sorted slab ranges for the one with the largest start <=
     // header (ranges are non-overlapping, so at most one can contain header).
