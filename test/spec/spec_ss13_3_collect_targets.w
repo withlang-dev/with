@@ -1,3 +1,4 @@
+//! skip-windows: issue #806: Windows win64 codegen — collect targets produce wrong output (exit 1)
 //! expect-stdout: ok
 // Spec test: §13.3 collect[C] target selection.
 

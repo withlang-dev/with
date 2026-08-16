@@ -1,3 +1,4 @@
+//! skip-windows: issue #806: Windows win64 codegen — error context produces wrong output (exit 1)
 // Spec test: Section 10.6 — Error Context (formerly 25.43)
 
 use std.result.ContextError

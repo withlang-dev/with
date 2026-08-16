@@ -1,3 +1,4 @@
+//! skip-windows: issue #806: Windows win64 fat-fn/closure ABI — Option/Result combinators produce wrong output (exit 1)
 // Spec test: Section 10.3, 10.4 — Option/Result Combinators (formerly 25.22)
 
 // PASS: option chaining

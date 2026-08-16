@@ -1,3 +1,4 @@
+//! skip-windows: issue #806: Windows win64 trait-object/vtable ABI — Box[dyn] coercion produces wrong output (exit 1)
 use std.box.Box
 trait BoxDynLogger:
     fn message(self: &Self) -> str

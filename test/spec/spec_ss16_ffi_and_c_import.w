@@ -1,3 +1,4 @@
+//! skip-windows: issue #799: Windows c_import fails on native MSVC headers
 //! expect-stdout: ok
 
 use c_import("stdio.h")

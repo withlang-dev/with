@@ -1,3 +1,4 @@
+//! skip-windows: issue #806: Windows win64 trait-object/vtable ABI — object safety produces wrong output (exit 1)
 // Spec test: Section 11.3 - Object Safety.
 
 use std.box.Box

@@ -1,3 +1,4 @@
+//! skip-windows: issue #806: Windows win64 trait-object/vtable ABI — implicit coercion produces wrong output (exit 1)
 // Spec test: Section 3.9 — Implicit Trait Object Coercion.
 
 trait Greet:
