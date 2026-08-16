@@ -1,4 +1,4 @@
-//! skip-windows: issue #797: panic exits 1 not 134 on native Windows
+//! skip-windows: issue #799: c_import behavior fails on native Windows MSVC headers
 //! expect-exit: 1
 //! expect-stderr: interior NUL
 

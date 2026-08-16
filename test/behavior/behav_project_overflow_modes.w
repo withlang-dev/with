@@ -1,4 +1,4 @@
-//! skip-windows: issue #797: panic exits 1 not 134 on native Windows
+//! skip-windows: issue #802: [build] overflow=wrap/saturate mis-evaluates on native Windows (assert fires, clean exit 134 — panic ABI is correct, the overflow value is wrong)
 //! expect-stdout: ok
 
 use pre_d_build_runner
