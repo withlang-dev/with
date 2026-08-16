@@ -17881,11 +17881,7 @@ impl Codegen:
         let str_type = if st_opt.is_some(): self.struct_llvm_types.get(st_opt.unwrap() as i64) else: wl_i64_type(self.context)
         let i64_ty = wl_i64_type(self.context)
         let params: Vec[i64] = Vec.new()
-        if name == "with_panic":
-            params.push(str_type)
-            params.push(str_type)
-            params.push(wl_i32_type(self.context))
-        else if name == "with_str_contains" or
+        if name == "with_str_contains" or
            name == "with_str_starts_with" or
            name == "with_str_ends_with" or
            name == "with_str_index_of" or
@@ -17912,15 +17908,54 @@ impl Codegen:
     fn emit_runtime_panic(msg: &str) -> Unit:
         self.emit_runtime_panic_value(self.gen_string_literal_raw(msg), self.gen_string_literal_raw(""))
 
+    // Emit a call to the runtime panic surface from a compiler-generated check
+    // (bounds, overflow, unwrap-None, …). `msg`/`loc` are str *values*.
+    //
+    // We route through `with_panic_ref(&str, &str, i32)`, NOT `with_panic(str,
+    // str, i32)`: a `&str` parameter is a plain pointer (never a >8-byte
+    // aggregate), so its physical ABI is identical on every target. A by-value
+    // `str` is a 16-byte struct, and `internal_abi_needs_indirect_param` passes
+    // it INDIRECT on Windows x86_64 but by-value on SysV — so hand-rolling a
+    // by-value `with_panic` call here (declaring the params as by-value str and
+    // passing loaded struct values) diverged from the callee's real Windows ABI.
+    // The by-value caller splits the struct across two registers ({ptr in rcx,
+    // len in rdx}); the Windows callee expects ONE indirect pointer per str and
+    // loads the struct through it, so it dereferences rdx — the length — as an
+    // address. Observed under wine: `movups (%rdx),%xmm0` with rdx=0x15 (the
+    // length of "called unwrap on None") -> page fault / access violation
+    // (0xC0000005; exit 1 on native Windows, 5 under wine — never the intended
+    // 134). This is the same normal-path route the library `panic()` ->
+    // `with_panic_ref` already takes, which is why library panics work on
+    // Windows. Spill each str value to a slot and pass its address.
     fn emit_runtime_panic_value(msg: i64, loc: i64) -> Unit:
-        let panic_fn = self.ensure_c_fn("with_panic", wl_void_type(self.context), 3)
-        let panic_ty = self.get_runtime_fn_type("with_panic", wl_void_type(self.context), 3)
+        let str_ty = self.str_llvm_type()
+        let msg_slot = self.create_entry_alloca(str_ty)
+        wl_build_store(self.builder, msg, msg_slot)
+        let loc_slot = self.create_entry_alloca(str_ty)
+        wl_build_store(self.builder, loc, loc_slot)
+        let panic_fn = self.ensure_panic_ref_fn()
+        let panic_ty = self.panic_ref_fn_type()
         let args: Vec[i64] = Vec.new()
-        args.push(msg)
-        args.push(loc)
+        args.push(msg_slot)
+        args.push(loc_slot)
         args.push(wl_const_int(wl_i32_type(self.context), 0, 0))
         let _call = wl_build_call(self.builder, panic_ty, panic_fn, vec_data_i64(&args), 3)
         let _unreachable = wl_build_unreachable(self.builder)
+
+    // `with_panic_ref(&str, &str, i32) -> void` — params are references, i.e.
+    // plain pointers, so the type is the same on every target (no indirect-
+    // aggregate ABI question). Declared once, reused by every emitted panic.
+    fn panic_ref_fn_type() -> i64:
+        let params: Vec[i64] = Vec.new()
+        params.push(wl_ptr_type(self.context))
+        params.push(wl_ptr_type(self.context))
+        params.push(wl_i32_type(self.context))
+        wl_function_type(wl_void_type(self.context), vec_data_i64(&params), 3, 0)
+
+    fn ensure_panic_ref_fn() -> i64:
+        let existing = wl_get_named_function(self.llmod, "with_panic_ref")
+        if existing != 0: return existing
+        wl_add_function(self.llmod, "with_panic_ref", self.panic_ref_fn_type())
 
     // ── VecIter.next() codegen intrinsic ──────────────────────────────
     // VecIter[T] = { data_ptr: i64, len: i64, idx: i64 }

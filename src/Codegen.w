@@ -6198,14 +6198,9 @@ impl Codegen:
         wl_build_cond_br(self.builder, failed, panic_bb, ok_bb)
         wl_position_at_end(self.builder, panic_bb)
         let panic_msg = "runtime fiber configuration cannot change after fibers exist"
-        let panic_fn = self.ensure_c_fn("with_panic", wl_void_type(self.context), 3)
-        let panic_ty = self.get_runtime_fn_type("with_panic", wl_void_type(self.context), 3)
-        let panic_args: Vec[i64] = Vec.new()
-        panic_args.push(self.build_str_value(wl_build_global_string_ptr(self.builder, panic_msg), wl_const_int(i64_ty, panic_msg.len(), 0)))
-        panic_args.push(self.build_str_value(wl_build_global_string_ptr(self.builder, ""), wl_const_int(i64_ty, 0, 0)))
-        panic_args.push(wl_const_int(i32_ty, 0, 0))
-        wl_build_call(self.builder, panic_ty, panic_fn, vec_data_i64(&panic_args), 3)
-        wl_build_unreachable(self.builder)
+        let panic_msg_val = self.build_str_value(wl_build_global_string_ptr(self.builder, panic_msg), wl_const_int(i64_ty, panic_msg.len(), 0))
+        let panic_loc_val = self.build_str_value(wl_build_global_string_ptr(self.builder, ""), wl_const_int(i64_ty, 0, 0))
+        self.emit_runtime_panic_value(panic_msg_val, panic_loc_val)
         wl_position_at_end(self.builder, ok_bb)
 
     mut fn wrap_main_for_exit() -> Unit:
