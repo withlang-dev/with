@@ -431,6 +431,21 @@ fn comp_run_compiler_capture(ctx: &ActionCtx, label: &str, argv: Vec[str], stdou
     let win_um_libdir = env("WITH_WINDOWS_UM_LIBDIR")
     if win_um_libdir.len() > 0:
         process_env = process_env.set("WITH_WINDOWS_UM_LIBDIR", win_um_libdir)
+    // Windows SDK / MSVC CRT include dirs, read by the child compiler's c_import
+    // (ClangBridge with_cimport_add_windows_system_includes) so libclang can
+    // resolve system headers. Include-side analog of the *_LIBDIR forwarding.
+    let win_msvc_incdir = env("WITH_WINDOWS_MSVC_INCDIR")
+    if win_msvc_incdir.len() > 0:
+        process_env = process_env.set("WITH_WINDOWS_MSVC_INCDIR", win_msvc_incdir)
+    let win_ucrt_incdir = env("WITH_WINDOWS_UCRT_INCDIR")
+    if win_ucrt_incdir.len() > 0:
+        process_env = process_env.set("WITH_WINDOWS_UCRT_INCDIR", win_ucrt_incdir)
+    let win_um_incdir = env("WITH_WINDOWS_UM_INCDIR")
+    if win_um_incdir.len() > 0:
+        process_env = process_env.set("WITH_WINDOWS_UM_INCDIR", win_um_incdir)
+    let win_shared_incdir = env("WITH_WINDOWS_SHARED_INCDIR")
+    if win_shared_incdir.len() > 0:
+        process_env = process_env.set("WITH_WINDOWS_SHARED_INCDIR", win_shared_incdir)
     let overflow_mode = comp_arg_value(ctx.args(), "overflow=")
     if overflow_mode.len() > 0:
         process_env = process_env.set("WITH_INTERNAL_OVERFLOW_MODE", overflow_mode)

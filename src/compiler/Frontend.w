@@ -287,9 +287,15 @@ impl Zcu:
         let _resource_dir = ensure_clang_resource_dir()
         self.record_frontend_tracked_input(ensure_clang_resource_identity_file())
 
-        // Pass project config include paths to clang bridge
-        if self.project_config.c_import_include_paths.len() > 0:
-            ci_set_include_paths(self.project_config.c_import_include_paths)
+        // Pass project config include paths to clang bridge. Always rebuild the
+        // list (clear+set) so a prior compile in the same process — `with test`
+        // runs many — cannot leak stale include dirs.
+        ci_set_include_paths(self.project_config.c_import_include_paths)
+        // Native Windows: libclang has no default system-header search path, so
+        // add the MSVC CRT + Windows SDK include dirs (WITH_WINDOWS_*_INCDIR).
+        // No-op off Windows / when unset; include-side analog of the
+        // WITH_WINDOWS_*_LIBDIR link wiring.
+        ci_add_windows_system_includes()
         // §16.1: pass the configured target SDK sysroot (empty resets any prior).
         ci_set_sdk_path(self.project_config.c_import_sdk_path)
 

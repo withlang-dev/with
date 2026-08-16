@@ -1176,6 +1176,26 @@ pub fn with_cimport_clear_include_paths() -> i32:
     g_cimport_include_count = 0
     0
 
+fn with_cimport_add_windows_incdir(var_name: &str) -> i32:
+    let dir = with_getenv_str(var_name)
+    if dir.len() > 0:
+        with_cimport_add_include_path(dir)
+    0
+
+// c_import on a native Windows build: libclang has no default system-header
+// search path, so `c_import("stdlib.h")` fails with 'file not found'. Add the
+// MSVC CRT + Windows SDK include dirs — the include-side analog of the
+// WITH_WINDOWS_*_LIBDIR link wiring in Link.w. Read from WITH_WINDOWS_*_INCDIR
+// (set by the build/CI toolchain step); no-op off Windows / when unset. Order
+// mirrors the vcvars INCLUDE search order: MSVC, then Kit ucrt/shared/um.
+pub fn with_cimport_add_windows_system_includes() -> i32:
+    if with_sysinfo_os() != "Windows": return 0
+    with_cimport_add_windows_incdir("WITH_WINDOWS_MSVC_INCDIR")
+    with_cimport_add_windows_incdir("WITH_WINDOWS_UCRT_INCDIR")
+    with_cimport_add_windows_incdir("WITH_WINDOWS_SHARED_INCDIR")
+    with_cimport_add_windows_incdir("WITH_WINDOWS_UM_INCDIR")
+    0
+
 pub fn with_cimport_set_resource_dir(path: &str) -> Unit:
     unsafe:
         resource_dir_resolved = 1
