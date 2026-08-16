@@ -11,8 +11,8 @@ fn write_file(path: &str, data: &str):
         exit_code(1)
 
 let argv = args()
-if argv.len() != 13:
-    eprint("usage: nightly_release_metadata <event> <requested-channel> <yyyymmdd> <yyyy-mm-dd> <run-id> <attempt> <sha> <server-url> <repository> <version> <github-output> <notes-output>")
+if argv.len() != 14:
+    eprint("usage: nightly_release_metadata <event> <requested-channel> <yyyymmdd> <yyyy-mm-dd> <run-id> <attempt> <sha> <server-url> <repository> <version> <github-output> <notes-output> <platforms>")
     exit_code(1)
 
 let event = argv.get(1)
@@ -27,9 +27,13 @@ let repository = argv.get(9)
 let version = argv.get(10)
 let github_output = argv.get(11)
 let notes_output = argv.get(12)
+let platforms = argv.get(13)
 
 if source_sha.len() < 12:
     eprint("error: source commit must contain at least 12 characters")
+    exit_code(1)
+if platforms.len() == 0:
+    eprint("error: at least one successful platform is required")
     exit_code(1)
 
 var channel = requested_channel.clone()
@@ -45,6 +49,9 @@ if channel == "test":
 else if channel == "nightly":
     tag = "nightly-" ++ compact_date ++ "-" ++ run_id ++ "-" ++ attempt ++ "-" ++ short_sha
     title = "With nightly " ++ display_date ++ " (" ++ short_sha ++ ")"
+else if channel == "release":
+    tag = version.clone()
+    title = "With " ++ version
 else:
     eprint("error: unsupported release channel: " ++ channel)
     exit_code(1)
@@ -58,18 +65,20 @@ let step_output =
     "title=" ++ title ++ "\n"
 write_file(github_output, step_output)
 
+let publication = if channel == "release": "release" else: "prerelease"
+let automation = if channel == "release": "Automated compiler " else: "Automated " ++ channel ++ " compiler "
 let notes =
-    "Automated " ++ channel ++ " compiler prerelease.\n\n" ++
+    automation ++ publication ++ ".\n\n" ++
     "Source commit: " ++ source_sha ++ "\n" ++
     "Workflow run: " ++ workflow_url ++ "\n" ++
     "Compiler version: " ++ version ++ "\n" ++
-    "Platforms: darwin-aarch64, linux-x86_64\n\n" ++
+    "Platforms: " ++ platforms ++ "\n\n" ++
     "Release contents:\n\n" ++
     "- Fixpoint-verified compiler binaries with SHA-256 sidecars\n" ++
-    "- Checksum-pinned LLVM 22.1.6 SDK archives, SHA-256 sidecars, and manifests\n\n" ++
+    "- Available checksum-pinned LLVM 22.1.6 SDK archives, SHA-256 sidecars, and manifests\n\n" ++
     "Verification gates on each platform:\n\n" ++
     "- `WITH_VERSION=" ++ version ++ " with build`\n" ++
     "- `WITH_VERSION=" ++ version ++ " with build :fixpoint`\n" ++
     "- Fixpoint-verified `out/release/bin/with` copied to each platform asset with a SHA-256 sidecar\n" ++
-    "- The same verified SDK inputs used by each build attached without rebuilding\n"
+    "- Available verified SDK inputs attached without rebuilding\n"
 write_file(notes_output, notes)
