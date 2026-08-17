@@ -1,4 +1,3 @@
-//! skip-windows: issue #806: Windows win64 fat-fn/closure ABI — Result combinators produce wrong output (exit 1)
 //! expect-stdout: ok
 
 fn ok_i32(value: i32) -> Result[i32, str]:
