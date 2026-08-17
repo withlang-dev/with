@@ -15,7 +15,14 @@ fn p7_cwd -> str:
     let rc = unsafe { rt_getcwd(&raw mut buf as *mut [4096]u8 as *mut u8, 4096) }
     if rc != 0:
         return ""
-    unsafe { with_str_from_cstr(&buf as *const [4096]u8 as *const u8) }
+    // with_str_from_cstr wraps the pointer (make_str) without copying, so the
+    // returned str aliases `buf`. Copy it off the stack before `buf` dies —
+    // otherwise every path derived from p7_repo_root is a use-after-free. On
+    // Linux/darwin the reused frame happened to survive the read; on Windows
+    // the native stage2's frame layout clobbers it, corrupting case_dir into a
+    // path with an interior NUL → "str to C string conversion" panic → the p7
+    // exit-134 cluster.
+    unsafe { with_str_from_cstr(&buf as *const [4096]u8 as *const u8) }.to_owned()
 
 pub type P7Run {
     rc: i32,
