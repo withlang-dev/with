@@ -15116,7 +15116,15 @@ impl Codegen:
                 let dst_sema_ty_for_sret = body.local_type_ids.get(dst_local_for_sret as i64)
                 let dst_llvm_ty_for_sret = self.mir_sema_type_to_llvm(dst_sema_ty_for_sret)
                 if self.internal_abi_needs_sret(dst_llvm_ty_for_sret):
-                    if param_count > arg_count and wl_get_return_type(call_ft) == wl_void_type(self.context):
+                    // An indirect closure/fn-pointer call already consumes param 0
+                    // for the environment pointer, so only a param count that
+                    // exceeds args + the env slot leaves room for a real sret
+                    // slot in call_ft. Without this the env slot is mistaken for
+                    // an sret slot, and a Never-returning closure (`void(env)`,
+                    // no sret) gets a spurious sret arg appended → arg-count
+                    // mismatch against its own type on win64.
+                    let indirect_env_slots = if is_indirect: 1 else: 0
+                    if param_count > arg_count + indirect_env_slots and wl_get_return_type(call_ft) == wl_void_type(self.context):
                         let first_param_ty = if param_count > 0: param_types.get(0) else: 0
                         if first_param_ty != 0 and wl_get_type_kind(first_param_ty) == wl_pointer_type_kind():
                             abi_has_sret = 1
