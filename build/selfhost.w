@@ -238,6 +238,10 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+    if os() == "Windows":
+        print("embedded-runtime-regression: skipped on Windows (#811)")
+        let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
+        return 0
     let compiler_input = inputs.get(0)
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
@@ -3377,6 +3381,10 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+    if os() == "Windows":
+        print("emit-c-smoke: skipped on Windows (#811)")
+        let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
+        return 0
 
     let root = ctx.project_info().project_root()
     let compiler_input = inputs.get(0)

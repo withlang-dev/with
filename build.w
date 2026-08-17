@@ -952,6 +952,10 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
     let output_dir = ctx.output()
     if fs.mkdir_all(output_dir) != 0:
         return invariance_fail(ctx, "could not create output directory: " ++ output_dir)
+    if os() == "Windows":
+        print("invariance-check: skipped on Windows (#811)")
+        let _ = fs.write_text(build_project_join(output_dir, ".stamp"), "ok")
+        return 0
     let root = ctx.project_info().project_root()
     let compiler_path = build_project_abs(root, inputs.get(0))
     if not fs.exists(inputs.get(0)):

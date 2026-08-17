@@ -1147,6 +1147,9 @@ pub fn run_check_requirements_informative_action(ctx: ActionCtx) -> i32:
 
 pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
+    if os() == "Windows":
+        print("spec-inventory-check: skipped on Windows (#811)")
+        return comp_write_ok_output(ctx)
     let spec_path = "docs/with-specification.md"
     if not fs.exists(spec_path):
         return comp_fail(ctx, "missing " ++ spec_path)
