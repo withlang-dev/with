@@ -426,12 +426,22 @@ impl Codegen:
             param_count = self.sema.get_type_d1(resolved)
             ret_ty_id = self.sema.get_type_d2(resolved)
         let ret_ty = self.mir_sema_type_to_llvm(ret_ty_id)
-        var llvm_ret = if ret_ty != 0: ret_ty else: wl_void_type(self.context)
+        let llvm_ret = if ret_ty != 0: ret_ty else: wl_void_type(self.context)
         let param_types: Vec[i64] = Vec.new()
         param_types.push(wl_ptr_type(self.context))
-        if self.internal_abi_needs_sret(llvm_ret):
-            param_types.push(wl_ptr_type(self.context))
-            llvm_ret = wl_void_type(self.context)
+        // The closure body is always emitted with a by-value direct return:
+        // gen_closure forces the direct-return path (current_function_name_sym
+        // = 0) so a closure never gains an sret param, even for a struct return
+        // >8 bytes on win64. The call type must match — do NOT manually
+        // sret-lower here. LLVM applies the target's aggregate-return ABI
+        // identically to a by-value caller and a by-value callee. Manually
+        // sret-lowering the call while the callee returns by value put the
+        // env pointer and the sret pointer in swapped registers on win64
+        // (callee: implicit sret in RCX, env in RDX; caller: env in RCX, sret
+        // in RDX), so a str-returning closure wrote its result through the env
+        // pointer and left the real destination garbage (#806). Contrast
+        // mir_build_raw_fn_type, whose sret lowering is correct because a named
+        // fn-pointer target is sret-lowered by declare_function too.
         for pi in 0..param_count:
             var p_sema_ty = self.mir_type_extra_at(extra_start + pi)
             if resolved >= self.mir_type_kinds_len() as i32:
