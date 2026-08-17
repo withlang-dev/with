@@ -1,4 +1,3 @@
-//! skip-windows: issue #806: Windows win64 trait-object/vtable ABI — Error trait produces wrong output (exit 1)
 //! expect-stdout: ok
 
 use std.result.ContextError
