@@ -204,6 +204,8 @@ extern fn LLVMCreateEnumAttribute(c: *mut u8, kind: u32, val: u64) -> *mut u8
 extern fn LLVMCreateTypeAttribute(c: *mut u8, kind: u32, ty: *mut u8) -> *mut u8
 extern fn LLVMAddAttributeAtIndex(v: *mut u8, idx: u32, attr: *mut u8)
 extern fn LLVMAddCallSiteAttribute(call: *mut u8, idx: u32, attr: *mut u8)
+extern fn LLVMGetEnumAttributeAtIndex(v: *mut u8, idx: u32, kind: u32) -> *mut u8
+extern fn LLVMGetTypeAttributeValue(attr: *mut u8) -> *mut u8
 
 // Basic blocks
 extern fn LLVMAppendBasicBlockInContext(c: *mut u8, fn_val: *mut u8, name: *const u8) -> *mut u8
@@ -777,6 +779,21 @@ pub fn wl_add_sret_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64) -> Unit:
         if kind != 0:
             let attr = LLVMCreateTypeAttribute(ctx as *mut u8, kind, ty as *mut u8)
             LLVMAddAttributeAtIndex(fn_val as *mut u8, (param_idx + 1) as u32, attr)
+
+// Query the sret type of a function parameter. Returns the pointee aggregate
+// type carried by an `sret(T)` attribute, or 0 when the parameter is not
+// sret-lowered. Used to reconstruct a by-value signature from an already
+// sret-lowered concrete function (win64 aggregate return).
+pub fn wl_get_param_sret_type(fn_val: i64, param_idx: i32) -> i64:
+    unsafe:
+        let name = "sret" as *const u8
+        let kind = LLVMGetEnumAttributeKindForName(name, 4 as u64)
+        if kind == 0:
+            return 0
+        let attr = LLVMGetEnumAttributeAtIndex(fn_val as *mut u8, (param_idx + 1) as u32, kind)
+        if attr as i64 == 0:
+            return 0
+        LLVMGetTypeAttributeValue(attr) as i64
 
 pub fn wl_add_call_param_byval_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64) -> Unit:
     unsafe:

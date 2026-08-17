@@ -1507,6 +1507,50 @@ impl Codegen:
             return fat
         let orig_param_count = wl_count_param_types(orig_fn_ty)
         let orig_ret_ty = wl_get_return_type(orig_fn_ty)
+        // On win64 a concrete function returning an aggregate >8B is physically
+        // sret-lowered by declare_function: `void(ptr sret, real_args...)`. A
+        // closure fn type (mir_build_closure_fn_type), by contrast, is by-value
+        // (`AGG(ptr ctx, real_args...)`) and LLVM inserts the hidden sret pointer
+        // FIRST — so the physical closure convention is `void(sret, ctx, args)`.
+        // Naively prepending ctx to the sret-lowered concrete type yields
+        // `void(ctx, sret, args)`, swapping ctx and sret and corrupting the
+        // result (#806/#819). Rebuild the thunk by-value to match the closure
+        // convention, and let LLVM sret-lower both the thunk definition and the
+        // closure call site identically.
+        let concrete_sret_ty = wl_get_param_sret_type(fn_val, 0)
+        if concrete_sret_ty != 0:
+            let thunk_params: Vec[i64] = Vec.new()
+            thunk_params.push(ptr_ty)
+            // Real args are the concrete params after the leading sret pointer.
+            for pi in 1..orig_param_count:
+                thunk_params.push(wl_get_fn_param_type(orig_fn_ty, pi))
+            let thunk_fn_ty = wl_function_type(concrete_sret_ty, vec_data_i64(&thunk_params), thunk_params.len() as i32, 0)
+            let thunk_id = self.closure_counter
+            self.closure_counter = thunk_id + 1
+            let thunk_name = f"__fn_thunk_{thunk_id}"
+            let thunk_fn = wl_add_function(self.llmod, thunk_name, thunk_fn_ty)
+            wl_set_linkage(thunk_fn, wl_internal_linkage())
+            let saved_bb = wl_get_insert_block(self.builder)
+            let entry = wl_append_bb(self.context, thunk_fn, "entry")
+            wl_position_at_end(self.builder, entry)
+            // Result buffer for the concrete sret call; loaded back and returned
+            // by value so LLVM lowers the thunk return the same way the closure
+            // call site is lowered. Target the thunk explicitly — self.current_function
+            // still names the outer function that triggered the coercion.
+            let result_buf = wl_create_entry_alloca(self.builder, thunk_fn, concrete_sret_ty)
+            let call_args: Vec[i64] = Vec.new()
+            call_args.push(result_buf)
+            for pi in 1..orig_param_count:
+                call_args.push(wl_get_param(thunk_fn, pi))
+            let call = wl_build_call(self.builder, orig_fn_ty, fn_val, vec_data_i64(&call_args), orig_param_count)
+            wl_add_call_sret_attr(self.context, call, 0, concrete_sret_ty)
+            let loaded = wl_build_load(self.builder, concrete_sret_ty, result_buf)
+            wl_build_ret(self.builder, loaded)
+            wl_position_at_end(self.builder, saved_bb)
+            var fat_s = wl_get_undef(fat_ty)
+            fat_s = wl_build_insert_value(self.builder, fat_s, thunk_fn, 0)
+            fat_s = wl_build_insert_value(self.builder, fat_s, wl_const_null(ptr_ty), 1)
+            return fat_s
         // Build thunk function type: fn(ptr, original_params...) -> original_ret
         let thunk_params: Vec[i64] = Vec.new()
         thunk_params.push(ptr_ty)
