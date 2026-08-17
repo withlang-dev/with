@@ -54,9 +54,14 @@ pub fn tracked_input_merge_unique(left: Vec[str], right: &Vec[str]) -> Vec[str]:
     out
 
 fn tracked_dirname(path: &str) -> str:
+    // Separator-agnostic: a native Windows source path is '\'-separated, so a
+    // '/'-only split returns "" and the embed target resolves against the cwd
+    // instead of the source's directory (#801). Matches the '\'-aware sibling
+    // helpers below.
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let b = path.byte_at(i as i64)
+        if b == 47 or b == 92:
             last_slash = i
     if last_slash < 0:
         return ""
@@ -108,7 +113,9 @@ fn tracked_normalize_path(path: &str) -> str:
     var start = 0
     for i in 0..(path.len() as i32 + 1):
         let at_end = i == path.len() as i32
-        if at_end or path.byte_at(i as i64) == 47:
+        // Split on both '/' and '\' so a '\'-separated Windows path normalizes
+        // to the same '/'-form the containment checks expect (#801).
+        if at_end or path.byte_at(i as i64) == 47 or path.byte_at(i as i64) == 92:
             if i > start:
                 // Flat decision (no inner chain ending in else-if): the seed
                 // compiler predates the #629 dangling-else fix and miscompiles
