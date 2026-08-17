@@ -15125,23 +15125,43 @@ impl Codegen:
                 args.push(packed)
                 continue
 
+            // Internal-ABI indirect aggregate argument. The callee lowers an
+            // aggregate parameter (win64 struct/array > 8B) to a pointer and reads
+            // it as the aggregate's address; the caller must match by spilling the
+            // value and passing its address. Mirror the CALLEE's own decision —
+            // never re-derive it from the argument's type. A genuine pointer
+            // parameter (`*const fn`, `*mut T`, `&T`) is ALSO lowered to `ptr`, but
+            // it is a direct 8-byte value, not an indirect aggregate. Keying on the
+            // argument's aggregate sema type (e.g. a fn item's fat TY_FN) spilled a
+            // fat closure to the stack and passed its address where the callee reads
+            // a thin function pointer — executing stack data on win64 (0xC0000005).
+            // FnAbi doctrine: one ABI decision, computed from the parameter, read by
+            // both callee prologue and this call site.
             if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
-                let arg_sema_ty = self.mir_operand_sema_type(body, operand_id)
-                if arg_sema_ty > 0:
-                    let arg_llvm_ty = self.mir_sema_type_to_llvm(arg_sema_ty)
-                    if self.internal_abi_needs_indirect_param(arg_llvm_ty):
-                        var arg_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
-                        var indirect_strategy = AnalysisMarshalStrategy.ExistingPointer
-                        if arg_ptr == 0:
-                            let val = self.mir_eval_operand(body, operand_id, 0)
-                            let tmp = self.create_entry_alloca(arg_llvm_ty)
-                            let stored = self.enforce_coerced_type(val, arg_llvm_ty, "indirect aggregate argument")
-                            wl_build_store(self.builder, stored, tmp)
-                            arg_ptr = tmp
-                            indirect_strategy = AnalysisMarshalStrategy.TemporaryAddress
-                        self.record_codegen_call_argument(body, args_id, operand_id, ai, indirect_strategy, arg_ptr, arg_ptr)
-                        args.push(arg_ptr)
-                        continue
+                // The parameter's pre-ABI aggregate LLVM type: prefer the callee's
+                // declared signature (the same p_sema_ty the prologue lowered), and
+                // fall back to the argument only for an unsignatured indirect
+                // closure call, where no callee signature is available.
+                var agg_ty: i64 = 0
+                if expected_sema_ty != 0:
+                    agg_ty = self.mir_sema_type_to_llvm(expected_sema_ty)
+                else:
+                    let arg_sema_ty = self.mir_operand_sema_type(body, operand_id)
+                    if arg_sema_ty > 0:
+                        agg_ty = self.mir_sema_type_to_llvm(arg_sema_ty)
+                if self.internal_abi_needs_indirect_param(agg_ty):
+                    var arg_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
+                    var indirect_strategy = AnalysisMarshalStrategy.ExistingPointer
+                    if arg_ptr == 0:
+                        let val = self.mir_eval_operand(body, operand_id, 0)
+                        let tmp = self.create_entry_alloca(agg_ty)
+                        let stored = self.enforce_coerced_type(val, agg_ty, "indirect aggregate argument")
+                        wl_build_store(self.builder, stored, tmp)
+                        arg_ptr = tmp
+                        indirect_strategy = AnalysisMarshalStrategy.TemporaryAddress
+                    self.record_codegen_call_argument(body, args_id, operand_id, ai, indirect_strategy, arg_ptr, arg_ptr)
+                    args.push(arg_ptr)
+                    continue
 
 
             // Ref param check: pass pointer to place instead of loading value.
