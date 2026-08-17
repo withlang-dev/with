@@ -292,7 +292,27 @@ impl Codegen:
             self.had_error = 1
             return 0
 
-        wl_function_type(ret_ty, vec_data_i64(&param_types), param_types.len() as i32, 0)
+        // D6: the reconstructed dispatch type MUST match the real method and its
+        // vtable wrapper (create_dyn_wrapper copies the method's ABI-lowered param
+        // layout). Trait methods use the native (internal) With ABI, so apply the
+        // same sret / indirect-param lowering declare_function does. Without this,
+        // a win64 aggregate return (>8B, e.g. `str`) is reconstructed here by-value
+        // while the wrapper returns via sret — the exact caller/callee ABI
+        // divergence D6 forbids, producing wrong output at every dyn call site.
+        let abi_param_types: Vec[i64] = Vec.new()
+        var actual_ret_ty = ret_ty
+        if self.internal_abi_needs_sret(ret_ty):
+            actual_ret_ty = wl_void_type(self.context)
+            abi_param_types.push(ptr_ty)
+        var api = 0
+        while api < param_types.len() as i32:
+            let src_ty = param_types.get(api as i64)
+            if self.internal_abi_needs_indirect_param(src_ty):
+                abi_param_types.push(ptr_ty)
+            else:
+                abi_param_types.push(src_ty)
+            api = api + 1
+        wl_function_type(actual_ret_ty, vec_data_i64(&abi_param_types), abi_param_types.len() as i32, 0)
 
     fn find_decl_index(node: i32) -> i32:
         for i in 0..self.pool.decl_count():

@@ -6951,21 +6951,43 @@ impl Codegen:
         if param_count > 0:
             wl_get_param_types(fn_ty, vec_data_i64(&param_types))
 
+        // D6: dyn_trait_method_fn_type applies the native win64 ABI, so an
+        // aggregate return (>8B) becomes an sret parameter — matching the vtable
+        // wrapper's real `void(sret_dest, self_data, ...)` shape. Detect it: a
+        // void LLVM return with one more parameter than the MIR arg list (the
+        // extra leading slot is sret) means we must pass the destination pointer
+        // as arg 0 and let the callee write the result in place.
+        let ret_ty = wl_get_return_type(fn_ty)
+        let is_void_ret = ret_ty == wl_void_type(self.context)
+        let has_sret = is_void_ret and param_count == arg_count + 1
+
         let call_args: Vec[i64] = Vec.new()
+        var sret_dst: i64 = 0
+        if has_sret:
+            if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+                return self.mir_emit_dyn_call_error("error: dyn trait sret call has no destination", next_bb)
+            var sret_dst_ty = self.mir_dest_llvm_type(body, dest_place)
+            if sret_dst_ty == 0:
+                sret_dst_ty = wl_ptr_type(self.context)
+            sret_dst = self.mir_place_ptr(body, dest_place, true, sret_dst_ty)
+            if sret_dst == 0:
+                return self.mir_emit_dyn_call_error("error: dyn trait sret destination could not be materialized", next_bb)
+            call_args.push(sret_dst)
         call_args.push(data_ptr)
+        let sret_off = if has_sret: 1 else: 0
         var ai = 1
         while ai < arg_count:
             let op_id = body.call_arg_operands.get((arg_start + ai) as i64)
             var expected_ty: i64 = 0
-            if ai < param_types.len() as i32:
-                expected_ty = param_types.get(ai as i64)
+            let pidx = ai + sret_off
+            if pidx < param_types.len() as i32:
+                expected_ty = param_types.get(pidx as i64)
             let val = self.mir_eval_call_operand(body, op_id, expected_ty, "dyn trait method", ai - 1)
             call_args.push(val)
             ai = ai + 1
 
         let result = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&call_args), call_args.len() as i32)
-        let ret_ty = wl_get_return_type(fn_ty)
-        if ret_ty != wl_void_type(self.context):
+        if not has_sret and ret_ty != wl_void_type(self.context):
             if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
                 return self.mir_emit_dyn_call_error("error: dyn trait call has no destination for non-void return", next_bb)
             var dst_ty = self.mir_dest_llvm_type(body, dest_place)
@@ -13659,6 +13681,31 @@ impl Codegen:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         true
 
+    // Build the dyn-trait fat pointer {data_ptr, vtable_ptr} for an argument
+    // whose declared parameter is `dyn Trait`. Extracted so the win64
+    // indirect-aggregate call paths (which pass the fat value BY ADDRESS) build
+    // the same value the direct path builds — never the concrete's own address.
+    mut fn mir_build_dyn_arg_fat_value(body: &MirBody, args_id: i32, operand_id: i32, ai: i32, dyn_trait_sym: i32) -> i64:
+        let arg_val = self.mir_eval_operand(body, operand_id, 0)
+        if self.llvm_type_is_dyn_fat_ptr(wl_type_of(arg_val)) != 0:
+            return arg_val
+        var dyn_info = self.mir_dyn_arg_info_from_operand(body, operand_id, arg_val)
+        if dyn_info.type_sym == 0:
+            let dyn_call_node = body.call_ast_node(args_id)
+            if dyn_call_node > 0 and self.pool.kind(dyn_call_node) == NodeKind.NK_CALL:
+                let dyn_ast_arg_start = self.pool.get_data1(dyn_call_node)
+                let dyn_ast_arg_count = self.pool.get_data2(dyn_call_node)
+                if ai < dyn_ast_arg_count:
+                    let dyn_arg_node = self.pool.get_extra(dyn_ast_arg_start + ai)
+                    dyn_info = self.mir_dyn_arg_info_from_ast_node(dyn_arg_node, arg_val)
+        if dyn_info.type_sym != 0:
+            if dyn_info.use_ptr != 0:
+                return self.build_dyn_trait_value_from_ptr(arg_val, dyn_info.type_sym, dyn_trait_sym)
+            return self.build_dyn_trait_value(arg_val, dyn_info.type_sym, dyn_trait_sym)
+        with_eprint(f"error: cannot lower argument {ai + 1} to dyn trait '{self.intern.resolve(dyn_trait_sym)}'")
+        self.had_error = 1
+        wl_get_undef(self.get_dyn_fat_ptr_type())
+
     mut fn mir_emit_call_term(body: &MirBody, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
         // Check for intrinsic-tagged calls (Vec/HashMap/Option builtins).
         // These have meaningless ConstKind.CK_FN syms — dispatch by intrinsic kind instead.
@@ -15096,11 +15143,34 @@ impl Codegen:
             if sema_sig_idx >= 0 and param_offset < self.sema.sig_get_param_count(sema_sig_idx):
                 expected_sema_ty = self.sema.sig_param_type(sema_sig_idx, param_offset)
 
+            // Resolve dyn-trait param early: the win64 indirect-aggregate spill
+            // paths below must build the fat pointer, not pass the concrete's
+            // own address. Computed once here and reused by the direct path.
+            var dyn_trait_sym: i32 = 0
+            if callee_fn_sym != 0:
+                dyn_trait_sym = self.get_fn_dyn_param_trait(callee_fn_sym, ai)
+            if dyn_trait_sym == 0 and callee_raw_fn_sym != 0:
+                dyn_trait_sym = self.get_raw_fn_dyn_param_trait(callee_raw_fn_sym, ai)
+
             // Byval: large struct param → alloca + store + pass pointer
             if (abi_byval_mask & ((1 as i64) << (ai as u32))) != 0:
                 var indirect_ty = expected_ty
                 if ai < abi_byval_types.len() as i32 and abi_byval_types.get(ai as i64) != 0:
                     indirect_ty = abi_byval_types.get(ai as i64)
+                // A dyn-trait param passed indirectly: the callee reads a fat
+                // pointer {data, vtable} by address, so build the fat value from
+                // the concrete and spill THAT — never pass the concrete's address.
+                if dyn_trait_sym != 0:
+                    let fatval = self.mir_build_dyn_arg_fat_value(body, args_id, operand_id, ai, dyn_trait_sym)
+                    var fat_ty = indirect_ty
+                    if fat_ty == 0:
+                        fat_ty = wl_type_of(fatval)
+                    let ftmp = self.create_entry_alloca(fat_ty)
+                    let fstored = self.enforce_coerced_type(fatval, fat_ty, "indirect dyn aggregate argument")
+                    wl_build_store(self.builder, fstored, ftmp)
+                    self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.TemporaryAddress, ftmp, ftmp)
+                    args.push(ftmp)
+                    continue
                 var arg_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
                 var byval_strategy = AnalysisMarshalStrategy.ExistingPointer
                 if arg_ptr == 0:
@@ -15150,6 +15220,19 @@ impl Codegen:
                     if arg_sema_ty > 0:
                         agg_ty = self.mir_sema_type_to_llvm(arg_sema_ty)
                 if self.internal_abi_needs_indirect_param(agg_ty):
+                    // A dyn-trait param passed indirectly: build the fat pointer
+                    // from the concrete and spill THAT — matching the byval path.
+                    if dyn_trait_sym != 0:
+                        let fatval = self.mir_build_dyn_arg_fat_value(body, args_id, operand_id, ai, dyn_trait_sym)
+                        var fat_ty = agg_ty
+                        if fat_ty == 0:
+                            fat_ty = wl_type_of(fatval)
+                        let ftmp = self.create_entry_alloca(fat_ty)
+                        let fstored = self.enforce_coerced_type(fatval, fat_ty, "indirect dyn aggregate argument")
+                        wl_build_store(self.builder, fstored, ftmp)
+                        self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.TemporaryAddress, ftmp, ftmp)
+                        args.push(ftmp)
+                        continue
                     var arg_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
                     var indirect_strategy = AnalysisMarshalStrategy.ExistingPointer
                     if arg_ptr == 0:
@@ -15174,11 +15257,7 @@ impl Codegen:
 
             // Check for dyn param BEFORE evaluating operand — coercion would
             // mangle the concrete struct into the fat-pointer shape.
-            var dyn_trait_sym: i32 = 0
-            if callee_fn_sym != 0:
-                dyn_trait_sym = self.get_fn_dyn_param_trait(callee_fn_sym, ai)
-            if dyn_trait_sym == 0 and callee_raw_fn_sym != 0:
-                dyn_trait_sym = self.get_raw_fn_dyn_param_trait(callee_raw_fn_sym, ai)
+            // (dyn_trait_sym was resolved above the byval branch.)
             var arg_val: i64 = 0
             if needs_ref:
                 // #D5 cathedral: single ref-param address policy (extracted).
