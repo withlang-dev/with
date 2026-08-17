@@ -235,17 +235,28 @@ fn codegen_type_node_mentions_self(pool: AstPool, self_sym: i32, type_node: i32)
     0
 
 impl Codegen:
+    // report_errors=false makes the skippable cases (a method whose signature
+    // mentions Self, or an unresolvable type) return 0 WITHOUT setting had_error
+    // or printing — so a vtable-build caller can fall back to the real method's
+    // by-value type for a non-dispatchable slot (e.g. `Ord.cmp`) instead of
+    // failing the whole compilation. The real dispatch site passes true, where a
+    // Self-mentioning method IS a genuine "can't dynamically dispatch this" error.
     mut fn dyn_trait_method_fn_type(trait_sym: i32, method_sym: i32) -> i64:
+        self.dyn_trait_method_fn_type_reporting(trait_sym, method_sym, true)
+
+    mut fn dyn_trait_method_fn_type_reporting(trait_sym: i32, method_sym: i32, report_errors: bool) -> i64:
         let trait_idx_opt = self.trait_map.get(trait_sym)
         if not trait_idx_opt.is_some():
-            with_eprint("error: missing trait metadata for dyn dispatch on '" ++ self.intern.resolve(trait_sym) ++ "'")
-            self.had_error = 1
+            if report_errors:
+                with_eprint("error: missing trait metadata for dyn dispatch on '" ++ self.intern.resolve(trait_sym) ++ "'")
+                self.had_error = 1
             return 0
         let trait_idx = trait_idx_opt.unwrap()
         let method_offset = self.find_trait_method_offset(trait_idx, method_sym)
         if method_offset < 0:
-            with_eprint("error: missing trait method '" ++ self.intern.resolve(method_sym) ++ "' in dyn trait '" ++ self.intern.resolve(trait_sym) ++ "'")
-            self.had_error = 1
+            if report_errors:
+                with_eprint("error: missing trait method '" ++ self.intern.resolve(method_sym) ++ "' in dyn trait '" ++ self.intern.resolve(trait_sym) ++ "'")
+                self.had_error = 1
             return 0
         let method_idx = self.trait_method_starts.get(trait_idx as i64) + method_offset
         let method_flags = self.trait_method_flags.get(method_idx as i64)
@@ -260,13 +271,15 @@ impl Codegen:
         while pi < param_count:
             let p_type_node = self.pool.fn_param_type(param_start, pi)
             if codegen_type_node_mentions_self(self.pool, self.sym_Self, p_type_node) != 0:
-                with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because a non-receiver parameter mentions Self")
-                self.had_error = 1
+                if report_errors:
+                    with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because a non-receiver parameter mentions Self")
+                    self.had_error = 1
                 return 0
             var p_ty = self.resolve_type(p_type_node)
             if p_ty == 0:
-                with_eprint("error: cannot resolve parameter type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
-                self.had_error = 1
+                if report_errors:
+                    with_eprint("error: cannot resolve parameter type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
+                    self.had_error = 1
                 return 0
             param_types.push(p_ty)
             pi = pi + 1
@@ -274,13 +287,15 @@ impl Codegen:
         var ret_sema_ty = self.sema.ty_void as i32
         if ret_node != 0:
             if codegen_type_node_mentions_self(self.pool, self.sym_Self, ret_node) != 0:
-                with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because its return type mentions Self")
-                self.had_error = 1
+                if report_errors:
+                    with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because its return type mentions Self")
+                    self.had_error = 1
                 return 0
             ret_sema_ty = self.sema.resolve_type_expr_frozen(ret_node) as i32
             if ret_sema_ty == 0:
-                with_eprint("error: cannot resolve return type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
-                self.had_error = 1
+                if report_errors:
+                    with_eprint("error: cannot resolve return type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
+                    self.had_error = 1
                 return 0
         if (method_flags / FnFlags.ASYNC) % 2 == 1:
             let task_args: Vec[i32] = Vec.new()
@@ -288,8 +303,9 @@ impl Codegen:
             ret_sema_ty = self.sema.find_generic_inst_type(self.sema.syms.task, task_args, 1) as i32
         let ret_ty = self.sema_type_to_llvm(ret_sema_ty)
         if ret_ty == 0:
-            with_eprint("error: cannot lower return type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
-            self.had_error = 1
+            if report_errors:
+                with_eprint("error: cannot lower return type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
+                self.had_error = 1
             return 0
 
         // D6: the reconstructed dispatch type MUST match the real method and its
@@ -373,18 +389,29 @@ impl Codegen:
             return method_fn
         let is_async_method = if impl_fn_sym != 0 and self.async_fn_ret_types.get(impl_fn_sym).is_some(): 1 else: 0
         // dyn_trait_method_fn_type applies the native win64 ABI: an aggregate
-        // return >8B (e.g. an async Task {i32,ptr}) becomes a leading sret
+        // return >8B (an async Task {i32,ptr}, or a fat Option like
+        // `Option[&dyn Error]` = {i32,{ptr,ptr}}) becomes a leading sret
         // parameter and a void return. The wrapper IS the vtable slot, so its
         // signature must match dyn_ft — carry the sret slot, place self/args
         // after it, and write the produced value through it instead of
-        // returning by value. Without this the async Task aggregate is seeded
-        // from the void return (`insertvalue void undef`) and every argument
-        // shifts by one slot. On SysV the 16B Task returns in registers (no
-        // sret), so the non-sret path below stays byte-identical.
-        let ret_ty = wl_get_return_type(dyn_ft)
+        // returning by value. Detect it structurally (void return + one extra
+        // leading param vs the real method) so it fires for sync aggregate
+        // returns too, not only async. On SysV a 16B/24B aggregate returns in
+        // registers (no sret), so the non-sret path below stays byte-identical.
+        let dyn_ret_ty = wl_get_return_type(dyn_ft)
         let dyn_param_count = wl_count_param_types(dyn_ft)
-        let has_sret = is_async_method != 0 and ret_ty == wl_void_type(self.context) and dyn_param_count == orig_param_count + 1
+        let has_sret = dyn_ret_ty == wl_void_type(self.context) and dyn_param_count == orig_param_count + 1
         let base = if has_sret: 1 else: 0
+        // For the sret and async paths dyn_ft is authoritative (win64 aggregate
+        // sret lowering / the reconstructed Task type). For a plain sync by-value
+        // return the IMPL fn's actual monomorphized return is authoritative:
+        // dyn_trait_method_fn_type resolves the trait method's DECLARED return,
+        // which for a generic return (e.g. `Scoped[T].with_enter -> T`) is the
+        // unsubstituted parameter and can lower to the wrong width (i32 vs the
+        // impl's i64). The wrapper body returns method_ft's value, so declaring
+        // the wrapper with method_ft's return keeps producer and body consistent
+        // and reproduces the pre-sret-fix behavior for this case.
+        let ret_ty = if has_sret or is_async_method != 0: dyn_ret_ty else: wl_get_return_type(method_ft)
         let wrapper_param_types: Vec[i64] = Vec.new()
         if has_sret:
             wrapper_param_types.push(ptr_ty)
@@ -975,13 +1002,26 @@ impl Codegen:
                     fv = self.fn_values.get(impl_fn_sym)
                     ft = self.fn_fn_types.get(impl_fn_sym)
             if fv.is_some() and ft.is_some():
-                var dyn_ft = ft.unwrap() as i64
-                if (method_flags / FnFlags.ASYNC) % 2 == 1:
-                    dyn_ft = self.dyn_trait_method_fn_type(trait_sym, method_sym)
-                    if dyn_ft == 0:
-                        entries.push(wl_const_null(wl_ptr_type(self.context)))
-                        continue
-                let wrapper = self.create_dyn_wrapper(impl_type_sym, impl_fn_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64, dyn_ft, consumes_self)
+                // Materialize fv/ft to plain values before the mut call below —
+                // they are Option views into self and cannot stay live across
+                // self.dyn_trait_method_fn_type.
+                let fv_val = fv.unwrap() as i64
+                let ft_val = ft.unwrap() as i64
+                // D6: the vtable slot type is dyn_trait_method_fn_type — the SAME
+                // descriptor the call site (mir_emit_dyn_trait_call) reads. The
+                // wrapper must be declared with it so producer and consumer agree,
+                // including the win64 sret lowering of an aggregate (>8B) return.
+                // Gating this on async only (the old code) left a non-async
+                // aggregate return — e.g. `source() -> Option[&dyn Error]` — with a
+                // by-value wrapper against an sret call site: the exact divergence.
+                var dyn_ft = self.dyn_trait_method_fn_type_reporting(trait_sym, method_sym, false)
+                if dyn_ft == 0:
+                    // Non-dispatchable slot (signature mentions Self, e.g.
+                    // `Ord.cmp`): fall back to the real method's by-value type.
+                    // The slot is never dynamically dispatched, so it can't
+                    // diverge from a call site — reproducing the old behavior.
+                    dyn_ft = ft_val
+                let wrapper = self.create_dyn_wrapper(impl_type_sym, impl_fn_sym, method_sym, fv_val, ft_val, dyn_ft, consumes_self)
                 entries.push(wrapper)
             else:
                 entries.push(wl_const_null(wl_ptr_type(self.context)))
@@ -1063,13 +1103,12 @@ impl Codegen:
                 with_eprint("error: missing monomorphized trait method '" ++ type_name ++ "." ++ method_name ++ "' for trait '" ++ trait_name ++ "'")
                 self.had_error = 1
                 return
-            var dyn_ft = ft.unwrap() as i64
-            if (method_flags / FnFlags.ASYNC) % 2 == 1:
-                dyn_ft = self.dyn_trait_method_fn_type(trait_sym, method_sym)
-                if dyn_ft == 0:
-                    self.had_error = 1
-                    return
-            let wrapper = self.create_dyn_wrapper(impl_type_sym, concrete_sym, method_sym, fv.unwrap() as i64, ft.unwrap() as i64, dyn_ft, consumes_self)
+            let fv_val = fv.unwrap() as i64
+            let ft_val = ft.unwrap() as i64
+            var dyn_ft = self.dyn_trait_method_fn_type_reporting(trait_sym, method_sym, false)
+            if dyn_ft == 0:
+                dyn_ft = ft_val
+            let wrapper = self.create_dyn_wrapper(impl_type_sym, concrete_sym, method_sym, fv_val, ft_val, dyn_ft, consumes_self)
             entries.push(wrapper)
 
         let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name
@@ -1132,12 +1171,9 @@ impl Codegen:
                 with_eprint("error: missing monomorphized trait method '" ++ type_name ++ "." ++ method_text ++ "' for trait '" ++ trait_text ++ "' (dyn generic inst)")
                 self.had_error = 1
                 return
-            var dyn_ft = ft
-            if (method_flags / FnFlags.ASYNC) % 2 == 1:
-                dyn_ft = self.dyn_trait_method_fn_type(trait_sym, method_sym)
-                if dyn_ft == 0:
-                    self.had_error = 1
-                    return
+            var dyn_ft = self.dyn_trait_method_fn_type_reporting(trait_sym, method_sym, false)
+            if dyn_ft == 0:
+                dyn_ft = ft
             let wrapper = self.create_dyn_wrapper(impl_type_sym, wrapper_fn_sym, method_sym, fv, ft, dyn_ft, consumes_self)
             entries.push(wrapper)
         if used_row == 0:
