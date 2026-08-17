@@ -1,3 +1,10 @@
 *.w linguist-language=With
 bootstrap/** linguist-vendored
 out/** linguist-generated
+
+# embed_file fixtures are embedded byte-for-byte and their content is asserted
+# exactly. Pin LF so a native Windows checkout (core.autocrlf=true, the default
+# on GitHub's Windows runners) does not rewrite them to CRLF, which would make
+# embed_file read "...\r\n" and break the byte-exact assertions (#801).
+test/behavior/*.txt text eol=lf
+test/behavior/**/*.txt text eol=lf
