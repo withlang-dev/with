@@ -1,4 +1,3 @@
-//! skip-windows: issue #806: Windows async lowering — no-suspend blocks produce wrong output (exit 1)
 //! expect-stdout: ok
 
 use std.task.Task

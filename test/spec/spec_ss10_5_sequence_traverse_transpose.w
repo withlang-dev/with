@@ -1,4 +1,3 @@
-//! skip-windows: issue #806: Windows win64 fat-fn/closure ABI — sequence/traverse/transpose produce wrong output (exit 1)
 //! expect-stdout: ok
 // Spec test: Section 10.5 / 10.7 — sequence / traverse / transpose.
 
