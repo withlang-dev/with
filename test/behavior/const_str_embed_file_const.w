@@ -1,4 +1,3 @@
-//! skip-windows: issue #801: embed_file path resolution fails on native Windows
 //! expect-stdout: ok
 
 const EMPTY: str = ""
