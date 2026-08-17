@@ -1,4 +1,4 @@
-//! skip-windows: issue #800: action/capability/net/process/fs OS-surface fails on native Windows
+//! skip-windows: #800: std.net has no Windows backend — rt/windows_x86_64.w defines no with_net_* symbols (linux/darwin do), so this link-fails; needs a Winsock implementation (WSAStartup/socket/bind/listen/accept/connect/send/recv/closesocket/getsockname)
 //! expect-stdout: ok
 
 // #658: the server-side std.net surface must actually work. TCP: listen
