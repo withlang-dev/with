@@ -1,4 +1,3 @@
-//! skip-windows: issue #802: core-language behavior fails on native Windows (needs root-cause)
 //! expect-stdout: ok
 
 fn doubled(xs: &Vec[i32]) -> Vec[i32]:

@@ -17068,6 +17068,7 @@ impl Codegen:
         // Save current state
         let saved_fn = self.current_function
         let saved_ret = self.current_ret_type
+        let saved_fn_name_sym = self.current_function_name_sym
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_allocas = self.local_allocas
         let saved_types = self.local_types
@@ -17083,6 +17084,16 @@ impl Codegen:
         // Build closure body
         self.current_function = closure_fn
         self.current_ret_type = ret_ty
+        // The synthetic closure is declared with a direct return (its LLVM
+        // signature uses ret_ty by value, never an sret param). Its TK_RETURN
+        // must therefore take the direct-return path. current_function_name_sym
+        // is keyed into extern_fn_has_sret; leaving the enclosing function's sym
+        // here makes the closure inherit that function's sret verdict (true on
+        // Windows for any struct return >8 bytes, e.g. Vec), which would store
+        // the result through param 0 and emit `ret void` in an i32 function.
+        // Sym 0 can never carry an sret entry (record_c_abi_transform ignores
+        // it), so it selects the direct path unconditionally.
+        self.current_function_name_sym = 0
         let entry = wl_append_bb(self.context, closure_fn, "entry")
         wl_position_at_end(self.builder, entry)
 
@@ -17320,6 +17331,7 @@ impl Codegen:
         // Restore state
         self.current_function = saved_fn
         self.current_ret_type = saved_ret
+        self.current_function_name_sym = saved_fn_name_sym
         wl_position_at_end(self.builder, saved_bb)
         self.local_allocas = saved_allocas
         self.local_types = saved_types

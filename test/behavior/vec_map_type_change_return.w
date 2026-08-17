@@ -1,4 +1,3 @@
-//! skip-windows: issue #802: core-language behavior fails on native Windows (needs root-cause)
 // Regression for #306: a type-changing Vec.map (A -> B) must unify with an
 // expected Vec[B] in return position and annotated-let position, not just when
 // let-bound without an expected type. Previously the map closure's parameter
