@@ -1,4 +1,4 @@
-//! skip-windows: issue #799: c_import behavior fails on native Windows MSVC headers
+//! skip-windows: #799: uses tmpfile() (MSVCRT creates it in the drive root — privilege-dependent) and fopen() on a hardcoded Unix "/tmp/" path absent on Windows; the COwned-fclose owning-wrapper mechanism it exercises is already covered on Windows by behav_c_import_owning_wrapper_strdup
 //! expect-stdout: ok
 
 // [Phase8] #357: stdio owning constructors. fopen and tmpfile each return an owned

@@ -1,4 +1,4 @@
-//! skip-windows: issue #799: Windows c_import fails on native MSVC headers
+//! skip-windows: #799: pulls system headers (stdio/stdlib/time/limits/string) and links libm ("m") — the c_import clang invocation (src/compiler/ClangBridge.w) lacks Windows MSVC/UCRT include-dir wiring so the headers are not found, and there is no separate libm on Windows
 //! expect-stdout: ok
 
 use c_import("stdio.h")

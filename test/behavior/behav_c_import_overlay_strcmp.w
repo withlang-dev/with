@@ -1,4 +1,3 @@
-//! skip-windows: issue #799: c_import behavior fails on native Windows MSVC headers
 //! expect-stdout: ok
 
 // #379: the curated libc overlay covers more than strlen. strcmp's two
