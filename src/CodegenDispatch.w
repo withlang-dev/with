@@ -17151,6 +17151,10 @@ impl Codegen:
         // semantic types in lockstep with the LLVM signature so closure-local MIR
         // can recover pointee types for reference parameters.
         let closure_param_sema_types: Vec[i32] = Vec.new()
+        // #D6: for a param passed indirectly on win64 (aggregate >8B), the entry
+        // holds the real by-value LLVM type so the body prologue can load a
+        // callee-owned copy from the incoming pointer; 0 for direct params.
+        let closure_param_real_llvm: Vec[i64] = Vec.new()
         let param_types: Vec[i64] = Vec.new()
         let closure_param_offset = if is_extern_closure: 0 else: 1
         if not is_extern_closure:
@@ -17168,12 +17172,21 @@ impl Codegen:
                     p_sema_ty = expected_p_sema_ty
             closure_param_sema_types.push(p_sema_ty)
             let p_llvm_ty = self.sema_type_to_llvm(p_sema_ty)
+            var chosen_ty = i32_ty
             if p_llvm_ty != 0:
-                param_types.push(p_llvm_ty)
+                chosen_ty = p_llvm_ty
             else if p_type != 0:
-                param_types.push(self.resolve_type(p_type))
+                chosen_ty = self.resolve_type(p_type)
+            // #D6: match mir_build_closure_fn_type — a win64 aggregate >8B param
+            // is passed indirectly (pointer), so the callee signature must
+            // declare `ptr` too, or caller and callee disagree on the argument
+            // shape and the aggregate arrives corrupted (#806).
+            if self.internal_abi_needs_indirect_param(chosen_ty):
+                closure_param_real_llvm.push(chosen_ty)
+                param_types.push(ptr_ty)
             else:
-                param_types.push(i32_ty)
+                closure_param_real_llvm.push(0)
+                param_types.push(chosen_ty)
         // Determine return type (infer from context or use i32)
         var ret_ty = i32_ty
         if closure_fn_ret_tid != 0:
@@ -17246,10 +17259,20 @@ impl Codegen:
         for i in 0..param_count:
             let p_name = self.pool.get_extra(extra_start + i * 2)
             let param_val = wl_get_param(closure_fn, i + closure_param_offset)
-            let param_ty = wl_type_of(param_val)
-            let alloca = self.create_entry_alloca(param_ty)
-            wl_build_store(self.builder, param_val, alloca)
-            self.record_local(p_name, alloca, param_ty, 1)
+            let real_ty = if i < closure_param_real_llvm.len() as i32: closure_param_real_llvm.get(i as i64) else: 0
+            if real_ty != 0:
+                // #D6 indirect param (win64 aggregate >8B): param_val is a pointer
+                // to the caller-materialized value. Load a callee-owned copy so the
+                // body reads its own storage, matching the indirect call ABI.
+                let loaded = wl_build_load(self.builder, real_ty, param_val)
+                let alloca = self.create_entry_alloca(real_ty)
+                wl_build_store(self.builder, loaded, alloca)
+                self.record_local(p_name, alloca, real_ty, 1)
+            else:
+                let param_ty = wl_type_of(param_val)
+                let alloca = self.create_entry_alloca(param_ty)
+                wl_build_store(self.builder, param_val, alloca)
+                self.record_local(p_name, alloca, param_ty, 1)
             if i < closure_param_sema_types.len() as i32:
                 self.record_local_sema_type(p_name, closure_param_sema_types.get(i as i64))
         // ── MIR-based closure body compilation ──────────────────────
