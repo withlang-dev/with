@@ -1,6 +1,7 @@
 use Archive
 use compiler.Runtime
 use std.collections.Atomic
+use std.builtins.int_to_string
 use TargetSpec
 
 extern fn with_str_clone_ref(s: &str) -> str
@@ -745,6 +746,7 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
         if ld_path.len() == 0:
             if runtime_sysinfo_os() == "Windows":
                 with_eprint("error: missing Windows LLVM linker metadata")
+                link_stage_report_runtime_root_diag(root)
             else:
                 with_eprint("error: cross-target link requires LLVM linker metadata (" ++ root ++ "/llvm_ld)")
             return link_stage_plan_fail()
@@ -904,6 +906,32 @@ fn link_stage_resolve_runtime_root() -> str:
             return with_str_clone_ref(dir)
     // Fall back to compiler-relative runtime dir.
     compiler_dir ++ "/runtime"
+
+// Diagnostic: on a Windows/cross link that could not find `llvm_ld`, print the
+// resolved root plus every candidate's per-file presence so a failing CI run
+// pins WHICH root was picked and what it is missing, without a second cycle.
+// `with test <files>` links directly (it never runs the build graph's
+// generate-llvm-link-metadata action that `with build` depends on), so the
+// resolved root must already carry llvm_ld — this shows whether any candidate does.
+fn link_stage_report_runtime_root_diag(resolved: &str):
+    let argv0 = runtime_arg_at(0)
+    let compiler_dir = if argv0.len() > 0: link_stage_dirname(argv0) else: "."
+    let platform_object = link_stage_host_platform_runtime_object()
+    with_eprint("  resolved runtime root: " ++ resolved)
+    with_eprint("  WITH_OUT_DIR: " ++ runtime_getenv("WITH_OUT_DIR"))
+    with_eprint("  argv0: " ++ argv0)
+    with_eprint("  platform object: " ++ platform_object)
+    let candidates: Vec[str] = Vec.new()
+    candidates.push(link_stage_artifact_root() ++ "/lib")
+    candidates.push(link_stage_artifact_root() ++ "/bootstrap-lib")
+    candidates.push(compiler_dir ++ "/runtime")
+    candidates.push(compiler_dir ++ "/../lib")
+    for i in 0..candidates.len() as i32:
+        let dir = candidates.get(i as i64)
+        let has_stubs = if runtime_read_file(dir ++ "/cimport_stubs.o").len() > 0: "yes" else: "no"
+        let has_platform = if platform_object.len() == 0 or runtime_read_file(dir ++ "/" ++ platform_object).len() > 0: "yes" else: "no"
+        let has_ld = if link_stage_read_file_trimmed(dir ++ "/llvm_ld").len() > 0: "yes" else: "no"
+        with_eprint("  candidate[" ++ int_to_string(i as i64) ++ "] " ++ dir ++ " cimport_stubs.o=" ++ has_stubs ++ " platform=" ++ has_platform ++ " llvm_ld=" ++ has_ld)
 
 // Directory holding the link inputs built FOR the active target:
 // the runtime root itself for native, its cross/<target>/ subdir
