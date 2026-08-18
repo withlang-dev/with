@@ -533,6 +533,13 @@ fn link_stage_windows_libpath(var_name: &str, fallback: &str) -> str:
         return v
     fallback ++ ""
 
+// Unix-only library spellings that have no Windows import lib and whose
+// symbols are already provided by the CRT/UCRT linked unconditionally below
+// (cos/abs/… in libucrt via libcmt; strlen/malloc/… in libcmt). A `link:`
+// directive naming one of these (e.g. `c_import("math.h", link: "m")`) must be
+// dropped on the Windows link, not turned into a nonexistent `m.lib`.
+fn link_stage_windows_lib_is_crt_implicit(name: &str): name == "m" or name == "c"
+
 fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &str, extras: &Vec[str], link_libs: &Vec[str], link_args: &Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
     let env: Vec[LinkStageEnvVar] = Vec.new()
@@ -569,8 +576,14 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
         let lib = link_libs.get(i as i64)
         if lib.ends_with(".lib"):
             args.push(with_str_clone_ref(lib))
-        else:
+        else if not link_stage_windows_lib_is_crt_implicit(lib):
             args.push(lib ++ ".lib")
+        // else: `m` (libm) and `c` (libc) are Unix-only spellings — Windows has
+        // no `m.lib`/`c.lib`, and their symbols (cos, abs, strlen, …) resolve
+        // from the UCRT/CRT already linked below (libucrt via libcmt). Emitting a
+        // bare `<name>.lib` would make lld-link fail to open a nonexistent import
+        // lib, so drop it. Any other name still becomes `<name>.lib` so a
+        // genuinely missing library fails loudly rather than silently vanishing.
     for i in 0..link_args.len() as i32:
         args.push(with_str_clone_ref(link_args.get(i as i64)))
     args.push("libcpmt.lib")
