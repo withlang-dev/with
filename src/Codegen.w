@@ -4939,6 +4939,28 @@ impl Codegen:
             return false
         self.abi_size_of(param_ty) > 8
 
+    // #806/D6: the LLVM param type a fat-closure signature must declare for a
+    // value of `val_ty`. A win64 aggregate >8B is passed indirectly (pointer):
+    // the closure callee (gen_closure / mir_build_closure_fn_type) declares
+    // `ptr` and loads its own copy, so every inline closure-call site must
+    // declare `ptr` too or caller and callee disagree on the argument shape and
+    // the aggregate arrives corrupted (#806). No-op on non-win64.
+    mut fn closure_abi_param_ty(val_ty: i64) -> i64:
+        if self.internal_abi_needs_indirect_param(val_ty):
+            return wl_ptr_type(self.context)
+        val_ty
+
+    // #806/D6: marshal a by-value closure argument to match closure_abi_param_ty.
+    // For a win64-indirect param, materialize a caller-owned copy and pass its
+    // address (the callee loads its own copy from it); otherwise pass the value
+    // unchanged. No-op on non-win64.
+    mut fn closure_abi_arg(val_ty: i64, val: i64) -> i64:
+        if self.internal_abi_needs_indirect_param(val_ty):
+            let a = self.create_entry_alloca(val_ty)
+            wl_build_store(self.builder, val, a)
+            return a
+        val
+
     mut fn c_abi_needs_sret(ret_ty: i64) -> bool:
         if ret_ty == 0:
             return false
