@@ -978,3 +978,259 @@ pub fn rt_compat_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_p
 
 pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     win_wait_process_slot(pid, timeout_ms, true)
+
+// ---------------------------------------------------------------------------
+// Networking (Winsock2 / ws2_32). Mirrors the POSIX backend in
+// rt/linux_x86_64.w:with_net_*, translated to Winsock semantics: SOCKET
+// handles are returned as i64 (INVALID_SOCKET reads as -1), closesocket
+// replaces close, send/recv take int-width lengths, and socket creation is
+// gated behind a one-time WSAStartup. ws2_32.lib is already on the Windows
+// link line (src/compiler/Link.w). Loopback handles fit in i32, so the public
+// with_net_* i32-fd ABI declared by std.net is preserved on both platforms.
+// ---------------------------------------------------------------------------
+
+extern fn WSAStartup(version: u16, data: *mut u8) -> i32
+extern fn socket(af: i32, ty: i32, protocol: i32) -> i64
+extern fn connect(s: i64, addr: *const u8, namelen: i32) -> i32
+extern fn bind(s: i64, addr: *const u8, namelen: i32) -> i32
+extern fn listen(s: i64, backlog: i32) -> i32
+extern fn accept(s: i64, addr: *mut u8, addrlen: *mut i32) -> i64
+extern fn getsockname(s: i64, addr: *mut u8, addrlen: *mut i32) -> i32
+extern fn send(s: i64, buf: *const u8, len: i32, flags: i32) -> i32
+extern fn recv(s: i64, buf: *mut u8, len: i32, flags: i32) -> i32
+extern fn closesocket(s: i64) -> i32
+extern fn getaddrinfo(node: *const u8, service: *const u8, hints: *const WindowsAddrInfo, res: *mut *mut WindowsAddrInfo) -> i32
+extern fn freeaddrinfo(res: *mut WindowsAddrInfo) -> Unit
+extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
+
+// Win64 ADDRINFOA (ws2def.h): ai_addrlen is size_t (u64) and ai_canonname
+// precedes ai_addr — both differ from the Linux struct addrinfo layout.
+type WindowsAddrInfo:
+    ai_flags: i32
+    ai_family: i32
+    ai_socktype: i32
+    ai_protocol: i32
+    ai_addrlen: u64
+    ai_canonname: *mut u8
+    ai_addr: *mut u8
+    ai_next: *mut WindowsAddrInfo
+
+fn rt_net_str_data(s: &str) -> *const u8:
+    unsafe **(&s as *const *const *const u8)
+
+fn rt_net_wsa_ensure() -> i32:
+    // 0x0202 == Winsock 2.2. WSAStartup is refcounted; we never WSACleanup
+    // (a process-lifetime refcount leak, matching how the runtime treats other
+    // one-shot OS init).
+    var wsadata: [512]u8 = [0 as u8; 512]
+    WSAStartup(514 as u16, &raw mut wsadata as *mut [512]u8 as *mut u8)
+
+fn rt_net_empty_str() -> str:
+    with_str_from_bytes("" as *const u8, 0)
+
+fn rt_net_copy_str_to_c_buf(s: &str, out: *mut u8, cap: i64) -> i32:
+    if s.len() + 1 > cap:
+        return -1
+    var i: i64 = 0
+    while i < s.len():
+        unsafe *((out as i64 + i) as *mut u8) = s.byte_at(i) as u8
+        i = i + 1
+    unsafe *((out as i64 + i) as *mut u8) = 0
+    0
+
+fn rt_net_write_port_to_c_buf(port: i32, out: *mut u8, cap: i64) -> i32:
+    if port < 0 or port > 65535 or cap < 2:
+        return -1
+    var rev: [6]u8 = [0 as u8; 6]
+    var n = port
+    var len: i64 = 0
+    if n == 0:
+        rev[0] = 48 as u8
+        len = 1
+    else:
+        while n > 0:
+            rev[len] = (48 + (n % 10)) as u8
+            len = len + 1
+            n = n / 10
+    if len + 1 > cap:
+        return -1
+    var i: i64 = 0
+    while i < len:
+        unsafe *((out as i64 + i) as *mut u8) = rev[len - i - 1]
+        i = i + 1
+    unsafe *((out as i64 + len) as *mut u8) = 0
+    0
+
+// Fill a 16-byte sockaddr_in for `port` from a dotted-quad IPv4 literal.
+// Returns 0 on success, -1 when `host` is not a numeric IPv4 address (the
+// caller then resolves it through getaddrinfo).
+fn rt_net_fill_sockaddr_ipv4(host: &str, port: i32, sa: *mut u8) -> i32:
+    var parts: [4]i32 = [0 as i32; 4]
+    var idx: i64 = 0
+    var cur: i32 = 0
+    var have_digit = false
+    var i: i64 = 0
+    while i < host.len():
+        let c = host.byte_at(i) as i32
+        if c >= 48 and c <= 57:
+            cur = cur * 10 + (c - 48)
+            if cur > 255:
+                return -1
+            have_digit = true
+        else if c == 46:
+            if not have_digit or idx >= 3:
+                return -1
+            parts[idx] = cur
+            idx = idx + 1
+            cur = 0
+            have_digit = false
+        else:
+            return -1
+        i = i + 1
+    if not have_digit or idx != 3:
+        return -1
+    parts[3] = cur
+    // sin_family=AF_INET(2) LE, sin_port big-endian, sin_addr network order.
+    unsafe *((sa as i64 + 0) as *mut u8) = 2 as u8
+    unsafe *((sa as i64 + 1) as *mut u8) = 0 as u8
+    unsafe *((sa as i64 + 2) as *mut u8) = ((port >> 8) & 255) as u8
+    unsafe *((sa as i64 + 3) as *mut u8) = (port & 255) as u8
+    unsafe *((sa as i64 + 4) as *mut u8) = parts[0] as u8
+    unsafe *((sa as i64 + 5) as *mut u8) = parts[1] as u8
+    unsafe *((sa as i64 + 6) as *mut u8) = parts[2] as u8
+    unsafe *((sa as i64 + 7) as *mut u8) = parts[3] as u8
+    var j: i64 = 8
+    while j < 16:
+        unsafe *((sa as i64 + j) as *mut u8) = 0 as u8
+        j = j + 1
+    0
+
+fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32) -> i32:
+    if rt_net_wsa_ensure() != 0:
+        return -1
+    var sa: [16]u8 = [0 as u8; 16]
+    if rt_net_fill_sockaddr_ipv4(host, port, &raw mut sa as *mut [16]u8 as *mut u8) == 0:
+        let fd = socket(2, socktype, protocol)
+        if fd < 0:
+            return -1
+        if connect(fd, &sa as *const [16]u8 as *const u8, 16) != 0:
+            let _ = closesocket(fd)
+            return -1
+        return fd as i32
+    // Non-numeric host: resolve through getaddrinfo.
+    var host_buf: [256]u8 = [0 as u8; 256]
+    var port_buf: [16]u8 = [0 as u8; 16]
+    if rt_net_copy_str_to_c_buf(host, &raw mut host_buf as *mut [256]u8 as *mut u8, 256) != 0:
+        return -1
+    if rt_net_write_port_to_c_buf(port, &raw mut port_buf as *mut [16]u8 as *mut u8, 16) != 0:
+        return -1
+    var hints = WindowsAddrInfo {
+        ai_flags: 0,
+        ai_family: 0,
+        ai_socktype: socktype,
+        ai_protocol: protocol,
+        ai_addrlen: 0 as u64,
+        ai_canonname: 0 as *mut u8,
+        ai_addr: 0 as *mut u8,
+        ai_next: 0 as *mut WindowsAddrInfo,
+    }
+    var res: *mut WindowsAddrInfo = 0 as *mut WindowsAddrInfo
+    let gai = getaddrinfo(&host_buf as *const [256]u8 as *const u8, &port_buf as *const [16]u8 as *const u8, &hints as *const WindowsAddrInfo, &raw mut res as *mut *mut WindowsAddrInfo)
+    if gai != 0 or res as i64 == 0:
+        return -1
+    var p = res
+    while p as i64 != 0:
+        let fd = socket((unsafe *p).ai_family, (unsafe *p).ai_socktype, (unsafe *p).ai_protocol)
+        if fd >= 0:
+            let rc = connect(fd, (unsafe *p).ai_addr as *const u8, (unsafe *p).ai_addrlen as i32)
+            if rc == 0:
+                freeaddrinfo(res)
+                return fd as i32
+            let _ = closesocket(fd)
+        p = (unsafe *p).ai_next
+    freeaddrinfo(res)
+    -1
+
+pub fn with_net_tcp_connect(host: str, port: i32) -> i32:
+    rt_net_connect_any(&host, port, 1, 6)
+
+pub fn with_net_udp_connect(host: str, port: i32) -> i32:
+    rt_net_connect_any(&host, port, 2, 17)
+
+fn rt_net_bind_inaddr_any(fd: i64, port: i32) -> i32:
+    var sa: [16]u8 = [0 as u8; 16]
+    sa[0] = 2 as u8
+    sa[2] = ((port >> 8) & 255) as u8
+    sa[3] = (port & 255) as u8
+    bind(fd, &sa as *const [16]u8 as *const u8, 16)
+
+pub fn with_net_tcp_listen(port: i32, backlog: i32) -> i32:
+    if port < 0 or port > 65535:
+        return -1
+    if rt_net_wsa_ensure() != 0:
+        return -1
+    let fd = socket(2, 1, 6)
+    if fd < 0:
+        return -1
+    if rt_net_bind_inaddr_any(fd, port) != 0:
+        let _ = closesocket(fd)
+        return -1
+    if listen(fd, backlog) != 0:
+        let _ = closesocket(fd)
+        return -1
+    fd as i32
+
+pub fn with_net_tcp_accept(sock: i32) -> i32:
+    let fd = accept(sock as i64, 0 as *mut u8, 0 as *mut i32)
+    if fd < 0:
+        return -1
+    fd as i32
+
+pub fn with_net_udp_bind(port: i32) -> i32:
+    if port < 0 or port > 65535:
+        return -1
+    if rt_net_wsa_ensure() != 0:
+        return -1
+    let fd = socket(2, 2, 17)
+    if fd < 0:
+        return -1
+    if rt_net_bind_inaddr_any(fd, port) != 0:
+        let _ = closesocket(fd)
+        return -1
+    fd as i32
+
+pub fn with_net_sock_port(sock: i32) -> i32:
+    var sa: [16]u8 = [0 as u8; 16]
+    var sl: i32 = 16
+    if getsockname(sock as i64, &raw mut sa as *mut [16]u8 as *mut u8, &raw mut sl) != 0:
+        return -1
+    ((sa[2] as i32) << 8) | (sa[3] as i32)
+
+pub fn with_net_send(sock: i32, data: str) -> i64:
+    let ptr = rt_net_str_data(&data)
+    let total = data.len()
+    var written: i64 = 0
+    while written < total:
+        let chunk = total - written
+        let r = send(sock as i64, (ptr as i64 + written) as *const u8, chunk as i32, 0)
+        if r <= 0:
+            return if written > 0: written else: -1
+        written = written + (r as i64)
+    written
+
+pub fn with_net_recv(sock: i32, max_len: i64) -> str:
+    if max_len <= 0:
+        return rt_net_empty_str()
+    let buf = with_alloc(max_len)
+    if buf as i64 == 0:
+        return rt_net_empty_str()
+    let r = recv(sock as i64, buf, max_len as i32, 0)
+    if r <= 0:
+        with_free(buf)
+        return rt_net_empty_str()
+    let out = with_str_from_bytes(buf as *const u8, r as i64)
+    with_free(buf)
+    out
+
+pub fn with_net_close(sock: i32) -> i32:
+    closesocket(sock as i64)
