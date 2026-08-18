@@ -260,6 +260,14 @@ jobs:
           kit_ver="$(ls "$kit_root" | sort -V | tail -1)"
           echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/x64")" >> "$GITHUB_ENV"
           echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/x64")" >> "$GITHUB_ENV"
+          # c_import system-header include dirs (ClangBridge.w reads
+          # WITH_WINDOWS_{MSVC,UCRT,SHARED,UM}_INCDIR).
+          echo "WITH_WINDOWS_MSVC_INCDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/include")" >> "$GITHUB_ENV"
+          kit_inc="/c/Program Files (x86)/Windows Kits/10/Include"
+          inc_ver="$(ls "$kit_inc" | sort -V | tail -1)"
+          echo "WITH_WINDOWS_UCRT_INCDIR=$(cygpath -m "$kit_inc/$inc_ver/ucrt")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_SHARED_INCDIR=$(cygpath -m "$kit_inc/$inc_ver/shared")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_UM_INCDIR=$(cygpath -m "$kit_inc/$inc_ver/um")" >> "$GITHUB_ENV"
           echo "$PWD/.deps/llvm-22.1.6-windows-x86_64-msvc/bin" >> "$GITHUB_PATH"
 
       - name: Build seed to release compiler
