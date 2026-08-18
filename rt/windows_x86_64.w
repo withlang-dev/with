@@ -94,20 +94,20 @@ var process_handles: [256]i64 = [0 as i64; 256]
 var process_ids: [256]i32 = [0 as i32; 256]
 var process_next_slot: i32 = 1
 
-unsafe fn win_error() -> i32:
+fn win_error() -> i32:
     let err = GetLastError()
     if err == 0: 1 else: err
 
-unsafe fn win_neg_error() -> i32:
+fn win_neg_error() -> i32:
     -win_error()
 
-unsafe fn win_strlen16(s: *const u16) -> i64:
+fn win_strlen16(s: *const u16) -> i64:
     var len: i64 = 0
     while unsafe *((s as i64 + len * 2) as *const u16) != 0:
         len = len + 1
     len
 
-unsafe fn win_cstr_len(s: *const u8) -> i64:
+fn win_cstr_len(s: *const u8) -> i64:
     if s as i64 == 0:
         return 0
     var len: i64 = 0
@@ -115,7 +115,7 @@ unsafe fn win_cstr_len(s: *const u8) -> i64:
         len = len + 1
     len
 
-unsafe fn win_utf8_to_utf16_buf(src: *const u8, dst: *mut u16, cap: i64) -> i32:
+fn win_utf8_to_utf16_buf(src: *const u8, dst: *mut u16, cap: i64) -> i32:
     if src as i64 == 0 or cap <= 0:
         return -1
     var i: i64 = 0
@@ -128,10 +128,10 @@ unsafe fn win_utf8_to_utf16_buf(src: *const u8, dst: *mut u16, cap: i64) -> i32:
     unsafe *((dst as i64 + i * 2) as *mut u16) = 0 as u16
     0
 
-unsafe fn win_str_data(s: &str) -> *const u8:
+fn win_str_data(s: &str) -> *const u8:
     unsafe **(&s as *const *const *const u8)
 
-unsafe fn win_str_to_utf16_buf(src: &str, dst: *mut u16, cap: i64) -> i32:
+fn win_str_to_utf16_buf(src: &str, dst: *mut u16, cap: i64) -> i32:
     if cap <= 0:
         return -1
     let data = win_str_data(src)
@@ -142,7 +142,7 @@ unsafe fn win_str_to_utf16_buf(src: &str, dst: *mut u16, cap: i64) -> i32:
     unsafe *((dst as i64 + i * 2) as *mut u16) = 0 as u16
     0
 
-unsafe fn win_utf16_to_utf8_buf(src: *const u16, dst: *mut u8, cap: i64) -> i32:
+fn win_utf16_to_utf8_buf(src: *const u16, dst: *mut u8, cap: i64) -> i32:
     var i: i64 = 0
     while i < cap - 1:
         let ch = unsafe *((src as i64 + i * 2) as *const u16)
@@ -153,7 +153,7 @@ unsafe fn win_utf16_to_utf8_buf(src: *const u16, dst: *mut u8, cap: i64) -> i32:
     unsafe *((dst as i64 + i) as *mut u8) = 0
     i as i32
 
-unsafe fn win_handle_for_fd(fd: i32) -> i64:
+fn win_handle_for_fd(fd: i32) -> i64:
     if fd == 0:
         return GetStdHandle(STD_INPUT_HANDLE)
     if fd == 1:
@@ -164,7 +164,7 @@ unsafe fn win_handle_for_fd(fd: i32) -> i64:
         return 0
     rt_handles[fd]
 
-unsafe fn win_alloc_fd(handle: i64) -> i32:
+fn win_alloc_fd(handle: i64) -> i32:
     if handle == 0 or handle == INVALID_HANDLE_VALUE:
         return win_neg_error()
     for i in 3..256:
@@ -174,14 +174,14 @@ unsafe fn win_alloc_fd(handle: i64) -> i32:
     let _ = CloseHandle(handle)
     -24
 
-pub unsafe fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
+pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
 
-pub unsafe fn rt_args() -> (*const *const u8, i32):
+pub fn rt_args() -> (*const *const u8, i32):
     (rt_argv_raw as *const *const u8, rt_argc)
 
-pub unsafe fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64:
+pub fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64:
     let handle = win_handle_for_fd(fd)
     if handle == 0 or handle == INVALID_HANDLE_VALUE:
         return -6
@@ -190,7 +190,7 @@ pub unsafe fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64:
         return -(win_error() as i64)
     written as i64
 
-pub unsafe fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64:
+pub fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64:
     let handle = win_handle_for_fd(fd)
     if handle == 0 or handle == INVALID_HANDLE_VALUE:
         return -6
@@ -199,7 +199,7 @@ pub unsafe fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64:
         return -(win_error() as i64)
     got as i64
 
-pub unsafe fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
+pub fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
     let _ = mode
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
@@ -212,7 +212,7 @@ pub unsafe fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
     let h = CreateFileW(&wpath as *const [4096]u16 as *const u16, access, FILE_SHARE_ALL, 0 as *mut u8, creation, FILE_ATTRIBUTE_NORMAL, 0)
     win_alloc_fd(h)
 
-pub unsafe fn rt_close(fd: i32) -> i32:
+pub fn rt_close(fd: i32) -> i32:
     if fd >= 0 and fd <= 2:
         return 0
     if fd < 0 or fd >= 256:
@@ -225,7 +225,7 @@ pub unsafe fn rt_close(fd: i32) -> i32:
         return win_neg_error()
     0
 
-pub unsafe fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
+pub fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
     let h = win_handle_for_fd(fd)
     if h == 0 or h == INVALID_HANDLE_VALUE:
         return -6
@@ -234,12 +234,12 @@ pub unsafe fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
         return -(win_error() as i64)
     pos
 
-unsafe fn win_filetime_to_ns(low: u32, high: u32) -> i64:
+fn win_filetime_to_ns(low: u32, high: u32) -> i64:
     let ticks = ((high as u64) << 32) | low as u64
     let unix_100ns = ticks - 116444736000000000 as u64
     (unix_100ns * 100) as i64
 
-pub unsafe fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
+pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
     let out = out_raw as *mut RtStatBuf
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
@@ -259,7 +259,7 @@ pub unsafe fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
     (unsafe *out).modified_ns = win_filetime_to_ns(write_low, write_high)
     0
 
-pub unsafe fn rt_file_mode(path: *const u8) -> i32:
+pub fn rt_file_mode(path: *const u8) -> i32:
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
         return -1
@@ -270,7 +270,7 @@ pub unsafe fn rt_file_mode(path: *const u8) -> i32:
         return 0o040755
     0o100644
 
-pub unsafe fn rt_chmod(path: *const u8, mode: i32) -> i32:
+pub fn rt_chmod(path: *const u8, mode: i32) -> i32:
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
         return -1
@@ -285,7 +285,7 @@ pub unsafe fn rt_chmod(path: *const u8, mode: i32) -> i32:
         return win_neg_error()
     0
 
-pub unsafe fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
+pub fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
     var wbuf: [4096]u16 = [0 as u16; 4096]
     let n = GetCurrentDirectoryW(4096 as u32, &raw mut wbuf as *mut [4096]u16 as *mut u16)
     if n == 0:
@@ -293,17 +293,17 @@ pub unsafe fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
     let _ = win_utf16_to_utf8_buf(&wbuf as *const [4096]u16 as *const u16, buf, size)
     0
 
-pub unsafe fn rt_mmap(size: i64) -> *mut u8:
+pub fn rt_mmap(size: i64) -> *mut u8:
     VirtualAlloc(0 as *mut u8, size as u64, MEM_COMMIT_RESERVE, PAGE_READWRITE)
 
-pub unsafe fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
+pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
     let _ = size
     let _free = VirtualFree(ptr, 0, MEM_RELEASE)
 
-pub unsafe fn rt_exit(code: i32) -> Unit:
+pub fn rt_exit(code: i32) -> Unit:
     ExitProcess(code)
 
-pub unsafe fn rt_clock_ns() -> i64:
+pub fn rt_clock_ns() -> i64:
     if qpc_freq == 0:
         let _ = QueryPerformanceFrequency(&raw mut qpc_freq)
     var now: i64 = 0
@@ -314,21 +314,21 @@ pub unsafe fn rt_clock_ns() -> i64:
     let remainder = now % qpc_freq
     seconds * 1000000000 + (remainder * 1000000000) / qpc_freq
 
-pub unsafe fn rt_wall_clock_sec() -> i64:
+pub fn rt_wall_clock_sec() -> i64:
     // FILETIME: 100ns intervals since 1601-01-01; rebase to the Unix epoch.
     var ft: i64 = 0
     GetSystemTimeAsFileTime(&raw mut ft)
     (ft - 116444736000000000) / 10000000
 
-pub unsafe fn rt_nanosleep(ns: i64) -> i32:
+pub fn rt_nanosleep(ns: i64) -> i32:
     let ms = if ns <= 0: 0 else: ((ns + 999999) / 1000000) as u32
     Sleep(ms)
     0
 
-pub unsafe fn rt_getpid() -> i32:
+pub fn rt_getpid() -> i32:
     GetCurrentProcessId()
 
-pub unsafe fn rt_kill(pid: i32, sig: i32) -> i32:
+pub fn rt_kill(pid: i32, sig: i32) -> i32:
     let access = SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE
     let h = OpenProcess(access, 0, pid)
     if h == 0:
@@ -338,56 +338,56 @@ pub unsafe fn rt_kill(pid: i32, sig: i32) -> i32:
     let _close = CloseHandle(h)
     0
 
-pub unsafe fn rt_raise(sig: i32) -> i32:
+pub fn rt_raise(sig: i32) -> i32:
     ExitProcess(128 + sig)
     0
 
-pub unsafe fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64:
+pub fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64:
     var tid: u32 = 0 as u32
     let h = CreateThread(0 as *mut u8, 0, start_routine, arg, 0, &raw mut tid)
     if h == 0:
         return -(win_error() as i64)
     h
 
-pub unsafe fn rt_thread_join(handle: i64) -> i32:
+pub fn rt_thread_join(handle: i64) -> i32:
     let r = WaitForSingleObject(handle, INFINITE)
     let _ = CloseHandle(handle)
     if r != WAIT_OBJECT_0:
         return win_neg_error()
     0
 
-pub unsafe fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
+pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
     if SystemFunction036(buf, len as u32) == 0:
         ExitProcess(1)
 
-pub unsafe fn rt_libc_stdin() -> *mut u8:
+pub fn rt_libc_stdin() -> *mut u8:
     0 as *mut u8
 
-pub unsafe fn rt_libc_stdout() -> *mut u8:
+pub fn rt_libc_stdout() -> *mut u8:
     0 as *mut u8
 
-pub unsafe fn rt_libc_stderr() -> *mut u8:
+pub fn rt_libc_stderr() -> *mut u8:
     0 as *mut u8
 
-pub unsafe fn rt_fiber_page_size() -> i64:
+pub fn rt_fiber_page_size() -> i64:
     4096
 
-pub unsafe fn rt_fiber_mmap_flags() -> i32:
+pub fn rt_fiber_mmap_flags() -> i32:
     0
 
-pub unsafe fn rt_fiber_fault_addr(info: *const u8) -> i64:
+pub fn rt_fiber_fault_addr(info: *const u8) -> i64:
     let _ = info
     0
 
-pub unsafe fn rt_fiber_reset_signal_handler(sig: i32) -> Unit:
+pub fn rt_fiber_reset_signal_handler(sig: i32) -> Unit:
     let _ = sig
 
-pub unsafe fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit:
+pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit:
     let _ = alt_stack
     let _ = alt_stack_size
     let _ = handler
 
-unsafe fn win_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i64) -> i32:
+fn win_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i64) -> i32:
     let parent_len = win_cstr_len(parent)
     let name_len = win_cstr_len(name)
     var need_slash = true
@@ -412,8 +412,8 @@ unsafe fn win_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i
     unsafe *((out as i64 + i + j) as *mut u8) = 0
     0
 
-unsafe fn win_is_dot_or_dotdot(name: *const u8) -> bool:
-    let first = unsafe *name
+fn win_is_dot_or_dotdot(name: *const u8) -> bool:
+    let first = unsafe *((name as i64) as *const u8)
     if first != 46:
         return false
     let second = unsafe *((name as i64 + 1) as *const u8)
@@ -423,18 +423,18 @@ unsafe fn win_is_dot_or_dotdot(name: *const u8) -> bool:
         return false
     (unsafe *((name as i64 + 2) as *const u8)) == 0
 
-unsafe fn win_find_name(data: *mut u8, out: *mut u8, cap: i64) -> i32:
+fn win_find_name(data: *mut u8, out: *mut u8, cap: i64) -> i32:
     let name_w = (data as i64 + 44) as *const u16
     win_utf16_to_utf8_buf(name_w, out, cap)
 
-unsafe fn win_is_dir(path: *const u8) -> bool:
+fn win_is_dir(path: *const u8) -> bool:
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
         return false
     let attrs = GetFileAttributesW(&wpath as *const [4096]u16 as *const u16)
     attrs != 0xffffffff as u32 and (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0
 
-pub unsafe fn rt_mkdir(path: *const u8, mode: i32) -> i32:
+pub fn rt_mkdir(path: *const u8, mode: i32) -> i32:
     let _ = mode
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
@@ -443,7 +443,7 @@ pub unsafe fn rt_mkdir(path: *const u8, mode: i32) -> i32:
         return win_neg_error()
     0
 
-pub unsafe fn rt_unlink(path: *const u8) -> i32:
+pub fn rt_unlink(path: *const u8) -> i32:
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
         return -1
@@ -451,7 +451,7 @@ pub unsafe fn rt_unlink(path: *const u8) -> i32:
         return win_neg_error()
     0
 
-pub unsafe fn rt_rmdir(path: *const u8) -> i32:
+pub fn rt_rmdir(path: *const u8) -> i32:
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
         return -1
@@ -459,7 +459,7 @@ pub unsafe fn rt_rmdir(path: *const u8) -> i32:
         return win_neg_error()
     0
 
-pub unsafe fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
+pub fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
     var oldw: [4096]u16 = [0 as u16; 4096]
     var neww: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(old_path, &raw mut oldw as *mut [4096]u16 as *mut u16, 4096) != 0:
@@ -470,7 +470,7 @@ pub unsafe fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
         return win_neg_error()
     0
 
-unsafe fn win_remove_tree_impl(path: *const u8) -> i32:
+fn win_remove_tree_impl(path: *const u8) -> i32:
     if not win_is_dir(path):
         return rt_unlink(path)
     var pattern8: [4096]u8 = [0 as u8; 4096]
@@ -498,10 +498,10 @@ unsafe fn win_remove_tree_impl(path: *const u8) -> i32:
         let _close = FindClose(h)
     rt_rmdir(path)
 
-pub unsafe fn rt_remove_tree(path: *const u8) -> i32:
+pub fn rt_remove_tree(path: *const u8) -> i32:
     win_remove_tree_impl(path)
 
-unsafe fn win_copy_file(src: *const u8, dst: *const u8) -> i32:
+fn win_copy_file(src: *const u8, dst: *const u8) -> i32:
     let in_fd = rt_open(src, 0, 0)
     if in_fd < 0:
         return in_fd
@@ -537,7 +537,7 @@ unsafe fn win_copy_file(src: *const u8, dst: *const u8) -> i32:
     let cout = rt_close(out_fd)
     if cin != 0: cin else: cout
 
-pub unsafe fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
+pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
     if not win_is_dir(src):
         return win_copy_file(src, dst)
     let mkdir_rc = rt_mkdir(dst, 0o755)
@@ -570,7 +570,7 @@ pub unsafe fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
     let _close2 = FindClose(h)
     0
 
-pub unsafe fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
+pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
     var targetw: [4096]u16 = [0 as u16; 4096]
     var linkw: [4096]u16 = [0 as u16; 4096]
     let _ = win_utf8_to_utf16_buf(target, &raw mut targetw as *mut [4096]u16 as *mut u16, 4096)
@@ -580,18 +580,18 @@ pub unsafe fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
         return win_neg_error()
     0
 
-pub unsafe fn rt_readlink(path: *const u8) -> str:
+pub fn rt_readlink(path: *const u8) -> str:
     let _ = path
     win_empty_str()
 
-unsafe fn win_empty_str() -> str:
+fn win_empty_str() -> str:
     with_str_from_cstr(c"".ptr)
 
-unsafe fn win_list_append(out: str, path: *const u8) -> str:
+fn win_list_append(out: str, path: *const u8) -> str:
     let path_text = with_str_from_cstr(path)
     out ++ path_text ++ "\n"
 
-unsafe fn win_list_files_walk(path: *const u8, out: str) -> str:
+fn win_list_files_walk(path: *const u8, out: str) -> str:
     if not win_is_dir(path):
         return win_list_append(out, path)
     var result = out
@@ -616,10 +616,10 @@ unsafe fn win_list_files_walk(path: *const u8, out: str) -> str:
     let _close = FindClose(h)
     result
 
-pub unsafe fn rt_list_files(path: *const u8) -> str:
+pub fn rt_list_files(path: *const u8) -> str:
     win_list_files_walk(path, win_empty_str())
 
-pub unsafe fn rt_access(path: *const u8, mode: i32) -> i32:
+pub fn rt_access(path: *const u8, mode: i32) -> i32:
     let _ = mode
     var wpath: [4096]u16 = [0 as u16; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
@@ -629,7 +629,7 @@ pub unsafe fn rt_access(path: *const u8, mode: i32) -> i32:
         return win_neg_error()
     0
 
-pub unsafe fn rt_sysinfo(out_raw: *mut u8) -> i32:
+pub fn rt_sysinfo(out_raw: *mut u8) -> i32:
     let out = out_raw as *mut RtSysInfo
     var info: [64]u8 = [0 as u8; 64]
     GetSystemInfo(&raw mut info as *mut [64]u8 as *mut u8)
@@ -649,13 +649,13 @@ pub unsafe fn rt_sysinfo(out_raw: *mut u8) -> i32:
     (unsafe *out).memory_total = total
     0
 
-pub unsafe fn rt_sysinfo_os() -> str:
+pub fn rt_sysinfo_os() -> str:
     with_str_from_cstr(c"Windows".ptr)
 
-pub unsafe fn rt_sysinfo_arch() -> str:
+pub fn rt_sysinfo_arch() -> str:
     with_str_from_cstr(c"x86_64".ptr)
 
-pub unsafe fn rt_getenv(name: *const u8) -> *const u8:
+pub fn rt_getenv(name: *const u8) -> *const u8:
     var wname: [1024]u16 = [0 as u16; 1024]
     var wvalue: [16384]u16 = [0 as u16; 16384]
     if win_utf8_to_utf16_buf(name, &raw mut wname as *mut [1024]u16 as *mut u16, 1024) != 0:
@@ -689,7 +689,7 @@ pub unsafe fn rt_getenv(name: *const u8) -> *const u8:
     let _ = win_utf16_to_utf8_buf(&wvalue as *const [16384]u16 as *const u16, buf, n as i64 + 1)
     buf as *const u8
 
-pub unsafe fn gethostname(name: *mut u8, len: u64) -> i32:
+pub fn gethostname(name: *mut u8, len: u64) -> i32:
     var wname: [256]u16 = [0 as u16; 256]
     var n: u32 = 256 as u32
     if GetComputerNameW(&raw mut wname as *mut [256]u16 as *mut u16, &raw mut n) == 0:
@@ -697,10 +697,10 @@ pub unsafe fn gethostname(name: *mut u8, len: u64) -> i32:
     let _ = win_utf16_to_utf8_buf(&wname as *const [256]u16 as *const u16, name, len as i64)
     0
 
-pub unsafe fn pthread_self() -> i64:
+pub fn pthread_self() -> i64:
     GetCurrentThreadId() as i64
 
-pub unsafe fn mkstemp(template_path: *mut u8) -> i32:
+pub fn mkstemp(template_path: *mut u8) -> i32:
     if template_path as i64 == 0:
         return -1
     var dir: [1024]u8 = [0 as u8; 1024]
@@ -721,7 +721,7 @@ pub unsafe fn mkstemp(template_path: *mut u8) -> i32:
     unsafe *((template_path as i64 + i) as *mut u8) = 0
     rt_open(&name as *const [1024]u8 as *const u8, 2, 384)
 
-pub unsafe fn realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8:
+pub fn realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8:
     if path as i64 == 0 or resolved_path as i64 == 0:
         return 0 as *mut u8
     let n = GetFullPathNameA(path, 4096 as u32, resolved_path, 0 as *mut *mut u8)
@@ -729,7 +729,7 @@ pub unsafe fn realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8:
         return 0 as *mut u8
     resolved_path
 
-unsafe fn win_setenv(name: &str, value: &str) -> i32:
+fn win_setenv(name: &str, value: &str) -> i32:
     var wname: [1024]u16 = [0 as u16; 1024]
     var wvalue: [8192]u16 = [0 as u16; 8192]
     let value_len = value.len()
@@ -742,7 +742,7 @@ unsafe fn win_setenv(name: &str, value: &str) -> i32:
         return win_neg_error()
     0
 
-unsafe fn win_process_alloc(handle: i64, pid: i32) -> i32:
+fn win_process_alloc(handle: i64, pid: i32) -> i32:
     for tries in 0..255:
         let slot = process_next_slot
         process_next_slot = process_next_slot + 1
@@ -754,7 +754,7 @@ unsafe fn win_process_alloc(handle: i64, pid: i32) -> i32:
             return slot
     -1
 
-unsafe fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
+fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
     if slot <= 0 or slot >= 256:
         return -1
     let h = process_handles[slot]
@@ -780,7 +780,7 @@ unsafe fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i3
         process_ids[slot] = 0
     code as i32
 
-unsafe fn win_append_utf16(dst: *mut u16, pos: i64, cap: i64, src: *const u16) -> i64:
+fn win_append_utf16(dst: *mut u16, pos: i64, cap: i64, src: *const u16) -> i64:
     var out_pos = pos
     var i: i64 = 0
     while out_pos < cap - 1:
@@ -792,7 +792,7 @@ unsafe fn win_append_utf16(dst: *mut u16, pos: i64, cap: i64, src: *const u16) -
         i = i + 1
     out_pos
 
-unsafe fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) -> i32:
+fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) -> i32:
     var pos: i64 = 0
     var offset: i64 = 0
     while offset < len and pos < cap - 4:
@@ -852,12 +852,12 @@ unsafe fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: 
     unsafe *((out as i64 + pos * 2) as *mut u16) = 0 as u16
     0
 
-unsafe fn win_make_security_attrs(out: *mut u8):
+fn win_make_security_attrs(out: *mut u8):
     unsafe *(out as *mut u32) = 24 as u32
     unsafe *((out as i64 + 8) as *mut i64) = 0
     unsafe *((out as i64 + 16) as *mut i32) = 1
 
-unsafe fn win_open_redirect(path: &str, write_mode: bool) -> i64:
+fn win_open_redirect(path: &str, write_mode: bool) -> i64:
     var wpath: [4096]u16 = [0 as u16; 4096]
     let _ = win_str_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     var sec: [24]u8 = [0 as u8; 24]
@@ -866,7 +866,7 @@ unsafe fn win_open_redirect(path: &str, write_mode: bool) -> i64:
     let creation = if write_mode: CREATE_ALWAYS else: OPEN_EXISTING
     CreateFileW(&wpath as *const [4096]u16 as *const u16, access, FILE_SHARE_ALL, &raw mut sec as *mut [24]u8 as *mut u8, creation, FILE_ATTRIBUTE_NORMAL, 0)
 
-unsafe fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: &str, cwd: &str, wait: bool, timeout_ms: i32) -> i32:
+fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: &str, cwd: &str, wait: bool, timeout_ms: i32) -> i32:
     let data = win_str_data(args)
     let cmd = with_alloc(32768 * 2)
     if cmd as i64 == 0:
@@ -926,23 +926,23 @@ unsafe fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin
         return win_wait_process_slot(slot, timeout_ms, true)
     slot
 
-pub unsafe fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
+pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     win_setenv(name, value)
 
-pub unsafe fn rt_compat_install_interrupt_handlers() -> Unit:
+pub fn rt_compat_install_interrupt_handlers() -> Unit:
     let _ = 0
 
-pub unsafe fn rt_compat_raise_stack_limit() -> Unit:
+pub fn rt_compat_raise_stack_limit() -> Unit:
     let _ = 0
 
-pub unsafe fn rt_set_process_memory_limit_bytes(limit: i64) -> i32:
+pub fn rt_set_process_memory_limit_bytes(limit: i64) -> i32:
     let _ = limit
     0
 
-pub unsafe fn rt_compat_interrupt_requested() -> i32:
+pub fn rt_compat_interrupt_requested() -> i32:
     0
 
-pub unsafe fn rt_compat_exec_binary(path: &str) -> i32:
+pub fn rt_compat_exec_binary(path: &str) -> i32:
     var blob: [4096]u8 = [0 as u8; 4096]
     let data = win_str_data(path)
     var i: i64 = 0
@@ -953,28 +953,28 @@ pub unsafe fn rt_compat_exec_binary(path: &str) -> i32:
     let argv = make_windows_blob_str(&raw mut blob as *mut [4096]u8 as *const u8, i + 1)
     win_spawn_argv(argv, "", "", "", "", true, 0)
 
-unsafe fn make_windows_blob_str(ptr: *const u8, len: i64) -> str:
+fn make_windows_blob_str(ptr: *const u8, len: i64) -> str:
     var raw: [2]i64 = [ptr as i64, len]
     let p = &raw as *const str
     unsafe *p
 
-pub unsafe fn rt_compat_exec_argv(args: &str) -> i32:
+pub fn rt_compat_exec_argv(args: &str) -> i32:
     win_spawn_argv(args, "", "", "", "", true, 0)
 
-pub unsafe fn rt_compat_exec_argv_cwd(args: &str, cwd: &str) -> i32:
+pub fn rt_compat_exec_argv_cwd(args: &str, cwd: &str) -> i32:
     win_spawn_argv(args, "", "", "", cwd, true, 0)
 
-pub unsafe fn rt_compat_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
+pub fn rt_compat_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
     win_spawn_argv(args, stdout_path, stderr_path, "", "", true, timeout_ms)
 
-pub unsafe fn rt_compat_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32:
+pub fn rt_compat_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, stdin_path: &str) -> i32:
     win_spawn_argv(args, stdout_path, stderr_path, stdin_path, "", true, timeout_ms)
 
-pub unsafe fn rt_compat_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32:
+pub fn rt_compat_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32:
     win_spawn_argv(args, stdout_path, stderr_path, "", cwd, true, timeout_ms)
 
-pub unsafe fn rt_compat_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32:
+pub fn rt_compat_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32:
     win_spawn_argv(args, stdout_path, stderr_path, "", "", false, 0)
 
-pub unsafe fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
+pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     win_wait_process_slot(pid, timeout_ms, true)
