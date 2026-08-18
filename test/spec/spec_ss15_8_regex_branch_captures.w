@@ -1,4 +1,3 @@
-//! skip-windows: issue #798: Windows regex-literal codegen crash (0xC0000005)
 //! expect-stdout: ok
 
 use std.regex

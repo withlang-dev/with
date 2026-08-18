@@ -1,4 +1,3 @@
-//! skip-windows: issue #798: regex-literal codegen crash (0xC0000005) on native Windows
 //! expect-stdout: ok
 
 // D29 #750 scaffolding: non-§18.2 prelude-closure names resolve only through
