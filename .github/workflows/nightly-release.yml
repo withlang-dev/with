@@ -192,9 +192,16 @@ jobs:
       # The unix matrix build above cannot cover Windows -- its steps use shasum,
       # tar -xzf, libclang.a and POSIX paths -- so Windows is a sibling job.
       WITH_SEED_REPO: withlang-dev/with
-      WITH_SEED_VERSION: v0.15.1.3
+      # Seed from a released, versioned asset -- never a hand-cut
+      # seed-windows-x86_64-<sha> release (unapproved manual uploads). v0.15.1.4's
+      # with-windows-x86_64.exe is CI-produced by this workflow from post-#806 main,
+      # so it carries the win64 aggregate-return ABI fix. The old v0.15.1.3 seed
+      # predated that fix; a compiler bootstrapped from it self-perpetuates the
+      # miscompile and crashes (0xC0000005) compiling any regex literal at comptime.
+      # build and :fixpoint never compile a regex, so that poison shipped green.
+      WITH_SEED_VERSION: v0.15.1.4
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: a1e0487f81e4c04292f87d2c6fc92122490ccf43faa025bb91901ec57d3bcdba
+      WITH_SEED_SHA256: cfb19aabfa78521c92c6a8f666d1b7107f451b681b18adc86a12028bbf0e9230
       # The Windows LLVM SDK is versioned independently of the nightly-sdk-* used
       # by darwin/linux and ships without .sha256/.manifest sidecars, so we pin the
       # archive digest directly here rather than fetching sidecar files.
@@ -260,6 +267,14 @@ jobs:
 
       - name: Verify fixpoint
         run: ./src/main.exe build :fixpoint
+
+      - name: Regex smoke test (guard against poison seed)
+        # build and :fixpoint never compile a regex, so a compiler that crashes
+        # (0xC0000005) on regex literals passes them yet is unusable. Exercise the
+        # exact comptime path here: this fixture is pure /.../ regex literals with
+        # no member imports, so a poison binary aborts and this step fails instead
+        # of packaging it green.
+        run: ./out/release/bin/with.exe check test/behavior/behav_regex_language_semantics.w
 
       - name: Package fixpoint-verified release asset
         run: |

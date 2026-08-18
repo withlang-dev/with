@@ -28,10 +28,18 @@ jobs:
       # Native Windows self-host: the published Windows seed compiler builds
       # stage1 -> stage2 -> stage3 and we assert stage2 == stage3 (fixpoint).
       WITH_SEED_REPO: withlang-dev/with
-      # Fixpoint-verified stable release seed for this platform.
-      WITH_SEED_VERSION: v0.15.1.3
+      # Seed from a released, versioned asset -- never a hand-cut
+      # seed-windows-x86_64-<sha> release (those are unapproved manual uploads).
+      # v0.15.1.4's with-windows-x86_64.exe is CI-produced by the nightly-release
+      # workflow from post-#806 main, so it carries the win64 aggregate-return ABI
+      # fix. The old v0.15.1.3 seed predated that fix; a compiler bootstrapped from
+      # it self-perpetuates the miscompile and crashes (0xC0000005) compiling any
+      # regex literal at comptime. build/:fixpoint never compile a regex, so that
+      # poison shipped green -- but it reds this job's battery the moment #798/#825
+      # un-skip the regex tests. The regex smoke-test step below is the backstop.
+      WITH_SEED_VERSION: v0.15.1.4
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: a1e0487f81e4c04292f87d2c6fc92122490ccf43faa025bb91901ec57d3bcdba
+      WITH_SEED_SHA256: cfb19aabfa78521c92c6a8f666d1b7107f451b681b18adc86a12028bbf0e9230
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: v0.15.1
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.zst
