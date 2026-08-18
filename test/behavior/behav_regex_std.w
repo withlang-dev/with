@@ -1,4 +1,4 @@
-//! skip-windows: issue #798: regex-literal codegen crash (0xC0000005) on native Windows
+//! skip-windows: member-import `use std.regex.Captures` not registered for the §18.1 explicit-import gate on native Windows (front-end miscompile; whole-module `use std.regex` is fine)
 //! expect-stdout: ok
 
 use std.regex.Captures
