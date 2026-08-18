@@ -8431,6 +8431,29 @@ fn ci_lookup_c_function_decl_idx(session: i64, name: &str) -> i32:
         return g_ci_fn_decl_by_escaped.get(name).unwrap()
     -1
 
+// A referenced C function that ci_translate_function will NOT emit as a
+// callable. This mirrors the emission filter exactly: leading-underscore
+// internal names are skipped (line ~1660) and static functions without
+// inline have no external linkage and no translated body (line ~1706). An
+// inline wrapper body that calls such a symbol would lower to a reference
+// nothing defines (SemaCheck: "undefined variable"), so the call lowering
+// must bail and let the wrapper be cleanly omitted+recorded rather than
+// emit a ghost call. The call-site system-symbol guard misses these on
+// Windows: ci_is_system_decl only catches `__`/`_[A-Z]` (not `_[a-z]` UCRT
+// helpers like `_vfwprintf_s_l`) and ci_is_system_path is Unix-only, so
+// this decl-index-driven check is the platform-independent source of truth.
+fn ci_fn_decl_is_unemittable(session: i64, decl_idx: i32) -> bool:
+    if decl_idx < 0:
+        return false
+    let dname = with_cimport_decl_name(session, decl_idx)
+    if dname.len() == 0:
+        return false
+    if dname.byte_at(0) == 95:
+        return true
+    let storage = with_cimport_fn_storage_class(session, decl_idx)
+    let is_inline = with_cimport_fn_is_inline(session, decl_idx)
+    storage == CX_SC_STATIC and is_inline == 0
+
 fn ci_call_callee_name(session: i64, cursor: i32) -> str:
     // Walk through transparent wrappers (IMPLICIT_CAST, PAREN_EXPR,
     // and libclang's kind-100 UnexposedExpr which is what CALL_EXPR
@@ -9962,6 +9985,16 @@ impl CiStmtPool:
                 return ci_value_ir_invalid()
             var arg_ids: Vec[i32] = Vec.new()
             let callee_decl_idx = ci_lookup_c_function_decl_idx(session, callee_text)
+            // #799: an inline wrapper body must not lower a call to a C
+            // function the emitter skips (leading-underscore UCRT helpers,
+            // static-non-inline). Bail so the wrapper is omitted+recorded
+            // rather than emitting a reference nothing defines.
+            if ci_fn_decl_is_unemittable(session, callee_decl_idx):
+                if g_ci_bail_message.len() == 0:
+                    g_ci_bail_message = f"inline body calls non-emitted C function '{callee_text}'"
+                    g_ci_bail_location = with_ci_cursor_location(session, cursor)
+                    g_ci_bail_kind = kind
+                return ci_value_ir_invalid()
             let callee_param_count = if callee_decl_idx >= 0: with_cimport_fn_param_count(session, callee_decl_idx) else: 0
             var ai = first_arg
             while ai < nc:
