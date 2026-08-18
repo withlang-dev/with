@@ -12487,15 +12487,35 @@ impl Codegen:
             wl_build_br(self.builder, loop_bb)
             wl_position_at_end(self.builder, end_bb)
             let str_ty = self.mir_sema_type_to_llvm(self.sema.ty_str as i32)
-            let str_params: Vec[i64] = Vec.new()
-            str_params.push(ptr_ty)
-            let str_fn_ty = wl_function_type(str_ty, vec_data_i64(&str_params), 1, 0)
+            let str_sym = self.intern.intern("with_str_from_vec_u8")
             var str_fn = wl_get_named_function(self.llmod, "with_str_from_vec_u8")
             if str_fn == 0:
+                // D6: the callee returns `str` (16B), which win64 lowers via sret.
+                // Declare and call through the single FnAbi path so caller and
+                // callee agree instead of hand-rolling a direct return.
+                let str_params: Vec[i64] = Vec.new()
+                var str_ret_ty = str_ty
+                var str_has_sret = 0
+                let str_byval_types: Vec[i64] = Vec.new()
+                let str_direct_types: Vec[i64] = Vec.new()
+                if self.internal_abi_needs_sret(str_ty):
+                    str_has_sret = 1
+                    str_ret_ty = void_ty
+                    str_params.push(ptr_ty)
+                str_params.push(ptr_ty)
+                str_byval_types.push(0)
+                str_direct_types.push(0)
+                let str_fn_ty = wl_function_type(str_ret_ty, vec_data_i64(&str_params), str_params.len() as i32, 0)
                 str_fn = wl_add_function(self.llmod, "with_str_from_vec_u8", str_fn_ty)
+                if str_has_sret != 0:
+                    wl_add_sret_attr(self.context, str_fn, 0, str_ty)
+                    self.record_c_abi_transform(str_sym, str_has_sret, str_ty, 0, move str_byval_types, 0, move str_direct_types, 0)
+                self.fn_values.insert(str_sym, str_fn)
+                self.fn_fn_types.insert(str_sym, str_fn_ty)
+            let str_call_ty: i64 = self.fn_fn_types.get(str_sym).unwrap()
             let str_args: Vec[i64] = Vec.new()
             str_args.push(out_ptr)
-            return wl_build_call(self.builder, str_fn_ty, str_fn, vec_data_i64(&str_args), 1)
+            return self.build_call_fn_value(str_sym, str_fn, str_call_ty, -1, 0, str_args, 1, "collect_str", 0)
 
         if dest_base_sym == self.sym_hashset or dest_base_sym == self.sym_hashmap:
             var key_tid = 0
