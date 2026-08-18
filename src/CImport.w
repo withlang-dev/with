@@ -9985,11 +9985,16 @@ impl CiStmtPool:
                 return ci_value_ir_invalid()
             var arg_ids: Vec[i32] = Vec.new()
             let callee_decl_idx = ci_lookup_c_function_decl_idx(session, callee_text)
-            // #799: an inline wrapper body must not lower a call to a C
-            // function the emitter skips (leading-underscore UCRT helpers,
-            // static-non-inline). Bail so the wrapper is omitted+recorded
-            // rather than emitting a reference nothing defines.
-            if ci_fn_decl_is_unemittable(session, callee_decl_idx):
+            // #799: a c_import inline wrapper body must not lower a call to a
+            // C function the header-import emitter skips (leading-underscore
+            // UCRT helpers, static-non-inline). Bail so the wrapper is
+            // omitted+recorded rather than emitting a reference nothing defines.
+            // Migrate mode has its own emitter that DOES translate static and
+            // reserved-name functions from the source .c (test
+            // migrate-emit-c-reserved-symbols asserts `fn __with_checked_add`
+            // is emitted and callable), so this c_import-only filter must not
+            // gate migrate-mode calls.
+            if not ci_translate_in_migrate_mode() and ci_fn_decl_is_unemittable(session, callee_decl_idx):
                 if g_ci_bail_message.len() == 0:
                     g_ci_bail_message = f"inline body calls non-emitted C function '{callee_text}'"
                     g_ci_bail_location = with_ci_cursor_location(session, cursor)
