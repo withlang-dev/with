@@ -4,7 +4,10 @@ fn valid_os(s: &str) -> bool:
     s == "Macos" or s == "Linux" or s == "Windows"
 
 fn valid_arch(s: &str) -> bool:
-    s == "armv8" or s == "x86_64"
+    // "armv8" is the pre-unification darwin spelling; accepted only so this
+    // passes under a seed built before arch() was unified on "aarch64".
+    // Drop it once the seeds carry the unified spelling.
+    s == "aarch64" or s == "armv8" or s == "x86_64"
 
 fn main:
     let os_name = os()

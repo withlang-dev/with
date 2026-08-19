@@ -13,7 +13,10 @@ pub fn os() -> str:
     with_sysinfo_os()
 
 // Returns the CPU architecture.
-// "armv8" on Apple Silicon/ARM64, "x86_64" on Intel/AMD 64-bit.
+// "aarch64" on ARM64, "x86_64" on Intel/AMD 64-bit. One spelling per
+// architecture on every platform -- notably "aarch64" on Apple Silicon
+// too, matching the target kinds (darwin_aarch64), the runtime sources
+// (rt/darwin_aarch64.w) and the published asset names.
 pub fn arch() -> str:
     with_sysinfo_arch()
 
