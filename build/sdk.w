@@ -101,6 +101,8 @@ pub fn sdk_current_platform() -> str:
         return "darwin-aarch64"
     if os() == "Linux" and arch() == "x86_64":
         return "linux-x86_64"
+    if os() == "Linux" and (arch() == "armv8" or arch() == "aarch64"):
+        return "linux-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "windows-x86_64"
     ""
@@ -110,6 +112,8 @@ pub fn sdk_host_tag_for_platform(platform: &str) -> str:
         return "darwin-arm64"
     if platform == "linux-x86_64":
         return "linux-x86_64"
+    if platform == "linux-aarch64":
+        return "linux-aarch64"
     if platform == "windows-x86_64":
         return "windows-x86_64-msvc"
     "unsupported"
