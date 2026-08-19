@@ -4,12 +4,12 @@
 
 type VecIter_i32 { data_ptr: i64, len: i64, idx: i64 }
 
-extern fn with_ptr_get_i32(ptr: i64, index: i64) -> i32
+extern fn with_ptr_get_i32(ptr: *const u8, index: i64) -> i32
 
 fn VecIter_i32.next(mut self: VecIter_i32) -> Option[i32]:
     if self.idx >= self.len:
         return .None
-    let val = unsafe { with_ptr_get_i32(self.data_ptr, self.idx) }
+    let val = unsafe { with_ptr_get_i32(self.data_ptr as *const u8, self.idx) }
     self.idx = self.idx + 1
     .Some(val)
 
