@@ -11,6 +11,9 @@ name: sdk-llvm darwin-x86_64
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/sdk-darwin-x86_64.yml'
 
 concurrency:
   group: sdk-darwin-x86_64-${{ github.ref }}
