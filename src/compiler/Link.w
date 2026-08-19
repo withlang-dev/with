@@ -27,6 +27,8 @@ extern let with_embedded_rt_core_o_start: u8
 extern let with_embedded_rt_core_o_end: u8
 extern let with_embedded_rt_darwin_aarch64_o_start: u8
 extern let with_embedded_rt_darwin_aarch64_o_end: u8
+extern let with_embedded_rt_linux_aarch64_o_start: u8
+extern let with_embedded_rt_linux_aarch64_o_end: u8
 extern let with_embedded_rt_linux_x86_64_o_start: u8
 extern let with_embedded_rt_linux_x86_64_o_end: u8
 extern let with_embedded_rt_windows_x86_64_o_start: u8
@@ -714,6 +716,8 @@ fn link_stage_embedded_runtime_object(name: &str) -> str:
         return link_stage_embedded_obj_slice(&with_embedded_rt_core_o_start as *const u8, &with_embedded_rt_core_o_end as *const u8)
     if name == "rt_darwin_aarch64.o":
         return link_stage_embedded_obj_slice(&with_embedded_rt_darwin_aarch64_o_start as *const u8, &with_embedded_rt_darwin_aarch64_o_end as *const u8)
+    if name == "rt_linux_aarch64.o":
+        return link_stage_embedded_obj_slice(&with_embedded_rt_linux_aarch64_o_start as *const u8, &with_embedded_rt_linux_aarch64_o_end as *const u8)
     if name == "rt_linux_x86_64.o":
         return link_stage_embedded_obj_slice(&with_embedded_rt_linux_x86_64_o_start as *const u8, &with_embedded_rt_linux_x86_64_o_end as *const u8)
     if name == "rt_windows_x86_64.o":
