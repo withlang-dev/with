@@ -7540,5 +7540,10 @@ pub fn run_cli_selfhost_object_symbol_action(ctx: ActionCtx) -> i32:
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
 
     let args = ctx.args()
-    let nm_tool = if args.len() > 0: selfhost_owned_text(args.get(0)) else: "nm"
+    // Resolve nm env-aware (mirrors bs_build_w_nm_smoke): honour $NM when set,
+    // else the target's arg ("nm"). The arm64-Windows lane sets NM to the SDK's
+    // llvm-nm.exe because the runner's ambient MSYS binutils nm cannot parse
+    // COFF-ARM64 ("file format not recognized").
+    let nm_arg = if args.len() > 0: selfhost_owned_text(args.get(0)) else: "nm"
+    let nm_tool = bs_build_w_tool_from_env("NM", nm_arg)
     bs_check_object_symbols(ctx, compiler_path, nm_tool, bs_join(output_dir, "cases"))
