@@ -261,6 +261,8 @@ pub fn driver_target_triple_kind(triple: &str) -> i32:
         return 4
     if triple == "x86_64-pc-windows-msvc" or triple == "windows_x86_64":
         return 5
+    if triple == "aarch64-pc-windows-msvc" or triple == "arm64-pc-windows-msvc" or triple == "windows_aarch64":
+        return 6
     -1
 
 pub type DriverTargetParseResult {

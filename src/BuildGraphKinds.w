@@ -8,7 +8,7 @@ const BUILD_GRAPH_STANDARD_KIND_MAX: i32 = 23
 const BUILD_GRAPH_PROJECT_KIND_MIN: i32 = 1000
 const BUILD_GRAPH_PROJECT_KIND_MAX: i32 = 1027
 const BUILD_GRAPH_TARGET_MIN: i32 = 0
-const BUILD_GRAPH_TARGET_MAX: i32 = 5
+const BUILD_GRAPH_TARGET_MAX: i32 = 6
 
 fn build_graph_kind_is_standard(kind: i32) -> bool:
     if kind >= BUILD_GRAPH_STANDARD_KIND_MIN and kind <= 4:
@@ -103,6 +103,8 @@ pub fn build_graph_target_name(kind: i32) -> str:
         return "darwin_aarch64"
     if kind == 5:
         return "windows_x86_64"
+    if kind == 6:
+        return "windows_aarch64"
     f"unknown({kind})"
 
 pub fn build_graph_host_target_kind() -> i32:
@@ -119,6 +121,8 @@ pub fn build_graph_host_target_kind() -> i32:
         if arch == "x86_64":
             return 1
     if os == "Windows":
+        if arch == "armv8" or arch == "aarch64":
+            return 6
         if arch == "x86_64":
             return 5
     0

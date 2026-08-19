@@ -161,6 +161,7 @@ fn frontend_rt_in_unit_platform_file() -> str:
     if kind == 2: return "rt/linux_aarch64.w"
     if kind == 4: return "rt/darwin_aarch64.w"
     if kind == 5: return "rt/windows_x86_64.w"
+    if kind == 6: return "rt/windows_aarch64.w"
     ""
 
 fn c_import_str_contains(text: &str, needle: &str) -> bool:
@@ -1410,7 +1411,7 @@ impl Zcu:
         if platform.len() == 0:
             self.diagnostics.emit(Diagnostic.err("rt-in-unit: no runtime platform source for target '" ++ target_spec_name() ++ "'", Span { file: 0, start: 0, end: 0 }))
             return merged_pool
-        let fiber_core = if platform == "rt/windows_x86_64.w": "rt/fiber_core_windows.w" else: "rt/fiber_core_darwin.w"
+        let fiber_core = if platform.starts_with("rt/windows"): "rt/fiber_core_windows.w" else: "rt/fiber_core_darwin.w"
         let files: Vec[str] = Vec.new()
         files.push("rt/rt_core.w")
         files.push(with_str_clone_ref(platform))

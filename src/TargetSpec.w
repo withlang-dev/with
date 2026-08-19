@@ -1,9 +1,9 @@
 // TargetSpec — the single source of truth for the active build target.
 //
-// `--target <triple>` (§18.5) selects a target kind: the same 0-5
+// `--target <triple>` (§18.5) selects a target kind: the same 0-6
 // numbering `std.build.BuildTarget` and `driver_target_triple_kind`
 // use (0 native, 1 linux_x86_64, 2 linux_aarch64, 3 darwin_x86_64,
-// 4 darwin_aarch64, 5 windows_x86_64). The driver records the active
+// 4 darwin_aarch64, 5 windows_x86_64, 6 windows_aarch64). The driver records the active
 // kind once per compile; parse-time @[target] guards, comptime
 // sysinfo, codegen C-ABI decisions, and the link stage read the
 // resolved target from here instead of querying host sysinfo.
@@ -43,6 +43,8 @@ pub fn target_spec_host_kind() -> i32:
         if arch == "x86_64":
             return 1
     if os == "Windows":
+        if arch == "armv8" or arch == "aarch64":
+            return 6
         if arch == "x86_64":
             return 5
     0
@@ -54,7 +56,7 @@ pub fn target_spec_os() -> str:
         return "Linux"
     if kind == 3 or kind == 4:
         return "Macos"
-    if kind == 5:
+    if kind == 5 or kind == 6:
         return "Windows"
     with_sysinfo_os()
 
@@ -66,7 +68,7 @@ pub fn target_spec_arch() -> str:
     let kind = target_spec_active
     if kind == 1 or kind == 3 or kind == 5:
         return "x86_64"
-    if kind == 2 or kind == 4:
+    if kind == 2 or kind == 4 or kind == 6:
         return "aarch64"
     with_sysinfo_arch()
 
@@ -84,6 +86,8 @@ pub fn target_spec_llvm_triple() -> str:
         return "arm64-apple-macosx11.0.0"
     if kind == 5:
         return "x86_64-pc-windows-msvc"
+    if kind == 6:
+        return "aarch64-pc-windows-msvc"
     ""
 
 // Display name in the build_graph_target_name spelling.
@@ -99,6 +103,8 @@ pub fn target_spec_name() -> str:
         return "darwin_aarch64"
     if kind == 5:
         return "windows_x86_64"
+    if kind == 6:
+        return "windows_aarch64"
     "native"
 
 // The non-native targets this compiler can actually produce code and

@@ -652,7 +652,7 @@ fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &s
                 with_eprint("error: cross link needs the ELF lld driver (ld.lld) next to " ++ llvm_ld)
                 return LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
             return link_stage_make_linux_llvm_link_command(elf_ld, obj_path, bin_path, extras, link_libs, link_args)
-        if target_spec_active_kind() == 5:
+        if target_spec_active_kind() == 5 or target_spec_active_kind() == 6:
             let coff_ld = link_stage_coff_lld_for(llvm_ld)
             if coff_ld.len() == 0:
                 with_eprint("error: cross link needs the COFF lld driver (lld-link) next to " ++ llvm_ld)
@@ -1005,6 +1005,8 @@ fn link_stage_platform_runtime_object() -> str:
             return "rt_linux_aarch64.o"
         if target_spec_active_kind() == 5:
             return "rt_windows_x86_64.o"
+        if target_spec_active_kind() == 6:
+            return "rt_windows_aarch64.o"
         with_eprint("error: unsupported cross runtime platform: " ++ target_spec_name())
         return ""
     link_stage_host_platform_runtime_object()
@@ -1022,11 +1024,13 @@ fn link_stage_host_platform_runtime_object() -> str:
         return "rt_darwin_aarch64.o"
     if os == "Windows" and arch == "x86_64":
         return "rt_windows_x86_64.o"
+    if os == "Windows" and (arch == "armv8" or arch == "aarch64"):
+        return "rt_windows_aarch64.o"
     with_eprint("error: unsupported host runtime platform: " ++ os ++ "/" ++ arch)
     ""
 
 fn link_stage_make_archive(obj_path: &str) -> str:
-    if runtime_sysinfo_os() == "Windows" or target_spec_active_kind() == 5:
+    if runtime_sysinfo_os() == "Windows" or target_spec_active_kind() == 5 or target_spec_active_kind() == 6:
         return with_str_clone_ref(obj_path)
     // Wrap a .o file in a .a archive so the linker treats it as a library
     // (only pulling in symbols that aren't already defined).
