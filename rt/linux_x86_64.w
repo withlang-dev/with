@@ -610,8 +610,10 @@ extern fn listen(fd: i32, backlog: i32) -> i32
 extern fn accept(fd: i32, addr: *mut u8, addrlen: *mut u32) -> i32
 extern fn setsockopt(fd: i32, level: i32, optname: i32, optval: *const u8, optlen: u32) -> i32
 extern fn getsockname(fd: i32, addr: *mut u8, addrlen: *mut u32) -> i32
-extern fn send(fd: i32, buf: *const u8, len: u64, flags: i32) -> i64
-extern fn recv(fd: i32, buf: *mut u8, len: u64, flags: i32) -> i64
+@[link_name("send")]
+extern fn rt_libc_send(fd: i32, buf: *const u8, len: u64, flags: i32) -> i64
+@[link_name("recv")]
+extern fn rt_libc_recv(fd: i32, buf: *mut u8, len: u64, flags: i32) -> i64
 extern fn getaddrinfo(node: *const u8, service: *const u8, hints: *const LinuxAddrInfo, res: *mut *mut LinuxAddrInfo) -> i32
 extern fn freeaddrinfo(res: *mut LinuxAddrInfo) -> Unit
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
@@ -767,7 +769,7 @@ pub fn with_net_send(sock: i32, data: &str) -> i64:
     while written < len:
         var r: i64 = 0
         loop:
-            r = send(sock, (ptr as i64 + written) as *const u8, (len - written) as u64, 0)
+            r = rt_libc_send(sock, (ptr as i64 + written) as *const u8, (len - written) as u64, 0)
             if r >= 0 or get_errno() != 4:
                 break
         if r < 0:
@@ -785,7 +787,7 @@ pub fn with_net_recv(sock: i32, max_len: i64) -> str:
         return rt_net_empty_str()
     var r: i64 = 0
     loop:
-        r = recv(sock, buf, max_len as u64, 0)
+        r = rt_libc_recv(sock, buf, max_len as u64, 0)
         if r >= 0 or get_errno() != 4:
             break
     if r <= 0:
