@@ -1006,8 +1006,10 @@ extern fn bind(s: i64, addr: *const u8, namelen: i32) -> i32
 extern fn listen(s: i64, backlog: i32) -> i32
 extern fn accept(s: i64, addr: *mut u8, addrlen: *mut i32) -> i64
 extern fn getsockname(s: i64, addr: *mut u8, addrlen: *mut i32) -> i32
-extern fn send(s: i64, buf: *const u8, len: i32, flags: i32) -> i32
-extern fn recv(s: i64, buf: *mut u8, len: i32, flags: i32) -> i32
+@[link_name("send")]
+extern fn rt_libc_send(s: i64, buf: *const u8, len: i32, flags: i32) -> i32
+@[link_name("recv")]
+extern fn rt_libc_recv(s: i64, buf: *mut u8, len: i32, flags: i32) -> i32
 extern fn closesocket(s: i64) -> i32
 extern fn getaddrinfo(node: *const u8, service: *const u8, hints: *const WindowsAddrInfo, res: *mut *mut WindowsAddrInfo) -> i32
 extern fn freeaddrinfo(res: *mut WindowsAddrInfo) -> Unit
@@ -1222,7 +1224,7 @@ pub fn with_net_send(sock: i32, data: str) -> i64:
     var written: i64 = 0
     while written < total:
         let chunk = total - written
-        let r = send(sock as i64, (ptr as i64 + written) as *const u8, chunk as i32, 0)
+        let r = rt_libc_send(sock as i64, (ptr as i64 + written) as *const u8, chunk as i32, 0)
         if r <= 0:
             return if written > 0: written else: -1
         written = written + (r as i64)
@@ -1234,7 +1236,7 @@ pub fn with_net_recv(sock: i32, max_len: i64) -> str:
     let buf = with_alloc(max_len)
     if buf as i64 == 0:
         return rt_net_empty_str()
-    let r = recv(sock as i64, buf, max_len as i32, 0)
+    let r = rt_libc_recv(sock as i64, buf, max_len as i32, 0)
     if r <= 0:
         with_free(buf)
         return rt_net_empty_str()
