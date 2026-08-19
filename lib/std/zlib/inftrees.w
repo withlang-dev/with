@@ -114,14 +114,14 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut c_ushort, __p
 
         ((unsafe *__param_table) = (unsafe *__param_table) + 1)
 
-        with_memcpy((&raw mut (unsafe *__ci_expr_old_0) as *i8), (&raw const __local_here as *i8), sizeof[code]())
+        with_memcpy((&raw mut (unsafe *__ci_expr_old_0) as *mut u8), (&raw const __local_here as *mut u8), sizeof[code]())
 
 
         var __ci_expr_old_1: *mut code = (unsafe *__param_table)
 
         ((unsafe *__param_table) = (unsafe *__param_table) + 1)
 
-        with_memcpy((&raw mut (unsafe *__ci_expr_old_1) as *i8), (&raw const __local_here as *i8), sizeof[code]())
+        with_memcpy((&raw mut (unsafe *__ci_expr_old_1) as *mut u8), (&raw const __local_here as *mut u8), sizeof[code]())
 
 
         ((unsafe *__param_bits) = ((1 as c_uint)))

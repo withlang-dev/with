@@ -1258,7 +1258,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         } else {
             (__ci_expr_ternary_18 = __local_copy___goto_482_14)
         }
-        with_memcpy(((((unsafe *__local_state__goto_475_31).head.extra + (__local_len__goto_486_14 as usize)) as *mut c_void) as *i8), ((__local_next__goto_476_32 as *const c_void) as *i8), ((__ci_expr_ternary_18 as c_ulong) as i64))
+        with_memcpy(((((unsafe *__local_state__goto_475_31).head.extra + (__local_len__goto_486_14 as usize)) as *mut c_void) as *mut u8), ((__local_next__goto_476_32 as *const c_void) as *mut u8), ((__ci_expr_ternary_18 as c_ulong) as i64))
         goto '__ci_bb_160
     }
 
@@ -2237,7 +2237,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_311 {
-        with_memcpy(((__local_put__goto_477_24 as *mut c_void) as *i8), ((__local_next__goto_476_32 as *const c_void) as *i8), ((__local_copy___goto_482_14 as c_ulong) as i64))
+        with_memcpy(((__local_put__goto_477_24 as *mut c_void) as *mut u8), ((__local_next__goto_476_32 as *const c_void) as *mut u8), ((__local_copy___goto_482_14 as c_ulong) as i64))
         (__local_have__goto_478_14 = (__local_have__goto_478_14 -% __local_copy___goto_482_14))
         (__local_next__goto_476_32 = __local_next__goto_476_32 + (__local_copy___goto_482_14 as usize))
         (__local_left__goto_478_20 = (__local_left__goto_478_20 -% __local_copy___goto_482_14))
@@ -2568,7 +2568,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_363 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *i8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).lencode[(((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((unsafe *__local_state__goto_475_31).lenbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *i8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).lencode[(((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((unsafe *__local_state__goto_475_31).lenbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *mut u8), sizeof[code]())
         if ((if (((unsafe *(&raw const __local_here__goto_484_10 as *const code)).bits as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_366
         } else {
@@ -3211,7 +3211,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_466 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *i8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).lencode[(((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((unsafe *__local_state__goto_475_31).lenbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *i8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).lencode[(((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((unsafe *__local_state__goto_475_31).lenbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *mut u8), sizeof[code]())
         if ((if (((unsafe *(&raw const __local_here__goto_484_10 as *const code)).bits as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_469
         } else {
@@ -3277,7 +3277,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_476 {
-        with_memcpy((&raw mut __local_last__goto_485_10 as *i8), (&raw const __local_here__goto_484_10 as *i8), sizeof[code]())
+        with_memcpy((&raw mut __local_last__goto_485_10 as *mut u8), (&raw const __local_here__goto_484_10 as *mut u8), sizeof[code]())
         goto '__ci_bb_478
     }
 
@@ -3290,7 +3290,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_479 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *i8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).lencode[((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).val as c_int) as c_uint) +% ((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).op as c_int)) as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) >> ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_uint)) as c_uint))]) as *i8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).lencode[((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).val as c_int) as c_uint) +% ((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).op as c_int)) as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) >> ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_uint)) as c_uint))]) as *mut u8), sizeof[code]())
         if ((if (((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((unsafe *(&raw const __local_here__goto_484_10 as *const code)).bits as c_int)) as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_482
         } else {
@@ -3541,7 +3541,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_520 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *i8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).distcode[(((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((unsafe *__local_state__goto_475_31).distbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *i8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).distcode[(((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((unsafe *__local_state__goto_475_31).distbits as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint))]) as *mut u8), sizeof[code]())
         if ((if (((unsafe *(&raw const __local_here__goto_484_10 as *const code)).bits as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_523
         } else {
@@ -3603,7 +3603,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_530 {
-        with_memcpy((&raw mut __local_last__goto_485_10 as *i8), (&raw const __local_here__goto_484_10 as *i8), sizeof[code]())
+        with_memcpy((&raw mut __local_last__goto_485_10 as *mut u8), (&raw const __local_here__goto_484_10 as *mut u8), sizeof[code]())
         goto '__ci_bb_532
     }
 
@@ -3616,7 +3616,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_533 {
-        with_memcpy((&raw mut __local_here__goto_484_10 as *i8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).distcode[((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).val as c_int) as c_uint) +% ((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).op as c_int)) as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) >> ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_uint)) as c_uint))]) as *i8), sizeof[code]())
+        with_memcpy((&raw mut __local_here__goto_484_10 as *mut u8), (&raw const (unsafe (unsafe *__local_state__goto_475_31).distcode[((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).val as c_int) as c_uint) +% ((((((__local_hold__goto_479_19 as c_uint) as c_uint) & (((((1 as c_uint) << ((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).op as c_int)) as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)) as c_uint) >> ((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_uint)) as c_uint))]) as *mut u8), sizeof[code]())
         if ((if (((((unsafe *(&raw const __local_last__goto_485_10 as *const code)).bits as c_int) + ((unsafe *(&raw const __local_here__goto_484_10 as *const code)).bits as c_int)) as c_uint)) <= __local_bits__goto_480_14: 1 else: 0) != 0) {
             goto '__ci_bb_536
         } else {
@@ -4780,9 +4780,9 @@ pub unsafe fn inflateGetDictionary(__param_strm: *mut z_stream_s, __param_dictio
     }
 
     if (__ci_expr_logic_0 != 0) {
-        with_memcpy(((__param_dictionary as *mut c_void) as *i8), ((((unsafe *__local_state).window + ((unsafe *__local_state).wnext as usize)) as *const c_void) as *i8), (((((unsafe *__local_state).whave as c_uint) -% ((unsafe *__local_state).wnext as c_uint)) as c_ulong) as i64))
+        with_memcpy(((__param_dictionary as *mut c_void) as *mut u8), ((((unsafe *__local_state).window + ((unsafe *__local_state).wnext as usize)) as *const c_void) as *mut u8), (((((unsafe *__local_state).whave as c_uint) -% ((unsafe *__local_state).wnext as c_uint)) as c_ulong) as i64))
 
-        with_memcpy(((((__param_dictionary + ((unsafe *__local_state).whave as usize)) - ((unsafe *__local_state).wnext as usize)) as *mut c_void) as *i8), (((unsafe *__local_state).window as *const c_void) as *i8), (((unsafe *__local_state).wnext as c_ulong) as i64))
+        with_memcpy(((((__param_dictionary + ((unsafe *__local_state).whave as usize)) - ((unsafe *__local_state).wnext as usize)) as *mut c_void) as *mut u8), (((unsafe *__local_state).window as *const c_void) as *mut u8), (((unsafe *__local_state).wnext as c_ulong) as i64))
 
     }
 
@@ -4921,7 +4921,7 @@ pub unsafe fn inflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
         return -4
     }
 
-    with_memset(((__local_copy_ as *mut c_void) as *i8), (0 as c_int), ((sizeof[inflate_state]() as c_ulong) as i64))
+    with_memset(((__local_copy_ as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[inflate_state]() as c_ulong) as i64))
 
     (__local_window = null)
 
@@ -4937,9 +4937,9 @@ pub unsafe fn inflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     }
 
-    with_memcpy(((__param_dest as *mut c_void) as *i8), ((__param_source as *const c_void) as *i8), ((sizeof[z_stream_s]() as c_ulong) as i64))
+    with_memcpy(((__param_dest as *mut c_void) as *mut u8), ((__param_source as *const c_void) as *mut u8), ((sizeof[z_stream_s]() as c_ulong) as i64))
 
-    with_memcpy(((__local_copy_ as *mut c_void) as *i8), ((__local_state as *const c_void) as *i8), ((sizeof[inflate_state]() as c_ulong) as i64))
+    with_memcpy(((__local_copy_ as *mut c_void) as *mut u8), ((__local_state as *const c_void) as *mut u8), ((sizeof[inflate_state]() as c_ulong) as i64))
 
     ((unsafe *__local_copy_).strm = __param_dest)
 
@@ -4960,7 +4960,7 @@ pub unsafe fn inflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
     ((unsafe *__local_copy_).next = (&(unsafe *__local_copy_).codes[0] as *mut code) + ((((((unsafe *__local_state).next as usize) -% ((&(unsafe *__local_state).codes[0] as *mut code) as usize)) / sizeof[code]()) as isize) as usize))
 
     if ((if __local_window != 0: 1 else: 0) != 0) {
-        with_memcpy(((__local_window as *mut c_void) as *i8), (((unsafe *__local_state).window as *const c_void) as *i8), (((unsafe *__local_state).whave as c_ulong) as i64))
+        with_memcpy(((__local_window as *mut c_void) as *mut u8), (((unsafe *__local_state).window as *const c_void) as *mut u8), (((unsafe *__local_state).whave as c_ulong) as i64))
     }
 
     ((unsafe *__local_copy_).window = __local_window)
@@ -5214,7 +5214,7 @@ pub unsafe fn inflateInit2_(__param_strm: *mut z_stream_s, __param_windowBits: c
         return -4
     }
 
-    with_memset(((__local_state as *mut c_void) as *i8), (0 as c_int), ((sizeof[inflate_state]() as c_ulong) as i64))
+    with_memset(((__local_state as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[inflate_state]() as c_ulong) as i64))
 
     ((unsafe *__param_strm).state = ((__local_state as *mut internal_state)))
 
@@ -5454,7 +5454,7 @@ unsafe fn updatewindow(__param_strm: *mut z_stream_s, __param_end: *const u8, __
     }
 
     if ((if __local_copy_ >= (unsafe *__local_state).wsize: 1 else: 0) != 0) {
-        with_memcpy((((unsafe *__local_state).window as *mut c_void) as *i8), (((__param_end - ((unsafe *__local_state).wsize as usize)) as *const c_void) as *i8), (((unsafe *__local_state).wsize as c_ulong) as i64))
+        with_memcpy((((unsafe *__local_state).window as *mut c_void) as *mut u8), (((__param_end - ((unsafe *__local_state).wsize as usize)) as *const c_void) as *mut u8), (((unsafe *__local_state).wsize as c_ulong) as i64))
 
         ((unsafe *__local_state).wnext = ((0 as c_uint)))
 
@@ -5467,12 +5467,12 @@ unsafe fn updatewindow(__param_strm: *mut z_stream_s, __param_end: *const u8, __
             (__local_dist = __local_copy_)
         }
 
-        with_memcpy(((((unsafe *__local_state).window + ((unsafe *__local_state).wnext as usize)) as *mut c_void) as *i8), (((__param_end - (__local_copy_ as usize)) as *const c_void) as *i8), ((__local_dist as c_ulong) as i64))
+        with_memcpy(((((unsafe *__local_state).window + ((unsafe *__local_state).wnext as usize)) as *mut c_void) as *mut u8), (((__param_end - (__local_copy_ as usize)) as *const c_void) as *mut u8), ((__local_dist as c_ulong) as i64))
 
         (__local_copy_ = (__local_copy_ -% __local_dist))
 
         if (__local_copy_ != 0) {
-            with_memcpy((((unsafe *__local_state).window as *mut c_void) as *i8), (((__param_end - (__local_copy_ as usize)) as *const c_void) as *i8), ((__local_copy_ as c_ulong) as i64))
+            with_memcpy((((unsafe *__local_state).window as *mut c_void) as *mut u8), (((__param_end - (__local_copy_ as usize)) as *const c_void) as *mut u8), ((__local_copy_ as c_ulong) as i64))
 
             ((unsafe *__local_state).wnext = __local_copy_)
 

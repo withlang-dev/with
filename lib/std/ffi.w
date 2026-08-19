@@ -22,7 +22,7 @@
 
 use std.box
 
-extern fn with_free(ptr: *i8) -> Unit
+extern fn with_free(ptr: *mut u8) -> Unit
 
 /// Heap-allocate `value` and return a type-erased context pointer suitable for
 /// a C callback's `void *ctx` slot. `value`'s `Drop` is deferred until
@@ -48,7 +48,7 @@ pub unsafe fn ctx_ref[T](ctx: *mut T) -> &T:
 /// this call the pointer is dangling; do not reuse it.
 pub unsafe fn unbox_ctx[T](ctx: *mut T) -> T:
     let value = *ctx
-    with_free(ctx as *i8)
+    with_free(ctx as *mut u8)
     value
 
 /// Run `T`'s drop glue and free the allocation, for wiring into a C API's
@@ -56,7 +56,7 @@ pub unsafe fn unbox_ctx[T](ctx: *mut T) -> T:
 pub unsafe fn drop_ctx[T](ctx: *mut T) -> Unit:
     let value = *ctx
     drop(value)
-    with_free(ctx as *i8)
+    with_free(ctx as *mut u8)
 
 // Note: generic functions cannot coerce to `extern "C" fn` directly (no
 // per-instantiation C-ABI symbol guarantee yet), so a generic

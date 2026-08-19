@@ -18,7 +18,8 @@ extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn rt_mmap(size: u64) -> *mut u8
 extern fn rt_munmap(ptr: *mut u8, size: u64)
 extern fn malloc(size: i64) -> *mut u8
-extern fn free(ptr: *mut u8) -> Unit
+@[link_name("free")]
+extern fn rt_libc_free(ptr: *mut u8) -> Unit
 extern fn rt_exit(code: i32)
 extern fn rt_clock_ns() -> i64
 extern fn rt_wall_clock_sec() -> i64
@@ -1257,7 +1258,7 @@ fn rt_free_unlocked_with_drop_origin(ptr: *mut u8, drop_origin_ptr: i64, drop_or
     let size = unsafe *(block as *const i64)
     if alloc_system_on() != 0:
         rt_alloc_release_mmap_bytes(size + RT_ALLOC_HEADER_SIZE)
-        free(block as *mut u8)
+        rt_libc_free(block as *mut u8)
         return
     if size > RT_LARGE_THRESHOLD:
         let total = size + RT_ALLOC_HEADER_SIZE

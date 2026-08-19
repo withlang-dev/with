@@ -2,9 +2,9 @@
 
 use std.traits
 
-extern fn with_alloc(size: i64) -> *i8
-extern fn with_free(ptr: *i8) -> Unit
-extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> Unit
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
 /// `Box[T]` owns one heap-allocated `T`.
 pub type Box[T] { ptr: *mut T }
@@ -28,7 +28,7 @@ impl[T] Box[T]:
     pub move fn into_inner() -> T:
         let ptr = self as *mut T
         let value = unsafe { *ptr }
-        with_free(ptr as *i8)
+        with_free(ptr as *mut u8)
         value
 
 impl[T] Deref[T] for Box[T]:
@@ -40,4 +40,4 @@ impl[T] Drop for Box[T]:
         let ptr = self as *mut T
         let value = unsafe { *ptr }
         drop(value)
-        with_free(ptr as *i8)
+        with_free(ptr as *mut u8)

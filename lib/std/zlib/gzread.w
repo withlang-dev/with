@@ -254,7 +254,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
                 (__local_n = ((((((((__local_eol as usize) -% ((unsafe *(&raw const __local_state.x as *const gzFile_s)).next as usize)) / sizeof[u8]()) as c_uint) as c_uint) +% (1 as c_uint)) as c_uint)))
             }
 
-            with_memcpy(((__local_buf as *mut c_void) as *i8), (((unsafe *(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *i8), ((__local_n as c_ulong) as i64))
+            with_memcpy(((__local_buf as *mut c_void) as *mut u8), (((unsafe *(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *mut u8), ((__local_n as c_ulong) as i64))
 
             (__local_state.x.have = ((unsafe *(&raw const __local_state.x as *const gzFile_s)).have -% __local_n))
 
@@ -824,7 +824,7 @@ unsafe fn gz_look(__param_state: *mut gz_state) -> c_int {
 
     ((unsafe *__param_state).x.next = (unsafe *__param_state).out)
 
-    with_memcpy((((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *mut c_void) as *i8), ((__local_strm.next_in as *const c_void) as *i8), ((__local_strm.avail_in as c_ulong) as i64))
+    with_memcpy((((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *mut c_void) as *mut u8), ((__local_strm.next_in as *const c_void) as *mut u8), ((__local_strm.avail_in as c_ulong) as i64))
 
     ((unsafe *__param_state).x.have = __local_strm.avail_in)
 
@@ -1140,7 +1140,7 @@ unsafe fn gz_read(__param_state: *mut gz_state, __param_buf: *mut c_void, __para
                 (__local_n = (unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).have)
             }
 
-            with_memcpy((__local_buf as *i8), (((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *const c_void) as *i8), ((__local_n as c_ulong) as i64))
+            with_memcpy((__local_buf as *mut u8), (((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *const c_void) as *mut u8), ((__local_n as c_ulong) as i64))
 
             ((unsafe *__param_state).x.next = (unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next + (__local_n as usize))
 

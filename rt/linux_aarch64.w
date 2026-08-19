@@ -3,9 +3,12 @@
 // Implements the rt_* platform boundary through stable libc/POSIX ABI symbols.
 // Error convention: negative return = negated errno.
 
+use std.builtins.c_void
+
 @[link_name("write")]
 extern fn rt_libc_write(fd: i32, buf: *const u8, len: u64) -> i64
-extern fn read(fd: i32, buf: *mut u8, len: u64) -> i64
+@[link_name("read")]
+extern fn rt_libc_read(fd: i32, buf: *mut u8, len: u64) -> i64
 extern fn open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn close(fd: i32) -> i32
 extern fn lseek(fd: i32, offset: i64, whence: i32) -> i64
@@ -21,9 +24,9 @@ extern fn getrandom(buf: *mut u8, len: u64, flags: u32) -> i64
 extern fn sysconf(name: i32) -> i64
 extern fn sigaltstack(ss: *const u8, old_ss: *mut u8) -> i32
 extern fn sigaction(sig: i32, act: *const u8, old_act: *mut u8) -> i32
-extern var stdin: *mut u8
-extern var stdout: *mut u8
-extern var stderr: *mut u8
+extern var stdin: *mut c_void
+extern var stdout: *mut c_void
+extern var stderr: *mut c_void
 
 fn get_errno() -> i32:
     let p = __errno_location()
@@ -74,13 +77,13 @@ pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
             off = off + n as u64
         let _close = rt_close(fd)
 
-pub fn rt_libc_stdin() -> *mut u8:
+pub fn rt_libc_stdin() -> *mut c_void:
     stdin
 
-pub fn rt_libc_stdout() -> *mut u8:
+pub fn rt_libc_stdout() -> *mut c_void:
     stdout
 
-pub fn rt_libc_stderr() -> *mut u8:
+pub fn rt_libc_stderr() -> *mut c_void:
     stderr
 
 pub fn rt_fiber_page_size() -> i64:
@@ -156,7 +159,7 @@ pub fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64:
 pub fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64:
     var r: i64 = 0
     loop:
-        r = read(fd, buf, len as u64)
+        r = rt_libc_read(fd, buf, len as u64)
         if r >= 0 or get_errno() != 4:
             break
     if r < 0:
@@ -196,8 +199,8 @@ pub fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
         return -(get_errno() as i64)
     r
 
-let S_IFMT: i32 = 61440
-let S_IFDIR: i32 = 16384
+let RT_S_IFMT: i32 = 61440
+let RT_S_IFDIR: i32 = 16384
 let S_IFREG: i32 = 32768
 let LINUX_STAT_SIZE: i64 = 144
 // aarch64 glibc struct stat puts st_mode at 16 (u32, with st_nlink at
@@ -220,8 +223,8 @@ pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
     let mtime_sec = unsafe *((base + LINUX_STAT_MTIME_SEC_OFFSET) as *const i64)
     let mtime_nsec = unsafe *((base + LINUX_STAT_MTIME_NSEC_OFFSET) as *const i64)
     (unsafe *out).size = size
-    (unsafe *out).is_dir = if (mode & S_IFMT) == S_IFDIR: 1 else: 0
-    (unsafe *out).is_file = if (mode & S_IFMT) == S_IFREG: 1 else: 0
+    (unsafe *out).is_dir = if (mode & RT_S_IFMT) == RT_S_IFDIR: 1 else: 0
+    (unsafe *out).is_file = if (mode & RT_S_IFMT) == S_IFREG: 1 else: 0
     (unsafe *out).modified_ns = mtime_sec * 1000000000 + mtime_nsec
     0
 
@@ -285,14 +288,15 @@ pub fn rt_nanosleep(ns: i64) -> i32:
         return -get_errno()
     0
 
-extern fn getpid() -> i32
+@[link_name("getpid")]
+extern fn rt_libc_getpid() -> i32
 extern fn raise(sig: i32) -> i32
 extern fn kill(pid: i32, sig: i32) -> i32
 extern fn pthread_create(thread: *mut i64, attr: *const u8, start_routine: *mut u8, arg: *mut u8) -> i32
 extern fn pthread_join(thread: i64, retval: *mut *mut u8) -> i32
 
 pub fn rt_getpid() -> i32:
-    getpid()
+    rt_libc_getpid()
 
 pub fn rt_kill(pid: i32, sig: i32) -> i32:
     let r = kill(pid, sig)
@@ -324,7 +328,8 @@ extern fn mkdir(path: *const u8, mode: i32) -> i32
 extern fn unlink(path: *const u8) -> i32
 extern fn rmdir(path: *const u8) -> i32
 extern fn rename(old_path: *const u8, new_path: *const u8) -> i32
-extern fn symlink(target: *const u8, link_path: *const u8) -> i32
+@[link_name("symlink")]
+extern fn rt_libc_symlink(target: *const u8, link_path: *const u8) -> i32
 extern fn access(path: *const u8, mode: i32) -> i32
 extern fn lstat(path: *const u8, st: *mut u8) -> i32
 extern fn readlink(path: *const u8, buf: *mut u8, bufsize: u64) -> i64
@@ -393,7 +398,7 @@ fn rt_lstat_is_dir(path: *const u8) -> bool:
     var mode: i32 = 0
     if rt_lstat_mode(path, &mode as *mut i32) != 0:
         return false
-    (mode & S_IFMT) == S_IFDIR
+    (mode & RT_S_IFMT) == RT_S_IFDIR
 
 pub fn rt_file_mode(path: *const u8) -> i32:
     var mode: i32 = 0
@@ -435,7 +440,7 @@ pub fn rt_remove_tree(path: *const u8) -> i32:
     let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
     if stat_rc != 0:
         return stat_rc
-    if (mode & S_IFMT) != S_IFDIR:
+    if (mode & RT_S_IFMT) != RT_S_IFDIR:
         return rt_unlink(path)
 
     let dir = opendir(path)
@@ -512,7 +517,7 @@ pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
     let stat_rc = rt_lstat_mode(src, &mode as *mut i32)
     if stat_rc != 0:
         return stat_rc
-    if (mode & S_IFMT) != S_IFDIR:
+    if (mode & RT_S_IFMT) != RT_S_IFDIR:
         return rt_copy_file(src, dst, mode)
 
     let mkdir_rc = rt_mkdir(dst, mode & 0o777)
@@ -549,7 +554,7 @@ pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
     rt_chmod(dst, mode & 0o777)
 
 pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
-    let r = symlink(target, link_path)
+    let r = rt_libc_symlink(target, link_path)
     if r < 0:
         return -get_errno()
     0
@@ -575,7 +580,7 @@ fn rt_list_files_walk(path: *const u8, out: str) -> str:
     let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
     if stat_rc != 0:
         return out
-    if (mode & S_IFMT) != S_IFDIR:
+    if (mode & RT_S_IFMT) != RT_S_IFDIR:
         return rt_list_files_append_line(out, path)
 
     let dir = opendir(path)
@@ -608,7 +613,8 @@ pub fn rt_access(path: *const u8, mode: i32) -> i32:
 
 extern fn socket(domain: i32, ty: i32, protocol: i32) -> i32
 extern fn connect(fd: i32, addr: *const u8, addrlen: u32) -> i32
-extern fn bind(fd: i32, addr: *const u8, addrlen: u32) -> i32
+@[link_name("bind")]
+extern fn rt_libc_bind(fd: i32, addr: *const u8, addrlen: u32) -> i32
 extern fn listen(fd: i32, backlog: i32) -> i32
 extern fn accept(fd: i32, addr: *mut u8, addrlen: *mut u32) -> i32
 extern fn setsockopt(fd: i32, level: i32, optname: i32, optval: *const u8, optlen: u32) -> i32
@@ -717,7 +723,7 @@ fn rt_net_bind_inaddr_any(fd: i32, port: i32) -> i32:
     sa[0] = 2 as u8
     sa[2] = ((port >> 8) & 255) as u8
     sa[3] = (port & 255) as u8
-    bind(fd, &sa as *const [16]u8 as *const u8, 16 as u32)
+    rt_libc_bind(fd, &sa as *const [16]u8 as *const u8, 16 as u32)
 
 pub fn with_net_tcp_listen(port: i32, backlog: i32) -> i32:
     if port < 0 or port > 65535:
@@ -842,8 +848,10 @@ extern fn execvp(file: *const u8, argv: *const *const u8) -> i32
 extern fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32
 extern fn chdir(path: *const u8) -> i32
 extern fn dup2(oldfd: i32, newfd: i32) -> i32
-extern fn getrlimit(resource: i32, lim: *mut u8) -> i32
-extern fn setrlimit(resource: i32, lim: *const u8) -> i32
+@[link_name("getrlimit")]
+extern fn rt_libc_getrlimit(resource: i32, lim: *mut u8) -> i32
+@[link_name("setrlimit")]
+extern fn rt_libc_setrlimit(resource: i32, lim: *const u8) -> i32
 extern fn with_clock_nanos() -> i64
 extern fn with_usleep(usecs: i32) -> i32
 
@@ -1055,7 +1063,7 @@ pub fn rt_compat_install_interrupt_handlers() -> Unit:
 pub fn rt_compat_raise_stack_limit() -> Unit:
     var lim: [16]u8 = [0 as u8; 16]
     let lim_base = (&raw mut lim) as *mut [16]u8 as i64
-    if getrlimit(POSIX_RLIMIT_STACK, lim_base as *mut u8) != 0:
+    if rt_libc_getrlimit(POSIX_RLIMIT_STACK, lim_base as *mut u8) != 0:
         return
     var want: u64 = (8 * 1024 * 1024) as u64
     let lim_max = posix_load_u64(lim_base, 8)
@@ -1064,14 +1072,14 @@ pub fn rt_compat_raise_stack_limit() -> Unit:
     let lim_cur = posix_load_u64(lim_base, 0)
     if want > lim_cur:
         posix_store_i64(lim_base, 0, want as i64)
-        let _ = setrlimit(POSIX_RLIMIT_STACK, lim_base as *const u8)
+        let _ = rt_libc_setrlimit(POSIX_RLIMIT_STACK, lim_base as *const u8)
 
 pub fn rt_set_process_memory_limit_bytes(limit: i64) -> i32:
     if limit <= 0:
         return 0
     var lim: [16]u8 = [0 as u8; 16]
     let lim_base = (&raw mut lim) as *mut [16]u8 as i64
-    if getrlimit(POSIX_RLIMIT_AS, lim_base as *mut u8) != 0:
+    if rt_libc_getrlimit(POSIX_RLIMIT_AS, lim_base as *mut u8) != 0:
         return -1
     var want = limit as u64
     let lim_max = posix_load_u64(lim_base, 8)
@@ -1081,7 +1089,7 @@ pub fn rt_set_process_memory_limit_bytes(limit: i64) -> i32:
     if lim_cur != POSIX_RLIM_INFINITY and lim_cur <= want:
         return 0
     posix_store_i64(lim_base, 0, want as i64)
-    setrlimit(POSIX_RLIMIT_AS, lim_base as *const u8)
+    rt_libc_setrlimit(POSIX_RLIMIT_AS, lim_base as *const u8)
 
 pub fn rt_compat_interrupt_requested() -> i32:
     posix_interrupt_flag

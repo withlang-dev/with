@@ -3,9 +3,9 @@
 use std.collections
 use std.traits
 
-extern fn with_alloc(size: i64) -> *i8
-extern fn with_free(ptr: *i8) -> Unit
-extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> Unit
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
 type RcControl {
     strong: i64,
@@ -54,8 +54,8 @@ impl[T] Drop for Rc[T]:
             let value_ptr = unsafe { (*ptr).value } as *mut T
             let value = unsafe { *value_ptr }
             drop(value)
-            with_free(value_ptr as *i8)
-            with_free(ptr as *i8)
+            with_free(value_ptr as *mut u8)
+            with_free(ptr as *mut u8)
 
 /// `Arc[T]` is a thread-safe, explicitly cloned shared owner.
 pub type Arc[T] { ptr: *mut u8 }
@@ -99,5 +99,5 @@ impl[T] Drop for Arc[T]:
             let value_ptr = unsafe { (*ptr).value } as *mut T
             let value = unsafe { *value_ptr }
             drop(value)
-            with_free(value_ptr as *i8)
-            with_free(ptr as *i8)
+            with_free(value_ptr as *mut u8)
+            with_free(ptr as *mut u8)

@@ -4,45 +4,45 @@
 
 use std.collections
 
-extern fn with_vec_len(v: *mut c_void) -> i64
-extern fn with_vec_get_i32(v: *mut c_void, index: i64) -> i32
-extern fn with_vec_get_str(v: *mut c_void, index: i64) -> str
-extern fn with_vec_push_i32(v: *mut c_void, val: i32) -> Unit
-extern fn with_vec_new_out(v: *mut c_void, elem_size: i64) -> Unit
+extern fn with_vec_len(v: *mut u8) -> i64
+extern fn with_vec_get_i32(v: *mut u8, index: i64) -> i32
+extern fn with_vec_get_str(v: *mut u8, index: i64) -> str
+extern fn with_vec_push_i32(v: *mut u8, val: i32) -> Unit
+extern fn with_vec_new_out(v: *mut u8, elem_size: i64) -> Unit
 
 /// Sum all elements in a Vec[i32].
 pub fn sum(arr: Vec[i32]) -> i32:
     var total: i32 = 0
     var i: i64 = 0
-    let n = with_vec_len((&raw mut arr) as *mut c_void)
+    let n = with_vec_len((&raw mut arr) as *mut u8)
     while i < n:
-        total = total + with_vec_get_i32((&raw mut arr) as *mut c_void, i)
+        total = total + with_vec_get_i32((&raw mut arr) as *mut u8, i)
         i = i + 1
     total
 
 /// Apply a function to each element, returning a new Vec of results.
 pub fn map(arr: Vec[str], f: fn(str) -> i32) -> Vec[i32]:
     let result: Vec[i32] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out((&raw mut result) as *mut c_void, 4)
+    with_vec_new_out((&raw mut result) as *mut u8, 4)
     var i: i64 = 0
-    let n = with_vec_len((&raw mut arr) as *mut c_void)
+    let n = with_vec_len((&raw mut arr) as *mut u8)
     while i < n:
-        let x = with_vec_get_str((&raw mut arr) as *mut c_void, i)
+        let x = with_vec_get_str((&raw mut arr) as *mut u8, i)
         let y = f(x)
-        with_vec_push_i32((&raw mut result) as *mut c_void, y)
+        with_vec_push_i32((&raw mut result) as *mut u8, y)
         i = i + 1
     result
 
 /// Keep only elements where `pred` returns true.
 pub fn filter(arr: Vec[i32], pred: fn(i32) -> bool) -> Vec[i32]:
     let result: Vec[i32] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out((&raw mut result) as *mut c_void, 4)
+    with_vec_new_out((&raw mut result) as *mut u8, 4)
     var i: i64 = 0
-    let n = with_vec_len((&raw mut arr) as *mut c_void)
+    let n = with_vec_len((&raw mut arr) as *mut u8)
     while i < n:
-        let x = with_vec_get_i32((&raw mut arr) as *mut c_void, i)
+        let x = with_vec_get_i32((&raw mut arr) as *mut u8, i)
         if pred(x):
-            with_vec_push_i32((&raw mut result) as *mut c_void, x)
+            with_vec_push_i32((&raw mut result) as *mut u8, x)
         i = i + 1
     result
 

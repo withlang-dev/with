@@ -945,7 +945,7 @@ unsafe fn gz_zero(__param_state: *mut gz_state) -> c_int {
 
 
         if (__local_first != 0) {
-            with_memset((((unsafe *__param_state).in_ as *mut c_void) as *i8), (0 as c_int), ((__local_n as c_ulong) as i64))
+            with_memset((((unsafe *__param_state).in_ as *mut c_void) as *mut u8), (0 as c_int), ((__local_n as c_ulong) as i64))
 
             (__local_first = ((0 as c_int)))
 
@@ -1028,7 +1028,7 @@ unsafe fn gz_write(__param_state: *mut gz_state, __param_buf: *const c_void, __p
                 (__local_copy_ = ((__local_len as c_uint)))
             }
 
-            with_memcpy(((((unsafe *__param_state).in_ + (__local_have as usize)) as *mut c_void) as *i8), (__local_buf as *i8), ((__local_copy_ as c_ulong) as i64))
+            with_memcpy(((((unsafe *__param_state).in_ + (__local_have as usize)) as *mut c_void) as *mut u8), (__local_buf as *mut u8), ((__local_copy_ as c_ulong) as i64))
 
             ((unsafe *__param_state).strm.avail_in = ((unsafe *(&raw const (unsafe *__param_state).strm as *const z_stream_s)).avail_in +% __local_copy_))
 
@@ -1130,7 +1130,7 @@ unsafe fn gz_vacate(__param_state: *mut gz_state) -> c_int {
 
     }
 
-    with_memmove((((unsafe *__param_state).in_ as *mut c_void) as *i8), ((__local_strm.next_in as *const c_void) as *i8), ((__local_strm.avail_in as c_ulong) as i64))
+    with_memmove((((unsafe *__param_state).in_ as *mut c_void) as *mut u8), ((__local_strm.next_in as *const c_void) as *mut u8), ((__local_strm.avail_in as c_ulong) as i64))
 
     (__local_strm.next_in = (unsafe *__param_state).in_)
 

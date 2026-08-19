@@ -1,5 +1,7 @@
 // rt/windows_x86_64.w -- Windows x86_64 runtime backend.
 
+use std.builtins.c_void
+
 extern fn GetLastError() -> i32
 extern fn GetStdHandle(kind: i32) -> i64
 extern fn ReadFile(handle: i64, buf: *mut u8, len: u32, read_out: *mut u32, overlapped: *mut u8) -> i32
@@ -362,14 +364,14 @@ pub fn rt_fill_random(buf: *mut u8, len: u64) -> Unit:
     if SystemFunction036(buf, len as u32) == 0:
         ExitProcess(1)
 
-pub fn rt_libc_stdin() -> *mut u8:
-    0 as *mut u8
+pub fn rt_libc_stdin() -> *mut c_void:
+    0 as *mut c_void
 
-pub fn rt_libc_stdout() -> *mut u8:
-    0 as *mut u8
+pub fn rt_libc_stdout() -> *mut c_void:
+    0 as *mut c_void
 
-pub fn rt_libc_stderr() -> *mut u8:
-    0 as *mut u8
+pub fn rt_libc_stderr() -> *mut c_void:
+    0 as *mut c_void
 
 pub fn rt_fiber_page_size() -> i64:
     4096
@@ -1001,7 +1003,8 @@ pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
 extern fn WSAStartup(version: u16, data: *mut u8) -> i32
 extern fn socket(af: i32, ty: i32, protocol: i32) -> i64
 extern fn connect(s: i64, addr: *const u8, namelen: i32) -> i32
-extern fn bind(s: i64, addr: *const u8, namelen: i32) -> i32
+@[link_name("bind")]
+extern fn rt_libc_bind(s: i64, addr: *const u8, namelen: i32) -> i32
 extern fn listen(s: i64, backlog: i32) -> i32
 extern fn accept(s: i64, addr: *mut u8, addrlen: *mut i32) -> i64
 extern fn getsockname(s: i64, addr: *mut u8, addrlen: *mut i32) -> i32
@@ -1173,7 +1176,7 @@ fn rt_net_bind_inaddr_any(fd: i64, port: i32) -> i32:
     sa[0] = 2 as u8
     sa[2] = ((port >> 8) & 255) as u8
     sa[3] = (port & 255) as u8
-    bind(fd, &sa as *const [16]u8 as *const u8, 16)
+    rt_libc_bind(fd, &sa as *const [16]u8 as *const u8, 16)
 
 pub fn with_net_tcp_listen(port: i32, backlog: i32) -> i32:
     if port < 0 or port > 65535:

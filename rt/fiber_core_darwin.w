@@ -72,8 +72,8 @@ let PROT_NONE: i32 = 0
 let PROT_READ_WRITE: i32 = 3
 let MAP_FAILED: i64 = -1
 
-let SIGBUS: i32 = 10
-let SIGSEGV: i32 = 11
+let RT_SIGBUS: i32 = 10
+let RT_SIGSEGV: i32 = 11
 
 let FIBER_ALT_STACK_SIZE: i64 = 131072
 

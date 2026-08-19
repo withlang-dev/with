@@ -1,8 +1,8 @@
 // std.sync — synchronization primitives.
 
-extern fn with_alloc(size: i64) -> *i8
-extern fn with_free(ptr: *i8) -> Unit
-extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> Unit
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_yield() -> Unit
 extern fn with_runtime_has_fibers() -> i32
@@ -214,8 +214,8 @@ impl[T] Drop for Mutex[T]:
         let value_ptr = (unsafe *state).value as *mut T
         let value = unsafe *value_ptr
         drop(value)
-        with_free(value_ptr as *i8)
-        with_free(state as *i8)
+        with_free(value_ptr as *mut u8)
+        with_free(state as *mut u8)
 
 /// Create a new generic reader-writer lock with the given initial value.
 pub fn RwLock.new[T](value: T) -> RwLock[T]:
@@ -318,8 +318,8 @@ impl[T] Drop for RwLock[T]:
         let value_ptr = (unsafe *state).value as *mut T
         let value = unsafe *value_ptr
         drop(value)
-        with_free(value_ptr as *i8)
-        with_free(state as *i8)
+        with_free(value_ptr as *mut u8)
+        with_free(state as *mut u8)
 
 pub fn Once.new() -> Once:
     let state = with_alloc(sizeof[OnceState]() as i64) as *mut OnceState

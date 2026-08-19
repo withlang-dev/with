@@ -90,12 +90,12 @@ pub extern fn with_ctzll(x: i64) -> i32
 pub extern fn with_abs(x: i32) -> i32
 pub extern fn with_alloc(size: i64) -> *mut u8
 pub extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8
-pub extern fn with_realloc(ptr: *i8, old_size: i64, new_size: i64) -> *i8
-pub extern fn with_free(ptr: *i8) -> Unit
-pub extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> *i8
-pub extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> *i8
-pub extern fn with_memset(ptr: *i8, c: i32, n: i64) -> *i8
-pub extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32
+pub extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
+pub extern fn with_free(ptr: *mut u8) -> Unit
+pub extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
+pub extern fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
+pub extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8
+pub extern fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32
 pub extern fn with_va_start(ap: *mut i8) -> Unit
 pub extern fn with_va_end(ap: *mut i8) -> Unit
 
