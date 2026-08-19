@@ -13,7 +13,7 @@ extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_setenv_str(name: &str, value: &str) -> i32
-extern fn with_vec_new_out(v: *mut c_void, elem_size: i64) -> Unit
+extern fn with_vec_new_out(v: *mut u8, elem_size: i64) -> Unit
 // The vec RETAINS the pushed header — ownership transfers, unlike every
 // read-only str extern (§16.3d declared effect; the bit-copy default would
 // leave two owners).
@@ -33,7 +33,7 @@ pub fn pid -> i32:
 pub fn args -> Vec[str]:
     let n = with_arg_count()
     let out: Vec[str] = Vec{ ptr: 0, len: 0, cap: 0, elem_size: 0 }
-    with_vec_new_out((&raw mut out) as *mut c_void, 16)
+    with_vec_new_out((&raw mut out) as *mut u8, 16)
     var i = 0
     while i < n:
         with_vec_push_str((&raw mut out) as *mut u8, with_arg_at(i))

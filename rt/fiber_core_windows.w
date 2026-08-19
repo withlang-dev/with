@@ -12,7 +12,7 @@ extern fn abort() -> Unit
 extern fn rt_mmap(size: i64) -> *mut u8
 extern fn rt_munmap(ptr: *mut u8, size: i64) -> Unit
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
-extern fn rt_exit(code: i32) -> Unit
+extern fn rt_exit(code: i32) -> Never
 extern fn rt_raise(sig: i32) -> i32
 extern fn rt_fiber_page_size() -> i64
 extern fn rt_fiber_mmap_flags() -> i32

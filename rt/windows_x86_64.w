@@ -11,7 +11,7 @@ extern fn GetCurrentDirectoryW(size: u32, buf: *mut u16) -> u32
 extern fn SetCurrentDirectoryW(path: *const u16) -> i32
 extern fn VirtualAlloc(addr: *mut u8, size: u64, alloc_type: u32, protect: u32) -> *mut u8
 extern fn VirtualFree(addr: *mut u8, size: u64, free_type: u32) -> i32
-extern fn ExitProcess(code: i32) -> Unit
+extern fn ExitProcess(code: i32) -> Never
 extern fn QueryPerformanceCounter(value: *mut i64) -> i32
 extern fn QueryPerformanceFrequency(value: *mut i64) -> i32
 extern fn GetSystemTimeAsFileTime(filetime: *mut i64) -> Unit
@@ -303,7 +303,7 @@ pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
     let _ = size
     let _free = VirtualFree(ptr, 0, MEM_RELEASE)
 
-pub fn rt_exit(code: i32) -> Unit:
+pub fn rt_exit(code: i32) -> Never:
     ExitProcess(code)
 
 pub fn rt_clock_ns() -> i64:
@@ -343,7 +343,6 @@ pub fn rt_kill(pid: i32, sig: i32) -> i32:
 
 pub fn rt_raise(sig: i32) -> i32:
     ExitProcess(128 + sig)
-    0
 
 pub fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64:
     var tid: u32 = 0 as u32

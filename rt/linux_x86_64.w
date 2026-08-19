@@ -243,7 +243,7 @@ pub fn rt_mmap(size: i64) -> *mut u8:
 pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
     let _ = munmap(ptr, size as u64)
 
-pub fn rt_exit(code: i32) -> Unit:
+pub fn rt_exit(code: i32) -> Never:
     _exit(code)
 
 pub fn rt_args() -> (*const *const u8, i32):
