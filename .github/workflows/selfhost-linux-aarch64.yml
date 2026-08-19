@@ -30,8 +30,12 @@ jobs:
       # which no fork/exec — and therefore no link — works on linux-aarch64).
       WITH_SEED_REPO: withlang-dev/with
       WITH_SEED_ASSET: with-linux-aarch64
-      WITH_SEED_VERSION: with-linux-aarch64
-      WITH_SEED_SHA256: 49e65242e753f4db68b66752a03e2b0b5a619c2a121f2c5ac8034b0cf0e18057
+      # Pinned to the v0.15.1.5 stable release asset, matching how the other
+      # three platforms pin (a versioned release, not a rolling tag). That
+      # asset is itself CI-produced and fixpoint-verified by the Release
+      # workflow's build-linux-aarch64 job.
+      WITH_SEED_VERSION: v0.15.1.5
+      WITH_SEED_SHA256: 20995c2de78d94c8e9c022107b48901ce97144ac2fb2b016f9ab19a22ae50683
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-linux-aarch64
       # NOTE: this platform's SDK ships as .tar.gz (the linux-x86_64 asset is
@@ -48,6 +52,11 @@ jobs:
       # so the fixpoint-verified runtime objects are published beside the seed
       # and fetched here.
       WITH_RUNTIME_ASSET: with-linux-aarch64-runtime.tar.gz
+      # The runtime objects live on the rolling with-linux-aarch64 seed release,
+      # NOT on the versioned release, so they need their own tag. They are
+      # interchangeable across these two builds -- verified by running a full
+      # self-host + fixpoint on main with exactly this seed/runtime pair.
+      WITH_RUNTIME_VERSION: with-linux-aarch64
       WITH_RUNTIME_SHA256: bdfd139b898a0c0d2ad0d989c2c4f2c9c8a63487fb54c08649cd56f34a3844db
     steps:
       - name: Checkout
@@ -103,7 +112,7 @@ jobs:
           # in <bindir>/runtime/, i.e. beside with-seed at the workspace root.
           mkdir -p runtime
           curl -fL -o /tmp/rt.tar.gz \
-            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_RUNTIME_ASSET"
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_RUNTIME_VERSION/$WITH_RUNTIME_ASSET"
           printf '%s  %s\n' "$WITH_RUNTIME_SHA256" /tmp/rt.tar.gz | sha256sum -c -
           tar -xzf /tmp/rt.tar.gz -C runtime
           test -f runtime/rt_linux_aarch64.o || { echo "runtime bundle missing rt_linux_aarch64.o"; exit 1; }
