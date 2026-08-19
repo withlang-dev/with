@@ -421,6 +421,9 @@ type HostRuntimeSpec:
     second_opposite_bootstrap_platform_blob: str
     second_opposite_platform_blob: str
     second_opposite_platform_symbol: str
+    third_opposite_bootstrap_platform_blob: str
+    third_opposite_platform_blob: str
+    third_opposite_platform_symbol: str
     fiber_core_source: str
     fiber_asm_source: str
 
@@ -481,6 +484,9 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_symbol: "rt_linux_x86_64_o",
+            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_x86_64.bin",
+            third_opposite_platform_blob: "out/lib/empty_rt_windows_x86_64.bin",
+            third_opposite_platform_symbol: "rt_windows_x86_64_o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_aarch64.s",
         }
@@ -498,6 +504,9 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_x86_64.bin",
             second_opposite_platform_blob: "out/lib/empty_rt_windows_x86_64.bin",
             second_opposite_platform_symbol: "rt_windows_x86_64_o",
+            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_aarch64.bin",
+            third_opposite_platform_blob: "out/lib/empty_rt_linux_aarch64.bin",
+            third_opposite_platform_symbol: "rt_linux_aarch64_o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_x86_64.s",
         }
@@ -515,6 +524,9 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_symbol: "rt_linux_x86_64_o",
+            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_aarch64.bin",
+            third_opposite_platform_blob: "out/lib/empty_rt_linux_aarch64.bin",
+            third_opposite_platform_symbol: "rt_linux_aarch64_o",
             fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_x86_64.s",
         }
@@ -531,6 +543,9 @@ fn host_runtime_spec() -> HostRuntimeSpec:
         second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_x86_64.bin",
         second_opposite_platform_blob: "out/lib/empty_rt_windows_x86_64.bin",
         second_opposite_platform_symbol: "rt_windows_x86_64_o",
+        third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_aarch64.bin",
+        third_opposite_platform_blob: "out/lib/empty_rt_linux_aarch64.bin",
+        third_opposite_platform_symbol: "rt_linux_aarch64_o",
         fiber_core_source: "rt/fiber_core_darwin.w",
         fiber_asm_source: "runtime/fiber_asm_aarch64.s",
     }
@@ -1489,6 +1504,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("bootstrap-rt-platform-object", "seed", host_runtime.platform_source, host_runtime.bootstrap_platform_object, "-O1", ""))
     out = out.add_target(empty_file_target("bootstrap-empty-opposite-runtime-blob", host_runtime.opposite_bootstrap_platform_blob))
     out = out.add_target(empty_file_target("bootstrap-empty-second-opposite-runtime-blob", host_runtime.second_opposite_bootstrap_platform_blob))
+    out = out.add_target(empty_file_target("bootstrap-empty-third-opposite-runtime-blob", host_runtime.third_opposite_bootstrap_platform_blob))
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O1", "compat-runtime-source"))
     out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O1", ""))
@@ -1530,6 +1546,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.opposite_platform_symbol))
     bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.second_opposite_bootstrap_platform_blob)
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.second_opposite_platform_symbol))
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.third_opposite_bootstrap_platform_blob)
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.third_opposite_platform_symbol))
     // Every consumed object's producer, declared (#680 edge audit).
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-cimport-stubs-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-compat-runtime-object")
@@ -1544,6 +1562,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-platform-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-empty-opposite-runtime-blob")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-empty-second-opposite-runtime-blob")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-empty-third-opposite-runtime-blob")
     out = out.add_target(bootstrap_embedded_objects)
     var bootstrap_embedded_objects_obj = target_new(.CompileAsmObject, "bootstrap-embedded-objects-object", "out/bootstrap-lib/embedded_objects.s").output("out/bootstrap-lib/embedded_objects.o")
     bootstrap_embedded_objects_obj = bootstrap_embedded_objects_obj.dep("bootstrap-embedded-objects-asm")
@@ -1555,6 +1574,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-platform-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-opposite-runtime-blob")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-second-opposite-runtime-blob")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-third-opposite-runtime-blob")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-cimport-stubs-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-compat-runtime-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-panic-runtime-object")
@@ -1750,6 +1770,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("rt-platform-object", stage_compiler_bin("with-stage2"), host_runtime.platform_source, host_runtime.platform_object, "-O1", "stage2"))
     out = out.add_target(empty_file_target("empty-opposite-runtime-blob", host_runtime.opposite_platform_blob))
     out = out.add_target(empty_file_target("empty-second-opposite-runtime-blob", host_runtime.second_opposite_platform_blob))
+    out = out.add_target(empty_file_target("empty-third-opposite-runtime-blob", host_runtime.third_opposite_platform_blob))
     out = out.add_target(with_object_target("cimport-stubs-object", stage_compiler_bin("with-stage2"), "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O1", "stage2"))
     var compat_runtime_obj = with_object_target("compat-runtime-object", stage_compiler_bin("with-stage2"), "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O1", "stage2")
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
@@ -1796,6 +1817,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.arg(host_runtime.opposite_platform_symbol)
     embedded_objects = embedded_objects.input(host_runtime.second_opposite_platform_blob)
     embedded_objects = embedded_objects.arg(host_runtime.second_opposite_platform_symbol)
+    embedded_objects = embedded_objects.input(host_runtime.third_opposite_platform_blob)
+    embedded_objects = embedded_objects.arg(host_runtime.third_opposite_platform_symbol)
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
     embedded_objects = embedded_objects.dep("compat-runtime-object")
@@ -1810,6 +1833,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.dep("rt-platform-object")
     embedded_objects = embedded_objects.dep("empty-opposite-runtime-blob")
     embedded_objects = embedded_objects.dep("empty-second-opposite-runtime-blob")
+    embedded_objects = embedded_objects.dep("empty-third-opposite-runtime-blob")
     out = out.add_target(embedded_objects)
 
     var embedded_objects_obj = target_new(.CompileAsmObject, "embedded-objects-object", "out/lib/embedded_objects.s").output("out/lib/embedded_objects.o")
@@ -1820,6 +1844,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     runtime = runtime.dep("embedded-objects-object")
     runtime = runtime.dep("empty-opposite-runtime-blob")
     runtime = runtime.dep("empty-second-opposite-runtime-blob")
+    runtime = runtime.dep("empty-third-opposite-runtime-blob")
     out = out.add_target(runtime)
 
     // ── Cross-target runtime (linux) ────────────────────────────────
