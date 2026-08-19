@@ -311,13 +311,13 @@ jobs:
       # ships without .sha256/.manifest sidecars (as on Windows), so the archive
       # digest is pinned directly here instead of fetching sidecar files.
       WITH_SEED_REPO: withlang-dev/with
-      # Rolling bootstrap seed, fixpoint-verified from main ae4c6a75 -- the commit
-      # carrying the #851 posix_str_to_c_buf fix, without which the runtime builds
-      # every child argv from a mis-dereferenced str and no fork/exec (hence no
-      # link) works at all on this platform.
-      WITH_SEED_VERSION: with-linux-aarch64
+      # Pinned to the v0.15.1.5 stable release asset, matching how the other
+      # three platforms pin (a versioned release, not a rolling tag). That asset
+      # was produced by this very job on the v0.15.1.5 tag, so the platform now
+      # bootstraps from its own fixpoint-verified output.
+      WITH_SEED_VERSION: v0.15.1.5
       WITH_SEED_ASSET: with-linux-aarch64
-      WITH_SEED_SHA256: 49e65242e753f4db68b66752a03e2b0b5a619c2a121f2c5ac8034b0cf0e18057
+      WITH_SEED_SHA256: 20995c2de78d94c8e9c022107b48901ce97144ac2fb2b016f9ab19a22ae50683
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-linux-aarch64
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
@@ -327,6 +327,9 @@ jobs:
       # rt_linux_aarch64.o from <bindir>/runtime/ -- here src/runtime/, since the
       # seed is installed as src/main.
       WITH_RUNTIME_ASSET: with-linux-aarch64-runtime.tar.gz
+      # Runtime objects live on the rolling with-linux-aarch64 seed release, not
+      # on the versioned one, so they need their own tag.
+      WITH_RUNTIME_VERSION: with-linux-aarch64
       WITH_RUNTIME_SHA256: bdfd139b898a0c0d2ad0d989c2c4f2c9c8a63487fb54c08649cd56f34a3844db
     steps:
       - name: Checkout source
@@ -383,7 +386,7 @@ jobs:
           chmod +x src/main
           mkdir -p src/runtime
           curl -fL -o "$RUNNER_TEMP/rt.tar.gz" \
-            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_RUNTIME_ASSET"
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_RUNTIME_VERSION/$WITH_RUNTIME_ASSET"
           printf '%s  %s\n' "$WITH_RUNTIME_SHA256" "$RUNNER_TEMP/rt.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/rt.tar.gz" -C src/runtime
           test -f src/runtime/rt_linux_aarch64.o || { echo "runtime bundle missing rt_linux_aarch64.o"; exit 1; }
