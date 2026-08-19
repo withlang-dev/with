@@ -111,17 +111,17 @@ pub fn build_graph_host_target_kind() -> i32:
     let os = with_sysinfo_os()
     let arch = with_sysinfo_arch()
     if os == "Macos":
-        if arch == "armv8" or arch == "aarch64":
+        if arch == "aarch64":
             return 4
         if arch == "x86_64":
             return 3
     if os == "Linux":
-        if arch == "armv8" or arch == "aarch64":
+        if arch == "aarch64":
             return 2
         if arch == "x86_64":
             return 1
     if os == "Windows":
-        if arch == "armv8" or arch == "aarch64":
+        if arch == "aarch64":
             return 6
         if arch == "x86_64":
             return 5

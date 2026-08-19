@@ -666,9 +666,9 @@ fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &s
     let arch = runtime_sysinfo_arch()
     if os == "Linux" and arch == "x86_64":
         return link_stage_make_linux_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
-    if os == "Linux" and (arch == "armv8" or arch == "aarch64"):
+    if os == "Linux" and arch == "aarch64":
         return link_stage_make_linux_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
-    if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
+    if os == "Macos" and arch == "aarch64":
         return link_stage_make_darwin_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     if os == "Windows" and arch == "x86_64":
         return link_stage_make_windows_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
@@ -1020,15 +1020,15 @@ fn link_stage_host_platform_runtime_object() -> str:
     let arch = runtime_sysinfo_arch()
     if os == "Linux" and arch == "x86_64":
         return "rt_linux_x86_64.o"
-    if os == "Linux" and (arch == "armv8" or arch == "aarch64"):
+    if os == "Linux" and arch == "aarch64":
         // No embedded slot yet — resolved from the on-disk runtime root
         // only (see link_stage_embedded_runtime_object).
         return "rt_linux_aarch64.o"
-    if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
+    if os == "Macos" and arch == "aarch64":
         return "rt_darwin_aarch64.o"
     if os == "Windows" and arch == "x86_64":
         return "rt_windows_x86_64.o"
-    if os == "Windows" and (arch == "armv8" or arch == "aarch64"):
+    if os == "Windows" and arch == "aarch64":
         return "rt_windows_aarch64.o"
     with_eprint("error: unsupported host runtime platform: " ++ os ++ "/" ++ arch)
     ""

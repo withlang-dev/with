@@ -217,14 +217,27 @@ fn comp_tool_from_env(primary: &str, legacy: &str, fallback: &str) -> str:
         return old
     compiler_owned_text(fallback)
 
+// True when a host-arch string denotes ARM64.
+//
+// arch() is unified on "aarch64" (rt/darwin_aarch64.w). This predicate exists
+// only because build.w and build/*.w are INTERPRETED BY THE SEED: a seed built
+// before that unification still reports "armv8" on darwin, so the build layer
+// must accept both until every pinned seed carries the unified spelling.
+//
+// This is the ONLY place in the tree that still knows the legacy spelling
+// (aside from ConanClient, where "armv8" is Conan's own ecosystem name and is
+// correct). Delete the "armv8" branch after the next reseed.
+pub fn comp_arch_is_aarch64(a: &str) -> bool:
+    a == "aarch64" or a == "armv8"
+
 fn comp_default_llvm_prefix() -> str:
     let host_os = os()
     let host_arch = arch()
-    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Macos" and comp_arch_is_aarch64(host_arch):
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-darwin-arm64"
     if host_os == "Linux" and host_arch == "x86_64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-linux-x86_64"
-    if host_os == "Linux" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Linux" and comp_arch_is_aarch64(host_arch):
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-linux-aarch64"
     if host_os == "Windows" and host_arch == "x86_64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-windows-x86_64-msvc"

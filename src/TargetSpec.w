@@ -33,17 +33,17 @@ pub fn target_spec_host_kind() -> i32:
     let os = with_sysinfo_os()
     let arch = with_sysinfo_arch()
     if os == "Macos":
-        if arch == "armv8" or arch == "aarch64":
+        if arch == "aarch64":
             return 4
         if arch == "x86_64":
             return 3
     if os == "Linux":
-        if arch == "armv8" or arch == "aarch64":
+        if arch == "aarch64":
             return 2
         if arch == "x86_64":
             return 1
     if os == "Windows":
-        if arch == "armv8" or arch == "aarch64":
+        if arch == "aarch64":
             return 6
         if arch == "x86_64":
             return 5
@@ -60,10 +60,9 @@ pub fn target_spec_os() -> str:
         return "Windows"
     with_sysinfo_os()
 
-// Resolved target arch. Cross targets use the canonical spelling
-// ("x86_64"/"aarch64"); native returns the host sysinfo spelling
-// unchanged (e.g. "armv8") so native behavior is byte-identical to
-// the pre-TargetSpec compiler.
+// Resolved target arch. Cross targets and the host now share one canonical
+// spelling ("x86_64"/"aarch64"), so a native target returns exactly what the
+// host sysinfo reports.
 pub fn target_spec_arch() -> str:
     let kind = target_spec_active
     if kind == 1 or kind == 3 or kind == 5:

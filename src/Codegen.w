@@ -4961,7 +4961,7 @@ fn codegen_c_abi_needs_byval_attr() -> bool:
 fn codegen_c_abi_darwin_arm64() -> bool:
     let os = target_spec_os()
     let arch = target_spec_arch()
-    os == "Macos" and (arch == "armv8" or arch == "aarch64")
+    os == "Macos" and arch == "aarch64"
 
 fn codegen_windows_x86_64() -> bool:
     let os = target_spec_os()

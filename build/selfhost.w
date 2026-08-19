@@ -1,5 +1,6 @@
 module build.selfhost
 
+use build.compiler
 use pcre2
 use std.build
 use std.process
@@ -98,7 +99,7 @@ fn bs_host_platform_runtime_object() -> str:
     let host_arch = arch()
     if host_os == "Linux" and host_arch == "x86_64":
         return "rt_linux_x86_64.o"
-    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Macos" and comp_arch_is_aarch64(host_arch):
         return "rt_darwin_aarch64.o"
     if host_os == "Windows" and host_arch == "x86_64":
         return "rt_windows_x86_64.o"
@@ -107,13 +108,13 @@ fn bs_host_platform_runtime_object() -> str:
 fn bs_host_target_triple() -> str:
     let host_os = os()
     let host_arch = arch()
-    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Macos" and comp_arch_is_aarch64(host_arch):
         return "aarch64-apple-darwin"
     if host_os == "Macos" and host_arch == "x86_64":
         return "x86_64-apple-darwin"
     if host_os == "Linux" and host_arch == "x86_64":
         return "x86_64-unknown-linux-gnu"
-    if host_os == "Linux" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Linux" and comp_arch_is_aarch64(host_arch):
         return "aarch64-unknown-linux-gnu"
     if host_os == "Windows" and host_arch == "x86_64":
         return "x86_64-pc-windows-msvc"
@@ -3273,7 +3274,7 @@ fn bs_check_emit_c_array_ref(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     bs_edge_assert_exact(ctx, run_result.stdout, "", "emit_c_array_ref", "stdout")
 
 fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
-    if not (os() == "Macos" and (arch() == "armv8" or arch() == "aarch64")):
+    if not (os() == "Macos" and comp_arch_is_aarch64(arch())):
         return 0
 
     let root = ctx.project_info().project_root()
@@ -6105,7 +6106,7 @@ fn bs_check_build_w_library_and_targets(ctx: &ActionCtx, compiler_path: &str, ba
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(host_dir, "src/main.w"), "fn main:\n    print(\"explicit host target\")\n", ctx.target_name(), "host source")
     if rc != 0: return rc
-    rc = bs_build_w_write_fixture(ctx, bs_join(host_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(ctx: BuildCtx) -> Build:\n    var host = BuildTarget.native\n    if os() == \"Macos\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.darwin_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.darwin_x86_64\n    else if os() == \"Linux\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.linux_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.linux_x86_64\n    else if os() == \"Windows\":\n        if arch() == \"x86_64\":\n            host = BuildTarget.windows_x86_64\n    var target = target_new(.Executable, \"host-target\", \"src/main.w\")\n    target = target.target(host)\n    var out = ctx.new_build()\n    out.add_target(target)\n", ctx.target_name(), "host build.w")
+    rc = bs_build_w_write_fixture(ctx, bs_join(host_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(ctx: BuildCtx) -> Build:\n    var host = BuildTarget.native\n    if os() == \"Macos\":\n        if arch() == \"aarch64\":\n            host = BuildTarget.darwin_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.darwin_x86_64\n    else if os() == \"Linux\":\n        if arch() == \"aarch64\":\n            host = BuildTarget.linux_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.linux_x86_64\n    else if os() == \"Windows\":\n        if arch() == \"x86_64\":\n            host = BuildTarget.windows_x86_64\n    var target = target_new(.Executable, \"host-target\", \"src/main.w\")\n    target = target.target(host)\n    var out = ctx.new_build()\n    out.add_target(target)\n", ctx.target_name(), "host build.w")
     if rc != 0: return rc
     let host_result = bs_build_w_expect_success(ctx, compiler_path, host_dir, "build-w-explicit-host-target", bs_blob_to_args(bs_argv_append("", "build")))
     if host_result.rc != 0: return host_result.rc

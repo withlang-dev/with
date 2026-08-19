@@ -1,5 +1,6 @@
 module build.package
 
+use build.compiler
 use std.build
 use std.string.StringBuilder
 use std.sysinfo
@@ -139,7 +140,7 @@ fn pkg_host_exe_suffix() -> str:
     ""
 
 fn pkg_current_platform() -> str:
-    if os() == "Macos" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Macos" and comp_arch_is_aarch64(arch()):
         return "darwin-aarch64"
     if os() == "Linux" and arch() == "x86_64":
         return "linux-x86_64"

@@ -23,7 +23,7 @@ pub enum OsKind: i32:
     Unknown
 
 pub enum ArchKind: i32:
-    Armv8
+    Aarch64
     X86_64
     Unknown
 
@@ -49,8 +49,8 @@ pub fn arch() -> str:
 /// Return the host CPU architecture as a closed tag for platform switches.
 pub fn arch_kind() -> ArchKind:
     let name = arch()
-    if name == "armv8" or name == "aarch64":
-        return ArchKind.Armv8
+    if name == "aarch64":
+        return ArchKind.Aarch64
     if name == "x86_64":
         return ArchKind.X86_64
     ArchKind.Unknown

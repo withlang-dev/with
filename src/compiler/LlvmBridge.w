@@ -556,7 +556,7 @@ pub fn wl_set_active_target_triple(triple: str) -> Unit:
 fn llvm_object_triple(default_triple: *mut u8) -> *const u8:
     if wl_active_triple_len > 0:
         return &wl_active_triple_buf as *const u8
-    if rt_sysinfo_os() == "Macos" and (rt_sysinfo_arch() == "armv8" or rt_sysinfo_arch() == "aarch64"):
+    if rt_sysinfo_os() == "Macos" and (rt_sysinfo_arch() == "aarch64"):
         return c"arm64-apple-macosx11.0.0".ptr as *const u8
     default_triple as *const u8
 
