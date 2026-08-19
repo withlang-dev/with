@@ -896,6 +896,17 @@ fn link_stage_resolve_runtime_root() -> str:
     candidates.push(compiler_dir ++ "/runtime")
     // <compiler_dir>/../lib/ (direct FHS-style path)
     candidates.push(compiler_dir ++ "/../lib")
+    // Nested bootstrap layout: a staged/release compiler lives in
+    // out/{stage,release}/bin while its toolchain (runtime objects + the
+    // llvm_ld linker metadata) sits two levels up in out/lib and
+    // out/bootstrap-lib. argv0 is absolute for a spawned child, so these
+    // resolve independently of the child's cwd. Without them a p7-spawned
+    // child `with` (cwd = the case dir, not the repo root) never reaches the
+    // linker metadata: it self-services the runtime objects from its embedded
+    // payload but llvm_ld has no embedded fallback, so linking on Windows dies
+    // with "missing Windows LLVM linker metadata".
+    candidates.push(compiler_dir ++ "/../../lib")
+    candidates.push(compiler_dir ++ "/../../bootstrap-lib")
     for i in 0..candidates.len() as i32:
         let dir = candidates.get(i as i64)
         let probe = dir ++ "/cimport_stubs.o"

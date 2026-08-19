@@ -1,4 +1,4 @@
-//! skip-windows: issue #802: core-language behavior fails on native Windows (needs root-cause)
+//! skip-windows: issue #802: on native Windows the p7-spawned child `with build --graph` emits the repo's own build graph instead of the case's (case `demo`/`P7_BASIC` targets and the `basic build invoked` warn absent) — child project-root/stderr resolution diverges from the POSIX path. Distinct from the p7 linker-metadata gap; tracked separately.
 //! expect-stdout: ok
 
 use pre_d_build_runner
