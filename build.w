@@ -374,6 +374,29 @@ fn empty_file_target(name: &str, output: &str) -> Target:
     target = target.write_scope(build_project_dirname(output))
     target
 
+// Every platform runtime object the compiler can serve from its own binary.
+// src/compiler/Link.w declares an extern per entry, so EVERY host must define
+// ALL of them: the host's own object carries real content and the rest are
+// zero-length placeholders. A host that omits one cannot link a compiler that
+// references it -- the failure surfaces far away, as
+// `lld-link/ld.lld: undefined symbol: with_embedded_rt_<platform>_o_start`
+// while linking stage1. Adding a platform means adding it here and in Link.w.
+fn embedded_platform_symbols() -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    out.push("rt_darwin_aarch64_o")
+    out.push("rt_linux_x86_64_o")
+    out.push("rt_linux_aarch64_o")
+    out.push("rt_windows_x86_64_o")
+    out.push("rt_windows_aarch64_o")
+    out
+
+// "rt_linux_aarch64_o" -> "<dir>/empty_rt_linux_aarch64.bin"
+fn empty_platform_blob_path(dir: &str, sym: &str) -> str:
+    dir ++ "/empty_" ++ sym.slice(0, sym.len() - 2) ++ ".bin"
+
+fn empty_platform_blob_target(prefix: &str, sym: &str) -> str:
+    prefix ++ sym
+
 
 fn target_with_embedded_stdlib_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
@@ -474,15 +497,6 @@ type HostRuntimeSpec:
     platform_object: str
     platform_install_object: str
     platform_symbol: str
-    opposite_bootstrap_platform_blob: str
-    opposite_platform_blob: str
-    opposite_platform_symbol: str
-    second_opposite_bootstrap_platform_blob: str
-    second_opposite_platform_blob: str
-    second_opposite_platform_symbol: str
-    third_opposite_bootstrap_platform_blob: str
-    third_opposite_platform_blob: str
-    third_opposite_platform_symbol: str
     fiber_core_source: str
     fiber_asm_source: str
 
@@ -539,15 +553,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             platform_object: "out/lib/rt_linux_aarch64.o",
             platform_install_object: "rt_linux_aarch64.o",
             platform_symbol: "rt_linux_aarch64_o",
-            opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_darwin_aarch64.bin",
-            opposite_platform_blob: "out/lib/empty_rt_darwin_aarch64.bin",
-            opposite_platform_symbol: "rt_darwin_aarch64_o",
-            second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
-            second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
-            second_opposite_platform_symbol: "rt_linux_x86_64_o",
-            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_aarch64.bin",
-            third_opposite_platform_blob: "out/lib/empty_rt_windows_aarch64.bin",
-            third_opposite_platform_symbol: "rt_windows_aarch64_o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_aarch64.s",
         }
@@ -559,15 +564,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             platform_object: "out/lib/rt_linux_x86_64.o",
             platform_install_object: "rt_linux_x86_64.o",
             platform_symbol: "rt_linux_x86_64_o",
-            opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_darwin_aarch64.bin",
-            opposite_platform_blob: "out/lib/empty_rt_darwin_aarch64.bin",
-            opposite_platform_symbol: "rt_darwin_aarch64_o",
-            second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_x86_64.bin",
-            second_opposite_platform_blob: "out/lib/empty_rt_windows_x86_64.bin",
-            second_opposite_platform_symbol: "rt_windows_x86_64_o",
-            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_aarch64.bin",
-            third_opposite_platform_blob: "out/lib/empty_rt_windows_aarch64.bin",
-            third_opposite_platform_symbol: "rt_windows_aarch64_o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_x86_64.s",
         }
@@ -579,15 +575,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             platform_object: "out/lib/rt_windows_x86_64.o",
             platform_install_object: "rt_windows_x86_64.o",
             platform_symbol: "rt_windows_x86_64_o",
-            opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_darwin_aarch64.bin",
-            opposite_platform_blob: "out/lib/empty_rt_darwin_aarch64.bin",
-            opposite_platform_symbol: "rt_darwin_aarch64_o",
-            second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
-            second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
-            second_opposite_platform_symbol: "rt_linux_x86_64_o",
-            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_aarch64.bin",
-            third_opposite_platform_blob: "out/lib/empty_rt_windows_aarch64.bin",
-            third_opposite_platform_symbol: "rt_windows_aarch64_o",
             fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_x86_64.s",
         }
@@ -599,15 +586,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             platform_object: "out/lib/rt_windows_aarch64.o",
             platform_install_object: "rt_windows_aarch64.o",
             platform_symbol: "rt_windows_aarch64_o",
-            opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_darwin_aarch64.bin",
-            opposite_platform_blob: "out/lib/empty_rt_darwin_aarch64.bin",
-            opposite_platform_symbol: "rt_darwin_aarch64_o",
-            second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
-            second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
-            second_opposite_platform_symbol: "rt_linux_x86_64_o",
-            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_x86_64.bin",
-            third_opposite_platform_blob: "out/lib/empty_rt_windows_x86_64.bin",
-            third_opposite_platform_symbol: "rt_windows_x86_64_o",
             fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_aarch64.s",
         }
@@ -618,15 +596,6 @@ fn host_runtime_spec() -> HostRuntimeSpec:
         platform_object: "out/lib/rt_darwin_aarch64.o",
         platform_install_object: "rt_darwin_aarch64.o",
         platform_symbol: "rt_darwin_aarch64_o",
-        opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
-        opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
-        opposite_platform_symbol: "rt_linux_x86_64_o",
-        second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_x86_64.bin",
-        second_opposite_platform_blob: "out/lib/empty_rt_windows_x86_64.bin",
-        second_opposite_platform_symbol: "rt_windows_x86_64_o",
-        third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_aarch64.bin",
-        third_opposite_platform_blob: "out/lib/empty_rt_windows_aarch64.bin",
-        third_opposite_platform_symbol: "rt_windows_aarch64_o",
         fiber_core_source: "rt/fiber_core_darwin.w",
         fiber_asm_source: "runtime/fiber_asm_aarch64.s",
     }
@@ -1595,9 +1564,11 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     out = out.add_target(with_object_target("bootstrap-rt-core-object", "seed", "rt/rt_core.w", "out/bootstrap-lib/rt_core.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-rt-platform-object", "seed", host_runtime.platform_source, host_runtime.bootstrap_platform_object, "-O1", ""))
-    out = out.add_target(empty_file_target("bootstrap-empty-opposite-runtime-blob", host_runtime.opposite_bootstrap_platform_blob))
-    out = out.add_target(empty_file_target("bootstrap-empty-second-opposite-runtime-blob", host_runtime.second_opposite_bootstrap_platform_blob))
-    out = out.add_target(empty_file_target("bootstrap-empty-third-opposite-runtime-blob", host_runtime.third_opposite_bootstrap_platform_blob))
+    let bootstrap_empty_syms = embedded_platform_symbols()
+    for bi in 0..bootstrap_empty_syms.len() as i32:
+        let bsym = bootstrap_empty_syms.get(bi as i64)
+        if bsym != host_runtime.platform_symbol:
+            out = out.add_target(empty_file_target(empty_platform_blob_target("bootstrap-empty-", bsym), empty_platform_blob_path("out/bootstrap-lib", bsym)))
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O1", "compat-runtime-source"))
     out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O1", ""))
@@ -1635,12 +1606,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("rt_core_o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.bootstrap_platform_object)
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.platform_symbol))
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.opposite_bootstrap_platform_blob)
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.opposite_platform_symbol))
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.second_opposite_bootstrap_platform_blob)
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.second_opposite_platform_symbol))
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.third_opposite_bootstrap_platform_blob)
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.third_opposite_platform_symbol))
+    for bi2 in 0..bootstrap_empty_syms.len() as i32:
+        let bsym2 = bootstrap_empty_syms.get(bi2 as i64)
+        if bsym2 != host_runtime.platform_symbol:
+            bootstrap_embedded_objects = bootstrap_embedded_objects.input(empty_platform_blob_path("out/bootstrap-lib", bsym2))
+            bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(bsym2))
     // Every consumed object's producer, declared (#680 edge audit).
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-cimport-stubs-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-compat-runtime-object")
@@ -1653,9 +1623,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-fiber-asm-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-core-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-platform-object")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-empty-opposite-runtime-blob")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-empty-second-opposite-runtime-blob")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-empty-third-opposite-runtime-blob")
+    for bi3 in 0..bootstrap_empty_syms.len() as i32:
+        let bsym3 = bootstrap_empty_syms.get(bi3 as i64)
+        if bsym3 != host_runtime.platform_symbol:
+            bootstrap_embedded_objects = bootstrap_embedded_objects.dep(empty_platform_blob_target("bootstrap-empty-", bsym3))
     out = out.add_target(bootstrap_embedded_objects)
     var bootstrap_embedded_objects_obj = target_new(.CompileAsmObject, "bootstrap-embedded-objects-object", "out/bootstrap-lib/embedded_objects.s").output("out/bootstrap-lib/embedded_objects.o")
     bootstrap_embedded_objects_obj = bootstrap_embedded_objects_obj.dep("bootstrap-embedded-objects-asm")
@@ -1665,9 +1636,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-llvm-link-metadata")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-core-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-platform-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-opposite-runtime-blob")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-second-opposite-runtime-blob")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-third-opposite-runtime-blob")
+    for bi4 in 0..bootstrap_empty_syms.len() as i32:
+        let bsym4 = bootstrap_empty_syms.get(bi4 as i64)
+        if bsym4 != host_runtime.platform_symbol:
+            bootstrap_runtime = bootstrap_runtime.dep(empty_platform_blob_target("bootstrap-empty-", bsym4))
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-cimport-stubs-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-compat-runtime-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-panic-runtime-object")
@@ -1861,9 +1833,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     // ownership behavior for every reachable body.
     out = out.add_target(with_object_target("rt-core-object", stage_compiler_bin("with-stage2"), "rt/rt_core.w", "out/lib/rt_core.o", "-O1", "stage2"))
     out = out.add_target(with_object_target("rt-platform-object", stage_compiler_bin("with-stage2"), host_runtime.platform_source, host_runtime.platform_object, "-O1", "stage2"))
-    out = out.add_target(empty_file_target("empty-opposite-runtime-blob", host_runtime.opposite_platform_blob))
-    out = out.add_target(empty_file_target("empty-second-opposite-runtime-blob", host_runtime.second_opposite_platform_blob))
-    out = out.add_target(empty_file_target("empty-third-opposite-runtime-blob", host_runtime.third_opposite_platform_blob))
+    let empty_syms = embedded_platform_symbols()
+    for ei in 0..empty_syms.len() as i32:
+        let esym = empty_syms.get(ei as i64)
+        if esym != host_runtime.platform_symbol:
+            out = out.add_target(empty_file_target(empty_platform_blob_target("empty-", esym), empty_platform_blob_path("out/lib", esym)))
     out = out.add_target(with_object_target("cimport-stubs-object", stage_compiler_bin("with-stage2"), "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O1", "stage2"))
     var compat_runtime_obj = with_object_target("compat-runtime-object", stage_compiler_bin("with-stage2"), "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O1", "stage2")
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
@@ -1906,12 +1880,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.arg("rt_core_o")
     embedded_objects = embedded_objects.input(build_owned_text(host_runtime.platform_object))
     embedded_objects = embedded_objects.arg(host_runtime.platform_symbol)
-    embedded_objects = embedded_objects.input(host_runtime.opposite_platform_blob)
-    embedded_objects = embedded_objects.arg(host_runtime.opposite_platform_symbol)
-    embedded_objects = embedded_objects.input(host_runtime.second_opposite_platform_blob)
-    embedded_objects = embedded_objects.arg(host_runtime.second_opposite_platform_symbol)
-    embedded_objects = embedded_objects.input(host_runtime.third_opposite_platform_blob)
-    embedded_objects = embedded_objects.arg(host_runtime.third_opposite_platform_symbol)
+    for ei2 in 0..empty_syms.len() as i32:
+        let esym2 = empty_syms.get(ei2 as i64)
+        if esym2 != host_runtime.platform_symbol:
+            embedded_objects = embedded_objects.input(empty_platform_blob_path("out/lib", esym2))
+            embedded_objects = embedded_objects.arg(build_owned_text(esym2))
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
     embedded_objects = embedded_objects.dep("compat-runtime-object")
@@ -1924,9 +1897,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.dep("fiber-asm-object")
     embedded_objects = embedded_objects.dep("rt-core-object")
     embedded_objects = embedded_objects.dep("rt-platform-object")
-    embedded_objects = embedded_objects.dep("empty-opposite-runtime-blob")
-    embedded_objects = embedded_objects.dep("empty-second-opposite-runtime-blob")
-    embedded_objects = embedded_objects.dep("empty-third-opposite-runtime-blob")
+    for ei3 in 0..empty_syms.len() as i32:
+        let esym3 = empty_syms.get(ei3 as i64)
+        if esym3 != host_runtime.platform_symbol:
+            embedded_objects = embedded_objects.dep(empty_platform_blob_target("empty-", esym3))
     out = out.add_target(embedded_objects)
 
     var embedded_objects_obj = target_new(.CompileAsmObject, "embedded-objects-object", "out/lib/embedded_objects.s").output("out/lib/embedded_objects.o")
@@ -1935,9 +1909,10 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var runtime = target_new(.Group, "runtime", "")
     runtime = runtime.dep("embedded-objects-object")
-    runtime = runtime.dep("empty-opposite-runtime-blob")
-    runtime = runtime.dep("empty-second-opposite-runtime-blob")
-    runtime = runtime.dep("empty-third-opposite-runtime-blob")
+    for ei4 in 0..empty_syms.len() as i32:
+        let esym4 = empty_syms.get(ei4 as i64)
+        if esym4 != host_runtime.platform_symbol:
+            runtime = runtime.dep(empty_platform_blob_target("empty-", esym4))
     out = out.add_target(runtime)
 
     // ── Cross-target runtime (linux) ────────────────────────────────
