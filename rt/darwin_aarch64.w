@@ -341,7 +341,7 @@ let S_IFMT: i32 = 61440
 let S_IFDIR: i32 = 16384
 let DARWIN_STAT_SIZE: i64 = 144
 let DARWIN_STAT_MODE_OFFSET: i64 = 4
-let DARWIN_DIRENT_NAME_OFFSET: i64 = 21
+let RT_DARWIN_DIRENT_NAME_OFFSET: i64 = 21
 let RT_PATH_MAX: i64 = 4096
 
 fn rt_cstr_len(s: *const u8) -> i64:
@@ -353,7 +353,7 @@ fn rt_cstr_len(s: *const u8) -> i64:
     len
 
 fn rt_dirent_name(ent: *mut u8) -> *const u8:
-    (ent as i64 + DARWIN_DIRENT_NAME_OFFSET) as *const u8
+    (ent as i64 + RT_DARWIN_DIRENT_NAME_OFFSET) as *const u8
 
 fn rt_dirent_is_dot_or_dotdot(name: *const u8) -> bool:
     let first = unsafe *name

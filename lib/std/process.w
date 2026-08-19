@@ -18,7 +18,7 @@ extern fn with_vec_new_out(v: *mut c_void, elem_size: i64) -> Unit
 // read-only str extern (§16.3d declared effect; the bit-copy default would
 // leave two owners).
 @[effect(val: escape_value)]
-extern fn with_vec_push_str(v: *mut c_void, val: str) -> Unit
+extern fn with_vec_push_str(v: *mut u8, val: str) -> Unit
 extern fn with_str_len(s: &str) -> i64
 
 /// Exit the process with the given status code.
@@ -36,7 +36,7 @@ pub fn args -> Vec[str]:
     with_vec_new_out((&raw mut out) as *mut c_void, 16)
     var i = 0
     while i < n:
-        with_vec_push_str((&raw mut out) as *mut c_void, with_arg_at(i))
+        with_vec_push_str((&raw mut out) as *mut u8, with_arg_at(i))
         i = i + 1
     out
 
