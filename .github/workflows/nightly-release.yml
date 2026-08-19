@@ -297,9 +297,134 @@ jobs:
           compression-level: 0
           retention-days: 7
 
+  build-linux-aarch64:
+    name: Verify and package linux-aarch64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    env:
+      # Native linux-aarch64 self-host mirrors .github/workflows/selfhost-linux-aarch64.yml:
+      # the published seed builds stage1 -> stage2 -> stage3, we assert stage2 ==
+      # stage3 (fixpoint), then package the fixpoint-verified binary. This is a
+      # sibling job rather than a `build` matrix entry because this platform's SDK
+      # ships without .sha256/.manifest sidecars (as on Windows), so the archive
+      # digest is pinned directly here instead of fetching sidecar files.
+      WITH_SEED_REPO: withlang-dev/with
+      # Rolling bootstrap seed, fixpoint-verified from main ae4c6a75 -- the commit
+      # carrying the #851 posix_str_to_c_buf fix, without which the runtime builds
+      # every child argv from a mis-dereferenced str and no fork/exec (hence no
+      # link) works at all on this platform.
+      WITH_SEED_VERSION: with-linux-aarch64
+      WITH_SEED_ASSET: with-linux-aarch64
+      WITH_SEED_SHA256: 49e65242e753f4db68b66752a03e2b0b5a619c2a121f2c5ac8034b0cf0e18057
+      WITH_SDK_REPO: withlang-dev/with
+      WITH_SDK_VERSION: sdk-linux-aarch64
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
+      WITH_SDK_SHA256: b1597fe5281c760f594235a0d5b01fe3360b8303f7615b9f87c3ff87a2740926
+      # This platform's compiler does not yet embed its own runtime object (see
+      # the note in selfhost-linux-aarch64.yml), so the seed resolves
+      # rt_linux_aarch64.o from <bindir>/runtime/ -- here src/runtime/, since the
+      # seed is installed as src/main.
+      WITH_RUNTIME_ASSET: with-linux-aarch64-runtime.tar.gz
+      WITH_RUNTIME_SHA256: bdfd139b898a0c0d2ad0d989c2c4f2c9c8a63487fb54c08649cd56f34a3844db
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Verify release version
+        run: test "$(tr -d '\r\n' < src/version)" = "$WITH_VERSION"
+
+      - name: Install host packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          # dev libs: the compiler link line uses -lz -lzstd -lxml2 (build/compiler.w).
+          sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev libxml2-dev
+
+      - name: Fetch verified LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          curl -fL -o "$RUNNER_TEMP/sdk.tar.gz" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          printf '%s  %s\n' "$WITH_SDK_SHA256" "$RUNNER_TEMP/sdk.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/sdk.tar.gz" -C .deps
+          prefix=".deps/llvm-22.1.6-linux-aarch64"
+          test -f "$prefix/lib/libclang.a" || { echo "SDK libclang.a missing"; exit 1; }
+          test -x "$prefix/bin/lld" || { echo "SDK lld missing"; exit 1; }
+          echo "LLVM_PREFIX=$PWD/$prefix" >> "$GITHUB_ENV"
+
+      - name: Set up linker shim (SDK lld + libxml2 alias)
+        run: |
+          set -euo pipefail
+          mkdir -p .link-shim
+          # The seed emits -fuse-ld=lld; expose the SDK's lld under the names the
+          # driver looks for. If the SDK lld carries DT_NEEDED libxml2.so.16 while
+          # Ubuntu ships libxml2.so.2, alias it -- ABI-safe for linking (an ELF
+          # link never calls into libxml2). Harmless when unneeded.
+          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld.lld
+          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld64.lld
+          ln -sf "$LLVM_PREFIX/bin/lld"    .link-shim/lld
+          xml2="$(ldconfig -p | awk '/libxml2\.so\.2 /{print $NF; exit}')"
+          [ -n "$xml2" ] || xml2="$(ls /lib/aarch64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1)"
+          [ -n "$xml2" ] || { echo "no system libxml2.so.2"; exit 1; }
+          ln -sf "$xml2" .link-shim/libxml2.so.16
+          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" "$LLVM_PREFIX/bin/ld.lld" --version
+          echo "$PWD/.link-shim" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$PWD/.link-shim:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+
+      - name: Fetch verified seed
+        run: |
+          set -euo pipefail
+          curl -fL -o src/main \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main | sha256sum -c -
+          chmod +x src/main
+          mkdir -p src/runtime
+          curl -fL -o "$RUNNER_TEMP/rt.tar.gz" \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_RUNTIME_ASSET"
+          printf '%s  %s\n' "$WITH_RUNTIME_SHA256" "$RUNNER_TEMP/rt.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/rt.tar.gz" -C src/runtime
+          test -f src/runtime/rt_linux_aarch64.o || { echo "runtime bundle missing rt_linux_aarch64.o"; exit 1; }
+          # Absolute linker path, so written here rather than shipped.
+          echo "$LLVM_PREFIX/bin/ld.lld" > src/runtime/llvm_ld
+          ./src/main version
+          # Fail fast if the seed cannot link, rather than part-way through a build.
+          printf 'fn main:\n    print("seed links")\n' > "$RUNNER_TEMP/seedcheck.w"
+          ./src/main run "$RUNNER_TEMP/seedcheck.w"
+
+      - name: Build seed to release compiler
+        run: ./src/main build
+
+      - name: Verify fixpoint
+        run: ./src/main build :fixpoint
+
+      - name: Package fixpoint-verified release asset
+        run: |
+          set -euo pipefail
+          test "$(./out/release/bin/with version)" = "with $WITH_VERSION"
+          cp out/release/bin/with out/release/with-linux-aarch64
+          chmod +x out/release/with-linux-aarch64
+          sha256sum out/release/with-linux-aarch64 > out/release/with-linux-aarch64.sha256
+
+      - name: Verify packaged checksum
+        run: sha256sum -c out/release/with-linux-aarch64.sha256
+
+      - name: Upload verified release inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nightly-linux-aarch64-${{ github.sha }}
+          path: |
+            out/release/with-linux-aarch64
+            out/release/with-linux-aarch64.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
   publish:
     name: Publish immutable release
-    needs: [build, build-windows]
+    needs: [build, build-windows, build-linux-aarch64]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -385,6 +510,17 @@ jobs:
             require_asset with-windows-x86_64.exe.sha256
             shasum -a 256 -c out/release/with-windows-x86_64.exe.sha256
             append_platform windows-x86_64
+          fi
+
+          # linux-aarch64 ships the compiler binary + .sha256 only: its SDK is a
+          # separately-versioned release without .sha256/.manifest sidecars, so it
+          # is not republished per release (same shape as windows-x86_64 above).
+          if [ -e out/release/with-linux-aarch64 ] ||
+             [ -e out/release/with-linux-aarch64.sha256 ]; then
+            require_asset with-linux-aarch64
+            require_asset with-linux-aarch64.sha256
+            shasum -a 256 -c out/release/with-linux-aarch64.sha256
+            append_platform linux-aarch64
           fi
 
           test -s "$assets_file" || {
