@@ -6216,6 +6216,15 @@ fn ci_cxtype_kind_is_int(kind: i32) -> bool:
 fn ci_cxtype_kind_is_float(kind: i32) -> bool:
     kind == CXT_Float or kind == CXT_Double or kind == CXT_LongDouble or kind == CXT_Float128 or kind == CXT_Half or kind == CXT_Float16
 
+// True for the aggregate `va_list` shapes: `__va_list_tag[N]` (glibc/x86_64)
+// and `struct __va_list` (AAPCS64 Linux). Darwin's `char *` va_list is a
+// pointer and never reaches here.
+fn ci_canonical_is_aggregate_va_list(session: i64, canon: i32) -> bool:
+    if with_ci_type_kind(session, canon) == CXT_ConstantArray:
+        let elem = with_ci_type_array_element(session, canon)
+        return elem >= 0 and ci_str_contains(with_ci_type_spelling(session, elem), "__va_list_tag")
+    with_ci_type_kind(session, canon) == CXT_Record and ci_str_contains(with_ci_type_spelling(session, canon), "__va_list")
+
 // ci_type_from_libclang — walks a libclang CXType tree into
 // CiType nodes, preserving structural decomposition for
 // pointers / arrays / function pointers and using CT_NAMED at
@@ -6346,23 +6355,21 @@ impl CiTypePool:
                 i = i + 1
             return self.ty_fn_ptr(ret_ty, params_start, arg_count)
 
-        // Aggregate `va_list` (glibc/aarch64 `__va_list_tag[N]`) has no
-        // spellable field layout, so the bridge demotes it to `c_void` —
-        // which `check` rejects as a value type, breaking every migrated
-        // variadic function. LLVM's `llvm.va_start`/`va_end` only need
-        // correctly-sized storage, so lower it to a `[u8; N]` buffer sized
-        // to the target's actual va_list. Detection is structural: the
-        // canonical type is an array whose element record is `__va_list_tag`
-        // — target-independent, and Darwin's `char*` va_list never reaches
-        // here (it lowers through the CXT_Pointer path above).
+        // Aggregate `va_list` has no spellable field layout, so the bridge
+        // demotes it to `c_void` — which `check` rejects as a value type,
+        // breaking every migrated variadic function. LLVM's
+        // `llvm.va_start`/`va_end` only need correctly-sized storage, so lower
+        // it to a `[u8; N]` buffer sized to the target's actual va_list.
+        // Detection is structural over the canonical type: glibc/x86_64 spells
+        // it `__va_list_tag[N]`, AAPCS64 Linux spells it `struct __va_list`.
+        // Darwin's `char*` va_list never reaches here (it lowers through the
+        // CXT_Pointer path above).
         let va_canon = with_ci_type_canonical(session, cxtype)
-        if va_canon >= 0 and with_ci_type_kind(session, va_canon) == CXT_ConstantArray:
-            let va_elem = with_ci_type_array_element(session, va_canon)
-            if va_elem >= 0 and ci_str_contains(with_ci_type_spelling(session, va_elem), "__va_list_tag"):
-                let va_size = with_ci_type_sizeof(session, cxtype) as i32
-                if va_size > 0:
-                    let u8_idx = self.add_string("u8")
-                    return self.ty_array(self.ty_named(u8_idx), va_size)
+        if va_canon >= 0 and ci_canonical_is_aggregate_va_list(session, va_canon):
+            let va_size = with_ci_type_sizeof(session, cxtype) as i32
+            if va_size > 0:
+                let u8_idx = self.add_string("u8")
+                return self.ty_array(self.ty_named(u8_idx), va_size)
 
         // Typedef, elaborated, atomic, and other named wrappers.
         // Normalize builtin typedef spellings so C names like size_t do
