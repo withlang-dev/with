@@ -2026,6 +2026,25 @@ impl Zcu:
             higher_fn_names.push(root_fn_names.get(hi as i64))
         for hi in 0..user_fn_names.len() as i32:
             higher_fn_names.push(user_fn_names.get(hi as i64))
+        // D30 R2c: runtime DEFINITIONS (bodied fns from <embedded-rt>/) are
+        // never decl-dropped by a bodiless extern in a higher tier — the
+        // extern is the redundant one (its symbol resolves in-unit) and is
+        // dropped from the higher tier instead. Higher-tier BODIED fns
+        // still shadow normally. Empty outside the WITH_RT_IN_UNIT lane.
+        var embedded_rt_fn_names: Vec[i32] = Vec.new()
+        var higher_bodied_fn_names: Vec[i32] = Vec.new()
+        for oi in 0..prelude_ordered.len() as i32:
+            let pd = prelude_ordered.get(oi as i64)
+            if merged_pool.kind(pd) == NodeKind.NK_FN_DECL and prelude_paths.get(oi as i64).starts_with("<embedded-rt>/"):
+                embedded_rt_fn_names.push(merged_pool.get_data0(pd))
+        for ri in 0..root_ordered.len() as i32:
+            let rd = root_ordered.get(ri as i64)
+            if merged_pool.kind(rd) == NodeKind.NK_FN_DECL:
+                higher_bodied_fn_names.push(merged_pool.get_data0(rd))
+        for ui in 0..user_import_ordered.len() as i32:
+            let ud = user_import_ordered.get(ui as i64)
+            if merged_pool.kind(ud) == NodeKind.NK_FN_DECL:
+                higher_bodied_fn_names.push(merged_pool.get_data0(ud))
         // D29 scaffolding (#750): NON-GENERIC user type declarations shadow
         // prelude/std types through Sema's tier-aware resolution (std
         // blindness + the §18.2 import gate + per-tier codegen symbols).
@@ -2043,7 +2062,12 @@ impl Zcu:
                 continue
             if frontend_path_is_std_rc_module(prelude_path) and (frontend_vec_contains_i32(higher_type_names, self.pool.intern("Rc")) or frontend_vec_contains_i32(higher_type_names, self.pool.intern("Arc"))):
                 continue
-            if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, prelude_paths, merged_pool, self.pool, oi, higher_fn_names):
+            // Runtime defs ignore higher-tier EXTERNS (def-wins: the extern
+            // is dropped from its tier instead) but keep within-tier dedupe
+            // and still yield to higher-tier BODIED fns.
+            let rt_def = ik == NodeKind.NK_FN_DECL and prelude_path.starts_with("<embedded-rt>/")
+            let shadow_names = if rt_def: &higher_bodied_fn_names else: &higher_fn_names
+            if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(prelude_ordered, prelude_paths, merged_pool, self.pool, oi, shadow_names):
                 // Error when a prelude fn (with a body) is shadowed by an extern fn
                 // (no body). The extern silently replaces the real function with an
                 // unresolved C symbol, causing a cryptic linker error later.
@@ -2063,6 +2087,8 @@ impl Zcu:
         for oi in 0..user_import_ordered.len() as i32:
             let id = user_import_ordered.get(oi as i64)
             let ik = merged_pool.kind(id)
+            if ik == NodeKind.NK_EXTERN_FN and frontend_vec_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
+                continue
             if (ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN) and frontend_fn_shadowed_in_tier(user_import_ordered, user_import_paths, merged_pool, self.pool, oi, root_fn_names):
                 continue
             if ik == NodeKind.NK_EXTERN_VAR:
@@ -2075,6 +2101,8 @@ impl Zcu:
         for oi in 0..root_ordered.len() as i32:
             let id = root_ordered.get(oi as i64)
             let ik = merged_pool.kind(id)
+            if ik == NodeKind.NK_EXTERN_FN and frontend_vec_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
+                continue
             if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(root_ordered, merged_pool, self.pool, oi):
                 continue
             merged_pool.add_decl(id)

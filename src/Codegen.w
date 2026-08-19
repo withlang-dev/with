@@ -4549,7 +4549,33 @@ impl Codegen:
                 not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
                 effective_name = self.current_decl_module_link_name(effective_name)
 
-        let function = wl_add_function(self.llmod, effective_name, fn_type)
+        // Declare-then-define unification (#761 R2c): the definition owns
+        // its symbol. A same-typed existing DECLARATION (an ensure_*/extern
+        // probe that ran first) is taken over so the body lands on the name
+        // callers reference; a mismatched bodiless declaration moves aside
+        // (e.g. ensure_async_runtime_declared's hardcoded void() vs the
+        // def's Unit-return shape — physically identical, structurally
+        // different) — LLVM's silent auto-uniquify otherwise split
+        // with_runtime_init into an empty declaration (which the
+        // synthesized wrapper called → undefined at link) and a
+        // with_runtime_init.1 carrying the real body. An existing
+        // DEFINITION keeps the add (auto-uniquified; flat-name duplicates).
+        // Only runtime-ABI names (with_/rt_/wl_) get the unification: their
+        // pre-existing declarations are the compiler's own ensure_* probes.
+        // A foreign declaration (libc send/recv via @[link_name]) keeps its
+        // C symbol — stealing it re-pointed rt-internal libc calls at a
+        // renamed undefined decl; the With fn takes the auto-uniquified
+        // name instead (whole-program resolution is value-keyed).
+        var ast_existing = wl_get_named_function(self.llmod, effective_name)
+        if ast_existing != 0 and not codegen_is_runtime_abi_symbol(effective_name):
+            ast_existing = 0
+        if ast_existing != 0 and wl_fn_is_declaration(ast_existing) != 0 and wl_global_get_value_type(ast_existing) != fn_type:
+            wl_set_value_name(ast_existing, effective_name ++ "__stale_decl")
+            ast_existing = 0
+        let function = if ast_existing != 0 and wl_fn_is_declaration(ast_existing) != 0:
+            ast_existing
+        else:
+            wl_add_function(self.llmod, effective_name, fn_type)
         self.with_fn_link_names.insert(self.intern.intern(effective_name), 1)
         if has_sret != 0:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
