@@ -881,8 +881,8 @@ fn posix_str_to_c_buf(s: &str) -> *mut u8:
     if out as i64 == 0:
         return 0 as *mut u8
     if s.len() > 0:
-        let sp = &s as *const *const u8
-        with_memcpy(out, unsafe *sp, s.len())
+        let sp = unsafe **(&s as *const *const *const u8)
+        with_memcpy(out, sp, s.len())
     unsafe *((out as i64 + s.len()) as *mut u8) = 0
     out
 
