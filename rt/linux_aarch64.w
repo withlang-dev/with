@@ -820,7 +820,7 @@ pub fn rt_sysinfo_os() -> str:
     with_str_from_cstr(c"Linux".ptr)
 
 pub fn rt_sysinfo_arch() -> str:
-    with_str_from_cstr(c"aarch64".ptr)
+    with_str_from_cstr(c"armv8".ptr)
 
 pub fn rt_getenv(name: *const u8) -> *const u8:
     getenv(name)
