@@ -1153,6 +1153,21 @@ impl Codegen:
         if self.di_builder == 0:
             return
         if byte_offset <= 0:
+            // Synthesized code (span 0) inside a function that HAS debug
+            // info must still carry a location: the LLVM verifier rejects
+            // location-less calls to inlinable (defined) callees, which the
+            // in-unit runtime made real (#761 — derived debug_str calling
+            // with_fmt_buf_* definitions). Line 0 is LLVM's spelling for
+            // compiler-generated code; clear only outside any subprogram.
+            var zero_scope = self.di_current_scope
+            if zero_scope == 0:
+                let zsp = self.di_fn_subprograms.get(self.current_function_name_sym)
+                if zsp.is_some():
+                    zero_scope = zsp.unwrap() as i64
+            if zero_scope != 0:
+                let zero_loc = wl_di_create_debug_location(self.context, 0, 0, zero_scope)
+                wl_di_set_current_location(self.builder, zero_loc)
+                return
             wl_di_clear_current_location(self.builder)
             return
         let loc = self.di_source.offset_to_location(byte_offset)
