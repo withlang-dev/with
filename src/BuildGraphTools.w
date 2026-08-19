@@ -60,6 +60,8 @@ pub fn build_graph_llvm_prefix() -> str:
         return ".deps/llvm-" ++ BUILD_GRAPH_LLVM_VERSION ++ "-linux-x86_64"
     if host_os == "Windows" and host_arch == "x86_64":
         return ".deps/llvm-" ++ BUILD_GRAPH_LLVM_VERSION ++ "-windows-x86_64-msvc"
+    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return ".deps/llvm-" ++ BUILD_GRAPH_LLVM_VERSION ++ "-windows-aarch64-msvc"
     BUILD_GRAPH_FALLBACK_LLVM_PREFIX
 
 pub fn build_graph_llvm_config_tool() -> BuildTool:

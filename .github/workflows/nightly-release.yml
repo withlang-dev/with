@@ -425,9 +425,116 @@ jobs:
           compression-level: 0
           retention-days: 7
 
+  build-windows-aarch64:
+    name: Verify and package windows-aarch64
+    runs-on: windows-11-arm
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: read
+    env:
+      # Native Windows-on-ARM64 self-host mirrors
+      # .github/workflows/selfhost-windows-aarch64.yml: the published arm64
+      # Windows seed builds stage1 -> stage2 -> stage3, we assert stage2 ==
+      # stage3 (fixpoint), then package the fixpoint-verified with.exe. Like
+      # build-windows this is a sibling job (not a `build` matrix entry): its
+      # steps use cygpath/vswhere and the SDK ships without sidecars.
+      WITH_SEED_REPO: withlang-dev/with
+      # CI-produced by seed-windows-aarch64.yml (cross-built on Linux, published
+      # to the seed-windows-aarch64 prerelease) -- never a hand-uploaded asset.
+      WITH_SEED_VERSION: seed-windows-aarch64
+      WITH_SEED_ASSET: with-windows-aarch64.exe
+      WITH_SEED_SHA256: e5fb03b405e48a724330f4f9ac7fcbb7f5f993645739e42172c2151ff2d29625
+      WITH_SDK_REPO: withlang-dev/with
+      WITH_SDK_VERSION: sdk-windows-aarch64
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
+      WITH_SDK_SHA256: ad13e07af474d683c699f041c52cd98697df9781b581dda913d39d92be186743
+      # Pin the worker pool to the arm64 runner's real core count (the seed's
+      # rt_sysinfo reads the wrong SYSTEM_INFO offset, which would otherwise
+      # oversubscribe the pool). Honoured before the core probe.
+      WITH_BUILD_JOBS: "4"
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Verify release version
+        run: test "$(tr -d '\r\n' < src/version)" = "$WITH_VERSION"
+
+      - name: Fetch verified windows-aarch64 LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          # git-bash GNU tar treats "D:\..." as host:path (the drive colon looks
+          # like host:path), so keep the archive on an msys path.
+          sdk="$(cygpath -u "$RUNNER_TEMP")/sdk.tar.gz"
+          curl -fL -o "$sdk" \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          printf '%s  %s\n' "$WITH_SDK_SHA256" "$sdk" | sha256sum -c -
+          tar -xzf "$sdk" -C .deps
+          prefix=".deps/llvm-22.1.6-windows-aarch64-msvc"
+          test -f "$prefix/lib/libclang.lib" || { echo "SDK libclang.lib missing"; exit 1; }
+          test -f "$prefix/bin/lld-link.exe" || { echo "SDK lld-link.exe missing"; exit 1; }
+
+      - name: Fetch verified windows-aarch64 seed
+        run: |
+          set -euo pipefail
+          curl -fL -o src/main.exe \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" src/main.exe | sha256sum -c -
+          ./src/main.exe version
+
+      - name: Configure native toolchain env
+        run: |
+          set -euo pipefail
+          # The compiler and every child link process are native Windows exes, so
+          # they need Windows-form paths (cygpath -m keeps forward slashes, which
+          # both the file APIs and lld-link accept).
+          echo "WITH=$(cygpath -m "$PWD/src/main.exe")" >> "$GITHUB_ENV"
+          echo "LLVM_PREFIX=$(cygpath -m "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc")" >> "$GITHUB_ENV"
+          # MSVC CRT + Windows SDK import libs (Link.w reads WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR).
+          # This is the arm64 runner, so the ARM64 lib subdirs are the native target.
+          vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+          vs_root="$(cygpath -u "$("$vswhere" -latest -products '*' -property installationPath)")"
+          msvc_ver="$(ls "$vs_root/VC/Tools/MSVC" | sort -V | tail -1)"
+          echo "WITH_WINDOWS_MSVC_LIBDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/lib/arm64")" >> "$GITHUB_ENV"
+          kit_root="/c/Program Files (x86)/Windows Kits/10/Lib"
+          kit_ver="$(ls "$kit_root" | grep -E '^10\.' | sort -V | tail -1)"
+          echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/arm64")" >> "$GITHUB_ENV"
+          echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/arm64")" >> "$GITHUB_ENV"
+          echo "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc/bin" >> "$GITHUB_PATH"
+
+      - name: Build seed to release compiler
+        run: ./src/main.exe build
+
+      - name: Verify fixpoint
+        run: ./src/main.exe build :fixpoint
+
+      - name: Package fixpoint-verified release asset
+        run: |
+          set -euo pipefail
+          test "$(./out/release/bin/with.exe version)" = "with $WITH_VERSION"
+          cp out/release/bin/with.exe out/release/with-windows-aarch64.exe
+          sha256sum out/release/with-windows-aarch64.exe > out/release/with-windows-aarch64.exe.sha256
+
+      - name: Verify packaged checksum
+        run: sha256sum -c out/release/with-windows-aarch64.exe.sha256
+
+      - name: Upload verified release inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: nightly-windows-aarch64-${{ github.sha }}
+          path: |
+            out/release/with-windows-aarch64.exe
+            out/release/with-windows-aarch64.exe.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
   publish:
     name: Publish immutable release
-    needs: [build, build-windows, build-linux-aarch64]
+    needs: [build, build-windows, build-linux-aarch64, build-windows-aarch64]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -524,6 +631,16 @@ jobs:
             require_asset with-linux-aarch64.sha256
             shasum -a 256 -c out/release/with-linux-aarch64.sha256
             append_platform linux-aarch64
+          fi
+
+          # windows-aarch64 ships the compiler binary + .sha256 only, same shape
+          # as windows-x86_64 and linux-aarch64 (SDK separately versioned).
+          if [ -e out/release/with-windows-aarch64.exe ] ||
+             [ -e out/release/with-windows-aarch64.exe.sha256 ]; then
+            require_asset with-windows-aarch64.exe
+            require_asset with-windows-aarch64.exe.sha256
+            shasum -a 256 -c out/release/with-windows-aarch64.exe.sha256
+            append_platform windows-aarch64
           fi
 
           test -s "$assets_file" || {

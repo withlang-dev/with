@@ -241,6 +241,8 @@ fn comp_default_llvm_prefix() -> str:
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-linux-aarch64"
     if host_os == "Windows" and host_arch == "x86_64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-windows-x86_64-msvc"
+    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-windows-aarch64-msvc"
     COMPILER_FALLBACK_LLVM_PREFIX
 
 fn comp_llvm_prefix() -> str:

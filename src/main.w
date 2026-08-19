@@ -2903,6 +2903,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let env_prefix = "//! env: "
     let skip_prefix = "//! skip: "
     let skip_windows_prefix = "//! skip-windows: "
+    let skip_windows_aarch64_prefix = "//! skip-windows-aarch64: "
     let requires_arch_prefix = "//! requires-arch: "
     let known_issue_prefix = "//! known-issue: "
     var start = 0
@@ -2944,6 +2945,15 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 if with_sysinfo_os() == "Windows":
                     result.skip = true
                     result.skip_reason = line.slice(skip_windows_prefix.len(), line.len())
+                    return result
+            else if line.starts_with(skip_windows_aarch64_prefix):
+                // Windows-on-ARM64 only. The broad `skip-windows` gate would
+                // cost the x86_64 lane its coverage too; this narrower gate
+                // keeps the test running everywhere except the arm64 Windows
+                // CI lane, where a genuinely arch-lane-specific gap is tracked.
+                if with_sysinfo_os() == "Windows" and test_arch_is_aarch64(with_sysinfo_arch()):
+                    result.skip = true
+                    result.skip_reason = line.slice(skip_windows_aarch64_prefix.len(), line.len())
                     return result
             else if line.starts_with(requires_arch_prefix):
                 // Arch-specific test (e.g. inline asm hardcoding one ISA's

@@ -1,4 +1,5 @@
 //! expect-stdout: ok
+//! skip-windows-aarch64: #876 loopback TCP/UDP exchange exits 134 only on the windows-11-arm CI runner (byte-identical net runtime to the green x64 lane)
 
 // #658: the server-side std.net surface must actually work. TCP: listen
 // on port 0, discover the ephemeral port, connect, accept, exchange

@@ -103,6 +103,8 @@ fn bs_host_platform_runtime_object() -> str:
         return "rt_darwin_aarch64.o"
     if host_os == "Windows" and host_arch == "x86_64":
         return "rt_windows_x86_64.o"
+    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "rt_windows_aarch64.o"
     ""
 
 fn bs_host_target_triple() -> str:
@@ -118,6 +120,8 @@ fn bs_host_target_triple() -> str:
         return "aarch64-unknown-linux-gnu"
     if host_os == "Windows" and host_arch == "x86_64":
         return "x86_64-pc-windows-msvc"
+    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "aarch64-pc-windows-msvc"
     ""
 
 // A representable triple that is never the host: darwin for Linux
@@ -7536,5 +7540,10 @@ pub fn run_cli_selfhost_object_symbol_action(ctx: ActionCtx) -> i32:
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
 
     let args = ctx.args()
-    let nm_tool = if args.len() > 0: selfhost_owned_text(args.get(0)) else: "nm"
+    // Resolve nm env-aware (mirrors bs_build_w_nm_smoke): honour $NM when set,
+    // else the target's arg ("nm"). The arm64-Windows lane sets NM to the SDK's
+    // llvm-nm.exe because the runner's ambient MSYS binutils nm cannot parse
+    // COFF-ARM64 ("file format not recognized").
+    let nm_arg = if args.len() > 0: selfhost_owned_text(args.get(0)) else: "nm"
+    let nm_tool = bs_build_w_tool_from_env("NM", nm_arg)
     bs_check_object_symbols(ctx, compiler_path, nm_tool, bs_join(output_dir, "cases"))
