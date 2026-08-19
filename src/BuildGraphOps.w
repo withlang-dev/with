@@ -302,7 +302,7 @@ pub fn build_graph_embed_object_files(root: &str, target: &BuildGraphTarget) -> 
     // The embed target's entry names the PLATFORM the assembly is for
     // (e.g. "linux_x86_64" for a cross-built compiler); empty = host.
     var macho_sections = build_graph_host_target_kind() == 3 or build_graph_host_target_kind() == 4
-    var coff_sections = build_graph_host_target_kind() == 5
+    var coff_sections = build_graph_host_target_kind() == 5 or build_graph_host_target_kind() == 6
     if target.entry.len() > 0:
         macho_sections = target.entry.starts_with("darwin")
         coff_sections = target.entry.starts_with("windows")
