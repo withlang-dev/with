@@ -2872,14 +2872,14 @@ fn test_parse_i32(text: &str) -> i32:
     value * sign
 
 fn test_arch_is_aarch64(arch: &str) -> bool:
-    arch == "aarch64" or arch == "armv8" or arch == "arm64"
+    arch == "aarch64" or arch == "arm64"
 
 fn test_arch_is_x86_64(arch: &str) -> bool:
     arch == "x86_64" or arch == "amd64" or arch == "x64"
 
 fn test_arch_matches(required: &str, host: &str) -> bool:
-    // Canonicalize the ISA spellings the runtime and directives may use so a
-    // `requires-arch: aarch64` gate also matches an "armv8"/"arm64" host.
+    // Canonicalize the ISA spellings a directive may use so a
+    // `requires-arch: aarch64` gate also matches an "arm64" host.
     if test_arch_is_aarch64(required): return test_arch_is_aarch64(host)
     if test_arch_is_x86_64(required): return test_arch_is_x86_64(host)
     required == host

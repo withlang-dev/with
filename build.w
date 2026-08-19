@@ -447,7 +447,7 @@ fn release_compiler_bin(name: &str) -> str:
 fn release_platform_asset_bin() -> str:
     let host_os = os()
     let host_arch = arch()
-    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Macos" and comp_arch_is_aarch64(host_arch):
         return "out/release/with-darwin-aarch64"
     if host_os == "Linux" and host_arch == "x86_64":
         return "out/release/with-linux-x86_64"
@@ -467,7 +467,7 @@ fn release_uat_platform_asset_dep(t: Target) -> Target:
     t
 
 fn host_runtime_spec() -> HostRuntimeSpec:
-    if os() == "Linux" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Linux" and comp_arch_is_aarch64(arch()):
         return HostRuntimeSpec {
             platform_source: "rt/linux_aarch64.w",
             compat_source: "rt/compat_runtime.w",
@@ -538,7 +538,7 @@ fn host_runtime_spec() -> HostRuntimeSpec:
 fn release_asset_for_host() -> str:
     if os() == "Linux" and arch() == "x86_64":
         return "with-linux-x86_64"
-    if os() == "Macos" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Macos" and comp_arch_is_aarch64(arch()):
         return "with-darwin-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "with-windows-x86_64.exe"
@@ -557,7 +557,7 @@ fn release_platform_tag() -> str:
 fn supported_release_platform_tag() -> str:
     if os() == "Linux" and arch() == "x86_64":
         return "linux-x86_64"
-    if os() == "Macos" and (arch() == "armv8" or arch() == "aarch64"):
+    if os() == "Macos" and comp_arch_is_aarch64(arch()):
         return "darwin-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "windows-x86_64"

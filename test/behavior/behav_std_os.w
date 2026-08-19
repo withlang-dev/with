@@ -6,7 +6,7 @@ fn valid_os(s: str) -> bool:
     s == "Macos" or s == "Linux" or s == "Windows"
 
 fn valid_arch(s: str) -> bool:
-    s == "armv8" or s == "aarch64" or s == "x86_64"
+    s == "aarch64" or s == "x86_64"
 
 fn main:
     assert(valid_os(os()), "unexpected std.os.os(): " ++ os())

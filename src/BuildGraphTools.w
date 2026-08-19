@@ -54,7 +54,7 @@ pub fn build_graph_llvm_prefix() -> str:
         return prefix
     let host_os = with_sysinfo_os()
     let host_arch = with_sysinfo_arch()
-    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+    if host_os == "Macos" and host_arch == "aarch64":
         return ".deps/llvm-" ++ BUILD_GRAPH_LLVM_VERSION ++ "-darwin-arm64"
     if host_os == "Linux" and host_arch == "x86_64":
         return ".deps/llvm-" ++ BUILD_GRAPH_LLVM_VERSION ++ "-linux-x86_64"
