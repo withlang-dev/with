@@ -1,0 +1,118 @@
+name: selfhost+tests
+
+on:
+  # Restrict push to main so a PR-branch push does not trigger BOTH a push run
+  # and a pull_request run (the double-run that doubles runner usage). PRs are
+  # covered by pull_request; main pushes (merges) by push.
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel a superseded in-progress run when the same PR branch is re-pushed.
+# Hardcode the platform token (not ${{ github.workflow }}) so the same-named
+# "selfhost+tests" workflows get distinct groups and do not cancel each other
+# across platforms.
+concurrency:
+  group: selfhost-tests-linux-aarch64-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  selfhost-linux-aarch64:
+    name: linux aarch64
+    runs-on: ubuntu-24.04-arm
+    # Self-host + fixpoint only; give it headroom on the shared ARM runner.
+    timeout-minutes: 180
+    env:
+      WITH_OUT_DIR: ${{ github.workspace }}/out
+      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-linux-aarch64
+      # Fixpoint-verified bootstrap seed for this platform (built from main
+      # ae4c6a75, the commit carrying the #851 posix_str_to_c_buf fix without
+      # which no fork/exec — and therefore no link — works on linux-aarch64).
+      WITH_SEED_REPO: withlang-dev/with
+      WITH_SEED_ASSET: with-linux-aarch64
+      WITH_SEED_VERSION: with-linux-aarch64
+      WITH_SEED_SHA256: 49e65242e753f4db68b66752a03e2b0b5a619c2a121f2c5ac8034b0cf0e18057
+      WITH_SDK_REPO: withlang-dev/with
+      WITH_SDK_VERSION: sdk-linux-aarch64
+      # NOTE: this platform's SDK ships as .tar.gz (the linux-x86_64 asset is
+      # .tar.zst), so it is extracted with tar -xzf rather than zstd.
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
+      WITH_SDK_SHA256: b1597fe5281c760f594235a0d5b01fe3360b8303f7615b9f87c3ff87a2740926
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install host packages
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          # dev libs: the compiler link line uses -lz -lzstd -lxml2
+          # (build/compiler.w), which need the .so dev symlinks.
+          sudo apt-get install -y --no-install-recommends zlib1g-dev libzstd-dev libxml2-dev
+
+      - name: Fetch LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          curl -fL -o /tmp/sdk.tar.gz \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          printf '%s  %s\n' "$WITH_SDK_SHA256" /tmp/sdk.tar.gz | sha256sum -c -
+          tar -xzf /tmp/sdk.tar.gz -C .deps
+          test -d "$LLVM_PREFIX/bin" || { echo "unexpected SDK layout"; ls -la .deps; exit 1; }
+          test -x "$LLVM_PREFIX/bin/lld" || { echo "SDK lld missing"; exit 1; }
+
+      - name: Set up linker shim (SDK lld + libxml2 alias)
+        run: |
+          set -euo pipefail
+          mkdir -p .link-shim
+          # The seed emits -fuse-ld=lld; expose the SDK's lld under the names the
+          # driver looks for. If the SDK lld carries DT_NEEDED libxml2.so.16
+          # while Ubuntu ships libxml2.so.2, alias it — ABI-safe for linking
+          # (an ELF link never calls into libxml2). Harmless when unneeded.
+          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld.lld
+          ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld64.lld
+          ln -sf "$LLVM_PREFIX/bin/lld"    .link-shim/lld
+          xml2="$(ldconfig -p | awk '/libxml2\.so\.2 /{print $NF; exit}')"
+          [ -n "$xml2" ] || xml2="$(ls /lib/aarch64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1)"
+          [ -n "$xml2" ] || { echo "no system libxml2.so.2"; exit 1; }
+          ln -sf "$xml2" .link-shim/libxml2.so.16
+          # Verify lld actually runs under the shim path the build steps use.
+          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" "$LLVM_PREFIX/bin/ld.lld" --version
+
+      - name: Bootstrap seed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fL -o with-seed \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" with-seed | sha256sum -c -
+          chmod +x with-seed
+          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed version
+
+      - name: Build (seed -> stage1 -> stage2 -> final)
+        env:
+          WITH: ${{ github.workspace }}/with-seed
+        run: |
+          set -euo pipefail
+          export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
+          export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
+          "$WITH" build
+
+      - name: Fixpoint (stage2.emit == stage3.emit)
+        env:
+          WITH: ${{ github.workspace }}/with-seed
+        run: |
+          set -euo pipefail
+          # Drive the build graph with the pinned seed; the graph compares the
+          # newly built stage2 and stage3 compiler outputs.
+          export PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH"
+          export LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}"
+          "$WITH" build :fixpoint
+
+      # NOTE: the `build :test` green battery is deliberately NOT run here yet.
+      # On linux-aarch64 it currently fails 8 target groups (behavior-tests 7 of
+      # 948 files, the three cli-selfhost suites, both c-migrator suites,
+      # embedded-runtime-regression, emit-c-smoke) while build and fixpoint are
+      # green. A follow-up change fixes those and adds the `:test` step here, so
+      # this platform matches the other selfhost workflows.
