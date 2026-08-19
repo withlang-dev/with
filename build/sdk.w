@@ -105,6 +105,8 @@ pub fn sdk_current_platform() -> str:
         return "linux-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "windows-x86_64"
+    if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
+        return "windows-aarch64"
     ""
 
 pub fn sdk_host_tag_for_platform(platform: &str) -> str:
@@ -272,12 +274,13 @@ fn sdk_validate_cache(ctx: &ActionCtx, platform: &str, cache_path: &str) -> i32:
     let cache = fs.read_text(cache_path)
     let cc = sdk_cache_line(cache, "CMAKE_C_COMPILER:")
     let cxx = sdk_cache_line(cache, "CMAKE_CXX_COMPILER:")
-    if platform == "windows-x86_64":
+    if platform == "windows-x86_64" or platform == "windows-aarch64":
         if not cc.contains("clang-cl") or not cxx.contains("clang-cl"):
             return sdk_fail(ctx, "refusing to package SDK not built with clang-cl; CMAKE_C_COMPILER=" ++ cc ++ " CMAKE_CXX_COMPILER=" ++ cxx)
-        let masm = sdk_cache_line(cache, "CMAKE_ASM_MASM_COMPILER:")
-        if not masm.contains("llvm-ml64"):
-            return sdk_fail(ctx, "refusing to package SDK not built with llvm-ml64; CMAKE_ASM_MASM_COMPILER=" ++ masm)
+        if platform == "windows-x86_64":
+            let masm = sdk_cache_line(cache, "CMAKE_ASM_MASM_COMPILER:")
+            if not masm.contains("llvm-ml64"):
+                return sdk_fail(ctx, "refusing to package SDK not built with llvm-ml64; CMAKE_ASM_MASM_COMPILER=" ++ masm)
         return 0
     if not cc.contains("clang") or cc.contains("/usr/bin/cc") or cc.contains("/usr/bin/gcc"):
         return sdk_fail(ctx, "refusing to package SDK not built with clang; CMAKE_C_COMPILER=" ++ cc)

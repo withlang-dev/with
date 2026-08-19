@@ -309,6 +309,65 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         return 1
     0
 
+// ── Cross-target (windows_aarch64) helpers ──────────────────────────
+
+fn cross_windows_aarch64_dir() -> str:
+    "out/lib/cross/windows_aarch64"
+
+fn cross_windows_aarch64_triple() -> str:
+    "aarch64-pc-windows-msvc"
+
+fn cross_windows_aarch64_llvm_prefix() -> str:
+    ".deps/llvm-" ++ compiler_llvm_version() ++ "-windows-aarch64-msvc"
+
+fn cross_windows_aarch64_object_target_named(name: &str, source: &str, obj_name: &str, opt: &str) -> Target:
+    var target = with_object_target(name, release_compiler_bin("with"), source, cross_windows_aarch64_dir() ++ "/" ++ obj_name, opt, "build")
+    target = target.arg("--target=" ++ cross_windows_aarch64_triple())
+    target
+
+fn cross_windows_aarch64_object_target(name: &str, source: &str, opt: &str) -> Target:
+    let base = comp_path_basename(source)
+    let stem = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
+    cross_windows_aarch64_object_target_named(name, source, stem ++ ".o", opt)
+
+// Generate cross/windows_aarch64/llvm_ld.rsp — arm64 sibling of
+// run_cross_windows_llvm_link_metadata_action; identical .lib selection
+// against the windows-aarch64 SDK prefix.
+fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let output_path = ctx.output()
+    let lib_dir = cross_windows_aarch64_llvm_prefix() ++ "/lib"
+    let libclang = lib_dir ++ "/libclang.lib"
+    if not fs.host_exists(libclang):
+        ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: missing " ++ libclang ++ "; extract the with-llvm-sdk-" ++ compiler_llvm_version() ++ "-windows-aarch64 release asset into .deps/")
+        return 1
+    let lib_files = fs.host_list_files(lib_dir)
+    if lib_files.len() == 0:
+        ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not list: " ++ lib_dir)
+        return 1
+    var clang_archives: Vec[str] = Vec.new()
+    var llvm_archives: Vec[str] = Vec.new()
+    for i in 0..lib_files.len() as i32:
+        let path = lib_files.get(i as i64)
+        let name = comp_path_basename(path)
+        if name.ends_with(".lib"):
+            if (name.starts_with("clang") or name.starts_with("libclang")) and path != libclang:
+                clang_archives.push(build_owned_text(path))
+            else:
+                if name.starts_with("LLVM") and name != "LLVM-C.lib":
+                    llvm_archives.push(build_owned_text(path))
+    var ld_rsp = comp_rsp_path(libclang) ++ "\n"
+    let sorted_clang = comp_sort_strings(clang_archives)
+    for i in 0..sorted_clang.len() as i32:
+        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang.get(i as i64)) ++ "\n"
+    let sorted_llvm = comp_sort_strings(llvm_archives)
+    for i in 0..sorted_llvm.len() as i32:
+        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm.get(i as i64)) ++ "\n"
+    if fs.write_text(output_path, ld_rsp) != 0:
+        ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not write: " ++ output_path)
+        return 1
+    0
+
 fn empty_file_target(name: &str, output: &str) -> Target:
     var target = target_new(.Action, build_owned_text(name), "").output(build_owned_text(output))
     target.action = run_write_empty_file_action
@@ -421,6 +480,9 @@ type HostRuntimeSpec:
     second_opposite_bootstrap_platform_blob: str
     second_opposite_platform_blob: str
     second_opposite_platform_symbol: str
+    third_opposite_bootstrap_platform_blob: str
+    third_opposite_platform_blob: str
+    third_opposite_platform_symbol: str
     fiber_core_source: str
     fiber_asm_source: str
 
@@ -453,6 +515,8 @@ fn release_platform_asset_bin() -> str:
         return "out/release/with-linux-x86_64"
     if host_os == "Windows" and host_arch == "x86_64":
         return "out/release/with-windows-x86_64.exe"
+    if host_os == "Windows" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "out/release/with-windows-aarch64.exe"
     release_compiler_bin("with")
 
 // The platform asset target only exists when the asset is a distinct copy of
@@ -481,6 +545,9 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_symbol: "rt_linux_x86_64_o",
+            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_aarch64.bin",
+            third_opposite_platform_blob: "out/lib/empty_rt_windows_aarch64.bin",
+            third_opposite_platform_symbol: "rt_windows_aarch64_o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_aarch64.s",
         }
@@ -498,6 +565,9 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_x86_64.bin",
             second_opposite_platform_blob: "out/lib/empty_rt_windows_x86_64.bin",
             second_opposite_platform_symbol: "rt_windows_x86_64_o",
+            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_aarch64.bin",
+            third_opposite_platform_blob: "out/lib/empty_rt_windows_aarch64.bin",
+            third_opposite_platform_symbol: "rt_windows_aarch64_o",
             fiber_core_source: "rt/fiber_core_darwin.w",
             fiber_asm_source: "runtime/fiber_asm_linux_x86_64.s",
         }
@@ -515,8 +585,31 @@ fn host_runtime_spec() -> HostRuntimeSpec:
             second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
             second_opposite_platform_symbol: "rt_linux_x86_64_o",
+            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_aarch64.bin",
+            third_opposite_platform_blob: "out/lib/empty_rt_windows_aarch64.bin",
+            third_opposite_platform_symbol: "rt_windows_aarch64_o",
             fiber_core_source: "rt/fiber_core_windows.w",
             fiber_asm_source: "runtime/fiber_asm_windows_x86_64.s",
+        }
+    if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
+        return HostRuntimeSpec {
+            platform_source: "rt/windows_aarch64.w",
+            compat_source: "rt/compat_runtime.w",
+            bootstrap_platform_object: "out/bootstrap-lib/rt_windows_aarch64.o",
+            platform_object: "out/lib/rt_windows_aarch64.o",
+            platform_install_object: "rt_windows_aarch64.o",
+            platform_symbol: "rt_windows_aarch64_o",
+            opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_darwin_aarch64.bin",
+            opposite_platform_blob: "out/lib/empty_rt_darwin_aarch64.bin",
+            opposite_platform_symbol: "rt_darwin_aarch64_o",
+            second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
+            second_opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
+            second_opposite_platform_symbol: "rt_linux_x86_64_o",
+            third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_x86_64.bin",
+            third_opposite_platform_blob: "out/lib/empty_rt_windows_x86_64.bin",
+            third_opposite_platform_symbol: "rt_windows_x86_64_o",
+            fiber_core_source: "rt/fiber_core_windows.w",
+            fiber_asm_source: "runtime/fiber_asm_windows_aarch64.s",
         }
     HostRuntimeSpec {
         platform_source: "rt/darwin_aarch64.w",
@@ -531,6 +624,9 @@ fn host_runtime_spec() -> HostRuntimeSpec:
         second_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_x86_64.bin",
         second_opposite_platform_blob: "out/lib/empty_rt_windows_x86_64.bin",
         second_opposite_platform_symbol: "rt_windows_x86_64_o",
+        third_opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_windows_aarch64.bin",
+        third_opposite_platform_blob: "out/lib/empty_rt_windows_aarch64.bin",
+        third_opposite_platform_symbol: "rt_windows_aarch64_o",
         fiber_core_source: "rt/fiber_core_darwin.w",
         fiber_asm_source: "runtime/fiber_asm_aarch64.s",
     }
@@ -542,6 +638,8 @@ fn release_asset_for_host() -> str:
         return "with-darwin-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "with-windows-x86_64.exe"
+    if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
+        return "with-windows-aarch64.exe"
     "with-darwin-aarch64"
 
 // "with-darwin-aarch64" -> "darwin-aarch64"
@@ -561,6 +659,8 @@ fn supported_release_platform_tag() -> str:
         return "darwin-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "windows-x86_64"
+    if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
+        return "windows-aarch64"
     ""
 
 // ".deps/llvm-<ver>-<host>" -> "llvm-<ver>-<host>"
@@ -580,6 +680,8 @@ fn release_package_asset_for_platform(platform: &str) -> str:
         return "with-linux-x86_64"
     if platform == "windows_x86_64" or platform == "windows-x86_64":
         return "with-windows-x86_64.exe"
+    if platform == "windows_aarch64" or platform == "windows-aarch64":
+        return "with-windows-aarch64.exe"
     "with-unsupported"
 
 fn package_platform_target(name: &str, platform: &str, ctx: &BuildCtx) -> Target:
@@ -614,6 +716,8 @@ fn package_current_host_target() -> Target:
         return target.dep("package-linux-x86_64")
     if platform == "windows-x86_64":
         return target.dep("package-windows-x86_64")
+    if platform == "windows-aarch64":
+        return target.dep("package-windows-aarch64")
     target.dep("package-darwin-aarch64")
 
 fn package_llvm_sdk_platform_target(name: &str, platform: &str, prefix: &str, build_cache: &str) -> Target:
@@ -647,6 +751,8 @@ fn package_llvm_sdk_current_host_target() -> Target:
         return target.dep("package-llvm-sdk-linux-aarch64")
     if platform == "windows-x86_64":
         return target.dep("package-llvm-sdk-windows-x86_64")
+    if platform == "windows-aarch64":
+        return target.dep("package-llvm-sdk-windows-aarch64")
     target.dep("package-llvm-sdk-darwin-aarch64")
 
 fn sdk_source_target(name: &str, url: &str, sha256: &str, archive: &str, source_root: &str, source_dir: &str, marker: &str) -> Target:
@@ -737,7 +843,7 @@ fn sdk_llvm_target(ctx: &BuildCtx) -> Target:
     let bootstrap_prefix = sdk_bootstrap_prefix_arg(ctx, platform)
     let output_prefix = sdk_output_prefix_arg(ctx, platform)
     let build_root = sdk_build_root_arg(ctx, platform)
-    var target = target_new(.Action, "sdk-llvm", "").output(if platform == "windows-x86_64": output_prefix ++ "/lib/libclang.lib" else: output_prefix ++ "/lib/libclang.a")
+    var target = target_new(.Action, "sdk-llvm", "").output(if platform == "windows-x86_64" or platform == "windows-aarch64": output_prefix ++ "/lib/libclang.lib" else: output_prefix ++ "/lib/libclang.a")
     target.action = run_sdk_llvm_action
     target = target.arg(bootstrap_prefix)
     target = target.arg(output_prefix)
@@ -1410,11 +1516,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(package_platform_target("package-darwin-aarch64", "darwin-aarch64", ctx))
     out = out.add_target(package_platform_target("package-linux-x86_64", "linux-x86_64", ctx))
     out = out.add_target(package_platform_target("package-windows-x86_64", "windows-x86_64", ctx))
+    out = out.add_target(package_platform_target("package-windows-aarch64", "windows-aarch64", ctx))
     out = out.add_target(package_current_host_target())
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-darwin-aarch64", "darwin-aarch64", sdk_default_prefix_for_platform("darwin-aarch64"), sdk_default_build_cache_for_platform("darwin-aarch64")))
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-x86_64", "linux-x86_64", sdk_default_prefix_for_platform("linux-x86_64"), sdk_default_build_cache_for_platform("linux-x86_64")))
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-aarch64", "linux-aarch64", sdk_default_prefix_for_platform("linux-aarch64"), sdk_default_build_cache_for_platform("linux-aarch64")))
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-windows-x86_64", "windows-x86_64", sdk_default_prefix_for_platform("windows-x86_64"), sdk_default_build_cache_for_platform("windows-x86_64")))
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-windows-aarch64", "windows-aarch64", sdk_default_prefix_for_platform("windows-aarch64"), sdk_default_build_cache_for_platform("windows-aarch64")))
     out = out.add_target(package_llvm_sdk_current_host_target())
 
     out = out.add_target(sdk_source_target("sdk-ninja-source", sdk_ninja_source_url(), sdk_ninja_source_sha256(), sdk_ninja_archive(), sdk_source_root(), sdk_ninja_source_dir(), sdk_ninja_source_marker()))
@@ -1489,6 +1597,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("bootstrap-rt-platform-object", "seed", host_runtime.platform_source, host_runtime.bootstrap_platform_object, "-O1", ""))
     out = out.add_target(empty_file_target("bootstrap-empty-opposite-runtime-blob", host_runtime.opposite_bootstrap_platform_blob))
     out = out.add_target(empty_file_target("bootstrap-empty-second-opposite-runtime-blob", host_runtime.second_opposite_bootstrap_platform_blob))
+    out = out.add_target(empty_file_target("bootstrap-empty-third-opposite-runtime-blob", host_runtime.third_opposite_bootstrap_platform_blob))
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O1", "compat-runtime-source"))
     out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O1", ""))
@@ -1530,6 +1639,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.opposite_platform_symbol))
     bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.second_opposite_bootstrap_platform_blob)
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.second_opposite_platform_symbol))
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.third_opposite_bootstrap_platform_blob)
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.third_opposite_platform_symbol))
     // Every consumed object's producer, declared (#680 edge audit).
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-cimport-stubs-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-compat-runtime-object")
@@ -1544,6 +1655,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-platform-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-empty-opposite-runtime-blob")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-empty-second-opposite-runtime-blob")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-empty-third-opposite-runtime-blob")
     out = out.add_target(bootstrap_embedded_objects)
     var bootstrap_embedded_objects_obj = target_new(.CompileAsmObject, "bootstrap-embedded-objects-object", "out/bootstrap-lib/embedded_objects.s").output("out/bootstrap-lib/embedded_objects.o")
     bootstrap_embedded_objects_obj = bootstrap_embedded_objects_obj.dep("bootstrap-embedded-objects-asm")
@@ -1555,6 +1667,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-platform-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-opposite-runtime-blob")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-second-opposite-runtime-blob")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-third-opposite-runtime-blob")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-cimport-stubs-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-compat-runtime-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-panic-runtime-object")
@@ -1750,6 +1863,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("rt-platform-object", stage_compiler_bin("with-stage2"), host_runtime.platform_source, host_runtime.platform_object, "-O1", "stage2"))
     out = out.add_target(empty_file_target("empty-opposite-runtime-blob", host_runtime.opposite_platform_blob))
     out = out.add_target(empty_file_target("empty-second-opposite-runtime-blob", host_runtime.second_opposite_platform_blob))
+    out = out.add_target(empty_file_target("empty-third-opposite-runtime-blob", host_runtime.third_opposite_platform_blob))
     out = out.add_target(with_object_target("cimport-stubs-object", stage_compiler_bin("with-stage2"), "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O1", "stage2"))
     var compat_runtime_obj = with_object_target("compat-runtime-object", stage_compiler_bin("with-stage2"), "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O1", "stage2")
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
@@ -1796,6 +1910,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.arg(host_runtime.opposite_platform_symbol)
     embedded_objects = embedded_objects.input(host_runtime.second_opposite_platform_blob)
     embedded_objects = embedded_objects.arg(host_runtime.second_opposite_platform_symbol)
+    embedded_objects = embedded_objects.input(host_runtime.third_opposite_platform_blob)
+    embedded_objects = embedded_objects.arg(host_runtime.third_opposite_platform_symbol)
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
     embedded_objects = embedded_objects.dep("compat-runtime-object")
@@ -1810,6 +1926,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.dep("rt-platform-object")
     embedded_objects = embedded_objects.dep("empty-opposite-runtime-blob")
     embedded_objects = embedded_objects.dep("empty-second-opposite-runtime-blob")
+    embedded_objects = embedded_objects.dep("empty-third-opposite-runtime-blob")
     out = out.add_target(embedded_objects)
 
     var embedded_objects_obj = target_new(.CompileAsmObject, "embedded-objects-object", "out/lib/embedded_objects.s").output("out/lib/embedded_objects.o")
@@ -1820,6 +1937,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     runtime = runtime.dep("embedded-objects-object")
     runtime = runtime.dep("empty-opposite-runtime-blob")
     runtime = runtime.dep("empty-second-opposite-runtime-blob")
+    runtime = runtime.dep("empty-third-opposite-runtime-blob")
     out = out.add_target(runtime)
 
     // ── Cross-target runtime (linux) ────────────────────────────────
@@ -1917,6 +2035,92 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_rt_windows = cross_rt_windows.dep("cross-win-clang-bridge-object")
     cross_rt_windows = cross_rt_windows.dep("cross-win-llvm-link-metadata")
     out = out.add_target(cross_rt_windows)
+
+    // ── Cross-target runtime (windows_aarch64) ──────────────────────
+    // `with build :cross-rt-windows-aarch64` builds the full windows_aarch64
+    // runtime + compiler link inputs into out/lib/cross/windows_aarch64/
+    // (COFF/ARM64 objects, aarch64-pc-windows-msvc triple) so a
+    // `--target aarch64-pc-windows-msvc` link resolves entirely from that
+    // directory (§18.5). Mirrors the windows_x86_64 cross-rt set; fiber
+    // core is the windows variant, fiber asm the arm64 windows variant.
+    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-rt-core-object", "rt/rt_core.w", "-O2"))
+    out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-rt-platform-object", "rt/windows_aarch64.w", "rt_windows_aarch64.o", "-O2"))
+    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-cimport-stubs-object", "rt/cimport_stubs.w", "-O1"))
+    var cross_winarm_compat = cross_windows_aarch64_object_target_named("cross-winarm-compat-runtime-object", "out/gen/compat_runtime.w", "compat_runtime.o", "-O1")
+    cross_winarm_compat = cross_winarm_compat.dep("compat-runtime-source")
+    out = out.add_target(cross_winarm_compat)
+    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-panic-runtime-object", "rt/panic_runtime.w", "-O1"))
+    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-fiber-stubs-object", "rt/fiber_stubs.w", "-O1"))
+    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-channel-runtime-object", "rt/channel_runtime.w", "-O1"))
+    out = out.add_target(cross_windows_aarch64_object_target("cross-winarm-fiber-runtime-object", "rt/fiber_runtime.w", "-O1"))
+    out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-fiber-core-object", "rt/fiber_core_windows.w", "fiber.o", "-O1"))
+    out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
+    out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
+
+    var cross_winarm_regex_ir = with_ir_target_overflow("cross-winarm-regex-runtime-ir", release_compiler_bin("with"), "rt/regex_runtime.w", "out/tmp/cross_winarm_regex_runtime.ll", "build", "wrap")
+    cross_winarm_regex_ir = cross_winarm_regex_ir.arg("--target=" ++ cross_windows_aarch64_triple())
+    out = out.add_target(cross_winarm_regex_ir)
+    var cross_winarm_regex = target_new(.CompileLlvmIrObject, "cross-winarm-regex-runtime-object", "out/tmp/cross_winarm_regex_runtime.ll").output(cross_windows_aarch64_dir() ++ "/regex_runtime.o")
+    cross_winarm_regex = cross_winarm_regex.dep("cross-winarm-regex-runtime-ir")
+    out = out.add_target(cross_winarm_regex)
+
+    var cross_winarm_fiber_asm = target_new(.CompileAsmObject, "cross-winarm-fiber-asm-object", "runtime/fiber_asm_windows_aarch64.s").output(cross_windows_aarch64_dir() ++ "/fiber_asm.o")
+    cross_winarm_fiber_asm = cross_winarm_fiber_asm.arg("triple=" ++ cross_windows_aarch64_triple())
+    out = out.add_target(cross_winarm_fiber_asm)
+
+    var cross_winarm_embedded = target_new(.EmbedObjectFiles, "cross-winarm-embedded-objects-asm", "windows_aarch64").output(cross_windows_aarch64_dir() ++ "/embedded_objects.s")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/cimport_stubs.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("cimport_stubs_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/compat_runtime.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("compat_runtime_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/panic_runtime.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("panic_runtime_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/regex_runtime.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("regex_runtime_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/fiber_stubs.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("fiber_stubs_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/channel_runtime.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("channel_runtime_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/fiber_runtime.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("fiber_runtime_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/fiber.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("fiber_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/fiber_asm.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("fiber_asm_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/rt_core.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("rt_core_o")
+    cross_winarm_embedded = cross_winarm_embedded.input(cross_windows_aarch64_dir() ++ "/rt_windows_aarch64.o")
+    cross_winarm_embedded = cross_winarm_embedded.arg("rt_windows_aarch64_o")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-cimport-stubs-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-compat-runtime-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-panic-runtime-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-regex-runtime-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-stubs-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-channel-runtime-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-runtime-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-core-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-asm-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-core-object")
+    cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-platform-object")
+    out = out.add_target(cross_winarm_embedded)
+
+    var cross_winarm_embedded_obj = target_new(.CompileAsmObject, "cross-winarm-embedded-objects-object", cross_windows_aarch64_dir() ++ "/embedded_objects.s").output(cross_windows_aarch64_dir() ++ "/embedded_objects.o")
+    cross_winarm_embedded_obj = cross_winarm_embedded_obj.arg("triple=" ++ cross_windows_aarch64_triple())
+    cross_winarm_embedded_obj = cross_winarm_embedded_obj.dep("cross-winarm-embedded-objects-asm")
+    out = out.add_target(cross_winarm_embedded_obj)
+
+    var cross_winarm_ld_rsp = target_new(.Action, "cross-winarm-llvm-link-metadata", "").output(cross_windows_aarch64_dir() ++ "/llvm_ld.rsp")
+    cross_winarm_ld_rsp.action = run_cross_windows_aarch64_llvm_link_metadata_action
+    cross_winarm_ld_rsp = cross_winarm_ld_rsp.write_scope(cross_windows_aarch64_dir())
+    cross_winarm_ld_rsp = cross_winarm_ld_rsp.write_scope("out/command/cross-winarm-llvm-link-metadata")
+    out = out.add_target(cross_winarm_ld_rsp)
+
+    var cross_rt_windows_aarch64 = target_new(.Group, "cross-rt-windows-aarch64", "")
+    cross_rt_windows_aarch64 = cross_rt_windows_aarch64.dep("cross-winarm-embedded-objects-object")
+    cross_rt_windows_aarch64 = cross_rt_windows_aarch64.dep("cross-winarm-llvm-bridge-object")
+    cross_rt_windows_aarch64 = cross_rt_windows_aarch64.dep("cross-winarm-clang-bridge-object")
+    cross_rt_windows_aarch64 = cross_rt_windows_aarch64.dep("cross-winarm-llvm-link-metadata")
+    out = out.add_target(cross_rt_windows_aarch64)
 
     // The compiler links to an UNSTAMPED intermediate whose inputs (out/gen/main.w
     // + src) are commit-independent, so it caches across commits (#650). A cheap
