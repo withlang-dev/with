@@ -773,8 +773,13 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
 
     if kind == CXType_Void: return session_strdup(s, "Unit\0" as *const u8)
     if kind == CXType_Bool: return session_strdup(s, "bool\0" as *const u8)
-    if kind == CXType_Char_S or kind == CXType_SChar: return session_strdup(s, "c_char\0" as *const u8)
-    if kind == CXType_Char_U or kind == CXType_UChar: return session_strdup(s, "u8\0" as *const u8)
+    // Plain `char` is CXType_Char_S where char is signed (x86_64, Apple) and
+    // CXType_Char_U where it is unsigned (AArch64/ARM Linux). Both spell C's
+    // `char`, so both map to `c_char` — With's `c_char` is a fixed `i8` alias,
+    // and the char-pointer rule below already treats Char_U as a char. Only
+    // an explicit `unsigned char` (CXType_UChar) is `u8`.
+    if kind == CXType_Char_S or kind == CXType_Char_U or kind == CXType_SChar: return session_strdup(s, "c_char\0" as *const u8)
+    if kind == CXType_UChar: return session_strdup(s, "u8\0" as *const u8)
     if kind == CXType_Short: return session_strdup(s, "c_short\0" as *const u8)
     if kind == CXType_UShort: return session_strdup(s, "c_ushort\0" as *const u8)
     if kind == CXType_Int: return session_strdup(s, "c_int\0" as *const u8)
@@ -3309,7 +3314,11 @@ pub fn with_ci_type_is_unsigned(session: i64, cursor_idx: i32) -> i32:
         let ty = clang_getCursorType(cursor)
         let canonical = clang_getCanonicalType(ty)
         let k = canonical.kind
-        if k == CXType_UChar or k == CXType_Char_U or k == CXType_UShort or k == CXType_UInt or k == CXType_ULong or k == CXType_ULongLong or k == CXType_UInt128:
+        // CXType_Char_U is plain `char` on an unsigned-char target (AArch64/ARM
+        // Linux). c_import models C `char` as `c_char` (= i8) on every target,
+        // so it must classify as signed here too — otherwise the translated
+        // arithmetic picks unsigned wrap ops for an i8-typed value.
+        if k == CXType_UChar or k == CXType_UShort or k == CXType_UInt or k == CXType_ULong or k == CXType_ULongLong or k == CXType_UInt128:
             return 1
         0
 
@@ -4039,7 +4048,9 @@ unsafe fn is_float_kind(k: i32) -> i32:
     0
 
 unsafe fn is_unsigned_kind(k: i32) -> i32:
-    if k >= CXType_Char_U and k <= CXType_UInt128: return 1
+    // Starts at UChar, not Char_U: plain `char` maps to c_char (= i8) on every
+    // target, including the unsigned-char ones (AArch64/ARM Linux).
+    if k >= CXType_UChar and k <= CXType_UInt128: return 1
     0
 
 pub fn with_ci_implicit_cast_kind(session: i64, cursor_idx: i32) -> i32:
