@@ -146,6 +146,8 @@ fn pkg_current_platform() -> str:
         return "linux-x86_64"
     if os() == "Windows" and arch() == "x86_64":
         return "windows-x86_64"
+    if os() == "Windows" and (arch() == "armv8" or arch() == "aarch64"):
+        return "windows-aarch64"
     ""
 
 fn pkg_env_or(ctx: &ActionCtx, name: &str, fallback: &str) -> str:

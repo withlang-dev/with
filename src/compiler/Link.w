@@ -672,6 +672,8 @@ fn link_stage_make_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_path: &s
         return link_stage_make_darwin_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     if os == "Windows" and arch == "x86_64":
         return link_stage_make_windows_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
+    if os == "Windows" and (arch == "armv8" or arch == "aarch64"):
+        return link_stage_make_windows_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     with_eprint("error: unsupported host LLVM linker platform: " ++ os ++ "/" ++ arch)
     LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
 
