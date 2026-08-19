@@ -38,6 +38,17 @@ jobs:
       # .tar.zst), so it is extracted with tar -xzf rather than zstd.
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
       WITH_SDK_SHA256: b1597fe5281c760f594235a0d5b01fe3360b8303f7615b9f87c3ff87a2740926
+      # The linux-aarch64 compiler does not yet embed its platform runtime
+      # object: the build emits with_embedded_rt_linux_aarch64_o_* into
+      # embedded_objects.s, but src/compiler/Link.w declares no extern for it --
+      # HostRuntimeSpec has only three embed slots for four platforms, so a
+      # darwin host cannot emit that blob at all and adding the extern alone
+      # would break darwin's link. Until that is fixed properly, the seed
+      # resolves rt_linux_aarch64.o and friends from <bindir>/runtime/ on disk,
+      # so the fixpoint-verified runtime objects are published beside the seed
+      # and fetched here.
+      WITH_RUNTIME_ASSET: with-linux-aarch64-runtime.tar.gz
+      WITH_RUNTIME_SHA256: bdfd139b898a0c0d2ad0d989c2c4f2c9c8a63487fb54c08649cd56f34a3844db
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,7 +99,24 @@ jobs:
             "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
           printf '%s  %s\n' "$WITH_SEED_SHA256" with-seed | sha256sum -c -
           chmod +x with-seed
+          # Runtime objects the seed links into everything it builds. They live
+          # in <bindir>/runtime/, i.e. beside with-seed at the workspace root.
+          mkdir -p runtime
+          curl -fL -o /tmp/rt.tar.gz \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_RUNTIME_ASSET"
+          printf '%s  %s\n' "$WITH_RUNTIME_SHA256" /tmp/rt.tar.gz | sha256sum -c -
+          tar -xzf /tmp/rt.tar.gz -C runtime
+          test -f runtime/rt_linux_aarch64.o || { echo "runtime bundle missing rt_linux_aarch64.o"; exit 1; }
+          # llvm_ld holds an absolute linker path, so it is written here rather
+          # than shipped in the bundle. llvm_ld.rsp's .deps/... entries are
+          # relative and resolve from the workspace root, where the build runs.
+          echo "$LLVM_PREFIX/bin/ld.lld" > runtime/llvm_ld
           LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed version
+          # Prove the seed can actually link before spending a full build on it.
+          printf 'fn main:\n    print("seed links")\n' > /tmp/seedcheck.w
+          PATH="$PWD/.link-shim:$LLVM_PREFIX/bin:$PATH" \
+            LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" \
+            ./with-seed run /tmp/seedcheck.w
 
       - name: Build (seed -> stage1 -> stage2 -> final)
         env:
