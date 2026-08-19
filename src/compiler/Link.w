@@ -29,6 +29,8 @@ extern let with_embedded_rt_darwin_aarch64_o_start: u8
 extern let with_embedded_rt_darwin_aarch64_o_end: u8
 extern let with_embedded_rt_linux_x86_64_o_start: u8
 extern let with_embedded_rt_linux_x86_64_o_end: u8
+extern let with_embedded_rt_linux_aarch64_o_start: u8
+extern let with_embedded_rt_linux_aarch64_o_end: u8
 extern let with_embedded_rt_windows_x86_64_o_start: u8
 extern let with_embedded_rt_windows_x86_64_o_end: u8
 
@@ -701,6 +703,8 @@ fn link_stage_embedded_runtime_object(name: &str) -> str:
         return link_stage_embedded_obj_slice(&with_embedded_rt_darwin_aarch64_o_start as *const u8, &with_embedded_rt_darwin_aarch64_o_end as *const u8)
     if name == "rt_linux_x86_64.o":
         return link_stage_embedded_obj_slice(&with_embedded_rt_linux_x86_64_o_start as *const u8, &with_embedded_rt_linux_x86_64_o_end as *const u8)
+    if name == "rt_linux_aarch64.o":
+        return link_stage_embedded_obj_slice(&with_embedded_rt_linux_aarch64_o_start as *const u8, &with_embedded_rt_linux_aarch64_o_end as *const u8)
     if name == "rt_windows_x86_64.o":
         return link_stage_embedded_obj_slice(&with_embedded_rt_windows_x86_64_o_start as *const u8, &with_embedded_rt_windows_x86_64_o_end as *const u8)
     ""
@@ -1002,8 +1006,6 @@ fn link_stage_host_platform_runtime_object() -> str:
     if os == "Linux" and arch == "x86_64":
         return "rt_linux_x86_64.o"
     if os == "Linux" and (arch == "armv8" or arch == "aarch64"):
-        // No embedded slot yet — resolved from the on-disk runtime root
-        // only (see link_stage_embedded_runtime_object).
         return "rt_linux_aarch64.o"
     if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
         return "rt_darwin_aarch64.o"
