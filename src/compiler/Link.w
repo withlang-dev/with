@@ -31,6 +31,8 @@ extern let with_embedded_rt_linux_x86_64_o_start: u8
 extern let with_embedded_rt_linux_x86_64_o_end: u8
 extern let with_embedded_rt_windows_x86_64_o_start: u8
 extern let with_embedded_rt_windows_x86_64_o_end: u8
+extern let with_embedded_rt_windows_aarch64_o_start: u8
+extern let with_embedded_rt_windows_aarch64_o_end: u8
 
 // D30 R2c: set by Compilation when THIS compile emitted the runtime
 // in-unit (WITH_RT_IN_UNIT lane, prelude on) — the .w-derived rt objects
@@ -716,6 +718,8 @@ fn link_stage_embedded_runtime_object(name: &str) -> str:
         return link_stage_embedded_obj_slice(&with_embedded_rt_linux_x86_64_o_start as *const u8, &with_embedded_rt_linux_x86_64_o_end as *const u8)
     if name == "rt_windows_x86_64.o":
         return link_stage_embedded_obj_slice(&with_embedded_rt_windows_x86_64_o_start as *const u8, &with_embedded_rt_windows_x86_64_o_end as *const u8)
+    if name == "rt_windows_aarch64.o":
+        return link_stage_embedded_obj_slice(&with_embedded_rt_windows_aarch64_o_start as *const u8, &with_embedded_rt_windows_aarch64_o_end as *const u8)
     ""
 
 fn link_stage_extract_runtime_obj(name: &str, path: &str) -> i32:

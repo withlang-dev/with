@@ -299,6 +299,7 @@ pub fn build_graph_embed_object_files(root: &str, target: &BuildGraphTarget) -> 
     var has_darwin_runtime = false
     var has_linux_runtime = false
     var has_windows_runtime = false
+    var has_windows_aarch64_runtime = false
     // The embed target's entry names the PLATFORM the assembly is for
     // (e.g. "linux_x86_64" for a cross-built compiler); empty = host.
     var macho_sections = build_graph_host_target_kind() == 3 or build_graph_host_target_kind() == 4
@@ -327,6 +328,8 @@ pub fn build_graph_embed_object_files(root: &str, target: &BuildGraphTarget) -> 
             has_linux_runtime = true
         if sym == "rt_windows_x86_64_o":
             has_windows_runtime = true
+        if sym == "rt_windows_aarch64_o":
+            has_windows_aarch64_runtime = true
         asm_text = asm_text ++ build_graph_emit_embedded_blob(sym, input_path)
     if not has_darwin_runtime:
         asm_text = asm_text ++ build_graph_emit_empty_embedded_blob("rt_darwin_aarch64_o")
@@ -334,6 +337,8 @@ pub fn build_graph_embed_object_files(root: &str, target: &BuildGraphTarget) -> 
         asm_text = asm_text ++ build_graph_emit_empty_embedded_blob("rt_linux_x86_64_o")
     if not has_windows_runtime:
         asm_text = asm_text ++ build_graph_emit_empty_embedded_blob("rt_windows_x86_64_o")
+    if not has_windows_aarch64_runtime:
+        asm_text = asm_text ++ build_graph_emit_empty_embedded_blob("rt_windows_aarch64_o")
     if build_graph_rt_write_file(output_path, asm_text) != 0:
         build_graph_rt_eprint("error: could not write embedded-object assembly for target '" ++ target.name ++ "': " ++ output_path)
         return 1

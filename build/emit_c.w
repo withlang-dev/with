@@ -133,7 +133,10 @@ fn emitc_push_host_c_flags(argv: Vec[str]) -> Vec[str]:
         argv |> push("-fuse-ld=lld")
     if os() == "Windows":
         argv |> push("-target")
-        argv |> push("x86_64-pc-windows-msvc")
+        if arch() == "armv8" or arch() == "aarch64":
+            argv |> push("aarch64-pc-windows-msvc")
+        else:
+            argv |> push("x86_64-pc-windows-msvc")
         argv |> push("-fms-runtime-lib=static")
         argv |> push("-D_CRT_SECURE_NO_WARNINGS")
         argv |> push("-fuse-ld=lld")
@@ -143,20 +146,26 @@ fn emitc_push_host_c_flags(argv: Vec[str]) -> Vec[str]:
         argv |> push("-Wl,/libpath:" ++ emitc_windows_msvc_libdir())
     argv
 
+// Windows SDK/CRT lib-arch subdir for the host: arm64 or x64. The
+// hardcoded fallbacks below embed this; env overrides (set by the
+// runner / cross SDK) take precedence and are used verbatim.
+fn emitc_windows_lib_arch():
+    if arch() == "armv8" or arch() == "aarch64": "arm64" else: "x64"
+
 fn emitc_windows_um_libdir():
     let dir = env("WITH_WINDOWS_UM_LIBDIR")
     if dir.len() > 0: return dir
-    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64"
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/" ++ emitc_windows_lib_arch()
 
 fn emitc_windows_ucrt_libdir():
     let dir = env("WITH_WINDOWS_UCRT_LIBDIR")
     if dir.len() > 0: return dir
-    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64"
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/" ++ emitc_windows_lib_arch()
 
 fn emitc_windows_msvc_libdir():
     let dir = env("WITH_WINDOWS_MSVC_LIBDIR")
     if dir.len() > 0: return dir
-    "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64"
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/" ++ emitc_windows_lib_arch()
 
 // Windows import-library paths. Honour the explicit libdir env override
 // (set by the runner / cross-build SDK) before the baked-in VS2019/Windows-Kit
@@ -165,17 +174,17 @@ fn emitc_windows_msvc_libdir():
 fn emitc_windows_sdk_um_lib(name: &str) -> str:
     let dir = env("WITH_WINDOWS_UM_LIBDIR")
     if dir.len() > 0: return dir ++ "/" ++ name
-    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64/" ++ name
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/" ++ emitc_windows_lib_arch() ++ "/" ++ name
 
 fn emitc_windows_sdk_ucrt_lib(name: &str) -> str:
     let dir = env("WITH_WINDOWS_UCRT_LIBDIR")
     if dir.len() > 0: return dir ++ "/" ++ name
-    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64/" ++ name
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/" ++ emitc_windows_lib_arch() ++ "/" ++ name
 
 fn emitc_windows_msvc_lib(name: &str) -> str:
     let dir = env("WITH_WINDOWS_MSVC_LIBDIR")
     if dir.len() > 0: return dir ++ "/" ++ name
-    "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64/" ++ name
+    "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/" ++ emitc_windows_lib_arch() ++ "/" ++ name
 
 fn emitc_push_system_libs(argv: Vec[str]) -> Vec[str]:
     if os() == "Windows":
