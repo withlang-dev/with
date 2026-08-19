@@ -92,6 +92,8 @@ fn emitc_c_compiler(ctx: &ActionCtx) -> str:
     let sdk_clang =
         if os() == "Windows":
             ".deps/llvm-22.1.6-windows-x86_64-msvc/bin/clang++.exe"
+        else if os() == "Linux" and (arch() == "armv8" or arch() == "aarch64"):
+            ".deps/llvm-22.1.6-linux-aarch64/bin/clang++"
         else if os() == "Linux":
             ".deps/llvm-22.1.6-linux-x86_64/bin/clang++"
         else if os() == "Macos":
@@ -121,6 +123,8 @@ fn emitc_host_platform_runtime_object() -> str:
     let host_arch = arch()
     if host_os == "Linux" and host_arch == "x86_64":
         return "rt_linux_x86_64.o"
+    if host_os == "Linux" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "rt_linux_aarch64.o"
     if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
         return "rt_darwin_aarch64.o"
     if host_os == "Windows" and host_arch == "x86_64":

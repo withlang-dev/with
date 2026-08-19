@@ -98,6 +98,8 @@ fn bs_host_platform_runtime_object() -> str:
     let host_arch = arch()
     if host_os == "Linux" and host_arch == "x86_64":
         return "rt_linux_x86_64.o"
+    if host_os == "Linux" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "rt_linux_aarch64.o"
     if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
         return "rt_darwin_aarch64.o"
     if host_os == "Windows" and host_arch == "x86_64":
