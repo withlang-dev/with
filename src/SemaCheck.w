@@ -15078,6 +15078,13 @@ impl Sema:
         else if self.fn_symbol_is_manual_extern(fn_sym) != 0:
             if self.require_unsafe_operation("manual extern function call requires unsafe context", node) == 0:
                 return 0
+        else if self.in_unsafe != 0 and sema_name_is_compiler_abi_extern(self.pool_resolve(fn_sym)) != 0:
+            // D30 transition: a runtime-ABI call (with_/rt_/wl_) is
+            // world-dependent — an exempt extern in the object world, a
+            // possibly-safe real definition in-unit. An unsafe block a
+            // caller wrote for the extern world stays honest in both, so
+            // it never counts as vacuous. Dies with the seam.
+            self.note_unsafe_operation()
         else if self.fn_symbol_is_manual_extern_value_abi(fn_sym) != 0:
             if self.in_unsafe != 0:
                 self.note_unsafe_operation()
