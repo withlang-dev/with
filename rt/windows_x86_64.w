@@ -40,6 +40,8 @@ extern fn GetSystemInfo(info: *mut u8) -> Unit
 extern fn GlobalMemoryStatusEx(info: *mut u8) -> i32
 extern fn GetComputerNameW(buf: *mut u16, size: *mut u32) -> i32
 extern fn SystemFunction036(buf: *mut u8, len: u32) -> i32
+extern fn VirtualProtect(addr: *mut u8, size: u64, new_protect: u32, old_protect: *mut u32) -> i32
+extern fn AddVectoredExceptionHandler(first: u32, handler: *mut u8) -> *mut u8
 extern fn GetCurrentThreadId() -> u32
 extern fn GetTempPathA(size: u32, buf: *mut u8) -> u32
 extern fn GetTempFileNameA(path: *const u8, prefix: *const u8, unique: u32, buf: *mut u8) -> u32
@@ -66,6 +68,7 @@ let FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x02000000 as u32
 let MEM_COMMIT_RESERVE: u32 = 0x3000 as u32
 let MEM_RELEASE: u32 = 0x8000 as u32
 let PAGE_READWRITE: u32 = 4 as u32
+let PAGE_GUARD: u32 = 0x100 as u32
 let WAIT_OBJECT_0: u32 = 0 as u32
 let WAIT_TIMEOUT: u32 = 258 as u32
 let INFINITE: u32 = 0xffffffff as u32
@@ -382,10 +385,17 @@ pub fn rt_fiber_fault_addr(info: *const u8) -> i64:
 pub fn rt_fiber_reset_signal_handler(sig: i32) -> Unit:
     let _ = sig
 
+// Arm the fiber stack's guard page. PAGE_GUARD raises STATUS_GUARD_PAGE_VIOLATION
+// on first touch AND auto-commits the page, so the vectored handler has real stack
+// to run its diagnostic on — the Windows analogue of POSIX sigaltstack.
+pub fn rt_fiber_protect_guard(region: *mut u8, len: i64) -> Unit:
+    var old: u32 = 0
+    let _ = VirtualProtect(region, len as u64, PAGE_READWRITE | PAGE_GUARD, &raw mut old)
+
 pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit:
     let _ = alt_stack
     let _ = alt_stack_size
-    let _ = handler
+    let _ = AddVectoredExceptionHandler(1 as u32, handler as *mut u8)
 
 fn win_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i64) -> i32:
     let parent_len = win_cstr_len(parent)
