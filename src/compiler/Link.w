@@ -32,6 +32,19 @@ extern let with_embedded_rt_linux_x86_64_o_end: u8
 extern let with_embedded_rt_windows_x86_64_o_start: u8
 extern let with_embedded_rt_windows_x86_64_o_end: u8
 
+// D30 R2c: set by Compilation when THIS compile emitted the runtime
+// in-unit (WITH_RT_IN_UNIT lane, prelude on) — the .w-derived rt objects
+// must not link (duplicate strong symbols); fiber_asm.o and the on-demand
+// regex/cimport archives stay. Compiler knowledge, never an nm/env probe
+// at link time.
+var link_stage_rt_in_unit_flag: i32 = 0
+
+pub fn link_stage_set_rt_in_unit(on: i32) -> Unit:
+    link_stage_rt_in_unit_flag = on
+
+fn link_stage_rt_in_unit() -> i32:
+    link_stage_rt_in_unit_flag
+
 var link_stage_temp_archives: Vec[str] = Vec.new()
 var link_stage_temp_archives_lock: Atomic[i32]
 
@@ -1158,11 +1171,16 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     let needs_fiber_runtime = if needs_async_runtime: 1 else: link_stage_undefined_symbols_need_fiber_runtime(undef)
     let needs_regex_runtime = link_stage_undefined_symbols_need_regex_runtime(undef)
     let needs_compat_runtime = link_stage_undefined_symbols_need_compat_runtime(undef)
-    if needs_fiber_runtime != 0:
-        // D30 R2c will gate the .w-derived trio here on the program object
-        // actually DEFINING the runtime in-unit (lazy emission means the
-        // WITH_RT_IN_UNIT parse alone defines nothing — an env-keyed gate
-        // orphaned with_runtime_init/run/shutdown).
+    if needs_fiber_runtime != 0 and link_stage_rt_in_unit() != 0:
+        // Runtime emitted in-unit: the asm-defined with_fiber_* symbols
+        // still trip the predicate, but only fiber_asm.o may link — the
+        // .w-derived trio would duplicate the in-unit definitions.
+        let fa_path = link_stage_find_runtime_object_path("fiber_asm.o")
+        if fa_path.len() == 0:
+            with_eprint("error: missing runtime/fiber_asm.o")
+            return link_stage_plan_fail()
+        extras.push(fa_path)
+    else if needs_fiber_runtime != 0:
         let channel_runtime_path = link_stage_find_runtime_object_path("channel_runtime.o")
         if channel_runtime_path.len() == 0:
             with_eprint("error: missing runtime/channel_runtime.o")
@@ -1188,7 +1206,19 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     if needs_helpers_runtime != 0:
         let use_rt_core = link_stage_should_use_rt_core_from_undef(undef)
         let needs_llvm = link_stage_undefined_symbols_need_llvm_bridge(undef)
-        if use_rt_core:
+        if use_rt_core and link_stage_rt_in_unit() != 0:
+            // Runtime emitted in-unit: no .w-derived rt objects — the
+            // program object owns the with_*/rt_* definitions. Only the
+            // on-demand regex archive may still join (regex_runtime is
+            // outside the in-unit set; pcre2 rides inside its object).
+            if needs_regex_runtime != 0:
+                let ri_regex_path = link_stage_find_runtime_object_path("regex_runtime.o")
+                if ri_regex_path.len() == 0:
+                    with_eprint("error: missing runtime/regex_runtime.o")
+                    return link_stage_plan_fail()
+                let ri_regex_ar = link_stage_make_archive(ri_regex_path)
+                extras.push(if ri_regex_ar.len() > 0: ri_regex_ar else: ri_regex_path)
+        else if use_rt_core:
             // Pure With program — rt_core.o + platform backend + panic runtime.
             // Non-async builds also link fiber_stubs.o for lifecycle and fiber
             // fallback symbols; async builds bring fiber.o instead.
@@ -1276,6 +1306,21 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
                 with_eprint("error: missing runtime/cimport_stubs.o")
                 return link_stage_plan_fail()
             extras.push(helpers_path)
+        else if link_stage_rt_in_unit() != 0:
+            // Runtime emitted in-unit on the cc path (in-unit compat code's
+            // raw libc undefs — fopen & co. — flip use_rt_core false): no
+            // .w-derived rt objects; only the on-demand archives may join.
+            if needs_regex_runtime != 0:
+                let ricc_regex_path = link_stage_find_runtime_object_path("regex_runtime.o")
+                if ricc_regex_path.len() == 0:
+                    with_eprint("error: missing runtime/regex_runtime.o")
+                    return link_stage_plan_fail()
+                let ricc_regex_ar = link_stage_make_archive(ricc_regex_path)
+                extras.push(if ricc_regex_ar.len() > 0: ricc_regex_ar else: ricc_regex_path)
+            let ricc_stubs_path = link_stage_find_runtime_object_path("cimport_stubs.o")
+            if ricc_stubs_path.len() > 0:
+                let ricc_stubs_ar = link_stage_make_archive(ricc_stubs_path)
+                extras.push(if ricc_stubs_ar.len() > 0: ricc_stubs_ar else: ricc_stubs_path)
         else:
             // User program with c_import (cc/Apple ld64 path) — rt_core.o first,
             // then cimport_stubs as archive. Apple's ld64 resolves archives correctly:
