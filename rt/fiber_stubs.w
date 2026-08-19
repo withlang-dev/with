@@ -2,7 +2,8 @@
 //
 // Linked only when fiber.o is not present, so these can be strong definitions.
 
-extern fn abort() -> Unit
+@[link_name("abort")]
+extern fn rt_libc_abort() -> Unit
 extern fn with_debug_alloc_report_leaks() -> Unit
 
 pub fn with_runtime_init() -> Unit:
@@ -106,4 +107,4 @@ pub fn with_runtime_fiber_running_worker(fiber_id: i32) -> i32:
 pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit:
     let _ = msg
     let _ = msg_len
-    abort()
+    rt_libc_abort()

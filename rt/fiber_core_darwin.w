@@ -8,14 +8,20 @@ extern fn with_alloc_origin(size: i64, origin: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> Unit
-extern fn mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
-extern fn mprotect(addr: *mut u8, len: u64, prot: i32) -> i32
-extern fn munmap(addr: *mut u8, len: u64) -> i32
-extern fn raise(sig: i32) -> i32
+@[link_name("mmap")]
+extern fn rt_libc_mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
+@[link_name("mprotect")]
+extern fn rt_libc_mprotect(addr: *mut u8, len: u64, prot: i32) -> i32
+@[link_name("munmap")]
+extern fn rt_libc_munmap(addr: *mut u8, len: u64) -> i32
+@[link_name("raise")]
+extern fn rt_libc_raise(sig: i32) -> i32
 @[link_name("write")]
 extern fn rt_libc_write(fd: i32, buf: *const u8, len: u64) -> i64
-extern fn _exit(code: i32) -> Never
-extern fn abort() -> Unit
+@[link_name("_exit")]
+extern fn rt_libc_exit(code: i32) -> Never
+@[link_name("abort")]
+extern fn rt_libc_abort() -> Unit
 extern fn rt_fiber_page_size() -> i64
 extern fn rt_fiber_mmap_flags() -> i32
 extern fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit
@@ -24,13 +30,20 @@ extern fn rt_fiber_fault_addr(info: *const u8) -> i64
 extern fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64
 extern fn rt_thread_join(handle: i64) -> i32
 extern fn rt_nanosleep(ns: i64) -> i32
-extern fn pthread_self() -> i64
-extern fn pthread_mutex_init(mutex: *mut u8, attr: *const u8) -> i32
-extern fn pthread_mutex_lock(mutex: *mut u8) -> i32
-extern fn pthread_mutex_unlock(mutex: *mut u8) -> i32
-extern fn pthread_cond_init(cond: *mut u8, attr: *const u8) -> i32
-extern fn pthread_cond_wait(cond: *mut u8, mutex: *mut u8) -> i32
-extern fn pthread_cond_broadcast(cond: *mut u8) -> i32
+@[link_name("pthread_self")]
+extern fn rt_libc_pthread_self() -> i64
+@[link_name("pthread_mutex_init")]
+extern fn rt_libc_pthread_mutex_init(mutex: *mut u8, attr: *const u8) -> i32
+@[link_name("pthread_mutex_lock")]
+extern fn rt_libc_pthread_mutex_lock(mutex: *mut u8) -> i32
+@[link_name("pthread_mutex_unlock")]
+extern fn rt_libc_pthread_mutex_unlock(mutex: *mut u8) -> i32
+@[link_name("pthread_cond_init")]
+extern fn rt_libc_pthread_cond_init(cond: *mut u8, attr: *const u8) -> i32
+@[link_name("pthread_cond_wait")]
+extern fn rt_libc_pthread_cond_wait(cond: *mut u8, mutex: *mut u8) -> i32
+@[link_name("pthread_cond_broadcast")]
+extern fn rt_libc_pthread_cond_broadcast(cond: *mut u8) -> i32
 
 extern fn with_fiber_switch(save: *mut u8, restore: *mut u8) -> Unit
 extern fn with_fiber_prepare_initial_context(ctx: *mut u8, stack: *mut u8, stack_size: i64) -> Unit
@@ -123,27 +136,27 @@ fn scheduler_cond_ptr() -> *mut u8:
 fn scheduler_init_primitives():
     if scheduler_primitives_initialized != 0:
         return
-    if pthread_mutex_init(scheduler_mutex_ptr(), 0 as *const u8) != 0:
-        abort()
-    if pthread_cond_init(scheduler_cond_ptr(), 0 as *const u8) != 0:
-        abort()
+    if rt_libc_pthread_mutex_init(scheduler_mutex_ptr(), 0 as *const u8) != 0:
+        rt_libc_abort()
+    if rt_libc_pthread_cond_init(scheduler_cond_ptr(), 0 as *const u8) != 0:
+        rt_libc_abort()
     scheduler_primitives_initialized = 1
 
 fn scheduler_lock():
-    if pthread_mutex_lock(scheduler_mutex_ptr()) != 0:
-        abort()
+    if rt_libc_pthread_mutex_lock(scheduler_mutex_ptr()) != 0:
+        rt_libc_abort()
 
 fn scheduler_unlock():
-    if pthread_mutex_unlock(scheduler_mutex_ptr()) != 0:
-        abort()
+    if rt_libc_pthread_mutex_unlock(scheduler_mutex_ptr()) != 0:
+        rt_libc_abort()
 
 fn scheduler_wait():
-    if pthread_cond_wait(scheduler_cond_ptr(), scheduler_mutex_ptr()) != 0:
-        abort()
+    if rt_libc_pthread_cond_wait(scheduler_cond_ptr(), scheduler_mutex_ptr()) != 0:
+        rt_libc_abort()
 
 fn scheduler_wake_all():
-    if pthread_cond_broadcast(scheduler_cond_ptr()) != 0:
-        abort()
+    if rt_libc_pthread_cond_broadcast(scheduler_cond_ptr()) != 0:
+        rt_libc_abort()
 
 fn worker_ctx_base() -> i64:
     (&raw mut worker_scheduler_ctxs) as *mut [1344]u8 as i64
@@ -152,7 +165,7 @@ fn scheduler_ctx_ptr(worker: i32) -> *mut u8:
     (worker_ctx_base() + worker as i64 * FIBER_CTX_SIZE) as *mut u8
 
 fn current_worker_index() -> i32:
-    let tid = pthread_self()
+    let tid = rt_libc_pthread_self()
     var i = 0
     while i < active_worker_count:
         if worker_thread_ids[i as i64] == tid:
@@ -401,7 +414,7 @@ fn worker_set_queue_head(worker: i32, value: i32):
 fn enqueue_worker(worker: i32, f: i64):
     let count = worker_queue_count(worker)
     if count >= MAX_FIBERS:
-        abort()
+        rt_libc_abort()
     fiber_set_owner_worker(f, worker)
     let tail = worker_queue_slot(worker, worker_queue_head(worker) + count)
     store_i64_index(worker_queue_base(), tail, f)
@@ -410,7 +423,7 @@ fn enqueue_worker(worker: i32, f: i64):
 fn enqueue_worker_front(worker: i32, f: i64):
     let count = worker_queue_count(worker)
     if count >= MAX_FIBERS:
-        abort()
+        rt_libc_abort()
     fiber_set_owner_worker(f, worker)
     let head = fiber_ring_index(worker_queue_head(worker) - 1)
     worker_set_queue_head(worker, head)
@@ -472,7 +485,7 @@ fn guard_page_size() -> i64:
         return fiber_page_size
     fiber_page_size = rt_fiber_page_size()
     if fiber_page_size <= 0:
-        abort()
+        rt_libc_abort()
     fiber_page_size
 
 fn fiber_effective_stack_size() -> i64:
@@ -484,10 +497,10 @@ fn fiber_effective_pool_limit() -> i32:
 fn allocate_stack_region(size: i64) -> *mut u8:
     let page_sz = guard_page_size()
     let total = page_sz + size
-    let region = mmap(0 as *mut u8, total as u64, PROT_READ_WRITE, rt_fiber_mmap_flags(), -1, 0)
+    let region = rt_libc_mmap(0 as *mut u8, total as u64, PROT_READ_WRITE, rt_fiber_mmap_flags(), -1, 0)
     if region as i64 == MAP_FAILED:
         return 0 as *mut u8
-    let _ = mprotect(region, page_sz as u64, PROT_NONE)
+    let _ = rt_libc_mprotect(region, page_sz as u64, PROT_NONE)
     (region as i64 + page_sz) as *mut u8
 
 fn acquire_fiber() -> i64:
@@ -527,7 +540,7 @@ fn free_fiber_stack(f: i64):
         return
     let page_sz = guard_page_size()
     let region = (stack as i64 - page_sz) as *mut u8
-    let _ = munmap(region, (page_sz + fiber_stack_size(f)) as u64)
+    let _ = rt_libc_munmap(region, (page_sz + fiber_stack_size(f)) as u64)
     fiber_set_stack(f, 0 as *mut u8)
 
 fn recycle_fiber(f: i64):
@@ -594,10 +607,10 @@ pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *m
                 let _ = rt_libc_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
                 fiber_write_i32(2, fiber_id(current))
                 let _ = rt_libc_write(2, ")\n" as *const u8, 2)
-                _exit(134)
+                rt_libc_exit(134)
 
     rt_fiber_reset_signal_handler(sig)
-    let _ = raise(sig)
+    let _ = rt_libc_raise(sig)
 
 fn fiber_install_signal_handlers():
     rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_stack_overflow_handler as i64)
@@ -617,7 +630,7 @@ pub fn with_fiber_bootstrap_finish() -> Unit:
     let worker = current_worker_index()
     let current = worker_current_fibers[worker as i64]
     if current == 0:
-        abort()
+        rt_libc_abort()
     scheduler_lock()
     completion_sequence = completion_sequence + 1
     fiber_set_completion_sequence(current, completion_sequence)
@@ -625,7 +638,7 @@ pub fn with_fiber_bootstrap_finish() -> Unit:
     scheduler_wake_all()
     scheduler_unlock()
     with_fiber_switch(current as *mut u8, scheduler_ctx_ptr(worker))
-    abort()
+    rt_libc_abort()
 
 fn finish_scheduler_turn(worker: i32, f: i64):
     scheduler_lock()
@@ -666,7 +679,7 @@ fn scheduler_worker_loop(worker: i32):
 fn scheduler_worker_entry(arg: *mut u8) -> *mut u8:
     let worker = (arg as i64) as i32
     scheduler_lock()
-    worker_thread_ids[worker as i64] = pthread_self()
+    worker_thread_ids[worker as i64] = rt_libc_pthread_self()
     scheduler_wake_all()
     scheduler_unlock()
     scheduler_worker_loop(worker)
@@ -690,7 +703,7 @@ fn scheduler_start_workers():
         let handle = rt_thread_spawn(scheduler_worker_entry as *mut u8, (i as i64) as *mut u8)
         if handle < 0:
             let _ = rt_libc_write(2, "fatal: could not start fiber scheduler worker\n" as *const u8, 46)
-            abort()
+            rt_libc_abort()
         worker_handles[i as i64] = handle
         i = i + 1
 
@@ -701,7 +714,7 @@ pub fn with_runtime_core_init() -> Unit:
     scheduler_running_fibers = 0
     worker_threads_started = 0
     active_worker_count = if configured_worker_count > 0: configured_worker_count else: 1
-    worker_thread_ids[0] = pthread_self()
+    worker_thread_ids[0] = rt_libc_pthread_self()
     fiber_page_size = guard_page_size()
     fiber_pool_reuse_count = 0
     fiber_pool_alloc_count = 0
@@ -734,7 +747,7 @@ pub fn with_runtime_core_init() -> Unit:
     while i < 8192:
         store_i64_index(worker_queue_base(), i, 0)
         i = i + 1
-    worker_thread_ids[0] = pthread_self()
+    worker_thread_ids[0] = rt_libc_pthread_self()
     scheduler_unlock()
     fiber_install_signal_handlers()
     scheduler_start_workers()
@@ -941,7 +954,7 @@ pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit:
     scheduler_wake_all()
     scheduler_unlock()
     with_fiber_switch(current as *mut u8, scheduler_ctx_ptr(worker))
-    abort()
+    rt_libc_abort()
 
 pub fn with_runtime_core_shutdown() -> Unit:
     scheduler_lock()

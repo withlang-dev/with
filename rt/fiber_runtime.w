@@ -20,8 +20,10 @@ extern fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_ewrite(s: &str) -> Unit
 extern fn with_i64_to_str(n: i64) -> str
-extern fn _exit(code: i32) -> Never
-extern fn abort() -> Unit
+@[link_name("_exit")]
+extern fn rt_libc_exit(code: i32) -> Never
+@[link_name("abort")]
+extern fn rt_libc_abort() -> Unit
 
 // The real definitions (fiber core) are unsafe fns: they write through the raw
 // out-pointers. These local unsafe wrappers spell that contract in both worlds
@@ -105,7 +107,7 @@ pub fn with_runtime_run() -> Unit:
     fiber_drain_detached_ready()
 
     if fiber_report_unhandled_panics() != 0:
-        _exit(1)
+        rt_libc_exit(1)
 
 fn fiber_take_detached_completed(fiber_id: i32, result_buf: *mut u8) -> i32:
     var panic_msg: *const u8 = 0 as *const u8
@@ -122,7 +124,7 @@ fn fiber_take_detached_completed(fiber_id: i32, result_buf: *mut u8) -> i32:
         with_ewrite("\n")
         // Propagated fiber panic: terminate with the panic convention (134),
         // same as with_panic. libc abort() diverges per platform (Windows → 3).
-        _exit(134)
+        rt_libc_exit(134)
     1
 
 fn fiber_remove_detached_at(index: i32):
@@ -205,7 +207,7 @@ pub fn with_fiber_await(fiber_id: i32) -> Unit:
                 with_ewrite("\n")
                 // Propagated fiber panic: exit 134 like with_panic, not libc
                 // abort() (which is 134 on Unix but 3 on Windows).
-                _exit(134)
+                rt_libc_exit(134)
             return
         if with_runtime_fiber_is_live(fiber_id) == 0:
             last_await_fiber_id = fiber_id
@@ -239,7 +241,7 @@ pub fn with_fiber_cleanup_await(fiber_id: i32) -> Unit:
                 with_ewrite("\n")
                 // Propagated fiber panic: exit 134 like with_panic, not libc
                 // abort() (which is 134 on Unix but 3 on Windows).
-                _exit(134)
+                rt_libc_exit(134)
             return
         if with_runtime_fiber_is_live(fiber_id) == 0:
             last_await_fiber_id = fiber_id
@@ -274,7 +276,7 @@ pub fn with_fiber_detach(fiber_id: i32, result_buf: *mut u8) -> i32:
     fiber_drain_detached_ready()
     if detached_fiber_count >= MAX_DETACHED_FIBERS:
         with_ewrite("fatal: too many detached fibers\n")
-        abort()
+        rt_libc_abort()
     detached_fiber_ids[detached_fiber_count as i64] = fiber_id
     detached_result_bufs[detached_fiber_count as i64] = result_buf as i64
     detached_fiber_count = detached_fiber_count + 1
@@ -297,7 +299,7 @@ pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
     fiber_drain_detached_ready()
     if detached_fiber_count >= MAX_DETACHED_FIBERS:
         with_ewrite("fatal: too many detached fibers\n")
-        abort()
+        rt_libc_abort()
     detached_fiber_ids[detached_fiber_count as i64] = fiber_id
     detached_result_bufs[detached_fiber_count as i64] = result_buf as i64
     detached_fiber_count = detached_fiber_count + 1

@@ -7,7 +7,8 @@ extern fn with_ewrite(s: &str) -> Unit
 extern fn with_i64_to_str(n: i64) -> str
 extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit
-extern fn _exit(code: i32) -> Never
+@[link_name("_exit")]
+extern fn rt_libc_exit(code: i32) -> Never
 
 fn str_data(s: &str) -> *const u8:
     unsafe **(&s as *const *const *const u8)
@@ -26,7 +27,7 @@ pub fn with_panic_ref(msg: &str, file: &str, line: i32) -> Never:
     let rendered = panic_render(msg, file, line)
     if with_fiber_in_fiber() != 0:
         with_fiber_panic_capture(str_data(rendered), rendered.len() as i32)
-        _exit(134)
+        rt_libc_exit(134)
     with_ewrite(rendered)
     with_ewrite("\n")
-    _exit(134)
+    rt_libc_exit(134)

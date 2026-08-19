@@ -17,7 +17,8 @@ extern fn rt_close(fd: i32) -> i32
 extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn rt_mmap(size: u64) -> *mut u8
 extern fn rt_munmap(ptr: *mut u8, size: u64)
-extern fn malloc(size: i64) -> *mut u8
+@[link_name("malloc")]
+extern fn rt_libc_malloc(size: i64) -> *mut u8
 @[link_name("free")]
 extern fn rt_libc_free(ptr: *mut u8) -> Unit
 extern fn rt_exit(code: i32)
@@ -33,7 +34,8 @@ extern fn rt_raise(sig: i32) -> i32
 extern fn rt_kill(pid: i32, sig: i32) -> i32
 extern fn rt_sysinfo(out: *mut u8) -> i32
 extern fn rt_set_process_memory_limit_bytes(limit: i64) -> i32
-extern fn gethostname(name: *mut u8, len: u64) -> i32
+@[link_name("gethostname")]
+extern fn rt_libc_gethostname(name: *mut u8, len: u64) -> i32
 extern fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64
 extern fn rt_thread_join(handle: i64) -> i32
 extern fn rt_fill_random(buf: *mut u8, len: u64) -> Unit
@@ -1159,7 +1161,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
     if alloc_system_on() != 0:
         let total = size + RT_ALLOC_HEADER_SIZE
         rt_alloc_reserve_mmap_bytes(total)
-        let p = malloc(total)
+        let p = rt_libc_malloc(total)
         if p as i64 == 0:
             rt_alloc_release_mmap_bytes(total)
             rt_exit(99)
@@ -3742,7 +3744,7 @@ pub fn with_sysinfo_arch() -> str:
 pub fn with_sysinfo_hostname() -> str:
     var buf: [256]u8 = [0 as u8; 256]
     let buf_ptr = (&raw mut buf) as *mut [256]u8 as *mut u8
-    if gethostname(buf_ptr, 256 as u64) != 0:
+    if rt_libc_gethostname(buf_ptr, 256 as u64) != 0:
         return make_str("unknown" as *const u8, 7)
     buf[255] = 0
     alloc_str(buf_ptr as *const u8, cstr_len(buf_ptr as *const u8))
