@@ -643,6 +643,8 @@ fn package_llvm_sdk_current_host_target() -> Target:
         return target.dep("package-llvm-sdk-darwin-aarch64")
     if platform == "linux-x86_64":
         return target.dep("package-llvm-sdk-linux-x86_64")
+    if platform == "linux-aarch64":
+        return target.dep("package-llvm-sdk-linux-aarch64")
     if platform == "windows-x86_64":
         return target.dep("package-llvm-sdk-windows-x86_64")
     target.dep("package-llvm-sdk-darwin-aarch64")
@@ -1411,6 +1413,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(package_current_host_target())
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-darwin-aarch64", "darwin-aarch64", sdk_default_prefix_for_platform("darwin-aarch64"), sdk_default_build_cache_for_platform("darwin-aarch64")))
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-x86_64", "linux-x86_64", sdk_default_prefix_for_platform("linux-x86_64"), sdk_default_build_cache_for_platform("linux-x86_64")))
+    out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-linux-aarch64", "linux-aarch64", sdk_default_prefix_for_platform("linux-aarch64"), sdk_default_build_cache_for_platform("linux-aarch64")))
     out = out.add_target(package_llvm_sdk_platform_target("package-llvm-sdk-windows-x86_64", "windows-x86_64", sdk_default_prefix_for_platform("windows-x86_64"), sdk_default_build_cache_for_platform("windows-x86_64")))
     out = out.add_target(package_llvm_sdk_current_host_target())
 
