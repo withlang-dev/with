@@ -19,6 +19,7 @@ extern fn rt_fiber_mmap_flags() -> i32
 extern fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit
 extern fn rt_fiber_reset_signal_handler(sig: i32) -> Unit
 extern fn rt_fiber_fault_addr(info: *const u8) -> i64
+extern fn rt_fiber_protect_guard(region: *mut u8, len: i64) -> Unit
 
 extern fn with_fiber_switch(save: *mut u8, restore: *mut u8) -> Unit
 extern fn with_fiber_prepare_initial_context(ctx: *mut u8, stack: *mut u8, stack_size: i64) -> Unit
@@ -142,6 +143,10 @@ fn store_i64_index(base: i64, index: i32, value: i64):
 fn load_i32(base: i64, offset: i64) -> i32:
     unsafe:
         *((base + offset) as *const i32)
+
+fn load_u32(base: i64, offset: i64) -> u32:
+    unsafe:
+        *((base + offset) as *const u32)
 
 fn store_i32(base: i64, offset: i64, value: i32):
     unsafe:
@@ -367,6 +372,7 @@ fn allocate_stack_region(size: i64) -> *mut u8:
     let region = rt_mmap(total)
     if region as i64 == 0 or region as i64 == MAP_FAILED:
         return 0 as *mut u8
+    rt_fiber_protect_guard(region, page_sz)
     (region as i64 + page_sz) as *mut u8
 
 fn acquire_fiber() -> i64:
@@ -459,26 +465,31 @@ fn fiber_write_i32(fd: i32, n: i32):
         let _ = rt_write(fd, (&buf as i64 + j as i64) as *const u8, 1)
         j = j - 1
 
-pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8) -> Unit:
-    let _ = ucontext
-    let fault_addr = rt_fiber_fault_addr(info)
-    if current_fiber != 0:
-        let stack = fiber_stack(current_fiber)
-        if stack as i64 != 0:
-            let page_sz = guard_page_size()
-            let guard_start = stack as i64 - page_sz
-            let guard_end = stack as i64
-            if fault_addr >= guard_start and fault_addr < guard_end:
-                let _ = rt_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
-                fiber_write_i32(2, fiber_id(current_fiber))
-                let _ = rt_write(2, ")\n" as *const u8, 2)
-                rt_exit(134)
-
-    rt_fiber_reset_signal_handler(sig)
-    let _ = rt_raise(sig)
+pub fn with_fiber_veh(exception_info: *mut u8) -> i32:
+    let rec = load_i64(exception_info as i64, 0)
+    if rec == 0:
+        return 0
+    let code = load_u32(rec, 0)
+    if code != 0x80000001 as u32 and code != 0xc0000005 as u32:
+        return 0
+    if current_fiber == 0:
+        return 0
+    let stack = fiber_stack(current_fiber)
+    if stack as i64 == 0:
+        return 0
+    let fault_addr = load_i64(rec, 40)
+    let page_sz = guard_page_size()
+    let guard_start = stack as i64 - page_sz
+    let guard_end = stack as i64
+    if fault_addr >= guard_start and fault_addr < guard_end:
+        let _ = rt_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
+        fiber_write_i32(2, fiber_id(current_fiber))
+        let _ = rt_write(2, ")\n" as *const u8, 2)
+        rt_exit(134)
+    0
 
 fn fiber_install_signal_handlers():
-    rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_stack_overflow_handler as i64)
+    rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_veh as i64)
 
 pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64) -> Unit:
     if current_fiber == 0:
