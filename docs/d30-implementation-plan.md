@@ -205,6 +205,31 @@ cell. String-emitted codegen calls (`with_print_str` & co.) resolve at
 LLVM-name level against the in-unit defs whose names are preserved —
 verify with the str probe before trusting.
 
+**R2c lane sweep results (2026-08-19, release at 7adc08e9):** baseline
+behavior suite 0 failures; under `WITH_RT_IN_UNIT` 69/~490 fail, in
+seven classes: (1) decl-shape divergences — `with_free`(13) /
+`with_realloc`(9) / `with_memcpy` / `with_vec_len` / `with_ptr_get_i32`
+declare `*mut c_void` where rt defs say `*mut u8` — mechanical
+def-is-truth sweeps across std.mem/box/arena + tests; (2) `SIGBUS`(10)
+constant shadowing — flat-namespace collision like the dirent constant;
+(3) `symlink`(9) — bare libc extern name vs std.fs's pub fn, the
+send/recv `@[link_name]` class; (4) vacuous-`unsafe`(4) +
+unsafe-required(3) — extern calls rebound to safe in-unit defs make
+user `unsafe {}` blocks vacuous, and vice versa (needs a rule: likely
+"an unsafe block around a runtime-ABI call is never vacuous" during
+transition); (5) `LLVM function verification failed after MIR cleanup
+for *.debug_str`(5) — REAL codegen bug under the lane, root-cause
+before any sweep; (6) 3 unclassified check failures; (7) singletons.
+Also fixed en route: std.process decl shapes, `rt_exit`/`ExitProcess`
+`-> Never` on all platforms. **Known flip-blocker recorded:** the
+compiler-self-lane stops at flat-namespace capture of rt PRIVATE
+helpers (root-tier `make_str` captures rt_core internals after the
+tier merge decl-drops the rt def) — needs module-scoped fn identity
+(#751 adjacency) or a full rt-private prefix sweep before the default
+flip. Sweep driver: per-file `WITH_RT_IN_UNIT=1 with test <file>`
+(never `with build` targets — the lane env poisons build.w's own
+evaluation through the seed's embedded stdlib).
+
 R2c. **Codegen lowers to ordinary module functions.** Family by family
 (str, vec, hashmap/slotmap, fmt, panic, fiber/async, regex, misc), each
 family alone in a drop-audit batch: replace the name-string synthesis with
