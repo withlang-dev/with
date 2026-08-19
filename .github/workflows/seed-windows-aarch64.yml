@@ -1,0 +1,298 @@
+name: seed windows-aarch64 (cross)
+
+# Cross-builds a Windows-on-ARM64 (`aarch64-pc-windows-msvc`) `with` compiler
+# seed on an x86_64 Linux runner and publishes it as a withlang-dev prerelease
+# asset `with-windows-aarch64.exe` (tag `seed-windows-aarch64`).
+#
+# How it works: the x86_64 Linux host bootstraps a fresh `with` from the source
+# tip being tested (which supports --target=aarch64-pc-windows-msvc —
+# TargetSpec.target_spec_cross_supported includes kind 6). That fresh compiler
+# then (a) builds the windows-aarch64 runtime/bridge objects
+# (`:cross-rt-windows-aarch64`) and (b) cross-emits + COFF-links the compiler
+# binary itself for arm64 Windows. The PE/COFF link statically pulls the TARGET
+# arch's libclang.lib / LLVM*.lib from the windows-aarch64 LLVM SDK, so this job
+# REQUIRES the `sdk-windows-aarch64` asset. It fails loudly (below) if that SDK
+# is not published. The MSVC CRT + Windows SDK (ucrt/um) arm64 import libs come
+# from `xwin`.
+#
+# The produced binary is a real arm64 PE/COFF image; it is NOT run or
+# fixpoint-verified here (no arm64-Windows runner). It is the intermediate seed
+# for a downstream native windows-arm64 stage1->stage2->stage3 bootstrap
+# (selfhost-windows-aarch64.yml).
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: >-
+          Buildable source tip to cross-build from (this repo). Must support the
+          windows-aarch64 cross target (kind 6) and be green from the pinned
+          seed. Defaults to the ref this workflow runs on. Use a FULL 40-char
+          commit SHA: actions/checkout treats a short SHA as a branch/tag name
+          pattern and its shallow fetch then matches nothing.
+        required: false
+        default: ""
+  push:
+    branches: [winarm/pr3-seed-ci]
+
+concurrency:
+  group: seed-windows-aarch64-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  cross-seed:
+    name: cross-build windows-aarch64 seed
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      LLVM_VER: "22.1.6"
+      # Native x86_64 host bootstrap seed (matches selfhost-linux CI).
+      WITH_SEED_REPO: withlang-dev/with
+      WITH_SEED_VERSION: v0.15.1.3
+      WITH_SEED_ASSET: with-linux-x86_64
+      WITH_SEED_SHA256: 0556c80c0acc44545c77e1dac77ffb677fe53c4cdbefba4aa7d36eb63b27b595
+      # Native x86_64 host LLVM SDK (drives the host bootstrap link).
+      WITH_SDK_REPO: withlang-dev/with
+      WITH_SDK_VERSION: v0.15.1
+      WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.zst
+      # windows-aarch64 TARGET LLVM SDK — statically linked into the cross
+      # compiler. Published to this repo by the `sdk-llvm windows-aarch64`
+      # workflow. Extracts to .deps/llvm-22.1.6-windows-aarch64-msvc/ (the
+      # top-level dir inside the tarball already matches build.w's expected
+      # prefix — no rename).
+      CROSS_SDK_TAG: sdk-windows-aarch64
+      CROSS_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
+      CROSS_SDK_SHA256: ad13e07af474d683c699f041c52cd98697df9781b581dda913d39d92be186743
+      # Cross target.
+      CROSS_TRIPLE: aarch64-pc-windows-msvc
+      # xwin: MSVC CRT + Windows SDK (ucrt/um) arm64 import libraries.
+      XWIN_VERSION: "0.9.0"
+      # Published seed asset.
+      SEED_RELEASE_TAG: seed-windows-aarch64
+      SEED_ASSET: with-windows-aarch64.exe
+      LLVM_PREFIX: ${{ github.workspace }}/.deps/llvm-22.1.6-linux-x86_64
+      # The build runs in working-directory: src-tree and writes ./out there, so
+      # the compiler's link stage must resolve its runtime root to that same
+      # tree (out/lib/cross/windows_aarch64/*.o). Point WITH_OUT_DIR at the real
+      # build tree so those cross objects are found (see the linux-aarch64 seed
+      # workflow for the failure mode when this is wrong).
+      WITH_OUT_DIR: ${{ github.workspace }}/src-tree/out
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Guard — require the windows-aarch64 SDK asset (fail loudly)
+        run: |
+          set -euo pipefail
+          # The cross link statically pulls the arm64 libclang.lib/LLVM*.lib from
+          # this SDK. Without it there is nothing to link against — fail now with a
+          # clear message rather than deep in the link with an obscure error.
+          if ! gh release view "$CROSS_SDK_TAG" --repo "$GITHUB_REPOSITORY" \
+                --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "$CROSS_SDK_ASSET"; then
+            echo "error: required windows-aarch64 SDK asset not published yet." >&2
+            echo "       expected: $GITHUB_REPOSITORY release '$CROSS_SDK_TAG' asset '$CROSS_SDK_ASSET'" >&2
+            echo "       run the 'sdk-llvm windows-aarch64' workflow first (it must go green)." >&2
+            exit 1
+          fi
+          echo "found $CROSS_SDK_ASSET on $GITHUB_REPOSITORY:$CROSS_SDK_TAG"
+
+      - name: Checkout buildable source (this repo @ ref)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_ref || github.sha }}
+          path: src-tree
+
+      - name: Confirm host arch and source tip
+        working-directory: src-tree
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "x86_64" || { echo "runner is not x86_64"; exit 1; }
+          git log -1 --oneline
+          # This tip must support the windows-aarch64 cross target (kind 6): the
+          # cross_supported gate must include kind 6, and TargetSpec must map the
+          # triple to it.
+          grep -q 'kind == 6' src/TargetSpec.w \
+            || { echo "source tip does not enable the windows-aarch64 cross target (kind 6)"; exit 1; }
+
+      - name: Install host packages
+        run: |
+          set -euo pipefail
+          # Defuse the apt-daily / unattended-upgrades systemd timers that race
+          # the dpkg lock on a fresh runner, then give apt a bounded lock timeout
+          # so it fails loudly instead of hanging forever.
+          sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+          sudo systemctl disable apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+          sudo systemctl kill --kill-who=all apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+          for _ in $(seq 1 60); do
+            sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || break
+            sleep 2
+          done
+          APT="sudo apt-get -o DPkg::Lock::Timeout=300"
+          $APT update -qq
+          # zstd: extract the host SDK. dev libs: the host bootstrap link line
+          # uses -lz -lzstd -lxml2 (build/compiler.w).
+          $APT install -y --no-install-recommends \
+            zstd zlib1g-dev libzstd-dev libxml2-dev curl ca-certificates
+
+      - name: Provide arm64 Windows import libs (xwin)
+        run: |
+          set -euo pipefail
+          # The COFF cross-link needs the MSVC CRT + Windows SDK (ucrt/um) import
+          # libraries for arm64. xwin downloads and splats them from Microsoft.
+          # `--arch aarch64` (canonical LLVM notation, not MS `arm64`) names the
+          # per-arch subdirs `aarch64`, which is what the WITH_WINDOWS_*_LIBDIR
+          # exports below point at.
+          curl -fL -o /tmp/xwin.tar.gz \
+            "https://github.com/Jake-Shadle/xwin/releases/download/${XWIN_VERSION}/xwin-${XWIN_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          mkdir -p /tmp/xwin-bin
+          tar -xzf /tmp/xwin.tar.gz -C /tmp/xwin-bin --strip-components=1
+          test -x /tmp/xwin-bin/xwin || { echo "xwin binary missing after extract"; ls -la /tmp/xwin-bin; exit 1; }
+          /tmp/xwin-bin/xwin --accept-license --arch aarch64 \
+            splat --output "$GITHUB_WORKSPACE/.deps/winsdk-arm64"
+          crt="$GITHUB_WORKSPACE/.deps/winsdk-arm64/crt/lib/aarch64"
+          ucrt="$GITHUB_WORKSPACE/.deps/winsdk-arm64/sdk/lib/ucrt/aarch64"
+          um="$GITHUB_WORKSPACE/.deps/winsdk-arm64/sdk/lib/um/aarch64"
+          for d in "$crt" "$ucrt" "$um"; do
+            test -d "$d" || { echo "xwin did not produce $d"; find "$GITHUB_WORKSPACE/.deps/winsdk-arm64" -maxdepth 3 -type d | head -40; exit 1; }
+          done
+          # The compiler resolves the arm64 Windows libdirs from these env vars
+          # (build/emit_c.w windows-aarch64 block). Export for later steps.
+          {
+            echo "WITH_WINDOWS_MSVC_LIBDIR=$crt"
+            echo "WITH_WINDOWS_UCRT_LIBDIR=$ucrt"
+            echo "WITH_WINDOWS_UM_LIBDIR=$um"
+          } >> "$GITHUB_ENV"
+          echo "arm64 Windows import libs ready"
+
+      - name: Fetch host x86_64 LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          curl -fL -o /tmp/host-sdk.tar.zst \
+            "https://github.com/$WITH_SDK_REPO/releases/download/$WITH_SDK_VERSION/$WITH_SDK_ASSET"
+          zstd -d -c /tmp/host-sdk.tar.zst | tar -x -C .deps
+          test -x "$LLVM_PREFIX/bin/lld" || { echo "host SDK lld missing"; ls -la .deps; exit 1; }
+          test -f "$LLVM_PREFIX/lib/libclang.a" || { echo "host SDK libclang.a missing"; exit 1; }
+
+      - name: Fetch target windows-aarch64 LLVM SDK
+        run: |
+          set -euo pipefail
+          mkdir -p .deps
+          curl -fL -o /tmp/cross-sdk.tar.gz \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$CROSS_SDK_TAG/$CROSS_SDK_ASSET"
+          # Verify against the pinned sha first, then the sidecar if present.
+          got="$(sha256sum /tmp/cross-sdk.tar.gz | awk '{print $1}')"
+          test "$got" = "$CROSS_SDK_SHA256" \
+            || { echo "cross SDK sha256 mismatch: want=$CROSS_SDK_SHA256 got=$got"; exit 1; }
+          tar -xzf /tmp/cross-sdk.tar.gz -C .deps
+          cross_prefix=".deps/llvm-${LLVM_VER}-windows-aarch64-msvc"
+          test -f "$cross_prefix/lib/libclang.lib" \
+            || { echo "cross SDK libclang.lib missing at $cross_prefix"; ls -la "$cross_prefix/lib" 2>/dev/null | head; exit 1; }
+
+      - name: Set up linker shim (SDK lld + lld-link + libxml2.so.16)
+        run: |
+          set -euo pipefail
+          mkdir -p .link-shim
+          # The seed emits -fuse-ld=lld; expose the host SDK's lld under the names
+          # the driver looks for. lld is target-agnostic: invoked as `lld-link` it
+          # performs a native COFF/PE link for the arm64 Windows output. Provide
+          # lld-link in the shim too so the compiler's coff_lld_for finds it as a
+          # sibling of whichever ld.lld the runtime metadata records. SDK lld has
+          # DT_NEEDED libxml2.so.16 while Ubuntu ships libxml2.so.2 — ABI-safe for
+          # linking, so alias it.
+          ln -sf "$LLVM_PREFIX/bin/ld.lld"   .link-shim/ld.lld
+          ln -sf "$LLVM_PREFIX/bin/ld.lld"   .link-shim/ld64.lld
+          ln -sf "$LLVM_PREFIX/bin/lld"      .link-shim/lld
+          ln -sf "$LLVM_PREFIX/bin/lld"      .link-shim/lld-link
+          xml2="$(ldconfig -p | awk '/libxml2\.so\.2 /{print $NF; exit}')"
+          [ -n "$xml2" ] || xml2="$(ls /lib/x86_64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1)"
+          [ -n "$xml2" ] || { echo "no system libxml2.so.2"; exit 1; }
+          ln -sf "$xml2" .link-shim/libxml2.so.16
+          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" "$LLVM_PREFIX/bin/ld.lld" --version
+
+      - name: Bootstrap host seed
+        run: |
+          set -euo pipefail
+          curl -fL -o with-seed \
+            "https://github.com/$WITH_SEED_REPO/releases/download/$WITH_SEED_VERSION/$WITH_SEED_ASSET"
+          printf '%s  %s\n' "$WITH_SEED_SHA256" with-seed | sha256sum -c -
+          chmod +x with-seed
+          LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" ./with-seed version
+
+      - name: Build native host compiler (seed -> stage1 -> stage2 -> final)
+        working-directory: src-tree
+        env:
+          WITH: ${{ github.workspace }}/with-seed
+        run: |
+          set -euo pipefail
+          export PATH="$GITHUB_WORKSPACE/.link-shim:$LLVM_PREFIX/bin:$PATH"
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/.link-shim:${LD_LIBRARY_PATH:-}"
+          # Symlink the fetched .deps into the source tree so relative .deps paths
+          # (host + cross SDK, xwin libdirs) resolve from the build CWD.
+          ln -sfn "$GITHUB_WORKSPACE/.deps" .deps
+          "$WITH" build
+          test -x out/release/bin/with || { echo "native release compiler not produced"; exit 1; }
+          out/release/bin/with version
+
+      - name: Build windows-aarch64 cross runtime/bridge objects (:cross-rt-windows-aarch64)
+        working-directory: src-tree
+        env:
+          WITH: ${{ github.workspace }}/with-seed
+        run: |
+          set -euo pipefail
+          export PATH="$GITHUB_WORKSPACE/.link-shim:$LLVM_PREFIX/bin:$PATH"
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/.link-shim:${LD_LIBRARY_PATH:-}"
+          "$WITH" build :cross-rt-windows-aarch64
+          d=out/lib/cross/windows_aarch64
+          for f in embedded_objects.o llvm_bridge.o clang_bridge.o llvm_ld.rsp; do
+            test -f "$d/$f" || { echo "missing cross artifact $d/$f"; ls -la "$d" 2>/dev/null; exit 1; }
+          done
+
+      - name: Cross-emit + COFF-link the windows-aarch64 compiler binary
+        working-directory: src-tree
+        run: |
+          set -euo pipefail
+          export PATH="$GITHUB_WORKSPACE/.link-shim:$LLVM_PREFIX/bin:$PATH"
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/.link-shim:${LD_LIBRARY_PATH:-}"
+          # out/gen/main.w is the version-stamped CLI entry produced by `with build`;
+          # it `use`s the src/ modules, so the full compiler is compiled in.
+          test -f out/gen/main.w || { echo "out/gen/main.w missing (expected after build)"; exit 1; }
+          out/release/bin/with build --target "$CROSS_TRIPLE" out/gen/main.w -O1 \
+            -o "$GITHUB_WORKSPACE/$SEED_ASSET"
+
+      - name: Verify cross output is an arm64 PE/COFF image
+        run: |
+          set -euo pipefail
+          test -f "$SEED_ASSET" || { echo "cross seed binary not produced"; exit 1; }
+          # llvm-readobj reports the COFF machine reliably; `file` may not.
+          hdr="$("$LLVM_PREFIX/bin/llvm-readobj" --file-headers "$SEED_ASSET")"
+          echo "$hdr" | grep -iE 'Machine|Format|Characteristics' | head -20
+          echo "$hdr" | grep -qiE 'IMAGE_FILE_MACHINE_ARM64|0xAA64' \
+            || { echo "cross output is not an arm64 PE/COFF image"; exit 1; }
+          # Host x86_64 cannot execute an arm64 Windows binary; do not run it here.
+          sha256sum "$SEED_ASSET" | tee "$SEED_ASSET.sha256"
+          ls -la "$SEED_ASSET"
+
+      - name: Package + publish seed to withlang-dev prerelease
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          sha256sum "$SEED_ASSET" | tee "$SEED_ASSET.sha256"
+          gh release view "$SEED_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$SEED_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --prerelease \
+              --title "with windows-aarch64 cross seed" \
+              --notes "CI cross-built arm64-Windows \`with\` compiler (aarch64-pc-windows-msvc). Intermediate seed for a native windows-aarch64 stage1->stage2->stage3 bootstrap; NOT fixpoint-verified here."
+          gh release upload "$SEED_RELEASE_TAG" "$SEED_ASSET" "$SEED_ASSET.sha256" \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: with-windows-aarch64-seed
+          path: |
+            with-windows-aarch64.exe
+            with-windows-aarch64.exe.sha256
+          retention-days: 14
