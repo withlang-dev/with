@@ -113,6 +113,17 @@ jobs:
           # lld-link.exe on PATH for the native COFF link step.
           echo "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc/bin" >> "$GITHUB_PATH"
 
+          # The arm64 runner's ambient `nm` (MSYS/Git-for-Windows binutils)
+          # lacks the aarch64-COFF BFD backend, so `nm <arm64 obj>` fails with
+          # "file format not recognized" (the object is a valid COFF-ARM64
+          # image; only this nm can't parse it). The SDK's llvm-nm reads
+          # COFF-ARM64 and emits the same BSD-format symbol lines. Shim
+          # `nm` -> llvm-nm in the SDK bin (prepended to PATH above) so the
+          # cli-selfhost-object-symbol test, which invokes the literal `nm`,
+          # resolves the aarch64-aware tool.
+          cp ".deps/llvm-22.1.6-windows-aarch64-msvc/bin/llvm-nm.exe" \
+             ".deps/llvm-22.1.6-windows-aarch64-msvc/bin/nm.exe"
+
       - name: Report toolchain
         run: |
           set -euo pipefail
