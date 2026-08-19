@@ -497,7 +497,7 @@ jobs:
           msvc_ver="$(ls "$vs_root/VC/Tools/MSVC" | sort -V | tail -1)"
           echo "WITH_WINDOWS_MSVC_LIBDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/lib/arm64")" >> "$GITHUB_ENV"
           kit_root="/c/Program Files (x86)/Windows Kits/10/Lib"
-          kit_ver="$(ls "$kit_root" | sort -V | tail -1)"
+          kit_ver="$(ls "$kit_root" | grep -E '^10\.' | sort -V | tail -1)"
           echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/arm64")" >> "$GITHUB_ENV"
           echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/arm64")" >> "$GITHUB_ENV"
           echo "$PWD/.deps/llvm-22.1.6-windows-aarch64-msvc/bin" >> "$GITHUB_PATH"

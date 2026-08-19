@@ -95,7 +95,7 @@ jobs:
           msvc_ver="$(ls "$vs_root/VC/Tools/MSVC" | sort -V | tail -1)"
           echo "WITH_WINDOWS_MSVC_LIBDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/lib/arm64")" >> "$GITHUB_ENV"
           kit_root="/c/Program Files (x86)/Windows Kits/10/Lib"
-          kit_ver="$(ls "$kit_root" | sort -V | tail -1)"
+          kit_ver="$(ls "$kit_root" | grep -E '^10\.' | sort -V | tail -1)"
           echo "WITH_WINDOWS_UCRT_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/ucrt/arm64")" >> "$GITHUB_ENV"
           echo "WITH_WINDOWS_UM_LIBDIR=$(cygpath -m "$kit_root/$kit_ver/um/arm64")" >> "$GITHUB_ENV"
 
@@ -105,7 +105,7 @@ jobs:
           # Include dirs as the x64 job.
           echo "WITH_WINDOWS_MSVC_INCDIR=$(cygpath -m "$vs_root/VC/Tools/MSVC/$msvc_ver/include")" >> "$GITHUB_ENV"
           kit_incroot="/c/Program Files (x86)/Windows Kits/10/Include"
-          kit_incver="$(ls "$kit_incroot" | sort -V | tail -1)"
+          kit_incver="$(ls "$kit_incroot" | grep -E '^10\.' | sort -V | tail -1)"
           echo "WITH_WINDOWS_UCRT_INCDIR=$(cygpath -m "$kit_incroot/$kit_incver/ucrt")" >> "$GITHUB_ENV"
           echo "WITH_WINDOWS_SHARED_INCDIR=$(cygpath -m "$kit_incroot/$kit_incver/shared")" >> "$GITHUB_ENV"
           echo "WITH_WINDOWS_UM_INCDIR=$(cygpath -m "$kit_incroot/$kit_incver/um")" >> "$GITHUB_ENV"
