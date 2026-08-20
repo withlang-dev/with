@@ -14752,14 +14752,18 @@ impl Sema:
                 else:
                     fn_sym = self.syms.some
                 self.comp_resolved.insert(node, fn_sym)
-            if self.symbol_visible_from_current(fn_sym) == 0:
-                self.emit_private_symbol_error(fn_sym, callee)
-                return 0
+            // D29 precedence: a lexical binding wins before any module-level
+            // interpretation — consult the scope BEFORE the global visibility
+            // gate, or a local callable named like another module's private
+            // fn mis-errors (in-unit runtime locals vs user top-levels).
             local_tid = self.scope_lookup(fn_sym)
             if local_tid >= 0:
                 callable_value_tid = self.callable_any_fn_type(local_tid as TypeId)
                 if self.binding_closure_nodes.contains(fn_sym):
                     callable_closure_node = self.binding_closure_nodes.get(fn_sym).unwrap()
+            if local_tid < 0 and self.symbol_visible_from_current(fn_sym) == 0:
+                self.emit_private_symbol_error(fn_sym, callee)
+                return 0
         else:
             callable_value_tid = self.callable_any_fn_type(self.check_expr(callee) as TypeId)
             if self.ast.kind(callee) == NodeKind.NK_CLOSURE:
@@ -14779,7 +14783,12 @@ impl Sema:
         // symbol pools can reuse integer ids, so a stale/raw generic map hit must
         // not turn an ordinary helper call into a generic instantiation.
         let sig_idx_raw = self.get_visible_sig(fn_sym)
-        let sig_idx = if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: -1 else: sig_idx_raw
+        // D29: a lexical CALLABLE binding preempts a module-level signature
+        // of the same flat name (same-module shadowing is already rejected,
+        // so this only decides the cross-module case in favor of the local).
+        let sig_idx = if callable_value_tid != 0: -1
+            else if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: -1
+            else: sig_idx_raw
         let variant_expected_ty = if self.variant_lookup.contains(fn_sym) and self.is_ci_visible(fn_sym) != 0: self.expected_variant_constructor_type(fn_sym) else: 0
         let imported_variant_owner_for_call = if self.imported_variant_owners.contains(fn_sym): self.imported_variant_owners.get(fn_sym).unwrap() else: 0
         let variant_payload_owner = if variant_expected_ty != 0:
