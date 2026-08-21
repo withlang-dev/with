@@ -230,6 +230,41 @@ flip. Sweep driver: per-file `WITH_RT_IN_UNIT=1 with test <file>`
 (never `with build` targets — the lane env poisons build.w's own
 evaluation through the seed's embedded stdlib).
 
+**R2c lane sweep, re-measured 2026-08-20 (release at cff51561):** 7
+failures / ~950 behavior tests, all in parked classes — flat-namespace
+capture (`behav_annotated_top_level_runtime_init`,
+`issue142_global_struct_init`: rt/fiber_runtime.w:42's `ptr` resolves to
+the USER file's private `ptr`, so the blocker runs in both directions,
+not just root-tier capturing rt privates), no_std prelude
+(`behav_no_std_alloc_prelude`, `behav_no_std_core_prelude`),
+capability-token comptime (`behav_capability_token_mismatch`), d27 view
+lifetime (`behav_d27_view_nll_before_owner_consume`), and the runner
+assertion (`behav_action_crash_diagnostic`). Classes (1)–(5) above are
+green. **But (1) is green for the wrong reason:** #839's declare/define
+unification reconciles mismatched decls at LLVM level, so the lane no
+longer fails on them while the contracts are still derived twice. A
+direct audit — every `extern fn with_*` decl in rt/lib/std/src/tools/test
+against the rt def of the same name, normalized to parameter types +
+return type — found **63 divergent sites across 24 symbols**, including
+contract divergences the lane cannot see: `with_panic` declared `-> Unit`
+against a `-> Never` def (callers could not see those paths diverge;
+13 dead `return`s existed only to satisfy the lie), `with_fiber_cancel`
+`-> Unit` vs `-> i32`, `with_vec_push_i32` declared `(&Vec[i32], i32)`
+against a `(*mut u8, i32)` def (a With-managed type in an extern
+signature — the §16.3e R4 error class), `with_str_hash` `i64` vs `u64`,
+and the Windows net family still `str` where R1 flipped darwin/linux to
+`&str`. Tranche 1 (28f7f19a) took the 24 return-type sites whose callers
+discard the value. **Remaining 39:** the pcre2 `*i8` family
+(`lib/std/re/defs.w` declares alloc/free/realloc/memcpy/memmove/memset/
+memcmp as `*i8`; ~217 call sites across 15 files pass `*i8` — needs a
+migration tool, not a hand sweep), `with_str_hash` (EmbeddedClangResource
+formats the value into a manifest, so the signedness flip changes
+manifest bytes for high-bit hashes — needs a deliberate cache-key bump),
+`with_vec_push_i32`/`with_hashmap_new_at` (src decl shapes),
+`with_bswap*` (`u` vs `i`), the Windows net rows, `with_channel_*`,
+`with_libc_write`, `with_fill_random`. The audit is the R2c exit gate
+for this class: zero divergences, then the decls themselves delete.
+
 R2c. **Codegen lowers to ordinary module functions.** Family by family
 (str, vec, hashmap/slotmap, fmt, panic, fiber/async, regex, misc), each
 family alone in a drop-audit batch: replace the name-string synthesis with
