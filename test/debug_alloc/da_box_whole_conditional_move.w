@@ -5,10 +5,10 @@
 // the reset pointer with no runtime guard).
 use std.box.Box
 use std.builtins.print_i32
-extern fn with_alloc(size: i64) -> *i8
-extern fn with_free(ptr: *i8) -> Unit
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> Unit
 
-type Resource { ptr: *i8, slot: *mut i32 }
+type Resource { ptr: *mut u8, slot: *mut i32 }
 impl Drop for Resource:
     fn drop(move self: Self):
         unsafe:

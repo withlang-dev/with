@@ -6,14 +6,14 @@
 // and sizeof silently became 0, so the memcpy below copied nothing —
 // arena_vec_push lost every element the same way.
 
-extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
 
 type Slot[T] {
     ptr: *mut T,
 }
 
 pub unsafe fn slot_put[T](s: *mut Slot[T], value: T) -> Unit:
-    with_memcpy((*s).ptr as *i8, &value as *const T as *i8, sizeof[T]() as i64)
+    with_memcpy((*s).ptr as *mut u8, &value as *const T as *const u8, sizeof[T]() as i64)
 
 fn main:
     var storage: i32 = 0
