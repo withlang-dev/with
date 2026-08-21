@@ -1170,11 +1170,11 @@ fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32) -> i3
     freeaddrinfo(res)
     -1
 
-pub fn with_net_tcp_connect(host: str, port: i32) -> i32:
-    rt_net_connect_any(&host, port, 1, 6)
+pub fn with_net_tcp_connect(host: &str, port: i32) -> i32:
+    rt_net_connect_any(host, port, 1, 6)
 
-pub fn with_net_udp_connect(host: str, port: i32) -> i32:
-    rt_net_connect_any(&host, port, 2, 17)
+pub fn with_net_udp_connect(host: &str, port: i32) -> i32:
+    rt_net_connect_any(host, port, 2, 17)
 
 fn rt_net_bind_inaddr_any(fd: i64, port: i32) -> i32:
     var sa: [16]u8 = [0 as u8; 16]
@@ -1225,8 +1225,8 @@ pub fn with_net_sock_port(sock: i32) -> i32:
         return -1
     ((sa[2] as i32) << 8) | (sa[3] as i32)
 
-pub fn with_net_send(sock: i32, data: str) -> i64:
-    let ptr = rt_net_str_data(&data)
+pub fn with_net_send(sock: i32, data: &str) -> i64:
+    let ptr = rt_net_str_data(data)
     let total = data.len()
     var written: i64 = 0
     while written < total:

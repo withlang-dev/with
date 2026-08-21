@@ -4,7 +4,6 @@
 
 extern fn with_fs_read_file(path: &str) -> str
 extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_vec_push_i32(v: &Vec[i32], val: i32) -> Unit
 
 type Source {
     path: str,
@@ -76,11 +75,11 @@ impl Source:
         slice
 
 fn source_compute_line_offsets(text: &str) -> Vec[i32]:
-    let offsets: Vec[i32] = Vec.new()
-    with_vec_push_i32(&offsets, 0)
+    var offsets: Vec[i32] = Vec.new()
+    offsets.push(0)
     for i in 0..text.len():
         if text[i] == 10:
-            with_vec_push_i32(&offsets, (i as i32) + 1)
+            offsets.push((i as i32) + 1)
     offsets
 
 impl Source:

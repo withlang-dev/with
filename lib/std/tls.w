@@ -354,10 +354,10 @@ unsafe fn tls_recv(conn: *mut TlsConn, buf: *mut u8, buf_cap: i32) -> i32:
 // ── Random bytes ───────────────────────────────────────────────────
 
 extern fn with_fs_read_file(path: &str) -> str
-extern fn with_fill_random(buf: *mut u8, len: i32)
+extern fn with_fill_random(buf: *mut u8, len: i64) -> Unit
 
 unsafe fn fill_random(buf: *mut u8, len: i32):
-    with_fill_random(buf, len)
+    with_fill_random(buf, len as i64)
 
 // ── TLS 1.2 Handshake ─────────────────────────────────────────────
 

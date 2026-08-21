@@ -11,7 +11,7 @@ use std.crypto.sha256
 // std.internal.str_abi also copies through the borrowed header directly so
 // this seed-built tool never enters the legacy consuming byte-at ABI.
 extern fn with_write_stdout(s: &str) -> Unit
-extern fn with_libc_write(fd: i32, buf: *mut u8, count: u64) -> i64
+extern fn with_libc_write(fd: i32, buf: *const u8, count: u64) -> i64
 extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_fs_read_file(path: &str) -> str
 

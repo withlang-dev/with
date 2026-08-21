@@ -30,7 +30,7 @@ fn line_of(text: &str, off: i32) -> i32:
 // One "name|sig|file:line" record per matching decl. `sig` is normalized to
 // parameter TYPES plus return type, names dropped:
 // `fn f(dst: *mut u8, n: i64) -> Unit` -> "(*mut u8,i64)->Unit"
-fn scan(path: &str, want_extern: bool) -> Vec[str]:
+fn scan(path: &str, want_extern: bool, aliases: &Vec[str]) -> Vec[str]:
     var found: Vec[str] = Vec.new()
     let text = read_file(path)
     if text.len() == 0: return found
@@ -73,30 +73,63 @@ fn scan(path: &str, want_extern: bool) -> Vec[str]:
                         sig = sig ++ "->Unit"
                     done = true
                     continue
-            if depth == 1:
-                if tag == TokenKind.TK_COMMA:
-                    after_colon = false
-                    first_word = true
-                    sig = sig ++ ","
-                    k = k + 1
-                    continue
-                if tag == TokenKind.TK_COLON:
-                    after_colon = true
-                    k = k + 1
-                    continue
-                if after_colon:
-                    if not first_word: sig = sig ++ " "
-                    sig = sig ++ text.slice(toks.get_start(k) as i64, toks.get_end(k) as i64)
-                    first_word = false
+            if depth == 1 and tag == TokenKind.TK_COMMA:
+                after_colon = false
+                first_word = true
+                sig = sig ++ ","
+                k = k + 1
+                continue
+            if depth == 1 and tag == TokenKind.TK_COLON:
+                after_colon = true
+                k = k + 1
+                continue
+            // Inside a parameter's type, every token counts — including the
+            // parens of a fn-pointer type like `*const fn(*mut u8) -> Unit`.
+            if after_colon:
+                if not first_word: sig = sig ++ " "
+                sig = sig ++ text.slice(toks.get_start(k) as i64, toks.get_end(k) as i64)
+                first_word = false
             k = k + 1
-        found.push(f"{name}|{sig}|{path}:{line_of(text, toks.get_start(i))}")
+        found.push(f"{name}|{expand_aliases(sig, aliases)}|{path}:{line_of(text, toks.get_start(i))}")
     found
 
-fn collect(root: &str, want_extern: bool) -> Vec[str]:
+// rt's own `type X = ...` aliases, as "name|expansion" records. A def spelled
+// through an alias and a decl spelled through its expansion are the same
+// contract; the audit must not report them as divergent.
+fn load_aliases(root: &str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    for p in list_files_text(root).split("\n"):
+        if not p.ends_with(".w"): continue
+        for line in read_file(p).split("\n"):
+            if not line.starts_with("type "): continue
+            let eq = line.find(" = ")
+            if eq < 0: continue
+            let alias = line.slice(5, eq as i64)
+            let body = line.slice((eq + 3) as i64, line.len())
+            out.push(f"{alias}|{normalize_type_text(body)}")
+    out
+
+// Whitespace is never significant inside a With type, so the comparison key
+// is the type text with every space removed: `* const fn ( * mut u8 )` and
+// `*const fn(*mut u8)` are the same contract.
+fn normalize_type_text(body: &str) -> str:
+    body.replace(" ", "")
+
+fn expand_aliases(sig: &str, rt_aliases: &Vec[str]) -> str:
+    var out = normalize_type_text(sig)
+    for i in 0..rt_aliases.len() as i32:
+        let rec = rt_aliases.get(i as i64)
+        let bar = rec.find("|")
+        let alias = rec.slice(0, bar as i64)
+        let body = rec.slice((bar + 1) as i64, rec.len())
+        out = out.replace(alias, body)
+    out
+
+fn collect(root: &str, want_extern: bool, aliases: &Vec[str]) -> Vec[str]:
     var all: Vec[str] = Vec.new()
     for p in list_files_text(root).split("\n"):
         if not p.ends_with(".w"): continue
-        for r in scan(p, want_extern):
+        for r in scan(p, want_extern, aliases):
             all.push(owned(r))
     all
 
@@ -107,7 +140,8 @@ fn field(rec: &str, k: i32) -> str:
         i = i + 1
     ""
 
-let defs = collect("rt", false)
+let aliases = load_aliases("rt")
+let defs = collect("rt", false, &aliases)
 var decls: Vec[str] = Vec.new()
 var roots: Vec[str] = Vec.new()
 roots.push("rt")
@@ -116,7 +150,7 @@ roots.push("src")
 roots.push("tools")
 roots.push("test")
 for ri in 0..roots.len() as i32:
-    for r in collect(roots.get(ri as i64), true):
+    for r in collect(roots.get(ri as i64), true, &aliases):
         decls.push(owned(r))
 
 var bad = 0

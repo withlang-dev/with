@@ -20,7 +20,6 @@ extern fn with_write(s: &str) -> Unit
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *i8
 extern fn i64_to_string(n: i64) -> str
 extern fn abort() -> Unit
 
