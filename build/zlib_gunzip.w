@@ -46,7 +46,7 @@ unsafe fn cleanup_stream(file: *mut c_void, out_ptr: *mut u8, stream: *mut z_str
     if initialized:
         let _end = inflateEnd(stream)
     if out_ptr as i64 != 0:
-        with_free(out_ptr as *i8)
+        with_free(out_ptr)
     if file as i64 != 0:
         let _close = fclose(file)
 

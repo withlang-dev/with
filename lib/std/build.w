@@ -2025,7 +2025,7 @@ fn build_https_fetch_source() -> str:
     "    if argv.len() < 3:\n" ++
     "        print(\"usage: https_fetch <url> <output>\")\n" ++
     "        return 2\n" ++
-    "    let rc = https_download(argv.get(1), argv.get(2))\n" ++
+    "    let rc = https_download(argv.get(1) ++ \"\", argv.get(2) ++ \"\")\n" ++
     "    if rc != 0:\n" ++
     "        print(\"HTTPS download failed: \" ++ argv.get(1))\n" ++
     "        return 1\n" ++

@@ -2719,6 +2719,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     pcre2_build = pcre2_build.write_scope("out/tmp/action-scratch/pcre2-build")
     pcre2_build = pcre2_build.input("out/pcre2_migrated")
     pcre2_build = pcre2_build.dep("build")
+    pcre2_build = pcre2_build.dep("pcre2-migrate")
     out = out.add_target(pcre2_build)
 
     var pcre2_test = target_new(.Action, "pcre2-test", "").output("out/corpus/pcre2-test")
@@ -2728,6 +2729,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     pcre2_test = pcre2_test.input("out/pcre2_reference/pcre2-10.47/RunTest")
     pcre2_test = pcre2_test.arg("out/pcre2_reference/pcre2-10.47")
     pcre2_test = pcre2_test.dep("verified-existing-stage")
+    // The declared inputs above are produced by pcre2-migrate / pcre2-build;
+    // without these edges a clean out/ fails with "missing declared input"
+    // before anything migrates (the zlib chain already had them).
+    pcre2_test = pcre2_test.dep("pcre2-build")
     out = out.add_target(pcre2_test)
 
     var pcre2_check_generated = target_new(.Action, "pcre2-check-generated", "").output("out/gen/.pcre2-check-generated-stamp")
