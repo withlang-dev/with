@@ -26,7 +26,7 @@ extern fn with_vec_free(v: *mut u8) -> Unit
 extern fn with_hashmap_free(map: *mut u8) -> Unit
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
-extern fn with_str_hash(s: &str) -> i64
+extern fn with_str_hash(s: &str) -> u64
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn str_from_byte(b: i32) -> str
 extern fn with_codegen_loop_set_break(idx: i32, bb: i64) -> Unit
@@ -4193,7 +4193,7 @@ impl Codegen:
         let canonical_path = codegen_canonical_module_path(source_path)
         if canonical_path.len() == 0 or canonical_path == "<unknown>":
             return with_str_clone_ref(base_name)
-        "__with_mod_" ++ codegen_hash_name_component(with_str_hash(canonical_path)) ++ "__" ++ base_name
+        "__with_mod_" ++ codegen_hash_name_component(with_str_hash(canonical_path) as i64) ++ "__" ++ base_name
 
     fn current_decl_module_link_name(base_name: &str) -> str:
         self.module_link_name_for_path(self.current_decl_source_file, base_name)

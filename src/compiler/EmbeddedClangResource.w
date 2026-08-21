@@ -16,7 +16,7 @@ extern fn with_fs_write_file(path: &str, data: &str) -> i32
 extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_fs_mkdir_p(path: &str) -> i32
 extern fn with_getenv_str(name: &str) -> str
-extern fn with_str_hash(s: &str) -> i64
+extern fn with_str_hash(s: &str) -> u64
 
 fn ecr_dirname(path: &str) -> str:
     var last = -1
@@ -72,7 +72,7 @@ pub fn ensure_clang_resource_identity_file() -> str:
     let path = root ++ "/.with-resource-identity"
     let listing = embedded_clang_resource_list()
     var content = "version:" ++ embedded_clang_resource_version() ++ "\n"
-    content = content ++ "listing:" ++ f"{with_str_hash(listing)}" ++ "\n"
+    content = content ++ "listing:" ++ f"{with_str_hash(listing) as i64}" ++ "\n"
     var start = 0
     var i = 0
     while i <= listing.len() as i32:
@@ -80,7 +80,7 @@ pub fn ensure_clang_resource_identity_file() -> str:
         if at_end or listing.byte_at(i as i64) == 10:
             if i > start:
                 let rel = listing.slice(start as i64, i as i64)
-                content = content ++ rel ++ ":" ++ f"{with_str_hash(embedded_clang_resource_data(rel))}" ++ "\n"
+                content = content ++ rel ++ ":" ++ f"{with_str_hash(embedded_clang_resource_data(rel)) as i64}" ++ "\n"
             start = i + 1
         i = i + 1
     let _write = with_fs_write_file(path, content)

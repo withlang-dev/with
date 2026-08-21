@@ -17865,7 +17865,7 @@ impl Codegen:
         if str_type == 0:
             with_eprint("error: str builtin type not found")
             return wl_const_null(wl_ptr_type(self.context))
-        let name = f"__with_str_view_{codegen_hash_name_component(with_str_hash(text))}_{text.len()}"
+        let name = f"__with_str_view_{codegen_hash_name_component(with_str_hash(text) as i64)}_{text.len()}"
         var str_global = wl_get_named_global(self.llmod, name)
         if str_global == 0:
             let ptr_value = self.const_c_string_pointer(text, wl_ptr_type(self.context))
@@ -17892,7 +17892,7 @@ impl Codegen:
             with_eprint("error: CStr builtin type not found")
             return wl_const_null(wl_ptr_type(self.context))
         let cstr_type = self.struct_llvm_types.get(st_opt.unwrap() as i64)
-        let name = f"__with_cstr_view_{codegen_hash_name_component(with_str_hash(text))}_{text.len()}"
+        let name = f"__with_cstr_view_{codegen_hash_name_component(with_str_hash(text) as i64)}_{text.len()}"
         var cstr_global = wl_get_named_global(self.llmod, name)
         if cstr_global == 0:
             let ptr_value = self.const_c_string_pointer(text, wl_ptr_type(self.context))

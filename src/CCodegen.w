@@ -22,7 +22,7 @@ extern fn with_interrupt_requested() -> i32
 extern fn with_fmt_buf_new() -> *mut u8
 extern fn with_fmt_buf_write_str_ref(buf: *mut u8, s: &str)
 extern fn with_fmt_buf_finish(buf: *mut u8) -> str
-extern fn with_str_hash(s: &str) -> i64
+extern fn with_str_hash(s: &str) -> u64
 
 type COut {
     buf: *mut u8,
@@ -654,10 +654,10 @@ impl CCodegen:
         cc_string_literal_payload(cc_intern_resolve(self.intern, self.ast.get_data0(expr)))
 
 fn cc_cstr_literal_data_name(text: &str) -> str:
-    f"__with_cstr_{cc_hash_name_component(with_str_hash(text))}_{text.len()}"
+    f"__with_cstr_{cc_hash_name_component(with_str_hash(text) as i64)}_{text.len()}"
 
 fn cc_cstr_literal_view_name(text: &str) -> str:
-    f"__with_cstr_view_{cc_hash_name_component(with_str_hash(text))}_{text.len()}"
+    f"__with_cstr_view_{cc_hash_name_component(with_str_hash(text) as i64)}_{text.len()}"
 
 fn cc_cstr_literal_bytes_initializer(text: &str) -> str:
     var out = cc_lbrace()

@@ -22,7 +22,7 @@ extern fn with_setenv_str(name: &str, value: &str) -> i32
 extern fn with_clock_nanos() -> i64
 extern fn with_getpid() -> i32
 extern fn with_str_clone_ref(s: &str) -> str
-extern fn with_str_hash(s: &str) -> i64
+extern fn with_str_hash(s: &str) -> u64
 extern fn with_nanosleep(ns: i64) -> i32
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
@@ -93,7 +93,7 @@ pub fn runtime_str_clone(s: &str) -> str:
     with_str_clone_ref(s)
 
 pub fn runtime_str_hash(s: &str) -> i64:
-    with_str_hash(s)
+    with_str_hash(s) as i64
 
 pub fn runtime_nanosleep(ns: i64) -> i32:
     with_nanosleep(ns)

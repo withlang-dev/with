@@ -1901,7 +1901,7 @@ impl Codegen:
     fn const_c_string_pointer(text: &str, ptr_ty: i64) -> i64:
         if ptr_ty == 0:
             return 0
-        let name = f"__with_cstr_{codegen_hash_name_component(with_str_hash(text))}_{text.len()}"
+        let name = f"__with_cstr_{codegen_hash_name_component(with_str_hash(text) as i64)}_{text.len()}"
         var bytes_global = wl_get_named_global(self.llmod, name)
         if bytes_global == 0:
             let bytes_ty = wl_array_type(wl_i8_type(self.context), text.len() + 1)
