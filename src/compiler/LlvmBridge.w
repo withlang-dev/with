@@ -10,7 +10,7 @@
 // ── Runtime helpers (from rt_core.w) ────────────────────────────
 extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_nanosleep(ns: i64) -> i32
 extern fn pthread_self() -> i64
 extern fn abort() -> Unit

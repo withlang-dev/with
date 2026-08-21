@@ -51,7 +51,7 @@ extern fn GetFullPathNameA(path: *const u8, size: u32, buf: *mut u8, file_part: 
 extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 
 let INVALID_HANDLE_VALUE: i64 = -1
 let STD_INPUT_HANDLE: i32 = -10

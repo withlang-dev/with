@@ -43,7 +43,7 @@ extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
 extern fn with_thread_join(handle: i64) -> i32
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn rt_read(fd: i32, buf: *mut u8, len: u64) -> i64
 extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64

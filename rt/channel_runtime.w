@@ -7,8 +7,8 @@
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_alloc_origin(size: i64, origin: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> Unit
-extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8
+extern fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8
 extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_yield() -> Unit
 extern fn with_runtime_has_fibers() -> i32

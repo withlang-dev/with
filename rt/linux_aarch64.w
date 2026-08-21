@@ -876,8 +876,8 @@ pub fn rt_getenv(name: *const u8) -> *const u8:
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
-extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
+extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
 @[link_name("setenv")]
 extern fn rt_libc_setenv(name: *const u8, value: *const u8, overwrite: i32) -> i32
 @[link_name("sigprocmask")]

@@ -6,8 +6,8 @@
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_alloc_origin(size: i64, origin: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
-extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
+extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
 @[link_name("mmap")]
 extern fn rt_libc_mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
 @[link_name("mprotect")]

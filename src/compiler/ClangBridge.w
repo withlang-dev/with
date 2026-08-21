@@ -8,8 +8,8 @@
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
-extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> Unit
-extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> Unit
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
+extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
 extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn rt_close(fd: i32) -> i32
 

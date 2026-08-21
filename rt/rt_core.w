@@ -3759,7 +3759,7 @@ pub fn with_sysinfo(out: *mut u8) -> i32:
 
 extern fn with_fiber_await(fiber_id: i32) -> Unit
 extern fn with_fiber_cleanup_await(fiber_id: i32) -> Unit
-extern fn with_fiber_cancel(fiber_id: i32) -> Unit
+extern fn with_fiber_cancel(fiber_id: i32) -> i32
 extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_yield() -> Unit
 extern fn with_runtime_run_one_step() -> Unit
