@@ -12638,13 +12638,21 @@ fn ci_lookup_macro_value(session: i64, name: &str) -> str:
 // #348: is `name` a function-like macro in the session? (by-name variant of
 // with_cimport_macro_is_fn_like).
 fn ci_macro_is_fn_like_name(session: i64, name: &str) -> i32:
-    if session == 0 or name.len() == 0:
+    // #882: mirror ci_lookup_macro_value. In migrate mode the caller threads
+    // the translation-unit session, but macros live in the SEPARATE macro
+    // session (g_migrate_macro_session, a distinct libclang object). Reading
+    // the TU session as a MacroSession walked a garbage names[] and crashed in
+    // make_str on zlib's deflate.c (the first unit whose initializers reference
+    // object-like macros). Resolve the macro session the same way its sibling
+    // does; the passed session remains the c_import fallback.
+    let msession = if g_migrate_macro_session != 0: g_migrate_macro_session else: session
+    if msession == 0 or name.len() == 0:
         return 0
-    let count = with_cimport_macro_count(session)
+    let count = with_cimport_macro_count(msession)
     var i = 0
     while i < count:
-        if with_cimport_macro_name(session, i) == name:
-            return with_cimport_macro_is_fn_like(session, i)
+        if with_cimport_macro_name(msession, i) == name:
+            return with_cimport_macro_is_fn_like(msession, i)
         i = i + 1
     0
 
