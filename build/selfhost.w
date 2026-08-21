@@ -4624,11 +4624,11 @@ fn bs_check_migrate_direct_runtime_memory_calls(ctx: &ActionCtx, compiler_path: 
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-direct-runtime-memory-calls", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "with_free((__param_ptr as *mut i8))", "direct_runtime_free_i8_normalized")
+    rc = bs_assert_contains(ctx, out_text, "with_free((__param_ptr as *mut u8))", "direct_runtime_free_ptr_normalized")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "as *mut c_void) as *i8)", "direct_runtime_memory_mut_i8_normalized")
+    rc = bs_assert_contains(ctx, out_text, "as *mut c_void) as *mut u8)", "direct_runtime_memory_mut_ptr_normalized")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "as *const c_void) as *i8)", "direct_runtime_memory_const_i8_normalized")
+    rc = bs_assert_contains(ctx, out_text, "as *const c_void) as *const u8)", "direct_runtime_memory_const_ptr_normalized")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")

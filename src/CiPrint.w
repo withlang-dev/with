@@ -505,7 +505,7 @@ fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool
     // nested init (the anonymous-member union arm) flattens to a member
     // store.
     if exprs.kind(rhs) == CiExprKind.CIE_DESIGNATED_INIT:
-        var out = ci_print_unsafe_stmt(indent, "with_memset((&raw mut " ++ lhs_str ++ " as *i8), 0, sizeof[" ++ ty_text ++ "]())")
+        var out = ci_print_unsafe_stmt(indent, "with_memset((&raw mut " ++ lhs_str ++ " as " ++ ci_rt_ptr_mut() ++ "), 0, sizeof[" ++ ty_text ++ "]())")
         let start = exprs.get_d0(rhs)
         let count = exprs.get_d1(rhs)
         var i = 0
@@ -522,7 +522,7 @@ fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool
             i = i + 1
         return out
     let rhs_str = ci_print_expr(exprs, types, rhs, 0, 1)
-    ci_print_unsafe_stmt(indent, "with_memcpy((&raw mut " ++ lhs_str ++ " as *i8), (&raw const " ++ rhs_str ++ " as *i8), sizeof[" ++ ty_text ++ "]())")
+    ci_print_unsafe_stmt(indent, "with_memcpy((&raw mut " ++ lhs_str ++ " as " ++ ci_rt_ptr_mut() ++ "), (&raw const " ++ rhs_str ++ " as " ++ ci_rt_ptr_const() ++ "), sizeof[" ++ ty_text ++ "]())")
 
 fn ci_print_sizeof_type_text(text: &str) -> str:
     if ci_starts_with_str(text, "*const "):

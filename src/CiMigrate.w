@@ -554,6 +554,14 @@ fn ci_migrate_merge_shared_fragment_texts(output_dir: &str, fragments: &Vec[str]
         i = i + 1
     ci_migrate_write_shared_defs(output_dir)
 
+// The pointer spellings of the runtime alloc/mem family, as the rt defines
+// them (rt/rt_core.w: with_alloc/realloc/free/memcpy/memmove/memset/memcmp).
+// ONE source for the preamble decls, the structural IR lowering, the text
+// mapper, and CiPrint's struct init/copy — a second derivation anywhere is
+// #880's bug (and #761's corruption class: one symbol, two contracts).
+pub fn ci_rt_ptr_mut() -> str: "*mut u8"
+pub fn ci_rt_ptr_const() -> str: "*const u8"
+
 // Generate the self-contained preamble that every migrated file needs.
 // In shared-defs mode this goes into defs.w; otherwise into each file.
 fn ci_migrate_preamble_text() -> str:
@@ -637,19 +645,22 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn with_bswap16(x: u16) -> u16\n"
     p = p ++ "extern fn with_bswap32(x: u32) -> u32\n"
     p = p ++ "extern fn with_bswap64(x: u64) -> u64\n"
+    // (bswap: unsigned like __builtin_bswapN; rt/rt_core.w defines them so.)
     p = p ++ "extern fn with_clzl(x: i64) -> i32\n"
     p = p ++ "extern fn with_clzll(x: i64) -> i32\n"
     p = p ++ "extern fn with_ctzl(x: i64) -> i32\n"
     p = p ++ "extern fn with_ctzll(x: i64) -> i32\n"
     p = p ++ "extern fn with_abs(x: i32) -> i32\n"
-    p = p ++ "extern fn with_alloc(size: i64) -> *mut u8\n"
-    p = p ++ "extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8\n"
-    p = p ++ "extern fn with_realloc(ptr: *i8, old_size: i64, new_size: i64) -> *i8\n"
-    p = p ++ "extern fn with_free(ptr: *i8) -> Unit\n"
-    p = p ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> *i8\n"
-    p = p ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> *i8\n"
-    p = p ++ "extern fn with_memset(ptr: *i8, c: i32, n: i64) -> *i8\n"
-    p = p ++ "extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32\n"
+    let pm = ci_rt_ptr_mut()
+    let pc = ci_rt_ptr_const()
+    p = p ++ "extern fn with_alloc(size: i64) -> " ++ pm ++ "\n"
+    p = p ++ "extern fn with_alloc_zeroed(count: i64, size: i64) -> " ++ pm ++ "\n"
+    p = p ++ "extern fn with_realloc(ptr: " ++ pm ++ ", old_size: i64, new_size: i64) -> " ++ pm ++ "\n"
+    p = p ++ "extern fn with_free(ptr: " ++ pm ++ ") -> Unit\n"
+    p = p ++ "extern fn with_memcpy(dst: " ++ pm ++ ", src: " ++ pc ++ ", n: i64) -> " ++ pm ++ "\n"
+    p = p ++ "extern fn with_memmove(dst: " ++ pm ++ ", src: " ++ pc ++ ", n: i64) -> " ++ pm ++ "\n"
+    p = p ++ "extern fn with_memset(dst: " ++ pm ++ ", c: i32, n: i64) -> " ++ pm ++ "\n"
+    p = p ++ "extern fn with_memcmp(a: " ++ pc ++ ", b: " ++ pc ++ ", n: i64) -> i32\n"
     p = p ++ "extern fn with_va_start(ap: *mut i8) -> Unit\n"
     p = p ++ "extern fn with_va_end(ap: *mut i8) -> Unit\n\n"
     p
@@ -949,7 +960,18 @@ fn ci_migrate_decl_is_filtered(session: i64, name: &str):
         return true
     ci_migrate_is_width_family_name(name)
 
+// Migrate mode is a property of translating a .c file, not of which entry
+// point asked for it. Before this wrapper only the single-file CLI path set
+// the flag; migrate_c_directory (the build-driven pcre2/zlib migrations) ran
+// every mode-gated rule with it off — e.g. the c_import-only #799 callee
+// filter then killed zlib on its static adler32_combine_.
 fn ci_migrate_file_inner(input_path: &str, output_path: &str, project_active: bool, project: &CiProject) -> i32:
+    g_ci_translate_migrate_mode = 1
+    let rc = ci_migrate_file_body(input_path, output_path, project_active, project)
+    g_ci_translate_migrate_mode = 0
+    rc
+
+fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: bool, project: &CiProject) -> i32:
     if with_cimport_available() == 0:
         eprint("migrate: libclang not available")
         return 1
@@ -1142,10 +1164,7 @@ fn ci_migrate_file_inner(input_path: &str, output_path: &str, project_active: bo
 
 pub fn migrate_c_file(input_path: &str, output_path: &str) -> i32:
     var project = CiProject.new()
-    g_ci_translate_migrate_mode = 1
-    let rc = ci_migrate_file_inner(input_path, output_path, false, &project)
-    g_ci_translate_migrate_mode = 0
-    rc
+    ci_migrate_file_inner(input_path, output_path, false, &project)
 
 fn ci_migrate_path_basename(path: &str) -> str:
     var end = path.len() as i32
@@ -1525,7 +1544,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         if storage == CX_SC_STATIC:
             return ""
         // #740 census class 2: the migrate preamble already declares the fixed
-        // with_* runtime externs (with_memcpy & co, *i8-shaped). Re-emitting a
+        // with_* runtime externs (with_memcpy & co, *mut u8-shaped). Re-emitting a
         // C prototype for the same symbol under its C spelling (`void*` →
         // *mut c_void) leaves one flat extern name with two signatures and
         // every preamble-shaped call mismatched. Prototype-only redeclarations

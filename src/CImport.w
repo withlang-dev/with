@@ -9344,11 +9344,10 @@ impl CiExprPool:
         if callee_text == "free" or callee_text == "with_free":
             if arg_ids.len() != 1:
                 return 0 as CiExprId
-            let i8_ty = types.named_type_from_text("i8")
-            if (i8_ty as i32) == 0:
+            let free_ptr_ty = types.named_type_from_text(ci_rt_ptr_mut())
+            if (free_ptr_ty as i32) == 0:
                 return 0 as CiExprId
-            let i8_ptr_ty = types.ty_pointer(i8_ty, 0)
-            let arg_cast = self.cast(i8_ptr_ty, (arg_ids.get(0)) as CiExprId)
+            let arg_cast = self.cast(free_ptr_ty, (arg_ids.get(0)) as CiExprId)
             let wf_idx = self.add_string("with_free")
             let wf_callee = self.ident(wf_idx, 0 as CiTypeId)
             let args_start = self.extra_len() as i32
@@ -9379,13 +9378,12 @@ impl CiExprPool:
         if callee_text == "realloc":
             if arg_ids.len() != 2:
                 return 0 as CiExprId
-            let i8_ty = types.named_type_from_text("i8")
+            let realloc_ptr_ty = types.named_type_from_text(ci_rt_ptr_mut())
             let i64_ty = types.named_type_from_text("i64")
             let c_void_ty = types.named_type_from_text("c_void")
-            if (i8_ty as i32) == 0 or (i64_ty as i32) == 0 or (c_void_ty as i32) == 0:
+            if (realloc_ptr_ty as i32) == 0 or (i64_ty as i32) == 0 or (c_void_ty as i32) == 0:
                 return 0 as CiExprId
-            let i8_ptr_ty = types.ty_pointer(i8_ty, 0)
-            let arg_ptr = self.cast(i8_ptr_ty, (arg_ids.get(0)) as CiExprId)
+            let arg_ptr = self.cast(realloc_ptr_ty, (arg_ids.get(0)) as CiExprId)
             let zero_idx = self.add_string("0")
             let zero_id = self.int_lit(zero_idx, 0 as CiTypeId)
             let old_size = self.cast(i64_ty, zero_id)
@@ -9398,29 +9396,30 @@ impl CiExprPool:
             let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
             return self.cast(void_ptr_ty, call_id)
         let i64_ty = types.named_type_from_text("i64")
-        let i8_ptr_ty = types.named_type_from_text("*i8")
+        let mut_ptr_ty = types.named_type_from_text(ci_rt_ptr_mut())
+        let const_ptr_ty = types.named_type_from_text(ci_rt_ptr_const())
         if callee_text == "memcpy" or callee_text == "memmove" or callee_text == "with_memcpy" or callee_text == "with_memmove":
-            if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (i8_ptr_ty as i32) == 0:
+            if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (mut_ptr_ty as i32) == 0 or (const_ptr_ty as i32) == 0:
                 return 0 as CiExprId
             let cast_args: Vec[i32] = Vec.new()
-            cast_args.push((self.cast(i8_ptr_ty, (arg_ids.get(0)) as CiExprId)) as i32)
-            cast_args.push((self.cast(i8_ptr_ty, (arg_ids.get(1)) as CiExprId)) as i32)
+            cast_args.push((self.cast(mut_ptr_ty, (arg_ids.get(0)) as CiExprId)) as i32)
+            cast_args.push((self.cast(const_ptr_ty, (arg_ids.get(1)) as CiExprId)) as i32)
             cast_args.push((self.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
             return self.build_named_call_expr(if callee_text == "memcpy" or callee_text == "with_memcpy": "with_memcpy" else: "with_memmove", &cast_args)
         if callee_text == "memset" or callee_text == "with_memset":
-            if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (i8_ptr_ty as i32) == 0:
+            if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (mut_ptr_ty as i32) == 0:
                 return 0 as CiExprId
             let cast_args: Vec[i32] = Vec.new()
-            cast_args.push((self.cast(i8_ptr_ty, (arg_ids.get(0)) as CiExprId)) as i32)
+            cast_args.push((self.cast(mut_ptr_ty, (arg_ids.get(0)) as CiExprId)) as i32)
             cast_args.push(arg_ids.get(1))
             cast_args.push((self.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
             return self.build_named_call_expr("with_memset", &cast_args)
         if callee_text == "memcmp" or callee_text == "with_memcmp":
-            if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (i8_ptr_ty as i32) == 0:
+            if arg_ids.len() != 3 or (i64_ty as i32) == 0 or (const_ptr_ty as i32) == 0:
                 return 0 as CiExprId
             let cast_args: Vec[i32] = Vec.new()
-            cast_args.push((self.cast(i8_ptr_ty, (arg_ids.get(0)) as CiExprId)) as i32)
-            cast_args.push((self.cast(i8_ptr_ty, (arg_ids.get(1)) as CiExprId)) as i32)
+            cast_args.push((self.cast(const_ptr_ty, (arg_ids.get(0)) as CiExprId)) as i32)
+            cast_args.push((self.cast(const_ptr_ty, (arg_ids.get(1)) as CiExprId)) as i32)
             cast_args.push((self.cast(i64_ty, (arg_ids.get(2)) as CiExprId)) as i32)
             return self.build_named_call_expr("with_memcmp", &cast_args)
         if callee_text == "memchr":
@@ -15530,7 +15529,7 @@ fn ci_find_fn_cursor(session: i64, name: &str) -> i32:
         i = i + 1
     -1
 
-// Cast memcpy args: (dst, src, n) → (dst as *i8, src as *i8, n as i64)
+// Cast memcpy args: (dst, src, n) → (dst as *mut u8, src as *const u8, n as i64)
 fn ci_cast_memcpy_args(args: &str) -> str:
     let first_comma = ci_find_arg_comma(args, 0)
     if first_comma < 0: return with_str_clone_ref(args)
@@ -15539,9 +15538,9 @@ fn ci_cast_memcpy_args(args: &str) -> str:
     let dst = ci_trim(args.slice(0, first_comma as i64))
     let src = ci_trim(args.slice((first_comma + 1) as i64, second_comma as i64))
     let n = ci_trim(args.slice((second_comma + 1) as i64, args.len()))
-    dst ++ " as *i8, " ++ src ++ " as *i8, " ++ n ++ " as i64"
+    dst ++ " as " ++ ci_rt_ptr_mut() ++ ", " ++ src ++ " as " ++ ci_rt_ptr_const() ++ ", " ++ n ++ " as i64"
 
-// Cast memset args: (ptr, c, n) → (ptr as *i8, c, n as i64)
+// Cast memset args: (ptr, c, n) → (ptr as *mut u8, c, n as i64)
 fn ci_cast_memset_args(args: &str) -> str:
     let first_comma = ci_find_arg_comma(args, 0)
     if first_comma < 0: return with_str_clone_ref(args)
@@ -15550,9 +15549,9 @@ fn ci_cast_memset_args(args: &str) -> str:
     let ptr = ci_trim(args.slice(0, first_comma as i64))
     let c = ci_trim(args.slice((first_comma + 1) as i64, second_comma as i64))
     let n = ci_trim(args.slice((second_comma + 1) as i64, args.len()))
-    ptr ++ " as *i8, " ++ c ++ ", " ++ n ++ " as i64"
+    ptr ++ " as " ++ ci_rt_ptr_mut() ++ ", " ++ c ++ ", " ++ n ++ " as i64"
 
-// Cast memcmp args: (a, b, n) → (a as *i8, b as *i8, n as i64)
+// Cast memcmp args: (a, b, n) → (a as *const u8, b as *const u8, n as i64)
 fn ci_cast_memcmp_args(args: &str) -> str:
     let first_comma = ci_find_arg_comma(args, 0)
     if first_comma < 0: return with_str_clone_ref(args)
@@ -15561,7 +15560,7 @@ fn ci_cast_memcmp_args(args: &str) -> str:
     let a = ci_trim(args.slice(0, first_comma as i64))
     let b = ci_trim(args.slice((first_comma + 1) as i64, second_comma as i64))
     let n = ci_trim(args.slice((second_comma + 1) as i64, args.len()))
-    a ++ " as *i8, " ++ b ++ " as *i8, " ++ n ++ " as i64"
+    a ++ " as " ++ ci_rt_ptr_const() ++ ", " ++ b ++ " as " ++ ci_rt_ptr_const() ++ ", " ++ n ++ " as i64"
 
 // Find the Nth comma in args string at depth 0 (respecting parens)
 fn ci_find_arg_comma(args: &str, start: i32) -> i32:
@@ -15832,7 +15831,7 @@ fn ci_has_value_libc_call_mapping(callee: &str) -> bool:
     // emit-C names the runtime memory entry points directly. Migrate skips
     // their C `void*` prototypes because its fixed preamble is the canonical
     // flat-namespace declaration, so direct calls need the same structural
-    // `*i8` normalization as their libc spellings (#740).
+    // pointer normalization as their libc spellings (#740, #880).
     if callee == "with_free" or callee == "with_memcpy" or callee == "with_memmove" or callee == "with_memset" or callee == "with_memcmp":
         return true
     if ci_starts_with(callee, "__builtin"):
@@ -15910,7 +15909,7 @@ impl CiExprPool:
             let cvoid_ty = types.ty_named(cvoid_idx)
             let void_ptr_ty = types.ty_pointer(cvoid_ty, 0)
             return self.cast(void_ptr_ty, call_id)
-        // free(p) → with_free(p as *i8)
+        // free(p) → with_free(p as *mut u8)
         if callee_text == "free":
             if arg_count != 1:
                 return 0 as CiExprId
@@ -15919,10 +15918,10 @@ impl CiExprPool:
             let arg_id = self.lower_expr_ir(session, arg_cursor, types, scope)
             if (arg_id as i32) == 0:
                 return 0 as CiExprId
-            let i8_idx = types.add_string("i8")
-            let i8_ty = types.ty_named(i8_idx)
-            let i8_ptr_ty = types.ty_pointer(i8_ty, 0)
-            let arg_cast = self.cast(i8_ptr_ty, arg_id)
+            let free_ptr_ty = types.named_type_from_text(ci_rt_ptr_mut())
+            if (free_ptr_ty as i32) == 0:
+                return 0 as CiExprId
+            let arg_cast = self.cast(free_ptr_ty, arg_id)
             let wf_idx = self.add_string("with_free")
             let wf_callee = self.ident(wf_idx, 0 as CiTypeId)
             let args_start = self.extra_len() as i32
@@ -15944,7 +15943,7 @@ fn ci_map_libc_call(callee: &str, args: &str) -> str:
     if callee == "malloc":
         return "(" ++ ci_migrate_wrap_call_if_needed("with_alloc", "with_alloc((" ++ args ++ ") as i64)") ++ " as *mut c_void)"
     if callee == "free":
-        return ci_migrate_wrap_call_if_needed("with_free", "with_free((" ++ args ++ ") as *mut u8)")
+        return ci_migrate_wrap_call_if_needed("with_free", "with_free((" ++ args ++ ") as " ++ ci_rt_ptr_mut() ++ ")")
     if callee == "calloc":
         let count_arg = ci_extract_first_arg(args)
         let size_arg = ci_after_first_arg(args)
@@ -15956,7 +15955,7 @@ fn ci_map_libc_call(callee: &str, args: &str) -> str:
         let size_arg = ci_after_first_arg(args)
         if ptr_arg.len() == 0 or size_arg.len() == 0:
             return ""
-        return "(" ++ ci_migrate_wrap_call_if_needed("with_realloc", "with_realloc((" ++ ptr_arg ++ ") as *mut u8, 0, (" ++ size_arg ++ ") as i64)") ++ " as *mut c_void)"
+        return "(" ++ ci_migrate_wrap_call_if_needed("with_realloc", "with_realloc((" ++ ptr_arg ++ ") as " ++ ci_rt_ptr_mut() ++ ", 0, (" ++ size_arg ++ ") as i64)") ++ " as *mut c_void)"
 
     // Memory operations — cast pointer args to *mut u8 / *const u8
     if callee == "memcpy":

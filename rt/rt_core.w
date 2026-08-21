@@ -3600,16 +3600,13 @@ pub fn with_popcount(n: i32) -> i32:
     x = (x + (x >> 4)) & 0x0F0F0F0F
     ((x * 0x01010101) >> 24) as i32
 
-pub fn with_bswap16(n: i16) -> i16:
-    let x = n as u16
-    (((x >> 8) & 0xFF) | ((x & 0xFF) << 8)) as i16
+pub fn with_bswap16(x: u16) -> u16:
+    ((x >> 8) & 0xFF) | ((x & 0xFF) << 8)
 
-pub fn with_bswap32(n: i32) -> i32:
-    let x = n as u32
-    (((x >> 24) & 0xFF) | ((x >> 8) & 0xFF00) | ((x & 0xFF00) << 8) | ((x & 0xFF) << 24)) as i32
+pub fn with_bswap32(x: u32) -> u32:
+    ((x >> 24) & 0xFF) | ((x >> 8) & 0xFF00) | ((x & 0xFF00) << 8) | ((x & 0xFF) << 24)
 
-pub fn with_bswap64(n: i64) -> i64:
-    let x = n as u64
+pub fn with_bswap64(x: u64) -> u64:
     // Extract each byte
     let b0 = x & 0xFF                // byte 0 (least significant)
     let b1 = (x >> 8) & 0xFF         // byte 1
@@ -3620,8 +3617,7 @@ pub fn with_bswap64(n: i64) -> i64:
     let b6 = (x >> 48) & 0xFF        // byte 6
     let b7 = (x >> 56) & 0xFF        // byte 7 (most significant)
     // Reassemble in reverse order
-    let r = (b0 << 56) | (b1 << 48) | (b2 << 40) | (b3 << 32) | (b4 << 24) | (b5 << 16) | (b6 << 8) | b7
-    r as i64
+    (b0 << 56) | (b1 << 48) | (b2 << 40) | (b3 << 32) | (b4 << 24) | (b5 << 16) | (b6 << 8) | b7
 
 pub fn with_clzl(n: i64) -> i32:
     if n == 0: return 64
