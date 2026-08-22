@@ -8623,6 +8623,10 @@ impl CiExprPool:
             var text = ""
             if mangled.len() > 0:
                 text = mangled
+            else if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
+                // #884: an allowed libc callee resolves through std.libc under
+                // its original name; the write_ rename is for definitions only.
+                text = ci_migrate_call_callee_name(name)
             else:
                 text = with_str_clone_ref(escaped)
             let s = self.add_string(text)
@@ -15677,6 +15681,18 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
 
 fn ci_libc_symbol_allowed_as(name: &str, kind: i32) -> bool:
     (ci_libc_symbol_kind_mask(name) & kind) != 0
+
+// #884: the spelling to use when CALLING a function. ci_migrate_c_function_name
+// renames a prelude-collision name (write -> write_) so a main-file DEFINITION
+// does not shadow the prelude. But a CALL to an ALLOWED libc function resolves
+// through std.libc (imported by ci_migrate_insert_libc_use), which exports the
+// original name at the POSIX arity — write(fd, buf, n) picks std.libc's
+// write(fd, buf, count), not the prelude's write(&str). Keep the original
+// spelling for such calls; emitting write_ references a name nothing defines.
+fn ci_migrate_call_callee_name(name: &str) -> str:
+    if ci_translate_in_migrate_mode() and ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
+        return name ++ ""
+    ci_migrate_c_function_name(name)
 
 fn ci_libc_kind_name(kind: i32) -> str:
     if kind == CI_LIBC_KIND_FN: return "function"

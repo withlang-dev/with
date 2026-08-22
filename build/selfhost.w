@@ -4752,6 +4752,39 @@ fn bs_check_migrate_posix_path_calls(ctx: &ActionCtx, compiler_path: &str, case_
     if check.rc != 0: return check.rc
     0
 
+// #884: a call to a prelude-collision libc function (write) must migrate to a
+// call under its ORIGINAL name, resolving through std.libc — not the write_
+// rename (which is for definitions and binds nothing). Covers both a plain
+// function and a goto function (the goto-CFG value lowerer is a separate path).
+fn bs_check_migrate_prelude_collision_libc_call(ctx: &ActionCtx, compiler_path: &str, case_dir: &str):
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "prelude_collision_libc_call.c")
+    let out_w = bs_join(case_dir, "prelude_collision_libc_call.w")
+    let c_text = "#include <unistd.h>\n\nlong wr_plain(int fd, const void *buf, unsigned long n) {\n  return write(fd, buf, n);\n}\n\nint wr_goto(int fd, const void *buf, unsigned long n) {\n  int total = 0;\n  int i = 0;\nloop:\n  if (i >= 2) goto done;\n  total = total + (int)write(fd, buf, n);\n  i = i + 1;\n  goto loop;\ndone:\n  return total;\n}\n\nint main(void) { return 0; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "migrate prelude-collision libc call")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-prelude-collision-libc-call", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "use std.libc", "prelude_collision_libc_import")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "write(", "prelude_collision_libc_call_original_name")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "write_(", "prelude_collision_libc_call_no_rename")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-prelude-collision-libc-call", check_args)
+    if check.rc != 0: return check.rc
+    0
+
 fn bs_check_migrate_cross_file_tentative_global_owner(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let generated_dir = bs_join(case_dir, "generated")
@@ -5054,6 +5087,8 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_runtime_cabi_aliases(ctx, compiler_path, bs_join(output_dir, "runtime_cabi_aliases"))
     if rc != 0: return rc
     rc = bs_check_migrate_w_prefixed_user_type(ctx, compiler_path, bs_join(output_dir, "w_prefixed_user_type"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_prelude_collision_libc_call(ctx, compiler_path, bs_join(output_dir, "prelude_collision_libc_call"))
     if rc != 0: return rc
     rc = bs_check_migrate_posix_path_calls(ctx, compiler_path, bs_join(output_dir, "posix_path_calls"))
     if rc != 0: return rc
