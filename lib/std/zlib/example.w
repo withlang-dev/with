@@ -29,7 +29,7 @@ unsafe fn test_compress(__param_compr: *mut u8, __param_comprLen: c_ulong, __par
     }
 
 
-    strcpy((__param_uncompr as *mut c_char), c"garbage".ptr)
+    strcpy(((__param_uncompr as *mut c_char) as *mut i8), c"garbage".ptr)
 
     (__local_err = ((uncompress(__param_uncompr, (&raw mut __param_uncomprLen as *mut c_ulong), (__param_compr as *const u8), __param_comprLen) as c_int)))
 
@@ -41,7 +41,7 @@ unsafe fn test_compress(__param_compr: *mut u8, __param_comprLen: c_ulong, __par
     }
 
 
-    if (strcmp((__param_uncompr as *mut c_char), (&hello[0] as *mut c_char)) != 0) {
+    if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (&hello[0] as *mut c_char)) != 0) {
         fprintf(__stderrp, c"bad uncompress\n".ptr)
 
         exit((1 as c_int))
@@ -100,7 +100,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
 
     }
 
-    strcpy((__param_uncompr as *mut c_char), c"garbage".ptr)
+    strcpy(((__param_uncompr as *mut c_char) as *mut i8), c"garbage".ptr)
 
     if ((if gzread(__local_file, (__param_uncompr as *mut c_void), (__param_uncomprLen as c_uint)) != __local_len: 1 else: 0) != 0) {
         fprintf(__stderrp, c"gzread err: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
@@ -109,7 +109,7 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
 
     }
 
-    if (strcmp((__param_uncompr as *mut c_char), (&hello[0] as *mut c_char)) != 0) {
+    if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (&hello[0] as *mut c_char)) != 0) {
         fprintf(__stderrp, c"bad gzread: %s\n".ptr, (__param_uncompr as *mut c_char))
 
         exit((1 as c_int))
@@ -173,16 +173,16 @@ unsafe fn test_gzio(__param_fname: *const i8, __param_uncompr: *mut u8, __param_
 
     }
 
-    gzgets(__local_file, (__param_uncompr as *mut c_char), (__param_uncomprLen as c_int))
+    gzgets(__local_file, ((__param_uncompr as *mut c_char) as *mut i8), (__param_uncomprLen as c_int))
 
-    if ((if strlen((__param_uncompr as *mut c_char)) != 7: 1 else: 0) != 0) {
+    if ((if strlen(((__param_uncompr as *mut c_char) as *const i8)) != 7: 1 else: 0) != 0) {
         fprintf(__stderrp, c"gzgets err after gzseek: %s\n".ptr, gzerror(__local_file, (&raw mut __local_err as *mut c_int)))
 
         exit((1 as c_int))
 
     }
 
-    if (strcmp((__param_uncompr as *mut c_char), (((&hello[0] as *mut c_char) + ((6 as isize) as usize)) as *const i8)) != 0) {
+    if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (((&hello[0] as *mut c_char) + ((6 as isize) as usize)) as *const i8)) != 0) {
         fprintf(__stderrp, c"bad gzgets after gzseek\n".ptr)
 
         exit((1 as c_int))
@@ -285,7 +285,7 @@ unsafe fn test_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __para
 
     var __local_d_stream: z_stream_s
 
-    strcpy((__param_uncompr as *mut c_char), c"garbage".ptr)
+    strcpy(((__param_uncompr as *mut c_char) as *mut i8), c"garbage".ptr)
 
     (__local_d_stream.zalloc = zalloc)
 
@@ -349,7 +349,7 @@ unsafe fn test_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, __para
     }
 
 
-    if (strcmp((__param_uncompr as *mut c_char), (&hello[0] as *mut c_char)) != 0) {
+    if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (&hello[0] as *mut c_char)) != 0) {
         fprintf(__stderrp, c"bad inflate\n".ptr)
 
         exit((1 as c_int))
@@ -465,7 +465,7 @@ unsafe fn test_large_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, 
 
     var __local_d_stream: z_stream_s
 
-    strcpy((__param_uncompr as *mut c_char), c"garbage".ptr)
+    strcpy(((__param_uncompr as *mut c_char) as *mut i8), c"garbage".ptr)
 
     (__local_d_stream.zalloc = zalloc)
 
@@ -607,7 +607,7 @@ unsafe fn test_sync(__param_compr: *mut u8, __param_comprLen: c_ulong, __param_u
 
     var __local_d_stream: z_stream_s
 
-    strcpy((__param_uncompr as *mut c_char), c"garbage".ptr)
+    strcpy(((__param_uncompr as *mut c_char) as *mut i8), c"garbage".ptr)
 
     (__local_d_stream.zalloc = zalloc)
 
@@ -745,7 +745,7 @@ unsafe fn test_dict_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, _
 
     var __local_d_stream: z_stream_s
 
-    strcpy((__param_uncompr as *mut c_char), c"garbage".ptr)
+    strcpy(((__param_uncompr as *mut c_char) as *mut i8), c"garbage".ptr)
 
     (__local_d_stream.zalloc = zalloc)
 
@@ -810,7 +810,7 @@ unsafe fn test_dict_inflate(__param_compr: *mut u8, __param_comprLen: c_ulong, _
     }
 
 
-    if (strcmp((__param_uncompr as *mut c_char), (&hello[0] as *mut c_char)) != 0) {
+    if (strcmp(((__param_uncompr as *mut c_char) as *const i8), (&hello[0] as *mut c_char)) != 0) {
         fprintf(__stderrp, c"bad inflate with dict\n".ptr)
 
         exit((1 as c_int))
@@ -899,9 +899,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     test_dict_inflate(__local_compr, __local_comprLen, __local_uncompr, __local_uncomprLen)
 
-    with_free(((__local_compr as *mut c_void) as *mut i8))
+    with_free(((__local_compr as *mut c_void) as *mut u8))
 
-    with_free(((__local_uncompr as *mut c_void) as *mut i8))
+    with_free(((__local_uncompr as *mut c_void) as *mut u8))
 
     return 0
 

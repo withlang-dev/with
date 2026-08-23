@@ -38,7 +38,7 @@ pub unsafe fn gzdopen(__param_fd: c_int, __param_mode: *const i8) -> *mut gzFile
 
     (__local_gz = gz_open((__local_path as *const c_void), __param_fd, __param_mode))
 
-    with_free(((__local_path as *mut c_void) as *mut i8))
+    with_free(((__local_path as *mut c_void) as *mut u8))
 
     return __local_gz
 
@@ -530,7 +530,7 @@ pub unsafe fn gzoffset64(__param_file: *mut gzFile_s) -> c_longlong {
 pub unsafe fn gz_error(__param_state: *mut gz_state, __param_err: c_int, __param_msg: *const i8) -> Unit {
     if ((if (unsafe *__param_state).msg != null: 1 else: 0) != 0) {
         if ((if (unsafe *__param_state).err != -4: 1 else: 0) != 0) {
-            with_free((((unsafe *__param_state).msg as *mut c_void) as *mut i8))
+            with_free((((unsafe *__param_state).msg as *mut c_void) as *mut u8))
         }
 
         ((unsafe *__param_state).msg = ((null as *mut c_char)))
@@ -678,7 +678,7 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
                         (__local_state.mode = ((1 as c_int)))
                     },
                     43 => {
-                        with_free(((__local_state as *mut c_void) as *mut i8))
+                        with_free(((__local_state as *mut c_void) as *mut u8))
 
                         return null
 
@@ -726,7 +726,7 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
     }
 
     if ((if __local_state.mode == 0: 1 else: 0) != 0) {
-        with_free(((__local_state as *mut c_void) as *mut i8))
+        with_free(((__local_state as *mut c_void) as *mut u8))
 
         return null
 
@@ -734,7 +734,7 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
 
     if ((if __local_state.mode == 7247: 1 else: 0) != 0) {
         if ((if __local_state.direct == 1: 1 else: 0) != 0) {
-            with_free(((__local_state as *mut c_void) as *mut i8))
+            with_free(((__local_state as *mut c_void) as *mut u8))
 
             return null
 
@@ -746,19 +746,19 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
 
     } else {
         if ((if __local_state.direct == -1: 1 else: 0) != 0) {
-            with_free(((__local_state as *mut c_void) as *mut i8))
+            with_free(((__local_state as *mut c_void) as *mut u8))
 
             return null
 
         }
     }
 
-    (__local_len = ((strlen((__param_path as *const c_char)) as c_ulong)))
+    (__local_len = ((strlen(((__param_path as *const c_char) as *const i8)) as c_ulong)))
 
     (__local_state.path = (((with_alloc(((((__local_len as c_ulong) +% (1 as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut c_char)))
 
     if ((if __local_state.path == null: 1 else: 0) != 0) {
-        with_free(((__local_state as *mut c_void) as *mut i8))
+        with_free(((__local_state as *mut c_void) as *mut u8))
 
         return null
 
@@ -796,7 +796,7 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
 
 
     if ((if __param_fd == -1: 1 else: 0) != 0) {
-        (__local_state.fd = ((open((__param_path as *const c_char), __local_oflag, 438) as c_int)))
+        (__local_state.fd = ((open(((__param_path as *const c_char) as *const i8), __local_oflag, 438) as c_int)))
     } else {
         if (((__local_oflag as c_int) & (4 as c_int)) != 0) {
             fcntl(__param_fd, (4 as c_int), ((fcntl(__param_fd, (3 as c_int)) as c_int) | (4 as c_int)))
@@ -811,9 +811,9 @@ unsafe fn gz_open(__param_path: *const c_void, __param_fd: c_int, __param_mode: 
     }
 
     if ((if __local_state.fd == -1: 1 else: 0) != 0) {
-        with_free(((__local_state.path as *mut c_void) as *mut i8))
+        with_free(((__local_state.path as *mut c_void) as *mut u8))
 
-        with_free(((__local_state as *mut c_void) as *mut i8))
+        with_free(((__local_state as *mut c_void) as *mut u8))
 
         return null
 

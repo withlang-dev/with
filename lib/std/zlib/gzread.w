@@ -254,7 +254,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
                 (__local_n = ((((((((__local_eol as usize) -% ((unsafe *(&raw const __local_state.x as *const gzFile_s)).next as usize)) / sizeof[u8]()) as c_uint) as c_uint) +% (1 as c_uint)) as c_uint)))
             }
 
-            with_memcpy(((__local_buf as *mut c_void) as *mut u8), (((unsafe *(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *mut u8), ((__local_n as c_ulong) as i64))
+            with_memcpy(((__local_buf as *mut c_void) as *mut u8), (((unsafe *(&raw const __local_state.x as *const gzFile_s)).next as *const c_void) as *const u8), ((__local_n as c_ulong) as i64))
 
             (__local_state.x.have = ((unsafe *(&raw const __local_state.x as *const gzFile_s)).have -% __local_n))
 
@@ -512,9 +512,9 @@ pub unsafe fn gzclose_r(__param_file: *mut gzFile_s) -> c_int {
     if (__local_state.size != 0) {
         inflateEnd(((&raw const __local_state.strm as *const z_stream_s) as *mut z_stream_s))
 
-        with_free(((__local_state.out as *mut c_void) as *mut i8))
+        with_free(((__local_state.out as *mut c_void) as *mut u8))
 
-        with_free(((__local_state.in_ as *mut c_void) as *mut i8))
+        with_free(((__local_state.in_ as *mut c_void) as *mut u8))
 
     }
 
@@ -531,11 +531,11 @@ pub unsafe fn gzclose_r(__param_file: *mut gzFile_s) -> c_int {
 
     gz_error(__local_state, (0 as c_int), (null as *const i8))
 
-    with_free(((__local_state.path as *mut c_void) as *mut i8))
+    with_free(((__local_state.path as *mut c_void) as *mut u8))
 
     (__local_ret = ((close(__local_state.fd) as c_int)))
 
-    with_free(((__local_state as *mut c_void) as *mut i8))
+    with_free(((__local_state as *mut c_void) as *mut u8))
 
     var __ci_expr_ternary_1: c_int = 0
 
@@ -700,9 +700,9 @@ unsafe fn gz_look(__param_state: *mut gz_state) -> c_int {
         }
 
         if (__ci_expr_logic_0 != 0) {
-            with_free((((unsafe *__param_state).out as *mut c_void) as *mut i8))
+            with_free((((unsafe *__param_state).out as *mut c_void) as *mut u8))
 
-            with_free((((unsafe *__param_state).in_ as *mut c_void) as *mut i8))
+            with_free((((unsafe *__param_state).in_ as *mut c_void) as *mut u8))
 
             gz_error(__param_state, (-4 as c_int), c"out of memory".ptr)
 
@@ -724,9 +724,9 @@ unsafe fn gz_look(__param_state: *mut gz_state) -> c_int {
         ((unsafe *__param_state).strm.next_in = null)
 
         if ((if inflateInit2_(((&raw const (unsafe *__param_state).strm as *const z_stream_s) as *mut z_stream_s), ((15 + 16) as c_int), c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) != 0: 1 else: 0) != 0) {
-            with_free((((unsafe *__param_state).out as *mut c_void) as *mut i8))
+            with_free((((unsafe *__param_state).out as *mut c_void) as *mut u8))
 
-            with_free((((unsafe *__param_state).in_ as *mut c_void) as *mut i8))
+            with_free((((unsafe *__param_state).in_ as *mut c_void) as *mut u8))
 
             ((unsafe *__param_state).size = ((0 as c_uint)))
 
@@ -824,7 +824,7 @@ unsafe fn gz_look(__param_state: *mut gz_state) -> c_int {
 
     ((unsafe *__param_state).x.next = (unsafe *__param_state).out)
 
-    with_memcpy((((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *mut c_void) as *mut u8), ((__local_strm.next_in as *const c_void) as *mut u8), ((__local_strm.avail_in as c_ulong) as i64))
+    with_memcpy((((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *mut c_void) as *mut u8), ((__local_strm.next_in as *const c_void) as *const u8), ((__local_strm.avail_in as c_ulong) as i64))
 
     ((unsafe *__param_state).x.have = __local_strm.avail_in)
 
@@ -1140,7 +1140,7 @@ unsafe fn gz_read(__param_state: *mut gz_state, __param_buf: *mut c_void, __para
                 (__local_n = (unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).have)
             }
 
-            with_memcpy((__local_buf as *mut u8), (((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *const c_void) as *mut u8), ((__local_n as c_ulong) as i64))
+            with_memcpy((__local_buf as *mut u8), (((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *const c_void) as *const u8), ((__local_n as c_ulong) as i64))
 
             ((unsafe *__param_state).x.next = (unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next + (__local_n as usize))
 

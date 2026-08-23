@@ -780,4 +780,6 @@ pub unsafe fn inflate_fast(__param_strm: *mut z_stream_s, __param_start: c_uint)
         goto '__ci_bb_3
     }
 
+    unreachable()
+
 }

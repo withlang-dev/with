@@ -392,7 +392,7 @@ pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut
 
 
     if (__param_stored_len != 0) {
-        with_memcpy(((((unsafe *__param_s).pending_buf + ((unsafe *__param_s).pending as usize)) as *mut c_void) as *mut u8), ((__param_buf as *mut u8) as *mut u8), (__param_stored_len as i64))
+        with_memcpy(((((unsafe *__param_s).pending_buf + ((unsafe *__param_s).pending as usize)) as *mut c_void) as *mut u8), (((__param_buf as *mut u8) as *const c_void) as *const u8), (__param_stored_len as i64))
     }
 
     ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% __param_stored_len))

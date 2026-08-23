@@ -66,7 +66,6 @@ pub extern fn acos(x: f64) -> f64
 pub extern fn atan(x: f64) -> f64
 pub extern fn atan2(y: f64, x: f64) -> f64
 
-pub type c_void = opaque
 pub type c_char = i8
 pub type c_short = i16
 pub type c_ushort = u16
@@ -77,6 +76,156 @@ pub type c_ulong = u64
 pub type c_longlong = i64
 pub type c_ulonglong = u64
 pub type c_longdouble = f64
+pub unsafe fn __with_builtin_add_overflow_i8(a: i8, b: i8, out: *mut i8) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    ((result ^ a) & (result ^ b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i8(a: i8, b: i8, out: *mut i8) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    ((a ^ b) & (result ^ a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i8(a: i8, b: i8, out: *mut i8) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+}
+pub unsafe fn __with_builtin_add_overflow_u8(a: u8, b: u8, out: *mut u8) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    result < a
+}
+pub unsafe fn __with_builtin_sub_overflow_u8(a: u8, b: u8, out: *mut u8) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    a < b
+}
+pub unsafe fn __with_builtin_mul_overflow_u8(a: u8, b: u8, out: *mut u8) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if b == 0: false else: result / b != a
+}
+pub unsafe fn __with_builtin_add_overflow_i16(a: i16, b: i16, out: *mut i16) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    ((result ^ a) & (result ^ b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i16(a: i16, b: i16, out: *mut i16) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    ((a ^ b) & (result ^ a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i16(a: i16, b: i16, out: *mut i16) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+}
+pub unsafe fn __with_builtin_add_overflow_u16(a: u16, b: u16, out: *mut u16) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    result < a
+}
+pub unsafe fn __with_builtin_sub_overflow_u16(a: u16, b: u16, out: *mut u16) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    a < b
+}
+pub unsafe fn __with_builtin_mul_overflow_u16(a: u16, b: u16, out: *mut u16) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if b == 0: false else: result / b != a
+}
+pub unsafe fn __with_builtin_add_overflow_i32(a: i32, b: i32, out: *mut i32) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    ((result ^ a) & (result ^ b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i32(a: i32, b: i32, out: *mut i32) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    ((a ^ b) & (result ^ a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i32(a: i32, b: i32, out: *mut i32) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+}
+pub unsafe fn __with_builtin_add_overflow_u32(a: u32, b: u32, out: *mut u32) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    result < a
+}
+pub unsafe fn __with_builtin_sub_overflow_u32(a: u32, b: u32, out: *mut u32) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    a < b
+}
+pub unsafe fn __with_builtin_mul_overflow_u32(a: u32, b: u32, out: *mut u32) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if b == 0: false else: result / b != a
+}
+pub unsafe fn __with_builtin_add_overflow_i64(a: i64, b: i64, out: *mut i64) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    ((result ^ a) & (result ^ b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i64(a: i64, b: i64, out: *mut i64) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    ((a ^ b) & (result ^ a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i64(a: i64, b: i64, out: *mut i64) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+}
+pub unsafe fn __with_builtin_add_overflow_u64(a: u64, b: u64, out: *mut u64) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    result < a
+}
+pub unsafe fn __with_builtin_sub_overflow_u64(a: u64, b: u64, out: *mut u64) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    a < b
+}
+pub unsafe fn __with_builtin_mul_overflow_u64(a: u64, b: u64, out: *mut u64) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if b == 0: false else: result / b != a
+}
+pub unsafe fn __with_builtin_add_overflow_i128(a: i128, b: i128, out: *mut i128) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    ((result ^ a) & (result ^ b)) < 0
+}
+pub unsafe fn __with_builtin_sub_overflow_i128(a: i128, b: i128, out: *mut i128) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    ((a ^ b) & (result ^ a)) < 0
+}
+pub unsafe fn __with_builtin_mul_overflow_i128(a: i128, b: i128, out: *mut i128) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+}
+pub unsafe fn __with_builtin_add_overflow_u128(a: u128, b: u128, out: *mut u128) -> bool {
+    let result = a +% b
+    unsafe { (*out = result) }
+    result < a
+}
+pub unsafe fn __with_builtin_sub_overflow_u128(a: u128, b: u128, out: *mut u128) -> bool {
+    let result = a -% b
+    unsafe { (*out = result) }
+    a < b
+}
+pub unsafe fn __with_builtin_mul_overflow_u128(a: u128, b: u128, out: *mut u128) -> bool {
+    let result = a *% b
+    unsafe { (*out = result) }
+    if b == 0: false else: result / b != a
+}
 pub extern fn with_clz(x: i32) -> i32
 pub extern fn with_ctz(x: i32) -> i32
 pub extern fn with_popcount(x: i32) -> i32
@@ -264,7 +413,7 @@ pub let NL_SETMAX: c_int = 255
 pub let NL_TEXTMAX: c_int = 2048
 pub let IOV_MAX: c_int = 1024
 pub let LONG_LONG_MAX: c_longlong = 9223372036854775807
-pub let LONG_LONG_MIN: c_longlong = ((0 - 9223372036854775807) - 1)
+pub let LONG_LONG_MIN: c_longlong = (0 - 9223372036854775807 - 1)
 pub let ULONG_LONG_MAX: c_ulonglong = ((0 as c_ulonglong) -% 1)
 pub let F_OK: c_int = 0
 pub let X_OK: c_int = (1 << 0)
@@ -321,6 +470,7 @@ pub let Z_ASCII: c_int = 1
 pub let Z_UNKNOWN: c_int = 2
 pub let Z_DEFLATED: c_int = 8
 pub let Z_NULL: c_int = 0
+pub let zlib_version: *const i8 = zlibVersion()
 pub let SIGHUP: c_int = 1
 pub let SIGINT: c_int = 2
 pub let SIGQUIT: c_int = 3
@@ -495,7 +645,7 @@ pub let INTPTR_MAX: c_long = 9223372036854775807
 pub let INTPTR_MIN: c_long = ((0 - 9223372036854775807) - 1)
 pub let UINTPTR_MAX: c_ulong = 18446744073709551615
 pub let INTMAX_MAX: c_long = INTMAX_C(9223372036854775807)
-pub let UINTMAX_MAX: c_ulong = 18446744073709551615
+pub let UINTMAX_MAX: c_ulong = UINTMAX_C(18446744073709551615u64)
 pub let INTMAX_MIN: c_long = ((0 - INTMAX_MAX) - 1)
 pub let PTRDIFF_MIN: c_long = INTMAX_MIN
 pub let PTRDIFF_MAX: c_long = INTMAX_MAX
@@ -1024,7 +1174,7 @@ pub let DONE: c_uint = 16208
 pub let BAD: c_uint = 16209
 pub let MEM: c_uint = 16210
 pub let SYNC: c_uint = 16211
-pub type inflate_state { strm: *mut z_stream_s = null, mode: i32 = 0, last: c_int = 0, wrap: c_int = 0, havedict: c_int = 0, flags: c_int = 0, dmax: c_uint = 0, check: c_ulong = 0, total: c_ulong = 0, head: *mut gz_header_s = null, wbits: c_uint = 0, wsize: c_uint = 0, whave: c_uint = 0, wnext: c_uint = 0, window: *mut u8 = null, hold: c_ulong = 0, bits: c_uint = 0, length: c_uint = 0, offset: c_uint = 0, extra: c_uint = 0, lencode: *const code = null, distcode: *const code = null, lenbits: c_uint = 0, distbits: c_uint = 0, ncode: c_uint = 0, nlen: c_uint = 0, ndist: c_uint = 0, have: c_uint = 0, next: *mut code = null, lens: [320]c_ushort = [0 as c_ushort; 320], work: [288]c_ushort = [0 as c_ushort; 288], codes: [1444]code, sane: c_int = 0, back: c_int = 0, was: c_uint = 0 }
+pub type inflate_state { strm: *mut z_stream_s = null, mode: i32 = 0, last: c_int = 0, wrap: c_int = 0, havedict: c_int = 0, flags: c_int = 0, dmax: c_uint = 0, check_: c_ulong = 0, total: c_ulong = 0, head: *mut gz_header_s = null, wbits: c_uint = 0, wsize: c_uint = 0, whave: c_uint = 0, wnext: c_uint = 0, window: *mut u8 = null, hold: c_ulong = 0, bits: c_uint = 0, length: c_uint = 0, offset: c_uint = 0, extra: c_uint = 0, lencode: *const code = null, distcode: *const code = null, lenbits: c_uint = 0, distbits: c_uint = 0, ncode: c_uint = 0, nlen: c_uint = 0, ndist: c_uint = 0, have: c_uint = 0, next: *mut code = null, lens: [320]c_ushort = [0 as c_ushort; 320], work: [288]c_ushort = [0 as c_ushort; 288], codes: [1444]code, sane: c_int = 0, back: c_int = 0, was: c_uint = 0 }
 impl Copy for inflate_state
 
 pub let ENOUGH_LENS: c_int = 852

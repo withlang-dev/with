@@ -148,6 +148,6 @@ pub unsafe fn zcalloc(__param_opaque_: *mut c_void, __param_items: c_uint, __par
 pub unsafe fn zcfree(__param_opaque_: *mut c_void, __param_ptr: *mut c_void) -> Unit {
     __param_opaque_
 
-    with_free((__param_ptr as *mut i8))
+    with_free((__param_ptr as *mut u8))
 
 }

@@ -575,7 +575,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
             while ((if (((unsafe *__local_s).pending as c_ulong) +% (__local_left as c_ulong)) > (unsafe *__local_s).pending_buf_size: 1 else: 0) != 0) {
                 var __local_copy_: c_ulong = (((((unsafe *__local_s).pending_buf_size as c_ulong) -% ((unsafe *__local_s).pending as c_ulong)) as c_ulong))
 
-                with_memcpy(((((unsafe *__local_s).pending_buf + ((unsafe *__local_s).pending as usize)) as *mut c_void) as *mut u8), ((((unsafe *__local_s).gzhead.extra + ((unsafe *__local_s).gzindex as usize)) as *const c_void) as *mut u8), (__local_copy_ as i64))
+                with_memcpy(((((unsafe *__local_s).pending_buf + ((unsafe *__local_s).pending as usize)) as *mut c_void) as *mut u8), ((((unsafe *__local_s).gzhead.extra + ((unsafe *__local_s).gzindex as usize)) as *const c_void) as *const u8), (__local_copy_ as i64))
 
                 ((unsafe *__local_s).pending = (unsafe *__local_s).pending_buf_size)
 
@@ -613,7 +613,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
 
             }
 
-            with_memcpy(((((unsafe *__local_s).pending_buf + ((unsafe *__local_s).pending as usize)) as *mut c_void) as *mut u8), ((((unsafe *__local_s).gzhead.extra + ((unsafe *__local_s).gzindex as usize)) as *const c_void) as *mut u8), (__local_left as i64))
+            with_memcpy(((((unsafe *__local_s).pending_buf + ((unsafe *__local_s).pending as usize)) as *mut c_void) as *mut u8), ((((unsafe *__local_s).gzhead.extra + ((unsafe *__local_s).gzindex as usize)) as *const c_void) as *const u8), (__local_left as i64))
 
             ((unsafe *__local_s).pending = ((unsafe *__local_s).pending +% __local_left))
 
@@ -1317,7 +1317,7 @@ pub unsafe fn deflateGetDictionary(__param_strm: *mut z_stream_s, __param_dictio
     }
 
     if (__ci_expr_logic_0 != 0) {
-        with_memcpy(((__param_dictionary as *mut c_void) as *mut u8), ((((((unsafe *__local_s).window + ((unsafe *__local_s).strstart as usize)) + ((unsafe *__local_s).lookahead as usize)) - (__local_len as usize)) as *const c_void) as *mut u8), ((__local_len as c_ulong) as i64))
+        with_memcpy(((__param_dictionary as *mut c_void) as *mut u8), ((((((unsafe *__local_s).window + ((unsafe *__local_s).strstart as usize)) + ((unsafe *__local_s).lookahead as usize)) - (__local_len as usize)) as *const c_void) as *const u8), ((__local_len as c_ulong) as i64))
     }
 
 
@@ -1350,7 +1350,7 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     (__local_ss = (unsafe *__param_source).state)
 
-    with_memcpy(((__param_dest as *mut c_void) as *mut u8), ((__param_source as *const c_void) as *mut u8), ((sizeof[z_stream_s]() as c_ulong) as i64))
+    with_memcpy(((__param_dest as *mut c_void) as *mut u8), ((__param_source as *const c_void) as *const u8), ((sizeof[z_stream_s]() as c_ulong) as i64))
 
     (__local_ds = (((unsafe *__param_dest).zalloc((unsafe *__param_dest).opaque_, 1, 5968) as *mut internal_state)))
 
@@ -1362,7 +1362,7 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     ((unsafe *__param_dest).state = __local_ds)
 
-    with_memcpy(((__local_ds as *mut c_void) as *mut u8), ((__local_ss as *const c_void) as *mut u8), ((sizeof[internal_state]() as c_ulong) as i64))
+    with_memcpy(((__local_ds as *mut c_void) as *mut u8), ((__local_ss as *const c_void) as *const u8), ((sizeof[internal_state]() as c_ulong) as i64))
 
     ((unsafe *__local_ds).strm = __param_dest)
 
@@ -1406,7 +1406,7 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
     }
 
 
-    with_memcpy((((unsafe *__local_ds).window as *mut c_void) as *mut u8), (((unsafe *__local_ss).window as *const c_void) as *mut u8), ((unsafe *__local_ss).high_water as i64))
+    with_memcpy((((unsafe *__local_ds).window as *mut c_void) as *mut u8), (((unsafe *__local_ss).window as *const c_void) as *const u8), ((unsafe *__local_ss).high_water as i64))
 
     var __ci_expr_ternary_5: c_uint = 0
 
@@ -1424,18 +1424,18 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
         (__ci_expr_ternary_5 = (((((unsafe *__local_ss).strstart as c_uint) -% ((unsafe *__local_ss).insert as c_uint)) as c_uint)))
     }
 
-    with_memcpy((((unsafe *__local_ds).prev as *mut c_void) as *mut u8), (((unsafe *__local_ss).prev as *const c_void) as *mut u8), ((((__ci_expr_ternary_5 as c_ulong) *% (sizeof[c_ushort]() as c_ulong)) as c_ulong) as i64))
+    with_memcpy((((unsafe *__local_ds).prev as *mut c_void) as *mut u8), (((unsafe *__local_ss).prev as *const c_void) as *const u8), ((((__ci_expr_ternary_5 as c_ulong) *% (sizeof[c_ushort]() as c_ulong)) as c_ulong) as i64))
 
 
-    with_memcpy((((unsafe *__local_ds).head as *mut c_void) as *mut u8), (((unsafe *__local_ss).head as *const c_void) as *mut u8), (((((unsafe *__local_ds).hash_size as c_ulong) *% (sizeof[c_ushort]() as c_ulong)) as c_ulong) as i64))
+    with_memcpy((((unsafe *__local_ds).head as *mut c_void) as *mut u8), (((unsafe *__local_ss).head as *const c_void) as *const u8), (((((unsafe *__local_ds).hash_size as c_ulong) *% (sizeof[c_ushort]() as c_ulong)) as c_ulong) as i64))
 
     ((unsafe *__local_ds).pending_out = (unsafe *__local_ds).pending_buf + ((((((unsafe *__local_ss).pending_out as usize) -% ((unsafe *__local_ss).pending_buf as usize)) / sizeof[u8]()) as isize) as usize))
 
-    with_memcpy((((unsafe *__local_ds).pending_out as *mut c_void) as *mut u8), (((unsafe *__local_ss).pending_out as *const c_void) as *mut u8), ((unsafe *__local_ss).pending as i64))
+    with_memcpy((((unsafe *__local_ds).pending_out as *mut c_void) as *mut u8), (((unsafe *__local_ss).pending_out as *const c_void) as *const u8), ((unsafe *__local_ss).pending as i64))
 
     ((unsafe *__local_ds).sym_buf = (unsafe *__local_ds).pending_buf + ((unsafe *__local_ds).lit_bufsize as usize))
 
-    with_memcpy((((unsafe *__local_ds).sym_buf as *mut c_void) as *mut u8), (((unsafe *__local_ss).sym_buf as *const c_void) as *mut u8), (((unsafe *__local_ss).sym_next as c_ulong) as i64))
+    with_memcpy((((unsafe *__local_ds).sym_buf as *mut c_void) as *mut u8), (((unsafe *__local_ss).sym_buf as *const c_void) as *const u8), (((unsafe *__local_ss).sym_next as c_ulong) as i64))
 
     ((unsafe *__local_ds).l_desc.dyn_tree = (&(unsafe *__local_ds).dyn_ltree[0] as *mut ct_data_s))
 
@@ -2385,7 +2385,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: c_int) -
                 (__local_left = __local_len)
             }
 
-            with_memcpy((((unsafe *__param_s).strm.next_out as *mut c_void) as *mut u8), ((((unsafe *__param_s).window + (((unsafe *__param_s).block_start as isize) as usize)) as *const c_void) as *mut u8), ((__local_left as c_ulong) as i64))
+            with_memcpy((((unsafe *__param_s).strm.next_out as *mut c_void) as *mut u8), ((((unsafe *__param_s).window + (((unsafe *__param_s).block_start as isize) as usize)) as *const c_void) as *const u8), ((__local_left as c_ulong) as i64))
 
             ((unsafe *__param_s).strm.next_out = (unsafe *__param_s).strm.next_out + (__local_left as usize))
 
@@ -2421,7 +2421,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: c_int) -
         if ((if __local_used >= (unsafe *__param_s).w_size: 1 else: 0) != 0) {
             ((unsafe *__param_s).matches = ((2 as c_uint)))
 
-            with_memcpy((((unsafe *__param_s).window as *mut c_void) as *mut u8), ((((unsafe *__param_s).strm.next_in - ((unsafe *__param_s).w_size as usize)) as *const c_void) as *mut u8), (((unsafe *__param_s).w_size as c_ulong) as i64))
+            with_memcpy((((unsafe *__param_s).window as *mut c_void) as *mut u8), ((((unsafe *__param_s).strm.next_in - ((unsafe *__param_s).w_size as usize)) as *const c_void) as *const u8), (((unsafe *__param_s).w_size as c_ulong) as i64))
 
             ((unsafe *__param_s).strstart = (unsafe *__param_s).w_size)
 
@@ -2431,7 +2431,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: c_int) -
             if ((if (((unsafe *__param_s).window_size as c_ulong) -% ((unsafe *__param_s).strstart as c_ulong)) <= __local_used: 1 else: 0) != 0) {
                 ((unsafe *__param_s).strstart = ((unsafe *__param_s).strstart -% (unsafe *__param_s).w_size))
 
-                with_memcpy((((unsafe *__param_s).window as *mut c_void) as *mut u8), ((((unsafe *__param_s).window + ((unsafe *__param_s).w_size as usize)) as *const c_void) as *mut u8), (((unsafe *__param_s).strstart as c_ulong) as i64))
+                with_memcpy((((unsafe *__param_s).window as *mut c_void) as *mut u8), ((((unsafe *__param_s).window + ((unsafe *__param_s).w_size as usize)) as *const c_void) as *const u8), (((unsafe *__param_s).strstart as c_ulong) as i64))
 
                 if ((if (unsafe *__param_s).matches < 2: 1 else: 0) != 0) {
                     ((unsafe *__param_s).matches = ((unsafe *__param_s).matches +% 1))
@@ -2443,7 +2443,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: c_int) -
 
             }
 
-            with_memcpy(((((unsafe *__param_s).window + ((unsafe *__param_s).strstart as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_s).strm.next_in - (__local_used as usize)) as *const c_void) as *mut u8), ((__local_used as c_ulong) as i64))
+            with_memcpy(((((unsafe *__param_s).window + ((unsafe *__param_s).strstart as usize)) as *mut c_void) as *mut u8), ((((unsafe *__param_s).strm.next_in - (__local_used as usize)) as *const c_void) as *const u8), ((__local_used as c_ulong) as i64))
 
             ((unsafe *__param_s).strstart = ((unsafe *__param_s).strstart +% __local_used))
 
@@ -2511,7 +2511,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: c_int) -
 
         ((unsafe *__param_s).strstart = ((unsafe *__param_s).strstart -% (unsafe *__param_s).w_size))
 
-        with_memcpy((((unsafe *__param_s).window as *mut c_void) as *mut u8), ((((unsafe *__param_s).window + ((unsafe *__param_s).w_size as usize)) as *const c_void) as *mut u8), (((unsafe *__param_s).strstart as c_ulong) as i64))
+        with_memcpy((((unsafe *__param_s).window as *mut c_void) as *mut u8), ((((unsafe *__param_s).window + ((unsafe *__param_s).w_size as usize)) as *const c_void) as *const u8), (((unsafe *__param_s).strstart as c_ulong) as i64))
 
         if ((if (unsafe *__param_s).matches < 2: 1 else: 0) != 0) {
             ((unsafe *__param_s).matches = ((unsafe *__param_s).matches +% 1))
@@ -3842,7 +3842,7 @@ unsafe fn read_buf(__param_strm: *mut z_stream_s, __param_buf: *mut u8, __param_
 
     ((unsafe *__param_strm).avail_in = ((unsafe *__param_strm).avail_in -% __local_len))
 
-    with_memcpy(((__param_buf as *mut c_void) as *mut u8), (((unsafe *__param_strm).next_in as *const c_void) as *mut u8), ((__local_len as c_ulong) as i64))
+    with_memcpy(((__param_buf as *mut c_void) as *mut u8), (((unsafe *__param_strm).next_in as *const c_void) as *const u8), ((__local_len as c_ulong) as i64))
 
     if ((if (unsafe *(unsafe *__param_strm).state).wrap == 1: 1 else: 0) != 0) {
         ((unsafe *__param_strm).adler = ((adler32((unsafe *__param_strm).adler, (__param_buf as *const u8), __local_len) as c_ulong)))
@@ -3899,7 +3899,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
         }
 
         if ((if (unsafe *__param_s).strstart >= ((__local_wsize as c_uint) +% ((((unsafe *__param_s).w_size as c_uint) -% (262 as c_uint)) as c_uint)): 1 else: 0) != 0) {
-            with_memcpy((((unsafe *__param_s).window as *mut c_void) as *mut u8), ((((unsafe *__param_s).window + (__local_wsize as usize)) as *const c_void) as *mut u8), ((((__local_wsize as c_uint) -% (__local_more as c_uint)) as c_ulong) as i64))
+            with_memcpy((((unsafe *__param_s).window as *mut c_void) as *mut u8), ((((unsafe *__param_s).window + (__local_wsize as usize)) as *const c_void) as *const u8), ((((__local_wsize as c_uint) -% (__local_more as c_uint)) as c_ulong) as i64))
 
             ((unsafe *__param_s).match_start = ((unsafe *__param_s).match_start -% __local_wsize))
 
@@ -4174,7 +4174,7 @@ unsafe fn flush_pending(__param_strm: *mut z_stream_s) -> Unit {
         return
     }
 
-    with_memcpy((((unsafe *__param_strm).next_out as *mut c_void) as *mut u8), (((unsafe *__local_s).pending_out as *const c_void) as *mut u8), ((__local_len as c_ulong) as i64))
+    with_memcpy((((unsafe *__param_strm).next_out as *mut c_void) as *mut u8), (((unsafe *__local_s).pending_out as *const c_void) as *const u8), ((__local_len as c_ulong) as i64))
 
     ((unsafe *__param_strm).next_out = (unsafe *__param_strm).next_out + (__local_len as usize))
 

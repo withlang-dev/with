@@ -471,23 +471,23 @@ pub unsafe fn gzclose_w(__param_file: *mut gzFile_s) -> c_int {
         if ((if not (__local_state.direct != 0): 1 else: 0) != 0) {
             deflateEnd(((&raw const __local_state.strm as *const z_stream_s) as *mut z_stream_s))
 
-            with_free(((__local_state.out as *mut c_void) as *mut i8))
+            with_free(((__local_state.out as *mut c_void) as *mut u8))
 
         }
 
-        with_free(((__local_state.in_ as *mut c_void) as *mut i8))
+        with_free(((__local_state.in_ as *mut c_void) as *mut u8))
 
     }
 
     gz_error(__local_state, (0 as c_int), (null as *const i8))
 
-    with_free(((__local_state.path as *mut c_void) as *mut i8))
+    with_free(((__local_state.path as *mut c_void) as *mut u8))
 
     if ((if close(__local_state.fd) == -1: 1 else: 0) != 0) {
         (__local_ret = ((-1 as c_int)))
     }
 
-    with_free(((__local_state as *mut c_void) as *mut i8))
+    with_free(((__local_state as *mut c_void) as *mut u8))
 
     return __local_ret
 
@@ -648,7 +648,7 @@ unsafe fn gz_init(__param_state: *mut gz_state) -> c_int {
         ((unsafe *__param_state).out = (((with_alloc((((unsafe *__param_state).want as c_ulong) as i64)) as *mut c_void) as *mut u8)))
 
         if ((if (unsafe *__param_state).out == null: 1 else: 0) != 0) {
-            with_free((((unsafe *__param_state).in_ as *mut c_void) as *mut i8))
+            with_free((((unsafe *__param_state).in_ as *mut c_void) as *mut u8))
 
             gz_error(__param_state, (-4 as c_int), c"out of memory".ptr)
 
@@ -665,9 +665,9 @@ unsafe fn gz_init(__param_state: *mut gz_state) -> c_int {
         (__local_ret = ((deflateInit2_(__local_strm, (unsafe *__param_state).level, (8 as c_int), ((15 + 16) as c_int), (8 as c_int), (unsafe *__param_state).strategy, c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
         if ((if __local_ret != 0: 1 else: 0) != 0) {
-            with_free((((unsafe *__param_state).out as *mut c_void) as *mut i8))
+            with_free((((unsafe *__param_state).out as *mut c_void) as *mut u8))
 
-            with_free((((unsafe *__param_state).in_ as *mut c_void) as *mut i8))
+            with_free((((unsafe *__param_state).in_ as *mut c_void) as *mut u8))
 
             gz_error(__param_state, (-4 as c_int), c"out of memory".ptr)
 
@@ -737,7 +737,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
             (__local_put = __ci_expr_ternary_1)
 
 
-            (__local_writ = ((write((unsafe *__param_state).fd, (__local_strm.next_in as *const c_void), (__local_put as c_ulong)) as c_int)))
+            (__local_writ = ((write((unsafe *__param_state).fd, __local_strm.next_in, __local_put) as c_int)))
 
             if ((if __local_writ < 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_2: c_int
@@ -831,7 +831,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
                 (__local_put = __ci_expr_ternary_7)
 
 
-                (__local_writ = ((write((unsafe *__param_state).fd, ((unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next as *const c_void), (__local_put as c_ulong)) as c_int)))
+                (__local_writ = ((write((unsafe *__param_state).fd, (unsafe *(&raw const (unsafe *__param_state).x as *const gzFile_s)).next, __local_put) as c_int)))
 
                 if ((if __local_writ < 0: 1 else: 0) != 0) {
                     var __ci_expr_logic_8: c_int
@@ -1028,7 +1028,7 @@ unsafe fn gz_write(__param_state: *mut gz_state, __param_buf: *const c_void, __p
                 (__local_copy_ = ((__local_len as c_uint)))
             }
 
-            with_memcpy(((((unsafe *__param_state).in_ + (__local_have as usize)) as *mut c_void) as *mut u8), (__local_buf as *mut u8), ((__local_copy_ as c_ulong) as i64))
+            with_memcpy(((((unsafe *__param_state).in_ + (__local_have as usize)) as *mut c_void) as *mut u8), (__local_buf as *const u8), ((__local_copy_ as c_ulong) as i64))
 
             ((unsafe *__param_state).strm.avail_in = ((unsafe *(&raw const (unsafe *__param_state).strm as *const z_stream_s)).avail_in +% __local_copy_))
 
@@ -1130,7 +1130,7 @@ unsafe fn gz_vacate(__param_state: *mut gz_state) -> c_int {
 
     }
 
-    with_memmove((((unsafe *__param_state).in_ as *mut c_void) as *mut u8), ((__local_strm.next_in as *const c_void) as *mut u8), ((__local_strm.avail_in as c_ulong) as i64))
+    with_memmove((((unsafe *__param_state).in_ as *mut c_void) as *mut u8), ((__local_strm.next_in as *const c_void) as *const u8), ((__local_strm.avail_in as c_ulong) as i64))
 
     (__local_strm.next_in = (unsafe *__param_state).in_)
 
