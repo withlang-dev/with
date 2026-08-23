@@ -4756,6 +4756,36 @@ fn bs_check_migrate_posix_path_calls(ctx: &ActionCtx, compiler_path: &str, case_
 // call under its ORIGINAL name, resolving through std.libc — not the write_
 // rename (which is for definitions and binds nothing). Covers both a plain
 // function and a goto function (the goto-CFG value lowerer is a separate path).
+// #886: a C struct with anonymous-union members initialized by braces —
+// `struct { union {…} fc; } t = {{12}}` — must migrate to the explicit union
+// form `fc: <synth> { a: 12 }`, not the flattened `fc: 12` (which the compiler
+// then mis-stores as 0). The migrated program reads the values back and
+// returns nonzero if any are wrong, so a flatten OR a miscompile fails it.
+fn bs_check_migrate_anon_union_init(ctx: &ActionCtx, compiler_path: &str, case_dir: &str):
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "anon_union_init.c")
+    let out_w = bs_join(case_dir, "anon_union_init.w")
+    let c_text = "struct pair { union { int a; int b; } fc; union { int c; int d; } dl; };\nstatic const struct pair T[2] = {{{12},{8}}, {{34},{9}}};\nint main(void) {\n  return (T[0].fc.a - 12) + (T[0].dl.c - 8) + (T[1].fc.a - 34) + (T[1].dl.c - 9);\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "migrate anon-union init")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-anon-union-init", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_not_contains(ctx, out_text, "fc: 12", "anon_union_init_not_flattened")
+    if rc != 0: return rc
+    var run_args: Vec[str] = Vec.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-anon-union-init", run_args)
+    if run.rc != 0: return run.rc
+    0
+
 fn bs_check_migrate_prelude_collision_libc_call(ctx: &ActionCtx, compiler_path: &str, case_dir: &str):
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "prelude_collision_libc_call.c")
@@ -5089,6 +5119,8 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_w_prefixed_user_type(ctx, compiler_path, bs_join(output_dir, "w_prefixed_user_type"))
     if rc != 0: return rc
     rc = bs_check_migrate_prelude_collision_libc_call(ctx, compiler_path, bs_join(output_dir, "prelude_collision_libc_call"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_anon_union_init(ctx, compiler_path, bs_join(output_dir, "anon_union_init"))
     if rc != 0: return rc
     rc = bs_check_migrate_posix_path_calls(ctx, compiler_path, bs_join(output_dir, "posix_path_calls"))
     if rc != 0: return rc

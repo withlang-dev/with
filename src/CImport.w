@@ -7090,7 +7090,18 @@ impl CiExprPool:
             return 0 as CiExprId
         let arm_name = ci_escape_reserved(with_ci_cursor_spelling(session, arm_cursor))
         let arm_ty = with_ci_type_translated(session, with_ci_cursor_type(session, arm_cursor))
-        let raw_id = self.lower_expr_ir(session, value_cursor, types, scope)
+        // #886: C initializes a union member with a braced value — `{12}` for
+        // `union {…} fc`. value_cursor is that InitListExpr, not the scalar, so
+        // descend to its inner expression before lowering. Without this the
+        // arm lowering returns 0, the whole record init falls back to a text
+        // path, and the union wrapper is dropped (`fc: 12`), which the compiler
+        // then mis-stores.
+        var arm_value_cursor = value_cursor
+        if with_ci_cursor_kind(session, value_cursor) == CXK_INIT_LIST:
+            let inner = ci_find_last_expr_child(session, value_cursor)
+            if inner >= 0:
+                arm_value_cursor = inner
+        let raw_id = self.lower_expr_ir(session, arm_value_cursor, types, scope)
         if (raw_id as i32) == 0:
             return 0 as CiExprId
         let coerced = self.coerce_init_expr_to_type(types, raw_id, arm_ty)
