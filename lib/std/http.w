@@ -194,12 +194,15 @@ fn https_get_once(url: &str) -> HttpResponse:
         if n <= 0:
             done = true
         else:
-            var chunk: str = ""
-            let sp = &raw mut chunk as *mut u8
-            unsafe:
-                *(sp as *mut u64) = &buf[0] as u64
-                *((sp + 8u64) as *mut i64) = n as i64
-            response.push_str(chunk)
+            // Append the decrypted bytes directly. (A previous version punned
+            // a `str` over `buf` via `&raw mut chunk` writes; -O1 does not model
+            // those raw writes as touching `chunk`, so push_str read a stale
+            // pointer and crashed. #883.)
+            let bp = &buf[0] as *const u8
+            var k = 0
+            while k < n:
+                response.push_byte(unsafe *(bp + k as u64))
+                k = k + 1
     socket_close(conn.fd)
 
     let raw = response.to_str()
