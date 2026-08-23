@@ -28,11 +28,14 @@ unsafe fn ghash_mult(x: *const u8, y: *const u8, out: *mut u8):
             for j in 0..16:
                 z[j] = z[j] ^ v[j]
         let lsb = (v[15] as u32) & 1 as u32
-        var carry: u8 = 0 as u8
+        var carry: u32 = 0 as u32
         for j in 0..16:
-            let cur = v[j]
-            v[j] = carry | ((cur as u32 >> 1 as u32) as u8)
-            carry = if (cur as u32 & 1 as u32) != 0 as u32: 0x80 as u8 else: 0 as u8
+            // `old` must be the value as an owned u32: binding the bare
+            // element `v[j]` yields a live view, so a later read after the
+            // write below would observe the NEW byte and corrupt the carry.
+            let old = v[j] as u32
+            v[j] = (carry | (old >> 1 as u32)) as u8
+            carry = if (old & 1 as u32) != 0 as u32: 0x80 as u32 else: 0 as u32
         if lsb != 0 as u32:
             v[0] = v[0] ^ (0xe1 as u8)
 
@@ -218,3 +221,29 @@ unsafe fn aesgcm_tag(ctx: *mut AesGcm, out: *mut u8):
 
 unsafe fn AesGcm.tag(ctx: *mut AesGcm, out: *mut u8):
     unsafe { aesgcm_tag(ctx, out) }
+
+// Self-check against NIST SP 800-38D AES-128-GCM test case 2
+// (K=0, IV=0[12], P=0[16]): ciphertext 0388dace…fe78, tag ab6e47d4…bddf.
+// Returns 0 on pass, 1 if ciphertext diverges, 2 if the tag diverges.
+// Guards #883 (the GHASH GF(2^128) multiply): a regression there fails here
+// long before it reaches the TLS record layer.
+pub fn aes128_gcm_kat() -> i32:
+    var key: [u8; 16] = [0u8; 16]
+    var iv: [u8; 12] = [0u8; 12]
+    var pt: [u8; 16] = [0u8; 16]
+    var ct: [u8; 16] = [0u8; 16]
+    var tag: [u8; 16] = [0u8; 16]
+    var g = AesGcm.new(&key[0] as *const u8, &iv[0] as *const u8, 12)
+    unsafe:
+        aesgcm_encrypt(&raw mut g as *mut AesGcm, &pt[0] as *const u8, &raw mut ct[0] as *mut u8, 16)
+        aesgcm_tag(&raw mut g as *mut AesGcm, &raw mut tag[0] as *mut u8)
+    let ct_exp: [u8; 16] = [0x03u8, 0x88u8, 0xdau8, 0xceu8, 0x60u8, 0xb6u8, 0xa3u8, 0x92u8, 0xf3u8, 0x28u8, 0xc2u8, 0xb9u8, 0x71u8, 0xb2u8, 0xfeu8, 0x78u8]
+    let tag_exp: [u8; 16] = [0xabu8, 0x6eu8, 0x47u8, 0xd4u8, 0x2cu8, 0xecu8, 0x13u8, 0xbdu8, 0xf5u8, 0x3au8, 0x67u8, 0xb2u8, 0x12u8, 0x57u8, 0xbdu8, 0xdfu8]
+    var i = 0
+    while i < 16:
+        if ct[i] != ct_exp[i]:
+            return 1
+        if tag[i] != tag_exp[i]:
+            return 2
+        i = i + 1
+    0
