@@ -15829,7 +15829,7 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     // __std*p forms above). std.libc exposes both target surfaces.
     if name == "stdin" or name == "stdout" or name == "stderr": return CI_LIBC_KIND_VAR
     if name == "fprintf" or name == "printf" or name == "snprintf" or name == "sprintf": return CI_LIBC_KIND_FN
-    if name == "vsnprintf": return CI_LIBC_KIND_FN
+    if name == "vsnprintf" or name == "vfprintf" or name == "vprintf": return CI_LIBC_KIND_FN
     if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno": return CI_LIBC_KIND_FN
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
     if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN

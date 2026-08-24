@@ -42,6 +42,8 @@ pub extern fn printf(fmt: *const i8, ...) -> i32
 pub extern fn snprintf(dst: *mut i8, size: u64, fmt: *const i8, ...) -> i32
 pub extern fn sprintf(dst: *mut i8, fmt: *const i8, ...) -> i32
 pub extern fn vsnprintf(dst: *mut i8, size: u64, fmt: *const i8, va: *mut i8) -> i32
+pub extern fn vfprintf(stream: *mut c_void, fmt: *const i8, va: *mut i8) -> i32
+pub extern fn vprintf(fmt: *const i8, va: *mut i8) -> i32
 pub extern fn fopen(path: *const i8, mode: *const i8) -> *mut c_void
 pub extern fn fclose(stream: *mut c_void) -> i32
 pub extern fn fflush(stream: *mut c_void) -> i32
