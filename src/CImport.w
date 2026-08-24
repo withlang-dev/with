@@ -12621,6 +12621,151 @@ fn ci_concat_strings(s: &str) -> str:
             i = i + 1
     result ++ "\""
 
+// #889: is `name` defined (object- or fn-like) in the migrate macro session?
+fn ci_macro_name_is_defined(name: &str) -> bool:
+    if name.len() == 0:
+        return false
+    let msession = g_migrate_macro_session
+    if msession == 0:
+        return false
+    let count = with_cimport_macro_count(msession)
+    var i = 0
+    while i < count:
+        if with_cimport_macro_name(msession, i) == name:
+            return true
+        i = i + 1
+    false
+
+// Leading C identifier of `s` (after trimming), or "".
+fn ci_first_ident(s: &str) -> str:
+    let t = ci_trim(s)
+    if t.len() == 0 or not ci_is_ident_start(t.byte_at(0) as i32):
+        return ""
+    var e = 1
+    while e < t.len() as i32 and ci_is_ident_char(t.byte_at(e as i64) as i32):
+        e = e + 1
+    t.slice(0, e as i64)
+
+// Evaluate `defined X` / `defined(X)`; 1/0, or -1 if not that shape.
+fn ci_pp_eval_defined(expr: &str) -> i32:
+    let t = ci_trim(expr)
+    if not ci_starts_with(t, "defined"):
+        return -1
+    let rest = ci_trim(t.slice(7, t.len()))
+    var name = ""
+    if rest.len() > 0 and rest.byte_at(0) == 40:
+        name = ci_first_ident(ci_trim(rest.slice(1, rest.len())))
+    else:
+        name = ci_first_ident(rest)
+    if name.len() == 0:
+        return -1
+    if ci_macro_name_is_defined(name): 1 else: 0
+
+// Evaluate a `#if` expression we understand (defined / !defined); -1 otherwise.
+fn ci_pp_eval_if_expr(expr: &str) -> i32:
+    let t = ci_trim(expr)
+    if t.len() == 0:
+        return -1
+    if t.byte_at(0) == 33:
+        let inner = ci_pp_eval_defined(ci_trim(t.slice(1, t.len())))
+        if inner < 0:
+            return -1
+        return if inner == 1: 0 else: 1
+    ci_pp_eval_defined(t)
+
+// Evaluate an #ifndef/#ifdef/#if directive line (trimmed); -1 if unevaluable.
+fn ci_pp_eval_ifdir(t: &str) -> i32:
+    if ci_starts_with(t, "#ifndef"):
+        let name = ci_first_ident(t.slice(7, t.len()))
+        if name.len() == 0:
+            return -1
+        return if ci_macro_name_is_defined(name): 0 else: 1
+    if ci_starts_with(t, "#ifdef"):
+        let name = ci_first_ident(t.slice(6, t.len()))
+        if name.len() == 0:
+            return -1
+        return if ci_macro_name_is_defined(name): 1 else: 0
+    if ci_starts_with(t, "#if"):
+        return ci_pp_eval_if_expr(t.slice(3, t.len()))
+    -1
+
+// True if any line of `src` is a preprocessor conditional directive.
+fn ci_source_has_pp_directive(src: &str) -> bool:
+    let lines = src.split("\n")
+    var i = 0i64
+    while i < lines.len() as i64:
+        let t = ci_trim(lines.get(i))
+        if t.len() > 0 and t.byte_at(0) == 35:
+            if ci_starts_with(t, "#if") or ci_starts_with(t, "#else") or ci_starts_with(t, "#elif") or ci_starts_with(t, "#endif"):
+                return true
+        i = i + 1
+    false
+
+fn ci_pp_digit(v: i32) -> str: "01234567".slice(v as i64, (v + 1) as i64)
+fn ci_pp_dec(c: i32) -> i32: c - 48
+
+// #889: resolve #if/#ifdef/#ifndef/#elif/#else/#endif inside an initializer's
+// source, keeping only active branches and dropping the directives. Returns ""
+// if any condition can't be evaluated — the caller then fails loudly rather
+// than guessing a branch. The per-level stack is packed one char per level:
+// bit0 = effective-active, bit1 = any-branch-taken, bit2 = parent-active.
+fn ci_resolve_pp_conditionals(src: &str) -> str:
+    let lines = src.split("\n")
+    var stack = ""
+    var out = ""
+    var i = 0i64
+    while i < lines.len() as i64:
+        let line = lines.get(i)
+        let t = ci_trim(line)
+        let is_dir = t.len() > 0 and t.byte_at(0) == 35 and (ci_starts_with(t, "#if") or ci_starts_with(t, "#else") or ci_starts_with(t, "#elif") or ci_starts_with(t, "#endif"))
+        if is_dir:
+            let depth = stack.len() as i32
+            let top = if depth > 0: ci_pp_dec(stack.byte_at((depth - 1) as i64) as i32) else: 0
+            let top_eff = (top & 1) == 1
+            let top_taken = ((top / 2) & 1) == 1
+            let top_par = ((top / 4) & 1) == 1
+            if ci_starts_with(t, "#if"):
+                let c = ci_pp_eval_ifdir(t)
+                if c < 0:
+                    return ""
+                let par = if depth == 0: true else: top_eff
+                var v = 0
+                if par and c == 1: v = v + 1
+                if c == 1: v = v + 2
+                if par: v = v + 4
+                stack = stack ++ ci_pp_digit(v)
+            else if ci_starts_with(t, "#elif"):
+                if depth == 0:
+                    return ""
+                let c = ci_pp_eval_if_expr(t.slice(5, t.len()))
+                if c < 0:
+                    return ""
+                var v = 0
+                if top_par and not top_taken and c == 1: v = v + 1
+                if top_taken or c == 1: v = v + 2
+                if top_par: v = v + 4
+                stack = stack.slice(0, (depth - 1) as i64) ++ ci_pp_digit(v)
+            else if ci_starts_with(t, "#else"):
+                if depth == 0:
+                    return ""
+                var v = 2
+                if top_par and not top_taken: v = v + 1
+                if top_par: v = v + 4
+                stack = stack.slice(0, (depth - 1) as i64) ++ ci_pp_digit(v)
+            else:
+                if depth == 0:
+                    return ""
+                stack = stack.slice(0, (depth - 1) as i64)
+        else:
+            let depth = stack.len() as i32
+            let active = if depth == 0: true else: (ci_pp_dec(stack.byte_at((depth - 1) as i64) as i32) & 1) == 1
+            if active:
+                out = out ++ line ++ "\n"
+        i = i + 1
+    if stack.len() != 0:
+        return ""
+    out
+
 fn ci_lookup_macro_value(session: i64, name: &str) -> str:
     if name.len() == 0:
         return ""
@@ -13697,13 +13842,26 @@ fn ci_var_initializer_text_from_cursor(session: i64, var_cursor: i32) -> str:
     init_src
 
 fn ci_var_init_expr_from_decl_source_for_type(session: i64, var_cursor: i32, target_type: &str) -> str:
-    let raw_decl_src = with_ci_cursor_source_text(session, var_cursor)
+    var raw_decl_src = with_ci_cursor_source_text(session, var_cursor)
     var init_src = ci_var_initializer_text_from_cursor(session, var_cursor)
     let var_name = with_ci_cursor_spelling(session, var_cursor)
     if init_src.len() == 0:
         init_src = ci_preprocessed_var_initializer_by_name(var_name)
     if init_src.len() == 0:
         return ""
+    // #889: resolve preprocessor conditionals in the raw initializer source
+    // before any concat/translate; fail loudly if a condition can't be
+    // evaluated rather than guessing a branch.
+    if ci_translate_in_migrate_mode():
+        if ci_source_has_pp_directive(init_src):
+            let pp_r = ci_resolve_pp_conditionals(init_src)
+            if pp_r.len() == 0:
+                return ""
+            init_src = pp_r
+        if ci_source_has_pp_directive(raw_decl_src):
+            let pp_rd = ci_resolve_pp_conditionals(raw_decl_src)
+            if pp_rd.len() > 0:
+                raw_decl_src = pp_rd
     let cursor_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
     let vty_str = if target_type.len() > 0: with_str_clone_ref(target_type) else: cursor_ty_str
     let var_cxtype = with_ci_cursor_type(session, var_cursor)
