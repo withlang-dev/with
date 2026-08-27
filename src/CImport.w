@@ -6986,7 +6986,12 @@ impl CiExprPool:
         var ci2 = 0
         while ci2 < nc:
             let child = with_ci_child(session, cursor, ci2)
-            let designator = ci_init_child_designator_name(session, child)
+            // Only read a designator when clang actually reports one. An
+            // offsetof field value (`__builtin_offsetof(T, member)`) carries a
+            // member reference that ci_init_child_designator_name would
+            // otherwise mistake for a `.member =` designator, misrouting the
+            // positional value and failing the whole record init.
+            let designator = if ci_init_child_has_designator(session, child) != 0: ci_init_child_designator_name(session, child) else: ""
             var slot = -1
             var arm_idx = -1
             if designator.len() == 0:
@@ -13406,6 +13411,12 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: &str, ty: 
         let decayed = ci_c_initializer_decay_array_identifier(session, trimmed, ty)
         if decayed.len() > 0:
             return decayed
+        // offsetof(type, field) needs the session to resolve the record layout,
+        // which ci_translate_c_expr lacks — handle it here where we have one.
+        // (pcre2test's modlist: `PO(name)` = offsetof(patctl, name) as a field.)
+        let offsetof_translated = ci_try_translate_offsetof_expr(session, trimmed)
+        if offsetof_translated.len() > 0:
+            return ci_coerce_init_value_for_type(offsetof_translated, ty)
         var translated = ci_translate_c_expr(trimmed, "", "")
         if translated.len() == 0:
             return ""
