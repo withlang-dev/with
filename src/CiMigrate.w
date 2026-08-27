@@ -454,13 +454,9 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
     defs.push_str(g_migrate_shared_defs_prefix)
     defs.push_str(" — shared definitions for migrated PCRE2\n\n")
     defs.push_str(ci_migrate_preamble_text())
-    // Hardcoded extras from pcre2_internal.h
-    defs.push_str("// PCRE2 string constants (from pcre2_internal.h macros)\n")
-    defs.push_str("let STRING_MARK: *const u8 = c\"MARK\".ptr\n")
-    defs.push_str("let STRING_DEFINE: *const u8 = c\"DEFINE\".ptr\n")
-    defs.push_str("let STRING_VERSION: *const u8 = c\"VERSION\".ptr\n")
-    defs.push_str("let STRING_WEIRD_STARTWORD: *const u8 = c\"[:<:]]\".ptr\n")
-    defs.push_str("let STRING_WEIRD_ENDWORD: *const u8 = c\"[:>:]]\".ptr\n")
+    // (STRING_MARK/DEFINE/VERSION/WEIRD_STARTWORD/WEIRD_ENDWORD were once
+    // hardcoded here as pointer forms. The general macro path now emits them as
+    // c_char arrays, so hardcoding a second pointer declaration shadowed it.)
     // Shared declarations collected during migration.
     if g_migrate_shared_decl_buf.len() > 0:
         defs.push_str("\n")
