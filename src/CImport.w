@@ -9175,12 +9175,30 @@ impl CiExprPool:
             return child_id
         if op == UO_DEREF:
             var deref_ty = 0 as CiTypeId
-            let child_ty = self.get_type(child_id)
+            var child_ty = self.get_type(child_id)
+            if (child_ty as i32) == 0:
+                child_ty = types.type_from_libclang(session, with_ci_cursor_type(session, child_cursor))
             if ci_type_is_fn_ptr(types, child_ty):
                 return child_id
             if (child_ty as i32) != 0 and types.kind(child_ty) == CiTypeKind.CT_POINTER:
                 deref_ty = (types.get_d0(child_ty)) as CiTypeId
-            return self.add(CiExprKind.CIE_DEREF, child_id as i32, 0, 0, deref_ty)
+            // D27: `arr[i]` denotes the element PLACE. Dereferencing a pointer read
+            // from an array element needs the pointer VALUE; without materializing it
+            // the deref result inherits the element's view origin and matches no type
+            // in comparisons/index expressions. Force the value with an explicit cast
+            // to the element's own pointer type — resolved through the *translated text*
+            // so a pointer typedef (PCRE2_SPTR = *const u8, a CT_NAMED not CT_POINTER)
+            // is recognized. Compiler-side auto-materialization is a D27 gap (#893).
+            var deref_child = child_id
+            if self.kind(child_id) == CiExprKind.CIE_INDEX:
+                let elem_ty_text = ci_trim(with_ci_type_translated(session, with_ci_cursor_type(session, child_cursor)))
+                if elem_ty_text.len() > 0 and elem_ty_text.byte_at(0) == 42:
+                    let resolved_ty = types.type_from_translated_text(elem_ty_text)
+                    if (resolved_ty as i32) != 0:
+                        deref_child = self.cast(resolved_ty, child_id)
+                        if (deref_ty as i32) == 0:
+                            deref_ty = (types.get_d0(resolved_ty)) as CiTypeId
+            return self.add(CiExprKind.CIE_DEREF, deref_child as i32, 0, 0, deref_ty)
 
         if op == UO_MINUS:
             if with_ci_type_is_unsigned(session, cursor) == 0:
@@ -9620,12 +9638,27 @@ impl CiStmtPool:
             let operand = self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             if ci_value_ir_valid(operand):
                 var deref_ty = 0 as CiTypeId
-                let operand_ty = exprs.get_type(operand.value_expr)
+                let operand_cursor = with_ci_child(session, cursor, 0)
+                var operand_ty = exprs.get_type(operand.value_expr)
+                if (operand_ty as i32) == 0:
+                    operand_ty = types.type_from_libclang(session, with_ci_cursor_type(session, operand_cursor))
                 if ci_type_is_fn_ptr(types, operand_ty):
                     return operand
                 if (operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER:
                     deref_ty = (types.get_d0(operand_ty)) as CiTypeId
-                let deref_id = exprs.add(CiExprKind.CIE_DEREF, operand.value_expr as i32, 0, 0, deref_ty)
+                // D27: materialize a pointer array-element before deref so the result is
+                // a plain pointer VALUE, not a view-origin place — resolved through the
+                // translated text to recognize pointer typedefs (PCRE2_SPTR). See #893.
+                var deref_operand = operand.value_expr
+                if exprs.kind(operand.value_expr) == CiExprKind.CIE_INDEX:
+                    let elem_ty_text = ci_trim(with_ci_type_translated(session, with_ci_cursor_type(session, operand_cursor)))
+                    if elem_ty_text.len() > 0 and elem_ty_text.byte_at(0) == 42:
+                        let resolved_ty = types.type_from_translated_text(elem_ty_text)
+                        if (resolved_ty as i32) != 0:
+                            deref_operand = exprs.cast(resolved_ty, operand.value_expr)
+                            if (deref_ty as i32) == 0:
+                                deref_ty = (types.get_d0(resolved_ty)) as CiTypeId
+                let deref_id = exprs.add(CiExprKind.CIE_DEREF, deref_operand as i32, 0, 0, deref_ty)
                 return CiValueExprIR {
                     setup_stmt: operand.setup_stmt,
                     value_expr: deref_id,
