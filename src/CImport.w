@@ -8898,15 +8898,17 @@ fn ci_migrate_preamble_name_is_modeled_libc(name: &str) -> bool:
     false
 
 fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
-    // Modeled libc/libm/ctype bindings. In a shared-defs (library) migration
-    // these are declared in the imported `defs` module, so calling one is a
-    // cross-module extern call — already safe, and wrapping it in `unsafe` is
-    // vacuous in the lib/std/re modeled-C zone. The mission is explicit: modeled
-    // C becomes humane, and the programmer should never spell out `unsafe` for a
-    // header-modeled libc call. Only same-file (single-file) migration, where the
-    // extern is declared in the same module, needs the wrap.
+    // Modeled libc/libm/ctype bindings. In a shared-defs migration that targets the
+    // lib/std/re modeled-C zone (pcre2: `--shared-defs std.re.defs`), these are
+    // declared in the imported `defs` module AND the compiler exempts that zone
+    // (sema_path_is_migrated_regex_implementation) from the manual-extern-call
+    // unsafe requirement — so a call is safe and wrapping it in `unsafe` is vacuous
+    // ("unsafe block contains no unsafe operations"). Mission: modeled C is humane;
+    // the programmer never spells out `unsafe` for a header-modeled libc call there.
+    // A GENERIC shared-defs migration (or a single-file one) is NOT exempt: a bare
+    // manual-extern call requires unsafe, so it must stay wrapped.
     if ci_migrate_preamble_name_is_modeled_libc(name):
-        return not ci_migrate_shared_defs_active()
+        return not (ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_regex_zone())
     // with_* compiler-ABI externs stay wrapped even in shared-defs mode: the D30
     // transition (SemaCheck) keeps that `unsafe` honest in both the object and
     // in-unit worlds, so it is never vacuous.
@@ -10897,7 +10899,10 @@ impl CiStmtPool:
                     let ret_c_ty = ci_pointer_type_explicit_mut(with_ci_type_translated(session, with_ci_cursor_type(session, ret_child)))
                     if ret_c_ty.len() > 0 and ret_c_ty != "void" and ret_c_ty != "Unit":
                         let ret_ty_id = types.type_from_translated_text(ret_c_ty)
-                        if (ret_ty_id as i32) != 0:
+                        // Not fn-ptr: a function-pointer return (`return &callback`
+                        // -> `return callback`) is already normalized by the migrator;
+                        // casting it would break that and defeats no MIR mismatch.
+                        if (ret_ty_id as i32) != 0 and not ci_type_is_fn_ptr(types, ret_ty_id):
                             let val_ty = exprs.get_type(ret_value)
                             let ret_is_ptr = types.kind(ret_ty_id) == CiTypeKind.CT_POINTER
                             let mismatch = if (val_ty as i32) != 0: ci_print_type(types, val_ty) != ci_print_type(types, ret_ty_id) else: ret_is_ptr
@@ -14767,7 +14772,10 @@ impl CiGotoCfgContext:
             let ret_c_ty = ci_pointer_type_explicit_mut(with_ci_type_translated(session, with_ci_cursor_type(session, ret_child)))
             if ret_c_ty.len() > 0 and ret_c_ty != "void" and ret_c_ty != "Unit":
                 let ret_ty_id = types.type_from_translated_text(ret_c_ty)
-                if (ret_ty_id as i32) != 0:
+                // Not fn-ptr: a function-pointer return is already normalized by the
+                // migrator (`return &callback` -> `return callback`); casting it breaks
+                // that and defeats no MIR mismatch.
+                if (ret_ty_id as i32) != 0 and not ci_type_is_fn_ptr(types, ret_ty_id):
                     let val_ty = exprs.get_type(ret_value)
                     let ret_is_ptr = types.kind(ret_ty_id) == CiTypeKind.CT_POINTER
                     let mismatch = if (val_ty as i32) != 0: ci_print_type(types, val_ty) != ci_print_type(types, ret_ty_id) else: ret_is_ptr

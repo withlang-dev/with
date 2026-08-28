@@ -131,6 +131,13 @@ pub fn migrate_reset_options() -> Unit:
 fn ci_migrate_shared_defs_active() -> bool:
     g_migrate_shared_defs_prefix.len() > 0
 
+// True when the shared-defs migration targets the lib/std/re modeled-C zone
+// (pcre2 uses `--shared-defs std.re.defs`). Only there does the compiler exempt
+// cross-module manual-extern calls from the unsafe requirement, so only there is
+// dropping the migrator's `unsafe` wrap around a modeled-libc call correct.
+fn ci_migrate_shared_defs_targets_regex_zone() -> bool:
+    ci_starts_with(g_migrate_shared_defs_prefix, "std.re")
+
 fn ci_migrate_shared_defs_reset:
     g_migrate_shared_decl_buf = Vec.new()
     g_migrate_shared_decl_keys = ""
