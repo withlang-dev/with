@@ -5933,13 +5933,32 @@ impl CiStmtPool:
 
         var setup = 0 as CiStmtId
         let arg_ids: Vec[i32] = Vec.new()
+        // cfprintf(colour, stream, fmt, ...) expands to fprintf(stream, fmt, ...).
+        // The general CXK_CALL_EXPR path coerces each argument to the callee's
+        // declared parameter type (so a string-literal fmt drops to c"...".ptr —
+        // #747: `str` no longer coerces to *const i8). Building the fprintf call
+        // by hand here bypassed that, leaving a bare `str` fmt that fails every
+        // cfprintf. Coerce the args that map to fprintf's fixed params the same way.
+        let fprintf_decl_idx = ci_lookup_c_function_decl_idx(session, "fprintf")
+        let fprintf_param_count = if fprintf_decl_idx >= 0: with_cimport_fn_param_count(session, fprintf_decl_idx) else: 0
         var ai = first_arg
         while ai < nc:
-            let lowered = self.lower_value_expr_ir(session, with_ci_child(session, cursor, ai), exprs, types, scope)
+            let arg_cursor = with_ci_child(session, cursor, ai)
+            let lowered = self.lower_value_expr_ir(session, arg_cursor, exprs, types, scope)
             if not ci_value_ir_valid(lowered):
                 return 0 as CiStmtId
             setup = self.merge_ir( setup, lowered.setup_stmt)
-            arg_ids.push(lowered.value_expr as i32)
+            var arg_id = lowered.value_expr
+            // Drop the leading colour arg: fprintf param index is one less.
+            let fp_param_index = (ai - first_arg) - 1
+            if fprintf_decl_idx >= 0 and fp_param_index >= 0 and fp_param_index < fprintf_param_count:
+                let raw_param_ty = with_cimport_fn_param_type_translated(session, fprintf_decl_idx, fp_param_index)
+                let target_ty = types.type_from_translated_text(ci_pointer_type_explicit_mut(raw_param_ty))
+                if (target_ty as i32) != 0:
+                    arg_id = exprs.coerce_value_expr_for_target(session, target_ty, arg_cursor, arg_id, types)
+                    if (arg_id as i32) == 0:
+                        return 0 as CiStmtId
+            arg_ids.push(arg_id as i32)
             ai = ai + 1
 
         let begin_args: Vec[i32] = Vec.new()
