@@ -1,6 +1,7 @@
 module build.pcre2
 
 use std.build
+use std.string.StringBuilder
 fn pcre2_owned_text(s: &str): s ++ ""
 
 const PCRE2_SHA256: str = "c08ae2388ef333e8403e670ad70c0a11f1eed021fd88308d7e02f596fcd9dc16"
@@ -278,21 +279,24 @@ fn pcre2_module_defines_main(text: &str) -> bool:
     false
 
 fn pcre2_module_body_for_synthetic_check(text: &str) -> str:
-    var out = ""
+    // StringBuilder, not `out ++ line`: the pcre2 modules are large (pcre2_match
+    // is ~49k lines), and quadratic `++` here blows the comptime string budget
+    // during this build action (#892).
+    var out = StringBuilder.with_capacity(text.len())
     var line_start = 0
     var line_no = 1
     for i in 0..text.len() as i32:
         if text.byte_at(i as i64) == 10:
             let line = text.slice(line_start as i64, (i + 1) as i64)
             if line_no > 2 and not line.starts_with("use std.re."):
-                out = out ++ line
+                out.push_str(line)
             line_start = i + 1
             line_no = line_no + 1
     if line_start < text.len() as i32:
         let line = text.slice(line_start as i64, text.len())
         if line_no > 2 and not line.starts_with("use std.re."):
-            out = out ++ line
-    out
+            out.push_str(line)
+    out.to_str()
 
 fn pcre2_first_function_name(text: &str) -> str:
     var line_start = 0
