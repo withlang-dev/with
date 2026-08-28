@@ -8311,6 +8311,13 @@ impl CiExprPool:
                     return value_id
                 if (value_ty as i32) != 0 and ci_print_type(types, value_ty) == ci_print_type(types, target_ty_id):
                     return value_id
+                // The lowered value carries a known scalar type that differs from this
+                // scalar target — e.g. `int n = (unsigned)(...)`, whose value stays a
+                // c_uint cast. Coerce it here: cast_if_needed's cursor-type shortcut
+                // would wrongly skip, because C's implicit conversion makes the cursor
+                // type read as the target already, leaving the store to narrow/sign-change.
+                if (value_ty as i32) != 0 and ci_named_type_is_scalar(ci_print_type(types, value_ty)):
+                    return self.cast(target_ty_id, value_id)
                 if self.kind(value_id) != CiExprKind.CIE_CAST:
                     return self.cast(target_ty_id, value_id)
             return self.cast_if_needed(target_ty_id, value_id, value_cursor, session, types)
@@ -8453,6 +8460,14 @@ fn ci_record_index_struct(session: i64, ty_name: &str) -> i32:
 // the `{0}` init. Records with nested-record/union/array fields return
 // false and the decl stays uninitialized exactly as before (still loud).
 fn ci_record_all_fields_defaulted(session: i64, ty_name: &str) -> bool:
+    // A system-header record that std.libc already models (rlimit, #750) is NOT
+    // emitted by the migrator — it maps to the std.libc definition, whose fields
+    // carry no defaults. Judging "all fields defaulted" from the C field types
+    // would emit `Ty {}` as the zero-init, which then fails "missing field". Leave
+    // such an uninitialized local uninitialized instead (an uninit struct local
+    // compiles; the C code fills it before use).
+    if ci_translate_in_migrate_mode() and ci_libc_symbol_allowed_as(ty_name, CI_LIBC_KIND_TYPE):
+        return false
     let sidx = ci_record_index_struct(session, ty_name)
     if sidx >= 0:
         if with_cimport_decl_kind(session, sidx) == CK_UNION:
@@ -10873,6 +10888,21 @@ impl CiStmtPool:
                         if (elem_ty_id as i32) == 0:
                             return 0 as CiStmtId
                         ret_value = exprs.add(CiExprKind.CIE_ARRAY_DECAY, ret_value as i32, elem_ty_id as i32, 0, 0 as CiTypeId)
+                else:
+                    // Coerce the return value to the return type (the return child's
+                    // own C type is the converted/return type via C's implicit cast).
+                    // Same rule as the goto-CFG lower_return: cast a known mismatch, or
+                    // an untyped pointer return (`(char*)p + n`) whose IR type is
+                    // unresolved. Without it the store fails MIR validation.
+                    let ret_c_ty = ci_pointer_type_explicit_mut(with_ci_type_translated(session, with_ci_cursor_type(session, ret_child)))
+                    if ret_c_ty.len() > 0 and ret_c_ty != "void" and ret_c_ty != "Unit":
+                        let ret_ty_id = types.type_from_translated_text(ret_c_ty)
+                        if (ret_ty_id as i32) != 0:
+                            let val_ty = exprs.get_type(ret_value)
+                            let ret_is_ptr = types.kind(ret_ty_id) == CiTypeKind.CT_POINTER
+                            let mismatch = if (val_ty as i32) != 0: ci_print_type(types, val_ty) != ci_print_type(types, ret_ty_id) else: ret_is_ptr
+                            if mismatch:
+                                ret_value = exprs.cast(ret_ty_id, ret_value)
                 let return_id = self.return_(ret_value)
                 return self.merge_ir( lowered_ret.setup_stmt, return_id)
 
@@ -11376,7 +11406,12 @@ fn ci_scope_get_return_type(scope: CiScope) -> str:
     unsafe:
         if scope.ptr as i64 == 0:
             return ""
-        (*scope.ptr).return_type
+        // Clone: a bare `(*scope.ptr).return_type` read through the raw pointer is a
+        // shallow copy that ALIASES the field's heap str. Dropping the returned value
+        // then frees the field's data, so a second call (or the scope's own drop)
+        // use-after-frees it ("invalid free"). A single call per function masked it;
+        // callers that read it per-statement need an independent copy.
+        with_str_clone_ref((*scope.ptr).return_type)
 
 fn ci_scope_contains(scope: CiScope, name: &str) -> bool:
     unsafe:
@@ -14719,6 +14754,25 @@ impl CiGotoCfgContext:
                     self.fail("unsupported array return type in goto CFG", with_ci_cursor_location(session, ret_child))
                     return
                 ret_value = exprs.add(CiExprKind.CIE_ARRAY_DECAY, ret_value as i32, elem_ty_id as i32, 0, 0 as CiTypeId)
+        else:
+            // Coerce the return value to the return type. C converts freely at return
+            // (`char*` -> `void*`, unsigned -> int); the return child's OWN C type is
+            // already the converted (return) type via the implicit cast, so use it as
+            // the target and key the decision off the lowered value's IR type —
+            // otherwise the store fails MIR validation ("use rvalue type is
+            // incompatible with assign destination"). Cast a known mismatch; also cast
+            // an UNTYPED pointer return (a computed pointer whose IR type is
+            // unresolved, e.g. `(char*)p + n`) — a same-type pointer cast is a harmless
+            // no-op. Untyped scalar returns are left alone to avoid noise.
+            let ret_c_ty = ci_pointer_type_explicit_mut(with_ci_type_translated(session, with_ci_cursor_type(session, ret_child)))
+            if ret_c_ty.len() > 0 and ret_c_ty != "void" and ret_c_ty != "Unit":
+                let ret_ty_id = types.type_from_translated_text(ret_c_ty)
+                if (ret_ty_id as i32) != 0:
+                    let val_ty = exprs.get_type(ret_value)
+                    let ret_is_ptr = types.kind(ret_ty_id) == CiTypeKind.CT_POINTER
+                    let mismatch = if (val_ty as i32) != 0: ci_print_type(types, val_ty) != ci_print_type(types, ret_ty_id) else: ret_is_ptr
+                    if mismatch:
+                        ret_value = exprs.cast(ret_ty_id, ret_value)
         values.push(ret_value as i32)
         self.return_current(values)
 
