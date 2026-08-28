@@ -6260,7 +6260,15 @@ impl Sema:
         if kind == NodeKind.NK_CAST:
             let cast_tid = self.resolve_type_expr(self.ast.get_data1(node))
             let src_node = self.ast.get_data0(node)
-            let src_tid = if self.ast.kind(src_node) == NodeKind.NK_NULL_LIT and self.type_allows_null_literal(cast_tid) != 0:
+            // `null as *T` gives the null literal its pointer context from the cast
+            // target. A parenthesized `(null) as *T` wraps the literal in NK_GROUPED,
+            // so peel groups before deciding — otherwise the null loses its context
+            // (only a direct-null cast was recognized) and errors "null requires
+            // pointer type context" in positions that don't supply one otherwise.
+            var cast_src_null = src_node
+            while cast_src_null != 0 and self.ast.kind(cast_src_null) == NodeKind.NK_GROUPED:
+                cast_src_null = self.ast.get_data0(cast_src_null)
+            let src_tid = if cast_src_null != 0 and self.ast.kind(cast_src_null) == NodeKind.NK_NULL_LIT and self.type_allows_null_literal(cast_tid) != 0:
                 self.check_expr_with_expected(src_node, cast_tid)
             else:
                 self.check_expr_with_expected(src_node, 0 as TypeId)
