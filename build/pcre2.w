@@ -409,36 +409,47 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, print_
         return -1
     if pcre2_ensure_generated_dependencies(ctx, generated_dir) != 0:
         return -1
-    let defs_path = pcre2_join(generated_dir, "defs.w")
-    if not fs.exists(defs_path):
-        let _ = pcre2_fail(ctx, "missing generated defs.w: " ++ defs_path)
+    // Cohesive check: compile pcre2test.w (whose imports pull in every module)
+    // from a lib/std/re layout, so `use std.re.X` resolves to the migrated siblings
+    // and the whole library is type-checked and MIR-validated together — matching
+    // how std.regex is actually built. The old per-module check compiled each module
+    // in isolation with its `use std.re.*` imports stripped, so every cross-module
+    // reference was undefined: it manufactured hundreds of false errors and never
+    // validated a real migration (it was added after the last promote).
+    let check_root = pcre2_join(pcre2_scratch_dir(ctx), "cohesive-check-" ++ ctx.target_name())
+    let re_dir = pcre2_join(pcre2_join(pcre2_join(check_root, "lib"), "std"), "re")
+    if fs.exists(check_root) and fs.remove_tree(check_root) != 0:
+        return pcre2_fail(ctx, "could not clear cohesive-check dir: " ++ check_root)
+    if fs.mkdir_all(re_dir) != 0:
+        return pcre2_fail(ctx, "could not create cohesive-check dir: " ++ re_dir)
+    if pcre2_copy_w_files(ctx, generated_dir, re_dir) != 0:
         return -1
-    let defs_text = fs.read_text(defs_path)
-    let files = fs.list_files(generated_dir)
-    var ok = 0
-    var total_errors = 0
-    for fi in 0..files.len() as i32:
-        let path = files.get(fi as i64)
-        let mod_name = pcre2_module_name(path)
-        if mod_name == "defs":
-            continue
-        let module_text = fs.read_text(path)
-        var synthetic = defs_text ++ pcre2_module_body_for_synthetic_check(module_text)
-        if not pcre2_module_defines_main(module_text):
-            synthetic = synthetic ++ "\nfn main { print(\"ok\") }\n"
-        let expected_decl = pcre2_first_function_name(module_text)
-        let source_name = pcre2_join(generated_dir, "__check_" ++ mod_name ++ ".w")
-        let errors = pcre2_check_synthetic_module(ctx, mod_name, source_name, synthetic, expected_decl)
-        if errors < 0:
-            return -1
-        if errors == 0:
-            ok = ok + 1
-        else:
-            print(mod_name ++ f" {errors} {module_text.len()}")
-            total_errors = total_errors + errors
+    let pcre2test = pcre2_join(re_dir, "pcre2test.w")
+    if not fs.exists(pcre2test):
+        return pcre2_fail(ctx, "missing pcre2test.w for cohesive check: " ++ pcre2test)
+    let ws = ctx.create_workspace("pcre2-cohesive-check")
+    ws.add_file(pcre2test)
+    var options = ws.options()
+    options.output_kind = BuildOutputKind.Check
+    ws.set_options(options)
+    ws.begin_intercept()
+    let result = ws.compile()
+    var saw_complete = false
+    var rc = result.rc
+    while not saw_complete:
+        let envelope = ws.wait_for_message()
+        match envelope.message:
+            CompilerMessage.Complete(done) =>
+                rc = done.rc
+                saw_complete = true
+            CompilerMessage.Error(_, message, _) =>
+                let _ = pcre2_fail(ctx, "cohesive-check workspace error: " ++ message)
+                return -1
+            _ => false
+    ws.end_intercept()
     if print_summary:
-        print(f"OK={ok} TOTAL_ERRORS={total_errors}")
-    total_errors
+        print(f"pcre2 cohesive check rc={rc}")
+    if rc == 0: 0 else: 1
 
 fn pcre2_copy_w_files(ctx: &ActionCtx, source_dir: &str, dest_dir: &str) -> i32:
     let fs = ctx.fs()
