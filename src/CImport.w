@@ -3061,6 +3061,16 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
             if macro_expr_result.len() > 0 and cast_expr_ty.len() > 0:
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
+                // A bare macro reference (e.g. `#define PRIdLEAST16 PRId16`)
+                // already carries the referenced macro's type. Re-annotating it
+                // with clang's semantic type mismatches when the two are emitted
+                // differently — PRId16 becomes a `str`, not the `[3]c_char` clang
+                // reports — so inherit the reference's type by emitting it plain.
+                if ci_is_c_ident(ci_trim(macro_expr_result)):
+                    let ref_line = "let " ++ safe_name ++ " = " ++ ci_trim(macro_expr_result)
+                    if not ci_migrate_shared_decl_add("let", safe_name, ref_line):
+                        output = output ++ ref_line ++ "\n"
+                    continue
                 // #775: clang's semantic type for a folded macro can be
                 // narrower than the folded VALUE (UINT_MAX's (__INT_MAX__
                 // *2U +1U) reports int but folds to 0xffffffff). When the
