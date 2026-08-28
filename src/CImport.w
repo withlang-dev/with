@@ -10128,7 +10128,19 @@ impl CiStmtPool:
                 let _ = exprs.add_extra(arg_ids.get(j))
                 j = j + 1
             var call_id = exprs.add(CiExprKind.CIE_CALL, callee.value_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
-            if ci_migrate_call_requires_unsafe_wrapper(callee_text):
+            // An indirect call through a function-pointer value (e.g. a struct's
+            // fn-ptr field such as memctl.free) requires an unsafe context (§16.11):
+            // a fn pointer can be null or dangling, so unlike a named modeled extern
+            // it is genuinely unsafe to invoke. ci_migrate_call_requires_unsafe_wrapper
+            // only recognizes named callees, so detect the fn-ptr callee by its type.
+            // `not ci_is_c_ident(callee_text)` excludes direct named calls: a
+            // function reference (strlen, a cross-module _pcre2_* fn) also carries a
+            // fn-ptr type, but invoking it by name is not an indirect call and must
+            // not be wrapped — doing so reintroduces the vacuous modeled-libc wraps.
+            // Only a fn-ptr *value* spelled as a non-identifier expression (a struct
+            // field like memctl.free, a deref) is an indirect call needing unsafe.
+            let indirect_fn_ptr_call = ci_type_is_fn_ptr(types, exprs.get_type(callee.value_expr)) and not ci_is_c_ident(callee_text) and not g_ci_migrate_in_unsafe_function_body
+            if ci_migrate_call_requires_unsafe_wrapper(callee_text) or indirect_fn_ptr_call:
                 call_id = exprs.unsafe_expr(call_id)
             return CiValueExprIR {
                 setup_stmt: setup,
