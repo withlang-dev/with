@@ -3029,6 +3029,12 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: &str, macro
         else:
             if ci_object_macro_value_is_type_like(stripped):
                 continue
+            // A comma-list object macro (e.g. `#define OP_NAME_LIST "End",
+            // "\\A", ...`) is only meaningful expanded inline inside an array
+            // initializer `{ OP_NAME_LIST }`; a standalone `let` for it would be
+            // truncated to the first element and ill-typed, so skip it.
+            if ci_split_top_level_items(stripped).len() as i32 > 1:
+                continue
             let compound_literal_ty = ci_compound_literal_macro_type(stripped)
             let compound_literal_result = if compound_literal_ty.len() > 0: ci_try_translate_compound_literal_macro(type_session, stripped) else: ""
             if compound_literal_ty.len() > 0 and compound_literal_result.len() == 0:
@@ -13973,8 +13979,9 @@ fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: CiScope, targ
         // expression, insert the explicit `&init[0] as *T` decay.
         // C performs this implicitly; With doesn't.
         //
-        // String literals are exempt — With accepts `*const i8 =
-        // "literal"` directly without an explicit decay.
+        // A string literal no longer coerces to a raw pointer (post-#747
+        // flip); a `*T` var initialized from one gets the c-string pointer
+        // spelling `c"...".ptr as *T`.
         if vty_str.len() > 0 and vty_str.byte_at(0) == 42:
             let init_peeled = ci_peel_transparent(session, init_cursor)
             let init_kind = with_ci_cursor_kind(session, init_peeled)
@@ -13982,6 +13989,8 @@ fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: CiScope, targ
                 let elem_ty = ci_array_elem_type_from_cursor(session, init_peeled)
                 if elem_ty.len() > 0:
                     init_expr = "(&" ++ init_expr ++ "[0] as " ++ vty_str ++ ")"
+            else if init_kind == CXK_STRING_LITERAL and ci_is_string_literal(init_expr):
+                init_expr = "c" ++ init_expr ++ ".ptr as " ++ vty_str
             // Pointer-type mismatch: when the var is `*T` and the
             // init expression's type is also a pointer but points
             // to a different type (e.g. `*c_void` from a malloc-
@@ -15714,7 +15723,9 @@ fn ci_coerce_init_value_for_type(value: &str, ty: &str) -> str:
         if rendered.len() > 0:
             return rendered
     if ci_starts_with(ty, "*") and ci_is_string_literal(value):
-        return with_str_clone_ref(value)
+        // A raw pointer type no longer coerces from a bare `str` literal
+        // (post-#747 flip); emit the c-string pointer spelling instead.
+        return "c" ++ value ++ ".ptr as " ++ ty
     with_str_clone_ref(value)
 
 fn ci_find_fn_cursor(session: i64, name: &str) -> i32:
