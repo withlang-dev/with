@@ -8873,13 +8873,28 @@ fn ci_migrate_wrap_call_if_needed(name: &str, call_text: &str) -> str:
         return "unsafe { " ++ call_text ++ " }"
     with_str_clone_ref(call_text)
 
-fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
+fn ci_migrate_preamble_name_is_modeled_libc(name: &str) -> bool:
     if name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strchr" or name == "memchr": return true
     if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace": return true
     if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint": return true
     if name == "isgraph" or name == "ispunct" or name == "iscntrl": return true
     if name == "tolower" or name == "toupper": return true
     if ci_is_libm_fn(name): return true
+    false
+
+fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
+    // Modeled libc/libm/ctype bindings. In a shared-defs (library) migration
+    // these are declared in the imported `defs` module, so calling one is a
+    // cross-module extern call — already safe, and wrapping it in `unsafe` is
+    // vacuous in the lib/std/re modeled-C zone. The mission is explicit: modeled
+    // C becomes humane, and the programmer should never spell out `unsafe` for a
+    // header-modeled libc call. Only same-file (single-file) migration, where the
+    // extern is declared in the same module, needs the wrap.
+    if ci_migrate_preamble_name_is_modeled_libc(name):
+        return not ci_migrate_shared_defs_active()
+    // with_* compiler-ABI externs stay wrapped even in shared-defs mode: the D30
+    // transition (SemaCheck) keeps that `unsafe` honest in both the object and
+    // in-unit worlds, so it is never vacuous.
     if name == "with_clz" or name == "with_ctz" or name == "with_popcount": return true
     if name == "with_bswap16" or name == "with_bswap32" or name == "with_bswap64": return true
     if name == "with_clzl" or name == "with_clzll" or name == "with_ctzl" or name == "with_ctzll": return true
