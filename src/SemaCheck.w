@@ -452,6 +452,27 @@ impl Sema:
         self.contextual_copy_adjustment_indices.insert(context_key, index)
         1
 
+    // #895: force a variadic-slot Copy view (`&T`, T: Copy) to materialize its
+    // pointee. A variadic argument establishes an owned-value demand with no
+    // declared param type, so route it through the same contextual-Copy
+    // machinery a fixed Copy param uses (record_contextual_copy_adjustment
+    // re-validates Copy-ness) — otherwise MIR lowers the view's address and the
+    // callee reads a pointer instead of the value.
+    mut fn materialize_variadic_value_arg(arg_node: i32, arg_ty: i32):
+        if arg_node <= 0 or arg_ty == 0:
+            return
+        // An explicit `&x` at a variadic slot passes its address by intent
+        // (e.g. `%p`); only implicit element/field Copy views materialize.
+        if self.cast_operand_is_explicit_borrow(arg_node) != 0:
+            return
+        let resolved = self.resolve_alias(arg_ty as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_REF or self.get_type_d1(resolved) != 0:
+            return
+        let pointee = self.get_type_d0(resolved)
+        if pointee == 0:
+            return
+        let _ = self.record_contextual_copy_adjustment(arg_node, pointee, arg_ty)
+
     fn has_contextual_copy_adjustment(source_node: i32) -> i32:
         self.has_contextual_copy_adjustment_for_sig(self.current_fn_sig_idx, source_node)
 
@@ -15016,6 +15037,12 @@ impl Sema:
             if is_closure_arg:
                 self.closure_direct_arg_escape_flags.pop()
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
+            // #895: a variadic argument is passed BY VALUE (C default promotions;
+            // D27 value context). An element/Copy view reaching a variadic slot
+            // has no param type to drive materialization, so demand it here — else
+            // MIR passes the view's address and the callee reads a pointer.
+            if expected_ty == 0 and sig_idx >= 0 and self.sig_is_variadic(sig_idx) != 0 and (ai + param_offset) >= self.sig_get_param_count(sig_idx):
+                self.materialize_variadic_value_arg(arg_node, arg_ty as i32)
             // §16.3c: a string literal that provably contains an interior NUL must
             // not coerce to a C string at an FFI boundary — C would truncate.
             if expected_ty != 0 and self.sema_type_is_c_char_pointer(expected_ty) != 0 and (self.extern_fn_names.contains(fn_sym) or self.ci_syms.contains(fn_sym)):
