@@ -11732,17 +11732,20 @@ impl CiStmtPool:
                         let preprocessed_init = ci_var_init_expr_from_preprocessed_cursor_for_type(session, child, with_ci_type_translated(session, vty))
                         if preprocessed_init.len() > 0:
                             source_init_expr = preprocessed_init
-                    if ci_is_concatenated_string(source_init_expr):
+                    // #880: when a macro is present, expand the sequence first —
+                    // it stringizes `#`-tokens (XSTRING) that ci_concat_strings
+                    // would drop; only fall back to a plain join if that fails.
+                    if init_has_macro:
+                        let expanded_seq = ci_expand_string_macro_sequence(session, init_src)
+                        if ci_is_string_literal(expanded_seq):
+                            let str_idx = exprs.add_string(expanded_seq)
+                            init_id = exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId)
+                    if (init_id as i32) == 0 and ci_is_concatenated_string(source_init_expr):
                         let str_idx = exprs.add_string(ci_concat_strings(source_init_expr))
                         init_id = exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId)
-                    else if ci_is_string_literal(source_init_expr):
+                    else if (init_id as i32) == 0 and ci_is_string_literal(source_init_expr):
                         let str_idx = exprs.add_string(source_init_expr)
                         init_id = exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId)
-                    if (init_id as i32) == 0 and init_has_macro:
-                        let expanded_init = ci_expand_string_macro_sequence(session, init_src)
-                        if expanded_init.len() > 0:
-                            let str_idx = exprs.add_string(expanded_init)
-                            init_id = exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId)
                     if (init_id as i32) == 0:
                         let lowered_init = self.lower_value_expr_ir(session, init_cursor, exprs, types, new_scope)
                         if not ci_value_ir_valid(lowered_init):
@@ -12544,6 +12547,28 @@ fn ci_is_concatenated_string(s: &str) -> bool:
         i = i + 1
     false
 
+// #880: true only when `s` is exclusively adjacent string literals and
+// whitespace — no macro/stringize token between them. Distinguishes a pure
+// `"a" "b"` concatenation (safe to join) from `"a" MACRO(x) "b"` (must expand).
+fn ci_concat_is_pure_literals(s: &str) -> bool:
+    let t = ci_trim(s)
+    var i = 0
+    let slen = t.len() as i32
+    var saw = false
+    while i < slen:
+        while i < slen and ci_is_space(t.byte_at(i as i64)):
+            i = i + 1
+        if i >= slen:
+            break
+        if t.byte_at(i as i64) != 34:
+            return false
+        let end = ci_find_string_literal_end(t, i)
+        if end <= i:
+            return false
+        saw = true
+        i = end
+    saw
+
 fn ci_byte_to_hex_escape(value: i32) -> str:
     let hex = "0123456789abcdef"
     let hi = (value >> 4) & 15
@@ -13298,7 +13323,12 @@ fn ci_expand_string_macro_sequence_depth(session: i64, s: &str, depth: i32) -> s
     let cleaned = ci_strip_parens(ci_trim(ci_strip_c_comments(s)))
     if cleaned.len() == 0:
         return ""
-    if ci_is_concatenated_string(cleaned):
+    // #880: only shortcut to a plain join when the sequence is PURELY adjacent
+    // string literals. A stringize/macro call between literals (pcre2 error text:
+    // "...UTF-" XSTRING(PCRE2_CODE_UNIT_WIDTH) " mode") must fall through to the
+    // token loop below, which expands the `#`-stringized token — ci_concat_strings
+    // would silently drop it ("UTF- mode").
+    if ci_is_concatenated_string(cleaned) and ci_concat_is_pure_literals(cleaned):
         return ci_concat_strings(cleaned)
     if ci_is_string_literal(cleaned):
         return ci_concat_strings(cleaned)
