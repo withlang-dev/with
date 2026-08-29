@@ -618,6 +618,18 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn atan2(y: f64, x: f64) -> f64\n"
     // c_void comes from the prelude's builtins; re-declaring it here would
     // shadow the foundation module out of the program (#750).
+    //
+    // #880 exception: the regex zone (lib/std/re) is ALSO compiled with
+    // --no-prelude for the embedded regex runtime (:regex-runtime-ir), where
+    // no builtin c_void exists — its defs must carry the declaration, as the
+    // pre-#750 promotion always did (both modes built green with it for
+    // months). Zone-scoped so ordinary migrations keep #750's protection.
+    if ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_regex_zone():
+        p = p ++ "\ntype c_void = opaque\n"
+        // `unreachable()` is also prelude-only; give the zone a self-contained
+        // Never shim (abort matches the builtin's crash-loudly semantics).
+        p = p ++ "extern fn abort() -> Never\n"
+        p = p ++ "fn __ci_unreachable() -> Never: abort()\n"
     p = p ++ "\ntype c_char = i8\n"
     p = p ++ "type c_short = i16\n"
     p = p ++ "type c_ushort = u16\n"
