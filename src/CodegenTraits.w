@@ -2214,6 +2214,14 @@ impl Codegen:
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             return self.try_eval_const_pointer_llvm(cur, resolved as i32)
 
+        // #880: a function-typed field (extern "C" callback slots in migrated C
+        // structs) is physically a pointer; without this case a `null` or named
+        // function in ONE field silently demoted the WHOLE global to runtime
+        // init — zero data in a standalone runtime object whose init never runs
+        // (pcre2's default match context lost heap_limit → every match -63).
+        if tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_FN:
+            return self.try_eval_const_pointer_llvm(cur, resolved as i32)
+
         if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL:
             let exact = self.exact_int_const_llvm(cur, resolved as i32)
             if exact != 0:
