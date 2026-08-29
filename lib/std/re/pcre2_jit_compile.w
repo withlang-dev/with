@@ -1,7 +1,35 @@
-// Migrated from PCRE2
+// Migrated from C
 use std.re.defs
+use std.re.pcre2_config
+use std.re.pcre2_context
+use std.re.pcre2_convert
+use std.re.pcre2_compile
+use std.re.pcre2_pattern_info
+use std.re.pcre2_match_data
+use std.re.pcre2_dfa_match
+use std.re.pcre2_match
+use std.re.pcre2_match_next
+use std.re.pcre2_substring
+use std.re.pcre2_serialize
+use std.re.pcre2_substitute
+use std.re.pcre2_error
+use std.re.pcre2_maketables
+use std.re.pcre2_tables
+use std.re.pcre2_chartables
+use std.re.pcre2_ucd
+use std.re.pcre2_auto_possess
+use std.re.pcre2_chkdint
+use std.re.pcre2_extuni
+use std.re.pcre2_find_bracket
+use std.re.pcre2_newline
+use std.re.pcre2_ord2utf
+use std.re.pcre2_script_run
+use std.re.pcre2_string_utils
+use std.re.pcre2_study
+use std.re.pcre2_valid_utf
+use std.re.pcre2_xclass
 
-fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: c_uint) -> c_int {
+pub unsafe fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: c_uint) -> c_int {
     var __local_re: *mut pcre2_real_code_8 = __param_code
 
     if (((__param_options as c_uint) & (512 as c_uint)) != 0) {
@@ -22,8 +50,8 @@ fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: c_
     }
 
     if ((if ((__param_options as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0) {
-        if ((if ((__local_re.overall_options as c_uint) & (67108864 as c_uint)) == 0: 1 else: 0) != 0) {
-            ((unsafe *__local_re).overall_options = __local_re.overall_options | 67108864)
+        if ((if (((unsafe *__local_re).overall_options as c_uint) & (67108864 as c_uint)) == 0: 1 else: 0) != 0) {
+            ((unsafe *__local_re).overall_options = ((unsafe *__local_re).overall_options as c_uint) | (67108864 as c_uint))
 
         }
 
@@ -33,7 +61,7 @@ fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: c_
 
 }
 
-fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int {
+pub unsafe fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int {
     __param_code
 
     __param_subject
@@ -46,30 +74,30 @@ fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
     __param_mcontext
 
-    ((unsafe *__param_match_data).rc = -45)
+    ((unsafe *__param_match_data).rc = ((-45 as c_int)))
 
-    return __param_match_data.rc
+    return (unsafe *__param_match_data).rc
 
 
 }
 
-fn pcre2_jit_free_unused_memory_8(__param_gcontext: *mut pcre2_real_general_context_8) {
+pub unsafe fn pcre2_jit_free_unused_memory_8(__param_gcontext: *mut pcre2_real_general_context_8) -> Unit {
     __param_gcontext
 
 }
 
-fn pcre2_jit_stack_create_8(__param_startsize: c_ulong, __param_maxsize: c_ulong, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8 {
+pub unsafe fn pcre2_jit_stack_create_8(__param_startsize: c_ulong, __param_maxsize: c_ulong, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8 {
     __param_gcontext
 
     __param_startsize
 
     __param_maxsize
 
-    return null
+    return ((null as *mut pcre2_real_jit_stack_8))
 
 }
 
-fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callback: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, __param_callback_data: *mut c_void) {
+pub unsafe fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callback: unsafe extern "C" fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, __param_callback_data: *mut c_void) -> Unit {
     __param_mcontext
 
     __param_callback
@@ -78,33 +106,33 @@ fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, _
 
 }
 
-fn pcre2_jit_stack_free_8(__param_jit_stack: *mut pcre2_real_jit_stack_8) {
+pub unsafe fn pcre2_jit_stack_free_8(__param_jit_stack: *mut pcre2_real_jit_stack_8) -> Unit {
     __param_jit_stack
 
 }
 
-fn _pcre2_jit_free_rodata_8(__param_current: *mut c_void, __param_allocator_data: *mut c_void) {
+pub unsafe fn _pcre2_jit_free_rodata_8(__param_current: *mut c_void, __param_allocator_data: *mut c_void) -> Unit {
     __param_current
 
     __param_allocator_data
 
 }
 
-fn _pcre2_jit_free_8(__param_executable_jit: *mut c_void, __param_memctl: *mut pcre2_memctl) {
+pub unsafe fn _pcre2_jit_free_8(__param_executable_jit: *mut c_void, __param_memctl: *mut pcre2_memctl) -> Unit {
     __param_executable_jit
 
     __param_memctl
 
 }
 
-fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> c_ulong {
+pub unsafe fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> c_ulong {
     __param_executable_jit
 
     return 0
 
 }
 
-fn _pcre2_jit_get_target_8() -> *const i8 {
-    return ("JIT is not supported" as *const c_char)
+pub fn _pcre2_jit_get_target_8() -> *const i8 {
+    return (&"JIT is not supported"[0] as *mut c_char)
 
 }

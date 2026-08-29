@@ -1,7 +1,35 @@
-// Migrated from PCRE2
+// Migrated from C
 use std.re.defs
+use std.re.pcre2_config
+use std.re.pcre2_context
+use std.re.pcre2_convert
+use std.re.pcre2_compile
+use std.re.pcre2_pattern_info
+use std.re.pcre2_match_data
+use std.re.pcre2_match
+use std.re.pcre2_match_next
+use std.re.pcre2_substring
+use std.re.pcre2_serialize
+use std.re.pcre2_substitute
+use std.re.pcre2_jit_compile
+use std.re.pcre2_error
+use std.re.pcre2_maketables
+use std.re.pcre2_tables
+use std.re.pcre2_chartables
+use std.re.pcre2_ucd
+use std.re.pcre2_auto_possess
+use std.re.pcre2_chkdint
+use std.re.pcre2_extuni
+use std.re.pcre2_find_bracket
+use std.re.pcre2_newline
+use std.re.pcre2_ord2utf
+use std.re.pcre2_script_run
+use std.re.pcre2_string_utils
+use std.re.pcre2_study
+use std.re.pcre2_valid_utf
+use std.re.pcre2_xclass
 
-fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8, __param_workspace: *mut c_int, __param_wscount: c_ulong) -> c_int {
+pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8, __param_workspace: *mut c_int, __param_wscount: c_ulong) -> c_int {
     var __local_subject = __param_subject
     var __local_length = __param_length
     var __local_options = __param_options
@@ -49,7 +77,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
     var __local_start_bits__goto_3370_16: *const u8 = null
 
-    var __local_cb__goto_3375_21: pcre2_callout_block_8
+    var __local_cb__goto_3375_21: pcre2_callout_block_8 = pcre2_callout_block_8 {  }
 
     var __local_actual_match_block__goto_3376_17: dfa_match_block_8
 
@@ -204,20 +232,20 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         (__local_original_options__goto_3347_10 = __local_options)
         (__local_null_str__goto_3349_13 = [205])
         (__local_original_subject__goto_3350_12 = __local_subject)
-        (__local_has_first_cu__goto_3357_6 = 0)
-        (__local_has_req_cu__goto_3358_6 = 0)
+        (__local_has_first_cu__goto_3357_6 = ((0 as c_int)))
+        (__local_has_req_cu__goto_3358_6 = ((0 as c_int)))
         (__local_memchr_found_first_cu__goto_3361_12 = null)
         (__local_memchr_found_first_cu2__goto_3362_12 = null)
-        (__local_first_cu__goto_3365_13 = 0)
-        (__local_first_cu2__goto_3366_13 = 0)
-        (__local_req_cu__goto_3367_13 = 0)
-        (__local_req_cu2__goto_3368_13 = 0)
+        (__local_first_cu__goto_3365_13 = ((0 as u8)))
+        (__local_first_cu2__goto_3366_13 = ((0 as u8)))
+        (__local_req_cu__goto_3367_13 = ((0 as u8)))
+        (__local_req_cu2__goto_3368_13 = ((0 as u8)))
         (__local_start_bits__goto_3370_16 = ((null as *const u8)))
         (__local_mb__goto_3377_18 = ((&raw mut __local_actual_match_block__goto_3376_17 as *mut dfa_match_block_8)))
         (__local_rws__goto_3385_13 = (&__local_base_recursion_workspace__goto_3384_5[0] as *mut RWS_anchor))
         ((unsafe *__local_rws__goto_3385_13).next = ((null as *mut RWS_anchor)))
-        ((unsafe *__local_rws__goto_3385_13).size = 7680)
-        ((unsafe *__local_rws__goto_3385_13).free = 7676)
+        ((unsafe *__local_rws__goto_3385_13).size = ((7680 as c_uint)))
+        ((unsafe *__local_rws__goto_3385_13).free = ((7676 as c_uint)))
         (__ci_expr_logic_0 = 0)
         if ((if __local_subject == null: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if (if __local_length == 0: 1 else: 0) != 0: 1 else: 0))
@@ -230,7 +258,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_1 {
-        (__local_subject = (&__local_null_str__goto_3349_13[0] as *mut u8))
+        (__local_subject = (&__local_null_str__goto_3349_13[0] as *const u8))
         goto '__ci_bb_2
     }
 
@@ -265,7 +293,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_5 {
-        (__local_rc__goto_3344_5 = -51)
+        (__local_rc__goto_3344_5 = ((-51 as c_int)))
         goto '__ci_bb_7
     }
 
@@ -282,7 +310,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_8 {
-        (__local_rc__goto_3344_5 = -34)
+        (__local_rc__goto_3344_5 = ((-34 as c_int)))
         goto '__ci_bb_7
     }
 
@@ -295,7 +323,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_10 {
-        (__local_length = _pcre2_strlen_8(__local_subject))
+        (__local_length = ((_pcre2_strlen_8(__local_subject) as c_ulong)))
         goto '__ci_bb_11
     }
 
@@ -308,7 +336,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_12 {
-        (__local_rc__goto_3344_5 = -43)
+        (__local_rc__goto_3344_5 = ((-43 as c_int)))
         goto '__ci_bb_7
     }
 
@@ -321,14 +349,14 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_14 {
-        (__local_rc__goto_3344_5 = -33)
+        (__local_rc__goto_3344_5 = ((-33 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_15 {
         (__ci_expr_logic_3 = 0)
         if ((if ((__local_options as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if ((((__local_re__goto_3346_24.overall_options as c_uint) | (__local_options as c_uint)) as c_uint) & (536870912 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if (if (((((unsafe *__local_re__goto_3346_24).overall_options as c_uint) | (__local_options as c_uint)) as c_uint) & (536870912 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_3 != 0) {
             goto '__ci_bb_16
@@ -338,12 +366,12 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_16 {
-        (__local_rc__goto_3344_5 = -34)
+        (__local_rc__goto_3344_5 = ((-34 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_17 {
-        if ((if ((__local_re__goto_3346_24.overall_options as c_uint) & (67108864 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__local_re__goto_3346_24).overall_options as c_uint) & (67108864 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_18
         } else {
             goto '__ci_bb_19
@@ -351,12 +379,12 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_18 {
-        (__local_rc__goto_3344_5 = -66)
+        (__local_rc__goto_3344_5 = ((-66 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_19 {
-        if ((if __local_re__goto_3346_24.magic_number != 1346589253: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_re__goto_3346_24).magic_number != 1346589253: 1 else: 0) != 0) {
             goto '__ci_bb_20
         } else {
             goto '__ci_bb_21
@@ -364,12 +392,12 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_20 {
-        (__local_rc__goto_3344_5 = -31)
+        (__local_rc__goto_3344_5 = ((-31 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_21 {
-        if ((if ((__local_re__goto_3346_24.flags as c_uint) & (((((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint)) as c_uint)) != 1: 1 else: 0) != 0) {
+        if ((if (((unsafe *__local_re__goto_3346_24).flags as c_uint) & (((((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint)) as c_uint)) != 1: 1 else: 0) != 0) {
             goto '__ci_bb_22
         } else {
             goto '__ci_bb_23
@@ -377,12 +405,12 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_22 {
-        (__local_rc__goto_3344_5 = -32)
+        (__local_rc__goto_3344_5 = ((-32 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_23 {
-        (__local_options = __local_options | ((((__local_re__goto_3346_24.flags as c_uint) & (((65536 as c_uint) | (131072 as c_uint)) as c_uint)) as c_uint) / (((((((65536 as c_uint) | (131072 as c_uint)) as c_uint) & ((((~((65536 as c_uint) | (131072 as c_uint))) as c_uint) +% (1 as c_uint)) as c_uint)) as c_uint) / (((((4 as c_uint) | (8 as c_uint)) as c_uint) & ((((~((4 as c_uint) | (8 as c_uint))) as c_uint) +% (1 as c_uint)) as c_uint)) as c_uint)) as c_uint)))
+        (__local_options = (__local_options as c_uint) | ((((((unsafe *__local_re__goto_3346_24).flags as c_uint) & (((65536 as c_uint) | (131072 as c_uint)) as c_uint)) as c_uint) / (((((((65536 as c_uint) | (131072 as c_uint)) as c_uint) & ((((~((65536 as c_uint) | (131072 as c_uint))) as c_uint) +% (1 as c_uint)) as c_uint)) as c_uint) / (((((4 as c_uint) | (8 as c_uint)) as c_uint) & ((((~((4 as c_uint) | (8 as c_uint))) as c_uint) +% (1 as c_uint)) as c_uint)) as c_uint)) as c_uint)) as c_uint))
         if ((if ((__local_options as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_24
         } else {
@@ -391,7 +419,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_24 {
-        if ((if ((unsafe __param_workspace[0]) & (-2 as c_int)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe __param_workspace[0]) as c_int) & (-2 as c_int)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_4 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_4 = (if (if (unsafe __param_workspace[1]) < 1: 1 else: 0) != 0: 1 else: 0))
@@ -409,31 +437,31 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_25 {
-        (__local_utf__goto_3356_6 = (if ((__local_re__goto_3346_24.overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
+        (__local_utf__goto_3356_6 = (((if (((unsafe *__local_re__goto_3346_24).overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) as c_int)))
         (__local_start_match__goto_3351_12 = __local_subject + (__param_start_offset as usize))
         (__local_end_subject__goto_3352_12 = __local_subject + (__local_length as usize))
         (__local_req_cu_ptr__goto_3354_12 = __local_start_match__goto_3351_12 - ((1 as isize) as usize))
         if ((if ((__local_options as c_uint) & ((((2147483648 as c_uint) as c_uint) | (64 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_6 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_6 = (if (if ((__local_re__goto_3346_24.overall_options as c_uint) & ((2147483648 as c_uint) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if (if (((unsafe *__local_re__goto_3346_24).overall_options as c_uint) & ((2147483648 as c_uint) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         (__local_anchored__goto_3356_11 = __ci_expr_logic_6)
-        (__local_startline__goto_3356_21 = (if ((__local_re__goto_3346_24.flags as c_uint) & (512 as c_uint)) != 0: 1 else: 0))
+        (__local_startline__goto_3356_21 = (((if (((unsafe *__local_re__goto_3346_24).flags as c_uint) & (512 as c_uint)) != 0: 1 else: 0) as c_int)))
         (__ci_expr_logic_7 = 0)
         if ((if not (__local_anchored__goto_3356_11 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_7 = (if (if ((__local_re__goto_3346_24.overall_options as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_7 = (if (if (((unsafe *__local_re__goto_3346_24).overall_options as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         (__local_firstline__goto_3356_32 = __ci_expr_logic_7)
         (__local_bumpalong_limit__goto_3353_12 = __local_end_subject__goto_3352_12)
         ((unsafe *__local_mb__goto_3377_18).cb = ((&raw mut __local_cb__goto_3375_21 as *mut pcre2_callout_block_8)))
-        (__local_cb__goto_3375_21.version = 2)
+        (__local_cb__goto_3375_21.version = ((2 as c_uint)))
         (__local_cb__goto_3375_21.subject = __local_subject)
         (__local_cb__goto_3375_21.subject_length = (((((__local_end_subject__goto_3352_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        (__local_cb__goto_3375_21.callout_flags = 0)
-        (__local_cb__goto_3375_21.capture_top = 1)
-        (__local_cb__goto_3375_21.capture_last = 0)
-        (__local_cb__goto_3375_21.mark = null)
+        (__local_cb__goto_3375_21.callout_flags = ((0 as c_uint)))
+        (__local_cb__goto_3375_21.capture_top = ((1 as c_uint)))
+        (__local_cb__goto_3375_21.capture_last = ((0 as c_uint)))
+        (__local_cb__goto_3375_21.mark = ((null as *const u8)))
         if ((if __param_mcontext == null: 1 else: 0) != 0) {
             goto '__ci_bb_28
         } else {
@@ -442,7 +470,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_26 {
-        (__local_rc__goto_3344_5 = -38)
+        (__local_rc__goto_3344_5 = ((-38 as c_int)))
         goto '__ci_bb_7
     }
 
@@ -451,16 +479,16 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_28 {
-        ((unsafe *__local_mb__goto_3377_18).callout = ((null as *mut fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int)))
-        with_memcpy((&raw mut (unsafe *__local_mb__goto_3377_18).memctl as *i8), (&raw const (unsafe *__local_re__goto_3346_24).memctl as *i8), sizeof[pcre2_memctl]())
-        ((unsafe *__local_mb__goto_3377_18).match_limit = (&raw const _pcre2_default_match_context_8 as *const pcre2_real_match_context_8).match_limit)
-        ((unsafe *__local_mb__goto_3377_18).match_limit_depth = (&raw const _pcre2_default_match_context_8 as *const pcre2_real_match_context_8).depth_limit)
-        ((unsafe *__local_mb__goto_3377_18).heap_limit = (&raw const _pcre2_default_match_context_8 as *const pcre2_real_match_context_8).heap_limit)
+        ((unsafe *__local_mb__goto_3377_18).callout = null)
+        with_memcpy((&raw mut (unsafe *__local_mb__goto_3377_18).memctl as *mut u8), (&raw const (unsafe *__local_re__goto_3346_24).memctl as *const u8), sizeof[pcre2_memctl]())
+        ((unsafe *__local_mb__goto_3377_18).match_limit = (unsafe *(&raw const _pcre2_default_match_context_8 as *const pcre2_real_match_context_8)).match_limit)
+        ((unsafe *__local_mb__goto_3377_18).match_limit_depth = (unsafe *(&raw const _pcre2_default_match_context_8 as *const pcre2_real_match_context_8)).depth_limit)
+        ((unsafe *__local_mb__goto_3377_18).heap_limit = (unsafe *(&raw const _pcre2_default_match_context_8 as *const pcre2_real_match_context_8)).heap_limit)
         goto '__ci_bb_30
     }
 
     '__ci_bb_29 {
-        if ((if __param_mcontext.offset_limit != (~(0 as c_ulong)): 1 else: 0) != 0) {
+        if ((if (unsafe *__param_mcontext).offset_limit != (~(0 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_31
         } else {
             goto '__ci_bb_32
@@ -468,7 +496,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_30 {
-        if ((if __local_mb__goto_3377_18.match_limit > __local_re__goto_3346_24.limit_match: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_mb__goto_3377_18).match_limit > (unsafe *__local_re__goto_3346_24).limit_match: 1 else: 0) != 0) {
             goto '__ci_bb_35
         } else {
             goto '__ci_bb_36
@@ -476,7 +504,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_31 {
-        if ((if ((__local_re__goto_3346_24.overall_options as c_uint) & (8388608 as c_uint)) == 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__local_re__goto_3346_24).overall_options as c_uint) & (8388608 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_33
         } else {
             goto '__ci_bb_34
@@ -484,32 +512,32 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_32 {
-        ((unsafe *__local_mb__goto_3377_18).callout = ((__param_mcontext.callout as *mut fn(*mut pcre2_callout_block_8, *mut c_void) -> c_int)))
-        ((unsafe *__local_mb__goto_3377_18).callout_data = __param_mcontext.callout_data)
-        with_memcpy((&raw mut (unsafe *__local_mb__goto_3377_18).memctl as *i8), (&raw const (unsafe *__param_mcontext).memctl as *i8), sizeof[pcre2_memctl]())
-        ((unsafe *__local_mb__goto_3377_18).match_limit = __param_mcontext.match_limit)
-        ((unsafe *__local_mb__goto_3377_18).match_limit_depth = __param_mcontext.depth_limit)
-        ((unsafe *__local_mb__goto_3377_18).heap_limit = __param_mcontext.heap_limit)
+        ((unsafe *__local_mb__goto_3377_18).callout = (unsafe *__param_mcontext).callout)
+        ((unsafe *__local_mb__goto_3377_18).callout_data = (unsafe *__param_mcontext).callout_data)
+        with_memcpy((&raw mut (unsafe *__local_mb__goto_3377_18).memctl as *mut u8), (&raw const (unsafe *__param_mcontext).memctl as *const u8), sizeof[pcre2_memctl]())
+        ((unsafe *__local_mb__goto_3377_18).match_limit = (unsafe *__param_mcontext).match_limit)
+        ((unsafe *__local_mb__goto_3377_18).match_limit_depth = (unsafe *__param_mcontext).depth_limit)
+        ((unsafe *__local_mb__goto_3377_18).heap_limit = (unsafe *__param_mcontext).heap_limit)
         goto '__ci_bb_30
     }
 
     '__ci_bb_33 {
-        (__local_rc__goto_3344_5 = -56)
+        (__local_rc__goto_3344_5 = ((-56 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_34 {
-        (__local_bumpalong_limit__goto_3353_12 = __local_subject + (__param_mcontext.offset_limit as usize))
+        (__local_bumpalong_limit__goto_3353_12 = __local_subject + ((unsafe *__param_mcontext).offset_limit as usize))
         goto '__ci_bb_32
     }
 
     '__ci_bb_35 {
-        ((unsafe *__local_mb__goto_3377_18).match_limit = __local_re__goto_3346_24.limit_match)
+        ((unsafe *__local_mb__goto_3377_18).match_limit = (unsafe *__local_re__goto_3346_24).limit_match)
         goto '__ci_bb_36
     }
 
     '__ci_bb_36 {
-        if ((if __local_mb__goto_3377_18.match_limit_depth > __local_re__goto_3346_24.limit_depth: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_mb__goto_3377_18).match_limit_depth > (unsafe *__local_re__goto_3346_24).limit_depth: 1 else: 0) != 0) {
             goto '__ci_bb_37
         } else {
             goto '__ci_bb_38
@@ -517,12 +545,12 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_37 {
-        ((unsafe *__local_mb__goto_3377_18).match_limit_depth = __local_re__goto_3346_24.limit_depth)
+        ((unsafe *__local_mb__goto_3377_18).match_limit_depth = (unsafe *__local_re__goto_3346_24).limit_depth)
         goto '__ci_bb_38
     }
 
     '__ci_bb_38 {
-        if ((if __local_mb__goto_3377_18.heap_limit > __local_re__goto_3346_24.limit_heap: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_mb__goto_3377_18).heap_limit > (unsafe *__local_re__goto_3346_24).limit_heap: 1 else: 0) != 0) {
             goto '__ci_bb_39
         } else {
             goto '__ci_bb_40
@@ -530,33 +558,33 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_39 {
-        ((unsafe *__local_mb__goto_3377_18).heap_limit = __local_re__goto_3346_24.limit_heap)
+        ((unsafe *__local_mb__goto_3377_18).heap_limit = (unsafe *__local_re__goto_3346_24).limit_heap)
         goto '__ci_bb_40
     }
 
     '__ci_bb_40 {
-        ((unsafe *__local_mb__goto_3377_18).start_code = (__local_re__goto_3346_24 as *const u8) + (__local_re__goto_3346_24.code_start as usize))
-        ((unsafe *__local_mb__goto_3377_18).tables = __local_re__goto_3346_24.tables)
+        ((unsafe *__local_mb__goto_3377_18).start_code = (__local_re__goto_3346_24 as *const u8) + ((unsafe *__local_re__goto_3346_24).code_start as usize))
+        ((unsafe *__local_mb__goto_3377_18).tables = (unsafe *__local_re__goto_3346_24).tables)
         ((unsafe *__local_mb__goto_3377_18).start_subject = __local_subject)
         ((unsafe *__local_mb__goto_3377_18).end_subject = __local_end_subject__goto_3352_12)
         ((unsafe *__local_mb__goto_3377_18).start_offset = __param_start_offset)
-        if ((if __local_re__goto_3346_24.max_lookbehind > 0: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_re__goto_3346_24).max_lookbehind > 0: 1 else: 0) != 0) {
             (__ci_expr_logic_8 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_8 = (if (if ((__local_re__goto_3346_24.flags as c_uint) & (8192 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_8 = (if (if (((unsafe *__local_re__goto_3346_24).flags as c_uint) & (8192 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         ((unsafe *__local_mb__goto_3377_18).allowemptypartial = __ci_expr_logic_8)
         ((unsafe *__local_mb__goto_3377_18).moptions = __local_options)
-        ((unsafe *__local_mb__goto_3377_18).poptions = __local_re__goto_3346_24.overall_options)
-        ((unsafe *__local_mb__goto_3377_18).match_call_count = 0)
-        ((unsafe *__local_mb__goto_3377_18).heap_used = 0)
-        ((unsafe *__local_mb__goto_3377_18).bsr_convention = __local_re__goto_3346_24.bsr_convention)
-        ((unsafe *__local_mb__goto_3377_18).nltype = 0)
+        ((unsafe *__local_mb__goto_3377_18).poptions = (unsafe *__local_re__goto_3346_24).overall_options)
+        ((unsafe *__local_mb__goto_3377_18).match_call_count = ((0 as c_uint)))
+        ((unsafe *__local_mb__goto_3377_18).heap_used = ((0 as c_ulong)))
+        ((unsafe *__local_mb__goto_3377_18).bsr_convention = (unsafe *__local_re__goto_3346_24).bsr_convention)
+        ((unsafe *__local_mb__goto_3377_18).nltype = ((0 as c_uint)))
         goto '__ci_bb_41
     }
 
     '__ci_bb_41 {
-        if (__local_re__goto_3346_24.newline_convention == 1) {
+        if ((unsafe *__local_re__goto_3346_24).newline_convention == 1) {
             goto '__ci_bb_43
         } else {
             goto '__ci_bb_53
@@ -576,37 +604,37 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_43 {
-        ((unsafe *__local_mb__goto_3377_18).nllen = 1)
-        ((unsafe *__local_mb__goto_3377_18).nl[0] = 13)
+        ((unsafe *__local_mb__goto_3377_18).nllen = ((1 as c_uint)))
+        ((unsafe *__local_mb__goto_3377_18).nl[0] = ((13 as u8)))
         goto '__ci_bb_42
     }
 
     '__ci_bb_44 {
-        ((unsafe *__local_mb__goto_3377_18).nllen = 1)
-        ((unsafe *__local_mb__goto_3377_18).nl[0] = 10)
+        ((unsafe *__local_mb__goto_3377_18).nllen = ((1 as c_uint)))
+        ((unsafe *__local_mb__goto_3377_18).nl[0] = ((10 as u8)))
         goto '__ci_bb_42
     }
 
     '__ci_bb_45 {
-        ((unsafe *__local_mb__goto_3377_18).nllen = 1)
-        ((unsafe *__local_mb__goto_3377_18).nl[0] = 0)
+        ((unsafe *__local_mb__goto_3377_18).nllen = ((1 as c_uint)))
+        ((unsafe *__local_mb__goto_3377_18).nl[0] = ((0 as u8)))
         goto '__ci_bb_42
     }
 
     '__ci_bb_46 {
-        ((unsafe *__local_mb__goto_3377_18).nllen = 2)
-        ((unsafe *__local_mb__goto_3377_18).nl[0] = 13)
-        ((unsafe *__local_mb__goto_3377_18).nl[1] = 10)
+        ((unsafe *__local_mb__goto_3377_18).nllen = ((2 as c_uint)))
+        ((unsafe *__local_mb__goto_3377_18).nl[0] = ((13 as u8)))
+        ((unsafe *__local_mb__goto_3377_18).nl[1] = ((10 as u8)))
         goto '__ci_bb_42
     }
 
     '__ci_bb_47 {
-        ((unsafe *__local_mb__goto_3377_18).nltype = 1)
+        ((unsafe *__local_mb__goto_3377_18).nltype = ((1 as c_uint)))
         goto '__ci_bb_42
     }
 
     '__ci_bb_48 {
-        ((unsafe *__local_mb__goto_3377_18).nltype = 2)
+        ((unsafe *__local_mb__goto_3377_18).nltype = ((2 as c_uint)))
         goto '__ci_bb_42
     }
 
@@ -627,12 +655,12 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_52 {
-        (__local_rc__goto_3344_5 = -44)
+        (__local_rc__goto_3344_5 = ((-44 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_53 {
-        if (__local_re__goto_3346_24.newline_convention == 2) {
+        if ((unsafe *__local_re__goto_3346_24).newline_convention == 2) {
             goto '__ci_bb_44
         } else {
             goto '__ci_bb_54
@@ -640,7 +668,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_54 {
-        if (__local_re__goto_3346_24.newline_convention == 6) {
+        if ((unsafe *__local_re__goto_3346_24).newline_convention == 6) {
             goto '__ci_bb_45
         } else {
             goto '__ci_bb_55
@@ -648,7 +676,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_55 {
-        if (__local_re__goto_3346_24.newline_convention == 3) {
+        if ((unsafe *__local_re__goto_3346_24).newline_convention == 3) {
             goto '__ci_bb_46
         } else {
             goto '__ci_bb_56
@@ -656,7 +684,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_56 {
-        if (__local_re__goto_3346_24.newline_convention == 4) {
+        if ((unsafe *__local_re__goto_3346_24).newline_convention == 4) {
             goto '__ci_bb_47
         } else {
             goto '__ci_bb_57
@@ -664,7 +692,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_57 {
-        if (__local_re__goto_3346_24.newline_convention == 5) {
+        if ((unsafe *__local_re__goto_3346_24).newline_convention == 5) {
             goto '__ci_bb_48
         } else {
             goto '__ci_bb_49
@@ -681,7 +709,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_59 {
-        if ((if ((__local_re__goto_3346_24.flags as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__local_re__goto_3346_24).flags as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_73
         } else {
             goto '__ci_bb_74
@@ -701,7 +729,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_61 {
-        (__local_rc__goto_3344_5 = _pcre2_valid_utf_8(__local_check_subject__goto_3592_14, ((__local_length as c_ulong) -% (((((__local_check_subject__goto_3592_14 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong) as c_ulong)), ((&raw const (unsafe *__param_match_data).startchar as *const c_ulong) as *mut c_ulong)))
+        (__local_rc__goto_3344_5 = ((_pcre2_valid_utf_8(__local_check_subject__goto_3592_14, (((__local_length as c_ulong) -% (((((__local_check_subject__goto_3592_14 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong) as c_ulong)) as c_ulong), ((&raw const (unsafe *__param_match_data).startchar as *const c_ulong) as *mut c_ulong)) as c_int)))
         if ((if __local_rc__goto_3344_5 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_71
         } else {
@@ -710,12 +738,12 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_62 {
-        (__local_rc__goto_3344_5 = -36)
+        (__local_rc__goto_3344_5 = ((-36 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_63 {
-        (__local_i__goto_3597_18 = __local_re__goto_3346_24.max_lookbehind)
+        (__local_i__goto_3597_18 = (((unsafe *__local_re__goto_3346_24).max_lookbehind as c_uint)))
         goto '__ci_bb_64
     }
 
@@ -737,7 +765,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_66 {
-        (__local_i__goto_3597_18 = __local_i__goto_3597_18 - 1)
+        (__local_i__goto_3597_18 = (__local_i__goto_3597_18 -% 1))
         goto '__ci_bb_64
     }
 
@@ -748,7 +776,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     '__ci_bb_68 {
         (__ci_expr_logic_12 = 0)
         if ((if __local_check_subject__goto_3592_14 > __local_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_12 = (if (if (((unsafe *__local_check_subject__goto_3592_14) as c_int) & 192) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_12 = (if (if ((((unsafe *__local_check_subject__goto_3592_14) as c_int) as c_int) & (192 as c_int)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_12 != 0) {
             goto '__ci_bb_69
@@ -767,7 +795,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_71 {
-        ((unsafe *__param_match_data).startchar = __param_match_data.startchar + ((((__local_check_subject__goto_3592_14 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong))
+        ((unsafe *__param_match_data).startchar = ((unsafe *__param_match_data).startchar +% ((((__local_check_subject__goto_3592_14 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
         goto '__ci_bb_7
     }
 
@@ -776,10 +804,10 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_73 {
-        (__local_has_first_cu__goto_3357_6 = 1)
-        (__local_first_cu2__goto_3366_13 = ((__local_re__goto_3346_24.first_codeunit as u8)))
+        (__local_has_first_cu__goto_3357_6 = ((1 as c_int)))
+        (__local_first_cu2__goto_3366_13 = (((unsafe *__local_re__goto_3346_24).first_codeunit as u8)))
         (__local_first_cu__goto_3365_13 = __local_first_cu2__goto_3366_13)
-        if ((if ((__local_re__goto_3346_24.flags as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__local_re__goto_3346_24).flags as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_76
         } else {
             goto '__ci_bb_77
@@ -789,7 +817,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     '__ci_bb_74 {
         (__ci_expr_logic_15 = 0)
         if ((if not (__local_startline__goto_3356_21 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_15 = (if (if ((__local_re__goto_3346_24.flags as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_15 = (if (if (((unsafe *__local_re__goto_3346_24).flags as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_15 != 0) {
             goto '__ci_bb_80
@@ -799,7 +827,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_75 {
-        if ((if ((__local_re__goto_3346_24.flags as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__local_re__goto_3346_24).flags as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_82
         } else {
             goto '__ci_bb_83
@@ -807,14 +835,14 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_76 {
-        (__local_first_cu2__goto_3366_13 = (unsafe (__local_mb__goto_3377_18.tables + ((256 as isize) as usize))[__local_first_cu__goto_3365_13]))
+        (__local_first_cu2__goto_3366_13 = (((unsafe ((unsafe *__local_mb__goto_3377_18).tables + ((256 as isize) as usize))[__local_first_cu__goto_3365_13]) as u8)))
         (__ci_expr_logic_14 = 0)
         (__ci_expr_logic_13 = 0)
         if ((if __local_first_cu__goto_3365_13 > 127: 1 else: 0) != 0) {
             (__ci_expr_logic_13 = (if (if not (__local_utf__goto_3356_6 != 0): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_13 != 0) {
-            (__ci_expr_logic_14 = (if (if ((__local_re__goto_3346_24.overall_options as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_14 = (if (if (((unsafe *__local_re__goto_3346_24).overall_options as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_14 != 0) {
             goto '__ci_bb_78
@@ -837,7 +865,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_80 {
-        (__local_start_bits__goto_3370_16 = (&(unsafe __local_re__goto_3346_24.start_bitmap[0]) as *const u8))
+        (__local_start_bits__goto_3370_16 = (&(unsafe *__local_re__goto_3346_24).start_bitmap[0] as *const u8))
         goto '__ci_bb_81
     }
 
@@ -846,10 +874,10 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_82 {
-        (__local_has_req_cu__goto_3358_6 = 1)
-        (__local_req_cu2__goto_3368_13 = ((__local_re__goto_3346_24.last_codeunit as u8)))
+        (__local_has_req_cu__goto_3358_6 = ((1 as c_int)))
+        (__local_req_cu2__goto_3368_13 = (((unsafe *__local_re__goto_3346_24).last_codeunit as u8)))
         (__local_req_cu__goto_3367_13 = __local_req_cu2__goto_3368_13)
-        if ((if ((__local_re__goto_3346_24.flags as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__local_re__goto_3346_24).flags as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_84
         } else {
             goto '__ci_bb_85
@@ -857,7 +885,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_83 {
-        if ((if (((__param_match_data.flags as c_int) as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if ((((unsafe *__param_match_data).flags as c_int) as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_88
         } else {
             goto '__ci_bb_89
@@ -865,14 +893,14 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_84 {
-        (__local_req_cu2__goto_3368_13 = (unsafe (__local_mb__goto_3377_18.tables + ((256 as isize) as usize))[__local_req_cu__goto_3367_13]))
+        (__local_req_cu2__goto_3368_13 = (((unsafe ((unsafe *__local_mb__goto_3377_18).tables + ((256 as isize) as usize))[__local_req_cu__goto_3367_13]) as u8)))
         (__ci_expr_logic_17 = 0)
         (__ci_expr_logic_16 = 0)
         if ((if __local_req_cu__goto_3367_13 > 127: 1 else: 0) != 0) {
             (__ci_expr_logic_16 = (if (if not (__local_utf__goto_3356_6 != 0): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_16 != 0) {
-            (__ci_expr_logic_17 = (if (if ((__local_re__goto_3346_24.overall_options as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_17 = (if (if (((unsafe *__local_re__goto_3346_24).overall_options as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_17 != 0) {
             goto '__ci_bb_86
@@ -895,16 +923,16 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_88 {
-        (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).free((__param_match_data.subject as *mut c_void), (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).memory_data)
-        ((unsafe *__param_match_data).flags = __param_match_data.flags & (~1))
+        (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).free(((unsafe *__param_match_data).subject as *mut c_void), (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).memory_data)
+        ((unsafe *__param_match_data).flags = ((unsafe *__param_match_data).flags as u8) & ((~1) as u8))
         goto '__ci_bb_89
     }
 
     '__ci_bb_89 {
         ((unsafe *__param_match_data).code = __local_re__goto_3346_24)
-        ((unsafe *__param_match_data).subject = null)
-        ((unsafe *__param_match_data).mark = null)
-        ((unsafe *__param_match_data).matchedby = 1)
+        ((unsafe *__param_match_data).subject = ((null as *const u8)))
+        ((unsafe *__param_match_data).mark = ((null as *const u8)))
+        ((unsafe *__param_match_data).matchedby = ((1 as u8)))
         ((unsafe *__param_match_data).options = __local_original_options__goto_3347_10)
         goto '__ci_bb_90
     }
@@ -915,7 +943,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
     '__ci_bb_91 {
         (__ci_expr_logic_18 = 0)
-        if ((if ((__local_re__goto_3346_24.optimization_flags as c_uint) & (4 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__local_re__goto_3346_24).optimization_flags as c_uint) & (4 as c_uint)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_18 = (if (if ((__local_options as c_uint) & (64 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_18 != 0) {
@@ -984,11 +1012,11 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         if ((if __local_t__goto_3721_18 < __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
             var __ci_expr_ternary_23: c_int = 0
 
-            if ((if __local_mb__goto_3377_18.nltype != 0: 1 else: 0) != 0) {
+            if ((if (unsafe *__local_mb__goto_3377_18).nltype != 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_19: c_int = 0
 
-                if ((if __local_t__goto_3721_18 < __local_mb__goto_3377_18.end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_19 = (if _pcre2_is_newline_8(__local_t__goto_3721_18, __local_mb__goto_3377_18.nltype, __local_mb__goto_3377_18.end_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
+                if ((if __local_t__goto_3721_18 < (unsafe *__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0) {
+                    (__ci_expr_logic_19 = (if _pcre2_is_newline_8(__local_t__goto_3721_18, (unsafe *__local_mb__goto_3377_18).nltype, (unsafe *__local_mb__goto_3377_18).end_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_ternary_23 = __ci_expr_logic_19)
@@ -998,17 +1026,17 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
                 var __ci_expr_logic_20: c_int = 0
 
-                if ((if __local_t__goto_3721_18 <= (__local_mb__goto_3377_18.end_subject - (__local_mb__goto_3377_18.nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_20 = (if (if (unsafe *__local_t__goto_3721_18) == __local_mb__goto_3377_18.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                if ((if __local_t__goto_3721_18 <= ((unsafe *__local_mb__goto_3377_18).end_subject - ((unsafe *__local_mb__goto_3377_18).nllen as usize)): 1 else: 0) != 0) {
+                    (__ci_expr_logic_20 = (if (if (unsafe *__local_t__goto_3721_18) == (unsafe *__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_20 != 0) {
                     var __ci_expr_logic_21: c_int
 
-                    if ((if __local_mb__goto_3377_18.nllen == 1: 1 else: 0) != 0) {
+                    if ((if (unsafe *__local_mb__goto_3377_18).nllen == 1: 1 else: 0) != 0) {
                         (__ci_expr_logic_21 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_21 = (if (if (unsafe *(__local_t__goto_3721_18 + ((1 as isize) as usize))) == __local_mb__goto_3377_18.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_21 = (if (if (unsafe *(__local_t__goto_3721_18 + ((1 as isize) as usize))) == (unsafe *__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_logic_22 = (if __ci_expr_logic_21 != 0: 1 else: 0))
@@ -1064,11 +1092,11 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         if ((if __local_t__goto_3721_18 < __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
             var __ci_expr_ternary_30: c_int = 0
 
-            if ((if __local_mb__goto_3377_18.nltype != 0: 1 else: 0) != 0) {
+            if ((if (unsafe *__local_mb__goto_3377_18).nltype != 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_26: c_int = 0
 
-                if ((if __local_t__goto_3721_18 < __local_mb__goto_3377_18.end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_26 = (if _pcre2_is_newline_8(__local_t__goto_3721_18, __local_mb__goto_3377_18.nltype, __local_mb__goto_3377_18.end_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
+                if ((if __local_t__goto_3721_18 < (unsafe *__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0) {
+                    (__ci_expr_logic_26 = (if _pcre2_is_newline_8(__local_t__goto_3721_18, (unsafe *__local_mb__goto_3377_18).nltype, (unsafe *__local_mb__goto_3377_18).end_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_ternary_30 = __ci_expr_logic_26)
@@ -1078,17 +1106,17 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
                 var __ci_expr_logic_27: c_int = 0
 
-                if ((if __local_t__goto_3721_18 <= (__local_mb__goto_3377_18.end_subject - (__local_mb__goto_3377_18.nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_27 = (if (if (unsafe *__local_t__goto_3721_18) == __local_mb__goto_3377_18.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                if ((if __local_t__goto_3721_18 <= ((unsafe *__local_mb__goto_3377_18).end_subject - ((unsafe *__local_mb__goto_3377_18).nllen as usize)): 1 else: 0) != 0) {
+                    (__ci_expr_logic_27 = (if (if (unsafe *__local_t__goto_3721_18) == (unsafe *__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_27 != 0) {
                     var __ci_expr_logic_28: c_int
 
-                    if ((if __local_mb__goto_3377_18.nllen == 1: 1 else: 0) != 0) {
+                    if ((if (unsafe *__local_mb__goto_3377_18).nllen == 1: 1 else: 0) != 0) {
                         (__ci_expr_logic_28 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_28 = (if (if (unsafe *(__local_t__goto_3721_18 + ((1 as isize) as usize))) == __local_mb__goto_3377_18.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_28 = (if (if (unsafe *(__local_t__goto_3721_18 + ((1 as isize) as usize))) == (unsafe *__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_logic_29 = (if __ci_expr_logic_28 != 0: 1 else: 0))
@@ -1140,8 +1168,8 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_112 {
-        (__local_end_subject__goto_3352_12 = __local_mb__goto_3377_18.end_subject)
-        if ((if ((__local_mb__goto_3377_18.moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
+        (__local_end_subject__goto_3352_12 = (unsafe *__local_mb__goto_3377_18).end_subject)
+        if ((if (((unsafe *__local_mb__goto_3377_18).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_168
         } else {
             goto '__ci_bb_169
@@ -1149,7 +1177,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_113 {
-        (__local_ok__goto_3745_14 = (if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0))
+        (__local_ok__goto_3745_14 = (((if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) as c_int)))
         if (__local_ok__goto_3745_14 != 0) {
             goto '__ci_bb_115
         } else {
@@ -1162,7 +1190,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_115 {
-        (__local_c__goto_3748_23 = (unsafe *__local_start_match__goto_3351_12))
+        (__local_c__goto_3748_23 = (((unsafe *__local_start_match__goto_3351_12) as u8)))
         (__ci_expr_logic_34 = 0)
         if (__local_has_first_cu__goto_3357_6 != 0) {
             var __ci_expr_logic_33: c_int
@@ -1197,7 +1225,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_117 {
-        (__local_ok__goto_3745_14 = (if ((((unsafe __local_start_bits__goto_3370_16[((__local_c__goto_3748_23 as c_int) / 8)]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c__goto_3748_23 as c_int) & 7) as c_uint)) as c_uint)) != 0: 1 else: 0))
+        (__local_ok__goto_3745_14 = (((if ((((unsafe __local_start_bits__goto_3370_16[((__local_c__goto_3748_23 as c_int) / 8)]) as c_int) as c_uint) & (((1 as c_uint) << ((((__local_c__goto_3748_23 as c_int) as c_int) & (7 as c_int)) as c_uint)) as c_uint)) != 0: 1 else: 0) as c_int)))
         goto '__ci_bb_118
     }
 
@@ -1236,7 +1264,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     '__ci_bb_124 {
         (__local_pp1__goto_3787_22 = null)
         (__local_pp2__goto_3788_22 = null)
-        (__local_searchlength__goto_3789_22 = ((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) / sizeof[u8]())
+        (__local_searchlength__goto_3789_22 = (((((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) / sizeof[u8]()) as c_ulong)))
         if ((if __local_memchr_found_first_cu__goto_3361_12 == null: 1 else: 0) != 0) {
             (__ci_expr_logic_36 = (if true: 1 else: 0))
         } else {
@@ -1250,7 +1278,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_125 {
-        (__local_start_match__goto_3351_12 = ((memchr((__local_start_match__goto_3351_12 as *mut c_void), __local_first_cu__goto_3365_13, (((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) / sizeof[u8]())) as *const u8)))
+        (__local_start_match__goto_3351_12 = ((memchr(((__local_start_match__goto_3351_12 as *const c_void) as *mut c_void), (__local_first_cu__goto_3365_13 as c_int), ((((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) / sizeof[u8]()) as c_ulong)) as *const u8)))
         if ((if __local_start_match__goto_3351_12 == null: 1 else: 0) != 0) {
             goto '__ci_bb_136
         } else {
@@ -1260,8 +1288,8 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
     '__ci_bb_126 {
         (__ci_expr_logic_45 = 0)
-        if ((if ((__local_mb__goto_3377_18.moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_45 = (if (if __local_start_match__goto_3351_12 >= __local_mb__goto_3377_18.end_subject: 1 else: 0) != 0: 1 else: 0))
+        if ((if (((unsafe *__local_mb__goto_3377_18).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_45 = (if (if __local_start_match__goto_3351_12 >= (unsafe *__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_45 != 0) {
             goto '__ci_bb_138
@@ -1271,7 +1299,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_127 {
-        (__local_pp1__goto_3787_22 = ((memchr((__local_start_match__goto_3351_12 as *mut c_void), __local_first_cu__goto_3365_13, __local_searchlength__goto_3789_22) as *const u8)))
+        (__local_pp1__goto_3787_22 = ((memchr(((__local_start_match__goto_3351_12 as *const c_void) as *mut c_void), (__local_first_cu__goto_3365_13 as c_int), __local_searchlength__goto_3789_22) as *const u8)))
         (__ci_expr_ternary_37 = null)
         if ((if __local_pp1__goto_3787_22 == null: 1 else: 0) != 0) {
             (__ci_expr_ternary_37 = __local_end_subject__goto_3352_12)
@@ -1307,7 +1335,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_130 {
-        (__local_pp2__goto_3788_22 = ((memchr((__local_start_match__goto_3351_12 as *mut c_void), __local_first_cu2__goto_3366_13, __local_searchlength__goto_3789_22) as *const u8)))
+        (__local_pp2__goto_3788_22 = ((memchr(((__local_start_match__goto_3351_12 as *const c_void) as *mut c_void), (__local_first_cu2__goto_3366_13 as c_int), __local_searchlength__goto_3789_22) as *const u8)))
         (__ci_expr_ternary_40 = null)
         if ((if __local_pp2__goto_3788_22 == null: 1 else: 0) != 0) {
             (__ci_expr_ternary_40 = __local_end_subject__goto_3352_12)
@@ -1386,7 +1414,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_140 {
-        if ((if __local_start_match__goto_3351_12 > (__local_mb__goto_3377_18.start_subject + (__param_start_offset as usize)): 1 else: 0) != 0) {
+        if ((if __local_start_match__goto_3351_12 > ((unsafe *__local_mb__goto_3377_18).start_subject + (__param_start_offset as usize)): 1 else: 0) != 0) {
             goto '__ci_bb_143
         } else {
             goto '__ci_bb_144
@@ -1432,10 +1460,10 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         if ((if (unsafe __local_start_match__goto_3351_12[-1]) == 13: 1 else: 0) != 0) {
             var __ci_expr_logic_59: c_int
 
-            if ((if __local_mb__goto_3377_18.nltype == 1: 1 else: 0) != 0) {
+            if ((if (unsafe *__local_mb__goto_3377_18).nltype == 1: 1 else: 0) != 0) {
                 (__ci_expr_logic_59 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_59 = (if (if __local_mb__goto_3377_18.nltype == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_59 = (if (if (unsafe *__local_mb__goto_3377_18).nltype == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_60 = (if __ci_expr_logic_59 != 0: 1 else: 0))
@@ -1459,11 +1487,11 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         if ((if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
             var __ci_expr_ternary_50: c_int = 0
 
-            if ((if __local_mb__goto_3377_18.nltype != 0: 1 else: 0) != 0) {
+            if ((if (unsafe *__local_mb__goto_3377_18).nltype != 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_46: c_int = 0
 
-                if ((if __local_start_match__goto_3351_12 > __local_mb__goto_3377_18.start_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_46 = (if _pcre2_was_newline_8(__local_start_match__goto_3351_12, __local_mb__goto_3377_18.nltype, __local_mb__goto_3377_18.start_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
+                if ((if __local_start_match__goto_3351_12 > (unsafe *__local_mb__goto_3377_18).start_subject: 1 else: 0) != 0) {
+                    (__ci_expr_logic_46 = (if _pcre2_was_newline_8(__local_start_match__goto_3351_12, (unsafe *__local_mb__goto_3377_18).nltype, (unsafe *__local_mb__goto_3377_18).start_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_ternary_50 = __ci_expr_logic_46)
@@ -1473,17 +1501,17 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
                 var __ci_expr_logic_47: c_int = 0
 
-                if ((if __local_start_match__goto_3351_12 >= (__local_mb__goto_3377_18.start_subject + (__local_mb__goto_3377_18.nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_47 = (if (if (unsafe *(__local_start_match__goto_3351_12 - (__local_mb__goto_3377_18.nllen as usize))) == __local_mb__goto_3377_18.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                if ((if __local_start_match__goto_3351_12 >= ((unsafe *__local_mb__goto_3377_18).start_subject + ((unsafe *__local_mb__goto_3377_18).nllen as usize)): 1 else: 0) != 0) {
+                    (__ci_expr_logic_47 = (if (if (unsafe *(__local_start_match__goto_3351_12 - ((unsafe *__local_mb__goto_3377_18).nllen as usize))) == (unsafe *__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_47 != 0) {
                     var __ci_expr_logic_48: c_int
 
-                    if ((if __local_mb__goto_3377_18.nllen == 1: 1 else: 0) != 0) {
+                    if ((if (unsafe *__local_mb__goto_3377_18).nllen == 1: 1 else: 0) != 0) {
                         (__ci_expr_logic_48 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_48 = (if (if (unsafe *((__local_start_match__goto_3351_12 - (__local_mb__goto_3377_18.nllen as usize)) + ((1 as isize) as usize))) == __local_mb__goto_3377_18.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_48 = (if (if (unsafe *((__local_start_match__goto_3351_12 - ((unsafe *__local_mb__goto_3377_18).nllen as usize)) + ((1 as isize) as usize))) == (unsafe *__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_logic_49 = (if __ci_expr_logic_48 != 0: 1 else: 0))
@@ -1539,11 +1567,11 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         if ((if __local_start_match__goto_3351_12 < __local_end_subject__goto_3352_12: 1 else: 0) != 0) {
             var __ci_expr_ternary_57: c_int = 0
 
-            if ((if __local_mb__goto_3377_18.nltype != 0: 1 else: 0) != 0) {
+            if ((if (unsafe *__local_mb__goto_3377_18).nltype != 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_53: c_int = 0
 
-                if ((if __local_start_match__goto_3351_12 > __local_mb__goto_3377_18.start_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_53 = (if _pcre2_was_newline_8(__local_start_match__goto_3351_12, __local_mb__goto_3377_18.nltype, __local_mb__goto_3377_18.start_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
+                if ((if __local_start_match__goto_3351_12 > (unsafe *__local_mb__goto_3377_18).start_subject: 1 else: 0) != 0) {
+                    (__ci_expr_logic_53 = (if _pcre2_was_newline_8(__local_start_match__goto_3351_12, (unsafe *__local_mb__goto_3377_18).nltype, (unsafe *__local_mb__goto_3377_18).start_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_ternary_57 = __ci_expr_logic_53)
@@ -1553,17 +1581,17 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
                 var __ci_expr_logic_54: c_int = 0
 
-                if ((if __local_start_match__goto_3351_12 >= (__local_mb__goto_3377_18.start_subject + (__local_mb__goto_3377_18.nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_54 = (if (if (unsafe *(__local_start_match__goto_3351_12 - (__local_mb__goto_3377_18.nllen as usize))) == __local_mb__goto_3377_18.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                if ((if __local_start_match__goto_3351_12 >= ((unsafe *__local_mb__goto_3377_18).start_subject + ((unsafe *__local_mb__goto_3377_18).nllen as usize)): 1 else: 0) != 0) {
+                    (__ci_expr_logic_54 = (if (if (unsafe *(__local_start_match__goto_3351_12 - ((unsafe *__local_mb__goto_3377_18).nllen as usize))) == (unsafe *__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_54 != 0) {
                     var __ci_expr_logic_55: c_int
 
-                    if ((if __local_mb__goto_3377_18.nllen == 1: 1 else: 0) != 0) {
+                    if ((if (unsafe *__local_mb__goto_3377_18).nllen == 1: 1 else: 0) != 0) {
                         (__ci_expr_logic_55 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_55 = (if (if (unsafe *((__local_start_match__goto_3351_12 - (__local_mb__goto_3377_18.nllen as usize)) + ((1 as isize) as usize))) == __local_mb__goto_3377_18.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_55 = (if (if (unsafe *((__local_start_match__goto_3351_12 - ((unsafe *__local_mb__goto_3377_18).nllen as usize)) + ((1 as isize) as usize))) == (unsafe *__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_logic_56 = (if __ci_expr_logic_55 != 0: 1 else: 0))
@@ -1619,7 +1647,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_162 {
-        (__local_c__goto_3902_20 = (unsafe *__local_start_match__goto_3351_12))
+        (__local_c__goto_3902_20 = (((unsafe *__local_start_match__goto_3351_12) as c_uint)))
         if ((if ((((unsafe __local_start_bits__goto_3370_16[((__local_c__goto_3902_20 as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c__goto_3902_20 as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_164
         } else {
@@ -1629,8 +1657,8 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
     '__ci_bb_163 {
         (__ci_expr_logic_63 = 0)
-        if ((if ((__local_mb__goto_3377_18.moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_63 = (if (if __local_start_match__goto_3351_12 >= __local_mb__goto_3377_18.end_subject: 1 else: 0) != 0: 1 else: 0))
+        if ((if (((unsafe *__local_mb__goto_3377_18).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_63 = (if (if __local_start_match__goto_3351_12 >= (unsafe *__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_63 != 0) {
             goto '__ci_bb_166
@@ -1657,7 +1685,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_168 {
-        if ((if (((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) / sizeof[u8]()) < __local_re__goto_3346_24.minlength: 1 else: 0) != 0) {
+        if ((if (((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) / sizeof[u8]()) < (unsafe *__local_re__goto_3346_24).minlength: 1 else: 0) != 0) {
             goto '__ci_bb_170
         } else {
             goto '__ci_bb_171
@@ -1675,9 +1703,9 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     '__ci_bb_171 {
         (__ci_expr_ternary_64 = 0)
         if (__local_has_first_cu__goto_3357_6 != 0) {
-            (__ci_expr_ternary_64 = 1)
+            (__ci_expr_ternary_64 = ((1 as c_int)))
         } else {
-            (__ci_expr_ternary_64 = 0)
+            (__ci_expr_ternary_64 = ((0 as c_int)))
         }
         (__local_p__goto_3926_18 = __local_start_match__goto_3351_12 + ((__ci_expr_ternary_64 as isize) as usize))
         (__ci_expr_logic_65 = 0)
@@ -1695,12 +1723,12 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         ((unsafe *__param_match_data).subject = __local_original_subject__goto_3350_12)
         ((unsafe *__param_match_data).subject_length = __local_length)
         ((unsafe *__param_match_data).start_offset = __param_start_offset)
-        (__local_rc__goto_3344_5 = -1)
+        (__local_rc__goto_3344_5 = ((-1 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_173 {
-        (__local_check_length__goto_3960_20 = ((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) / sizeof[u8]())
+        (__local_check_length__goto_3960_20 = (((((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) / sizeof[u8]()) as c_ulong)))
         if ((if __local_check_length__goto_3960_20 < 5000: 1 else: 0) != 0) {
             (__ci_expr_logic_67 = (if true: 1 else: 0))
         } else {
@@ -1738,7 +1766,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
     '__ci_bb_177 {
         (__local_pp__goto_3974_24 = __local_p__goto_3926_18)
-        (__local_p__goto_3926_18 = ((memchr((__local_pp__goto_3974_24 as *mut c_void), __local_req_cu__goto_3367_13, (((__local_end_subject__goto_3352_12 as usize) -% (__local_pp__goto_3974_24 as usize)) / sizeof[u8]())) as *const u8)))
+        (__local_p__goto_3926_18 = ((memchr(((__local_pp__goto_3974_24 as *const c_void) as *mut c_void), (__local_req_cu__goto_3367_13 as c_int), ((((__local_end_subject__goto_3352_12 as usize) -% (__local_pp__goto_3974_24 as usize)) / sizeof[u8]()) as c_ulong)) as *const u8)))
         if ((if __local_p__goto_3926_18 == null: 1 else: 0) != 0) {
             goto '__ci_bb_180
         } else {
@@ -1747,7 +1775,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_178 {
-        (__local_p__goto_3926_18 = ((memchr((__local_p__goto_3926_18 as *mut c_void), __local_req_cu__goto_3367_13, (((__local_end_subject__goto_3352_12 as usize) -% (__local_p__goto_3926_18 as usize)) / sizeof[u8]())) as *const u8)))
+        (__local_p__goto_3926_18 = ((memchr(((__local_p__goto_3926_18 as *const c_void) as *mut c_void), (__local_req_cu__goto_3367_13 as c_int), ((((__local_end_subject__goto_3352_12 as usize) -% (__local_p__goto_3926_18 as usize)) / sizeof[u8]()) as c_ulong)) as *const u8)))
         if ((if __local_p__goto_3926_18 == null: 1 else: 0) != 0) {
             goto '__ci_bb_184
         } else {
@@ -1764,7 +1792,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_180 {
-        (__local_p__goto_3926_18 = ((memchr((__local_pp__goto_3974_24 as *mut c_void), __local_req_cu2__goto_3368_13, (((__local_end_subject__goto_3352_12 as usize) -% (__local_pp__goto_3974_24 as usize)) / sizeof[u8]())) as *const u8)))
+        (__local_p__goto_3926_18 = ((memchr(((__local_pp__goto_3974_24 as *const c_void) as *mut c_void), (__local_req_cu2__goto_3368_13 as c_int), ((((__local_end_subject__goto_3352_12 as usize) -% (__local_pp__goto_3974_24 as usize)) / sizeof[u8]()) as c_ulong)) as *const u8)))
         if ((if __local_p__goto_3926_18 == null: 1 else: 0) != 0) {
             goto '__ci_bb_182
         } else {
@@ -1811,7 +1839,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         ((unsafe *__local_mb__goto_3377_18).start_used_ptr = __local_start_match__goto_3351_12)
         ((unsafe *__local_mb__goto_3377_18).last_used_ptr = __local_start_match__goto_3351_12)
         ((unsafe *__local_mb__goto_3377_18).recursive = ((null as *mut dfa_recursion_info)))
-        (__local_rc__goto_3344_5 = internal_dfa_match(__local_mb__goto_3377_18, __local_mb__goto_3377_18.start_code, __local_start_match__goto_3351_12, __param_start_offset, (&__param_match_data.ovector[0] as *mut c_ulong), (((__param_match_data.oveccount as c_uint) as c_uint) *% (2 as c_uint)), __param_workspace, (__param_wscount as c_int), 0, (&__local_base_recursion_workspace__goto_3384_5[0] as *mut c_int)))
+        (__local_rc__goto_3344_5 = ((internal_dfa_match(__local_mb__goto_3377_18, (unsafe *__local_mb__goto_3377_18).start_code, __local_start_match__goto_3351_12, __param_start_offset, (&(unsafe *__param_match_data).ovector[0] as *mut c_ulong), (((((unsafe *__param_match_data).oveccount as c_uint) as c_uint) *% (2 as c_uint)) as c_uint), __param_workspace, (__param_wscount as c_int), (0 as c_uint), (&__local_base_recursion_workspace__goto_3384_5[0] as *mut c_int)) as c_int)))
         if ((if __local_rc__goto_3344_5 != -1: 1 else: 0) != 0) {
             (__ci_expr_logic_68 = (if true: 1 else: 0))
         } else {
@@ -1837,11 +1865,11 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         if (__local_firstline__goto_3356_32 != 0) {
             var __ci_expr_ternary_77: c_int = 0
 
-            if ((if __local_mb__goto_3377_18.nltype != 0: 1 else: 0) != 0) {
+            if ((if (unsafe *__local_mb__goto_3377_18).nltype != 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_73: c_int = 0
 
-                if ((if __local_start_match__goto_3351_12 < __local_mb__goto_3377_18.end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_73 = (if _pcre2_is_newline_8(__local_start_match__goto_3351_12, __local_mb__goto_3377_18.nltype, __local_mb__goto_3377_18.end_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
+                if ((if __local_start_match__goto_3351_12 < (unsafe *__local_mb__goto_3377_18).end_subject: 1 else: 0) != 0) {
+                    (__ci_expr_logic_73 = (if _pcre2_is_newline_8(__local_start_match__goto_3351_12, (unsafe *__local_mb__goto_3377_18).nltype, (unsafe *__local_mb__goto_3377_18).end_subject, ((&raw const (unsafe *__local_mb__goto_3377_18).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_3356_6) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_ternary_77 = __ci_expr_logic_73)
@@ -1851,17 +1879,17 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
                 var __ci_expr_logic_74: c_int = 0
 
-                if ((if __local_start_match__goto_3351_12 <= (__local_mb__goto_3377_18.end_subject - (__local_mb__goto_3377_18.nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_74 = (if (if (unsafe *__local_start_match__goto_3351_12) == __local_mb__goto_3377_18.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                if ((if __local_start_match__goto_3351_12 <= ((unsafe *__local_mb__goto_3377_18).end_subject - ((unsafe *__local_mb__goto_3377_18).nllen as usize)): 1 else: 0) != 0) {
+                    (__ci_expr_logic_74 = (if (if (unsafe *__local_start_match__goto_3351_12) == (unsafe *__local_mb__goto_3377_18).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_74 != 0) {
                     var __ci_expr_logic_75: c_int
 
-                    if ((if __local_mb__goto_3377_18.nllen == 1: 1 else: 0) != 0) {
+                    if ((if (unsafe *__local_mb__goto_3377_18).nllen == 1: 1 else: 0) != 0) {
                         (__ci_expr_logic_75 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_75 = (if (if (unsafe *(__local_start_match__goto_3351_12 + ((1 as isize) as usize))) == __local_mb__goto_3377_18.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_75 = (if (if (unsafe *(__local_start_match__goto_3351_12 + ((1 as isize) as usize))) == (unsafe *__local_mb__goto_3377_18).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_logic_76 = (if __ci_expr_logic_75 != 0: 1 else: 0))
@@ -1889,7 +1917,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     '__ci_bb_193 {
         (__ci_expr_logic_69 = 0)
         if ((if __local_rc__goto_3344_5 == -2: 1 else: 0) != 0) {
-            (__ci_expr_logic_69 = (if (if __param_match_data.oveccount > 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_69 = (if (if (unsafe *__param_match_data).oveccount > 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_69 != 0) {
             goto '__ci_bb_194
@@ -1920,8 +1948,8 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     '__ci_bb_196 {
         ((unsafe *__param_match_data).subject_length = __local_length)
         ((unsafe *__param_match_data).start_offset = __param_start_offset)
-        ((unsafe *__param_match_data).leftchar = (((((__local_mb__goto_3377_18.start_used_ptr as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
-        ((unsafe *__param_match_data).rightchar = (((((__local_mb__goto_3377_18.last_used_ptr as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((unsafe *__param_match_data).leftchar = ((((((unsafe *__local_mb__goto_3377_18).start_used_ptr as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
+        ((unsafe *__param_match_data).rightchar = ((((((unsafe *__local_mb__goto_3377_18).last_used_ptr as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
         ((unsafe *__param_match_data).startchar = (((((__local_start_match__goto_3351_12 as usize) -% (__local_subject as usize)) / sizeof[u8]()) as c_ulong)))
         goto '__ci_bb_197
     }
@@ -1964,8 +1992,8 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_201 {
-        ((unsafe *__param_match_data).subject = ((&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).malloc(((__local_length as c_ulong) *% (1 as c_ulong)), (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).memory_data) as *const u8))
-        if ((if __param_match_data.subject == null: 1 else: 0) != 0) {
+        ((unsafe *__param_match_data).subject = (((unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).malloc(((__local_length as c_ulong) *% (1 as c_ulong)), (unsafe *(&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl)).memory_data) as *const u8)))
+        if ((if (unsafe *__param_match_data).subject == null: 1 else: 0) != 0) {
             goto '__ci_bb_204
         } else {
             goto '__ci_bb_205
@@ -1973,22 +2001,22 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_202 {
-        ((unsafe *__param_match_data).subject = null)
+        ((unsafe *__param_match_data).subject = ((null as *const u8)))
         goto '__ci_bb_203
     }
 
     '__ci_bb_203 {
-        ((unsafe *__param_match_data).flags = __param_match_data.flags | 1)
+        ((unsafe *__param_match_data).flags = ((unsafe *__param_match_data).flags as u8) | (1 as u8))
         goto '__ci_bb_200
     }
 
     '__ci_bb_204 {
-        (__local_rc__goto_3344_5 = -48)
+        (__local_rc__goto_3344_5 = ((-48 as c_int)))
         goto '__ci_bb_7
     }
 
     '__ci_bb_205 {
-        with_memcpy(((__param_match_data.subject as *mut c_void) as *i8), (__local_subject as *i8), (((__local_length as c_ulong) *% (1 as c_ulong)) as i64))
+        with_memcpy((((unsafe *__param_match_data).subject as *mut c_void) as *mut u8), ((__local_subject as *const c_void) as *const u8), ((((__local_length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
         goto '__ci_bb_203
     }
 
@@ -2063,23 +2091,23 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
             (__ci_expr_logic_81 = (if (if (unsafe *__local_start_match__goto_3351_12) == 10: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_81 != 0) {
-            (__ci_expr_logic_82 = (if (if ((__local_re__goto_3346_24.flags as c_uint) & (2048 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_82 = (if (if (((unsafe *__local_re__goto_3346_24).flags as c_uint) & (2048 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_82 != 0) {
             var __ci_expr_logic_84: c_int
 
             var __ci_expr_logic_83: c_int
 
-            if ((if __local_mb__goto_3377_18.nltype == 1: 1 else: 0) != 0) {
+            if ((if (unsafe *__local_mb__goto_3377_18).nltype == 1: 1 else: 0) != 0) {
                 (__ci_expr_logic_83 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_83 = (if (if __local_mb__goto_3377_18.nltype == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_83 = (if (if (unsafe *__local_mb__goto_3377_18).nltype == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_83 != 0) {
                 (__ci_expr_logic_84 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_84 = (if (if __local_mb__goto_3377_18.nllen == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_84 = (if (if (unsafe *__local_mb__goto_3377_18).nllen == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_85 = (if __ci_expr_logic_84 != 0: 1 else: 0))
@@ -2102,7 +2130,7 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_219 {
-        if ((if __local_rws__goto_3385_13.next != null: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_rws__goto_3385_13).next != null: 1 else: 0) != 0) {
             goto '__ci_bb_220
         } else {
             goto '__ci_bb_221
@@ -2110,9 +2138,9 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
     }
 
     '__ci_bb_220 {
-        (__local_next__goto_4119_15 = __local_rws__goto_3385_13.next)
-        ((unsafe *__local_rws__goto_3385_13).next = __local_next__goto_4119_15.next)
-        (&raw const (unsafe *__local_mb__goto_3377_18).memctl as *const pcre2_memctl).free(__local_next__goto_4119_15, (&raw const (unsafe *__local_mb__goto_3377_18).memctl as *const pcre2_memctl).memory_data)
+        (__local_next__goto_4119_15 = (unsafe *__local_rws__goto_3385_13).next)
+        ((unsafe *__local_rws__goto_3385_13).next = (unsafe *__local_next__goto_4119_15).next)
+        (unsafe *(&raw const (unsafe *__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).free(__local_next__goto_4119_15, (unsafe *(&raw const (unsafe *__local_mb__goto_3377_18).memctl as *const pcre2_memctl)).memory_data)
         goto '__ci_bb_219
     }
 
@@ -2121,98 +2149,100 @@ fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
         return __local_rc__goto_3344_5
     }
 
+    __ci_unreachable()
+
 }
 
-fn do_callout_dfa(__param_code: *const u8, __param_offsets: *mut c_ulong, __param_current_subject: *const u8, __param_ptr: *const u8, __param_mb: *mut dfa_match_block_8, __param_extracode: c_ulong, __param_lengthptr: *mut c_ulong) -> c_int {
-    var __local_cb: *mut pcre2_callout_block_8 = __param_mb.cb
+unsafe fn do_callout_dfa(__param_code: *const u8, __param_offsets: *mut c_ulong, __param_current_subject: *const u8, __param_ptr: *const u8, __param_mb: *mut dfa_match_block_8, __param_extracode: c_ulong, __param_lengthptr: *mut c_ulong) -> c_int {
+    var __local_cb: *mut pcre2_callout_block_8 = (unsafe *__param_mb).cb
 
     var __ci_expr_ternary_0: c_ulong = 0
 
     if ((if (unsafe __param_code[__param_extracode]) == OP_CALLOUT: 1 else: 0) != 0) {
         (__ci_expr_ternary_0 = ((_pcre2_OP_lengths_8[OP_CALLOUT] as c_ulong)))
     } else {
-        (__ci_expr_ternary_0 = (((((((unsafe __param_code[((5 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) | ((unsafe __param_code[((((5 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int)) as c_uint) as c_ulong)))
+        (__ci_expr_ternary_0 = ((((((((unsafe __param_code[((5 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __param_code[((((5 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int) as c_int)) as c_uint) as c_ulong)))
     }
 
     ((unsafe *__param_lengthptr) = __ci_expr_ternary_0)
 
 
-    if ((if __param_mb.callout == null: 1 else: 0) != 0) {
+    if ((if (unsafe *__param_mb).callout == null: 1 else: 0) != 0) {
         return 0
     }
 
     ((unsafe *__local_cb).offset_vector = __param_offsets)
 
-    ((unsafe *__local_cb).start_match = (((((__param_current_subject as usize) -% (__param_mb.start_subject as usize)) / sizeof[u8]()) as c_ulong)))
+    ((unsafe *__local_cb).start_match = (((((__param_current_subject as usize) -% ((unsafe *__param_mb).start_subject as usize)) / sizeof[u8]()) as c_ulong)))
 
-    ((unsafe *__local_cb).current_position = (((((__param_ptr as usize) -% (__param_mb.start_subject as usize)) / sizeof[u8]()) as c_ulong)))
+    ((unsafe *__local_cb).current_position = (((((__param_ptr as usize) -% ((unsafe *__param_mb).start_subject as usize)) / sizeof[u8]()) as c_ulong)))
 
-    ((unsafe *__local_cb).pattern_position = ((((((unsafe __param_code[((1 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) | ((unsafe __param_code[((((1 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int)) as c_uint)))
+    ((unsafe *__local_cb).pattern_position = ((((((((unsafe __param_code[((1 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __param_code[((((1 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int) as c_int)) as c_uint) as c_ulong)))
 
-    ((unsafe *__local_cb).next_item_length = ((((((unsafe __param_code[((3 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) | ((unsafe __param_code[((((3 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int)) as c_uint)))
+    ((unsafe *__local_cb).next_item_length = ((((((((unsafe __param_code[((3 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __param_code[((((3 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int) as c_int)) as c_uint) as c_ulong)))
 
     if ((if (unsafe __param_code[__param_extracode]) == OP_CALLOUT: 1 else: 0) != 0) {
-        ((unsafe *__local_cb).callout_number = (unsafe __param_code[((5 as c_ulong) +% (__param_extracode as c_ulong))]))
+        ((unsafe *__local_cb).callout_number = (((unsafe __param_code[((5 as c_ulong) +% (__param_extracode as c_ulong))]) as c_uint)))
 
-        ((unsafe *__local_cb).callout_string_offset = 0)
+        ((unsafe *__local_cb).callout_string_offset = ((0 as c_ulong)))
 
-        ((unsafe *__local_cb).callout_string = null)
+        ((unsafe *__local_cb).callout_string = ((null as *const u8)))
 
-        ((unsafe *__local_cb).callout_string_length = 0)
+        ((unsafe *__local_cb).callout_string_length = ((0 as c_ulong)))
 
     } else {
-        ((unsafe *__local_cb).callout_number = 0)
+        ((unsafe *__local_cb).callout_number = ((0 as c_uint)))
 
-        ((unsafe *__local_cb).callout_string_offset = ((((((unsafe __param_code[((7 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) | ((unsafe __param_code[((((7 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int)) as c_uint)))
+        ((unsafe *__local_cb).callout_string_offset = ((((((((unsafe __param_code[((7 as c_ulong) +% (__param_extracode as c_ulong))]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __param_code[((((7 as c_ulong) +% (__param_extracode as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_int) as c_int)) as c_uint) as c_ulong)))
 
         ((unsafe *__local_cb).callout_string = (__param_code + (((9 as c_ulong) +% (__param_extracode as c_ulong)) as usize)) + ((1 as isize) as usize))
 
-        ((unsafe *__local_cb).callout_string_length = (((((unsafe *__param_lengthptr) as c_ulong) -% (9 as c_ulong)) as c_ulong) -% (2 as c_ulong)))
+        ((unsafe *__local_cb).callout_string_length = (((((((unsafe *__param_lengthptr) as c_ulong) -% (9 as c_ulong)) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
     }
 
-    return __param_mb.callout(__local_cb, __param_mb.callout_data)
+    return (unsafe *__param_mb).callout(__local_cb, (unsafe *__param_mb).callout_data)
 
 }
 
-fn more_workspace(__param_rwsptr: *mut *mut RWS_anchor, __param_ovecsize: c_uint, __param_mb: *mut dfa_match_block_8) -> c_int {
+unsafe fn more_workspace(__param_rwsptr: *mut *mut RWS_anchor, __param_ovecsize: c_uint, __param_mb: *mut dfa_match_block_8) -> c_int {
     var __local_rws: *mut RWS_anchor = (unsafe *__param_rwsptr)
 
     var __local_new: *mut RWS_anchor
 
-    if ((if __local_rws.next != null: 1 else: 0) != 0) {
-        (__local_new = __local_rws.next)
+    if ((if (unsafe *__local_rws).next != null: 1 else: 0) != 0) {
+        (__local_new = (unsafe *__local_rws).next)
 
     } else {
         var __local_newsize: c_uint = with 0 as __ci_expr_seq_13 {
             var __ci_expr_ternary_0: c_ulong = 0
-            if ((if __local_rws.size >= ((4294967295 as c_ulong) / (((sizeof[c_int]() as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
-                (__ci_expr_ternary_0 = (4294967295 as c_ulong) / (sizeof[c_int]() as c_ulong))
+            if ((if (unsafe *__local_rws).size >= ((4294967295 as c_ulong) / (((sizeof[c_int]() as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
+                (__ci_expr_ternary_0 = ((((4294967295 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong)))
             } else {
-                (__ci_expr_ternary_0 = ((__local_rws.size as c_uint) *% (2 as c_uint)))
+                (__ci_expr_ternary_0 = (((((unsafe *__local_rws).size as c_uint) *% (2 as c_uint)) as c_ulong)))
             }
-            __ci_expr_ternary_0 as c_uint
+            (__ci_expr_ternary_0 as c_uint)
         }
 
-        var __local_newsizeK: c_uint = (((__local_newsize as c_ulong) / (((1024 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong))) as c_uint
+        var __local_newsizeK: c_uint = ((((__local_newsize as c_ulong) / (((1024 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong)) as c_uint))
 
-        if ((if ((__local_newsizeK as c_ulong) +% (__param_mb.heap_used as c_ulong)) > __param_mb.heap_limit: 1 else: 0) != 0) {
-            (__local_newsizeK = ((((__param_mb.heap_limit as c_ulong) -% (__param_mb.heap_used as c_ulong)) as c_uint)))
+        if ((if ((__local_newsizeK as c_ulong) +% ((unsafe *__param_mb).heap_used as c_ulong)) > (unsafe *__param_mb).heap_limit: 1 else: 0) != 0) {
+            (__local_newsizeK = (((((unsafe *__param_mb).heap_limit as c_ulong) -% ((unsafe *__param_mb).heap_used as c_ulong)) as c_uint)))
         }
 
-        (__local_newsize = ((__local_newsizeK as c_ulong) *% (((1024 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong)))
+        (__local_newsize = ((((__local_newsizeK as c_ulong) *% (((1024 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong)) as c_uint)))
 
-        if ((if __local_newsize < ((((1000 as c_uint) +% (__param_ovecsize as c_uint)) as c_ulong) +% (4 as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_newsize < ((((1000 as c_uint) +% (__param_ovecsize as c_uint)) as c_ulong) +% (((sizeof[RWS_anchor]() as c_ulong) / (4 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
             return -63
         }
 
-        (__local_new = (((&raw const (unsafe *__param_mb).memctl as *const pcre2_memctl).malloc(((__local_newsize as c_ulong) *% (sizeof[c_int]() as c_ulong)), (&raw const (unsafe *__param_mb).memctl as *const pcre2_memctl).memory_data) as *mut RWS_anchor)))
+        (__local_new = (((unsafe *(&raw const (unsafe *__param_mb).memctl as *const pcre2_memctl)).malloc(((__local_newsize as c_ulong) *% (sizeof[c_int]() as c_ulong)), (unsafe *(&raw const (unsafe *__param_mb).memctl as *const pcre2_memctl)).memory_data) as *mut RWS_anchor)))
 
         if ((if __local_new == null: 1 else: 0) != 0) {
             return -48
         }
 
-        ((unsafe *__param_mb).heap_used = __param_mb.heap_used + __local_newsizeK)
+        ((unsafe *__param_mb).heap_used = ((unsafe *__param_mb).heap_used +% __local_newsizeK))
 
         ((unsafe *__local_new).next = ((null as *mut RWS_anchor)))
 
@@ -2222,7 +2252,7 @@ fn more_workspace(__param_rwsptr: *mut *mut RWS_anchor, __param_ovecsize: c_uint
 
     }
 
-    ((unsafe *__local_new).free = ((__local_new.size as c_ulong) -% (4 as c_ulong)))
+    ((unsafe *__local_new).free = (((((unsafe *__local_new).size as c_ulong) -% (((sizeof[RWS_anchor]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_uint)))
 
     ((unsafe *__param_rwsptr) = __local_new)
 
@@ -2230,7 +2260,7 @@ fn more_workspace(__param_rwsptr: *mut *mut RWS_anchor, __param_ovecsize: c_uint
 
 }
 
-fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_code: *const u8, __param_current_subject: *const u8, __param_start_offset: c_ulong, __param_offsets: *mut c_ulong, __param_offsetcount: c_uint, __param_workspace: *mut c_int, __param_wscount: c_int, __param_rlevel: c_uint, __param_RWS: *mut c_int) -> c_int {
+unsafe fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_code: *const u8, __param_current_subject: *const u8, __param_start_offset: c_ulong, __param_offsets: *mut c_ulong, __param_offsetcount: c_uint, __param_workspace: *mut c_int, __param_wscount: c_int, __param_rlevel: c_uint, __param_RWS: *mut c_int) -> c_int {
     var __local_current_subject = __param_current_subject
     var __local_offsetcount = __param_offsetcount
     var __local_wscount = __param_wscount
@@ -2256,7 +2286,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     var __local_end_code__goto_546_12: *const u8 = null
 
-    var __local_new_recursive__goto_547_20: dfa_recursion_info
+    var __local_new_recursive__goto_547_20: dfa_recursion_info = dfa_recursion_info {  }
 
     var __local_active_count__goto_548_5: c_int = 0
 
@@ -3201,20 +3231,20 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_start_subject__goto_553_12 = __param_mb.start_subject)
-        (__local_end_subject__goto_554_12 = __param_mb.end_subject)
-        (__local_start_code__goto_555_12 = __param_mb.start_code)
-        (__local_utf__goto_558_6 = (if ((__param_mb.poptions as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
+        (__local_start_subject__goto_553_12 = (unsafe *__param_mb).start_subject)
+        (__local_end_subject__goto_554_12 = (unsafe *__param_mb).end_subject)
+        (__local_start_code__goto_555_12 = (unsafe *__param_mb).start_code)
+        (__local_utf__goto_558_6 = (((if (((unsafe *__param_mb).poptions as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) as c_int)))
         if (__local_utf__goto_558_6 != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_0 = (if (if ((__param_mb.poptions as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (((unsafe *__param_mb).poptions as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         (__local_utf_or_ucp__goto_559_6 = __ci_expr_logic_0)
-        (__local_reset_could_continue__goto_564_6 = 0)
-        (__ci_expr_old_1 = __param_mb.match_call_count)
-        ((unsafe *__param_mb).match_call_count = __param_mb.match_call_count + 1)
-        if ((if __ci_expr_old_1 >= __param_mb.match_limit: 1 else: 0) != 0) {
+        (__local_reset_could_continue__goto_564_6 = ((0 as c_int)))
+        (__ci_expr_old_1 = (unsafe *__param_mb).match_call_count)
+        ((unsafe *__param_mb).match_call_count = ((unsafe *__param_mb).match_call_count +% 1))
+        if ((if __ci_expr_old_1 >= (unsafe *__param_mb).match_limit: 1 else: 0) != 0) {
             goto '__ci_bb_1
         } else {
             goto '__ci_bb_2
@@ -3227,8 +3257,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_2 {
         (__ci_expr_old_2 = __local_rlevel)
-        (__local_rlevel = __local_rlevel + 1)
-        if ((if __ci_expr_old_2 > __param_mb.match_limit_depth: 1 else: 0) != 0) {
+        (__local_rlevel = (__local_rlevel +% 1))
+        if ((if __ci_expr_old_2 > (unsafe *__param_mb).match_limit_depth: 1 else: 0) != 0) {
             goto '__ci_bb_3
         } else {
             goto '__ci_bb_4
@@ -3240,17 +3270,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_4 {
-        (__local_offsetcount = __local_offsetcount & (-2 as c_uint))
+        (__local_offsetcount = (__local_offsetcount as c_uint) & ((-2 as c_uint) as c_uint))
         (__local_wscount = __local_wscount - 2)
-        (__local_wscount = (__local_wscount - (__local_wscount % ((3 as c_int) * 2))) / (2 * (3 as c_int)))
-        (__local_ctypes__goto_544_16 = __param_mb.tables + (((512 + 320) as isize) as usize))
-        (__local_lcc__goto_544_25 = __param_mb.tables + ((0 as isize) as usize))
-        (__local_fcc__goto_544_31 = __param_mb.tables + ((256 as isize) as usize))
-        (__local_match_count__goto_548_30 = -1)
+        (__local_wscount = ((((__local_wscount - (__local_wscount % ((((sizeof[stateblock]() as c_ulong) / (4 as c_ulong)) as c_int) * 2))) / (2 * (((sizeof[stateblock]() as c_ulong) / (4 as c_ulong)) as c_int))) as c_int)))
+        (__local_ctypes__goto_544_16 = (unsafe *__param_mb).tables + (((512 + 320) as isize) as usize))
+        (__local_lcc__goto_544_25 = (unsafe *__param_mb).tables + ((0 as isize) as usize))
+        (__local_fcc__goto_544_31 = (unsafe *__param_mb).tables + ((256 as isize) as usize))
+        (__local_match_count__goto_548_30 = ((-1 as c_int)))
         (__local_active_states__goto_542_13 = (((__param_workspace + ((2 as isize) as usize)) as *mut stateblock)))
         (__local_new_states__goto_542_29 = __local_active_states__goto_542_13 + ((__local_wscount as isize) as usize))
         (__local_next_new_state__goto_543_33 = __local_new_states__goto_542_29)
-        (__local_new_count__goto_548_19 = 0)
+        (__local_new_count__goto_548_19 = ((0 as c_int)))
         if ((if (unsafe *__param_this_start_code) == OP_ASSERTBACK: 1 else: 0) != 0) {
             (__ci_expr_logic_3 = (if true: 1 else: 0))
         } else {
@@ -3264,7 +3294,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_5 {
-        (__local_max_back__goto_594_10 = 0)
+        (__local_max_back__goto_594_10 = ((0 as c_ulong)))
         (__local_end_code__goto_546_12 = __param_this_start_code)
         goto '__ci_bb_8
     }
@@ -3273,7 +3303,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__local_end_code__goto_546_12 = __param_this_start_code)
         (__ci_expr_logic_9 = 0)
         if ((if __local_rlevel == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_9 = (if (if ((__param_mb.moptions as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_9 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_9 != 0) {
             goto '__ci_bb_35
@@ -3283,13 +3313,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_7 {
-        ((unsafe __param_workspace[0]) = 0)
+        ((unsafe __param_workspace[0]) = ((0 as c_int)))
         (__local_ptr__goto_545_12 = __local_current_subject)
         goto '__ci_bb_49
     }
 
     '__ci_bb_8 {
-        (__local_back__goto_600_12 = (((((((unsafe __local_end_code__goto_546_12[(2 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_end_code__goto_546_12[((2 + 2) + 1)]) as c_int)) as c_uint) as c_ulong)))
+        (__local_back__goto_600_12 = ((((((((unsafe __local_end_code__goto_546_12[(2 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_end_code__goto_546_12[((2 + 2) + 1)]) as c_int) as c_int)) as c_uint) as c_ulong)))
         if ((if __local_back__goto_600_12 > __local_max_back__goto_594_10: 1 else: 0) != 0) {
             goto '__ci_bb_11
         } else {
@@ -3319,12 +3349,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_12 {
-        (__local_end_code__goto_546_12 = __local_end_code__goto_546_12 + ((((((unsafe __local_end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_end_code__goto_546_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_end_code__goto_546_12 = __local_end_code__goto_546_12 + (((((((unsafe __local_end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_end_code__goto_546_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_9
     }
 
     '__ci_bb_13 {
-        (__local_gone_back__goto_595_10 = 0)
+        (__local_gone_back__goto_595_10 = ((0 as c_ulong)))
         goto '__ci_bb_16
     }
 
@@ -3342,7 +3372,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_15 {
-        if ((if __local_current_subject < __param_mb.start_used_ptr: 1 else: 0) != 0) {
+        if ((if __local_current_subject < (unsafe *__param_mb).start_used_ptr: 1 else: 0) != 0) {
             goto '__ci_bb_25
         } else {
             goto '__ci_bb_26
@@ -3366,7 +3396,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_18 {
-        (__local_gone_back__goto_595_10 = __local_gone_back__goto_595_10 + 1)
+        (__local_gone_back__goto_595_10 = (__local_gone_back__goto_595_10 +% 1))
         goto '__ci_bb_16
     }
 
@@ -3417,16 +3447,16 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_27 {
         (__ci_expr_ternary_6 = 0)
         if ((if (unsafe __local_end_code__goto_546_12[(1 + 2)]) == OP_REVERSE: 1 else: 0) != 0) {
-            (__ci_expr_ternary_6 = 1 + 2)
+            (__ci_expr_ternary_6 = (((1 + 2) as c_int)))
         } else {
-            (__ci_expr_ternary_6 = 0)
+            (__ci_expr_ternary_6 = ((0 as c_int)))
         }
-        (__local_revlen__goto_644_14 = __ci_expr_ternary_6)
+        (__local_revlen__goto_644_14 = ((__ci_expr_ternary_6 as c_uint)))
         (__ci_expr_ternary_7 = 0)
         if ((if __local_revlen__goto_644_14 == 0: 1 else: 0) != 0) {
-            (__ci_expr_ternary_7 = 0)
+            (__ci_expr_ternary_7 = ((0 as c_ulong)))
         } else {
-            (__ci_expr_ternary_7 = (((((((unsafe __local_end_code__goto_546_12[(2 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_end_code__goto_546_12[((2 + 2) + 1)]) as c_int)) as c_uint) as c_ulong)))
+            (__ci_expr_ternary_7 = ((((((((unsafe __local_end_code__goto_546_12[(2 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_end_code__goto_546_12[((2 + 2) + 1)]) as c_int) as c_int)) as c_uint) as c_ulong)))
         }
         (__local_back__goto_645_12 = __ci_expr_ternary_7)
         if ((if __local_back__goto_645_12 <= __local_gone_back__goto_595_10: 1 else: 0) != 0) {
@@ -3460,13 +3490,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_31 {
-        (__local_end_code__goto_546_12 = __local_end_code__goto_546_12 + ((((((unsafe __local_end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_end_code__goto_546_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_end_code__goto_546_12 = __local_end_code__goto_546_12 + (((((((unsafe __local_end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_end_code__goto_546_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_28
     }
 
     '__ci_bb_32 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_bstate__goto_648_11)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_bstate__goto_648_11) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = ((((__local_gone_back__goto_595_10 as c_ulong) -% (__local_back__goto_645_12 as c_ulong)) as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_34
@@ -3502,11 +3532,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             (__ci_expr_logic_12 = (if (if (unsafe *__param_this_start_code) == OP_SCBRAPOS: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_12 != 0) {
-            (__ci_expr_ternary_13 = 2)
+            (__ci_expr_ternary_13 = ((2 as c_int)))
         } else {
-            (__ci_expr_ternary_13 = 0)
+            (__ci_expr_ternary_13 = ((0 as c_int)))
         }
-        (__local_length__goto_680_9 = (1 + 2) + __ci_expr_ternary_13)
+        (__local_length__goto_680_9 = ((((1 + 2) + __ci_expr_ternary_13) as c_int)))
         goto '__ci_bb_43
     }
 
@@ -3515,7 +3545,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_38 {
-        (__local_end_code__goto_546_12 = __local_end_code__goto_546_12 + ((((((unsafe __local_end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_end_code__goto_546_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_end_code__goto_546_12 = __local_end_code__goto_546_12 + (((((((unsafe __local_end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_end_code__goto_546_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_39
     }
 
@@ -3528,7 +3558,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_40 {
-        (__local_new_count__goto_548_19 = (unsafe __param_workspace[1]))
+        (__local_new_count__goto_548_19 = (((unsafe __param_workspace[1]) as c_int)))
         if ((if not ((unsafe __param_workspace[0]) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_41
         } else {
@@ -3537,7 +3567,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_41 {
-        with_memcpy((__local_new_states__goto_542_29 as *i8), (__local_active_states__goto_542_13 as *i8), ((((__local_new_count__goto_548_19 as c_ulong) as c_ulong) *% (sizeof[stateblock]() as c_ulong)) as i64))
+        with_memcpy(((__local_new_states__goto_542_29 as *mut c_void) as *mut u8), ((__local_active_states__goto_542_13 as *const c_void) as *const u8), (((((__local_new_count__goto_548_19 as c_ulong) as c_ulong) *% (sizeof[stateblock]() as c_ulong)) as c_ulong) as i64))
         goto '__ci_bb_42
     }
 
@@ -3569,7 +3599,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_46 {
         ((unsafe *__local_next_new_state__goto_543_33).offset = ((((((__local_end_code__goto_546_12 as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) + __local_length__goto_680_9) as c_int)))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_48
     }
@@ -3579,8 +3609,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_48 {
-        (__local_end_code__goto_546_12 = __local_end_code__goto_546_12 + ((((((unsafe __local_end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_end_code__goto_546_12[(1 + 1)]) as c_int)) as c_uint) as usize))
-        (__local_length__goto_680_9 = 1 + 2)
+        (__local_end_code__goto_546_12 = __local_end_code__goto_546_12 + (((((((unsafe __local_end_code__goto_546_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_end_code__goto_546_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
+        (__local_length__goto_680_9 = (((1 + 2) as c_int)))
         goto '__ci_bb_44
     }
 
@@ -3589,10 +3619,10 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_50 {
-        (__local_partial_newline__goto_704_8 = 0)
+        (__local_partial_newline__goto_704_8 = ((0 as c_int)))
         (__local_could_continue__goto_705_8 = __local_reset_could_continue__goto_564_6)
-        (__local_reset_could_continue__goto_564_6 = 0)
-        if ((if __local_ptr__goto_545_12 > __param_mb.last_used_ptr: 1 else: 0) != 0) {
+        (__local_reset_could_continue__goto_564_6 = ((0 as c_int)))
+        if ((if __local_ptr__goto_545_12 > (unsafe *__param_mb).last_used_ptr: 1 else: 0) != 0) {
             goto '__ci_bb_53
         } else {
             goto '__ci_bb_54
@@ -3607,7 +3637,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__ci_expr_logic_427 = 0)
         (__ci_expr_logic_426 = 0)
         if ((if __local_match_count__goto_548_30 >= 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_426 = (if (if ((((__param_mb.moptions as c_uint) | (__param_mb.poptions as c_uint)) as c_uint) & (536870912 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_426 = (if (if (((((unsafe *__param_mb).moptions as c_uint) | ((unsafe *__param_mb).poptions as c_uint)) as c_uint) & (536870912 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_426 != 0) {
             (__ci_expr_logic_427 = (if (if __local_ptr__goto_545_12 < __local_end_subject__goto_554_12: 1 else: 0) != 0: 1 else: 0))
@@ -3629,8 +3659,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__local_active_states__goto_542_13 = __local_new_states__goto_542_29)
         (__local_new_states__goto_542_29 = __local_temp_states__goto_542_42)
         (__local_active_count__goto_548_5 = __local_new_count__goto_548_19)
-        (__local_new_count__goto_548_19 = 0)
-        ((unsafe __param_workspace[0]) = (unsafe __param_workspace[0]) ^ 1)
+        (__local_new_count__goto_548_19 = ((0 as c_int)))
+        ((unsafe __param_workspace[0]) = ((unsafe __param_workspace[0]) as c_int) ^ (1 as c_int))
         ((unsafe __param_workspace[1]) = __local_active_count__goto_548_5)
         (__local_next_active_state__goto_543_13 = __local_active_states__goto_542_13 + ((__local_active_count__goto_548_5 as isize) as usize))
         (__local_next_new_state__goto_543_33 = __local_new_states__goto_542_29)
@@ -3642,8 +3672,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_55 {
-        (__local_clen__goto_702_7 = 1)
-        (__local_c__goto_703_12 = (unsafe *__local_ptr__goto_545_12))
+        (__local_clen__goto_702_7 = ((1 as c_int)))
+        (__local_c__goto_703_12 = (((unsafe *__local_ptr__goto_545_12) as c_uint)))
         (__ci_expr_logic_15 = 0)
         if (__local_utf__goto_558_6 != 0) {
             (__ci_expr_logic_15 = (if (if __local_c__goto_703_12 >= 192: 1 else: 0) != 0: 1 else: 0))
@@ -3656,13 +3686,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_56 {
-        (__local_clen__goto_702_7 = 0)
-        (__local_c__goto_703_12 = 4294967295)
+        (__local_clen__goto_702_7 = ((0 as c_int)))
+        (__local_c__goto_703_12 = ((4294967295 as c_uint)))
         goto '__ci_bb_57
     }
 
     '__ci_bb_57 {
-        (__local_i__goto_701_7 = 0)
+        (__local_i__goto_701_7 = ((0 as c_int)))
         goto '__ci_bb_72
     }
 
@@ -3679,7 +3709,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_60 {
-        (__local_c__goto_703_12 = (((((__local_c__goto_703_12 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_703_12 = ((((((((__local_c__goto_703_12 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_clen__goto_702_7 = __local_clen__goto_702_7 + 1)
         goto '__ci_bb_62
     }
@@ -3697,7 +3727,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_63 {
-        (__local_c__goto_703_12 = (((((((__local_c__goto_703_12 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_703_12 = ((((((((((__local_c__goto_703_12 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_clen__goto_702_7 = __local_clen__goto_702_7 + 2)
         goto '__ci_bb_65
     }
@@ -3715,7 +3745,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_66 {
-        (__local_c__goto_703_12 = (((((((((__local_c__goto_703_12 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_703_12 = ((((((((((((__local_c__goto_703_12 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_clen__goto_702_7 = __local_clen__goto_702_7 + 3)
         goto '__ci_bb_68
     }
@@ -3733,13 +3763,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_69 {
-        (__local_c__goto_703_12 = (((((((((((__local_c__goto_703_12 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_703_12 = ((((((((((((((__local_c__goto_703_12 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_clen__goto_702_7 = __local_clen__goto_702_7 + 4)
         goto '__ci_bb_71
     }
 
     '__ci_bb_70 {
-        (__local_c__goto_703_12 = (((((((((((((__local_c__goto_703_12 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[5]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_703_12 = ((((((((((((((((__local_c__goto_703_12 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_545_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_545_12[5]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_clen__goto_702_7 = __local_clen__goto_702_7 + 5)
         goto '__ci_bb_71
     }
@@ -3758,8 +3788,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_73 {
         (__local_current_state__goto_753_17 = __local_active_states__goto_542_13 + ((__local_i__goto_701_7 as isize) as usize))
-        (__local_caseless__goto_754_10 = 0)
-        (__local_state_offset__goto_757_9 = __local_current_state__goto_753_17.offset)
+        (__local_caseless__goto_754_10 = ((0 as c_int)))
+        (__local_state_offset__goto_757_9 = (unsafe *__local_current_state__goto_753_17).offset)
         if ((if __local_state_offset__goto_757_9 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_76
         } else {
@@ -3781,7 +3811,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_76 {
-        if ((if __local_current_state__goto_753_17.data > 0: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_current_state__goto_753_17).data > 0: 1 else: 0) != 0) {
             goto '__ci_bb_78
         } else {
             goto '__ci_bb_79
@@ -3789,7 +3819,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_77 {
-        (__local_j__goto_701_10 = 0)
+        (__local_j__goto_701_10 = ((0 as c_int)))
         goto '__ci_bb_86
     }
 
@@ -3804,7 +3834,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_79 {
-        (__local_state_offset__goto_757_9 = 0 - __local_state_offset__goto_757_9)
+        (__local_state_offset__goto_757_9 = (((0 - __local_state_offset__goto_757_9) as c_int)))
         ((unsafe *__local_current_state__goto_753_17).offset = __local_state_offset__goto_757_9)
         goto '__ci_bb_80
     }
@@ -3815,8 +3845,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_81 {
         ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9)
-        ((unsafe *__local_next_new_state__goto_543_33).count = __local_current_state__goto_753_17.count)
-        ((unsafe *__local_next_new_state__goto_543_33).data = __local_current_state__goto_753_17.data - 1)
+        ((unsafe *__local_next_new_state__goto_543_33).count = (unsafe *__local_current_state__goto_753_17).count)
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((((unsafe *__local_current_state__goto_753_17).data - 1) as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_83
     }
@@ -3834,7 +3864,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_84 {
-        (__local_reset_could_continue__goto_564_6 = 1)
+        (__local_reset_could_continue__goto_564_6 = ((1 as c_int)))
         goto '__ci_bb_85
     }
 
@@ -3853,7 +3883,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_87 {
         (__ci_expr_logic_17 = 0)
         if ((if (unsafe __local_active_states__goto_542_13[__local_j__goto_701_10]).offset == __local_state_offset__goto_757_9: 1 else: 0) != 0) {
-            (__ci_expr_logic_17 = (if (if (unsafe __local_active_states__goto_542_13[__local_j__goto_701_10]).count == __local_current_state__goto_753_17.count: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_17 = (if (if (unsafe __local_active_states__goto_542_13[__local_j__goto_701_10]).count == (unsafe *__local_current_state__goto_753_17).count: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_17 != 0) {
             goto '__ci_bb_90
@@ -3869,7 +3899,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_89 {
         (__local_code__goto_755_16 = __local_start_code__goto_555_12 + ((__local_state_offset__goto_757_9 as isize) as usize))
-        (__local_codevalue__goto_756_14 = (unsafe *__local_code__goto_755_16))
+        (__local_codevalue__goto_756_14 = (((unsafe *__local_code__goto_755_16) as c_uint)))
         (__ci_expr_logic_18 = 0)
         if ((if __local_clen__goto_702_7 == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_18 = (if (if poptable[__local_codevalue__goto_756_14] != 0: 1 else: 0) != 0: 1 else: 0))
@@ -3894,7 +3924,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_93 {
-        (__local_could_continue__goto_705_8 = 1)
+        (__local_could_continue__goto_705_8 = ((1 as c_int)))
         goto '__ci_bb_94
     }
 
@@ -3907,7 +3937,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_95 {
-        (__local_dlen__goto_702_13 = 1)
+        (__local_dlen__goto_702_13 = ((1 as c_int)))
         if (__local_utf__goto_558_6 != 0) {
             goto '__ci_bb_98
         } else {
@@ -3916,8 +3946,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_96 {
-        (__local_dlen__goto_702_13 = 0)
-        (__local_d__goto_703_15 = 4294967295)
+        (__local_dlen__goto_702_13 = ((0 as c_int)))
+        (__local_d__goto_703_15 = ((4294967295 as c_uint)))
         goto '__ci_bb_97
     }
 
@@ -3926,7 +3956,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_98 {
-        (__local_d__goto_703_15 = (unsafe *(__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))))
+        (__local_d__goto_703_15 = (((unsafe *(__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))) as c_uint)))
         if ((if __local_d__goto_703_15 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_101
         } else {
@@ -3935,7 +3965,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_99 {
-        (__local_d__goto_703_15 = (unsafe __local_code__goto_755_16[coptable[__local_codevalue__goto_756_14]]))
+        (__local_d__goto_703_15 = (((unsafe __local_code__goto_755_16[coptable[__local_codevalue__goto_756_14]]) as c_uint)))
         goto '__ci_bb_100
     }
 
@@ -3960,7 +3990,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_103 {
-        (__local_d__goto_703_15 = (((((__local_d__goto_703_15 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((__local_d__goto_703_15 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_dlen__goto_702_13 = __local_dlen__goto_702_13 + 1)
         goto '__ci_bb_105
     }
@@ -3978,7 +4008,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_106 {
-        (__local_d__goto_703_15 = (((((((__local_d__goto_703_15 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((((__local_d__goto_703_15 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_dlen__goto_702_13 = __local_dlen__goto_702_13 + 2)
         goto '__ci_bb_108
     }
@@ -3996,7 +4026,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_109 {
-        (__local_d__goto_703_15 = (((((((((__local_d__goto_703_15 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((((((__local_d__goto_703_15 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_dlen__goto_702_13 = __local_dlen__goto_702_13 + 3)
         goto '__ci_bb_111
     }
@@ -4014,13 +4044,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_112 {
-        (__local_d__goto_703_15 = (((((((((((__local_d__goto_703_15 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((((((((__local_d__goto_703_15 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_dlen__goto_702_13 = __local_dlen__goto_702_13 + 4)
         goto '__ci_bb_114
     }
 
     '__ci_bb_113 {
-        (__local_d__goto_703_15 = (((((((((((((__local_d__goto_703_15 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[5]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((((((((((__local_d__goto_703_15 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe (__local_code__goto_755_16 + ((coptable[__local_codevalue__goto_756_14] as c_uint) as usize))[5]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         (__local_dlen__goto_702_13 = __local_dlen__goto_702_13 + 5)
         goto '__ci_bb_114
     }
@@ -4054,27 +4084,27 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_120 {
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 + 300)
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 +% 300))
         goto '__ci_bb_118
     }
 
     '__ci_bb_121 {
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 + 340)
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 +% 340))
         goto '__ci_bb_118
     }
 
     '__ci_bb_122 {
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 + 320)
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 +% 320))
         goto '__ci_bb_118
     }
 
     '__ci_bb_123 {
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 + 360)
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 +% 360))
         goto '__ci_bb_118
     }
 
     '__ci_bb_124 {
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 + 380)
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 +% 380))
         goto '__ci_bb_118
     }
 
@@ -4182,13 +4212,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         } else {
             var __ci_expr_logic_22: c_int = 0
 
-            if ((if ((__param_mb.moptions as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
+            if ((if (((unsafe *__param_mb).moptions as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_21: c_int
 
-                if ((if ((__param_mb.moptions as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
+                if ((if (((unsafe *__param_mb).moptions as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
                     (__ci_expr_logic_21 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_21 = (if (if __local_current_subject > (__local_start_subject__goto_553_12 + (__param_mb.start_offset as usize)): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_21 = (if (if __local_current_subject > (__local_start_subject__goto_553_12 + ((unsafe *__param_mb).start_offset as usize)): 1 else: 0) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_logic_22 = (if __ci_expr_logic_21 != 0: 1 else: 0))
@@ -4210,8 +4240,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_140 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + 1) + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + 1) + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_142
     }
@@ -4243,8 +4273,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_145 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 - ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 - (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_147
     }
@@ -4272,9 +4302,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_150 {
         (__ci_expr_ternary_24 = 0)
         if ((if __local_offsetcount >= 2: 1 else: 0) != 0) {
-            (__ci_expr_ternary_24 = 1)
+            (__ci_expr_ternary_24 = ((1 as c_int)))
         } else {
-            (__ci_expr_ternary_24 = 0)
+            (__ci_expr_ternary_24 = ((0 as c_int)))
         }
         (__local_match_count__goto_548_30 = __ci_expr_ternary_24)
         goto '__ci_bb_152
@@ -4300,9 +4330,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         if ((if __local_match_count__goto_548_30 == 0: 1 else: 0) != 0) {
             (__ci_expr_ternary_26 = ((__local_offsetcount as c_int)))
         } else {
-            (__ci_expr_ternary_26 = __local_match_count__goto_548_30 * 2)
+            (__ci_expr_ternary_26 = (((__local_match_count__goto_548_30 * 2) as c_int)))
         }
-        (__local_count__goto_759_9 = __ci_expr_ternary_26 - 2)
+        (__local_count__goto_759_9 = (((__ci_expr_ternary_26 - 2) as c_int)))
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_155
         } else {
@@ -4311,7 +4341,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_153 {
-        (__local_match_count__goto_548_30 = 0)
+        (__local_match_count__goto_548_30 = ((0 as c_int)))
         goto '__ci_bb_154
     }
 
@@ -4320,7 +4350,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_155 {
-        with_memmove(((__param_offsets + ((2 as isize) as usize)) as *i8), (__param_offsets as *i8), ((((__local_count__goto_759_9 as c_ulong) as c_ulong) *% (sizeof[usize]() as c_ulong)) as i64))
+        with_memmove((((__param_offsets + ((2 as isize) as usize)) as *mut c_void) as *mut u8), ((__param_offsets as *const c_void) as *const u8), (((((__local_count__goto_759_9 as c_ulong) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
         goto '__ci_bb_156
     }
 
@@ -4339,7 +4369,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_158 {
-        if ((if ((__param_mb.moptions as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__param_mb).moptions as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_159
         } else {
             goto '__ci_bb_160
@@ -4359,7 +4389,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_162 {
-        (__local_code__goto_755_16 = __local_code__goto_755_16 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_163
     }
 
@@ -4383,7 +4413,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_165 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = (((((__local_code__goto_755_16 as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) as c_int)))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_167
     }
@@ -4424,7 +4454,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_172 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = (((((((__local_code__goto_755_16 as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) + 1) + 2) as c_int)))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_174
     }
@@ -4434,7 +4464,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_174 {
-        (__local_code__goto_755_16 = __local_code__goto_755_16 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_170
     }
 
@@ -4450,7 +4480,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_176 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = ((((((((__local_code__goto_755_16 as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) + 1) + 2) + 2) as c_int)))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_178
     }
@@ -4460,7 +4490,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_178 {
-        (__local_code__goto_755_16 = __local_code__goto_755_16 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_179
     }
 
@@ -4488,7 +4518,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_182 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = (((((((__local_code__goto_755_16 as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) + 1) + 2) as c_int)))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_184
     }
@@ -4498,7 +4528,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_184 {
-        (__local_code__goto_755_16 = __local_code__goto_755_16 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_179
     }
 
@@ -4513,8 +4543,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_186 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_188
     }
@@ -4524,7 +4554,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_188 {
-        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((1 as c_uint) +% ((((((unsafe __local_code__goto_755_16[2]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(2 + 1)]) as c_int)) as c_uint) as c_uint)) as usize))
+        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((1 as c_uint) +% (((((((unsafe __local_code__goto_755_16[2]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(2 + 1)]) as c_int) as c_int)) as c_uint) as c_uint)) as usize))
         goto '__ci_bb_189
     }
 
@@ -4537,7 +4567,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_190 {
-        (__local_code__goto_755_16 = __local_code__goto_755_16 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_189
     }
 
@@ -4553,7 +4583,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_192 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = (((((((__local_code__goto_755_16 as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) + 1) + 2) as c_int)))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_194
     }
@@ -4567,7 +4597,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_195 {
-        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((1 as c_uint) +% ((((((unsafe __local_code__goto_755_16[2]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(2 + 1)]) as c_int)) as c_uint) as c_uint)) as usize))
+        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((1 as c_uint) +% (((((((unsafe __local_code__goto_755_16[2]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(2 + 1)]) as c_int) as c_int)) as c_uint) as c_uint)) as usize))
         goto '__ci_bb_196
     }
 
@@ -4580,7 +4610,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_197 {
-        (__local_code__goto_755_16 = __local_code__goto_755_16 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_code__goto_755_16 = __local_code__goto_755_16 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_196
     }
 
@@ -4596,7 +4626,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_199 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = (((((((__local_code__goto_755_16 as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) + 1) + 2) as c_int)))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_201
     }
@@ -4612,7 +4642,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_202 {
         (__ci_expr_logic_34 = 0)
         if ((if __local_ptr__goto_545_12 == __local_start_subject__goto_553_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_34 = (if (if ((__param_mb.moptions as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_34 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_34 != 0) {
             goto '__ci_bb_203
@@ -4636,8 +4666,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_205 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_207
     }
@@ -4653,7 +4683,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_208 {
         (__ci_expr_logic_36 = 0)
         if ((if __local_ptr__goto_545_12 == __local_start_subject__goto_553_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_36 = (if (if ((__param_mb.moptions as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_36 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_36 != 0) {
             (__ci_expr_logic_44 = (if true: 1 else: 0))
@@ -4665,17 +4695,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             if ((if __local_ptr__goto_545_12 != __local_end_subject__goto_554_12: 1 else: 0) != 0) {
                 (__ci_expr_logic_37 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_37 = (if (if ((__param_mb.poptions as c_uint) & (2097152 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_37 = (if (if (((unsafe *__param_mb).poptions as c_uint) & (2097152 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_37 != 0) {
                 var __ci_expr_ternary_42: c_int = 0
 
-                if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+                if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                     var __ci_expr_logic_38: c_int = 0
 
-                    if ((if __local_ptr__goto_545_12 > __param_mb.start_subject: 1 else: 0) != 0) {
-                        (__ci_expr_logic_38 = (if _pcre2_was_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.start_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                    if ((if __local_ptr__goto_545_12 > (unsafe *__param_mb).start_subject: 1 else: 0) != 0) {
+                        (__ci_expr_logic_38 = (if _pcre2_was_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).start_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_ternary_42 = __ci_expr_logic_38)
@@ -4685,17 +4715,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                     var __ci_expr_logic_39: c_int = 0
 
-                    if ((if __local_ptr__goto_545_12 >= (__param_mb.start_subject + (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                        (__ci_expr_logic_39 = (if (if (unsafe *(__local_ptr__goto_545_12 - (__param_mb.nllen as usize))) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    if ((if __local_ptr__goto_545_12 >= ((unsafe *__param_mb).start_subject + ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                        (__ci_expr_logic_39 = (if (if (unsafe *(__local_ptr__goto_545_12 - ((unsafe *__param_mb).nllen as usize))) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_39 != 0) {
                         var __ci_expr_logic_40: c_int
 
-                        if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                        if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                             (__ci_expr_logic_40 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_40 = (if (if (unsafe *((__local_ptr__goto_545_12 - (__param_mb.nllen as usize)) + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_40 = (if (if (unsafe *((__local_ptr__goto_545_12 - ((unsafe *__param_mb).nllen as usize)) + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_logic_41 = (if __ci_expr_logic_40 != 0: 1 else: 0))
@@ -4735,8 +4765,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_211 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_213
     }
@@ -4758,7 +4788,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_215 {
-        if ((if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_217
         } else {
             goto '__ci_bb_218
@@ -4788,8 +4818,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_220 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_222
     }
@@ -4825,8 +4855,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_226 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_228
     }
@@ -4862,8 +4892,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_232 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_234
     }
@@ -4881,11 +4911,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             var __ci_expr_ternary_53: c_int = 0
 
-            if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+            if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_49: c_int = 0
 
-                if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_49 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                    (__ci_expr_logic_49 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_ternary_53 = __ci_expr_logic_49)
@@ -4895,17 +4925,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                 var __ci_expr_logic_50: c_int = 0
 
-                if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_50 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                    (__ci_expr_logic_50 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_50 != 0) {
                     var __ci_expr_logic_51: c_int
 
-                    if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                    if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                         (__ci_expr_logic_51 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_51 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_51 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_logic_52 = (if __ci_expr_logic_51 != 0: 1 else: 0))
@@ -4931,17 +4961,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__ci_expr_logic_57 = 0)
         (__ci_expr_logic_56 = 0)
         (__ci_expr_logic_55 = 0)
-        if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= __param_mb.end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_55 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+            (__ci_expr_logic_55 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_55 != 0) {
-            (__ci_expr_logic_56 = (if (if __param_mb.nltype == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_56 = (if (if (unsafe *__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_56 != 0) {
-            (__ci_expr_logic_57 = (if (if __param_mb.nllen == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_57 = (if (if (unsafe *__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_57 != 0) {
-            (__ci_expr_logic_58 = (if (if __local_c__goto_703_12 == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_58 = (if (if __local_c__goto_703_12 == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_58 != 0) {
             goto '__ci_bb_238
@@ -4955,7 +4985,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_238 {
-        (__local_partial_newline__goto_704_8 = 1)
+        (__local_partial_newline__goto_704_8 = ((1 as c_int)))
         (__local_could_continue__goto_705_8 = __local_partial_newline__goto_704_8)
         goto '__ci_bb_240
     }
@@ -4975,8 +5005,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_241 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_243
     }
@@ -5012,8 +5042,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_247 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_249
     }
@@ -5034,11 +5064,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
             var __ci_expr_ternary_65: c_int = 0
 
-            if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+            if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_61: c_int = 0
 
-                if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                    (__ci_expr_logic_61 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                    (__ci_expr_logic_61 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_ternary_65 = __ci_expr_logic_61)
@@ -5048,17 +5078,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                 var __ci_expr_logic_62: c_int = 0
 
-                if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_62 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                    (__ci_expr_logic_62 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_62 != 0) {
                     var __ci_expr_logic_63: c_int
 
-                    if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                    if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                         (__ci_expr_logic_63 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_63 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_63 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_logic_64 = (if __ci_expr_logic_63 != 0: 1 else: 0))
@@ -5070,7 +5100,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             }
 
             if (__ci_expr_ternary_65 != 0) {
-                (__ci_expr_logic_66 = (if (if __local_ptr__goto_545_12 == (__local_end_subject__goto_554_12 - (__param_mb.nllen as usize)): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_66 = (if (if __local_ptr__goto_545_12 == (__local_end_subject__goto_554_12 - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_67 = (if __ci_expr_logic_66 != 0: 1 else: 0))
@@ -5084,7 +5114,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_251 {
-        if ((if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_253
         } else {
             goto '__ci_bb_254
@@ -5110,8 +5140,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_255 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_257
     }
@@ -5125,7 +5155,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_258 {
-        if ((if ((__param_mb.moptions as c_uint) & (2 as c_uint)) == 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__param_mb).moptions as c_uint) & (2 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_259
         } else {
             goto '__ci_bb_260
@@ -5135,7 +5165,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_259 {
         (__ci_expr_logic_69 = 0)
         if ((if __local_clen__goto_702_7 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_69 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_69 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_69 != 0) {
             goto '__ci_bb_261
@@ -5149,7 +5179,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_261 {
-        (__local_could_continue__goto_705_8 = 1)
+        (__local_could_continue__goto_705_8 = ((1 as c_int)))
         goto '__ci_bb_263
     }
 
@@ -5161,14 +5191,14 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
             var __ci_expr_logic_75: c_int = 0
 
-            if ((if ((__param_mb.poptions as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
+            if ((if (((unsafe *__param_mb).poptions as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
                 var __ci_expr_ternary_74: c_int = 0
 
-                if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+                if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                     var __ci_expr_logic_70: c_int = 0
 
-                    if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                        (__ci_expr_logic_70 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                    if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                        (__ci_expr_logic_70 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_ternary_74 = __ci_expr_logic_70)
@@ -5178,17 +5208,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                     var __ci_expr_logic_71: c_int = 0
 
-                    if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                        (__ci_expr_logic_71 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                        (__ci_expr_logic_71 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_71 != 0) {
                         var __ci_expr_logic_72: c_int
 
-                        if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                        if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                             (__ci_expr_logic_72 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_72 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_72 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_logic_73 = (if __ci_expr_logic_72 != 0: 1 else: 0))
@@ -5204,7 +5234,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             }
 
             if (__ci_expr_logic_75 != 0) {
-                (__ci_expr_logic_76 = (if (if __local_ptr__goto_545_12 == (__local_end_subject__goto_554_12 - (__param_mb.nllen as usize)): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_76 = (if (if __local_ptr__goto_545_12 == (__local_end_subject__goto_554_12 - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_77 = (if __ci_expr_logic_76 != 0: 1 else: 0))
@@ -5236,17 +5266,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__ci_expr_logic_81 = 0)
         (__ci_expr_logic_80 = 0)
         (__ci_expr_logic_79 = 0)
-        if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= __param_mb.end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_79 = (if (if ((__param_mb.moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+            (__ci_expr_logic_79 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_79 != 0) {
-            (__ci_expr_logic_80 = (if (if __param_mb.nltype == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_80 = (if (if (unsafe *__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_80 != 0) {
-            (__ci_expr_logic_81 = (if (if __param_mb.nllen == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_81 = (if (if (unsafe *__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_81 != 0) {
-            (__ci_expr_logic_82 = (if (if __local_c__goto_703_12 == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_82 = (if (if __local_c__goto_703_12 == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_82 != 0) {
             goto '__ci_bb_270
@@ -5260,8 +5290,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_267 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_269
     }
@@ -5275,7 +5305,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_270 {
-        if ((if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_272
         } else {
             goto '__ci_bb_273
@@ -5287,7 +5317,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_272 {
-        (__local_reset_could_continue__goto_564_6 = 1)
+        (__local_reset_could_continue__goto_564_6 = ((1 as c_int)))
         (__ci_expr_old_83 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
         if ((if __ci_expr_old_83 < __local_wscount: 1 else: 0) != 0) {
@@ -5298,7 +5328,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_273 {
-        (__local_partial_newline__goto_704_8 = 1)
+        (__local_partial_newline__goto_704_8 = ((1 as c_int)))
         (__local_could_continue__goto_705_8 = __local_partial_newline__goto_704_8)
         goto '__ci_bb_274
     }
@@ -5308,9 +5338,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_275 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - (__local_state_offset__goto_757_9 + 1))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 1)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - (__local_state_offset__goto_757_9 + 1)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((1 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_277
     }
@@ -5324,7 +5354,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_278 {
-        if ((if ((__param_mb.moptions as c_uint) & (2 as c_uint)) == 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__param_mb).moptions as c_uint) & (2 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_279
         } else {
             goto '__ci_bb_280
@@ -5334,7 +5364,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_279 {
         (__ci_expr_logic_84 = 0)
         if ((if __local_clen__goto_702_7 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_84 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_84 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_84 != 0) {
             goto '__ci_bb_282
@@ -5345,11 +5375,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_280 {
         (__ci_expr_ternary_102 = 0)
-        if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
             var __ci_expr_logic_98: c_int = 0
 
-            if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                (__ci_expr_logic_98 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+            if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                (__ci_expr_logic_98 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
             }
 
             (__ci_expr_ternary_102 = __ci_expr_logic_98)
@@ -5359,17 +5389,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
             var __ci_expr_logic_99: c_int = 0
 
-            if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                (__ci_expr_logic_99 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+            if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                (__ci_expr_logic_99 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_99 != 0) {
                 var __ci_expr_logic_100: c_int
 
-                if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                     (__ci_expr_logic_100 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_100 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_100 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_logic_101 = (if __ci_expr_logic_100 != 0: 1 else: 0))
@@ -5391,7 +5421,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_282 {
-        (__local_could_continue__goto_705_8 = 1)
+        (__local_could_continue__goto_705_8 = ((1 as c_int)))
         goto '__ci_bb_284
     }
 
@@ -5401,14 +5431,14 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         } else {
             var __ci_expr_logic_90: c_int = 0
 
-            if ((if ((__param_mb.poptions as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
+            if ((if (((unsafe *__param_mb).poptions as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
                 var __ci_expr_ternary_89: c_int = 0
 
-                if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+                if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                     var __ci_expr_logic_85: c_int = 0
 
-                    if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                        (__ci_expr_logic_85 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                    if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                        (__ci_expr_logic_85 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                     }
 
                     (__ci_expr_ternary_89 = __ci_expr_logic_85)
@@ -5418,17 +5448,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                     var __ci_expr_logic_86: c_int = 0
 
-                    if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                        (__ci_expr_logic_86 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                    if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                        (__ci_expr_logic_86 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_86 != 0) {
                         var __ci_expr_logic_87: c_int
 
-                        if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                        if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                             (__ci_expr_logic_87 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_87 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_87 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_logic_88 = (if __ci_expr_logic_87 != 0: 1 else: 0))
@@ -5472,17 +5502,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__ci_expr_logic_95 = 0)
         (__ci_expr_logic_94 = 0)
         (__ci_expr_logic_93 = 0)
-        if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= __param_mb.end_subject: 1 else: 0) != 0) {
-            (__ci_expr_logic_93 = (if (if ((__param_mb.moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+            (__ci_expr_logic_93 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (((32 as c_uint) | (16 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_93 != 0) {
-            (__ci_expr_logic_94 = (if (if __param_mb.nltype == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_94 = (if (if (unsafe *__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_94 != 0) {
-            (__ci_expr_logic_95 = (if (if __param_mb.nllen == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_95 = (if (if (unsafe *__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_95 != 0) {
-            (__ci_expr_logic_96 = (if (if __local_c__goto_703_12 == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_96 = (if (if __local_c__goto_703_12 == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_96 != 0) {
             goto '__ci_bb_291
@@ -5496,8 +5526,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_288 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_290
     }
@@ -5511,7 +5541,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_291 {
-        if ((if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_293
         } else {
             goto '__ci_bb_294
@@ -5523,7 +5553,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_293 {
-        (__local_reset_could_continue__goto_564_6 = 1)
+        (__local_reset_could_continue__goto_564_6 = ((1 as c_int)))
         (__ci_expr_old_97 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
         if ((if __ci_expr_old_97 < __local_wscount: 1 else: 0) != 0) {
@@ -5534,7 +5564,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_294 {
-        (__local_partial_newline__goto_704_8 = 1)
+        (__local_partial_newline__goto_704_8 = ((1 as c_int)))
         (__local_could_continue__goto_705_8 = __local_partial_newline__goto_704_8)
         goto '__ci_bb_295
     }
@@ -5544,9 +5574,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_296 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - (__local_state_offset__goto_757_9 + 1))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 1)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - (__local_state_offset__goto_757_9 + 1)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((1 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_298
     }
@@ -5574,8 +5604,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_301 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_303
     }
@@ -5595,7 +5625,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             (__ci_expr_logic_104 = (if (if __local_c__goto_703_12 < 256: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_104 != 0) {
-            (__ci_expr_logic_105 = (if (if ((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_codevalue__goto_756_14] as c_int)) ^ (toptable2[__local_codevalue__goto_756_14] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_105 = (if (if ((((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) as c_int) & ((toptable1[__local_codevalue__goto_756_14] as c_int) as c_int)) as c_int) ^ ((toptable2[__local_codevalue__goto_756_14] as c_int) as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_105 != 0) {
             goto '__ci_bb_305
@@ -5619,8 +5649,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_307 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_309
     }
@@ -5641,7 +5671,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             if ((if __local_c__goto_703_12 >= 256: 1 else: 0) != 0) {
                 (__ci_expr_logic_107 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_107 = (if (if ((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_codevalue__goto_756_14] as c_int)) ^ (toptable2[__local_codevalue__goto_756_14] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_107 = (if (if ((((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) as c_int) & ((toptable1[__local_codevalue__goto_756_14] as c_int) as c_int)) as c_int) ^ ((toptable2[__local_codevalue__goto_756_14] as c_int) as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_108 = (if __ci_expr_logic_107 != 0: 1 else: 0))
@@ -5669,8 +5699,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_313 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_315
     }
@@ -5693,7 +5723,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_317 {
         (__local_temp__goto_1104_22 = __local_ptr__goto_545_12 - ((1 as isize) as usize))
-        if ((if __local_temp__goto_1104_22 < __param_mb.start_used_ptr: 1 else: 0) != 0) {
+        if ((if __local_temp__goto_1104_22 < (unsafe *__param_mb).start_used_ptr: 1 else: 0) != 0) {
             goto '__ci_bb_320
         } else {
             goto '__ci_bb_321
@@ -5701,7 +5731,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_318 {
-        (__local_left_word__goto_1100_13 = 0)
+        (__local_left_word__goto_1100_13 = ((0 as c_int)))
         goto '__ci_bb_319
     }
 
@@ -5731,7 +5761,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_323 {
-        (__local_d__goto_703_15 = (unsafe *__local_temp__goto_1104_22))
+        (__local_d__goto_703_15 = (((unsafe *__local_temp__goto_1104_22) as c_uint)))
         (__ci_expr_logic_110 = 0)
         if (__local_utf__goto_558_6 != 0) {
             (__ci_expr_logic_110 = (if (if __local_d__goto_703_15 >= 192: 1 else: 0) != 0: 1 else: 0))
@@ -5782,7 +5812,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_329 {
-        (__local_d__goto_703_15 = (((((__local_d__goto_703_15 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((__local_d__goto_703_15 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_331
     }
 
@@ -5799,7 +5829,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_332 {
-        (__local_d__goto_703_15 = (((((((__local_d__goto_703_15 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((((__local_d__goto_703_15 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_334
     }
 
@@ -5816,7 +5846,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_335 {
-        (__local_d__goto_703_15 = (((((((((__local_d__goto_703_15 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((((((__local_d__goto_703_15 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_337
     }
 
@@ -5833,12 +5863,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_338 {
-        (__local_d__goto_703_15 = (((((((((((__local_d__goto_703_15 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((((((((__local_d__goto_703_15 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_340
     }
 
     '__ci_bb_339 {
-        (__local_d__goto_703_15 = (((((((((((((__local_d__goto_703_15 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[5]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_d__goto_703_15 = ((((((((((((((((__local_d__goto_703_15 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_temp__goto_1104_22[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_temp__goto_1104_22[5]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
         goto '__ci_bb_340
     }
 
@@ -5847,8 +5877,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_341 {
-        (__local_chartype__goto_1114_17 = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_d__goto_703_15 as c_int) / 128)] as c_int) * 128) + ((__local_d__goto_703_15 as c_int) % 128))] as c_uint) as usize)).chartype)
-        (__local_category__goto_1115_17 = _pcre2_ucp_gentype_8[__local_chartype__goto_1114_17])
+        (__local_chartype__goto_1114_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_d__goto_703_15 as c_int) / 128)] as c_int) * 128) + ((__local_d__goto_703_15 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
+        (__local_category__goto_1115_17 = ((_pcre2_ucp_gentype_8[__local_chartype__goto_1114_17] as c_int)))
         if ((if __local_category__goto_1115_17 == ucp_L: 1 else: 0) != 0) {
             (__ci_expr_logic_112 = (if true: 1 else: 0))
         } else {
@@ -5871,7 +5901,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_342 {
         (__ci_expr_logic_115 = 0)
         if ((if __local_d__goto_703_15 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_115 = (if (if (((unsafe __local_ctypes__goto_544_16[__local_d__goto_703_15]) as c_int) & 16) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_115 = (if (if ((((unsafe __local_ctypes__goto_544_16[__local_d__goto_703_15]) as c_int) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         (__local_left_word__goto_1100_13 = __ci_expr_logic_115)
         goto '__ci_bb_343
@@ -5882,7 +5912,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_344 {
-        if ((if __local_ptr__goto_545_12 >= __param_mb.last_used_ptr: 1 else: 0) != 0) {
+        if ((if __local_ptr__goto_545_12 >= (unsafe *__param_mb).last_used_ptr: 1 else: 0) != 0) {
             goto '__ci_bb_347
         } else {
             goto '__ci_bb_348
@@ -5890,7 +5920,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_345 {
-        (__local_right_word__goto_1100_24 = 0)
+        (__local_right_word__goto_1100_24 = ((0 as c_int)))
         goto '__ci_bb_346
     }
 
@@ -5940,7 +5970,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_351 {
         (__ci_expr_logic_116 = 0)
-        if ((if __local_temp__goto_1129_24 < __param_mb.end_subject: 1 else: 0) != 0) {
+        if ((if __local_temp__goto_1129_24 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
             (__ci_expr_logic_116 = (if (if ((((unsafe *__local_temp__goto_1129_24) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_116 != 0) {
@@ -5960,8 +5990,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_354 {
-        (__local_chartype__goto_1139_17 = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).chartype)
-        (__local_category__goto_1140_17 = _pcre2_ucp_gentype_8[__local_chartype__goto_1139_17])
+        (__local_chartype__goto_1139_17 = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).chartype as c_int)))
+        (__local_category__goto_1140_17 = ((_pcre2_ucp_gentype_8[__local_chartype__goto_1139_17] as c_int)))
         if ((if __local_category__goto_1140_17 == ucp_L: 1 else: 0) != 0) {
             (__ci_expr_logic_118 = (if true: 1 else: 0))
         } else {
@@ -5984,7 +6014,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_355 {
         (__ci_expr_logic_121 = 0)
         if ((if __local_c__goto_703_12 < 256: 1 else: 0) != 0) {
-            (__ci_expr_logic_121 = (if (if (((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & 16) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_121 = (if (if ((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) as c_int) & (16 as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         (__local_right_word__goto_1100_24 = __ci_expr_logic_121)
         goto '__ci_bb_356
@@ -6009,8 +6039,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_359 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_361
     }
@@ -6057,7 +6087,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_367 {
-        (__local_chartype__goto_1169_13 = __local_prop__goto_1171_28.chartype)
+        (__local_chartype__goto_1169_13 = (((unsafe *__local_prop__goto_1171_28).chartype as c_int)))
         if ((if __local_chartype__goto_1169_13 == ucp_Lu: 1 else: 0) != 0) {
             (__ci_expr_logic_124 = (if true: 1 else: 0))
         } else {
@@ -6073,32 +6103,32 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_368 {
-        (__local_OK__goto_1168_14 = (if _pcre2_ucp_gentype_8[__local_prop__goto_1171_28.chartype] == (unsafe __local_code__goto_755_16[2]): 1 else: 0))
+        (__local_OK__goto_1168_14 = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop__goto_1171_28).chartype] == (unsafe __local_code__goto_755_16[2]): 1 else: 0) as c_int)))
         goto '__ci_bb_366
     }
 
     '__ci_bb_369 {
-        (__local_OK__goto_1168_14 = (if __local_prop__goto_1171_28.chartype == (unsafe __local_code__goto_755_16[2]): 1 else: 0))
+        (__local_OK__goto_1168_14 = (((if (unsafe *__local_prop__goto_1171_28).chartype == (unsafe __local_code__goto_755_16[2]): 1 else: 0) as c_int)))
         goto '__ci_bb_366
     }
 
     '__ci_bb_370 {
-        (__local_OK__goto_1168_14 = (if __local_prop__goto_1171_28.script == (unsafe __local_code__goto_755_16[2]): 1 else: 0))
+        (__local_OK__goto_1168_14 = (((if (unsafe *__local_prop__goto_1171_28).script == (unsafe __local_code__goto_755_16[2]): 1 else: 0) as c_int)))
         goto '__ci_bb_366
     }
 
     '__ci_bb_371 {
-        if ((if __local_prop__goto_1171_28.script == (unsafe __local_code__goto_755_16[2]): 1 else: 0) != 0) {
+        if ((if (unsafe *__local_prop__goto_1171_28).script == (unsafe __local_code__goto_755_16[2]): 1 else: 0) != 0) {
             (__ci_expr_logic_126 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_126 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((__local_prop__goto_1171_28.scriptx_bidiclass as c_int) & 1023) as isize) as usize))[(((unsafe __local_code__goto_755_16[2]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[2]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_126 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop__goto_1171_28).scriptx_bidiclass as c_int) as c_int) & (1023 as c_int)) as isize) as usize))[(((unsafe __local_code__goto_755_16[2]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[2]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         (__local_OK__goto_1168_14 = __ci_expr_logic_126)
         goto '__ci_bb_366
     }
 
     '__ci_bb_372 {
-        (__local_chartype__goto_1169_13 = __local_prop__goto_1171_28.chartype)
+        (__local_chartype__goto_1169_13 = (((unsafe *__local_prop__goto_1171_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1169_13] == 1: 1 else: 0) != 0) {
             (__ci_expr_logic_127 = (if true: 1 else: 0))
         } else {
@@ -6125,12 +6155,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_376 {
-        (__local_OK__goto_1168_14 = 1)
+        (__local_OK__goto_1168_14 = ((1 as c_int)))
         goto '__ci_bb_375
     }
 
     '__ci_bb_377 {
-        (__local_OK__goto_1168_14 = (if _pcre2_ucp_gentype_8[__local_prop__goto_1171_28.chartype] == 6: 1 else: 0))
+        (__local_OK__goto_1168_14 = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop__goto_1171_28).chartype] == 6: 1 else: 0) as c_int)))
         goto '__ci_bb_375
     }
 
@@ -6335,7 +6365,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_403 {
-        (__local_chartype__goto_1169_13 = __local_prop__goto_1171_28.chartype)
+        (__local_chartype__goto_1169_13 = (((unsafe *__local_prop__goto_1171_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1169_13] == 1: 1 else: 0) != 0) {
             (__ci_expr_logic_128 = (if true: 1 else: 0))
         } else {
@@ -6381,7 +6411,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_409 {
-        (__local_OK__goto_1168_14 = 0)
+        (__local_OK__goto_1168_14 = ((0 as c_int)))
         goto '__ci_bb_408
     }
 
@@ -6396,7 +6426,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_411 {
-        (__local_OK__goto_1168_14 = 1)
+        (__local_OK__goto_1168_14 = ((1 as c_int)))
         goto '__ci_bb_408
     }
 
@@ -6437,17 +6467,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_414 {
-        (__local_OK__goto_1168_14 = (if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe __local_code__goto_755_16[2]): 1 else: 0))
+        (__local_OK__goto_1168_14 = (((if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe __local_code__goto_755_16[2]): 1 else: 0) as c_int)))
         goto '__ci_bb_366
     }
 
     '__ci_bb_415 {
-        (__local_OK__goto_1168_14 = (if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((__local_prop__goto_1171_28.bprops as c_int) & 4095) as isize) as usize))[(((unsafe __local_code__goto_755_16[2]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[2]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0))
+        (__local_OK__goto_1168_14 = (((if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop__goto_1171_28).bprops as c_int) as c_int) & (4095 as c_int)) as isize) as usize))[(((unsafe __local_code__goto_755_16[2]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[2]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) as c_int)))
         goto '__ci_bb_366
     }
 
     '__ci_bb_416 {
-        (__local_OK__goto_1168_14 = (if __local_codevalue__goto_756_14 != 16: 1 else: 0))
+        (__local_OK__goto_1168_14 = (((if __local_codevalue__goto_756_14 != 16: 1 else: 0) as c_int)))
         goto '__ci_bb_366
     }
 
@@ -6562,8 +6592,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_431 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 3)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 3) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_433
     }
@@ -6577,7 +6607,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_434 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_435
         } else {
@@ -6604,8 +6634,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_437 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_439
     }
@@ -6625,19 +6655,19 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__ci_expr_logic_140 = 0)
         (__ci_expr_logic_139 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_139 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= __param_mb.end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_139 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (unsafe *__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_139 != 0) {
-            (__ci_expr_logic_140 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_140 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_140 != 0) {
-            (__ci_expr_logic_141 = (if (if __param_mb.nltype == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_141 = (if (if (unsafe *__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_141 != 0) {
-            (__ci_expr_logic_142 = (if (if __param_mb.nllen == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_142 = (if (if (unsafe *__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_142 != 0) {
-            (__ci_expr_logic_143 = (if (if __local_c__goto_703_12 == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_143 = (if (if __local_c__goto_703_12 == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_143 != 0) {
             goto '__ci_bb_442
@@ -6651,7 +6681,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_442 {
-        (__local_partial_newline__goto_704_8 = 1)
+        (__local_partial_newline__goto_704_8 = ((1 as c_int)))
         (__local_could_continue__goto_705_8 = __local_partial_newline__goto_704_8)
         goto '__ci_bb_444
     }
@@ -6684,11 +6714,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
                 } else {
                     var __ci_expr_ternary_151: c_int = 0
 
-                    if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+                    if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                         var __ci_expr_logic_147: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_147 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                            (__ci_expr_logic_147 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_ternary_151 = __ci_expr_logic_147)
@@ -6698,17 +6728,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                         var __ci_expr_logic_148: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_148 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                            (__ci_expr_logic_148 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         if (__ci_expr_logic_148 != 0) {
                             var __ci_expr_logic_149: c_int
 
-                            if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                            if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                                 (__ci_expr_logic_149 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_149 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_149 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
                             (__ci_expr_logic_150 = (if __ci_expr_logic_149 != 0: 1 else: 0))
@@ -6728,7 +6758,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             }
 
             if (__ci_expr_logic_153 != 0) {
-                (__ci_expr_logic_154 = (if (if ((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_154 = (if (if ((((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) as c_int) & ((toptable1[__local_d__goto_703_15] as c_int) as c_int)) as c_int) ^ ((toptable2[__local_d__goto_703_15] as c_int) as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_155 = (if __ci_expr_logic_154 != 0: 1 else: 0))
@@ -6804,8 +6834,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_453 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_455
     }
@@ -6829,19 +6859,19 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__ci_expr_logic_160 = 0)
         (__ci_expr_logic_159 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_159 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= __param_mb.end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_159 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (unsafe *__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_159 != 0) {
-            (__ci_expr_logic_160 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_160 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_160 != 0) {
-            (__ci_expr_logic_161 = (if (if __param_mb.nltype == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_161 = (if (if (unsafe *__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_161 != 0) {
-            (__ci_expr_logic_162 = (if (if __param_mb.nllen == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_162 = (if (if (unsafe *__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_162 != 0) {
-            (__ci_expr_logic_163 = (if (if __local_c__goto_703_12 == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_163 = (if (if __local_c__goto_703_12 == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_163 != 0) {
             goto '__ci_bb_458
@@ -6855,7 +6885,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_458 {
-        (__local_partial_newline__goto_704_8 = 1)
+        (__local_partial_newline__goto_704_8 = ((1 as c_int)))
         (__local_could_continue__goto_705_8 = __local_partial_newline__goto_704_8)
         goto '__ci_bb_460
     }
@@ -6888,11 +6918,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
                 } else {
                     var __ci_expr_ternary_171: c_int = 0
 
-                    if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+                    if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                         var __ci_expr_logic_167: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_167 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                            (__ci_expr_logic_167 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_ternary_171 = __ci_expr_logic_167)
@@ -6902,17 +6932,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                         var __ci_expr_logic_168: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_168 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                            (__ci_expr_logic_168 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         if (__ci_expr_logic_168 != 0) {
                             var __ci_expr_logic_169: c_int
 
-                            if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                            if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                                 (__ci_expr_logic_169 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_169 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_169 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
                             (__ci_expr_logic_170 = (if __ci_expr_logic_169 != 0: 1 else: 0))
@@ -6932,7 +6962,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             }
 
             if (__ci_expr_logic_173 != 0) {
-                (__ci_expr_logic_174 = (if (if ((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_174 = (if (if ((((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) as c_int) & ((toptable1[__local_d__goto_703_15] as c_int) as c_int)) as c_int) ^ ((toptable2[__local_d__goto_703_15] as c_int) as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_175 = (if __ci_expr_logic_174 != 0: 1 else: 0))
@@ -6978,8 +7008,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_465 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_467
     }
@@ -7003,8 +7033,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_469 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_471
     }
@@ -7028,19 +7058,19 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__ci_expr_logic_179 = 0)
         (__ci_expr_logic_178 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_178 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= __param_mb.end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_178 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (unsafe *__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_178 != 0) {
-            (__ci_expr_logic_179 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_179 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_179 != 0) {
-            (__ci_expr_logic_180 = (if (if __param_mb.nltype == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_180 = (if (if (unsafe *__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_180 != 0) {
-            (__ci_expr_logic_181 = (if (if __param_mb.nllen == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_181 = (if (if (unsafe *__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_181 != 0) {
-            (__ci_expr_logic_182 = (if (if __local_c__goto_703_12 == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_182 = (if (if __local_c__goto_703_12 == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_182 != 0) {
             goto '__ci_bb_474
@@ -7054,7 +7084,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_474 {
-        (__local_partial_newline__goto_704_8 = 1)
+        (__local_partial_newline__goto_704_8 = ((1 as c_int)))
         (__local_could_continue__goto_705_8 = __local_partial_newline__goto_704_8)
         goto '__ci_bb_476
     }
@@ -7087,11 +7117,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
                 } else {
                     var __ci_expr_ternary_190: c_int = 0
 
-                    if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+                    if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                         var __ci_expr_logic_186: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_186 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                            (__ci_expr_logic_186 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_ternary_190 = __ci_expr_logic_186)
@@ -7101,17 +7131,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                         var __ci_expr_logic_187: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_187 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                            (__ci_expr_logic_187 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         if (__ci_expr_logic_187 != 0) {
                             var __ci_expr_logic_188: c_int
 
-                            if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                            if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                                 (__ci_expr_logic_188 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_188 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_188 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
                             (__ci_expr_logic_189 = (if __ci_expr_logic_188 != 0: 1 else: 0))
@@ -7131,7 +7161,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             }
 
             if (__ci_expr_logic_192 != 0) {
-                (__ci_expr_logic_193 = (if (if ((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_193 = (if (if ((((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) as c_int) & ((toptable1[__local_d__goto_703_15] as c_int) as c_int)) as c_int) ^ ((toptable2[__local_d__goto_703_15] as c_int) as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_194 = (if __ci_expr_logic_193 != 0: 1 else: 0))
@@ -7178,7 +7208,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_481 {
         ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_483
     }
@@ -7192,7 +7222,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_484 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_485
         } else {
@@ -7207,19 +7237,19 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__ci_expr_logic_197 = 0)
         (__ci_expr_logic_196 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_196 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= __param_mb.end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_196 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (unsafe *__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_196 != 0) {
-            (__ci_expr_logic_197 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_197 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_197 != 0) {
-            (__ci_expr_logic_198 = (if (if __param_mb.nltype == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_198 = (if (if (unsafe *__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_198 != 0) {
-            (__ci_expr_logic_199 = (if (if __param_mb.nllen == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_199 = (if (if (unsafe *__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_199 != 0) {
-            (__ci_expr_logic_200 = (if (if __local_c__goto_703_12 == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_200 = (if (if __local_c__goto_703_12 == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_200 != 0) {
             goto '__ci_bb_487
@@ -7233,7 +7263,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_487 {
-        (__local_partial_newline__goto_704_8 = 1)
+        (__local_partial_newline__goto_704_8 = ((1 as c_int)))
         (__local_could_continue__goto_705_8 = __local_partial_newline__goto_704_8)
         goto '__ci_bb_489
     }
@@ -7266,11 +7296,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
                 } else {
                     var __ci_expr_ternary_208: c_int = 0
 
-                    if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+                    if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                         var __ci_expr_logic_204: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_204 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                            (__ci_expr_logic_204 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_ternary_208 = __ci_expr_logic_204)
@@ -7280,17 +7310,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                         var __ci_expr_logic_205: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_205 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                            (__ci_expr_logic_205 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         if (__ci_expr_logic_205 != 0) {
                             var __ci_expr_logic_206: c_int
 
-                            if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                            if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                                 (__ci_expr_logic_206 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_206 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_206 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
                             (__ci_expr_logic_207 = (if __ci_expr_logic_206 != 0: 1 else: 0))
@@ -7310,7 +7340,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             }
 
             if (__ci_expr_logic_210 != 0) {
-                (__ci_expr_logic_211 = (if (if ((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_211 = (if (if ((((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) as c_int) & ((toptable1[__local_d__goto_703_15] as c_int) as c_int)) as c_int) ^ ((toptable2[__local_d__goto_703_15] as c_int) as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_212 = (if __ci_expr_logic_211 != 0: 1 else: 0))
@@ -7329,7 +7359,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_490 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_492
         } else {
             goto '__ci_bb_493
@@ -7365,8 +7395,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_495 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = ((__local_state_offset__goto_757_9 + 1) + 2) + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((((__local_state_offset__goto_757_9 + 1) + 2) + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_497
     }
@@ -7405,8 +7435,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_502 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + 2) + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + 2) + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_504
     }
@@ -7416,7 +7446,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_504 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_505
         } else {
@@ -7431,19 +7461,19 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         (__ci_expr_logic_217 = 0)
         (__ci_expr_logic_216 = 0)
         if ((if __local_d__goto_703_15 == 12: 1 else: 0) != 0) {
-            (__ci_expr_logic_216 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= __param_mb.end_subject: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_216 = (if (if (__local_ptr__goto_545_12 + ((1 as isize) as usize)) >= (unsafe *__param_mb).end_subject: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_216 != 0) {
-            (__ci_expr_logic_217 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_217 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_217 != 0) {
-            (__ci_expr_logic_218 = (if (if __param_mb.nltype == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_218 = (if (if (unsafe *__param_mb).nltype == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_218 != 0) {
-            (__ci_expr_logic_219 = (if (if __param_mb.nllen == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_219 = (if (if (unsafe *__param_mb).nllen == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_219 != 0) {
-            (__ci_expr_logic_220 = (if (if __local_c__goto_703_12 == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_220 = (if (if __local_c__goto_703_12 == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_220 != 0) {
             goto '__ci_bb_507
@@ -7457,7 +7487,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_507 {
-        (__local_partial_newline__goto_704_8 = 1)
+        (__local_partial_newline__goto_704_8 = ((1 as c_int)))
         (__local_could_continue__goto_705_8 = __local_partial_newline__goto_704_8)
         goto '__ci_bb_509
     }
@@ -7490,11 +7520,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
                 } else {
                     var __ci_expr_ternary_228: c_int = 0
 
-                    if ((if __param_mb.nltype != 0: 1 else: 0) != 0) {
+                    if ((if (unsafe *__param_mb).nltype != 0: 1 else: 0) != 0) {
                         var __ci_expr_logic_224: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 < __param_mb.end_subject: 1 else: 0) != 0) {
-                            (__ci_expr_logic_224 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, __param_mb.nltype, __param_mb.end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 < (unsafe *__param_mb).end_subject: 1 else: 0) != 0) {
+                            (__ci_expr_logic_224 = (if _pcre2_is_newline_8(__local_ptr__goto_545_12, (unsafe *__param_mb).nltype, (unsafe *__param_mb).end_subject, ((&raw const (unsafe *__param_mb).nllen as *const c_uint) as *mut c_uint), __local_utf__goto_558_6) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_ternary_228 = __ci_expr_logic_224)
@@ -7504,17 +7534,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
                         var __ci_expr_logic_225: c_int = 0
 
-                        if ((if __local_ptr__goto_545_12 <= (__param_mb.end_subject - (__param_mb.nllen as usize)): 1 else: 0) != 0) {
-                            (__ci_expr_logic_225 = (if (if (unsafe *__local_ptr__goto_545_12) == __param_mb.nl[0]: 1 else: 0) != 0: 1 else: 0))
+                        if ((if __local_ptr__goto_545_12 <= ((unsafe *__param_mb).end_subject - ((unsafe *__param_mb).nllen as usize)): 1 else: 0) != 0) {
+                            (__ci_expr_logic_225 = (if (if (unsafe *__local_ptr__goto_545_12) == (unsafe *__param_mb).nl[0]: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         if (__ci_expr_logic_225 != 0) {
                             var __ci_expr_logic_226: c_int
 
-                            if ((if __param_mb.nllen == 1: 1 else: 0) != 0) {
+                            if ((if (unsafe *__param_mb).nllen == 1: 1 else: 0) != 0) {
                                 (__ci_expr_logic_226 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_226 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == __param_mb.nl[1]: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_226 = (if (if (unsafe *(__local_ptr__goto_545_12 + ((1 as isize) as usize))) == (unsafe *__param_mb).nl[1]: 1 else: 0) != 0: 1 else: 0))
                             }
 
                             (__ci_expr_logic_227 = (if __ci_expr_logic_226 != 0: 1 else: 0))
@@ -7534,7 +7564,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             }
 
             if (__ci_expr_logic_230 != 0) {
-                (__ci_expr_logic_231 = (if (if ((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) & (toptable1[__local_d__goto_703_15] as c_int)) ^ (toptable2[__local_d__goto_703_15] as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_231 = (if (if ((((((unsafe __local_ctypes__goto_544_16[__local_c__goto_703_12]) as c_int) as c_int) & ((toptable1[__local_d__goto_703_15] as c_int) as c_int)) as c_int) ^ ((toptable2[__local_d__goto_703_15] as c_int) as c_int)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_232 = (if __ci_expr_logic_231 != 0: 1 else: 0))
@@ -7571,7 +7601,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_513 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_514
         } else {
             goto '__ci_bb_515
@@ -7603,8 +7633,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_517 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = (__local_state_offset__goto_757_9 + 2) + 2)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = ((((__local_state_offset__goto_757_9 + 2) + 2) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_519
     }
@@ -7633,7 +7663,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_523 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_524
         } else {
@@ -7660,8 +7690,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_526 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 4)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 4) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_528
     }
@@ -7700,7 +7730,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_533 {
-        (__local_chartype__goto_1448_13 = __local_prop__goto_1450_28.chartype)
+        (__local_chartype__goto_1448_13 = (((unsafe *__local_prop__goto_1450_28).chartype as c_int)))
         if ((if __local_chartype__goto_1448_13 == ucp_Lu: 1 else: 0) != 0) {
             (__ci_expr_logic_236 = (if true: 1 else: 0))
         } else {
@@ -7716,32 +7746,32 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_534 {
-        (__local_OK__goto_1447_14 = (if _pcre2_ucp_gentype_8[__local_prop__goto_1450_28.chartype] == (unsafe __local_code__goto_755_16[3]): 1 else: 0))
+        (__local_OK__goto_1447_14 = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop__goto_1450_28).chartype] == (unsafe __local_code__goto_755_16[3]): 1 else: 0) as c_int)))
         goto '__ci_bb_532
     }
 
     '__ci_bb_535 {
-        (__local_OK__goto_1447_14 = (if __local_prop__goto_1450_28.chartype == (unsafe __local_code__goto_755_16[3]): 1 else: 0))
+        (__local_OK__goto_1447_14 = (((if (unsafe *__local_prop__goto_1450_28).chartype == (unsafe __local_code__goto_755_16[3]): 1 else: 0) as c_int)))
         goto '__ci_bb_532
     }
 
     '__ci_bb_536 {
-        (__local_OK__goto_1447_14 = (if __local_prop__goto_1450_28.script == (unsafe __local_code__goto_755_16[3]): 1 else: 0))
+        (__local_OK__goto_1447_14 = (((if (unsafe *__local_prop__goto_1450_28).script == (unsafe __local_code__goto_755_16[3]): 1 else: 0) as c_int)))
         goto '__ci_bb_532
     }
 
     '__ci_bb_537 {
-        if ((if __local_prop__goto_1450_28.script == (unsafe __local_code__goto_755_16[3]): 1 else: 0) != 0) {
+        if ((if (unsafe *__local_prop__goto_1450_28).script == (unsafe __local_code__goto_755_16[3]): 1 else: 0) != 0) {
             (__ci_expr_logic_238 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_238 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((__local_prop__goto_1450_28.scriptx_bidiclass as c_int) & 1023) as isize) as usize))[(((unsafe __local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_238 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop__goto_1450_28).scriptx_bidiclass as c_int) as c_int) & (1023 as c_int)) as isize) as usize))[(((unsafe __local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         (__local_OK__goto_1447_14 = __ci_expr_logic_238)
         goto '__ci_bb_532
     }
 
     '__ci_bb_538 {
-        (__local_chartype__goto_1448_13 = __local_prop__goto_1450_28.chartype)
+        (__local_chartype__goto_1448_13 = (((unsafe *__local_prop__goto_1450_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1448_13] == 1: 1 else: 0) != 0) {
             (__ci_expr_logic_239 = (if true: 1 else: 0))
         } else {
@@ -7768,12 +7798,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_542 {
-        (__local_OK__goto_1447_14 = 1)
+        (__local_OK__goto_1447_14 = ((1 as c_int)))
         goto '__ci_bb_541
     }
 
     '__ci_bb_543 {
-        (__local_OK__goto_1447_14 = (if _pcre2_ucp_gentype_8[__local_prop__goto_1450_28.chartype] == 6: 1 else: 0))
+        (__local_OK__goto_1447_14 = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop__goto_1450_28).chartype] == 6: 1 else: 0) as c_int)))
         goto '__ci_bb_541
     }
 
@@ -7978,7 +8008,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_569 {
-        (__local_chartype__goto_1448_13 = __local_prop__goto_1450_28.chartype)
+        (__local_chartype__goto_1448_13 = (((unsafe *__local_prop__goto_1450_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1448_13] == 1: 1 else: 0) != 0) {
             (__ci_expr_logic_240 = (if true: 1 else: 0))
         } else {
@@ -8024,7 +8054,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_575 {
-        (__local_OK__goto_1447_14 = 0)
+        (__local_OK__goto_1447_14 = ((0 as c_int)))
         goto '__ci_bb_574
     }
 
@@ -8039,7 +8069,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_577 {
-        (__local_OK__goto_1447_14 = 1)
+        (__local_OK__goto_1447_14 = ((1 as c_int)))
         goto '__ci_bb_574
     }
 
@@ -8080,17 +8110,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_580 {
-        (__local_OK__goto_1447_14 = (if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe __local_code__goto_755_16[3]): 1 else: 0))
+        (__local_OK__goto_1447_14 = (((if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe __local_code__goto_755_16[3]): 1 else: 0) as c_int)))
         goto '__ci_bb_532
     }
 
     '__ci_bb_581 {
-        (__local_OK__goto_1447_14 = (if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((__local_prop__goto_1450_28.bprops as c_int) & 4095) as isize) as usize))[(((unsafe __local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0))
+        (__local_OK__goto_1447_14 = (((if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop__goto_1450_28).bprops as c_int) as c_int) & (4095 as c_int)) as isize) as usize))[(((unsafe __local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) as c_int)))
         goto '__ci_bb_532
     }
 
     '__ci_bb_582 {
-        (__local_OK__goto_1447_14 = (if __local_codevalue__goto_756_14 != 16: 1 else: 0))
+        (__local_OK__goto_1447_14 = (((if __local_codevalue__goto_756_14 != 16: 1 else: 0) as c_int)))
         goto '__ci_bb_532
     }
 
@@ -8239,7 +8269,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_602 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_603
         } else {
@@ -8266,8 +8296,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_605 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_607
     }
@@ -8281,7 +8311,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_608 {
-        (__local_ncount__goto_1568_13 = 0)
+        (__local_ncount__goto_1568_13 = ((0 as c_int)))
         (__ci_expr_logic_252 = 0)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             (__ci_expr_logic_252 = (if (if __local_codevalue__goto_756_14 == 415: 1 else: 0) != 0: 1 else: 0))
@@ -8304,7 +8334,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_611 {
-        _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), __param_mb.start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_1568_13 as *mut c_int))
+        _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), (unsafe *__param_mb).start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_1568_13 as *mut c_int))
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
         (__ci_expr_old_253 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
@@ -8316,7 +8346,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_612 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_state_offset__goto_757_9)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_state_offset__goto_757_9) as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).count = __local_count__goto_759_9)
         ((unsafe *__local_next_new_state__goto_543_33).data = __local_ncount__goto_1568_13)
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
@@ -8332,7 +8362,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_615 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_616
         } else {
@@ -8359,8 +8389,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_618 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_620
     }
@@ -8374,7 +8404,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_621 {
-        (__local_ncount__goto_1590_13 = 0)
+        (__local_ncount__goto_1590_13 = ((0 as c_int)))
         goto '__ci_bb_623
     }
 
@@ -8395,7 +8425,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_625 {
-        if ((if __param_mb.bsr_convention == 2: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_mb).bsr_convention == 2: 1 else: 0) != 0) {
             goto '__ci_bb_626
         } else {
             goto '__ci_bb_627
@@ -8435,7 +8465,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_630 {
-        (__local_ncount__goto_1590_13 = 1)
+        (__local_ncount__goto_1590_13 = ((1 as c_int)))
         goto '__ci_bb_631
     }
 
@@ -8461,7 +8491,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_634 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_state_offset__goto_757_9)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_state_offset__goto_757_9) as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).count = __local_count__goto_759_9)
         ((unsafe *__local_next_new_state__goto_543_33).data = __local_ncount__goto_1590_13)
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
@@ -8529,7 +8559,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_644 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_645
         } else {
@@ -8556,8 +8586,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_647 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_649
     }
@@ -8595,12 +8625,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_654 {
-        (__local_OK__goto_1632_14 = 1)
+        (__local_OK__goto_1632_14 = ((1 as c_int)))
         goto '__ci_bb_653
     }
 
     '__ci_bb_655 {
-        (__local_OK__goto_1632_14 = 0)
+        (__local_OK__goto_1632_14 = ((0 as c_int)))
         goto '__ci_bb_653
     }
 
@@ -8686,9 +8716,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_666 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_state_offset__goto_757_9)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_state_offset__goto_757_9) as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).count = __local_count__goto_759_9)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_668
     }
@@ -8702,7 +8732,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_669 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_670
         } else {
@@ -8729,8 +8759,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_672 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_674
     }
@@ -8768,12 +8798,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_679 {
-        (__local_OK__goto_1665_14 = 1)
+        (__local_OK__goto_1665_14 = ((1 as c_int)))
         goto '__ci_bb_678
     }
 
     '__ci_bb_680 {
-        (__local_OK__goto_1665_14 = 0)
+        (__local_OK__goto_1665_14 = ((0 as c_int)))
         goto '__ci_bb_678
     }
 
@@ -8955,9 +8985,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_703 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_state_offset__goto_757_9)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_state_offset__goto_757_9) as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).count = __local_count__goto_759_9)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_705
     }
@@ -8971,7 +9001,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_706 {
-        (__local_count__goto_759_9 = 4)
+        (__local_count__goto_759_9 = ((4 as c_int)))
         goto '__ci_bb_707
     }
 
@@ -8986,13 +9016,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_708 {
-        (__local_count__goto_759_9 = 0)
+        (__local_count__goto_759_9 = ((0 as c_int)))
         goto '__ci_bb_707
     }
 
     '__ci_bb_709 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 4)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 4) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_711
     }
@@ -9035,7 +9065,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_716 {
-        (__local_chartype__goto_1709_13 = __local_prop__goto_1711_28.chartype)
+        (__local_chartype__goto_1709_13 = (((unsafe *__local_prop__goto_1711_28).chartype as c_int)))
         if ((if __local_chartype__goto_1709_13 == ucp_Lu: 1 else: 0) != 0) {
             (__ci_expr_logic_265 = (if true: 1 else: 0))
         } else {
@@ -9051,32 +9081,32 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_717 {
-        (__local_OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[__local_prop__goto_1711_28.chartype] == (unsafe __local_code__goto_755_16[3]): 1 else: 0))
+        (__local_OK__goto_1708_14 = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop__goto_1711_28).chartype] == (unsafe __local_code__goto_755_16[3]): 1 else: 0) as c_int)))
         goto '__ci_bb_715
     }
 
     '__ci_bb_718 {
-        (__local_OK__goto_1708_14 = (if __local_prop__goto_1711_28.chartype == (unsafe __local_code__goto_755_16[3]): 1 else: 0))
+        (__local_OK__goto_1708_14 = (((if (unsafe *__local_prop__goto_1711_28).chartype == (unsafe __local_code__goto_755_16[3]): 1 else: 0) as c_int)))
         goto '__ci_bb_715
     }
 
     '__ci_bb_719 {
-        (__local_OK__goto_1708_14 = (if __local_prop__goto_1711_28.script == (unsafe __local_code__goto_755_16[3]): 1 else: 0))
+        (__local_OK__goto_1708_14 = (((if (unsafe *__local_prop__goto_1711_28).script == (unsafe __local_code__goto_755_16[3]): 1 else: 0) as c_int)))
         goto '__ci_bb_715
     }
 
     '__ci_bb_720 {
-        if ((if __local_prop__goto_1711_28.script == (unsafe __local_code__goto_755_16[3]): 1 else: 0) != 0) {
+        if ((if (unsafe *__local_prop__goto_1711_28).script == (unsafe __local_code__goto_755_16[3]): 1 else: 0) != 0) {
             (__ci_expr_logic_267 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_267 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((__local_prop__goto_1711_28.scriptx_bidiclass as c_int) & 1023) as isize) as usize))[(((unsafe __local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_267 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop__goto_1711_28).scriptx_bidiclass as c_int) as c_int) & (1023 as c_int)) as isize) as usize))[(((unsafe __local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         (__local_OK__goto_1708_14 = __ci_expr_logic_267)
         goto '__ci_bb_715
     }
 
     '__ci_bb_721 {
-        (__local_chartype__goto_1709_13 = __local_prop__goto_1711_28.chartype)
+        (__local_chartype__goto_1709_13 = (((unsafe *__local_prop__goto_1711_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
             (__ci_expr_logic_268 = (if true: 1 else: 0))
         } else {
@@ -9103,12 +9133,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_725 {
-        (__local_OK__goto_1708_14 = 1)
+        (__local_OK__goto_1708_14 = ((1 as c_int)))
         goto '__ci_bb_724
     }
 
     '__ci_bb_726 {
-        (__local_OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[__local_prop__goto_1711_28.chartype] == 6: 1 else: 0))
+        (__local_OK__goto_1708_14 = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop__goto_1711_28).chartype] == 6: 1 else: 0) as c_int)))
         goto '__ci_bb_724
     }
 
@@ -9313,7 +9343,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_752 {
-        (__local_chartype__goto_1709_13 = __local_prop__goto_1711_28.chartype)
+        (__local_chartype__goto_1709_13 = (((unsafe *__local_prop__goto_1711_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
             (__ci_expr_logic_269 = (if true: 1 else: 0))
         } else {
@@ -9359,7 +9389,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_758 {
-        (__local_OK__goto_1708_14 = 0)
+        (__local_OK__goto_1708_14 = ((0 as c_int)))
         goto '__ci_bb_757
     }
 
@@ -9374,7 +9404,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_760 {
-        (__local_OK__goto_1708_14 = 1)
+        (__local_OK__goto_1708_14 = ((1 as c_int)))
         goto '__ci_bb_757
     }
 
@@ -9415,17 +9445,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_763 {
-        (__local_OK__goto_1708_14 = (if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe __local_code__goto_755_16[3]): 1 else: 0))
+        (__local_OK__goto_1708_14 = (((if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe __local_code__goto_755_16[3]): 1 else: 0) as c_int)))
         goto '__ci_bb_715
     }
 
     '__ci_bb_764 {
-        (__local_OK__goto_1708_14 = (if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((__local_prop__goto_1711_28.bprops as c_int) & 4095) as isize) as usize))[(((unsafe __local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0))
+        (__local_OK__goto_1708_14 = (((if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop__goto_1711_28).bprops as c_int) as c_int) & (4095 as c_int)) as isize) as usize))[(((unsafe __local_code__goto_755_16[3]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[3]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) as c_int)))
         goto '__ci_bb_715
     }
 
     '__ci_bb_765 {
-        (__local_OK__goto_1708_14 = (if __local_codevalue__goto_756_14 != 16: 1 else: 0))
+        (__local_OK__goto_1708_14 = (((if __local_codevalue__goto_756_14 != 16: 1 else: 0) as c_int)))
         goto '__ci_bb_715
     }
 
@@ -9559,8 +9589,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_782 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + __local_count__goto_759_9)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + __local_count__goto_759_9) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_784
     }
@@ -9574,7 +9604,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_785 {
-        (__local_count__goto_759_9 = 2)
+        (__local_count__goto_759_9 = ((2 as c_int)))
         goto '__ci_bb_786
     }
 
@@ -9589,13 +9619,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_787 {
-        (__local_count__goto_759_9 = 0)
+        (__local_count__goto_759_9 = ((0 as c_int)))
         goto '__ci_bb_786
     }
 
     '__ci_bb_788 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_790
     }
@@ -9613,7 +9643,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_791 {
-        (__local_ncount__goto_1838_13 = 0)
+        (__local_ncount__goto_1838_13 = ((0 as c_int)))
         if ((if __local_codevalue__goto_756_14 == 414: 1 else: 0) != 0) {
             (__ci_expr_logic_281 = (if true: 1 else: 0))
         } else {
@@ -9637,7 +9667,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_794 {
-        _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), __param_mb.start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_1838_13 as *mut c_int))
+        _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), (unsafe *__param_mb).start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_1838_13 as *mut c_int))
         (__ci_expr_old_282 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
         if ((if __ci_expr_old_282 < __local_wscount: 1 else: 0) != 0) {
@@ -9648,8 +9678,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_795 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - (__local_state_offset__goto_757_9 + __local_count__goto_759_9))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - (__local_state_offset__goto_757_9 + __local_count__goto_759_9)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = __local_ncount__goto_1838_13)
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_797
@@ -9664,7 +9694,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_798 {
-        (__local_count__goto_759_9 = 2)
+        (__local_count__goto_759_9 = ((2 as c_int)))
         goto '__ci_bb_799
     }
 
@@ -9679,13 +9709,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_800 {
-        (__local_count__goto_759_9 = 0)
+        (__local_count__goto_759_9 = ((0 as c_int)))
         goto '__ci_bb_799
     }
 
     '__ci_bb_801 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_803
     }
@@ -9703,7 +9733,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_804 {
-        (__local_ncount__goto_1868_13 = 0)
+        (__local_ncount__goto_1868_13 = ((0 as c_int)))
         goto '__ci_bb_806
     }
 
@@ -9724,7 +9754,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_808 {
-        if ((if __param_mb.bsr_convention == 2: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_mb).bsr_convention == 2: 1 else: 0) != 0) {
             goto '__ci_bb_809
         } else {
             goto '__ci_bb_810
@@ -9765,7 +9795,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_813 {
-        (__local_ncount__goto_1868_13 = 1)
+        (__local_ncount__goto_1868_13 = ((1 as c_int)))
         goto '__ci_bb_814
     }
 
@@ -9790,8 +9820,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_817 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - (__local_state_offset__goto_757_9 + __local_count__goto_759_9))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - (__local_state_offset__goto_757_9 + __local_count__goto_759_9)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = __local_ncount__goto_1868_13)
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_819
@@ -9858,7 +9888,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_827 {
-        (__local_count__goto_759_9 = 2)
+        (__local_count__goto_759_9 = ((2 as c_int)))
         goto '__ci_bb_828
     }
 
@@ -9873,13 +9903,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_829 {
-        (__local_count__goto_759_9 = 0)
+        (__local_count__goto_759_9 = ((0 as c_int)))
         goto '__ci_bb_828
     }
 
     '__ci_bb_830 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_832
     }
@@ -9921,12 +9951,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_837 {
-        (__local_OK__goto_1918_14 = 1)
+        (__local_OK__goto_1918_14 = ((1 as c_int)))
         goto '__ci_bb_836
     }
 
     '__ci_bb_838 {
-        (__local_OK__goto_1918_14 = 0)
+        (__local_OK__goto_1918_14 = ((0 as c_int)))
         goto '__ci_bb_836
     }
 
@@ -10012,9 +10042,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_849 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - (__local_state_offset__goto_757_9 + __local_count__goto_759_9))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - (__local_state_offset__goto_757_9 + __local_count__goto_759_9)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_851
     }
@@ -10028,7 +10058,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_852 {
-        (__local_count__goto_759_9 = 2)
+        (__local_count__goto_759_9 = ((2 as c_int)))
         goto '__ci_bb_853
     }
 
@@ -10043,13 +10073,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_854 {
-        (__local_count__goto_759_9 = 0)
+        (__local_count__goto_759_9 = ((0 as c_int)))
         goto '__ci_bb_853
     }
 
     '__ci_bb_855 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_857
     }
@@ -10091,12 +10121,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_862 {
-        (__local_OK__goto_1958_14 = 1)
+        (__local_OK__goto_1958_14 = ((1 as c_int)))
         goto '__ci_bb_861
     }
 
     '__ci_bb_863 {
-        (__local_OK__goto_1958_14 = 0)
+        (__local_OK__goto_1958_14 = ((0 as c_int)))
         goto '__ci_bb_861
     }
 
@@ -10278,9 +10308,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_886 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - (__local_state_offset__goto_757_9 + __local_count__goto_759_9))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - (__local_state_offset__goto_757_9 + __local_count__goto_759_9)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_888
     }
@@ -10312,7 +10342,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_891 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_895
         } else {
@@ -10321,8 +10351,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_892 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = ((__local_state_offset__goto_757_9 + 1) + 2) + 3)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((((__local_state_offset__goto_757_9 + 1) + 2) + 3) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_894
     }
@@ -10361,7 +10391,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_899 {
-        (__local_chartype__goto_1995_13 = __local_prop__goto_1997_28.chartype)
+        (__local_chartype__goto_1995_13 = (((unsafe *__local_prop__goto_1997_28).chartype as c_int)))
         if ((if __local_chartype__goto_1995_13 == ucp_Lu: 1 else: 0) != 0) {
             (__ci_expr_logic_294 = (if true: 1 else: 0))
         } else {
@@ -10377,32 +10407,32 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_900 {
-        (__local_OK__goto_1994_14 = (if _pcre2_ucp_gentype_8[__local_prop__goto_1997_28.chartype] == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0))
+        (__local_OK__goto_1994_14 = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop__goto_1997_28).chartype] == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) as c_int)))
         goto '__ci_bb_898
     }
 
     '__ci_bb_901 {
-        (__local_OK__goto_1994_14 = (if __local_prop__goto_1997_28.chartype == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0))
+        (__local_OK__goto_1994_14 = (((if (unsafe *__local_prop__goto_1997_28).chartype == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) as c_int)))
         goto '__ci_bb_898
     }
 
     '__ci_bb_902 {
-        (__local_OK__goto_1994_14 = (if __local_prop__goto_1997_28.script == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0))
+        (__local_OK__goto_1994_14 = (((if (unsafe *__local_prop__goto_1997_28).script == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) as c_int)))
         goto '__ci_bb_898
     }
 
     '__ci_bb_903 {
-        if ((if __local_prop__goto_1997_28.script == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) != 0) {
+        if ((if (unsafe *__local_prop__goto_1997_28).script == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) != 0) {
             (__ci_expr_logic_296 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_296 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((__local_prop__goto_1997_28.scriptx_bidiclass as c_int) & 1023) as isize) as usize))[(((unsafe __local_code__goto_755_16[((1 + 2) + 2)]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[((1 + 2) + 2)]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_296 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop__goto_1997_28).scriptx_bidiclass as c_int) as c_int) & (1023 as c_int)) as isize) as usize))[(((unsafe __local_code__goto_755_16[((1 + 2) + 2)]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[((1 + 2) + 2)]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         (__local_OK__goto_1994_14 = __ci_expr_logic_296)
         goto '__ci_bb_898
     }
 
     '__ci_bb_904 {
-        (__local_chartype__goto_1995_13 = __local_prop__goto_1997_28.chartype)
+        (__local_chartype__goto_1995_13 = (((unsafe *__local_prop__goto_1997_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
             (__ci_expr_logic_297 = (if true: 1 else: 0))
         } else {
@@ -10429,12 +10459,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_908 {
-        (__local_OK__goto_1994_14 = 1)
+        (__local_OK__goto_1994_14 = ((1 as c_int)))
         goto '__ci_bb_907
     }
 
     '__ci_bb_909 {
-        (__local_OK__goto_1994_14 = (if _pcre2_ucp_gentype_8[__local_prop__goto_1997_28.chartype] == 6: 1 else: 0))
+        (__local_OK__goto_1994_14 = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop__goto_1997_28).chartype] == 6: 1 else: 0) as c_int)))
         goto '__ci_bb_907
     }
 
@@ -10639,7 +10669,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_935 {
-        (__local_chartype__goto_1995_13 = __local_prop__goto_1997_28.chartype)
+        (__local_chartype__goto_1995_13 = (((unsafe *__local_prop__goto_1997_28).chartype as c_int)))
         if ((if _pcre2_ucp_gentype_8[__local_chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
             (__ci_expr_logic_298 = (if true: 1 else: 0))
         } else {
@@ -10685,7 +10715,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_941 {
-        (__local_OK__goto_1994_14 = 0)
+        (__local_OK__goto_1994_14 = ((0 as c_int)))
         goto '__ci_bb_940
     }
 
@@ -10700,7 +10730,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_943 {
-        (__local_OK__goto_1994_14 = 1)
+        (__local_OK__goto_1994_14 = ((1 as c_int)))
         goto '__ci_bb_940
     }
 
@@ -10741,17 +10771,17 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_946 {
-        (__local_OK__goto_1994_14 = (if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0))
+        (__local_OK__goto_1994_14 = (((if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_703_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_703_12 as c_int) % 128))] as c_uint) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe __local_code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) as c_int)))
         goto '__ci_bb_898
     }
 
     '__ci_bb_947 {
-        (__local_OK__goto_1994_14 = (if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((__local_prop__goto_1997_28.bprops as c_int) & 4095) as isize) as usize))[(((unsafe __local_code__goto_755_16[((1 + 2) + 2)]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[((1 + 2) + 2)]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0))
+        (__local_OK__goto_1994_14 = (((if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop__goto_1997_28).bprops as c_int) as c_int) & (4095 as c_int)) as isize) as usize))[(((unsafe __local_code__goto_755_16[((1 + 2) + 2)]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_code__goto_755_16[((1 + 2) + 2)]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) as c_int)))
         goto '__ci_bb_898
     }
 
     '__ci_bb_948 {
-        (__local_OK__goto_1994_14 = (if __local_codevalue__goto_756_14 != 16: 1 else: 0))
+        (__local_OK__goto_1994_14 = (((if __local_codevalue__goto_756_14 != 16: 1 else: 0) as c_int)))
         goto '__ci_bb_898
     }
 
@@ -10871,7 +10901,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_964 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_965
         } else {
             goto '__ci_bb_966
@@ -10903,8 +10933,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_968 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = ((__local_state_offset__goto_757_9 + 1) + 2) + 3)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((((__local_state_offset__goto_757_9 + 1) + 2) + 3) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_970
     }
@@ -10951,7 +10981,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_976 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_980
         } else {
@@ -10960,8 +10990,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_977 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + 2) + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + 2) + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_979
     }
@@ -10975,7 +11005,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_980 {
-        (__local_ncount__goto_2121_13 = 0)
+        (__local_ncount__goto_2121_13 = ((0 as c_int)))
         if ((if __local_codevalue__goto_756_14 == 417: 1 else: 0) != 0) {
             goto '__ci_bb_982
         } else {
@@ -10994,10 +11024,10 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_983 {
-        (__local_nptr__goto_2120_20 = _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), __param_mb.start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_2121_13 as *mut c_int)))
+        (__local_nptr__goto_2120_20 = _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), (unsafe *__param_mb).start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_2121_13 as *mut c_int)))
         (__ci_expr_logic_310 = 0)
         if ((if __local_nptr__goto_2120_20 >= __local_end_subject__goto_554_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_310 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_310 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_310 != 0) {
             goto '__ci_bb_984
@@ -11007,13 +11037,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_984 {
-        (__local_reset_could_continue__goto_564_6 = 1)
+        (__local_reset_could_continue__goto_564_6 = ((1 as c_int)))
         goto '__ci_bb_985
     }
 
     '__ci_bb_985 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_986
         } else {
             goto '__ci_bb_987
@@ -11045,8 +11075,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_989 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - ((__local_state_offset__goto_757_9 + 2) + 2))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - ((__local_state_offset__goto_757_9 + 2) + 2)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = __local_ncount__goto_2121_13)
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_991
@@ -11061,7 +11091,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_992 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_state_offset__goto_757_9)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_state_offset__goto_757_9) as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).count = __local_count__goto_759_9)
         ((unsafe *__local_next_new_state__goto_543_33).data = __local_ncount__goto_2121_13)
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
@@ -11095,7 +11125,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_997 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_1001
         } else {
@@ -11104,8 +11134,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_998 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + 2) + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + 2) + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1000
     }
@@ -11119,7 +11149,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1001 {
-        (__local_ncount__goto_2149_13 = 0)
+        (__local_ncount__goto_2149_13 = ((0 as c_int)))
         goto '__ci_bb_1003
     }
 
@@ -11140,7 +11170,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1005 {
-        if ((if __param_mb.bsr_convention == 2: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_mb).bsr_convention == 2: 1 else: 0) != 0) {
             goto '__ci_bb_1006
         } else {
             goto '__ci_bb_1007
@@ -11176,7 +11206,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1010 {
-        (__local_ncount__goto_2149_13 = 1)
+        (__local_ncount__goto_2149_13 = ((1 as c_int)))
         goto '__ci_bb_1011
     }
 
@@ -11192,7 +11222,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1013 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_1014
         } else {
             goto '__ci_bb_1015
@@ -11224,8 +11254,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1017 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - ((__local_state_offset__goto_757_9 + 2) + 2))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - ((__local_state_offset__goto_757_9 + 2) + 2)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = __local_ncount__goto_2149_13)
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1019
@@ -11240,7 +11270,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1020 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_state_offset__goto_757_9)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_state_offset__goto_757_9) as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).count = __local_count__goto_759_9)
         ((unsafe *__local_next_new_state__goto_543_33).data = __local_ncount__goto_2149_13)
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
@@ -11326,7 +11356,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1032 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_1036
         } else {
@@ -11335,8 +11365,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1033 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + 2) + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + 2) + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1035
     }
@@ -11374,12 +11404,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1040 {
-        (__local_OK__goto_2195_14 = 1)
+        (__local_OK__goto_2195_14 = ((1 as c_int)))
         goto '__ci_bb_1039
     }
 
     '__ci_bb_1041 {
-        (__local_OK__goto_2195_14 = 0)
+        (__local_OK__goto_2195_14 = ((0 as c_int)))
         goto '__ci_bb_1039
     }
 
@@ -11451,7 +11481,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1051 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_1052
         } else {
             goto '__ci_bb_1053
@@ -11483,9 +11513,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1055 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - ((__local_state_offset__goto_757_9 + 2) + 2))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - ((__local_state_offset__goto_757_9 + 2) + 2)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1057
     }
@@ -11499,9 +11529,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1058 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_state_offset__goto_757_9)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_state_offset__goto_757_9) as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).count = __local_count__goto_759_9)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1060
     }
@@ -11533,7 +11563,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1063 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_1067
         } else {
@@ -11542,8 +11572,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1064 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + 2) + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + 2) + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1066
     }
@@ -11581,12 +11611,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1071 {
-        (__local_OK__goto_2231_14 = 1)
+        (__local_OK__goto_2231_14 = ((1 as c_int)))
         goto '__ci_bb_1070
     }
 
     '__ci_bb_1072 {
-        (__local_OK__goto_2231_14 = 0)
+        (__local_OK__goto_2231_14 = ((0 as c_int)))
         goto '__ci_bb_1070
     }
 
@@ -11754,7 +11784,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1094 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_1095
         } else {
             goto '__ci_bb_1096
@@ -11786,9 +11816,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1098 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - ((__local_state_offset__goto_757_9 + 2) + 2))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - ((__local_state_offset__goto_757_9 + 2) + 2)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1100
     }
@@ -11802,9 +11832,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1101 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_state_offset__goto_757_9)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_state_offset__goto_757_9) as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).count = __local_count__goto_759_9)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1103
     }
@@ -11844,8 +11874,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1107 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = (__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = ((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1109
     }
@@ -11921,8 +11951,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1119 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = (__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = ((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1121
     }
@@ -11936,7 +11966,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1122 {
-        (__local_othercase__goto_2278_24 = (unsafe __local_fcc__goto_544_31[__local_c__goto_703_12]))
+        (__local_othercase__goto_2278_24 = (((unsafe __local_fcc__goto_544_31[__local_c__goto_703_12]) as c_uint)))
         goto '__ci_bb_1124
     }
 
@@ -11968,8 +11998,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1127 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = (__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = ((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1129
     }
@@ -11997,8 +12027,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1132 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 2)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 2) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1134
     }
@@ -12020,11 +12050,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1136 {
-        (__local_ncount__goto_2305_13 = 0)
-        (__local_nptr__goto_2306_20 = _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), __param_mb.start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_2305_13 as *mut c_int)))
+        (__local_ncount__goto_2305_13 = ((0 as c_int)))
+        (__local_nptr__goto_2306_20 = _pcre2_extuni_8(__local_c__goto_703_12, (__local_ptr__goto_545_12 + ((__local_clen__goto_702_7 as isize) as usize)), (unsafe *__param_mb).start_subject, __local_end_subject__goto_554_12, __local_utf__goto_558_6, (&raw mut __local_ncount__goto_2305_13 as *mut c_int)))
         (__ci_expr_logic_328 = 0)
         if ((if __local_nptr__goto_2306_20 >= __local_end_subject__goto_554_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_328 = (if (if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_328 = (if (if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_328 != 0) {
             goto '__ci_bb_1138
@@ -12038,7 +12068,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1138 {
-        (__local_reset_could_continue__goto_564_6 = 1)
+        (__local_reset_could_continue__goto_564_6 = ((1 as c_int)))
         goto '__ci_bb_1139
     }
 
@@ -12053,8 +12083,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1140 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - (__local_state_offset__goto_757_9 + 1))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - (__local_state_offset__goto_757_9 + 1)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = __local_ncount__goto_2305_13)
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1142
@@ -12097,7 +12127,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1148 {
-        if ((if __param_mb.bsr_convention == 2: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_mb).bsr_convention == 2: 1 else: 0) != 0) {
             goto '__ci_bb_1149
         } else {
             goto '__ci_bb_1150
@@ -12123,8 +12153,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1152 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1154
     }
@@ -12168,8 +12198,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1159 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1161
     }
@@ -12179,7 +12209,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1161 {
-        if ((if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_1162
         } else {
             goto '__ci_bb_1163
@@ -12187,7 +12217,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1162 {
-        (__local_reset_could_continue__goto_564_6 = 1)
+        (__local_reset_could_continue__goto_564_6 = ((1 as c_int)))
         goto '__ci_bb_1163
     }
 
@@ -12220,9 +12250,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1167 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - (__local_state_offset__goto_757_9 + 1))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
-        ((unsafe *__local_next_new_state__goto_543_33).data = 1)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - (__local_state_offset__goto_757_9 + 1)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).data = ((1 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1169
     }
@@ -12236,8 +12266,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1170 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1172
     }
@@ -12341,8 +12371,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1186 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1188
     }
@@ -12442,8 +12472,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1201 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1203
     }
@@ -12551,8 +12581,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1218 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1220
     }
@@ -12748,8 +12778,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1245 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_state_offset__goto_757_9 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1247
     }
@@ -12937,8 +12967,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1270 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = (__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = ((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1272
     }
@@ -12981,7 +13011,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1277 {
-        (__local_otherd__goto_2421_18 = (unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]))
+        (__local_otherd__goto_2421_18 = (((unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]) as c_uint)))
         goto '__ci_bb_1278
     }
 
@@ -13012,8 +13042,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1281 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = (__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = ((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1283
     }
@@ -13027,13 +13057,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1284 {
-        (__local_caseless__goto_754_10 = 1)
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 - 13)
+        (__local_caseless__goto_754_10 = ((1 as c_int)))
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 -% 13))
         goto '__ci_bb_1285
     }
 
     '__ci_bb_1285 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_1286
         } else {
@@ -13060,8 +13090,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1288 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1290
     }
@@ -13075,7 +13105,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1291 {
-        (__local_otherd__goto_2454_18 = 4294967295)
+        (__local_otherd__goto_2454_18 = ((4294967295 as c_uint)))
         if (__local_caseless__goto_754_10 != 0) {
             goto '__ci_bb_1293
         } else {
@@ -13118,7 +13148,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1296 {
-        (__local_otherd__goto_2454_18 = (unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]))
+        (__local_otherd__goto_2454_18 = (((unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]) as c_uint)))
         goto '__ci_bb_1297
     }
 
@@ -13184,8 +13214,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1305 {
-        (__local_caseless__goto_754_10 = 1)
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 - 13)
+        (__local_caseless__goto_754_10 = ((1 as c_int)))
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 -% 13))
         goto '__ci_bb_1306
     }
 
@@ -13200,8 +13230,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1307 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1309
     }
@@ -13219,7 +13249,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1310 {
-        (__local_otherd__goto_2497_18 = 4294967295)
+        (__local_otherd__goto_2497_18 = ((4294967295 as c_uint)))
         if (__local_caseless__goto_754_10 != 0) {
             goto '__ci_bb_1312
         } else {
@@ -13262,7 +13292,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1315 {
-        (__local_otherd__goto_2497_18 = (unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]))
+        (__local_otherd__goto_2497_18 = (((unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]) as c_uint)))
         goto '__ci_bb_1316
     }
 
@@ -13304,8 +13334,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1321 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = (__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = ((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1323
     }
@@ -13319,8 +13349,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1324 {
-        (__local_caseless__goto_754_10 = 1)
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 - 13)
+        (__local_caseless__goto_754_10 = ((1 as c_int)))
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 -% 13))
         goto '__ci_bb_1325
     }
 
@@ -13335,8 +13365,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1326 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1328
     }
@@ -13354,7 +13384,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1329 {
-        (__local_otherd__goto_2538_18 = 4294967295)
+        (__local_otherd__goto_2538_18 = ((4294967295 as c_uint)))
         if (__local_caseless__goto_754_10 != 0) {
             goto '__ci_bb_1331
         } else {
@@ -13397,7 +13427,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1334 {
-        (__local_otherd__goto_2538_18 = (unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]))
+        (__local_otherd__goto_2538_18 = (((unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]) as c_uint)))
         goto '__ci_bb_1335
     }
 
@@ -13440,7 +13470,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1340 {
         ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1342
     }
@@ -13454,13 +13484,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1343 {
-        (__local_caseless__goto_754_10 = 1)
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 - 13)
+        (__local_caseless__goto_754_10 = ((1 as c_int)))
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 -% 13))
         goto '__ci_bb_1344
     }
 
     '__ci_bb_1344 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_1345
         } else {
@@ -13469,7 +13499,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1345 {
-        (__local_otherd__goto_2571_18 = 4294967295)
+        (__local_otherd__goto_2571_18 = ((4294967295 as c_uint)))
         if (__local_caseless__goto_754_10 != 0) {
             goto '__ci_bb_1347
         } else {
@@ -13512,7 +13542,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1350 {
-        (__local_otherd__goto_2571_18 = (unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]))
+        (__local_otherd__goto_2571_18 = (((unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]) as c_uint)))
         goto '__ci_bb_1351
     }
 
@@ -13522,7 +13552,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1352 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_1354
         } else {
             goto '__ci_bb_1355
@@ -13558,8 +13588,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1357 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = ((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) + 2)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) + 2) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1359
     }
@@ -13588,8 +13618,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1363 {
-        (__local_caseless__goto_754_10 = 1)
-        (__local_codevalue__goto_756_14 = __local_codevalue__goto_756_14 - 13)
+        (__local_caseless__goto_754_10 = ((1 as c_int)))
+        (__local_codevalue__goto_756_14 = (__local_codevalue__goto_756_14 -% 13))
         goto '__ci_bb_1364
     }
 
@@ -13604,8 +13634,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1365 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = ((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1367
     }
@@ -13615,7 +13645,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1367 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_1368
         } else {
@@ -13624,7 +13654,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1368 {
-        (__local_otherd__goto_2611_18 = 4294967295)
+        (__local_otherd__goto_2611_18 = ((4294967295 as c_uint)))
         if (__local_caseless__goto_754_10 != 0) {
             goto '__ci_bb_1370
         } else {
@@ -13667,7 +13697,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1373 {
-        (__local_otherd__goto_2611_18 = (unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]))
+        (__local_otherd__goto_2611_18 = (((unsafe __local_fcc__goto_544_31[__local_d__goto_703_15]) as c_uint)))
         goto '__ci_bb_1374
     }
 
@@ -13700,7 +13730,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1378 {
         (__local_count__goto_759_9 = __local_count__goto_759_9 + 1)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_1379
         } else {
             goto '__ci_bb_1380
@@ -13732,8 +13762,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1382 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = ((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) + 2)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((((__local_state_offset__goto_757_9 + __local_dlen__goto_702_13) + 1) + 2) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1384
     }
@@ -13762,7 +13792,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1388 {
-        (__local_isinclass__goto_2647_14 = 0)
+        (__local_isinclass__goto_2647_14 = ((0 as c_int)))
         if ((if __local_codevalue__goto_756_14 == 112: 1 else: 0) != 0) {
             goto '__ci_bb_1389
         } else {
@@ -13771,7 +13801,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1389 {
-        (__local_ecode__goto_2649_20 = __local_code__goto_755_16 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ecode__goto_2649_20 = __local_code__goto_755_16 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_1392
         } else {
@@ -13793,7 +13823,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1392 {
-        (__local_isinclass__goto_2647_14 = _pcre2_xclass_8(__local_c__goto_703_12, ((__local_code__goto_755_16 + ((1 as isize) as usize)) + ((2 as isize) as usize)), __param_mb.start_code, __local_utf__goto_558_6))
+        (__local_isinclass__goto_2647_14 = ((_pcre2_xclass_8(__local_c__goto_703_12, ((__local_code__goto_755_16 + ((1 as isize) as usize)) + ((2 as isize) as usize)), (unsafe *__param_mb).start_code, __local_utf__goto_558_6) as c_int)))
         goto '__ci_bb_1393
     }
 
@@ -13802,7 +13832,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1394 {
-        (__local_ecode__goto_2649_20 = __local_code__goto_755_16 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ecode__goto_2649_20 = __local_code__goto_755_16 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         if ((if __local_clen__goto_702_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_1397
         } else {
@@ -13824,7 +13854,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1397 {
-        (__local_isinclass__goto_2647_14 = _pcre2_eclass_8(__local_c__goto_703_12, ((__local_code__goto_755_16 + ((1 as isize) as usize)) + ((2 as isize) as usize)), __local_ecode__goto_2649_20, __param_mb.start_code, __local_utf__goto_558_6))
+        (__local_isinclass__goto_2647_14 = ((_pcre2_eclass_8(__local_c__goto_703_12, ((__local_code__goto_755_16 + ((1 as isize) as usize)) + ((2 as isize) as usize)), __local_ecode__goto_2649_20, (unsafe *__param_mb).start_code, __local_utf__goto_558_6) as c_int)))
         goto '__ci_bb_1398
     }
 
@@ -13835,9 +13865,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_1399 {
         (__ci_expr_ternary_369 = 0)
         if ((if __local_c__goto_703_12 > 255: 1 else: 0) != 0) {
-            (__ci_expr_ternary_369 = (if __local_codevalue__goto_756_14 == 111: 1 else: 0))
+            (__ci_expr_ternary_369 = (((if __local_codevalue__goto_756_14 == 111: 1 else: 0) as c_int)))
         } else {
-            (__ci_expr_ternary_369 = (if ((((unsafe (__local_code__goto_755_16 + ((1 as isize) as usize))[((__local_c__goto_703_12 as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c__goto_703_12 as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0))
+            (__ci_expr_ternary_369 = (((if ((((unsafe (__local_code__goto_755_16 + ((1 as isize) as usize))[((__local_c__goto_703_12 as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c__goto_703_12 as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) as c_int)))
         }
         (__local_isinclass__goto_2647_14 = __ci_expr_ternary_369)
         goto '__ci_bb_1400
@@ -13870,8 +13900,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1404 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_next_state_offset__goto_2648_13 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_next_state_offset__goto_2648_13 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1406
     }
@@ -13918,7 +13948,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1411 {
         ((unsafe *__local_next_new_state__goto_543_33).offset = __local_state_offset__goto_757_9)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1413
     }
@@ -13932,7 +13962,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1414 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
         if ((if __local_count__goto_759_9 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_1415
         } else {
@@ -13959,8 +13989,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1417 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_next_state_offset__goto_2648_13 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_next_state_offset__goto_2648_13 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1419
     }
@@ -14032,8 +14062,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1428 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_next_state_offset__goto_2648_13 + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_next_state_offset__goto_2648_13 + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1430
     }
@@ -14079,8 +14109,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1435 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = __local_next_state_offset__goto_2648_13 + 1)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((__local_next_state_offset__goto_2648_13 + 1) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1437
     }
@@ -14094,8 +14124,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1438 {
-        (__local_count__goto_759_9 = __local_current_state__goto_753_17.count)
-        if ((if __local_count__goto_759_9 >= (((((((unsafe __local_ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ecode__goto_2649_20[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
+        (__local_count__goto_759_9 = (unsafe *__local_current_state__goto_753_17).count)
+        if ((if __local_count__goto_759_9 >= ((((((((unsafe __local_ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ecode__goto_2649_20[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0) {
             goto '__ci_bb_1439
         } else {
             goto '__ci_bb_1440
@@ -14121,8 +14151,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1441 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_next_state_offset__goto_2648_13 + 1) + (2 * 2))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_next_state_offset__goto_2648_13 + 1) + (2 * 2)) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1443
     }
@@ -14136,10 +14166,10 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1444 {
-        (__local_max__goto_2753_17 = (((((((unsafe __local_ecode__goto_2649_20[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_ecode__goto_2649_20[((1 + 2) + 1)]) as c_int)) as c_uint) as c_int)))
+        (__local_max__goto_2753_17 = ((((((((unsafe __local_ecode__goto_2649_20[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ecode__goto_2649_20[((1 + 2) + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
         (__ci_expr_logic_378 = 0)
         if ((if (unsafe *__local_ecode__goto_2649_20) == OP_CRPOSRANGE: 1 else: 0) != 0) {
-            (__ci_expr_logic_378 = (if (if __local_count__goto_759_9 >= (((((((unsafe __local_ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ecode__goto_2649_20[(1 + 1)]) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_378 = (if (if __local_count__goto_759_9 >= ((((((((unsafe __local_ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ecode__goto_2649_20[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_378 != 0) {
             goto '__ci_bb_1446
@@ -14196,8 +14226,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1451 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = (__local_next_state_offset__goto_2648_13 + 1) + (2 * 2))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = ((((__local_next_state_offset__goto_2648_13 + 1) + (2 * 2)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1453
     }
@@ -14249,7 +14279,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1460 {
         ((unsafe *__local_next_new_state__goto_543_33).offset = __local_next_state_offset__goto_2648_13)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1462
     }
@@ -14355,9 +14385,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1475 {
-        (__local_endasscode__goto_2792_20 = __local_code__goto_755_16 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_endasscode__goto_2792_20 = __local_code__goto_755_16 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         (__local_rws__goto_2793_21 = ((__local_RWS as *mut RWS_anchor)))
-        if ((if __local_rws__goto_2793_21.free < ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
+        if ((if (unsafe *__local_rws__goto_2793_21).free < ((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_1476
         } else {
             goto '__ci_bb_1477
@@ -14365,7 +14395,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1476 {
-        (__local_rc__goto_2789_13 = more_workspace((&raw mut __local_rws__goto_2793_21 as *mut *mut RWS_anchor), 4, __param_mb))
+        (__local_rc__goto_2789_13 = ((more_workspace((&raw mut __local_rws__goto_2793_21 as *mut *mut RWS_anchor), (4 as c_uint), __param_mb) as c_int)))
         if ((if __local_rc__goto_2789_13 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_1478
         } else {
@@ -14374,9 +14404,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1477 {
-        (__local_local_offsets__goto_2791_21 = ((((__local_RWS + (__local_rws__goto_2793_21.size as usize)) - (__local_rws__goto_2793_21.free as usize)) as *mut c_ulong)))
-        (__local_local_workspace__goto_2790_14 = (__local_local_offsets__goto_2791_21 as *mut c_int) + (((2 as c_ulong) *% (2 as c_ulong)) as usize))
-        ((unsafe *__local_rws__goto_2793_21).free = __local_rws__goto_2793_21.free - ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
+        (__local_local_offsets__goto_2791_21 = ((((__local_RWS + ((unsafe *__local_rws__goto_2793_21).size as usize)) - ((unsafe *__local_rws__goto_2793_21).free as usize)) as *mut c_ulong)))
+        (__local_local_workspace__goto_2790_14 = (__local_local_offsets__goto_2791_21 as *mut c_int) + (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as usize))
+        ((unsafe *__local_rws__goto_2793_21).free = ((unsafe *__local_rws__goto_2793_21).free -% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
         goto '__ci_bb_1480
     }
 
@@ -14398,13 +14428,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1481 {
-        (__local_endasscode__goto_2792_20 = __local_endasscode__goto_2792_20 + ((((((unsafe __local_endasscode__goto_2792_20[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_endasscode__goto_2792_20[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_endasscode__goto_2792_20 = __local_endasscode__goto_2792_20 + (((((((unsafe __local_endasscode__goto_2792_20[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_endasscode__goto_2792_20[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_1480
     }
 
     '__ci_bb_1482 {
-        (__local_rc__goto_2789_13 = internal_dfa_match(__param_mb, __local_code__goto_755_16, __local_ptr__goto_545_12, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_2791_21, 2, __local_local_workspace__goto_2790_14, 1000, __local_rlevel, __local_RWS))
-        ((unsafe *__local_rws__goto_2793_21).free = __local_rws__goto_2793_21.free + ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
+        (__local_rc__goto_2789_13 = ((internal_dfa_match(__param_mb, __local_code__goto_755_16, __local_ptr__goto_545_12, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_2791_21, (2 as c_uint), __local_local_workspace__goto_2790_14, (1000 as c_int), __local_rlevel, __local_RWS) as c_int)))
+        ((unsafe *__local_rws__goto_2793_21).free = ((unsafe *__local_rws__goto_2793_21).free +% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
         (__ci_expr_logic_383 = 0)
         if ((if __local_rc__goto_2789_13 < 0: 1 else: 0) != 0) {
             (__ci_expr_logic_383 = (if (if __local_rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
@@ -14449,7 +14479,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1487 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = (((((((__local_endasscode__goto_2792_20 + ((2 as isize) as usize)) + ((1 as isize) as usize)) as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) as c_int)))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1489
     }
@@ -14463,7 +14493,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1490 {
-        (__local_codelink__goto_2832_13 = (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as c_int)))
+        (__local_codelink__goto_2832_13 = ((((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
         if ((if (unsafe __local_code__goto_755_16[(2 + 1)]) == OP_CALLOUT: 1 else: 0) != 0) {
             (__ci_expr_logic_386 = (if true: 1 else: 0))
         } else {
@@ -14477,7 +14507,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1491 {
-        (__local_rrc__goto_758_9 = do_callout_dfa(__local_code__goto_755_16, __param_offsets, __local_current_subject, __local_ptr__goto_545_12, __param_mb, 3, (&raw mut __local_callout_length__goto_2842_22 as *mut c_ulong)))
+        (__local_rrc__goto_758_9 = ((do_callout_dfa(__local_code__goto_755_16, __param_offsets, __local_current_subject, __local_ptr__goto_545_12, __param_mb, (3 as c_ulong), (&raw mut __local_callout_length__goto_2842_22 as *mut c_ulong)) as c_int)))
         if ((if __local_rrc__goto_758_9 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_1493
         } else {
@@ -14486,7 +14516,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1492 {
-        (__local_condcode__goto_2833_21 = (unsafe __local_code__goto_755_16[(2 + 1)]))
+        (__local_condcode__goto_2833_21 = (((unsafe __local_code__goto_755_16[(2 + 1)]) as u8)))
         if ((if __local_condcode__goto_2833_21 == OP_CREF: 1 else: 0) != 0) {
             (__ci_expr_logic_387 = (if true: 1 else: 0))
         } else {
@@ -14565,8 +14595,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1502 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = ((__local_state_offset__goto_757_9 + __local_codelink__goto_2832_13) + 2) + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((((__local_state_offset__goto_757_9 + __local_codelink__goto_2832_13) + 2) + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1504
     }
@@ -14602,8 +14632,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1508 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + 2) + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + 2) + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1510
     }
@@ -14617,7 +14647,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1511 {
-        (__local_value__goto_2876_24 = ((((((unsafe __local_code__goto_755_16[(2 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[((2 + 2) + 1)]) as c_int)) as c_uint)))
+        (__local_value__goto_2876_24 = (((((((unsafe __local_code__goto_755_16[(2 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[((2 + 2) + 1)]) as c_int) as c_int)) as c_uint)))
         if ((if __local_value__goto_2876_24 != 65535: 1 else: 0) != 0) {
             goto '__ci_bb_1514
         } else {
@@ -14627,9 +14657,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1512 {
         (__local_asscode__goto_2890_22 = (__local_code__goto_755_16 + ((2 as isize) as usize)) + ((1 as isize) as usize))
-        (__local_endasscode__goto_2891_22 = __local_asscode__goto_2890_22 + ((((((unsafe __local_asscode__goto_2890_22[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_asscode__goto_2890_22[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_endasscode__goto_2891_22 = __local_asscode__goto_2890_22 + (((((((unsafe __local_asscode__goto_2890_22[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_asscode__goto_2890_22[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         (__local_rws__goto_2892_23 = ((__local_RWS as *mut RWS_anchor)))
-        if ((if __local_rws__goto_2892_23.free < ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
+        if ((if (unsafe *__local_rws__goto_2892_23).free < ((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_1525
         } else {
             goto '__ci_bb_1526
@@ -14645,7 +14675,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1515 {
-        if ((if __param_mb.recursive != null: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_mb).recursive != null: 1 else: 0) != 0) {
             goto '__ci_bb_1516
         } else {
             goto '__ci_bb_1517
@@ -14677,8 +14707,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1519 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = ((__local_state_offset__goto_757_9 + 2) + 2) + 2)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((((__local_state_offset__goto_757_9 + 2) + 2) + 2) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1521
     }
@@ -14692,8 +14722,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1522 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = ((__local_state_offset__goto_757_9 + __local_codelink__goto_2832_13) + 2) + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((((__local_state_offset__goto_757_9 + __local_codelink__goto_2832_13) + 2) + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1524
     }
@@ -14707,7 +14737,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1525 {
-        (__local_rc__goto_2887_15 = more_workspace((&raw mut __local_rws__goto_2892_23 as *mut *mut RWS_anchor), 4, __param_mb))
+        (__local_rc__goto_2887_15 = ((more_workspace((&raw mut __local_rws__goto_2892_23 as *mut *mut RWS_anchor), (4 as c_uint), __param_mb) as c_int)))
         if ((if __local_rc__goto_2887_15 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_1527
         } else {
@@ -14716,9 +14746,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1526 {
-        (__local_local_offsets__goto_2889_23 = ((((__local_RWS + (__local_rws__goto_2892_23.size as usize)) - (__local_rws__goto_2892_23.free as usize)) as *mut c_ulong)))
-        (__local_local_workspace__goto_2888_16 = (__local_local_offsets__goto_2889_23 as *mut c_int) + (((2 as c_ulong) *% (2 as c_ulong)) as usize))
-        ((unsafe *__local_rws__goto_2892_23).free = __local_rws__goto_2892_23.free - ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
+        (__local_local_offsets__goto_2889_23 = ((((__local_RWS + ((unsafe *__local_rws__goto_2892_23).size as usize)) - ((unsafe *__local_rws__goto_2892_23).free as usize)) as *mut c_ulong)))
+        (__local_local_workspace__goto_2888_16 = (__local_local_offsets__goto_2889_23 as *mut c_int) + (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as usize))
+        ((unsafe *__local_rws__goto_2892_23).free = ((unsafe *__local_rws__goto_2892_23).free -% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
         goto '__ci_bb_1529
     }
 
@@ -14740,13 +14770,13 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1530 {
-        (__local_endasscode__goto_2891_22 = __local_endasscode__goto_2891_22 + ((((((unsafe __local_endasscode__goto_2891_22[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_endasscode__goto_2891_22[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_endasscode__goto_2891_22 = __local_endasscode__goto_2891_22 + (((((((unsafe __local_endasscode__goto_2891_22[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_endasscode__goto_2891_22[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_1529
     }
 
     '__ci_bb_1531 {
-        (__local_rc__goto_2887_15 = internal_dfa_match(__param_mb, __local_asscode__goto_2890_22, __local_ptr__goto_545_12, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_2889_23, 2, __local_local_workspace__goto_2888_16, 1000, __local_rlevel, __local_RWS))
-        ((unsafe *__local_rws__goto_2892_23).free = __local_rws__goto_2892_23.free + ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
+        (__local_rc__goto_2887_15 = ((internal_dfa_match(__param_mb, __local_asscode__goto_2890_22, __local_ptr__goto_545_12, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_2889_23, (2 as c_uint), __local_local_workspace__goto_2888_16, (1000 as c_int), __local_rlevel, __local_RWS) as c_int)))
+        ((unsafe *__local_rws__goto_2892_23).free = ((unsafe *__local_rws__goto_2892_23).free +% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
         (__ci_expr_logic_394 = 0)
         if ((if __local_rc__goto_2887_15 < 0: 1 else: 0) != 0) {
             (__ci_expr_logic_394 = (if (if __local_rc__goto_2887_15 != -1: 1 else: 0) != 0: 1 else: 0))
@@ -14801,7 +14831,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1537 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = (((((((__local_endasscode__goto_2891_22 + ((2 as isize) as usize)) + ((1 as isize) as usize)) as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) as c_int)))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1539
     }
@@ -14815,8 +14845,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1540 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = ((__local_state_offset__goto_757_9 + __local_codelink__goto_2832_13) + 2) + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((((__local_state_offset__goto_757_9 + __local_codelink__goto_2832_13) + 2) + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1542
     }
@@ -14831,12 +14861,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1543 {
         (__local_rws__goto_2937_21 = ((__local_RWS as *mut RWS_anchor)))
-        (__local_callpat__goto_2938_20 = __local_start_code__goto_555_12 + ((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_callpat__goto_2938_20 = __local_start_code__goto_555_12 + (((((((unsafe __local_code__goto_755_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code__goto_755_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         (__ci_expr_ternary_398 = 0)
-        if ((if __local_callpat__goto_2938_20 == __param_mb.start_code: 1 else: 0) != 0) {
-            (__ci_expr_ternary_398 = 0)
+        if ((if __local_callpat__goto_2938_20 == (unsafe *__param_mb).start_code: 1 else: 0) != 0) {
+            (__ci_expr_ternary_398 = ((0 as c_uint)))
         } else {
-            (__ci_expr_ternary_398 = ((((((unsafe __local_callpat__goto_2938_20[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_callpat__goto_2938_20[((1 + 2) + 1)]) as c_int)) as c_uint)))
+            (__ci_expr_ternary_398 = (((((((unsafe __local_callpat__goto_2938_20[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_callpat__goto_2938_20[((1 + 2) + 1)]) as c_int) as c_int)) as c_uint)))
         }
         (__local_recno__goto_2939_18 = __ci_expr_ternary_398)
         if ((if (unsafe __local_code__goto_755_16[(1 + 2)]) == OP_CREF: 1 else: 0) != 0) {
@@ -14851,7 +14881,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1545 {
-        if ((if __local_rws__goto_2937_21.free < ((1000 as c_ulong) +% (((1000 as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
+        if ((if (unsafe *__local_rws__goto_2937_21).free < ((1000 as c_ulong) +% (((1000 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_1546
         } else {
             goto '__ci_bb_1547
@@ -14859,7 +14889,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1546 {
-        (__local_rc__goto_2934_13 = more_workspace((&raw mut __local_rws__goto_2937_21 as *mut *mut RWS_anchor), 2000, __param_mb))
+        (__local_rc__goto_2934_13 = ((more_workspace((&raw mut __local_rws__goto_2937_21 as *mut *mut RWS_anchor), (2000 as c_uint), __param_mb) as c_int)))
         if ((if __local_rc__goto_2934_13 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_1548
         } else {
@@ -14868,10 +14898,10 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1547 {
-        (__local_local_offsets__goto_2936_21 = ((((__local_RWS + (__local_rws__goto_2937_21.size as usize)) - (__local_rws__goto_2937_21.free as usize)) as *mut c_ulong)))
-        (__local_local_workspace__goto_2935_14 = (__local_local_offsets__goto_2936_21 as *mut c_int) + (((1000 as c_ulong) *% (2 as c_ulong)) as usize))
-        ((unsafe *__local_rws__goto_2937_21).free = __local_rws__goto_2937_21.free - ((1000 as c_ulong) +% (((1000 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
-        (__local_ri__goto_2960_34 = __param_mb.recursive)
+        (__local_local_offsets__goto_2936_21 = ((((__local_RWS + ((unsafe *__local_rws__goto_2937_21).size as usize)) - ((unsafe *__local_rws__goto_2937_21).free as usize)) as *mut c_ulong)))
+        (__local_local_workspace__goto_2935_14 = (__local_local_offsets__goto_2936_21 as *mut c_int) + (((1000 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as usize))
+        ((unsafe *__local_rws__goto_2937_21).free = ((unsafe *__local_rws__goto_2937_21).free -% (((1000 as c_ulong) +% (((1000 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
+        (__local_ri__goto_2960_34 = (unsafe *__param_mb).recursive)
         goto '__ci_bb_1550
     }
 
@@ -14895,11 +14925,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_1551 {
         (__ci_expr_logic_400 = 0)
         (__ci_expr_logic_399 = 0)
-        if ((if __local_recno__goto_2939_18 == __local_ri__goto_2960_34.group_num: 1 else: 0) != 0) {
-            (__ci_expr_logic_399 = (if (if __local_ptr__goto_545_12 == __local_ri__goto_2960_34.subject_position: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_recno__goto_2939_18 == (unsafe *__local_ri__goto_2960_34).group_num: 1 else: 0) != 0) {
+            (__ci_expr_logic_399 = (if (if __local_ptr__goto_545_12 == (unsafe *__local_ri__goto_2960_34).subject_position: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_399 != 0) {
-            (__ci_expr_logic_400 = (if (if __param_mb.last_used_ptr == __local_ri__goto_2960_34.last_used_ptr: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_400 = (if (if (unsafe *__param_mb).last_used_ptr == (unsafe *__local_ri__goto_2960_34).last_used_ptr: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_400 != 0) {
             goto '__ci_bb_1554
@@ -14909,19 +14939,19 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1552 {
-        (__local_ri__goto_2960_34 = __local_ri__goto_2960_34.prevrec)
+        (__local_ri__goto_2960_34 = (unsafe *__local_ri__goto_2960_34).prevrec)
         goto '__ci_bb_1550
     }
 
     '__ci_bb_1553 {
         (__local_new_recursive__goto_547_20.group_num = __local_recno__goto_2939_18)
         (__local_new_recursive__goto_547_20.subject_position = __local_ptr__goto_545_12)
-        (__local_new_recursive__goto_547_20.last_used_ptr = __param_mb.last_used_ptr)
-        (__local_new_recursive__goto_547_20.prevrec = __param_mb.recursive)
+        (__local_new_recursive__goto_547_20.last_used_ptr = (unsafe *__param_mb).last_used_ptr)
+        (__local_new_recursive__goto_547_20.prevrec = (unsafe *__param_mb).recursive)
         ((unsafe *__param_mb).recursive = ((&raw mut __local_new_recursive__goto_547_20 as *mut dfa_recursion_info)))
-        (__local_rc__goto_2934_13 = internal_dfa_match(__param_mb, __local_callpat__goto_2938_20, __local_ptr__goto_545_12, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_2936_21, 1000, __local_local_workspace__goto_2935_14, 1000, __local_rlevel, __local_RWS))
-        ((unsafe *__local_rws__goto_2937_21).free = __local_rws__goto_2937_21.free + ((1000 as c_ulong) +% (((1000 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
-        ((unsafe *__param_mb).recursive = (&raw const __local_new_recursive__goto_547_20 as *const dfa_recursion_info).prevrec)
+        (__local_rc__goto_2934_13 = ((internal_dfa_match(__param_mb, __local_callpat__goto_2938_20, __local_ptr__goto_545_12, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_2936_21, (1000 as c_uint), __local_local_workspace__goto_2935_14, (1000 as c_int), __local_rlevel, __local_RWS) as c_int)))
+        ((unsafe *__local_rws__goto_2937_21).free = ((unsafe *__local_rws__goto_2937_21).free +% (((1000 as c_ulong) +% (((1000 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
+        ((unsafe *__param_mb).recursive = (unsafe *(&raw const __local_new_recursive__goto_547_20 as *const dfa_recursion_info)).prevrec)
         if ((if __local_rc__goto_2934_13 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_1556
         } else {
@@ -14950,7 +14980,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1558 {
-        (__local_rc__goto_2934_13 = (__local_rc__goto_2934_13 * 2) - 2)
+        (__local_rc__goto_2934_13 = ((((__local_rc__goto_2934_13 * 2) - 2) as c_int)))
         goto '__ci_bb_1561
     }
 
@@ -14975,7 +15005,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1562 {
-        (__local_charcount__goto_3005_24 = (((unsafe __local_local_offsets__goto_2936_21[(__local_rc__goto_2934_13 + 1)]) as c_ulong) -% ((unsafe __local_local_offsets__goto_2936_21[__local_rc__goto_2934_13]) as c_ulong)))
+        (__local_charcount__goto_3005_24 = (((((unsafe __local_local_offsets__goto_2936_21[(__local_rc__goto_2934_13 + 1)]) as c_ulong) -% ((unsafe __local_local_offsets__goto_2936_21[__local_rc__goto_2934_13]) as c_ulong)) as c_ulong)))
         if (__local_utf__goto_558_6 != 0) {
             goto '__ci_bb_1565
         } else {
@@ -15029,7 +15059,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1570 {
-        (__local_charcount__goto_3005_24 = __local_charcount__goto_3005_24 - 1)
+        (__local_charcount__goto_3005_24 = (__local_charcount__goto_3005_24 -% 1))
         goto '__ci_bb_1571
     }
 
@@ -15062,8 +15092,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1575 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - ((__local_state_offset__goto_757_9 + 2) + 1))
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - ((__local_state_offset__goto_757_9 + 2) + 1)) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = ((((__local_charcount__goto_3005_24 as c_ulong) -% (1 as c_ulong)) as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1577
@@ -15078,8 +15108,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1578 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = (__local_state_offset__goto_757_9 + 2) + 1)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = ((((__local_state_offset__goto_757_9 + 2) + 1) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1580
     }
@@ -15103,7 +15133,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     '__ci_bb_1583 {
         (__local_local_ptr__goto_3040_20 = __local_ptr__goto_545_12)
         (__local_rws__goto_3041_21 = ((__local_RWS as *mut RWS_anchor)))
-        if ((if __local_rws__goto_3041_21.free < ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
+        if ((if (unsafe *__local_rws__goto_3041_21).free < ((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_1584
         } else {
             goto '__ci_bb_1585
@@ -15111,7 +15141,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1584 {
-        (__local_rc__goto_3036_13 = more_workspace((&raw mut __local_rws__goto_3041_21 as *mut *mut RWS_anchor), 4, __param_mb))
+        (__local_rc__goto_3036_13 = ((more_workspace((&raw mut __local_rws__goto_3041_21 as *mut *mut RWS_anchor), (4 as c_uint), __param_mb) as c_int)))
         if ((if __local_rc__goto_3036_13 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_1586
         } else {
@@ -15120,9 +15150,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1585 {
-        (__local_local_offsets__goto_3038_21 = ((((__local_RWS + (__local_rws__goto_3041_21.size as usize)) - (__local_rws__goto_3041_21.free as usize)) as *mut c_ulong)))
-        (__local_local_workspace__goto_3037_14 = (__local_local_offsets__goto_3038_21 as *mut c_int) + (((2 as c_ulong) *% (2 as c_ulong)) as usize))
-        ((unsafe *__local_rws__goto_3041_21).free = __local_rws__goto_3041_21.free - ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
+        (__local_local_offsets__goto_3038_21 = ((((__local_RWS + ((unsafe *__local_rws__goto_3041_21).size as usize)) - ((unsafe *__local_rws__goto_3041_21).free as usize)) as *mut c_ulong)))
+        (__local_local_workspace__goto_3037_14 = (__local_local_offsets__goto_3038_21 as *mut c_int) + (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as usize))
+        ((unsafe *__local_rws__goto_3041_21).free = ((unsafe *__local_rws__goto_3041_21).free -% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
         if ((if __local_codevalue__goto_756_14 == 155: 1 else: 0) != 0) {
             goto '__ci_bb_1588
         } else {
@@ -15140,18 +15170,18 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1588 {
-        (__local_allow_zero__goto_3042_14 = 1)
+        (__local_allow_zero__goto_3042_14 = ((1 as c_int)))
         (__local_code__goto_755_16 = __local_code__goto_755_16 + 1)
         goto '__ci_bb_1590
     }
 
     '__ci_bb_1589 {
-        (__local_allow_zero__goto_3042_14 = 0)
+        (__local_allow_zero__goto_3042_14 = ((0 as c_int)))
         goto '__ci_bb_1590
     }
 
     '__ci_bb_1590 {
-        (__local_matched_count__goto_3039_31 = 0)
+        (__local_matched_count__goto_3039_31 = ((0 as c_ulong)))
         goto '__ci_bb_1591
     }
 
@@ -15160,7 +15190,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1592 {
-        (__local_rc__goto_3036_13 = internal_dfa_match(__param_mb, __local_code__goto_755_16, __local_local_ptr__goto_3040_20, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_3038_21, 2, __local_local_workspace__goto_3037_14, 1000, __local_rlevel, __local_RWS))
+        (__local_rc__goto_3036_13 = ((internal_dfa_match(__param_mb, __local_code__goto_755_16, __local_local_ptr__goto_3040_20, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_3038_21, (2 as c_uint), __local_local_workspace__goto_3037_14, (1000 as c_int), __local_rlevel, __local_RWS) as c_int)))
         if ((if __local_rc__goto_3036_13 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_1595
         } else {
@@ -15169,12 +15199,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1593 {
-        (__local_matched_count__goto_3039_31 = __local_matched_count__goto_3039_31 + 1)
+        (__local_matched_count__goto_3039_31 = (__local_matched_count__goto_3039_31 +% 1))
         goto '__ci_bb_1591
     }
 
     '__ci_bb_1594 {
-        ((unsafe *__local_rws__goto_3041_21).free = __local_rws__goto_3041_21.free + ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
+        ((unsafe *__local_rws__goto_3041_21).free = ((unsafe *__local_rws__goto_3041_21).free +% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
         if ((if __local_matched_count__goto_3039_31 > 0: 1 else: 0) != 0) {
             (__ci_expr_logic_404 = (if true: 1 else: 0))
         } else {
@@ -15196,7 +15226,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1596 {
-        (__local_charcount__goto_3039_20 = (((unsafe __local_local_offsets__goto_3038_21[1]) as c_ulong) -% ((unsafe __local_local_offsets__goto_3038_21[0]) as c_ulong)))
+        (__local_charcount__goto_3039_20 = (((((unsafe __local_local_offsets__goto_3038_21[1]) as c_ulong) -% ((unsafe __local_local_offsets__goto_3038_21[0]) as c_ulong)) as c_ulong)))
         if ((if __local_charcount__goto_3039_20 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_1599
         } else {
@@ -15231,7 +15261,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1603 {
-        (__local_end_subpattern__goto_3102_22 = __local_end_subpattern__goto_3102_22 + ((((((unsafe __local_end_subpattern__goto_3102_22[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_end_subpattern__goto_3102_22[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_end_subpattern__goto_3102_22 = __local_end_subpattern__goto_3102_22 + (((((((unsafe __local_end_subpattern__goto_3102_22[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_end_subpattern__goto_3102_22[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_1604
     }
 
@@ -15258,7 +15288,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1606 {
         (__local_ptr__goto_545_12 = __local_local_ptr__goto_3040_20)
-        (__local_clen__goto_702_7 = 0)
+        (__local_clen__goto_702_7 = ((0 as c_int)))
         (__ci_expr_old_406 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
         if ((if __ci_expr_old_406 < __local_wscount: 1 else: 0) != 0) {
@@ -15285,7 +15315,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1609 {
         ((unsafe *__local_next_new_state__goto_543_33).offset = __local_next_state_offset__goto_3103_15)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1611
     }
@@ -15335,7 +15365,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1617 {
-        (__local_charcount__goto_3039_20 = __local_charcount__goto_3039_20 - 1)
+        (__local_charcount__goto_3039_20 = (__local_charcount__goto_3039_20 -% 1))
         goto '__ci_bb_1618
     }
 
@@ -15344,8 +15374,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1619 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_next_state_offset__goto_3103_15)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_next_state_offset__goto_3103_15) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = ((((__local_charcount__goto_3039_20 as c_ulong) -% (1 as c_ulong)) as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1621
@@ -15361,7 +15391,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1622 {
         (__local_rws__goto_3141_21 = ((__local_RWS as *mut RWS_anchor)))
-        if ((if __local_rws__goto_3141_21.free < ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
+        if ((if (unsafe *__local_rws__goto_3141_21).free < ((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_1623
         } else {
             goto '__ci_bb_1624
@@ -15369,7 +15399,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1623 {
-        (__local_rc__goto_3138_13 = more_workspace((&raw mut __local_rws__goto_3141_21 as *mut *mut RWS_anchor), 4, __param_mb))
+        (__local_rc__goto_3138_13 = ((more_workspace((&raw mut __local_rws__goto_3141_21 as *mut *mut RWS_anchor), (4 as c_uint), __param_mb) as c_int)))
         if ((if __local_rc__goto_3138_13 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_1625
         } else {
@@ -15378,11 +15408,11 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1624 {
-        (__local_local_offsets__goto_3140_21 = ((((__local_RWS + (__local_rws__goto_3141_21.size as usize)) - (__local_rws__goto_3141_21.free as usize)) as *mut c_ulong)))
-        (__local_local_workspace__goto_3139_14 = (__local_local_offsets__goto_3140_21 as *mut c_int) + (((2 as c_ulong) *% (2 as c_ulong)) as usize))
-        ((unsafe *__local_rws__goto_3141_21).free = __local_rws__goto_3141_21.free - ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
-        (__local_rc__goto_3138_13 = internal_dfa_match(__param_mb, __local_code__goto_755_16, __local_ptr__goto_545_12, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_3140_21, 2, __local_local_workspace__goto_3139_14, 1000, __local_rlevel, __local_RWS))
-        ((unsafe *__local_rws__goto_3141_21).free = __local_rws__goto_3141_21.free + ((1000 as c_ulong) +% (((2 as c_ulong) *% (2 as c_ulong)) as c_ulong)))
+        (__local_local_offsets__goto_3140_21 = ((((__local_RWS + ((unsafe *__local_rws__goto_3141_21).size as usize)) - ((unsafe *__local_rws__goto_3141_21).free as usize)) as *mut c_ulong)))
+        (__local_local_workspace__goto_3139_14 = (__local_local_offsets__goto_3140_21 as *mut c_int) + (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as usize))
+        ((unsafe *__local_rws__goto_3141_21).free = ((unsafe *__local_rws__goto_3141_21).free -% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
+        (__local_rc__goto_3138_13 = ((internal_dfa_match(__param_mb, __local_code__goto_755_16, __local_ptr__goto_545_12, ((((__local_ptr__goto_545_12 as usize) -% (__local_start_subject__goto_553_12 as usize)) / sizeof[u8]()) as c_ulong), __local_local_offsets__goto_3140_21, (2 as c_uint), __local_local_workspace__goto_3139_14, (1000 as c_int), __local_rlevel, __local_RWS) as c_int)))
+        ((unsafe *__local_rws__goto_3141_21).free = ((unsafe *__local_rws__goto_3141_21).free +% (((1000 as c_ulong) +% (((2 as c_ulong) *% (((sizeof[c_ulong]() as c_ulong) / (4 as c_ulong)) as c_ulong)) as c_ulong)) as c_uint)))
         if ((if __local_rc__goto_3138_13 >= 0: 1 else: 0) != 0) {
             goto '__ci_bb_1627
         } else {
@@ -15401,7 +15431,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1627 {
         (__local_end_subpattern__goto_3170_22 = __local_code__goto_755_16)
-        (__local_charcount__goto_3171_22 = (((unsafe __local_local_offsets__goto_3140_21[1]) as c_ulong) -% ((unsafe __local_local_offsets__goto_3140_21[0]) as c_ulong)))
+        (__local_charcount__goto_3171_22 = (((((unsafe __local_local_offsets__goto_3140_21[1]) as c_ulong) -% ((unsafe __local_local_offsets__goto_3140_21[0]) as c_ulong)) as c_ulong)))
         goto '__ci_bb_1630
     }
 
@@ -15418,7 +15448,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1630 {
-        (__local_end_subpattern__goto_3170_22 = __local_end_subpattern__goto_3170_22 + ((((((unsafe __local_end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_end_subpattern__goto_3170_22[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_end_subpattern__goto_3170_22 = __local_end_subpattern__goto_3170_22 + (((((((unsafe __local_end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_end_subpattern__goto_3170_22[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_1631
     }
 
@@ -15439,9 +15469,9 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
             (__ci_expr_logic_409 = (if (if (unsafe *__local_end_subpattern__goto_3170_22) == OP_KETRMIN: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_409 != 0) {
-            (__ci_expr_ternary_410 = ((((((__local_end_subpattern__goto_3170_22 as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) - (((((unsafe __local_end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_end_subpattern__goto_3170_22[(1 + 1)]) as c_int)) as c_uint)) as c_int)))
+            (__ci_expr_ternary_410 = ((((((__local_end_subpattern__goto_3170_22 as usize) -% (__local_start_code__goto_555_12 as usize)) / sizeof[u8]()) - ((((((unsafe __local_end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_end_subpattern__goto_3170_22[(1 + 1)]) as c_int) as c_int)) as c_uint)) as c_int)))
         } else {
-            (__ci_expr_ternary_410 = -1)
+            (__ci_expr_ternary_410 = ((-1 as c_int)))
         }
         (__local_repeat_state_offset__goto_3172_34 = __ci_expr_ternary_410)
         if ((if __local_charcount__goto_3171_22 == 0: 1 else: 0) != 0) {
@@ -15479,7 +15509,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1636 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = __local_next_state_offset__goto_3172_15)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1638
     }
@@ -15494,7 +15524,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1639 {
         (__local_ptr__goto_545_12 = __local_ptr__goto_545_12 + (__local_charcount__goto_3171_22 as usize))
-        (__local_clen__goto_702_7 = 0)
+        (__local_clen__goto_702_7 = ((0 as c_int)))
         (__ci_expr_old_413 = __local_new_count__goto_548_19)
         (__local_new_count__goto_548_19 = __local_new_count__goto_548_19 + 1)
         if ((if __ci_expr_old_413 < __local_wscount: 1 else: 0) != 0) {
@@ -15518,7 +15548,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1642 {
         ((unsafe *__local_next_new_state__goto_543_33).offset = __local_next_state_offset__goto_3172_15)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1644
     }
@@ -15537,8 +15567,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1645 {
         (__local_next_active_state__goto_543_13 = __local_active_states__goto_542_13)
-        (__local_active_count__goto_548_5 = 0)
-        (__local_i__goto_701_7 = -1)
+        (__local_active_count__goto_548_5 = ((0 as c_int)))
+        (__local_i__goto_701_7 = ((-1 as c_int)))
         (__ci_expr_old_414 = __local_active_count__goto_548_5)
         (__local_active_count__goto_548_5 = __local_active_count__goto_548_5 + 1)
         if ((if __ci_expr_old_414 < __local_wscount: 1 else: 0) != 0) {
@@ -15554,7 +15584,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
 
     '__ci_bb_1647 {
         ((unsafe *__local_next_active_state__goto_543_13).offset = __local_repeat_state_offset__goto_3172_34)
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1649
     }
@@ -15606,7 +15636,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1655 {
-        (__local_charcount__goto_3171_22 = __local_charcount__goto_3171_22 - 1)
+        (__local_charcount__goto_3171_22 = (__local_charcount__goto_3171_22 -% 1))
         goto '__ci_bb_1656
     }
 
@@ -15615,8 +15645,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1657 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_next_state_offset__goto_3172_15)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_next_state_offset__goto_3172_15) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = ((((__local_charcount__goto_3171_22 as c_ulong) -% (1 as c_ulong)) as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1659
@@ -15649,8 +15679,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1662 {
-        ((unsafe *__local_next_new_state__goto_543_33).offset = 0 - __local_repeat_state_offset__goto_3172_34)
-        ((unsafe *__local_next_new_state__goto_543_33).count = 0)
+        ((unsafe *__local_next_new_state__goto_543_33).offset = (((0 - __local_repeat_state_offset__goto_3172_34) as c_int)))
+        ((unsafe *__local_next_new_state__goto_543_33).count = ((0 as c_int)))
         ((unsafe *__local_next_new_state__goto_543_33).data = ((((__local_charcount__goto_3171_22 as c_ulong) -% (1 as c_ulong)) as c_int)))
         (__local_next_new_state__goto_543_33 = __local_next_new_state__goto_543_33 + 1)
         goto '__ci_bb_1664
@@ -15673,7 +15703,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1667 {
-        (__local_rrc__goto_758_9 = do_callout_dfa(__local_code__goto_755_16, __param_offsets, __local_current_subject, __local_ptr__goto_545_12, __param_mb, 0, (&raw mut __local_callout_length__goto_3247_20 as *mut c_ulong)))
+        (__local_rrc__goto_758_9 = ((do_callout_dfa(__local_code__goto_755_16, __param_offsets, __local_current_subject, __local_ptr__goto_545_12, __param_mb, (0 as c_ulong), (&raw mut __local_callout_length__goto_3247_20 as *mut c_ulong)) as c_int)))
         if ((if __local_rrc__goto_758_9 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_1668
         } else {
@@ -15708,8 +15738,8 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1672 {
-        ((unsafe *__local_next_active_state__goto_543_13).offset = __local_state_offset__goto_757_9 + (__local_callout_length__goto_3247_20 as c_int))
-        ((unsafe *__local_next_active_state__goto_543_13).count = 0)
+        ((unsafe *__local_next_active_state__goto_543_13).offset = (((__local_state_offset__goto_757_9 + (__local_callout_length__goto_3247_20 as c_int)) as c_int)))
+        ((unsafe *__local_next_active_state__goto_543_13).count = ((0 as c_int)))
         (__local_next_active_state__goto_543_13 = __local_next_active_state__goto_543_13 + 1)
         goto '__ci_bb_1674
     }
@@ -17276,12 +17306,12 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
         if (__local_could_continue__goto_705_8 != 0) {
             var __ci_expr_logic_420: c_int
 
-            if ((if ((__param_mb.moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
+            if ((if (((unsafe *__param_mb).moptions as c_uint) & (32 as c_uint)) != 0: 1 else: 0) != 0) {
                 (__ci_expr_logic_420 = (if true: 1 else: 0))
             } else {
                 var __ci_expr_logic_419: c_int = 0
 
-                if ((if ((__param_mb.moptions as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
+                if ((if (((unsafe *__param_mb).moptions as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
                     (__ci_expr_logic_419 = (if (if __local_match_count__goto_548_30 < 0: 1 else: 0) != 0: 1 else: 0))
                 }
 
@@ -17303,10 +17333,10 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
                 if ((if __local_ptr__goto_545_12 >= __local_end_subject__goto_554_12: 1 else: 0) != 0) {
                     var __ci_expr_logic_422: c_int
 
-                    if ((if __local_ptr__goto_545_12 > __param_mb.start_used_ptr: 1 else: 0) != 0) {
+                    if ((if __local_ptr__goto_545_12 > (unsafe *__param_mb).start_used_ptr: 1 else: 0) != 0) {
                         (__ci_expr_logic_422 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_422 = (if __param_mb.allowemptypartial != 0: 1 else: 0))
+                        (__ci_expr_logic_422 = (if (unsafe *__param_mb).allowemptypartial != 0: 1 else: 0))
                     }
 
                     (__ci_expr_logic_423 = (if __ci_expr_logic_422 != 0: 1 else: 0))
@@ -17333,7 +17363,7 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1871 {
-        (__local_match_count__goto_548_30 = -2)
+        (__local_match_count__goto_548_30 = ((-2 as c_int)))
         goto '__ci_bb_1872
     }
 
@@ -17342,13 +17372,15 @@ fn internal_dfa_match(__param_mb: *mut dfa_match_block_8, __param_this_start_cod
     }
 
     '__ci_bb_1873 {
-        (__local_match_count__goto_548_30 = -1)
+        (__local_match_count__goto_548_30 = ((-1 as c_int)))
         goto '__ci_bb_1874
     }
 
     '__ci_bb_1874 {
         return __local_match_count__goto_548_30
     }
+
+    __ci_unreachable()
 
 }
 

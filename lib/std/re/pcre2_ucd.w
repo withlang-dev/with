@@ -1,2 +1,30 @@
-// Migrated from PCRE2
+// Migrated from C
 use std.re.defs
+use std.re.pcre2_config
+use std.re.pcre2_context
+use std.re.pcre2_convert
+use std.re.pcre2_compile
+use std.re.pcre2_pattern_info
+use std.re.pcre2_match_data
+use std.re.pcre2_dfa_match
+use std.re.pcre2_match
+use std.re.pcre2_match_next
+use std.re.pcre2_substring
+use std.re.pcre2_serialize
+use std.re.pcre2_substitute
+use std.re.pcre2_jit_compile
+use std.re.pcre2_error
+use std.re.pcre2_maketables
+use std.re.pcre2_tables
+use std.re.pcre2_chartables
+use std.re.pcre2_auto_possess
+use std.re.pcre2_chkdint
+use std.re.pcre2_extuni
+use std.re.pcre2_find_bracket
+use std.re.pcre2_newline
+use std.re.pcre2_ord2utf
+use std.re.pcre2_script_run
+use std.re.pcre2_string_utils
+use std.re.pcre2_study
+use std.re.pcre2_valid_utf
+use std.re.pcre2_xclass

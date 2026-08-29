@@ -1,7 +1,37 @@
-// Migrated from PCRE2
+// Migrated from C
 use std.re.defs
+use std.re.pcre2_config
+use std.re.pcre2_context
+use std.re.pcre2_convert
+use std.re.pcre2_compile
+use std.re.pcre2_pattern_info
+use std.re.pcre2_match_data
+use std.re.pcre2_dfa_match
+use std.re.pcre2_match
+use std.re.pcre2_match_next
+use std.re.pcre2_substring
+use std.re.pcre2_serialize
+use std.re.pcre2_substitute
+use std.re.pcre2_jit_compile
+use std.re.pcre2_error
+use std.re.pcre2_maketables
+use std.re.pcre2_tables
+use std.re.pcre2_chartables
+use std.re.pcre2_ucd
+use std.re.pcre2_auto_possess
+use std.re.pcre2_chkdint
+use std.re.pcre2_extuni
+use std.re.pcre2_find_bracket
+use std.re.pcre2_newline
+use std.re.pcre2_ord2utf
+use std.re.pcre2_script_run
+use std.re.pcre2_string_utils
+use std.re.pcre2_study
+use std.re.pcre2_valid_utf
+use std.re.pcre2_xclass
+use std.re.pcre2_compile_cgroup
 
-fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __param_negated: c_int, __param_classbits: *mut u8) {
+pub unsafe fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __param_negated: c_int, __param_classbits: *mut u8) -> Unit {
     var __local_classbits = __param_classbits
     var __local_c: c_int
 
@@ -16,26 +46,26 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
 
     if ((if __param_ptype == 13: 1 else: 0) != 0) {
         if ((if not (__param_negated != 0): 1 else: 0) != 0) {
-            with_memset((__local_classbits as *i8), 255, (32 as i64))
+            with_memset(((__local_classbits as *mut c_void) as *mut u8), (255 as c_int), ((32 as c_ulong) as i64))
         }
 
         return
 
     }
 
-    (__local_c = 0)
+    (__local_c = ((0 as c_int)))
 
     while ((if __local_c < 256: 1 else: 0) != 0) {
         (__local_prop = (&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[(__local_c / 128)] as c_int) * 128) + (__local_c % 128))] as c_uint) as usize))
 
-        (__local_set_bit = 0)
+        (__local_set_bit = ((0 as c_int)))
 
         __local_set_bit
 
         while true {
             match __param_ptype {
                 0 => {
-                    (__local_chartype = __local_prop.chartype)
+                    (__local_chartype = (((unsafe *__local_prop).chartype as c_int)))
 
                     var __ci_expr_logic_1: c_int
 
@@ -58,28 +88,28 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
 
                 },
                 1 => {
-                    (__local_set_bit = (if _pcre2_ucp_gentype_8[__local_prop.chartype] == __param_pdata: 1 else: 0))
+                    (__local_set_bit = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop).chartype] == __param_pdata: 1 else: 0) as c_int)))
                 },
                 2 => {
-                    (__local_set_bit = (if __local_prop.chartype == __param_pdata: 1 else: 0))
+                    (__local_set_bit = (((if (unsafe *__local_prop).chartype == __param_pdata: 1 else: 0) as c_int)))
                 },
                 3 => {
-                    (__local_set_bit = (if __local_prop.script == __param_pdata: 1 else: 0))
+                    (__local_set_bit = (((if (unsafe *__local_prop).script == __param_pdata: 1 else: 0) as c_int)))
                 },
                 4 => {
                     var __ci_expr_logic_2: c_int
 
-                    if ((if __local_prop.script == __param_pdata: 1 else: 0) != 0) {
+                    if ((if (unsafe *__local_prop).script == __param_pdata: 1 else: 0) != 0) {
                         (__ci_expr_logic_2 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_2 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((__local_prop.scriptx_bidiclass as c_int) & 1023) as isize) as usize))[((__param_pdata as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << (((__param_pdata as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_2 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop).scriptx_bidiclass as c_int) as c_int) & (1023 as c_int)) as isize) as usize))[((__param_pdata as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << (((__param_pdata as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     (__local_set_bit = __ci_expr_logic_2)
 
                 },
                 5 => {
-                    (__local_gentype = _pcre2_ucp_gentype_8[__local_prop.chartype])
+                    (__local_gentype = ((_pcre2_ucp_gentype_8[(unsafe *__local_prop).chartype] as c_uint)))
 
                     var __ci_expr_logic_3: c_int
 
@@ -97,31 +127,31 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
                     while true {
                         match __local_c {
                             9 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             32 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             160 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             10 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             11 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             12 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             13 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             133 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             _ => {
-                                (__local_set_bit = (if _pcre2_ucp_gentype_8[__local_prop.chartype] == 6: 1 else: 0))
+                                (__local_set_bit = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop).chartype] == 6: 1 else: 0) as c_int)))
                             },
                         }
 
@@ -133,31 +163,31 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
                     while true {
                         match __local_c {
                             9 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             32 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             160 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             10 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             11 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             12 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             13 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             133 => {
-                                (__local_set_bit = 1)
+                                (__local_set_bit = ((1 as c_int)))
                             },
                             _ => {
-                                (__local_set_bit = (if _pcre2_ucp_gentype_8[__local_prop.chartype] == 6: 1 else: 0))
+                                (__local_set_bit = (((if _pcre2_ucp_gentype_8[(unsafe *__local_prop).chartype] == 6: 1 else: 0) as c_int)))
                             },
                         }
 
@@ -166,9 +196,9 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
                     }
                 },
                 8 => {
-                    (__local_chartype = __local_prop.chartype)
+                    (__local_chartype = (((unsafe *__local_prop).chartype as c_int)))
 
-                    (__local_gentype = _pcre2_ucp_gentype_8[__local_chartype])
+                    (__local_gentype = ((_pcre2_ucp_gentype_8[__local_chartype] as c_uint)))
 
                     var __ci_expr_logic_7: c_int
 
@@ -227,15 +257,15 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
 
                 },
                 11 => {
-                    (__local_set_bit = (if ((__local_prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == __param_pdata: 1 else: 0))
+                    (__local_set_bit = (((if (((unsafe *__local_prop).scriptx_bidiclass as c_int) >> (11 as c_uint)) == __param_pdata: 1 else: 0) as c_int)))
                 },
                 12 => {
-                    (__local_set_bit = (if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((__local_prop.bprops as c_int) & 4095) as isize) as usize))[((__param_pdata as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << (((__param_pdata as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0))
+                    (__local_set_bit = (((if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((((unsafe *__local_prop).bprops as c_int) as c_int) & (4095 as c_int)) as isize) as usize))[((__param_pdata as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << (((__param_pdata as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) as c_int)))
                 },
                 14 => {
-                    (__local_chartype = __local_prop.chartype)
+                    (__local_chartype = (((unsafe *__local_prop).chartype as c_int)))
 
-                    (__local_gentype = _pcre2_ucp_gentype_8[__local_chartype])
+                    (__local_gentype = ((_pcre2_ucp_gentype_8[__local_chartype] as c_uint)))
 
                     var __ci_expr_logic_12: c_int = 0
 
@@ -257,7 +287,7 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
 
                 },
                 15 => {
-                    (__local_chartype = __local_prop.chartype)
+                    (__local_chartype = (((unsafe *__local_prop).chartype as c_int)))
 
                     var __ci_expr_logic_15: c_int = 0
 
@@ -285,7 +315,7 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
 
                 },
                 16 => {
-                    (__local_gentype = _pcre2_ucp_gentype_8[__local_prop.chartype])
+                    (__local_gentype = ((_pcre2_ucp_gentype_8[(unsafe *__local_prop).chartype] as c_uint)))
 
                     var __ci_expr_logic_17: c_int
 
@@ -307,9 +337,12 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
 
                 },
                 _ => {
-                    do {
+                    loop {
                         0
-                    } while (0 != 0)
+                        if not ((0 != 0)) {
+                            break
+                        }
+                    }
 
                     var __ci_expr_logic_22: c_int
 
@@ -358,14 +391,14 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
         }
 
         if (__param_negated != 0) {
-            (__local_set_bit = (if not (__local_set_bit != 0): 1 else: 0))
+            (__local_set_bit = (((if not (__local_set_bit != 0): 1 else: 0) as c_int)))
         }
 
         if (__local_set_bit != 0) {
-            ((unsafe *__local_classbits) = (unsafe *__local_classbits) | (((1 as c_int) << ((__local_c & 7) as c_uint)) as u8))
+            ((unsafe *__local_classbits) = ((unsafe *__local_classbits) as u8) | ((((1 as c_int) << (((__local_c as c_int) & (7 as c_int)) as c_uint)) as u8) as u8))
         }
 
-        if ((if (__local_c & 7) == 7: 1 else: 0) != 0) {
+        if ((if ((__local_c as c_int) & (7 as c_int)) == 7: 1 else: 0) != 0) {
             (__local_classbits = __local_classbits + 1)
         }
 
@@ -377,7 +410,7 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
 
 }
 
-fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: c_uint, __param_start_ptr: *mut c_uint, __param_pcode: *mut *mut u8, __param_negate_class: c_int, __param_has_bitmap: *mut c_int, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> *mut c_uint {
+pub unsafe fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: c_uint, __param_start_ptr: *mut c_uint, __param_pcode: *mut *mut u8, __param_negate_class: c_int, __param_has_bitmap: *mut c_int, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> *mut c_uint {
     var __local_pptr__goto_1072_11: *mut c_uint = null
 
     var __local_code__goto_1073_14: *mut u8 = null
@@ -555,11 +588,11 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     '__ci_bb_0 {
         (__local_pptr__goto_1072_11 = __param_start_ptr)
         (__local_code__goto_1073_14 = (unsafe *__param_pcode))
-        (__local_cbits__goto_1075_16 = __param_cb.cbits)
+        (__local_cbits__goto_1075_16 = (unsafe *__param_cb).cbits)
         (__local_classbits__goto_1078_16 = ((&raw const (unsafe *__param_cb).classbits.classbits[0] as *mut u8)))
-        (__local_utf__goto_1081_6 = (if ((__param_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
-        (__local_should_flip_negation__goto_1074_6 = 0)
-        (__local_xclass_props__goto_1089_10 = 0)
+        (__local_utf__goto_1081_6 = (((if ((__param_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) as c_int)))
+        (__local_should_flip_negation__goto_1074_6 = ((0 as c_int)))
+        (__local_xclass_props__goto_1089_10 = ((0 as c_uint)))
         (__local_cranges__goto_1091_15 = ((null as *mut class_ranges)))
         if (__local_utf__goto_1081_6 != 0) {
             goto '__ci_bb_1
@@ -578,7 +611,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
 
     '__ci_bb_2 {
         (__local_class_uchardata__goto_1090_14 = (__local_code__goto_1073_14 + ((2 as isize) as usize)) + ((2 as isize) as usize))
-        with_memset((__local_classbits__goto_1078_16 as *i8), 0, (32 as i64))
+        with_memset(((__local_classbits__goto_1078_16 as *mut c_void) as *mut u8), (0 as c_int), ((32 as c_ulong) as i64))
         goto '__ci_bb_20
     }
 
@@ -592,12 +625,12 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_4 {
-        (__local_cranges__goto_1091_15 = ((__param_cb.first_data as *mut class_ranges)))
+        (__local_cranges__goto_1091_15 = (((unsafe *__param_cb).first_data as *mut class_ranges)))
         goto '__ci_bb_11
     }
 
     '__ci_bb_5 {
-        if ((if __local_cranges__goto_1091_15.range_list_size > 0: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_cranges__goto_1091_15).range_list_size > 0: 1 else: 0) != 0) {
             goto '__ci_bb_14
         } else {
             goto '__ci_bb_15
@@ -606,11 +639,11 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
 
     '__ci_bb_6 {
         ((unsafe *__param_errorcodeptr) = ERR21)
-        return null
+        return ((null as *mut c_uint))
     }
 
     '__ci_bb_7 {
-        if ((if __param_cb.last_data != null: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_cb).last_data != null: 1 else: 0) != 0) {
             goto '__ci_bb_8
         } else {
             goto '__ci_bb_9
@@ -618,7 +651,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_8 {
-        ((unsafe *__param_cb.last_data).next = (((&raw const (unsafe *__local_cranges__goto_1091_15).header as *const compile_data) as *mut compile_data)))
+        ((unsafe *(unsafe *__param_cb).last_data).next = (((&raw const (unsafe *__local_cranges__goto_1091_15).header as *const compile_data) as *mut compile_data)))
         goto '__ci_bb_10
     }
 
@@ -645,7 +678,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_13 {
-        ((unsafe *__param_cb).first_data = (&raw const (unsafe *__local_cranges__goto_1091_15).header as *const compile_data).next)
+        ((unsafe *__param_cb).first_data = (unsafe *(&raw const (unsafe *__local_cranges__goto_1091_15).header as *const compile_data)).next)
         goto '__ci_bb_5
     }
 
@@ -663,7 +696,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_16 {
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 2)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (2 as c_uint))
         goto '__ci_bb_17
     }
 
@@ -671,12 +704,12 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
         (__ci_expr_logic_1 = 0)
         (__ci_expr_ternary_0 = 0)
         if (__local_utf__goto_1081_6 != 0) {
-            (__ci_expr_ternary_0 = 1114111)
+            (__ci_expr_ternary_0 = ((1114111 as c_uint)))
         } else {
-            (__ci_expr_ternary_0 = 255)
+            (__ci_expr_ternary_0 = ((255 as c_uint)))
         }
-        if ((if (unsafe __local_ranges__goto_1145_21[((__local_cranges__goto_1091_15.range_list_size as c_int) - 1)]) == __ci_expr_ternary_0: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (unsafe __local_ranges__goto_1145_21[((__local_cranges__goto_1091_15.range_list_size as c_int) - 2)]) <= 256: 1 else: 0) != 0: 1 else: 0))
+        if ((if (unsafe __local_ranges__goto_1145_21[(((unsafe *__local_cranges__goto_1091_15).range_list_size as c_int) - 1)]) == __ci_expr_ternary_0: 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if (if (unsafe __local_ranges__goto_1145_21[(((unsafe *__local_cranges__goto_1091_15).range_list_size as c_int) - 2)]) <= 256: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_1 != 0) {
             goto '__ci_bb_18
@@ -686,7 +719,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_18 {
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 16)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (16 as c_uint))
         goto '__ci_bb_19
     }
 
@@ -736,10 +769,10 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_25 {
-        (__local_local_negate__goto_1171_8 = (if __local_meta__goto_1170_12 == 2149646336: 1 else: 0))
+        (__local_local_negate__goto_1171_8 = (((if __local_meta__goto_1170_12 == 2149646336: 1 else: 0) as c_int)))
         (__ci_expr_old_3 = __local_pptr__goto_1072_11)
         (__local_pptr__goto_1072_11 = __local_pptr__goto_1072_11 + 1)
-        (__local_posix_class__goto_1172_7 = (unsafe *__ci_expr_old_3))
+        (__local_posix_class__goto_1172_7 = (((unsafe *__ci_expr_old_3) as c_int)))
         if (__local_local_negate__goto_1171_8 != 0) {
             goto '__ci_bb_26
         } else {
@@ -748,7 +781,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_26 {
-        (__local_should_flip_negation__goto_1074_6 = 1)
+        (__local_should_flip_negation__goto_1074_6 = ((1 as c_int)))
         goto '__ci_bb_27
     }
 
@@ -765,7 +798,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_28 {
-        (__local_posix_class__goto_1172_7 = 0)
+        (__local_posix_class__goto_1172_7 = ((0 as c_int)))
         goto '__ci_bb_29
     }
 
@@ -787,9 +820,9 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
 
     '__ci_bb_31 {
         (__local_posix_class__goto_1172_7 = __local_posix_class__goto_1172_7 * 3)
-        with_memcpy(((&(unsafe (&raw const __local_pbits__goto_1174_22 as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), ((__local_cbits__goto_1075_16 + ((_pcre2_posix_class_maps8[__local_posix_class__goto_1172_7] as isize) as usize)) as *i8), (32 as i64))
-        (__local_taboffset__goto_1173_7 = _pcre2_posix_class_maps8[(__local_posix_class__goto_1172_7 + 1)])
-        (__local_tabopt__goto_1173_18 = _pcre2_posix_class_maps8[(__local_posix_class__goto_1172_7 + 2)])
+        with_memcpy(((&(unsafe *(&raw const __local_pbits__goto_1174_22 as *const class_bits_storage)).classbits[0] as *mut u8) as *mut u8), (((__local_cbits__goto_1075_16 + ((_pcre2_posix_class_maps8[__local_posix_class__goto_1172_7] as isize) as usize)) as *const c_void) as *const u8), ((32 as c_ulong) as i64))
+        (__local_taboffset__goto_1173_7 = ((_pcre2_posix_class_maps8[(__local_posix_class__goto_1172_7 + 1)] as c_int)))
+        (__local_tabopt__goto_1173_18 = ((_pcre2_posix_class_maps8[(__local_posix_class__goto_1172_7 + 2)] as c_int)))
         if ((if __local_taboffset__goto_1173_7 >= 0: 1 else: 0) != 0) {
             goto '__ci_bb_43
         } else {
@@ -812,21 +845,21 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     '__ci_bb_34 {
         (__ci_expr_ternary_7 = 0)
         if ((if __local_posix_class__goto_1172_7 == 8: 1 else: 0) != 0) {
-            (__ci_expr_ternary_7 = 14)
+            (__ci_expr_ternary_7 = ((14 as c_int)))
         } else {
             var __ci_expr_ternary_6: c_int = 0
 
             if ((if __local_posix_class__goto_1172_7 == 9: 1 else: 0) != 0) {
-                (__ci_expr_ternary_6 = 15)
+                (__ci_expr_ternary_6 = ((15 as c_int)))
             } else {
-                (__ci_expr_ternary_6 = 16)
+                (__ci_expr_ternary_6 = ((16 as c_int)))
             }
 
             (__ci_expr_ternary_7 = __ci_expr_ternary_6)
 
         }
-        (__local_ptype__goto_1207_16 = __ci_expr_ternary_7)
-        _pcre2_update_classbits_8(__local_ptype__goto_1207_16, 0, __local_local_negate__goto_1171_8, __local_classbits__goto_1078_16)
+        (__local_ptype__goto_1207_16 = ((__ci_expr_ternary_7 as c_uint)))
+        _pcre2_update_classbits_8(__local_ptype__goto_1207_16, (0 as c_uint), __local_local_negate__goto_1171_8, __local_classbits__goto_1078_16)
         if ((if ((__local_xclass_props__goto_1089_10 as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_35
         } else {
@@ -847,7 +880,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_37 {
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + 3)
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% 3))
         goto '__ci_bb_39
     }
 
@@ -856,22 +889,22 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + 1)
         (__ci_expr_ternary_9 = 0)
         if (__local_local_negate__goto_1171_8 != 0) {
-            (__ci_expr_ternary_9 = 4)
+            (__ci_expr_ternary_9 = ((4 as c_int)))
         } else {
-            (__ci_expr_ternary_9 = 3)
+            (__ci_expr_ternary_9 = ((3 as c_int)))
         }
-        ((unsafe *__ci_expr_old_8) = __ci_expr_ternary_9)
+        ((unsafe *__ci_expr_old_8) = ((__ci_expr_ternary_9 as u8)))
         (__ci_expr_old_10 = __local_class_uchardata__goto_1090_14)
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + 1)
         ((unsafe *__ci_expr_old_10) = ((__local_ptype__goto_1207_16 as u8)))
         (__ci_expr_old_11 = __local_class_uchardata__goto_1090_14)
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + 1)
-        ((unsafe *__ci_expr_old_11) = 0)
+        ((unsafe *__ci_expr_old_11) = ((0 as u8)))
         goto '__ci_bb_39
     }
 
     '__ci_bb_39 {
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 5)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (5 as c_uint))
         goto '__ci_bb_36
     }
 
@@ -912,12 +945,12 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_45 {
-        (__local_i__goto_1275_18 = 0)
+        (__local_i__goto_1275_18 = ((0 as c_int)))
         goto '__ci_bb_48
     }
 
     '__ci_bb_46 {
-        (__local_i__goto_1278_18 = 0)
+        (__local_i__goto_1278_18 = ((0 as c_int)))
         goto '__ci_bb_52
     }
 
@@ -934,7 +967,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_49 {
-        (__local_pbits__goto_1174_22.classbits[__local_i__goto_1275_18] = (&raw const __local_pbits__goto_1174_22 as *const class_bits_storage).classbits[__local_i__goto_1275_18] | (unsafe __local_cbits__goto_1075_16[(__local_i__goto_1275_18 + __local_taboffset__goto_1173_7)]))
+        (__local_pbits__goto_1174_22.classbits[__local_i__goto_1275_18] = ((unsafe *(&raw const __local_pbits__goto_1174_22 as *const class_bits_storage)).classbits[__local_i__goto_1275_18] as u8) | ((unsafe __local_cbits__goto_1075_16[(__local_i__goto_1275_18 + __local_taboffset__goto_1173_7)]) as u8))
         goto '__ci_bb_50
     }
 
@@ -956,7 +989,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_53 {
-        (__local_pbits__goto_1174_22.classbits[__local_i__goto_1278_18] = (&raw const __local_pbits__goto_1174_22 as *const class_bits_storage).classbits[__local_i__goto_1278_18] & ((~(unsafe __local_cbits__goto_1075_16[(__local_i__goto_1278_18 + __local_taboffset__goto_1173_7)])) as u8))
+        (__local_pbits__goto_1174_22.classbits[__local_i__goto_1278_18] = ((unsafe *(&raw const __local_pbits__goto_1174_22 as *const class_bits_storage)).classbits[__local_i__goto_1278_18] as u8) & (((~(unsafe __local_cbits__goto_1075_16[(__local_i__goto_1278_18 + __local_taboffset__goto_1173_7)])) as u8) as u8))
         goto '__ci_bb_54
     }
 
@@ -970,7 +1003,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_56 {
-        (__local_tabopt__goto_1173_18 = 0 - __local_tabopt__goto_1173_18)
+        (__local_tabopt__goto_1173_18 = (((0 - __local_tabopt__goto_1173_18) as c_int)))
         goto '__ci_bb_57
     }
 
@@ -983,7 +1016,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_58 {
-        (__local_pbits__goto_1174_22.classbits[1] = (&raw const __local_pbits__goto_1174_22 as *const class_bits_storage).classbits[1] & (~60))
+        (__local_pbits__goto_1174_22.classbits[1] = ((unsafe *(&raw const __local_pbits__goto_1174_22 as *const class_bits_storage)).classbits[1] as u8) & ((~60) as u8))
         goto '__ci_bb_60
     }
 
@@ -1005,7 +1038,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_61 {
-        (__local_pbits__goto_1174_22.classbits[11] = (&raw const __local_pbits__goto_1174_22 as *const class_bits_storage).classbits[11] & 127)
+        (__local_pbits__goto_1174_22.classbits[11] = ((unsafe *(&raw const __local_pbits__goto_1174_22 as *const class_bits_storage)).classbits[11] as u8) & (127 as u8))
         goto '__ci_bb_62
     }
 
@@ -1014,17 +1047,17 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_63 {
-        (__local_i__goto_1311_18 = 0)
+        (__local_i__goto_1311_18 = ((0 as c_int)))
         goto '__ci_bb_66
     }
 
     '__ci_bb_64 {
-        (__local_i__goto_1314_18 = 0)
+        (__local_i__goto_1314_18 = ((0 as c_int)))
         goto '__ci_bb_70
     }
 
     '__ci_bb_65 {
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 2)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (2 as c_uint))
         goto '__ci_bb_20
     }
 
@@ -1037,7 +1070,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_67 {
-        ((unsafe __local_classwords__goto_1308_17[__local_i__goto_1311_18]) = (unsafe __local_classwords__goto_1308_17[__local_i__goto_1311_18]) | (~(&raw const __local_pbits__goto_1174_22 as *const class_bits_storage).classwords[__local_i__goto_1311_18]))
+        ((unsafe __local_classwords__goto_1308_17[__local_i__goto_1311_18]) = ((unsafe __local_classwords__goto_1308_17[__local_i__goto_1311_18]) as c_uint) | ((~(unsafe *(&raw const __local_pbits__goto_1174_22 as *const class_bits_storage)).classwords[__local_i__goto_1311_18]) as c_uint))
         goto '__ci_bb_68
     }
 
@@ -1059,7 +1092,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_71 {
-        ((unsafe __local_classwords__goto_1308_17[__local_i__goto_1314_18]) = (unsafe __local_classwords__goto_1308_17[__local_i__goto_1314_18]) | (&raw const __local_pbits__goto_1174_22 as *const class_bits_storage).classwords[__local_i__goto_1314_18])
+        ((unsafe __local_classwords__goto_1308_17[__local_i__goto_1314_18]) = ((unsafe __local_classwords__goto_1308_17[__local_i__goto_1314_18]) as c_uint) | ((unsafe *(&raw const __local_pbits__goto_1174_22 as *const class_bits_storage)).classwords[__local_i__goto_1314_18] as c_uint))
         goto '__ci_bb_72
     }
 
@@ -1080,7 +1113,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_75 {
-        (__local_escape__goto_1175_12 = (__local_meta__goto_1170_12 as c_uint) & (65535 as c_uint))
+        (__local_escape__goto_1175_12 = ((((__local_meta__goto_1170_12 as c_uint) & (65535 as c_uint)) as c_uint)))
         goto '__ci_bb_76
     }
 
@@ -1093,12 +1126,12 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_77 {
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 2)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (2 as c_uint))
         goto '__ci_bb_20
     }
 
     '__ci_bb_78 {
-        (__local_i__goto_1336_16 = 0)
+        (__local_i__goto_1336_16 = ((0 as c_int)))
         goto '__ci_bb_79
     }
 
@@ -1111,7 +1144,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_80 {
-        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1336_16]) = (unsafe __local_classbits__goto_1078_16[__local_i__goto_1336_16]) | (unsafe __local_cbits__goto_1075_16[(__local_i__goto_1336_16 + 64)]))
+        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1336_16]) = ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1336_16]) as u8) | ((unsafe __local_cbits__goto_1075_16[(__local_i__goto_1336_16 + 64)]) as u8))
         goto '__ci_bb_81
     }
 
@@ -1125,8 +1158,8 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_83 {
-        (__local_should_flip_negation__goto_1074_6 = 1)
-        (__local_i__goto_1341_16 = 0)
+        (__local_should_flip_negation__goto_1074_6 = ((1 as c_int)))
+        (__local_i__goto_1341_16 = ((0 as c_int)))
         goto '__ci_bb_84
     }
 
@@ -1139,7 +1172,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_85 {
-        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1341_16]) = (unsafe __local_classbits__goto_1078_16[__local_i__goto_1341_16]) | ((~(unsafe __local_cbits__goto_1075_16[(__local_i__goto_1341_16 + 64)])) as u8))
+        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1341_16]) = ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1341_16]) as u8) | (((~(unsafe __local_cbits__goto_1075_16[(__local_i__goto_1341_16 + 64)])) as u8) as u8))
         goto '__ci_bb_86
     }
 
@@ -1153,7 +1186,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_88 {
-        (__local_i__goto_1346_16 = 0)
+        (__local_i__goto_1346_16 = ((0 as c_int)))
         goto '__ci_bb_89
     }
 
@@ -1166,7 +1199,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_90 {
-        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1346_16]) = (unsafe __local_classbits__goto_1078_16[__local_i__goto_1346_16]) | (unsafe __local_cbits__goto_1075_16[(__local_i__goto_1346_16 + 160)]))
+        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1346_16]) = ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1346_16]) as u8) | ((unsafe __local_cbits__goto_1075_16[(__local_i__goto_1346_16 + 160)]) as u8))
         goto '__ci_bb_91
     }
 
@@ -1180,8 +1213,8 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_93 {
-        (__local_should_flip_negation__goto_1074_6 = 1)
-        (__local_i__goto_1351_16 = 0)
+        (__local_should_flip_negation__goto_1074_6 = ((1 as c_int)))
+        (__local_i__goto_1351_16 = ((0 as c_int)))
         goto '__ci_bb_94
     }
 
@@ -1194,7 +1227,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_95 {
-        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1351_16]) = (unsafe __local_classbits__goto_1078_16[__local_i__goto_1351_16]) | ((~(unsafe __local_cbits__goto_1075_16[(__local_i__goto_1351_16 + 160)])) as u8))
+        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1351_16]) = ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1351_16]) as u8) | (((~(unsafe __local_cbits__goto_1075_16[(__local_i__goto_1351_16 + 160)])) as u8) as u8))
         goto '__ci_bb_96
     }
 
@@ -1208,7 +1241,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_98 {
-        (__local_i__goto_1363_16 = 0)
+        (__local_i__goto_1363_16 = ((0 as c_int)))
         goto '__ci_bb_99
     }
 
@@ -1221,7 +1254,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_100 {
-        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1363_16]) = (unsafe __local_classbits__goto_1078_16[__local_i__goto_1363_16]) | (unsafe __local_cbits__goto_1075_16[(__local_i__goto_1363_16 + 0)]))
+        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1363_16]) = ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1363_16]) as u8) | ((unsafe __local_cbits__goto_1075_16[(__local_i__goto_1363_16 + 0)]) as u8))
         goto '__ci_bb_101
     }
 
@@ -1235,8 +1268,8 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_103 {
-        (__local_should_flip_negation__goto_1074_6 = 1)
-        (__local_i__goto_1368_16 = 0)
+        (__local_should_flip_negation__goto_1074_6 = ((1 as c_int)))
+        (__local_i__goto_1368_16 = ((0 as c_int)))
         goto '__ci_bb_104
     }
 
@@ -1249,7 +1282,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_105 {
-        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1368_16]) = (unsafe __local_classbits__goto_1078_16[__local_i__goto_1368_16]) | ((~(unsafe __local_cbits__goto_1075_16[(__local_i__goto_1368_16 + 0)])) as u8))
+        ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1368_16]) = ((unsafe __local_classbits__goto_1078_16[__local_i__goto_1368_16]) as u8) | (((~(unsafe __local_cbits__goto_1075_16[(__local_i__goto_1368_16 + 0)])) as u8) as u8))
         goto '__ci_bb_106
     }
 
@@ -1275,7 +1308,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_110 {
-        add_list_to_class(((__param_options as c_uint) & ((~8) as c_uint)), __param_xoptions, __param_cb, (&_pcre2_hspace_list_8[0] as *mut c_uint))
+        add_list_to_class((((__param_options as c_uint) & ((~8) as c_uint)) as c_uint), __param_xoptions, __param_cb, (&_pcre2_hspace_list_8[0] as *mut c_uint))
         goto '__ci_bb_77
     }
 
@@ -1292,7 +1325,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_113 {
-        add_not_list_to_class(((__param_options as c_uint) & ((~8) as c_uint)), __param_xoptions, __param_cb, (&_pcre2_hspace_list_8[0] as *mut c_uint))
+        add_not_list_to_class((((__param_options as c_uint) & ((~8) as c_uint)) as c_uint), __param_xoptions, __param_cb, (&_pcre2_hspace_list_8[0] as *mut c_uint))
         goto '__ci_bb_77
     }
 
@@ -1309,7 +1342,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_116 {
-        add_list_to_class(((__param_options as c_uint) & ((~8) as c_uint)), __param_xoptions, __param_cb, (&_pcre2_vspace_list_8[0] as *mut c_uint))
+        add_list_to_class((((__param_options as c_uint) & ((~8) as c_uint)) as c_uint), __param_xoptions, __param_cb, (&_pcre2_vspace_list_8[0] as *mut c_uint))
         goto '__ci_bb_77
     }
 
@@ -1326,15 +1359,15 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_119 {
-        add_not_list_to_class(((__param_options as c_uint) & ((~8) as c_uint)), __param_xoptions, __param_cb, (&_pcre2_vspace_list_8[0] as *mut c_uint))
+        add_not_list_to_class((((__param_options as c_uint) & ((~8) as c_uint)) as c_uint), __param_xoptions, __param_cb, (&_pcre2_vspace_list_8[0] as *mut c_uint))
         goto '__ci_bb_77
     }
 
     '__ci_bb_120 {
-        (__local_ptype__goto_1433_18 = ((unsafe *__local_pptr__goto_1072_11) as c_uint) >> (16 as c_uint))
+        (__local_ptype__goto_1433_18 = (((((unsafe *__local_pptr__goto_1072_11) as c_uint) >> (16 as c_uint)) as c_uint)))
         (__ci_expr_old_13 = __local_pptr__goto_1072_11)
         (__local_pptr__goto_1072_11 = __local_pptr__goto_1072_11 + 1)
-        (__local_pdata__goto_1434_18 = ((unsafe *__ci_expr_old_13) as c_uint) & (65535 as c_uint))
+        (__local_pdata__goto_1434_18 = (((((unsafe *__ci_expr_old_13) as c_uint) & (65535 as c_uint)) as c_uint)))
         if ((if __local_ptype__goto_1433_18 == 13: 1 else: 0) != 0) {
             goto '__ci_bb_121
         } else {
@@ -1355,7 +1388,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_122 {
-        _pcre2_update_classbits_8(__local_ptype__goto_1433_18, __local_pdata__goto_1434_18, (if __local_escape__goto_1175_12 == 15: 1 else: 0), __local_classbits__goto_1078_16)
+        _pcre2_update_classbits_8(__local_ptype__goto_1433_18, __local_pdata__goto_1434_18, ((if __local_escape__goto_1175_12 == 15: 1 else: 0) as c_int), __local_classbits__goto_1078_16)
         if ((if ((__local_xclass_props__goto_1089_10 as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_125
         } else {
@@ -1364,7 +1397,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_123 {
-        with_memset((__local_classbits__goto_1078_16 as *i8), 255, (32 as i64))
+        with_memset(((__local_classbits__goto_1078_16 as *mut c_void) as *mut u8), (255 as c_int), ((32 as c_ulong) as i64))
         goto '__ci_bb_124
     }
 
@@ -1385,7 +1418,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_127 {
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + 3)
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% 3))
         goto '__ci_bb_129
     }
 
@@ -1394,22 +1427,22 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + 1)
         (__ci_expr_ternary_16 = 0)
         if ((if __local_escape__goto_1175_12 == 16: 1 else: 0) != 0) {
-            (__ci_expr_ternary_16 = 3)
+            (__ci_expr_ternary_16 = ((3 as c_int)))
         } else {
-            (__ci_expr_ternary_16 = 4)
+            (__ci_expr_ternary_16 = ((4 as c_int)))
         }
-        ((unsafe *__ci_expr_old_15) = __ci_expr_ternary_16)
+        ((unsafe *__ci_expr_old_15) = ((__ci_expr_ternary_16 as u8)))
         (__ci_expr_old_17 = __local_class_uchardata__goto_1090_14)
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + 1)
-        ((unsafe *__ci_expr_old_17) = __local_ptype__goto_1433_18)
+        ((unsafe *__ci_expr_old_17) = ((__local_ptype__goto_1433_18 as u8)))
         (__ci_expr_old_18 = __local_class_uchardata__goto_1090_14)
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + 1)
-        ((unsafe *__ci_expr_old_18) = __local_pdata__goto_1434_18)
+        ((unsafe *__ci_expr_old_18) = ((__local_pdata__goto_1434_18 as u8)))
         goto '__ci_bb_129
     }
 
     '__ci_bb_129 {
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 5)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (5 as c_uint))
         goto '__ci_bb_126
     }
 
@@ -1546,7 +1579,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_148 {
-        ((unsafe *__param_cb).external_flags = __param_cb.external_flags | 2048)
+        ((unsafe *__param_cb).external_flags = ((unsafe *__param_cb).external_flags as c_uint) | (2048 as c_uint))
         goto '__ci_bb_149
     }
 
@@ -1604,7 +1637,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_154 {
-        ((unsafe *__param_cb).external_flags = __param_cb.external_flags | 2048)
+        ((unsafe *__param_cb).external_flags = ((unsafe *__param_cb).external_flags as c_uint) | (2048 as c_uint))
         goto '__ci_bb_155
     }
 
@@ -1621,7 +1654,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_157 {
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 2)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (2 as c_uint))
         add_to_class(__param_options, __param_xoptions, __param_cb, __local_c__goto_1175_20, __local_d__goto_1493_14)
         goto '__ci_bb_20
     }
@@ -1631,7 +1664,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_159 {
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 2)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (2 as c_uint))
         add_to_class(__param_options, __param_xoptions, __param_cb, __local_meta__goto_1170_12, __local_meta__goto_1170_12)
         goto '__ci_bb_20
     }
@@ -1658,7 +1691,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
 
     '__ci_bb_163 {
         (__local_range__goto_1577_13 = (((__local_cranges__goto_1091_15 + ((1 as isize) as usize)) as *mut c_uint)))
-        (__local_end__goto_1578_13 = __local_range__goto_1577_13 + ((__local_cranges__goto_1091_15.range_list_size as c_uint) as usize))
+        (__local_end__goto_1578_13 = __local_range__goto_1577_13 + (((unsafe *__local_cranges__goto_1091_15).range_list_size as c_uint) as usize))
         goto '__ci_bb_165
     }
 
@@ -1687,7 +1720,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_167 {
-        if ((if __local_cranges__goto_1091_15.char_lists_size > 0: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_cranges__goto_1091_15).char_lists_size > 0: 1 else: 0) != 0) {
             goto '__ci_bb_173
         } else {
             goto '__ci_bb_174
@@ -1709,11 +1742,11 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     '__ci_bb_170 {
         (__ci_expr_ternary_25 = 0)
         if ((if ((__param_options as c_uint) & (((524288 as c_uint) | (131072 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
-            (__ci_expr_ternary_25 = (__param_options as c_uint) & ((~8) as c_uint))
+            (__ci_expr_ternary_25 = ((((__param_options as c_uint) & ((~8) as c_uint)) as c_uint)))
         } else {
             (__ci_expr_ternary_25 = __param_options)
         }
-        add_to_class(__ci_expr_ternary_25, __param_xoptions, __param_cb, (unsafe __local_range__goto_1577_13[0]), (unsafe __local_range__goto_1577_13[1]))
+        add_to_class(__ci_expr_ternary_25, __param_xoptions, __param_cb, ((unsafe __local_range__goto_1577_13[0]) as c_uint), ((unsafe __local_range__goto_1577_13[1]) as c_uint))
         if ((if (unsafe __local_range__goto_1577_13[1]) > 255: 1 else: 0) != 0) {
             goto '__ci_bb_171
         } else {
@@ -1759,7 +1792,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_178 {
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 9)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (9 as c_uint))
         goto '__ci_bb_175
     }
 
@@ -1784,7 +1817,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_183 {
-        (__local_should_flip_negation__goto_1074_6 = 1)
+        (__local_should_flip_negation__goto_1074_6 = ((1 as c_int)))
         (__local_range__goto_1577_13 = __local_end__goto_1578_13)
         goto '__ci_bb_180
     }
@@ -1798,10 +1831,10 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_185 {
-        (__local_range_start__goto_1612_16 = (unsafe __local_range__goto_1577_13[0]))
-        (__local_range_end__goto_1613_16 = (unsafe __local_range__goto_1577_13[1]))
+        (__local_range_start__goto_1612_16 = (((unsafe __local_range__goto_1577_13[0]) as c_uint)))
+        (__local_range_end__goto_1613_16 = (((unsafe __local_range__goto_1577_13[1]) as c_uint)))
         (__local_range__goto_1577_13 = __local_range__goto_1577_13 + ((2 as isize) as usize))
-        (__local_xclass_props__goto_1089_10 = __local_xclass_props__goto_1089_10 | 1)
+        (__local_xclass_props__goto_1089_10 = (__local_xclass_props__goto_1089_10 as c_uint) | (1 as c_uint))
         if ((if __local_range_start__goto_1612_16 < 256: 1 else: 0) != 0) {
             goto '__ci_bb_187
         } else {
@@ -1818,7 +1851,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_187 {
-        (__local_range_start__goto_1612_16 = 256)
+        (__local_range_start__goto_1612_16 = ((256 as c_uint)))
         goto '__ci_bb_188
     }
 
@@ -1847,7 +1880,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_191 {
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + 1)
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% 1))
         if ((if __local_range_start__goto_1612_16 < __local_range_end__goto_1613_16: 1 else: 0) != 0) {
             goto '__ci_bb_193
         } else {
@@ -1858,21 +1891,21 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     '__ci_bb_192 {
         (__ci_expr_ternary_26 = 0)
         if ((if __local_range_start__goto_1612_16 < __local_range_end__goto_1613_16: 1 else: 0) != 0) {
-            (__ci_expr_ternary_26 = 3)
+            (__ci_expr_ternary_26 = ((3 as c_int)))
         } else {
-            (__ci_expr_ternary_26 = 2)
+            (__ci_expr_ternary_26 = ((2 as c_int)))
         }
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + __ci_expr_ternary_26)
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% __ci_expr_ternary_26))
         goto '__ci_bb_184
     }
 
     '__ci_bb_193 {
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + _pcre2_ord2utf_8(__local_range_start__goto_1612_16, __local_class_uchardata__goto_1090_14))
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% _pcre2_ord2utf_8(__local_range_start__goto_1612_16, __local_class_uchardata__goto_1090_14)))
         goto '__ci_bb_194
     }
 
     '__ci_bb_194 {
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + _pcre2_ord2utf_8(__local_range_end__goto_1613_16, __local_class_uchardata__goto_1090_14))
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% _pcre2_ord2utf_8(__local_range_end__goto_1613_16, __local_class_uchardata__goto_1090_14)))
         goto '__ci_bb_184
     }
 
@@ -1891,7 +1924,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     '__ci_bb_197 {
         (__ci_expr_old_27 = __local_class_uchardata__goto_1090_14)
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + 1)
-        ((unsafe *__ci_expr_old_27) = 2)
+        ((unsafe *__ci_expr_old_27) = ((2 as u8)))
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + (_pcre2_ord2utf_8(__local_range_start__goto_1612_16, __local_class_uchardata__goto_1090_14) as usize))
         goto '__ci_bb_199
     }
@@ -1899,7 +1932,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     '__ci_bb_198 {
         (__ci_expr_old_28 = __local_class_uchardata__goto_1090_14)
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + 1)
-        ((unsafe *__ci_expr_old_28) = 1)
+        ((unsafe *__ci_expr_old_28) = ((1 as u8)))
         goto '__ci_bb_199
     }
 
@@ -1909,7 +1942,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_200 {
-        (&raw const (unsafe *__param_cb.cx).memctl as *const pcre2_memctl).free(__local_cranges__goto_1091_15, (&raw const (unsafe *__param_cb.cx).memctl as *const pcre2_memctl).memory_data)
+        (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).free(__local_cranges__goto_1091_15, (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
         goto '__ci_bb_201
     }
 
@@ -1937,22 +1970,22 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     '__ci_bb_204 {
         (__ci_expr_old_29 = __local_class_uchardata__goto_1090_14)
         (__local_class_uchardata__goto_1090_14 = __local_class_uchardata__goto_1090_14 + 1)
-        ((unsafe *__ci_expr_old_29) = 0)
+        ((unsafe *__ci_expr_old_29) = ((0 as u8)))
         goto '__ci_bb_205
     }
 
     '__ci_bb_205 {
         (__ci_expr_old_30 = __local_code__goto_1073_14)
         (__local_code__goto_1073_14 = __local_code__goto_1073_14 + 1)
-        ((unsafe *__ci_expr_old_30) = 112)
+        ((unsafe *__ci_expr_old_30) = ((112 as u8)))
         (__local_code__goto_1073_14 = __local_code__goto_1073_14 + ((2 as isize) as usize))
         (__ci_expr_ternary_31 = 0)
         if (__param_negate_class != 0) {
-            (__ci_expr_ternary_31 = 1)
+            (__ci_expr_ternary_31 = ((1 as c_int)))
         } else {
-            (__ci_expr_ternary_31 = 0)
+            (__ci_expr_ternary_31 = ((0 as c_int)))
         }
-        ((unsafe *__local_code__goto_1073_14) = __ci_expr_ternary_31)
+        ((unsafe *__local_code__goto_1073_14) = ((__ci_expr_ternary_31 as u8)))
         if ((if ((__local_xclass_props__goto_1089_10 as c_uint) & (4 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_206
         } else {
@@ -1961,7 +1994,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_206 {
-        ((unsafe *__local_code__goto_1073_14) = (unsafe *__local_code__goto_1073_14) | 4)
+        ((unsafe *__local_code__goto_1073_14) = ((unsafe *__local_code__goto_1073_14) as u8) | (4 as u8))
         goto '__ci_bb_207
     }
 
@@ -2001,7 +2034,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
 
     '__ci_bb_211 {
         (__local_classwords__goto_1719_17 = ((&raw const (unsafe *__param_cb).classbits.classwords[0] as *mut c_uint)))
-        (__local_i__goto_1720_16 = 0)
+        (__local_i__goto_1720_16 = ((0 as c_int)))
         goto '__ci_bb_213
     }
 
@@ -2022,7 +2055,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_214 {
-        ((unsafe __local_classwords__goto_1719_17[__local_i__goto_1720_16]) = (~(unsafe __local_classwords__goto_1719_17[__local_i__goto_1720_16])))
+        ((unsafe __local_classwords__goto_1719_17[__local_i__goto_1720_16]) = (((~(unsafe __local_classwords__goto_1719_17[__local_i__goto_1720_16])) as c_uint)))
         goto '__ci_bb_215
     }
 
@@ -2038,9 +2071,9 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     '__ci_bb_217 {
         (__ci_expr_old_33 = __local_code__goto_1073_14)
         (__local_code__goto_1073_14 = __local_code__goto_1073_14 + 1)
-        ((unsafe *__ci_expr_old_33) = (unsafe *__ci_expr_old_33) | 2)
-        with_memmove(((__local_code__goto_1073_14 + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize)) as *i8), (__local_code__goto_1073_14 as *i8), (((((__local_class_uchardata__goto_1090_14 as usize) -% (__local_code__goto_1073_14 as usize)) / sizeof[u8]()) * 1) as i64))
-        with_memcpy((__local_code__goto_1073_14 as *i8), (__local_classbits__goto_1078_16 as *i8), (32 as i64))
+        ((unsafe *__ci_expr_old_33) = ((unsafe *__ci_expr_old_33) as u8) | (2 as u8))
+        with_memmove((((__local_code__goto_1073_14 + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize)) as *mut c_void) as *mut u8), ((__local_code__goto_1073_14 as *const c_void) as *const u8), ((((((__local_class_uchardata__goto_1090_14 as usize) -% (__local_code__goto_1073_14 as usize)) / sizeof[u8]()) * 1) as c_ulong) as i64))
+        with_memcpy(((__local_code__goto_1073_14 as *mut c_void) as *mut u8), ((__local_classbits__goto_1078_16 as *const c_void) as *const u8), ((32 as c_ulong) as i64))
         (__local_code__goto_1073_14 = __local_class_uchardata__goto_1090_14 + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
         goto '__ci_bb_219
     }
@@ -2059,7 +2092,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_220 {
-        ((unsafe *__param_has_bitmap) = 1)
+        ((unsafe *__param_has_bitmap) = ((1 as c_int)))
         goto '__ci_bb_221
     }
 
@@ -2068,13 +2101,13 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_222 {
-        (__local_char_lists_size__goto_1744_12 = __local_cranges__goto_1091_15.char_lists_size)
+        (__local_char_lists_size__goto_1744_12 = (unsafe *__local_cranges__goto_1091_15).char_lists_size)
         goto '__ci_bb_224
     }
 
     '__ci_bb_223 {
         ((unsafe __local_previous__goto_1703_16[1]) = ((((((((__local_code__goto_1073_14 as usize) -% (__local_previous__goto_1703_16 as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
-        ((unsafe __local_previous__goto_1703_16[(1 + 1)]) = (((((((__local_code__goto_1073_14 as usize) -% (__local_previous__goto_1703_16 as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
+        ((unsafe __local_previous__goto_1703_16[(1 + 1)]) = ((((((((__local_code__goto_1073_14 as usize) -% (__local_previous__goto_1703_16 as usize)) / sizeof[u8]()) as c_int) as c_int) & (255 as c_int)) as u8)))
         goto '__ci_bb_235
     }
 
@@ -2099,9 +2132,9 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_227 {
-        (__local_char_lists_size__goto_1744_12 = (((__local_char_lists_size__goto_1744_12 as c_ulong) +% (((sizeof[u32]() as c_ulong) -% (1 as c_ulong)) as c_ulong)) as c_ulong) & ((~((sizeof[u32]() as c_ulong) -% (1 as c_ulong))) as c_ulong))
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + 4)
-        ((unsafe *__param_cb).char_lists_size = __param_cb.char_lists_size + __local_char_lists_size__goto_1744_12)
+        (__local_char_lists_size__goto_1744_12 = ((((((__local_char_lists_size__goto_1744_12 as c_ulong) +% (((sizeof[u32]() as c_ulong) -% (1 as c_ulong)) as c_ulong)) as c_ulong) & ((~((sizeof[u32]() as c_ulong) -% (1 as c_ulong))) as c_ulong)) as c_ulong)))
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% 4))
+        ((unsafe *__param_cb).char_lists_size = ((unsafe *__param_cb).char_lists_size +% __local_char_lists_size__goto_1744_12))
         (__local_char_lists_size__goto_1744_12 = __local_char_lists_size__goto_1744_12 / sizeof[u8]())
         if ((if (unsafe *__param_lengthptr) > 65536: 1 else: 0) != 0) {
             (__ci_expr_logic_34 = (if true: 1 else: 0))
@@ -2125,7 +2158,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
 
     '__ci_bb_230 {
         ((unsafe *__param_errorcodeptr) = ERR20)
-        return null
+        return ((null as *mut c_uint))
     }
 
     '__ci_bb_231 {
@@ -2146,34 +2179,34 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
 
     '__ci_bb_234 {
         (__ci_expr_ternary_35 = 0)
-        if (1 != 0) {
-            (__ci_expr_ternary_35 = 16)
+        if ((if sizeof[u8]() == 1: 1 else: 0) != 0) {
+            (__ci_expr_ternary_35 = ((16 as c_int)))
         } else {
-            (__ci_expr_ternary_35 = 4096)
+            (__ci_expr_ternary_35 = ((4096 as c_int)))
         }
-        ((unsafe __local_code__goto_1073_14[0]) = (((__ci_expr_ternary_35 | ((__local_cranges__goto_1091_15.char_lists_types as c_int) >> (8 as c_uint))) as u8)))
-        ((unsafe __local_code__goto_1073_14[1]) = ((__local_cranges__goto_1091_15.char_lists_types as u8)))
+        ((unsafe __local_code__goto_1073_14[0]) = ((((__ci_expr_ternary_35 as c_int) | ((((unsafe *__local_cranges__goto_1091_15).char_lists_types as c_int) >> (8 as c_uint)) as c_int)) as u8)))
+        ((unsafe __local_code__goto_1073_14[1]) = (((unsafe *__local_cranges__goto_1091_15).char_lists_types as u8)))
         (__local_code__goto_1073_14 = __local_code__goto_1073_14 + ((2 as isize) as usize))
-        ((unsafe *__param_cb).char_lists_size = __param_cb.char_lists_size + __local_char_lists_size__goto_1744_12)
-        (__local_data__goto_1773_16 = __param_cb.start_code - (__param_cb.char_lists_size as usize))
-        with_memcpy((__local_data__goto_1773_16 as *i8), ((((__local_cranges__goto_1091_15 + ((1 as isize) as usize)) as *mut u8) + (__local_cranges__goto_1091_15.char_lists_start as usize)) as *i8), (__local_char_lists_size__goto_1744_12 as i64))
-        (__local_char_lists_size__goto_1744_12 = __param_cb.char_lists_size)
+        ((unsafe *__param_cb).char_lists_size = ((unsafe *__param_cb).char_lists_size +% __local_char_lists_size__goto_1744_12))
+        (__local_data__goto_1773_16 = (unsafe *__param_cb).start_code - ((unsafe *__param_cb).char_lists_size as usize))
+        with_memcpy(((__local_data__goto_1773_16 as *mut c_void) as *mut u8), (((((__local_cranges__goto_1091_15 + ((1 as isize) as usize)) as *mut u8) + ((unsafe *__local_cranges__goto_1091_15).char_lists_start as usize)) as *const c_void) as *const u8), (__local_char_lists_size__goto_1744_12 as i64))
+        (__local_char_lists_size__goto_1744_12 = (unsafe *__param_cb).char_lists_size)
         ((unsafe __local_code__goto_1073_14[0]) = (((((((__local_char_lists_size__goto_1744_12 as c_ulong) >> (1 as c_uint)) as c_uint) as c_uint) >> (8 as c_uint)) as u8)))
         ((unsafe __local_code__goto_1073_14[(0 + 1)]) = (((((((__local_char_lists_size__goto_1744_12 as c_ulong) >> (1 as c_uint)) as c_uint) as c_uint) & (255 as c_uint)) as u8)))
         (__local_code__goto_1073_14 = __local_code__goto_1073_14 + ((2 as isize) as usize))
-        ((unsafe *__param_cb).char_lists_size = (((__local_char_lists_size__goto_1744_12 as c_ulong) +% (((sizeof[u32]() as c_ulong) -% (1 as c_ulong)) as c_ulong)) as c_ulong) & ((~((sizeof[u32]() as c_ulong) -% (1 as c_ulong))) as c_ulong))
-        (&raw const (unsafe *__param_cb.cx).memctl as *const pcre2_memctl).free(__local_cranges__goto_1091_15, (&raw const (unsafe *__param_cb.cx).memctl as *const pcre2_memctl).memory_data)
+        ((unsafe *__param_cb).char_lists_size = ((((((__local_char_lists_size__goto_1744_12 as c_ulong) +% (((sizeof[u32]() as c_ulong) -% (1 as c_ulong)) as c_ulong)) as c_ulong) & ((~((sizeof[u32]() as c_ulong) -% (1 as c_ulong))) as c_ulong)) as c_ulong)))
+        (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).free(__local_cranges__goto_1091_15, (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).memory_data)
         goto '__ci_bb_229
     }
 
     '__ci_bb_235 {
         ((unsafe *__param_pcode) = __local_code__goto_1073_14)
-        return (__local_pptr__goto_1072_11 - ((1 as isize) as usize))
+        return (((__local_pptr__goto_1072_11 - ((1 as isize) as usize)) as *mut c_uint))
     }
 
     '__ci_bb_236 {
         (__local_classwords__goto_1839_13 = ((&raw const (unsafe *__param_cb).classbits.classwords[0] as *mut c_uint)))
-        (__local_i__goto_1841_12 = 0)
+        (__local_i__goto_1841_12 = ((0 as c_int)))
         goto '__ci_bb_238
     }
 
@@ -2185,7 +2218,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
             (__ci_expr_logic_36 = (if (if __param_negate_class != __local_should_flip_negation__goto_1074_6: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_36 != 0) {
-            (__ci_expr_logic_37 = (if (if (&raw const (unsafe *__param_cb).classbits as *const class_bits_storage).classwords[0] == (~(0 as c_uint)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_37 = (if (if (unsafe *(&raw const (unsafe *__param_cb).classbits as *const class_bits_storage)).classwords[0] == (~(0 as c_uint)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_37 != 0) {
             goto '__ci_bb_242
@@ -2203,7 +2236,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     }
 
     '__ci_bb_239 {
-        ((unsafe __local_classwords__goto_1839_13[__local_i__goto_1841_12]) = (~(unsafe __local_classwords__goto_1839_13[__local_i__goto_1841_12])))
+        ((unsafe __local_classwords__goto_1839_13[__local_i__goto_1841_12]) = (((~(unsafe __local_classwords__goto_1839_13[__local_i__goto_1841_12])) as c_uint)))
         goto '__ci_bb_240
     }
 
@@ -2218,7 +2251,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
 
     '__ci_bb_242 {
         (__local_classwords__goto_1847_19 = ((&raw const (unsafe *__param_cb).classbits.classwords[0] as *const c_uint)))
-        (__local_i__goto_1848_7 = 0)
+        (__local_i__goto_1848_7 = ((0 as c_int)))
         goto '__ci_bb_244
     }
 
@@ -2231,8 +2264,8 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
         } else {
             (__ci_expr_ternary_40 = OP_NCLASS)
         }
-        ((unsafe *__ci_expr_old_39) = __ci_expr_ternary_40)
-        with_memcpy((__local_code__goto_1073_14 as *i8), (__local_classbits__goto_1078_16 as *i8), (32 as i64))
+        ((unsafe *__ci_expr_old_39) = ((__ci_expr_ternary_40 as u8)))
+        with_memcpy(((__local_code__goto_1073_14 as *mut c_void) as *mut u8), ((__local_classbits__goto_1078_16 as *const c_void) as *const u8), ((32 as c_ulong) as i64))
         (__local_code__goto_1073_14 = __local_code__goto_1073_14 + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
         goto '__ci_bb_235
     }
@@ -2277,7 +2310,7 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
     '__ci_bb_250 {
         (__ci_expr_old_38 = __local_code__goto_1073_14)
         (__local_code__goto_1073_14 = __local_code__goto_1073_14 + 1)
-        ((unsafe *__ci_expr_old_38) = 13)
+        ((unsafe *__ci_expr_old_38) = ((13 as u8)))
         goto '__ci_bb_235
     }
 
@@ -2285,9 +2318,11 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
         goto '__ci_bb_243
     }
 
+    __ci_unreachable()
+
 }
 
-fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_uint, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> c_int {
+pub unsafe fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_uint, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> c_int {
     var __local_context: eclass_context
 
     var __local_op_info: eclass_op_info
@@ -2297,7 +2332,7 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
         if ((if __param_lengthptr != null: 1 else: 0) != 0) {
             (__ci_expr_ternary_0 = (unsafe *__param_lengthptr))
         } else {
-            (__ci_expr_ternary_0 = 0)
+            (__ci_expr_ternary_0 = ((0 as c_ulong)))
         }
         __ci_expr_ternary_0
     }
@@ -2306,9 +2341,9 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
     var __local_previous: *mut u8
 
-    var __local_allbitsone: c_int = 1
+    var __local_allbitsone: c_int = ((1 as c_int))
 
-    (__local_context.needs_bitmap = 0)
+    (__local_context.needs_bitmap = ((0 as c_int)))
 
     (__local_context.options = __param_options)
 
@@ -2324,7 +2359,7 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
     (__local_code = __local_code + 1)
 
-    ((unsafe *__ci_expr_old_1) = 113)
+    ((unsafe *__ci_expr_old_1) = ((113 as u8)))
 
 
     (__local_code = __local_code + ((2 as isize) as usize))
@@ -2333,25 +2368,25 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
     (__local_code = __local_code + 1)
 
-    ((unsafe *__ci_expr_old_2) = 0)
+    ((unsafe *__ci_expr_old_2) = ((0 as u8)))
 
 
-    if ((if not (compile_eclass_nested((&raw mut __local_context as *mut eclass_context), 0, __param_pptr, (&raw mut __local_code as *mut *mut u8), (&raw mut __local_op_info as *mut eclass_op_info), __param_lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_eclass_nested((&raw mut __local_context as *mut eclass_context), (0 as c_int), __param_pptr, (&raw mut __local_code as *mut *mut u8), (&raw mut __local_op_info as *mut eclass_op_info), __param_lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
     if ((if __param_lengthptr != null: 1 else: 0) != 0) {
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + (((__local_code as usize) -% (__local_previous as usize)) / sizeof[u8]()))
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% (((__local_code as usize) -% (__local_previous as usize)) / sizeof[u8]())))
 
         (__local_code = __local_previous)
 
     }
 
-    var __local_i: c_int = 0
+    var __local_i: c_int = ((0 as c_int))
 
     while ((if __local_i < 8: 1 else: 0) != 0) {
-        if ((if (&raw const __local_op_info.bits as *const class_bits_storage).classwords[__local_i] != 4294967295: 1 else: 0) != 0) {
-            (__local_allbitsone = 0)
+        if ((if (unsafe *(&raw const __local_op_info.bits as *const class_bits_storage)).classwords[__local_i] != 4294967295: 1 else: 0) != 0) {
+            (__local_allbitsone = ((0 as c_int)))
 
             break
 
@@ -2362,48 +2397,48 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
     }
 
 
-    if ((if (&raw const __local_op_info as *const eclass_op_info).op_single_type != 0: 1 else: 0) != 0) {
+    if ((if (unsafe *(&raw const __local_op_info as *const eclass_op_info)).op_single_type != 0: 1 else: 0) != 0) {
         (__local_code = __local_previous)
 
         var __ci_expr_logic_3: c_int = 0
 
-        if ((if (&raw const __local_op_info as *const eclass_op_info).op_single_type == 6: 1 else: 0) != 0) {
+        if ((if (unsafe *(&raw const __local_op_info as *const eclass_op_info)).op_single_type == 6: 1 else: 0) != 0) {
             (__ci_expr_logic_3 = (if __local_allbitsone != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_3 != 0) {
             if ((if __param_lengthptr != null: 1 else: 0) != 0) {
-                ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) - 1)
+                ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) -% 1))
             }
 
             var __ci_expr_old_4: *mut u8 = __local_code
 
             (__local_code = __local_code + 1)
 
-            ((unsafe *__ci_expr_old_4) = 13)
+            ((unsafe *__ci_expr_old_4) = ((13 as u8)))
 
 
         } else {
             var __ci_expr_logic_5: c_int
 
-            if ((if (&raw const __local_op_info as *const eclass_op_info).op_single_type == 6: 1 else: 0) != 0) {
+            if ((if (unsafe *(&raw const __local_op_info as *const eclass_op_info)).op_single_type == 6: 1 else: 0) != 0) {
                 (__ci_expr_logic_5 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_5 = (if (if (&raw const __local_op_info as *const eclass_op_info).op_single_type == 7: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_5 = (if (if (unsafe *(&raw const __local_op_info as *const eclass_op_info)).op_single_type == 7: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_5 != 0) {
-                var __local_required_len: c_ulong = ((1 as c_ulong) +% (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong))
+                var __local_required_len: c_ulong = ((((1 as c_ulong) +% (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)) as c_ulong))
 
                 if ((if __param_lengthptr != null: 1 else: 0) != 0) {
                     if ((if __local_required_len > (((unsafe *__param_lengthptr) as c_ulong) -% (__local_previous_length as c_ulong)): 1 else: 0) != 0) {
-                        ((unsafe *__param_lengthptr) = ((__local_previous_length as c_ulong) +% (__local_required_len as c_ulong)))
+                        ((unsafe *__param_lengthptr) = ((((__local_previous_length as c_ulong) +% (__local_required_len as c_ulong)) as c_ulong)))
                     }
 
                 }
 
                 if ((if __param_lengthptr != null: 1 else: 0) != 0) {
-                    ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) - __local_required_len)
+                    ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) -% __local_required_len))
                 }
 
                 var __ci_expr_old_6: *mut u8 = __local_code
@@ -2412,56 +2447,59 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
                 var __ci_expr_ternary_7: c_int = 0
 
-                if ((if (&raw const __local_op_info as *const eclass_op_info).op_single_type == 6: 1 else: 0) != 0) {
+                if ((if (unsafe *(&raw const __local_op_info as *const eclass_op_info)).op_single_type == 6: 1 else: 0) != 0) {
                     (__ci_expr_ternary_7 = OP_NCLASS)
                 } else {
                     (__ci_expr_ternary_7 = OP_CLASS)
                 }
 
-                ((unsafe *__ci_expr_old_6) = __ci_expr_ternary_7)
+                ((unsafe *__ci_expr_old_6) = ((__ci_expr_ternary_7 as u8)))
 
 
-                with_memcpy((__local_code as *i8), ((&(unsafe (&raw const __local_op_info.bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), (32 as i64))
+                with_memcpy(((__local_code as *mut c_void) as *mut u8), ((&(unsafe *(&raw const __local_op_info.bits as *const class_bits_storage)).classbits[0] as *mut u8) as *const u8), ((32 as c_ulong) as i64))
 
                 (__local_code = __local_code + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
 
             } else {
-                var __local_need_map: c_int = (&raw const __local_context as *const eclass_context).needs_bitmap
+                var __local_need_map: c_int = (unsafe *(&raw const __local_context as *const eclass_context)).needs_bitmap
 
                 var __local_required_len_1: c_ulong
 
-                do {
+                loop {
                     0
-                } while (0 != 0)
+                    if not ((0 != 0)) {
+                        break
+                    }
+                }
 
                 var __ci_expr_ternary_8: c_ulong = 0
 
                 if (__local_need_map != 0) {
-                    (__ci_expr_ternary_8 = (32 as c_ulong) / (sizeof[u8]() as c_ulong))
+                    (__ci_expr_ternary_8 = ((((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
                 } else {
-                    (__ci_expr_ternary_8 = 0)
+                    (__ci_expr_ternary_8 = ((0 as c_ulong)))
                 }
 
-                (__local_required_len_1 = (((&raw const __local_op_info as *const eclass_op_info).length as c_ulong) +% (__ci_expr_ternary_8 as c_ulong)))
+                (__local_required_len_1 = (((((unsafe *(&raw const __local_op_info as *const eclass_op_info)).length as c_ulong) +% (__ci_expr_ternary_8 as c_ulong)) as c_ulong)))
 
 
                 if ((if __param_lengthptr != null: 1 else: 0) != 0) {
                     if ((if __local_required_len_1 > (((unsafe *__param_lengthptr) as c_ulong) -% (__local_previous_length as c_ulong)): 1 else: 0) != 0) {
-                        ((unsafe *__param_lengthptr) = ((__local_previous_length as c_ulong) +% (__local_required_len_1 as c_ulong)))
+                        ((unsafe *__param_lengthptr) = ((((__local_previous_length as c_ulong) +% (__local_required_len_1 as c_ulong)) as c_ulong)))
                     }
 
-                    ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) - 4)
+                    ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) -% 4))
 
                     var __ci_expr_old_9: *mut u8 = __local_code
 
                     (__local_code = __local_code + 1)
 
-                    ((unsafe *__ci_expr_old_9) = 112)
+                    ((unsafe *__ci_expr_old_9) = ((112 as u8)))
 
 
                     ((unsafe __local_code[0]) = ((((((1 + 2) + 1) as c_int) >> (8 as c_uint)) as u8)))
 
-                    ((unsafe __local_code[(0 + 1)]) = (((((1 + 2) + 1) & 255) as u8)))
+                    ((unsafe __local_code[(0 + 1)]) = ((((((1 + 2) + 1) as c_int) & (255 as c_int)) as u8)))
 
 
                     (__local_code = __local_code + ((2 as isize) as usize))
@@ -2470,7 +2508,7 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
                     (__local_code = __local_code + 1)
 
-                    ((unsafe *__ci_expr_old_10) = 0)
+                    ((unsafe *__ci_expr_old_10) = ((0 as u8)))
 
 
                 } else {
@@ -2480,41 +2518,47 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
                     var __local_flags: u8
 
-                    do {
+                    loop {
                         0
-                    } while (0 != 0)
+                        if not ((0 != 0)) {
+                            break
+                        }
+                    }
 
-                    (__local_rest = (((&raw const __local_op_info as *const eclass_op_info).code_start + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
+                    (__local_rest = (((unsafe *(&raw const __local_op_info as *const eclass_op_info)).code_start + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
 
-                    (__local_rest_len = ((((&raw const __local_op_info as *const eclass_op_info).code_start + ((&raw const __local_op_info as *const eclass_op_info).length as usize)) as usize) -% (__local_rest as usize)) / sizeof[u8]())
+                    (__local_rest_len = (((((((unsafe *(&raw const __local_op_info as *const eclass_op_info)).code_start + ((unsafe *(&raw const __local_op_info as *const eclass_op_info)).length as usize)) as usize) -% (__local_rest as usize)) / sizeof[u8]()) as c_ulong)))
 
-                    (__local_flags = (unsafe (&raw const __local_op_info as *const eclass_op_info).code_start[(1 + 2)]))
+                    (__local_flags = (((unsafe (unsafe *(&raw const __local_op_info as *const eclass_op_info)).code_start[(1 + 2)]) as u8)))
 
-                    do {
+                    loop {
                         0
-                    } while (0 != 0)
+                        if not ((0 != 0)) {
+                            break
+                        }
+                    }
 
                     var __ci_expr_ternary_11: c_ulong = 0
 
                     if (__local_need_map != 0) {
-                        (__ci_expr_ternary_11 = (32 as c_ulong) / (sizeof[u8]() as c_ulong))
+                        (__ci_expr_ternary_11 = ((((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
                     } else {
-                        (__ci_expr_ternary_11 = 0)
+                        (__ci_expr_ternary_11 = ((0 as c_ulong)))
                     }
 
-                    with_memmove((((((__local_code + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize)) + (__ci_expr_ternary_11 as usize)) as *i8), (__local_rest as *i8), (((__local_rest_len as c_ulong) *% (1 as c_ulong)) as i64))
+                    with_memmove(((((((__local_code + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize)) + (__ci_expr_ternary_11 as usize)) as *mut c_void) as *mut u8), ((__local_rest as *const c_void) as *const u8), ((((__local_rest_len as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
 
 
                     var __ci_expr_old_12: *mut u8 = __local_code
 
                     (__local_code = __local_code + 1)
 
-                    ((unsafe *__ci_expr_old_12) = 112)
+                    ((unsafe *__ci_expr_old_12) = ((112 as u8)))
 
 
                     ((unsafe __local_code[0]) = (((((__local_required_len_1 as c_int) as c_int) >> (8 as c_uint)) as u8)))
 
-                    ((unsafe __local_code[(0 + 1)]) = ((((__local_required_len_1 as c_int) & 255) as u8)))
+                    ((unsafe __local_code[(0 + 1)]) = (((((__local_required_len_1 as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
                     (__local_code = __local_code + ((2 as isize) as usize))
@@ -2526,16 +2570,16 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
                     var __ci_expr_ternary_14: c_int = 0
 
                     if (__local_need_map != 0) {
-                        (__ci_expr_ternary_14 = 2)
+                        (__ci_expr_ternary_14 = ((2 as c_int)))
                     } else {
-                        (__ci_expr_ternary_14 = 0)
+                        (__ci_expr_ternary_14 = ((0 as c_int)))
                     }
 
-                    ((unsafe *__ci_expr_old_13) = (__local_flags as c_int) | __ci_expr_ternary_14)
+                    ((unsafe *__ci_expr_old_13) = (((((__local_flags as c_int) as c_int) | (__ci_expr_ternary_14 as c_int)) as u8)))
 
 
                     if (__local_need_map != 0) {
-                        with_memcpy((__local_code as *i8), ((&(unsafe (&raw const __local_op_info.bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), (32 as i64))
+                        with_memcpy(((__local_code as *mut c_void) as *mut u8), ((&(unsafe *(&raw const __local_op_info.bits as *const class_bits_storage)).classbits[0] as *mut u8) as *const u8), ((32 as c_ulong) as i64))
 
                         (__local_code = __local_code + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
 
@@ -2551,35 +2595,35 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
 
     } else {
-        var __local_need_map_1: c_int = (&raw const __local_context as *const eclass_context).needs_bitmap
+        var __local_need_map_1: c_int = (unsafe *(&raw const __local_context as *const eclass_context)).needs_bitmap
 
-        var __local_required_len_2: c_ulong = with 0 as __ci_expr_seq_176 {
+        var __local_required_len_2: c_ulong = with 0 as __ci_expr_seq_179 {
             var __ci_expr_ternary_15: c_ulong = 0
             if (__local_need_map_1 != 0) {
-                (__ci_expr_ternary_15 = (32 as c_ulong) / (sizeof[u8]() as c_ulong))
+                (__ci_expr_ternary_15 = ((((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong)))
             } else {
-                (__ci_expr_ternary_15 = 0)
+                (__ci_expr_ternary_15 = ((0 as c_ulong)))
             }
-            ((((4 as c_ulong) +% (__ci_expr_ternary_15 as c_ulong)) as c_ulong) +% ((&raw const __local_op_info as *const eclass_op_info).length as c_ulong))
+            (((((4 as c_ulong) +% (__ci_expr_ternary_15 as c_ulong)) as c_ulong) +% ((unsafe *(&raw const __local_op_info as *const eclass_op_info)).length as c_ulong)) as c_ulong)
         }
 
         if ((if __param_lengthptr != null: 1 else: 0) != 0) {
             if ((if __local_required_len_2 > (((unsafe *__param_lengthptr) as c_ulong) -% (__local_previous_length as c_ulong)): 1 else: 0) != 0) {
-                ((unsafe *__param_lengthptr) = ((__local_previous_length as c_ulong) +% (__local_required_len_2 as c_ulong)))
+                ((unsafe *__param_lengthptr) = ((((__local_previous_length as c_ulong) +% (__local_required_len_2 as c_ulong)) as c_ulong)))
             }
 
-            ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) - 4)
+            ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) -% 4))
 
             var __ci_expr_old_16: *mut u8 = __local_code
 
             (__local_code = __local_code + 1)
 
-            ((unsafe *__ci_expr_old_16) = 113)
+            ((unsafe *__ci_expr_old_16) = ((113 as u8)))
 
 
             ((unsafe __local_code[0]) = ((((((1 + 2) + 1) as c_int) >> (8 as c_uint)) as u8)))
 
-            ((unsafe __local_code[(0 + 1)]) = (((((1 + 2) + 1) & 255) as u8)))
+            ((unsafe __local_code[(0 + 1)]) = ((((((1 + 2) + 1) as c_int) & (255 as c_int)) as u8)))
 
 
             (__local_code = __local_code + ((2 as isize) as usize))
@@ -2588,18 +2632,18 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
             (__local_code = __local_code + 1)
 
-            ((unsafe *__ci_expr_old_17) = 0)
+            ((unsafe *__ci_expr_old_17) = ((0 as u8)))
 
 
         } else {
             if (__local_need_map_1 != 0) {
                 var __local_map_start: *mut u8 = (((__local_previous + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
 
-                ((unsafe __local_previous[(1 + 2)]) = (unsafe __local_previous[(1 + 2)]) | 1)
+                ((unsafe __local_previous[(1 + 2)]) = ((unsafe __local_previous[(1 + 2)]) as u8) | (1 as u8))
 
-                with_memmove(((__local_map_start + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize)) as *i8), (__local_map_start as *i8), (((((__local_code as usize) -% (__local_map_start as usize)) / sizeof[u8]()) * 1) as i64))
+                with_memmove((((__local_map_start + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize)) as *mut c_void) as *mut u8), ((__local_map_start as *const c_void) as *const u8), ((((((__local_code as usize) -% (__local_map_start as usize)) / sizeof[u8]()) * 1) as c_ulong) as i64))
 
-                with_memcpy((__local_map_start as *i8), ((&(unsafe (&raw const __local_op_info.bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), (32 as i64))
+                with_memcpy(((__local_map_start as *mut c_void) as *mut u8), ((&(unsafe *(&raw const __local_op_info.bits as *const class_bits_storage)).classbits[0] as *mut u8) as *const u8), ((32 as c_ulong) as i64))
 
                 (__local_code = __local_code + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
 
@@ -2607,7 +2651,7 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
             ((unsafe __local_previous[1]) = ((((((((__local_code as usize) -% (__local_previous as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
 
-            ((unsafe __local_previous[(1 + 1)]) = (((((((__local_code as usize) -% (__local_previous as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
+            ((unsafe __local_previous[(1 + 1)]) = ((((((((__local_code as usize) -% (__local_previous as usize)) / sizeof[u8]()) as c_int) as c_int) & (255 as c_int)) as u8)))
 
 
         }
@@ -2620,7 +2664,7 @@ fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_ui
 
 }
 
-fn do_heapify(__param_buffer: *mut c_uint, __param_size: c_ulong, __param_i: c_ulong) {
+unsafe fn do_heapify(__param_buffer: *mut c_uint, __param_size: c_ulong, __param_i: c_ulong) -> Unit {
     var __local_i = __param_i
     var __local_max: c_ulong
 
@@ -2636,9 +2680,9 @@ fn do_heapify(__param_buffer: *mut c_uint, __param_size: c_ulong, __param_i: c_u
     while (1 != 0) {
         (__local_max = __local_i)
 
-        (__local_left = ((((__local_i as c_ulong) << (1 as c_uint)) as c_ulong) +% (2 as c_ulong)))
+        (__local_left = ((((((__local_i as c_ulong) << (1 as c_uint)) as c_ulong) +% (2 as c_ulong)) as c_ulong)))
 
-        (__local_right = ((__local_left as c_ulong) +% (2 as c_ulong)))
+        (__local_right = ((((__local_left as c_ulong) +% (2 as c_ulong)) as c_ulong)))
 
         var __ci_expr_logic_0: c_int = 0
 
@@ -2666,13 +2710,13 @@ fn do_heapify(__param_buffer: *mut c_uint, __param_size: c_ulong, __param_i: c_u
             return
         }
 
-        (__local_tmp1 = (unsafe __param_buffer[__local_i]))
+        (__local_tmp1 = (((unsafe __param_buffer[__local_i]) as c_uint)))
 
-        (__local_tmp2 = (unsafe __param_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]))
+        (__local_tmp2 = (((unsafe __param_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]) as c_uint)))
 
-        ((unsafe __param_buffer[__local_i]) = (unsafe __param_buffer[__local_max]))
+        ((unsafe __param_buffer[__local_i]) = (((unsafe __param_buffer[__local_max]) as c_uint)))
 
-        ((unsafe __param_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]) = (unsafe __param_buffer[((__local_max as c_ulong) +% (1 as c_ulong))]))
+        ((unsafe __param_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]) = (((unsafe __param_buffer[((__local_max as c_ulong) +% (1 as c_ulong))]) as c_uint)))
 
         ((unsafe __param_buffer[__local_max]) = __local_tmp1)
 
@@ -2685,21 +2729,21 @@ fn do_heapify(__param_buffer: *mut c_uint, __param_size: c_ulong, __param_i: c_u
 }
 
 fn get_nocase_range(__param_c: c_uint) -> *const c_uint {
-    var __local_left: c_uint = 0
+    var __local_left: c_uint = ((0 as c_uint))
 
     var __local_right: c_uint = _pcre2_ucd_nocase_ranges_size_8
 
     var __local_middle: c_uint
 
     if ((if __param_c > 1114111: 1 else: 0) != 0) {
-        return ((&_pcre2_ucd_nocase_ranges_8[0] as *const c_uint) + (__local_right as usize))
+        return ((((&_pcre2_ucd_nocase_ranges_8[0] as *const c_uint) + (__local_right as usize)) as *const c_uint))
     }
 
     while (1 != 0) {
-        (__local_middle = (((((__local_left as c_uint) +% (__local_right as c_uint)) as c_uint) >> (1 as c_uint)) as c_uint) | (1 as c_uint))
+        (__local_middle = ((((((((__local_left as c_uint) +% (__local_right as c_uint)) as c_uint) >> (1 as c_uint)) as c_uint) | (1 as c_uint)) as c_uint)))
 
         if ((if _pcre2_ucd_nocase_ranges_8[__local_middle] <= __param_c: 1 else: 0) != 0) {
-            (__local_left = ((__local_middle as c_uint) +% (1 as c_uint)))
+            (__local_left = ((((__local_middle as c_uint) +% (1 as c_uint)) as c_uint)))
         } else {
             var __ci_expr_logic_0: c_int = 0
 
@@ -2708,9 +2752,9 @@ fn get_nocase_range(__param_c: c_uint) -> *const c_uint {
             }
 
             if (__ci_expr_logic_0 != 0) {
-                (__local_right = ((__local_middle as c_uint) -% (1 as c_uint)))
+                (__local_right = ((((__local_middle as c_uint) -% (1 as c_uint)) as c_uint)))
             } else {
-                return ((&_pcre2_ucd_nocase_ranges_8[0] as *const c_uint) + (((__local_middle as c_uint) -% (1 as c_uint)) as usize))
+                return ((((&_pcre2_ucd_nocase_ranges_8[0] as *const c_uint) + (((__local_middle as c_uint) -% (1 as c_uint)) as usize)) as *const c_uint))
             }
 
         }
@@ -2719,7 +2763,7 @@ fn get_nocase_range(__param_c: c_uint) -> *const c_uint {
 
 }
 
-fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
+unsafe fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
     var __local_buffer = __param_buffer
     var __local_new_start: c_uint = __param_start
 
@@ -2731,25 +2775,28 @@ fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_optio
 
     var __local_tmp: [3]c_uint
 
-    var __local_result: c_ulong = 2
+    var __local_result: c_ulong = ((2 as c_ulong))
 
     var __local_skip_range: *const c_uint = get_nocase_range(__local_c)
 
-    var __local_skip_start: c_uint = (unsafe __local_skip_range[0])
+    var __local_skip_start: c_uint = (((unsafe __local_skip_range[0]) as c_uint))
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     while ((if __local_c <= __param_end: 1 else: 0) != 0) {
         var __local_co: c_uint
 
         if ((if __local_c > __local_skip_start: 1 else: 0) != 0) {
-            (__local_c = (unsafe __local_skip_range[1]))
+            (__local_c = (((unsafe __local_skip_range[1]) as c_uint)))
 
             (__local_skip_range = __local_skip_range + ((2 as isize) as usize))
 
-            (__local_skip_start = (unsafe __local_skip_range[0]))
+            (__local_skip_start = (((unsafe __local_skip_range[0]) as c_uint)))
 
             continue
 
@@ -2782,12 +2829,12 @@ fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_optio
             }
 
             if (__ci_expr_logic_2 != 0) {
-                (__ci_expr_ternary_3 = 0)
+                (__ci_expr_ternary_3 = ((0 as c_int)))
             } else {
-                (__ci_expr_ternary_3 = 3)
+                (__ci_expr_ternary_3 = ((3 as c_int)))
             }
 
-            (__local_co = ((_pcre2_ucd_turkish_dotted_i_caseset_8 as c_uint) +% (__ci_expr_ternary_3 as c_uint)))
+            (__local_co = ((((_pcre2_ucd_turkish_dotted_i_caseset_8 as c_uint) +% (__ci_expr_ternary_3 as c_uint)) as c_uint)))
 
 
         } else {
@@ -2795,7 +2842,7 @@ fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_optio
 
             var __ci_expr_logic_4: c_int = 0
 
-            (__local_co = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize)).caseset)
+            (__local_co = ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize)).caseset as c_uint)))
 
             if ((if __local_co != 0: 1 else: 0) != 0) {
                 (__ci_expr_logic_4 = (if (if ((__param_options as c_uint) & (4 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
@@ -2806,7 +2853,7 @@ fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_optio
             }
 
             if (__ci_expr_logic_5 != 0) {
-                (__local_co = 0)
+                (__local_co = ((0 as c_uint)))
 
             }
 
@@ -2822,43 +2869,61 @@ fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_optio
 
             (__local_tmp[0] = __local_c)
 
-            (__local_tmp[1] = 4294967295)
+            (__local_tmp[1] = ((4294967295 as c_uint)))
 
             if ((if __local_co != __local_c: 1 else: 0) != 0) {
                 (__local_tmp[1] = __local_co)
 
-                (__local_tmp[2] = 4294967295)
+                (__local_tmp[2] = ((4294967295 as c_uint)))
 
             }
 
         }
 
-        (__local_c = __local_c + 1)
+        (__local_c = (__local_c +% 1))
 
-        do {
+        loop {
             if ((if (unsafe *__local_list) < __local_new_start: 1 else: 0) != 0) {
                 if ((if (((unsafe *__local_list) as c_uint) +% (1 as c_uint)) == __local_new_start: 1 else: 0) != 0) {
-                    (__local_new_start = __local_new_start - 1)
+                    (__local_new_start = (__local_new_start -% 1))
 
-                    continue
+                    (__local_list = __local_list + 1)
+
+                    if ((if (unsafe *__local_list) != 4294967295: 1 else: 0) != 0) {
+                        continue
+                    }
+                    break
+
 
                 }
 
             } else {
                 if ((if (unsafe *__local_list) > __local_new_end: 1 else: 0) != 0) {
                     if ((if (((unsafe *__local_list) as c_uint) -% (1 as c_uint)) == __local_new_end: 1 else: 0) != 0) {
-                        (__local_new_end = __local_new_end + 1)
+                        (__local_new_end = (__local_new_end +% 1))
 
-                        continue
+                        (__local_list = __local_list + 1)
+
+                        if ((if (unsafe *__local_list) != 4294967295: 1 else: 0) != 0) {
+                            continue
+                        }
+                        break
+
 
                     }
 
                 } else {
-                    continue
+                    (__local_list = __local_list + 1)
+
+                    if ((if (unsafe *__local_list) != 4294967295: 1 else: 0) != 0) {
+                        continue
+                    }
+                    break
+
                 }
             }
 
-            (__local_result = __local_result + 2)
+            (__local_result = (__local_result +% 2))
 
             if ((if __local_buffer != null: 1 else: 0) != 0) {
                 ((unsafe __local_buffer[0]) = (unsafe *__local_list))
@@ -2869,7 +2934,11 @@ fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_optio
 
             }
 
-        } while { (__local_list = __local_list + 1); ((if (unsafe *__local_list) != 4294967295: 1 else: 0) != 0) }
+            (__local_list = __local_list + 1)
+            if not (((if (unsafe *__local_list) != 4294967295: 1 else: 0) != 0)) {
+                break
+            }
+        }
 
     }
 
@@ -2888,12 +2957,12 @@ fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_optio
 
 }
 
-fn append_char_list(__param_p: *const c_uint, __param_buffer: *mut c_uint) -> c_ulong {
+unsafe fn append_char_list(__param_p: *const c_uint, __param_buffer: *mut c_uint) -> c_ulong {
     var __local_p = __param_p
     var __local_buffer = __param_buffer
     var __local_n: *const c_uint
 
-    var __local_result: c_ulong = 0
+    var __local_result: c_ulong = ((0 as c_ulong))
 
     while ((if (unsafe *__local_p) != 4294967295: 1 else: 0) != 0) {
         (__local_n = __local_p)
@@ -2902,9 +2971,12 @@ fn append_char_list(__param_p: *const c_uint, __param_buffer: *mut c_uint) -> c_
             (__local_n = __local_n + 1)
         }
 
-        do {
+        loop {
             0
-        } while (0 != 0)
+            if not ((0 != 0)) {
+                break
+            }
+        }
 
         if ((if __local_buffer != null: 1 else: 0) != 0) {
             ((unsafe __local_buffer[0]) = (unsafe *__local_p))
@@ -2915,7 +2987,7 @@ fn append_char_list(__param_p: *const c_uint, __param_buffer: *mut c_uint) -> c_
 
         }
 
-        (__local_result = __local_result + 2)
+        (__local_result = (__local_result +% 2))
 
         (__local_p = __local_n + ((1 as isize) as usize))
 
@@ -2932,18 +3004,21 @@ fn get_highest_char(__param_options: c_uint) -> c_uint {
 
 }
 
-fn append_negated_char_list(__param_p: *const c_uint, __param_options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
+unsafe fn append_negated_char_list(__param_p: *const c_uint, __param_options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
     var __local_p = __param_p
     var __local_buffer = __param_buffer
     var __local_n: *const c_uint
 
-    var __local_start: c_uint = 0
+    var __local_start: c_uint = ((0 as c_uint))
 
-    var __local_result: c_ulong = 2
+    var __local_result: c_ulong = ((2 as c_ulong))
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     while ((if (unsafe *__local_p) != 4294967295: 1 else: 0) != 0) {
         (__local_n = __local_p)
@@ -2952,22 +3027,25 @@ fn append_negated_char_list(__param_p: *const c_uint, __param_options: c_uint, _
             (__local_n = __local_n + 1)
         }
 
-        do {
+        loop {
             0
-        } while (0 != 0)
+            if not ((0 != 0)) {
+                break
+            }
+        }
 
         if ((if __local_buffer != null: 1 else: 0) != 0) {
             ((unsafe __local_buffer[0]) = __local_start)
 
-            ((unsafe __local_buffer[1]) = (((unsafe *__local_p) as c_uint) -% (1 as c_uint)))
+            ((unsafe __local_buffer[1]) = (((((unsafe *__local_p) as c_uint) -% (1 as c_uint)) as c_uint)))
 
             (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
         }
 
-        (__local_result = __local_result + 2)
+        (__local_result = (__local_result +% 2))
 
-        (__local_start = (((unsafe *__local_n) as c_uint) +% (1 as c_uint)))
+        (__local_start = (((((unsafe *__local_n) as c_uint) +% (1 as c_uint)) as c_uint)))
 
         (__local_p = __local_n + ((1 as isize) as usize))
 
@@ -2976,7 +3054,7 @@ fn append_negated_char_list(__param_p: *const c_uint, __param_options: c_uint, _
     if ((if __local_buffer != null: 1 else: 0) != 0) {
         ((unsafe __local_buffer[0]) = __local_start)
 
-        ((unsafe __local_buffer[1]) = get_highest_char(__param_options))
+        ((unsafe __local_buffer[1]) = ((get_highest_char(__param_options) as c_uint)))
 
         (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
@@ -2988,23 +3066,23 @@ fn append_negated_char_list(__param_p: *const c_uint, __param_options: c_uint, _
 
 }
 
-fn append_non_ascii_range(__param_options: c_uint, __param_buffer: *mut c_uint) -> *mut c_uint {
+unsafe fn append_non_ascii_range(__param_options: c_uint, __param_buffer: *mut c_uint) -> *mut c_uint {
     if ((if __param_buffer == null: 1 else: 0) != 0) {
-        return null
+        return ((null as *mut c_uint))
     }
 
-    ((unsafe __param_buffer[0]) = 256)
+    ((unsafe __param_buffer[0]) = ((256 as c_uint)))
 
-    ((unsafe __param_buffer[1]) = get_highest_char(__param_options))
+    ((unsafe __param_buffer[1]) = ((get_highest_char(__param_options) as c_uint)))
 
-    return (__param_buffer + ((2 as isize) as usize))
+    return (((__param_buffer + ((2 as isize) as usize)) as *mut c_uint))
 
 }
 
-fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
+unsafe fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
     var __local_ptr = __param_ptr
     var __local_buffer = __param_buffer
-    var __local_total_size: c_ulong = 0
+    var __local_total_size: c_ulong = ((0 as c_ulong))
 
     var __local_size: c_ulong
 
@@ -3018,32 +3096,32 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
         while true {
             match (((unsafe *__local_ptr) as c_uint) & ((4294901760 as c_uint) as c_uint)) {
                 2149318656 => {
-                    (__local_meta_arg = ((unsafe *__local_ptr) as c_uint) & (65535 as c_uint))
+                    (__local_meta_arg = (((((unsafe *__local_ptr) as c_uint) & (65535 as c_uint)) as c_uint)))
 
                     while true {
                         match __local_meta_arg {
                             6 => {
                                 (__local_buffer = append_non_ascii_range(__param_options, __local_buffer))
 
-                                (__local_total_size = __local_total_size + 2)
+                                (__local_total_size = (__local_total_size +% 2))
 
                             },
                             10 => {
                                 (__local_buffer = append_non_ascii_range(__param_options, __local_buffer))
 
-                                (__local_total_size = __local_total_size + 2)
+                                (__local_total_size = (__local_total_size +% 2))
 
                             },
                             8 => {
                                 (__local_buffer = append_non_ascii_range(__param_options, __local_buffer))
 
-                                (__local_total_size = __local_total_size + 2)
+                                (__local_total_size = (__local_total_size +% 2))
 
                             },
                             19 => {
-                                (__local_size = append_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), __local_buffer))
+                                (__local_size = ((append_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), __local_buffer) as c_ulong)))
 
-                                (__local_total_size = __local_total_size + __local_size)
+                                (__local_total_size = (__local_total_size +% __local_size))
 
                                 if ((if __local_buffer != null: 1 else: 0) != 0) {
                                     (__local_buffer = __local_buffer + (__local_size as usize))
@@ -3051,9 +3129,9 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
 
                             },
                             18 => {
-                                (__local_size = append_negated_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), __param_options, __local_buffer))
+                                (__local_size = ((append_negated_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), __param_options, __local_buffer) as c_ulong)))
 
-                                (__local_total_size = __local_total_size + __local_size)
+                                (__local_total_size = (__local_total_size +% __local_size))
 
                                 if ((if __local_buffer != null: 1 else: 0) != 0) {
                                     (__local_buffer = __local_buffer + (__local_size as usize))
@@ -3061,9 +3139,9 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
 
                             },
                             21 => {
-                                (__local_size = append_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), __local_buffer))
+                                (__local_size = ((append_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), __local_buffer) as c_ulong)))
 
-                                (__local_total_size = __local_total_size + __local_size)
+                                (__local_total_size = (__local_total_size +% __local_size))
 
                                 if ((if __local_buffer != null: 1 else: 0) != 0) {
                                     (__local_buffer = __local_buffer + (__local_size as usize))
@@ -3071,9 +3149,9 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
 
                             },
                             20 => {
-                                (__local_size = append_negated_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), __param_options, __local_buffer))
+                                (__local_size = ((append_negated_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), __param_options, __local_buffer) as c_ulong)))
 
-                                (__local_total_size = __local_total_size + __local_size)
+                                (__local_total_size = (__local_total_size +% __local_size))
 
                                 if ((if __local_buffer != null: 1 else: 0) != 0) {
                                     (__local_buffer = __local_buffer + (__local_size as usize))
@@ -3091,15 +3169,15 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
 
                                 if (__ci_expr_logic_0 != 0) {
                                     if ((if __local_buffer != null: 1 else: 0) != 0) {
-                                        ((unsafe __local_buffer[0]) = 0)
+                                        ((unsafe __local_buffer[0]) = ((0 as c_uint)))
 
-                                        ((unsafe __local_buffer[1]) = get_highest_char(__param_options))
+                                        ((unsafe __local_buffer[1]) = ((get_highest_char(__param_options) as c_uint)))
 
                                         (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
                                     }
 
-                                    (__local_total_size = __local_total_size + 2)
+                                    (__local_total_size = (__local_total_size +% 2))
 
                                 }
 
@@ -3116,15 +3194,15 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
 
                                 if (__ci_expr_logic_0 != 0) {
                                     if ((if __local_buffer != null: 1 else: 0) != 0) {
-                                        ((unsafe __local_buffer[0]) = 0)
+                                        ((unsafe __local_buffer[0]) = ((0 as c_uint)))
 
-                                        ((unsafe __local_buffer[1]) = get_highest_char(__param_options))
+                                        ((unsafe __local_buffer[1]) = ((get_highest_char(__param_options) as c_uint)))
 
                                         (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
                                     }
 
-                                    (__local_total_size = __local_total_size + 2)
+                                    (__local_total_size = (__local_total_size +% 2))
 
                                 }
 
@@ -3147,7 +3225,7 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
                 2149646336 => {
                     (__local_buffer = append_non_ascii_range(__param_options, __local_buffer))
 
-                    (__local_total_size = __local_total_size + 2)
+                    (__local_total_size = (__local_total_size +% 2))
 
                     (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
@@ -3198,9 +3276,12 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
         if (__ci_expr_logic_3 != 0) {
             (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
-            do {
+            loop {
                 0
-            } while (0 != 0)
+                if not ((0 != 0)) {
+                    break
+                }
+            }
 
             if ((if (unsafe *__local_ptr) == 2147811328: 1 else: 0) != 0) {
                 (__local_ptr = __local_ptr + 1)
@@ -3214,14 +3295,14 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
 
             (__local_ptr = __local_ptr + 1)
 
-            (__local_size = utf_caseless_extend(__local_start_char, (unsafe *__ci_expr_old_4), __param_options, __local_buffer))
+            (__local_size = ((utf_caseless_extend(__local_start_char, (unsafe *__ci_expr_old_4), __param_options, __local_buffer) as c_ulong)))
 
 
             if ((if __local_buffer != null: 1 else: 0) != 0) {
                 (__local_buffer = __local_buffer + (__local_size as usize))
             }
 
-            (__local_total_size = __local_total_size + __local_size)
+            (__local_total_size = (__local_total_size +% __local_size))
 
             continue
 
@@ -3238,7 +3319,7 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
 
         (__local_ptr = __local_ptr + 1)
 
-        (__local_total_size = __local_total_size + 2)
+        (__local_total_size = (__local_total_size +% 2))
 
     }
 
@@ -3246,7 +3327,7 @@ fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer
 
 }
 
-fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8) -> *mut class_ranges {
+unsafe fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8) -> *mut class_ranges {
     var __local_cranges: *mut class_ranges
 
     var __local_ptr: *mut c_uint
@@ -3255,9 +3336,9 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
 
     var __local_dst: *mut c_uint
 
-    var __local_class_options: c_uint = 0
+    var __local_class_options: c_uint = ((0 as c_uint))
 
-    var __local_range_list_size: c_ulong = 0
+    var __local_range_list_size: c_ulong = ((0 as c_ulong))
 
     var __local_total_size: c_ulong
 
@@ -3284,7 +3365,7 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
 
 
     if (((__param_options as c_uint) & (524288 as c_uint)) != 0) {
-        (__local_class_options = __local_class_options | 1)
+        (__local_class_options = (__local_class_options as c_uint) | (1 as c_uint))
     }
 
     var __ci_expr_logic_0: c_int = 0
@@ -3294,50 +3375,53 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
     }
 
     if (__ci_expr_logic_0 != 0) {
-        (__local_class_options = __local_class_options | 2)
+        (__local_class_options = (__local_class_options as c_uint) | (2 as c_uint))
     }
 
 
     if (((__param_xoptions as c_uint) & (128 as c_uint)) != 0) {
-        (__local_class_options = __local_class_options | 4)
+        (__local_class_options = (__local_class_options as c_uint) | (4 as c_uint))
     }
 
     if (((__param_xoptions as c_uint) & (65536 as c_uint)) != 0) {
-        (__local_class_options = __local_class_options | 8)
+        (__local_class_options = (__local_class_options as c_uint) | (8 as c_uint))
     }
 
-    (__local_range_list_size = parse_class(__param_start_ptr, __local_class_options, null))
+    (__local_range_list_size = ((parse_class(__param_start_ptr, __local_class_options, (null as *mut c_uint)) as c_ulong)))
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     var __ci_expr_ternary_1: c_int = 0
 
     if ((if __local_range_list_size >= 2: 1 else: 0) != 0) {
-        (__ci_expr_ternary_1 = 3)
+        (__ci_expr_ternary_1 = ((3 as c_int)))
     } else {
-        (__ci_expr_ternary_1 = 0)
+        (__ci_expr_ternary_1 = ((0 as c_int)))
     }
 
-    (__local_total_size = ((__local_range_list_size as c_ulong) +% (__ci_expr_ternary_1 as c_ulong)))
+    (__local_total_size = ((((__local_range_list_size as c_ulong) +% (__ci_expr_ternary_1 as c_ulong)) as c_ulong)))
 
 
-    (__local_cranges = (((&raw const (unsafe *__param_cb.cx).memctl as *const pcre2_memctl).malloc(((sizeof[class_ranges]() as c_ulong) +% (((__local_total_size as c_ulong) *% (sizeof[u32]() as c_ulong)) as c_ulong)), (&raw const (unsafe *__param_cb.cx).memctl as *const pcre2_memctl).memory_data) as *mut class_ranges)))
+    (__local_cranges = (((unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).malloc(((sizeof[class_ranges]() as c_ulong) +% (((__local_total_size as c_ulong) *% (sizeof[u32]() as c_ulong)) as c_ulong)), (unsafe *(&raw const (unsafe *(unsafe *__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut class_ranges)))
 
     if ((if __local_cranges == null: 1 else: 0) != 0) {
-        return null
+        return ((null as *mut class_ranges))
     }
 
     ((unsafe *__local_cranges).header.next = ((null as *mut compile_data)))
 
     ((unsafe *__local_cranges).range_list_size = ((__local_range_list_size as c_ushort)))
 
-    ((unsafe *__local_cranges).char_lists_types = 0)
+    ((unsafe *__local_cranges).char_lists_types = ((0 as c_ushort)))
 
-    ((unsafe *__local_cranges).char_lists_size = 0)
+    ((unsafe *__local_cranges).char_lists_size = ((0 as c_ulong)))
 
-    ((unsafe *__local_cranges).char_lists_start = 0)
+    ((unsafe *__local_cranges).char_lists_start = ((0 as c_ulong)))
 
     if ((if __local_range_list_size == 0: 1 else: 0) != 0) {
         return __local_cranges
@@ -3351,7 +3435,7 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
         return __local_cranges
     }
 
-    (__local_i = (((((__local_range_list_size as c_ulong) >> (2 as c_uint)) as c_ulong) -% (1 as c_ulong)) as c_ulong) << (1 as c_uint))
+    (__local_i = ((((((((__local_range_list_size as c_ulong) >> (2 as c_uint)) as c_ulong) -% (1 as c_ulong)) as c_ulong) << (1 as c_uint)) as c_ulong)))
 
     while (1 != 0) {
         do_heapify(__local_buffer, __local_range_list_size, __local_i)
@@ -3360,32 +3444,32 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
             break
         }
 
-        (__local_i = __local_i - 2)
+        (__local_i = (__local_i -% 2))
 
     }
 
-    (__local_i = ((__local_range_list_size as c_ulong) -% (2 as c_ulong)))
+    (__local_i = ((((__local_range_list_size as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
     while (1 != 0) {
-        (__local_tmp1 = (unsafe __local_buffer[__local_i]))
+        (__local_tmp1 = (((unsafe __local_buffer[__local_i]) as c_uint)))
 
-        (__local_tmp2 = (unsafe __local_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]))
+        (__local_tmp2 = (((unsafe __local_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]) as c_uint)))
 
-        ((unsafe __local_buffer[__local_i]) = (unsafe __local_buffer[0]))
+        ((unsafe __local_buffer[__local_i]) = (((unsafe __local_buffer[0]) as c_uint)))
 
-        ((unsafe __local_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]) = (unsafe __local_buffer[1]))
+        ((unsafe __local_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]) = (((unsafe __local_buffer[1]) as c_uint)))
 
         ((unsafe __local_buffer[0]) = __local_tmp1)
 
         ((unsafe __local_buffer[1]) = __local_tmp2)
 
-        do_heapify(__local_buffer, __local_i, 0)
+        do_heapify(__local_buffer, __local_i, (0 as c_ulong))
 
         if ((if __local_i == 0: 1 else: 0) != 0) {
             break
         }
 
-        (__local_i = __local_i - 2)
+        (__local_i = (__local_i -% 2))
 
     }
 
@@ -3393,7 +3477,7 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
 
     (__local_ptr = __local_buffer + ((2 as isize) as usize))
 
-    (__local_range_list_size = __local_range_list_size - 2)
+    (__local_range_list_size = (__local_range_list_size -% 2))
 
     while true {
         var __ci_expr_logic_2: c_int = 0
@@ -3409,25 +3493,28 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
         if ((if (((unsafe __local_dst[1]) as c_uint) +% (1 as c_uint)) < (unsafe __local_ptr[0]): 1 else: 0) != 0) {
             (__local_dst = __local_dst + ((2 as isize) as usize))
 
-            ((unsafe __local_dst[0]) = (unsafe __local_ptr[0]))
+            ((unsafe __local_dst[0]) = (((unsafe __local_ptr[0]) as c_uint)))
 
-            ((unsafe __local_dst[1]) = (unsafe __local_ptr[1]))
+            ((unsafe __local_dst[1]) = (((unsafe __local_ptr[1]) as c_uint)))
 
         } else {
             if ((if (unsafe __local_dst[1]) < (unsafe __local_ptr[1]): 1 else: 0) != 0) {
-                ((unsafe __local_dst[1]) = (unsafe __local_ptr[1]))
+                ((unsafe __local_dst[1]) = (((unsafe __local_ptr[1]) as c_uint)))
             }
         }
 
         (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
-        (__local_range_list_size = __local_range_list_size - 2)
+        (__local_range_list_size = (__local_range_list_size -% 2))
 
     }
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     (__local_ptr = __local_buffer)
 
@@ -3462,21 +3549,24 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
     (__local_char_list_start = (unsafe *__ci_expr_old_4))
 
 
-    (__local_char_list_end = 2147483647)
+    (__local_char_list_end = ((2147483647 as c_uint)))
 
     (__local_next_char = (((__local_buffer + (__local_total_size as usize)) as *mut c_ushort)))
 
-    (__local_tmp1 = 0)
+    (__local_tmp1 = ((0 as c_uint)))
 
-    (__local_tmp2 = 6)
+    (__local_tmp2 = ((6 as c_uint)))
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
-    (__local_range_start = (unsafe __local_dst[0]))
+    (__local_range_start = (((unsafe __local_dst[0]) as c_uint)))
 
-    (__local_range_end = (unsafe __local_dst[1]))
+    (__local_range_end = (((unsafe __local_dst[1]) as c_uint)))
 
     while (1 != 0) {
         if ((if __local_range_start >= __local_char_list_start: 1 else: 0) != 0) {
@@ -3489,7 +3579,7 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
             }
 
             if (__ci_expr_logic_5 != 0) {
-                (__local_tmp1 = __local_tmp1 + 1)
+                (__local_tmp1 = (__local_tmp1 +% 1))
 
                 (__local_next_char = __local_next_char - 1)
 
@@ -3498,7 +3588,7 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
                 } else {
                     (__local_next_char = __local_next_char - 1)
 
-                    ((unsafe *(__local_next_char as *mut c_uint)) = (((__local_range_end as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint))
+                    ((unsafe *(__local_next_char as *mut c_uint)) = ((((((__local_range_end as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint)) as c_uint)))
 
                 }
 
@@ -3507,7 +3597,7 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
 
             if ((if __local_range_start < __local_range_end: 1 else: 0) != 0) {
                 if ((if __local_range_start > __local_char_list_start: 1 else: 0) != 0) {
-                    (__local_tmp1 = __local_tmp1 + 1)
+                    (__local_tmp1 = (__local_tmp1 +% 1))
 
                     (__local_next_char = __local_next_char - 1)
 
@@ -3516,44 +3606,50 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
                     } else {
                         (__local_next_char = __local_next_char - 1)
 
-                        ((unsafe *(__local_next_char as *mut c_uint)) = (__local_range_start as c_uint) << (1 as c_uint))
+                        ((unsafe *(__local_next_char as *mut c_uint)) = ((((__local_range_start as c_uint) << (1 as c_uint)) as c_uint)))
 
                     }
 
                 } else {
-                    ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | (((4 as c_ushort) << (__local_tmp2 as c_uint)) as c_ushort))
+                    ((unsafe *__local_cranges).char_lists_types = ((unsafe *__local_cranges).char_lists_types as c_ushort) | (((4 as c_int) << (__local_tmp2 as c_uint)) as c_ushort))
                 }
 
             }
 
-            do {
+            loop {
                 0
-            } while (0 != 0)
+                if not ((0 != 0)) {
+                    break
+                }
+            }
 
             if ((if __local_dst > __local_buffer: 1 else: 0) != 0) {
                 (__local_dst = __local_dst - ((2 as isize) as usize))
 
-                (__local_range_start = (unsafe __local_dst[0]))
+                (__local_range_start = (((unsafe __local_dst[0]) as c_uint)))
 
-                (__local_range_end = (unsafe __local_dst[1]))
+                (__local_range_end = (((unsafe __local_dst[1]) as c_uint)))
 
                 continue
 
             }
 
-            (__local_range_start = 0)
+            (__local_range_start = ((0 as c_uint)))
 
-            (__local_range_end = 0)
+            (__local_range_end = ((0 as c_uint)))
 
         }
 
         if ((if __local_range_end >= __local_char_list_start: 1 else: 0) != 0) {
-            do {
+            loop {
                 0
-            } while (0 != 0)
+                if not ((0 != 0)) {
+                    break
+                }
+            }
 
             if ((if __local_range_end < __local_char_list_end: 1 else: 0) != 0) {
-                (__local_tmp1 = __local_tmp1 + 1)
+                (__local_tmp1 = (__local_tmp1 +% 1))
 
                 (__local_next_char = __local_next_char - 1)
 
@@ -3562,22 +3658,25 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
                 } else {
                     (__local_next_char = __local_next_char - 1)
 
-                    ((unsafe *(__local_next_char as *mut c_uint)) = (((__local_range_end as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint))
+                    ((unsafe *(__local_next_char as *mut c_uint)) = ((((((__local_range_end as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint)) as c_uint)))
 
                 }
 
-                do {
+                loop {
                     0
-                } while (0 != 0)
+                    if not ((0 != 0)) {
+                        break
+                    }
+                }
 
             }
 
-            ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | (((4 as c_ushort) << (__local_tmp2 as c_uint)) as c_ushort))
+            ((unsafe *__local_cranges).char_lists_types = ((unsafe *__local_cranges).char_lists_types as c_ushort) | (((4 as c_int) << (__local_tmp2 as c_uint)) as c_ushort))
 
         }
 
         if ((if __local_tmp1 >= 3: 1 else: 0) != 0) {
-            ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | (((3 as c_ushort) << (__local_tmp2 as c_uint)) as c_ushort))
+            ((unsafe *__local_cranges).char_lists_types = ((unsafe *__local_cranges).char_lists_types as c_ushort) | (((3 as c_int) << (__local_tmp2 as c_uint)) as c_ushort))
 
             (__local_next_char = __local_next_char - 1)
 
@@ -3591,18 +3690,21 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
             }
 
         } else {
-            ((unsafe *__local_cranges).char_lists_types = __local_cranges.char_lists_types | ((__local_tmp1 as c_uint) << (__local_tmp2 as c_uint)))
+            ((unsafe *__local_cranges).char_lists_types = ((unsafe *__local_cranges).char_lists_types as c_ushort) | (((__local_tmp1 as c_uint) << (__local_tmp2 as c_uint)) as c_ushort))
         }
 
         if ((if __local_range_start < 256: 1 else: 0) != 0) {
             break
         }
 
-        do {
+        loop {
             0
-        } while (0 != 0)
+            if not ((0 != 0)) {
+                break
+            }
+        }
 
-        (__local_char_list_end = ((__local_char_list_start as c_uint) -% (1 as c_uint)))
+        (__local_char_list_end = ((((__local_char_list_start as c_uint) -% (1 as c_uint)) as c_uint)))
 
         var __ci_expr_old_6: *const c_uint = __local_char_list_next
 
@@ -3611,9 +3713,9 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
         (__local_char_list_start = (unsafe *__ci_expr_old_6))
 
 
-        (__local_tmp1 = 0)
+        (__local_tmp1 = ((0 as c_uint)))
 
-        (__local_tmp2 = __local_tmp2 - 3)
+        (__local_tmp2 = (__local_tmp2 -% 3))
 
     }
 
@@ -3621,9 +3723,12 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
         (__local_dst = __local_dst + ((2 as isize) as usize))
     }
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     ((unsafe *__local_cranges).char_lists_size = (((((((__local_buffer + (__local_total_size as usize)) as *mut u8) as usize) -% ((__local_next_char as *mut u8) as usize)) / sizeof[u8]()) as c_ulong)))
 
@@ -3635,7 +3740,7 @@ fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uin
 
 }
 
-fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_start: c_uint, __param_end: c_uint) {
+unsafe fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_start: c_uint, __param_end: c_uint) -> Unit {
     var __local_classbits: *mut u8 = ((&raw const (unsafe *__param_cb).classbits.classbits[0] as *mut u8))
 
     var __local_c: c_uint
@@ -3650,14 +3755,14 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
         if ((if __param_end <= 255: 1 else: 0) != 0) {
             (__ci_expr_ternary_0 = __param_end)
         } else {
-            (__ci_expr_ternary_0 = 255)
+            (__ci_expr_ternary_0 = ((255 as c_uint)))
         }
         __ci_expr_ternary_0
     }
 
     if ((if ((__param_options as c_uint) & (8 as c_uint)) != 0: 1 else: 0) != 0) {
         if ((if ((__param_options as c_uint) & (((524288 as c_uint) | (131072 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
-            var __local_turkish_i: c_int = (if ((__param_xoptions as c_uint) & (((65536 as c_uint) | (128 as c_uint)) as c_uint)) == 65536: 1 else: 0)
+            var __local_turkish_i: c_int = (((if ((__param_xoptions as c_uint) & (((65536 as c_uint) | (128 as c_uint)) as c_uint)) == 65536: 1 else: 0) as c_int))
 
             if ((if __param_start < 128: 1 else: 0) != 0) {
                 var __local_lo_end: c_uint = with 0 as __ci_expr_seq_24 {
@@ -3665,7 +3770,7 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
                     if ((if __local_classbits_end < 127: 1 else: 0) != 0) {
                         (__ci_expr_ternary_1 = __local_classbits_end)
                     } else {
-                        (__ci_expr_ternary_1 = 127)
+                        (__ci_expr_ternary_1 = ((127 as c_uint)))
                     }
                     __ci_expr_ternary_1
                 }
@@ -3689,17 +3794,17 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
                     }
 
                     if (__ci_expr_logic_3 != 0) {
-                        (__local_c = __local_c + 1)
+                        (__local_c = (__local_c +% 1))
 
                         continue
 
                     }
 
 
-                    ((unsafe __local_classbits[(((unsafe __param_cb.fcc[__local_c]) as c_int) >> (3 as c_uint))]) = (unsafe __local_classbits[(((unsafe __param_cb.fcc[__local_c]) as c_int) >> (3 as c_uint))]) | (((1 as c_uint) << ((((unsafe __param_cb.fcc[__local_c]) as c_int) & 7) as c_uint)) as u8))
+                    ((unsafe __local_classbits[(((unsafe (unsafe *__param_cb).fcc[__local_c]) as c_int) >> (3 as c_uint))]) = ((unsafe __local_classbits[(((unsafe (unsafe *__param_cb).fcc[__local_c]) as c_int) >> (3 as c_uint))]) as u8) | ((((1 as c_uint) << (((((unsafe (unsafe *__param_cb).fcc[__local_c]) as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8) as u8))
 
 
-                    (__local_c = __local_c + 1)
+                    (__local_c = (__local_c +% 1))
 
                 }
 
@@ -3712,7 +3817,7 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
                     if ((if __param_start > 128: 1 else: 0) != 0) {
                         (__ci_expr_ternary_4 = __param_start)
                     } else {
-                        (__ci_expr_ternary_4 = 128)
+                        (__ci_expr_ternary_4 = ((128 as c_uint)))
                     }
                     __ci_expr_ternary_4
                 }
@@ -3723,11 +3828,11 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
                     var __local_co: c_uint = ((((__local_c as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint))
 
                     if ((if __local_co <= 255: 1 else: 0) != 0) {
-                        ((unsafe __local_classbits[((__local_co as c_uint) >> (3 as c_uint))]) = (unsafe __local_classbits[((__local_co as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << (((__local_co as c_uint) & (7 as c_uint)) as c_uint)) as u8))
+                        ((unsafe __local_classbits[((__local_co as c_uint) >> (3 as c_uint))]) = ((unsafe __local_classbits[((__local_co as c_uint) >> (3 as c_uint))]) as u8) | ((((1 as c_uint) << (((__local_co as c_uint) & (7 as c_uint)) as c_uint)) as u8) as u8))
                     }
 
 
-                    (__local_c = __local_c + 1)
+                    (__local_c = (__local_c +% 1))
 
                 }
 
@@ -3738,9 +3843,9 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
             (__local_c = __param_start)
 
             while ((if __local_c <= __local_classbits_end: 1 else: 0) != 0) {
-                ((unsafe __local_classbits[(((unsafe __param_cb.fcc[__local_c]) as c_int) >> (3 as c_uint))]) = (unsafe __local_classbits[(((unsafe __param_cb.fcc[__local_c]) as c_int) >> (3 as c_uint))]) | (((1 as c_uint) << ((((unsafe __param_cb.fcc[__local_c]) as c_int) & 7) as c_uint)) as u8))
+                ((unsafe __local_classbits[(((unsafe (unsafe *__param_cb).fcc[__local_c]) as c_int) >> (3 as c_uint))]) = ((unsafe __local_classbits[(((unsafe (unsafe *__param_cb).fcc[__local_c]) as c_int) >> (3 as c_uint))]) as u8) | ((((1 as c_uint) << (((((unsafe (unsafe *__param_cb).fcc[__local_c]) as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8) as u8))
 
-                (__local_c = __local_c + 1)
+                (__local_c = (__local_c +% 1))
 
             }
 
@@ -3749,17 +3854,17 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
 
     }
 
-    (__local_byte_start = (((__param_start as c_uint) +% (7 as c_uint)) as c_uint) >> (3 as c_uint))
+    (__local_byte_start = ((((((__param_start as c_uint) +% (7 as c_uint)) as c_uint) >> (3 as c_uint)) as c_uint)))
 
-    (__local_byte_end = (((__local_classbits_end as c_uint) +% (1 as c_uint)) as c_uint) >> (3 as c_uint))
+    (__local_byte_end = ((((((__local_classbits_end as c_uint) +% (1 as c_uint)) as c_uint) >> (3 as c_uint)) as c_uint)))
 
     if ((if __local_byte_start >= __local_byte_end: 1 else: 0) != 0) {
         (__local_c = __param_start)
 
         while ((if __local_c <= __local_classbits_end: 1 else: 0) != 0) {
-            ((unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) = (unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8))
+            ((unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) = ((unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) as u8) | ((((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8) as u8))
 
-            (__local_c = __local_c + 1)
+            (__local_c = (__local_c +% 1))
 
         }
 
@@ -3771,9 +3876,9 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
     (__local_c = __local_byte_start)
 
     while ((if __local_c < __local_byte_end: 1 else: 0) != 0) {
-        ((unsafe __local_classbits[__local_c]) = 255)
+        ((unsafe __local_classbits[__local_c]) = ((255 as u8)))
 
-        (__local_c = __local_c + 1)
+        (__local_c = (__local_c +% 1))
 
     }
 
@@ -3785,9 +3890,9 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
     (__local_c = __param_start)
 
     while ((if __local_c < __local_byte_start: 1 else: 0) != 0) {
-        ((unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) = (unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8))
+        ((unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) = ((unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) as u8) | ((((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8) as u8))
 
-        (__local_c = __local_c + 1)
+        (__local_c = (__local_c +% 1))
 
     }
 
@@ -3795,25 +3900,25 @@ fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *
     (__local_c = __local_byte_end)
 
     while ((if __local_c <= __local_classbits_end: 1 else: 0) != 0) {
-        ((unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) = (unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8))
+        ((unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) = ((unsafe __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) as u8) | ((((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8) as u8))
 
-        (__local_c = __local_c + 1)
+        (__local_c = (__local_c +% 1))
 
     }
 
 
 }
 
-fn add_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) {
+unsafe fn add_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) -> Unit {
     var __local_p = __param_p
     while ((if (unsafe __local_p[0]) < 256: 1 else: 0) != 0) {
-        var __local_n: c_uint = 0
+        var __local_n: c_uint = ((0 as c_uint))
 
         while ((if (unsafe __local_p[((__local_n as c_uint) +% (1 as c_uint))]) == (((((unsafe __local_p[0]) as c_uint) +% (__local_n as c_uint)) as c_uint) +% (1 as c_uint)): 1 else: 0) != 0) {
-            (__local_n = __local_n + 1)
+            (__local_n = (__local_n +% 1))
         }
 
-        add_to_class(__param_options, __param_xoptions, __param_cb, (unsafe __local_p[0]), (unsafe __local_p[__local_n]))
+        add_to_class(__param_options, __param_xoptions, __param_cb, ((unsafe __local_p[0]) as c_uint), ((unsafe __local_p[__local_n]) as c_uint))
 
         (__local_p = __local_p + (((__local_n as c_uint) +% (1 as c_uint)) as usize))
 
@@ -3821,10 +3926,10 @@ fn add_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_
 
 }
 
-fn add_not_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) {
+unsafe fn add_not_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) -> Unit {
     var __local_p = __param_p
     if ((if (unsafe __local_p[0]) > 0: 1 else: 0) != 0) {
-        add_to_class(__param_options, __param_xoptions, __param_cb, 0, (((unsafe __local_p[0]) as c_uint) -% (1 as c_uint)))
+        add_to_class(__param_options, __param_xoptions, __param_cb, (0 as c_uint), ((((unsafe __local_p[0]) as c_uint) -% (1 as c_uint)) as c_uint))
     }
 
     while ((if (unsafe __local_p[0]) < 256: 1 else: 0) != 0) {
@@ -3835,12 +3940,12 @@ fn add_not_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __pa
         var __ci_expr_ternary_0: c_uint = 0
 
         if ((if (unsafe __local_p[1]) > 255: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = 255)
+            (__ci_expr_ternary_0 = ((255 as c_uint)))
         } else {
-            (__ci_expr_ternary_0 = (((unsafe __local_p[1]) as c_uint) -% (1 as c_uint)))
+            (__ci_expr_ternary_0 = (((((unsafe __local_p[1]) as c_uint) -% (1 as c_uint)) as c_uint)))
         }
 
-        add_to_class(__param_options, __param_xoptions, __param_cb, (((unsafe __local_p[0]) as c_uint) +% (1 as c_uint)), __ci_expr_ternary_0)
+        add_to_class(__param_options, __param_xoptions, __param_cb, ((((unsafe __local_p[0]) as c_uint) +% (1 as c_uint)) as c_uint), __ci_expr_ternary_0)
 
 
         (__local_p = __local_p + 1)
@@ -3849,48 +3954,51 @@ fn add_not_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __pa
 
 }
 
-fn fold_negation(__param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong, __param_preserve_classbits: c_int) {
-    if ((if __param_pop_info.op_single_type == 0: 1 else: 0) != 0) {
+unsafe fn fold_negation(__param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong, __param_preserve_classbits: c_int) -> Unit {
+    if ((if (unsafe *__param_pop_info).op_single_type == 0: 1 else: 0) != 0) {
         if ((if __param_lengthptr != null: 1 else: 0) != 0) {
-            ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + 1)
+            ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% 1))
         } else {
-            ((unsafe (unsafe *__param_pop_info).code_start[__param_pop_info.length]) = 4)
+            ((unsafe (unsafe *__param_pop_info).code_start[(unsafe *__param_pop_info).length]) = ((4 as u8)))
         }
 
-        ((unsafe *__param_pop_info).length = __param_pop_info.length + 1)
+        ((unsafe *__param_pop_info).length = ((unsafe *__param_pop_info).length +% 1))
 
     } else {
         var __ci_expr_logic_0: c_int
 
-        if ((if __param_pop_info.op_single_type == 6: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_pop_info).op_single_type == 6: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_0 = (if (if __param_pop_info.op_single_type == 7: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (unsafe *__param_pop_info).op_single_type == 7: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
             var __ci_expr_ternary_1: c_int = 0
 
-            if ((if __param_pop_info.op_single_type == 7: 1 else: 0) != 0) {
-                (__ci_expr_ternary_1 = 6)
+            if ((if (unsafe *__param_pop_info).op_single_type == 7: 1 else: 0) != 0) {
+                (__ci_expr_ternary_1 = ((6 as c_int)))
             } else {
-                (__ci_expr_ternary_1 = 7)
+                (__ci_expr_ternary_1 = ((7 as c_int)))
             }
 
-            ((unsafe *__param_pop_info).op_single_type = __ci_expr_ternary_1)
+            ((unsafe *__param_pop_info).op_single_type = ((__ci_expr_ternary_1 as u8)))
 
 
             if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-                ((unsafe *__param_pop_info.code_start) = __param_pop_info.op_single_type)
+                ((unsafe *((unsafe *__param_pop_info).code_start)) = (unsafe *__param_pop_info).op_single_type)
             }
 
         } else {
-            do {
+            loop {
                 0
-            } while (0 != 0)
+                if not ((0 != 0)) {
+                    break
+                }
+            }
 
             if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-                ((unsafe (unsafe *__param_pop_info).code_start[(1 + 2)]) = (unsafe __param_pop_info.code_start[(1 + 2)]) ^ 1)
+                ((unsafe (unsafe *__param_pop_info).code_start[(1 + 2)]) = ((unsafe (unsafe *__param_pop_info).code_start[(1 + 2)]) as u8) ^ (1 as u8))
             }
 
         }
@@ -3898,10 +4006,10 @@ fn fold_negation(__param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut 
     }
 
     if ((if not (__param_preserve_classbits != 0): 1 else: 0) != 0) {
-        var __local_i: c_int = 0
+        var __local_i: c_int = ((0 as c_int))
 
         while ((if __local_i < 8: 1 else: 0) != 0) {
-            ((unsafe *__param_pop_info).bits.classwords[__local_i] = (~(&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage).classwords[__local_i]))
+            ((unsafe *__param_pop_info).bits.classwords[__local_i] = (((~(unsafe *(&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage)).classwords[__local_i]) as c_uint)))
 
             (__local_i = __local_i + 1)
 
@@ -3912,56 +4020,59 @@ fn fold_negation(__param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut 
 
 }
 
-fn fold_binary(__param_op: c_int, __param_lhs_op_info: *mut eclass_op_info, __param_rhs_op_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) {
+unsafe fn fold_binary(__param_op: c_int, __param_lhs_op_info: *mut eclass_op_info, __param_rhs_op_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> Unit {
     while true {
         match __param_op {
             1 => {
-                if (not ((if __param_rhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
-                    if ((if __param_lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                if (not ((if (unsafe *__param_rhs_op_info).op_single_type == 6: 1 else: 0) != 0)) {
+                    if ((if (unsafe *__param_lhs_op_info).op_single_type == 6: 1 else: 0) != 0) {
                         if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-                            with_memmove((__param_lhs_op_info.code_start as *i8), (__param_rhs_op_info.code_start as *i8), (((__param_rhs_op_info.length as c_ulong) *% (1 as c_ulong)) as i64))
+                            with_memmove((((unsafe *__param_lhs_op_info).code_start as *mut c_void) as *mut u8), (((unsafe *__param_rhs_op_info).code_start as *const c_void) as *const u8), (((((unsafe *__param_rhs_op_info).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
                         }
 
-                        ((unsafe *__param_lhs_op_info).length = __param_rhs_op_info.length)
+                        ((unsafe *__param_lhs_op_info).length = (unsafe *__param_rhs_op_info).length)
 
-                        ((unsafe *__param_lhs_op_info).op_single_type = __param_rhs_op_info.op_single_type)
+                        ((unsafe *__param_lhs_op_info).op_single_type = (unsafe *__param_rhs_op_info).op_single_type)
 
                     } else {
-                        if ((if __param_rhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
+                        if ((if (unsafe *__param_rhs_op_info).op_single_type == 7: 1 else: 0) != 0) {
                             if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-                                ((unsafe (unsafe *__param_lhs_op_info).code_start[0]) = 7)
+                                ((unsafe (unsafe *__param_lhs_op_info).code_start[0]) = ((7 as u8)))
                             }
 
-                            ((unsafe *__param_lhs_op_info).length = 1)
+                            ((unsafe *__param_lhs_op_info).length = ((1 as c_ulong)))
 
-                            ((unsafe *__param_lhs_op_info).op_single_type = 7)
+                            ((unsafe *__param_lhs_op_info).op_single_type = ((7 as u8)))
 
                         } else {
-                            if (not ((if __param_lhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
+                            if (not ((if (unsafe *__param_lhs_op_info).op_single_type == 7: 1 else: 0) != 0)) {
                                 if ((if __param_lengthptr != null: 1 else: 0) != 0) {
-                                    ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + 1)
+                                    ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% 1))
                                 } else {
-                                    do {
+                                    loop {
                                         0
-                                    } while (0 != 0)
+                                        if not ((0 != 0)) {
+                                            break
+                                        }
+                                    }
 
-                                    ((unsafe (unsafe *__param_rhs_op_info).code_start[__param_rhs_op_info.length]) = 1)
+                                    ((unsafe (unsafe *__param_rhs_op_info).code_start[(unsafe *__param_rhs_op_info).length]) = ((1 as u8)))
 
                                 }
 
-                                ((unsafe *__param_lhs_op_info).length = __param_lhs_op_info.length + ((__param_rhs_op_info.length as c_ulong) +% (1 as c_ulong)))
+                                ((unsafe *__param_lhs_op_info).length = ((unsafe *__param_lhs_op_info).length +% (((unsafe *__param_rhs_op_info).length as c_ulong) +% (1 as c_ulong))))
 
-                                ((unsafe *__param_lhs_op_info).op_single_type = 0)
+                                ((unsafe *__param_lhs_op_info).op_single_type = ((0 as u8)))
 
                             }
                         }
                     }
                 }
 
-                var __local_i: c_int = 0
+                var __local_i: c_int = ((0 as c_int))
 
                 while ((if __local_i < 8: 1 else: 0) != 0) {
-                    ((unsafe *__param_lhs_op_info).bits.classwords[__local_i] = (&raw const (unsafe *__param_lhs_op_info).bits as *const class_bits_storage).classwords[__local_i] & (&raw const (unsafe *__param_rhs_op_info).bits as *const class_bits_storage).classwords[__local_i])
+                    ((unsafe *__param_lhs_op_info).bits.classwords[__local_i] = ((unsafe *(&raw const (unsafe *__param_lhs_op_info).bits as *const class_bits_storage)).classwords[__local_i] as c_uint) & ((unsafe *(&raw const (unsafe *__param_rhs_op_info).bits as *const class_bits_storage)).classwords[__local_i] as c_uint))
 
                     (__local_i = __local_i + 1)
 
@@ -3970,52 +4081,55 @@ fn fold_binary(__param_op: c_int, __param_lhs_op_info: *mut eclass_op_info, __pa
 
             },
             2 => {
-                if (not ((if __param_rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
-                    if ((if __param_lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
+                if (not ((if (unsafe *__param_rhs_op_info).op_single_type == 7: 1 else: 0) != 0)) {
+                    if ((if (unsafe *__param_lhs_op_info).op_single_type == 7: 1 else: 0) != 0) {
                         if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-                            with_memmove((__param_lhs_op_info.code_start as *i8), (__param_rhs_op_info.code_start as *i8), (((__param_rhs_op_info.length as c_ulong) *% (1 as c_ulong)) as i64))
+                            with_memmove((((unsafe *__param_lhs_op_info).code_start as *mut c_void) as *mut u8), (((unsafe *__param_rhs_op_info).code_start as *const c_void) as *const u8), (((((unsafe *__param_rhs_op_info).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
                         }
 
-                        ((unsafe *__param_lhs_op_info).length = __param_rhs_op_info.length)
+                        ((unsafe *__param_lhs_op_info).length = (unsafe *__param_rhs_op_info).length)
 
-                        ((unsafe *__param_lhs_op_info).op_single_type = __param_rhs_op_info.op_single_type)
+                        ((unsafe *__param_lhs_op_info).op_single_type = (unsafe *__param_rhs_op_info).op_single_type)
 
                     } else {
-                        if ((if __param_rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                        if ((if (unsafe *__param_rhs_op_info).op_single_type == 6: 1 else: 0) != 0) {
                             if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-                                ((unsafe (unsafe *__param_lhs_op_info).code_start[0]) = 6)
+                                ((unsafe (unsafe *__param_lhs_op_info).code_start[0]) = ((6 as u8)))
                             }
 
-                            ((unsafe *__param_lhs_op_info).length = 1)
+                            ((unsafe *__param_lhs_op_info).length = ((1 as c_ulong)))
 
-                            ((unsafe *__param_lhs_op_info).op_single_type = 6)
+                            ((unsafe *__param_lhs_op_info).op_single_type = ((6 as u8)))
 
                         } else {
-                            if (not ((if __param_lhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
+                            if (not ((if (unsafe *__param_lhs_op_info).op_single_type == 6: 1 else: 0) != 0)) {
                                 if ((if __param_lengthptr != null: 1 else: 0) != 0) {
-                                    ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + 1)
+                                    ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% 1))
                                 } else {
-                                    do {
+                                    loop {
                                         0
-                                    } while (0 != 0)
+                                        if not ((0 != 0)) {
+                                            break
+                                        }
+                                    }
 
-                                    ((unsafe (unsafe *__param_rhs_op_info).code_start[__param_rhs_op_info.length]) = 2)
+                                    ((unsafe (unsafe *__param_rhs_op_info).code_start[(unsafe *__param_rhs_op_info).length]) = ((2 as u8)))
 
                                 }
 
-                                ((unsafe *__param_lhs_op_info).length = __param_lhs_op_info.length + ((__param_rhs_op_info.length as c_ulong) +% (1 as c_ulong)))
+                                ((unsafe *__param_lhs_op_info).length = ((unsafe *__param_lhs_op_info).length +% (((unsafe *__param_rhs_op_info).length as c_ulong) +% (1 as c_ulong))))
 
-                                ((unsafe *__param_lhs_op_info).op_single_type = 0)
+                                ((unsafe *__param_lhs_op_info).op_single_type = ((0 as u8)))
 
                             }
                         }
                     }
                 }
 
-                var __local_i_1: c_int = 0
+                var __local_i_1: c_int = ((0 as c_int))
 
                 while ((if __local_i_1 < 8: 1 else: 0) != 0) {
-                    ((unsafe *__param_lhs_op_info).bits.classwords[__local_i_1] = (&raw const (unsafe *__param_lhs_op_info).bits as *const class_bits_storage).classwords[__local_i_1] | (&raw const (unsafe *__param_rhs_op_info).bits as *const class_bits_storage).classwords[__local_i_1])
+                    ((unsafe *__param_lhs_op_info).bits.classwords[__local_i_1] = ((unsafe *(&raw const (unsafe *__param_lhs_op_info).bits as *const class_bits_storage)).classwords[__local_i_1] as c_uint) | ((unsafe *(&raw const (unsafe *__param_rhs_op_info).bits as *const class_bits_storage)).classwords[__local_i_1] as c_uint))
 
                     (__local_i_1 = __local_i_1 + 1)
 
@@ -4024,57 +4138,60 @@ fn fold_binary(__param_op: c_int, __param_lhs_op_info: *mut eclass_op_info, __pa
 
             },
             3 => {
-                if (not ((if __param_rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
-                    if ((if __param_lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
+                if (not ((if (unsafe *__param_rhs_op_info).op_single_type == 7: 1 else: 0) != 0)) {
+                    if ((if (unsafe *__param_lhs_op_info).op_single_type == 7: 1 else: 0) != 0) {
                         if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-                            with_memmove((__param_lhs_op_info.code_start as *i8), (__param_rhs_op_info.code_start as *i8), (((__param_rhs_op_info.length as c_ulong) *% (1 as c_ulong)) as i64))
+                            with_memmove((((unsafe *__param_lhs_op_info).code_start as *mut c_void) as *mut u8), (((unsafe *__param_rhs_op_info).code_start as *const c_void) as *const u8), (((((unsafe *__param_rhs_op_info).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
                         }
 
-                        ((unsafe *__param_lhs_op_info).length = __param_rhs_op_info.length)
+                        ((unsafe *__param_lhs_op_info).length = (unsafe *__param_rhs_op_info).length)
 
-                        ((unsafe *__param_lhs_op_info).op_single_type = __param_rhs_op_info.op_single_type)
+                        ((unsafe *__param_lhs_op_info).op_single_type = (unsafe *__param_rhs_op_info).op_single_type)
 
                     } else {
-                        if ((if __param_rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
-                            fold_negation(__param_lhs_op_info, __param_lengthptr, 1)
+                        if ((if (unsafe *__param_rhs_op_info).op_single_type == 6: 1 else: 0) != 0) {
+                            fold_negation(__param_lhs_op_info, __param_lengthptr, (1 as c_int))
 
                         } else {
-                            if ((if __param_lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                            if ((if (unsafe *__param_lhs_op_info).op_single_type == 6: 1 else: 0) != 0) {
                                 if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-                                    with_memmove((__param_lhs_op_info.code_start as *i8), (__param_rhs_op_info.code_start as *i8), (((__param_rhs_op_info.length as c_ulong) *% (1 as c_ulong)) as i64))
+                                    with_memmove((((unsafe *__param_lhs_op_info).code_start as *mut c_void) as *mut u8), (((unsafe *__param_rhs_op_info).code_start as *const c_void) as *const u8), (((((unsafe *__param_rhs_op_info).length as c_ulong) *% (1 as c_ulong)) as c_ulong) as i64))
                                 }
 
-                                ((unsafe *__param_lhs_op_info).length = __param_rhs_op_info.length)
+                                ((unsafe *__param_lhs_op_info).length = (unsafe *__param_rhs_op_info).length)
 
-                                ((unsafe *__param_lhs_op_info).op_single_type = __param_rhs_op_info.op_single_type)
+                                ((unsafe *__param_lhs_op_info).op_single_type = (unsafe *__param_rhs_op_info).op_single_type)
 
-                                fold_negation(__param_lhs_op_info, __param_lengthptr, 1)
+                                fold_negation(__param_lhs_op_info, __param_lengthptr, (1 as c_int))
 
                             } else {
                                 if ((if __param_lengthptr != null: 1 else: 0) != 0) {
-                                    ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + 1)
+                                    ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% 1))
                                 } else {
-                                    do {
+                                    loop {
                                         0
-                                    } while (0 != 0)
+                                        if not ((0 != 0)) {
+                                            break
+                                        }
+                                    }
 
-                                    ((unsafe (unsafe *__param_rhs_op_info).code_start[__param_rhs_op_info.length]) = 3)
+                                    ((unsafe (unsafe *__param_rhs_op_info).code_start[(unsafe *__param_rhs_op_info).length]) = ((3 as u8)))
 
                                 }
 
-                                ((unsafe *__param_lhs_op_info).length = __param_lhs_op_info.length + ((__param_rhs_op_info.length as c_ulong) +% (1 as c_ulong)))
+                                ((unsafe *__param_lhs_op_info).length = ((unsafe *__param_lhs_op_info).length +% (((unsafe *__param_rhs_op_info).length as c_ulong) +% (1 as c_ulong))))
 
-                                ((unsafe *__param_lhs_op_info).op_single_type = 0)
+                                ((unsafe *__param_lhs_op_info).op_single_type = ((0 as u8)))
 
                             }
                         }
                     }
                 }
 
-                var __local_i_2: c_int = 0
+                var __local_i_2: c_int = ((0 as c_int))
 
                 while ((if __local_i_2 < 8: 1 else: 0) != 0) {
-                    ((unsafe *__param_lhs_op_info).bits.classwords[__local_i_2] = (&raw const (unsafe *__param_lhs_op_info).bits as *const class_bits_storage).classwords[__local_i_2] ^ (&raw const (unsafe *__param_rhs_op_info).bits as *const class_bits_storage).classwords[__local_i_2])
+                    ((unsafe *__param_lhs_op_info).bits.classwords[__local_i_2] = ((unsafe *(&raw const (unsafe *__param_lhs_op_info).bits as *const class_bits_storage)).classwords[__local_i_2] as c_uint) ^ ((unsafe *(&raw const (unsafe *__param_rhs_op_info).bits as *const class_bits_storage)).classwords[__local_i_2] as c_uint))
 
                     (__local_i_2 = __local_i_2 + 1)
 
@@ -4083,9 +4200,12 @@ fn fold_binary(__param_op: c_int, __param_lhs_op_info: *mut eclass_op_info, __pa
 
             },
             _ => {
-                do {
+                loop {
                     0
-                } while (0 != 0)
+                    if not ((0 != 0)) {
+                        break
+                    }
+                }
             },
         }
 
@@ -4095,20 +4215,23 @@ fn fold_binary(__param_op: c_int, __param_lhs_op_info: *mut eclass_op_info, __pa
 
 }
 
-fn compile_eclass_nested(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+unsafe fn compile_eclass_nested(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
     var __local_negated = __param_negated
     var __local_ptr: *mut c_uint = (unsafe *__param_pptr)
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     var __ci_expr_old_0: *mut c_uint = __local_ptr
 
     (__local_ptr = __local_ptr + 1)
 
     if ((if (unsafe *__ci_expr_old_0) == (((2148401152 as c_uint) as c_uint) | (1 as c_uint)): 1 else: 0) != 0) {
-        (__local_negated = (if not (__local_negated != 0): 1 else: 0))
+        (__local_negated = (((if not (__local_negated != 0): 1 else: 0) as c_int)))
     }
 
 
@@ -4118,19 +4241,25 @@ fn compile_eclass_nested(__param_context: *mut eclass_context, __param_negated: 
         return 0
     }
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     return 1
 
 }
 
-fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+unsafe fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
     var __local_ptr__goto_2134_11: *mut c_uint = null
 
     var __local_prev_ptr__goto_2135_11: *mut c_uint = null
@@ -4177,10 +4306,10 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
         if ((if __param_lengthptr != null: 1 else: 0) != 0) {
             (__ci_expr_ternary_0 = (unsafe *__param_lengthptr))
         } else {
-            (__ci_expr_ternary_0 = 0)
+            (__ci_expr_ternary_0 = ((0 as c_ulong)))
         }
         (__local_prev_length__goto_2138_12 = __ci_expr_ternary_0)
-        (__local_meta__goto_2140_10 = ((unsafe *__local_ptr__goto_2134_11) as c_uint) & ((4294901760 as c_uint) as c_uint))
+        (__local_meta__goto_2140_10 = (((((unsafe *__local_ptr__goto_2134_11) as c_uint) & ((4294901760 as c_uint) as c_uint)) as c_uint)))
         goto '__ci_bb_1
     }
 
@@ -4209,7 +4338,7 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
 
     '__ci_bb_3 {
         (__local_ptr__goto_2134_11 = __local_ptr__goto_2134_11 + 1)
-        ((unsafe *__param_pop_info).length = 1)
+        ((unsafe *__param_pop_info).length = ((1 as c_ulong)))
         if ((if (if __local_meta__goto_2140_10 == 2148204544: 1 else: 0) == __param_negated: 1 else: 0) != 0) {
             goto '__ci_bb_4
         } else {
@@ -4220,18 +4349,18 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
     '__ci_bb_4 {
         (__ci_expr_old_1 = __local_code__goto_2136_14)
         (__local_code__goto_2136_14 = __local_code__goto_2136_14 + 1)
-        ((unsafe *__param_pop_info).op_single_type = 6)
-        ((unsafe *__ci_expr_old_1) = __param_pop_info.op_single_type)
-        with_memset(((&(unsafe (&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), 255, (32 as i64))
+        ((unsafe *__param_pop_info).op_single_type = ((6 as u8)))
+        ((unsafe *__ci_expr_old_1) = (unsafe *__param_pop_info).op_single_type)
+        with_memset(((&(unsafe *(&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage)).classbits[0] as *mut u8) as *mut u8), (255 as c_int), ((32 as c_ulong) as i64))
         goto '__ci_bb_6
     }
 
     '__ci_bb_5 {
         (__ci_expr_old_2 = __local_code__goto_2136_14)
         (__local_code__goto_2136_14 = __local_code__goto_2136_14 + 1)
-        ((unsafe *__param_pop_info).op_single_type = 7)
-        ((unsafe *__ci_expr_old_2) = __param_pop_info.op_single_type)
-        with_memset(((&(unsafe (&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), 0, (32 as i64))
+        ((unsafe *__param_pop_info).op_single_type = ((7 as u8)))
+        ((unsafe *__ci_expr_old_2) = (unsafe *__param_pop_info).op_single_type)
+        with_memset(((&(unsafe *(&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage)).classbits[0] as *mut u8) as *mut u8), (0 as c_int), ((32 as c_ulong) as i64))
         goto '__ci_bb_6
     }
 
@@ -4291,7 +4420,7 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
 
     '__ci_bb_16 {
         (__local_prev_ptr__goto_2135_11 = __local_ptr__goto_2134_11)
-        (__local_ptr__goto_2134_11 = _pcre2_compile_class_not_nested_8(__param_context.options, __param_context.xoptions, __local_ptr__goto_2134_11, (&raw mut __local_code__goto_2136_14 as *mut *mut u8), (if (if __local_meta__goto_2140_10 != 2148401152: 1 else: 0) == __param_negated: 1 else: 0), ((&raw const (unsafe *__param_context).needs_bitmap as *const c_int) as *mut c_int), __param_context.errorcodeptr, __param_context.cb, __param_lengthptr))
+        (__local_ptr__goto_2134_11 = _pcre2_compile_class_not_nested_8((unsafe *__param_context).options, (unsafe *__param_context).xoptions, __local_ptr__goto_2134_11, (&raw mut __local_code__goto_2136_14 as *mut *mut u8), ((if (if __local_meta__goto_2140_10 != 2148401152: 1 else: 0) == __param_negated: 1 else: 0) as c_int), ((&raw const (unsafe *__param_context).needs_bitmap as *const c_int) as *mut c_int), (unsafe *__param_context).errorcodeptr, (unsafe *__param_context).cb, __param_lengthptr))
         if ((if __local_ptr__goto_2134_11 == null: 1 else: 0) != 0) {
             goto '__ci_bb_17
         } else {
@@ -4384,9 +4513,9 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
     '__ci_bb_31 {
         (__ci_expr_ternary_4 = 0)
         if ((if __param_lengthptr != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_4 = (((unsafe *__param_lengthptr) as c_ulong) -% (__local_prev_length__goto_2138_12 as c_ulong)))
+            (__ci_expr_ternary_4 = (((((unsafe *__param_lengthptr) as c_ulong) -% (__local_prev_length__goto_2138_12 as c_ulong)) as c_ulong)))
         } else {
-            (__ci_expr_ternary_4 = 0)
+            (__ci_expr_ternary_4 = ((0 as c_ulong)))
         }
         (__local_extra_length__goto_2139_12 = __ci_expr_ternary_4)
         if ((if (unsafe *__local_code_start__goto_2137_14) == OP_ALLANY: 1 else: 0) != 0) {
@@ -4430,10 +4559,10 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
     }
 
     '__ci_bb_37 {
-        ((unsafe *__param_pop_info).length = 1)
-        ((unsafe *__param_pop_info).op_single_type = 6)
-        ((unsafe *__local_code_start__goto_2137_14) = __param_pop_info.op_single_type)
-        with_memset(((&(unsafe (&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), 255, (32 as i64))
+        ((unsafe *__param_pop_info).length = ((1 as c_ulong)))
+        ((unsafe *__param_pop_info).op_single_type = ((6 as u8)))
+        ((unsafe *__local_code_start__goto_2137_14) = (unsafe *__param_pop_info).op_single_type)
+        with_memset(((&(unsafe *(&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage)).classbits[0] as *mut u8) as *mut u8), (255 as c_int), ((32 as c_ulong) as i64))
         goto '__ci_bb_34
     }
 
@@ -4462,16 +4591,16 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
     }
 
     '__ci_bb_43 {
-        ((unsafe *__param_pop_info).length = 1)
+        ((unsafe *__param_pop_info).length = ((1 as c_ulong)))
         (__ci_expr_ternary_6 = 0)
         if ((if (unsafe *__local_code_start__goto_2137_14) == OP_CLASS: 1 else: 0) != 0) {
-            (__ci_expr_ternary_6 = 7)
+            (__ci_expr_ternary_6 = ((7 as c_int)))
         } else {
-            (__ci_expr_ternary_6 = 6)
+            (__ci_expr_ternary_6 = ((6 as c_int)))
         }
-        ((unsafe *__param_pop_info).op_single_type = __ci_expr_ternary_6)
-        ((unsafe *__local_code_start__goto_2137_14) = __param_pop_info.op_single_type)
-        with_memcpy(((&(unsafe (&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), ((__local_code_start__goto_2137_14 + ((1 as isize) as usize)) as *i8), (32 as i64))
+        ((unsafe *__param_pop_info).op_single_type = ((__ci_expr_ternary_6 as u8)))
+        ((unsafe *__local_code_start__goto_2137_14) = (unsafe *__param_pop_info).op_single_type)
+        with_memcpy(((&(unsafe *(&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage)).classbits[0] as *mut u8) as *mut u8), (((__local_code_start__goto_2137_14 + ((1 as isize) as usize)) as *const c_void) as *const u8), ((32 as c_ulong) as i64))
         if ((if __param_lengthptr != null: 1 else: 0) != 0) {
             goto '__ci_bb_44
         } else {
@@ -4480,14 +4609,14 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
     }
 
     '__ci_bb_44 {
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + (((__local_code__goto_2136_14 as usize) -% ((__local_code_start__goto_2137_14 + ((1 as isize) as usize)) as usize)) / sizeof[u8]()))
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% (((__local_code__goto_2136_14 as usize) -% ((__local_code_start__goto_2137_14 + ((1 as isize) as usize)) as usize)) / sizeof[u8]())))
         goto '__ci_bb_45
     }
 
     '__ci_bb_45 {
         (__local_code__goto_2136_14 = __local_code_start__goto_2137_14 + ((1 as isize) as usize))
         (__ci_expr_logic_7 = 0)
-        if ((if not (__param_context.needs_bitmap != 0): 1 else: 0) != 0) {
+        if ((if not ((unsafe *__param_context).needs_bitmap != 0): 1 else: 0) != 0) {
             (__ci_expr_logic_7 = (if (if (unsafe *__local_code_start__goto_2137_14) == 7: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_7 != 0) {
@@ -4499,12 +4628,12 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
 
     '__ci_bb_46 {
         (__local_classwords__goto_2241_17 = ((&raw const (unsafe *__param_pop_info).bits.classwords[0] as *mut c_uint)))
-        (__local_i__goto_2243_16 = 0)
+        (__local_i__goto_2243_16 = ((0 as c_int)))
         goto '__ci_bb_49
     }
 
     '__ci_bb_47 {
-        ((unsafe *__param_context).needs_bitmap = 1)
+        ((unsafe *__param_context).needs_bitmap = ((1 as c_int)))
         goto '__ci_bb_48
     }
 
@@ -4538,7 +4667,7 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
     }
 
     '__ci_bb_53 {
-        ((unsafe *__param_context).needs_bitmap = 1)
+        ((unsafe *__param_context).needs_bitmap = ((1 as c_int)))
         goto '__ci_bb_52
     }
 
@@ -4559,8 +4688,8 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
     }
 
     '__ci_bb_57 {
-        ((unsafe *__param_pop_info).op_single_type = 5)
-        ((unsafe *__local_code_start__goto_2137_14) = __param_pop_info.op_single_type)
+        ((unsafe *__param_pop_info).op_single_type = ((5 as u8)))
+        ((unsafe *__local_code_start__goto_2137_14) = (unsafe *__param_pop_info).op_single_type)
         goto '__ci_bb_58
     }
 
@@ -4577,8 +4706,8 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
     }
 
     '__ci_bb_60 {
-        with_memcpy(((&(unsafe (&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), ((&(unsafe (&raw const (unsafe *__param_context.cb).classbits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), (32 as i64))
-        ((unsafe *__param_pop_info).length = (((((__local_code__goto_2136_14 as usize) -% (__local_code_start__goto_2137_14 as usize)) / sizeof[u8]()) as c_ulong) +% (__local_extra_length__goto_2139_12 as c_ulong)))
+        with_memcpy(((&(unsafe *(&raw const (unsafe *__param_pop_info).bits as *const class_bits_storage)).classbits[0] as *mut u8) as *mut u8), ((&(unsafe *(&raw const (unsafe *(unsafe *__param_context).cb).classbits as *const class_bits_storage)).classbits[0] as *mut u8) as *const u8), ((32 as c_ulong) as i64))
+        ((unsafe *__param_pop_info).length = (((((((__local_code__goto_2136_14 as usize) -% (__local_code_start__goto_2137_14 as usize)) / sizeof[u8]()) as c_ulong) +% (__local_extra_length__goto_2139_12 as c_ulong)) as c_ulong)))
         goto '__ci_bb_40
     }
 
@@ -4607,7 +4736,7 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
     }
 
     '__ci_bb_64 {
-        ((unsafe *__param_lengthptr) = (unsafe *__param_lengthptr) + (((__local_code__goto_2136_14 as usize) -% (__local_code_start__goto_2137_14 as usize)) / sizeof[u8]()))
+        ((unsafe *__param_lengthptr) = ((unsafe *__param_lengthptr) +% (((__local_code__goto_2136_14 as usize) -% (__local_code_start__goto_2137_14 as usize)) / sizeof[u8]())))
         (__local_code__goto_2136_14 = __local_code_start__goto_2137_14)
         goto '__ci_bb_65
     }
@@ -4634,9 +4763,11 @@ fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: 
         return 1
     }
 
+    __ci_unreachable()
+
 }
 
-fn compile_class_juxtaposition(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+unsafe fn compile_class_juxtaposition(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
     var __local_ptr: *mut c_uint = (unsafe *__param_pptr)
 
     var __local_code: *mut u8 = (unsafe *__param_pcode)
@@ -4670,14 +4801,14 @@ fn compile_class_juxtaposition(__param_context: *mut eclass_context, __param_neg
         var __local_rhs_op_info: eclass_op_info
 
         if (__param_negated != 0) {
-            (__local_op = 1)
+            (__local_op = ((1 as c_uint)))
 
-            (__local_rhs_negated = 1)
+            (__local_rhs_negated = ((1 as c_int)))
 
         } else {
-            (__local_op = 2)
+            (__local_op = ((2 as c_uint)))
 
-            (__local_rhs_negated = 0)
+            (__local_rhs_negated = ((0 as c_int)))
 
         }
 
@@ -4685,17 +4816,20 @@ fn compile_class_juxtaposition(__param_context: *mut eclass_context, __param_neg
             return 0
         }
 
-        fold_binary(__local_op, __param_pop_info, (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr)
+        fold_binary((__local_op as c_int), __param_pop_info, (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr)
 
         if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-            (__local_code = __param_pop_info.code_start + (__param_pop_info.length as usize))
+            (__local_code = (unsafe *__param_pop_info).code_start + ((unsafe *__param_pop_info).length as usize))
         }
 
     }
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     ((unsafe *__param_pptr) = __local_ptr)
 
@@ -4705,14 +4839,14 @@ fn compile_class_juxtaposition(__param_context: *mut eclass_context, __param_neg
 
 }
 
-fn compile_class_unary(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+unsafe fn compile_class_unary(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
     var __local_negated = __param_negated
     var __local_ptr: *mut c_uint = (unsafe *__param_pptr)
 
     while ((if (unsafe *__local_ptr) == 2152202240: 1 else: 0) != 0) {
         (__local_ptr = __local_ptr + 1)
 
-        (__local_negated = (if not (__local_negated != 0): 1 else: 0))
+        (__local_negated = (((if not (__local_negated != 0): 1 else: 0) as c_int)))
 
     }
 
@@ -4722,15 +4856,18 @@ fn compile_class_unary(__param_context: *mut eclass_context, __param_negated: c_
         return 0
     }
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     return 1
 
 }
 
-fn compile_class_binary_tight(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+unsafe fn compile_class_binary_tight(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
     var __local_ptr: *mut c_uint = (unsafe *__param_pptr)
 
     var __local_code: *mut u8 = (unsafe *__param_pcode)
@@ -4747,14 +4884,14 @@ fn compile_class_binary_tight(__param_context: *mut eclass_context, __param_nega
         var __local_rhs_op_info: eclass_op_info
 
         if (__param_negated != 0) {
-            (__local_op = 2)
+            (__local_op = ((2 as c_uint)))
 
-            (__local_rhs_negated = 1)
+            (__local_rhs_negated = ((1 as c_int)))
 
         } else {
-            (__local_op = 1)
+            (__local_op = ((1 as c_uint)))
 
-            (__local_rhs_negated = 0)
+            (__local_rhs_negated = ((0 as c_int)))
 
         }
 
@@ -4764,17 +4901,20 @@ fn compile_class_binary_tight(__param_context: *mut eclass_context, __param_nega
             return 0
         }
 
-        fold_binary(__local_op, __param_pop_info, (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr)
+        fold_binary((__local_op as c_int), __param_pop_info, (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr)
 
         if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-            (__local_code = __param_pop_info.code_start + (__param_pop_info.length as usize))
+            (__local_code = (unsafe *__param_pop_info).code_start + ((unsafe *__param_pop_info).length as usize))
         }
 
     }
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     ((unsafe *__param_pptr) = __local_ptr)
 
@@ -4784,7 +4924,7 @@ fn compile_class_binary_tight(__param_context: *mut eclass_context, __param_nega
 
 }
 
-fn compile_class_binary_loose(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+unsafe fn compile_class_binary_loose(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
     var __local_ptr: *mut c_uint = (unsafe *__param_pptr)
 
     var __local_code: *mut u8 = (unsafe *__param_pcode)
@@ -4816,51 +4956,51 @@ fn compile_class_binary_loose(__param_context: *mut eclass_context, __param_nega
             var __ci_expr_ternary_2: c_int = 0
 
             if ((if (unsafe *__local_ptr) == 2152005632: 1 else: 0) != 0) {
-                (__ci_expr_ternary_2 = 1)
+                (__ci_expr_ternary_2 = ((1 as c_int)))
             } else {
                 var __ci_expr_ternary_1: c_int = 0
 
                 if ((if (unsafe *__local_ptr) == 2152071168: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_1 = 2)
+                    (__ci_expr_ternary_1 = ((2 as c_int)))
                 } else {
-                    (__ci_expr_ternary_1 = 3)
+                    (__ci_expr_ternary_1 = ((3 as c_int)))
                 }
 
                 (__ci_expr_ternary_2 = __ci_expr_ternary_1)
 
             }
 
-            (__local_op = __ci_expr_ternary_2)
+            (__local_op = ((__ci_expr_ternary_2 as c_uint)))
 
 
-            (__local_op_neg = (if (unsafe *__local_ptr) == 2152136704: 1 else: 0))
+            (__local_op_neg = (((if (unsafe *__local_ptr) == 2152136704: 1 else: 0) as c_int)))
 
-            (__local_rhs_negated = (if (unsafe *__local_ptr) != 2152071168: 1 else: 0))
+            (__local_rhs_negated = (((if (unsafe *__local_ptr) != 2152071168: 1 else: 0) as c_int)))
 
         } else {
             var __ci_expr_ternary_4: c_int = 0
 
             if ((if (unsafe *__local_ptr) == 2152005632: 1 else: 0) != 0) {
-                (__ci_expr_ternary_4 = 2)
+                (__ci_expr_ternary_4 = ((2 as c_int)))
             } else {
                 var __ci_expr_ternary_3: c_int = 0
 
                 if ((if (unsafe *__local_ptr) == 2152071168: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_3 = 1)
+                    (__ci_expr_ternary_3 = ((1 as c_int)))
                 } else {
-                    (__ci_expr_ternary_3 = 3)
+                    (__ci_expr_ternary_3 = ((3 as c_int)))
                 }
 
                 (__ci_expr_ternary_4 = __ci_expr_ternary_3)
 
             }
 
-            (__local_op = __ci_expr_ternary_4)
+            (__local_op = ((__ci_expr_ternary_4 as c_uint)))
 
 
-            (__local_op_neg = 0)
+            (__local_op_neg = ((0 as c_int)))
 
-            (__local_rhs_negated = (if (unsafe *__local_ptr) == 2152071168: 1 else: 0))
+            (__local_rhs_negated = (((if (unsafe *__local_ptr) == 2152071168: 1 else: 0) as c_int)))
 
         }
 
@@ -4870,21 +5010,24 @@ fn compile_class_binary_loose(__param_context: *mut eclass_context, __param_nega
             return 0
         }
 
-        fold_binary(__local_op, __param_pop_info, (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr)
+        fold_binary((__local_op as c_int), __param_pop_info, (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr)
 
         if (__local_op_neg != 0) {
-            fold_negation(__param_pop_info, __param_lengthptr, 0)
+            fold_negation(__param_pop_info, __param_lengthptr, (0 as c_int))
         }
 
         if ((if __param_lengthptr == null: 1 else: 0) != 0) {
-            (__local_code = __param_pop_info.code_start + (__param_pop_info.length as usize))
+            (__local_code = (unsafe *__param_pop_info).code_start + ((unsafe *__param_pop_info).length as usize))
         }
 
     }
 
-    do {
+    loop {
         0
-    } while (0 != 0)
+        if not ((0 != 0)) {
+            break
+        }
+    }
 
     ((unsafe *__param_pptr) = __local_ptr)
 
@@ -4894,4 +5037,4 @@ fn compile_class_binary_loose(__param_context: *mut eclass_context, __param_nega
 
 }
 
-let char_list_starts: [3]c_uint = [0x10000, 0x8000, 0x100]
+let char_list_starts: [3]c_uint = [65536, 32768, 256]

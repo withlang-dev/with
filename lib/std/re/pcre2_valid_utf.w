@@ -1,7 +1,35 @@
-// Migrated from PCRE2
+// Migrated from C
 use std.re.defs
+use std.re.pcre2_config
+use std.re.pcre2_context
+use std.re.pcre2_convert
+use std.re.pcre2_compile
+use std.re.pcre2_pattern_info
+use std.re.pcre2_match_data
+use std.re.pcre2_dfa_match
+use std.re.pcre2_match
+use std.re.pcre2_match_next
+use std.re.pcre2_substring
+use std.re.pcre2_serialize
+use std.re.pcre2_substitute
+use std.re.pcre2_jit_compile
+use std.re.pcre2_error
+use std.re.pcre2_maketables
+use std.re.pcre2_tables
+use std.re.pcre2_chartables
+use std.re.pcre2_ucd
+use std.re.pcre2_auto_possess
+use std.re.pcre2_chkdint
+use std.re.pcre2_extuni
+use std.re.pcre2_find_bracket
+use std.re.pcre2_newline
+use std.re.pcre2_ord2utf
+use std.re.pcre2_script_run
+use std.re.pcre2_string_utils
+use std.re.pcre2_study
+use std.re.pcre2_xclass
 
-fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __param_erroroffset: *mut c_ulong) -> c_int {
+pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __param_erroroffset: *mut c_ulong) -> c_int {
     var __local_length = __param_length
     var __local_p: *const u8
 
@@ -15,9 +43,9 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
         var __local_d: c_uint
 
 
-        (__local_c = (unsafe *__local_p))
+        (__local_c = (((unsafe *__local_p) as c_uint)))
 
-        (__local_length = __local_length - 1)
+        (__local_length = (__local_length -% 1))
 
         if ((if __local_c < 128: 1 else: 0) != 0) {
             (__local_p = __local_p + 1)
@@ -40,7 +68,7 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
 
         }
 
-        (__local_ab = _pcre2_utf8_table4[((__local_c as c_uint) & (63 as c_uint))])
+        (__local_ab = ((_pcre2_utf8_table4[((__local_c as c_uint) & (63 as c_uint))] as c_uint)))
 
         if ((if __local_length < __local_ab: 1 else: 0) != 0) {
             ((unsafe *__param_erroroffset) = (((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong)))
@@ -65,14 +93,14 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
 
         }
 
-        (__local_length = __local_length - __local_ab)
+        (__local_length = (__local_length -% __local_ab))
 
         (__local_p = __local_p + 1)
 
-        (__local_d = (unsafe *__local_p))
+        (__local_d = (((unsafe *__local_p) as c_uint)))
 
         if ((if ((__local_d as c_uint) & (192 as c_uint)) != 128: 1 else: 0) != 0) {
-            ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (1 as c_ulong)))
+            ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
 
             return -8
 
@@ -83,7 +111,7 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
             match __local_ab {
                 1 => {
                     if ((if ((__local_c as c_uint) & (62 as c_uint)) == 0: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (1 as c_ulong)))
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
 
                         return -17
 
@@ -92,8 +120,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                 2 => {
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -9
 
@@ -107,7 +135,7 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)))
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -18
 
@@ -121,7 +149,7 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)))
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -16
 
@@ -132,8 +160,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                 3 => {
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -9
 
@@ -142,8 +170,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -10
 
@@ -157,7 +185,7 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                     }
 
                     if (__ci_expr_logic_2 != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)))
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -19
 
@@ -180,7 +208,7 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                     }
 
                     if (__ci_expr_logic_4 != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)))
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -15
 
@@ -191,8 +219,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                 4 => {
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -9
 
@@ -201,8 +229,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -10
 
@@ -211,8 +239,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (4 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (4 as c_ulong)) as c_ulong)))
 
                         return -11
 
@@ -226,7 +254,7 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                     }
 
                     if (__ci_expr_logic_5 != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (4 as c_ulong)))
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (4 as c_ulong)) as c_ulong)))
 
                         return -20
 
@@ -237,8 +265,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                 5 => {
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (2 as c_ulong)) as c_ulong)))
 
                         return -9
 
@@ -247,8 +275,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (3 as c_ulong)) as c_ulong)))
 
                         return -10
 
@@ -257,8 +285,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (4 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (4 as c_ulong)) as c_ulong)))
 
                         return -11
 
@@ -267,8 +295,8 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((unsafe *__local_p) as c_int) & 192) != 128: 1 else: 0) != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (5 as c_ulong)))
+                    if ((if ((((unsafe *__local_p) as c_int) as c_int) & (192 as c_int)) != 128: 1 else: 0) != 0) {
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (5 as c_ulong)) as c_ulong)))
 
                         return -12
 
@@ -282,7 +310,7 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
                     }
 
                     if (__ci_expr_logic_6 != 0) {
-                        ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (5 as c_ulong)))
+                        ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (5 as c_ulong)) as c_ulong)))
 
                         return -21
 
@@ -297,14 +325,14 @@ fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __para
         }
 
         if ((if __local_ab > 3: 1 else: 0) != 0) {
-            ((unsafe *__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (__local_ab as c_ulong)))
+            ((unsafe *__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) / sizeof[u8]()) as c_ulong) as c_ulong) -% (__local_ab as c_ulong)) as c_ulong)))
 
             var __ci_expr_ternary_8: c_int = 0
 
             if ((if __local_ab == 4: 1 else: 0) != 0) {
-                (__ci_expr_ternary_8 = -13)
+                (__ci_expr_ternary_8 = ((-13 as c_int)))
             } else {
-                (__ci_expr_ternary_8 = -14)
+                (__ci_expr_ternary_8 = ((-14 as c_int)))
             }
 
             return __ci_expr_ternary_8

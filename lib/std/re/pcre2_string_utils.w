@@ -1,7 +1,35 @@
-// Migrated from PCRE2
+// Migrated from C
 use std.re.defs
+use std.re.pcre2_config
+use std.re.pcre2_context
+use std.re.pcre2_convert
+use std.re.pcre2_compile
+use std.re.pcre2_pattern_info
+use std.re.pcre2_match_data
+use std.re.pcre2_dfa_match
+use std.re.pcre2_match
+use std.re.pcre2_match_next
+use std.re.pcre2_substring
+use std.re.pcre2_serialize
+use std.re.pcre2_substitute
+use std.re.pcre2_jit_compile
+use std.re.pcre2_error
+use std.re.pcre2_maketables
+use std.re.pcre2_tables
+use std.re.pcre2_chartables
+use std.re.pcre2_ucd
+use std.re.pcre2_auto_possess
+use std.re.pcre2_chkdint
+use std.re.pcre2_extuni
+use std.re.pcre2_find_bracket
+use std.re.pcre2_newline
+use std.re.pcre2_ord2utf
+use std.re.pcre2_script_run
+use std.re.pcre2_study
+use std.re.pcre2_valid_utf
+use std.re.pcre2_xclass
 
-fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int {
+pub unsafe fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2
     var __local_c1: u8
@@ -44,7 +72,7 @@ fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int {
 
 }
 
-fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int {
+pub unsafe fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2
     var __local_c1: u8
@@ -71,11 +99,11 @@ fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int
 
         (__local_c1 = (unsafe *__ci_expr_old_1))
 
-        var __ci_expr_old_2: *const c_char = __local_str2
+        var __ci_expr_old_2: *const i8 = __local_str2
 
         (__local_str2 = __local_str2 + 1)
 
-        (__local_c2 = (unsafe *__ci_expr_old_2))
+        (__local_c2 = (((unsafe *__ci_expr_old_2) as u8)))
 
         if ((if __local_c1 != __local_c2: 1 else: 0) != 0) {
             return ((((if __local_c1 > __local_c2: 1 else: 0) as c_int) << (1 as c_uint)) - 1)
@@ -87,7 +115,7 @@ fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int
 
 }
 
-fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8) -> c_ulong {
+pub unsafe fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8) -> c_ulong {
     var __local_str2 = __param_str2
     var __local_t: *mut u8 = __param_str1
 
@@ -96,23 +124,23 @@ fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8) -> c_ulong
 
         (__local_t = __local_t + 1)
 
-        var __ci_expr_old_1: *const c_char = __local_str2
+        var __ci_expr_old_1: *const i8 = __local_str2
 
         (__local_str2 = __local_str2 + 1)
 
-        ((unsafe *__ci_expr_old_0) = (unsafe *__ci_expr_old_1))
+        ((unsafe *__ci_expr_old_0) = (((unsafe *__ci_expr_old_1) as u8)))
 
     }
 
-    ((unsafe *__local_t) = 0)
+    ((unsafe *__local_t) = ((0 as u8)))
 
     return (((__local_t as usize) -% (__param_str1 as usize)) / sizeof[u8]())
 
 }
 
-fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
+pub unsafe fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
     var __local_str = __param_str
-    var __local_c: c_ulong = 0
+    var __local_c: c_ulong = ((0 as c_ulong))
 
     while true {
         var __ci_expr_old_0: *const u8 = __local_str
@@ -123,7 +151,7 @@ fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
             break
         }
 
-        (__local_c = __local_c + 1)
+        (__local_c = (__local_c +% 1))
 
     }
 
@@ -131,7 +159,7 @@ fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
 
 }
 
-fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_len: c_ulong) -> c_int {
+pub unsafe fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_len: c_ulong) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2
     var __local_len = __param_len
@@ -160,7 +188,7 @@ fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_le
         }
 
 
-        (__local_len = __local_len - 1)
+        (__local_len = (__local_len -% 1))
 
     }
 
@@ -168,7 +196,7 @@ fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_le
 
 }
 
-fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param_len: c_ulong) -> c_int {
+pub unsafe fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param_len: c_ulong) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2
     var __local_len = __param_len
@@ -185,11 +213,11 @@ fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param
         (__local_c1 = (unsafe *__ci_expr_old_0))
 
 
-        var __ci_expr_old_1: *const c_char = __local_str2
+        var __ci_expr_old_1: *const i8 = __local_str2
 
         (__local_str2 = __local_str2 + 1)
 
-        (__local_c2 = (unsafe *__ci_expr_old_1))
+        (__local_c2 = (((unsafe *__ci_expr_old_1) as u8)))
 
 
         if ((if __local_c1 != __local_c2: 1 else: 0) != 0) {
@@ -197,7 +225,7 @@ fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param
         }
 
 
-        (__local_len = __local_len - 1)
+        (__local_len = (__local_len -% 1))
 
     }
 

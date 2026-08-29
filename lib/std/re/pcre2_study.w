@@ -1,7 +1,35 @@
-// Migrated from PCRE2
+// Migrated from C
 use std.re.defs
+use std.re.pcre2_config
+use std.re.pcre2_context
+use std.re.pcre2_convert
+use std.re.pcre2_compile
+use std.re.pcre2_pattern_info
+use std.re.pcre2_match_data
+use std.re.pcre2_dfa_match
+use std.re.pcre2_match
+use std.re.pcre2_match_next
+use std.re.pcre2_substring
+use std.re.pcre2_serialize
+use std.re.pcre2_substitute
+use std.re.pcre2_jit_compile
+use std.re.pcre2_error
+use std.re.pcre2_maketables
+use std.re.pcre2_tables
+use std.re.pcre2_chartables
+use std.re.pcre2_ucd
+use std.re.pcre2_auto_possess
+use std.re.pcre2_chkdint
+use std.re.pcre2_extuni
+use std.re.pcre2_find_bracket
+use std.re.pcre2_newline
+use std.re.pcre2_ord2utf
+use std.re.pcre2_script_run
+use std.re.pcre2_string_utils
+use std.re.pcre2_valid_utf
+use std.re.pcre2_xclass
 
-fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
+pub unsafe fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     var __local_count__goto_1917_5: c_int = 0
 
     var __local_code__goto_1918_14: *mut u8 = null
@@ -49,11 +77,11 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_count__goto_1917_5 = 0)
-        (__local_utf__goto_1919_6 = (if ((__param_re.overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
-        (__local_ucp__goto_1920_6 = (if ((__param_re.overall_options as c_uint) & (131072 as c_uint)) != 0: 1 else: 0))
-        (__local_code__goto_1918_14 = (__param_re as *mut u8) + (__param_re.code_start as usize))
-        if ((if ((__param_re.flags as c_uint) & (((16 as c_uint) | (512 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
+        (__local_count__goto_1917_5 = ((0 as c_int)))
+        (__local_utf__goto_1919_6 = (((if (((unsafe *__param_re).overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) as c_int)))
+        (__local_ucp__goto_1920_6 = (((if (((unsafe *__param_re).overall_options as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) as c_int)))
+        (__local_code__goto_1918_14 = (__param_re as *mut u8) + ((unsafe *__param_re).code_start as usize))
+        if ((if (((unsafe *__param_re).flags as c_uint) & (((16 as c_uint) | (512 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_1
         } else {
             goto '__ci_bb_2
@@ -61,8 +89,8 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_1 {
-        (__local_depth__goto_1932_7 = 0)
-        (__local_rc__goto_1933_7 = set_start_bits(__param_re, __local_code__goto_1918_14, __local_utf__goto_1919_6, __local_ucp__goto_1920_6, (&raw mut __local_depth__goto_1932_7 as *mut c_int)))
+        (__local_depth__goto_1932_7 = ((0 as c_int)))
+        (__local_rc__goto_1933_7 = ((set_start_bits(__param_re, (__local_code__goto_1918_14 as *const u8), __local_utf__goto_1919_6, __local_ucp__goto_1920_6, (&raw mut __local_depth__goto_1932_7 as *mut c_int)) as c_int)))
         if ((if __local_rc__goto_1933_7 == SSB_UNKNOWN: 1 else: 0) != 0) {
             goto '__ci_bb_3
         } else {
@@ -72,8 +100,8 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
 
     '__ci_bb_2 {
         (__ci_expr_logic_5 = 0)
-        if ((if ((__param_re.flags as c_uint) & (((8192 as c_uint) | (8388608 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if __param_re.top_backref <= 128: 1 else: 0) != 0: 1 else: 0))
+        if ((if (((unsafe *__param_re).flags as c_uint) & (((8192 as c_uint) | (8388608 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_5 = (if (if (unsafe *__param_re).top_backref <= 128: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
             goto '__ci_bb_58
@@ -111,11 +139,11 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_8 {
-        (__local_a__goto_1953_9 = -1)
-        (__local_b__goto_1954_9 = -1)
+        (__local_a__goto_1953_9 = ((-1 as c_int)))
+        (__local_b__goto_1954_9 = ((-1 as c_int)))
         (__local_p__goto_1955_14 = ((&raw const (unsafe *__param_re).start_bitmap[0] as *mut u8)))
-        (__local_flags__goto_1956_14 = 64)
-        (__local_i__goto_1952_9 = 0)
+        (__local_flags__goto_1956_14 = ((64 as c_uint)))
+        (__local_i__goto_1952_9 = ((0 as c_int)))
         goto '__ci_bb_10
     }
 
@@ -155,7 +183,7 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_14 {
-        (__local_y__goto_1964_17 = (__local_x__goto_1960_15 as c_int) & (((~__local_x__goto_1960_15) as c_int) + 1))
+        (__local_y__goto_1964_17 = (((((__local_x__goto_1960_15 as c_int) as c_int) & ((((~__local_x__goto_1960_15) as c_int) + 1) as c_int)) as u8)))
         if ((if __local_y__goto_1964_17 != __local_x__goto_1960_15: 1 else: 0) != 0) {
             goto '__ci_bb_16
         } else {
@@ -177,7 +205,7 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_18 {
-        ((unsafe *__param_re).flags = __param_re.flags | __local_flags__goto_1956_14)
+        ((unsafe *__param_re).flags = ((unsafe *__param_re).flags as c_uint) | (__local_flags__goto_1956_14 as c_uint))
         goto '__ci_bb_9
     }
 
@@ -326,7 +354,7 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_41 {
-        (__local_d__goto_1996_15 = (unsafe (__param_re.tables + ((256 as isize) as usize))[(__local_c__goto_1963_13 as c_uint)]))
+        (__local_d__goto_1996_15 = (((unsafe ((unsafe *__param_re).tables + ((256 as isize) as usize))[(__local_c__goto_1963_13 as c_uint)]) as c_int)))
         if (__local_utf__goto_1919_6 != 0) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
@@ -376,7 +404,7 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_48 {
-        (__local_d__goto_1996_15 = (((__local_c__goto_1963_13 + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[(__local_c__goto_1963_13 / 128)] as c_int) * 128) + (__local_c__goto_1963_13 % 128))] as c_uint) as usize)).other_case) as c_uint)))
+        (__local_d__goto_1996_15 = ((((__local_c__goto_1963_13 + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[(__local_c__goto_1963_13 / 128)] as c_int) * 128) + (__local_c__goto_1963_13 % 128))] as c_uint) as usize)).other_case) as c_uint) as c_int)))
         goto '__ci_bb_49
     }
 
@@ -395,16 +423,16 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
 
     '__ci_bb_52 {
         (__ci_expr_logic_4 = 0)
-        if (((__param_re.flags as c_uint) & (128 as c_uint)) != 0) {
+        if ((((unsafe *__param_re).flags as c_uint) & (128 as c_uint)) != 0) {
             var __ci_expr_logic_3: c_int
 
-            if ((if __param_re.last_codeunit == ((__local_a__goto_1953_9 as c_uint)): 1 else: 0) != 0) {
+            if ((if (unsafe *__param_re).last_codeunit == ((__local_a__goto_1953_9 as c_uint)): 1 else: 0) != 0) {
                 (__ci_expr_logic_3 = (if true: 1 else: 0))
             } else {
                 var __ci_expr_logic_2: c_int = 0
 
                 if ((if __local_b__goto_1954_9 >= 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if __param_re.last_codeunit == ((__local_b__goto_1954_9 as c_uint)): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_2 = (if (if (unsafe *__param_re).last_codeunit == ((__local_b__goto_1954_9 as c_uint)): 1 else: 0) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_logic_3 = (if __ci_expr_logic_2 != 0: 1 else: 0))
@@ -426,14 +454,14 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_54 {
-        ((unsafe *__param_re).flags = __param_re.flags & (~((128 as c_uint) | (256 as c_uint))))
-        ((unsafe *__param_re).last_codeunit = 0)
+        ((unsafe *__param_re).flags = ((unsafe *__param_re).flags as c_uint) & ((~((128 as c_uint) | (256 as c_uint))) as c_uint))
+        ((unsafe *__param_re).last_codeunit = ((0 as c_uint)))
         goto '__ci_bb_55
     }
 
     '__ci_bb_55 {
-        ((unsafe *__param_re).first_codeunit = __local_a__goto_1953_9)
-        (__local_flags__goto_1956_14 = 16)
+        ((unsafe *__param_re).first_codeunit = ((__local_a__goto_1953_9 as c_uint)))
+        (__local_flags__goto_1956_14 = ((16 as c_uint)))
         if ((if __local_b__goto_1954_9 >= 0: 1 else: 0) != 0) {
             goto '__ci_bb_56
         } else {
@@ -442,7 +470,7 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_56 {
-        (__local_flags__goto_1956_14 = __local_flags__goto_1956_14 | 32)
+        (__local_flags__goto_1956_14 = (__local_flags__goto_1956_14 as c_uint) | (32 as c_uint))
         goto '__ci_bb_57
     }
 
@@ -451,8 +479,8 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     }
 
     '__ci_bb_58 {
-        (__local_backref_cache__goto_2057_7[0] = 0)
-        (__local_min__goto_2056_7 = find_minlength(__param_re, __local_code__goto_1918_14, __local_code__goto_1918_14, __local_utf__goto_1919_6, null, (&raw mut __local_count__goto_1917_5 as *mut c_int), (&__local_backref_cache__goto_2057_7[0] as *mut c_int)))
+        (__local_backref_cache__goto_2057_7[0] = ((0 as c_int)))
+        (__local_min__goto_2056_7 = ((find_minlength((__param_re as *const pcre2_real_code_8), (__local_code__goto_1918_14 as *const u8), (__local_code__goto_1918_14 as *const u8), __local_utf__goto_1919_6, (null as *mut recurse_check), (&raw mut __local_count__goto_1917_5 as *mut c_int), (&__local_backref_cache__goto_2057_7[0] as *mut c_int)) as c_int)))
         goto '__ci_bb_60
     }
 
@@ -519,11 +547,11 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     '__ci_bb_71 {
         (__ci_expr_ternary_6 = 0)
         if ((if __local_min__goto_2056_7 > 65535: 1 else: 0) != 0) {
-            (__ci_expr_ternary_6 = 65535)
+            (__ci_expr_ternary_6 = ((65535 as c_int)))
         } else {
             (__ci_expr_ternary_6 = __local_min__goto_2056_7)
         }
-        ((unsafe *__param_re).minlength = __ci_expr_ternary_6)
+        ((unsafe *__param_re).minlength = ((__ci_expr_ternary_6 as c_ushort)))
         goto '__ci_bb_61
     }
 
@@ -543,9 +571,11 @@ fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
         }
     }
 
+    __ci_unreachable()
+
 }
 
-fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8, __param_startcode: *const u8, __param_utf: c_int, __param_recurses: *mut recurse_check, __param_countptr: *mut c_int, __param_backref_cache: *mut c_int) -> c_int {
+unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8, __param_startcode: *const u8, __param_utf: c_int, __param_recurses: *mut recurse_check, __param_countptr: *mut c_int, __param_backref_cache: *mut c_int) -> c_int {
     var __local_length__goto_106_5: c_int = 0
 
     var __local_branchlength__goto_107_5: c_int = 0
@@ -568,7 +598,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
 
     var __local_cc__goto_116_12: *const u8 = null
 
-    var __local_this_recurse__goto_117_15: recurse_check
+    var __local_this_recurse__goto_117_15: recurse_check = recurse_check {  }
 
     var __local_d__goto_137_7: c_int = 0
 
@@ -657,16 +687,16 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_length__goto_106_5 = -1)
-        (__local_branchlength__goto_107_5 = 0)
-        (__local_prev_cap_recno__goto_108_5 = -1)
-        (__local_prev_cap_d__goto_109_5 = 0)
-        (__local_prev_recurse_recno__goto_110_5 = -1)
-        (__local_prev_recurse_d__goto_111_5 = 0)
-        (__local_once_fudge__goto_112_10 = 0)
-        (__local_had_recurse__goto_113_6 = 0)
-        (__local_dupcapused__goto_114_6 = (if ((__param_re.flags as c_uint) & (2097152 as c_uint)) != 0: 1 else: 0))
-        (__local_nextbranch__goto_115_12 = __param_code + ((((((unsafe __param_code[1]) as c_int) << (8 as c_uint)) | ((unsafe __param_code[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_length__goto_106_5 = ((-1 as c_int)))
+        (__local_branchlength__goto_107_5 = ((0 as c_int)))
+        (__local_prev_cap_recno__goto_108_5 = ((-1 as c_int)))
+        (__local_prev_cap_d__goto_109_5 = ((0 as c_int)))
+        (__local_prev_recurse_recno__goto_110_5 = ((-1 as c_int)))
+        (__local_prev_recurse_d__goto_111_5 = ((0 as c_int)))
+        (__local_once_fudge__goto_112_10 = ((0 as c_uint)))
+        (__local_had_recurse__goto_113_6 = ((0 as c_int)))
+        (__local_dupcapused__goto_114_6 = (((if (((unsafe *__param_re).flags as c_uint) & (2097152 as c_uint)) != 0: 1 else: 0) as c_int)))
+        (__local_nextbranch__goto_115_12 = __param_code + (((((((unsafe __param_code[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __param_code[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         (__local_cc__goto_116_12 = (__param_code + ((1 as isize) as usize)) + ((2 as isize) as usize))
         (__ci_expr_logic_0 = 0)
         if ((if (unsafe *__param_code) >= OP_SBRA: 1 else: 0) != 0) {
@@ -736,13 +766,13 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_11 {
-        (__local_branchlength__goto_107_5 = 65535)
+        (__local_branchlength__goto_107_5 = ((65535 as c_int)))
         (__local_cc__goto_116_12 = __local_nextbranch__goto_115_12)
         goto '__ci_bb_12
     }
 
     '__ci_bb_12 {
-        (__local_op__goto_138_15 = (unsafe *__local_cc__goto_116_12))
+        (__local_op__goto_138_15 = (((unsafe *__local_cc__goto_116_12) as u8)))
         goto '__ci_bb_13
     }
 
@@ -759,7 +789,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_15 {
-        (__local_cs__goto_139_14 = __local_cc__goto_116_12 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_cs__goto_139_14 = __local_cc__goto_116_12 + (((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         if ((if (unsafe *__local_cs__goto_139_14) != OP_ALT: 1 else: 0) != 0) {
             goto '__ci_bb_16
         } else {
@@ -777,7 +807,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_18 {
-        (__local_d__goto_137_7 = find_minlength(__param_re, __local_cc__goto_116_12, __param_startcode, __param_utf, __param_recurses, __param_countptr, __param_backref_cache))
+        (__local_d__goto_137_7 = ((find_minlength(__param_re, __local_cc__goto_116_12, __param_startcode, __param_utf, __param_recurses, __param_countptr, __param_backref_cache) as c_int)))
         if ((if __local_d__goto_137_7 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_23
         } else {
@@ -798,7 +828,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_20 {
-        (__local_once_fudge__goto_112_10 = 3)
+        (__local_once_fudge__goto_112_10 = ((3 as c_uint)))
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((1 + 2) as isize) as usize))
         goto '__ci_bb_14
     }
@@ -821,7 +851,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_25 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_26
     }
 
@@ -839,7 +869,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_28 {
-        (__local_recno__goto_137_15 = (((((((unsafe __local_cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[((1 + 2) + 1)]) as c_int)) as c_uint) as c_int)))
+        (__local_recno__goto_137_15 = ((((((((unsafe __local_cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[((1 + 2) + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
         if (__local_dupcapused__goto_114_6 != 0) {
             (__ci_expr_logic_4 = (if true: 1 else: 0))
         } else {
@@ -854,7 +884,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
 
     '__ci_bb_29 {
         (__local_prev_cap_recno__goto_108_5 = __local_recno__goto_137_15)
-        (__local_prev_cap_d__goto_109_5 = find_minlength(__param_re, __local_cc__goto_116_12, __param_startcode, __param_utf, __param_recurses, __param_countptr, __param_backref_cache))
+        (__local_prev_cap_d__goto_109_5 = ((find_minlength(__param_re, __local_cc__goto_116_12, __param_startcode, __param_utf, __param_recurses, __param_countptr, __param_backref_cache) as c_int)))
         if ((if __local_prev_cap_d__goto_109_5 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_31
         } else {
@@ -876,7 +906,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_33 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_34
     }
 
@@ -940,10 +970,10 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_41 {
-        (__local_nextbranch__goto_115_12 = __local_cc__goto_116_12 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_nextbranch__goto_115_12 = __local_cc__goto_116_12 + (((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((1 + 2) as isize) as usize))
-        (__local_branchlength__goto_107_5 = 0)
-        (__local_had_recurse__goto_113_6 = 0)
+        (__local_branchlength__goto_107_5 = ((0 as c_int)))
+        (__local_had_recurse__goto_113_6 = ((0 as c_int)))
         goto '__ci_bb_14
     }
 
@@ -952,7 +982,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_43 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_44
     }
 
@@ -969,22 +999,22 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_46 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_OP_lengths_8[(unsafe *__local_cc__goto_116_12)] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_OP_lengths_8[(unsafe *__local_cc__goto_116_12)] as c_uint) as usize) as c_int))
         goto '__ci_bb_14
     }
 
     '__ci_bb_47 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((((((unsafe __local_cc__goto_116_12[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((((((unsafe __local_cc__goto_116_12[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[((1 + (2 * 2)) + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_14
     }
 
     '__ci_bb_48 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_OP_lengths_8[(unsafe *__local_cc__goto_116_12)] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_OP_lengths_8[(unsafe *__local_cc__goto_116_12)] as c_uint) as usize) as c_int))
         goto '__ci_bb_49
     }
 
     '__ci_bb_49 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_50
     }
 
@@ -1016,7 +1046,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_53 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_utf8_table4[((((unsafe __local_cc__goto_116_12[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_utf8_table4[((((unsafe __local_cc__goto_116_12[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize) as c_int))
         goto '__ci_bb_54
     }
 
@@ -1033,16 +1063,16 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
             (__ci_expr_logic_9 = (if (if (unsafe __local_cc__goto_116_12[1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_9 != 0) {
-            (__ci_expr_ternary_10 = 4)
+            (__ci_expr_ternary_10 = ((4 as c_int)))
         } else {
-            (__ci_expr_ternary_10 = 2)
+            (__ci_expr_ternary_10 = ((2 as c_int)))
         }
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((__ci_expr_ternary_10 as isize) as usize))
         goto '__ci_bb_14
     }
 
     '__ci_bb_56 {
-        (__local_branchlength__goto_107_5 = __local_branchlength__goto_107_5 + (((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint))
+        (__local_branchlength__goto_107_5 = __local_branchlength__goto_107_5 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint))
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((2 + 2) as isize) as usize))
         (__ci_expr_logic_11 = 0)
         if (__param_utf != 0) {
@@ -1056,7 +1086,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_57 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_utf8_table4[((((unsafe __local_cc__goto_116_12[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_utf8_table4[((((unsafe __local_cc__goto_116_12[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize) as c_int))
         goto '__ci_bb_58
     }
 
@@ -1065,7 +1095,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_59 {
-        (__local_branchlength__goto_107_5 = __local_branchlength__goto_107_5 + (((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint))
+        (__local_branchlength__goto_107_5 = __local_branchlength__goto_107_5 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint))
         (__ci_expr_ternary_13 = 0)
         if ((if (unsafe __local_cc__goto_116_12[(1 + 2)]) == OP_PROP: 1 else: 0) != 0) {
             (__ci_expr_logic_12 = (if true: 1 else: 0))
@@ -1073,9 +1103,9 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
             (__ci_expr_logic_12 = (if (if (unsafe __local_cc__goto_116_12[(1 + 2)]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_12 != 0) {
-            (__ci_expr_ternary_13 = 2)
+            (__ci_expr_ternary_13 = ((2 as c_int)))
         } else {
-            (__ci_expr_ternary_13 = 0)
+            (__ci_expr_ternary_13 = ((0 as c_int)))
         }
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((((2 + 2) + __ci_expr_ternary_13) as isize) as usize))
         goto '__ci_bb_14
@@ -1135,7 +1165,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_68 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_OP_lengths_8[__local_op__goto_138_15] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_OP_lengths_8[__local_op__goto_138_15] as c_uint) as usize) as c_int))
         goto '__ci_bb_14
     }
 
@@ -1158,7 +1188,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_71 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_OP_lengths_8[__local_op__goto_138_15] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_OP_lengths_8[__local_op__goto_138_15] as c_uint) as usize) as c_int))
         goto '__ci_bb_14
     }
 
@@ -1176,12 +1206,12 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_73 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_75
     }
 
     '__ci_bb_74 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_OP_lengths_8[OP_CLASS] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_OP_lengths_8[OP_CLASS] as c_uint) as usize) as c_int))
         goto '__ci_bb_75
     }
 
@@ -1212,7 +1242,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_80 {
-        (__local_branchlength__goto_107_5 = __local_branchlength__goto_107_5 + (((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint))
+        (__local_branchlength__goto_107_5 = __local_branchlength__goto_107_5 + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint))
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((1 + (2 * 2)) as isize) as usize))
         goto '__ci_bb_77
     }
@@ -1313,7 +1343,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     '__ci_bb_93 {
         (__ci_expr_logic_17 = 0)
         if ((if not (__local_dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_17 = (if (if ((__param_re.overall_options as c_uint) & (512 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_17 = (if (if (((unsafe *__param_re).overall_options as c_uint) & (512 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_17 != 0) {
             goto '__ci_bb_94
@@ -1323,19 +1353,19 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_94 {
-        (__local_count__goto_481_11 = ((((((unsafe __local_cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[((1 + 2) + 1)]) as c_int)) as c_uint)))
-        (__local_slot__goto_482_18 = ((__param_re as *const u8) + (sizeof[pcre2_real_code_8]() as usize)) + ((((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) as c_uint) *% ((__param_re.name_entry_size as c_int) as c_uint)) as usize))
-        (__local_d__goto_137_7 = 2147483647)
+        (__local_count__goto_481_11 = ((((((((unsafe __local_cc__goto_116_12[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[((1 + 2) + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
+        (__local_slot__goto_482_18 = ((__param_re as *const u8) + (sizeof[pcre2_real_code_8]() as usize)) + (((((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_uint) *% (((unsafe *__param_re).name_entry_size as c_int) as c_uint)) as usize))
+        (__local_d__goto_137_7 = ((2147483647 as c_int)))
         goto '__ci_bb_97
     }
 
     '__ci_bb_95 {
-        (__local_d__goto_137_7 = 0)
+        (__local_d__goto_137_7 = ((0 as c_int)))
         goto '__ci_bb_96
     }
 
     '__ci_bb_96 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_OP_lengths_8[(unsafe *__local_cc__goto_116_12)] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_OP_lengths_8[(unsafe *__local_cc__goto_116_12)] as c_uint) as usize) as c_int))
         goto '__ci_bb_132
     }
 
@@ -1350,7 +1380,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_98 {
-        (__local_recno__goto_137_15 = ((((((unsafe __local_slot__goto_482_18[0]) as c_int) << (8 as c_uint)) | ((unsafe __local_slot__goto_482_18[(0 + 1)]) as c_int)) as c_uint)))
+        (__local_recno__goto_137_15 = ((((((((unsafe __local_slot__goto_482_18[0]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_slot__goto_482_18[(0 + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
         (__ci_expr_logic_19 = 0)
         if ((if __local_recno__goto_137_15 <= (unsafe __param_backref_cache[0]): 1 else: 0) != 0) {
             (__ci_expr_logic_19 = (if (if (unsafe __param_backref_cache[__local_recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
@@ -1367,7 +1397,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_100 {
-        (__local_dd__goto_492_13 = (unsafe __param_backref_cache[__local_recno__goto_137_15]))
+        (__local_dd__goto_492_13 = (((unsafe __param_backref_cache[__local_recno__goto_137_15]) as c_int)))
         goto '__ci_bb_102
     }
 
@@ -1398,7 +1428,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_105 {
-        (__local_ce__goto_139_18 = __local_ce__goto_139_18 + ((((((unsafe __local_ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ce__goto_139_18[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ce__goto_139_18 = __local_ce__goto_139_18 + (((((((unsafe __local_ce__goto_139_18[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ce__goto_139_18[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_106
     }
 
@@ -1411,7 +1441,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_107 {
-        (__local_dd__goto_492_13 = 0)
+        (__local_dd__goto_492_13 = ((0 as c_int)))
         if ((if not (__local_dupcapused__goto_114_6 != 0): 1 else: 0) != 0) {
             (__ci_expr_logic_20 = (if true: 1 else: 0))
         } else {
@@ -1438,12 +1468,12 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
 
     '__ci_bb_109 {
         ((unsafe __param_backref_cache[__local_recno__goto_137_15]) = __local_dd__goto_492_13)
-        (__local_i__goto_492_17 = (unsafe __param_backref_cache[0]) + 1)
+        (__local_i__goto_492_17 = ((((unsafe __param_backref_cache[0]) + 1) as c_int)))
         goto '__ci_bb_124
     }
 
     '__ci_bb_110 {
-        (__local_had_recurse__goto_113_6 = 1)
+        (__local_had_recurse__goto_113_6 = ((1 as c_int)))
         goto '__ci_bb_112
     }
 
@@ -1466,7 +1496,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_114 {
-        if ((if __local_r__goto_512_30.group == __local_cs__goto_139_14: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_r__goto_512_30).group == __local_cs__goto_139_14: 1 else: 0) != 0) {
             goto '__ci_bb_117
         } else {
             goto '__ci_bb_118
@@ -1474,7 +1504,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_115 {
-        (__local_r__goto_512_30 = __local_r__goto_512_30.prev)
+        (__local_r__goto_512_30 = (unsafe *__local_r__goto_512_30).prev)
         goto '__ci_bb_113
     }
 
@@ -1495,14 +1525,14 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_119 {
-        (__local_had_recurse__goto_113_6 = 1)
+        (__local_had_recurse__goto_113_6 = ((1 as c_int)))
         goto '__ci_bb_121
     }
 
     '__ci_bb_120 {
         (__local_this_recurse__goto_117_15.prev = __param_recurses)
         (__local_this_recurse__goto_117_15.group = __local_cs__goto_139_14)
-        (__local_dd__goto_492_13 = find_minlength(__param_re, __local_cs__goto_139_14, __param_startcode, __param_utf, (&raw mut __local_this_recurse__goto_117_15 as *mut recurse_check), __param_countptr, __param_backref_cache))
+        (__local_dd__goto_492_13 = ((find_minlength(__param_re, __local_cs__goto_139_14, __param_startcode, __param_utf, (&raw mut __local_this_recurse__goto_117_15 as *mut recurse_check), __param_countptr, __param_backref_cache) as c_int)))
         if ((if __local_dd__goto_492_13 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_122
         } else {
@@ -1531,7 +1561,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_125 {
-        ((unsafe __param_backref_cache[__local_i__goto_492_17]) = -1)
+        ((unsafe __param_backref_cache[__local_i__goto_492_17]) = ((-1 as c_int)))
         goto '__ci_bb_126
     }
 
@@ -1563,7 +1593,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_131 {
-        (__local_slot__goto_482_18 = __local_slot__goto_482_18 + ((__param_re.name_entry_size as c_uint) as usize))
+        (__local_slot__goto_482_18 = __local_slot__goto_482_18 + ((((unsafe *__param_re).name_entry_size as c_uint) as usize) as c_int))
         goto '__ci_bb_97
     }
 
@@ -1572,7 +1602,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_133 {
-        (__local_recno__goto_137_15 = ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint)))
+        (__local_recno__goto_137_15 = ((((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
         (__ci_expr_logic_22 = 0)
         if ((if __local_recno__goto_137_15 <= (unsafe __param_backref_cache[0]): 1 else: 0) != 0) {
             (__ci_expr_logic_22 = (if (if (unsafe __param_backref_cache[__local_recno__goto_137_15]) >= 0: 1 else: 0) != 0: 1 else: 0))
@@ -1585,13 +1615,13 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_134 {
-        (__local_d__goto_137_7 = (unsafe __param_backref_cache[__local_recno__goto_137_15]))
+        (__local_d__goto_137_7 = (((unsafe __param_backref_cache[__local_recno__goto_137_15]) as c_int)))
         goto '__ci_bb_136
     }
 
     '__ci_bb_135 {
-        (__local_d__goto_137_7 = 0)
-        if ((if ((__param_re.overall_options as c_uint) & (512 as c_uint)) == 0: 1 else: 0) != 0) {
+        (__local_d__goto_137_7 = ((0 as c_int)))
+        if ((if (((unsafe *__param_re).overall_options as c_uint) & (512 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_137
         } else {
             goto '__ci_bb_138
@@ -1599,7 +1629,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_136 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_OP_lengths_8[(unsafe *__local_cc__goto_116_12)] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_OP_lengths_8[(unsafe *__local_cc__goto_116_12)] as c_uint) as usize) as c_int))
         goto '__ci_bb_132
     }
 
@@ -1615,7 +1645,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
 
     '__ci_bb_138 {
         ((unsafe __param_backref_cache[__local_recno__goto_137_15]) = __local_d__goto_137_7)
-        (__local_i__goto_554_11 = (unsafe __param_backref_cache[0]) + 1)
+        (__local_i__goto_554_11 = ((((unsafe __param_backref_cache[0]) + 1) as c_int)))
         goto '__ci_bb_160
     }
 
@@ -1628,7 +1658,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_141 {
-        (__local_ce__goto_139_18 = __local_ce__goto_139_18 + ((((((unsafe __local_ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ce__goto_139_18[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ce__goto_139_18 = __local_ce__goto_139_18 + (((((((unsafe __local_ce__goto_139_18[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ce__goto_139_18[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_142
     }
 
@@ -1670,7 +1700,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_146 {
-        (__local_had_recurse__goto_113_6 = 1)
+        (__local_had_recurse__goto_113_6 = ((1 as c_int)))
         goto '__ci_bb_148
     }
 
@@ -1693,7 +1723,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_150 {
-        if ((if __local_r__goto_571_28.group == __local_cs__goto_139_14: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_r__goto_571_28).group == __local_cs__goto_139_14: 1 else: 0) != 0) {
             goto '__ci_bb_153
         } else {
             goto '__ci_bb_154
@@ -1701,7 +1731,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_151 {
-        (__local_r__goto_571_28 = __local_r__goto_571_28.prev)
+        (__local_r__goto_571_28 = (unsafe *__local_r__goto_571_28).prev)
         goto '__ci_bb_149
     }
 
@@ -1722,14 +1752,14 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_155 {
-        (__local_had_recurse__goto_113_6 = 1)
+        (__local_had_recurse__goto_113_6 = ((1 as c_int)))
         goto '__ci_bb_157
     }
 
     '__ci_bb_156 {
         (__local_this_recurse__goto_117_15.prev = __param_recurses)
         (__local_this_recurse__goto_117_15.group = __local_cs__goto_139_14)
-        (__local_d__goto_137_7 = find_minlength(__param_re, __local_cs__goto_139_14, __param_startcode, __param_utf, (&raw mut __local_this_recurse__goto_117_15 as *mut recurse_check), __param_countptr, __param_backref_cache))
+        (__local_d__goto_137_7 = ((find_minlength(__param_re, __local_cs__goto_139_14, __param_startcode, __param_utf, (&raw mut __local_this_recurse__goto_117_15 as *mut recurse_check), __param_countptr, __param_backref_cache) as c_int)))
         if ((if __local_d__goto_137_7 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_158
         } else {
@@ -1758,7 +1788,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_161 {
-        ((unsafe __param_backref_cache[__local_i__goto_554_11]) = -1)
+        ((unsafe __param_backref_cache[__local_i__goto_554_11]) = ((-1 as c_int)))
         goto '__ci_bb_162
     }
 
@@ -1798,25 +1828,25 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_166 {
-        (__local_min__goto_137_10 = 0)
+        (__local_min__goto_137_10 = ((0 as c_int)))
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + 1)
         goto '__ci_bb_165
     }
 
     '__ci_bb_167 {
-        (__local_min__goto_137_10 = 1)
+        (__local_min__goto_137_10 = ((1 as c_int)))
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + 1)
         goto '__ci_bb_165
     }
 
     '__ci_bb_168 {
-        (__local_min__goto_137_10 = ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint)))
+        (__local_min__goto_137_10 = ((((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((1 + (2 * 2)) as isize) as usize))
         goto '__ci_bb_165
     }
 
     '__ci_bb_169 {
-        (__local_min__goto_137_10 = 1)
+        (__local_min__goto_137_10 = ((1 as c_int)))
         goto '__ci_bb_165
     }
 
@@ -1909,7 +1939,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_181 {
-        (__local_branchlength__goto_107_5 = 65535)
+        (__local_branchlength__goto_107_5 = ((65535 as c_int)))
         goto '__ci_bb_183
     }
 
@@ -1923,9 +1953,9 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_184 {
-        (__local_ce__goto_139_18 = __param_startcode + ((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ce__goto_139_18 = __param_startcode + (((((((unsafe __local_cc__goto_116_12[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cc__goto_116_12[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         (__local_cs__goto_139_14 = __local_ce__goto_139_18)
-        (__local_recno__goto_137_15 = ((((((unsafe __local_cs__goto_139_14[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_cs__goto_139_14[((1 + 2) + 1)]) as c_int)) as c_uint)))
+        (__local_recno__goto_137_15 = ((((((((unsafe __local_cs__goto_139_14[(1 + 2)]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_cs__goto_139_14[((1 + 2) + 1)]) as c_int) as c_int)) as c_uint) as c_int)))
         if ((if __local_recno__goto_137_15 == __local_prev_recurse_recno__goto_110_5: 1 else: 0) != 0) {
             goto '__ci_bb_185
         } else {
@@ -1944,12 +1974,12 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
 
     '__ci_bb_187 {
         (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((3 as c_uint) +% (__local_once_fudge__goto_112_10 as c_uint)) as usize))
-        (__local_once_fudge__goto_112_10 = 0)
+        (__local_once_fudge__goto_112_10 = ((0 as c_uint)))
         goto '__ci_bb_14
     }
 
     '__ci_bb_188 {
-        (__local_ce__goto_139_18 = __local_ce__goto_139_18 + ((((((unsafe __local_ce__goto_139_18[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ce__goto_139_18[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ce__goto_139_18 = __local_ce__goto_139_18 + (((((((unsafe __local_ce__goto_139_18[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ce__goto_139_18[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_189
     }
 
@@ -1974,7 +2004,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_191 {
-        (__local_had_recurse__goto_113_6 = 1)
+        (__local_had_recurse__goto_113_6 = ((1 as c_int)))
         goto '__ci_bb_193
     }
 
@@ -1997,7 +2027,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_195 {
-        if ((if __local_r__goto_657_24.group == __local_cs__goto_139_14: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_r__goto_657_24).group == __local_cs__goto_139_14: 1 else: 0) != 0) {
             goto '__ci_bb_198
         } else {
             goto '__ci_bb_199
@@ -2005,7 +2035,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_196 {
-        (__local_r__goto_657_24 = __local_r__goto_657_24.prev)
+        (__local_r__goto_657_24 = (unsafe *__local_r__goto_657_24).prev)
         goto '__ci_bb_194
     }
 
@@ -2026,14 +2056,14 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_200 {
-        (__local_had_recurse__goto_113_6 = 1)
+        (__local_had_recurse__goto_113_6 = ((1 as c_int)))
         goto '__ci_bb_202
     }
 
     '__ci_bb_201 {
         (__local_this_recurse__goto_117_15.prev = __param_recurses)
         (__local_this_recurse__goto_117_15.group = __local_cs__goto_139_14)
-        (__local_prev_recurse_d__goto_111_5 = find_minlength(__param_re, __local_cs__goto_139_14, __param_startcode, __param_utf, (&raw mut __local_this_recurse__goto_117_15 as *mut recurse_check), __param_countptr, __param_backref_cache))
+        (__local_prev_recurse_d__goto_111_5 = ((find_minlength(__param_re, __local_cs__goto_139_14, __param_startcode, __param_utf, (&raw mut __local_this_recurse__goto_117_15 as *mut recurse_check), __param_countptr, __param_backref_cache) as c_int)))
         if ((if __local_prev_recurse_d__goto_111_5 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_203
         } else {
@@ -2056,7 +2086,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_205 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_OP_lengths_8[__local_op__goto_138_15] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_OP_lengths_8[__local_op__goto_138_15] as c_uint) as usize) as c_int))
         (__ci_expr_logic_28 = 0)
         if (__param_utf != 0) {
             (__ci_expr_logic_28 = (if (if (unsafe __local_cc__goto_116_12[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
@@ -2069,7 +2099,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_206 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_utf8_table4[((((unsafe __local_cc__goto_116_12[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_utf8_table4[((((unsafe __local_cc__goto_116_12[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize) as c_int))
         goto '__ci_bb_207
     }
 
@@ -2083,7 +2113,7 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
     }
 
     '__ci_bb_209 {
-        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + ((_pcre2_OP_lengths_8[__local_op__goto_138_15] as c_uint) as usize))
+        (__local_cc__goto_116_12 = __local_cc__goto_116_12 + (((_pcre2_OP_lengths_8[__local_op__goto_138_15] as c_uint) as usize) as c_int))
         goto '__ci_bb_14
     }
 
@@ -3379,21 +3409,23 @@ fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *const u8,
         }
     }
 
+    __ci_unreachable()
+
 }
 
-fn set_table_bit(__param_re: *mut pcre2_real_code_8, __param_p: *const u8, __param_caseless: c_int, __param_utf: c_int, __param_ucp: c_int) -> *const u8 {
+unsafe fn set_table_bit(__param_re: *mut pcre2_real_code_8, __param_p: *const u8, __param_caseless: c_int, __param_utf: c_int, __param_ucp: c_int) -> *const u8 {
     var __local_p = __param_p
     var __local_c: c_uint = with 0 as __ci_expr_seq_7 {
         var __ci_expr_old_0: *const u8 = __local_p
         (__local_p = __local_p + 1)
-        (unsafe *__ci_expr_old_0)
+        ((unsafe *__ci_expr_old_0) as c_uint)
     }
 
     __param_utf
 
     __param_ucp
 
-    ((unsafe *__param_re).start_bitmap[((__local_c as c_uint) / (8 as c_uint))] = __param_re.start_bitmap[((__local_c as c_uint) / (8 as c_uint))] | ((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)))
+    ((unsafe *__param_re).start_bitmap[((__local_c as c_uint) / (8 as c_uint))] = ((unsafe *__param_re).start_bitmap[((__local_c as c_uint) / (8 as c_uint))] as u8) | (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8))
 
     if (__param_utf != 0) {
         if ((if __local_c >= 192: 1 else: 0) != 0) {
@@ -3402,28 +3434,28 @@ fn set_table_bit(__param_re: *mut pcre2_real_code_8, __param_p: *const u8, __par
 
                 (__local_p = __local_p + 1)
 
-                (__local_c = (((((__local_c as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe *__ci_expr_old_1) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                (__local_c = ((((((((__local_c as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe *__ci_expr_old_1) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
 
             } else {
                 if ((if ((__local_c as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
-                    (__local_c = (((((((__local_c as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe *__local_p) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_p[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                    (__local_c = ((((((((((__local_c as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe *__local_p) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_p[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
 
                     (__local_p = __local_p + ((2 as isize) as usize))
 
                 } else {
                     if ((if ((__local_c as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
-                        (__local_c = (((((((((__local_c as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe *__local_p) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_p[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                        (__local_c = ((((((((((((__local_c as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe *__local_p) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_p[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
 
                         (__local_p = __local_p + ((3 as isize) as usize))
 
                     } else {
                         if ((if ((__local_c as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
-                            (__local_c = (((((((((((__local_c as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe *__local_p) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_p[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                            (__local_c = ((((((((((((((__local_c as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe *__local_p) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_p[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
 
                             (__local_p = __local_p + ((4 as isize) as usize))
 
                         } else {
-                            (__local_c = (((((((((((((__local_c as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe *__local_p) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_p[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                            (__local_c = ((((((((((((((((__local_c as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe *__local_p) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_p[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_p[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint)) as c_uint)))
 
                             (__local_p = __local_p + ((5 as isize) as usize))
 
@@ -3453,17 +3485,17 @@ fn set_table_bit(__param_re: *mut pcre2_real_code_8, __param_p: *const u8, __par
 
                 _pcre2_ord2utf_8(__local_c, (&__local_buff[0] as *mut u8))
 
-                ((unsafe *__param_re).start_bitmap[((__local_buff[0] as c_int) / 8)] = __param_re.start_bitmap[((__local_buff[0] as c_int) / 8)] | ((1 as c_uint) << (((__local_buff[0] as c_int) & 7) as c_uint)))
+                ((unsafe *__param_re).start_bitmap[((__local_buff[0] as c_int) / 8)] = ((unsafe *__param_re).start_bitmap[((__local_buff[0] as c_int) / 8)] as u8) | (((1 as c_uint) << ((((__local_buff[0] as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
 
             } else {
                 if ((if __local_c < 256: 1 else: 0) != 0) {
-                    ((unsafe *__param_re).start_bitmap[((__local_c as c_uint) / (8 as c_uint))] = __param_re.start_bitmap[((__local_c as c_uint) / (8 as c_uint))] | ((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)))
+                    ((unsafe *__param_re).start_bitmap[((__local_c as c_uint) / (8 as c_uint))] = ((unsafe *__param_re).start_bitmap[((__local_c as c_uint) / (8 as c_uint))] as u8) | (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8))
                 }
             }
 
         } else {
             if (1 != 0) {
-                ((unsafe *__param_re).start_bitmap[(((unsafe __param_re.tables[((256 as c_uint) +% (__local_c as c_uint))]) as c_int) / 8)] = __param_re.start_bitmap[(((unsafe __param_re.tables[((256 as c_uint) +% (__local_c as c_uint))]) as c_int) / 8)] | ((1 as c_uint) << ((((unsafe __param_re.tables[((256 as c_uint) +% (__local_c as c_uint))]) as c_int) & 7) as c_uint)))
+                ((unsafe *__param_re).start_bitmap[(((unsafe (unsafe *__param_re).tables[((256 as c_uint) +% (__local_c as c_uint))]) as c_int) / 8)] = ((unsafe *__param_re).start_bitmap[(((unsafe (unsafe *__param_re).tables[((256 as c_uint) +% (__local_c as c_uint))]) as c_int) / 8)] as u8) | (((1 as c_uint) << (((((unsafe (unsafe *__param_re).tables[((256 as c_uint) +% (__local_c as c_uint))]) as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
             }
         }
 
@@ -3474,15 +3506,15 @@ fn set_table_bit(__param_re: *mut pcre2_real_code_8, __param_p: *const u8, __par
 
 }
 
-fn set_type_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int, __param_table_limit: c_uint) {
+unsafe fn set_type_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int, __param_table_limit: c_uint) -> Unit {
     var __local_c: c_uint
 
-    (__local_c = 0)
+    (__local_c = ((0 as c_uint)))
 
     while ((if __local_c < __param_table_limit: 1 else: 0) != 0) {
-        ((unsafe *__param_re).start_bitmap[__local_c] = __param_re.start_bitmap[__local_c] | (unsafe __param_re.tables[((((__local_c as c_uint) +% (512 as c_uint)) as c_uint) +% (__param_cbit_type as c_uint))]))
+        ((unsafe *__param_re).start_bitmap[__local_c] = ((unsafe *__param_re).start_bitmap[__local_c] as u8) | ((unsafe (unsafe *__param_re).tables[((((__local_c as c_uint) +% (512 as c_uint)) as c_uint) +% (__param_cbit_type as c_uint))]) as u8))
 
-        (__local_c = __local_c + 1)
+        (__local_c = (__local_c +% 1))
 
     }
 
@@ -3491,46 +3523,46 @@ fn set_type_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int, _
         return
     }
 
-    (__local_c = 128)
+    (__local_c = ((128 as c_uint)))
 
     while ((if __local_c < 256: 1 else: 0) != 0) {
-        if ((if ((((unsafe __param_re.tables[((512 as c_uint) +% (((__local_c as c_uint) / (8 as c_uint)) as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if ((((unsafe (unsafe *__param_re).tables[((512 as c_uint) +% (((__local_c as c_uint) / (8 as c_uint)) as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
             var __local_buff: [6]u8
 
             _pcre2_ord2utf_8(__local_c, (&__local_buff[0] as *mut u8))
 
-            ((unsafe *__param_re).start_bitmap[((__local_buff[0] as c_int) / 8)] = __param_re.start_bitmap[((__local_buff[0] as c_int) / 8)] | ((1 as c_uint) << (((__local_buff[0] as c_int) & 7) as c_uint)))
+            ((unsafe *__param_re).start_bitmap[((__local_buff[0] as c_int) / 8)] = ((unsafe *__param_re).start_bitmap[((__local_buff[0] as c_int) / 8)] as u8) | (((1 as c_uint) << ((((__local_buff[0] as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
 
         }
 
 
-        (__local_c = __local_c + 1)
+        (__local_c = (__local_c +% 1))
 
     }
 
 
 }
 
-fn set_nottype_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int, __param_table_limit: c_uint) {
+unsafe fn set_nottype_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int, __param_table_limit: c_uint) -> Unit {
     var __local_c: c_uint
 
-    (__local_c = 0)
+    (__local_c = ((0 as c_uint)))
 
     while ((if __local_c < __param_table_limit: 1 else: 0) != 0) {
-        ((unsafe *__param_re).start_bitmap[__local_c] = __param_re.start_bitmap[__local_c] | ((~(unsafe __param_re.tables[((((__local_c as c_uint) +% (512 as c_uint)) as c_uint) +% (__param_cbit_type as c_uint))])) as u8))
+        ((unsafe *__param_re).start_bitmap[__local_c] = ((unsafe *__param_re).start_bitmap[__local_c] as u8) | (((~(unsafe (unsafe *__param_re).tables[((((__local_c as c_uint) +% (512 as c_uint)) as c_uint) +% (__param_cbit_type as c_uint))])) as u8) as u8))
 
-        (__local_c = __local_c + 1)
+        (__local_c = (__local_c +% 1))
 
     }
 
 
     if ((if __param_table_limit != 32: 1 else: 0) != 0) {
-        (__local_c = 24)
+        (__local_c = ((24 as c_uint)))
 
         while ((if __local_c < 32: 1 else: 0) != 0) {
-            ((unsafe *__param_re).start_bitmap[__local_c] = 255)
+            ((unsafe *__param_re).start_bitmap[__local_c] = ((255 as u8)))
 
-            (__local_c = __local_c + 1)
+            (__local_c = (__local_c +% 1))
 
         }
 
@@ -3538,18 +3570,18 @@ fn set_nottype_bits(__param_re: *mut pcre2_real_code_8, __param_cbit_type: c_int
 
 }
 
-fn study_char_list(__param_code: *const u8, __param_start_bitmap: *mut u8, __param_char_lists_end: *const u8) {
+unsafe fn study_char_list(__param_code: *const u8, __param_start_bitmap: *mut u8, __param_char_lists_end: *const u8) -> Unit {
     var __local_code = __param_code
     var __local_type_: c_uint
 
     var __local_list_ind: c_uint
 
 
-    var __local_char_list_add: c_uint = 0
+    var __local_char_list_add: c_uint = ((0 as c_uint))
 
-    var __local_range_start: c_uint = (~(0 as c_uint))
+    var __local_range_start: c_uint = (((~(0 as c_uint)) as c_uint))
 
-    var __local_range_end: c_uint = 0
+    var __local_range_end: c_uint = ((0 as c_uint))
 
 
     var __local_next_char: *const u8
@@ -3564,26 +3596,26 @@ fn study_char_list(__param_code: *const u8, __param_start_bitmap: *mut u8, __par
     var __local_end: u8
 
 
-    (__local_type_ = (((((unsafe __local_code[0]) as c_int) << (8 as c_uint)) as c_uint) as c_uint) | (((unsafe __local_code[1]) as c_int) as c_uint))
+    (__local_type_ = ((((((((unsafe __local_code[0]) as c_int) << (8 as c_uint)) as c_uint) as c_uint) | (((unsafe __local_code[1]) as c_int) as c_uint)) as c_uint)))
 
     (__local_code = __local_code + ((2 as isize) as usize))
 
-    (__local_next_char = __param_char_lists_end - ((((((((unsafe __local_code[0]) as c_int) << (8 as c_uint)) | ((unsafe __local_code[(0 + 1)]) as c_int)) as c_uint) as c_uint) << (1 as c_uint)) as usize))
+    (__local_next_char = __param_char_lists_end - (((((((((unsafe __local_code[0]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code[(0 + 1)]) as c_int) as c_int)) as c_uint) as c_uint) << (1 as c_uint)) as usize))
 
-    (__local_type_ = __local_type_ & 4095)
+    (__local_type_ = (__local_type_ as c_uint) & (4095 as c_uint))
 
-    (__local_list_ind = 0)
+    (__local_list_ind = ((0 as c_uint)))
 
     if ((if ((__local_type_ as c_uint) & (4 as c_uint)) != 0: 1 else: 0) != 0) {
-        (__local_range_start = 256)
+        (__local_range_start = ((256 as c_uint)))
     }
 
     while ((if __local_type_ > 0: 1 else: 0) != 0) {
-        var __local_item_count: c_uint = ((__local_type_ as c_uint) & (3 as c_uint))
+        var __local_item_count: c_uint = ((((__local_type_ as c_uint) & (3 as c_uint)) as c_uint))
 
         if ((if __local_item_count == 3: 1 else: 0) != 0) {
             if ((if __local_list_ind <= 1: 1 else: 0) != 0) {
-                (__local_item_count = (unsafe *(__local_next_char as *const c_ushort)))
+                (__local_item_count = (((unsafe *(__local_next_char as *const c_ushort)) as c_uint)))
 
                 (__local_next_char = __local_next_char + ((2 as isize) as usize))
 
@@ -3598,7 +3630,7 @@ fn study_char_list(__param_code: *const u8, __param_start_bitmap: *mut u8, __par
 
         while ((if __local_item_count > 0: 1 else: 0) != 0) {
             if ((if __local_list_ind <= 1: 1 else: 0) != 0) {
-                (__local_range_end = (unsafe *(__local_next_char as *const c_ushort)))
+                (__local_range_end = (((unsafe *(__local_next_char as *const c_ushort)) as c_uint)))
 
                 (__local_next_char = __local_next_char + ((2 as isize) as usize))
 
@@ -3610,49 +3642,49 @@ fn study_char_list(__param_code: *const u8, __param_start_bitmap: *mut u8, __par
             }
 
             if ((if ((__local_range_end as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
-                (__local_range_end = ((__local_char_list_add as c_uint) +% (((__local_range_end as c_uint) >> (1 as c_uint)) as c_uint)))
+                (__local_range_end = ((((__local_char_list_add as c_uint) +% (((__local_range_end as c_uint) >> (1 as c_uint)) as c_uint)) as c_uint)))
 
                 _pcre2_ord2utf_8(__local_range_end, (&__local_end_buffer[0] as *mut u8))
 
-                (__local_end = __local_end_buffer[0])
+                (__local_end = ((__local_end_buffer[0] as u8)))
 
                 if ((if __local_range_start < __local_range_end: 1 else: 0) != 0) {
                     _pcre2_ord2utf_8(__local_range_start, (&__local_start_buffer[0] as *mut u8))
 
-                    (__local_start = __local_start_buffer[0])
+                    (__local_start = ((__local_start_buffer[0] as u8)))
 
                     while ((if __local_start <= __local_end: 1 else: 0) != 0) {
-                        ((unsafe __param_start_bitmap[((__local_start as c_int) / 8)]) = (unsafe __param_start_bitmap[((__local_start as c_int) / 8)]) | ((1 as c_uint) << (((__local_start as c_int) & 7) as c_uint)))
+                        ((unsafe __param_start_bitmap[((__local_start as c_int) / 8)]) = ((unsafe __param_start_bitmap[((__local_start as c_int) / 8)]) as u8) | (((1 as c_uint) << ((((__local_start as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
 
-                        (__local_start = __local_start + 1)
+                        (__local_start = (__local_start +% 1))
 
                     }
 
 
                 } else {
-                    ((unsafe __param_start_bitmap[((__local_end as c_int) / 8)]) = (unsafe __param_start_bitmap[((__local_end as c_int) / 8)]) | ((1 as c_uint) << (((__local_end as c_int) & 7) as c_uint)))
+                    ((unsafe __param_start_bitmap[((__local_end as c_int) / 8)]) = ((unsafe __param_start_bitmap[((__local_end as c_int) / 8)]) as u8) | (((1 as c_uint) << ((((__local_end as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
                 }
 
-                (__local_range_start = (~(0 as c_uint)))
+                (__local_range_start = (((~(0 as c_uint)) as c_uint)))
 
             } else {
-                (__local_range_start = ((__local_char_list_add as c_uint) +% (((__local_range_end as c_uint) >> (1 as c_uint)) as c_uint)))
+                (__local_range_start = ((((__local_char_list_add as c_uint) +% (((__local_range_end as c_uint) >> (1 as c_uint)) as c_uint)) as c_uint)))
             }
 
-            (__local_item_count = __local_item_count - 1)
+            (__local_item_count = (__local_item_count -% 1))
 
         }
 
-        (__local_list_ind = __local_list_ind + 1)
+        (__local_list_ind = (__local_list_ind +% 1))
 
         (__local_type_ = __local_type_ >> (3 as c_uint))
 
         if ((if __local_range_start == (~(0 as c_uint)): 1 else: 0) != 0) {
             if ((if ((__local_type_ as c_uint) & (4 as c_uint)) != 0: 1 else: 0) != 0) {
                 if ((if __local_list_ind == 1: 1 else: 0) != 0) {
-                    (__local_range_start = 32768)
+                    (__local_range_start = ((32768 as c_uint)))
                 } else {
-                    (__local_range_start = 65536)
+                    (__local_range_start = ((65536 as c_uint)))
                 }
 
             }
@@ -3662,41 +3694,41 @@ fn study_char_list(__param_code: *const u8, __param_start_bitmap: *mut u8, __par
                 _pcre2_ord2utf_8(__local_range_start, (&__local_start_buffer[0] as *mut u8))
 
                 if ((if __local_list_ind == 1: 1 else: 0) != 0) {
-                    (__local_range_end = 32767)
+                    (__local_range_end = ((32767 as c_uint)))
                 } else {
-                    (__local_range_end = 65535)
+                    (__local_range_end = ((65535 as c_uint)))
                 }
 
                 _pcre2_ord2utf_8(__local_range_end, (&__local_end_buffer[0] as *mut u8))
 
-                (__local_end = __local_end_buffer[0])
+                (__local_end = ((__local_end_buffer[0] as u8)))
 
-                (__local_start = __local_start_buffer[0])
+                (__local_start = ((__local_start_buffer[0] as u8)))
 
                 while ((if __local_start <= __local_end: 1 else: 0) != 0) {
-                    ((unsafe __param_start_bitmap[((__local_start as c_int) / 8)]) = (unsafe __param_start_bitmap[((__local_start as c_int) / 8)]) | ((1 as c_uint) << (((__local_start as c_int) & 7) as c_uint)))
+                    ((unsafe __param_start_bitmap[((__local_start as c_int) / 8)]) = ((unsafe __param_start_bitmap[((__local_start as c_int) / 8)]) as u8) | (((1 as c_uint) << ((((__local_start as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
 
-                    (__local_start = __local_start + 1)
+                    (__local_start = (__local_start +% 1))
 
                 }
 
 
-                (__local_range_start = (~(0 as c_uint)))
+                (__local_range_start = (((~(0 as c_uint)) as c_uint)))
 
             }
         }
 
         if ((if __local_list_ind == 1: 1 else: 0) != 0) {
-            (__local_char_list_add = 32768)
+            (__local_char_list_add = ((32768 as c_uint)))
         } else {
-            (__local_char_list_add = 0)
+            (__local_char_list_add = ((0 as c_uint)))
         }
 
     }
 
 }
 
-fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, __param_utf: c_int, __param_ucp: c_int, __param_depthptr: *mut c_int) -> c_int {
+unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, __param_utf: c_int, __param_ucp: c_int, __param_depthptr: *mut c_int) -> c_int {
     var __local_code = __param_code
     var __local_c__goto_1096_10: c_uint = 0
 
@@ -3770,9 +3802,9 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
         (__local_yield___goto_1097_5 = SSB_DONE)
         (__ci_expr_ternary_0 = 0)
         if (__param_utf != 0) {
-            (__ci_expr_ternary_0 = 16)
+            (__ci_expr_ternary_0 = ((16 as c_int)))
         } else {
-            (__ci_expr_ternary_0 = 32)
+            (__ci_expr_ternary_0 = ((32 as c_int)))
         }
         (__local_table_limit__goto_1100_5 = __ci_expr_ternary_0)
         ((unsafe *__param_depthptr) = (unsafe *__param_depthptr) + 1)
@@ -3792,7 +3824,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_3 {
-        (__local_try_next__goto_1110_8 = 1)
+        (__local_try_next__goto_1110_8 = ((1 as c_int)))
         (__local_tcode__goto_1111_14 = (__local_code + ((1 as isize) as usize)) + ((2 as isize) as usize))
         if ((if (unsafe *__local_code) == OP_CBRA: 1 else: 0) != 0) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
@@ -3851,7 +3883,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_10 {
-        (__local_code = __local_code + ((((((unsafe __local_code[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_code[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_code = __local_code + (((((((unsafe __local_code[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_code[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_4
     }
 
@@ -3876,7 +3908,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_15 {
-        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + ((_pcre2_OP_lengths_8[OP_CIRC] as c_uint) as usize))
+        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((_pcre2_OP_lengths_8[OP_CIRC] as c_uint) as usize) as c_int))
         goto '__ci_bb_12
     }
 
@@ -3917,13 +3949,13 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_21 {
-        (__local_try_next__goto_1110_8 = 0)
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_22 {
         _pcre2_ord2utf_8(__local_c__goto_1096_10, (&__local_buff__goto_1231_25[0] as *mut u8))
-        (__local_c__goto_1096_10 = __local_buff__goto_1231_25[0])
+        (__local_c__goto_1096_10 = ((__local_buff__goto_1231_25[0] as c_uint)))
         goto '__ci_bb_23
     }
 
@@ -3936,12 +3968,12 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_24 {
-        ((unsafe *__param_re).start_bitmap[(255 / 8)] = __param_re.start_bitmap[(255 / 8)] | ((1 as c_uint) << ((255 & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[(255 / 8)] = ((unsafe *__param_re).start_bitmap[(255 / 8)] as u8) | (((1 as c_uint) << (((255 as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_26
     }
 
     '__ci_bb_25 {
-        ((unsafe *__param_re).start_bitmap[((__local_c__goto_1096_10 as c_uint) / (8 as c_uint))] = __param_re.start_bitmap[((__local_c__goto_1096_10 as c_uint) / (8 as c_uint))] | ((1 as c_uint) << (((__local_c__goto_1096_10 as c_uint) & (7 as c_uint)) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[((__local_c__goto_1096_10 as c_uint) / (8 as c_uint))] = ((unsafe *__param_re).start_bitmap[((__local_c__goto_1096_10 as c_uint) / (8 as c_uint))] as u8) | (((1 as c_uint) << (((__local_c__goto_1096_10 as c_uint) & (7 as c_uint)) as c_uint)) as u8))
         goto '__ci_bb_26
     }
 
@@ -3955,7 +3987,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_28 {
-        (__local_ncode__goto_1119_16 = __local_tcode__goto_1111_14 + ((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ncode__goto_1119_16 = __local_tcode__goto_1111_14 + (((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_29
     }
 
@@ -3968,13 +4000,13 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_30 {
-        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + ((((((unsafe __local_ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ncode__goto_1119_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + (((((((unsafe __local_ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ncode__goto_1119_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_29
     }
 
     '__ci_bb_31 {
         (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + (((1 + 2) as isize) as usize))
-        (__local_done__goto_1264_17 = 0)
+        (__local_done__goto_1264_17 = ((0 as c_int)))
         goto '__ci_bb_32
     }
 
@@ -4011,7 +4043,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_38 {
-        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + ((((((unsafe __local_ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ncode__goto_1119_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + (((((((unsafe __local_ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ncode__goto_1119_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_39
     }
 
@@ -4024,7 +4056,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_40 {
-        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + ((((((unsafe __local_ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ncode__goto_1119_16[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + (((((((unsafe __local_ncode__goto_1119_16[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ncode__goto_1119_16[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_39
     }
 
@@ -4039,17 +4071,17 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_43 {
-        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + ((_pcre2_OP_lengths_8[OP_CALLOUT] as c_uint) as usize))
+        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + (((_pcre2_OP_lengths_8[OP_CALLOUT] as c_uint) as usize) as c_int))
         goto '__ci_bb_37
     }
 
     '__ci_bb_44 {
-        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + ((((((unsafe __local_ncode__goto_1119_16[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | ((unsafe __local_ncode__goto_1119_16[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint) as usize))
+        (__local_ncode__goto_1119_16 = __local_ncode__goto_1119_16 + (((((((unsafe __local_ncode__goto_1119_16[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_ncode__goto_1119_16[((1 + (2 * 2)) + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_37
     }
 
     '__ci_bb_45 {
-        (__local_done__goto_1264_17 = 1)
+        (__local_done__goto_1264_17 = ((1 as c_int)))
         goto '__ci_bb_37
     }
 
@@ -4339,7 +4371,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_84 {
-        (__local_rc__goto_1118_9 = set_start_bits(__param_re, __local_tcode__goto_1111_14, __param_utf, __param_ucp, __param_depthptr))
+        (__local_rc__goto_1118_9 = ((set_start_bits(__param_re, __local_tcode__goto_1111_14, __param_utf, __param_ucp, __param_depthptr) as c_int)))
         if ((if __local_rc__goto_1118_9 == SSB_DONE: 1 else: 0) != 0) {
             goto '__ci_bb_85
         } else {
@@ -4348,7 +4380,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_85 {
-        (__local_try_next__goto_1110_8 = 0)
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_87
     }
 
@@ -4377,7 +4409,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_91 {
-        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + ((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_92
     }
 
@@ -4396,7 +4428,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
 
     '__ci_bb_94 {
         (__local_yield___goto_1097_5 = SSB_CONTINUE)
-        (__local_try_next__goto_1110_8 = 0)
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
@@ -4405,12 +4437,12 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_96 {
-        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + ((_pcre2_OP_lengths_8[OP_CALLOUT] as c_uint) as usize))
+        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((_pcre2_OP_lengths_8[OP_CALLOUT] as c_uint) as usize) as c_int))
         goto '__ci_bb_12
     }
 
     '__ci_bb_97 {
-        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + ((((((unsafe __local_tcode__goto_1111_14[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | ((unsafe __local_tcode__goto_1111_14[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint) as usize))
+        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((((((unsafe __local_tcode__goto_1111_14[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_tcode__goto_1111_14[((1 + (2 * 2)) + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_12
     }
 
@@ -4419,7 +4451,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_99 {
-        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + ((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_100
     }
 
@@ -4438,7 +4470,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
 
     '__ci_bb_102 {
         (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + 1)
-        (__local_rc__goto_1118_9 = set_start_bits(__param_re, __local_tcode__goto_1111_14, __param_utf, __param_ucp, __param_depthptr))
+        (__local_rc__goto_1118_9 = ((set_start_bits(__param_re, __local_tcode__goto_1111_14, __param_utf, __param_ucp, __param_depthptr) as c_int)))
         if ((if __local_rc__goto_1118_9 == SSB_FAIL: 1 else: 0) != 0) {
             (__ci_expr_logic_5 = (if true: 1 else: 0))
         } else {
@@ -4465,7 +4497,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_105 {
-        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + ((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_106
     }
 
@@ -4488,7 +4520,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_109 {
-        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + ((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_110
     }
 
@@ -4506,22 +4538,22 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_112 {
-        (__local_tcode__goto_1111_14 = set_table_bit(__param_re, (__local_tcode__goto_1111_14 + ((1 as isize) as usize)), 0, __param_utf, __param_ucp))
+        (__local_tcode__goto_1111_14 = set_table_bit(__param_re, (__local_tcode__goto_1111_14 + ((1 as isize) as usize)), (0 as c_int), __param_utf, __param_ucp))
         goto '__ci_bb_12
     }
 
     '__ci_bb_113 {
-        (__local_tcode__goto_1111_14 = set_table_bit(__param_re, (__local_tcode__goto_1111_14 + ((1 as isize) as usize)), 1, __param_utf, __param_ucp))
+        (__local_tcode__goto_1111_14 = set_table_bit(__param_re, (__local_tcode__goto_1111_14 + ((1 as isize) as usize)), (1 as c_int), __param_utf, __param_ucp))
         goto '__ci_bb_12
     }
 
     '__ci_bb_114 {
-        (__local_tcode__goto_1111_14 = set_table_bit(__param_re, ((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 0, __param_utf, __param_ucp))
+        (__local_tcode__goto_1111_14 = set_table_bit(__param_re, ((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), (0 as c_int), __param_utf, __param_ucp))
         goto '__ci_bb_12
     }
 
     '__ci_bb_115 {
-        (__local_tcode__goto_1111_14 = set_table_bit(__param_re, ((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), 1, __param_utf, __param_ucp))
+        (__local_tcode__goto_1111_14 = set_table_bit(__param_re, ((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)), (1 as c_int), __param_utf, __param_ucp))
         goto '__ci_bb_12
     }
 
@@ -4531,8 +4563,8 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_117 {
-        set_table_bit(__param_re, (__local_tcode__goto_1111_14 + ((1 as isize) as usize)), 0, __param_utf, __param_ucp)
-        (__local_try_next__goto_1110_8 = 0)
+        set_table_bit(__param_re, (__local_tcode__goto_1111_14 + ((1 as isize) as usize)), (0 as c_int), __param_utf, __param_ucp)
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
@@ -4542,14 +4574,14 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_119 {
-        set_table_bit(__param_re, (__local_tcode__goto_1111_14 + ((1 as isize) as usize)), 1, __param_utf, __param_ucp)
-        (__local_try_next__goto_1110_8 = 0)
+        set_table_bit(__param_re, (__local_tcode__goto_1111_14 + ((1 as isize) as usize)), (1 as c_int), __param_utf, __param_ucp)
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_120 {
-        ((unsafe *__param_re).start_bitmap[(9 / 8)] = __param_re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(32 / 8)] = __param_re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[(9 / 8)] = ((unsafe *__param_re).start_bitmap[(9 / 8)] as u8) | (((1 as c_uint) << (((9 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(32 / 8)] = ((unsafe *__param_re).start_bitmap[(32 / 8)] as u8) | (((1 as c_uint) << (((32 as c_int) & (7 as c_int)) as c_uint)) as u8))
         if (__param_utf != 0) {
             goto '__ci_bb_121
         } else {
@@ -4558,28 +4590,28 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_121 {
-        ((unsafe *__param_re).start_bitmap[(194 / 8)] = __param_re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(225 / 8)] = __param_re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(226 / 8)] = __param_re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(227 / 8)] = __param_re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[(194 / 8)] = ((unsafe *__param_re).start_bitmap[(194 / 8)] as u8) | (((1 as c_uint) << (((194 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(225 / 8)] = ((unsafe *__param_re).start_bitmap[(225 / 8)] as u8) | (((1 as c_uint) << (((225 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(226 / 8)] = ((unsafe *__param_re).start_bitmap[(226 / 8)] as u8) | (((1 as c_uint) << (((226 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(227 / 8)] = ((unsafe *__param_re).start_bitmap[(227 / 8)] as u8) | (((1 as c_uint) << (((227 as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_123
     }
 
     '__ci_bb_122 {
-        ((unsafe *__param_re).start_bitmap[((160 as c_int) / 8)] = __param_re.start_bitmap[((160 as c_int) / 8)] | ((1 as c_uint) << (((160 as c_int) & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[((160 as c_int) / 8)] = ((unsafe *__param_re).start_bitmap[((160 as c_int) / 8)] as u8) | (((1 as c_uint) << ((((160 as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_123
     }
 
     '__ci_bb_123 {
-        (__local_try_next__goto_1110_8 = 0)
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_124 {
-        ((unsafe *__param_re).start_bitmap[(10 / 8)] = __param_re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(11 / 8)] = __param_re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(12 / 8)] = __param_re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(13 / 8)] = __param_re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[(10 / 8)] = ((unsafe *__param_re).start_bitmap[(10 / 8)] as u8) | (((1 as c_uint) << (((10 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(11 / 8)] = ((unsafe *__param_re).start_bitmap[(11 / 8)] as u8) | (((1 as c_uint) << (((11 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(12 / 8)] = ((unsafe *__param_re).start_bitmap[(12 / 8)] as u8) | (((1 as c_uint) << (((12 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(13 / 8)] = ((unsafe *__param_re).start_bitmap[(13 / 8)] as u8) | (((1 as c_uint) << (((13 as c_int) & (7 as c_int)) as c_uint)) as u8))
         if (__param_utf != 0) {
             goto '__ci_bb_125
         } else {
@@ -4588,54 +4620,54 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_125 {
-        ((unsafe *__param_re).start_bitmap[(194 / 8)] = __param_re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(226 / 8)] = __param_re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[(194 / 8)] = ((unsafe *__param_re).start_bitmap[(194 / 8)] as u8) | (((1 as c_uint) << (((194 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(226 / 8)] = ((unsafe *__param_re).start_bitmap[(226 / 8)] as u8) | (((1 as c_uint) << (((226 as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_127
     }
 
     '__ci_bb_126 {
-        ((unsafe *__param_re).start_bitmap[((133 as c_int) / 8)] = __param_re.start_bitmap[((133 as c_int) / 8)] | ((1 as c_uint) << (((133 as c_int) & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[((133 as c_int) / 8)] = ((unsafe *__param_re).start_bitmap[((133 as c_int) / 8)] as u8) | (((1 as c_uint) << ((((133 as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_127
     }
 
     '__ci_bb_127 {
-        (__local_try_next__goto_1110_8 = 0)
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_128 {
-        set_nottype_bits(__param_re, 64, __local_table_limit__goto_1100_5)
-        (__local_try_next__goto_1110_8 = 0)
+        set_nottype_bits(__param_re, (64 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_129 {
-        set_type_bits(__param_re, 64, __local_table_limit__goto_1100_5)
-        (__local_try_next__goto_1110_8 = 0)
+        set_type_bits(__param_re, (64 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_130 {
-        set_nottype_bits(__param_re, 0, __local_table_limit__goto_1100_5)
-        (__local_try_next__goto_1110_8 = 0)
+        set_nottype_bits(__param_re, (0 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_131 {
-        set_type_bits(__param_re, 0, __local_table_limit__goto_1100_5)
-        (__local_try_next__goto_1110_8 = 0)
+        set_type_bits(__param_re, (0 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_132 {
-        set_nottype_bits(__param_re, 160, __local_table_limit__goto_1100_5)
-        (__local_try_next__goto_1110_8 = 0)
+        set_nottype_bits(__param_re, (160 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_133 {
-        set_type_bits(__param_re, 160, __local_table_limit__goto_1100_5)
-        (__local_try_next__goto_1110_8 = 0)
+        set_type_bits(__param_re, (160 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_12
     }
 
@@ -4676,8 +4708,8 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_141 {
-        ((unsafe *__param_re).start_bitmap[(9 / 8)] = __param_re.start_bitmap[(9 / 8)] | ((1 as c_uint) << ((9 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(32 / 8)] = __param_re.start_bitmap[(32 / 8)] | ((1 as c_uint) << ((32 & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[(9 / 8)] = ((unsafe *__param_re).start_bitmap[(9 / 8)] as u8) | (((1 as c_uint) << (((9 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(32 / 8)] = ((unsafe *__param_re).start_bitmap[(32 / 8)] as u8) | (((1 as c_uint) << (((32 as c_int) & (7 as c_int)) as c_uint)) as u8))
         if (__param_utf != 0) {
             goto '__ci_bb_142
         } else {
@@ -4686,15 +4718,15 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_142 {
-        ((unsafe *__param_re).start_bitmap[(194 / 8)] = __param_re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(225 / 8)] = __param_re.start_bitmap[(225 / 8)] | ((1 as c_uint) << ((225 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(226 / 8)] = __param_re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(227 / 8)] = __param_re.start_bitmap[(227 / 8)] | ((1 as c_uint) << ((227 & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[(194 / 8)] = ((unsafe *__param_re).start_bitmap[(194 / 8)] as u8) | (((1 as c_uint) << (((194 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(225 / 8)] = ((unsafe *__param_re).start_bitmap[(225 / 8)] as u8) | (((1 as c_uint) << (((225 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(226 / 8)] = ((unsafe *__param_re).start_bitmap[(226 / 8)] as u8) | (((1 as c_uint) << (((226 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(227 / 8)] = ((unsafe *__param_re).start_bitmap[(227 / 8)] as u8) | (((1 as c_uint) << (((227 as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_144
     }
 
     '__ci_bb_143 {
-        ((unsafe *__param_re).start_bitmap[((160 as c_int) / 8)] = __param_re.start_bitmap[((160 as c_int) / 8)] | ((1 as c_uint) << (((160 as c_int) & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[((160 as c_int) / 8)] = ((unsafe *__param_re).start_bitmap[((160 as c_int) / 8)] as u8) | (((1 as c_uint) << ((((160 as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_144
     }
 
@@ -4703,10 +4735,10 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_145 {
-        ((unsafe *__param_re).start_bitmap[(10 / 8)] = __param_re.start_bitmap[(10 / 8)] | ((1 as c_uint) << ((10 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(11 / 8)] = __param_re.start_bitmap[(11 / 8)] | ((1 as c_uint) << ((11 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(12 / 8)] = __param_re.start_bitmap[(12 / 8)] | ((1 as c_uint) << ((12 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(13 / 8)] = __param_re.start_bitmap[(13 / 8)] | ((1 as c_uint) << ((13 & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[(10 / 8)] = ((unsafe *__param_re).start_bitmap[(10 / 8)] as u8) | (((1 as c_uint) << (((10 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(11 / 8)] = ((unsafe *__param_re).start_bitmap[(11 / 8)] as u8) | (((1 as c_uint) << (((11 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(12 / 8)] = ((unsafe *__param_re).start_bitmap[(12 / 8)] as u8) | (((1 as c_uint) << (((12 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(13 / 8)] = ((unsafe *__param_re).start_bitmap[(13 / 8)] as u8) | (((1 as c_uint) << (((13 as c_int) & (7 as c_int)) as c_uint)) as u8))
         if (__param_utf != 0) {
             goto '__ci_bb_146
         } else {
@@ -4715,13 +4747,13 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_146 {
-        ((unsafe *__param_re).start_bitmap[(194 / 8)] = __param_re.start_bitmap[(194 / 8)] | ((1 as c_uint) << ((194 & 7) as c_uint)))
-        ((unsafe *__param_re).start_bitmap[(226 / 8)] = __param_re.start_bitmap[(226 / 8)] | ((1 as c_uint) << ((226 & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[(194 / 8)] = ((unsafe *__param_re).start_bitmap[(194 / 8)] as u8) | (((1 as c_uint) << (((194 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        ((unsafe *__param_re).start_bitmap[(226 / 8)] = ((unsafe *__param_re).start_bitmap[(226 / 8)] as u8) | (((1 as c_uint) << (((226 as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_148
     }
 
     '__ci_bb_147 {
-        ((unsafe *__param_re).start_bitmap[((133 as c_int) / 8)] = __param_re.start_bitmap[((133 as c_int) / 8)] | ((1 as c_uint) << (((133 as c_int) & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[((133 as c_int) / 8)] = ((unsafe *__param_re).start_bitmap[((133 as c_int) / 8)] as u8) | (((1 as c_uint) << ((((133 as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_148
     }
 
@@ -4730,32 +4762,32 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_149 {
-        set_nottype_bits(__param_re, 64, __local_table_limit__goto_1100_5)
+        set_nottype_bits(__param_re, (64 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
         goto '__ci_bb_139
     }
 
     '__ci_bb_150 {
-        set_type_bits(__param_re, 64, __local_table_limit__goto_1100_5)
+        set_type_bits(__param_re, (64 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
         goto '__ci_bb_139
     }
 
     '__ci_bb_151 {
-        set_nottype_bits(__param_re, 0, __local_table_limit__goto_1100_5)
+        set_nottype_bits(__param_re, (0 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
         goto '__ci_bb_139
     }
 
     '__ci_bb_152 {
-        set_type_bits(__param_re, 0, __local_table_limit__goto_1100_5)
+        set_type_bits(__param_re, (0 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
         goto '__ci_bb_139
     }
 
     '__ci_bb_153 {
-        set_nottype_bits(__param_re, 160, __local_table_limit__goto_1100_5)
+        set_nottype_bits(__param_re, (160 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
         goto '__ci_bb_139
     }
 
     '__ci_bb_154 {
-        set_type_bits(__param_re, 160, __local_table_limit__goto_1100_5)
+        set_type_bits(__param_re, (160 as c_int), (__local_table_limit__goto_1100_5 as c_uint))
         goto '__ci_bb_139
     }
 
@@ -4844,11 +4876,11 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_166 {
-        (__local_xclassflags__goto_1122_17 = (unsafe __local_tcode__goto_1111_14[(1 + 2)]))
-        if ((if ((__local_xclassflags__goto_1122_17 as c_int) & 4) != 0: 1 else: 0) != 0) {
+        (__local_xclassflags__goto_1122_17 = (((unsafe __local_tcode__goto_1111_14[(1 + 2)]) as u8)))
+        if ((if (((__local_xclassflags__goto_1122_17 as c_int) as c_int) & (4 as c_int)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_7 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_7 = (if (if ((__local_xclassflags__goto_1122_17 as c_int) & (2 | 1)) == 1: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_7 = (if (if (((__local_xclassflags__goto_1122_17 as c_int) as c_int) & (((2 as c_int) | (1 as c_int)) as c_int)) == 1: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_7 != 0) {
             goto '__ci_bb_167
@@ -4863,7 +4895,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
 
     '__ci_bb_168 {
         (__ci_expr_ternary_8 = null)
-        if ((if ((__local_xclassflags__goto_1122_17 as c_int) & 2) == 0: 1 else: 0) != 0) {
+        if ((if (((__local_xclassflags__goto_1122_17 as c_int) as c_int) & (2 as c_int)) == 0: 1 else: 0) != 0) {
             (__ci_expr_ternary_8 = ((null as *const u8)))
         } else {
             (__ci_expr_ternary_8 = ((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
@@ -4871,7 +4903,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
         (__local_classmap__goto_1120_20 = __ci_expr_ternary_8)
         (__ci_expr_logic_9 = 0)
         if (__param_utf != 0) {
-            (__ci_expr_logic_9 = (if (if ((__local_xclassflags__goto_1122_17 as c_int) & 1) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_9 = (if (if (((__local_xclassflags__goto_1122_17 as c_int) as c_int) & (1 as c_int)) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_9 != 0) {
             goto '__ci_bb_169
@@ -4883,17 +4915,17 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     '__ci_bb_169 {
         (__ci_expr_ternary_10 = 0)
         if ((if __local_classmap__goto_1120_20 == null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_10 = 0)
+            (__ci_expr_ternary_10 = ((0 as c_int)))
         } else {
-            (__ci_expr_ternary_10 = 32)
+            (__ci_expr_ternary_10 = ((32 as c_int)))
         }
         (__local_p__goto_1750_20 = (((__local_tcode__goto_1111_14 + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize)) + ((__ci_expr_ternary_10 as isize) as usize))
-        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + ((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         (__ci_expr_ternary_11 = 0)
-        if (1 != 0) {
-            (__ci_expr_ternary_11 = 16)
+        if ((if sizeof[u8]() == 1: 1 else: 0) != 0) {
+            (__ci_expr_ternary_11 = ((16 as c_int)))
         } else {
-            (__ci_expr_ternary_11 = 4096)
+            (__ci_expr_ternary_11 = ((4096 as c_int)))
         }
         if ((if (unsafe *__local_p__goto_1750_20) >= __ci_expr_ternary_11: 1 else: 0) != 0) {
             goto '__ci_bb_171
@@ -4907,7 +4939,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_171 {
-        study_char_list(__local_p__goto_1750_20, (&(unsafe __param_re.start_bitmap[0]) as *mut u8), ((__param_re as *const u8) + (__param_re.code_start as usize)))
+        study_char_list(__local_p__goto_1750_20, (&(unsafe *__param_re).start_bitmap[0] as *mut u8), ((__param_re as *const u8) + ((unsafe *__param_re).code_start as usize)))
         goto '__ci_bb_173
     }
 
@@ -4953,12 +4985,12 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     '__ci_bb_180 {
         (__ci_expr_old_14 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__local_b__goto_1749_21 = (unsafe *__ci_expr_old_14))
+        (__local_b__goto_1749_21 = (((unsafe *__ci_expr_old_14) as u8)))
         goto '__ci_bb_181
     }
 
     '__ci_bb_181 {
-        if ((if (((unsafe *__local_p__goto_1750_20) as c_int) & 192) == 128: 1 else: 0) != 0) {
+        if ((if ((((unsafe *__local_p__goto_1750_20) as c_int) as c_int) & (192 as c_int)) == 128: 1 else: 0) != 0) {
             goto '__ci_bb_182
         } else {
             goto '__ci_bb_183
@@ -4971,19 +5003,19 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_183 {
-        ((unsafe *__param_re).start_bitmap[((__local_b__goto_1749_21 as c_int) / 8)] = __param_re.start_bitmap[((__local_b__goto_1749_21 as c_int) / 8)] | ((1 as c_uint) << (((__local_b__goto_1749_21 as c_int) & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[((__local_b__goto_1749_21 as c_int) / 8)] = ((unsafe *__param_re).start_bitmap[((__local_b__goto_1749_21 as c_int) / 8)] as u8) | (((1 as c_uint) << ((((__local_b__goto_1749_21 as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_179
     }
 
     '__ci_bb_184 {
         (__ci_expr_old_15 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__local_b__goto_1749_21 = (unsafe *__ci_expr_old_15))
+        (__local_b__goto_1749_21 = (((unsafe *__ci_expr_old_15) as u8)))
         goto '__ci_bb_185
     }
 
     '__ci_bb_185 {
-        if ((if (((unsafe *__local_p__goto_1750_20) as c_int) & 192) == 128: 1 else: 0) != 0) {
+        if ((if ((((unsafe *__local_p__goto_1750_20) as c_int) as c_int) & (192 as c_int)) == 128: 1 else: 0) != 0) {
             goto '__ci_bb_186
         } else {
             goto '__ci_bb_187
@@ -4998,12 +5030,12 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     '__ci_bb_187 {
         (__ci_expr_old_16 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__local_e__goto_1749_24 = (unsafe *__ci_expr_old_16))
+        (__local_e__goto_1749_24 = (((unsafe *__ci_expr_old_16) as u8)))
         goto '__ci_bb_188
     }
 
     '__ci_bb_188 {
-        if ((if (((unsafe *__local_p__goto_1750_20) as c_int) & 192) == 128: 1 else: 0) != 0) {
+        if ((if ((((unsafe *__local_p__goto_1750_20) as c_int) as c_int) & (192 as c_int)) == 128: 1 else: 0) != 0) {
             goto '__ci_bb_189
         } else {
             goto '__ci_bb_190
@@ -5028,12 +5060,12 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_192 {
-        ((unsafe *__param_re).start_bitmap[((__local_b__goto_1749_21 as c_int) / 8)] = __param_re.start_bitmap[((__local_b__goto_1749_21 as c_int) / 8)] | ((1 as c_uint) << (((__local_b__goto_1749_21 as c_int) & 7) as c_uint)))
+        ((unsafe *__param_re).start_bitmap[((__local_b__goto_1749_21 as c_int) / 8)] = ((unsafe *__param_re).start_bitmap[((__local_b__goto_1749_21 as c_int) / 8)] as u8) | (((1 as c_uint) << ((((__local_b__goto_1749_21 as c_int) as c_int) & (7 as c_int)) as c_uint)) as u8))
         goto '__ci_bb_193
     }
 
     '__ci_bb_193 {
-        (__local_b__goto_1749_21 = __local_b__goto_1749_21 + 1)
+        (__local_b__goto_1749_21 = (__local_b__goto_1749_21 +% 1))
         goto '__ci_bb_191
     }
 
@@ -5090,8 +5122,8 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_203 {
-        ((unsafe *__param_re).start_bitmap[24] = __param_re.start_bitmap[24] | 240)
-        with_memset((((&(unsafe __param_re.start_bitmap[0]) as *mut u8) + ((25 as isize) as usize)) as *i8), 255, (7 as i64))
+        ((unsafe *__param_re).start_bitmap[24] = ((unsafe *__param_re).start_bitmap[24] as u8) | (240 as u8))
+        with_memset(((((&(unsafe *__param_re).start_bitmap[0] as *mut u8) + ((25 as isize) as usize)) as *mut c_void) as *mut u8), (255 as c_int), ((7 as c_ulong) as i64))
         goto '__ci_bb_204
     }
 
@@ -5108,7 +5140,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_206 {
-        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + ((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint) as usize))
+        (__local_tcode__goto_1111_14 = __local_tcode__goto_1111_14 + (((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int) as c_int)) as c_uint) as usize))
         goto '__ci_bb_208
     }
 
@@ -5136,12 +5168,12 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_211 {
-        (__local_c__goto_1096_10 = 0)
+        (__local_c__goto_1096_10 = ((0 as c_uint)))
         goto '__ci_bb_214
     }
 
     '__ci_bb_212 {
-        (__local_c__goto_1096_10 = 0)
+        (__local_c__goto_1096_10 = ((0 as c_uint)))
         goto '__ci_bb_224
     }
 
@@ -5158,17 +5190,17 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_215 {
-        ((unsafe *__param_re).start_bitmap[__local_c__goto_1096_10] = __param_re.start_bitmap[__local_c__goto_1096_10] | (unsafe __local_classmap__goto_1120_20[__local_c__goto_1096_10]))
+        ((unsafe *__param_re).start_bitmap[__local_c__goto_1096_10] = ((unsafe *__param_re).start_bitmap[__local_c__goto_1096_10] as u8) | ((unsafe __local_classmap__goto_1120_20[__local_c__goto_1096_10]) as u8))
         goto '__ci_bb_216
     }
 
     '__ci_bb_216 {
-        (__local_c__goto_1096_10 = __local_c__goto_1096_10 + 1)
+        (__local_c__goto_1096_10 = (__local_c__goto_1096_10 +% 1))
         goto '__ci_bb_214
     }
 
     '__ci_bb_217 {
-        (__local_c__goto_1096_10 = 128)
+        (__local_c__goto_1096_10 = ((128 as c_uint)))
         goto '__ci_bb_218
     }
 
@@ -5189,7 +5221,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_220 {
-        (__local_c__goto_1096_10 = __local_c__goto_1096_10 + 1)
+        (__local_c__goto_1096_10 = (__local_c__goto_1096_10 +% 1))
         goto '__ci_bb_218
     }
 
@@ -5198,9 +5230,9 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_222 {
-        (__local_d__goto_1845_19 = (((__local_c__goto_1096_10 as c_uint) >> (6 as c_uint)) as c_uint) | (192 as c_uint))
-        ((unsafe *__param_re).start_bitmap[(__local_d__goto_1845_19 / 8)] = __param_re.start_bitmap[(__local_d__goto_1845_19 / 8)] | ((1 as c_uint) << ((__local_d__goto_1845_19 & 7) as c_uint)))
-        (__local_c__goto_1096_10 = ((((((__local_c__goto_1096_10 as c_uint) & (192 as c_uint)) as c_uint) +% (64 as c_uint)) as c_uint) -% (1 as c_uint)))
+        (__local_d__goto_1845_19 = ((((((__local_c__goto_1096_10 as c_uint) >> (6 as c_uint)) as c_uint) | (192 as c_uint)) as c_int)))
+        ((unsafe *__param_re).start_bitmap[(__local_d__goto_1845_19 / 8)] = ((unsafe *__param_re).start_bitmap[(__local_d__goto_1845_19 / 8)] as u8) | (((1 as c_uint) << (((__local_d__goto_1845_19 as c_int) & (7 as c_int)) as c_uint)) as u8))
+        (__local_c__goto_1096_10 = ((((((((__local_c__goto_1096_10 as c_uint) & (192 as c_uint)) as c_uint) +% (64 as c_uint)) as c_uint) -% (1 as c_uint)) as c_uint)))
         goto '__ci_bb_223
     }
 
@@ -5217,12 +5249,12 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_225 {
-        ((unsafe *__param_re).start_bitmap[__local_c__goto_1096_10] = __param_re.start_bitmap[__local_c__goto_1096_10] | (unsafe __local_classmap__goto_1120_20[__local_c__goto_1096_10]))
+        ((unsafe *__param_re).start_bitmap[__local_c__goto_1096_10] = ((unsafe *__param_re).start_bitmap[__local_c__goto_1096_10] as u8) | ((unsafe __local_classmap__goto_1120_20[__local_c__goto_1096_10]) as u8))
         goto '__ci_bb_226
     }
 
     '__ci_bb_226 {
-        (__local_c__goto_1096_10 = __local_c__goto_1096_10 + 1)
+        (__local_c__goto_1096_10 = (__local_c__goto_1096_10 +% 1))
         goto '__ci_bb_224
     }
 
@@ -5248,7 +5280,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_231 {
-        if ((if ((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int)) as c_uint)) == 0: 1 else: 0) != 0) {
+        if ((if (((((((unsafe __local_tcode__goto_1111_14[1]) as c_int) << (8 as c_uint)) as c_int) | (((unsafe __local_tcode__goto_1111_14[(1 + 1)]) as c_int) as c_int)) as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_232
         } else {
             goto '__ci_bb_233
@@ -5261,7 +5293,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_233 {
-        (__local_try_next__goto_1110_8 = 0)
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_234
     }
 
@@ -5270,7 +5302,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
     }
 
     '__ci_bb_235 {
-        (__local_try_next__goto_1110_8 = 0)
+        (__local_try_next__goto_1110_8 = ((0 as c_int)))
         goto '__ci_bb_229
     }
 
@@ -6609,5 +6641,7 @@ fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *const u8, _
             goto '__ci_bb_13
         }
     }
+
+    __ci_unreachable()
 
 }

@@ -45,7 +45,7 @@ fn regex_runtime_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
 
 fn regex_runtime_free(ptr: *mut c_void, data: *mut c_void):
     let _ = data
-    with_free(ptr as *i8)
+    with_free(ptr as *mut u8)
 
 fn regex_to_cstr(s: &str) -> *const u8:
     let out = with_alloc(s.len() + 1)
@@ -69,7 +69,7 @@ fn regex_owned_cstr(s: *const u8) -> str:
 
 pub fn with_regex_error_message(code: i32) -> str:
     let buf = with_alloc(256)
-    let rc = pcre2_get_error_message_8(code, buf as *mut u8, 256)
+    let rc = unsafe { pcre2_get_error_message_8(code, buf as *mut u8, 256) }
     if rc < 0:
         with_free(buf)
         return "regex error"
@@ -103,7 +103,7 @@ pub unsafe fn with_regex_compile(pattern: &str, options: i32, err_code: *mut i32
         &raw mut raw_err_offset,
         &raw mut ccontext
     )
-    with_free(c_pattern as *i8)
+    with_free(c_pattern as *mut u8)
     pcre2_general_context_free_8(gcontext)
     if err_code as i64 != 0:
         *err_code = raw_err_code
@@ -114,21 +114,21 @@ pub unsafe fn with_regex_compile(pattern: &str, options: i32, err_code: *mut i32
 pub fn with_regex_code_copy(code: *const i8) -> *const i8:
     if code as i64 == 0:
         return null
-    pcre2_code_copy_8(code as *const pcre2_real_code_8) as *const i8
+    (unsafe { pcre2_code_copy_8(code as *const pcre2_real_code_8) }) as *const i8
 
 pub fn with_regex_code_free(code: *const i8) -> Unit:
     if code as i64 != 0:
-        pcre2_code_free_8(code as *mut pcre2_real_code_8)
+        unsafe { pcre2_code_free_8(code as *mut pcre2_real_code_8) }
 
 pub fn with_regex_capture_count(code: *const i8) -> i32:
     if code as i64 == 0:
         return 0
     var capture_count: c_uint = 0
-    let rc = pcre2_pattern_info_8(
+    let rc = unsafe { pcre2_pattern_info_8(
         code as *const pcre2_real_code_8,
         PCRE2_INFO_CAPTURECOUNT as c_uint,
         (&raw mut capture_count) as *mut c_void
-    )
+    ) }
     if rc < 0:
         with_panic("with_regex_capture_count(): pattern info failed", "", 0)
     capture_count as i32
@@ -183,11 +183,11 @@ pub fn with_regex_capture_name_count(code: *const i8) -> i32:
     if code as i64 == 0:
         return 0
     var name_count: c_uint = 0
-    let rc = pcre2_pattern_info_8(
+    let rc = unsafe { pcre2_pattern_info_8(
         code as *const pcre2_real_code_8,
         PCRE2_INFO_NAMECOUNT as c_uint,
         (&raw mut name_count) as *mut c_void
-    )
+    ) }
     if rc < 0:
         with_panic("with_regex_capture_name_count(): pattern info failed", "", 0)
     name_count as i32
@@ -198,27 +198,27 @@ pub fn with_regex_capture_name_at(code: *const i8, index: i32) -> str:
     var name_count: c_uint = 0
     var entry_size: c_uint = 0
     var table: *const u8 = null
-    var rc = pcre2_pattern_info_8(
+    var rc = unsafe { pcre2_pattern_info_8(
         code as *const pcre2_real_code_8,
         PCRE2_INFO_NAMECOUNT as c_uint,
         (&raw mut name_count) as *mut c_void
-    )
+    ) }
     if rc < 0:
         with_panic("with_regex_capture_name_at(): name count lookup failed", "", 0)
     if index >= name_count as i32:
         return ""
-    rc = pcre2_pattern_info_8(
+    rc = unsafe { pcre2_pattern_info_8(
         code as *const pcre2_real_code_8,
         PCRE2_INFO_NAMEENTRYSIZE as c_uint,
         (&raw mut entry_size) as *mut c_void
-    )
+    ) }
     if rc < 0:
         with_panic("with_regex_capture_name_at(): entry size lookup failed", "", 0)
-    rc = pcre2_pattern_info_8(
+    rc = unsafe { pcre2_pattern_info_8(
         code as *const pcre2_real_code_8,
         PCRE2_INFO_NAMETABLE as c_uint,
         (&raw mut table) as *mut c_void
-    )
+    ) }
     if rc < 0:
         with_panic("with_regex_capture_name_at(): name table lookup failed", "", 0)
     let entry = (table as i64 + index as i64 * entry_size as i64 + 2) as *const u8
@@ -228,8 +228,8 @@ pub fn with_regex_group_name_to_index(code: *const i8, name: &str) -> i32:
     if code as i64 == 0:
         return -1
     let cname = regex_to_cstr(name)
-    let out = pcre2_substring_number_from_name_8(code as *const pcre2_real_code_8, cname)
-    with_free(cname as *i8)
+    let out = unsafe { pcre2_substring_number_from_name_8(code as *const pcre2_real_code_8, cname) }
+    with_free(cname as *mut u8)
     if out < 0:
         return -1
     out
@@ -237,12 +237,12 @@ pub fn with_regex_group_name_to_index(code: *const i8, name: &str) -> i32:
 pub fn with_regex_substitute(code: *const i8, text: &str, repl: &str, replace_all: i32) -> str:
     if code as i64 == 0:
         return with_str_clone_ref(text)
-    let gcontext = pcre2_general_context_create_8(regex_runtime_malloc, regex_runtime_free, null)
+    let gcontext = unsafe { pcre2_general_context_create_8(regex_runtime_malloc, regex_runtime_free, null) }
     if gcontext as i64 == 0:
         with_panic("with_regex_substitute(): general context creation failed", "", 0)
-    let match_data = pcre2_match_data_create_from_pattern_8(code as *const pcre2_real_code_8, gcontext)
+    let match_data = unsafe { pcre2_match_data_create_from_pattern_8(code as *const pcre2_real_code_8, gcontext) }
     if match_data as i64 == 0:
-        pcre2_general_context_free_8(gcontext)
+        unsafe { pcre2_general_context_free_8(gcontext) }
         with_panic("with_regex_substitute(): match data creation failed", "", 0)
     let c_repl = regex_to_cstr(repl)
     var options: c_uint = (PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH) as c_uint
@@ -252,7 +252,7 @@ pub fn with_regex_substitute(code: *const i8, text: &str, repl: &str, replace_al
     if buffer_len < 64:
         buffer_len = 64
     var buffer = with_alloc(buffer_len as i64 + 1) as *mut u8
-    var rc = pcre2_substitute_8(
+    var rc = unsafe { pcre2_substitute_8(
         code as *const pcre2_real_code_8,
         regex_str_data(text),
         text.len() as c_ulong,
@@ -264,11 +264,11 @@ pub fn with_regex_substitute(code: *const i8, text: &str, repl: &str, replace_al
         repl.len() as c_ulong,
         buffer,
         &raw mut buffer_len
-    )
+    ) }
     if rc == PCRE2_ERROR_NOMEMORY:
         with_free(buffer as *mut u8)
         buffer = with_alloc(buffer_len as i64 + 1) as *mut u8
-        rc = pcre2_substitute_8(
+        rc = unsafe { pcre2_substitute_8(
             code as *const pcre2_real_code_8,
             regex_str_data(text),
             text.len() as c_ulong,
@@ -280,18 +280,18 @@ pub fn with_regex_substitute(code: *const i8, text: &str, repl: &str, replace_al
             repl.len() as c_ulong,
             buffer,
             &raw mut buffer_len
-        )
+        ) }
     if rc < 0:
         let msg = "with_regex_substitute(): " ++ with_regex_error_message(rc as i32)
-        with_free(c_repl as *i8)
+        with_free(c_repl as *mut u8)
         with_free(buffer as *mut u8)
-        pcre2_match_data_free_8(match_data)
-        pcre2_general_context_free_8(gcontext)
+        unsafe { pcre2_match_data_free_8(match_data) }
+        unsafe { pcre2_general_context_free_8(gcontext) }
         with_panic(msg, "", 0)
     unsafe *((buffer as i64 + buffer_len as i64) as *mut u8) = 0
     let result = with_str_from_bytes(buffer as *const u8, buffer_len as i64)
-    with_free(c_repl as *i8)
+    with_free(c_repl as *mut u8)
     with_free(buffer as *mut u8)
-    pcre2_match_data_free_8(match_data)
-    pcre2_general_context_free_8(gcontext)
+    unsafe { pcre2_match_data_free_8(match_data) }
+    unsafe { pcre2_general_context_free_8(gcontext) }
     result
