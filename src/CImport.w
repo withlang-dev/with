@@ -8626,6 +8626,20 @@ impl CiExprPool:
             if ci_is_string_literal(expansion_expanded):
                 let s = self.add_string(with_str_clone_ref(expansion_expanded))
                 return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
+            // #880: the `STRING_UTFn_RIGHTPAR` form expands to
+            // `<string-concat-macro>, <length>` (the length is a sibling struct
+            // field). ci_expand_string_macro_sequence bails on the trailing comma,
+            // so source_expanded/expansion_expanded are empty and the fallback
+            // below would keep only the first macro's char. Look the macro up,
+            // drop a trailing top-level `, <n>`, and expand just the string part.
+            let macro_val = ci_lookup_macro_value(session, ci_trim(source_src))
+            if macro_val.len() > 0:
+                let str_part = ci_text_before_top_comma(macro_val)
+                if str_part.len() > 0 and str_part.len() < macro_val.len():
+                    let recovered = ci_expand_string_macro_sequence(session, str_part)
+                    if ci_is_string_literal(recovered):
+                        let s = self.add_string(recovered)
+                        return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
             var preprocessed_expanded = ""
             var text = with_str_clone_ref(literal_src)
             if ci_is_string_literal(spelling_literal):
@@ -12716,6 +12730,37 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
 
 fn ci_is_byte_array_type(ty: &str) -> bool:
     ty.len() > 0 and ty.byte_at(0) == 91 and ci_is_byte_array_element_type(ci_array_element_type(ty))
+
+// #880: return the text before the first top-level comma (outside string
+// literals and (), []), or the whole string when there is none. Used to peel a
+// trailing `, <length>` off a `STRING_UTFn_RIGHTPAR`-style macro value.
+fn ci_text_before_top_comma(s: &str) -> str:
+    var i = 0
+    let slen = s.len() as i32
+    var depth = 0
+    while i < slen:
+        let c = s.byte_at(i as i64)
+        if c == 34 or c == 39:
+            let q = c
+            i = i + 1
+            while i < slen:
+                let cc = s.byte_at(i as i64)
+                if cc == 92:
+                    i = i + 2
+                    continue
+                if cc == q:
+                    i = i + 1
+                    break
+                i = i + 1
+            continue
+        if c == 40 or c == 91:
+            depth = depth + 1
+        else if c == 41 or c == 93:
+            depth = depth - 1
+        else if c == 44 and depth == 0:
+            return s.slice(0, i as i64)
+        i = i + 1
+    with_str_clone_ref(s)
 
 fn ci_concat_strings(s: &str) -> str:
     // Concatenate adjacent string literals "foo" "bar" -> "foobar"
