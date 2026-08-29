@@ -13133,6 +13133,26 @@ fn ci_string_text_contains_macro_like_ident(s: &str) -> bool:
     var i = 0
     let slen = s.len() as i32
     while i < slen:
+        // #880: skip the CONTENT of string literals — an all-caps word with an
+        // underscore/digit inside a message (e.g. "PCRE2_EXTRA...", "UTF8") is
+        // text, not an unexpanded macro reference. Scanning it here false-flagged
+        // pcre2's error tables, forcing a re-derivation that truncated the whole
+        // concatenation at its first interior comment. Only an identifier OUTSIDE
+        // any string literal is a real leftover macro.
+        let b = s.byte_at(i as i64)
+        if b == 34 or b == 39:
+            let q = b
+            i = i + 1
+            while i < slen:
+                let cc = s.byte_at(i as i64)
+                if cc == 92:
+                    i = i + 2
+                    continue
+                if cc == q:
+                    i = i + 1
+                    break
+                i = i + 1
+            continue
         if ci_is_ident_start(s.byte_at(i as i64)):
             let start = i
             var has_lower = false
