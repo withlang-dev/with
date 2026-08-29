@@ -8633,7 +8633,13 @@ impl CiExprPool:
             // expanded forms above come back empty. The fn-like invocation's
             // argument is the actual string expression; expand that before the
             // spelling fallback keeps only the first macro's character.
-            if ci_is_string_literal(expansion_arg_expanded):
+            //
+            // Gate on the definition-site smell (a #define outside any string in
+            // the token/source text): a literal written directly in a macro BODY
+            // (CHECK_ERR's "%s error: %d\n") also reaches here with a string arg
+            // ("compress") — substituting the arg there swaps the format string
+            // for the argument.
+            if ci_is_string_literal(expansion_arg_expanded) and (ci_text_has_pp_define_outside_string(literal_src) or ci_text_has_pp_define_outside_string(source_src)):
                 let s = self.add_string(with_str_clone_ref(expansion_arg_expanded))
                 return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
             // #880: the `STRING_UTFn_RIGHTPAR` form expands to
@@ -12740,6 +12746,36 @@ fn ci_render_string_literal_as_byte_array(value: &str, ty: &str) -> str:
 
 fn ci_is_byte_array_type(ty: &str) -> bool:
     ty.len() > 0 and ty.byte_at(0) == 91 and ci_is_byte_array_element_type(ci_array_element_type(ty))
+
+// #880: true when `s` contains a preprocessor `#define` OUTSIDE any string
+// literal — the signature of a cursor whose token/source text is a slice of
+// macro DEFINITION sites in a header rather than the use-site expression.
+fn ci_text_has_pp_define_outside_string(s: &str) -> bool:
+    var i = 0
+    let slen = s.len() as i32
+    while i < slen:
+        let c = s.byte_at(i as i64)
+        if c == 34 or c == 39:
+            let q = c
+            i = i + 1
+            while i < slen:
+                let cc = s.byte_at(i as i64)
+                if cc == 92:
+                    i = i + 2
+                    continue
+                if cc == q:
+                    i = i + 1
+                    break
+                i = i + 1
+            continue
+        if c == 35:
+            var j = i + 1
+            while j < slen and (s.byte_at(j as i64) == 32 or s.byte_at(j as i64) == 9):
+                j = j + 1
+            if j + 6 <= slen and s.slice(j as i64, (j + 6) as i64) == "define":
+                return true
+        i = i + 1
+    false
 
 // #880: return the text before the first top-level comma (outside string
 // literals and (), []), or the whole string when there is none. Used to peel a
