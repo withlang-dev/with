@@ -8613,6 +8613,19 @@ impl CiExprPool:
             let expansion_arg_expanded = ci_expand_string_macro_sequence(session, expansion_arg)
             let spelling_expanded = ci_expand_string_macro_sequence(session, spelling_src)
             let source_expanded = ci_expand_string_macro_sequence(session, source_src)
+            // #880: a macro-expanded adjacent-string concatenation
+            // (e.g. STRING_UTF_RIGHTPAR = STR_U STR_T STR_F STR_RIGHT_PARENTHESIS)
+            // spans several string tokens, but the spelling location resolves to
+            // only the FIRST macro's string — `spelling_literal` below keeps just
+            // "U". The fully macro-expanded forms carry the whole concatenation;
+            // prefer them. For a normal single-macro string they equal the
+            // spelling, so this only changes the truncated multi-token case.
+            if ci_is_string_literal(source_expanded):
+                let s = self.add_string(with_str_clone_ref(source_expanded))
+                return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
+            if ci_is_string_literal(expansion_expanded):
+                let s = self.add_string(with_str_clone_ref(expansion_expanded))
+                return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
             var preprocessed_expanded = ""
             var text = with_str_clone_ref(literal_src)
             if ci_is_string_literal(spelling_literal):
