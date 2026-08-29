@@ -8626,6 +8626,16 @@ impl CiExprPool:
             if ci_is_string_literal(expansion_expanded):
                 let s = self.add_string(with_str_clone_ref(expansion_expanded))
                 return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
+            // #880: a string built ENTIRELY of macros used as a fn-like macro's
+            // argument (pcre2's PUTCHARS(STR_STAR_NUL)) has a cursor extent that
+            // maps to the macro DEFINITION sites in the header — token and source
+            // text are a slice of pcre2_internal.h's #define lines, and both
+            // expanded forms above come back empty. The fn-like invocation's
+            // argument is the actual string expression; expand that before the
+            // spelling fallback keeps only the first macro's character.
+            if ci_is_string_literal(expansion_arg_expanded):
+                let s = self.add_string(with_str_clone_ref(expansion_arg_expanded))
+                return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
             // #880: the `STRING_UTFn_RIGHTPAR` form expands to
             // `<string-concat-macro>, <length>` (the length is a sibling struct
             // field). ci_expand_string_macro_sequence bails on the trailing comma,
