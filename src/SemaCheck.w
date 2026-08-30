@@ -11898,6 +11898,14 @@ impl Sema:
                     // incompatible exact type is rejected by the ordinary
                     // structural check below.
                     self.reject_owned_demand_from_view_projection(f_value, field_expected, "struct literal field")
+                    // §16.4: union construction requires exactly one field
+                    // initializer — a bare value for a union-typed field is not
+                    // a construction form. Codegen has no member to write, so
+                    // accepting it silently stored the wrong value (#886).
+                    if field_expected != 0 and val_ty != 0 and self.type_is_union(field_expected) and self.types_compatible(field_expected, val_ty as i32) == 0 and self.has_contextual_copy_adjustment(f_value) == 0:
+                        let u_resolved = self.resolve_alias(field_expected as TypeId)
+                        let u_member = if self.get_type_d2(u_resolved) > 0: with_str_clone_ref(self.pool_resolve(self.type_extra.get(self.get_type_d1(u_resolved) as i64))) else: "member"
+                        self.emit_error("a union-typed field requires an explicit member initializer; use `" ++ self.type_name(field_expected) ++ " { " ++ u_member ++ ": ... }` (§16.4)", f_value)
                     if field_expected != 0 and val_ty != 0:
                         let field_value_resolved = self.resolve_alias(val_ty)
                         let field_expected_resolved = self.resolve_alias(field_expected as TypeId)
