@@ -8,7 +8,7 @@ type Plain: Copy { value: i32 }
 
 impl Named for Person:
     fn name(self: &Self) -> str:
-        self.name
+        self.name.clone()
 
 fn describe[T](val: T) -> i32:
     comptime if T.implements(Named):

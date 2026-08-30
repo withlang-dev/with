@@ -5,7 +5,7 @@ type BoxAutoDerefUser { name: str, score: i32 }
 
 impl BoxAutoDerefUser:
     fn label(self: &Self) -> str:
-        self.name
+        self.name.clone()
 
 fn test_box_auto_deref_field:
     let user: Box[BoxAutoDerefUser] = Box.new(BoxAutoDerefUser { name: "Ada", score: 9 })

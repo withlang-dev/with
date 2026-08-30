@@ -75,4 +75,4 @@ impl Arena:
     pub fn get_str(id: ArenaId) -> str:
         if self.kind(id) != ARENA_SLOT_STR():
             return ""
-        self.slots.get(arena_id_raw(id) as i64).str_value
+        self.slots.get(arena_id_raw(id) as i64).str_value.clone()

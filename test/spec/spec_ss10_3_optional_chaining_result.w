@@ -13,7 +13,7 @@ fn Response.body_len(self: &Self) -> usize:
     self.body.len()
 
 fn Response.try_body(self: &Self) -> Result[str, str]:
-    Ok(self.body)
+    Ok(self.body.clone())
 
 fn Response.add_to_len(self: &Self, n: usize) -> usize:
     self.body.len() + n

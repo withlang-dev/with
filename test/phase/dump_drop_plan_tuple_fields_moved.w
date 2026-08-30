@@ -15,9 +15,9 @@ impl Drop for W:
             *self.slot = *self.slot + 1
 
 fn run(slot: *mut i32):
-    let pair = (W { slot: slot }, W { slot: slot })
-    let a = pair.0
-    let b = pair.1
+    var pair = (W { slot: slot }, W { slot: slot })
+    let a = move pair.0
+    let b = move pair.1
     let _ = a
     let _ = b
 

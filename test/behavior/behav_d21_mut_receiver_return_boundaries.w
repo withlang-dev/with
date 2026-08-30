@@ -19,7 +19,7 @@ impl Factory:
         value
 
 impl Holder:
-    mut fn take_values() -> Vec[i32]: self.values
+    mut fn take_values() -> Vec[i32]: return move self.values
 
 impl Viewed:
     mut fn value_ref() -> &i32: &self.value

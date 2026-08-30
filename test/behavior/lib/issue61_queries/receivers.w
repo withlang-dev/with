@@ -25,7 +25,7 @@ pub fn boxed_state(state: State) -> StateBox[State]:
     boxed
 
 pub fn alias_and_temporary_score(state: State) -> i32:
-    let state_box = boxed_state(move state)
+    var state_box = boxed_state(move state)
     let alias_list = make_alias_list()
     var total = alias_list.len() as i32
     total = total + make_alias_list().len() as i32
@@ -38,5 +38,5 @@ pub fn alias_and_temporary_score(state: State) -> i32:
     if make_lookup().get("missing").is_none():
         total = total + 1
     total = total + make_lookup().get("beta").unwrap()
-    total = total + state_box.value.alias.unwrap().len() as i32
+    total = total + (move state_box.value.alias).unwrap().len() as i32
     total

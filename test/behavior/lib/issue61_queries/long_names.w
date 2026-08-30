@@ -22,8 +22,8 @@ pub fn make_monumentally_verbose_carrier_for_compiler_owned_string_stability() -
     }
 
 pub fn long_name_score() -> i32:
-    let carrier = make_monumentally_verbose_carrier_for_compiler_owned_string_stability()
-    let lowered = carrier.extraordinarily_verbose_alias_field_name_that_must_remain_stable.unwrap().trim().to_lower()
+    var carrier = make_monumentally_verbose_carrier_for_compiler_owned_string_stability()
+    let lowered = (move carrier.extraordinarily_verbose_alias_field_name_that_must_remain_stable).unwrap().trim().to_lower()
     let scratch = HashMap[str, i32].new()
     scratch.insert("soon_removed_soon_removed_soon_removed", 99)
     scratch.remove("soon_removed_soon_removed_soon_removed")

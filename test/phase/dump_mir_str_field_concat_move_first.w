@@ -6,5 +6,5 @@ type Acc { buf: str, name: str }
 fn fast_field -> str:
     var a = Acc { buf: "", name: "n" }
     a.buf = a.buf ++ "x"
-    a.buf
+    move a.buf
 

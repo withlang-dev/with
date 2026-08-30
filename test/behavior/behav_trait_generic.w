@@ -14,7 +14,7 @@ impl Showable for Wrapper:    fn show(self:
 
 impl Showable for Tag:    fn show(self:
     &Self) -> str:
-        self.label
+        self.label.clone()
 
 fn display[T](x: T) -> str where T: Showable:
     x.show()

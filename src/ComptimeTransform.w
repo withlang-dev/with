@@ -1641,15 +1641,22 @@ impl Sema:
         let push_stmts: Vec[i32] = Vec.new()
         let push_self_ident = out.ct_build_ident(decl, self_sym)
         push_stmts.push(out.add_node(NodeKind.NK_LET_BINDING, start, end, soa_out_sym, push_self_ident as i32, 1) as i32)
+        // D32 (§2.2): the row's fields are vacated explicitly — a bare
+        // `value.field` arg is an implicit field move (error), and an owned
+        // param is a read path, so rebind the row to a `var` first.
+        let soa_value_sym = intern.intern("__soa_value")
+        let push_value_ident = out.ct_build_ident(decl, value_sym)
+        push_stmts.push(out.add_node(NodeKind.NK_LET_BINDING, start, end, soa_value_sym, push_value_ident as i32, 1) as i32)
         for fi in 0..field_count:
             let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
             let out_ident = out.ct_build_ident(decl, soa_out_sym)
             let out_field = out.ct_build_field_access(decl, out_ident, field_sym)
             let push_callee = out.ct_build_field_access(decl, out_field, push_sym)
-            let value_ident = out.ct_build_ident(decl, value_sym)
+            let value_ident = out.ct_build_ident(decl, soa_value_sym)
             let value_field = out.ct_build_field_access(decl, value_ident, field_sym)
+            let moved_field = out.add_node(NodeKind.NK_MOVE_ARG, start, end, value_field as i32, 0, 0)
             let push_args: Vec[i32] = Vec.new()
-            push_args.push(value_field)
+            push_args.push(moved_field as i32)
             push_stmts.push(out.ct_build_call(decl, push_callee, push_args))
         let push_tail = out.ct_build_ident(decl, soa_out_sym)
         let push_body = out.ct_build_block(decl, push_stmts, push_tail)

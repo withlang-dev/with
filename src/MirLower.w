@@ -5869,9 +5869,20 @@ impl MirBuilder:
     // block's scope-exit drops: left lazy, pop_scope_inline drops the
     // base local in full (the move was never recorded) and the outer
     // consumer's capture reads freed storage — tail `move owned.field`
-    // returned a blanked Vec. Whole-local OK_MOVE operands are recorded
-    // eagerly at lower time and stay lazy.
+    // returned a blanked Vec. ONLY the explicit `move` spelling routes
+    // here: bare field tails also lower to OK_MOVE place operands (view
+    // returns, borrow tails) and materializing those copies the pointee
+    // into a value temp that mismatches a `&`-typed destination.
+    // Whole-local OK_MOVE operands are recorded eagerly and stay lazy.
     mut fn materialize_tail_field_move(result: i32, tail_expr: i32) -> i32:
+        var tail = tail_expr
+        while tail != 0:
+            let tk = self.ast.kind(tail)
+            if tk != NodeKind.NK_GROUPED and tk != NodeKind.NK_NO_SUSPEND and tk != NodeKind.NK_UNSAFE_BLOCK:
+                break
+            tail = self.ast.get_data0(tail)
+        if tail == 0 or self.ast.kind(tail) != NodeKind.NK_MOVE_ARG:
+            return result
         if self.body.operand_kinds.get(result as i64) != OperandKind.OK_MOVE:
             return result
         let place: i32 = self.body.operand_d0.get(result as i64)

@@ -18,7 +18,9 @@ fn make_holder(slot: *mut i32) -> Holder:
     Holder { values: values }
 
 fn Holder.into_values(move self: Holder) -> Vec[W]:
-    self.values
+    // D32: field vacates need a mutable path — rebind the consumed self.
+    var owned = self
+    return move owned.values
 
 fn run(slot: *mut i32):
     let holder = make_holder(slot)

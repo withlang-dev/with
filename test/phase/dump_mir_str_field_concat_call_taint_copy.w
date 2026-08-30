@@ -14,5 +14,5 @@ fn call_taints_base -> str:
     var a = Acc { buf: "", name: "n" }
     let _ = touch(a)
     a.buf = a.buf ++ "x"
-    a.buf
+    move a.buf
 

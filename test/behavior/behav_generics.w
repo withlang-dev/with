@@ -27,7 +27,7 @@ fn test_generic_comparison:
 
 type Box[T] { value: T }
 
-fn Box.get(self: &Self) -> T:
+fn Box.get(self: &Self) -> &T:
     self.value
 
 fn test_generic_struct:

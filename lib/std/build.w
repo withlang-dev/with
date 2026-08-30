@@ -508,7 +508,7 @@ pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCt
 
 pub fn BuildCtx.project_info(self: &Self) -> &ProjectInfo:
     tool_capability_require(self.token, "BuildCtx")
-    self.project
+    &self.project
 
 pub fn BuildCtx.new_build(self: &Self) -> Build:
     tool_capability_require(self.token, "BuildCtx")

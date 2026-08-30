@@ -23011,6 +23011,19 @@ impl Sema:
         let pm_help = "field `" ++ pm_field_name ++ "` of `" ++ pm_name ++ "` was moved out, so `" ++ pm_name ++ "` is no longer a whole value; reinitialize the field before this use, or clone the field instead of moving it"
         self.emit_error_with_help("use of partially moved value", pm_n, pm_help)
 
+    // D32 (§2.2): a `Type.Member` path (enum variant constructor, static
+    // member) is not a field read — nothing moves out of a type name.
+    fn d32_base_is_type_name(fa_node: i32) -> i32:
+        var b = self.ast.get_data0(fa_node)
+        while b != 0 and self.ast.kind(b) == NodeKind.NK_GROUPED:
+            b = self.ast.get_data0(b)
+        if b == 0 or self.ast.kind(b) != NodeKind.NK_IDENT:
+            return 0
+        let sym = self.ast.get_data0(b)
+        if self.scope_has(sym) != 0:
+            return 0
+        if self.named_types.contains(sym): 1 else: 0
+
     // D32 (§2.2): the one legal vacate is the explicit `move place.field`
     // through a mutable path — a `var` base or the receiver of a `mut fn`
     // (binding-mut covers both: D12 binds `mut self` mutable) with no
@@ -23063,7 +23076,11 @@ impl Sema:
             let field_ty_opt = self.typed_expr_types.get(node)
             let field_ty = if field_ty_opt.is_some(): field_ty_opt.unwrap() else: self.field_access_type_no_diagnostic(node)
             let owner_sym = self.drop_owner_for_field_access(node)
-            if field_ty != 0 and self.type_needs_drop(field_ty) != 0:
+            // A Copy field read is never a move (the specialization re-check
+            // can report needs_drop for pointer fields — *mut Arena came back
+            // needs-drop with copy=1; the Copy gate is the durable one, #898).
+            // A Type.Member path is a constructor, not a field read.
+            if field_ty != 0 and self.is_copy(field_ty as TypeId) == 0 and self.type_needs_drop(field_ty) != 0 and self.d32_base_is_type_name(node) == 0:
                 if owner_sym != 0 and self.has_drop_method(owner_sym) != 0 and self.current_drop_type_sym == owner_sym:
                     // §2.4: inside the owner's own drop the consumed `self` is
                     // owned and its fields may be consumed freely.
@@ -23078,6 +23095,10 @@ impl Sema:
                 // field move errors at the move site; the explicit spelling's
                 // read-path gate lives at check_expr's NK_MOVE_ARG arm.
                 if self.marking_explicit_move == 0:
+                    if with_getenv_str("WITH_D32_DEBUG").len() > 0:
+                        let d32_res = self.resolve_alias(field_ty as TypeId)
+                        let d32_copy = if self.is_copy(field_ty as TypeId) != 0: 1 else: 0
+                        with_eprint(f"[d32] arm=consumed node={node} field_ty={field_ty} resolved={d32_res as i32} kind={self.get_type_kind(d32_res)} copy={d32_copy} name={self.type_name(field_ty)}")
                     self.d32_emit_implicit_field_move_error(node)
                     return
                 // Slice E + #607: explicit field moves are sound under the
@@ -23159,6 +23180,8 @@ impl Sema:
             return
         if k != NodeKind.NK_FIELD_ACCESS:
             return
+        if self.d32_base_is_type_name(expr) != 0:
+            return
         // The tail call (fn-body epilogue) runs after the body block's scope
         // was popped, so helpers here must never RE-CHECK the base chain — a
         // re-check of a block-local base emits phantom "undefined variable"
@@ -23174,6 +23197,9 @@ impl Sema:
             self.suppress_errors = self.suppress_errors - 1
         if field_ty == 0 or self.is_copy(field_ty as TypeId) != 0 or self.type_needs_drop(field_ty) == 0:
             return
+        if with_getenv_str("WITH_D32_DEBUG").len() > 0:
+            let d32r = self.resolve_alias(field_ty as TypeId)
+            with_eprint(f"[d32] arm=return node={expr} field_ty={field_ty} resolved={d32r as i32} kind={self.get_type_kind(d32r)} name={self.type_name(field_ty)}")
         if self.has_contextual_copy_adjustment(expr) != 0:
             return
         // §2.4: inside the owner's own drop fields are freely consumable.

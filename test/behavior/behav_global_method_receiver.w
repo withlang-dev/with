@@ -7,7 +7,7 @@ type Tool {
 global tool = Tool { prefix: "ok" }
 
 fn Tool.label(self: &Self) -> str:
-    self.prefix
+    self.prefix.clone()
 
 fn main:
     assert(tool.label() == "ok")

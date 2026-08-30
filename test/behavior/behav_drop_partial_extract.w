@@ -14,8 +14,8 @@ fn new_w(id: i32, s: *mut i32) -> W:
     W { id: id, slot: s }
 
 fn run_tuple_extract_one(s: *mut i32):
-    let t = (new_w(1, s), new_w(2, s))
-    let a = t.0
+    var t = (new_w(1, s), new_w(2, s))
+    let a = move t.0
 
 fn run_array_observe_one(s: *mut i32):
     let arr = [new_w(1, s), new_w(2, s)]

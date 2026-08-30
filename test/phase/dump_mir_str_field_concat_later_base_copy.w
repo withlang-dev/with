@@ -8,5 +8,5 @@ type Acc { buf: str, name: str }
 fn later_base_operand -> str:
     var a = Acc { buf: "", name: "n" }
     a.buf = a.buf ++ a.name
-    a.buf
+    move a.buf
 

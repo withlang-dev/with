@@ -19,7 +19,7 @@ unsafe fn write_point_field(p: *mut Point, v: i32):
     p.x = v
 
 unsafe fn read_node_fields(p: *const Node) -> str:
-    p.label
+    p.label.clone()
 
 fn test_auto_deref_read:
     let pt = Point { x: 10, y: 20 }
