@@ -363,6 +363,19 @@ let b = a            // a is moved; b is the new owner
 // a.push(1)         // COMPILE ERROR: use of moved value `a`
 ```
 
+**A field never moves out implicitly — anywhere, in any context.** The
+only way to vacate a field is the explicit `move place.field`, and only
+through a mutable path (a `var` base, or the receiver of a `mut fn`).
+Whole values decompose whole (destructuring, record update). An
+implicit field move is a compile error at the move site, with fix-its
+offering both intents: `move place.field` to vacate (reset-on-move
+leaves the field a valid empty value — the take, §2.5.1), or
+`place.field.clone()` to keep the base whole. An explicit `move
+place.field` through a read path (a `let` base, or the receiver of a
+read `fn`) is a compile error — a vacate is a write. This rule is
+uniform over owned locals, receivers, and every other base; there is no
+flow condition and no type condition. (D32.)
+
 **Conditional moves are flow-sensitive.** A binding moved on some but
 not all control-flow paths reaching a program point is *conditionally
 moved* there. Using it is a compile error unless it has been
@@ -520,27 +533,25 @@ let c = process(combine(a, b))
 // only c survives
 ```
 
-**Partial moves from Drop types are forbidden** in normal code.
-Inside `drop` itself, you can access and consume fields freely.
-Outside of `drop`, moving a field out of a Drop type is a compile
-error:
+**Field moves are explicit, uniformly** (§2.2, D32): an implicit field
+move is a compile error for every type — the earlier Drop/non-Drop
+conditional is superseded by the one rule. Inside `drop` itself, the
+consumed `self` is owned and its fields may be accessed and consumed
+freely. Elsewhere, vacate a field with the explicit `move w1.fd`
+through a mutable path, clone it, or consume the whole value:
 
 ```
 type FileWrapper { fd: File, name: String }
 impl Drop for FileWrapper:
     fn drop(move self: Self): close_file(self.fd)
 
-let w1 = FileWrapper { fd: open_file(), name: "A" }
-let w2 = { w1 with name: "B" }   // ERROR: partial move from Drop type
-//        ^^^ w1 implements Drop; cannot move w1.fd out
-
-// Fix: clone the field, or consume the entire value:
-let w2 = FileWrapper { fd: w1.fd.clone(), name: "B" }
-// or restructure so FileWrapper doesn't implement Drop
+var w1 = FileWrapper { fd: open_file(), name: "A" }
+let w2 = FileWrapper { fd: move w1.fd, name: "B" }   // explicit vacate
+// or: FileWrapper { fd: w1.fd.clone(), name: "B" }  // keep w1 whole
 ```
 
-For non-`Drop` types, partial moves and record update syntax work
-as described in §4.3.
+Record update syntax (`{ base with field: value }`) consumes the base
+whole (§4.3) and is not a field move.
 
 For explicit cleanup of resources not tied to a value's lifetime, `defer`
 executes a statement when the enclosing scope exits:

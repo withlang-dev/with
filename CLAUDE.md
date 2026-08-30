@@ -639,8 +639,8 @@ Every spec change, and most decisions surfaced to Eric, go through this
 procedure. Present all four parts in one brief, then wait for the ruling:
 
 1. **What the others do.** Compare the reference projects (`.reference/`:
-   go, rust, swift, Vale, zig — plus any that fit) — verified in their
-   trees, not from memory. Name the mechanism each uses and where it
+   go, mojo, rust, swift, Vale, zig — plus any that fit) — verified in
+   their trees, not from memory. Name the mechanism each uses and where it
    diverges from the others.
 2. **What the spec currently says.** Quote the exact text. Check whether
    the current spec already rules the question (it often does — the
