@@ -25,14 +25,16 @@ fn mk(s: *mut i32) -> Holder:
     Holder { a: v, b: new_w(s) }
 
 fn Holder.into_values(move self: Holder) -> Vec[W]:
-    self.a
+    var owned = self
+    return move owned.a
 
 fn take(h: Holder) -> Vec[W]:
-    h.a
+    var owned = h
+    return move owned.a
 
 fn run_let(s: *mut i32):
-    let h = mk(s)
-    let m = h.a
+    var h = mk(s)
+    let m = move h.a
 
 fn run_tail(s: *mut i32):
     let v = take(mk(s))

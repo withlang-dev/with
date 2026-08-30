@@ -27,7 +27,7 @@ fn take(r: Resource):
 fn run_field(cond: bool, slot: *mut i32):
     var h = Holder { r: new_resource(slot) }
     if cond:
-        var tmp = h.r
+        var tmp = move h.r
         take(move tmp)
 
 fn main:

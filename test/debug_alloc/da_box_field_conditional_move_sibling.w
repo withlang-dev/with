@@ -26,7 +26,7 @@ fn take_box(x: Box[Resource]):
 fn run_box_field(cond: bool, slot: *mut i32):
     var h = HolderB { b: Box.new(new_resource(slot)), tag: 3 }
     if cond:
-        var tmp = h.b
+        var tmp = move h.b
         take_box(move tmp)
     print_i32(h.tag)
 

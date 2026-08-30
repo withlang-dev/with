@@ -14,11 +14,11 @@ fn new_w(s: *mut i32) -> W:
     unsafe { W { ptr: with_alloc(24), slot: s } }
 
 fn run(s: *mut i32, early: bool):
-    let pair = (new_w(s), new_w(s))
-    let first = pair.0
+    var pair = (new_w(s), new_w(s))
+    let first = move pair.0
     if early:
         return
-    let second = pair.1
+    let second = move pair.1
 
 fn main:
     var c = 0

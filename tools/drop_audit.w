@@ -225,7 +225,7 @@ fn sc_field_take(shape: &str, restore: bool) -> str:
     "    let _k = 0\n" ++
     "extend " ++ holder ++ ":\n" ++
     "    mut fn feed(slot2: *mut i32):\n" ++
-    "        var tmp = self." ++ member ++ "\n" ++
+    "        var tmp = move self." ++ member ++ "\n" ++
     "        eat(move tmp)\n" ++
     refill ++
     "fn go(slot: *mut i32):\n" ++
@@ -274,7 +274,7 @@ fn sc_partial_move() -> str:
     "    let sink = move r\n" ++
     "fn go(slot: *mut i32):\n" ++
     "    var s = " ++ shape_mk("field", "1") ++ "\n" ++
-    "    var tmp = s.r\n" ++
+    "    var tmp = move s.r\n" ++
     "    take(move tmp)\n" ++
     "    let _k = s.tag\n"
 
@@ -288,15 +288,15 @@ fn sc_branch_move_state_identity() -> str:
     "    let y = move x\n" ++
     "fn go(slot: *mut i32):\n" ++
     "    var pair = Pair { a: mk(1, slot), b: mk(2, slot) }\n" ++
-    "    var first = pair.a\n" ++
+    "    var first = move pair.a\n" ++
     "    eat(move first)\n" ++
     "    var take_branch = true\n" ++
     "    if take_branch:\n" ++
     "        pair.a = mk(3, slot)\n" ++
-    "        var second = pair.b\n" ++
+    "        var second = move pair.b\n" ++
     "        eat(move second)\n" ++
     "        return\n" ++
-    "    var fallback = pair.b\n" ++
+    "    var fallback = move pair.b\n" ++
     "    eat(move fallback)\n"
 
 fn sc_recv_mut() -> str:

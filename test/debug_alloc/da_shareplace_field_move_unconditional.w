@@ -27,7 +27,7 @@ fn take(r: Resource):
 
 extend Holder:
     mut fn feed():
-        var tmp = self.r
+        var tmp = move self.r
         take(move tmp)
 
 fn main:

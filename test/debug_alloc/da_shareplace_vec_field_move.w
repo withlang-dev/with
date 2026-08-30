@@ -24,7 +24,7 @@ fn eat(v: Vec[Resource]):
 
 extend HolderV:
     mut fn feed():
-        var tmp = self.items
+        var tmp = move self.items
         eat(move tmp)
 
 fn main:
