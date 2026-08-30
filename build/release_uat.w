@@ -122,15 +122,15 @@ fn ruat_run_capture_cwd(ctx: &ActionCtx, compiler: &str, workdir: &str, label: &
     let root = ctx.project_info().project_root()
     let stdout_path = ruat_capture_path(root, workdir, label, "stdout")
     let stderr_path = ruat_capture_path(root, workdir, label, "stderr")
-    let result = ctx.process_runner().run_capture_cwd(args, stdout_path, stderr_path, timeout_ms, ruat_abs(root, workdir))
-    UatRunResult { result.rc, result.stdout, result.stderr }
+    var result = ctx.process_runner().run_capture_cwd(args, stdout_path, stderr_path, timeout_ms, ruat_abs(root, workdir))
+    UatRunResult { result.rc, move result.stdout, move result.stderr }
 
 fn ruat_run_capture(ctx: &ActionCtx, workdir: &str, label: &str, args: Vec[str], timeout_ms: i32) -> UatRunResult:
     let root = ctx.project_info().project_root()
     let stdout_path = ruat_capture_path(root, workdir, label, "stdout")
     let stderr_path = ruat_capture_path(root, workdir, label, "stderr")
-    let result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, timeout_ms)
-    UatRunResult { result.rc, result.stdout, result.stderr }
+    var result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, timeout_ms)
+    UatRunResult { result.rc, move result.stdout, move result.stderr }
 
 fn ruat_run_capture_input(ctx: &ActionCtx, compiler: &str, workdir: &str, label: &str, code_mode: &str, code: &str, stdin_text: &str, timeout_ms: i32) -> UatRunResult:
     let root = ctx.project_info().project_root()
@@ -140,8 +140,8 @@ fn ruat_run_capture_input(ctx: &ActionCtx, compiler: &str, workdir: &str, label:
     let stdout_path = ruat_capture_path(root, workdir, label, "stdout")
     let stderr_path = ruat_capture_path(root, workdir, label, "stderr")
     let args = ruat_argv2(compiler, code_mode, code)
-    let result = ctx.process_runner().run_capture_input(args, stdout_path, stderr_path, timeout_ms, ruat_abs(root, stdin_rel))
-    UatRunResult { result.rc, result.stdout, result.stderr }
+    var result = ctx.process_runner().run_capture_input(args, stdout_path, stderr_path, timeout_ms, ruat_abs(root, stdin_rel))
+    UatRunResult { result.rc, move result.stdout, move result.stderr }
 
 fn ruat_expect_success(ctx: &ActionCtx, result: &UatRunResult, label: &str) -> i32:
     if result.rc == 0:
