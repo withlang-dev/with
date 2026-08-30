@@ -9669,6 +9669,24 @@ impl Sema:
         let param_mask = self.compute_expr_view_origin_mask(expr_node)
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
+        // D27 R3 / §21.1 rule 1: an unannotated let of an ELEMENT place binds
+        // the VIEW, so the viewed root must borrow exactly as `&v[0]` does —
+        // collect_expr_view_deps only carries ref-typed origins, leaving a
+        // plain owned base (v in `let cur = v[0]`) unrecorded, and a later
+        // `v[0] = …; use cur` read a stale element through an invalidated
+        // view with no diagnostic (#887, the GHASH corruption). Scoped
+        // narrowly: only a view-bound binding whose initializer is a bare
+        // index place — a call or projection result keeps its collected deps
+        // (a fallback through place_root_sym there manufactured phantom
+        // receiver views).
+        if deps.len() == 0 and param_mask == 0 and self.scope_is_view_bound(sym) != 0:
+            var peeled_place = expr_node
+            while peeled_place != 0 and self.ast.kind(peeled_place) == NodeKind.NK_GROUPED:
+                peeled_place = self.ast.get_data0(peeled_place)
+            if peeled_place != 0 and self.ast.kind(peeled_place) == NodeKind.NK_INDEX:
+                let root = self.place_root_sym(peeled_place)
+                if root != 0 and root != sym:
+                    deps = self.push_unique_i32(move deps, root)
         self.set_binding_view_deps(sym, param_mask, deps)
         self.register_view_binding_borrows(sym, expr_node)
 
