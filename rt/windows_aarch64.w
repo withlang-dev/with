@@ -257,7 +257,7 @@ pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
     var info: [64]u8 = [0 as u8; 64]
     if GetFileAttributesExW(&wpath as *const [4096]u16 as *const u16, 0, &raw mut info as *mut [64]u8 as *mut u8) == 0:
         return win_neg_error()
-    let base = &info as i64
+    let base = &raw const info as i64
     let attrs = unsafe *(base as *const u32)
     let write_low = unsafe *((base + 20) as *const u32)
     let write_high = unsafe *((base + 24) as *const u32)
@@ -653,13 +653,13 @@ pub fn rt_sysinfo(out_raw: *mut u8) -> i32:
     // (@8 is lpMinimumApplicationAddress, @36 is the obsolete dwProcessorType
     // which reads ~8664 on x64 — reading it as the core count oversubscribed
     // the build worker pool 16-wide on small runners.)
-    let page_size = unsafe *((&info as i64 + 4) as *const u32)
-    let processors = unsafe *((&info as i64 + 32) as *const u32)
+    let page_size = unsafe *((&raw const info as i64 + 4) as *const u32)
+    let processors = unsafe *((&raw const info as i64 + 32) as *const u32)
     var mem: [64]u8 = [0 as u8; 64]
     unsafe *((&raw mut mem) as *mut [64]u8 as *mut u32) = 64 as u32
     var total: i64 = 0
     if GlobalMemoryStatusEx(&raw mut mem as *mut [64]u8 as *mut u8) != 0:
-        total = unsafe *((&mem as i64 + 8) as *const u64) as i64
+        total = unsafe *((&raw const mem as i64 + 8) as *const u64) as i64
     (unsafe *out).cpu_cores = if processors > 0: processors as i32 else: 1
     (unsafe *out).page_size = if page_size > 0: page_size as i64 else: 4096
     (unsafe *out).memory_total = total
@@ -930,9 +930,9 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
         let _ = CloseHandle(stderr_h)
     if ok == 0:
         return win_neg_error()
-    let process_h = unsafe *((&proc_info as i64 + 0) as *const i64)
-    let thread_h = unsafe *((&proc_info as i64 + 8) as *const i64)
-    let pid = unsafe *((&proc_info as i64 + 16) as *const i32)
+    let process_h = unsafe *((&raw const proc_info as i64 + 0) as *const i64)
+    let thread_h = unsafe *((&raw const proc_info as i64 + 8) as *const i64)
+    let pid = unsafe *((&raw const proc_info as i64 + 16) as *const i32)
     let _thread_close = CloseHandle(thread_h)
     let slot = win_process_alloc(process_h, pid)
     if slot < 0:

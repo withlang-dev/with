@@ -6281,6 +6281,14 @@ impl Sema:
         if kind == NodeKind.NK_CAST:
             let cast_tid = self.resolve_type_expr(self.ast.get_data1(node))
             let src_node = self.ast.get_data0(node)
+            // D31 (§16.11): an explicit borrow cast to an integer type is an
+            // error. Under D22 §6.2 the cast target would materialize the Copy
+            // pointee, making the `&` an unnecessary character that only
+            // misleads — the value spelling drops it, the address spelling is
+            // `&raw`. D22 §6.2 stays intact for every other cast target.
+            if cast_tid != 0 and self.get_type_kind(self.resolve_alias(cast_tid)) == TypeKind.TY_INT and self.cast_operand_is_explicit_borrow(src_node) != 0:
+                self.emit_error("a borrow does not cast to an integer; use `&raw const place as " ++ self.type_name(cast_tid) ++ "` for the address, or `place as " ++ self.type_name(cast_tid) ++ "` for the value (§16.11, D31)", node)
+                return 0 as TypeId
             // `null as *T` gives the null literal its pointer context from the cast
             // target. A parenthesized `(null) as *T` wraps the literal in NK_GROUPED,
             // so peel groups before deciding — otherwise the null loses its context

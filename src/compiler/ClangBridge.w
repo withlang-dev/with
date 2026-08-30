@@ -575,7 +575,7 @@ unsafe fn buf_append_i64(buf: *mut u8, pos: *mut i64, cap: i64, val: i64):
         idx = idx - 1
         *(((&raw mut tmp) as i64 + idx) as *mut u8) = (48 + (v % 10) as i32) as u8
         v = v / 10
-    buf_append_str(buf, pos, cap, ((&tmp) as i64 + idx) as *const u8)
+    buf_append_str(buf, pos, cap, ((&raw const tmp) as i64 + idx) as *const u8)
 
 // ── Dynamic array helpers ───────────────────────────────────────
 

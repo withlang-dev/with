@@ -1561,7 +1561,7 @@ fn i64_to_buf(n: i64, buf: *mut u8) -> i64:
         tmp[pos] = 45  // '-'
         pos = pos - 1
     let len = 20 - pos as i64
-    rt_memcpy(buf, (&tmp as i64 + (pos + 1) as i64) as *const u8, len)
+    rt_memcpy(buf, (&raw const tmp as i64 + (pos + 1) as i64) as *const u8, len)
     len
 
 // Write unsigned u64 to buf, return length.
@@ -1578,7 +1578,7 @@ fn u64_to_buf(n_arg: u64, buf: *mut u8) -> i64:
             n = n / 10
             pos = pos - 1
     let len = 20 - pos as i64
-    rt_memcpy(buf, (&tmp as i64 + (pos + 1) as i64) as *const u8, len)
+    rt_memcpy(buf, (&raw const tmp as i64 + (pos + 1) as i64) as *const u8, len)
     len
 
 // Write u64 in given base to buf.
@@ -1599,7 +1599,7 @@ fn u64_base_to_buf(n_arg: u64, base: i32, uppercase: i32, buf: *mut u8) -> i64:
             n = n / (base as u64)
             pos = pos - 1
     let len = 65 - pos as i64
-    rt_memcpy(buf, (&tmp as i64 + (pos + 1) as i64) as *const u8, len)
+    rt_memcpy(buf, (&raw const tmp as i64 + (pos + 1) as i64) as *const u8, len)
     len
 
 // ── with_fmt_* functions ───────────────────────────────────────────
@@ -1842,7 +1842,7 @@ pub fn with_fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32,
     // Digits
     var dbuf: [66]u8 = [0 as u8; 66]
     let dlen = u64_base_to_buf(val as u64, base, if mode == 88: 1 else: 0, &dbuf as *mut u8)
-    rt_memcpy((&buf as i64 + len) as *mut u8, &dbuf as *const u8, dlen)
+    rt_memcpy((&raw const buf as i64 + len) as *mut u8, &dbuf as *const u8, dlen)
     len = len + dlen
 
     // Width / padding
@@ -1854,7 +1854,7 @@ pub fn with_fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32,
             let out = rt_alloc(width as i64 + 1)
             rt_memcpy(out, &buf as *const u8, prefix_len)
             rt_memset((out as i64 + prefix_len) as *mut u8, 48, pad_count)
-            rt_memcpy((out as i64 + prefix_len + pad_count) as *mut u8, (&buf as i64 + prefix_len) as *const u8, dlen)
+            rt_memcpy((out as i64 + prefix_len + pad_count) as *mut u8, (&raw const buf as i64 + prefix_len) as *const u8, dlen)
             unsafe *((out as i64 + width as i64) as *mut u8) = 0
             return make_str(out as *const u8, width as i64)
         return pad_str(&buf as *const u8, len, width as i64, fill_char, align_mode)
@@ -1904,7 +1904,7 @@ pub fn with_fmt_f64_spec(val: f64, flags: i64, width: i32, precision: i32, mode:
                 sign_len = 1
             rt_memcpy(out, &buf as *const u8, sign_len)
             rt_memset((out as i64 + sign_len) as *mut u8, 48, pad_count)
-            rt_memcpy((out as i64 + sign_len + pad_count) as *mut u8, (&buf as i64 + sign_len) as *const u8, len - sign_len)
+            rt_memcpy((out as i64 + sign_len + pad_count) as *mut u8, (&raw const buf as i64 + sign_len) as *const u8, len - sign_len)
             unsafe *((out as i64 + width as i64) as *mut u8) = 0
             return make_str(out as *const u8, width as i64)
         return pad_str(&buf as *const u8, len, width as i64, fill_char, align_mode)
@@ -3245,7 +3245,7 @@ fn fs_path_is_dir_c(path: *const u8) -> bool:
     var st: [24]u8 = [0 as u8; 24]
     if rt_stat(path, &st as *mut u8) != 0:
         return false
-    let base = &st as i64
+    let base = &raw const st as i64
     unsafe *((base + 8) as *const i32) != 0
 
 fn fs_mkdir_component(path: *const u8, mode: i32) -> i32:
@@ -3398,7 +3398,7 @@ pub fn with_read_line_stdin() -> str:
     var buf: [4096]u8 = [0 as u8; 4096]
     var len: i64 = 0
     while len < 4095:
-        let r = rt_read(0, (&buf as i64 + len) as *mut u8, 1)
+        let r = rt_read(0, (&raw const buf as i64 + len) as *mut u8, 1)
         if r <= 0: break
         if buf[len] == 10: break  // '\n'
         len = len + 1

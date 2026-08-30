@@ -462,7 +462,7 @@ fn fiber_write_i32(fd: i32, n: i32):
         i = i + 1
     var j = i - 1
     while j >= 0:
-        let _ = rt_write(fd, (&buf as i64 + j as i64) as *const u8, 1)
+        let _ = rt_write(fd, (&raw const buf as i64 + j as i64) as *const u8, 1)
         j = j - 1
 
 pub fn with_fiber_veh(exception_info: *mut u8) -> i32:

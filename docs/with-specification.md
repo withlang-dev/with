@@ -9458,6 +9458,18 @@ values only. They do not read memory, write memory, create a safe
 reference, create a slice/view, or assert that the resulting pointer is
 valid to use.
 
+**An explicit borrow cast to an integer type is a compile error.**
+`&place as <integer-type>` is rejected: under the contextual-Copy demand
+(D22 §6.2, cast target) the `&` would be an unnecessary character that
+only misleads — the value spelling is `place as u64`, and the address
+spelling is `&raw const place as u64`. The diagnostic offers both
+intents as fix-its. Integer address observation belongs to raw pointers
+(`p as usize`, above); a safe borrow never converts to an integer.
+D22 §6.2 stays intact for every other cast target — a named view or an
+explicit borrow under a non-integer owned cast target still materializes
+per the contextual-Copy ruling, and `&place as *T` remains the blessed
+address-taking pointer spelling. (D31.)
+
 For typed pointer arithmetic, `p + n` means address computation scaled
 by the pointee size: conceptually `addr(p) + n * sizeof(T)` under the
 target raw-pointer model. Under the flat-address default, both the

@@ -229,7 +229,7 @@ pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
     let r = rt_libc_stat(path, &native_buf as *mut [144]u8 as *mut u8)
     if r < 0:
         return -get_errno()
-    let base = &native_buf as i64
+    let base = &raw const native_buf as i64
     let size = unsafe *((base + LINUX_STAT_SIZE_OFFSET) as *const i64)
     let mode = unsafe *((base + LINUX_STAT_MODE_OFFSET) as *const i32)
     let mtime_sec = unsafe *((base + LINUX_STAT_MTIME_SEC_OFFSET) as *const i64)
@@ -419,7 +419,7 @@ fn rt_lstat_mode(path: *const u8, mode_out: *mut i32) -> i32:
     let r = rt_libc_lstat(path, &st as *mut [144]u8 as *mut u8)
     if r < 0:
         return -get_errno()
-    unsafe *mode_out = unsafe *((&st as i64 + LINUX_STAT_MODE_OFFSET) as *const i32)
+    unsafe *mode_out = unsafe *((&raw const st as i64 + LINUX_STAT_MODE_OFFSET) as *const i32)
     0
 
 fn rt_lstat_is_dir(path: *const u8) -> bool:
@@ -592,7 +592,7 @@ pub fn rt_readlink(path: *const u8) -> str:
     let n = rt_libc_readlink(path, &buf as *mut [4096]u8 as *mut u8, 4095 as u64)
     if n < 0:
         return rt_empty_str()
-    unsafe *((&buf as i64 + n) as *mut u8) = 0
+    unsafe *((&raw const buf as i64 + n) as *mut u8) = 0
     with_str_from_cstr(&buf as *const [4096]u8 as *const u8)
 
 fn rt_empty_str() -> str:
