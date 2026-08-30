@@ -91,6 +91,26 @@ with run examples/hello.w
 All release binaries are listed on the
 [releases page](https://github.com/withlang-dev/with/releases).
 
+## Quick Start with Nix
+
+Run `with` from anywhere:
+
+```sh
+$ nix run github:withlang-dev/with# -- -e 'print("hello!")'
+hello!
+```
+
+Build the binary distribution:
+
+```sh
+nix build
+```
+
+The Nix package installs pinned upstream release binaries for macOS arm64 and
+Linux x86_64.
+`nix run` and `nix build` select the matching release asset.
+It does not rebuild the compiler from source.
+
 ## Building from Source
 
 Requirements:
