@@ -113,7 +113,9 @@ fn link_stage_result_for_command(command: LinkStageCommand) -> LinkStageResult:
 fn link_stage_result_for_plan(plan: LinkStagePlan) -> LinkStageResult:
     if not plan.ok:
         return link_stage_result_fail()
-    link_stage_result_for_command(move plan.command)
+    // D32: field vacates need a mutable path — rebind the owned param.
+    var owned_plan = plan
+    link_stage_result_for_command(move owned_plan.command)
 
 fn link_stage_argv_append(argv: &str, arg: &str) -> str:
     argv ++ arg ++ "\0"

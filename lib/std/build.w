@@ -366,26 +366,38 @@ pub fn process_spec(executable: str) -> ProcessSpec:
         capture_stderr: true,
     }
 
+// D32 (§2.2): builder steps rebind the consumed receiver to a `var` and
+// mutate in place — no field leaves the value, so nothing vacates.
 pub fn ProcessSpec.arg(move self: Self, value: str) -> ProcessSpec:
-    var args = self.args
-    args.push(value)
-    ProcessSpec { executable: self.executable, args, cwd: self.cwd, env: self.env, timeout_ms: self.timeout_ms, stdin_path: self.stdin_path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+    var owned = self
+    owned.args.push(value)
+    owned
 
 pub fn ProcessSpec.working_dir(move self: Self, path: str) -> ProcessSpec:
-    ProcessSpec { executable: self.executable, args: self.args, cwd: path, env: self.env, timeout_ms: self.timeout_ms, stdin_path: self.stdin_path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+    var owned = self
+    owned.cwd = path
+    owned
 
 pub fn ProcessSpec.timeout(move self: Self, ms: i32) -> ProcessSpec:
-    ProcessSpec { executable: self.executable, args: self.args, cwd: self.cwd, env: self.env, timeout_ms: ms, stdin_path: self.stdin_path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+    var owned = self
+    owned.timeout_ms = ms
+    owned
 
 pub fn ProcessSpec.stdin(move self: Self, path: str) -> ProcessSpec:
-    ProcessSpec { executable: self.executable, args: self.args, cwd: self.cwd, env: self.env, timeout_ms: self.timeout_ms, stdin_path: path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+    var owned = self
+    owned.stdin_path = path
+    owned
 
 pub fn ProcessSpec.env_var(move self: Self, name: str, value: str) -> ProcessSpec:
-    let env = (move self.env).set(name, value)
-    ProcessSpec { executable: self.executable, args: self.args, cwd: self.cwd, env, timeout_ms: self.timeout_ms, stdin_path: self.stdin_path, capture_stdout: self.capture_stdout, capture_stderr: self.capture_stderr }
+    var owned = self
+    owned.env = (move owned.env).set(name, value)
+    owned
 
 pub fn ProcessSpec.capture(move self: Self, stdout: bool, stderr: bool) -> ProcessSpec:
-    ProcessSpec { executable: self.executable, args: self.args, cwd: self.cwd, env: self.env, timeout_ms: self.timeout_ms, stdin_path: self.stdin_path, capture_stdout: stdout, capture_stderr: stderr }
+    var owned = self
+    owned.capture_stdout = stdout
+    owned.capture_stderr = stderr
+    owned
 
 pub type ToolProcessResult {
     rc: i32,
@@ -605,9 +617,9 @@ pub fn process_env() -> ProcessEnv:
     ProcessEnv { vars: Vec.new() }
 
 pub fn ProcessEnv.set(move self: Self, name: str, value: str) -> ProcessEnv:
-    var vars = self.vars
-    vars.push(ProcessEnvVar { name, value })
-    ProcessEnv { vars }
+    var owned = self
+    owned.vars.push(ProcessEnvVar { name, value })
+    owned
 
 pub fn ProjectInfo.package_name(self: &Self) -> &str:
     self.package.name
@@ -1519,9 +1531,11 @@ fn tool_process_apply_env(env: ProcessEnv) -> SavedProcessEnv:
     SavedProcessEnv { driver, names, values }
 
 fn tool_process_restore_env(saved: SavedProcessEnv):
-    for i in 0..saved.names.len() as i32:
-        let _restore = with_setenv_str(saved.names.get(i as i64), saved.values.get(i as i64))
-    tool_process_restore_driver_env(saved.driver)
+    // D32: field vacates need a mutable path — rebind the owned param.
+    var owned = saved
+    for i in 0..owned.names.len() as i32:
+        let _restore = with_setenv_str(owned.names.get(i as i64), owned.values.get(i as i64))
+    tool_process_restore_driver_env(move owned.driver)
 
 pub fn ProcessRunner.run_capture(self: &Self, args: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
@@ -2181,52 +2195,14 @@ fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
     0
 
 pub fn Target.target(move self: Self, target: BuildTarget) -> Target:
-    Target {
-        kind: self.kind,
-        name: self.name,
-        entry: self.entry,
-        output: self.output,
-        target_kind: target,
-        optimize_mode: self.optimize_mode,
-        system_libs: self.system_libs,
-        include_paths: self.include_paths,
-        defines: self.defines,
-        inputs: self.inputs,
-        extra_outputs: self.extra_outputs,
-        write_scopes: self.write_scopes,
-        deps: self.deps,
-        args: self.args,
-        action: self.action,
-        timeout_ms: self.timeout_ms,
-        cwd: self.cwd,
-        env: self.env,
-        network: self.network,
-        parallel: self.parallel,
-    }
+    var out = self
+    out.target_kind = target
+    out
 
 pub fn Target.optimize(move self: Self, mode: OptimizeMode) -> Target:
-    Target {
-        kind: self.kind,
-        name: self.name,
-        entry: self.entry,
-        output: self.output,
-        target_kind: self.target_kind,
-        optimize_mode: mode,
-        system_libs: self.system_libs,
-        include_paths: self.include_paths,
-        defines: self.defines,
-        inputs: self.inputs,
-        extra_outputs: self.extra_outputs,
-        write_scopes: self.write_scopes,
-        deps: self.deps,
-        args: self.args,
-        action: self.action,
-        timeout_ms: self.timeout_ms,
-        cwd: self.cwd,
-        env: self.env,
-        network: self.network,
-        parallel: self.parallel,
-    }
+    var out = self
+    out.optimize_mode = mode
+    out
 
 pub fn Target.link_system_lib(move self: Target, lib: str) -> Target:
     var out = self
@@ -2244,28 +2220,9 @@ pub fn Target.define(move self: Target, define: str) -> Target:
     out
 
 pub fn Target.output(move self: Self, output: str) -> Target:
-    Target {
-        kind: self.kind,
-        name: self.name,
-        entry: self.entry,
-        output,
-        target_kind: self.target_kind,
-        optimize_mode: self.optimize_mode,
-        system_libs: self.system_libs,
-        include_paths: self.include_paths,
-        defines: self.defines,
-        inputs: self.inputs,
-        extra_outputs: self.extra_outputs,
-        write_scopes: self.write_scopes,
-        deps: self.deps,
-        args: self.args,
-        action: self.action,
-        timeout_ms: self.timeout_ms,
-        cwd: self.cwd,
-        env: self.env,
-        network: self.network,
-        parallel: self.parallel,
-    }
+    var out = self
+    out.output = output
+    out
 
 pub fn Target.input(move self: Target, input: str) -> Target:
     var out = self

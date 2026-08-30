@@ -225,7 +225,9 @@ impl BuildGraphMaterializer:
         if path.kind == ComptimeValueKind.CV_INVALID or contents.kind == ComptimeValueKind.CV_INVALID:
             out.error_msg = "generated source has a field with the wrong comptime value type"
             return out
-        out.generated_sources.push(BuildGraphGeneratedSource { path: path.text, contents: contents.text })
+        // D32: take intended; clone until the D32 compiler is the seed
+        // (old §2.4 Drop-owner gate on ComptimeValue).
+        out.generated_sources.push(BuildGraphGeneratedSource { path: path.text.clone(), contents: contents.text.clone() })
         out
 
 pub type BuildGraphMaterializeResult {
@@ -286,6 +288,6 @@ impl BuildGraphMaterializer:
 // materializer stores the Sema (refs cannot be struct fields), so the
 // caller gets it back instead of reusing a moved value (§3.8).
 pub fn materialize_build_graph_from_comptime(sema: Sema, value: &ComptimeValue, extras: Vec[ComptimeValue]) -> BuildGraphMaterializeResult:
-    let mat = build_graph_materializer(move sema, move extras)
+    var mat = build_graph_materializer(move sema, move extras)
     let graph = mat.materialize_build(value)
-    BuildGraphMaterializeResult { graph, sema: mat.sema }
+    BuildGraphMaterializeResult { graph, sema: move mat.sema }

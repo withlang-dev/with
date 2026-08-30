@@ -15,8 +15,8 @@ type Holder { d: D, tag: i32 }
 fn pick_field(cond: bool) -> D:
     var h = Holder { d: D { id: 7 }, tag: 0 }
     if cond:
-        return h.d
-    h.d
+        return move h.d
+    move h.d
 
 // Whole-value control (already-correct path).
 fn pick_whole(cond: bool) -> D:

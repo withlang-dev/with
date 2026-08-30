@@ -19,7 +19,7 @@ impl Drop for D:
     fn drop(move self: Self): ()
 
 // Bag has no Drop impl but Drop-bearing fields (transitive Drop): partial moves
-// out of it are permitted via the field-place niche (#607).
+// out of it are the explicit `move` vacate (D32 §2.2).
 type Bag { a: D, b: D, c: D, d: D, tag: i32 }
 
 fn churn(k: i32) -> i32:
@@ -27,17 +27,17 @@ fn churn(k: i32) -> i32:
     var acc = 0
     if k > 0:
         if k > 1:
-            let x = bag.a
+            let x = move bag.a
             acc = acc + x.id
         else:
-            let y = bag.b
+            let y = move bag.b
             acc = acc + y.id
     else:
         if k < -1:
-            let z = bag.c
+            let z = move bag.c
             acc = acc + z.id
         else:
-            let w = bag.d
+            let w = move bag.d
             acc = acc + w.id
     acc + bag.tag
 

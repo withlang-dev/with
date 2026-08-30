@@ -355,7 +355,7 @@ pub fn Compilation.init -> Compilation:
 impl Compilation:
     mut fn configure(opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool):
         self.config = compilation_config_from_cli(opt_level, no_std, alloc_mode, runtime_available, self.config.prelude_mode)
-        var zcu = self.zcu
+        var zcu = move self.zcu
         zcu.set_prelude_mode(self.config.prelude_mode)
         self.zcu = zcu
 
@@ -392,34 +392,34 @@ impl Compilation:
         self.apply_runtime_config(project_config_load_for_source(source_path))
 
     mut fn set_prelude_mode(mode: i32):
-        var cfg = self.config
+        var cfg = move self.config
         cfg.prelude_mode = compilation_normalize_prelude_mode(mode)
         let cfg_prelude_mode = cfg.prelude_mode
         self.config = cfg
-        var zcu = self.zcu
+        var zcu = move self.zcu
         zcu.set_prelude_mode(cfg_prelude_mode)
         self.zcu = zcu
 
     mut fn set_overflow_mode(mode: i32):
-        var cfg = self.config
+        var cfg = move self.config
         cfg.overflow_mode = if overflow_mode_valid(mode): mode else: -1
         self.config = cfg
 
     mut fn set_debug_info(enabled: bool):
-        var cfg = self.config
+        var cfg = move self.config
         cfg.debug_info = enabled
         self.config = cfg
 
     mut fn set_compiler_hooks_enabled(enabled: bool):
-        var cfg = self.config
+        var cfg = move self.config
         cfg.compiler_hooks_enabled = enabled
         self.config = cfg
 
     mut fn set_tool_mode_entry_path(path: &str):
-        var cfg = self.config
+        var cfg = move self.config
         cfg.tool_mode_entry_path = with_str_clone_ref(path)
         self.config = cfg
-        var zcu = self.zcu
+        var zcu = move self.zcu
         zcu.tool_mode_entry_path = with_str_clone_ref(path)
         self.zcu = zcu
 
@@ -442,7 +442,7 @@ impl Compilation:
 
     mut fn compile_file(path: &str) -> AstPool:
         compilation_debug_init("Compilation.compile_file:start " ++ path)
-        var zcu = self.zcu
+        var zcu = move self.zcu
         let pool = zcu.compile_file_frontend_with_config(path, self.project_config_for_source(path))
         self.zcu = zcu
         compilation_debug_init(f"Compilation.compile_file:done decls={pool.decl_count()}")
@@ -450,7 +450,7 @@ impl Compilation:
 
     mut fn compile_file_with_config(path: &str, cfg: ProjectConfig) -> AstPool:
         compilation_debug_init("Compilation.compile_file_with_config:start " ++ path)
-        var zcu = self.zcu
+        var zcu = move self.zcu
         let pool = zcu.compile_file_frontend_with_config(path, self.apply_runtime_config(move cfg))
         self.zcu = zcu
         compilation_debug_init(f"Compilation.compile_file_with_config:done decls={pool.decl_count()}")
@@ -458,7 +458,7 @@ impl Compilation:
 
     mut fn compile_entry_file(path: &str) -> AstPool:
         compilation_debug_init("Compilation.compile_entry_file:start " ++ path)
-        var zcu = self.zcu
+        var zcu = move self.zcu
         let pool = zcu.compile_file_frontend_entry_with_config(path, self.project_config_for_source(path))
         self.zcu = zcu
         compilation_debug_init(f"Compilation.compile_entry_file:done decls={pool.decl_count()}")
@@ -466,7 +466,7 @@ impl Compilation:
 
     mut fn compile_entry_file_with_config(path: &str, cfg: ProjectConfig) -> AstPool:
         compilation_debug_init("Compilation.compile_entry_file_with_config:start " ++ path)
-        var zcu = self.zcu
+        var zcu = move self.zcu
         let pool = zcu.compile_file_frontend_entry_with_config(path, self.apply_runtime_config(move cfg))
         self.zcu = zcu
         compilation_debug_init(f"Compilation.compile_entry_file_with_config:done decls={pool.decl_count()}")
@@ -655,7 +655,7 @@ impl Compilation:
         if diag_text.len() == 0:
             return 0
         var emitted = 0
-        var zcu = self.zcu
+        var zcu = move self.zcu
         let lines = compilation_split_nonempty_lines(diag_text)
         for li in 0..lines.len() as i32:
             let fields = compilation_split_escaped_fields(lines.get(li as i64))
@@ -811,7 +811,7 @@ impl Compilation:
         self.build_binary_to_path(source_path, output_dir ++ "/" ++ stem)
 
     mut fn compile_source_text(source_path: &str, source_text: &str) -> AstPool:
-        var zcu = self.zcu
+        var zcu = move self.zcu
         let source_dir = frontend_dirname(source_path)
         zcu.reset_for_new_invocation(source_dir, source_path, "")
         zcu.project_config = self.project_config_for_source(source_path)
@@ -825,7 +825,7 @@ impl Compilation:
         pool
 
     mut fn compile_source_text_with_config(source_path: &str, source_text: &str, cfg: ProjectConfig) -> AstPool:
-        var zcu = self.zcu
+        var zcu = move self.zcu
         let source_dir = frontend_dirname(source_path)
         zcu.reset_for_new_invocation(source_dir, source_path, "")
         zcu.project_config = self.apply_runtime_config(move cfg)
@@ -849,7 +849,7 @@ impl Compilation:
         if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
             runtime_eprint("error: compile_entry_source_texts requires matching non-empty source paths and texts")
             return AstPool.new()
-        var zcu = self.zcu
+        var zcu = move self.zcu
         let source_path = source_paths.get(0)
         let source_text = source_texts.get(0)
         let source_dir = frontend_dirname(source_path)
@@ -927,18 +927,18 @@ impl Compilation:
             return compilation_binary_link_plan_fail()
         compilation_debug_init("build_binary_to_path:linking")
         // Merge direct and dependency link libraries from project config.
-        var all_link_libs = self.zcu.last_link_lib_names
+        var all_link_libs = move self.zcu.last_link_lib_names
         for lli in 0..self.zcu.project_config.link_libs.len() as i32:
             all_link_libs.push(with_str_clone_ref(self.zcu.project_config.link_libs.get(lli as i64)))
         for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
             all_link_libs.push(with_str_clone_ref(self.zcu.project_config.dep_link_libs.get(dli as i64)))
-        var _sp_dla = self.zcu.project_config.dep_link_args
+        var _sp_dla = move self.zcu.project_config.dep_link_args
         let unit_objects = codegen_unit_extra_objects(obj_path, self.zcu.last_codegen_unit_count)
         // D30 R2c: this compile emitted the runtime in-unit iff the lane is
         // on AND the frontend actually parsed the rt prefix (prelude on).
         let rt_in_unit = if runtime_getenv("WITH_RT_IN_UNIT").len() > 0 and self.config.prelude_mode != PRELUDE_NONE(): 1 else: 0
         link_stage_set_rt_in_unit(rt_in_unit)
-        let link_plan = link_stage_link_object_to_binary_plan_with_units(obj_path, unit_objects, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, move _sp_dla, requires_async_runtime)
+        var link_plan = link_stage_link_object_to_binary_plan_with_units(obj_path, unit_objects, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, move _sp_dla, requires_async_runtime)
         if not link_plan.ok:
             compilation_cleanup_build_products(obj_path, bin_path)
             return compilation_binary_link_plan_fail()
@@ -946,16 +946,16 @@ impl Compilation:
             ok: true,
             obj_path: with_str_clone_ref(obj_path),
             bin_path: with_str_clone_ref(bin_path),
-            command: link_plan.command,
+            command: move link_plan.command,
         }
 
     mut fn execute_binary_link_plan(plan: CompilationBinaryLinkPlan) -> str:
         if not plan.ok:
             return ""
         let bin_path = plan.bin_path
-        let link_result = compilation_execute_binary_link_plan(self.config.debug_info, plan)
+        var link_result = compilation_execute_binary_link_plan(self.config.debug_info, plan)
         self.last_link_command_available = 1
-        self.last_link_command = link_result.command
+        self.last_link_command = move link_result.command
         self.last_link_rc = link_result.rc
         if not link_result.ok:
             return ""
@@ -964,21 +964,22 @@ impl Compilation:
 fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
     if not plan.ok:
         return link_stage_result_fail()
+    var owned = move plan
     let t_link = profile_now()
-    let link_result = link_stage_result_for_command(move plan.command)
+    let link_result = link_stage_result_for_command(move owned.command)
     if not link_result.ok:
         compilation_debug_init("build_binary_to_path:link FAILED")
-        compilation_cleanup_build_products(plan.obj_path, plan.bin_path)
+        compilation_cleanup_build_products(owned.obj_path, owned.bin_path)
         return link_result
     if profile_enabled():
         profile_emit("link", t_link, "")
     if debug_info:
         let t_dsym = profile_now()
-        compilation_run_dsymutil_best_effort(plan.bin_path)
+        compilation_run_dsymutil_best_effort(owned.bin_path)
         if profile_enabled():
             profile_emit("dsymutil", t_dsym, "")
-    compilation_remove_file_best_effort(plan.obj_path)
-    compilation_remove_unit_objects_best_effort(plan.obj_path)
+    compilation_remove_file_best_effort(owned.obj_path)
+    compilation_remove_unit_objects_best_effort(owned.obj_path)
     link_result
 
 impl Compilation:
@@ -1170,7 +1171,7 @@ impl Compilation:
         final_output
 
     mut fn emit_typed(pool: AstPool) -> bool:
-        var zcu = self.zcu
+        var zcu = move self.zcu
         let typed_pool = pool
         if typed_pool.decl_count() == 0:
             runtime_eprint("error: no source loaded for typed emission")
@@ -1429,8 +1430,8 @@ impl Compilation:
         if self.zcu.last_async_mir_module.body_count() == 0:
             return ""
         let text = dump_async_mir_module(self.zcu.last_async_mir_module, self.zcu.pool)
-        var mir_snapshot = self.zcu.last_mir_module
-        var async_snapshot = self.zcu.last_async_mir_module
+        var mir_snapshot = move self.zcu.last_mir_module
+        var async_snapshot = move self.zcu.last_async_mir_module
         self.zcu.set_codegen_snapshot(move mir_snapshot, self.zcu.last_mir_dump, move async_snapshot, text)
         text
 
@@ -1483,7 +1484,7 @@ impl Compilation:
             sema.emit_config_warnings = 0
         else:
             sema = self.zcu.configure_tracked_input_sema(Sema.init(self.zcu.pool, move self.zcu.diagnostics, active_pool))
-            sema.source_text = self.zcu.current_source_text
+            sema.source_text = move self.zcu.current_source_text
             // Clone like Frontend's seam: a bare assignment moves the table out of
             // the Zcu (single-owner Vec), and the backend's module-object pruning
             // then sees empty decl paths and emits every imported module's bodies.
@@ -1533,8 +1534,8 @@ impl Compilation:
         // the complete module. This makes the phase transfer explicit: no shallow
         // Sema alias survives a Vec reallocation while generic specializations add
         // their final dependent types.
-        let lowered = lower_module(move sema, active_pool, self.zcu.pool)
-        sema = lowered.sema
+        var lowered = lower_module(move sema, active_pool, self.zcu.pool)
+        sema = move lowered.sema
         let mir_mod = lowered.mir_module
         sema.freeze_symbols()
         sema.freeze_types()
@@ -1565,7 +1566,7 @@ impl Compilation:
         if do_profile:
             profile_emit("mir.lower", t_mir, f"bodies={mir_mod.body_count()}")
         let t_suspend_check = profile_now()
-        var _sp_diags = sema.diags
+        var _sp_diags = move sema.diags
         // #782: the callee borrows &sema while diags is moved out — hand it a
         // whole sema (fresh empty slot; it returns the merged list).
         sema.diags = DiagnosticList.init()
@@ -1593,14 +1594,14 @@ impl Compilation:
             self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
             return
         let t_async = profile_now()
-        var _async_diags = sema.diags
+        var _async_diags = move sema.diags
         // #782: same shape as the suspend check above — whole sema borrowed
         // while diags is taken; reinit before the borrow.
         sema.diags = DiagnosticList.init()
-        let async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, self.zcu.pool, &sema, move _async_diags)
+        var async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, self.zcu.pool, &sema, move _async_diags)
         if do_profile:
             profile_emit("async.lower", t_async, "")
-        sema.diags = async_artifacts.diags
+        sema.diags = move async_artifacts.diags
         compilation_dump_type_names("post-mir-lower", active_pool, self.zcu.pool)
 
         // Sync sema AFTER MIR lowering — type tables are frozen but other
@@ -1608,13 +1609,13 @@ impl Compilation:
         self.zcu.diagnostics = move sema.diags
         self.zcu.sync_from_sema(move sema)
         compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
-        var async_mod = async_artifacts.out_mod
+        var async_mod = move async_artifacts.out_mod
         self.zcu.set_codegen_snapshot(move mir_mod, "", move async_mod, "")
 
     mut fn run_async_mir_lower(pool: AstPool) -> Unit:
         let _ = self.run_mir_lower(pool)
         if self.zcu.diagnostics.has_errors():
-            var mir_snapshot = self.zcu.last_mir_module
+            var mir_snapshot = move self.zcu.last_mir_module
             self.zcu.set_codegen_snapshot(move mir_snapshot, self.zcu.last_mir_dump, AsyncMirModule.init(), "")
             return
 

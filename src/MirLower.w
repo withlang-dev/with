@@ -625,6 +625,16 @@ impl MirBuilder:
         if self.place_moved_field_exact(place) != 0:
             return
         if self.place_has_moved_field_descendant(place) != 0:
+            // D32 (§2.2/§2.4): a Drop-impl owner with a vacated field is
+            // still a WHOLE value — reset-on-move left the field a valid
+            // empty value — so its custom drop runs like any other scope
+            // exit (the drop glue's runtime guard skips the blank field).
+            // Decomposing into per-field drops here would silently discard
+            // the user drop (pre-D32 sema made this shape unreachable).
+            let pd_owner = self.sema.method_owner_symbol_for_type(self.sema.resolve_alias(sema_ty as TypeId) as i32)
+            if pd_owner != 0 and self.sema.has_drop_method(pd_owner) != 0:
+                self.emit_drop_stmt(place, "scope-exit", 0)
+                return
             let field_count = self.partial_drop_field_count(sema_ty)
             if field_count <= 0:
                 return
@@ -5854,6 +5864,27 @@ impl MirBuilder:
     mut fn lower_block(node: i32) -> i32:
         self.lower_block_mode(node, 1)
 
+    // A want_result block tail that lowered to a LAZY OK_MOVE of a field
+    // place (the NK_MOVE_ARG field arm) must materialize BEFORE this
+    // block's scope-exit drops: left lazy, pop_scope_inline drops the
+    // base local in full (the move was never recorded) and the outer
+    // consumer's capture reads freed storage — tail `move owned.field`
+    // returned a blanked Vec. Whole-local OK_MOVE operands are recorded
+    // eagerly at lower time and stay lazy.
+    mut fn materialize_tail_field_move(result: i32, tail_expr: i32) -> i32:
+        if self.body.operand_kinds.get(result as i64) != OperandKind.OK_MOVE:
+            return result
+        let place: i32 = self.body.operand_d0.get(result as i64)
+        if mir_place_plain_local(&self.body, place) >= 0:
+            return result
+        let moved_ty = self.operand_type(result)
+        let moved_tmp = self.new_temp(moved_ty)
+        let moved_place = self.place_for_local(moved_tmp)
+        let moved_rv = self.body.new_rvalue(RvalueKind.RK_USE, result, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, moved_place, moved_rv, self.ast.get_start(tail_expr))
+        self.consume_moved_operand(result)
+        self.body.new_operand(OperandKind.OK_COPY, moved_place)
+
     mut fn lower_generator_yield(node: i32) -> i32:
         let inner = self.ast.get_data0(node)
         let value_op = if inner != 0: self.lower_expr(inner) else: self.unit_operand()
@@ -5945,6 +5976,7 @@ impl MirBuilder:
             if want_result != 0:
                 self.cancel_scheduled_value_drop_for_receiver_expr(tail_expr)
                 result = self.lower_expr(tail_expr)
+                result = self.materialize_tail_field_move(result, tail_expr)
             else:
                 let tail_frame = self.push_stmt_temp_frame()
                 result = self.lower_expr_discard(tail_expr)
@@ -13768,7 +13800,9 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     if (fn_flags / FnFlags.TAILREC) % 2 == 1:
         builder.body.optimize_self_tail_calls()
 
-    builder.body
+    // D32: field vacates need a mutable path — rebind the owned param.
+    var owned_builder = builder
+    return move owned_builder.body
 
 fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, group: i32) -> MirBody:
     let dispatch_sym = sema.fn_clause_group_name(group)
@@ -13778,7 +13812,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, 
     if sig_idx < 0:
         builder.body.local_type_ids.set_i32(0, sema.ty_void)
         builder.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
-        return builder.body
+        return move builder.body
 
     let ret_ty = sema.sig_return_type(sig_idx)
     builder.body.local_type_ids.set_i32(0, ret_ty)
@@ -13883,7 +13917,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: AstPool, pool: InternPool, 
     builder.terminate(TermKind.TK_CALL, panic_op, panic_args_id, panic_place, unreachable_bb)
     builder.switch_to(unreachable_bb)
     builder.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
-    builder.body
+    return move builder.body
 
 impl MirBody:
     mut fn optimize_self_tail_calls():
@@ -14143,7 +14177,7 @@ fn lower_generator_constructor(sema: &Sema, ast_pool: AstPool, pool: InternPool,
     let ret_place = builder.place_for_local(0)
     builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ret_place, rv, ast_pool.get_start(fn_node))
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
-    builder.body
+    return move builder.body
 
 fn lower_generator_next_body(sema: &Sema, source: &MirBody, fn_node: i32) -> MirBody:
     let fn_sym = source.fn_sym
@@ -14491,8 +14525,8 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
         while specialization < sema.concrete_specialization_nodes.len() as i32:
             let mono_sym: i32 = sema.concrete_specialization_syms.get(specialization as i64)
             if mir_mod.find_body(mono_sym) < 0:
-                let lowered = lower_concrete_specialization(move sema, ast_pool, pool, specialization)
-                sema = lowered.sema
+                var lowered = lower_concrete_specialization(move sema, ast_pool, pool, specialization)
+                sema = move lowered.sema
                 mir_mod.add_body(move lowered.body)
             specialization = specialization + 1
         sema.preregister_mir_types()

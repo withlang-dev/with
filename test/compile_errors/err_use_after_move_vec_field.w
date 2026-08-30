@@ -17,7 +17,7 @@ fn main:
     var c = 0
     let v: Vec[W] = Vec.new()
     v.push(W { slot: &raw mut c })
-    let h = Holder { a: v }
-    let m = h.a
+    var h = Holder { a: v }
+    let m = move h.a
     let n = h.a.len()
     print_i32(n as i32)

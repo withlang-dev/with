@@ -874,9 +874,9 @@ fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, pack
     var include_paths: Vec[str] = Vec.new()
     if runtime_is_dir(dep_dir ++ "/include") != 0:
         include_paths.push("include")
-    let scan = conan_scan_libraries(dep_dir)
-    var lib_paths = scan.lib_paths
-    var libs = scan.libs
+    var scan = conan_scan_libraries(dep_dir)
+    var lib_paths = move scan.lib_paths
+    var libs = move scan.libs
     if libs.len() == 0:
         libs.push(with_str_clone_ref(name))
         if runtime_is_dir(dep_dir ++ "/lib") != 0:

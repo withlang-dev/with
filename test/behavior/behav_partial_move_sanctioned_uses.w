@@ -9,9 +9,9 @@ type Pair { left: str, right: str }
 fn use_whole(p: &Pair) -> i64: p.left.len() + p.right.len()
 
 fn main:
-    let p = Pair { left: "ab" ++ "", right: "cdef" ++ "" }
+    var p = Pair { left: "ab" ++ "", right: "cdef" ++ "" }
     var taken = "" ++ ""
-    taken = p.left
+    taken = move p.left
     // Sibling read while p is partially moved: legal.
     if p.right.len() != 4:
         return 1

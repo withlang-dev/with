@@ -1479,7 +1479,7 @@ unsafe fn run_build_action_from_build_w(root: &str, cfg: &ProjectConfig, target:
         return build_action_run_result(1)
     // The evaluator consumes its Vec params (write_scope frees them); the
     // target still owns these buffers, so pass independent clones (#715 class).
-    let result = comptime_eval_tool_action_result(sema_ptr, (*sema_ptr).ast, (*sema_ptr).pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, bg_clone_str_vec(&target.inputs), target.output, bg_clone_str_vec(&target.extra_outputs), bg_clone_str_vec(&target.args), bg_clone_str_vec(&target.write_scopes), target.timeout_ms, target.cwd, bg_clone_str_vec(&target.env), target.network, if options.strict_effects: 1 else: 0)
+    var result = comptime_eval_tool_action_result(sema_ptr, (*sema_ptr).ast, (*sema_ptr).pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, bg_clone_str_vec(&target.inputs), target.output, bg_clone_str_vec(&target.extra_outputs), bg_clone_str_vec(&target.args), bg_clone_str_vec(&target.write_scopes), target.timeout_ms, target.cwd, bg_clone_str_vec(&target.env), target.network, if options.strict_effects: 1 else: 0)
     if result.runtime_exit_code != 0:
         if result.runtime_stderr.len() > 0:
             with_ewrite(result.runtime_stderr)
@@ -1527,7 +1527,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     comp.set_tool_mode_entry_path(entry_path)
     let compile_cfg = project_config_clone(cfg)
     let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), move compile_cfg)
-    var sema = comp.zcu.last_sema
+    var sema = move comp.zcu.last_sema
     if pool.decl_count() == 0 or comp.has_errors():
         graph.error_msg = "build.w evaluation wrapper compilation failed"
         return BuildGraphLoadResult { graph, sema }
@@ -1540,15 +1540,15 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     // non-idempotent comptime filesystem mutations (e.g. extract_tar's symlink
     // -> EEXIST). Re-evaluate only to rebuild the declarative graph.
     let suppress_side_effects = if build_action_worker_env_enabled() or build_test_worker_env_enabled(): 1 else: 0
-    let eval_result = unsafe { comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root, if options.strict_effects: 1 else: 0, suppress_side_effects) }
+    var eval_result = unsafe { comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root, if options.strict_effects: 1 else: 0, suppress_side_effects) }
     if eval_result.error_msg.len() > 0:
         graph.ok = false
-        graph.error_msg = eval_result.error_msg
+        graph.error_msg = move eval_result.error_msg
         return BuildGraphLoadResult { graph, sema }
-    let materialized = materialize_build_graph_from_comptime(move sema, eval_result.value, move eval_result.extras)
+    var materialized = materialize_build_graph_from_comptime(move sema, eval_result.value, move eval_result.extras)
     build_cache_record_build_effects(root, eval_result.effect_records)
     build_cache_graph_write(root, graph_cache_key, &materialized.graph)
-    BuildGraphLoadResult { graph: materialized.graph, sema: materialized.sema }
+    BuildGraphLoadResult { graph: move materialized.graph, sema: move materialized.sema }
 
 fn build_graph_find_build_root(start_dir: &str) -> str:
     var cur = if start_dir.len() > 0: with_str_clone_ref(start_dir) else: "."
@@ -1758,11 +1758,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             dep_rebuilt = true
         if target.kind != 9 and pool_dep_inflight:
             while pool_oldest < pool_names.len() as i32:
-                let retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+                var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 if retire.rc == 0:
-                    completed_targets.push(retire.name)
+                    completed_targets.push(move retire.name)
                 let retire_rc = retire.rc
                 if retire_rc != 0:
                     if survey:
@@ -1786,11 +1786,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         let will_pool = target.kind == 23 and target.parallel != 0 and times_top_level
         if not will_pool and pool_oldest < pool_names.len() as i32:
             while pool_oldest < pool_names.len() as i32:
-                let retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+                var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 if retire.rc == 0:
-                    completed_targets.push(retire.name)
+                    completed_targets.push(move retire.name)
                 let retire_rc = retire.rc
                 if retire_rc != 0:
                     if survey:
@@ -1802,11 +1802,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 return pool_failed_rc
         if will_pool:
             if pool_names.len() as i32 - pool_oldest >= pool_width:
-                let retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+                var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 if retire.rc == 0:
-                    completed_targets.push(retire.name)
+                    completed_targets.push(move retire.name)
                 let retire_rc = retire.rc
                 let retired_name = pool_names.get(pool_oldest as i64)
                 pool_oldest = pool_oldest + 1
@@ -1815,11 +1815,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                         survey_failed.push(with_str_clone_ref(retired_name))
                     if not survey:
                         while pool_oldest < pool_names.len() as i32:
-                            let drain = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+                            var drain = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                             timed_names.push(with_str_clone_ref(drain.name))
                             timed_ns.push(drain.spent)
                             if drain.rc == 0:
-                                completed_targets.push(drain.name)
+                                completed_targets.push(move drain.name)
                             pool_oldest = pool_oldest + 1
                         return retire_rc
             let pool_capture_dir = resolve_join(root, "out/command/" ++ build_action_safe_label(target.name))
@@ -1831,11 +1831,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             if pid <= 0:
                 with_eprint("error: could not spawn worker for build.w target '" ++ target.name ++ "'")
                 while pool_oldest < pool_names.len() as i32:
-                    let drain = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+                    var drain = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                     timed_names.push(with_str_clone_ref(drain.name))
                     timed_ns.push(drain.spent)
                     if drain.rc == 0:
-                        completed_targets.push(drain.name)
+                        completed_targets.push(move drain.name)
                     pool_oldest = pool_oldest + 1
                 return 1
             pool_names.push(with_str_clone_ref(target.name))
@@ -1993,11 +1993,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         build_cache_record(root, target, comp.tracked_input_paths(), no_strings)
         completed_targets.push(with_str_clone_ref(target.name))
     while pool_oldest < pool_names.len() as i32:
-        let retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+        var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
         timed_names.push(with_str_clone_ref(retire.name))
         timed_ns.push(retire.spent)
         if retire.rc == 0:
-            completed_targets.push(retire.name)
+            completed_targets.push(move retire.name)
         let retire_rc = retire.rc
         if retire_rc != 0:
             if survey:
@@ -2245,7 +2245,7 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
 fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCommandOptions) -> i32:
     let cmd_t0 = with_clock_nanos()
     var actual_options = options
-    var actual_source = actual_options.source_path
+    var actual_source = move actual_options.source_path
     if actual_source == "":
         let root = build_graph_find_build_root(".")
         if root.len() == 0:
@@ -2339,7 +2339,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
         link_stage_cleanup_current_process_temp_archives()
         return 0
     if actual_options.output_kind == BuildOutputKind.Object:
-        var obj_path = actual_options.output_path
+        var obj_path = move actual_options.output_path
         if obj_path == "":
             obj_path = link_stage_output_path_for_source(actual_options.source_path) ++ ".o"
         let result = comp.emit_object_to_path(actual_options.source_path, obj_path)
@@ -2450,7 +2450,7 @@ fn dump_ast(source_file: &str, no_std: bool, alloc_mode: bool, include_header: b
     var parser = Parser.init(move tokens, text, 0, intern, move diags)
     let pool = parser.parse_module()
     intern = parser.intern
-    diags = parser.diags
+    diags = move parser.diags
 
     if diags.has_errors():
         let source = Source.from_string(source_file, text, 0)
@@ -2729,7 +2729,7 @@ fn discover_test_functions(text: &str) -> TestDiscovery:
     var parser = Parser.init(move tokens, text, 0, intern, move diags)
     let pool = parser.parse_module()
     intern = parser.intern
-    diags = parser.diags
+    diags = move parser.diags
 
     let test_names: Vec[str] = Vec.new()
     if diags.has_errors():
@@ -2760,7 +2760,7 @@ fn discover_bench_functions(text: &str) -> BenchDiscovery:
     var parser = Parser.init(move tokens, text, 0, intern, move diags)
     let pool = parser.parse_module()
     intern = parser.intern
-    diags = parser.diags
+    diags = move parser.diags
 
     let bench_names: Vec[str] = Vec.new()
     if diags.has_errors():
@@ -3217,7 +3217,8 @@ fn run_test_binary_checked(bin_path: &str, target: &str, test_name: &str, quiet:
 // Both directions are enforced — a red is tolerated (loudly), and a green
 // fails the file until the directive is removed with the issue's fix.
 fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
-    let known_issue = parse_test_directives_for_target(target).known_issue
+    var directives = parse_test_directives_for_target(target)
+    let known_issue = move directives.known_issue
     if known_issue.len() == 0:
         return run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
     let rc = run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)

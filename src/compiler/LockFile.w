@@ -384,8 +384,8 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
 
 pub fn lock_upsert_installed_c_dep_tree(lock: LockFile, project_root: &str, name: &str, version: &str) -> LockFile:
     let walk = LockDepWalk { lock, seen: Vec.new() }
-    let done = lock_upsert_installed_c_dep_tree_seen(move walk, project_root, name, version)
-    done.lock
+    var done = lock_upsert_installed_c_dep_tree_seen(move walk, project_root, name, version)
+    return move done.lock
 
 fn lock_c_name(entry_name: &str) -> str:
     if entry_name.starts_with("c."):

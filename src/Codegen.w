@@ -511,7 +511,7 @@ fn Codegen.init(module_name: &str) -> Codegen:
 // every cg teardown path (explicit deinit or scope exit) stays untouched.
 extend Codegen:
     mut fn take_sema() -> Sema:
-        var s = self.sema
+        var s = move self.sema
         self.sema = Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new())
         s
 
@@ -1711,16 +1711,19 @@ impl Codegen:
         self.loop_depth = 0
 
     // Consumes: fields move back into self (see restore_label_registry).
+    // D32: field vacates need a mutable path, so the owned param rebinds
+    // to a `var` first.
     mut fn restore_loop_state(state: LoopState):
-        self.loop_break_bbs = move state.break_bbs
-        self.loop_continue_bbs = state.continue_bbs
-        self.loop_result_allocas = state.result_allocas
-        self.loop_labels = state.labels
-        self.loop_depth = state.depth
+        var st = state
+        self.loop_break_bbs = move st.break_bbs
+        self.loop_continue_bbs = move st.continue_bbs
+        self.loop_result_allocas = move st.result_allocas
+        self.loop_labels = move st.labels
+        self.loop_depth = st.depth
 
     mut fn push_loop_context(break_bb: i64, continue_bb: i64, result_alloca: i64, label_sym: i32):
         let idx = self.loop_depth
-        var labels: Vec[i32] = self.loop_labels
+        var labels: Vec[i32] = move self.loop_labels
         with_codegen_loop_set_break(idx, break_bb)
         with_codegen_loop_set_continue(idx, continue_bb)
         with_codegen_loop_set_result(idx, result_alloca)
@@ -1729,7 +1732,7 @@ impl Codegen:
         self.loop_depth = idx + 1
 
     mut fn pop_loop_context():
-        var labels: Vec[i32] = self.loop_labels
+        var labels: Vec[i32] = move self.loop_labels
         let _ = labels.pop()
         self.loop_labels = labels
         self.loop_depth = self.loop_depth - 1

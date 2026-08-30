@@ -1672,7 +1672,7 @@ fn ci_migrate_project_var_resolved_type(project_active: bool, project: &CiProjec
         return ""
     let symbol = project.symbols.get(symbol_id as i64)
     if symbol.resolved_ty_text.len() > 0:
-        return symbol.resolved_ty_text
+        return symbol.resolved_ty_text.clone()
     if (symbol.resolved_ty as i32) != 0:
         return ci_print_type(project.types, symbol.resolved_ty)
     ""

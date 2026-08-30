@@ -1603,13 +1603,13 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
                 pending.push(body.rval_d0.get(rv as i64))
                 contexts.push("read")
             for pi in 0..pending.len() as i32:
-                let r = analysis_seam_row(sema, body, fn_name, fn_path, span, pending.get(pi as i64), contexts.get(pi as i64))
+                var r = analysis_seam_row(sema, body, fn_name, fn_path, span, pending.get(pi as i64), contexts.get(pi as i64))
                 if r.ok != 0 and not seen.contains(r.key):
-                    seen.insert(r.key, 1)
+                    seen.insert(move r.key, 1)
                     counts.set_i32(r.class_idx as i64, counts.get(r.class_idx as i64) + 1)
                     if r.actionable != 0:
                         counts.set_i32(6, counts.get(6) + 1)
-                    report_lines.push(r.row)
+                    report_lines.push(move r.row)
         // Call arguments: retained when the callee consumes them.
         for bb in 0..body.block_count():
             if body.term_kind(bb) != TermKind.TK_CALL:
@@ -1642,13 +1642,13 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
                     if pkind == TypeKind.TY_REF or pkind == TypeKind.TY_PTR:
                         continue
                     context = "call-arg-owned"
-                let cr = analysis_seam_row(sema, body, fn_name, fn_path, term_span, body.call_arg_operands.get(opi as i64), context)
+                var cr = analysis_seam_row(sema, body, fn_name, fn_path, term_span, body.call_arg_operands.get(opi as i64), context)
                 if cr.ok != 0 and not seen.contains(cr.key):
-                    seen.insert(cr.key, 1)
+                    seen.insert(move cr.key, 1)
                     counts.set_i32(cr.class_idx as i64, counts.get(cr.class_idx as i64) + 1)
                     if cr.actionable != 0:
                         counts.set_i32(6, counts.get(6) + 1)
-                    report_lines.push(cr.row)
+                    report_lines.push(move cr.row)
     for li in 0..report_lines.len() as i32:
         out = out ++ report_lines.get(li as i64)
     let moves_ref = counts.get(0)
@@ -1811,7 +1811,7 @@ fn analysis_symbol_name(report: &AnalysisReport, sym: i32) -> str:
     for i in 0..report.facts.len() as i32:
         let fact = report.facts.get(i as i64)
         if fact.symbol == sym and (fact.kind == AnalysisFactKind.Signature or fact.kind == AnalysisFactKind.Body or fact.kind == AnalysisFactKind.Declaration):
-            return fact.name
+            return fact.name.clone()
     f"sym{sym}"
 
 fn analysis_find_symbol(report: &AnalysisReport, name: &str) -> i32:

@@ -40,7 +40,12 @@ pub fn JsonWriter.new() -> JsonWriter:
     JsonWriter { text: "", needs_comma: false, after_key: false }
 
 impl JsonWriter:
-    pub move fn finish(): self.text
+    pub move fn finish() -> str:
+        // D32: field vacates need a mutable path — rebind the consumed self.
+        // (`return` form until the D32 compiler is the seed: the current
+        // seed mislowers bare-tail field moves.)
+        var owned = self
+        return move owned.text
 
 fn json_escape_string(value: &str) -> str:
     var out = ""
@@ -69,11 +74,13 @@ impl JsonWriter:
     // Explicit return type: unannotated fns with early `return <value>`
     // mis-finalize (#653); the annotation is the documented workaround.
     move fn prefix_value() -> JsonWriter:
-        if self.after_key:
-            return JsonWriter { text: self.text, needs_comma: self.needs_comma, after_key: false }
-        if self.needs_comma:
-            return JsonWriter { text: self.text ++ ",", needs_comma: self.needs_comma, after_key: self.after_key }
-        JsonWriter { text: self.text, needs_comma: self.needs_comma, after_key: self.after_key }
+        // D32: field vacates need a mutable path — rebind the consumed self.
+        var owned = self
+        if owned.after_key:
+            return JsonWriter { text: move owned.text, needs_comma: owned.needs_comma, after_key: false }
+        if owned.needs_comma:
+            return JsonWriter { text: owned.text ++ ",", needs_comma: owned.needs_comma, after_key: owned.after_key }
+        JsonWriter { text: move owned.text, needs_comma: owned.needs_comma, after_key: owned.after_key }
 
     pub move fn begin_object():
         let prefixed = self.prefix_value()

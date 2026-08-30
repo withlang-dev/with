@@ -486,8 +486,8 @@ impl LspDocument:
         let pool = comp.compile_source_text(self.path, self.text)
         self.cached_pool = pool
         self.cached_intern = comp.zcu.pool
-        self.cached_diags = comp.zcu.diagnostics
-        self.cached_decl_paths = comp.zcu.decl_source_paths
+        self.cached_diags = move comp.zcu.diagnostics
+        self.cached_decl_paths = move comp.zcu.decl_source_paths
         // Build type-at-offset map from sema's typed_expr_types.
         // Iterate all AST nodes and check which have type info.
         let sema = comp.zcu.last_sema

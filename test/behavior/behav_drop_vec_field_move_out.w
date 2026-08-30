@@ -1,10 +1,9 @@
 //! expect-stdout: ok
 
-// #607: moving a transitive-Drop field (Vec[W]) out of a non-Drop struct —
-// via let, return-tail, explicit return, and destructuring. The binding takes
-// sole ownership of the moved field; the owner's partial drop still frees the
-// sibling field exactly once. (Spec §2.4: partial moves from non-Drop types
-// work; only Drop-impl owners forbid them.)
+// #607/D32: vacating a transitive-Drop field (Vec[W]) with the explicit
+// `move` — via let, bare tail, explicit return, and whole destructuring. The
+// binding takes sole ownership of the moved field; the owner's partial drop
+// still frees the sibling field exactly once (§2.2, §2.5.1).
 
 type W { id: i32, slot: *mut i32 }
 impl Drop for W:
@@ -21,14 +20,16 @@ fn mk(s: *mut i32) -> Holder:
     Holder { a: v, b: W { id: 4, slot: s } }
 
 fn take_tail(h: Holder) -> Vec[W]:
-    h.a
+    var owned = h
+    move owned.a
 
 fn take_return(h: Holder) -> Vec[W]:
-    return h.a
+    var owned = h
+    return move owned.a
 
 fn run_let(s: *mut i32):
-    let h = mk(s)
-    let m = h.a
+    var h = mk(s)
+    let m = move h.a
     let n = m.len()
 
 fn run_tail(s: *mut i32):

@@ -1747,12 +1747,12 @@ impl Sema:
         let di = self.find_decl_index(node)
         if di >= 0 and di < self.decl_source_paths.len() as i32:
             return with_str_clone_ref(self.decl_source_paths.get(di as i64))
-        self.current_module_path
+        self.current_module_path.clone()
 
     fn decl_source_path_for_index(decl_index: i32) -> str:
         if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
             return with_str_clone_ref(self.decl_source_paths.get(decl_index as i64))
-        self.current_module_path
+        self.current_module_path.clone()
 
     fn decl_source_file_id_for_index(decl_index: i32) -> i32:
         if decl_index >= 0 and decl_index < self.decl_source_file_ids.len() as i32:

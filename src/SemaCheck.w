@@ -2229,11 +2229,15 @@ impl Sema:
         self.expected_expr_type = saved_expected_et
         self.has_expected_type = saved_has_et
         self.typed_expr_types.insert(body, body_ty as i32)
-        // #607: user-visible move-out of a transitive-Drop field stays rejected.
-        // Returns do not all route through mark_moved_if_consumed, so check the
-        // returned tail explicitly.
+        // D32 (§2.2): returns do not all route through mark_moved_if_consumed,
+        // so check the returned tail explicitly — a bare non-Copy field here
+        // is an implicit field move and errors at the move site. Unannotated
+        // fns have no ret_type yet; the checked body's own type is the demand
+        // (`move fn finish(): self.text` escaped through the gap).
         if ret_type != 0 and ret_type != self.ty_void as i32:
-            self.reject_returned_drop_field_move(body)
+            self.check_returned_field_move(body, ret_type)
+        else if ret_type == 0 and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+            self.check_returned_field_move(body, body_ty as i32)
         if is_gen == 1:
             self.finalize_generator_state_type(node, sig_idx)
         // Tail expression bodies participate in effect inference the same way an
@@ -2515,21 +2519,22 @@ impl Sema:
     // Consumes: the fields move back into self (a view here silently
     // bit-copies and the caller's drop frees what self now owns — #730).
     mut fn restore_label_registry(state: LabelRegistryState):
-        self.fn_label_syms = move state.label_syms
-        self.fn_label_nodes = state.label_nodes
-        self.fn_label_paths = state.label_paths
-        self.fn_label_orders = state.label_orders
-        self.fn_label_used = state.label_used
-        self.fn_goto_syms = state.goto_syms
-        self.fn_goto_nodes = state.goto_nodes
-        self.fn_goto_paths = state.goto_paths
-        self.fn_goto_orders = state.goto_orders
-        self.fn_init_nodes = state.init_nodes
-        self.fn_init_paths = state.init_paths
-        self.fn_init_orders = state.init_orders
-        self.fn_label_scope_stack = state.scope_stack
-        self.fn_label_next_scope_id = state.next_scope_id
-        self.fn_label_order_counter = state.order_counter
+        var owned = move state
+        self.fn_label_syms = move owned.label_syms
+        self.fn_label_nodes = move owned.label_nodes
+        self.fn_label_paths = move owned.label_paths
+        self.fn_label_orders = move owned.label_orders
+        self.fn_label_used = move owned.label_used
+        self.fn_goto_syms = move owned.goto_syms
+        self.fn_goto_nodes = move owned.goto_nodes
+        self.fn_goto_paths = move owned.goto_paths
+        self.fn_goto_orders = move owned.goto_orders
+        self.fn_init_nodes = move owned.init_nodes
+        self.fn_init_paths = move owned.init_paths
+        self.fn_init_orders = move owned.init_orders
+        self.fn_label_scope_stack = move owned.scope_stack
+        self.fn_label_next_scope_id = owned.next_scope_id
+        self.fn_label_order_counter = owned.order_counter
 
     mut fn reset_label_registry() -> Unit:
         self.fn_label_syms = Vec.new()
@@ -6605,6 +6610,20 @@ impl Sema:
             // (use-after-move diagnostics; reassignment heals).
             if self.ast.kind(inner) == NodeKind.NK_FIELD_ACCESS:
                 let fty = self.check_expr(inner)
+                // D32 (§2.2): a vacate is a write — the explicit `move
+                // place.field` needs a mutable path (`var` base or `mut fn`
+                // receiver). Inside the owner's own drop the consumed `self`
+                // is owned (§2.4) and the gate does not apply. POD fields
+                // "move" as plain copies and stay ungated.
+                if fty != 0 and self.type_needs_drop(fty as i32) != 0 and self.d32_field_move_path_is_mutable(inner) == 0:
+                    let d32_owner = self.drop_owner_for_field_access(inner)
+                    let d32_in_own_drop = if self.current_drop_type_sym != 0 and self.current_drop_type_sym == d32_owner: 1 else: 0
+                    if d32_in_own_drop == 0 and not self.field_move_diag_nodes.contains(node):
+                        self.field_move_diag_nodes.insert(node, 1)
+                        let d32_place = render_expr(self.ast, self.pool, inner as NodeId, 0)
+                        let d32_named = if d32_place.len() > 0 and d32_place.len() < 60 and sema_str_contains_char(d32_place, 10) == 0: 1 else: 0
+                        let d32_help = if d32_named != 0: "`move " ++ d32_place ++ "` needs a `var` base or a `mut fn` receiver; clone instead (`" ++ d32_place ++ ".clone()`) to keep the owner whole" else: "`move` on a field needs a `var` base or a `mut fn` receiver; clone the field instead to keep the owner whole" ++ ""
+                        self.emit_error_with_help("cannot vacate a field through a read path — a vacate is a write (§2.2, D32)", node, d32_help)
                 // #782/§2.5.1: this is the EXPLICIT `move x.f` spelling —
                 // record it so later whole-value uses stay sanctioned.
                 self.marking_explicit_move = self.marking_explicit_move + 1
@@ -8972,6 +8991,9 @@ impl Sema:
             if dk == TypeKind.TY_REF or dk == TypeKind.TY_PTR:
                 return
         let fty: i32 = self.view_projection_exprs.get(value_node).unwrap()
+        // D32 (§2.2): this demand-site error claims the node so the
+        // implicit-field-move error does not double-report it.
+        self.field_move_diag_nodes.insert(value_node, 1)
         self.emit_error("cannot take ownership of a non-Copy field through a borrow (" ++ self.type_name(fty) ++ " is not Copy); borrow the field, clone it, or restructure so the owner transfers it (D22 §13.6) — " ++ context, value_node)
 
     // §2.4 × D22/D27 coherence: inside the owner's own drop body, an
@@ -10078,7 +10100,7 @@ impl Sema:
             // function silently finalized Unit (#653, #659).
             if val_type != 0:
                 self.typed_expr_types.insert(value, val_type as i32)
-            self.reject_returned_drop_field_move(value)
+            self.check_returned_field_move(value, self.current_return_type as i32)
             // If returned value originates from a parameter, record effects:
             // - EFF_ESCAPE_VALUE: a non-Copy owned value escaping via return
             //   (returning a Copy field is a read, not a consumption)
@@ -11935,13 +11957,19 @@ impl Sema:
                         self.check_ephemeral_task_storage(f_value, "non-ephemeral struct")
                     // #605: a whole non-Copy local moved into a struct field is
                     // consumed (use-after-move + drop-once), like a let-binding
-                    // value. Restricted to a plain identifier: field/index
-                    // projections are partial moves governed elsewhere, and newly
-                    // enforcing them here would reject existing field-read
-                    // construction (e.g. `T { a: ctx.x }`). The MIR move
-                    // (consume_moved_operand) handles call-result temporaries and
-                    // the actual drop suppression for all forms.
-                    if self.ast.kind(f_value) == NodeKind.NK_IDENT and self.type_needs_drop(val_ty as i32) != 0:
+                    // value. D32 (§2.2) retires #605's plain-identifier
+                    // restriction: a bare field projection here is an implicit
+                    // field move (MIR's consume_moved_operand already moves it —
+                    // unmarked, that was a silent blank) and now errors at the
+                    // move site like every other consuming position. A
+                    // reference-typed field BORROWS its value (#626 coercion) —
+                    // no consumption, no marking.
+                    var d32_field_borrows = 0
+                    if field_expected != 0:
+                        let d32_fe_kind = self.get_type_kind(self.resolve_alias(field_expected as TypeId))
+                        if d32_fe_kind == TypeKind.TY_REF or d32_fe_kind == TypeKind.TY_PTR:
+                            d32_field_borrows = 1
+                    if d32_field_borrows == 0 and self.type_needs_drop(val_ty as i32) != 0:
                         self.mark_moved_if_consumed(f_value)
                     // A field whose owned demand recorded a contextual-Copy
                     // materialization contributes the DEMANDED type to the
@@ -17307,7 +17335,7 @@ impl Sema:
                 let impl_node = self.ast.get_decl(di)
                 if self.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL or self.ast.get_data2(impl_node) != self.syms.drop:
                     continue
-                let target = self.impl_target_match(impl_node, resolved)
+                var target = self.impl_target_match(impl_node, resolved)
                 if target.ok == 0:
                     continue
                 let candidate_node = self.impl_decl_method_node(impl_node, drop_method)
@@ -17318,8 +17346,8 @@ impl Sema:
                     sema_phase_bug(f"BUG: ambiguous Drop impls for concrete generic type {resolved}")
                 method_fn = candidate_fn
                 method_node = candidate_node
-                matched_subst_names = target.subst_names
-                matched_subst_types = target.subst_types
+                matched_subst_names = move target.subst_names
+                matched_subst_types = move target.subst_types
 
             if method_fn == 0:
                 continue
@@ -22983,6 +23011,43 @@ impl Sema:
         let pm_help = "field `" ++ pm_field_name ++ "` of `" ++ pm_name ++ "` was moved out, so `" ++ pm_name ++ "` is no longer a whole value; reinitialize the field before this use, or clone the field instead of moving it"
         self.emit_error_with_help("use of partially moved value", pm_n, pm_help)
 
+    // D32 (§2.2): the one legal vacate is the explicit `move place.field`
+    // through a mutable path — a `var` base or the receiver of a `mut fn`
+    // (binding-mut covers both: D12 binds `mut self` mutable) with no
+    // borrow deref anywhere in the chain. Everything else is a read path.
+    mut fn d32_field_move_path_is_mutable(fa_node: i32) -> i32:
+        // Classification is a query — it may lazily re-derive base types, so
+        // suppress diagnostics for the duration (a post-scope query of a
+        // block-local base must not emit "undefined variable").
+        self.suppress_errors = self.suppress_errors + 1
+        let packed = self.classify_place(fa_node)
+        self.suppress_errors = self.suppress_errors - 1
+        if unpack_place_kind(packed) == PlaceKind.PK_NotPlace:
+            return 0
+        if unpack_place_mut(packed) == PlaceMut.PM_ReadOnly:
+            return 0
+        let root = self.place_root_sym(fa_node)
+        if root == 0:
+            return 0
+        self.scope_lookup_mut(root)
+
+    // D32 (§2.2): a field never moves out implicitly — anywhere, in any
+    // context. One error shape at the move site; the help offers both
+    // intents when the path could take an explicit `move`, and
+    // clone/restructure when it cannot.
+    mut fn d32_emit_implicit_field_move_error(node: i32):
+        if self.field_move_diag_nodes.contains(node):
+            return
+        self.field_move_diag_nodes.insert(node, 1)
+        let place = render_expr(self.ast, self.pool, node as NodeId, 0)
+        let named = if place.len() > 0 and place.len() < 60 and sema_str_contains_char(place, 10) == 0: 1 else: 0
+        var help = ""
+        if self.d32_field_move_path_is_mutable(node) != 0:
+            help = if named != 0: "write `move " ++ place ++ "` to vacate the field (reset-on-move leaves an empty value, §2.5.1), or `" ++ place ++ ".clone()` to keep the owner whole" else: "write `move <place>.<field>` to vacate the field (§2.5.1), or clone it to keep the owner whole" ++ ""
+        else:
+            help = if named != 0: "clone it (`" ++ place ++ ".clone()`), or restructure so the owner transfers it — a vacate needs a `var` base or a `mut fn` receiver" else: "clone the field, or restructure so the owner transfers it — a vacate needs a `var` base or a `mut fn` receiver" ++ ""
+        self.emit_error_with_help("a field never moves out implicitly (§2.2, D32)", node, help)
+
     mut fn mark_moved_if_consumed(node: i32):
         if node == 0:
             return
@@ -22999,24 +23064,30 @@ impl Sema:
             let field_ty = if field_ty_opt.is_some(): field_ty_opt.unwrap() else: self.field_access_type_no_diagnostic(node)
             let owner_sym = self.drop_owner_for_field_access(node)
             if field_ty != 0 and self.type_needs_drop(field_ty) != 0:
-                if owner_sym != 0 and self.has_drop_method(owner_sym) != 0:
-                    let field_sym = self.ast.get_data1(node)
-                    if self.current_drop_type_sym == owner_sym:
-                        if self.drop_control_flow_depth != 0:
-                            self.emit_error("field move inside drop cannot be conditional", node)
-                            return
-                        self.record_drop_consumed_field(owner_sym, field_sym)
-                    else:
-                        self.emit_error("partial move from Drop type", node)
-                else:
-                    // Slice E + #607: field moves out of a non-Drop struct are
-                    // sound under the field-place niche — MirLower blanks the
-                    // moved field (conditional moves on the moving path;
-                    // unconditional moves stay statically moved with the owner's
-                    // partial drop), and the owner's guarded per-field drop
-                    // (rt_value_is_zero) skips a blanked field. This covers
-                    // transitive-Drop fields (Vec[W]) as well as Drop-impl fields.
-                    self.mark_field_moved(node)
+                if owner_sym != 0 and self.has_drop_method(owner_sym) != 0 and self.current_drop_type_sym == owner_sym:
+                    // §2.4: inside the owner's own drop the consumed `self` is
+                    // owned and its fields may be consumed freely.
+                    if self.drop_control_flow_depth != 0:
+                        self.emit_error("field move inside drop cannot be conditional", node)
+                        return
+                    self.record_drop_consumed_field(owner_sym, self.ast.get_data1(node))
+                    return
+                // D32 (§2.2): uniform over every base and every type — the
+                // Drop/non-Drop owner condition is retired (§2.4's example
+                // vacates a Drop owner's field with `move w1.fd`). An implicit
+                // field move errors at the move site; the explicit spelling's
+                // read-path gate lives at check_expr's NK_MOVE_ARG arm.
+                if self.marking_explicit_move == 0:
+                    self.d32_emit_implicit_field_move_error(node)
+                    return
+                // Slice E + #607: explicit field moves are sound under the
+                // field-place niche — MirLower blanks the moved field
+                // (conditional moves on the moving path; unconditional moves
+                // stay statically moved with the owner's partial drop), and the
+                // owner's guarded per-field drop (rt_value_is_zero) skips a
+                // blanked field. This covers transitive-Drop fields (Vec[W]) as
+                // well as Drop-impl fields.
+                self.mark_field_moved(node)
             return
         if kind == NodeKind.NK_IDENT:
             // #782: consuming a binding whole while one of its fields is
@@ -23053,32 +23124,67 @@ impl Sema:
         if kind == NodeKind.NK_MOVE_ARG:
             return
 
-    // #607: return-tail field moves do not all flow through mark_moved_if_consumed.
-    // Keep the user-facing language boundary: moving a transitive-Drop field out of
-    // an aggregate is rejected until the language decision explicitly changes.
-    mut fn reject_returned_drop_field_move(expr: i32):
-        if expr == 0:
+    // D32 (§2.2): return positions demand an owned value, so a bare
+    // non-Copy field in return/tail position is an implicit field move —
+    // it errors at the move site like every other implicit field move
+    // (#607's Drop-owner rejection is subsumed by the uniform rule).
+    // View returns (&T / *T) escape, not move; explicit `move` spellings
+    // are NK_MOVE_ARG leaves gated at check_expr's arm; NK_RETURN values
+    // route here from check_return itself, so the walker skips them.
+    mut fn check_returned_field_move(expr: i32, ret_tid: i32):
+        if expr == 0 or ret_tid == 0:
+            return
+        let ret_kind = self.get_type_kind(self.resolve_alias(ret_tid as TypeId))
+        if ret_kind == TypeKind.TY_REF or ret_kind == TypeKind.TY_PTR:
             return
         let k = self.ast.kind(expr)
         if k == NodeKind.NK_BLOCK:
-            self.reject_returned_drop_field_move(self.ast.get_data2(expr))
+            self.check_returned_field_move(self.ast.get_data2(expr), ret_tid)
             return
-        if k == NodeKind.NK_GROUPED or k == NodeKind.NK_NO_SUSPEND:
-            self.reject_returned_drop_field_move(self.ast.get_data0(expr))
+        if k == NodeKind.NK_GROUPED or k == NodeKind.NK_NO_SUSPEND or k == NodeKind.NK_UNSAFE_BLOCK or k == NodeKind.NK_COMPTIME:
+            self.check_returned_field_move(self.ast.get_data0(expr), ret_tid)
+            return
+        if k == NodeKind.NK_IF_EXPR:
+            self.check_returned_field_move(self.ast.get_data1(expr), ret_tid)
+            self.check_returned_field_move(self.ast.get_data2(expr), ret_tid)
+            return
+        if k == NodeKind.NK_MATCH:
+            let arm_start = self.ast.get_data1(expr)
+            let arm_count = self.ast.get_data2(expr)
+            for ai in 0..arm_count:
+                self.check_returned_field_move(self.ast.get_extra(arm_start + ai), ret_tid)
+            return
+        if k == NodeKind.NK_MATCH_ARM:
+            self.check_returned_field_move(self.ast.get_data1(expr), ret_tid)
             return
         if k != NodeKind.NK_FIELD_ACCESS:
             return
-        let owner_sym = self.drop_owner_for_field_access(expr)
-        if owner_sym != 0 and self.has_drop_method(owner_sym) != 0:
-            return
-        // #607: return-tail field moves out of a non-Drop struct are permitted —
-        // MirLower consumes them like any other field move (static move + owner
-        // partial drop; the niche guard covers the rest). Mark moved so
-        // use-after-move diagnostics fire on the source.
+        // The tail call (fn-body epilogue) runs after the body block's scope
+        // was popped, so helpers here must never RE-CHECK the base chain — a
+        // re-check of a block-local base emits phantom "undefined variable"
+        // errors (seen on ClangBridge's unsafe deref tails). Read recorded
+        // types; suppress diagnostics around the derive-only fallback.
         let field_ty_opt = self.typed_expr_types.get(expr)
-        let field_ty = if field_ty_opt.is_some(): field_ty_opt.unwrap() else: self.field_access_type_no_diagnostic(expr)
-        if field_ty != 0 and self.is_copy(field_ty as TypeId) == 0 and self.type_needs_drop(field_ty) != 0:
-            self.mark_field_moved(expr)
+        var field_ty = 0
+        if field_ty_opt.is_some():
+            field_ty = field_ty_opt.unwrap()
+        else:
+            self.suppress_errors = self.suppress_errors + 1
+            field_ty = self.field_access_type_no_diagnostic(expr)
+            self.suppress_errors = self.suppress_errors - 1
+        if field_ty == 0 or self.is_copy(field_ty as TypeId) != 0 or self.type_needs_drop(field_ty) == 0:
+            return
+        if self.has_contextual_copy_adjustment(expr) != 0:
+            return
+        // §2.4: inside the owner's own drop fields are freely consumable.
+        // Drop returns Unit so only check_return's call can arrive here.
+        if self.current_drop_type_sym != 0:
+            self.suppress_errors = self.suppress_errors + 1
+            let d_owner = self.drop_owner_for_field_access(expr)
+            self.suppress_errors = self.suppress_errors - 1
+            if d_owner == self.current_drop_type_sym:
+                return
+        self.d32_emit_implicit_field_move_error(expr)
 
     fn drop_owner_for_fn_symbol(fn_sym: i32) -> i32:
         let text = self.pool_resolve(fn_sym)

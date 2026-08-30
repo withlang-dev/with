@@ -1,8 +1,8 @@
 //! expect-stdout: ok
 
 // Slice E: a Drop-bearing field moved conditionally out of a non-Drop struct,
-// through `if` and through `match`. (`move` is binding-only, so the field move
-// is the implicit form `take(h.r)`.) The field-place niche blanks the moved field
+// through `if` and through `match`, via the explicit `move` vacate (D32 §2.2).
+// The field-place niche blanks the moved field
 // on the moving path; the owner's guarded per-field drop skips it, so each value
 // drops exactly once.
 
@@ -17,14 +17,14 @@ type Holder { r: Resource }
 fn take(r: Resource): ()
 
 fn run_if(cond: bool, slot: *mut i32):
-    let h = Holder { r: Resource { id: 1, slot } }
+    var h = Holder { r: Resource { id: 1, slot } }
     if cond:
-        take(h.r)
+        take(move h.r)
 
 fn run_match(cond: bool, slot: *mut i32):
-    let h = Holder { r: Resource { id: 1, slot } }
+    var h = Holder { r: Resource { id: 1, slot } }
     match cond:
-        true => take(h.r)
+        true => take(move h.r)
         false => ()
 
 fn main:

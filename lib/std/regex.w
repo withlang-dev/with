@@ -166,7 +166,7 @@ pub unsafe fn Regex.__literal_code(slot: *mut *const i8, pattern: &str, options:
 
 impl Regex:
     pub fn pattern() -> str:
-        self.pattern_text
+        self.pattern_text.clone()
 
     pub fn num_captures() -> i32:
         self.capture_count
@@ -301,7 +301,7 @@ fn regex_expand_numbered_capture(captures: &Captures, repl: &str, start: i64, en
         number = number * 10 + (repl.byte_at(i) - 48)
         i = i + 1
     match captures.get(number):
-        Some(found) => found.text
+        Some(found) => { var taken = found; let out = move taken.text; out }
         None => ""
 
 fn regex_is_name_start(ch: i32) -> bool:
@@ -505,7 +505,7 @@ impl Captures:
 
     pub fn text(index: i32) -> str:
         match self.get(index):
-            Some(found) => found.text
+            Some(found) => { var taken = found; let out = move taken.text; out }
             None => ""
 
     pub fn name_text(name: &str) -> str:
@@ -514,7 +514,7 @@ impl Captures:
         else:
             with_str_clone_ref(name)
         match self.name(lookup_name):
-            Some(found) => found.text
+            Some(found) => { var taken = found; let out = move taken.text; out }
             None => ""
 
 impl Regex:
@@ -522,7 +522,7 @@ impl Regex:
         match self.captures(text):
             Some(captures) => {
                 match captures.get(index):
-                    Some(found) => found.text
+                    Some(found) => { var taken = found; let out = move taken.text; out }
                     None => ""
             }
             None => ""
@@ -535,7 +535,7 @@ impl Regex:
         match self.captures(text):
             Some(captures) => {
                 match captures.name(lookup_name):
-                    Some(found) => found.text
+                    Some(found) => { var taken = found; let out = move taken.text; out }
                     None => ""
             }
             None => ""

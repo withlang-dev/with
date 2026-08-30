@@ -422,7 +422,7 @@ impl Zcu:
             var parser = Parser.init_with_pool(move tokens, synthetic, 0, self.pool, move self.diagnostics, out)
             out = parser.parse_module()
             self.pool = parser.intern
-            self.diagnostics = parser.diags
+            self.diagnostics = move parser.diags
 
             let after = out.decl_count()
             // Mark all c_import-synthesized declarations
@@ -1529,7 +1529,7 @@ impl Zcu:
             var pparser = Parser.init(move ptokens, synthetic, 0, self.pool, move self.diagnostics)
             pool = pparser.parse_module()
             self.pool = pparser.intern
-            self.diagnostics = pparser.diags
+            self.diagnostics = move pparser.diags
             self.seed_decl_source_paths(pool, name, file_id)
             pool = self.expand_prelude_closure_frontend(pool)
             if frontend_rt_in_unit_enabled() != 0:
@@ -1544,7 +1544,7 @@ impl Zcu:
                 uparser.enable_implicit_main_mode()
             pool = uparser.parse_module()
             self.pool = uparser.intern
-            self.diagnostics = uparser.diags
+            self.diagnostics = move uparser.diags
             self.append_decl_source_paths(pool.decl_count() - before_user, name, file_id)
         else:
             var lexer = Lexer.init(normalized_text, file_id)
@@ -1554,7 +1554,7 @@ impl Zcu:
                 parser.enable_implicit_main_mode()
             pool = parser.parse_module()
             self.pool = parser.intern
-            self.diagnostics = parser.diags
+            self.diagnostics = move parser.diags
             self.seed_decl_source_paths(pool, name, file_id)
         for extra_i in 0..self.extra_source_names.len() as i32:
             let extra_name: str = with_str_clone_ref(self.extra_source_names.get(extra_i as i64))
@@ -1568,7 +1568,7 @@ impl Zcu:
             var extra_parser = Parser.init_with_pool(move extra_tokens, extra_text, extra_file_id, self.pool, move self.diagnostics, pool)
             pool = extra_parser.parse_module()
             self.pool = extra_parser.intern
-            self.diagnostics = extra_parser.diags
+            self.diagnostics = move extra_parser.diags
             self.append_decl_source_paths(pool.decl_count() - before, extra_name, extra_file_id)
         if do_profile:
             let parse_ns = runtime_clock_nanos() - t_parse
@@ -1587,13 +1587,13 @@ impl Zcu:
             runtime_eprint("[frontend] compile_source:resolve")
         // Wave 4: sidecar resolved artifact.
         let t_resolve = runtime_clock_nanos()
-        var _sp_diag = self.diagnostics
-        let artifacts = resolve_from_root_pool_with_prefix(name, normalized_text, file_id, pool, self.pool, move _sp_diag, false, self.prelude_prefix_decls)
+        var _sp_diag = move self.diagnostics
+        var artifacts = resolve_from_root_pool_with_prefix(name, normalized_text, file_id, pool, self.pool, move _sp_diag, false, self.prelude_prefix_decls)
         if do_profile:
             let resolve_ns = runtime_clock_nanos() - t_resolve
             runtime_eprint(f"[profile] frontend.resolve  {resolve_ns / 1000000}.{(resolve_ns % 1000000) / 1000} ms")
         self.pool = artifacts.pool
-        self.diagnostics = artifacts.diags
+        self.diagnostics = move artifacts.diags
         self.set_resolve_snapshot(artifacts.result, name)
         self.capture_last_link_lib_names(self.pool, self.last_resolved)
         if self.diagnostics.has_errors():
@@ -1672,7 +1672,7 @@ impl Zcu:
             // against a stale symbol table in the transform pass.
             self.pool = pre_sema.pool
             pool = pre_sema.comptime_transform_module(pool, self.pool)
-            self.diagnostics = pre_sema.diags
+            self.diagnostics = move pre_sema.diags
             self.decl_source_paths = sema_clone_str_vec(&pre_sema.decl_source_paths)
             self.decl_source_file_ids = sema_clone_i32_vec(&pre_sema.decl_source_file_ids)
             self.decl_is_c_import = sema_clone_i32_vec(&pre_sema.decl_is_c_import)
@@ -1680,7 +1680,7 @@ impl Zcu:
             self.source_text_names = sema_clone_str_vec(&pre_sema.source_text_names)
             self.source_texts = sema_clone_str_vec(&pre_sema.source_texts)
             self.c_import_omitted_symbols = sema_clone_str_str_hashmap(&pre_sema.ci_omitted_symbols)
-            var tracked_paths = self.tracked_input_paths
+            var tracked_paths = move self.tracked_input_paths
             self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &pre_sema.tracked_input_paths)
             if self.diagnostics.has_errors() and self.analysis_partial_semantics == 0:
                 self.render_all_diagnostics_frontend()
@@ -1802,7 +1802,7 @@ impl Zcu:
             var parser = Parser.init_with_pool(move tokens, text, mod.file_id, self.pool, move self.diagnostics, merged_pool)
             merged_pool = parser.parse_module()
             self.pool = parser.intern
-            self.diagnostics = parser.diags
+            self.diagnostics = move parser.diags
             self.add_source_text_mapping(mod.file_id, path, text)
             self.append_decl_source_paths(merged_pool.decl_count() - before, path, mod.file_id)
 
@@ -1977,17 +1977,17 @@ impl Zcu:
                         self.emit_missing_import_frontend(merged_pool, decl)
             ui2 = ui2 + 1
 
-        let prelude_reordered = self.reorder_import_tier_frontend(prelude_ordered, prelude_paths, prelude_file_ids, prelude_c_import)
-        prelude_ordered = prelude_reordered.decls
-        prelude_paths = prelude_reordered.paths
-        prelude_file_ids = prelude_reordered.file_ids
-        prelude_c_import = prelude_reordered.ci_flags
+        var prelude_reordered = self.reorder_import_tier_frontend(prelude_ordered, prelude_paths, prelude_file_ids, prelude_c_import)
+        prelude_ordered = move prelude_reordered.decls
+        prelude_paths = move prelude_reordered.paths
+        prelude_file_ids = move prelude_reordered.file_ids
+        prelude_c_import = move prelude_reordered.ci_flags
 
-        let user_reordered = self.reorder_import_tier_frontend(user_import_ordered, user_import_paths, user_import_file_ids, user_import_c_import)
-        user_import_ordered = user_reordered.decls
-        user_import_paths = user_reordered.paths
-        user_import_file_ids = user_reordered.file_ids
-        user_import_c_import = user_reordered.ci_flags
+        var user_reordered = self.reorder_import_tier_frontend(user_import_ordered, user_import_paths, user_import_file_ids, user_import_c_import)
+        user_import_ordered = move user_reordered.decls
+        user_import_paths = move user_reordered.paths
+        user_import_file_ids = move user_reordered.file_ids
+        user_import_c_import = move user_reordered.ci_flags
 
         // Collect fn names from higher-priority tiers for deduplication.
         var root_fn_names: Vec[i32] = Vec.new()
@@ -2473,7 +2473,7 @@ impl Zcu:
         var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, target_pool)
         let merged_pool = parser.parse_module()
         self.pool = parser.intern
-        self.diagnostics = parser.diags
+        self.diagnostics = move parser.diags
         self.append_decl_source_paths(merged_pool.decl_count() - before, path, file_id)
         merged_pool
 

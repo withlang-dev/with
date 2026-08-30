@@ -951,8 +951,8 @@ impl AstPool:
 impl Sema:
     mut fn ct_rewrite_comptime_for(source_ast: AstPool, pool: AstPool, intern: InternPool, wrapper: i32, inner: i32) -> i32:
         let iterable_node = pool.get_data1(inner)
-        let evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, iterable_node) }
-        let iterable = evald.value
+        var evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, iterable_node) }
+        let iterable = move evald.value
         if comptime_value_is_valid(iterable) == 0:
             return wrapper
 
@@ -996,8 +996,8 @@ impl Sema:
             return self.ct_rewrite_comptime_for(source_ast, pool, intern, node, inner)
 
         let diag_count_before = self.diags.count()
-        let evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, inner) }
-        let value = evald.value
+        var evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, inner) }
+        let value = move evald.value
         if comptime_value_is_valid(value) == 0:
             if evald.error_msg.len() > 0 and self.diags.count() == diag_count_before:
                 self.ct_emit_error(source_ast, inner, evald.error_msg)
@@ -1872,7 +1872,10 @@ impl Sema:
         if evald.value.kind != ComptimeValueKind.CV_STR:
             self.ct_emit_error(out, decl, "user-defined derive '" ++ target_name ++ "' must return generated With source as str")
             return ""
-        evald.value.text
+        // D32: a take (`move`) is the intent, but ComptimeValue has a Drop
+        // impl and the CURRENT seed still enforces the retired §2.4
+        // Drop-owner condition — clone until the D32 compiler is the seed.
+        evald.value.text.clone()
 
     mut fn ct_parse_user_derive_source(out: AstPool, intern: InternPool, decl: i32, source: &str) -> Vec[i32]:
         let generated: Vec[i32] = Vec.new()
@@ -1883,7 +1886,7 @@ impl Sema:
         let tokens = lexer.tokenize()
         var parser = Parser.init_with_pool(move tokens, source, self.local_file_id, intern, move self.diags, out)
         let parsed = parser.parse_module()
-        self.diags = parser.diags
+        self.diags = move parser.diags
         if parsed.decl_count() <= before:
             self.ct_emit_error(out, decl, "user-defined derive did not emit any declarations")
             return generated
@@ -3183,7 +3186,7 @@ impl Sema:
 
         let transform_pool = intern
         var transform_sema = Sema.init(transform_pool, move self.diags, out)
-        transform_sema.source_text = self.source_text
+        transform_sema.source_text = move self.source_text
         transform_sema.decl_source_paths = sema_clone_str_vec(&self.decl_source_paths)
         transform_sema.decl_source_file_ids = sema_clone_i32_vec(&self.decl_source_file_ids)
         transform_sema.decl_is_c_import = sema_clone_i32_vec(&self.decl_is_c_import)
@@ -3195,7 +3198,7 @@ impl Sema:
         transform_sema.set_tracked_input_context(self.tracked_input_root, self.tracked_input_paths)
         transform_sema.prepare_for_comptime_transform()
         if transform_sema.diags.has_errors():
-            self.diags = transform_sema.diags
+            self.diags = move transform_sema.diags
             self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
             return out
 
@@ -3204,6 +3207,6 @@ impl Sema:
             let decl = out.get_decl(di)
             let live_ast = out
             transform_sema.ct_transform_decl(live_ast, out, intern, decl as i32)
-        self.diags = transform_sema.diags
+        self.diags = move transform_sema.diags
         self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
         out

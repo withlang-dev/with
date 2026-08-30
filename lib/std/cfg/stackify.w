@@ -988,9 +988,9 @@ impl StackifyContext:
             return
 
 pub fn stackify_graph(graph: StackifyGraph) -> StackifyResult:
-    let analysis = stackify_compute_analysis(graph)
+    var analysis = stackify_compute_analysis(graph)
     if not analysis.ok:
-        return stackify_result_error(analysis.message)
+        return stackify_result_error(move analysis.message)
     var ctx = stackify_context_new(move graph, move analysis)
     ctx.result_push_frame()
     ctx.push_process(StackifyProcessKind.DomSubtree, ctx.graph.entry, 0, 0, 0)
@@ -998,7 +998,7 @@ pub fn stackify_graph(graph: StackifyGraph) -> StackifyResult:
         let entry = ctx.pop_process()
         ctx.process(entry)
     if not ctx.ok:
-        return stackify_result_error(ctx.message)
+        return stackify_result_error(move ctx.message)
     let root_start = ctx.result_pop_frame()
     let root_count = ctx.result_frame_count(root_start)
     ctx.tree.roots_start = ctx.tree_add_child_range(root_start, root_count)

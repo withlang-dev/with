@@ -15,8 +15,10 @@ type Root {
 
 impl Root:
     mut fn sync(snapshot: Snapshot):
-        self.active = move snapshot.items
-        self.snapshot = snapshot
+        // D32: field vacates need a mutable path — rebind the owned param.
+        var owned = snapshot
+        self.active = move owned.items
+        self.snapshot = owned
 
 fn main:
     var items: Vec[i32] = Vec.new()

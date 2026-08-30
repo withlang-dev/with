@@ -772,6 +772,10 @@ type Sema {
     // assignment-RHS reads) make later whole-value uses an error. A
     // suppression set, so branch-merge imprecision only ever suppresses.
     explicitly_partial_syms: HashMap[i32, i32],
+    // D32 (§2.2): one field-move diagnostic per node — the demand-site
+    // error (D22 §13.6) and the implicit-move error claim the node here,
+    // whichever fires first.
+    field_move_diag_nodes: HashMap[i32, i32],
     marking_explicit_move: i32,
     moved_field_path_starts: Vec[i32],
     moved_field_path_counts: Vec[i32],
@@ -2036,6 +2040,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bind_states: Vec.new(),
         moved_field_base_syms: Vec.new(),
         explicitly_partial_syms: sema_new_map_i32_i32(),
+        field_move_diag_nodes: sema_new_map_i32_i32(),
         marking_explicit_move: 0,
         moved_field_path_starts: Vec.new(),
         moved_field_path_counts: Vec.new(),

@@ -393,10 +393,10 @@ pub fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> Build
             out.targets.push(build_graph_target_deep_copy(&graph.targets[ti_all as i64]))
         out.raw_text = build_graph_emit(out)
         return out
-    let selected = build_graph_select_target_closure(graph, target_name)
+    var selected = build_graph_select_target_closure(graph, target_name)
     if not selected.ok:
         out.ok = false
-        out.error_msg = selected.error_msg
+        out.error_msg = move selected.error_msg
     else:
         for ti in 0..selected.targets.len() as i32:
             out.targets.push(build_graph_target_deep_copy(&selected.targets[ti as i64]))

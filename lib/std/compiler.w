@@ -59,7 +59,7 @@ pub type SourceEmitter {
     output_path: str,
 }
 
-fn compiler_hook_escape(value: str) -> str:
+fn compiler_hook_escape(value: &str) -> str:
     var out = ""
     for i in 0..value.len() as i32:
         let ch = value.byte_at(i as i64)
@@ -92,7 +92,7 @@ pub fn SourceEmitter.__driver_new(token: str, output_path: str) -> SourceEmitter
     compiler_capability_require(token, "SourceEmitter")
     SourceEmitter { token, output_path }
 
-pub fn Diagnostics.error(self: &Self, location: SourceLocation, message: str) -> Unit:
+pub fn Diagnostics.error(self: &Self, location: &SourceLocation, message: str) -> Unit:
     compiler_capability_require(self.token, "Diagnostics")
     if self.output_path.len() == 0:
         with_eprint("error: Diagnostics.error called without a driver diagnostic output")
@@ -134,7 +134,7 @@ pub fn FunctionInfo.is_pub(self: &Self) -> bool:
 pub fn FunctionInfo.has_docs(self: &Self) -> bool:
     self.docs_value
 
-pub fn FunctionInfo.location(self: &Self) -> SourceLocation:
+pub fn FunctionInfo.location(self: &Self) -> &SourceLocation:
     self.source_location
 
 pub fn TypeInfo.new(module_name: str, name: str, public_value: bool, docs_value: bool, kind: str, source_location: SourceLocation) -> TypeInfo:
@@ -146,7 +146,7 @@ pub fn TypeInfo.is_pub(self: &Self) -> bool:
 pub fn TypeInfo.has_docs(self: &Self) -> bool:
     self.docs_value
 
-pub fn TypeInfo.location(self: &Self) -> SourceLocation:
+pub fn TypeInfo.location(self: &Self) -> &SourceLocation:
     self.source_location
 
 pub fn ProjectInfo.new() -> ProjectInfo:

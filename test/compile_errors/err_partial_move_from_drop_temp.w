@@ -1,4 +1,4 @@
-//! expect-check-fail: partial move from Drop type
+//! expect-check-fail: a field never moves out implicitly
 
 type DropTempChild { id: str }
 impl Drop for DropTempChild:

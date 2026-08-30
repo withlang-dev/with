@@ -397,7 +397,7 @@ fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sem
         cg.body_fn_map.insert(sym, 1)
     let src = cg.emit_module()
     if cg.had_error != 0:
-        return CEmitResult { ok: 0, source: "", err_msg: cg.err_msg }
+        return CEmitResult { ok: 0, source: "", err_msg: move cg.err_msg }
     CEmitResult { ok: 1, source: src, err_msg: "" }
 
 impl CCodegen:
@@ -959,18 +959,18 @@ impl CCodegen:
             let path = self.sema.decl_source_paths.get(di as i64)
             if path.len() > 0:
                 return with_str_clone_ref(path)
-        self.source_path
+        self.source_path.clone()
 
     fn source_text_for_path(path: &str) -> str:
         if path.len() == 0 or path == self.source_path:
-            return self.source_text
+            return self.source_text.clone()
         let embedded_rel = embedded_std_rel_path(path)
         if embedded_rel.len() > 0:
             return embedded_std_source(embedded_rel)
         let text = with_fs_read_file(path)
         if text.len() > 0:
             return text
-        self.source_text
+        self.source_text.clone()
 
     fn decl_source_text(decl: NodeId) -> str:
         self.source_text_for_path(self.decl_source_path(decl))
@@ -8390,7 +8390,7 @@ impl CCodegen:
         var acc = CollectFnTypes.new()
         for bi in 0..self.mir_mod.bodies.len() as i32:
             if self.check_interrupted() != 0:
-                return acc.out
+                return move acc.out
             let body = self.mir_body_at(bi as i64)
             for li in 0..body.local_type_ids.len() as i32:
                 acc = self.collect_fn_types_from_tid(move acc, body.local_type_ids.get(li as i64))
@@ -8400,7 +8400,7 @@ impl CCodegen:
                 let param_count = self.sema.sig_get_param_count(sig_idx)
                 for pi in 0..param_count:
                     acc = self.collect_fn_types_from_tid(move acc, self.sema.sig_param_type(sig_idx, pi))
-        acc.out
+        return move acc.out
 
     mut fn collect_used_struct_types() -> Vec[i32]:
         var acc = CollectStructTypes.new()
@@ -8409,11 +8409,11 @@ impl CCodegen:
 
         for bi in 0..self.mir_mod.bodies.len() as i32:
             if self.check_interrupted() != 0:
-                return acc.out
+                return move acc.out
             let body = self.mir_body_at(bi as i64)
             for bb in 0..body.block_count():
                 if self.check_interrupted() != 0:
-                    return acc.out
+                    return move acc.out
                 if body.term_kind(bb) != TermKind.TK_CALL:
                     continue
                 let args_id = body.term_data1(bb)
@@ -8441,7 +8441,7 @@ impl CCodegen:
                     acc = self.collect_struct_types_from_tid(move acc, dst_opt_tid)
             for li in 0..body.local_type_ids.len() as i32:
                 if self.check_interrupted() != 0:
-                    return acc.out
+                    return move acc.out
                 let tid = self.local_struct_collection_tid(body, li)
                 acc = self.collect_struct_types_from_tid(move acc, tid)
             let sig_idx = self.body_sig_index(body.fn_sym)
@@ -8456,7 +8456,7 @@ impl CCodegen:
         var i = 0
         while i < acc.out.len() as i32:
             if self.check_interrupted() != 0:
-                return acc.out
+                return move acc.out
             let tid: i32 = acc.out.get(i as i64)
             i = i + 1
             let resolved = self.sema.resolve_alias(tid as TypeId) as i32
@@ -8465,7 +8465,7 @@ impl CCodegen:
                 let field_tids = self.synthetic_generic_struct_field_tids(resolved)
                 for fi in 0..field_tids.len() as i32:
                     if self.check_interrupted() != 0:
-                        return acc.out
+                        return move acc.out
                     acc = self.collect_struct_types_from_tid(move acc, field_tids.get(fi as i64))
                 continue
             if self.type_is_payload_enum(resolved) != 0:
@@ -8474,7 +8474,7 @@ impl CCodegen:
                     let payload_count = self.sema.type_reflection_variant_payload_count(resolved, vi)
                     for pi in 0..payload_count:
                         if self.check_interrupted() != 0:
-                            return acc.out
+                            return move acc.out
                         acc = self.collect_struct_types_from_tid(move acc, self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi))
                 continue
             if tk == TypeKind.TY_TUPLE:
@@ -8482,7 +8482,7 @@ impl CCodegen:
                 let count = self.sema.get_type_d1(resolved as TypeId)
                 for ti in 0..count:
                     if self.check_interrupted() != 0:
-                        return acc.out
+                        return move acc.out
                     acc = self.collect_struct_types_from_tid(move acc, self.sema.type_extra.get((start + ti) as i64))
                 continue
             if tk != TypeKind.TY_STRUCT:
@@ -8491,11 +8491,11 @@ impl CCodegen:
             let count = self.sema.get_type_d2(resolved as TypeId)
             for fi in 0..count:
                 if self.check_interrupted() != 0:
-                    return acc.out
+                    return move acc.out
                 let raw_field_tid: i32 = self.sema.type_extra.get((start + fi * 3 + 1) as i64)
                 acc = self.collect_struct_types_from_tid(move acc, raw_field_tid)
 
-        acc.out
+        return move acc.out
 
     mut fn emit_fn_type_defs() -> str:
         let fn_tids = self.collect_used_fn_types()

@@ -12,6 +12,6 @@ impl Drop for W:
 type Holder { item: W }
 
 fn main:
-    let holder = Holder { item: W { id: 7 } }
-    let moved = holder.item
+    var holder = Holder { item: W { id: 7 } }
+    let moved = move holder.item
     print_i32(holder.item.id)

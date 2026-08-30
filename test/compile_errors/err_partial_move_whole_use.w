@@ -1,8 +1,8 @@
-//! expect-check-fail: use of partially moved value
+//! expect-check-fail: a field never moves out implicitly
 
-// #782: an assignment-RHS field read MOVES the str out of the owned
-// local; using the local as a WHOLE value afterwards (here: a call
-// argument) reads the blanked field and must be rejected.
+// #782 → D32 (§2.2): the assignment-RHS bare field read that used to move
+// implicitly (and made the later whole use an error) now errors at the
+// move site itself — the site-local rule subsumes the flow-conditional one.
 
 type Capability { root: str, name: str }
 

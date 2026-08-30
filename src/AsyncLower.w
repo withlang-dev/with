@@ -71,8 +71,8 @@ fn lower_async_module(mir_mod: &MirModule, ast: AstPool, pool: InternPool, sema:
     }
     lower.run()
     AsyncLowerResult {
-        out_mod: lower.out_mod,
-        diags: lower.diags,
+        out_mod: move lower.out_mod,
+        diags: move lower.diags,
     }
 
 impl AsyncLower:

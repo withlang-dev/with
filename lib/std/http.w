@@ -222,12 +222,12 @@ pub fn https_get_response(url: str, max_redirects: i32) -> HttpResponse:
     var current = url
     var redirects = 0
     while true:
-        let response = https_get_once(current)
+        var response = https_get_once(current)
         if not http_is_redirect(response.status):
             return response
         if redirects >= max_redirects:
             return http_empty_response(-1)
-        let next = http_resolve_redirect(current, response.location)
+        let next = http_resolve_redirect(current, move response.location)
         if next.len() == 0:
             return http_empty_response(-1)
         current = next
@@ -235,10 +235,10 @@ pub fn https_get_response(url: str, max_redirects: i32) -> HttpResponse:
     http_empty_response(-1)
 
 pub fn https_get(url: str) -> str:
-    let response = https_get_response(url, 5)
+    var response = https_get_response(url, 5)
     if response.status != 200:
         return ""
-    response.body
+    return move response.body
 
 pub fn https_download(url: str, dest_path: str) -> i32:
     let response = https_get_response(url, 5)

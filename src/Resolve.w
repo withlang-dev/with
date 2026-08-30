@@ -223,7 +223,7 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
             var parser = Parser.init(move tokens, text, file_id, state.pool, move state.diags)
             let parsed = parser.parse_module()
             state.pool = parser.intern
-            state.diags = parser.diags
+            state.diags = move parser.diags
             state.process_module_with_pool(work, text, parsed)
 
         work = work + 1
@@ -231,15 +231,15 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
     let modules = state.build_module_table()
     ResolveArtifacts {
         pool: state.pool,
-        diags: state.diags,
+        diags: move state.diags,
         result: ResolveResult {
             modules,
-            imports: state.result.imports,
-            defs: state.result.defs,
-            scopes: state.result.scopes,
-            bindings: state.result.bindings,
-            uses: state.result.uses,
-            link_libs: state.result.link_libs,
+            imports: move state.result.imports,
+            defs: move state.result.defs,
+            scopes: move state.result.scopes,
+            bindings: move state.result.bindings,
+            uses: move state.result.uses,
+            link_libs: move state.result.link_libs,
         },
     }
 

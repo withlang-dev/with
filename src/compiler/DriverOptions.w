@@ -410,11 +410,11 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
         }
     build.overflow_mode = overflow.mode
 
-    let target = driver_parse_build_target(argc)
+    var target = driver_parse_build_target(argc)
     if not target.ok:
         return BuildCommandParseResult {
             ok: false,
-            error_msg: target.error_msg,
+            error_msg: move target.error_msg,
             build,
             graph,
     }

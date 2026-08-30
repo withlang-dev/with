@@ -209,7 +209,7 @@ impl Zcu:
     fn decl_source_path_frontend(decl_index: i32) -> str:
         if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
             return with_str_clone_ref(self.decl_source_paths.get(decl_index as i64))
-        self.current_source_path
+        self.current_source_path.clone()
 
     fn decl_source_file_id_frontend(decl_index: i32) -> i32:
         if decl_index >= 0 and decl_index < self.decl_source_file_ids.len() as i32:
@@ -219,7 +219,7 @@ impl Zcu:
     fn decl_source_dir_frontend(decl_index: i32) -> str:
         let path = self.decl_source_path_frontend(decl_index)
         if path.len() == 0:
-            return self.source_dir
+            return self.source_dir.clone()
         resolve_dirname(path)
 
     fn c_import_cache_lookup(key: &str) -> str:
@@ -283,9 +283,9 @@ impl Zcu:
         for li in 0..diag.labels.len() as i32:
             let lab_file = diag.labels.get(li as i64).span.file
             if lab_file != 0 and lab_file != diag.primary.file:
-                let lab_source = self.source_for_file_id_frontend(lab_file)
-                label_paths.push(lab_source.path)
-                label_texts.push(lab_source.text)
+                var lab_source = self.source_for_file_id_frontend(lab_file)
+                label_paths.push(move lab_source.path)
+                label_texts.push(move lab_source.text)
             else:
                 label_paths.push("")
                 label_texts.push("")
@@ -360,8 +360,8 @@ impl Zcu:
 
     fn tracked_input_root() -> str:
         if self.project_config.root_dir.len() > 0:
-            return self.project_config.root_dir
-        self.source_dir
+            return self.project_config.root_dir.clone()
+        self.source_dir.clone()
 
     fn configure_tracked_input_sema(sema: Sema) -> Sema:
         sema.set_tracked_input_context(self.tracked_input_root(), &self.tracked_input_paths)
@@ -420,7 +420,7 @@ impl Zcu:
         if zcu_debug_pool_flow_enabled() != 0:
             runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.state.symbol_texts.len() as i32} sema.pool={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
         self.pool = sema.pool
-        var tracked_paths = self.tracked_input_paths
+        var tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &sema.tracked_input_paths)
         // Callers move sema.diags into Zcu.diagnostics before syncing. The moved
         // field is an all-zero reset sentinel, not a reusable Vec: pushing a
