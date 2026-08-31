@@ -3,6 +3,7 @@ module build.compiler
 use std.build
 use std.process
 use std.sysinfo
+use std.string.StringBuilder
 fn compiler_owned_text(s: &str): s ++ ""
 
 const COMPILER_LLVM_VERSION: str = "22.1.6"
@@ -191,22 +192,27 @@ fn comp_normalize_line_endings(text: &str) -> str:
             break
     if not has_cr:
         return compiler_owned_text(text)
-    var out = ""
+    // StringBuilder, not `out ++ slice` in a loop: src/main.w is the whole
+    // amalgamated compiler (~200KB+), and a CRLF checkout (GitHub's Windows
+    // runners default to core.autocrlf=true) trips this path. Repeated `++`
+    // recopies the growing buffer every line, which blows the comptime string
+    // budget (>1 GiB of cumulative copies). Mirrors br_normalize_embedded_source.
+    var out = StringBuilder.with_capacity(text.len())
     var start = 0
     var i = 0
     while i < text.len() as i32:
         let ch = text.byte_at(i as i64)
         if ch == 13:
             if i > start:
-                out = out ++ text.slice(start as i64, i as i64)
+                out.push_str(text.slice(start as i64, i as i64))
             if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
                 i = i + 1
-            out = out ++ "\n"
+            out.push_str("\n")
             start = i + 1
         i = i + 1
     if start < text.len() as i32:
-        out = out ++ text.slice(start as i64, text.len())
-    out
+        out.push_str(text.slice(start as i64, text.len()))
+    out.to_str()
 
 fn comp_tool_from_env(primary: &str, legacy: &str, fallback: &str) -> str:
     let explicit = env(compiler_owned_text(primary))
