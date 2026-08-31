@@ -1,0 +1,72 @@
+//! expect-stdout: ok
+
+use std.collections
+use std.encoding.base16
+
+fn ascii_bytes(text: &str):
+    let out = Vec[u8].with_capacity(text.len())
+    var i: i64 = 0
+    while i < text.len():
+        out.push(text.byte_at(i) as u8)
+        i = i + 1
+    out
+
+fn assert_bytes_eq(actual: &Vec[u8], expected: &Vec[u8]):
+    assert(actual.len() == expected.len())
+    var i: i64 = 0
+    while i < expected.len():
+        assert(actual.get(i) == expected.get(i))
+        i = i + 1
+
+fn assert_base16_vector(input: &str, encoded: &str):
+    let bytes = ascii_bytes(input)
+    assert(base16_encode(bytes) == encoded)
+    assert_bytes_eq(&base16_decode(encoded).unwrap(), &bytes)
+
+fn test_base16_vectors:
+    assert_base16_vector("", "")
+    assert_base16_vector("f", "66")
+    assert_base16_vector("fo", "666F")
+    assert_base16_vector("foo", "666F6F")
+    assert_base16_vector("foob", "666F6F62")
+    assert_base16_vector("fooba", "666F6F6261")
+    assert_base16_vector("foobar", "666F6F626172")
+
+fn test_base16_alphabet_and_case:
+    let alphabet = "0123456789ABCDEF"
+    var value: i32 = 0
+    while value < 16:
+        let input = [(value << 4) as u8]
+        assert(base16_encode(input).byte_at(0) == alphabet.byte_at(value as i64))
+        let low_input = [value as u8]
+        let encoded = base16_encode(low_input)
+        assert(encoded.byte_at(0) == 48)
+        assert(encoded.byte_at(1) == alphabet.byte_at(value as i64))
+        value = value + 1
+    assert(base16_decode("aa").unwrap().get(0) == 170 as u8)
+    assert(base16_decode("bb").unwrap().get(0) == 187 as u8)
+    assert(base16_decode("cc").unwrap().get(0) == 204 as u8)
+    assert(base16_decode("dd").unwrap().get(0) == 221 as u8)
+    assert(base16_decode("ee").unwrap().get(0) == 238 as u8)
+    assert(base16_decode("ff").unwrap().get(0) == 255 as u8)
+    let expected = ascii_bytes("foo")
+    let decoded = base16_decode("666f6f").unwrap()
+    assert_bytes_eq(&decoded, &expected)
+    assert(base16_encode(decoded) == "666F6F")
+
+fn test_base16_all_octets:
+    var value: i32 = 0
+    while value < 256:
+        let input = [value as u8]
+        let encoded = base16_encode(input)
+        let decoded = base16_decode(encoded).unwrap()
+        assert(encoded.len() == 2)
+        assert(decoded.len() == 1)
+        assert(decoded.get(0) == value as u8)
+        value = value + 1
+
+fn main:
+    test_base16_vectors()
+    test_base16_alphabet_and_case()
+    test_base16_all_octets()
+    print("ok")
