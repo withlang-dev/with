@@ -179,6 +179,13 @@ fn sema_path_is_user_lint_source(path: &str) -> i32:
         return 0
     if path.starts_with("src/") or path.starts_with("build/"):
         return 0
+    // #838: one-liner programs (`<cli -e/-n/-p ...>`) are synthesized and
+    // throwaway; every consumer of this gate is style/perf advice, and in
+    // -n/-p the accumulator lint's premise cannot hold (user code lives
+    // inside the wrapper's per-line loop — nothing accumulates across
+    // iterations). Advice belongs in modules, not pipelines.
+    if path.starts_with("<cli "):
+        return 0
     1
 
 fn sema_extern_is_compiler_implementation(name: &str, path: &str) -> i32:
