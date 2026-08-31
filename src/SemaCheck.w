@@ -21076,11 +21076,19 @@ impl Sema:
             return self.get_type_d2(resolved)
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
-            let base_tid = self.lookup_named_type_visible(base_sym)
+            let base_tid = self.type_reflection_base_template(base_sym)
             if base_tid != 0:
                 if self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_STRUCT:
                     return self.get_type_d2(self.resolve_alias(base_tid as TypeId))
         0
+
+    // Reflection on an existing inst is a compiler-demand resolution, not a
+    // user-spelled name: the D29 prelude gate must not hide the template
+    // (#911 — an import-gated std generic reached via method return made
+    // the eager cache pass preregister zero fields, then phase-bug).
+    fn type_reflection_base_template(base_sym: i32) -> i32:
+        let visible = self.lookup_named_type_visible(base_sym)
+        if visible != 0: visible else: self.lookup_named_type_ambient(base_sym)
 
     fn type_reflection_field_name(tid: i32, field_index: i32) -> i32:
         let resolved = self.resolve_alias(tid)
@@ -21093,7 +21101,7 @@ impl Sema:
             return self.type_extra.get((te_start + field_index * 3) as i64)
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
-            let base_tid = self.lookup_named_type_visible(base_sym)
+            let base_tid = self.type_reflection_base_template(base_sym)
             if base_tid != 0:
                 let base_resolved = self.resolve_alias(base_tid as TypeId)
                 if self.get_type_kind(base_resolved) == TypeKind.TY_STRUCT:
