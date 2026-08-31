@@ -19,13 +19,13 @@ pub type NoopLogger {}
 impl Copy for NoopLogger
 
 impl Logger for NoopLogger:
-    fn info(self: &Self, message: str) -> Unit:
+    fn info(message: str) -> Unit:
         let _ = self
         let _ = message
-    fn warn(self: &Self, message: str) -> Unit:
+    fn warn(message: str) -> Unit:
         let _ = self
         let _ = message
-    fn error(self: &Self, message: str) -> Unit:
+    fn error(message: str) -> Unit:
         let _ = self
         let _ = message
 

@@ -161,7 +161,7 @@ impl[K: Ord, V] BTreeMap[K, V]:
         out
 
 impl[K: Ord, V] IntoIter[(K, V)] for BTreeMap[K, V]:
-    fn iter(self: &Self) -> VecIter[(K, V)]:
+    fn iter() -> VecIter[(K, V)]:
         self.entries.iter()
 
 pub fn BTreeSet.new[T]() -> BTreeSet[T]:
@@ -282,7 +282,7 @@ impl[T: Ord] BTreeSet[T]:
         out
 
 impl[T: Ord] IntoIter[T] for BTreeSet[T]:
-    fn iter(self: &Self) -> VecIter[T]:
+    fn iter() -> VecIter[T]:
         self.values.iter()
 
 /// Type-safe generational handle into a SlotMap[T].
@@ -296,11 +296,11 @@ pub type Handle[T] {
 impl[T] Copy for Handle[T]
 
 impl[T] Eq for Handle[T]:
-    fn eq(self: &Self, other: Handle[T]) -> bool:
+    fn eq(other: Handle[T]) -> bool:
         self.index == other.index and self.generation == other.generation
 
 impl[T] Hash for Handle[T]:
-    fn hash_value(self: &Self) -> i64:
+    fn hash_value() -> i64:
         ((self.index as i64) << 32) ^ (self.generation as i64)
 
 /// Generational dense-ish storage for long-lived relationships.
@@ -375,7 +375,7 @@ pub trait IntoIter[T]:
 // IntoIter for Vec — enables collection-level async combinators and
 // explicit trait dispatch over Vec-backed collections.
 impl[T] IntoIter[T] for Vec[T]:
-    fn iter(self: &Self) -> VecIter[T]: self.iter()
+    fn iter() -> VecIter[T]: self.iter()
 
 /// Lazy iterator adapter produced by `.map(f)`.
 type MapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> U }

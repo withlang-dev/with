@@ -32,7 +32,7 @@ impl[T] Box[T]:
         value
 
 impl[T] Deref[T] for Box[T]:
-    fn deref(self: &Self) -> &T:
+    fn deref() -> &T:
         unsafe { *(self as *const *const T) as &T }
 
 impl[T] Drop for Box[T]:

@@ -30,7 +30,7 @@ extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_list_files(path: &str) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
 
-fn slice(text: str, start: i32, end: i32): text.slice(start as i64, end as i64)
+fn slice(text: &str, start: i32, end: i32): text.slice(start as i64, end as i64)
 
 type ReceiverDeclFacts {
     starts: Vec[i32],
@@ -39,7 +39,7 @@ type ReceiverDeclFacts {
     flags: Vec[i32],
 }
 
-fn compiler_receiver_decls(path: str) -> ReceiverDeclFacts:
+fn compiler_receiver_decls(path: &str) -> ReceiverDeclFacts:
     let result = compiler_analyze_file(path, "select:kind=declaration")
     let facts = ReceiverDeclFacts { starts: Vec.new(), ends: Vec.new(), modes: Vec.new(), flags: Vec.new() }
     for i in 0..result.report.facts.len() as i32:
@@ -60,7 +60,7 @@ fn receiver_fact_at(facts: &ReceiverDeclFacts, offset: i32) -> i32:
         if offset >= facts.starts.get(i as i64) and offset < facts.ends.get(i as i64): return i
     -1
 
-fn migrate_file(path: str) -> i32:
+fn migrate_file(path: &str) -> i32:
     let text = unsafe { with_fs_read_file(path) }
     let tlen = text.len() as i32
     if tlen == 0:
@@ -128,8 +128,14 @@ fn migrate_file(path: str) -> i32:
             i = i + 1
             continue
         let declared_mode = declarations.modes.get(fact_index as i64)
-        let trait_impl = declarations.flags.get(fact_index as i64) & (AnalysisDeclarationFlag.TraitImpl as i32) != 0
-        if declared_mode == AnalysisReceiverMode.Read as i32 and trait_impl:
+        // #727: trait-IMPL read borrows migrate too — synthesis is
+        // trait-contract-driven (pinned by
+        // behav_trait_impl_keyword_receivers, incl. the body-never-touches-
+        // self case), so the D7-era conservative trait-impl skip is retired.
+        // Trait DECLARATION read contracts stay explicit (the D7 carve-out:
+        // associated contracts must remain spellable).
+        let trait_decl = declarations.flags.get(fact_index as i64) & (AnalysisDeclarationFlag.TraitDeclaration as i32) != 0
+        if declared_mode == AnalysisReceiverMode.Read as i32 and trait_decl:
             i = i + 1
             continue
         let syntax_mode = if mode == 2: AnalysisReceiverMode.Mut as i32 else if mode == 3: AnalysisReceiverMode.Move as i32 else: AnalysisReceiverMode.Read as i32
@@ -199,12 +205,12 @@ fn migrate_file(path: str) -> i32:
     let _ = unsafe { with_fs_write_file(path, result) }
     methods
 
-fn path_excluded(path: str, excludes: &Vec[str]) -> bool:
+fn path_excluded(path: &str, excludes: &Vec[str]) -> bool:
     for i in 0..excludes.len() as i32:
         if path == excludes.get(i as i64): return true
     false
 
-fn migrate_path(path: str, excludes: &Vec[str]) -> i32:
+fn migrate_path(path: &str, excludes: &Vec[str]) -> i32:
     if path_excluded(path, excludes): return 0
     if path.ends_with(".w"):
         let changed = migrate_file(path)
@@ -239,9 +245,9 @@ fn main:
                 print("error: --exclude requires a file path")
                 exit_code(1)
             arg = arg + 1
-            excludes.push(argv.get(arg as i64))
+            excludes.push(argv.get(arg as i64).clone())
         else:
-            paths.push(argv.get(arg as i64))
+            paths.push(argv.get(arg as i64).clone())
         arg = arg + 1
     if paths.len() == 0:
         print("error: no migration paths supplied")

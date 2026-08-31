@@ -24,7 +24,7 @@ pub type ContextError[E]  {
 }
 
 impl[E: Error] Error for ContextError[E]:
-    fn display(self: &Self) -> str:
+    fn display() -> str:
         self.message.clone()
-    fn source(self: &Self) -> Option[&dyn Error]:
+    fn source() -> Option[&dyn Error]:
         Some(&self.source)

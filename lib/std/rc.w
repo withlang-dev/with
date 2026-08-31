@@ -42,7 +42,7 @@ impl[T] Rc[T]:
         unsafe { (*ptr).value as *mut T as &T }
 
 impl[T] Deref[T] for Rc[T]:
-    fn deref(self: &Self) -> &T:
+    fn deref() -> &T:
         self.as_ref()
 
 impl[T] Drop for Rc[T]:
@@ -87,7 +87,7 @@ impl[T] Arc[T]:
         unsafe { (*ptr).value as *mut T as &T }
 
 impl[T] Deref[T] for Arc[T]:
-    fn deref(self: &Self) -> &T:
+    fn deref() -> &T:
         self.as_ref()
 
 impl[T] Drop for Arc[T]:

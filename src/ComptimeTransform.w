@@ -2362,7 +2362,9 @@ impl Sema:
         let body = ct_build_fstring_self(out, decl, self_sym, debug_mode, if receiver_flags == FN_PARAM_FLAG_REF_SELF: 1 else: 0)
 
         let param_start = out.extra_len()
-        out.ct_add_fn_param(self_sym, self_type as i32, receiver_flags)
+        // #727: this receiver is compiler-synthesized — the user never wrote
+        // it, so it must not count against the D7 self-less surface audit.
+        out.ct_add_fn_param(self_sym, self_type as i32, receiver_flags | FN_PARAM_FLAG_SYNTH_RECEIVER)
         let fn_sym = intern.intern(type_name ++ "." ++ intern.resolve(method_sym))
         let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
         out.add_fn_meta(fn_node, FN_META_REQUIRED_UNIT, ret_type as i32, param_start, 1, 0, 0)

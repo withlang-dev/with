@@ -120,13 +120,13 @@ pub trait ScopedMut[T]:    fn with_enter_mut(self:
 // Core trait impls for primitive types
 
 impl Eq for i32:
-    fn eq(self: &Self, other: i32) -> bool: *self == other
+    fn eq(other: i32) -> bool: *self == other
 
 impl Eq for bool:
-    fn eq(self: &Self, other: bool) -> bool: *self == other
+    fn eq(other: bool) -> bool: *self == other
 
 impl Eq for u8:
-    fn eq(self: &Self, other: u8) -> bool: *self == other
+    fn eq(other: u8) -> bool: *self == other
 
 impl Default for i32:
     fn default() -> i32:
@@ -153,55 +153,55 @@ impl Clone for str:
     // std.string (absent under --no-std) and &str method dispatch to str
     // impls is #762; concat lowers through the emitted intrinsics in
     // every mode.
-    fn clone(self: &Self) -> str: self ++ ""
+    fn clone() -> str: self ++ ""
 
 // Primitive clones: generic code (e.g. the SoA derive's row rebuild)
 // spells materialization uniformly as .clone(); for Copy primitives the
 // clone IS the copy.
-impl Clone for i8:   fn clone(self: &Self): *self
-impl Clone for i16:  fn clone(self: &Self): *self
-impl Clone for i32:  fn clone(self: &Self): *self
-impl Clone for i64:  fn clone(self: &Self): *self
-impl Clone for u8:   fn clone(self: &Self): *self
-impl Clone for u16:  fn clone(self: &Self): *self
-impl Clone for u32:  fn clone(self: &Self): *self
-impl Clone for u64:  fn clone(self: &Self): *self
-impl Clone for f32:  fn clone(self: &Self): *self
-impl Clone for f64:  fn clone(self: &Self): *self
-impl Clone for bool: fn clone(self: &Self): *self
+impl Clone for i8:   fn clone(): *self
+impl Clone for i16:  fn clone(): *self
+impl Clone for i32:  fn clone(): *self
+impl Clone for i64:  fn clone(): *self
+impl Clone for u8:   fn clone(): *self
+impl Clone for u16:  fn clone(): *self
+impl Clone for u32:  fn clone(): *self
+impl Clone for u64:  fn clone(): *self
+impl Clone for f32:  fn clone(): *self
+impl Clone for f64:  fn clone(): *self
+impl Clone for bool: fn clone(): *self
 
 impl Eq for str:
-    fn eq(self: &Self, other: &str) -> bool: *self == other
+    fn eq(other: &str) -> bool: *self == other
 
 impl Eq for i64:
-    fn eq(self: &Self, other: i64) -> bool: *self == other
+    fn eq(other: i64) -> bool: *self == other
 
 impl Ord for i32:
-    fn cmp(self: &Self, other: i32) -> i32:
+    fn cmp(other: i32) -> i32:
         if *self < other: return -1
         if *self > other: return 1
         0
 
 impl Ord for i64:
-    fn cmp(self: &Self, other: i64) -> i32:
+    fn cmp(other: i64) -> i32:
         if *self < other: return -1
         if *self > other: return 1
         0
 
 impl Ord for u8:
-    fn cmp(self: &Self, other: u8) -> i32:
+    fn cmp(other: u8) -> i32:
         if *self < other: return -1
         if *self > other: return 1
         0
 
 impl Ord for bool:
-    fn cmp(self: &Self, other: bool) -> i32:
+    fn cmp(other: bool) -> i32:
         if *self == other: return 0
         if not *self and other: return -1
         1
 
 impl Ord for str:
-    fn cmp(self: &Self, other: &str) -> i32:
+    fn cmp(other: &str) -> i32:
         let value = *self
         var i = 0
         let left_len = value.len()
@@ -222,44 +222,44 @@ impl Ord for str:
         0
 
 impl Debug for i32:
-    fn debug_str(self: &Self) -> str: with_i32_to_str(*self)
+    fn debug_str() -> str: with_i32_to_str(*self)
 
 impl Debug for i64:
-    fn debug_str(self: &Self) -> str: with_i64_to_str(*self)
+    fn debug_str() -> str: with_i64_to_str(*self)
 
 impl Debug for u8:
-    fn debug_str(self: &Self) -> str: with_i32_to_str(*self as i32)
+    fn debug_str() -> str: with_i32_to_str(*self as i32)
 
 impl Debug for bool:
-    fn debug_str(self: &Self) -> str:
+    fn debug_str() -> str:
         if *self:
             "true"
         else:
             "false"
 
 impl Debug for str:
-    fn debug_str(self: &Self) -> str:
+    fn debug_str() -> str:
         let value = *self
         "\"" ++ value ++ "\""
 
 impl Hash for i32:
-    fn hash_value(self: &Self) -> i64: (1469598103934665603 *% 1099511628211) ^ (*self as i64)
+    fn hash_value() -> i64: (1469598103934665603 *% 1099511628211) ^ (*self as i64)
 
 impl Hash for u8:
-    fn hash_value(self: &Self) -> i64: (1469598103934665603 *% 1099511628211) ^ (*self as i64)
+    fn hash_value() -> i64: (1469598103934665603 *% 1099511628211) ^ (*self as i64)
 
 impl Hash for i64:
-    fn hash_value(self: &Self) -> i64: (1469598103934665603 *% 1099511628211) ^ *self
+    fn hash_value() -> i64: (1469598103934665603 *% 1099511628211) ^ *self
 
 impl Hash for bool:
-    fn hash_value(self: &Self) -> i64:
+    fn hash_value() -> i64:
         if *self:
             1
         else:
             0
 
 impl Hash for str:
-    fn hash_value(self: &Self) -> i64:
+    fn hash_value() -> i64:
         let value = *self
         var h: i64 = 1469598103934665603
         var i: i64 = 0

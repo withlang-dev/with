@@ -1205,6 +1205,16 @@ fn analysis_audit_receivers(report: &AnalysisReport, sema: &Sema):
 // D7 source-surface completion. Receiver contract correctness and source
 // migration are separate invariants: an explicit receiver can have the right
 // mode while still violating the self-less surface.
+//
+// #727: the D7 trait carve-out is CONFORMING, not a violation — inside a
+// trait block, location cannot discriminate instance from associated
+// contracts, so a READ instance contract keeps its explicit `self: &Self`
+// ("Do not re-open this by flipping trait plain-fn to implicit-instance;
+// that makes associated contracts unspellable", decisions.md D7). Only the
+// unambiguous keyword forms synthesise in trait bodies, so an explicit
+// `mut self: Self` / `move self: Self` in a trait DECLARATION is still a
+// violation (it has a keyword spelling), as is every explicit self in
+// impls, extends, and top-level methods.
 fn analysis_audit_receiver_surface(report: &AnalysisReport, sema: &Sema):
     analysis_audit_receivers(report, sema)
     var explicit = 0
@@ -1212,6 +1222,7 @@ fn analysis_audit_receiver_surface(report: &AnalysisReport, sema: &Sema):
     var explicit_trait_impl = 0
     var explicit_top_level = 0
     var explicit_trait_decl = 0
+    var conforming_trait_decl = 0
     var synthetic = 0
     for i in 0..report.facts.len() as i32:
         let fact = report.facts.get(i as i64)
@@ -1220,6 +1231,9 @@ fn analysis_audit_receiver_surface(report: &AnalysisReport, sema: &Sema):
         if mode == AnalysisReceiverMode.None as i32: continue
         if fact.flags & (AnalysisDeclarationFlag.SyntheticReceiver as i32) != 0:
             synthetic = synthetic + 1
+            continue
+        if fact.flags & (AnalysisDeclarationFlag.TraitDeclaration as i32) != 0 and mode == AnalysisReceiverMode.Read as i32:
+            conforming_trait_decl = conforming_trait_decl + 1
             continue
         explicit = explicit + 1
         if fact.flags & (AnalysisDeclarationFlag.InImpl as i32) != 0:
@@ -1230,9 +1244,9 @@ fn analysis_audit_receiver_surface(report: &AnalysisReport, sema: &Sema):
             explicit_top_level = explicit_top_level + 1
         if fact.flags & (AnalysisDeclarationFlag.TraitDeclaration as i32) != 0:
             explicit_trait_decl = explicit_trait_decl + 1
-    report.note(f"receiver-surface: explicit={explicit} in-impl={explicit_in_impl} trait-impl={explicit_trait_impl} trait-decl={explicit_trait_decl} top-level={explicit_top_level} synthetic={synthetic}")
+    report.note(f"receiver-surface: explicit={explicit} in-impl={explicit_in_impl} trait-impl={explicit_trait_impl} trait-decl-nonread={explicit_trait_decl} top-level={explicit_top_level} carve-out={conforming_trait_decl} synthetic={synthetic}")
     if explicit != 0:
-        report.fail(f"receiver surface still contains {explicit} explicit `self` parameter(s); query kind=declaration,flags&={AnalysisDeclarationFlag.ExplicitReceiver as i32}")
+        report.fail(f"receiver surface still contains {explicit} explicit `self` parameter(s) outside the D7 trait read carve-out; query kind=declaration,flags&={AnalysisDeclarationFlag.ExplicitReceiver as i32}")
 
 fn analysis_audit_phase(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule):
     if sema.symbols_frozen == 0:

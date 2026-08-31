@@ -1346,7 +1346,7 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         "    mut fn transitive_write(): self.write()\n" ++
         "    move fn take() -> Matrix: self\n\n" ++
         "impl Drop for Resource:\n" ++
-        "    fn drop(move self: Self):\n" ++
+        "    move fn drop():\n" ++
         "        let _ = self.id\n\n" ++
         "fn consume(r: Resource):\n" ++
         "    let _ = r.id\n\n" ++
@@ -1390,6 +1390,11 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     if deep_debug_analyze_expect(ctx, root, compiler, ownership_abs, out_dir, "analyze-receiver-effects", "matrix:kind=receiver,name~Matrix.transitive_write", "declared=mut required=mut") != 0:
         return 1
     if deep_debug_analyze_expect(ctx, root, compiler, ownership_abs, out_dir, "analyze-path", "path:call:main:consume", "call-path: main -> consume") != 0:
+        return 1
+    // #727: the D7 self-less surface gate, re-armed. The audit conforms to
+    // the trait read carve-out; a new explicit receiver anywhere else in
+    // this unit is a red lane, not a note.
+    if deep_debug_analyze_expect(ctx, root, compiler, ownership_abs, out_dir, "analyze-receiver-surface", "audit:receiver-surface", "receiver-surface-audit: facts=") != 0:
         return 1
     let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
