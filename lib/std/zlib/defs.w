@@ -206,10 +206,31 @@ pub unsafe fn __with_builtin_sub_overflow_i128(a: i128, b: i128, out: *mut i128)
     unsafe { (*out = result) }
     ((a ^ b) & (result ^ a)) < 0
 }
+// The 128-bit overflow checks stay division-free on purpose: `/` on i128/u128
+// lowers to the __divti3/__udivti3 compiler-rt libcalls, and this shim is
+// compiled into freestanding runtime objects whose COFF link has no builtins
+// library to resolve them from. Limb decomposition keeps the check to multiplies
+// and shifts, which lower inline on every target and at every -O level.
+fn u128_mul_would_overflow(a: u128, b: u128) -> bool {
+    let a_hi = (a >> 64) as u64
+    let b_hi = (b >> 64) as u64
+    if a_hi != 0 and b_hi != 0: return true
+    let a_lo = (a as u64) as u128
+    let b_lo = (b as u64) as u128
+    let cross = (a_hi as u128) *% b_lo +% (b_hi as u128) *% a_lo
+    if (cross >> 64) != 0: return true
+    let low = a_lo *% b_lo
+    ((low >> 64) +% cross) >> 64 != 0
+}
 pub unsafe fn __with_builtin_mul_overflow_i128(a: i128, b: i128, out: *mut i128) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if a == 0 or b == 0: false else if a == -1: result == b else if b == -1: result == a else: result / b != a
+    unsafe { (*out = a *% b) }
+    if a == 0 or b == 0: return false
+    let neg = (a < 0) != (b < 0)
+    let ua = if a < 0: (0 as u128) -% (a as u128) else: a as u128
+    let ub = if b < 0: (0 as u128) -% (b as u128) else: b as u128
+    if u128_mul_would_overflow(ua, ub): return true
+    let limit = if neg: (1 as u128) << 127 else: ((1 as u128) << 127) -% 1
+    ua *% ub > limit
 }
 pub unsafe fn __with_builtin_add_overflow_u128(a: u128, b: u128, out: *mut u128) -> bool {
     let result = a +% b
@@ -222,9 +243,8 @@ pub unsafe fn __with_builtin_sub_overflow_u128(a: u128, b: u128, out: *mut u128)
     a < b
 }
 pub unsafe fn __with_builtin_mul_overflow_u128(a: u128, b: u128, out: *mut u128) -> bool {
-    let result = a *% b
-    unsafe { (*out = result) }
-    if b == 0: false else: result / b != a
+    unsafe { (*out = a *% b) }
+    u128_mul_would_overflow(a, b)
 }
 pub extern fn with_clz(x: i32) -> i32
 pub extern fn with_ctz(x: i32) -> i32
