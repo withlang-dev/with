@@ -187,6 +187,10 @@ No serialization in v1. Parse-only.
 
 #### 1.4 `std.encoding` — Base64 and Hex
 
+> **Superseded:** The proposal below is retained for historical context. The
+> implemented RFC 4648 API and strict decoding contract are documented in
+> [docs/std-encoding-rfc4648.md](../std-encoding-rfc4648.md).
+
 ```
 // std.encoding.base64
 

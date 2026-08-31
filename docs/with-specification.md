@@ -10740,6 +10740,7 @@ what users import.
 | `std.rc` | `Rc[T]`, `Arc[T]`, explicit shared ownership | — |
 | `std.collections` | Vec, HashMap, HashSet, BTreeMap, SlotMap, Handle | — |
 | `std.string` | String/StrView types and methods | `string.h`, `ctype.h` |
+| `std.encoding` | Native RFC 4648 Base16, Base32, Base32hex, Base64, and Base64URL data encodings | — |
 | `std.net` | TCP, UDP, DNS | `sys/socket.h`, `netdb.h` |
 | `std.thread` | OS-level threading | `pthread.h` |
 | `std.sync` | Mutex, RwLock, Atomic, Condvar, Barrier, Once | `pthread.h`, `stdatomic.h` |
