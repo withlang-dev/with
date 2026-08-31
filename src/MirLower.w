@@ -6447,10 +6447,10 @@ impl MirBuilder:
         // next() specialization keyed by the for node — dispatch exactly
         // that; the template sym alone names no lowered function.
         let next_sym = self.pool.intern("next")
-        let recorded_mono = self.sema.resolved_call_mono_syms.get(for_node)
+        let recorded_mono = self.sema.iter_next_mono_syms.get(for_node)
         var recorded_mono_sym = 0
         if recorded_mono.is_some(): recorded_mono_sym = recorded_mono.unwrap()
-        let recorded_sig = self.sema.resolved_call_sigs.get(for_node)
+        let recorded_sig = self.sema.iter_next_sigs.get(for_node)
         var recorded_sig_idx = -1
         if recorded_sig.is_some(): recorded_sig_idx = recorded_sig.unwrap()
         let callee_sym = if recorded_mono_sym != 0: recorded_mono_sym else: self.resolve_method_callee_sym(iter_expr, next_sym)
@@ -6493,7 +6493,7 @@ impl MirBuilder:
             // emits the recorded next() specialization (#912).
             self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
             self.body.set_call_ast_node(args_id, for_node)
-            self.record_call_contract(args_id, for_node, -1)
+            self.body.set_call_contract(args_id, recorded_sig_idx, recorded_mono_sym)
             self.body.require_call_contract(args_id)
         let next_local = self.new_temp(next_ret_ty)
         let next_place = self.place_for_local(next_local)
@@ -6620,8 +6620,20 @@ impl MirBuilder:
         let saved_expected = self.expected_type
         if out_elem_ty > 0 and out_elem_ty != self.sema.ty_void:
             self.expected_type = out_elem_ty
-        let elem_op = self.lower_expr(expr)
+        var elem_op = self.lower_expr(expr)
         self.expected_type = saved_expected
+        // D33/#912: a bare by-value Drop binding as the result expr (only
+        // reachable through consuming/generic iteration — views demand clone
+        // at check) must MOVE into the output, and the move must be
+        // REGISTERED (consume_moved_operand) so the per-iteration scope
+        // drop's moved-skip and reset-on-move blank protect what the output
+        // now owns. lower_expr may already produce the OK_MOVE (sema's owned
+        // demand) without registering it — register either way.
+        if out_elem_ty > 0 and self.sema.is_copy_frozen(out_elem_ty) == 0:
+            if self.body.operand_kinds.get(elem_op as i64) == OperandKind.OK_COPY:
+                elem_op = self.body.new_operand(OperandKind.OK_MOVE, self.body.operand_d0.get(elem_op as i64))
+            if self.body.operand_kinds.get(elem_op as i64) == OperandKind.OK_MOVE:
+                self.consume_moved_operand(elem_op)
         let comp_ty = self.expr_type(comp_node)
         let target_base = self.literal_target_base_sym(comp_ty)
         if self.is_btreeset_base_sym(target_base) != 0:
@@ -6901,8 +6913,16 @@ impl MirBuilder:
         self.forget_string_flow_facts()
 
     mut fn lower_comprehension_generic_iter(comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32, iter_ty: i32):
+        // #912: sema recorded the concrete next() specialization keyed by
+        // the clause's iterable expression node — dispatch exactly that.
         let next_sym = self.pool.intern("next")
-        let callee_sym = self.resolve_method_callee_sym(iter_expr, next_sym)
+        let recorded_mono = self.sema.iter_next_mono_syms.get(iter_expr)
+        var recorded_mono_sym = 0
+        if recorded_mono.is_some(): recorded_mono_sym = recorded_mono.unwrap()
+        let recorded_sig = self.sema.iter_next_sigs.get(iter_expr)
+        var recorded_sig_idx = -1
+        if recorded_sig.is_some(): recorded_sig_idx = recorded_sig.unwrap()
+        let callee_sym = if recorded_mono_sym != 0: recorded_mono_sym else: self.resolve_method_callee_sym(iter_expr, next_sym)
         if callee_sym == next_sym:
             self.mark_unsupported()
             return
@@ -6915,7 +6935,9 @@ impl MirBuilder:
         let owner_sym = self.sema.method_owner_symbol_for_type(resolved_iter as i32)
         let sema_next_sym = self.sema.pool_lookup_symbol("next")
         var next_ret_ty = 0
-        if owner_sym != 0 and sema_next_sym > 0:
+        if recorded_sig_idx >= 0:
+            next_ret_ty = self.sema.sig_return_type(recorded_sig_idx)
+        if next_ret_ty == 0 and owner_sym != 0 and sema_next_sym > 0:
             let sig_idx = self.sema.lookup_method_sig(owner_sym, sema_next_sym)
             if sig_idx >= 0:
                 next_ret_ty = self.sema.sig_return_type(sig_idx)
@@ -6932,6 +6954,13 @@ impl MirBuilder:
         let next_args: Vec[i32] = Vec.new()
         next_args.push(self.body.new_operand(OperandKind.OK_COPY, iter_place))
         let args_id = self.body.new_call_args(next_args)
+        if recorded_sig_idx >= 0:
+            // Route through the generic-call contract so codegen lazily
+            // emits the recorded next() specialization (#912).
+            self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
+            self.body.set_call_ast_node(args_id, iter_expr)
+            self.body.set_call_contract(args_id, recorded_sig_idx, recorded_mono_sym)
+            self.body.require_call_contract(args_id)
         let next_local = self.new_temp(next_ret_ty)
         let next_place = self.place_for_local(next_local)
         let after_next_bb = self.new_block()
@@ -6952,10 +6981,44 @@ impl MirBuilder:
         let item_place = self.place_for_local(item_local)
         let downcast_place = self.body.new_downcast_place(next_place, some_idx, next_ret_ty)
         let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
-        let next_payload = self.body.new_operand(OperandKind.OK_COPY, payload_place)
+        // Drop-class elements MOVE out of the Option temp (the `?` idiom) —
+        // a copy leaves the stale Some to double-drop the payload at cleanup.
+        let next_payload = self.body.new_operand(if self.sema.is_copy_frozen(elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
         self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
+        // #614b + D33: the binding lives in a per-iteration scope so an
+        // owned Drop element drops once on the back-edge — including
+        // filter-skipped iterations — never again at function exit. All
+        // paths join before the single pop, mirroring lower_comprehension_
+        // body's filter shape with one shared continue edge.
+        self.push_scope()
         self.bind_comprehension_element(comp_node, pat_or_sym, item_place, elem_ty, iter_expr)
-        self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, header_bb)
+        let clause_extra = self.comprehension_clause_start(comp_node)
+        let clause_filter = self.ast.get_extra(clause_extra + clause_index * 3 + 2)
+        let iter_join_bb = self.new_block()
+        if clause_filter != 0:
+            let pass_bb = self.new_block()
+            let cond_op = self.lower_expr(clause_filter)
+            let fvals: Vec[i32] = Vec.new()
+            fvals.push(1)
+            let ftargets: Vec[i32] = Vec.new()
+            ftargets.push(pass_bb as i32)
+            let ftable = self.body.new_switch_table(fvals, ftargets)
+            self.terminate(TermKind.TK_SWITCH_INT, cond_op, ftable, iter_join_bb, 0)
+            self.switch_to(pass_bb)
+            // #771-style frame: the leaf push is a statement — its
+            // reset-on-move flush is what blanks a moved-out binding so
+            // the back-edge scope drop is inert for it.
+            let pass_frame = self.push_stmt_temp_frame()
+            self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
+            self.finish_stmt_temp_frame(pass_frame)
+            self.terminate(TermKind.TK_GOTO, iter_join_bb, 0, 0, 0)
+        else:
+            let leaf_frame = self.push_stmt_temp_frame()
+            self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
+            self.finish_stmt_temp_frame(leaf_frame)
+            self.terminate(TermKind.TK_GOTO, iter_join_bb, 0, 0, 0)
+        self.switch_to(iter_join_bb)
+        self.pop_scope_with_goto(header_bb)
 
         self.switch_to(exit_bb)
         self.forget_string_flow_facts()

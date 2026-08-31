@@ -6770,6 +6770,7 @@ impl Sema:
                 let iterable = self.ast.get_extra(base + 1)
                 let filter = self.ast.get_extra(base + 2)
                 let iter_ty = self.check_expr(iterable)
+                self.demand_generic_iter_next(iter_ty, iterable, iterable)
                 let elem_ty = self.infer_for_element_type(iter_ty as i32)
                 self.push_scope()
                 pushed_scopes = pushed_scopes + 1
@@ -6826,6 +6827,7 @@ impl Sema:
                 let iterable2 = self.ast.get_extra(base3 + 1)
                 let filter2 = self.ast.get_extra(base3 + 2)
                 let iter_ty2 = self.check_expr(iterable2)
+                self.demand_generic_iter_next(iter_ty2, iterable2, iterable2)
                 let elem_ty2 = self.infer_for_element_type(iter_ty2 as i32)
                 self.push_scope()
                 pushed_scopes2 = pushed_scopes2 + 1
@@ -10396,6 +10398,66 @@ impl Sema:
                 return rhs
         lhs
 
+    // #912: an iteration desugar over a generic iterator IS a next() call,
+    // but no spelled call ever demands the specialization. Register it via
+    // the ordinary generic-method-call machinery, keyed so the lowering can
+    // dispatch the recorded mono sym: for-loops key by the FOR node,
+    // comprehension clauses by their iterable expression node.
+    mut fn demand_generic_iter_next(iter_type: TypeId, iterable: i32, key_node: i32):
+        let it_resolved = self.resolve_alias(iter_type)
+        if self.get_type_kind(it_resolved) != TypeKind.TY_GENERIC_INST:
+            return
+        let next_sym = self.pool_lookup_symbol("next")
+        if next_sym <= 0:
+            return
+        var owner_sym = self.get_generic_inst_base(it_resolved as i32)
+        if not self.type_decl_nodes.contains(owner_sym):
+            let canon = self.canonical_symbol_by_text(owner_sym)
+            if canon != 0 and self.type_decl_nodes.contains(canon):
+                owner_sym = canon
+        if self.lookup_method_sig(owner_sym, next_sym) >= 0:
+            return
+        let next_fn = self.lookup_generic_method_fn(owner_sym, next_sym)
+        if next_fn == 0:
+            return
+        // check_generic_method_call records its contract keyed by the node we
+        // pass, and stamps typed_expr_types[node] with next()'s return. When
+        // the key is an expression node (a comprehension iterable — possibly
+        // itself a call like xs.into_iter()) that would clobber the
+        // expression's own type and call contract. Save, call, move the
+        // recorded contract into the dedicated iter_next channel, restore.
+        let saved_ty = self.typed_expr_types.get(key_node)
+        var saved_ty_val = 0
+        if saved_ty.is_some(): saved_ty_val = saved_ty.unwrap()
+        let saved_sig = self.resolved_call_sigs.get(key_node)
+        var saved_sig_val = -1
+        if saved_sig.is_some(): saved_sig_val = saved_sig.unwrap()
+        let saved_mono = self.resolved_call_mono_syms.get(key_node)
+        var saved_mono_val = 0
+        if saved_mono.is_some(): saved_mono_val = saved_mono.unwrap()
+        let no_args: Vec[i32] = Vec.new()
+        let _ = self.check_generic_method_call(owner_sym, iter_type as i32, next_fn, 0, iterable, no_args, 0, 0, key_node)
+        let new_sig = self.resolved_call_sigs.get(key_node)
+        var new_sig_val = -1
+        if new_sig.is_some(): new_sig_val = new_sig.unwrap()
+        if new_sig_val >= 0:
+            self.iter_next_sigs.insert(key_node, new_sig_val)
+        let new_mono = self.resolved_call_mono_syms.get(key_node)
+        var new_mono_val = 0
+        if new_mono.is_some(): new_mono_val = new_mono.unwrap()
+        if new_mono_val != 0:
+            self.iter_next_mono_syms.insert(key_node, new_mono_val)
+        if saved_ty_val != 0:
+            self.typed_expr_types.insert(key_node, saved_ty_val)
+        if saved_sig_val >= 0:
+            self.resolved_call_sigs.insert(key_node, saved_sig_val)
+        else:
+            self.resolved_call_sigs.remove(key_node)
+        if saved_mono_val != 0:
+            self.resolved_call_mono_syms.insert(key_node, saved_mono_val)
+        else:
+            self.resolved_call_mono_syms.remove(key_node)
+
     mut fn check_for(node: i32) -> i32:
         let binding = self.ast.get_data0(node)
         let iterable = self.ast.get_data1(node)
@@ -10408,19 +10470,7 @@ impl Sema:
         // #912: the for-desugar over a generic iterator IS a next() call, but
         // no spelled call ever demands the specialization — register it here,
         // keyed by the for node, so MIR dispatches the concrete next().
-        let for_iter_resolved = self.resolve_alias(iter_type)
-        if self.get_type_kind(for_iter_resolved) == TypeKind.TY_GENERIC_INST:
-            let for_next_sym = self.pool_lookup_symbol("next")
-            var for_owner_sym = self.get_generic_inst_base(for_iter_resolved as i32)
-            if not self.type_decl_nodes.contains(for_owner_sym):
-                let for_owner_canon = self.canonical_symbol_by_text(for_owner_sym)
-                if for_owner_canon != 0 and self.type_decl_nodes.contains(for_owner_canon):
-                    for_owner_sym = for_owner_canon
-            if for_next_sym > 0 and self.lookup_method_sig(for_owner_sym, for_next_sym) < 0:
-                let for_next_fn = self.lookup_generic_method_fn(for_owner_sym, for_next_sym)
-                if for_next_fn != 0:
-                    let for_no_args: Vec[i32] = Vec.new()
-                    let _ = self.check_generic_method_call(for_owner_sym, iter_type as i32, for_next_fn, 0, iterable, for_no_args, 0, 0, node)
+        self.demand_generic_iter_next(iter_type, iterable, node)
 
         // §13 implicit iteration: `for x in vec` borrows the collection (the
         // compiler-inserted .iter() form), so no consuming gate applies. Drop-

@@ -862,6 +862,12 @@ type Sema {
     // share-place ABI and the monomorphized MIR identity.
     resolved_call_sigs: HashMap[i32, i32],
     resolved_call_mono_syms: HashMap[i32, i32],
+    // #912: the iteration desugar's next() specialization, keyed by the FOR
+    // node (loops) or the clause's iterable expression node (comprehensions).
+    // A dedicated channel — keying resolved_call_sigs by an expression node
+    // would clobber that expression's own call contract.
+    iter_next_sigs: HashMap[i32, i32],
+    iter_next_mono_syms: HashMap[i32, i32],
     magic_ident_kinds: HashMap[i32, i32],
     // Implicit parameter bindings stack: pairs of (type_id, binding_sym)
     implicit_binding_types: Vec[i32],
@@ -2104,6 +2110,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         call_resolved_default_arg_keys: sema_new_map_i64_i32(),
         resolved_call_sigs: sema_new_map_i32_i32(),
         resolved_call_mono_syms: sema_new_map_i32_i32(),
+        iter_next_sigs: sema_new_map_i32_i32(),
+        iter_next_mono_syms: sema_new_map_i32_i32(),
         magic_ident_kinds: sema_new_map_i32_i32(),
         implicit_binding_types: Vec.new(),
         implicit_binding_syms: Vec.new(),
