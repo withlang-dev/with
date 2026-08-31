@@ -12032,12 +12032,26 @@ impl Sema:
                         let u_member = if self.get_type_d2(u_resolved) > 0: with_str_clone_ref(self.pool_resolve(self.type_extra.get(self.get_type_d1(u_resolved) as i64))) else: "member"
                         self.emit_error("a union-typed field requires an explicit member initializer; use `" ++ self.type_name(field_expected) ++ " { " ++ u_member ++ ": ... }` (§16.4)", f_value)
                     if field_expected != 0 and val_ty != 0:
-                        let field_value_resolved = self.resolve_alias(val_ty)
                         let field_expected_resolved = self.resolve_alias(field_expected as TypeId)
-                        let field_value_kind = self.get_type_kind(field_value_resolved)
+                        // #896: reject ANY incompatible field value — the old
+                        // gate only fired when the VALUE was a &T view, so a
+                        // wrong-typed owned value (str into i32) passed sema
+                        // and produced garbage at codegen. Same predicate as
+                        // bindings/calls; unions carry their §16.4 message
+                        // above, dyn coercions and contextual-Copy
+                        // adjustments are legitimate.
                         let field_expected_kind = self.get_type_kind(field_expected_resolved)
-                        if field_value_kind == TypeKind.TY_REF and field_expected_kind != TypeKind.TY_REF and field_expected_kind != TypeKind.TY_PTR and self.types_compatible(field_expected, val_ty as i32) == 0 and self.has_contextual_copy_adjustment(f_value) == 0:
-                            self.emit_error("type mismatch in struct literal field", f_value)
+                        let field_value_kind = self.get_type_kind(self.resolve_alias(val_ty))
+                        // Integer literals initialize pointer fields (the
+                        // stdlib's own `Vec{ ptr: 0, ... }` null idiom).
+                        let f_int_to_ptr = field_expected_kind == TypeKind.TY_PTR and field_value_kind == TypeKind.TY_INT
+                        if not f_int_to_ptr and
+                           self.type_is_union(field_expected) == 0 and
+                           self.type_is_dyn_object(field_expected_resolved) == 0 and
+                           self.types_compatible(field_expected, val_ty as i32) == 0 and
+                           self.has_contextual_copy_adjustment(f_value) == 0:
+                            let f_label = if f_name != 0: "'" ++ self.pool_resolve(f_name) ++ "'" else: f"#{fi}"
+                            self.emit_error("type mismatch in struct literal field " ++ f_label ++ ": expected " ++ self.type_name(field_expected) ++ ", got " ++ self.type_name(val_ty as i32), f_value)
                     if not self.ephemeral_types.contains(name):
                         self.check_ephemeral_task_storage(f_value, "non-ephemeral struct")
                     // #605: a whole non-Copy local moved into a struct field is
