@@ -2658,6 +2658,10 @@ fn dump_place_map_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
     0
 
 fn trace_cleanup_edge_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    // #760: an invalid spec is a hard error, not marker text with rc=0.
+    if mir_cleanup_edge_spec_ok(spec) == 0:
+        with_eprint("error: invalid --trace-cleanup-edge spec '" ++ spec ++ "'; expected fn:bbFROM->bbTO")
+        return 1
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)

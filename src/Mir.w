@@ -2266,6 +2266,15 @@ fn mir_cleanup_edge_to(target: &str) -> i32:
             return mir_parse_block_id(target.slice((i + 2) as i64, target.len()))
     -1
 
+// #760: the CLI validates the spec BEFORE compiling, so a typo'd edge is
+// a hard error instead of a five-minute compile ending in marker text
+// and rc=0. One parser: this reuses the exact from/to readers below.
+pub fn mir_cleanup_edge_spec_ok(spec: &str) -> i32:
+    let target = mir_debug_spec_target(spec)
+    if mir_cleanup_edge_from(target) < 0 or mir_cleanup_edge_to(target) < 0:
+        return 0
+    1
+
 fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema, spec: &str) -> str:
     let wanted_fn = mir_debug_spec_fn(spec)
     let target = mir_debug_spec_target(spec)
