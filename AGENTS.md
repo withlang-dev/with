@@ -955,6 +955,11 @@ If any step fails, continue debugging until it passes.
 
 ## Bootstrap Rules
 
+### Every PR must be bootstrappable
+Each PR must be green and buildable from a tagged seed release that already
+exists in the repo before it merges — if a change needs a newer seed, tag a
+release to be that seed first.
+
 ### The seed compiler is frozen
 The installed compiler at ~/.local/bin/with has its own Link.w, its own
 embedded runtime objects, and its own codegen logic baked into the binary.
