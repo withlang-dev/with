@@ -386,15 +386,12 @@ pub type VecIntoIter[T] { vec: Vec[T] }
 impl[T] Vec[T]:
     pub move fn into_iter() -> VecIntoIter[T]: VecIntoIter { vec: self }
 
-impl[T] VecIntoIter[T]:
+impl[T] Iter[T] for VecIntoIter[T]:
     // remove(0) is D27's proven element transfer; the memmove-per-next
     // cost stands until a front-cursor variant earns its unsafe.
-    pub mut fn next() -> Option[T]:
+    mut fn next() -> Option[T]:
         if self.vec.len() == 0: return None
         Some(self.vec.remove(0))
-
-impl[T] Iter[T] for VecIntoIter[T]:
-    mut fn next() -> Option[T]: self.next()
 
 /// Lazy iterator adapter produced by `.map(f)`.
 type MapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> U }
