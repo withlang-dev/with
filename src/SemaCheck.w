@@ -6456,8 +6456,19 @@ impl Sema:
                     return 0 as TypeId
             if self.variant_lookup.contains(name):
                 let vs_tid: i32 = self.variant_type_ids.get(name).unwrap()
+                // #694: a GENERIC enum's template tid must not escape as an
+                // expression type — nothing binds its parameters here, and
+                // codegen has no layout for the unparameterized template
+                // (aggregate-rvalue/invalid-MIR crashes). Reject cleanly.
+                let vs_owner_sym = self.get_type_name(self.resolve_alias(vs_tid as TypeId))
+                if vs_owner_sym != 0 and self.type_decl_nodes.contains(vs_owner_sym):
+                    let vs_td: i32 = self.type_decl_nodes.get(vs_owner_sym).unwrap()
+                    if self.type_decl_tp_count(vs_td) > 0:
+                        self.emit_error_with_help("cannot infer the enum type for `." ++ self.pool_resolve(name) ++ "`", node, "annotate the binding (e.g. `let x: " ++ self.pool_resolve(vs_owner_sym) ++ "[...] = ...`) or spell the enum type on the variant")
+                        return 0 as TypeId
                 self.typed_expr_types.insert(node, vs_tid)
                 return vs_tid as TypeId
+            self.emit_error("no enum in scope has a variant `." ++ self.pool_resolve(name) ++ "`", node)
             return 0 as TypeId
 
         if kind == NodeKind.NK_WITH_EXPR:
