@@ -2,6 +2,9 @@
 
 use std.collections
 use std.encoding.base16
+use std.string
+use std.encoding.base32
+use std.encoding.base32hex
 
 fn ascii_bytes(text: &str):
     let out = Vec[u8].with_capacity(text.len())
@@ -65,8 +68,70 @@ fn test_base16_all_octets:
         assert(decoded.get(0) == value as u8)
         value = value + 1
 
+fn assert_base32_vector(input: &str, encoded: &str, encoded_hex: &str):
+    let bytes = ascii_bytes(input)
+    assert(base32_encode(bytes) == encoded)
+    assert(base32hex_encode(bytes) == encoded_hex)
+    assert_bytes_eq(&base32_decode(encoded).unwrap(), &bytes)
+    assert_bytes_eq(&base32hex_decode(encoded_hex).unwrap(), &bytes)
+
+fn ascii_lower(text: &str):
+    var out = StringBuilder.with_capacity(text.len())
+    var i: i64 = 0
+    while i < text.len():
+        let byte = text.byte_at(i)
+        out.push_byte((if byte >= 65 and byte <= 90: byte + 32 else: byte) as u8)
+        i = i + 1
+    out.to_str()
+
+fn test_base32_vectors:
+    assert_base32_vector("", "", "")
+    assert_base32_vector("f", "MY======", "CO======")
+    assert_base32_vector("fo", "MZXQ====", "CPNG====")
+    assert_base32_vector("foo", "MZXW6===", "CPNMU===")
+    assert_base32_vector("foob", "MZXW6YQ=", "CPNMUOG=")
+    assert_base32_vector("fooba", "MZXW6YTB", "CPNMUOJ1")
+    assert_base32_vector("foobar", "MZXW6YTBOI======", "CPNMUOJ1E8======")
+
+fn test_base32_alphabets:
+    let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    let alphabet_hex = "0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    var value: i32 = 0
+    while value < 32:
+        let input = [(value << 3) as u8]
+        let encoded = base32_encode(input)
+        let encoded_hex = base32hex_encode(input)
+        let lower = ascii_lower(encoded)
+        let lower_hex = ascii_lower(encoded_hex)
+        assert(encoded.byte_at(0) == alphabet.byte_at(value as i64))
+        assert(encoded_hex.byte_at(0) == alphabet_hex.byte_at(value as i64))
+        assert(base32_decode(lower).unwrap().get(0) == input[0])
+        assert(base32hex_decode(lower_hex).unwrap().get(0) == input[0])
+        value = value + 1
+
+fn test_base32_terminal_quanta_and_case:
+    let one = ascii_bytes("f")
+    let two = ascii_bytes("fo")
+    let three = ascii_bytes("foo")
+    let four = ascii_bytes("foob")
+    let five = ascii_bytes("fooba")
+    assert(base32_encode(one).ends_with("======"))
+    assert(base32_encode(two).ends_with("===="))
+    assert(base32_encode(three).ends_with("==="))
+    assert(base32_encode(four).ends_with("="))
+    assert(not base32_encode(five).contains("="))
+    assert_bytes_eq(&base32_decode("mzxw6===").unwrap(), &three)
+    assert_bytes_eq(&base32hex_decode("cpnmu===").unwrap(), &three)
+    let decoded = base32_decode("mzxw6===").unwrap()
+    let decoded_hex = base32hex_decode("cpnmu===").unwrap()
+    assert(base32_encode(decoded) == "MZXW6===")
+    assert(base32hex_encode(decoded_hex) == "CPNMU===")
+
 fn main:
     test_base16_vectors()
     test_base16_alphabet_and_case()
     test_base16_all_octets()
+    test_base32_vectors()
+    test_base32_alphabets()
+    test_base32_terminal_quanta_and_case()
     print("ok")
