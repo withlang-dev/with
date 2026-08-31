@@ -5,6 +5,8 @@ use std.string
 use std.encoding.base16
 use std.encoding.base32
 use std.encoding.base32hex
+use std.encoding.base64
+use std.encoding.base64url
 
 fn corpus(length: i64):
     let out = Vec[u8].with_capacity(length)
@@ -100,6 +102,59 @@ fn test_base32_borrowed_inputs:
     assert(base32hex_encode(values).len() == 8)
     assert(values.len() == 5)
 
+fn assert_base64_round_trips(data: Vec[u8]):
+    let encoded = base64_encode(data)
+    let encoded_url = base64url_encode(data)
+    assert(encoded.len() == ((data.len() + 2) / 3) * 4)
+    assert(encoded_url.len() == encoded.len())
+    assert_bytes_eq(&base64_decode(encoded).unwrap(), &data)
+    assert_bytes_eq(&base64url_decode(encoded_url).unwrap(), &data)
+
+fn test_base64_boundary_round_trips:
+    var length: i64 = 0
+    while length <= 257:
+        assert_base64_round_trips(corpus(length))
+        length = length + 1
+    assert_base64_round_trips(corpus(65536))
+
+fn test_base64_exhaustive_short_inputs:
+    var value = 0
+    while value < 256:
+        let input = [value as u8]
+        let encoded = base64_encode(input)
+        let encoded_url = base64url_encode(input)
+        let decoded = base64_decode(encoded).unwrap()
+        let decoded_url = base64url_decode(encoded_url).unwrap()
+        assert(decoded.len() == 1)
+        assert(decoded_url.len() == 1)
+        assert(decoded.get(0) == input[0])
+        assert(decoded_url.get(0) == input[0])
+        value = value + 1
+    value = 0
+    while value < 65536:
+        let input = [(value >> 8) as u8, (value & 255) as u8]
+        let encoded = base64_encode(input)
+        let encoded_url = base64url_encode(input)
+        let decoded = base64_decode(encoded).unwrap()
+        let decoded_url = base64url_decode(encoded_url).unwrap()
+        assert(decoded.len() == 2)
+        assert(decoded_url.len() == 2)
+        assert(decoded.get(0) == input[0])
+        assert(decoded.get(1) == input[1])
+        assert(decoded_url.get(0) == input[0])
+        assert(decoded_url.get(1) == input[1])
+        value = value + 1
+
+fn test_base64_borrowed_inputs:
+    let fixed = [1 as u8, 2 as u8, 3 as u8]
+    let values = corpus(3)
+    assert(base64_encode(fixed) == "AQID")
+    assert(base64url_encode(fixed) == "AQID")
+    assert(fixed[0] == 1 as u8)
+    assert(base64_encode(values) == "aLH6")
+    assert(base64url_encode(values) == "aLH6")
+    assert(values.len() == 3)
+
 fn main:
     test_base16_boundaries()
     test_base16_borrowed_inputs()
@@ -107,4 +162,7 @@ fn main:
     test_base32hex_ordering()
     test_base32_all_single_octets()
     test_base32_borrowed_inputs()
+    test_base64_boundary_round_trips()
+    test_base64_exhaustive_short_inputs()
+    test_base64_borrowed_inputs()
     print("ok")

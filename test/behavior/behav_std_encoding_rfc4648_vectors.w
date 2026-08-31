@@ -5,6 +5,8 @@ use std.encoding.base16
 use std.string
 use std.encoding.base32
 use std.encoding.base32hex
+use std.encoding.base64
+use std.encoding.base64url
 
 fn ascii_bytes(text: &str):
     let out = Vec[u8].with_capacity(text.len())
@@ -127,6 +129,62 @@ fn test_base32_terminal_quanta_and_case:
     assert(base32_encode(decoded) == "MZXW6===")
     assert(base32hex_encode(decoded_hex) == "CPNMU===")
 
+fn assert_base64_vector(input: &str, encoded: &str):
+    let bytes = ascii_bytes(input)
+    assert(base64_encode(bytes) == encoded)
+    assert(base64url_encode(bytes) == encoded)
+    assert_bytes_eq(&base64_decode(encoded).unwrap(), &bytes)
+    assert_bytes_eq(&base64url_decode(encoded).unwrap(), &bytes)
+
+fn test_base64_vectors:
+    assert_base64_vector("", "")
+    assert_base64_vector("f", "Zg==")
+    assert_base64_vector("fo", "Zm8=")
+    assert_base64_vector("foo", "Zm9v")
+    assert_base64_vector("foob", "Zm9vYg==")
+    assert_base64_vector("fooba", "Zm9vYmE=")
+    assert_base64_vector("foobar", "Zm9vYmFy")
+
+fn test_base64_alphabets:
+    let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    let alphabet_url = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    var value: i32 = 0
+    while value < 64:
+        let input = [(value << 2) as u8]
+        assert(base64_encode(input).byte_at(0) == alphabet.byte_at(value as i64))
+        assert(base64url_encode(input).byte_at(0) == alphabet_url.byte_at(value as i64))
+        value = value + 1
+
+fn test_base64_terminal_quanta_and_examples:
+    let one = ascii_bytes("f")
+    let two = ascii_bytes("fo")
+    let three = ascii_bytes("foo")
+    assert(base64_encode(one).ends_with("=="))
+    assert(base64url_encode(one).ends_with("=="))
+    assert(base64_encode(two).ends_with("="))
+    assert(base64url_encode(two).ends_with("="))
+    assert(not base64_encode(three).contains("="))
+    assert(not base64url_encode(three).contains("="))
+
+    let full = [20 as u8, 251 as u8, 156 as u8, 3 as u8, 217 as u8, 126 as u8]
+    let tail_two = [20 as u8, 251 as u8, 156 as u8, 3 as u8, 217 as u8]
+    let tail_one = [20 as u8, 251 as u8, 156 as u8, 3 as u8]
+    assert(base64_encode(full) == "FPucA9l+")
+    assert(base64_encode(tail_two) == "FPucA9k=")
+    assert(base64_encode(tail_one) == "FPucAw==")
+
+    let distinct = [251 as u8, 255 as u8]
+    assert(base64_encode(distinct) == "+/8=")
+    assert(base64url_encode(distinct) == "-_8=")
+    let decoded = base64_decode("+/8=").unwrap()
+    let decoded_url = base64url_decode("-_8=").unwrap()
+    assert(decoded.len() == 2)
+    assert(decoded_url.len() == 2)
+    assert(decoded.get(0) == 251 as u8)
+    assert(decoded.get(1) == 255 as u8)
+    assert(decoded_url.get(0) == 251 as u8)
+    assert(decoded_url.get(1) == 255 as u8)
+
 fn main:
     test_base16_vectors()
     test_base16_alphabet_and_case()
@@ -134,4 +192,7 @@ fn main:
     test_base32_vectors()
     test_base32_alphabets()
     test_base32_terminal_quanta_and_case()
+    test_base64_vectors()
+    test_base64_alphabets()
+    test_base64_terminal_quanta_and_examples()
     print("ok")

@@ -7,6 +7,8 @@ use std.encoding
 use std.encoding.base16
 use std.encoding.base32
 use std.encoding.base32hex
+use std.encoding.base64
+use std.encoding.base64url
 
 fn raw_text(bytes: []u8):
     var out = StringBuilder.with_capacity(bytes.len())
@@ -87,9 +89,56 @@ fn test_base32_noncanonical_bits:
     expect_noncanonical(base32hex_decode("CPNMV==="), 4)
     expect_noncanonical(base32hex_decode("CPNMUOH="), 6)
 
+fn test_base64_rejection:
+    expect_invalid_length(base64_decode("Zg"), 2)
+    expect_invalid_length(base64url_decode("Zg"), 2)
+    expect_invalid_length(base64_decode("A?="), 3)
+    expect_invalid_byte(base64_decode("-_8="), 0, 45 as u8)
+    expect_invalid_byte(base64url_decode("+/8="), 0, 43 as u8)
+    expect_invalid_byte(base64_decode("AA?="), 2, 63 as u8)
+    expect_invalid_byte(base64_decode("AA\n="), 2, 10 as u8)
+    expect_invalid_byte(base64_decode("AA\r\n"), 2, 13 as u8)
+    let nul = [65 as u8, 65 as u8, 0 as u8, 61 as u8]
+    expect_invalid_byte(base64_decode(raw_text(nul)), 2, 0 as u8)
+    let non_ascii = [65 as u8, 65 as u8, 255 as u8, 61 as u8]
+    expect_invalid_byte(base64_decode(raw_text(non_ascii)), 2, 255 as u8)
+    expect_invalid_byte(base64url_decode("AA?="), 2, 63 as u8)
+    expect_invalid_byte(base64url_decode("AA\n="), 2, 10 as u8)
+    let url_nul = [65 as u8, 65 as u8, 0 as u8, 61 as u8]
+    expect_invalid_byte(base64url_decode(raw_text(url_nul)), 2, 0 as u8)
+    let url_non_ascii = [65 as u8, 65 as u8, 255 as u8, 61 as u8]
+    expect_invalid_byte(base64url_decode(raw_text(url_non_ascii)), 2, 255 as u8)
+
+fn test_base64_padding:
+    expect_invalid_padding(base64_decode("A==="), 1)
+    expect_invalid_padding(base64_decode("=AAA"), 0)
+    expect_invalid_padding(base64_decode("AA=A"), 3)
+    expect_invalid_padding(base64_decode("Zh=A"), 3)
+    expect_invalid_padding(base64_decode("AAAA===="), 4)
+    expect_invalid_padding(base64url_decode("A==="), 1)
+    expect_invalid_padding(base64url_decode("=AAA"), 0)
+    expect_invalid_padding(base64url_decode("AA=A"), 3)
+    expect_invalid_padding(base64url_decode("Zh=A"), 3)
+    expect_invalid_padding(base64url_decode("AAAA===="), 4)
+
+fn test_base64_noncanonical_bits:
+    expect_noncanonical(base64_decode("Zh=="), 1)
+    expect_noncanonical(base64_decode("Zm9="), 2)
+    expect_noncanonical(base64url_decode("Zh=="), 1)
+    expect_noncanonical(base64url_decode("Zm9="), 2)
+
+fn test_base64_case_is_significant:
+    let upper = base64_decode("Zg==").unwrap()
+    let lower = base64_decode("zg==").unwrap()
+    assert(upper.get(0) != lower.get(0))
+
 fn main:
     test_base16_rejection()
     test_base32_rejection()
     test_base32_padding()
     test_base32_noncanonical_bits()
+    test_base64_rejection()
+    test_base64_padding()
+    test_base64_noncanonical_bits()
+    test_base64_case_is_significant()
     print("ok")
