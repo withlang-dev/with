@@ -227,7 +227,7 @@ pub fn rt_close(fd: i32) -> i32:
         return 0
     if fd < 0 or fd >= 256:
         return -6
-    let h = rt_handles[fd]
+    let h: i64 = rt_handles[fd]
     rt_handles[fd] = 0
     if h == 0:
         return -6
@@ -773,7 +773,7 @@ fn win_process_alloc(handle: i64, pid: i32) -> i32:
 fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
     if slot <= 0 or slot >= 256:
         return -1
-    let h = process_handles[slot]
+    let h: i64 = process_handles[slot]
     if h == 0:
         return -1
     let wait_ms = if timeout_ms > 0: timeout_ms as u32 else: INFINITE
