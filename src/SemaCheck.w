@@ -6468,7 +6468,13 @@ impl Sema:
                         return 0 as TypeId
                 self.typed_expr_types.insert(node, vs_tid)
                 return vs_tid as TypeId
-            self.emit_error("no enum in scope has a variant `." ++ self.pool_resolve(name) ++ "`", node)
+            // A BARE unknown shorthand stays silent: context-dependent
+            // shorthands (the comprehension `_Empty` marker, bare `None`
+            // ahead of its expected type) are completed by a later pass.
+            // A payload-carrying one has no later completion — it was the
+            // #694 codegen crash — so it errors here.
+            if self.ast.get_data2(node) > 0:
+                self.emit_error("no enum in scope has a variant `." ++ self.pool_resolve(name) ++ "`", node)
             return 0 as TypeId
 
         if kind == NodeKind.NK_WITH_EXPR:
