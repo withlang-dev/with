@@ -1,4 +1,4 @@
-//! skip-windows: issue #802: core-language behavior fails on native Windows (needs root-cause)
+//! skip-on: windows issue #802: core-language behavior fails on native Windows (needs root-cause)
 //! expect-stdout: ok
 
 use pre_d_build_runner

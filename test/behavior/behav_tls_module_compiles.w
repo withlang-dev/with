@@ -1,4 +1,4 @@
-//! skip-windows: #800: std.tls rides std.net, which has no Windows backend
+//! skip-on: windows #800: std.tls rides std.net, which has no Windows backend
 //! expect-stdout: ok
 // Pin: std.tls must compile. Nothing else in the suite imports it, so a
 // latent error there (e.g. the pre-#747-flip consuming tcp_connect making

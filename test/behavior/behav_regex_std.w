@@ -1,4 +1,4 @@
-//! skip-windows: member-import `use std.regex.Captures` not registered for the §18.1 explicit-import gate on native Windows (front-end miscompile; whole-module `use std.regex` is fine)
+//! skip-on: windows member-import `use std.regex.Captures` not registered for the §18.1 explicit-import gate on native Windows (front-end miscompile; whole-module `use std.regex` is fine)
 //! expect-stdout: ok
 
 use std.regex.Captures

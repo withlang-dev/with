@@ -1,4 +1,4 @@
-//! skip-windows: #800: symlink() needs Developer Mode or elevation on Windows (CreateSymbolicLinkW fails ERROR_PRIVILEGE_NOT_HELD); rt_symlink already passes ALLOW_UNPRIVILEGED_CREATE, so this is an environment privilege gap, not a code bug
+//! skip-on: windows #800: symlink() needs Developer Mode or elevation on Windows (CreateSymbolicLinkW fails ERROR_PRIVILEGE_NOT_HELD); rt_symlink already passes ALLOW_UNPRIVILEGED_CREATE, so this is an environment privilege gap, not a code bug
 use std.fs
 
 fn contains_line(text: &str, line: &str) -> bool:

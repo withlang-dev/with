@@ -1,5 +1,5 @@
 //! expect-error: undefined variable
-//! requires-arch: aarch64
+//! only-on: aarch64
 
 // A function guarded for a non-active architecture is excluded entirely;
 // referencing it fails loudly rather than producing wrong-target code. On an

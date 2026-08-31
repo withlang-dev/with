@@ -1,4 +1,4 @@
-//! skip-windows: #799: opendir/readdir/closedir are POSIX <dirent.h>, absent from MSVCRT (link-undefined on Windows); the borrowed-owned-handle wrapper mechanism is already covered on Windows by behav_c_import_owning_wrapper_strdup
+//! skip-on: windows #799: opendir/readdir/closedir are POSIX <dirent.h>, absent from MSVCRT (link-undefined on Windows); the borrowed-owned-handle wrapper mechanism is already covered on Windows by behav_c_import_owning_wrapper_strdup
 //! expect-stdout: ok
 
 // [Phase8] #357 increment 2: readdir BORROWS the owned DIR — its curated

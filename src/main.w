@@ -152,6 +152,10 @@ type TestDirectives {
     check_only: bool,
     skip: bool,
     skip_reason: str,
+    // #795: a malformed platform-gate directive is a loud failure, never a
+    // silent no-op (an unknown value would otherwise read as a comment and
+    // the test would run everywhere).
+    directive_error: str,
     extra_args: str,
     known_issue: str,
     // `//! env: NAME=VALUE` pairs, set for the test's compile+run and
@@ -188,6 +192,7 @@ fn empty_test_directives -> TestDirectives:
         check_only: false,
         skip: false,
         skip_reason: "",
+        directive_error: "",
         extra_args: "",
         known_issue: "",
         env_pairs: Vec.new(),
@@ -2877,6 +2882,44 @@ fn test_arch_is_aarch64(arch: &str) -> bool:
 fn test_arch_is_x86_64(arch: &str) -> bool:
     arch == "x86_64" or arch == "amd64" or arch == "x64"
 
+// #795: value-keyed platform gates (`skip-on:` / `only-on:`). A gate value
+// is an OS (windows, linux, darwin), an ISA (aarch64, x86_64), or an
+// os-arch pair (windows-aarch64). Unknown values are directive errors —
+// a mistyped gate must fail loudly, never silently run everywhere.
+fn test_gate_value_is_os(value: &str) -> bool:
+    value == "windows" or value == "linux" or value == "darwin"
+
+fn test_gate_os_matches(value: &str) -> bool:
+    let host = with_sysinfo_os()
+    if value == "windows": return host == "Windows"
+    if value == "linux": return host == "Linux"
+    if value == "darwin": return host == "Darwin"
+    false
+
+fn test_gate_value_is_arch(value: &str) -> bool:
+    test_arch_is_aarch64(value) or test_arch_is_x86_64(value)
+
+// 1 = host matches, 0 = host does not match, -1 = invalid value.
+fn test_gate_matches(value: &str) -> i32:
+    if test_gate_value_is_os(value):
+        return if test_gate_os_matches(value): 1 else: 0
+    if test_gate_value_is_arch(value):
+        return if test_arch_matches(value, with_sysinfo_arch()): 1 else: 0
+    var dash = -1
+    var gi = 0
+    while gi < value.len() as i32:
+        if value.byte_at(gi as i64) == 45:
+            dash = gi
+            break
+        gi = gi + 1
+    if dash > 0:
+        let os_part = value.slice(0, dash as i64)
+        let arch_part = value.slice((dash + 1) as i64, value.len())
+        if test_gate_value_is_os(os_part) and test_gate_value_is_arch(arch_part):
+            let m = test_gate_os_matches(os_part) and test_arch_matches(arch_part, with_sysinfo_arch())
+            return if m: 1 else: 0
+    -1
+
 fn test_arch_matches(required: &str, host: &str) -> bool:
     // Canonicalize the ISA spellings a directive may use so a
     // `requires-arch: aarch64` gate also matches an "arm64" host.
@@ -2902,9 +2945,8 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     let args_prefix = "//! args: "
     let env_prefix = "//! env: "
     let skip_prefix = "//! skip: "
-    let skip_windows_prefix = "//! skip-windows: "
-    let skip_windows_aarch64_prefix = "//! skip-windows-aarch64: "
-    let requires_arch_prefix = "//! requires-arch: "
+    let skip_on_prefix = "//! skip-on: "
+    let only_on_prefix = "//! only-on: "
     let known_issue_prefix = "//! known-issue: "
     var start = 0
     var i = 0
@@ -2941,27 +2983,43 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 result.skip = true
                 result.skip_reason = line.slice(skip_prefix.len(), line.len())
                 return result
-            else if line.starts_with(skip_windows_prefix):
-                if with_sysinfo_os() == "Windows":
-                    result.skip = true
-                    result.skip_reason = line.slice(skip_windows_prefix.len(), line.len())
+            else if line.starts_with(skip_on_prefix):
+                // #795: `skip-on: <os|arch|os-arch> <reason>` — skip on
+                // matching hosts; the reason binds the gate to an issue
+                // (D23 discipline). Repeatable for multiple platforms.
+                let rest = line.slice(skip_on_prefix.len(), line.len())
+                var gate_sp: i64 = -1
+                var gsi: i64 = 0
+                while gsi < rest.len():
+                    if rest.byte_at(gsi) == 32:
+                        gate_sp = gsi
+                        break
+                    gsi = gsi + 1
+                let gate_value = if gate_sp > 0: rest.slice(0, gate_sp) else: rest.slice(0, rest.len())
+                let gate_reason = if gate_sp > 0: rest.slice(gate_sp + 1, rest.len()) else: rest.slice(rest.len(), rest.len())
+                let gate_m = test_gate_matches(gate_value)
+                if gate_m < 0:
+                    result.directive_error = "skip-on: unknown platform value '" ++ gate_value ++ "' (expected windows|linux|darwin, aarch64|x86_64, or an os-arch pair)"
                     return result
-            else if line.starts_with(skip_windows_aarch64_prefix):
-                // Windows-on-ARM64 only. The broad `skip-windows` gate would
-                // cost the x86_64 lane its coverage too; this narrower gate
-                // keeps the test running everywhere except the arm64 Windows
-                // CI lane, where a genuinely arch-lane-specific gap is tracked.
-                if with_sysinfo_os() == "Windows" and test_arch_is_aarch64(with_sysinfo_arch()):
-                    result.skip = true
-                    result.skip_reason = line.slice(skip_windows_aarch64_prefix.len(), line.len())
+                if gate_reason.len() == 0:
+                    result.directive_error = "skip-on " ++ gate_value ++ ": missing reason"
                     return result
-            else if line.starts_with(requires_arch_prefix):
-                // Arch-specific test (e.g. inline asm hardcoding one ISA's
-                // registers). Runs only on the named arch; skipped elsewhere.
-                let required = line.slice(requires_arch_prefix.len(), line.len())
-                if not test_arch_matches(required, with_sysinfo_arch()):
+                if gate_m == 1:
                     result.skip = true
-                    result.skip_reason = "requires-arch " ++ required
+                    result.skip_reason = gate_reason
+                    return result
+            else if line.starts_with(only_on_prefix):
+                // #795: `only-on: <os|arch|os-arch>` — the test's nature is
+                // platform-specific (e.g. inline asm hardcoding one ISA's
+                // registers); runs only on matching hosts.
+                let only_value = line.slice(only_on_prefix.len(), line.len())
+                let only_m = test_gate_matches(only_value)
+                if only_m < 0:
+                    result.directive_error = "only-on: unknown platform value '" ++ only_value ++ "' (expected windows|linux|darwin, aarch64|x86_64, or an os-arch pair)"
+                    return result
+                if only_m == 0:
+                    result.skip = true
+                    result.skip_reason = "only-on " ++ only_value
                     return result
             else if line == "//! skip":
                 result.skip = true
@@ -3030,6 +3088,10 @@ fn test_output_contains_expected(actual: &str, expected: &str) -> bool:
     expected.len() == 0 or actual.contains(expected)
 
 fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: bool) -> i32:
+    // #795: malformed platform gates fail loudly on every host.
+    if directives.directive_error.len() > 0:
+        emit_test_stage_error(directives.directive_error, target, "directives", "")
+        return 1
     if directives.skip:
         if directives.skip_reason.len() == 0:
             emit_test_stage_error("skip missing reason", target, "directives", "")

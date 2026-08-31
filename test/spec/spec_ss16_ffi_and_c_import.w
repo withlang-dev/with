@@ -1,4 +1,4 @@
-//! skip-windows: #799: INCDIR wiring + libm-drop are in place (the c_import clang args reach the MSVC/UCRT headers, and the link no longer references a nonexistent m.lib), but `use c_import("limits.h")` still fails to compile as a C header snippet on native Windows ("failed to compile C header snippet: limits.h"). Remaining UCRT/MSVC header-modeling work (task #79) before this can pass; the stdio.h path already works (see behav_c_import_sdk_header, un-skipped)
+//! skip-on: windows #799: INCDIR wiring + libm-drop are in place (the c_import clang args reach the MSVC/UCRT headers, and the link no longer references a nonexistent m.lib), but `use c_import("limits.h")` still fails to compile as a C header snippet on native Windows ("failed to compile C header snippet: limits.h"). Remaining UCRT/MSVC header-modeling work (task #79) before this can pass; the stdio.h path already works (see behav_c_import_sdk_header, un-skipped)
 //! expect-stdout: ok
 
 use c_import("stdio.h")
