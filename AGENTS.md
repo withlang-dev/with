@@ -685,7 +685,10 @@ possible.
 
 ### Commit authorship
 
-Eric Hartford <eric@quixi.ai> is the sole author of this repository.
+Every commit is authored by the human contributor who drove the work,
+under their own name and email — never anyone else's identity. For
+Eric that is Eric Hartford <eric@quixi.ai>. Agent-driven work is
+committed under the identity of the human who ran the agent.
 Never add an AI assistant, model, tool, or vendor as a commit author,
 co-author, trailer, or credit line. Do not use `Co-Authored-By` for AI
 assistance.
