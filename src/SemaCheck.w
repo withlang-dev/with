@@ -10405,6 +10405,23 @@ impl Sema:
         let iter_type = self.check_expr(iterable)
         let elem_type = self.infer_for_element_type(iter_type as i32)
 
+        // #912: the for-desugar over a generic iterator IS a next() call, but
+        // no spelled call ever demands the specialization — register it here,
+        // keyed by the for node, so MIR dispatches the concrete next().
+        let for_iter_resolved = self.resolve_alias(iter_type)
+        if self.get_type_kind(for_iter_resolved) == TypeKind.TY_GENERIC_INST:
+            let for_next_sym = self.pool_lookup_symbol("next")
+            var for_owner_sym = self.get_generic_inst_base(for_iter_resolved as i32)
+            if not self.type_decl_nodes.contains(for_owner_sym):
+                let for_owner_canon = self.canonical_symbol_by_text(for_owner_sym)
+                if for_owner_canon != 0 and self.type_decl_nodes.contains(for_owner_canon):
+                    for_owner_sym = for_owner_canon
+            if for_next_sym > 0 and self.lookup_method_sig(for_owner_sym, for_next_sym) < 0:
+                let for_next_fn = self.lookup_generic_method_fn(for_owner_sym, for_next_sym)
+                if for_next_fn != 0:
+                    let for_no_args: Vec[i32] = Vec.new()
+                    let _ = self.check_generic_method_call(for_owner_sym, iter_type as i32, for_next_fn, 0, iterable, for_no_args, 0, 0, node)
+
         // §13 implicit iteration: `for x in vec` borrows the collection (the
         // compiler-inserted .iter() form), so no consuming gate applies. Drop-
         // class elements bind as &T views via infer_for_element_type; copying
@@ -19456,9 +19473,17 @@ impl Sema:
                 let result = self.substitute_type(sig_ret, self.generic_subst_param_syms, self.generic_subst_type_ids, subst_count)
                 if result > 0:
                     out = result
-            // Fallback: re-resolve from the method's return type AST node
-            if out == 0 and method_fn_sym != 0 and self.fn_decl_nodes.contains(method_fn_sym):
-                let fn_node: i32 = self.fn_decl_nodes.get(method_fn_sym).unwrap()
+            // Fallback: re-resolve from the method's return type AST node.
+            // Generic impl methods register in generic_fn_nodes, not
+            // fn_decl_nodes (#912) — consult both.
+            var fallback_fn_node = 0
+            if method_fn_sym != 0:
+                if self.fn_decl_nodes.contains(method_fn_sym):
+                    fallback_fn_node = self.fn_decl_nodes.get(method_fn_sym).unwrap()
+                if fallback_fn_node == 0:
+                    fallback_fn_node = self.generic_fn_node_for_symbol(method_fn_sym)
+            if out == 0 and fallback_fn_node != 0:
+                let fn_node = fallback_fn_node
                 let meta = self.ast.find_fn_meta(fn_node)
                 if meta >= 0:
                     let ret_node = self.ast.fn_meta_ret(meta)
@@ -22960,21 +22985,36 @@ impl Sema:
                     vip_slot = self.ensure_generic_inst_type(self.syms.vecslot, vip_args, 1) as i32
                 return vip_slot
         // Generic Iter[T] protocol: look up next() method on the type,
-        // extract T from its Option[T] return type.
+        // extract T from its Option[T] return type. For a generic-inst
+        // iterable the stored sig returns Option[<param>] — substitute the
+        // inst's args first, or the loop var binds the placeholder (#912).
         let owner_sym = self.method_owner_symbol_for_type(resolved as i32)
         if owner_sym != 0:
             let next_sym = self.pool_lookup_symbol("next")
             if next_sym > 0:
                 let sig_idx = self.lookup_method_sig(owner_sym, next_sym)
-                if sig_idx >= 0:
-                    let ret_ty = self.sig_return_type(sig_idx)
-                    if ret_ty != 0:
-                        let ret_resolved = self.resolve_alias(ret_ty as TypeId)
-                        let ret_tk = self.get_type_kind(ret_resolved)
-                        if ret_tk == TypeKind.TY_GENERIC_INST:
-                            let ret_base = self.pool_resolve(self.get_type_d0(ret_resolved))
-                            if ret_base == "Option" and self.get_generic_inst_arg_count(ret_resolved as i32) > 0:
-                                return self.get_generic_inst_arg(ret_resolved as i32, 0)
+                var ret_ty = if sig_idx >= 0: self.sig_return_type(sig_idx) else: 0
+                if tk == TypeKind.TY_GENERIC_INST:
+                    // A generic impl's next() registers no concrete sig, so
+                    // resolve its return from the template under the inst's
+                    // substitution (canonicalized: base syms intern per-module).
+                    var subst_sym = self.get_generic_inst_base(resolved as i32)
+                    if not self.type_decl_nodes.contains(subst_sym):
+                        let canon = self.canonical_symbol_by_text(subst_sym)
+                        if canon != 0 and self.type_decl_nodes.contains(canon):
+                            subst_sym = canon
+                    if self.type_decl_nodes.contains(subst_sym):
+                        let next_fn_sym = self.lookup_generic_method_fn(subst_sym, next_sym)
+                        let substituted = self.substitute_method_return_for_generic_inst(resolved as i32, subst_sym, next_sym, next_fn_sym, ret_ty)
+                        if substituted > 0:
+                            ret_ty = substituted
+                if ret_ty != 0:
+                    let ret_resolved = self.resolve_alias(ret_ty as TypeId)
+                    let ret_tk = self.get_type_kind(ret_resolved)
+                    if ret_tk == TypeKind.TY_GENERIC_INST:
+                        let ret_base = self.pool_resolve(self.get_type_d0(ret_resolved))
+                        if ret_base == "Option" and self.get_generic_inst_arg_count(ret_resolved as i32) > 0:
+                            return self.get_generic_inst_arg(ret_resolved as i32, 0)
         self.ty_i32 as i32
 
     // #747: the extern doctrine (check_call, §3.8/G1) as ONE queryable rule.

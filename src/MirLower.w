@@ -6443,8 +6443,17 @@ impl MirBuilder:
                                     return self.lower_for_iter_place(for_node, pat_or_sym, recv, body_expr)
 
         // Generic iterator protocol: resolve next() on the iterator type.
+        // #912: for a generic iterator, check_for recorded the concrete
+        // next() specialization keyed by the for node — dispatch exactly
+        // that; the template sym alone names no lowered function.
         let next_sym = self.pool.intern("next")
-        let callee_sym = self.resolve_method_callee_sym(iter_expr, next_sym)
+        let recorded_mono = self.sema.resolved_call_mono_syms.get(for_node)
+        var recorded_mono_sym = 0
+        if recorded_mono.is_some(): recorded_mono_sym = recorded_mono.unwrap()
+        let recorded_sig = self.sema.resolved_call_sigs.get(for_node)
+        var recorded_sig_idx = -1
+        if recorded_sig.is_some(): recorded_sig_idx = recorded_sig.unwrap()
+        let callee_sym = if recorded_mono_sym != 0: recorded_mono_sym else: self.resolve_method_callee_sym(iter_expr, next_sym)
         if callee_sym == next_sym:
             self.mark_unsupported()
 
@@ -6457,7 +6466,9 @@ impl MirBuilder:
         let owner_sym = self.sema.method_owner_symbol_for_type(resolved_iter as i32)
         let sema_next_sym = self.sema.pool_lookup_symbol("next")
         var next_ret_ty = 0
-        if owner_sym != 0 and sema_next_sym > 0:
+        if recorded_sig_idx >= 0:
+            next_ret_ty = self.sema.sig_return_type(recorded_sig_idx)
+        if next_ret_ty == 0 and owner_sym != 0 and sema_next_sym > 0:
             let sig_idx = self.sema.lookup_method_sig(owner_sym, sema_next_sym)
             if sig_idx >= 0:
                 next_ret_ty = self.sema.sig_return_type(sig_idx)
@@ -6477,6 +6488,13 @@ impl MirBuilder:
         let next_args: Vec[i32] = Vec.new()
         next_args.push(self.body.new_operand(OperandKind.OK_COPY, iter_place))
         let args_id = self.body.new_call_args(next_args)
+        if recorded_sig_idx >= 0:
+            // Route through the generic-call contract so codegen lazily
+            // emits the recorded next() specialization (#912).
+            self.body.set_call_intrinsic(args_id, MirIntrinsic.GENERIC_CALL)
+            self.body.set_call_ast_node(args_id, for_node)
+            self.record_call_contract(args_id, for_node, -1)
+            self.body.require_call_contract(args_id)
         let next_local = self.new_temp(next_ret_ty)
         let next_place = self.place_for_local(next_local)
         let after_next_bb = self.new_block()
@@ -6497,9 +6515,16 @@ impl MirBuilder:
         let item_place = self.place_for_local(item_local)
         let downcast_place = self.body.new_downcast_place(next_place, some_idx, next_ret_ty)
         let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
-        let next_payload = self.body.new_operand(OperandKind.OK_COPY, payload_place)
+        // Drop-class elements MOVE out of the Option temp (the `?` idiom) —
+        // a copy leaves the stale Some to double-drop the payload at cleanup.
+        let next_payload = self.body.new_operand(if self.sema.is_copy_frozen(elem_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
         self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
 
+        // #614b + D33: the binding itself lives in a per-iteration scope. A
+        // Drop-class element yielded by value (consuming iteration) must drop
+        // once per iteration on the back-edge/break edge — registered in the
+        // function scope it drops again at exit (the drop#17/drop#20 double).
+        self.push_scope()
         self.bind_for_element_or_skip(for_node, pat_or_sym, item_place, elem_ty, body_expr, header_bb)
 
         // #771 (the #729 loop shape): stmt temps created INSIDE the body must
@@ -6508,7 +6533,7 @@ impl MirBuilder:
         let loop_body_temp_frame = self.push_stmt_temp_frame()
         let _ = self.lower_expr_discard(body_expr)
         self.finish_stmt_temp_frame(loop_body_temp_frame)
-        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+        self.pop_scope_with_goto(header_bb)
 
         self.pop_control_target()
         self.switch_to(exit_bb)
