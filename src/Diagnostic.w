@@ -171,6 +171,20 @@ impl DiagnosticList:
         return
 
     mut fn emit(diag: Diagnostic) -> Unit:
+        // #759: an identical diagnostic (severity, message, primary span,
+        // code) re-derived by a later pass over the same AST is one
+        // diagnostic — the comptime-transform sema and check_module both
+        // run declaration collection, and every decl-phase error rendered
+        // twice. Same node + same words twice is never signal.
+        for i in 0..self.items.len() as i32:
+            let existing = self.items.get(i as i64)
+            if existing.severity == diag.severity and
+               existing.primary.file == diag.primary.file and
+               existing.primary.start == diag.primary.start and
+               existing.primary.end == diag.primary.end and
+               existing.message == diag.message and
+               existing.code == diag.code:
+                return
         self.items.push(move diag)
 
     fn count() -> i32:
