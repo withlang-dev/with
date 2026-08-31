@@ -64,6 +64,15 @@ let RT_SIGSEGV: i32 = 11
 
 let FIBER_ALT_STACK_SIZE: i64 = 131072
 
+// Committed room reserved *below* the guard page. Windows has no sigaltstack:
+// when the guard page faults, KiUserExceptionDispatcher builds the CONTEXT and
+// RtlDispatchException walks the VEH list on the *faulting* fiber stack — which
+// is exhausted. Without headroom below the guard, that dispatch (plus our
+// handler's WriteFile/ExitProcess calls) runs off the bottom into unmapped
+// memory, producing a nested 0xC0000005 before the diagnostic prints. This
+// committed slack is the Windows analogue of the POSIX alt stack.
+let FIBER_GUARD_HEADROOM: i64 = 65536
+
 var current_fiber: i64 = 0
 var scheduler_ctx: [328]u8 = [0 as u8; 328]
 var free_pool_head: i64 = 0
@@ -367,13 +376,16 @@ fn fiber_effective_pool_limit() -> i32:
 
 fn allocate_stack_region(size: i64) -> *mut u8:
     let page_sz = guard_page_size()
-    let total = page_sz + size
+    let total = FIBER_GUARD_HEADROOM + page_sz + size
     let _ = rt_fiber_mmap_flags()
     let region = rt_mmap(total)
     if region as i64 == 0 or region as i64 == MAP_FAILED:
         return 0 as *mut u8
-    rt_fiber_protect_guard(region, page_sz)
-    (region as i64 + page_sz) as *mut u8
+    // Guard page sits above the committed headroom: [region+headroom, +page_sz).
+    // Usable stack is above the guard; the returned pointer is its low end, so
+    // the guard region stays `stack-page_sz .. stack` (with_fiber_veh unchanged).
+    rt_fiber_protect_guard((region as i64 + FIBER_GUARD_HEADROOM) as *mut u8, page_sz)
+    (region as i64 + FIBER_GUARD_HEADROOM + page_sz) as *mut u8
 
 fn acquire_fiber() -> i64:
     if free_pool_head != 0:
@@ -411,8 +423,8 @@ fn free_fiber_stack(f: i64):
     if stack as i64 == 0:
         return
     let page_sz = guard_page_size()
-    let region = (stack as i64 - page_sz) as *mut u8
-    rt_munmap(region, page_sz + fiber_stack_size(f))
+    let region = (stack as i64 - page_sz - FIBER_GUARD_HEADROOM) as *mut u8
+    rt_munmap(region, FIBER_GUARD_HEADROOM + page_sz + fiber_stack_size(f))
     fiber_set_stack(f, 0 as *mut u8)
 
 fn recycle_fiber(f: i64):
