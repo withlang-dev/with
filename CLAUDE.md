@@ -486,11 +486,12 @@ With. With IS a scripting language; there is no "just a quick script" exception.
   (`use Lexer`, `use Token`) for token-accurate source tooling — regex/text
   hacks are not acceptable for self-host-critical rewrites. See
   `tools/migrate_receivers.w`.
-- File I/O via `extern fn with_fs_read_file(path: str) -> str` /
-  `with_fs_write_file(path: str, data: str) -> i32`. (Transitional
-  spelling: these decls are the D30-deprecated internal seam and die with
-  it — post-retirement, tools reach fs through `std.fs`, and `str` in an
-  extern signature is a §16.3e error.)
+- File I/O via `use std.fs` (`read_file(path)`, `write_file(path, data)`,
+  `list_files(path)`). Never declare the `with_fs_*` externs in a tool or
+  user program: that D30-deprecated internal seam SEGFAULTS in user
+  programs (#901) and dies with the D30 retirement (#761). Caveat until
+  #909 lands: `read_file` returns `""` for a missing/unreadable path —
+  check existence when the distinction matters.
 
 **After bootstrap the seed depends on nothing external from LLVM.** A
 hard invariant.
