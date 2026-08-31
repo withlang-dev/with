@@ -955,6 +955,12 @@ If any step fails, continue debugging until it passes.
 
 ## Bootstrap Rules
 
+### Changes land via pull request
+All changes reach `main` through a reviewed PR — no direct pushes. Branch
+protection enforces this (one approving review; admins exempt for release
+and seed operations). Batch related commits into one PR the way the
+battery discipline batches them.
+
 ### Every PR must be bootstrappable
 Each PR must be green and buildable from a tagged seed release that already
 exists in the repo before it merges — if a change needs a newer seed, tag a
