@@ -1416,7 +1416,21 @@ fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, st
     let old_force = with_getenv_str("WITH_BUILD_ACTION_FORCE")
     let _set_worker = with_setenv_str("WITH_BUILD_ACTION_WORKER", target.name)
     let _set_force = with_setenv_str("WITH_BUILD_ACTION_FORCE", "1")
+    // #680: a pooled Test lane runs its own core-width sliding window; N
+    // lanes at full width oversubscribe multiplicatively (the plausible
+    // origin of #702's 20-34GB era). Divide the inner window by the pool
+    // width — Zig's max_rss admission, expressed as width. An explicit
+    // WITH_BUILD_TEST_JOBS from the user wins.
+    let old_test_jobs = with_getenv_str("WITH_BUILD_TEST_JOBS")
+    if target.kind == 2 and old_test_jobs.len() == 0:
+        let cores = build_graph_rt_cpu_cores()
+        var inner = if build_pool_width() > 0: cores / build_pool_width() else: cores
+        if inner < 2:
+            inner = 2
+        let _set_jobs = with_setenv_str("WITH_BUILD_TEST_JOBS", f"{inner}")
     let pid = build_graph_rt_exec_argv_capture_spawn(build_target_worker_argv(target, options), stdout_path, stderr_path)
+    if target.kind == 2 and old_test_jobs.len() == 0:
+        let _restore_jobs = with_setenv_str("WITH_BUILD_TEST_JOBS", old_test_jobs)
     let _restore_worker = with_setenv_str("WITH_BUILD_ACTION_WORKER", old_worker)
     let _restore_force = with_setenv_str("WITH_BUILD_ACTION_FORCE", old_force)
     pid
@@ -1793,7 +1807,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     skipped_targets.push(with_str_clone_ref(target.name))
                     completed_targets.push(with_str_clone_ref(target.name))
                     continue
-        let will_pool = target.kind == 23 and target.parallel != 0 and times_top_level
+        // #680: Action AND Test lanes pool when flagged parallel-safe. A
+        // pooled Test child divides the inner sliding window by the pool
+        // width (see build_pool_spawn) so lanes multiply across cores, not
+        // into oversubscription.
+        let will_pool = (target.kind == 23 or target.kind == 2) and target.parallel != 0 and times_top_level
         if not will_pool and pool_oldest < pool_names.len() as i32:
             while pool_oldest < pool_names.len() as i32:
                 var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)

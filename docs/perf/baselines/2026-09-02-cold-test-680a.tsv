@@ -1,0 +1,40 @@
+# baseline: cold 'with build :test' AFTER #680 phase A (lane pooling)
+# date: 2026-09-02  commit: (this)  host: darwin-aarch64
+# wall 451.5s (was 538.1s pre-#680, -16%); all green; peak child 432M, tripwire quiet
+# lane walls GREW under contention/width-division (behavior 121.8->140.8s,
+# cli-selfhost-project 28.6->88.1s) while total wall shrank — expected shape.
+target	seconds	peak_rss
+behavior-tests	140.8s	287M
+selfcheck	12.1s	0M
+native-compile-error-tests	31.0s	288M
+native-codegen-tests	32.0s	287M
+native-spec-tests	47.6s	288M
+native-phase-tests	48.5s	287M
+comptime-diff-tests	49.3s	287M
+debug-alloc-tests	50.2s	287M
+internals-tests	51.1s	288M
+lexer-tests	52.0s	288M
+parser-tests	53.0s	288M
+deep-debug-tool-tests	21.9s	286M
+cli-selfhost-smoke-tests	21.0s	286M
+cli-selfhost-one-liner-tests	10.6s	287M
+cli-selfhost-fmt-tests	9.8s	286M
+cli-selfhost-object-symbol-tests	16.3s	286M
+cli-selfhost-build-w-tests	89.0s	289M
+cli-selfhost-project-tests	88.1s	289M
+cli-selfhost-lsp-tests	87.2s	287M
+cli-selfhost-edge-tests	9.2s	0M
+cli-selfhost-parallel-tests	8.5s	0M
+c-migrator-basic-tests	12.4s	0M
+c-migrator-core-tests	13.3s	0M
+issue61-regression	17.1s	432M
+invariance-comment-sema	17.1s	432M
+invariance-let-sema	17.2s	432M
+invariance-two-lets-sema	17.2s	432M
+invariance-let-parser	17.2s	432M
+invariance-let-main	17.2s	432M
+embedded-runtime-regression	16.2s	286M
+emit-c-smoke	6.3s	0M
+spec-inventory-check	7.7s	0M
+test-green	76.7s	0M
+TOTAL	450.6s	225M
