@@ -1,0 +1,12 @@
+target	seconds	peak_rss
+behavior-tests	3.1s	225M
+native-compile-error-tests	3.0s	225M
+native-codegen-tests	2.9s	224M
+native-spec-tests	2.9s	224M
+native-phase-tests	2.9s	224M
+comptime-diff-tests	2.9s	224M
+internals-tests	2.9s	224M
+lexer-tests	2.9s	224M
+parser-tests	2.9s	224M
+test-green	3.8s	0M
+TOTAL	10.8s	225M

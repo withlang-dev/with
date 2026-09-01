@@ -52,3 +52,13 @@ memory-windowing arc item is cut pending #702 re-verification.
   — the test phase is nearly serial; #680's prize). Orchestrator
   high-water 456M; largest child 499M — ~70× under #702's recorded
   20–34 GB, which needs re-verification (see #702).
+
+- **2026-09-01** (`88832131`, post-#921-phase-1 reseed): matched-cache
+  runner-era baseline. No-op `:test` 11.5s wall (was ~30s+ pre-runner:
+  the per-invocation eval floor times each serial action). Post-change
+  `:test` (all 34 lanes executing) 463s. `test-green` standalone 19s
+  (79s at campaign start). Action-worker peak RSS 2M (was 223M —
+  actions run native in the compiled runner, evaluator state never
+  materializes). Remaining critical path: the cli-selfhost trio at
+  ~90s×3 with honest exit-stamped walls — genuinely co-terminal, the
+  #921 Workspace-phase target. TSV: baselines/2026-09-01-warm-test-runner.tsv.
