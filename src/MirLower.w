@@ -9172,10 +9172,34 @@ impl MirBuilder:
     // AFTER lowering so block bodies adjust through their tail operand.
     // Gated to named-rooted places — a temporary's view must keep failing
     // loudly instead of borrowing a dying slot.
+    // The tail operand may already have been lowered as a MOVE before the
+    // declared &T return proves it a borrow. Un-do the move's §2.5.1
+    // bookkeeping for that place — otherwise the epilogue flush blanks the
+    // borrowed place, and for a field of a borrowed &Self receiver the blank
+    // lands in the CALLER's struct: `fn get(self: &Self) -> &T: stmt();
+    // self.field` returned a valid reference to a field this function then
+    // zeroed (the std.build capability-accessor corruption, #921 rig).
+    mut fn cancel_move_bookkeeping_for_borrowed_place(place: i32) -> Unit:
+        var i = self.pending_reset_field_places.len() as i32 - 1
+        while i >= 0:
+            if self.places_are_identical(place, self.pending_reset_field_places.get(i as i64)) != 0:
+                let _p = self.pending_reset_field_places.remove(i as i64)
+                let _t = self.pending_reset_field_types.remove(i as i64)
+            i = i - 1
+        self.clear_moved_fields_for_place(place)
+        let local_id = mir_place_plain_local(&self.body, place)
+        if local_id >= 0:
+            var j = self.pending_reset_locals.len() as i32 - 1
+            while j >= 0:
+                if self.pending_reset_locals.get(j as i64) == local_id:
+                    let _l = self.pending_reset_locals.remove(j as i64)
+                j = j - 1
+            self.clear_local_value_moved(local_id)
+
     mut fn adjust_ret_operand_auto_ref(op: i32, value_expr: i32, ret_ty: i32, span: i32) -> i32:
         if op < 0 or value_expr == 0 or ret_ty == 0:
             return -1
-        let ok = self.body.operand_kinds.get(op as i64)
+        let ok: i32 = self.body.operand_kinds.get(op as i64)
         if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
             return -1
         let actual_ty = self.expr_type(value_expr)
@@ -9186,6 +9210,8 @@ impl MirBuilder:
         let place: i32 = self.body.operand_d0.get(op as i64)
         if self.place_source_is_named(place) == 0:
             return -1
+        if ok == OperandKind.OK_MOVE:
+            self.cancel_move_bookkeeping_for_borrowed_place(place)
         if self.place_type_is_str(place) != 0:
             self.mark_string_place_copied(place)
         else:
