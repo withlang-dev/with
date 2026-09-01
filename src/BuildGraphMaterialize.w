@@ -276,6 +276,7 @@ impl BuildGraphMaterializer:
                 return graph
             if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
                 with_eprint(f"[graph] after-target-{i} dt=" ++ graph.default_target)
+        graph = build_graph_complete_edges(move graph)
         graph.ok = true
         if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
             with_eprint("[graph] after-ok dt=" ++ graph.default_target)

@@ -2265,6 +2265,29 @@ fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: &str, 
         return bs_fail(ctx, f"embed cache second binary failed with exit code {second_run.rc}: " ++ second_run.stderr)
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(second_run.stdout), "second", "build_cache_embed_second", "stdout")
 
+// #700: a target consuming another target's output gets the producer edge
+// inferred — the graph knows who writes the file, so the author never spells
+// it. Selecting the consumer alone must schedule the producer first (the
+// undeclared edge is how a consumer was once served a pre-swap artifact
+// while its producer rebuilt: a binary from two tree states that never
+// coexisted).
+fn bs_check_build_graph_inferred_edge(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "inferrededge")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn produce(ctx: ActionCtx) -> i32:\n    if ctx.fs().write_text(ctx.output(), \"a\") != 0: return 1\n    0\n\nfn consume(ctx: ActionCtx) -> i32:\n    if ctx.fs().write_text(ctx.output(), ctx.fs().read_text(\"out/a.txt\")) != 0: return 1\n    0\n\npub fn build(ctx: BuildCtx) -> Build:\n    var out = ctx.new_build()\n    var a = target_new(.Action, \"a\", \"\").output(\"out/a.txt\")\n    a.action = produce\n    a = a.write_scope(\"out\")\n    out = out.add_target(move a)\n    var b = target_new(.Action, \"b\", \"\").output(\"out/b.txt\")\n    b.action = consume\n    b = b.input(\"out/a.txt\")\n    b = b.write_scope(\"out\")\n    out = out.add_target(move b)\n    out.default(\"b\")\n", "inferred edge build")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(":b")
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-graph-inferred-edge", args, 120000, case_dir)
+    if result.rc != 0:
+        return bs_fail(ctx, "consumer-only build failed (#700 inferred edge): " ++ result.stderr)
+    if ctx.fs().read_text(bs_join(case_dir, "out/a.txt")) != "a":
+        return bs_fail(ctx, "selecting ':b' did not schedule its producer 'a' (#700 inferred edge)")
+    if ctx.fs().read_text(bs_join(case_dir, "out/b.txt")) != "a":
+        return bs_fail(ctx, "consumer ran before its producer's output existed (#700 inferred edge)")
+    0
+
 fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "effectaudit")
     if rc != 0: return rc
@@ -2412,6 +2435,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_cache_tracks_embed_file(ctx, compiler_path, bs_join(output_dir, "build_cache_embed_case"))
     if rc != 0: return rc
     rc = bs_check_build_effects_audit(ctx, compiler_path, bs_join(output_dir, "build_effects_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_graph_inferred_edge(ctx, compiler_path, bs_join(output_dir, "build_graph_edge_case"))
     if rc != 0: return rc
     bs_check_run_project_targets(ctx, compiler_path, bs_join(output_dir, "run_project_case"))
 

@@ -288,54 +288,6 @@ pub fn collect_test_files(target_dir: &str) -> Vec[str]:
             w_files.push(with_str_clone_ref(path))
     build_graph_sorted_strings(w_files)
 
-fn build_graph_edge_find(paths: &Vec[str], path: &str) -> i64:
-    for i in 0..paths.len() as i32:
-        if paths.get(i as i64) == path:
-            return i as i64
-    -1
-
-// #680 groundwork: a concurrency-ready graph cannot rely on declaration
-// order to keep a consumer after its producer. Enumerate every consumption
-// of a produced path that lacks a declared dep edge; fix by adding .dep()
-// in build.w. (Duplicate outputs — primary AND extra — are already
-// hard-rejected per filtered graph by build_graph_validate_outputs, so a
-// scheduler inherits single-writer-per-invocation from it. Ordering-only
-// edges must never feed the dep_rebuilt staleness rule, or byte-identical
-// producer reruns re-invalidate consumers — the exact trap D13 removed.)
-pub fn build_graph_audit_edges(graph: &BuildGraph) -> i32:
-    let out_paths: Vec[str] = Vec.new()
-    let out_owners: Vec[str] = Vec.new()
-    for i in 0..graph.targets.len() as i32:
-        let t = &graph.targets[i as i64]
-        if t.output.len() > 0:
-            out_paths.push(with_str_clone_ref(t.output))
-            out_owners.push(with_str_clone_ref(t.name))
-        for oi in 0..t.extra_outputs.len() as i32:
-            out_paths.push(with_str_clone_ref(t.extra_outputs.get(oi as i64)))
-            out_owners.push(with_str_clone_ref(t.name))
-    var missing = 0
-    for i in 0..graph.targets.len() as i32:
-        let t = &graph.targets[i as i64]
-        let consumed: Vec[str] = Vec.new()
-        if t.entry.len() > 0:
-            consumed.push(with_str_clone_ref(t.entry))
-        for ii in 0..t.inputs.len() as i32:
-            consumed.push(with_str_clone_ref(t.inputs.get(ii as i64)))
-        for ci in 0..consumed.len() as i32:
-            let path = consumed.get(ci as i64)
-            let producer_idx = build_graph_edge_find(&out_paths, path)
-            if producer_idx < 0:
-                continue
-            let producer = out_owners.get(producer_idx)
-            if producer == t.name:
-                continue
-            if not t.deps.contains(producer):
-                build_graph_rt_eprint("note: build.w target '" ++ t.name ++ "' consumes '" ++ path ++ "' produced by '" ++ producer ++ "' without a declared dep edge (declaration-order dependent)")
-                missing = missing + 1
-    if missing > 0:
-        build_graph_rt_eprint(f"[graph] edge audit: {missing} undeclared producer edges (add .dep() in build.w; #680)")
-    0
-
 pub fn build_graph_time_fmt(ns: i64) -> str:
     let tenths = ns / 100000000
     f"{tenths / 10}.{tenths % 10}s"

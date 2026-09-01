@@ -1953,9 +1953,6 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     let generated_rc = build_graph_write_generated_sources(root, graph)
     if generated_rc != 0:
         return generated_rc
-    let edge_rc = build_graph_audit_edges(graph)
-    if edge_rc != 0:
-        return edge_rc
     let completed_targets: Vec[str] = Vec.new()
     let skipped_targets: Vec[str] = Vec.new()
     // Per-target wall time: only the top-level driver records/reports; worker

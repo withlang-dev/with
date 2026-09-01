@@ -377,6 +377,57 @@ fn build_graph_target_deep_copy(t: &BuildGraphTarget) -> BuildGraphTarget:
         action_source_paths: bg_clone_str_vec(&t.action_source_paths),
     }
 
+fn build_graph_output_index(paths: &Vec[str], path: &str) -> i64:
+    for i in 0..paths.len() as i32:
+        if paths.get(i as i64) == path:
+            return i as i64
+    -1
+
+// A consumer of a produced path depends on its producer whether or not
+// build.w spelled the edge: the graph already knows who writes the file, so
+// it declares the edge itself (#700) instead of making the author repeat it.
+// Without the edge, consumption is declaration-order dependent and skips
+// dep_rebuilt propagation, so a consumer can be served a pre-swap artifact
+// while its producer is rebuilt — a binary assembled from two tree states
+// that never coexisted. Inferred edges are data edges (the consumer reads the
+// file), so they feed dep_rebuilt exactly as a written .dep() does; an
+// ordering-only edge stays the author's to declare. Runs once, before the
+// graph is emitted, so cached graph text and every filtered subgraph carry
+// the completed edges.
+pub fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
+    var out = graph
+    let out_paths: Vec[str] = Vec.new()
+    let out_owners: Vec[str] = Vec.new()
+    for i in 0..out.targets.len() as i32:
+        let t = &out.targets[i as i64]
+        if t.output.len() > 0:
+            out_paths.push(with_str_clone_ref(t.output))
+            out_owners.push(with_str_clone_ref(t.name))
+        for oi in 0..t.extra_outputs.len() as i32:
+            out_paths.push(with_str_clone_ref(t.extra_outputs.get(oi as i64)))
+            out_owners.push(with_str_clone_ref(t.name))
+    for i in 0..out.targets.len() as i32:
+        let to_add: Vec[str] = Vec.new()
+        let t = &out.targets[i as i64]
+        let consumed: Vec[str] = Vec.new()
+        if t.entry.len() > 0:
+            consumed.push(with_str_clone_ref(t.entry))
+        for ii in 0..t.inputs.len() as i32:
+            consumed.push(with_str_clone_ref(t.inputs.get(ii as i64)))
+        for ci in 0..consumed.len() as i32:
+            let producer_idx = build_graph_output_index(&out_paths, consumed.get(ci as i64))
+            if producer_idx < 0:
+                continue
+            let producer = out_owners.get(producer_idx)
+            if producer == t.name or t.deps.contains(producer) or to_add.contains(producer):
+                continue
+            if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
+                with_eprint("[graph] inferred edge " ++ t.name ++ " -> " ++ producer)
+            to_add.push(with_str_clone_ref(producer))
+        for ai in 0..to_add.len() as i32:
+            out.targets[i as i64].deps.push(with_str_clone_ref(to_add.get(ai as i64)))
+    out
+
 pub fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
     var out = empty_build_graph()
     out.ok = graph.ok
