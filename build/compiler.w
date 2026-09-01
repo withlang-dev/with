@@ -1073,7 +1073,7 @@ fn comp_known_missing_module(item: &str) -> str:
     ""
 
 fn comp_known_missing_attribute(item: &str) -> str:
-    if item == "ffi_stack": return "\302\24714.19 roadmap"
+    if item == "ffi_stack": return "§14.19 roadmap"
     if item == "align": return "#449"
     if item == "repr": return "#449"
     if item == "target": return "#479"
@@ -1129,7 +1129,7 @@ fn comp_inventory_known_lines() -> Vec[str]:
     items.push("--open\t#537")
     items.push("--target\t#425")
     items.push("align\t#449")
-    items.push("ffi_stack\t\302\24714.19 roadmap")
+    items.push("ffi_stack\t§14.19 roadmap")
     items.push("repr\t#449")
     items.push("std.os\t#476")
     items.push("target\t#479")

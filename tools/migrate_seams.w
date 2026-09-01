@@ -22,7 +22,7 @@ extern fn with_fs_read_file(path: &str) -> str
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
 
 fn argv_append(argv: str, arg: str) -> str:
-    if argv.len() == 0: arg else: argv ++ "\u{1}" ++ arg
+    if argv.len() == 0: arg else: argv ++ "\x01" ++ arg
 
 fn split_lines(text: str) -> Vec[str]:
     let out: Vec[str] = Vec.new()

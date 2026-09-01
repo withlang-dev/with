@@ -3866,6 +3866,14 @@ impl Parser:
             self.advance()
             let node = self.pool.add_node(NodeKind.NK_STRING_LIT, start, end, sym, 0, 0)
             return self.parse_postfix(node)
+        // #929: an escape the decoders don't know must be a compile error,
+        // never silent text — `\u{0}` once produced the literal characters
+        // `u{0}` and a garbage argv blob. Validate here, at the one front
+        // door, so the three decoders (codegen, C backend, comptime) only
+        // ever see the escapes they agree on.
+        let bad_escape = string_literal_bad_escape(content, is_fstring_token_text(text))
+        if bad_escape.len() > 0:
+            self.emit_error("unknown escape sequence '" ++ bad_escape ++ "' in string literal (supported: " ++ string_escape_help() ++ ")")
         // f"..." prefix triggers string interpolation
         if is_fstring_token_text(text):
             self.advance()
@@ -3955,14 +3963,18 @@ impl Parser:
         var i = 0
         while i < clen:
             let ch = content.byte_at(i as i64)
-            if ch == 123:  // {
-                // Check for {{ (escaped brace → literal {)
-                if i + 1 < clen and content.byte_at((i + 1) as i64) == 123:
-                    i = i + 2
-                    continue
-                // Check for \{ (backslash-escaped brace → literal {)
-                if i > 0 and content.byte_at((i - 1) as i64) == 92:
+            if ch == '{':
+                // \{ is a literal brace when the backslash itself is not
+                // escaped (an odd run of backslashes precedes it); it must win
+                // over {{ so `\{{x}` is a literal brace followed by a hole.
+                var slashes = 0
+                while i - slashes > 0 and content.byte_at((i - slashes - 1) as i64) == '\\': slashes = slashes + 1
+                if slashes % 2 == 1:
                     i = i + 1
+                    continue
+                // {{ is a literal brace
+                if i + 1 < clen and content.byte_at((i + 1) as i64) == '{':
+                    i = i + 2
                     continue
                 // Collect text segment before the {
                 if i > seg_start:
@@ -4394,6 +4406,52 @@ impl Parser:
             value = text.byte_at(base as i64) as i32
         let value64 = value as i64
         self.pool.add_node(NodeKind.NK_INT_LIT, start, end, ast_int_part0(value64), ast_int_part1(value64), ast_int_part2(value64))
+
+// #929: the characters that may follow a backslash in a string literal —
+// the set every decoder accepts (CodegenDispatch decode_string_escapes,
+// CCodegen cc_decode_with_string_escapes, ComptimeEval
+// comptime_decode_string_escapes); `x` introduces `\xHH`.
+fn string_escape_chars(): "ntr0\\\"'{}x"
+
+// The diagnostic's "supported:" list, rendered from the set so it can't drift.
+fn string_escape_help() -> str:
+    let chars = string_escape_chars()
+    var out = ""
+    for i in 0..chars.len():
+        if i > 0: out = out ++ " "
+        out = out ++ "\\" ++ chars.slice(i, i + 1)
+        if chars.byte_at(i) == 'x': out = out ++ "HH"
+    out
+
+// Returns the offending two-character sequence, or "" when every escape is
+// known. For f-strings only brace depth 0 is literal text; `{expr}` segments
+// are parsed as With source separately and validate their own literals.
+fn string_literal_bad_escape(content: &str, is_fstring: bool) -> str:
+    let n = content.len()
+    var depth = 0
+    var i: i64 = 0
+    while i < n:
+        let ch = content.byte_at(i)
+        if is_fstring and depth > 0:
+            if ch == '{': depth = depth + 1
+            if ch == '}': depth = depth - 1
+            i = i + 1
+            continue
+        if is_fstring and ch == '{':
+            // `{{` is a literal brace, a lone `{` opens a hole
+            let paired = i + 1 < n and content.byte_at(i + 1) == '{'
+            if paired: i = i + 2
+            else:
+                depth = 1
+                i = i + 1
+            continue
+        if ch == '\\' and i + 1 < n:
+            if not string_escape_chars().contains(content.slice(i + 1, i + 2)):
+                return content.slice(i, i + 2)
+            i = i + 2
+            continue
+        i = i + 1
+    ""
 
 fn strip_string_token_text(text: &str) -> str:
     // f"..." → content between f" and closing "
