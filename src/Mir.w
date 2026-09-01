@@ -1140,15 +1140,15 @@ fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: &InternPool, sema: &Sema) -
     let d1 = body.stmt_data1(stmt_id)
 
     if kind == StmtKind.Assign:
-        return mir_place_text(body, d0) ++ " = " ++ mir_rvalue_text(body, d1, pool, sema) ++ ";"
+        return mir_place_text_named(body, d0, pool, sema) ++ " = " ++ mir_rvalue_text(body, d1, pool, sema) ++ ";"
     if kind == StmtKind.StorageLive:
         return f"StorageLive(_{d0});"
     if kind == StmtKind.StorageDead:
         return f"StorageDead(_{d0});"
     if kind == StmtKind.Drop:
         if d1 != 0:
-            return "drop(" ++ mir_place_text(body, d0) ++ ") @ " ++ pool.resolve(d1) ++ ";"
-        return "drop(" ++ mir_place_text(body, d0) ++ ");"
+            return "drop(" ++ mir_place_text_named(body, d0, pool, sema) ++ ") @ " ++ pool.resolve(d1) ++ ";"
+        return "drop(" ++ mir_place_text_named(body, d0, pool, sema) ++ ");"
     if kind == StmtKind.Nop:
         return "nop;"
 
@@ -1206,13 +1206,82 @@ fn mir_term_text(body: &MirBody, bb: i32, pool: &InternPool, sema: &Sema) -> str
     if kind == TermKind.TK_CALL:
         let fn_text = mir_operand_text(body, d0, pool, sema)
         let args_text = mir_call_args_text(body, d1, pool, sema)
-        let dest_text = mir_place_text(body, d2)
+        let dest_text = mir_place_text_named(body, d2, pool, sema)
         return f"call {fn_text}({args_text}) -> [return: {dest_text}, next: bb{d3}];"
 
     if kind == TermKind.TK_DROP_AND_GOTO:
-        return f"drop({mir_place_text(body, d0)}) -> bb{d1};"
+        return f"drop({mir_place_text_named(body, d0, pool, sema)}) -> bb{d1};"
 
     f"term<{kind}>({d0}, {d1}, {d2}, {d3});"
+
+// Display twin of mir_place_text: renders PK_FIELD tokens as field NAMES
+// (`_1.buf`, not `_1.f354`) so dump fixtures never pin pool-order-dependent
+// sym ids — any stdlib intern change shifted them and flapped the phase
+// lane. Token disambiguation follows tuple_index_from_field_token's rule:
+// a token below the base type's field count is an index, otherwise an
+// interned sym (either pool). Nested generic-inst field types degrade to
+// the raw `.f{token}` spelling rather than risk the frozen query's phase
+// bug in a formatter. The raw mir_place_text stays the drop-state KEY
+// spelling — do not switch key/hot-path callers to this.
+fn mir_place_text_named(body: &MirBody, place_id: i32, pool: &InternPool, sema: &Sema) -> str:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return "_?"
+    let p_start = body.place_proj_starts.get(place_id as i64)
+    let p_count = body.place_proj_counts.get(place_id as i64)
+    let local = body.place_locals.get(place_id as i64) as i32
+    if p_count == 0:
+        return mir_drop_state_local_key(local)
+    var out = mir_drop_state_local_key(local)
+    var cur_ty = if local >= 0 and local < body.local_type_ids.len() as i32: body.local_type_ids.get(local as i64) else: 0
+    for i in 0..p_count:
+        let pk = body.proj_kinds.get((p_start + i) as i64)
+        let pd = body.proj_d0.get((p_start + i) as i64)
+        if pk == ProjKind.PK_FIELD:
+            var rendered = ""
+            var next_ty = 0
+            if cur_ty != 0:
+                let resolved = sema.resolve_alias(cur_ty as TypeId)
+                let fcount = sema.type_reflection_field_count(resolved as i32)
+                if pd >= 0 and pd < fcount:
+                    let fname = sema.type_reflection_field_name(resolved as i32, pd)
+                    let ftext = sema.pool_resolve_symbol(fname)
+                    if ftext.len() > 0:
+                        rendered = "." ++ ftext
+                else:
+                    var ftext = pool.resolve_symbol(pd)
+                    if ftext.len() == 0:
+                        ftext = sema.pool_resolve_symbol(pd)
+                    if ftext.len() > 0:
+                        rendered = "." ++ ftext
+                    if sema.get_type_kind(resolved) == TypeKind.TY_STRUCT:
+                        next_ty = sema.struct_field_type_frozen(resolved as i32, pd)
+            if rendered.len() == 0:
+                rendered = f".f{pd}"
+            out = out ++ rendered
+            cur_ty = next_ty
+            continue
+        if pk == ProjKind.PK_TUPLE_INDEX:
+            out = out ++ f".{pd}"
+            cur_ty = 0
+            continue
+        if pk == ProjKind.PK_INDEX:
+            out = out ++ f"[_{pd}]"
+            cur_ty = 0
+            continue
+        if pk == ProjKind.PK_DEREF:
+            out = out ++ ".*"
+            if cur_ty != 0:
+                let deref_resolved = sema.resolve_alias(cur_ty as TypeId)
+                let deref_tk = sema.get_type_kind(deref_resolved)
+                cur_ty = if deref_tk == TypeKind.TY_REF or deref_tk == TypeKind.TY_PTR: sema.get_type_d0(deref_resolved) else: 0
+            continue
+        if pk == ProjKind.PK_DOWNCAST:
+            out = out ++ f"<as v{pd}>"
+            cur_ty = 0
+            continue
+        out = out ++ f"<p{pk}:{pd}>"
+        cur_ty = 0
+    out
 
 fn mir_place_text(body: &MirBody, place_id: i32) -> str:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
@@ -1272,23 +1341,23 @@ fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: &InternPool, sema: &Sema)
 
     if k == RvalueKind.RK_REF:
         let borrow = if d0 == BorrowKind.EXCLUSIVE: "mut" else: "shared"
-        return "ref(" ++ borrow ++ ", " ++ mir_place_text(body, d1) ++ ")"
+        return "ref(" ++ borrow ++ ", " ++ mir_place_text_named(body, d1, pool, sema) ++ ")"
 
     if k == RvalueKind.RK_ADDR_OF:
-        return "addr_of(" ++ mir_place_text(body, d0) ++ ")"
+        return "addr_of(" ++ mir_place_text_named(body, d0, pool, sema) ++ ")"
 
     if k == RvalueKind.RK_AGGREGATE:
         return f"aggregate(kind={d0}, tag={d2}, fields=[{mir_agg_fields_text(body, d1, pool, sema)}])"
 
     if k == RvalueKind.RK_DISCRIMINANT:
-        return "discriminant(" ++ mir_place_text(body, d0) ++ ")"
+        return "discriminant(" ++ mir_place_text_named(body, d0, pool, sema) ++ ")"
 
     if k == RvalueKind.RK_CAST:
         let ty = if d1 != 0: f"ty{d1}" else: "<inferred>"
         return "cast(" ++ mir_operand_text(body, d0, pool, sema) ++ " as " ++ ty ++ ")"
 
     if k == RvalueKind.RK_LEN:
-        return "len(" ++ mir_place_text(body, d0) ++ ")"
+        return "len(" ++ mir_place_text_named(body, d0, pool, sema) ++ ")"
 
     if k == RvalueKind.RK_ARRAY_FILL:
         return f"array_fill({mir_operand_text(body, d0, pool, sema)}, count={d1})"
@@ -1297,7 +1366,7 @@ fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: &InternPool, sema: &Sema)
         return f"str_concat_n([{mir_call_args_text(body, d0, pool, sema)}])"
 
     if k == RvalueKind.RK_SLICE:
-        return "slice(" ++ mir_place_text(body, d0) ++ ", " ++ mir_operand_text(body, d1, pool, sema) ++ ", " ++ mir_operand_text(body, d2, pool, sema) ++ ")"
+        return "slice(" ++ mir_place_text_named(body, d0, pool, sema) ++ ", " ++ mir_operand_text(body, d1, pool, sema) ++ ", " ++ mir_operand_text(body, d2, pool, sema) ++ ")"
 
     return f"rvalue<{k}>({d0}, {d1}, {d2})"
 
@@ -1309,9 +1378,9 @@ fn mir_operand_text(body: &MirBody, operand_id: i32, pool: &InternPool, sema: &S
     let d0 = body.operand_d0.get(operand_id as i64)
 
     if k == OperandKind.OK_COPY:
-        return "copy " ++ mir_place_text(body, d0)
+        return "copy " ++ mir_place_text_named(body, d0, pool, sema)
     if k == OperandKind.OK_MOVE:
-        return "move " ++ mir_place_text(body, d0)
+        return "move " ++ mir_place_text_named(body, d0, pool, sema)
     if k == OperandKind.OK_CONSTANT:
         return mir_const_text(body, d0, pool, sema)
 
