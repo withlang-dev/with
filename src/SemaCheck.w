@@ -9785,7 +9785,28 @@ impl Sema:
     fn view_origin_is_stack_local(sym: i32) -> i32:
         if sym == 0:
             return 0
-        if self.param_index_for_sym(sym) >= 0:
+        let pi = self.param_index_for_sym(sym)
+        if pi >= 0:
+            // #718 (D5 §3.8): the DECLARED mode decides whether a parameter
+            // outlives this call. A `&T` param and a fn/mut fn receiver
+            // borrow a caller place — non-dying origins. A plain consuming
+            // `T` param and a `move fn` receiver die when the callee
+            // returns; a view of them dangles exactly like a view of a
+            // local. (Pre-D5 every param was a borrow; that's the hole.)
+            if self.current_fn_sig_idx < 0:
+                return 0
+            if pi == 0:
+                let rmode = self.sig_receiver_mode(self.current_fn_sig_idx)
+                if rmode == ReceiverMode.Read or rmode == ReceiverMode.Mut:
+                    return 0
+                if rmode == ReceiverMode.Move:
+                    return 1
+            let p_ty = self.sig_param_type(self.current_fn_sig_idx, pi)
+            if p_ty != 0:
+                let p_tk = self.get_type_kind(self.resolve_alias(p_ty as TypeId))
+                if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
+                    return 0
+                return 1
             return 0
         if self.global_value_decl_kind(sym) != 0:
             return 0
