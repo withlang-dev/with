@@ -12126,9 +12126,12 @@ impl Sema:
                         // adjustments are legitimate.
                         let field_expected_kind = self.get_type_kind(field_expected_resolved)
                         let field_value_kind = self.get_type_kind(self.resolve_alias(val_ty))
-                        // Integer literals initialize pointer fields (the
-                        // stdlib's own `Vec{ ptr: 0, ... }` null idiom).
-                        let f_int_to_ptr = field_expected_kind == TypeKind.TY_PTR and field_value_kind == TypeKind.TY_INT
+                        // A raw-pointer field accepts integers (the stdlib's
+                        // `Vec{ ptr: 0 }` null idiom) and any other raw
+                        // pointer (`CString{ ptr: buf }` mixes *mut u8 and
+                        // *const i8) — pointer-type mixing is the unsafe
+                        // tier's concern, not this check's.
+                        let f_int_to_ptr = field_expected_kind == TypeKind.TY_PTR and (field_value_kind == TypeKind.TY_INT or field_value_kind == TypeKind.TY_PTR)
                         if not f_int_to_ptr and
                            self.type_is_union(field_expected) == 0 and
                            self.type_is_dyn_object(field_expected_resolved) == 0 and
