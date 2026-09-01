@@ -1,191 +1,211 @@
-# Hardening `with migrate`: from "works on pcre2" to "works on C"
+# Taming `with migrate`: a boring pipeline for 40 upstreams
 
-Status: PLAN (2026-09-01, from the full-engine review). Nothing here is
-implemented yet. Owner: Eric. Line numbers are anchors as of `6cd878d3`;
-re-grep before editing — the function names are the stable references.
+Status: PLAN v2 (2026-09-01, revised after the SDLC ruling). Nothing here
+is implemented yet. Owner: Eric. Line anchors as of `6cd878d3`; re-grep
+before editing — function names are the stable references.
 
-## Ruling context
+## The SDLC ruling (drives everything below)
 
-The engine must contain **zero library-specific special cases**. Everything
-in `src/CImport.w` / `src/CiMigrate.w` / `src/CiIR.w` / `src/CiPrint.w` must
-be general-purpose C translation; per-library policy (file ordering, width
-pruning, modeled-zone unsafe exemptions) belongs to the *caller* — CLI flags
-and build scripts such as `build/pcre2.w`. pcre2 migration must keep working
-throughout: the fix for a special case is the general mechanism it papered
-over, never deletion-and-hope.
+Migrated code is a **pinned, regenerated artifact**:
 
-Review verdict, for orientation: the function-body translator is sound
-(closed CiIR with no raw-text escape hatch, ANF value lowering, real
-CFG + `std.cfg.stackify` goto elimination, fail-loud bottom). The rot is in
-the type layer (strings), the decl layer (string concatenation), and a set
-of text heuristics standing in for libclang API gaps. No from-scratch
-rewrite. Each phase below lands independently and keeps pcre2 green.
+- We NEVER modify generated code. Ever.
+- Upstream ships a version we want → update the pin → re-migrate →
+  fix integration fallout on the With stdlib side (the wrapper), not in
+  the generated output.
+- Two upstreams today (pcre2, zlib). **Target: ~40.** A pin bump must be
+  a boring, reviewable, near-zero-touch operation, or the process does
+  not scale.
 
-## The battery (every phase's gate)
+This re-ranks what generated output must be good at. Nobody edits it, so
+*human editability is not a goal*. In priority order, the output must be:
 
-A phase is done when ALL of these pass, unchanged from before the phase
-except where the phase's own goal says otherwise:
+1. **Diff-auditable across re-migrations** — reviewing a pin bump IS
+   reviewing the regenerated diff; a one-function upstream patch must
+   diff as roughly one function.
+2. **Debuggable** — migration bugs are found by stepping generated code
+   against the C source; names, types, and control-flow shape must
+   survive.
+3. **Target-neutral** — one generated artifact for all targets, like the
+   C source it came from (Windows is LLP64; everything else LP64).
+4. **Total in coverage** — at 40 upstreams, every construct the engine
+   can't handle is a blocked pin bump. Loud failure stays mandatory, but
+   the failure *rate* is the scaling cost.
+5. **Typed at the seam** — the wrapper integrates against typed
+   signatures and named constants.
 
-1. `with build :test` — includes the `c-migrator-basic`/`c-migrator-core`
-   lanes and the five `test/migrate/*.c` regressions.
-2. Full pcre2 re-migration from `.reference/pcre2` with the flags
-   `build/pcre2.w` uses today; the migrated output **compiles** and the
-   migrated test suite passes (the #880 methodology: never hand-edit
-   output; a migrate fix is done only when the regenerated `.w` compiles).
-3. Same for zlib from `.reference/zlib`.
-4. `grep -in "pcre2\|raylib\|cliteral\|sljit\|zlib\|adler\|deflate" src/CImport.w src/CiMigrate.w src/CiIR.w src/CiPrint.w`
-   — hits may only be **comments citing a discovery case**, never a code
-   condition. This grep is the standing regression check for the ruling;
-   each phase shrinks its hit list and no phase may grow it.
+## Architecture decision record
 
-## Inventory: what must go, and what replaces it
+**Considered: lower C to a compiler IR (LLVM IR / bytecode) and emit With
+from that — "generic transpiler."** Rejected as the primary path:
 
-### A. Type identity by spelling (the deepest class)
+- IR is not target-neutral: sizeof/alignof fold and ABI lowers at IR-gen
+  per triple → a different generated library per target family (LLP64
+  Windows vs LP64), violating goal 3.
+- IR output is diff-unstable (temp numbering, block order, structurizer
+  cascade) → violates goal 1; and decompiler-grade → violates goal 2.
+- IR erases the typed seam (goal 5). Every maintainability-oriented
+  transpiler we can point at (`.reference/translate-c` — Zig's
+  next-generation translate-c on aro: typed C AST → Zig AST) sits at the
+  typed AST; IR-emitters (llvm-cbe, decompilers) serve machines.
+- What IR *would* buy — total coverage and semantic certainty — is
+  obtainable inside the AST path via the two moves below.
 
-- `ci_type_is_small_int` / `ci_type_is_unsigned_small_int`
-  (CImport.w:~4013-4028): C **integer promotion** decided by string-matching
-  type spellings, with `PCRE2_UCHAR8` hardcoded into the list. Any other
-  library's `typedef uint8_t byte_t;` silently gets wrong promotion — the
-  sign-extension bug the function's own comment warns about.
-- `CiPrint.w:~453-466`: scalar-copy vs `memcpy` assignment decided by
-  `starts_with(name, "c_")` — a `c_`-prefixed aggregate typedef is silently
-  scalar-copied. **This produces wrong code today** and outranks every named
-  special case in severity.
-- `CT_NAMED(spelling)` leaves in `CiTypePool.type_from_libclang`
-  (CImport.w:~6285), `type_from_translated_text` re-parsing `"*mut "`
-  prefixes back into the IR (~6435), and the function-scope type
-  environment being `HashMap[str, str]` (`CiScopeState`, ~5367).
+**Adopted: post-expansion typed AST.** The preprocessor and Sema are the
+"partial compilation"; we migrate what clang sees after them:
 
-**Replacement (Phase 1): canonical types.** Resolve every typedef through
-libclang's canonical type once at the boundary; carry `CiTypeId`
-end-to-end; promotion/signedness/aggregate-ness are queries on the resolved
-type, never on a spelling. The hardcoded name lists (including the
-legitimate `uint8_t`/`c_uchar` entries — they're the same disease) all
-delete. Acceptance: a fixture with `typedef uint8_t my_byte;` and
-`typedef struct {...} c_thing;` migrates with correct promotion casts and
-correct memcpy assignment; the `PCRE2_UCHAR8` lines are gone.
+- **(i) Query clang, never re-derive C semantics.** We own the libclang
+  bridge (rt/cimport_stubs + the wl_ bridge over static clang), so the
+  "libclang API gap" is self-imposed. Expose canonical types, Sema's
+  usual-arithmetic-conversions answers, token-accurate extents, macro
+  provenance. Every place the engine currently guesses (promotion by
+  type-spelling, sizeof-by-prefix, for-clause text binning) becomes a
+  query.
+- **(ii) Stop un-expanding macros.** Function-like macros inline at use
+  sites — clang already expanded them; the engine's pre-expansion
+  recovery (the six-way string cascade, STR_/STRING_ prefix guessing,
+  stringify/paste machinery, the hand-rolled re-expander) exists only to
+  make output *look like* the source. Under never-edit SDLC that is
+  cosmetics purchased with exactly the fragility that breaks pin bumps.
+  Deleting it lifts coverage (statement macros, do-while(0), X-macro
+  output all become ordinary inlined code) and removes the largest
+  heuristic surface in the engine. Object-like constants KEEP the
+  trivial named-const path (`PCRE2_ERROR_*` — the wrapper needs the
+  names). Config-family selection (pcre2 widths) happens where C says it
+  does: the preprocessor (`-D PCRE2_CODE_UNIT_WIDTH=8` makes `_16`/`_32`
+  code vanish via #if) — the general mechanism width-slice approximated
+  with name pruning.
 
-### B. One library's code hand-lowered in the engine
+Costs accepted: expanded bodies where source had macro calls (bloat; an
+upstream macro edit diffs at every use site — noisy but comprehensible),
+and no macro abstractions in output. Both are acceptable for an artifact
+nobody edits.
 
-- `lower_cfprintf_effect_ir` (CImport.w:~5923-5980) + dispatch (~6083) +
-  by-name rejection in value position (~10141): a ~60-line lowering pass
-  for `cfprintf`, a function defined in **pcre2test.c**. Delete outright.
-  pcre2test either carries a local shim (`#define cfprintf(c, ...)
-  fprintf(__VA_ARGS__)`-equivalent in a forced include owned by
-  `build/pcre2.w`) or the call fails loudly like any other untranslatable
-  construct. A test driver is not the library; its migration convenience
-  must not live in the engine.
-- `CLITERAL` (CImport.w:~550, ~2828): raylib's compound-literal macro,
-  matched by name with magic slice offsets. The general mechanism is
-  compound-literal-through-macro handling from the AST (clang sees through
-  it); if that's not reachable, fail loudly. Delete the name matches.
+## Engine ruling (unchanged from v1)
 
-### C. Macro-prefix guessing
+Zero library-specific special cases in the engine
+(`src/CImport.w`, `src/CiMigrate.w`, `src/CiIR.w`, `src/CiPrint.w`).
+Per-library policy lives in the library's **recipe** (see below). The fix
+for a special case is the general mechanism it papered over.
 
-- `ci_expr_has_unresolved_string_macro` (CImport.w:~14215):
-  `starts_with(ident, "STR_") or starts_with(ident, "STRING_")` — pcre2's
-  internal macro-naming conventions deciding initializer routing.
-  **Replacement:** ask the preprocessor record whether the identifier *was*
-  a macro at that location (the macro session already exists —
-  `with_cimport_parse_macros`), never guess from spelling.
+Standing grep gate — hits may only be comments citing a discovery case,
+never a code condition; no phase may grow the list:
 
-### D. Destination-keyed semantics
+```
+grep -in "pcre2\|raylib\|cliteral\|sljit\|zlib\|adler\|deflate" \
+  src/CImport.w src/CiMigrate.w src/CiIR.w src/CiPrint.w
+```
 
-- `ci_migrate_shared_defs_targets_regex_zone` (CiMigrate.w:~139) +
-  consumers (CImport.w:~3726, ~8959, ~15634): `unsafe`-wrapping of
-  modeled-libc calls and `__builtin_unreachable` lowering keyed to the
-  output module prefix being `std.re`. **Replacement:** an explicit
-  `--modeled-zone` CLI flag; `build/pcre2.w` passes it; the engine never
-  sniffs destination names. Semantics identical for pcre2, declared instead
-  of inferred.
+## The 40-library process shape: recipes
 
-### E. Orchestration policy in the engine
+Each upstream gets a declarative recipe (the `build/pcre2.w` action is
+the prototype; formalize the shape as data, one per library):
 
-- `ci_migrate_pcre2_order_rank` (CiMigrate.w:~1199-1260): a 32-entry table
-  of literal pcre2 filenames is the whole directory-ordering strategy.
-  The order matters only because shared-defs dedup is first-sighting-wins.
-  **Replacement:** make dedup order-independent — collect all renders per
-  key, merge with prefer-concrete-over-opaque as a general rule (the
-  `upgrade_opaque_type` string hack at ~163 is half of this already; make
-  it structural), then emit. The table then deletes with no `--file-order`
-  flag needed. Directory order becomes plain alphabetical.
-- Width-slice `_16`/`_32` suffix pruning (CiMigrate.w:~34-56): silently
-  deletes `sha_256`/`crc_32`/`utf_16`-style identifiers in any codebase
-  when the flag is on, plus hardcoded `PCRE2_UCHAR16/32`, `PCRE2_SPTR16/32`
-  names. **Replacement:** `--prune-decls <pattern-file-or-list>` supplied by
-  the caller; `build/pcre2.w` owns the pcre2 width-family patterns. The
-  engine keeps only the generic prune mechanism.
-- `defs.w` header text "shared definitions for migrated PCRE2"
-  (CiMigrate.w:~462): use the `--shared-defs` prefix in the comment.
+- pin: upstream repo + version/commit
+- preprocessor config: -D defines (incl. config-family selection),
+  include paths, forced includes (a library-owned shim header is the
+  home for upstream-specific helpers — e.g. pcre2test's `cfprintf` —
+  never the engine)
+- migrate flags: --shared-defs prefix, --modeled-zone, --exclude,
+  --no-c-export
+- wrapper location (the With-side integration surface that absorbs
+  bump fallout)
+- validation: how to run the library's own migrated test suite
 
-### F. Silent text prostheses (make loud or make structural)
+Pin-bump SDLC: bump pin → re-migrate → generated diff reviewed →
+wrapper integration fixed → library suite green. Once recipes are data,
+the bump loop is automatable per library (a build target per recipe:
+re-migrate + compile + suite).
 
-Ordered by wrongness-risk:
+## Inventory of current violations (from the 6cd878d3 review)
 
-1. `normalize_output` global text replace `"-> void"` → `"-> Unit"`
-   (CiMigrate.w:~400-406) — rewrites string literals too. Replace with
-   emission-site fix (never emit `-> void`), then delete the replace.
-2. `for`-clause partitioning by semicolon-scanning source text
-   (CImport.w:~10460): a macro expanding to contain `;` mis-bins
-   init/cond/inc. Use token-based clause extents from clang; where
-   unreachable, detect ambiguity and bail loudly.
-3. Global-initializer recovery by scanning the whole raw source for
-   `name =` (CImport.w:~13820): name-keyed, breaks on shadowing/same-named
-   statics. Key by cursor location, not name.
-4. Six-way string-literal text cascade (CImport.w:~8595-8625) with
-   heuristic guards tuned to pcre2 (#880): reduce to the token-based
-   sources; when the survivors disagree, bail loudly instead of guessing.
-5. The `>512`-element initializer cliff (CImport.w:~11269): one code path,
-   not two; if the text path must stay for memory reasons, verify its
-   output against the AST count and bail on mismatch.
-6. `ci_string_text_contains_macro_like_ident` (CImport.w:~13228): ALL-CAPS
-   heuristic flags `NULL`/`OP_ADD`-shaped identifiers; scope it to
-   identifiers the macro session actually knows.
-7. Name-keyed `ci_find_fn_cursor` linear scan (CImport.w:~16034): O(n²)
-   and ambiguous for same-named statics; index once by location.
+Kept from v1, re-grouped by which adopted mechanism deletes each:
 
-### G. Structural (after A-F; larger)
+**Deleted by (i) canonical types / clang queries:**
+- `ci_type_is_small_int` / `_unsigned_` (CImport.w:~4013-4028):
+  integer promotion by type-spelling lists incl. `PCRE2_UCHAR8`.
+- `CiPrint.w:~453-466`: scalar-vs-memcpy assignment by
+  `starts_with(name, "c_")` — **produces wrong code today** on any
+  `c_`-prefixed aggregate typedef; highest severity item in this doc.
+- `CT_NAMED(spelling)` leaves (~6285), `type_from_translated_text`
+  string re-parse (~6435), `CiScopeState` `HashMap[str,str]` (~5367).
+- sizeof/alignof by source-text prefix (~7409); for-clause partitioning
+  by semicolon-scanning (~10460); callee names by scan-to-paren
+  (5 sites); name-keyed `ci_find_fn_cursor` (~16034) and
+  whole-file-scan initializer recovery (~13820) → location-keyed.
 
-- Wire `CiDeclPool`/`ci_print_decl` (currently dead — reachable only from
-  its own round-trip self-test) into the production path so signatures,
-  structs, enums, typedefs, globals and module assembly stop being
-  `Vec[str]` concatenation, `pub `-prepending line surgery, and the
-  `@@DECL|` text-marker merge protocol. This also gives module-level
-  output a verification surface.
+**Deleted by (ii) post-expansion migration:**
+- `STR_`/`STRING_` prefix guessing (~14215), the six-way string-literal
+  cascade (~8595-8625), stringify/paste machinery (~13164-13443), the
+  hand-rolled re-expander (~13100), `ci_string_text_contains_macro_like_ident`
+  ALL-CAPS heuristic (~13228).
+- Width-slice entirely (CiMigrate.w:~34-56, incl. the `_16`/`_32`
+  suffix prune that would silently delete `sha_256`/`crc_32`-style
+  identifiers in other codebases) → recipe-level -D selection.
+- Macro-expression translation limits (variadic/statement-macro bails)
+  stop mattering for function-like macros; object-like const path stays.
+
+**Deleted by recipe extraction:**
+- `lower_cfprintf_effect_ir` + dispatch + value-position rejection
+  (CImport.w:~5923-5980, ~6083, ~10141): pcre2test's helper hand-lowered
+  in the engine → pcre2 recipe's forced-include shim, or loud failure.
+- `CLITERAL` name matches (~550, ~2828 — raylib!) → same treatment.
+- `std.re` destination-prefix sniffing for unsafe/unreachable semantics
+  (CiMigrate.w:~139; CImport.w:~3726, ~8959, ~15634) → explicit
+  `--modeled-zone` flag in the recipe.
+- `ci_migrate_pcre2_order_rank` 32-entry filename table
+  (CiMigrate.w:~1199-1260) → dies with order-independent dedup (below),
+  not by moving the table.
+- `defs.w` header hardcoding "PCRE2" (~462) → use the prefix.
+
+**Independent structural fixes:**
+- Order-independent shared-defs dedup: collect per key, merge with
+  prefer-concrete-over-opaque as a general rule (make the
+  `upgrade_opaque_type` string hack at ~163 structural), then emit.
+  Removes the ordering requirement entirely.
+- `normalize_output`'s global `"-> void"`→`"-> Unit"` text replace
+  (CiMigrate.w:~400-406) rewrites string literals too → fix emission
+  sites, delete the replace.
+- The >512-element initializer cliff (~11269): one path, or verify the
+  text path against the AST and bail on mismatch.
+- Wire `CiDeclPool`/`ci_print_decl` (currently dead) into production so
+  module-level output stops being `Vec[str]` concatenation, `pub `
+  line-prepending, and the `@@DECL|` text-marker merge protocol.
 
 ## Phases
 
-| Phase | Contents | Risk | Proof |
-|---|---|---|---|
-| 1 | A (canonical types) | touches promotion/assignment lowering everywhere | battery + new typedef fixtures |
-| 2 | E-dedup (order independence), then delete the rank table | shared-defs output reshuffles once (diff review of pcre2 defs.w) | battery; defs.w semantically identical |
-| 3 | D + E-width + B + C (policy extraction, deletions) | low — each is flag-plumbing plus a deletion | battery + the §Battery grep shrinks to comments-only |
-| 4 | F (loud/structural prostheses), one item per commit | medium — each swaps a guess for a bail; expect new loud failures on constructs previously mistranslated | battery; any new bail on pcre2/zlib is a finding, not a regression |
-| 5 | G (decl layer through CiIR) | high — big diff; do last | battery + `ci_ir_roundtrip_test` promoted to cover decls |
-| 6 | Third-library proof: migrate a codebase never tuned against (sqlite3 amalgamation or lua) with **zero engine edits allowed during the run**; every failure files an issue against the general mechanism | — | the honest generality gate |
+| Phase | Contents | Proof |
+|---|---|---|
+| 1 | Bridge enrichment + canonical types end-to-end (mechanism i). Kills the promotion lists, the `c_` memcpy bug, the text prostheses. | battery + typedef/`c_`-aggregate fixtures |
+| 2 | Order-independent dedup; delete the pcre2 rank table. | battery; pcre2 defs.w semantically identical |
+| 3 | Recipe extraction: `--modeled-zone`, forced-include shims (cfprintf, CLITERAL), recipe files for pcre2 + zlib; delete the engine cases. | battery + grep gate shrinks to comments-only |
+| 4 | Post-expansion migration (mechanism ii): delete recovery machinery + width-slice; pcre2 recipe switches to -D width selection. One-time large regeneration diff, reviewed. | battery; migrated suites green; engine line count drops |
+| 5 | Decl layer through CiIR; remaining loud-not-guess fixes. | battery + decl round-trip coverage |
+| 6 | Library 3: an upstream never tuned against (sqlite3 amalgamation or lua), recipe-only, **zero engine edits during the run**; failures file issues against general mechanisms. Then library 4... | the generality gate, repeated per new upstream |
+
+Battery per phase (unchanged): `with build :test` (migrator lanes +
+test/migrate fixtures), full pcre2 + zlib re-migration with output
+compiling and their migrated suites passing, never hand-editing output,
+plus the grep gate.
 
 ## Traps
 
-- **Never hand-edit migrated output** to get a gate green; fix the engine
-  and re-migrate (the #880 discipline).
-- **One source of truth per contract**: the rt pointer-spelling rule
-  (`ci_rt_ptr_mut`/`ci_rt_ptr_const`, CiMigrate.w:~565) is the pattern —
-  when Phase 1 centralizes type identity, kill every second derivation it
-  finds, don't leave both.
-- The B11 `LEGACY` comments (CImport.w:~14390-14419) are fossils — the
-  legacy string translator is gone and body-translation failure is already
-  loud and fatal (CiMigrate.w:~1614). Don't "restore" a fallback while
-  making prostheses loud; loud-and-stop is the contract.
-- Fixture sprawl: each deleted special case gains a minimal `.c` fixture in
-  `test/migrate/` reproducing the construct generally (not the pcre2
-  spelling), per sweep-all-corpora discipline.
-- `test/migrate` has five files against a 16.5k-line engine; every phase
-  should leave it larger than it found it.
+- **Never hand-edit migrated output** to pass a gate (the #880
+  discipline). Fix the engine or the recipe, re-migrate.
+- One source of truth per contract (`ci_rt_ptr_mut`/`ci_rt_ptr_const`
+  is the pattern); Phase 1 must kill second derivations it finds.
+- The B11 `LEGACY` comments (~14390-14419) are fossils; the legacy
+  fallback is gone and body failure is already loud and fatal
+  (CiMigrate.w:~1614). Loud-and-stop stays the contract.
+- Phase 4's regeneration diff is large by construction — review it as
+  a semantic diff (suite-verified), not line-by-line; every later bump
+  diff gets smaller because of it.
+- Each deleted special case gains a general `test/migrate/` fixture
+  (the corpus is 5 files against a 16.5k-line engine; every phase must
+  leave it larger).
 
 ## Non-goals
 
-- Macro model expansion (statement macros, X-macros, type-generic
-  dispatch): the current "single well-typed expression or loudly
-  untranslated" policy is a defensible general scope, not a special case.
-  Revisit only after Phase 6 data says otherwise.
-- Migrating C++ or GNU computed goto (`goto *`): already loud, stays out.
+- A second `--raw` IR-level tier (100%-coverage disposable port for
+  bring-up). Coherent idea, out of scope until the recipe pipeline is
+  proven on libraries 3+.
+- C++ and computed goto: already loud, stay out.
