@@ -10813,6 +10813,10 @@ impl MirBuilder:
     mut fn lower_owned_receiver_place(self_expr: i32, value_ty: i32) -> i32:
         let source_place = self.lower_expr_place(self_expr)
         let value_op = self.body.new_operand(OperandKind.OK_MOVE, source_place)
+        // #724 acceptance chase: an UNREGISTERED move leaves the source's
+        // scheduled drop live — r.err() extracted the payload while r's
+        // enum drop still freed it (double free / freed-payload reads).
+        self.consume_moved_operand(value_op)
         self.materialize_operand(value_op, value_ty, self.ast.get_start(self_expr))
 
     mut fn emit_vec_new_into(vec_place: i32, span: i32):
@@ -11166,8 +11170,20 @@ impl MirBuilder:
         let downcast = self.body.new_downcast_place(value_place, variant_idx, value_ty)
         let payload_place = self.body.new_field_place(downcast, 0, payload_ty)
         let some_fields: Vec[i32] = Vec.new()
-        some_fields.push(self.operand_for_place(payload_place, payload_ty))
+        let ok_err_payload_op = self.operand_for_place(payload_place, payload_ty)
+        // Register the payload move so the materialized receiver temp's
+        // drop skips what the Option now owns.
+        self.consume_moved_operand(ok_err_payload_op)
+        some_fields.push(ok_err_payload_op)
         self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
+        // §2.5.1 reset-on-move, emitted directly on the moving path: blank
+        // the extracted payload so the receiver temp's whole-enum scope drop
+        // frees nothing. (The other_bb path keeps its payload — err() on an
+        // Ok value must still drop the un-extracted Ok payload.)
+        if self.sema.is_copy_frozen(payload_ty) == 0:
+            let blank_zop = self.body.gen_zero_operand(payload_ty)
+            let blank_rv = self.body.new_rvalue(RvalueKind.RK_USE, blank_zop, 0, 0)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, payload_place, blank_rv, span)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
