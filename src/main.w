@@ -2552,6 +2552,11 @@ fn reseed_gate_smoke(root: &str, compiler_path: &str) -> i32:
     // action natively — the whole post-reseed path, exercised pre-reseed.
     let smoke_override = with_getenv_str("WITH_RESEED_SMOKE_TARGET")
     let smoke_target = if smoke_override.len() > 0: smoke_override else: "compiler-main-source"
+    // The graph cache is keyed by compiler fingerprint, so a never-installed
+    // candidate misses — unless it already orchestrated this repo once (a
+    // manual run, or the refusal demo). Drop the cache so the smoke always
+    // evaluates build.w through the candidate's comptime evaluator (#931).
+    with_fs_remove_file(build_cache_graph_path(root))
     let old_force = with_getenv_str("WITH_BUILD_ACTION_FORCE")
     with_setenv_str("WITH_BUILD_ACTION_FORCE", "1")
     var smoke_argv = ""

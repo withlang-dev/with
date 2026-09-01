@@ -768,7 +768,7 @@ pub fn build_cache_print_effects(root: &str, graph: &BuildGraph, target_filter: 
 // NOT load from this cache: evaluating an action needs the live Sema the
 // real load produces. Length-prefixed strings survive arbitrary bytes.
 
-fn build_cache_graph_path(root: &str) -> str:
+pub fn build_cache_graph_path(root: &str) -> str:
     build_cache_state_dir(root) ++ "/build-graph.cache"
 
 pub fn build_cache_graph_key(root: &str, target_kind: i32, strict_effects: i32) -> str:
