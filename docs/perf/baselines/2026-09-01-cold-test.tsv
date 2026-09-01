@@ -1,0 +1,41 @@
+# baseline: cold 'with build :test'
+# date: 2026-09-01  commit: ea2196d3  host: darwin-aarch64 (Eric's laptop)
+# orchestrator: out/bootstrap/bin/with-stage1 (instrumented, fingerprint-cold cache)
+# wall 538.1s for 630.4s of lane work => parallelism factor 1.17x
+# caveats: same as build baseline
+target	seconds	peak_rss
+behavior-tests	121.8s	1M
+selfcheck	12.8s	0M
+native-compile-error-tests	5.8s	0M
+native-codegen-tests	3.7s	0M
+native-spec-tests	24.8s	0M
+native-phase-tests	23.3s	0M
+comptime-diff-tests	2.5s	0M
+debug-alloc-tests	23.3s	0M
+internals-tests	3.6s	0M
+lexer-tests	2.8s	0M
+parser-tests	3.5s	0M
+deep-debug-tool-tests	4.1s	0M
+cli-selfhost-smoke-tests	4.7s	0M
+cli-selfhost-one-liner-tests	9.4s	0M
+cli-selfhost-fmt-tests	3.5s	0M
+cli-selfhost-object-symbol-tests	14.0s	0M
+cli-selfhost-build-w-tests	87.1s	0M
+cli-selfhost-project-tests	27.6s	0M
+cli-selfhost-lsp-tests	4.2s	0M
+cli-selfhost-edge-tests	8.2s	0M
+cli-selfhost-parallel-tests	7.5s	0M
+c-migrator-basic-tests	11.4s	0M
+c-migrator-core-tests	12.4s	0M
+issue61-regression	16.6s	432M
+invariance-comment-sema	16.6s	432M
+invariance-let-sema	16.6s	432M
+invariance-two-lets-sema	16.6s	432M
+invariance-let-parser	16.6s	432M
+invariance-let-main	16.6s	432M
+embedded-runtime-regression	16.6s	286M
+emit-c-smoke	5.5s	0M
+requirements-informative-check	3.6s	0M
+spec-inventory-check	7.8s	0M
+test-green	75.3s	0M
+TOTAL	537.3s	227M

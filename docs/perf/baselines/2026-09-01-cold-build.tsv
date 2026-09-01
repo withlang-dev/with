@@ -1,0 +1,27 @@
+# baseline: cold full 'with build'
+# date: 2026-09-01  commit: ea2196d3  host: darwin-aarch64 (Eric's laptop)
+# orchestrator: out/bootstrap/bin/with-stage1 (instrumented, fingerprint-cold cache)
+# caveats: in-process targets report high-water DELTA (0M = mark already set);
+#          grandchild processes not summed into a pooled lane's rusage
+target	seconds	peak_rss
+stage2	80.8s	0M
+llvm-bridge-object	4.0s	223M
+clang-bridge-object	4.0s	222M
+llvm-link-metadata	3.3s	0M
+cimport-stubs-object	2.7s	223M
+compat-runtime-object	2.7s	223M
+panic-runtime-object	2.7s	222M
+regex-runtime-ir	9.0s	499M
+regex-runtime-object	3.4s	169M
+fiber-stubs-object	2.7s	223M
+channel-runtime-object	2.7s	223M
+fiber-runtime-object	2.7s	223M
+fiber-core-object	2.9s	223M
+fiber-asm-object	0.0s	0M
+rt-core-object	3.1s	223M
+rt-platform-object	3.1s	222M
+embedded-objects-asm	0.0s	0M
+embedded-objects-object	0.0s	0M
+link-compiler	79.6s	0M
+build	4.7s	0M
+TOTAL	192.5s	456M
