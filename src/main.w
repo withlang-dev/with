@@ -2031,6 +2031,18 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         with_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
     if times_top_level:
         build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
+        // #679 RSS tripwire (Eric, 2026-09-02): measured peak is ~0.5 GB;
+        // any target crossing 1 GB is a memory regression and fails the
+        // build loudly. Raising the limit is a deliberate, visible edit
+        // here — never a silent creep.
+        var rss_trip_rc = 0
+        for tri in 0..timed_rss.len() as i32:
+            if timed_rss.get(tri as i64) > 1073741824:
+                let trip_name = if tri < timed_names.len() as i32: with_str_clone_ref(timed_names.get(tri as i64)) else: "?" ++ ""
+                with_eprint("error: rss tripwire: target '" ++ trip_name ++ f"' peaked at {timed_rss.get(tri as i64) / 1048576}M (limit 1024M, #679)")
+                rss_trip_rc = 1
+        if rss_trip_rc != 0:
+            return 1
     if survey and survey_failed.len() as i32 > 0:
         with_eprint(f"survey: {survey_failed.len() as i32} target(s) failed:")
         for sfi in 0..survey_failed.len() as i32:
