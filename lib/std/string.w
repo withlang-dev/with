@@ -22,6 +22,8 @@ use std.collections
 extern fn with_lines_out_ref(out: *mut u8, s: &str) -> Unit
 extern fn with_parse_i64_ref(s: &str) -> i64
 extern fn with_str_len(s: &str) -> i64
+@[effect(v: write)]
+extern fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit
 extern fn with_str_eq_ref(a: &str, b: &str) -> i32
 extern fn with_str_from_vec_u8(bytes: *const u8) -> str
 extern fn with_alloc(size: i64) -> *mut u8
@@ -48,9 +50,11 @@ pub fn StringBuilder.with_capacity(capacity: i64) -> Self:
 
 /// Append raw UTF-8 bytes from a string.
 impl StringBuilder:
+    // #919: one grow-to-fit + one memcpy — the old per-byte push loop was
+    // ~100x slower natively and interpreted per byte under the comptime
+    // evaluator (the test-green 77s anomaly's core).
     pub mut fn push_str(s: &str) -> Unit:
-        for i in 0..s.len():
-            self.bytes.push(s.byte_at(i) as u8)
+        unsafe { with_vec_append_bytes((&raw mut self.bytes) as *mut u8, s) }
         return
 
     /// Append one byte.

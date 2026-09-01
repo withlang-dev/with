@@ -2511,6 +2511,26 @@ fn vec_grow(v: *mut u8):
     vec_set_ptr_field(v, new_ptr)
     vec_set_cap(v, new_cap)
 
+// #919 (D34-C interim): bulk byte append for StringBuilder — the old
+// per-byte push was one bounds-checked call per byte (and several
+// interpreted steps per byte under the comptime evaluator). Grow to
+// fit once, memcpy once. Byte semantics only: a non-u8 element size is
+// a caller bug and fails loudly.
+pub fn with_vec_append_bytes(v: *mut u8, s: &str) -> Unit:
+    let n = str_length(s)
+    if n <= 0:
+        return
+    if vec_get_elem_size(v) != 1:
+        with_panic_core(make_str("with_vec_append_bytes requires a byte vector" as *const u8, 44), make_str("" as *const u8, 0), 0)
+    let vlen = vec_get_len(v)
+    var vcap = vec_get_cap(v)
+    while vcap < vlen + n:
+        vec_grow(v)
+        vcap = vec_get_cap(v)
+    let dst = (vec_get_ptr_field(v) as i64 + vlen) as *mut u8
+    rt_memcpy(dst, str_data(s), n)
+    vec_set_len(v, vlen + n)
+
 pub fn with_vec_push(v: *mut u8, elem: *const u8) -> Unit:
     let vlen = vec_get_len(v)
     let vcap = vec_get_cap(v)
