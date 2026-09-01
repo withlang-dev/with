@@ -4,6 +4,8 @@ extern fn with_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &st
 extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
 extern fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
 extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
+extern fn with_exec_try_wait(pid: i32) -> i32
+extern fn with_usleep(usecs: i32) -> i32
 extern fn with_exec_child_maxrss() -> i64
 extern fn with_self_maxrss() -> i64
 extern fn with_exec_binary(path: &str) -> i32
@@ -58,6 +60,12 @@ pub fn build_graph_rt_self_maxrss() -> i64: with_self_maxrss()
 
 pub fn build_graph_rt_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     with_exec_wait(pid, timeout_ms)
+
+// #921: nonblocking reap probe — -2 while the child still runs.
+pub fn build_graph_rt_exec_try_wait(pid: i32) -> i32:
+    with_exec_try_wait(pid)
+
+pub fn build_graph_rt_usleep(usecs: i32) -> i32: with_usleep(usecs)
 
 pub fn build_graph_rt_getenv(name: &str) -> str:
     with_getenv_str(name)

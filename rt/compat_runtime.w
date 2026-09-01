@@ -15,6 +15,7 @@ extern fn rt_compat_exec_argv_capture_input(args: &str, stdout_path: &str, stder
 extern fn rt_compat_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
 extern fn rt_compat_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: &str) -> i32
 extern fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32
+extern fn rt_compat_exec_try_wait(pid: i32) -> i32
 extern fn rt_compat_exec_child_maxrss() -> i64
 extern fn rt_compat_self_maxrss() -> i64
 
@@ -53,6 +54,11 @@ pub fn with_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_path: 
 
 pub fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     rt_compat_exec_wait(pid, timeout_ms)
+
+// #921: nonblocking reap probe — -2 while the child still runs; on death
+// reaps it (recording child maxrss) and returns the decoded exit code.
+pub fn with_exec_try_wait(pid: i32) -> i32:
+    rt_compat_exec_try_wait(pid)
 
 pub fn with_exec_child_maxrss() -> i64:
     rt_compat_exec_child_maxrss()

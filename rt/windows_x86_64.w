@@ -990,6 +990,26 @@ pub fn rt_compat_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_p
 pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     win_wait_process_slot(pid, timeout_ms, true)
 
+// #921: nonblocking reap probe — -2 while the child still runs; on death
+// consumes the slot and returns the exit code (no termination on probe).
+pub fn rt_compat_exec_try_wait(pid: i32) -> i32:
+    if pid <= 0 or pid >= 256:
+        return -1
+    let h: i64 = process_handles[pid]
+    if h == 0:
+        return -1
+    let wr = WaitForSingleObject(h, 0 as u32)
+    if wr == WAIT_TIMEOUT:
+        return -2
+    if wr != WAIT_OBJECT_0:
+        return win_neg_error()
+    var code: u32 = 1 as u32
+    let _ = GetExitCodeProcess(h, &raw mut code)
+    let _close = CloseHandle(h)
+    process_handles[pid] = 0
+    process_ids[pid] = 0
+    code as i32
+
 // #679/#702 stubs: RSS accounting is POSIX-only for now (#807-adjacent).
 pub fn rt_compat_exec_child_maxrss() -> i64: 0
 

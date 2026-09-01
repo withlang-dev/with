@@ -1436,33 +1436,109 @@ fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, st
     pid
 
 // Wait on the pool's oldest worker, replay its captured output, record its
-// wall time, and mark it completed on success. Returns the worker's rc.
-// The timing/completion records go back to the caller: an owned Vec
-// parameter would consume the pool state (pre-#691 handle-copy aliasing
-// is gone), so the reads borrow and the caller applies the record.
+// wall time, and mark it completed on success.
 type PoolRetireResult { rc: i32, name: str, spent: i64, maxrss: i64 }
 
-fn build_pool_retire_oldest(pool_names: &Vec[str], pool_pids: &Vec[i32], pool_t0s: &Vec[i64], pool_outs: &Vec[str], pool_errs: &Vec[str], pool_timeouts: &Vec[i32], oldest: i32) -> PoolRetireResult:
-    let idx = oldest as i64
-    let name = pool_names.get(idx)
-    let rc = build_graph_rt_exec_wait(pool_pids.get(idx), pool_timeouts.get(idx))
-    let child_rss = build_graph_rt_child_maxrss()
-    let spent = with_clock_nanos() - pool_t0s.get(idx)
-    let out_text = with_fs_read_file(pool_outs.get(idx))
-    if out_text.len() > 0:
-        with_write(out_text)
-    let err_text = with_fs_read_file(pool_errs.get(idx))
-    if err_text.len() > 0:
-        with_ewrite(err_text)
-    with_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
-    if rc == 124:
-        with_eprint("error: build.w target '" ++ name ++ "' timed out")
-        return PoolRetireResult { rc: 124, name: with_str_clone_ref(name), spent, maxrss: child_rss }
-    if rc != 0:
-        with_eprint("error: build.w target '" ++ name ++ f"' failed with exit code {rc}")
-        return PoolRetireResult { rc, name: with_str_clone_ref(name), spent, maxrss: child_rss }
-    build_cache_forget_fingerprints()
-    PoolRetireResult { rc: 0, name: with_str_clone_ref(name), spent, maxrss: child_rss }
+// #921: pooled-worker bookkeeping. Deaths are stamped by a nonblocking reap
+// sweep the moment a child exits, not when FIFO retire order reaches it —
+// before this, a fast lane inherited the wall of any older sibling it
+// outlived (three lanes reporting an identical 88.9s), which misread the
+// pool's critical path. Output replay stays FIFO; only the clocks moved.
+type PoolState {
+    names: Vec[str],
+    pids: Vec[i32],
+    t0s: Vec[i64],
+    outs: Vec[str],
+    errs: Vec[str],
+    timeouts: Vec[i32],
+    done: Vec[i32],
+    done_rcs: Vec[i32],
+    done_ats: Vec[i64],
+    done_rsss: Vec[i64],
+    oldest: i32,
+}
+
+fn PoolState.new() -> Self:
+    PoolState { names: Vec.new(), pids: Vec.new(), t0s: Vec.new(), outs: Vec.new(), errs: Vec.new(), timeouts: Vec.new(), done: Vec.new(), done_rcs: Vec.new(), done_ats: Vec.new(), done_rsss: Vec.new(), oldest: 0 }
+
+impl PoolState:
+    fn has_live(): self.oldest < self.names.len() as i32
+
+    fn live_len(): self.names.len() as i32 - self.oldest
+
+    fn dep_inflight(dep_name: &str) -> bool:
+        for pi in self.oldest..self.names.len() as i32:
+            if self.names.get(pi as i64) == dep_name:
+                return true
+        false
+
+    mut fn push(name: str, pid: i32, t0: i64, out_path: str, err_path: str, timeout_ms: i32) -> Unit:
+        self.names.push(name)
+        self.pids.push(pid)
+        self.t0s.push(t0)
+        self.outs.push(out_path)
+        self.errs.push(err_path)
+        self.timeouts.push(timeout_ms)
+        self.done.push(0)
+        self.done_rcs.push(0)
+        self.done_ats.push(0)
+        self.done_rsss.push(0)
+        return
+
+    // One nonblocking pass over the live entries: reap and timestamp any
+    // child that has exited, in-order or not.
+    mut fn sweep() -> Unit:
+        for i in self.oldest..self.names.len() as i32:
+            if self.done.get(i as i64) != 0:
+                continue
+            let rc = build_graph_rt_exec_try_wait(self.pids.get(i as i64))
+            if rc == -2:
+                continue
+            self.done[i as i64] = 1
+            self.done_rcs[i as i64] = rc
+            self.done_ats[i as i64] = with_clock_nanos()
+            self.done_rsss[i as i64] = build_graph_rt_child_maxrss()
+        return
+
+    // Block until the oldest worker is done (sweeping siblings while we
+    // wait), replay its captured output, and report its true wall/rss.
+    // Timeout semantics match the old blocking wait: the budget runs from
+    // retire, and expiry kills the child (with_exec_wait's timeout path).
+    mut fn retire_oldest() -> PoolRetireResult:
+        let idx = self.oldest as i64
+        self.sweep()
+        if self.done.get(idx) == 0:
+            let deadline = with_clock_nanos() + self.timeouts.get(idx) as i64 * 1000000
+            while self.done.get(idx) == 0:
+                if with_clock_nanos() >= deadline:
+                    let killed_rc = build_graph_rt_exec_wait(self.pids.get(idx), 1)
+                    self.done[idx] = 1
+                    self.done_rcs[idx] = killed_rc
+                    self.done_ats[idx] = with_clock_nanos()
+                    self.done_rsss[idx] = build_graph_rt_child_maxrss()
+                    break
+                build_graph_rt_usleep(10000)
+                self.sweep()
+        self.oldest = self.oldest + 1
+        let name = self.names.get(idx)
+        let rc = self.done_rcs.get(idx)
+        let spent = self.done_ats.get(idx) - self.t0s.get(idx)
+        let child_rss = self.done_rsss.get(idx)
+        let out_text = with_fs_read_file(self.outs.get(idx))
+        if out_text.len() > 0:
+            with_write(out_text)
+        let err_text = with_fs_read_file(self.errs.get(idx))
+        if err_text.len() > 0:
+            with_ewrite(err_text)
+        with_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
+        if rc == 124:
+            with_eprint("error: build.w target '" ++ name ++ "' timed out")
+            return PoolRetireResult { rc: 124, name: with_str_clone_ref(name), spent, maxrss: child_rss }
+        if rc != 0:
+            with_eprint("error: build.w target '" ++ name ++ f"' failed with exit code {rc}")
+            return PoolRetireResult { rc, name: with_str_clone_ref(name), spent, maxrss: child_rss }
+        build_cache_forget_fingerprints()
+        PoolRetireResult { rc: 0, name: with_str_clone_ref(name), spent, maxrss: child_rss }
 
 // #683: serial actions run IN-PROCESS — this driver already holds the
 // evaluated graph and sema; the former worker child recompiled build.w
@@ -1728,13 +1804,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     // #680 stage B: allow_parallel action targets run as concurrent workers.
     // Declaration order stays the program order — the pool only overlaps runs
     // of consecutive marked targets; any other execution drains it first.
-    let pool_names: Vec[str] = Vec.new()
-    let pool_pids: Vec[i32] = Vec.new()
-    let pool_t0s: Vec[i64] = Vec.new()
-    let pool_outs: Vec[str] = Vec.new()
-    let pool_errs: Vec[str] = Vec.new()
-    let pool_timeouts: Vec[i32] = Vec.new()
-    var pool_oldest = 0
+    var pool = PoolState.new()
     var pool_failed_rc = 0
     let pool_width = build_pool_width()
     for ti in 0..graph.targets.len() as i32:
@@ -1767,14 +1837,10 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 with_eprint("error: invalid build.w define for '" ++ target.name ++ "': " ++ define)
                 return 1
         var pool_dep_inflight = false
-        if pool_oldest < pool_names.len() as i32:
+        if pool.has_live():
             for di in 0..target.deps.len() as i32:
-                let dep_name = target.deps.get(di as i64)
-                for pi in pool_oldest..pool_names.len() as i32:
-                    if pool_names.get(pi as i64) == dep_name:
-                        pool_dep_inflight = true
-                        break
-                if pool_dep_inflight:
+                if pool.dep_inflight(target.deps.get(di as i64)):
+                    pool_dep_inflight = true
                     break
         var dep_rebuilt = false
         for di in 0..target.deps.len() as i32:
@@ -1789,20 +1855,18 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if pool_dep_inflight:
             dep_rebuilt = true
         if target.kind != 9 and pool_dep_inflight:
-            while pool_oldest < pool_names.len() as i32:
-                var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+            while pool.has_live():
+                var retire = pool.retire_oldest()
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 timed_rss.push(retire.maxrss)
                 if retire.rc == 0:
                     completed_targets.push(move retire.name)
-                let retire_rc = retire.rc
-                if retire_rc != 0:
+                else:
                     if survey:
-                        survey_failed.push(with_str_clone_ref(pool_names.get(pool_oldest as i64)))
+                        survey_failed.push(with_str_clone_ref(retire.name))
                     if not survey and pool_failed_rc == 0:
-                        pool_failed_rc = retire_rc
-                pool_oldest = pool_oldest + 1
+                        pool_failed_rc = retire.rc
             if pool_failed_rc != 0:
                 return pool_failed_rc
         if target.kind == 9:
@@ -1821,46 +1885,41 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // width (see build_pool_spawn) so lanes multiply across cores, not
         // into oversubscription.
         let will_pool = (target.kind == 23 or target.kind == 2) and target.parallel != 0 and times_top_level
-        if not will_pool and pool_oldest < pool_names.len() as i32:
-            while pool_oldest < pool_names.len() as i32:
-                var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+        if not will_pool and pool.has_live():
+            while pool.has_live():
+                var retire = pool.retire_oldest()
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 timed_rss.push(retire.maxrss)
                 if retire.rc == 0:
                     completed_targets.push(move retire.name)
-                let retire_rc = retire.rc
-                if retire_rc != 0:
+                else:
                     if survey:
-                        survey_failed.push(with_str_clone_ref(pool_names.get(pool_oldest as i64)))
+                        survey_failed.push(with_str_clone_ref(retire.name))
                     if not survey and pool_failed_rc == 0:
-                        pool_failed_rc = retire_rc
-                pool_oldest = pool_oldest + 1
+                        pool_failed_rc = retire.rc
             if pool_failed_rc != 0:
                 return pool_failed_rc
         if will_pool:
-            if pool_names.len() as i32 - pool_oldest >= pool_width:
-                var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+            if pool.live_len() >= pool_width:
+                var retire = pool.retire_oldest()
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 timed_rss.push(retire.maxrss)
+                let retire_rc = retire.rc
                 if retire.rc == 0:
                     completed_targets.push(move retire.name)
-                let retire_rc = retire.rc
-                let retired_name = pool_names.get(pool_oldest as i64)
-                pool_oldest = pool_oldest + 1
-                if retire_rc != 0:
+                else:
                     if survey:
-                        survey_failed.push(with_str_clone_ref(retired_name))
+                        survey_failed.push(with_str_clone_ref(retire.name))
                     if not survey:
-                        while pool_oldest < pool_names.len() as i32:
-                            var drain = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+                        while pool.has_live():
+                            var drain = pool.retire_oldest()
                             timed_names.push(with_str_clone_ref(drain.name))
                             timed_ns.push(drain.spent)
                             timed_rss.push(drain.maxrss)
                             if drain.rc == 0:
                                 completed_targets.push(move drain.name)
-                            pool_oldest = pool_oldest + 1
                         return retire_rc
             let pool_capture_dir = resolve_join(root, "out/command/" ++ build_action_safe_label(target.name))
             let _pool_mkdir = with_fs_mkdir_p(pool_capture_dir)
@@ -1870,21 +1929,15 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let pid = build_pool_spawn(target, options, worker_stdout, worker_stderr)
             if pid <= 0:
                 with_eprint("error: could not spawn worker for build.w target '" ++ target.name ++ "'")
-                while pool_oldest < pool_names.len() as i32:
-                    var drain = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+                while pool.has_live():
+                    var drain = pool.retire_oldest()
                     timed_names.push(with_str_clone_ref(drain.name))
                     timed_ns.push(drain.spent)
                     timed_rss.push(drain.maxrss)
                     if drain.rc == 0:
                         completed_targets.push(move drain.name)
-                    pool_oldest = pool_oldest + 1
                 return 1
-            pool_names.push(with_str_clone_ref(target.name))
-            pool_pids.push(pid)
-            pool_t0s.push(spawn_t0)
-            pool_outs.push(worker_stdout)
-            pool_errs.push(worker_stderr)
-            pool_timeouts.push(if target.timeout_ms > 0: target.timeout_ms else: 1200000)
+            pool.push(with_str_clone_ref(target.name), pid, spawn_t0, worker_stdout, worker_stderr, if target.timeout_ms > 0: target.timeout_ms else: 1200000)
             continue
         if times_top_level:
             // #747: the timing label is retained across the iteration while
@@ -2034,20 +2087,18 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         comp.print_warnings()
         build_cache_record(root, target, comp.tracked_input_paths(), no_strings)
         completed_targets.push(with_str_clone_ref(target.name))
-    while pool_oldest < pool_names.len() as i32:
-        var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
+    while pool.has_live():
+        var retire = pool.retire_oldest()
         timed_names.push(with_str_clone_ref(retire.name))
         timed_ns.push(retire.spent)
         timed_rss.push(retire.maxrss)
         if retire.rc == 0:
             completed_targets.push(move retire.name)
-        let retire_rc = retire.rc
-        if retire_rc != 0:
+        else:
             if survey:
-                survey_failed.push(with_str_clone_ref(pool_names.get(pool_oldest as i64)))
+                survey_failed.push(with_str_clone_ref(retire.name))
             if not survey and pool_failed_rc == 0:
-                pool_failed_rc = retire_rc
-        pool_oldest = pool_oldest + 1
+                pool_failed_rc = retire.rc
     if pool_failed_rc != 0:
         return pool_failed_rc
     if timing_name.len() > 0:

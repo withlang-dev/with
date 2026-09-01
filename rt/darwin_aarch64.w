@@ -1268,6 +1268,29 @@ pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     posix_active_child_pgid = 0
     rc
 
+// #921: nonblocking reap probe — -2 while the child still runs; on death
+// reaps it, records rusage maxrss, and decodes the exit like exec_wait.
+pub fn rt_compat_exec_try_wait(pid: i32) -> i32:
+    if pid <= 0:
+        return -1
+    var status: i32 = -1
+    var ru: [160]u8 = [0 as u8; 160]
+    let ru_base = (&raw mut ru) as *mut [160]u8 as *mut u8
+    let waited = rt_libc_wait4(pid, &raw mut status, POSIX_WNOHANG, ru_base)
+    if waited == 0:
+        return -2
+    if waited < 0:
+        if get_errno() == POSIX_EINTR:
+            return -2
+        return -1
+    posix_last_child_maxrss = posix_rusage_maxrss(ru_base as *const u8)
+    let termsig = status & 0x7f
+    if termsig == 0:
+        return (status >> 8) & 0xff
+    if termsig != 0x7f:
+        return 128 + termsig
+    status
+
 // #679/#702: peak RSS (bytes) of the most recently reaped child.
 pub fn rt_compat_exec_child_maxrss() -> i64:
     posix_last_child_maxrss
