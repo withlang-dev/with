@@ -2523,6 +2523,60 @@ fn build_report_wall(target_name: &str, t0: i64):
 // battery reduce to: verify out/release/bin/with is the exact binary
 // last-green blessed, copy it, set 0755. Same guarantee require-last-green
 // enforces, none of the graph machinery.
+// #745/#757: during the battery the release candidate only ever runs as a
+// spawned pure-compiler child (workers, tests). It first evaluates build.w
+// as the ORCHESTRATOR — comptime evaluator, action graph, worker/runner
+// spawning — after it is already installed as the seed, with no gate in
+// between; and build.w + build/*.w + tools are never checked by the new
+// compiler at all. Two regressions shipped through green batteries that
+// way (the D27 element-view flip wedging emit_c.w; the clone-storm 64 GiB
+// evaluator blow-up). Before a candidate can become the seed, run it once
+// as the checker of the build system's own source and once as the
+// orchestrator of a forced action (a graph-cache miss by fingerprint, so
+// the full build.w evaluation runs), under a time and memory budget.
+fn reseed_gate_smoke(root: &str, compiler_path: &str) -> i32:
+    let gate_dir = resolve_join(root, "out/command/reseed-gate")
+    with_fs_mkdir_p(gate_dir)
+    let t0 = with_clock_nanos()
+    var check_argv = ""
+    check_argv = build_graph_argv_append(check_argv, compiler_path)
+    check_argv = build_graph_argv_append(check_argv, "check")
+    check_argv = build_graph_argv_append(check_argv, resolve_join(root, "build.w"))
+    let check_out = resolve_join(gate_dir, "check.stdout")
+    let check_err = resolve_join(gate_dir, "check.stderr")
+    let check_rc = build_graph_rt_exec_argv_capture(check_argv, check_out, check_err, 300000)
+    if check_rc != 0:
+        with_ewrite(with_fs_read_file(check_err))
+        with_eprint(f"error: reseed gate: candidate cannot check build.w (exit {check_rc}); the build system's own source must typecheck under the new compiler before it can be the seed (#745)")
+        return 1
+    // Orchestrator smoke: a forced Action target run by the candidate. Its
+    // fingerprint differs from the seed's, so the graph cache misses and the
+    // candidate evaluates build.w in full, compiles its runner, and runs the
+    // action natively — the whole post-reseed path, exercised pre-reseed.
+    let smoke_override = with_getenv_str("WITH_RESEED_SMOKE_TARGET")
+    let smoke_target = if smoke_override.len() > 0: smoke_override else: "compiler-main-source"
+    let old_force = with_getenv_str("WITH_BUILD_ACTION_FORCE")
+    with_setenv_str("WITH_BUILD_ACTION_FORCE", "1")
+    var smoke_argv = ""
+    smoke_argv = build_graph_argv_append(smoke_argv, compiler_path)
+    smoke_argv = build_graph_argv_append(smoke_argv, "build")
+    smoke_argv = build_graph_argv_append(smoke_argv, ":" ++ smoke_target)
+    let smoke_out = resolve_join(gate_dir, "smoke.stdout")
+    let smoke_err = resolve_join(gate_dir, "smoke.stderr")
+    let smoke_rc = build_graph_rt_exec_argv_capture(smoke_argv, smoke_out, smoke_err, 600000)
+    let smoke_rss = build_graph_rt_child_maxrss()
+    with_setenv_str("WITH_BUILD_ACTION_FORCE", old_force)
+    let spent = with_clock_nanos() - t0
+    if smoke_rc != 0:
+        with_ewrite(with_fs_read_file(smoke_err))
+        with_eprint(f"error: reseed gate: candidate failed as build orchestrator on ':{smoke_target}' (exit {smoke_rc}); a regression confined to build.w evaluation or the action graph would detonate on the first post-reseed build (#757)")
+        return 1
+    if smoke_rss > 1073741824:
+        with_eprint(f"error: reseed gate: candidate as orchestrator peaked at {smoke_rss / 1048576}M (limit 1024M, #679 tripwire) — the clone-storm class (#757)")
+        return 1
+    with_write("[reseed-gate] candidate checks build.w and orchestrates ':" ++ smoke_target ++ "' natively (" ++ build_graph_time_fmt(spent) ++ f", peak {smoke_rss / 1048576}M)\n")
+    0
+
 fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     let compiler_path = resolve_join(root, "out/release/bin/with")
     if with_fs_file_exists(compiler_path) == 0:
@@ -2542,6 +2596,9 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     if not manifest.contains("\"compiler_sha256\": \"" ++ sha ++ "\""):
         with_eprint("error: " ++ compiler_path ++ " is not the compiler recorded by last-green; run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
         return 1
+    let gate_rc = reseed_gate_smoke(root, compiler_path)
+    if gate_rc != 0:
+        return gate_rc
     let dest = if target_name == "update-seed": resolve_join(root, "src/main") else: with_getenv_str("HOME") ++ "/.local/bin/with"
     if with_fs_write_file(dest, data) != 0:
         with_eprint("error: could not write " ++ dest)
