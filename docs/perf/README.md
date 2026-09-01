@@ -27,9 +27,23 @@ The reference study behind the campaign lives in
 - Grandchildren are invisible to a lane driver's rusage (a test lane's
   sliding-window compiler children report ~1M at the lane row).
 
-## Campaign targets (issue #679)
+## Campaign targets (issue #679, principled — Eric 2026-09-02)
 
-iterate loop ≤ 3.5 min · commit battery ≤ 10 min · peak RSS ≤ 8 GB.
+Derived from principle, not feasibility:
+
+- **iterate ≤ 30s** — the inner loop must not cost more than the thought
+  it verifies (flow survives ~30s; 2 min kills it). Requires #684;
+  interim milestone 60s.
+- **battery ≤ 5 min** — verification cost must never force batching;
+  every batched commit is bisection debt. Near gate: 10 min via #680 +
+  fixpoint parallelization.
+- **RSS: 1 GB per-target tripwire, enforced** — measured peak ~0.5 GB;
+  crossing 1 GB fails the build naming the target. Raising the limit is
+  a visible edit in src/main.w, never a silent creep.
+
+Arc order (data-driven): #680 → fixpoint parallelization → #684
+(promoted — it alone delivers the iterate target) → #682. The
+memory-windowing arc item is cut pending #702 re-verification.
 
 ## Log
 
