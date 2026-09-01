@@ -1353,7 +1353,9 @@ fn build_runner_entry_source() -> str:
     "    let package = Package { name: env(\"WITH_BUILD_RUNNER_PKG\"), version: env(\"WITH_BUILD_RUNNER_PKG_VER\") }\n" ++
     "    BuildCtx.__driver_new(package, env(\"WITH_BUILD_RUNNER_ROOT\"), env(\"WITH_TOOL_CAPABILITY_TOKEN\"))\n\n" ++
     "fn main:\n" ++
+    "    let _s = set_env(\"WITH_BUILD_TOOLFS_SUPPRESS\", \"1\")\n" ++
     "    let b = build(__runner_ctx())\n" ++
+    "    let _c = set_env(\"WITH_BUILD_TOOLFS_SUPPRESS\", \"\")\n" ++
     "    __driver_exit(b.__driver_run_action(__runner_ctx(), __driver_action_name()))\n"
 
 fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
@@ -2148,6 +2150,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     let effects_path = build_runner_effects_path(root, target.name)
                     let raw_rc = run_build_action_runner_process(runner_path, target, effects_path)
                     worker_rc = build_runner_postprocess(root, target, raw_rc, effects_path, options)
+                    if worker_rc != 0 and raw_rc != 97:
+                        // The pooled retire prints this for pool workers; the
+                        // serial runner path matches so a crashing action
+                        // names its target on stderr in every worker mode.
+                        with_eprint("error: build.w target '" ++ target.name ++ f"' failed with exit code {worker_rc}")
                 else:
                     worker_rc = run_build_action_worker_process(target, options)
                 if worker_rc != 0:

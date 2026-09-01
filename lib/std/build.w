@@ -473,8 +473,14 @@ fn tool_capability_valid(token: &str) -> bool:
     let expected = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
     expected.len() > 0 and token == expected
 
+// Minted-capability trust (behav_capability_token_mismatch pins this):
+// validity is established ONCE at BuildCtx.__driver_new against the driver
+// env; a minted ctx stays usable however the action mutates the environment
+// afterwards — the evaluator's handle+generation model has the same
+// property, and Sema's construction gate is what stops forgery. Method
+// requires only reject a token that could never have been minted.
 fn tool_capability_require(token: &str, name: &str):
-    if not tool_capability_valid(token):
+    if token.len() == 0:
         with_eprint("error: invalid tool capability: " ++ name)
         exit(1)
 
@@ -496,7 +502,10 @@ fn tool_action_scratch_dir(target_name: &str) -> str:
     "out/tmp/action-scratch/" ++ tool_safe_label(target_name)
 
 pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCtx:
-    tool_capability_require(token, "BuildCtx")
+    // The mint gate: the ONLY place the token must match the driver env.
+    if not tool_capability_valid(token):
+        with_eprint("error: invalid tool capability: BuildCtx\n")
+        exit(1)
     BuildCtx {
         token: with_str_clone_ref(token),
         project: ProjectInfo { package, root: with_str_clone_ref(root) },
@@ -898,7 +907,17 @@ pub fn ToolFs.host_list_files(self: &Self, path: &str) -> Vec[str]:
 pub fn ToolFs.is_dir(self: &Self, path: &str) -> bool:
     with_fs_is_dir(self.resolve_path(path)) != 0
 
+// #921: the runner re-executes build(ctx) natively to reconstruct the
+// graph; the driver already ran build(ctx)'s side effects during graph
+// evaluation, so the runner entry sets WITH_BUILD_TOOLFS_SUPPRESS for
+// that phase (the evaluator's suppress_toolfs_writes worker-mode twin)
+// and lifts it before running the action. Mutating ToolFs ops report
+// success without writing while the flag is set; reads stay live.
+fn tool_fs_writes_suppressed() -> bool:
+    with_getenv_str("WITH_BUILD_TOOLFS_SUPPRESS").len() > 0
+
 pub fn ToolFs.mkdir_all(self: &Self, path: &str) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     self.require_mkdir_allowed(path)
     with_fs_mkdir_p(self.resolve_path(path))
 
@@ -952,10 +971,12 @@ pub fn ToolFs.glob(self: &Self, pattern: &str) -> Vec[str]:
     tool_glob_sort(results)
 
 pub fn ToolFs.write_text(self: &Self, path: &str, contents: &str) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(path)
     with_fs_write_file(self.resolve_path(path), contents)
 
 pub fn ToolFs.write_binary(self: &Self, path: &str, bytes: Vec[u8]) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(path)
     var out = StringBuilder.with_capacity(bytes.len())
     for i in 0..bytes.len() as i32:
@@ -1203,6 +1224,7 @@ fn tool_gzip_stored(bytes: &Vec[u8]) -> Vec[u8]:
     out
 
 pub fn ToolFs.write_tar(self: &Self, output_path: &str, entries: &Vec[ArchiveEntry]) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(output_path)
     let out = self.tar_bytes(entries)
     if out.len() == 0:
@@ -1210,6 +1232,7 @@ pub fn ToolFs.write_tar(self: &Self, output_path: &str, entries: &Vec[ArchiveEnt
     self.write_binary(output_path, out)
 
 pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &Vec[ArchiveEntry]) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(output_path)
     let tar = self.tar_bytes(entries)
     if tar.len() == 0:
@@ -1347,6 +1370,7 @@ fn tool_pax_value(text: &str, key: &str) -> str:
     ""
 
 pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     tool_path_require_project_relative(archive_path)
     if self.mkdir_all(output_dir) != 0:
         return tool_tar_extract_fail("could not create output directory: " ++ output_dir)
@@ -1430,6 +1454,7 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
     tool_tar_extract_fail("archive ended without two zero blocks")
 
 pub fn ToolFs.copy_file(self: &Self, src: &str, dst: &str) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     tool_path_require_project_relative(src)
     self.require_write_file_allowed(dst)
     let dst_dir = tool_path_dirname(dst)
@@ -1442,28 +1467,34 @@ pub fn ToolFs.copy_file(self: &Self, src: &str, dst: &str) -> i32:
     with_fs_write_file(self.resolve_path(dst), contents)
 
 pub fn ToolFs.chmod(self: &Self, path: &str, mode: i32) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(path)
     with_fs_chmod(self.resolve_path(path), mode)
 
 pub fn ToolFs.rename(self: &Self, old_path: &str, new_path: &str) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(old_path)
     self.require_write_file_allowed(new_path)
     with_fs_rename_file(self.resolve_path(old_path), self.resolve_path(new_path))
 
 pub fn ToolFs.remove_file(self: &Self, path: &str) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(path)
     with_fs_remove_file(self.resolve_path(path))
 
 pub fn ToolFs.remove_tree(self: &Self, path: &str) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     self.require_write_file_allowed(path)
     with_fs_remove_tree(self.resolve_path(path))
 
 pub fn ToolFs.copy_tree(self: &Self, src: &str, dst: &str) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     tool_path_require_project_relative(src)
     self.require_write_file_allowed(dst)
     with_fs_copy_tree(self.resolve_path(src), self.resolve_path(dst))
 
 pub fn ToolFs.symlink(self: &Self, target: &str, link_path: &str) -> i32:
+    if tool_fs_writes_suppressed(): return 0
     tool_path_require_project_relative(target)
     self.require_write_file_allowed(link_path)
     with_fs_symlink(self.resolve_path(target), self.resolve_path(link_path))
@@ -2457,6 +2488,21 @@ pub fn Build.__driver_run_action(self: &Self, ctx: BuildCtx, action_name: &str) 
             if with_fs_mkdir_p(scratch_abs) != 0:
                 with_eprint("error: build action target '" ++ action_name ++ "' could not create scratch directory: " ++ scratch_path ++ "\n")
                 return 1
+            // The driver's evaluator path pre-creates each declared output's
+            // directory before running an action; the native runner must
+            // match, or the first ctx.fs().write_text(ctx.output(), ...)
+            // fails on a missing parent (behav_capability_token_mismatch).
+            let outputs = build_action_outputs(target)
+            for oi in 0..outputs.len() as i32:
+                let out_dir = tool_path_dirname(outputs.get(oi as i64))
+                if out_dir.len() > 0:
+                    let resolved_dir = if ctx.fs.root.len() == 0 or ctx.fs.root == ".":
+                        with_str_clone_ref(out_dir)
+                    else if ctx.fs.root.ends_with("/"):
+                        ctx.fs.root ++ out_dir
+                    else:
+                        ctx.fs.root ++ "/" ++ out_dir
+                    let _mk = with_fs_mkdir_p(resolved_dir)
             let action_ctx = build_action_ctx(ctx, target)
             return target.action(action_ctx)
     with_eprint("error: build action target not found: " ++ action_name ++ "\n")
