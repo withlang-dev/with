@@ -4355,6 +4355,10 @@ impl Parser:
         var raw = ""
         if text.len() >= 3:
             raw = text.slice(2, text.len() as i64 - 1)
+        // #929: c"..." decodes with the same escape set as a plain string.
+        let bad_escape = string_literal_bad_escape(raw, false)
+        if bad_escape.len() > 0:
+            self.emit_error("unknown escape sequence '" ++ bad_escape ++ "' in string literal (supported: " ++ string_escape_help() ++ ")")
         let sym = self.intern.intern(raw)
         self.advance()
         let node = self.pool.add_node(NodeKind.NK_C_STRING_LIT, start, end, sym, 0, 0)
