@@ -2061,6 +2061,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 let _e1 = with_setenv_str("WITH_BUILD_RUNNER_ROOT", root)
                 let _e2 = with_setenv_str("WITH_BUILD_RUNNER_PKG", cfg.package_name)
                 let _e3 = with_setenv_str("WITH_BUILD_RUNNER_PKG_VER", cfg.package_version)
+                // #921 C1: native Workspace.compile spawns `with
+                // __workspace-compile` children through this compiler.
+                let _e5 = with_setenv_str("WITH_BUILD_COMPILER", with_arg_at(0))
                 if with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN").len() == 0:
                     let _e4 = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", f"runner-{with_getpid()}-{with_clock_nanos()}")
         // #680: Action AND Test lanes pool when flagged parallel-safe. A

@@ -561,8 +561,7 @@ pub fn BuildCtx.current_workspace(self: &Self) -> Workspace:
 
 pub fn ActionCtx.create_workspace(self: &Self, name: &str) -> Workspace:
     tool_capability_require(self.token, "Workspace")
-    with_eprint("error: ActionCtx.create_workspace requires compiler driver comptime evaluation\n")
-    exit(97)
+    Workspace { token: self.token, id: ws_alloc_id(name) }
 
 pub fn ActionCtx.current_workspace(self: &Self) -> Workspace:
     tool_capability_require(self.token, "Workspace")
@@ -571,28 +570,33 @@ pub fn ActionCtx.current_workspace(self: &Self) -> Workspace:
 
 pub fn Workspace.name(self: &Self) -> str:
     tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.name requires compiler driver comptime evaluation\n")
-    exit(97)
+    var loaded = ws_state_load(self.id)
+    move loaded.name
 
 pub fn Workspace.add_file(self: &Self, path: &str) -> Unit:
     tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.add_file requires compiler driver comptime evaluation\n")
-    exit(97)
+    var s = ws_state_load(self.id)
+    s.files.push(with_str_clone_ref(path))
+    ws_state_store(self.id, &s)
 
 pub fn Workspace.add_string(self: &Self, name: &str, source: &str) -> Unit:
     tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.add_string requires compiler driver comptime evaluation\n")
-    exit(97)
+    var s = ws_state_load(self.id)
+    s.string_names.push(with_str_clone_ref(name))
+    s.string_texts.push(with_str_clone_ref(source))
+    ws_state_store(self.id, &s)
 
 pub fn Workspace.options(self: &Self) -> BuildOptions:
     tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.options requires compiler driver comptime evaluation\n")
-    exit(97)
+    var loaded = ws_state_load(self.id)
+    move loaded.options
 
 pub fn Workspace.set_options(self: &Self, options: BuildOptions) -> Unit:
     tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.set_options requires compiler driver comptime evaluation\n")
-    exit(97)
+    var s = ws_state_load(self.id)
+    s.options = options
+    s.has_options = true
+    ws_state_store(self.id, &s)
 
 pub fn Workspace.set_migrate_options(self: &Self, options: MigrateOptions) -> Unit:
     tool_capability_require(self.token, "Workspace")
@@ -601,8 +605,9 @@ pub fn Workspace.set_migrate_options(self: &Self, options: MigrateOptions) -> Un
 
 pub fn Workspace.compile(self: &Self) -> BuildResult:
     tool_capability_require(self.token, "Workspace")
-    with_eprint("error: Workspace.compile requires compiler driver comptime evaluation\n")
-    exit(97)
+    let s = ws_state_load(self.id)
+    let plan = ws_build_plan(&s, with_getenv_str("WITH_BUILD_RUNNER_ROOT"))
+    ws_run_compile_child(self.id, &plan)
 
 pub fn Workspace.begin_intercept(self: &Self) -> Unit:
     tool_capability_require(self.token, "Workspace")
@@ -2417,6 +2422,446 @@ pub fn Target.compiler(move self: Target, compiler: &str) -> Target:
     var out = self
     out.args.push("compiler=" ++ compiler)
     out
+
+// ── D24/#921: workspace compile plan wire format ───────────────────────
+// The one home for the plan that crosses to a `with __workspace-compile`
+// child. The compiler driver (ComptimeEval) and the native build runner
+// both import THIS type and these serializers, so the two sides can never
+// drift. Length-prefixed text: ints and bools one per line, a string as a
+// byte-length line then the raw bytes and a newline, a vec as a count
+// line then that many strings. Driver-internal surface (the __driver_
+// prefix), not for user build scripts.
+
+pub type WorkspaceCompilePlan {
+    valid: i32,
+    name: str,
+    is_migrate: i32,
+    final_output: str,
+    absolute_output: str,
+    output_kind: i32,
+    has_strings: i32,
+    source_paths: Vec[str],
+    source_texts: Vec[str],
+    absolute_source: str,
+    include_paths: Vec[str],
+    defines: Vec[str],
+    link_libs: Vec[str],
+    opt_level: i32,
+    no_std: bool,
+    alloc_mode: bool,
+    runtime_available: bool,
+    debug_info: bool,
+    compiler_hooks_enabled: bool,
+    prelude_mode: i32,
+    overflow_mode: i32,
+    migrate_is_dir: i32,
+    migrate_source: str,
+    migrate_include_paths: Vec[str],
+    migrate_forced_includes: Vec[str],
+    migrate_defines: Vec[str],
+    migrate_exclude_basenames: str,
+    migrate_no_c_export: bool,
+    migrate_c_export_functions: bool,
+    migrate_convert_goto_to_structured: bool,
+    migrate_block_style: i32,
+    migrate_width_slice: i32,
+    migrate_shared_defs: str,
+    migrate_one: str,
+    migrate_shared_fragment: str,
+}
+
+pub fn __driver_workspace_plan_invalid() -> WorkspaceCompilePlan:
+    WorkspaceCompilePlan {
+        valid: 0, name: "", is_migrate: 0, final_output: "", absolute_output: "",
+        output_kind: 0, has_strings: 0, source_paths: Vec.new(), source_texts: Vec.new(),
+        absolute_source: "", include_paths: Vec.new(), defines: Vec.new(), link_libs: Vec.new(),
+        opt_level: 1, no_std: false, alloc_mode: false, runtime_available: true,
+        debug_info: true, compiler_hooks_enabled: true, prelude_mode: 0, overflow_mode: -1,
+        migrate_is_dir: 0, migrate_source: "", migrate_include_paths: Vec.new(),
+        migrate_forced_includes: Vec.new(), migrate_defines: Vec.new(),
+        migrate_exclude_basenames: "", migrate_no_c_export: false,
+        migrate_c_export_functions: false, migrate_convert_goto_to_structured: false,
+        migrate_block_style: 0, migrate_width_slice: 0, migrate_shared_defs: "",
+        migrate_one: "", migrate_shared_fragment: "",
+    }
+
+fn wp_put_int(out: &str, v: i32) -> str: out ++ f"{v}\n"
+
+fn wp_put_str(out: &str, s: &str) -> str: out ++ f"{s.len()}\n" ++ s ++ "\n"
+
+fn wp_put_vec(out: &str, v: &Vec[str]) -> str:
+    var acc = out ++ f"{v.len() as i32}\n"
+    for i in 0..v.len() as i32:
+        acc = wp_put_str(acc, v.get(i as i64))
+    acc
+
+fn wp_put_bool(out: &str, b: bool) -> str: out ++ (if b: "1\n" else: "0\n")
+
+pub fn __driver_workspace_plan_serialize(p: &WorkspaceCompilePlan) -> str:
+    var out = ""
+    out = wp_put_int(out, p.valid)
+    out = wp_put_str(out, p.name)
+    out = wp_put_int(out, p.is_migrate)
+    out = wp_put_str(out, p.final_output)
+    out = wp_put_str(out, p.absolute_output)
+    out = wp_put_int(out, p.output_kind)
+    out = wp_put_int(out, p.has_strings)
+    out = wp_put_vec(out, &p.source_paths)
+    out = wp_put_vec(out, &p.source_texts)
+    out = wp_put_str(out, p.absolute_source)
+    out = wp_put_vec(out, &p.include_paths)
+    out = wp_put_vec(out, &p.defines)
+    out = wp_put_vec(out, &p.link_libs)
+    out = wp_put_int(out, p.opt_level)
+    out = wp_put_bool(out, p.no_std)
+    out = wp_put_bool(out, p.alloc_mode)
+    out = wp_put_bool(out, p.runtime_available)
+    out = wp_put_bool(out, p.debug_info)
+    out = wp_put_bool(out, p.compiler_hooks_enabled)
+    out = wp_put_int(out, p.prelude_mode)
+    out = wp_put_int(out, p.overflow_mode)
+    out = wp_put_int(out, p.migrate_is_dir)
+    out = wp_put_str(out, p.migrate_source)
+    out = wp_put_vec(out, &p.migrate_include_paths)
+    out = wp_put_vec(out, &p.migrate_forced_includes)
+    out = wp_put_vec(out, &p.migrate_defines)
+    out = wp_put_str(out, p.migrate_exclude_basenames)
+    out = wp_put_bool(out, p.migrate_no_c_export)
+    out = wp_put_bool(out, p.migrate_c_export_functions)
+    out = wp_put_bool(out, p.migrate_convert_goto_to_structured)
+    out = wp_put_int(out, p.migrate_block_style)
+    out = wp_put_int(out, p.migrate_width_slice)
+    out = wp_put_str(out, p.migrate_shared_defs)
+    out = wp_put_str(out, p.migrate_one)
+    out = wp_put_str(out, p.migrate_shared_fragment)
+    out
+
+type WpCursor { text: str, pos: i64, ok: i32 }
+
+fn wp_parse_i32(s: &str, default_value: i32) -> i32:
+    if s.len() == 0: return default_value
+    var v = 0
+    var sign = 1
+    var i: i64 = 0
+    if s.byte_at(0) == 45:
+        sign = -1
+        i = 1
+    if i >= s.len(): return default_value
+    while i < s.len():
+        let ch = s.byte_at(i)
+        if ch < 48 or ch > 57: return default_value
+        v = v * 10 + (ch - 48)
+        i = i + 1
+    v * sign
+
+impl WpCursor:
+    mut fn next_line() -> str:
+        if self.ok == 0:
+            return ""
+        var end = self.pos
+        let n = self.text.len()
+        while end < n and self.text.byte_at(end) != 10:
+            end = end + 1
+        if end >= n:
+            self.ok = 0
+            return ""
+        let line = self.text.slice(self.pos, end)
+        self.pos = end + 1
+        line
+
+    mut fn next_int() -> i32: wp_parse_i32(self.next_line(), 0)
+
+    mut fn next_str() -> str:
+        let lenline = self.next_line()
+        if self.ok == 0:
+            return ""
+        let want = wp_parse_i32(lenline, -1)
+        if want < 0 or self.pos + want as i64 + 1 > self.text.len():
+            self.ok = 0
+            return ""
+        let s = self.text.slice(self.pos, self.pos + want as i64)
+        self.pos = self.pos + want as i64 + 1
+        s
+
+    mut fn next_vec() -> Vec[str]:
+        let out: Vec[str] = Vec.new()
+        let count = self.next_int()
+        for i in 0..count:
+            out.push(self.next_str())
+        out
+
+    mut fn next_bool() -> bool: self.next_int() != 0
+
+pub fn __driver_workspace_plan_deserialize(text: &str) -> WorkspaceCompilePlan:
+    var c = WpCursor { text: with_str_clone_ref(text), pos: 0, ok: 1 }
+    var out = __driver_workspace_plan_invalid()
+    let valid = c.next_int()
+    out.name = c.next_str()
+    out.is_migrate = c.next_int()
+    out.final_output = c.next_str()
+    out.absolute_output = c.next_str()
+    out.output_kind = c.next_int()
+    out.has_strings = c.next_int()
+    out.source_paths = c.next_vec()
+    out.source_texts = c.next_vec()
+    out.absolute_source = c.next_str()
+    out.include_paths = c.next_vec()
+    out.defines = c.next_vec()
+    out.link_libs = c.next_vec()
+    out.opt_level = c.next_int()
+    out.no_std = c.next_bool()
+    out.alloc_mode = c.next_bool()
+    out.runtime_available = c.next_bool()
+    out.debug_info = c.next_bool()
+    out.compiler_hooks_enabled = c.next_bool()
+    out.prelude_mode = c.next_int()
+    out.overflow_mode = c.next_int()
+    out.migrate_is_dir = c.next_int()
+    out.migrate_source = c.next_str()
+    out.migrate_include_paths = c.next_vec()
+    out.migrate_forced_includes = c.next_vec()
+    out.migrate_defines = c.next_vec()
+    out.migrate_exclude_basenames = c.next_str()
+    out.migrate_no_c_export = c.next_bool()
+    out.migrate_c_export_functions = c.next_bool()
+    out.migrate_convert_goto_to_structured = c.next_bool()
+    out.migrate_block_style = c.next_int()
+    out.migrate_width_slice = c.next_int()
+    out.migrate_shared_defs = c.next_str()
+    out.migrate_one = c.next_str()
+    out.migrate_shared_fragment = c.next_str()
+    if c.ok == 0:
+        return __driver_workspace_plan_invalid()
+    out.valid = valid
+    out
+
+// ── #921 C1: native Workspace (plain compiles) ─────────────────────────
+// Workspace state is file-backed under
+// <root>/out/tmp/workspace-native/<pid>/<id>/ because the public surface
+// takes `self: &Self` handles (the evaluator kept state in its records;
+// the native runner keeps it on disk). compile() serializes the same
+// WorkspaceCompilePlan the driver uses and spawns the same
+// `with __workspace-compile` child (D24) via WITH_BUILD_COMPILER.
+// Migrate and intercept surfaces still exit 97 (evaluator fallback).
+
+extern fn with_getpid() -> i32
+
+fn ws_root() -> str:
+    let root = with_getenv_str("WITH_BUILD_RUNNER_ROOT")
+    let base = if root.len() == 0 or root == ".": "" ++ "" else if root.ends_with("/"): with_str_clone_ref(root) else: root ++ "/"
+    base ++ f"out/tmp/workspace-native/{with_getpid()}"
+
+fn ws_dir(id: i32) -> str: ws_root() ++ f"/{id}"
+
+fn ws_state_path(id: i32) -> str: ws_dir(id) ++ "/state.txt"
+
+type WsState {
+    name: str,
+    files: Vec[str],
+    string_names: Vec[str],
+    string_texts: Vec[str],
+    has_options: bool,
+    options: BuildOptions,
+}
+
+fn ws_default_options() -> BuildOptions:
+    BuildOptions {
+        source_path: "", output_path: "", output_kind: BuildOutputKind.Binary,
+        opt_level: 1, debug_info: true, no_std: false, alloc_mode: false,
+        prelude_mode: PreludeMode.Full, overflow_mode: OverflowMode.Default, deterministic: false,
+        target: BuildTarget.native, include_paths: Vec.new(), defines: Vec.new(),
+        link_libs: Vec.new(), compiler_hooks_enabled: true,
+    }
+
+fn ws_state_serialize(s: &WsState) -> str:
+    var out = ""
+    out = wp_put_str(out, s.name)
+    out = wp_put_vec(out, &s.files)
+    out = wp_put_vec(out, &s.string_names)
+    out = wp_put_vec(out, &s.string_texts)
+    out = wp_put_bool(out, s.has_options)
+    out = wp_put_str(out, s.options.source_path)
+    out = wp_put_str(out, s.options.output_path)
+    out = wp_put_int(out, s.options.output_kind as i32)
+    out = wp_put_int(out, s.options.opt_level)
+    out = wp_put_bool(out, s.options.debug_info)
+    out = wp_put_bool(out, s.options.no_std)
+    out = wp_put_bool(out, s.options.alloc_mode)
+    out = wp_put_int(out, s.options.prelude_mode as i32)
+    out = wp_put_int(out, s.options.overflow_mode as i32)
+    out = wp_put_bool(out, s.options.deterministic)
+    out = wp_put_int(out, s.options.target as i32)
+    out = wp_put_vec(out, &s.options.include_paths)
+    out = wp_put_vec(out, &s.options.defines)
+    out = wp_put_vec(out, &s.options.link_libs)
+    out = wp_put_bool(out, s.options.compiler_hooks_enabled)
+    out
+
+fn ws_state_load(id: i32) -> WsState:
+    let text = with_fs_read_file(ws_state_path(id))
+    var c = WpCursor { text: with_str_clone_ref(text), pos: 0, ok: if text.len() > 0: 1 else: 0 }
+    var s = WsState { name: "", files: Vec.new(), string_names: Vec.new(), string_texts: Vec.new(), has_options: false, options: ws_default_options() }
+    if c.ok == 0:
+        return s
+    s.name = c.next_str()
+    s.files = c.next_vec()
+    s.string_names = c.next_vec()
+    s.string_texts = c.next_vec()
+    s.has_options = c.next_bool()
+    s.options.source_path = c.next_str()
+    s.options.output_path = c.next_str()
+    s.options.output_kind = c.next_int() as BuildOutputKind
+    s.options.opt_level = c.next_int()
+    s.options.debug_info = c.next_bool()
+    s.options.no_std = c.next_bool()
+    s.options.alloc_mode = c.next_bool()
+    s.options.prelude_mode = c.next_int() as PreludeMode
+    s.options.overflow_mode = c.next_int() as OverflowMode
+    s.options.deterministic = c.next_bool()
+    s.options.target = c.next_int() as BuildTarget
+    s.options.include_paths = c.next_vec()
+    s.options.defines = c.next_vec()
+    s.options.link_libs = c.next_vec()
+    s.options.compiler_hooks_enabled = c.next_bool()
+    s
+
+fn ws_state_store(id: i32, s: &WsState):
+    let _mk = with_fs_mkdir_p(ws_dir(id))
+    let wrc = with_fs_write_file(ws_state_path(id), ws_state_serialize(s))
+    if wrc != 0:
+        with_eprint("error: Workspace state write failed: " ++ ws_state_path(id) ++ "\n")
+        exit(1)
+
+fn ws_alloc_id(name: &str) -> i32:
+    let root = ws_root()
+    let _mk = with_fs_mkdir_p(root)
+    let counter_path = root ++ "/next-id.txt"
+    let text = with_fs_read_file(counter_path)
+    var id = 0
+    if text.len() > 0:
+        var i: i64 = 0
+        while i < text.len():
+            let ch = text.byte_at(i)
+            if ch < 48 or ch > 57: break
+            id = id * 10 + (ch - 48)
+            i = i + 1
+    let _w = with_fs_write_file(counter_path, f"{id + 1}")
+    var s = WsState { name: with_str_clone_ref(name), files: Vec.new(), string_names: Vec.new(), string_texts: Vec.new(), has_options: false, options: ws_default_options() }
+    ws_state_store(id, &s)
+    id
+
+// Fall back to the comptime evaluator (the driver re-runs the action);
+// the reserved exit code the driver maps to a re-run, never a failure.
+fn ws_needs_evaluator(what: &str) -> Never:
+    with_eprint("note: Workspace." ++ what ++ " runs through the comptime evaluator; falling back\n")
+    exit(97)
+
+fn ws_path(root: &str, path: &str) -> str:
+    if path.len() == 0:
+        return with_str_clone_ref(path)
+    if path.byte_at(0) == 47:
+        return with_str_clone_ref(path)
+    let clean_root = if root.ends_with("/"): root.slice(0, root.len() - 1) else: with_str_clone_ref(root)
+    if clean_root.len() == 0 or clean_root == ".":
+        return with_str_clone_ref(path)
+    clean_root ++ "/" ++ path
+
+// Faithful port of the driver's workspace_compile_plan (non-migrate arm);
+// the evaluator's dynamic option lookups become typed field reads with
+// the same defaults. Divergence here is a correctness bug, not drift —
+// both sides feed the same child.
+fn ws_build_plan(state: &WsState, project_root: &str) -> WorkspaceCompilePlan:
+    var plan = __driver_workspace_plan_invalid()
+    if state.options.target as i32 != 0:
+        with_eprint("error: Workspace.compile currently supports only the native target\n")
+        exit(1)
+    var source_path = with_str_clone_ref(state.options.source_path)
+    if source_path.len() == 0 and state.files.len() > 0:
+        source_path = with_str_clone_ref(state.files.get(0))
+    if source_path.len() == 0 and state.string_names.len() == 0:
+        with_eprint("error: Workspace.compile requires at least one source file or source string\n")
+        exit(1)
+    let output_kind = state.options.output_kind as i32
+    var final_output = with_str_clone_ref(state.options.output_path)
+    if final_output.len() == 0:
+        final_output = "out/bin/" ++ state.name
+        if output_kind == 1:
+            final_output = "out/obj/" ++ state.name ++ ".o"
+        else if output_kind == 2:
+            final_output = "out/gen/" ++ state.name ++ ".c"
+        else if output_kind == 4:
+            final_output = "out/lib/lib" ++ state.name ++ ".a"
+    plan.valid = 1
+    plan.name = with_str_clone_ref(state.name)
+    plan.final_output = with_str_clone_ref(final_output)
+    plan.absolute_output = ws_path(project_root, final_output)
+    plan.output_kind = output_kind
+    plan.include_paths = tool_clone_str_vec(&state.options.include_paths)
+    plan.defines = tool_clone_str_vec(&state.options.defines)
+    plan.link_libs = tool_clone_str_vec(&state.options.link_libs)
+    plan.opt_level = state.options.opt_level
+    plan.no_std = state.options.no_std
+    plan.alloc_mode = state.options.alloc_mode
+    plan.debug_info = state.options.debug_info
+    plan.compiler_hooks_enabled = state.options.compiler_hooks_enabled
+    plan.prelude_mode = state.options.prelude_mode as i32
+    plan.overflow_mode = state.options.overflow_mode as i32
+    if state.string_names.len() > 0:
+        if output_kind != 0 and output_kind != 5:
+            with_eprint("error: Workspace.compile source strings currently support binary or check output only\n")
+            exit(1)
+        for si in 0..state.string_names.len() as i32:
+            plan.source_paths.push(ws_path(project_root, state.string_names.get(si as i64)))
+            plan.source_texts.push(with_str_clone_ref(state.string_texts.get(si as i64)))
+        plan.has_strings = 1
+    else:
+        if output_kind != 0 and output_kind != 1 and output_kind != 2 and output_kind != 4 and output_kind != 5:
+            with_eprint("error: Workspace.compile output kind is not implemented yet\n")
+            exit(1)
+        plan.absolute_source = ws_path(project_root, source_path)
+    plan
+
+fn ws_artifact_kind_for_output(output_kind: i32) -> ArtifactKind:
+    if output_kind == 1: return ArtifactKind.object
+    if output_kind == 2: return ArtifactKind.c_source
+    if output_kind == 3: return ArtifactKind.llvm_ir
+    if output_kind == 4: return ArtifactKind.static_library
+    if output_kind == 5: return ArtifactKind.diagnostics
+    ArtifactKind.executable
+
+fn ws_run_compile_child(id: i32, plan: &WorkspaceCompilePlan) -> BuildResult:
+    let compiler = with_getenv_str("WITH_BUILD_COMPILER")
+    if compiler.len() == 0:
+        ws_needs_evaluator("compile (no WITH_BUILD_COMPILER)")
+    let plan_path = ws_dir(id) ++ "/plan.txt"
+    let result_path = ws_dir(id) ++ "/result.txt"
+    let _rm = with_fs_remove_file(result_path)
+    if with_fs_write_file(plan_path, __driver_workspace_plan_serialize(plan)) != 0:
+        with_eprint("error: Workspace.compile could not write the plan file\n")
+        exit(1)
+    var argv = compiler ++ "\0"
+    argv = argv ++ "__workspace-compile\0"
+    argv = argv ++ plan_path ++ "\0"
+    argv = argv ++ result_path ++ "\0"
+    let rc = with_exec_argv(argv)
+    let result_text = with_fs_read_file(result_path)
+    var child_rc = rc
+    if result_text.len() > 0:
+        var c = WpCursor { text: with_str_clone_ref(result_text), pos: 0, ok: 1 }
+        let file_rc = c.next_int()
+        if c.ok != 0 and child_rc == 0:
+            child_rc = file_rc
+    let artifacts: Vec[Artifact] = Vec.new()
+    let want_artifact_path = if plan.output_kind == 5: "" ++ "" else: with_str_clone_ref(plan.final_output)
+    if child_rc == 0 and want_artifact_path.len() > 0:
+        artifacts.push(Artifact { kind: ws_artifact_kind_for_output(plan.output_kind), path: want_artifact_path })
+    BuildResult {
+        status: if child_rc == 0: BuildStatus.ok else: BuildStatus.failed,
+        rc: child_rc,
+        workspace_name: with_str_clone_ref(plan.name),
+        artifacts,
+        diagnostics: Vec.new(),
+    }
 
 fn build_action_outputs(target: &Target) -> Vec[str]:
     let outputs: Vec[str] = Vec.new()
