@@ -1333,6 +1333,147 @@ fn build_action_safe_label(text: &str) -> str:
 fn build_action_scratch_dir(target_name: &str) -> str:
     "out/tmp/action-scratch/" ++ build_action_safe_label(target_name)
 
+// ── #921: native build runner ───────────────────────────────────────────
+// Action workers exec a compiled runner binary instead of re-entering the
+// compiler: build.w + std.build compile once into out/.build-state/
+// build-runner (cached by the same key as the graph cache), the runner
+// reconstructs the graph by calling build(ctx) at native speed and runs
+// the named action through std.build's driver seam
+// (Build.__driver_run_action, WITH_BUILD_ACTION_NAME). The comptime
+// evaluator stays authoritative for strict-effects runs and for actions
+// that reach the Workspace surface — those exit 97 and the driver re-runs
+// them through an evaluator worker, recording the target name in
+// out/.build-state/runner-fallback.list so later runs skip the retry.
+
+fn build_runner_entry_source() -> str:
+    "use std.build\n" ++
+    "use std.process\n" ++
+    "use build\n\n" ++
+    "fn __runner_ctx() -> BuildCtx:\n" ++
+    "    let package = Package { name: env(\"WITH_BUILD_RUNNER_PKG\"), version: env(\"WITH_BUILD_RUNNER_PKG_VER\") }\n" ++
+    "    BuildCtx.__driver_new(package, env(\"WITH_BUILD_RUNNER_ROOT\"), env(\"WITH_TOOL_CAPABILITY_TOKEN\"))\n\n" ++
+    "fn main:\n" ++
+    "    let b = build(__runner_ctx())\n" ++
+    "    __driver_exit(b.__driver_run_action(__runner_ctx(), __driver_action_name()))\n"
+
+fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
+    let bin_path = resolve_join(root, "out/.build-state/build-runner")
+    let key_path = bin_path ++ ".key"
+    let key = build_cache_graph_key(root, options.target_kind, 0)
+    if with_fs_file_exists(bin_path) != 0 and with_fs_read_file(key_path) == key:
+        return bin_path
+    let entry_path = resolve_join(root, "__with_build_runner.w")
+    let t0 = with_clock_nanos()
+    var comp = Compilation.init()
+    var runner_options = build_command_options_clone(options)
+    runner_options.opt_level = 1
+    comp.configure_options(move runner_options)
+    comp.set_tool_mode_entry_path(entry_path)
+    let no_settings: Vec[str] = Vec.new()
+    let built = comp.build_binary_from_source_to_path_with_build_settings(entry_path, build_runner_entry_source(), bin_path, no_settings, no_settings, no_settings)
+    if built == "" or comp.has_errors():
+        with_eprint("warning: build runner compile failed; actions fall back to comptime evaluation")
+        let _rm = with_fs_remove_file(key_path)
+        return ""
+    let _k = with_fs_write_file(key_path, key)
+    with_eprint("[build] runner compiled " ++ build_graph_time_fmt(with_clock_nanos() - t0))
+    bin_path
+
+fn build_runner_fallback_list_path(root: &str) -> str:
+    resolve_join(root, "out/.build-state/runner-fallback.list")
+
+fn build_runner_load_fallback(root: &str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    let text = with_fs_read_file(build_runner_fallback_list_path(root))
+    let lines = text.split("\n")
+    for i in 0..lines.len() as i32:
+        if lines.get(i as i64).len() > 0:
+            out.push(with_str_clone_ref(lines.get(i as i64)))
+    out
+
+fn build_runner_note_fallback(root: &str, name: &str):
+    let path = build_runner_fallback_list_path(root)
+    let existing = with_fs_read_file(path)
+    if ("\n" ++ existing).contains("\n" ++ name ++ "\n"):
+        return
+    let _w = with_fs_write_file(path, existing ++ name ++ "\n")
+
+fn build_runner_target_eligible(target: &BuildGraphTarget, options: &BuildCommandOptions, runner_path: &str, fallback: &Vec[str]) -> bool:
+    if runner_path.len() == 0 or target.kind != 23 or options.strict_effects:
+        return false
+    for i in 0..fallback.len() as i32:
+        if fallback.get(i as i64) == target.name:
+            return false
+    true
+
+fn build_runner_effects_path(root: &str, target_name: &str) -> str:
+    let dir = resolve_join(root, "out/command/" ++ build_action_safe_label(target_name))
+    let _mk = with_fs_mkdir_p(dir)
+    resolve_join(dir, "worker.effects")
+
+fn build_runner_read_effects(path: &str) -> Vec[str]:
+    var out: Vec[str] = Vec.new()
+    let text = with_fs_read_file(path)
+    let lines = text.split("\n")
+    for i in 0..lines.len() as i32:
+        if lines.get(i as i64).len() > 0:
+            out.push(with_str_clone_ref(lines.get(i as i64)))
+    out
+
+fn build_runner_validate_outputs(root: &str, target: &BuildGraphTarget) -> i32:
+    if target.output.len() > 0:
+        let output_path = build_graph_resolve_project_path(root, target.output)
+        if with_fs_file_exists(output_path) == 0:
+            with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
+            return 1
+    for oi in 0..target.extra_outputs.len() as i32:
+        let extra_output = build_graph_resolve_project_path(root, target.extra_outputs.get(oi as i64))
+        if with_fs_file_exists(extra_output) == 0:
+            with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ extra_output)
+            return 1
+    0
+
+// Serial runner worker: inherit stdio like the evaluator worker path.
+fn run_build_action_runner_process(runner_path: &str, target: &BuildGraphTarget, effects_path: &str) -> i32:
+    let old_name = with_getenv_str("WITH_BUILD_ACTION_NAME")
+    let old_effects = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
+    let _sn = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
+    let _se = with_setenv_str("WITH_BUILD_EFFECTS_OUT", effects_path)
+    let _rm = with_fs_remove_file(effects_path)
+    let rc = build_graph_rt_exec_argv(build_graph_argv_append("", runner_path))
+    let _rn = with_setenv_str("WITH_BUILD_ACTION_NAME", old_name)
+    let _re = with_setenv_str("WITH_BUILD_EFFECTS_OUT", old_effects)
+    rc
+
+// Map a runner worker's raw exit into the driver's verdict: 97 re-runs the
+// action through the evaluator worker (and records the fallback for future
+// runs); success validates declared outputs and records the cache verdict
+// with the effect records the runner emitted.
+fn build_runner_postprocess(root: &str, target: &BuildGraphTarget, raw_rc: i32, effects_path: &str, options: &BuildCommandOptions) -> i32:
+    if raw_rc == 97:
+        build_runner_note_fallback(root, target.name)
+        with_eprint("[build] '" ++ target.name ++ "' needs the comptime evaluator; re-running (recorded for future runs)")
+        let rc = run_build_action_worker_process(target, options)
+        if rc == 0:
+            build_cache_forget_fingerprints()
+        return rc
+    if raw_rc != 0:
+        return raw_rc
+    let out_rc = build_runner_validate_outputs(root, target)
+    if out_rc != 0:
+        return out_rc
+    let no_inputs: Vec[str] = Vec.new()
+    build_cache_record(root, target, no_inputs, build_runner_read_effects(effects_path))
+    0
+
+fn build_pool_finalize_retire(root: &str, graph: &BuildGraph, options: &BuildCommandOptions, retire: &PoolRetireResult) -> i32:
+    if retire.via_runner == 0:
+        return retire.rc
+    let ti = build_graph_find_target_index_by_name(graph, retire.name)
+    if ti < 0:
+        return retire.rc
+    build_runner_postprocess(root, &graph.targets[ti as i64], retire.rc, retire.effects_path, options)
+
 fn build_action_worker_env_enabled() -> bool:
     with_getenv_str("WITH_BUILD_ACTION_WORKER").len() > 0
 
@@ -1435,9 +1576,24 @@ fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, st
     let _restore_force = with_setenv_str("WITH_BUILD_ACTION_FORCE", old_force)
     pid
 
+// #921: pooled runner worker — same capture protocol as build_pool_spawn,
+// but the child is the compiled build runner, addressed by
+// WITH_BUILD_ACTION_NAME (std.build's driver seam) instead of the
+// evaluator worker env.
+fn build_pool_spawn_runner(runner_path: &str, target: &BuildGraphTarget, effects_path: &str, stdout_path: &str, stderr_path: &str) -> i32:
+    let old_name = with_getenv_str("WITH_BUILD_ACTION_NAME")
+    let old_effects = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
+    let _sn = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
+    let _se = with_setenv_str("WITH_BUILD_EFFECTS_OUT", effects_path)
+    let _rm = with_fs_remove_file(effects_path)
+    let pid = build_graph_rt_exec_argv_capture_spawn(build_graph_argv_append("", runner_path), stdout_path, stderr_path)
+    let _rn = with_setenv_str("WITH_BUILD_ACTION_NAME", old_name)
+    let _re = with_setenv_str("WITH_BUILD_EFFECTS_OUT", old_effects)
+    pid
+
 // Wait on the pool's oldest worker, replay its captured output, record its
 // wall time, and mark it completed on success.
-type PoolRetireResult { rc: i32, name: str, spent: i64, maxrss: i64 }
+type PoolRetireResult { rc: i32, name: str, spent: i64, maxrss: i64, via_runner: i32, effects_path: str }
 
 // #921: pooled-worker bookkeeping. Deaths are stamped by a nonblocking reap
 // sweep the moment a child exits, not when FIFO retire order reaches it —
@@ -1451,6 +1607,8 @@ type PoolState {
     outs: Vec[str],
     errs: Vec[str],
     timeouts: Vec[i32],
+    via_runner: Vec[i32],
+    effects_paths: Vec[str],
     done: Vec[i32],
     done_rcs: Vec[i32],
     done_ats: Vec[i64],
@@ -1459,7 +1617,7 @@ type PoolState {
 }
 
 fn PoolState.new() -> Self:
-    PoolState { names: Vec.new(), pids: Vec.new(), t0s: Vec.new(), outs: Vec.new(), errs: Vec.new(), timeouts: Vec.new(), done: Vec.new(), done_rcs: Vec.new(), done_ats: Vec.new(), done_rsss: Vec.new(), oldest: 0 }
+    PoolState { names: Vec.new(), pids: Vec.new(), t0s: Vec.new(), outs: Vec.new(), errs: Vec.new(), timeouts: Vec.new(), via_runner: Vec.new(), effects_paths: Vec.new(), done: Vec.new(), done_rcs: Vec.new(), done_ats: Vec.new(), done_rsss: Vec.new(), oldest: 0 }
 
 impl PoolState:
     fn has_live(): self.oldest < self.names.len() as i32
@@ -1472,13 +1630,15 @@ impl PoolState:
                 return true
         false
 
-    mut fn push(name: str, pid: i32, t0: i64, out_path: str, err_path: str, timeout_ms: i32) -> Unit:
+    mut fn push(name: str, pid: i32, t0: i64, out_path: str, err_path: str, timeout_ms: i32, ran_via_runner: i32, effects_path: str) -> Unit:
         self.names.push(name)
         self.pids.push(pid)
         self.t0s.push(t0)
         self.outs.push(out_path)
         self.errs.push(err_path)
         self.timeouts.push(timeout_ms)
+        self.via_runner.push(ran_via_runner)
+        self.effects_paths.push(effects_path)
         self.done.push(0)
         self.done_rcs.push(0)
         self.done_ats.push(0)
@@ -1531,14 +1691,19 @@ impl PoolState:
         if err_text.len() > 0:
             with_ewrite(err_text)
         with_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
+        let ran_via_runner = self.via_runner.get(idx)
+        let effects_path = with_str_clone_ref(self.effects_paths.get(idx))
         if rc == 124:
             with_eprint("error: build.w target '" ++ name ++ "' timed out")
-            return PoolRetireResult { rc: 124, name: with_str_clone_ref(name), spent, maxrss: child_rss }
+            return PoolRetireResult { rc: 124, name: with_str_clone_ref(name), spent, maxrss: child_rss, via_runner: ran_via_runner, effects_path }
         if rc != 0:
-            with_eprint("error: build.w target '" ++ name ++ f"' failed with exit code {rc}")
-            return PoolRetireResult { rc, name: with_str_clone_ref(name), spent, maxrss: child_rss }
+            // 97 from a runner worker is the evaluator-fallback signal the
+            // caller's finalize maps to a re-run, not a failure.
+            if rc != 97 or ran_via_runner == 0:
+                with_eprint("error: build.w target '" ++ name ++ f"' failed with exit code {rc}")
+            return PoolRetireResult { rc, name: with_str_clone_ref(name), spent, maxrss: child_rss, via_runner: ran_via_runner, effects_path }
         build_cache_forget_fingerprints()
-        PoolRetireResult { rc: 0, name: with_str_clone_ref(name), spent, maxrss: child_rss }
+        PoolRetireResult { rc: 0, name: with_str_clone_ref(name), spent, maxrss: child_rss, via_runner: ran_via_runner, effects_path }
 
 // #683: serial actions run IN-PROCESS — this driver already holds the
 // evaluated graph and sema; the former worker child recompiled build.w
@@ -1807,6 +1972,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     var pool = PoolState.new()
     var pool_failed_rc = 0
     let pool_width = build_pool_width()
+    // #921: the native runner is ensured lazily at the first eligible
+    // Action target so non-action invocations never pay its compile.
+    var runner_checked = false
+    var runner_path = ""
+    var runner_fallback: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = &graph.targets[ti as i64]
         if timing_name.len() > 0:
@@ -1857,16 +2027,17 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if target.kind != 9 and pool_dep_inflight:
             while pool.has_live():
                 var retire = pool.retire_oldest()
+                let final_rc = build_pool_finalize_retire(root, graph, options, &retire)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 timed_rss.push(retire.maxrss)
-                if retire.rc == 0:
+                if final_rc == 0:
                     completed_targets.push(move retire.name)
                 else:
                     if survey:
                         survey_failed.push(with_str_clone_ref(retire.name))
                     if not survey and pool_failed_rc == 0:
-                        pool_failed_rc = retire.rc
+                        pool_failed_rc = final_rc
             if pool_failed_rc != 0:
                 return pool_failed_rc
         if target.kind == 9:
@@ -1880,6 +2051,16 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     skipped_targets.push(with_str_clone_ref(target.name))
                     completed_targets.push(with_str_clone_ref(target.name))
                     continue
+        if target.kind == 23 and not runner_checked and not build_action_worker_env_enabled() and not options.strict_effects:
+            runner_checked = true
+            runner_path = build_runner_ensure(root, options)
+            if runner_path.len() > 0:
+                runner_fallback = build_runner_load_fallback(root)
+                let _e1 = with_setenv_str("WITH_BUILD_RUNNER_ROOT", root)
+                let _e2 = with_setenv_str("WITH_BUILD_RUNNER_PKG", cfg.package_name)
+                let _e3 = with_setenv_str("WITH_BUILD_RUNNER_PKG_VER", cfg.package_version)
+                if with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN").len() == 0:
+                    let _e4 = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", f"runner-{with_getpid()}-{with_clock_nanos()}")
         // #680: Action AND Test lanes pool when flagged parallel-safe. A
         // pooled Test child divides the inner sliding window by the pool
         // width (see build_pool_spawn) so lanes multiply across cores, not
@@ -1888,26 +2069,27 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if not will_pool and pool.has_live():
             while pool.has_live():
                 var retire = pool.retire_oldest()
+                let final_rc = build_pool_finalize_retire(root, graph, options, &retire)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 timed_rss.push(retire.maxrss)
-                if retire.rc == 0:
+                if final_rc == 0:
                     completed_targets.push(move retire.name)
                 else:
                     if survey:
                         survey_failed.push(with_str_clone_ref(retire.name))
                     if not survey and pool_failed_rc == 0:
-                        pool_failed_rc = retire.rc
+                        pool_failed_rc = final_rc
             if pool_failed_rc != 0:
                 return pool_failed_rc
         if will_pool:
             if pool.live_len() >= pool_width:
                 var retire = pool.retire_oldest()
+                let retire_rc = build_pool_finalize_retire(root, graph, options, &retire)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 timed_rss.push(retire.maxrss)
-                let retire_rc = retire.rc
-                if retire.rc == 0:
+                if retire_rc == 0:
                     completed_targets.push(move retire.name)
                 else:
                     if survey:
@@ -1915,10 +2097,11 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     if not survey:
                         while pool.has_live():
                             var drain = pool.retire_oldest()
+                            let drain_rc = build_pool_finalize_retire(root, graph, options, &drain)
                             timed_names.push(with_str_clone_ref(drain.name))
                             timed_ns.push(drain.spent)
                             timed_rss.push(drain.maxrss)
-                            if drain.rc == 0:
+                            if drain_rc == 0:
                                 completed_targets.push(move drain.name)
                         return retire_rc
             let pool_capture_dir = resolve_join(root, "out/command/" ++ build_action_safe_label(target.name))
@@ -1926,18 +2109,21 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let worker_stdout = resolve_join(pool_capture_dir, "worker.stdout")
             let worker_stderr = resolve_join(pool_capture_dir, "worker.stderr")
             let spawn_t0 = with_clock_nanos()
-            let pid = build_pool_spawn(target, options, worker_stdout, worker_stderr)
+            let via_runner = build_runner_target_eligible(target, options, runner_path, &runner_fallback)
+            let effects_path = if via_runner: build_runner_effects_path(root, target.name) else: "" ++ ""
+            let pid = if via_runner: build_pool_spawn_runner(runner_path, target, effects_path, worker_stdout, worker_stderr) else: build_pool_spawn(target, options, worker_stdout, worker_stderr)
             if pid <= 0:
                 with_eprint("error: could not spawn worker for build.w target '" ++ target.name ++ "'")
                 while pool.has_live():
                     var drain = pool.retire_oldest()
+                    let drain_rc = build_pool_finalize_retire(root, graph, options, &drain)
                     timed_names.push(with_str_clone_ref(drain.name))
                     timed_ns.push(drain.spent)
                     timed_rss.push(drain.maxrss)
-                    if drain.rc == 0:
+                    if drain_rc == 0:
                         completed_targets.push(move drain.name)
                 return 1
-            pool.push(with_str_clone_ref(target.name), pid, spawn_t0, worker_stdout, worker_stderr, if target.timeout_ms > 0: target.timeout_ms else: 1200000)
+            pool.push(with_str_clone_ref(target.name), pid, spawn_t0, worker_stdout, worker_stderr, if target.timeout_ms > 0: target.timeout_ms else: 1200000, if via_runner: 1 else: 0, effects_path)
             continue
         if times_top_level:
             // #747: the timing label is retained across the iteration while
@@ -1957,7 +2143,13 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 with_eprint("survey: skipping evidence target '" ++ target.name ++ "' (earlier failures)")
                 continue
             if not build_action_worker_env_enabled():
-                let worker_rc = run_build_action_worker_process(target, options)
+                var worker_rc = 0
+                if build_runner_target_eligible(target, options, runner_path, &runner_fallback):
+                    let effects_path = build_runner_effects_path(root, target.name)
+                    let raw_rc = run_build_action_runner_process(runner_path, target, effects_path)
+                    worker_rc = build_runner_postprocess(root, target, raw_rc, effects_path, options)
+                else:
+                    worker_rc = run_build_action_worker_process(target, options)
                 if worker_rc != 0:
                     if survey:
                         survey_failed.push(with_str_clone_ref(target.name))
@@ -2089,16 +2281,17 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         completed_targets.push(with_str_clone_ref(target.name))
     while pool.has_live():
         var retire = pool.retire_oldest()
+        let final_rc = build_pool_finalize_retire(root, graph, options, &retire)
         timed_names.push(with_str_clone_ref(retire.name))
         timed_ns.push(retire.spent)
         timed_rss.push(retire.maxrss)
-        if retire.rc == 0:
+        if final_rc == 0:
             completed_targets.push(move retire.name)
         else:
             if survey:
                 survey_failed.push(with_str_clone_ref(retire.name))
             if not survey and pool_failed_rc == 0:
-                pool_failed_rc = retire.rc
+                pool_failed_rc = final_rc
     if pool_failed_rc != 0:
         return pool_failed_rc
     if timing_name.len() > 0:

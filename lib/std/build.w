@@ -532,86 +532,92 @@ pub fn BuildCtx.process_runner(self: &Self) -> &ProcessRunner:
 
 pub fn BuildCtx.env_input(self: &Self, name: &str) -> str:
     tool_capability_require(self.token, "BuildCtx")
+    tool_effect_record_env("", name)
     with_getenv_str(name)
 
+// #921: the Workspace surface drives an in-process Compilation and exists
+// only under the compiler driver's comptime evaluation. In a natively
+// compiled build runner these stubs exit 97 — a reserved code the driver
+// maps to "re-run this action through the comptime evaluator", never a
+// build failure.
 pub fn BuildCtx.create_workspace(self: &Self, name: &str) -> Workspace:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: BuildCtx.create_workspace requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn BuildCtx.current_workspace(self: &Self) -> Workspace:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: BuildCtx.current_workspace requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn ActionCtx.create_workspace(self: &Self, name: &str) -> Workspace:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: ActionCtx.create_workspace requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn ActionCtx.current_workspace(self: &Self) -> Workspace:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: ActionCtx.current_workspace requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.name(self: &Self) -> str:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.name requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.add_file(self: &Self, path: &str) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.add_file requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.add_string(self: &Self, name: &str, source: &str) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.add_string requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.options(self: &Self) -> BuildOptions:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.options requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.set_options(self: &Self, options: BuildOptions) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.set_options requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.set_migrate_options(self: &Self, options: MigrateOptions) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.set_migrate_options requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.compile(self: &Self) -> BuildResult:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.compile requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.begin_intercept(self: &Self) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.begin_intercept requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.wait_for_message(self: &Self) -> CompilerMessageEnvelope:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.wait_for_message requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.end_intercept(self: &Self) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.end_intercept requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn Workspace.set_link_command(self: &Self, command: LinkCommand) -> Unit:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.set_link_command requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn parallel(workspaces: Vec[Workspace]) -> Vec[BuildResult]:
     with_eprint("error: parallel requires compiler driver comptime evaluation\n")
-    exit(1)
+    exit(97)
 
 pub fn process_env() -> ProcessEnv:
     ProcessEnv { vars: Vec.new() }
@@ -1537,6 +1543,123 @@ fn tool_process_restore_env(saved: SavedProcessEnv):
         let _restore = with_setenv_str(owned.names.get(i as i64), owned.values.get(i as i64))
     tool_process_restore_driver_env(move owned.driver)
 
+// ── #921: effect records (native twin of the evaluator's) ──────────────
+// When WITH_BUILD_EFFECTS_OUT names a file, env_input and process runs
+// append the same tab-separated records the comptime evaluator emits
+// (ComptimeEval record_env_input_effect / record_process_effect), so the
+// compiler driver can feed build-cache invalidation for natively-run
+// actions. Format parity with the evaluator is load-bearing — keep both
+// sides in lockstep.
+
+fn tool_effect_escape(text: &str) -> str:
+    var out = StringBuilder.with_capacity(text.len())
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 92:
+            out.push_str("\\\\")
+        else if ch == 9:
+            out.push_str("\\t")
+        else if ch == 10:
+            out.push_str("\\n")
+        else if ch == 13:
+            out.push_str("\\r")
+        else:
+            out.push_byte(ch as u8)
+    out.to_str()
+
+fn tool_effect_join_argv(parts: &Vec[str]) -> str:
+    var out = StringBuilder.new()
+    for i in 0..parts.len() as i32:
+        if i > 0:
+            out.push_str(" ")
+        out.push_str(tool_effect_escape(parts.get(i as i64)))
+    out.to_str()
+
+fn tool_effect_contains_slash(text: &str) -> bool:
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 47:
+            return true
+    false
+
+fn tool_effect_resolve_executable(exe: &str) -> str:
+    if exe.len() == 0:
+        return ""
+    if with_fs_file_exists(exe) != 0:
+        return with_str_clone_ref(exe)
+    if tool_effect_contains_slash(exe):
+        return ""
+    let path = with_getenv_str("PATH")
+    var start = 0
+    var i = 0
+    while i <= path.len() as i32:
+        if i == path.len() as i32 or path.byte_at(i as i64) == 58:
+            let dir = path.slice(start as i64, i as i64)
+            let candidate = if dir.len() == 0: with_str_clone_ref(exe) else: dir ++ "/" ++ exe
+            if with_fs_file_exists(candidate) != 0:
+                return candidate
+            start = i + 1
+        i = i + 1
+    ""
+
+fn tool_effect_tool_identity(parts: &Vec[str]) -> str:
+    if parts.len() == 0:
+        return ""
+    let exe = parts.get(0)
+    let resolved = tool_effect_resolve_executable(exe)
+    if resolved.len() > 0:
+        return tool_effect_escape(resolved) ++ ":" ++ tool_sha256_text(with_fs_read_file(resolved))
+    tool_effect_escape(exe) ++ ":unresolved"
+
+fn tool_effect_record(line: &str):
+    let out_path = with_getenv_str("WITH_BUILD_EFFECTS_OUT")
+    if out_path.len() == 0:
+        return
+    let existing = with_fs_read_file(out_path)
+    if ("\n" ++ existing).contains("\n" ++ line ++ "\n"):
+        return
+    let _write = with_fs_write_file(out_path, existing ++ line ++ "\n")
+
+fn tool_effect_record_env(target_name: &str, name: &str):
+    tool_effect_record("env\t" ++ tool_effect_escape(target_name) ++ "\t" ++ tool_effect_escape(name) ++ "\t" ++ tool_sha256_text(with_getenv_str(name)))
+
+fn tool_effect_env_text(process_env: &ProcessEnv) -> str:
+    var out = StringBuilder.new()
+    for i in 0..process_env.vars.len() as i32:
+        let item = process_env.vars.get(i as i64)
+        if i > 0:
+            out.push_str(",")
+        out.push_str(tool_effect_escape(item.name))
+        out.push_str(":")
+        out.push_str(tool_sha256_text(item.value))
+    out.to_str()
+
+fn ProcessRunner.record_process_effect(self: &Self, method: &str, parts: &Vec[str], cwd: &str, timeout_ms: i32, stdin_path: &str, stdout_path: &str, stderr_path: &str, env_text: &str):
+    if with_getenv_str("WITH_BUILD_EFFECTS_OUT").len() == 0:
+        return
+    let target = if self.target_name.len() > 0: self.target_name else: "<build>"
+    var line = StringBuilder.new()
+    line.push_str("process\ttarget=")
+    line.push_str(tool_effect_escape(target))
+    line.push_str("\tmethod=")
+    line.push_str(tool_effect_escape(method))
+    line.push_str("\targv=")
+    line.push_str(tool_effect_join_argv(parts))
+    line.push_str("\tcwd=")
+    line.push_str(tool_effect_escape(cwd))
+    line.push_str("\ttimeout=")
+    line.push_str(f"{timeout_ms}")
+    line.push_str("\tstdin=")
+    line.push_str(tool_effect_escape(stdin_path))
+    line.push_str("\tstdout=")
+    line.push_str(tool_effect_escape(stdout_path))
+    line.push_str("\tstderr=")
+    line.push_str(tool_effect_escape(stderr_path))
+    line.push_str("\tenv=")
+    line.push_str(env_text)
+    line.push_str("\ttool=")
+    line.push_str(tool_effect_tool_identity(parts))
+    tool_effect_record(line.to_str())
+
 pub fn ProcessRunner.run_capture(self: &Self, args: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "run_capture")
@@ -1544,6 +1667,7 @@ pub fn ProcessRunner.run_capture(self: &Self, args: &Vec[str], stdout_path: &str
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
     tool_process_restore_driver_env(env)
+    self.record_process_effect("run_capture", args, "", timeout_ms, "", stdout_path, stderr_path, "")
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
@@ -1557,15 +1681,18 @@ pub fn ProcessRunner.run(self: &Self, args: &Vec[str]) -> i32:
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv(tool_process_argv(args))
     tool_process_restore_driver_env(env)
+    self.record_process_effect("run", args, "", 0, "", "", "", "")
     rc
 
 pub fn ProcessRunner.run_capture_with_env(self: &Self, args: &Vec[str], stdout_path: &str, stderr_path: &str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "run_capture_with_env")
     self.require_capture_allowed(stdout_path, stderr_path, "run_capture_with_env")
+    let env_text = tool_effect_env_text(&process_env)
     let env = tool_process_apply_env(process_env)
     let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
     tool_process_restore_env(env)
+    self.record_process_effect("run_capture_with_env", args, "", timeout_ms, "", stdout_path, stderr_path, env_text)
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
@@ -1580,6 +1707,7 @@ pub fn ProcessRunner.run_capture_cwd(self: &Self, args: &Vec[str], stdout_path: 
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
     tool_process_restore_driver_env(env)
+    self.record_process_effect("run_capture_cwd", args, cwd, timeout_ms, "", stdout_path, stderr_path, "")
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
@@ -1591,9 +1719,11 @@ pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: &Vec[str], stdo
     tool_capability_require(self.token, "ProcessRunner")
     self.require_network_allowed(args, "run_capture_cwd_with_env")
     self.require_capture_allowed(stdout_path, stderr_path, "run_capture_cwd_with_env")
+    let env_text = tool_effect_env_text(&process_env)
     let env = tool_process_apply_env(process_env)
     let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
     tool_process_restore_env(env)
+    self.record_process_effect("run_capture_cwd_with_env", args, cwd, timeout_ms, "", stdout_path, stderr_path, env_text)
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
@@ -1608,6 +1738,7 @@ pub fn ProcessRunner.run_capture_input(self: &Self, args: &Vec[str], stdout_path
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture_input(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, stdin_path)
     tool_process_restore_driver_env(env)
+    self.record_process_effect("run_capture_input", args, "", timeout_ms, stdin_path, stdout_path, stderr_path, "")
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
@@ -1622,6 +1753,7 @@ pub fn ProcessRunner.spawn_capture(self: &Self, args: &Vec[str], stdout_path: &s
     let env = tool_process_clear_driver_env()
     let pid = with_exec_argv_capture_spawn(tool_process_argv(args), stdout_path, stderr_path)
     tool_process_restore_driver_env(env)
+    self.record_process_effect("spawn_capture", args, "", 0, "", stdout_path, stderr_path, "")
     pid
 
 pub fn ProcessRunner.wait(self: &Self, pid: i32, timeout_ms: i32) -> i32:
@@ -1773,6 +1905,7 @@ pub fn ActionCtx.network(self: &Self) -> bool:
 
 pub fn ActionCtx.env_input(self: &Self, name: &str) -> str:
     tool_capability_require(self.token, "ActionCtx")
+    tool_effect_record_env(self.target_name_value, name)
     with_getenv_str(name)
 
 fn build_graph_escape(value: &str) -> str:
