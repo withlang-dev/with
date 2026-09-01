@@ -3297,7 +3297,7 @@ impl Parser:
         if target_type_node != 0:
             self.pool.add_impl_target_type_node(impl_node, target_type_node)
 
-        // Store impl trait type args if present (e.g., impl IntoIter[i32] for Type)
+        // Store impl trait type args if present (e.g., impl Iterable[i32] for Type)
         if trait_arg_count > 0:
             self.pool.add_impl_trait_type_args(impl_node, trait_arg_extra_start, trait_arg_count)
 

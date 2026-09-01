@@ -6,7 +6,7 @@
 
 use std.collections
 
-fn count_all[C: IntoIter[i32]](c: &C) -> i32:
+fn count_all[C: Iterable[i32]](c: &C) -> i32:
     var walker = c.iter()
     var n = 0
     while true:

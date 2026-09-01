@@ -1,4 +1,4 @@
-//! known-issue: #724 owned collections lack element-transfer iteration; await combinators double-own tasks via view bit-copies
+//! known-issue: #916 async caller of a cancelled sync-but-suspending callee consumes its garbage return
 //! expect-stdout: ok
 
 use std.task.Task

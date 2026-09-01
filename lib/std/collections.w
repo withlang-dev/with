@@ -160,7 +160,7 @@ impl[K: Ord, V] BTreeMap[K, V]:
             entry_i = entry_i + 1
         out
 
-impl[K: Ord, V] IntoIter[(K, V)] for BTreeMap[K, V]:
+impl[K: Ord, V] Iterable[(K, V)] for BTreeMap[K, V]:
     fn iter() -> VecIter[(K, V)]:
         self.entries.iter()
 
@@ -281,7 +281,7 @@ impl[T: Ord] BTreeSet[T]:
             self_i = self_i + 1
         out
 
-impl[T: Ord] IntoIter[T] for BTreeSet[T]:
+impl[T: Ord] Iterable[T] for BTreeSet[T]:
     fn iter() -> VecIter[T]:
         self.values.iter()
 
@@ -364,17 +364,18 @@ type HashMapEntry[K, V] ephemeral { map_ptr: i64, key: K }
 /// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
 type VecIter[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
 
-/// Conversion to iterator for allocation-backed collection types.
+/// Borrow-iteration capability for allocation-backed collection types
+/// (D33 naming: formerly misnamed `IntoIter`).
 /// §13.2: the borrow an iterator registers on its receiver is SHARED, so
 /// constructing one only reads the collection — a `&Vec` parameter iterates.
 /// (A trait method's receiver is explicit: plain `fn` in a trait declares a
 /// static method, per the parser's trait-impl receiver rule.)
-pub trait IntoIter[T]:
+pub trait Iterable[T]:
     fn iter(self: &Self) -> VecIter[T]
 
-// IntoIter for Vec — enables collection-level async combinators and
-// explicit trait dispatch over Vec-backed collections.
-impl[T] IntoIter[T] for Vec[T]:
+// Iterable for Vec — explicit borrow-iteration trait dispatch over
+// Vec-backed collections.
+impl[T] Iterable[T] for Vec[T]:
     fn iter() -> VecIter[T]: self.iter()
 
 /// Consuming iterator over Vec[T] (§13, D33). Obtain via `vec.into_iter()`:
@@ -383,8 +384,14 @@ impl[T] IntoIter[T] for Vec[T]:
 /// tail and the buffer through the owned Vec's ordinary drop.
 pub type VecIntoIter[T] { vec: Vec[T] }
 
-impl[T] Vec[T]:
-    pub move fn into_iter() -> VecIntoIter[T]: VecIntoIter { vec: self }
+/// Consuming-iteration capability (§13, D33): the collection moves in,
+/// elements move out. The loop-shaped `remove` — access observes,
+/// transfer is explicit (D27).
+pub trait IntoIter[T]:
+    move fn into_iter() -> VecIntoIter[T]
+
+impl[T] IntoIter[T] for Vec[T]:
+    move fn into_iter() -> VecIntoIter[T]: VecIntoIter { vec: self }
 
 impl[T] Iter[T] for VecIntoIter[T]:
     // remove(0) is D27's proven element transfer; the memmove-per-next

@@ -71,6 +71,15 @@ full-consume, break-early tail drop, error-path drop, and — per the
 ruling — a **moved-iterator** fixture (the iterator value itself moved,
 then driven; drop-exactly-once).
 
+**Naming ruling (2026-08-31, Eric: "I bless A").** The pair: a trait is
+named by the method it promises. **`IntoIter[T]`** = consuming
+(`move fn into_iter() -> VecIntoIter[T]`); **`Iterable[T]`** = borrowing
+(`fn iter(self: &Self) -> VecIter[T]`, the former misnamed `IntoIter`).
+Internally consistent with the -ator-less house scheme: trait `Iter` /
+type `VecIter` :: trait `IntoIter` / type `VecIntoIter`. Alternatives
+declined: `IntoIterable`/`Iterable` (name drifts from its own method),
+`AsIter` (Rust-ese, not English).
+
 ---
 
 ## D32 — STRICT field moves: implicit is an error everywhere; explicit `move place.field` through a mutable path is the one vacate

@@ -1,4 +1,3 @@
-//! known-issue: #724 owned collections lack element-transfer iteration; await combinators double-own tasks via view bit-copies
 //! expect-stdout: ok
 
 use std.task.Task
@@ -118,8 +117,8 @@ fn test_await_settled_is_input_ordered():
     tasks.push(delayed_ok(20, 0))
     let settled = tasks |> await_settled
     assert(settled.len() == 2)
-    let first = settled.get(0)
-    let second = settled.get(1)
+    let first = settled.remove(0)
+    let second = settled.remove(0)
     assert(first.is_err())
     assert(first.err().unwrap() == "slow")
     assert(second.is_ok())
