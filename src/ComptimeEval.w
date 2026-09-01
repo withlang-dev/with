@@ -226,6 +226,10 @@ type ComptimeEvaluator {
     active_global_syms: Vec[i32],
     active_fn_syms: Vec[i32],
     capability_records: Vec[ComptimeCapabilityRecord],
+    // #679: decl_node -> decl index, precomputed once — every interpreted
+    // call resolved its module context via an O(decls) linear scan (3-4
+    // per call), the dominant cost of action-heavy comptime evaluation.
+    decl_index_by_node: HashMap[i32, i32],
     workspace_records: Vec[ComptimeWorkspaceRecord],
     current_workspace_id: i32,
     next_capability_generation: i32,
@@ -298,10 +302,17 @@ fn comptime_control_break(value: ComptimeValue, label: i32) -> ComptimeControl:
 fn comptime_control_continue(label: i32) -> ComptimeControl:
     ComptimeControl { kind: ComptimeControlKind.CTL_CONTINUE, value: comptime_value_void(0), label }
 
+fn comptime_decl_index_map(ast: &AstPool) -> HashMap[i32, i32]:
+    let map: HashMap[i32, i32] = HashMap.new()
+    for di in 0..ast.decl_count():
+        map.insert(ast.get_decl(di), di)
+    map
+
 fn comptime_control_error() -> ComptimeControl:
     ComptimeControl { kind: ComptimeControlKind.CTL_ERROR, value: comptime_value_invalid(), label: 0 }
 
 fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_success: i32) -> ComptimeEvaluator:
+    let decl_index_by_node = comptime_decl_index_map(&ast)
     ComptimeEvaluator {
         sema,
         ast,
@@ -315,6 +326,7 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         active_global_syms: Vec.new(),
         active_fn_syms: Vec.new(),
         capability_records: Vec.new(),
+        decl_index_by_node,
         workspace_records: Vec.new(),
         current_workspace_id: -1,
         next_capability_generation: 1,
@@ -2293,9 +2305,9 @@ impl ComptimeEvaluator:
         0
 
     fn find_decl_index(decl_node: i32) -> i32:
-        for di in 0..self.ast.decl_count():
-            if self.ast.get_decl(di) == decl_node:
-                return di
+        let cached = self.decl_index_by_node.get(decl_node)
+        if cached.is_some():
+            return cached.unwrap()
         -1
 
     fn decl_file_id(decl_node: i32) -> i32:
@@ -7568,8 +7580,12 @@ impl ComptimeEvaluator:
                     saved_subst_syms: Vec.new(),
                     saved_subst_tys: Vec.new(),
                 }
-        self.sema.local_file_id = self.decl_file_id(fn_node)
-        self.sema.current_module_path = self.decl_path(fn_node)
+        // #679: same-file calls (the hot case in interpreted loops) skip the
+        // context switch — decl_path clones a str per call otherwise.
+        let ctx_file = self.decl_file_id(fn_node)
+        if ctx_file != self.sema.local_file_id or self.sema.current_module_path.len() == 0:
+            self.sema.local_file_id = ctx_file
+            self.sema.current_module_path = self.decl_path(fn_node)
         self.active_fn_syms.push(fn_sym)
         self.push_scope()
 
