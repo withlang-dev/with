@@ -1531,14 +1531,23 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     // serialized graph (~0.2s) instead of re-evaluating build.w (~5s per
     // invocation — including every worker spawn). Action workers are
     // excluded: evaluating an action needs the live Sema only the real
-    // eval produces. Eval-time side effects (SDK materialization) persist
+    // eval produces. Test-kind workers are admitted (#921 phase 0): pooled
+    // Test lanes spawn under the action-worker protocol but never evaluate
+    // an action closure — the child only needs the graph data, exactly like
+    // serial WITH_BUILD_TEST_WORKER children already run from this cache.
+    // Eval-time side effects (SDK materialization) persist
     // on disk from the eval that wrote the cache; if their products are
     // manually deleted, targets fail loudly on missing declared inputs —
     // delete out/.build-state/build-graph.cache to force a re-eval.
     let graph_cache_key = build_cache_graph_key(root, options.target_kind, if options.strict_effects: 1 else: 0)
-    if not build_action_worker_env_enabled():
-        let cached = build_cache_graph_try_read(root, graph_cache_key)
-        if cached.ok:
+    let worker_name = with_getenv_str("WITH_BUILD_ACTION_WORKER")
+    let cached = build_cache_graph_try_read(root, graph_cache_key)
+    if cached.ok:
+        var cache_admitted = worker_name.len() == 0
+        if not cache_admitted:
+            let wi = build_graph_find_target_index_by_name(&cached, worker_name)
+            cache_admitted = wi >= 0 and (&cached.targets[wi as i64]).kind == 2
+        if cache_admitted:
             return BuildGraphLoadResult { graph: cached, sema: Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new()) }
     var graph = empty_build_graph()
     let entry_path = resolve_join(root, "__with_build_eval.w")
