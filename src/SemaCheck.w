@@ -9089,6 +9089,58 @@ impl Sema:
             return 0
         0
 
+    // #725 (§5.2/§2.4): does this expression call an @[iter_of_self]
+    // method on an OWNED rvalue receiver? Such a receiver is a statement
+    // temporary — it dies when the enclosing statement ends — so the views
+    // the iterator holds root in dying storage. A named receiver keeps the
+    // ordinary origin tracking; a view-typed (&T) rvalue receiver borrows
+    // something that outlives the statement and is not this hole.
+    fn expr_borrows_owned_temp_iter(node: i32) -> i32:
+        if node <= 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME:
+            return self.expr_borrows_owned_temp_iter(self.ast.get_data0(node))
+        if kind == NodeKind.NK_PIPELINE:
+            if self.expr_borrows_owned_temp_iter(self.ast.get_data0(node)) != 0:
+                return 1
+            return self.expr_borrows_owned_temp_iter(self.ast.get_data1(node))
+        if kind == NodeKind.NK_BINARY:
+            if self.expr_borrows_owned_temp_iter(self.ast.get_data1(node)) != 0:
+                return 1
+            return self.expr_borrows_owned_temp_iter(self.ast.get_data2(node))
+        if kind == NodeKind.NK_FIELD_ACCESS:
+            return self.expr_borrows_owned_temp_iter(self.ast.get_data0(node))
+        if kind != NodeKind.NK_CALL:
+            return 0
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let recv = self.ast.get_data0(callee)
+            let method = self.ast.get_data1(callee)
+            if self.place_root_sym(recv) == 0:
+                let recv_ty_opt = self.typed_expr_types.get(recv)
+                if recv_ty_opt.is_some():
+                    let recv_ty: i32 = recv_ty_opt.unwrap()
+                    let recv_tk = self.get_type_kind(self.resolve_alias(recv_ty as TypeId))
+                    if recv_tk != TypeKind.TY_REF and recv_tk != TypeKind.TY_PTR:
+                        let owner_sym = self.method_owner_symbol_for_type(recv_ty)
+                        if owner_sym != 0:
+                            var ios = 0
+                            if self.comp_resolved.contains(node):
+                                ios = self.fn_symbol_is_iter_of_self(self.comp_resolved.get(node).unwrap())
+                            if ios == 0:
+                                ios = self.method_is_iter_of_self_fn(owner_sym, method)
+                            if ios != 0:
+                                return 1
+            if self.expr_borrows_owned_temp_iter(recv) != 0:
+                return 1
+        let call_extra = self.ast.get_data1(node)
+        let call_argc = self.ast.get_data2(node)
+        for ai in 0..call_argc:
+            if self.expr_borrows_owned_temp_iter(self.ast.get_extra(call_extra + ai)) != 0:
+                return 1
+        0
+
     mut fn check_let_binding(node: i32) -> i32:
         let name = self.ast.get_data0(node)
         var bind_name = self.extract_decl_name_after(node, "let")
@@ -9145,6 +9197,11 @@ impl Sema:
         if ann_type != 0:
             self.reject_owned_demand_from_view_projection(value, ann_type as i32, "typed let binding")
         var bind_type: TypeId = val_type
+        // #725 (§5.2/§2.4): an ephemeral binding whose initializer borrows a
+        // statement TEMPORARY outlives its origin — the temp collection dies
+        // when this statement ends and the iterator's views dangle.
+        if val_type != 0 and self.type_is_ephemeral_value(val_type as i32) != 0 and self.expr_borrows_owned_temp_iter(value) != 0:
+            self.emit_error_with_help("ephemeral value borrows a temporary that dies at the end of this statement", value, "bind the collection to a named variable first, then iterate the name")
         if ann_type != 0:
             bind_type = ann_type
             if val_type != 0:
