@@ -346,16 +346,27 @@ fn build_graph_time_picked(picked: &Vec[i64], idx: i64) -> bool:
             return true
     false
 
-// Per-invocation wall-time record: chronological TSV beside the cache state
-// (the dir build_cache_state_dir names), plus a slowest-first stderr summary.
-// Durations must never enter hashed build inputs or compared artifacts.
-pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64], total_ns: i64) -> Unit:
+fn build_graph_rss_fmt(bytes: i64) -> str:
+    if bytes <= 0:
+        return "0M"
+    f"{(bytes + 524288) / 1048576}M"
+
+// Per-invocation wall-time + peak-RSS record: chronological TSV beside the
+// cache state (the dir build_cache_state_dir names), plus a slowest-first
+// stderr summary with the RSS high-water target (#679/#702 — the 8 GB
+// budget needs per-target attribution, like wall time got in c3de4c0b).
+// Pooled children report exact wait4 rusage; in-process targets report the
+// orchestrator's high-water DELTA around the target (0 when it stayed under
+// the existing mark — attribution, not absolute footprint).
+// Durations and sizes must never enter hashed build inputs or artifacts.
+pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64], rss_list: &Vec[i64], total_ns: i64) -> Unit:
     if names.len() == 0:
         return
-    var text = "target\tseconds\n"
+    var text = "target\tseconds\tpeak_rss\n"
     for i in 0..names.len() as i32:
-        text = text ++ names.get(i as i64) ++ "\t" ++ build_graph_time_fmt(ns_list.get(i as i64)) ++ "\n"
-    text = text ++ "TOTAL\t" ++ build_graph_time_fmt(total_ns) ++ "\n"
+        let rss = if i < rss_list.len() as i32: rss_list.get(i as i64) else: 0
+        text = text ++ names.get(i as i64) ++ "\t" ++ build_graph_time_fmt(ns_list.get(i as i64)) ++ "\t" ++ build_graph_rss_fmt(rss) ++ "\n"
+    text = text ++ "TOTAL\t" ++ build_graph_time_fmt(total_ns) ++ "\t" ++ build_graph_rss_fmt(build_graph_rt_self_maxrss()) ++ "\n"
     let state_dir = resolve_join(root, "out/.build-state")
     let _mkdir = build_graph_rt_mkdir_p(state_dir)
     let _write = build_graph_rt_write_file(resolve_join(state_dir, "build-times.tsv"), text)
@@ -369,4 +380,10 @@ pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64]
                     best = i as i64
         picked.push(best)
         summary = summary ++ " " ++ names.get(best) ++ " " ++ build_graph_time_fmt(ns_list.get(best))
+    var rss_best: i64 = -1
+    for i in 0..rss_list.len() as i32:
+        if rss_best < 0 or rss_list.get(i as i64) > rss_list.get(rss_best):
+            rss_best = i as i64
+    if rss_best >= 0 and rss_best < names.len() as i32 and rss_list.get(rss_best) > 0:
+        summary = summary ++ "; peak rss " ++ build_graph_rss_fmt(rss_list.get(rss_best)) ++ " (" ++ names.get(rss_best) ++ ")"
     build_graph_rt_eprint(summary ++ " (out/.build-state/build-times.tsv)")

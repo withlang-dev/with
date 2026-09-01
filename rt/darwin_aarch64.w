@@ -926,6 +926,18 @@ extern fn rt_libc_execv(path: *const u8, argv: *const *const u8) -> i32
 extern fn rt_libc_execvp(file: *const u8, argv: *const *const u8) -> i32
 @[link_name("waitpid")]
 extern fn rt_libc_waitpid(pid: i32, status: *mut i32, options: i32) -> i32
+@[link_name("wait4")]
+extern fn rt_libc_wait4(pid: i32, status: *mut i32, options: i32, rusage: *mut u8) -> i32
+@[link_name("getrusage")]
+extern fn rt_libc_getrusage(who: i32, rusage: *mut u8) -> i32
+
+// #679/#702: peak-RSS accounting for the build graph. struct rusage on
+// Darwin: ru_utime (16) + ru_stime (16) precede ru_maxrss (long, BYTES
+// here — Linux reports KB and normalizes in its own impl).
+var posix_last_child_maxrss: i64 = 0
+
+fn posix_rusage_maxrss(buf: *const u8) -> i64:
+    unsafe *((buf as i64 + 32) as *const i64)
 @[link_name("chdir")]
 extern fn rt_libc_chdir(path: *const u8) -> i32
 @[link_name("dup2")]
@@ -996,9 +1008,12 @@ fn posix_wait_child(pid: i32, timeout_ms: i32) -> i32:
     var status: i32 = -1
     let start_ns = with_clock_nanos()
     let timeout_ns = timeout_ms as i64 * 1000000
+    var ru: [160]u8 = [0 as u8; 160]
+    let ru_base = (&raw mut ru) as *mut [160]u8 as *mut u8
     while true:
-        let waited = if timeout_ms > 0: rt_libc_waitpid(pid, &raw mut status, POSIX_WNOHANG) else: rt_libc_waitpid(pid, &raw mut status, 0)
+        let waited = if timeout_ms > 0: rt_libc_wait4(pid, &raw mut status, POSIX_WNOHANG, ru_base) else: rt_libc_wait4(pid, &raw mut status, 0, ru_base)
         if waited == pid:
+            posix_last_child_maxrss = posix_rusage_maxrss(ru_base as *const u8)
             let termsig = status & 0x7f
             if termsig == 0:
                 return (status >> 8) & 0xff
@@ -1252,3 +1267,16 @@ pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     let rc = posix_wait_child(pid, timeout_ms)
     posix_active_child_pgid = 0
     rc
+
+// #679/#702: peak RSS (bytes) of the most recently reaped child.
+pub fn rt_compat_exec_child_maxrss() -> i64:
+    posix_last_child_maxrss
+
+// #679/#702: this process's own high-water RSS (bytes) — the build graph
+// attributes in-process targets by high-water DELTA around each one.
+pub fn rt_compat_self_maxrss() -> i64:
+    var ru: [160]u8 = [0 as u8; 160]
+    let ru_base = (&raw mut ru) as *mut [160]u8 as *mut u8
+    if rt_libc_getrusage(0, ru_base) != 0:
+        return 0
+    posix_rusage_maxrss(ru_base as *const u8)

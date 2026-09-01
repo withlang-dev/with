@@ -995,6 +995,11 @@ pub fn rt_compat_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_p
 pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     win_wait_process_slot(pid, timeout_ms, true)
 
+// #679/#702 stubs: RSS accounting is POSIX-only for now (#807-adjacent).
+pub fn rt_compat_exec_child_maxrss() -> i64: 0
+
+pub fn rt_compat_self_maxrss() -> i64: 0
+
 // ---------------------------------------------------------------------------
 // Networking (Winsock2 / ws2_32). Mirrors the POSIX backend in
 // rt/linux_x86_64.w:with_net_*, translated to Winsock semantics: SOCKET

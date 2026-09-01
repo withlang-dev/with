@@ -1426,12 +1426,13 @@ fn build_pool_spawn(target: &BuildGraphTarget, options: &BuildCommandOptions, st
 // The timing/completion records go back to the caller: an owned Vec
 // parameter would consume the pool state (pre-#691 handle-copy aliasing
 // is gone), so the reads borrow and the caller applies the record.
-type PoolRetireResult { rc: i32, name: str, spent: i64 }
+type PoolRetireResult { rc: i32, name: str, spent: i64, maxrss: i64 }
 
 fn build_pool_retire_oldest(pool_names: &Vec[str], pool_pids: &Vec[i32], pool_t0s: &Vec[i64], pool_outs: &Vec[str], pool_errs: &Vec[str], pool_timeouts: &Vec[i32], oldest: i32) -> PoolRetireResult:
     let idx = oldest as i64
     let name = pool_names.get(idx)
     let rc = build_graph_rt_exec_wait(pool_pids.get(idx), pool_timeouts.get(idx))
+    let child_rss = build_graph_rt_child_maxrss()
     let spent = with_clock_nanos() - pool_t0s.get(idx)
     let out_text = with_fs_read_file(pool_outs.get(idx))
     if out_text.len() > 0:
@@ -1442,12 +1443,12 @@ fn build_pool_retire_oldest(pool_names: &Vec[str], pool_pids: &Vec[i32], pool_t0
     with_eprint("[time] " ++ name ++ " " ++ build_graph_time_fmt(spent))
     if rc == 124:
         with_eprint("error: build.w target '" ++ name ++ "' timed out")
-        return PoolRetireResult { rc: 124, name: with_str_clone_ref(name), spent }
+        return PoolRetireResult { rc: 124, name: with_str_clone_ref(name), spent, maxrss: child_rss }
     if rc != 0:
         with_eprint("error: build.w target '" ++ name ++ f"' failed with exit code {rc}")
-        return PoolRetireResult { rc, name: with_str_clone_ref(name), spent }
+        return PoolRetireResult { rc, name: with_str_clone_ref(name), spent, maxrss: child_rss }
     build_cache_forget_fingerprints()
-    PoolRetireResult { rc: 0, name: with_str_clone_ref(name), spent }
+    PoolRetireResult { rc: 0, name: with_str_clone_ref(name), spent, maxrss: child_rss }
 
 // #683: serial actions run IN-PROCESS — this driver already holds the
 // evaluated graph and sema; the former worker child recompiled build.w
@@ -1697,7 +1698,9 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     let run_t0 = with_clock_nanos()
     let timed_names: Vec[str] = Vec.new()
     let timed_ns: Vec[i64] = Vec.new()
+    let timed_rss: Vec[i64] = Vec.new()
     var timing_name = ""
+    var timing_rss0: i64 = 0
     var timing_t0: i64 = 0
     // #680 stage B: allow_parallel action targets run as concurrent workers.
     // Declaration order stays the program order — the pool only overlaps runs
@@ -1717,6 +1720,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let spent = with_clock_nanos() - timing_t0
             timed_names.push(with_str_clone_ref(timing_name))
             timed_ns.push(spent)
+            timed_rss.push(build_graph_rt_self_maxrss() - timing_rss0)
             with_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
             timing_name = ""
         if build_graph_kind_removed(target.kind):
@@ -1766,6 +1770,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
+                timed_rss.push(retire.maxrss)
                 if retire.rc == 0:
                     completed_targets.push(move retire.name)
                 let retire_rc = retire.rc
@@ -1794,6 +1799,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
+                timed_rss.push(retire.maxrss)
                 if retire.rc == 0:
                     completed_targets.push(move retire.name)
                 let retire_rc = retire.rc
@@ -1810,6 +1816,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
+                timed_rss.push(retire.maxrss)
                 if retire.rc == 0:
                     completed_targets.push(move retire.name)
                 let retire_rc = retire.rc
@@ -1823,6 +1830,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                             var drain = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                             timed_names.push(with_str_clone_ref(drain.name))
                             timed_ns.push(drain.spent)
+                            timed_rss.push(drain.maxrss)
                             if drain.rc == 0:
                                 completed_targets.push(move drain.name)
                             pool_oldest = pool_oldest + 1
@@ -1839,6 +1847,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     var drain = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
                     timed_names.push(with_str_clone_ref(drain.name))
                     timed_ns.push(drain.spent)
+                    timed_rss.push(drain.maxrss)
                     if drain.rc == 0:
                         completed_targets.push(move drain.name)
                     pool_oldest = pool_oldest + 1
@@ -1855,6 +1864,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             // target keeps its name — an owned copy, not a field move.
             timing_name = with_str_clone_ref(target.name)
             timing_t0 = with_clock_nanos()
+            timing_rss0 = build_graph_rt_self_maxrss()
         let standard_result = build_graph_dispatch_standard_target(root, target, completed_targets)
         if standard_result.handled:
             if standard_result.rc != 0:
@@ -2001,6 +2011,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         var retire = build_pool_retire_oldest(pool_names, pool_pids, pool_t0s, pool_outs, pool_errs, pool_timeouts, pool_oldest)
         timed_names.push(with_str_clone_ref(retire.name))
         timed_ns.push(retire.spent)
+        timed_rss.push(retire.maxrss)
         if retire.rc == 0:
             completed_targets.push(move retire.name)
         let retire_rc = retire.rc
@@ -2016,9 +2027,10 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         let spent = with_clock_nanos() - timing_t0
         timed_names.push(with_str_clone_ref(timing_name))
         timed_ns.push(spent)
+        timed_rss.push(build_graph_rt_self_maxrss() - timing_rss0)
         with_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
     if times_top_level:
-        build_graph_times_report(root, &timed_names, &timed_ns, with_clock_nanos() - run_t0)
+        build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
     if survey and survey_failed.len() as i32 > 0:
         with_eprint(f"survey: {survey_failed.len() as i32} target(s) failed:")
         for sfi in 0..survey_failed.len() as i32:
