@@ -36,6 +36,13 @@ impl Sema:
                     let md = self.ast.get_decl(j)
                     if self.ast.kind(md) != NodeKind.NK_FN_DECL:
                         break
+                    // #756: spans are per-file byte offsets — nesting is only
+                    // meaningful within one file. Without this guard the walk
+                    // crossed module boundaries and adopted a foreign file's
+                    // free fn as a method whenever its byte range happened to
+                    // nest inside this impl's range (#754's defect class).
+                    if self.decls_share_source_file(j, di) == 0:
+                        break
                     if self.ast.get_start(md) < impl_start or self.ast.get_end(md) > impl_end:
                         break
                     self.method_decl_origins.insert(j, origin)

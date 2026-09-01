@@ -297,7 +297,8 @@ impl Sema:
             return with_str_clone_ref(pooled)
         f"sym{sym}"
 
-    fn impl_owner_type_name_for_decl(decl: i32) -> str:
+    fn impl_owner_type_name_for_decl(decl_index: i32) -> str:
+        let decl = self.ast.get_decl(decl_index)
         let start = self.ast.get_start(decl)
         let end = self.ast.get_end(decl)
         var best_span = 0
@@ -305,6 +306,11 @@ impl Sema:
         for di in 0..self.ast.decl_count():
             let cand = self.ast.get_decl(di)
             if self.ast.kind(cand) != NodeKind.NK_IMPL_DECL:
+                continue
+            // #756: spans are per-file offsets — containment across files is
+            // coordinate soup (the renderer's own copy of the adoption bug:
+            // regex.w free fns printed as BTreeMap methods).
+            if self.decls_share_source_file(di, decl_index) == 0:
                 continue
             let impl_start = self.ast.get_start(cand)
             let impl_end = self.ast.get_end(cand)
@@ -390,7 +396,7 @@ impl Sema:
             if kind == NodeKind.NK_FN_DECL:
                 let fn_name_sym = self.ast.get_data0(decl)
                 var fn_name = self.safe_symbol_text(fn_name_sym)
-                let owner_type_name = self.impl_owner_type_name_for_decl(decl)
+                let owner_type_name = self.impl_owner_type_name_for_decl(di)
                 let parsed_fn_name = self.extract_decl_name_after(decl, "fn")
                 if owner_type_name.len() > 0:
                     if parsed_fn_name.len() > 0:
@@ -567,7 +573,7 @@ impl Sema:
             if kind == NodeKind.NK_FN_DECL:
                 let fn_name_sym = self.ast.get_data0(decl)
                 var fn_name = self.safe_symbol_text(fn_name_sym)
-                let owner_type_name = self.impl_owner_type_name_for_decl(decl)
+                let owner_type_name = self.impl_owner_type_name_for_decl(di)
                 let parsed_fn_name = self.extract_decl_name_after(decl, "fn")
                 if owner_type_name.len() > 0:
                     if parsed_fn_name.len() > 0:
