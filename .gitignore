@@ -1,4 +1,5 @@
-.claude/
+.claude/*
+!.claude/settings.json
 .demo/
 
 # Reference repos (large external clones)
