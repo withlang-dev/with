@@ -1,6 +1,7 @@
 module build.retention
 
 use std.build
+use std.string.StringBuilder
 use std.sysinfo
 fn retention_owned_text(s: &str): s ++ ""
 
@@ -382,7 +383,12 @@ fn ret_append_state_file(ctx: &ActionCtx, combined: &str, target_name: &str) -> 
 fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &Vec[str]) -> str:
     if files.len() == 0:
         return ""
-    var out = ""
+    // #679: this runs under the comptime action evaluator, where the old
+    // `out = out ++ line` accumulation over ~2000 files was quadratic
+    // INTERPRETED copying and 100-file batches meant ~20 spawn round-trips
+    // — 77s of test-green wall for ~0.2s of native hashing. StringBuilder
+    // + 250-file batches keep it linear and the spawns rare.
+    var out = StringBuilder.new()
     var batch: Vec[str] = Vec.new()
     var batch_names: Vec[str] = Vec.new()
     var batch_index = 0
@@ -392,7 +398,9 @@ fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &Vec[str]) -> 
         batch.push(ret_abs(root, file))
         batch_names.push(retention_owned_text(file))
         let last = i + 1 == files.len() as i32
-        if batch.len() as i32 >= 100 or last:
+        // argv is capped at 255 entries by the runtime spawn path — stay under
+        // it (tool + slack) while keeping spawns rare.
+        if batch.len() as i32 >= 250 or last:
             let args: Vec[str] = Vec.new()
             args.push(ret_sha256_tool(root))
             for bi in 0..batch.len() as i32:
@@ -404,11 +412,14 @@ fn ret_sha256_files_manifest(ctx: &ActionCtx, label: &str, files: &Vec[str]) -> 
                 let line = lines.get(li as i64)
                 if line.len() < 64:
                     return ""
-                out = out ++ line.slice(0, 64) ++ "  " ++ batch_names.get(li as i64) ++ "\n"
+                out.push_str(line.slice(0, 64))
+                out.push_str("  ")
+                out.push_str(batch_names.get(li as i64))
+                out.push_str("\n")
             batch = Vec.new()
             batch_names = Vec.new()
             batch_index = batch_index + 1
-    out
+    out.to_str()
 
 fn ret_append_file_hashes(combined: &str, ctx: &ActionCtx, label: &str, files: &Vec[str]) -> str:
     let manifest = ret_sha256_files_manifest(ctx, label, files)
