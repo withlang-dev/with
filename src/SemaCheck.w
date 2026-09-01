@@ -8634,9 +8634,17 @@ impl Sema:
                 if raw_root != 0 and self.current_fn_sig_idx >= 0:
                     let raw_pi = self.param_index_for_sym(raw_root)
                     if raw_pi >= 0:
+                        // A `mut fn` receiver is a compiler-modeled BORROWED
+                        // place (IndirectPlace): the caller retains ownership
+                        // and its drop, so the smuggle rationale below —
+                        // caller must transfer — cannot apply. Seeding
+                        // ESCAPE_VALUE here demanded `move fn` from every
+                        // in-place mutator that hands a field's raw address
+                        // to a runtime helper (StringBuilder.push_str, #919).
+                        let raw_recv_borrows = raw_pi == 0 and self.sig_receiver_mode(self.current_fn_sig_idx) == ReceiverMode.Mut
                         let raw_p_tid = self.sig_param_type(self.current_fn_sig_idx, raw_pi)
                         let raw_p_kind = self.get_type_kind(self.resolve_alias(raw_p_tid as TypeId))
-                        if raw_p_kind != TypeKind.TY_REF and raw_p_kind != TypeKind.TY_PTR and self.is_copy(raw_p_tid as TypeId) == 0:
+                        if not raw_recv_borrows and raw_p_kind != TypeKind.TY_REF and raw_p_kind != TypeKind.TY_PTR and self.is_copy(raw_p_tid as TypeId) == 0:
                             self.note_param_effect(raw_root, EFF_ESCAPE_VALUE)
                 var raw_pointee = operand as i32
                 // D27: a runtime subscript already has exact type &T in value
