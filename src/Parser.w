@@ -2804,7 +2804,9 @@ impl Parser:
             self.pool.add_extra(type_ann)
             flags = flags + (type_extra + 1) * 16
 
-        self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
+        let node = self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
+        self.pool.mark_const_decl(node)
+        node
 
 // ── error decl (desugars to enum) ────────────────────────────────
 

@@ -494,6 +494,11 @@ type AstPoolState {
     sealed_trait_nodes: Vec[i32],
     extend_impl_nodes: Vec[i32],
     comptime_decl_nodes: Vec[i32],
+    // D39: NK_LET_DECL nodes the parser produced from `const` — the wrapper
+    // it desugars to (NK_COMPTIME) is folded away by the comptime transform,
+    // so the bundle-interface emitter reads const-ness from this mark, which
+    // is identical for `.w` and `.wi` input.
+    const_decl_nodes: Vec[i32],
     move_closure_nodes: Vec[i32],
     non_escaping_closure_nodes: Vec[i32],
     by_place_closure_nodes: Vec[i32],
@@ -532,6 +537,7 @@ type AstPoolState {
     sealed_trait_set: HashMap[i32, i32],
     extend_impl_set: HashMap[i32, i32],
     comptime_decl_set: HashMap[i32, i32],
+    const_decl_set: HashMap[i32, i32],
     move_closure_set: HashMap[i32, i32],
     non_escaping_closure_set: HashMap[i32, i32],
     by_place_closure_set: HashMap[i32, i32],
@@ -591,6 +597,7 @@ fn AstPool.new -> AstPool:
             sealed_trait_nodes: Vec.new(),
             extend_impl_nodes: Vec.new(),
             comptime_decl_nodes: Vec.new(),
+            const_decl_nodes: Vec.new(),
             move_closure_nodes: Vec.new(),
             non_escaping_closure_nodes: Vec.new(),
             by_place_closure_nodes: Vec.new(),
@@ -622,6 +629,7 @@ fn AstPool.new -> AstPool:
             sealed_trait_set: HashMap.new(),
             extend_impl_set: HashMap.new(),
             comptime_decl_set: HashMap.new(),
+            const_decl_set: HashMap.new(),
             move_closure_set: HashMap.new(),
             non_escaping_closure_set: HashMap.new(),
             by_place_closure_set: HashMap.new(),
@@ -1574,6 +1582,14 @@ impl AstPool:
 
     fn is_comptime_decl_node(node: NodeId) -> i32:
         if self.state.comptime_decl_set.contains(node as i32): return 1
+        0
+
+    fn mark_const_decl(node: NodeId):
+        self.state.const_decl_nodes.push(node as i32)
+        self.state.const_decl_set.insert(node as i32, 1)
+
+    fn is_const_decl_node(node: NodeId) -> i32:
+        if self.state.const_decl_set.contains(node as i32): return 1
         0
 
     fn mark_move_closure(node: NodeId):

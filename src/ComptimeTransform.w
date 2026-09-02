@@ -132,6 +132,8 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         out.mark_extend_impl((src.state.extend_impl_nodes.get(ei as i64)) as NodeId)
     for ci in 0..src.state.comptime_decl_nodes.len() as i32:
         out.mark_comptime_decl((src.state.comptime_decl_nodes.get(ci as i64)) as NodeId)
+    for ki in 0..src.state.const_decl_nodes.len() as i32:
+        out.mark_const_decl((src.state.const_decl_nodes.get(ki as i64)) as NodeId)
     for gi in 0..src.state.global_allocator_decl_nodes.len() as i32:
         out.mark_global_allocator_decl((src.state.global_allocator_decl_nodes.get(gi as i64)) as NodeId)
     for hi in 0..src.compiler_hook_count():
