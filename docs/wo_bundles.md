@@ -1,7 +1,9 @@
 # `.wo` bundles: compile a migrated corpus once, link it forever
 
-Status: DESIGN (2026-09-02). Ruled in direction by Eric (decisions.md D38);
-nothing here is implemented. Companions: `docs/stdlib_sourcing_plan.md`
+Status: batches A and B implemented and reseeded (`467aae3e`, `8014b8e3`,
+2026-09-02); batch C (pcre2) is designed below in "Implementation notes
+(batch C)" and awaits Eric's ruling on the interface artifact. Ruled in
+direction by Eric (decisions.md D38). Companions: `docs/stdlib_sourcing_plan.md`
 (the corpora), `docs/harden_migrate.md` (the migrator), decisions.md D30
 (runtime objects as a cache), #761 (the mixed-generation corruption
 class this design must never reintroduce).
@@ -27,26 +29,30 @@ ABI is exposed anywhere.
 
 ## What a `.wo` is
 
-A **With module bundle**: a corpus's migrated With source, plus one
-prebuilt object per (target, With ABI version), plus a manifest.
+A **With module bundle**: a corpus's migrated With source and tests in
+the tree (`lib/std/<corpus>/`), plus, per (target, ABI), three store
+artifacts the compiler writes together and embeds together:
 
 ```
-<corpus>.wo/
-    manifest            corpus name, upstream pin (tag, tarball sha256),
-                        corpus content sha, migrator version that produced
-                        the source, per-object records below
-    src/                the raw migrated With modules — the interface
-    tests/              the corpus's own tests, migrated (the oracle)
-    obj/<sha>-<target>-abi<N>.o
-                        With-native object: With-mangled symbols, With ABI N
+lib/std/<corpus>/                the raw migrated modules + the corpus's own
+                                 tests (the oracle); source of every artifact
+<store>/<corpus>-<key>.o         With-native object: With-mangled symbols
+<store>/<corpus>-<key>.manifest  abi-sha, target, object name, one `prefix`
+                                 line per module (the on-demand predicate)
+<store>/<corpus>-<key>.wi        the interface: every module's public
+                                 declarations, bodies removed
 ```
 
-The **interface is the source.** Sema reads `src/` exactly as it reads
-the embedded stdlib today, so signatures carry receiver modes, ownership
-effects, and layouts; generics and `comptime` instantiate at the use site;
-the facade over a raw corpus is ordinary With. There is no serialized
-metadata format to design or keep in sync, and nothing another language
-could consume: the bundle is With-only by construction, not by policy.
+The **interface is the source's declarations.** It is With text, written
+by the compiler from Sema's finalized declarations, and Sema reads it
+exactly as it reads embedded stdlib source, so signatures carry receiver
+modes, ownership modes, and layouts, and the facade over a raw corpus is
+ordinary With. There is no serialized metadata format to design or keep
+in sync, and nothing another language could consume: the bundle is
+With-only by construction, not by policy. It is the declarations rather
+than the whole source because Sema on pcre2's 155k lines costs 6.06 s
+per program that imports it (hello world: 0.03 s) and `std.regex` is in
+the prelude; see "Implementation notes (batch C)".
 
 The **object is With-native.** Its functions are compiled with With's
 calling convention (`FnAbi` pass modes), carry With-mangled names, and
@@ -102,7 +108,7 @@ compiler.
 ## How a user program uses `.wo`s
 
 `use std.zlib` (or `use std.stc.deque` through its facade) resolves against
-the embedded bundle source; Sema checks the program with full ownership
+the embedded bundle interface; Sema checks the program with full ownership
 knowledge. At link time the compiler extracts from its embedded store
 exactly the `.wo` objects the program referenced and static-links them;
 the linker dead-strips what is unreferenced. The user's binary is
@@ -270,17 +276,125 @@ A bundle module may not define generic functions or comptime bodies (the
 C-shaped boundary of `docs/abi_roadmap.md` Level 0; the bundle build
 refuses one), so nothing from a bundle is ever instantiated at a use site.
 Facades (`std.regex`, `std.zlib`) are stdlib source outside the bundle and
-compile in-unit as before. In the bootstrap chain this is also why
-`--link-object` is not on the critical path: a compiler with a bundle
-embedded skips the bodies and links its own embedded copy; the seed, which
-has none, compiles the corpus in-unit into stage1 once.
+compile in-unit as before. (Batch C revises the bootstrap consequence:
+stage1 must link the bundle through `--link-bundle` too, or stage1
+compiles the corpus in-unit into stage2 while stage2 links the bundle
+into stage3 and fixpoint breaks.)
 
 **Order inside the batch.** (1) `--link-object`; (2) the ABI-sha stamp and
 `with version --abi-sha`; (3) `--emit-bundle-manifest`; (4) `Link.w`
 embedded-bundle selection with an empty index; (5) declarations-only
-codegen for bundle-provided modules; (6) the `build.w` helper and store
-land with the first bundle (batch C). Battery, reseed. Then batch C
-converts pcre2 on top.
+codegen for bundle-provided modules — all landed in `467aae3e` and
+`8014b8e3`, battery green, reseeded. (6) the `build.w` helper and store
+land with the first bundle (batch C).
+
+## Implementation notes (batch C, pcre2) — proposed, awaiting ruling
+
+**Two gaps batch B left** (found mapping pcre2; fixed first as batch C0,
+alone in a battery because both touch symbol naming):
+
+- Whole-program codegen names a function by its bare base name
+  (`fn_abi_module_link_name` with mode 0), but a bundle defines
+  `__with_mod_<hash>__<base>`, so a bundle-provided call site would never
+  reference a bundle symbol and the on-demand predicate would never fire.
+  The three `module_object_mode != 0` naming guards in `Codegen` become
+  one predicate — this path uses module link names — true in
+  module-object mode or when an embedded bundle provides the path.
+- `codegen_canonical_module_path` joins a tree-resolved `lib/std/re/x.w`
+  with `$PWD`, so a bundle built from a checkout would hash an absolute
+  path into every symbol. The rule maps `lib/std/<rest>` (and
+  `…/lib/std/<rest>`) to `<embedded-std>/std/<rest>`, the identity Sema's
+  module naming already applies. ABI-defining: re-record
+  `docs/with-abi.sha256`. Verified by `--emit-bundle-manifest` on the
+  corpus root printing `<embedded-std>/std/re/…` prefixes.
+
+**The measured constraint.** `with check lib/std/re/pcre2test.w` takes
+6.06 s; hello world 0.03 s. `std.regex` is imported by the prelude, so
+"the facade imports `std.re.*` directly" would put six seconds of Sema on
+every program. Batch B's declarations-only rule saves codegen, not Sema.
+So a bundle ships its interface, and the compiler embeds interfaces,
+never corpus sources.
+
+**Interface (`.wi`).** Written by the compiler beside the object
+(`--emit-bundle-interface <path>`) from Sema's finalized declarations,
+not a text slice: one `module <embedded-std>/std/<corpus>/<name>.w`
+section per module in the bundle, holding that module's `pub`
+declarations with bodies removed — structs, enums, unions, aliases and
+`const`s in full (use sites need layouts and folded values), `pub let`
+globals without their initializer, `pub fn`/`pub unsafe fn` as signature
+only, plus any private type a public signature mentions. A bodyless `fn`
+and an initializer-less `let` are accepted only inside interface texts (a
+parser mode); user source is unchanged. Sema registers a bodyless
+declaration exactly like a defined one: pass modes and receiver modes come
+from the declared signature (`fn_param_uses_value_ref_abi` runs at
+declaration time; D5, D6), so the caller's ABI cannot diverge from the
+bundle's, and its ownership effects are the D5 canonical reading of the
+signature — plain `T` consumes, `&T` borrows, receiver modes as declared.
+No body check, no MIR, no codegen beyond the declaration. A generic or
+`comptime` declaration in a bundle module is a bundle-build error (Level
+0's C-shaped boundary, `docs/abi_roadmap.md`).
+
+**Resolver.** `use std.re.X` on a compiler whose bundle index provides
+`<embedded-std>/std/re/X.w` reads that module's interface section;
+otherwise the source, as today. `lib/std/re/` stays out of
+`EmbeddedStdlibData.w` (it is excluded today), and that exclusion becomes
+the rule for every corpus: three blobs per bundle (object, manifest,
+interface), never the 5.5 MB of source.
+
+**`--link-bundle <store>/<name>-<key>`** (repeatable) replaces the bare
+`--link-object` for stage links: it names the object, the manifest
+(prefixes → declarations only) and the interface (resolver) together, so a
+compiler with an empty index (stage1) compiles exactly what a compiler
+with the bundle embedded compiles.
+
+**Bootstrap chain.** `wo_bundle("pcre2", "lib/std/re", <root>)` registers
+`pcre2-wo`: key = sha256(corpus_sha | target | abi_sha) with `corpus_sha`
+from `build_cache_hash_directory_w_files` over the root's closure; store
+`$WITH_WO_DIR` (default `~/.local/with-wo/`); present → nothing runs;
+absent → the compiler whose stamp equals `abi_sha` builds it (`--emit-obj
+--emit-bundle-manifest --emit-bundle-interface`, published atomically).
+seed → stage1: the seed's own embedded bundle when it has one, else the
+corpus in-unit once (only until the reseed after this batch). stage1 →
+stage2: `--link-bundle` with the tree-ABI bundle stage1 built; stage2
+embeds it. stage2 → stage3: stage2's index; same stored bytes, so
+fixpoint holds by construction. Cross compilers embed the `--target`
+bundles the release compiler builds. The five `regex-runtime-ir`/`-object`
+target pairs and the `regex_runtime.o` entries in `Link.w`,
+`build/package.w`, `build/emit_c.w`, `build/runtime.w`, and
+`install-regex-runtime` go away.
+
+**Root.** `rt/regex_runtime.w`'s `use` list (32 modules; `pcre2test` and
+`pcre2posix` are harness, not bundle) is the bundle root, moved to
+`lib/std/re/bundle.w` and written by the migrate action, which already
+post-patches `use` lines into three modules
+(`pcre2_ensure_generated_dependencies`).
+
+**Retiring the shim (D30).** `std.regex` imports `std.re.*` through the
+interface and calls pcre2 directly, as `std.zlib` does; `Regex.__literal_code`
+stays the regex-literal entry and gains `Regex.__capture_count`, so
+codegen's `gen_regex_literal_value` calls facade functions only;
+SemaCheck's compile-time literal validation (`validate_regex_literal`)
+uses `std.regex` like any program — the compiler is one more user of the
+facade and links the bundle on demand; `CCodegen`'s ten `with_regex_*`
+prototypes, `CiMigrate`'s borrowed-str mask, and `rt/regex_runtime.w` are
+deleted; `build/emit_c.w` stops harvesting `with_regex_` exports (its
+"found no runtime exports" check retires with the last runtime export; in
+the emit-C lane the corpus compiles in-unit as C, no bundle involved).
+
+**Lanes.** `wo-drift`: rebuild the bundle to a scratch object with the
+current compiler — byte-identical to the stored one when corpus and ABI
+are unchanged (determinism of the bundle itself) — and run `:pcre2-test`
+(upstream RunTest) with `pcre2test` linked against the bundle.
+`abi-hash-check` already guards the key.
+
+**Known debt.** #941: the migrator emits `/`-based 128-bit overflow
+helpers; the promoted `defs.w` files carry a hand edit a re-migrate would
+drop. The generator is fixed before the first `wo-drift` run.
+
+**Decisions awaiting ruling.** (1) The interface artifact, and bodyless
+declarations accepted inside interface texts only. (2) The effects of a
+bodyless declaration are the D5 canonical reading of its signature.
+Everything else above is mechanism.
 
 ## Non-goals
 

@@ -41,6 +41,19 @@ drop protocol), declared and versioned in `docs/with-abi.md`; a change
 to an ABI-defining rule must bump the version, enforced by a battery hash
 check. No `@[c_export]`, no C surface, anywhere in the compiler.
 
+**Amendment (2026-09-02, proposed with batch C; awaiting ruling).** The
+bundle's interface is its *declarations*, not its source. Measured:
+Sema on pcre2's source costs 6.06 s per program that imports it (hello
+world 0.03 s), and `std.regex` is in the prelude. So a bundle ships a
+compiler-written declarations-only interface (`.wi`: bodyless `pub fn`
+and `pub let`, types and consts in full) and the compiler embeds
+interfaces, never corpus sources. Sound under D5/D6: pass modes and
+receiver modes are declaration-derived, and a bodyless declaration's
+effects are the D5 canonical reading of its signature. Swift's
+`.swiftinterface` is the reference; Rust's `.rmeta` and Go's export data
+are the binary equivalents (verified in `.reference/`). Design:
+`docs/wo_bundles.md` "Implementation notes (batch C)".
+
 **Context.** The container corpora (D37) will bring the compiler's
 migrated dependencies to 20–30. Today each bootstrap stage recompiles
 every corpus (pcre2's `regex_runtime.o` three times per build; zlib

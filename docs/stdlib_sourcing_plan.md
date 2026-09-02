@@ -100,16 +100,18 @@ Per corpus, exactly what `build/pcre2.w` does today:
    set in the migrate review) — then the corpus is re-migrated.
 
 Each corpus lands as a **`.wo` bundle** (decisions.md D38,
-`docs/wo_bundles.md`): its migrated source and tests are the bundle, its
-object is compiled once per target and With ABI version, and a normal
-compiler build links the existing object instead of recompiling the
-corpus. The compiler embeds every bundle; user programs automatically
-link the ones they reference.
+`docs/wo_bundles.md`): its migrated source and tests live in the tree, its
+object, manifest and declarations-only interface are compiled once per
+target and With ABI, and a normal compiler build links the existing object
+instead of recompiling the corpus. The compiler embeds every bundle's
+object and interface (never the source: Sema on a corpus costs seconds
+per program); user programs automatically link the ones they reference.
 
 Layout: each bundle's source is checked in under `lib/std/<corpus>/`
 exactly as pcre2's (`lib/std/re/`) and zlib's (`lib/std/zlib/`) are —
-generated, never hand-edited, and inside the embedded stdlib tree because a
-bundle's symbols hash the module's canonical `<embedded-std>/…` path
+generated, never hand-edited, and under the stdlib tree because a bundle's
+symbols hash the module's canonical `<embedded-std>/…` path, which that
+location names whether or not the source is embedded
 (`docs/wo_bundles.md`, "Object build"); facades in `lib/std/collections.w`
 and a new `lib/std/algorithms.w`; a `corpora` battery lane that runs every
 bundle's upstream tests, plus the `wo-drift` lane from `docs/wo_bundles.md`.
