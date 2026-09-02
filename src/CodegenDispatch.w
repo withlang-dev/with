@@ -6341,7 +6341,8 @@ impl Codegen:
         if tk == TypeKind.TY_GENERIC_INST:
             // Preserve generic substitutions when projecting fields through a
             // specialized struct like Outer[Entry] -> wrapped: Wrapper[Entry].
-            let generic_field_ty = self.sema.struct_field_type_frozen_or_compute(resolved, field_token)
+            // #742: codegen runs on a frozen Sema — a read, never a compute.
+            let generic_field_ty = self.sema.struct_field_type_frozen(resolved, field_token)
             if generic_field_ty > 0:
                 return generic_field_ty
             let base_sym = self.mir_type_d0_at(resolved)
@@ -7077,7 +7078,7 @@ impl Codegen:
                 if field_text.len() == 0:
                     field_text = self.sema_symbol_text(field)
                 let sema_field = if field_text.len() > 0: self.sema.pool_lookup_symbol(field_text) else: 0
-                var field_ty = self.sema.struct_field_type_frozen_or_compute(resolved, if sema_field != 0: sema_field else: field)
+                var field_ty = self.sema.struct_field_type_frozen(resolved, if sema_field != 0: sema_field else: field)
                 if field_ty != 0:
                     return field_ty
         if self.sema.typed_expr_types.contains(node):

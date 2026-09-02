@@ -10965,13 +10965,9 @@ impl Sema:
     // that only registered during codegen-era re-checks (after every eager
     // pass) computes and backfills its field cache here. Codegen owns the
     // sema during emission, so this mutable window is the sanctioned one.
-    mut fn struct_field_type_frozen_or_compute(struct_type: i32, field: i32) -> i32:
-        let resolved = self.resolve_alias(struct_type as TypeId)
-        if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and
-           not self.generic_struct_field_type_cache.contains(sema_pair_key(resolved as i32, field)):
-            self.preregister_generic_struct_fields(resolved as i32)
-        self.struct_field_type_frozen(struct_type, field)
-
+    // #742: the compute-on-miss twin of this read is gone — its only callers
+    // were codegen, which runs on a frozen Sema; eager_type_caches_pass fills
+    // the generic field caches before freeze, and a miss here is loud.
     fn struct_field_type_frozen(struct_type: i32, field: i32) -> i32:
         if struct_type == 0:
             return 0
