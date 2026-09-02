@@ -8,3 +8,13 @@ out/** linguist-generated
 # embed_file read "...\r\n" and break the byte-exact assertions (#801).
 test/behavior/*.txt text eol=lf
 test/behavior/**/*.txt text eol=lf
+
+# With source is content-hashed cross-platform: docs/with-abi.sha256 records the
+# sha256 of the ABI-defining sources (build/abi.w, docs/with-abi.md §7 / D38), and
+# that hash keys every .wo bundle, so the bytes fed to it must be identical on
+# every platform. Under core.autocrlf=true a Windows checkout rewrites LF to CRLF,
+# which both changes each source's hash (abi-hash-check mismatch) and leaves a
+# trailing "\r" on the record's path column that trips the comptime ToolFs
+# project-root check. Pin LF so the hash is stable and the record parses cleanly.
+*.w text eol=lf
+docs/with-abi.sha256 text eol=lf
