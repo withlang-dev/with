@@ -1,9 +1,9 @@
 # `.wo` bundles: compile a migrated corpus once, link it forever
 
-Status: batches A and B implemented and reseeded (`467aae3e`, `8014b8e3`,
-2026-09-02); batch C (pcre2) is designed below in "Implementation notes
-(batch C)" and awaits Eric's ruling on the interface artifact. Ruled in
-direction by Eric (decisions.md D38). Companions: `docs/stdlib_sourcing_plan.md`
+Status: batches A, B and C0 implemented and reseeded (`467aae3e`,
+`8014b8e3`, `22e534c6`, 2026-09-02); batch C (pcre2) is designed below in
+"Implementation notes (batch C)" under Eric's D39 ruling on bundle
+interfaces. Ruled in direction by Eric (decisions.md D38, D39). Companions: `docs/stdlib_sourcing_plan.md`
 (the corpora), `docs/harden_migrate.md` (the migrator), decisions.md D30
 (runtime objects as a cache), #761 (the mixed-generation corruption
 class this design must never reintroduce).
@@ -288,7 +288,7 @@ codegen for bundle-provided modules — all landed in `467aae3e` and
 `8014b8e3`, battery green, reseeded. (6) the `build.w` helper and store
 land with the first bundle (batch C).
 
-## Implementation notes (batch C, pcre2) — proposed, awaiting ruling
+## Implementation notes (batch C, pcre2) — ruled, decisions.md D39
 
 **Two gaps batch B left** (found mapping pcre2; fixed first as batch C0,
 alone in a battery because both touch symbol naming):
@@ -315,24 +315,60 @@ every program. Batch B's declarations-only rule saves codegen, not Sema.
 So a bundle ships its interface, and the compiler embeds interfaces,
 never corpus sources.
 
-**Interface (`.wi`).** Written by the compiler beside the object
-(`--emit-bundle-interface <path>`) from Sema's finalized declarations,
-not a text slice: one `module <embedded-std>/std/<corpus>/<name>.w`
-section per module in the bundle, holding that module's `pub`
-declarations with bodies removed — structs, enums, unions, aliases and
-`const`s in full (use sites need layouts and folded values), `pub let`
-globals without their initializer, `pub fn`/`pub unsafe fn` as signature
-only, plus any private type a public signature mentions. A bodyless `fn`
-and an initializer-less `let` are accepted only inside interface texts (a
-parser mode); user source is unchanged. Sema registers a bodyless
-declaration exactly like a defined one: pass modes and receiver modes come
-from the declared signature (`fn_param_uses_value_ref_abi` runs at
-declaration time; D5, D6), so the caller's ABI cannot diverge from the
-bundle's, and its ownership effects are the D5 canonical reading of the
-signature — plain `T` consumes, `&T` borrows, receiver modes as declared.
-No body check, no MIR, no codegen beyond the declaration. A generic or
-`comptime` declaration in a bundle module is a bundle-build error (Level
-0's C-shaped boundary, `docs/abi_roadmap.md`).
+**Interface (`.wi`) — D39.** A `.wi` is a compiler-recognized source
+flavor: ordinary With declaration syntax read in an interface-only parser
+mode, in which a function may omit its body and a storage-backed global
+may omit its initializer. Ordinary `.w` source never admits either, so
+the language does not acquire C-header forward declarations by accident.
+In the AST the state is typed, never implied by a missing node: a
+function declaration's body is `SourceBody | InterfaceBody`, a global's
+initializer is `Expr | InterfaceProvided`, under the invariant that
+anything requiring implementation information rejects or ignores
+`InterfaceBody` and anything operating on declarations works identically
+on both. The compiler writes the interface after full Sema
+(`--emit-bundle-interface <path>`, beside `--emit-obj`) from finalized
+semantic declarations, never as a syntactic projection: one `module
+<embedded-std>/std/<corpus>/<name>.w` section per bundle module holding
+the `pub` types with exactly the declarations needed to reproduce their
+layout (canonicalized, no alias or import chains), `pub const NAME: T =
+<folded value>` (canonical folded constants, never the source
+expression, so interface constants carry no implementation
+dependencies), `pub let NAME: T` for storage the object supplies, and
+every `pub fn`/`pub unsafe fn` signature. Consumers resolve a
+bundle-provided module to its `.wi`, run ordinary declaration, type and
+layout Sema on it, and never body analysis or MIR for bundle
+implementations. A generic or `comptime` declaration in a bundle module
+is a bundle-build error (Level 0's C-shaped boundary,
+`docs/abi_roadmap.md`).
+
+**Callable semantics are the declaration — D39.** No body-inferred
+ownership or effect information is part of an interface. `T` is
+consumed; `&T` is borrowed for the call; `&mut T` is a mutable borrow;
+`move self` consumes the receiver; `mut self` is the mutable receiver;
+raw pointers carry no With ownership beyond their declared type; a
+returned reference's origin follows deterministic elision — the receiver
+if there is one, else the single borrowed parameter, else the declaration
+is ambiguous and the bundle build rejects it (`pub fn choose(a: &Foo, b:
+&Foo) -> &Foo` has no interface under the default rules). A source
+function whose `T` parameter is not consumed was declared wrong and
+should say `&T`; the boundary exposing that is a feature. When an API
+genuinely needs to state an origin, With's source language gains a way
+to say it (conceptually `-> &Foo from a`): a real language feature for
+authors, never an interface-only annotation of inferred Sema facts. If a
+caller must know it for correctness, it belongs in the contract.
+
+**Fingerprint — D39.** The bundle build proves the interface is exact,
+not merely parseable: Sema computes a canonical exported-declaration
+graph from the full source and, separately, from the emitted `.wi`,
+hashes both, and requires equality. The graph covers type layouts and
+ABI-relevant field offsets, enum discriminant values, parameter and
+return types, receiver mode, declaration-level ownership and borrow
+modes, calling convention, visibility, constant type and value, extern
+function-pointer signatures, and generic constraints when applicable.
+The fingerprint is recorded in the manifest, so an object and an
+interface from different generations can never be paired: the consumer
+checks it before linking. An emitter bug is a build failure, never an
+ABI corruption.
 
 **Resolver.** `use std.re.X` on a compiler whose bundle index provides
 `<embedded-std>/std/re/X.w` reads that module's interface section;
@@ -391,10 +427,10 @@ are unchanged (determinism of the bundle itself) — and run `:pcre2-test`
 helpers; the promoted `defs.w` files carry a hand edit a re-migrate would
 drop. The generator is fixed before the first `wo-drift` run.
 
-**Decisions awaiting ruling.** (1) The interface artifact, and bodyless
-declarations accepted inside interface texts only. (2) The effects of a
-bodyless declaration are the D5 canonical reading of its signature.
-Everything else above is mechanism.
+**Ruled** as decisions.md D39 (2026-09-02). The spec projection — the
+interface source flavor, the elision rule, and the explicit-origin
+spelling as a future language feature — is drafted separately for Eric's
+blessing of the words.
 
 ## Non-goals
 
