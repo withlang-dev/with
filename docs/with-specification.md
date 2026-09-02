@@ -10409,7 +10409,7 @@ with repl                                    # interactive session
 with init                                    # create a new project
 with migrate <c-sources>                     # translate C to With (§13.5b, §16)
 with emit-c-header <file>                    # emit C declarations for @[c_export] (§16.5)
-with version | with help
+with version [--abi-sha] | with help         # --abi-sha: the ABI identity .wo bundles key on
 with -e <code> | -n <code> | -p <code>      # one-liners (§18.5b)
 ```
 

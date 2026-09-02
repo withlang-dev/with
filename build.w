@@ -884,6 +884,19 @@ fn build_replace_once(text: &str, needle: &str, replacement: &str) -> str:
         return ""
     text.slice(0, idx) ++ replacement ++ text.slice(idx + needle.len(), text.len())
 
+// The compiler source imports four build-generated modules; a repo fixture
+// that runs `with check src/main.w` needs every one of them or the check
+// dies on the import (#932). Returns "" on success, else the failing step.
+fn build_copy_generated_compiler_modules(fs: &ToolFs, repo_copy: &str) -> str:
+    if fs.mkdir_all(build_project_join(repo_copy, "out/gen/compiler")) != 0:
+        return "could not create embedded gen directory"
+    let names = "EmbeddedStdlibData EmbeddedRuntimeData EmbeddedClangResourceData EmbeddedBundlesData"
+    for name in names.split(" "):
+        let rel = "out/gen/compiler/" ++ name ++ ".w"
+        if fs.write_text(build_project_join(repo_copy, rel), fs.read_text(rel)) != 0:
+            return "could not copy generated module " ++ rel
+    ""
+
 fn issue61_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error("issue61-regression: " ++ message)
     1
@@ -921,19 +934,9 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     if fs.symlink("lib", build_project_join(repo_copy, "lib")) != 0:
         return issue61_fail(ctx, "could not link lib into repo fixture")
 
-    let embedded_src = "out/gen/compiler/EmbeddedStdlibData.w"
-    let embedded_dst = build_project_join(repo_copy, "out/gen/compiler/EmbeddedStdlibData.w")
-    if fs.mkdir_all(build_project_join(repo_copy, "out/gen/compiler")) != 0:
-        return issue61_fail(ctx, "could not create embedded stdlib data directory")
-    if fs.write_text(embedded_dst, fs.read_text(embedded_src)) != 0:
-        return issue61_fail(ctx, "could not copy embedded stdlib data module")
-    if fs.write_text(build_project_join(repo_copy, "out/gen/compiler/EmbeddedRuntimeData.w"), fs.read_text("out/gen/compiler/EmbeddedRuntimeData.w")) != 0:
-        return issue61_fail(ctx, "could not copy embedded runtime data module")
-
-    let clang_res_src = "out/gen/compiler/EmbeddedClangResourceData.w"
-    let clang_res_dst = build_project_join(repo_copy, "out/gen/compiler/EmbeddedClangResourceData.w")
-    if fs.write_text(clang_res_dst, fs.read_text(clang_res_src)) != 0:
-        return issue61_fail(ctx, "could not copy embedded clang resource data module")
+    let copy_err = build_copy_generated_compiler_modules(fs, repo_copy)
+    if copy_err.len() > 0:
+        return issue61_fail(ctx, copy_err)
 
     let sema_path = build_project_join(repo_copy, "src/SemaCheck.w")
     let sema_text = fs.read_text(sema_path)
@@ -1062,14 +1065,9 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
         return invariance_fail(ctx, "could not remove copied seed from repo fixture")
     if fs.symlink("lib", build_project_join(repo_copy, "lib")) != 0:
         return invariance_fail(ctx, "could not link lib into repo fixture")
-    if fs.mkdir_all(build_project_join(repo_copy, "out/gen/compiler")) != 0:
-        return invariance_fail(ctx, "could not create embedded gen directory")
-    if fs.write_text(build_project_join(repo_copy, "out/gen/compiler/EmbeddedStdlibData.w"), fs.read_text("out/gen/compiler/EmbeddedStdlibData.w")) != 0:
-        return invariance_fail(ctx, "could not copy embedded stdlib data module")
-    if fs.write_text(build_project_join(repo_copy, "out/gen/compiler/EmbeddedRuntimeData.w"), fs.read_text("out/gen/compiler/EmbeddedRuntimeData.w")) != 0:
-        return invariance_fail(ctx, "could not copy embedded runtime data module")
-    if fs.write_text(build_project_join(repo_copy, "out/gen/compiler/EmbeddedClangResourceData.w"), fs.read_text("out/gen/compiler/EmbeddedClangResourceData.w")) != 0:
-        return invariance_fail(ctx, "could not copy embedded clang resource data module")
+    let copy_err = build_copy_generated_compiler_modules(fs, repo_copy)
+    if copy_err.len() > 0:
+        return invariance_fail(ctx, copy_err)
 
     let edit_copy = build_project_join(repo_copy, file)
     let pristine = fs.read_text(edit_copy)
@@ -2153,6 +2151,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     var stamp = target_new(.Action, "build", "").output(release_compiler_bin("with"))
     stamp.action = run_patch_version_action
     stamp = stamp.input(release_compiler_bin("with") ++ ".unstamped")
+    // The ABI stamp is sha256 of this record; a re-record must re-stamp.
+    stamp = stamp.input("docs/with-abi.sha256")
     stamp = target_with_version_inputs(move stamp, ctx)
     stamp = stamp.extra_output("out/command/build")
     stamp = stamp.write_scope("out/release/bin")
