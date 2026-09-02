@@ -2597,6 +2597,63 @@ fn mir_block_reaches_linearly(body: &MirBody, from_bb: i32, to_bb: i32) -> i32:
         hops = hops + 1
     0
 
+fn mir_local_of_place(body: &MirBody, place: i32) -> i32:
+    if place < 0 or place >= body.place_locals.len() as i32:
+        return -1
+    body.place_locals.get(place as i64)
+
+// The locals whose VALUE an rvalue reads, decoded per kind with the same
+// d0/d1/d2 layout the MIR printer uses (mir_rvalue_text is the contract).
+// Address-takes (ref, addr_of) are not value reads. #927: the use-after-kill
+// validator read `rval_d0` as an operand for every kind — for an aggregate
+// that is the aggregate kind, for a binop the operator, for a ref the borrow
+// kind — so operand 0 of the body (a move-self function's `self`) was
+// "read" after its reset blank, and every D32 rebind builder audited red.
+fn mir_rvalue_read_locals(body: &MirBody, rv: i32) -> Vec[i32]:
+    let out: Vec[i32] = Vec.new()
+    if rv < 0 or rv >= body.rval_kinds.len() as i32:
+        return out
+    let k = body.rval_kinds.get(rv as i64)
+    let d0 = body.rval_d0.get(rv as i64)
+    let d1 = body.rval_d1.get(rv as i64)
+    let d2 = body.rval_d2.get(rv as i64)
+    // Collect candidate locals (-1 = none), then keep the real ones.
+    let cands: Vec[i32] = Vec.new()
+    if k == RvalueKind.RK_USE or k == RvalueKind.RK_CAST or k == RvalueKind.RK_ARRAY_FILL:
+        cands.push(mir_local_of_operand(body, d0))
+    else if k == RvalueKind.RK_BIN_OP:
+        cands.push(mir_local_of_operand(body, d1))
+        cands.push(mir_local_of_operand(body, d2))
+    else if k == RvalueKind.RK_UN_OP:
+        cands.push(mir_local_of_operand(body, d1))
+    else if k == RvalueKind.RK_DISCRIMINANT or k == RvalueKind.RK_LEN:
+        cands.push(mir_local_of_place(body, d0))
+    else if k == RvalueKind.RK_SLICE:
+        cands.push(mir_local_of_place(body, d0))
+        cands.push(mir_local_of_operand(body, d1))
+        cands.push(mir_local_of_operand(body, d2))
+    else if k == RvalueKind.RK_AGGREGATE:
+        if d1 >= 0 and d1 < body.agg_field_starts.len() as i32:
+            let fstart = body.agg_field_starts.get(d1 as i64)
+            let fcount = body.agg_field_counts.get(d1 as i64)
+            for fi in 0..fcount:
+                let opi = fstart + fi
+                if opi >= 0 and opi < body.agg_field_operands.len() as i32:
+                    cands.push(mir_local_of_operand(body, body.agg_field_operands.get(opi as i64)))
+    else if k == RvalueKind.RK_STR_CONCAT_N:
+        if d0 >= 0 and d0 < body.call_arg_starts.len() as i32:
+            let start = body.call_arg_starts.get(d0 as i64)
+            let count = body.call_arg_counts.get(d0 as i64)
+            for ai in 0..count:
+                let opi = start + ai
+                if opi >= 0 and opi < body.call_arg_operands.len() as i32:
+                    cands.push(mir_local_of_operand(body, body.call_arg_operands.get(opi as i64)))
+    for ci in 0..cands.len() as i32:
+        let local = cands.get(ci as i64)
+        if local >= 0:
+            out.push(local)
+    out
+
 fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
     let local_count = body.local_type_ids.len() as i32
     if local_count <= 0 or local_count > 20000:
@@ -2629,22 +2686,12 @@ fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
                 continue
             if sk != StmtKind.Assign:
                 continue
-            // Reads first: an operand of the rvalue must not be a killed local.
-            let used = mir_local_of_operand(body, body.rval_d0.get(d1 as i64))
-            if used >= 0 and used < local_count and killed.get(used as i64) != 0 and mir_block_reaches_linearly(body, killed_bb.get(used as i64), bb) != 0:
-                return f"{fn_name}: local _{used} is read at bb{bb} after its reset-on-move blank zeroed it"
-            if d1 >= 0 and d1 < body.rval_kinds.len() as i32 and body.rval_kinds.get(d1 as i64) == RvalueKind.RK_AGGREGATE:
-                let fid = body.rval_d1.get(d1 as i64)
-                if fid >= 0 and fid < body.agg_field_starts.len() as i32:
-                    let fstart = body.agg_field_starts.get(fid as i64)
-                    let fcount = body.agg_field_counts.get(fid as i64)
-                    for fi in 0..fcount:
-                        let opi = fstart + fi
-                        if opi < 0 or opi >= body.agg_field_operands.len() as i32:
-                            continue
-                        let agg_used = mir_local_of_operand(body, body.agg_field_operands.get(opi as i64))
-                        if agg_used >= 0 and agg_used < local_count and killed.get(agg_used as i64) != 0 and mir_block_reaches_linearly(body, killed_bb.get(agg_used as i64), bb) != 0:
-                            return f"{fn_name}: local _{agg_used} is read by an aggregate at bb{bb} after its reset-on-move blank zeroed it"
+            // Reads first: no value operand of the rvalue may be a killed local.
+            let reads = mir_rvalue_read_locals(body, d1)
+            for ri in 0..reads.len() as i32:
+                let used = reads.get(ri as i64)
+                if used >= 0 and used < local_count and killed.get(used as i64) != 0 and mir_block_reaches_linearly(body, killed_bb.get(used as i64), bb) != 0:
+                    return f"{fn_name}: local _{used} is read at bb{bb} after its reset-on-move blank zeroed it"
             // Then the write: a zero fill kills, any other write revives.
             if d0 >= 0 and d0 < body.place_locals.len() as i32 and body.place_proj_counts.get(d0 as i64) == 0:
                 let dst = body.place_locals.get(d0 as i64)

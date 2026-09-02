@@ -1382,6 +1382,27 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         return 1
     if deep_debug_analyze_expect(ctx, root, compiler, ownership_abs, out_dir, "analyze-storage", "audit:storage", "storage-audit") != 0:
         return 1
+    // #927: a move-self builder that rebinds `self` and then builds an
+    // aggregate must audit clean — the use-after-kill validator once read an
+    // aggregate's kind slot as an operand and flagged the moved `self`.
+    let rebind_input = build_project_join(out_dir, "rebind-input.w")
+    let rebind_source =
+        "type Pair { a: i32, b: i32 }\n\n" ++
+        "type P { vars: Vec[i32] }\n\n" ++
+        "pub fn P.set(move self: Self, v: i32) -> P:\n" ++
+        "    var owned = self\n" ++
+        "    let pair = Pair { a: v, b: v }\n" ++
+        "    owned.vars.push(pair.a)\n" ++
+        "    owned\n\n" ++
+        "fn main:\n" ++
+        "    var p = P { vars: Vec.new() }\n" ++
+        "    p = p.set(1)\n" ++
+        "    print(f\"{p.vars.len()}\")\n"
+    if fs.write_text(rebind_input, rebind_source) != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not write rebind fixture")
+        return 1
+    if deep_debug_analyze_expect(ctx, root, compiler, build_project_abs(root, rebind_input), out_dir, "analyze-audit-rebind", "audit:all", "violations=0 ok") != 0:
+        return 1
     // D5 superseded: a read-only free parameter is owned, not share-place —
     // callee-place-alias marshalling survives only on receivers (D12), so the
     // matrix probe targets the mut-receiver method.
