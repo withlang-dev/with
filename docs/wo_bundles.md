@@ -138,6 +138,56 @@ linked by G+k), so two checks replace it:
    a `.wo` from day one. Compiler build cost stays flat as the count
    grows to 30.
 
+## Conforming pcre2 and zlib (the first two bundles)
+
+What each is today, and what changes. Both follow the one pattern; every
+later corpus follows it from day one.
+
+**pcre2 today.** `lib/std/re/` holds the migrated modules. A 297-line
+shim, `rt/regex_runtime.w`, imports all of them and exports `with_regex_*`;
+it is compiled whole-module to IR and then to `regex_runtime.o` three
+times per build (`bootstrap-`, `stage2-`, `cross-` targets), embedded
+through the `EmbedObjectFiles` assembly generator
+(`with_embedded_regex_runtime_o_start/_end`), and linked on demand when a
+program's undefined symbols need it (`Link.w`'s
+`link_stage_undefined_symbols_need_regex_runtime`). `std.regex` and the
+compiler itself (SemaCheck 12 call sites, CCodegen 10, CiMigrate 3,
+CodegenDispatch 1) call the shim.
+
+**zlib today.** `lib/std/zlib/` holds the migrated modules; `std.zlib`
+imports them directly (the model facade). Nothing prebuilt: every consumer
+(`std.build`, `build/zlib_gzip.w`, `build/zlib_gunzip.w`) compiles the
+corpus in-unit.
+
+**After.**
+- `pcre2.wo` = `lib/std/re/` (source) + its migrated tests + one object per
+  target × ABI version, built by a `pcre2-wo` target from a bundle root that
+  imports every module (today that root is the shim's `use` list), keyed
+  and stored per §"How the compiler build uses `.wo`s", built only when
+  absent. `zlib.wo` likewise from `lib/std/zlib/`.
+- The embed generator and `Link.w`'s name→slice table become data-driven
+  over the set of bundles instead of three hardcoded objects; on-demand
+  linking generalizes from "needs regex runtime" to "an undefined symbol
+  belongs to bundle X" using each bundle's manifest symbol list (this is
+  also the link-time interface check).
+- `std.regex` imports `std.re` directly, exactly as `std.zlib` imports
+  `std.zlib.*`; the compiler's internal callers move onto `std.regex`;
+  `rt/regex_runtime.w` and the `with_regex_*` seam are deleted (D30).
+- Each bootstrap stage links the store's objects; stage1 (built by the
+  seed) receives them as plain link inputs from `build.w`, stage2 and the
+  release binary embed them.
+
+**Order of batches.** (A) extract the ABI-defining classifier and naming
+into `src/FnAbi.w` beside `TypeLayout.w`, add `WITH_ABI_VERSION`, record
+the ABI-source hash, add the battery check — alone in its battery
+(codegen-touching). (B) the `.wo` mechanism: store, key, manifest,
+data-driven embed and link tables, on-demand linking. (C) pcre2: bundle
+target, `std.regex` over `std.re`, compiler callers off the shim, shim
+deleted. (D) zlib: bundle target, consumers link it. (A) comes first so
+the key is narrow from the first bundle; without it the only correct key
+includes the whole of `Codegen.w`, which recompiles the corpora on most
+compiler commits — the thing this design exists to stop.
+
 ## Non-goals
 
 - Dynamic linking (`.so`): a runtime loader, C-ABI symbol tables, and
