@@ -143,12 +143,20 @@ fn count_non_use_decls_frontend(pool: AstPool) -> i32:
 
 impl Zcu:
     mut fn emit_missing_import_frontend(pool: AstPool, decl: i32):
+        // #932: name the module — an unnamed miss cost a debugger session
+        // to bisect (a fresh clone lacks the build-generated modules).
+        let path_start = pool.get_data0(decl)
+        let path_count = pool.get_data1(decl)
+        var dotted = ""
+        for i in 0..path_count:
+            if i > 0: dotted = dotted ++ "."
+            dotted = dotted ++ self.pool.resolve(pool.get_extra(path_start + i))
         let span = Span {
             file: 0,
             start: pool.get_start(decl),
             end: pool.get_end(decl),
         }
-        self.diagnostics.emit(Diagnostic.err("import module not found", span))
+        self.diagnostics.emit(Diagnostic.err(import_not_found_message(dotted), span))
 
 fn frontend_rt_in_unit_enabled() -> i32:
     if runtime_getenv("WITH_RT_IN_UNIT").len() > 0: 1 else: 0
@@ -1588,13 +1596,19 @@ impl Zcu:
         // Wave 4: sidecar resolved artifact.
         let t_resolve = runtime_clock_nanos()
         var _sp_diag = move self.diagnostics
-        var artifacts = resolve_from_root_pool_with_prefix(name, normalized_text, file_id, pool, self.pool, move _sp_diag, false, self.prelude_prefix_decls)
+        var artifacts = resolve_from_root_pool_with_prefix(name, normalized_text, file_id, pool, self.pool, move _sp_diag, false, self.prelude_prefix_decls, self.next_file_id)
         if do_profile:
             let resolve_ns = runtime_clock_nanos() - t_resolve
             runtime_eprint(f"[profile] frontend.resolve  {resolve_ns / 1000000}.{(resolve_ns % 1000000) / 1000} ms")
         self.pool = artifacts.pool
         self.diagnostics = move artifacts.diags
         self.set_resolve_snapshot(artifacts.result, name)
+        // #930: the resolver numbered imported modules from next_file_id;
+        // advance past them so no later registration reuses one of their ids.
+        for mi in 0..self.last_resolved.modules.len() as i32:
+            let mod_file_id = self.last_resolved.modules.get(mi as i64).file_id
+            if mod_file_id >= self.next_file_id:
+                self.next_file_id = mod_file_id + 1
         self.capture_last_link_lib_names(self.pool, self.last_resolved)
         if self.diagnostics.has_errors():
             // #661: resolve-phase parse errors carry resolve-generation file

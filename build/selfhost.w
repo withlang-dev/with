@@ -2288,6 +2288,30 @@ fn bs_check_build_graph_inferred_edge(ctx: &ActionCtx, compiler_path: &str, case
         return bs_fail(ctx, "consumer ran before its producer's output existed (#700 inferred edge)")
     0
 
+// #930: a parse error inside an imported module must be attributed to that
+// module's path and line — not to whichever embedded stdlib text shared its
+// file id (Resolve and the frontend each numbered files from 1).
+fn bs_check_imported_module_diag_location(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "importdiag")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "use helper\n\nfn main:\n    print(helper_two())\n", "import diag main")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/helper.w"), "pub fn helper_two() -> str:\n    let x = = 1\n    \"a\"\n", "import diag helper")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push("src/main.w")
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "imported-module-diag-location", args, 120000, case_dir)
+    if result.rc == 0:
+        return bs_fail(ctx, "imported module with a syntax error was accepted (rc 0)")
+    if not result.stderr.contains("expected expression"):
+        return bs_fail(ctx, "imported module syntax error reported the wrong diagnostic: " ++ result.stderr)
+    if not result.stderr.contains("helper.w:2:"):
+        return bs_fail(ctx, "imported module diagnostic is not attributed to helper.w:2 (#930): " ++ result.stderr)
+    if result.stderr.contains("<embedded-std>"):
+        return bs_fail(ctx, "imported module diagnostic rendered against an embedded stdlib text (#930): " ++ result.stderr)
+    0
+
 fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "effectaudit")
     if rc != 0: return rc
@@ -2437,6 +2461,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_effects_audit(ctx, compiler_path, bs_join(output_dir, "build_effects_case"))
     if rc != 0: return rc
     rc = bs_check_build_graph_inferred_edge(ctx, compiler_path, bs_join(output_dir, "build_graph_edge_case"))
+    if rc != 0: return rc
+    rc = bs_check_imported_module_diag_location(ctx, compiler_path, bs_join(output_dir, "import_diag_case"))
     if rc != 0: return rc
     bs_check_run_project_targets(ctx, compiler_path, bs_join(output_dir, "run_project_case"))
 

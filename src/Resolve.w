@@ -185,11 +185,17 @@ fn resolve_normalize_source_text(text: &str) -> str:
     out.to_str()
 
 fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, root_pool: AstPool, pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveArtifacts:
-    resolve_from_root_pool_with_prefix(root_path, root_text, root_file_id, root_pool, pool, move diags, emit_resolve_diags, 0)
+    resolve_from_root_pool_with_prefix(root_path, root_text, root_file_id, root_pool, pool, move diags, emit_resolve_diags, 0, 1)
 
-fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_file_id: i32, root_pool: AstPool, pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool, root_prefix_skip: i32) -> ResolveArtifacts:
+// `first_file_id` is the caller's next unused file id: imported modules are
+// numbered from it so their ids never collide with texts the caller already
+// registered (#930 — the resolver and the frontend each counted from 1, and
+// an imported module's parse error rendered against the embedded stdlib
+// text that shared its number).
+fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_file_id: i32, root_pool: AstPool, pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool, root_prefix_skip: i32, first_file_id: i32) -> ResolveArtifacts:
     var state = ResolveState.init(pool, move diags, emit_resolve_diags)
     state.root_prefix_skip = root_prefix_skip
+    state.next_file_id = first_file_id
     let normalized_root_text = resolve_normalize_source_text(root_text)
     let root_dir = resolve_dirname(root_path)
     state.root_source_dir = with_str_clone_ref(root_dir)
@@ -356,7 +362,7 @@ impl ResolveState:
                 if resolved_path.len() > 0:
                     target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)
                 else:
-                    self.emit_import_decl_error(module_id, start, end, "import module not found")
+                    self.emit_import_decl_error(module_id, start, end, import_not_found_message(dotted))
                 self.result.imports.push(ResolvedImport {
                     module_id,
                     index_in_module: import_index,
@@ -1121,6 +1127,18 @@ impl ResolveState:
             return cand6
 
         ""
+
+extern fn with_fs_is_dir(path: &str) -> i32
+
+// #932: one message for an unresolved `use`, from both the resolver and the
+// frontend's import pass. It names the module; in a tree that has never been
+// built (no out/gen) it also says that generated modules need one
+// `with build` — the miss that cost a debugger session to bisect.
+pub fn import_not_found_message(dotted: &str) -> str:
+    var msg = "import module not found: '" ++ dotted ++ "'"
+    if with_fs_is_dir("out/gen") == 0:
+        msg = msg ++ " (build-generated modules live under out/gen; run `with build` once in a fresh checkout)"
+    msg
 
 fn resolve_file_exists(path: &str) -> bool:
     with_fs_read_file(path).len() > 0
