@@ -4614,7 +4614,7 @@ fn bs_check_migrate_builtin_overflow(ctx: &ActionCtx, compiler_path: &str, case_
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "builtin_overflow.c")
     let out_w = bs_join(case_dir, "builtin_overflow.w")
-    let c_text = "static int add_or_neg1(int a, int b) { int r; if (__builtin_add_overflow(a, b, &r)) return -1; return r; }\nstatic int sub_or_neg1(int a, int b) { int r; if (__builtin_sub_overflow(a, b, &r)) return -1; return r; }\nstatic int mul_or_neg1(int a, int b) { int r; if (__builtin_mul_overflow(a, b, &r)) return -1; return r; }\nstatic unsigned add_or_7(unsigned a, unsigned b) { unsigned r; if (__builtin_add_overflow(a, b, &r)) return 7; return r; }\nstatic unsigned sub_or_7(unsigned a, unsigned b) { unsigned r; if (__builtin_sub_overflow(a, b, &r)) return 7; return r; }\nstatic unsigned mul_or_7(unsigned a, unsigned b) { unsigned r; if (__builtin_mul_overflow(a, b, &r)) return 7; return r; }\nint main(void) { return add_or_neg1(20, 22) == 42 && add_or_neg1(2147483647, 1) == -1 && sub_or_neg1(-2147483647 - 1, 1) == -1 && mul_or_neg1(50000, 50000) == -1 && add_or_7(4294967295u, 1u) == 7u && sub_or_7(0u, 1u) == 7u && mul_or_7(4294967295u, 2u) == 7u ? 0 : 1; }\n"
+    let c_text = "static int add_or_neg1(int a, int b) { int r; if (__builtin_add_overflow(a, b, &r)) return -1; return r; }\nstatic int sub_or_neg1(int a, int b) { int r; if (__builtin_sub_overflow(a, b, &r)) return -1; return r; }\nstatic int mul_or_neg1(int a, int b) { int r; if (__builtin_mul_overflow(a, b, &r)) return -1; return r; }\nstatic unsigned add_or_7(unsigned a, unsigned b) { unsigned r; if (__builtin_add_overflow(a, b, &r)) return 7; return r; }\nstatic unsigned sub_or_7(unsigned a, unsigned b) { unsigned r; if (__builtin_sub_overflow(a, b, &r)) return 7; return r; }\nstatic unsigned mul_or_7(unsigned a, unsigned b) { unsigned r; if (__builtin_mul_overflow(a, b, &r)) return 7; return r; }\nstatic int umul128_overflows(unsigned __int128 a, unsigned __int128 b) { unsigned __int128 r; return __builtin_mul_overflow(a, b, &r); }\nstatic int smul128_overflows(__int128 a, __int128 b) { __int128 r; return __builtin_mul_overflow(a, b, &r); }\nint main(void) { return add_or_neg1(20, 22) == 42 && add_or_neg1(2147483647, 1) == -1 && sub_or_neg1(-2147483647 - 1, 1) == -1 && mul_or_neg1(50000, 50000) == -1 && add_or_7(4294967295u, 1u) == 7u && sub_or_7(0u, 1u) == 7u && mul_or_7(4294967295u, 2u) == 7u && umul128_overflows(((unsigned __int128)1) << 64, ((unsigned __int128)1) << 64) == 1 && umul128_overflows(((unsigned __int128)1) << 63, 2) == 0 && smul128_overflows(((__int128)1) << 126, 2) == 1 && smul128_overflows(-(((__int128)1) << 126), 2) == 0 ? 0 : 1; }\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate compiler overflow builtins")
     if rc != 0: return rc
     var args: Vec[str] = Vec.new()
@@ -4631,6 +4631,17 @@ fn bs_check_migrate_builtin_overflow(ctx: &ActionCtx, compiler_path: &str, case_
     rc = bs_assert_contains(ctx, out_text, "__with_builtin_mul_overflow_u32", "builtin_overflow_unsigned_mul")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "if 0", "builtin_overflow_no_zero_fallback")
+    if rc != 0: return rc
+    // #941: the 128-bit multiply checks go through the limb helper and never
+    // divide (`/` on i128/u128 is a __udivti3 libcall a freestanding runtime
+    // object cannot resolve); the narrower helpers still may.
+    rc = bs_assert_contains(ctx, out_text, "u128_mul_would_overflow(a, b)", "builtin_overflow_u128_limb_helper")
+    if rc != 0: return rc
+    let wide_start = bs_index_of(out_text, "fn __with_builtin_mul_overflow_i128")
+    let wide_end = bs_index_of(out_text, "with_clz")
+    if wide_start < 0 or wide_end <= wide_start:
+        return bs_fail(ctx, "builtin_overflow: the 128-bit helper region was not found in the migrated output")
+    rc = bs_assert_not_contains(ctx, out_text.slice(wide_start as i64, wide_end as i64), " / ", "builtin_overflow_128_division_free")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")

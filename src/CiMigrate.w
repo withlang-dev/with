@@ -444,14 +444,39 @@ fn ci_migrate_render_overflow_helper(op: &str, ty: &str, is_signed: bool):
         "if b == 0: false else: result / b != a"
     let signature = "unsafe fn __with_builtin_" ++ op ++ "_overflow_" ++ ty ++ "(a: " ++ ty ++ ", b: " ++ ty ++ ", out: *mut " ++ ty ++ ") -> bool"
     let body = "    let result = a " ++ token ++ " b\n    unsafe { (*out = result) }\n    " ++ overflow ++ "\n"
+    ci_migrate_render_fn_with_body(signature, body)
+
+fn ci_migrate_render_fn_with_body(signature: &str, body: &str) -> str:
     if migrate_prefer_brace():
         return signature ++ " {\n" ++ body ++ "}\n"
     signature ++ ":\n" ++ body
 
+// The 128-bit multiply checks are division-free (#941): `/` on i128/u128
+// lowers to the __divti3/__udivti3 compiler-rt libcalls, which a freestanding
+// runtime object's COFF link has no builtins library to resolve. Limb
+// decomposition keeps the check to multiplies and shifts, inline on every
+// target at every -O level. The shared helper is emitted once, before the
+// i128 multiply that first needs it.
+fn ci_migrate_render_u128_mul_would_overflow() -> str:
+    let comment = "// The 128-bit overflow checks stay division-free on purpose: `/` on i128/u128\n// lowers to the __divti3/__udivti3 compiler-rt libcalls, and this shim is\n// compiled into freestanding runtime objects whose COFF link has no builtins\n// library to resolve them from. Limb decomposition keeps the check to multiplies\n// and shifts, which lower inline on every target and at every -O level.\n"
+    let body = "    let a_hi = (a >> 64) as u64\n    let b_hi = (b >> 64) as u64\n    if a_hi != 0 and b_hi != 0: return true\n    let a_lo = (a as u64) as u128\n    let b_lo = (b as u64) as u128\n    let cross = (a_hi as u128) *% b_lo +% (b_hi as u128) *% a_lo\n    if (cross >> 64) != 0: return true\n    let low = a_lo *% b_lo\n    ((low >> 64) +% cross) >> 64 != 0\n"
+    comment ++ ci_migrate_render_fn_with_body("fn u128_mul_would_overflow(a: u128, b: u128) -> bool", body)
+
+fn ci_migrate_render_mul_overflow_128(ty: &str, is_signed: bool) -> str:
+    let signature = "unsafe fn __with_builtin_mul_overflow_" ++ ty ++ "(a: " ++ ty ++ ", b: " ++ ty ++ ", out: *mut " ++ ty ++ ") -> bool"
+    let body = if is_signed:
+        "    unsafe { (*out = a *% b) }\n    if a == 0 or b == 0: return false\n    let neg = (a < 0) != (b < 0)\n    let ua = if a < 0: (0 as u128) -% (a as u128) else: a as u128\n    let ub = if b < 0: (0 as u128) -% (b as u128) else: b as u128\n    if u128_mul_would_overflow(ua, ub): return true\n    let limit = if neg: (1 as u128) << 127 else: ((1 as u128) << 127) -% 1\n    ua *% ub > limit\n"
+    else:
+        "    unsafe { (*out = a *% b) }\n    u128_mul_would_overflow(a, b)\n"
+    ci_migrate_render_fn_with_body(signature, body)
+
 fn ci_migrate_render_overflow_helpers(ty: &str, is_signed: bool):
+    let wide = ty == "i128" or ty == "u128"
+    let shared = if ty == "i128": ci_migrate_render_u128_mul_would_overflow() else: ""
+    let mul = if wide: ci_migrate_render_mul_overflow_128(ty, is_signed) else: ci_migrate_render_overflow_helper("mul", ty, is_signed)
     ci_migrate_render_overflow_helper("add", ty, is_signed) ++
     ci_migrate_render_overflow_helper("sub", ty, is_signed) ++
-    ci_migrate_render_overflow_helper("mul", ty, is_signed)
+    shared ++ mul
 
 // Write the shared defs module (defs.w) to output_dir.
 // Contains: preamble + hardcoded extras + shared declarations.

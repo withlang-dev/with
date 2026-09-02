@@ -8909,6 +8909,14 @@ impl CiTypePool:
 
 impl CiExprPool:
     fn build_named_call_expr(name: &str, arg_ids: &Vec[i32]) -> CiExprId:
+        self.build_named_call_expr_typed(name, arg_ids, 0 as CiTypeId)
+
+    // A synthesized call whose result type is known (a preamble helper with a
+    // fixed signature): carrying it lets every consumer that coerces on a type
+    // mismatch — the return paths, initializers — see the mismatch. An untyped
+    // call (`0`) is invisible to them (#941: `return __builtin_mul_overflow(..)`
+    // from an `int` function lost its bool→int conversion).
+    fn build_named_call_expr_typed(name: &str, arg_ids: &Vec[i32], result_ty: CiTypeId) -> CiExprId:
         let callee_idx = self.add_string(name)
         let callee_id = self.ident(callee_idx, 0 as CiTypeId)
         let args_start = self.extra_len() as i32
@@ -8916,7 +8924,7 @@ impl CiExprPool:
         while i < arg_ids.len():
             let _ = self.add_extra(arg_ids.get(i))
             i = i + 1
-        var call = self.add(CiExprKind.CIE_CALL, callee_id as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
+        var call = self.add(CiExprKind.CIE_CALL, callee_id as i32, args_start, arg_ids.len() as i32, result_ty)
         if ci_migrate_call_requires_unsafe_wrapper(name):
             call = self.unsafe_expr(call)
         call
@@ -9468,7 +9476,9 @@ impl CiExprPool:
         args.push(self.cast(canonical_ty, (arg_ids.get(0)) as CiExprId) as i32)
         args.push(self.cast(canonical_ty, (arg_ids.get(1)) as CiExprId) as i32)
         args.push(self.cast(canonical_ptr_ty, (arg_ids.get(2)) as CiExprId) as i32)
-        let call = self.build_named_call_expr("__with_builtin_" ++ op ++ "_overflow_" ++ out_ty, &args)
+        // The helpers return bool (C `_Bool`); typing the call is what lets an
+        // `int f() { return __builtin_mul_overflow(...); }` coerce at the return.
+        let call = self.build_named_call_expr_typed("__with_builtin_" ++ op ++ "_overflow_" ++ out_ty, &args, types.named_type_from_text("bool"))
         self.unsafe_expr(call)
 
     fn build_libc_call_value_expr(session: i64, cursor: i32, callee_text: &str, arg_ids: &Vec[i32], types: CiTypePool) -> CiExprId:
