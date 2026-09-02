@@ -8866,6 +8866,11 @@ impl MirBuilder:
         let args_id = self.body.new_call_args(args)
         self.body.set_call_ast_node(args_id, node)
         self.record_call_contract(args_id, node, sig_idx)
+        // #933: a call whose result has no type is a Sema hole, not a unit
+        // value — lowering it as unit once aggregated a void payload into an
+        // Option and trapped LLVM. Fail here, naming the call.
+        if actual_ret_type_id == 0:
+            sema_phase_bug(f"BUG: call result has no type: node={node} sig={sig_idx} callee={bc_callee_sym}")
         let result_local = self.new_temp(actual_ret_type_id)
         let result_place = self.place_for_local(result_local)
         let next_bb = self.new_block()
@@ -13469,7 +13474,21 @@ impl MirBuilder:
                     vs_payload_ty = vs_payload_tys.get(vsi as i64)
                     if vs_payload_ty != 0:
                         self.expected_type = vs_payload_ty
-                let vs_arg_op = self.lower_expr(vs_arg)
+                // #933: a payload is a call argument — apply Sema's recorded
+                // adjustments in lower_call_arg's order (auto-reference, then
+                // the D22 contextual copy) before a plain lowering. Skipping
+                // them stored a `&i32` view where `Option[i32]` demanded the
+                // value (read back as 0) and would store a value where a
+                // reference was expected.
+                var vs_arg_op = -1
+                if vs_payload_ty != 0:
+                    vs_arg_op = self.lower_auto_ref_call_arg(vs_arg, vs_payload_ty)
+                    if vs_arg_op < 0:
+                        vs_arg_op = self.lower_auto_copy_ref_call_arg(vs_arg, vs_payload_ty)
+                    if vs_arg_op < 0:
+                        vs_arg_op = self.lower_auto_deref_call_arg(vs_arg, vs_payload_ty)
+                if vs_arg_op < 0:
+                    vs_arg_op = self.lower_expr(vs_arg)
                 vs_fields.push(vs_arg_op)
                 self.expected_type = saved_expected
                 vs_names.push(0)

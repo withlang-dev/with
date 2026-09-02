@@ -6444,6 +6444,7 @@ impl Sema:
                 let resolved_variant_sym = self.qualified_enum_variant_sym(expected_variant_ty, name)
                 self.comp_resolved.insert(node, resolved_variant_sym)
                 self.typed_expr_types.insert(node, expected_variant_ty)
+                self.check_variant_shorthand_args(node, expected_variant_ty, name)
                 return expected_variant_ty as TypeId
             // Fall through to variant_lookup if expected type is not an enum
             // (e.g., function return type leaking through). Only error if the
@@ -6467,6 +6468,7 @@ impl Sema:
                         self.emit_error_with_help("cannot infer the enum type for `." ++ self.pool_resolve(name) ++ "`", node, "annotate the binding (e.g. `let x: " ++ self.pool_resolve(vs_owner_sym) ++ "[...] = ...`) or spell the enum type on the variant")
                         return 0 as TypeId
                 self.typed_expr_types.insert(node, vs_tid)
+                self.check_variant_shorthand_args(node, vs_tid, name)
                 return vs_tid as TypeId
             // A BARE unknown shorthand stays silent: context-dependent
             // shorthands (the comprehension `_Empty` marker, bare `None`
@@ -13258,6 +13260,26 @@ impl Sema:
         let opt_args: Vec[i32] = Vec.new()
         opt_args.push(payload_ty)
         self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
+
+    // #933: a `.Variant(args)` shorthand's payload arguments are checked
+    // against the variant's payload types exactly as the bare `Variant(args)`
+    // call checks them. Skipping them left a generic-method-call payload
+    // (`.Some(v.get(0))`) with no recorded type: MirLower fell back to unit
+    // for the call result and codegen asked LLVM to size a void payload.
+    mut fn check_variant_shorthand_args(node: i32, enum_ty: i32, variant_name: i32):
+        let arg_count = self.ast.get_data2(node)
+        if arg_count <= 0:
+            return
+        let args_start = self.ast.get_data1(node)
+        let payloads = self.enum_variant_payload_types(enum_ty, variant_name)
+        for ai in 0..arg_count:
+            let arg_node = self.ast.get_extra(args_start + ai)
+            if arg_node == 0:
+                continue
+            if ai < payloads.len() as i32 and payloads.get(ai as i64) != 0:
+                let _ = self.check_expr_with_expected(arg_node, payloads.get(ai as i64) as TypeId)
+            else:
+                let _ = self.check_expr_value_context(arg_node)
 
     fn expected_variant_constructor_type(variant_name: i32) -> i32:
         if self.has_expected_type == 0 or self.expected_expr_type == 0:
