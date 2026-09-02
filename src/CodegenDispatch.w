@@ -17692,7 +17692,7 @@ impl Codegen:
 
         let spawn_fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, 0)
         var effective_name = self.function_symbol_name(name_sym)
-        if self.module_object_mode != 0:
+        if self.path_uses_module_link_names(self.current_decl_source_file):
             if not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
                 effective_name = self.current_decl_module_link_name(effective_name)
         let existing_spawn = wl_get_named_function(self.llmod, effective_name)

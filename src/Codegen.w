@@ -299,11 +299,10 @@ type Codegen {
     decl_source_paths: Vec[str],
     current_decl_source_file: str,
     module_object_mode: i32,
-    // D38: module link-name prefixes provided by embedded .wo bundles; loaded
-    // once on first use. A function from such a module is declared, never
-    // defined, in this unit (docs/wo_bundles.md "Declarations only").
+    // D38: module link-name prefixes provided by embedded .wo bundles. A
+    // function from such a module is declared under its module link name,
+    // never defined, in this unit (docs/wo_bundles.md "Declarations only").
     bundle_prefixes: Vec[str],
-    bundle_prefixes_loaded: i32,
 
     // Loop stack (fixed-size arrays via Vec)
     loop_break_bbs: Vec[i64],
@@ -941,8 +940,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         decl_source_paths: Vec.new(),
         current_decl_source_file: "<unknown>",
         module_object_mode: 0,
-        bundle_prefixes: Vec.new(),
-        bundle_prefixes_loaded: 0,
+        bundle_prefixes: embedded_bundle_prefixes(),
         loop_break_bbs: Vec.new(),
         loop_continue_bbs: Vec.new(),
         loop_result_allocas: Vec.new(),
@@ -4162,22 +4160,30 @@ impl Codegen:
 // Symbol-naming rules live in src/FnAbi.w (docs/with-abi.md §5); this is
 // the adapter that feeds them the codegen mode.
 impl Codegen:
-    fn module_link_name_for_path(source_path: &str, base_name: &str) -> str:
-        fn_abi_module_link_name(self.module_object_mode, source_path, base_name)
+    // Module link names (`__with_mod_<hash>__<base>`) apply in module-object
+    // mode, and in every mode to a path an embedded .wo bundle provides: the
+    // bundle defined those symbols under its module prefix, so this unit's
+    // declaration must spell the same name or the link never meets (D38).
+    fn path_uses_module_link_names(source_path: &str) -> bool:
+        self.module_object_mode != 0 or self.path_is_bundle_provided(source_path)
 
-    // D38: is this Sema function defined by a module an embedded .wo bundle
-    // provides? Then this unit declares it and the bundle's object defines it.
-    mut fn fn_is_bundle_provided(sema_sym: i32) -> bool:
-        if self.bundle_prefixes_loaded == 0:
-            self.bundle_prefixes = embedded_bundle_prefixes()
-            self.bundle_prefixes_loaded = 1
+    fn module_link_name_for_path(source_path: &str, base_name: &str) -> str:
+        let mode = if self.path_uses_module_link_names(source_path): 1 else: 0
+        fn_abi_module_link_name(mode, source_path, base_name)
+
+    // D38: does an embedded .wo bundle provide this module? Then this unit
+    // declares its functions and the bundle's object defines them.
+    fn path_is_bundle_provided(source_path: &str) -> bool:
         if self.bundle_prefixes.len() == 0:
             return false
+        let prefix = fn_abi_module_link_prefix(source_path)
+        prefix.len() > 0 and self.bundle_prefixes.contains(prefix)
+
+    fn fn_is_bundle_provided(sema_sym: i32) -> bool:
         let path_opt = self.sema.fn_decl_source_paths.get(sema_sym)
         if path_opt.is_none():
             return false
-        let prefix = fn_abi_module_link_prefix(path_opt.unwrap())
-        prefix.len() > 0 and self.bundle_prefixes.contains(prefix)
+        self.path_is_bundle_provided(path_opt.unwrap())
 
     fn current_decl_module_link_name(base_name: &str) -> str:
         self.module_link_name_for_path(self.current_decl_source_file, base_name)
@@ -4543,7 +4549,7 @@ impl Codegen:
             effective_name = parsed_name
         if (flags / FnFlags.ENTRY) % 2 == 1:
             effective_name = "main"
-        else if self.module_object_mode != 0:
+        else if self.path_uses_module_link_names(self.current_decl_source_file):
             if not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name) and
                 not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
                 effective_name = self.current_decl_module_link_name(effective_name)
@@ -4687,7 +4693,7 @@ impl Codegen:
                 sema_name
             else:
                 self.function_symbol_name(cg_sym)
-        if self.module_object_mode != 0 and force_internal == 0 and
+        if self.path_uses_module_link_names(self.current_decl_source_file) and force_internal == 0 and
             not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
             effective_name = self.current_decl_module_link_name(effective_name)
 

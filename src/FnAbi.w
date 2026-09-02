@@ -59,11 +59,31 @@ pub fn codegen_hash_name_component(value: i64) -> str:
         return "n" ++ f"{0 - value}"
     f"{value}"
 
+// "lib/std/re/x.w" or ".../lib/std/re/x.w" → "std/re/x.w"; "" for any other
+// path. The same three spellings Sema's module naming accepts.
+fn fn_abi_std_tree_relative(path: &str) -> str:
+    if path.starts_with("lib/std/"):
+        return path.slice("lib/".len(), path.len())
+    let marker = "/lib/std/"
+    var i = 0 as i64
+    while i + marker.len() <= path.len():
+        if path.slice(i, i + marker.len()) == marker:
+            return path.slice(i + "/lib/".len(), path.len())
+        i = i + 1
+    ""
+
 pub fn codegen_canonical_module_path(path: &str) -> str:
     if path.len() == 0 or path == "<unknown>":
         return with_str_clone_ref(path)
     if path.byte_at(0) == '<':
         return with_str_clone_ref(path)
+    // A stdlib module resolved from a checkout's tree is the module its
+    // embedded copy is (Sema names both `std.x`), so its canonical path is
+    // the embedded spelling: a .wo built from the tree hashes the same
+    // symbols as one built from any checkout, never `$PWD` (D38).
+    let std_rel = fn_abi_std_tree_relative(path)
+    if std_rel.len() > 0:
+        return "<embedded-std>/" ++ std_rel
     if path.byte_at(0) == '/':
         return resolve_normalize_path(path)
     let cwd = with_getenv_str("PWD")
