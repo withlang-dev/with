@@ -21308,7 +21308,27 @@ impl Sema:
     // the eager cache pass preregister zero fields, then phase-bug).
     fn type_reflection_base_template(base_sym: i32) -> i32:
         let visible = self.lookup_named_type_visible(base_sym)
-        if visible != 0: visible else: self.lookup_named_type_ambient(base_sym)
+        if visible != 0:
+            return visible
+        let ambient = self.lookup_named_type_ambient(base_sym)
+        if ambient != 0:
+            return ambient
+        // #742: both lookups above still filter by the CURRENT module's
+        // imports, so reflection on an inst created elsewhere (VecIter[i32]
+        // reached through std.iter's iter_sum) answered "no fields" during the
+        // eager cache passes and only worked once codegen stood in a module
+        // that could see the decl. An existing inst names its template by
+        // symbol; when that symbol has exactly one declared candidate there
+        // is nothing to disambiguate — answer from registration truth.
+        var only = 0
+        var i = self.named_type_candidate_head(base_sym)
+        while i >= 0:
+            let candidate_tid = self.named_type_candidate_tids.get(i as i64)
+            if only != 0 and candidate_tid != only:
+                return 0
+            only = candidate_tid
+            i = self.named_type_candidate_next.get(i as i64)
+        only
 
     fn type_reflection_field_name(tid: i32, field_index: i32) -> i32:
         let resolved = self.resolve_alias(tid)

@@ -3774,6 +3774,17 @@ impl Sema:
             if bare != variant_sym:
                 self.cache_generic_enum_payload(tid, bare, &payloads)
 
+    // A generic inst whose template reflects fields/variants now but whose
+    // caches were filled when it reflected none (see eager_type_caches_pass).
+    fn generic_inst_prereg_pending(tid: i32) -> i32:
+        if self.type_reflection_field_count(tid) > 0 and not self.generic_struct_field_index_type_cache.contains(sema_pair_key(tid, 0)):
+            return 1
+        if self.type_reflection_variant_count(tid) > 0:
+            let first_variant = self.type_reflection_variant_name(tid, 0)
+            if first_variant != 0 and not self.generic_enum_payload_cache_starts.contains(sema_pair_key(tid, first_variant)):
+                return 1
+        0
+
     mut fn preregister_mir_types():
         let vec_sym = self.syms.vec
         let vi_sym = self.syms.veciter
@@ -3850,6 +3861,7 @@ impl Sema:
         var layout_pass_done = false
         while not layout_pass_done:
             let lt_n = self.type_kinds.len() as i32
+            var prereg_progress = false
             for lti in 0..lt_n:
                 if not self.layout_size_cache.contains(lti):
                     let lt_sz = self.type_layout_size_of(lti)
@@ -3870,7 +3882,20 @@ impl Sema:
                     let field_count = self.type_reflection_field_count(lti)
                     for fi in 0..field_count:
                         self.layout_field_offset_cache.insert(sema_pair_key(lti, fi), self.type_layout_struct_field_offset(lti, fi))
-            if self.type_kinds.len() as i32 == lt_n:
+            // #742: an inst first cached while its template was not yet
+            // resolvable (an import-gated std generic reached through a method
+            // return, #911) registered zero fields. Visibility can be
+            // established by caching a LATER type in this same pass, so sweep
+            // after the pass, not inside it, and pass again while a sweep fills
+            // something — codegen's frozen read must never miss. The
+            // compute-on-miss fallback that used to repair this at codegen time
+            // was a mutable Sema re-entry after freeze.
+            for pti in 0..lt_n:
+                if self.type_kinds.get(pti as i64) == TypeKind.TY_GENERIC_INST and self.generic_inst_prereg_pending(pti) != 0:
+                    self.preregister_generic_struct_fields(pti)
+                    self.preregister_generic_enum_payloads(pti)
+                    prereg_progress = true
+            if self.type_kinds.len() as i32 == lt_n and not prereg_progress:
                 layout_pass_done = true
 
 
