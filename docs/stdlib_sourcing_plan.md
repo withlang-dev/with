@@ -83,11 +83,18 @@ Per corpus, exactly what `build/pcre2.w` does today:
    as a general rule — never a corpus-specific special case (the standard
    set in the migrate review) — then the corpus is re-migrated.
 
-Proposed layout (proposal, not ruling): checked-in migrated output under
-`lib/vendor/<corpus>/` the way pcre2's lives in `lib/std/re/`, generated
-and never hand-edited; facades in `lib/std/collections.w` and a new
-`lib/std/algorithms.w`; a `corpora` battery lane that builds every migrated
-tree and runs its upstream tests.
+Each corpus lands as a **`.wo` bundle** (decisions.md D38,
+`docs/wo_bundles.md`): its migrated source and tests are the bundle, its
+object is compiled once per target and With ABI version, and a normal
+compiler build links the existing object instead of recompiling the
+corpus. The compiler embeds every bundle; user programs automatically
+link the ones they reference.
+
+Proposed layout (proposal, not ruling): the bundles' source checked in
+under `lib/vendor/<corpus>/` the way pcre2's lives in `lib/std/re/`,
+generated and never hand-edited; facades in `lib/std/collections.w` and a
+new `lib/std/algorithms.w`; a `corpora` battery lane that runs every
+bundle's upstream tests, plus the `wo-drift` lane from `docs/wo_bundles.md`.
 
 ## Facade rules
 
