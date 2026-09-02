@@ -45,16 +45,21 @@ Outside the corpora, written natively: graph algorithms and union-find
 free list (#936 — no mature C library ships generational slot maps), and the
 intrinsic-integrated Vec and str, which stay as they are.
 
-**The sourcing rule** (Eric, 2026-09-02): migrate-and-facade for
-*libraries* whose value is breadth, upstream tests, and tracking upstream
-releases — pcre2, zlib, the container corpora. Hand-port and own for
-*runtime and low-level primitives* that are small, stable, and entangled
-with assembly or the allocator: the fiber switch (minicoro is the
-reference to port from, not a corpus; `runtime/fiber_asm_*.s` already
-exists), the crypto primitives (`lib/std/crypto`, 2.5k lines in BearSSL's
-image against 59k of upstream, of which we use only the primitives — held
-to upstream's known-answer vectors as fixtures rather than to a migrated
-corpus), and the allocator.
+**The sourcing rule** (Eric, 2026-09-02). Why we take code from these
+libraries at all: **hardenedness**. ffmpeg, zlib, minicoro, pcre2 have
+stood the test of time; decades of production use found the bugs a fresh
+implementation would have to find again. Upstream test suites and
+release tracking are how we keep that hardenedness, not the reason for
+it. Given that, the split is about the code's shape, not its value:
+migrate-and-facade for *libraries* — pcre2, zlib, the container corpora —
+where the migrator can carry the hardened code across faithfully;
+hand-port and own for *runtime and low-level primitives* that are small,
+stable, and entangled with assembly or the allocator, where a port is the
+faithful form: the fiber switch (minicoro is the hardened reference to
+port from; `runtime/fiber_asm_*.s` already exists), the crypto primitives
+(`lib/std/crypto`, 2.5k lines in BearSSL's image against 59k of upstream,
+of which we use only the primitives — held to upstream's known-answer
+vectors as fixtures), and the allocator.
 
 To confirm at pin time, not from memory: TommyDS's exact license text (its
 `COPYING`), and that c-algorithms is `void*` + comparator callbacks
