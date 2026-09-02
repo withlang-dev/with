@@ -5873,6 +5873,31 @@ impl Sema:
     // own, so they never receive these bits (mirrors the flush-time clamp). This
     // only ADDS data; nothing consumes the completed bits until the P1 flip, so P0
     // is behavior-neutral.
+    fn effect_edge_projection(edge_index: i32) -> i32:
+        if edge_index < self.effect_flow_projections.len() as i32: self.effect_flow_projections.get(edge_index as i64) else: 1
+
+    // The ownership-forcing effects one recorded edge carries from the callee
+    // parameter back to the caller parameter — ONE rule, read by the fixpoint
+    // and by audit:effects (#927: the audit recomputed the transfer without
+    // the D17 projection rule below and reported the demoted consume bit as
+    // "missing" on every `param.field` passed to a consuming parameter).
+    // D17: ownership-forcing effects do not cross a NON-COPY projection edge —
+    // the callee consumes the FIELD, which blanks it and WRITES the caller's
+    // root place. Copy-typed projections keep the promotion (aliasing
+    // capture, nothing blanked). Mirrors weaken_projection_owning_effects on
+    // the direct path so the fixpoint cannot re-promote what direct noting
+    // demoted.
+    // `callee_param_is_copy` is the Copy-ness of the callee parameter's type,
+    // supplied by the caller: is_copy (computing, pre-freeze) in the fixpoint,
+    // is_copy_frozen (read-only) in the audit.
+    fn effect_edge_transfer(callee_sig: i32, callee_pi: i32, projection: i32, callee_param_is_copy: i32) -> i32:
+        let callee_eff = self.sig_param_effect(callee_sig, callee_pi)
+        var trans = callee_eff & (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE)
+        let e_owning = trans & (EFF_CONSUME | EFF_ESCAPE_VALUE)
+        if projection != 0 and e_owning != 0 and callee_param_is_copy == 0:
+            trans = (trans - e_owning) | EFF_WRITE
+        trans
+
     mut fn fixpoint_effect_flow():
         let n = self.effect_flow_edges.len() as i32
         if n < 4:
@@ -5885,26 +5910,16 @@ impl Sema:
             var i = 0
             var edge_index = 0
             while i + 3 < n:
-                let caller_sig = self.effect_flow_edges.get(i as i64)
-                let caller_pi = self.effect_flow_edges.get((i + 1) as i64)
-                let callee_sig = self.effect_flow_edges.get((i + 2) as i64)
-                let callee_pi = self.effect_flow_edges.get((i + 3) as i64)
+                let caller_sig: i32 = self.effect_flow_edges.get(i as i64)
+                let caller_pi: i32 = self.effect_flow_edges.get((i + 1) as i64)
+                let callee_sig: i32 = self.effect_flow_edges.get((i + 2) as i64)
+                let callee_pi: i32 = self.effect_flow_edges.get((i + 3) as i64)
                 i = i + 4
-                let projection = if edge_index < self.effect_flow_projections.len() as i32: self.effect_flow_projections.get(edge_index as i64) else: 1
+                let projection = self.effect_edge_projection(edge_index)
                 edge_index = edge_index + 1
-                let callee_eff = self.sig_param_effect(callee_sig, callee_pi)
-                var trans = callee_eff & (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE)
-                // D17: ownership-forcing effects do not cross a NON-COPY
-                // projection edge — the callee consumes the FIELD, which blanks
-                // it and WRITES the caller's root place. Copy-typed projections
-                // keep the promotion (aliasing capture, nothing blanked).
-                // Mirrors weaken_projection_owning_effects on the direct path so
-                // the fixpoint cannot re-promote what direct noting demoted.
-                let e_owning = trans & (EFF_CONSUME | EFF_ESCAPE_VALUE)
-                if projection != 0 and e_owning != 0:
-                    let edge_arg_ty = self.sig_param_type(callee_sig, callee_pi)
-                    if edge_arg_ty > 0 and self.is_copy(edge_arg_ty as TypeId) == 0:
-                        trans = (trans - e_owning) | EFF_WRITE
+                let edge_arg_ty = self.sig_param_type(callee_sig, callee_pi)
+                let edge_arg_is_copy = if edge_arg_ty > 0: self.is_copy(edge_arg_ty as TypeId) else: 1
+                let trans = self.effect_edge_transfer(callee_sig, callee_pi, projection, edge_arg_is_copy)
                 if trans == 0:
                     continue
                 let p_tid = self.sig_param_type(caller_sig, caller_pi)

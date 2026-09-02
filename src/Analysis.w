@@ -873,12 +873,15 @@ fn analysis_audit_effects(report: &AnalysisReport, sema: &Sema):
         else if mode == ReceiverMode.Mut and (required & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
             report.fail(f"sig {si}: mut receiver requires move")
     var at = 0
+    var edge_index = 0
     while at + 3 < sema.effect_flow_edges.len() as i32:
         let caller_sig = sema.effect_flow_edges.get(at as i64)
         let caller_pi = sema.effect_flow_edges.get((at + 1) as i64)
         let callee_sig = sema.effect_flow_edges.get((at + 2) as i64)
         let callee_pi = sema.effect_flow_edges.get((at + 3) as i64)
+        let projection = sema.effect_edge_projection(edge_index)
         at = at + 4
+        edge_index = edge_index + 1
         if caller_sig < 0 or callee_sig < 0 or caller_pi < 0 or callee_pi < 0:
             report.fail("effect edge contains a negative signature or parameter")
             continue
@@ -886,7 +889,12 @@ fn analysis_audit_effects(report: &AnalysisReport, sema: &Sema):
         let caller_kind = if caller_ty > 0: sema.get_type_kind(sema.resolve_alias(caller_ty as TypeId)) else: TypeKind.TY_ERR
         if caller_kind == TypeKind.TY_REF or caller_kind == TypeKind.TY_PTR:
             continue
-        let propagated = sema.sig_param_effect(callee_sig, callee_pi) & (EFF_WRITE | EFF_CONSUME | EFF_ESCAPE_VALUE)
+        // #927: the same transfer the fixpoint applies — projection edges demote
+        // consume/escape to write (D17) — so the audit checks the rule, not a
+        // stronger restatement of it.
+        let callee_ty = sema.sig_param_type(callee_sig, callee_pi)
+        let callee_is_copy = if callee_ty > 0: sema.is_copy_frozen(callee_ty as TypeId) else: 1
+        let propagated = sema.effect_edge_transfer(callee_sig, callee_pi, projection, callee_is_copy)
         let caller = sema.sig_param_effect(caller_sig, caller_pi)
         if (caller & propagated) != propagated:
             report.fail(f"effect edge sig {caller_sig}:{caller_pi} -> {callee_sig}:{callee_pi} is not at fixpoint; missing={propagated & ~caller}")
