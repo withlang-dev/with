@@ -1619,9 +1619,10 @@ pub fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
         LLVMDisposeMessage(default_triple)
         // `with ir` emits UNOPTIMIZED IR, so this path is the only place the
         // -O1 pipeline runs for an IR->object target (regex_runtime.o in every
-        // build). Run the full `default<O1>` pipeline — the same one the direct
-        // source->object path runs via wl_optimize(m, tm, 1) — so the invariant
-        // "-O1 everywhere" holds for this route too, not just codegen level.
+        // build). Run the one pipeline the direct source->object path runs —
+        // wl_optimize is the single pass-runner, so the two routes cannot
+        // drift — and the invariant "-O1 everywhere" holds here too, not just
+        // at codegen level.
         //
         // `default<O1>` also strips the dead module-level chain that globaldce
         // alone used to remove here: unoptimized IR leaves an internal,
@@ -1633,12 +1634,7 @@ pub fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
         // `.text`, so the dead `call` would otherwise reach the link as an
         // undefined symbol. The O1 module-simplification pipeline includes
         // GlobalDCE, removing the whole dead chain portably — matching darwin.
-        let opt_opts = LLVMCreatePassBuilderOptions()
-        let opt_err = LLVMRunPasses(m, to_cstr("default<O1>"), tm, opt_opts)
-        if opt_err as i64 != 0:
-            let omsg = LLVMGetErrorMessage(opt_err)
-            if omsg as i64 != 0: LLVMDisposeErrorMessage(omsg)
-        LLVMDisposePassBuilderOptions(opt_opts)
+        wl_optimize(m as i64, tm as i64, 1)
         var out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
         var emit_err: *mut u8 = 0 as *mut u8
