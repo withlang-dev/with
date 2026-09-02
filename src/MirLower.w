@@ -6859,10 +6859,23 @@ impl MirBuilder:
         self.forget_string_flow_facts()
 
     mut fn lower_comprehension_vec(comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32):
-        let iter_op = self.lower_expr(iter_expr)
+        // #934: a comprehension iterates like a `for` (§13): a place receiver
+        // is read through its own place — no header move, so the source Vec
+        // stays valid afterwards — and Drop-class elements bind &T views read
+        // by VEC_GET_REF (lower_for_iter_ref), Copy-class elements by value
+        // (lower_for_vec). Materializing the receiver moved it out of its
+        // binding, and VEC_GET copied a Drop-class element into a local typed
+        // as a reference.
         let iter_ty = self.expr_type(iter_expr)
         let elem_ty = self.sema.infer_for_element_type_frozen(iter_ty)
-        let vec_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        let ivk = self.ast.kind(iter_expr)
+        var vec_place = 0
+        if ivk == NodeKind.NK_IDENT or ivk == NodeKind.NK_FIELD_ACCESS or ivk == NodeKind.NK_INDEX:
+            vec_place = self.lower_expr_place(iter_expr)
+        else:
+            let iter_op = self.lower_expr(iter_expr)
+            vec_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+        let elem_is_view = self.sema.get_type_kind(self.sema.resolve_alias(elem_ty)) == TypeKind.TY_REF
 
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
@@ -6898,7 +6911,10 @@ impl MirBuilder:
         self.switch_to(body_bb)
         let elem_local = self.new_temp(elem_ty)
         let elem_place = self.place_for_local(elem_local)
-        self.emit_vec_get_into(vec_place, counter_place, elem_place, self.ast.get_start(iter_expr))
+        if elem_is_view:
+            self.emit_vec_get_ref_into(vec_place, counter_place, elem_place, self.ast.get_start(iter_expr))
+        else:
+            self.emit_vec_get_into(vec_place, counter_place, elem_place, self.ast.get_start(iter_expr))
         self.bind_comprehension_element(comp_node, pat_or_sym, elem_place, elem_ty, iter_expr)
         self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
 
@@ -10876,6 +10892,19 @@ impl MirBuilder:
         self.body.set_call_intrinsic(args_id, MirIntrinsic.VEC_GET)
         let next_bb = self.new_block()
         self.terminate(TermKind.TK_CALL, fn_op, args_id, elem_place, next_bb)
+        self.switch_to(next_bb)
+
+    // Element view: VEC_GET_REF yields &T for the element at index without
+    // copying it — the read lower_for_iter_ref uses for Drop-class elements.
+    mut fn emit_vec_get_ref_into(vec_place: i32, index_place: i32, elem_place: i32, span: i32):
+        let args: Vec[i32] = Vec.new()
+        args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+        args.push(self.body.new_operand(OperandKind.OK_COPY, index_place))
+        let args_id = self.body.new_call_args(args)
+        self.body.set_call_intrinsic(args_id, MirIntrinsic.VEC_GET_REF)
+        let next_bb = self.new_block()
+        let unit = self.unit_operand()
+        self.terminate(TermKind.TK_CALL, unit, args_id, elem_place, next_bb)
         self.switch_to(next_bb)
 
     mut fn emit_vec_push(vec_place: i32, elem_op: i32, span: i32):
