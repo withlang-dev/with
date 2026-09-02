@@ -12,9 +12,51 @@
 // so a bundle-provided module keeps its canonical
 // `<embedded-std>/std/<corpus>/<name>.w` path and only its text changes.
 use std.collections.HashMap
+use std.crypto.sha256
 extern fn with_str_clone_ref(s: &str) -> str
 
 var g_bundle_interface_texts: HashMap[str, str] = HashMap.new()
+
+// sha256 hex of a text — the manifest's `interface-sha` (the .wi bytes) and
+// the fingerprint (the canonical declaration rows).
+pub fn bundle_text_sha256(text: &str) -> str:
+    var digest: [32]u8 = [0 as u8; 32]
+    sha256_hash_str(text, &raw mut digest[0] as *mut u8)
+    sha256_hex(&digest[0] as *const u8)
+
+// `--bundle-corpus <rel>` names the module `<embedded-std>/<rel>.w` or the
+// directory `<embedded-std>/<rel>/` — `std/re` is pcre2's corpus, `std/wi_demo`
+// the one-module demo.
+pub fn bundle_corpus_contains(corpus: &str, canonical_path: &str) -> bool:
+    if corpus.len() == 0:
+        return false
+    let base = "<embedded-std>/" ++ corpus
+    canonical_path == base ++ ".w" or canonical_path.starts_with(base ++ "/")
+
+// `<embedded-std>/std/re/defs.w` → `std.re.defs`; "" for any other path.
+pub fn bundle_module_dotted_name(canonical_path: &str) -> str:
+    let prefix = "<embedded-std>/"
+    if not canonical_path.starts_with(prefix) or not canonical_path.ends_with(".w"):
+        return ""
+    let rel = canonical_path.slice(prefix.len(), canonical_path.len() - 2)
+    var out = ""
+    for i in 0..rel.len():
+        out = out ++ (if rel.byte_at(i) == '/': "." else: rel.slice(i, i + 1))
+    out
+
+// The `module <path>` section paths of an interface file, in file order.
+pub fn bundle_interface_section_paths(wi_text: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    var start: i64 = 0
+    while start < wi_text.len():
+        var end = start
+        while end < wi_text.len() and wi_text.byte_at(end) != '\n':
+            end = end + 1
+        let line = wi_text.slice(start, end)
+        if line.starts_with("module "):
+            out.push(bundle_interface_trim(line.slice(7, line.len())))
+        start = end + 1
+    out
 
 // The interface section registered for a canonical module path; "" when the
 // path is not bundle-provided.

@@ -370,6 +370,63 @@ interface from different generations can never be paired: the consumer
 checks it before linking. An emitter bug is a build failure, never an
 ABI corruption.
 
+**Emitter and fingerprint (batch C2, implemented).** `with build <root>
+--emit-obj --bundle-corpus <rel> --emit-bundle-interface <x>.wi
+--bundle-fingerprint <a>` writes the object, the interface and the
+source-side fingerprint from the Sema codegen hands back (layouts
+frozen); `with check <x>.wi --bundle-corpus <rel> --bundle-fingerprint
+<b>` reads the `.wi` as the whole bundle (every `module` section
+registered, a synthesized root importing each) and writes the
+interface-side fingerprint; the bundle build requires `a == b`. The
+manifest records `fingerprint` and `interface-sha` (sha256 of the `.wi`
+bytes); `--link-bundle` refuses an interface whose sha is not the
+manifest's. `--bundle-corpus std/re` selects `<embedded-std>/std/re/…`;
+`std/wi_demo` selects the single module `<embedded-std>/std/wi_demo.w`.
+The emitter (`src/compiler/BundleInterfaceEmit.w`) prints from Sema's
+finalized tables only, never source text, never a placeholder: a
+declaration it cannot state exactly is a loud error naming it and
+nothing is written. Per section: the module's `use` lines in import order
+(a module holding only `use` lines, as pcre2's migrated table modules do,
+still gets a section), then types, consts, storage globals, extern fns,
+free fns and impl blocks, each group bytewise by name. Exported: every
+`pub` declaration plus every corpus type a printed declaration names,
+with its own visibility (a layout needs its field types; a std-tier
+consumer sees private std declarations through Sema's internal
+boundary either way). Aliases are emitted as declarations and resolved
+inside every other spelling; `impl Copy for T` follows a Copy type;
+struct field defaults are printed when they are literals, casts of
+literals (`0 as c_ulong`) or repeat arrays (`[0 as u8; 32]`); a plain
+enum never gets `= N`, a discriminant enum always does, with its backing
+type. Refused: generics, async/gen/comptime/variadic/`@[c_export]`
+functions, extension methods, default parameter values, destructured
+parameters, a type with a `drop` method, a droppable mutable global, a
+const whose folded value is not a literal, an ambiguous returned
+reference (the C1 message), trait objects and Range types, ephemeral or
+derived types, traits, `c_import`, extern storage, selector imports.
+The fingerprint (`src/compiler/BundleFingerprint.w`) is sha256 over
+sorted TSV rows holding spellings and layout numbers only — one `module`
+row per corpus module; type rows with kind, size, align, Copy-ness,
+layout flags, visibility, fields (name, spelling, offset, explicit
+align, default) and variants (name, discriminant, payloads); const,
+global, extern and fn rows, the fn rows carrying the receiver mode,
+unsafe-ness, per-parameter spelling, share-place verdict and DECLARED
+effect (SemaCheck's `declared_param_effect`/`declared_view_origin`, the
+rule C1's interface Sema applies, so source and interface agree), the
+return spelling and the declared view origin. The source pass warns when
+a plain `T` parameter's body only reads it — the D39 "declare it `&T`"
+signal. The harness `bundle-interface-tests` regenerates
+`test/bundle_interface/wi_demo.wi` byte for byte, requires
+fingerprint equality, checks three interface mutations change it, runs
+the consumer against the emitted interface, and fires each refusal.
+Measured on pcre2 (2026-09-02, stage1): a 4.3k-line `.wi`, source and
+interface fingerprints equal, and a tiny `std.re` consumer's `check`
+drops from 5.2 s through the source to 0.26 s through the interface.
+Corpus findings for batch C3: `defs.w` exports 46 generic functions
+(migrated C macros such as `INT8_C[T]`, `PCRE2_GLUE[T]`, `MAX_255[T]`)
+that the bundle build refuses — the migrator must emit them non-pub or
+non-generic; `pcre2_chartables.w`, `pcre2_tables.w` and `pcre2_ucd.w`
+carry only `use` lines.
+
 **Resolver.** `use std.re.X` on a compiler whose bundle index provides
 `<embedded-std>/std/re/X.w` reads that module's interface section;
 otherwise the source, as today. `lib/std/re/` stays out of

@@ -270,7 +270,8 @@ fn cli_option_takes_value(arg: &str) -> bool:
     arg == "--trace-ownership" or arg == "--trace-cleanup-edge" or
     arg == "--contains" or arg == "--exit-code" or
     arg == "--debug-alloc-filter" or arg == "--out" or
-    arg == "--link-object" or arg == "--link-bundle" or arg == "--emit-bundle-manifest"
+    arg == "--link-object" or arg == "--link-bundle" or arg == "--emit-bundle-manifest" or
+    arg == "--emit-bundle-interface" or arg == "--bundle-fingerprint" or arg == "--bundle-corpus"
 
 fn cli_default_opt_level(argc: i32) -> i32:
     if argc >= 2:
@@ -912,11 +913,22 @@ fn run_cli(argc: i32) -> i32:
         comp.configure(0, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         comp.set_link_bundles(&driver_link_bundle_args(argc))
-        let pool = comp.compile_file(source)
+        // D39: `--bundle-fingerprint` on check is the interface-side pass of
+        // the bundle build's fingerprint comparison; a `.wi` root holding
+        // `module` sections is checked as the whole bundle it is.
+        let bundle_corpus = driver_bundle_corpus_arg(argc)
+        let bundle_fingerprint_path = driver_bundle_fingerprint_arg(argc)
+        if bundle_fingerprint_path.len() > 0 and bundle_corpus.len() == 0:
+            with_eprint("error: --bundle-fingerprint requires --bundle-corpus <rel>")
+            return 1
+        comp.set_bundle_fingerprint(bundle_corpus, bundle_fingerprint_path)
+        let pool = if source.ends_with(".wi"): comp.compile_bundle_interface_root(source) else: comp.compile_file(source)
         if pool.decl_count() == 0:
             with_eprint("error: check failed during compilation")
             return 1
         if not comp.check_pool(pool, source):
+            return 1
+        if bundle_fingerprint_path.len() > 0 and comp.write_check_bundle_fingerprint().len() == 0:
             return 1
         with_write("ok\n")
         comp.print_warnings()

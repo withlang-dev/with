@@ -20,6 +20,8 @@ use compiler.ProjectConfig
 use compiler.DriverOptions
 use compiler.AbiStamp
 use compiler.BundleInterfaces
+use compiler.BundleInterfaceEmit
+use compiler.BundleFingerprint
 use compiler.EmbeddedBundles
 use FnAbi
 use compiler.Zcu
@@ -339,6 +341,12 @@ type Compilation {
     link_bundles_loaded: bool,
     // D38: `--emit-bundle-manifest` path for emit_object_to_path ("" = none).
     bundle_manifest_path: str,
+    // D39: `--emit-bundle-interface` / `--bundle-fingerprint` paths ("" =
+    // none) and the `--bundle-corpus` module filter they and the manifest
+    // share.
+    bundle_interface_path: str,
+    bundle_fingerprint_path: str,
+    bundle_corpus: str,
 }
 
 type CompilationBinaryLinkPlan {
@@ -367,6 +375,9 @@ pub fn Compilation.init -> Compilation:
         link_bundles: Vec.new(),
         link_bundles_loaded: false,
         bundle_manifest_path: "",
+        bundle_interface_path: "",
+        bundle_fingerprint_path: "",
+        bundle_corpus: "",
     }
 
 impl Compilation:
@@ -386,10 +397,85 @@ impl Compilation:
         self.link_objects = driver_clone_str_vec(&options.link_objects)
         self.set_link_bundles(&options.link_bundles)
         self.bundle_manifest_path = with_str_clone_ref(options.bundle_manifest_path)
+        self.bundle_interface_path = with_str_clone_ref(options.bundle_interface_path)
+        self.set_bundle_fingerprint(options.bundle_corpus, options.bundle_fingerprint_path)
 
     pub mut fn set_link_bundles(prefixes: &Vec[str]):
         self.link_bundles = driver_clone_str_vec(prefixes)
         self.link_bundles_loaded = false
+
+    // D39: `--bundle-corpus <rel>` and `--bundle-fingerprint <path>` — on
+    // `check` too, the second fingerprint pass runs on the emitted .wi.
+    pub mut fn set_bundle_fingerprint(corpus: &str, fingerprint_path: &str):
+        self.bundle_corpus = with_str_clone_ref(corpus)
+        self.bundle_fingerprint_path = with_str_clone_ref(fingerprint_path)
+
+    // The exported-declaration model of the corpus in the finalized Sema
+    // (the one codegen handed back, or the one `check` froze), with every
+    // refusal printed. Read through a borrow: a bare read would move the
+    // Sema out of the Zcu (the root-15 class).
+    fn bundle_model(what: &str) -> BundleInterfaceModel:
+        let sema = &self.zcu.last_sema
+        let model = bundle_interface_build(sema, self.bundle_corpus)
+        for wi in 0..model.warnings.len() as i32:
+            runtime_eprint("warning: bundle interface: " ++ model.warnings.get(wi as i64))
+        for ei in 0..model.errors.len() as i32:
+            runtime_eprint("error: bundle interface: " ++ model.errors.get(ei as i64))
+        if not model.ok:
+            runtime_eprint(f"error: {what}: {model.errors.len() as i32} declaration(s) have no exact interface spelling (listed above); nothing written")
+        model
+
+    // D39: write the exported-declaration fingerprint of the corpus modules
+    // to --bundle-fingerprint (the sha on the first line) and the rows it
+    // hashes to `<path>.tsv` (for diffing when two passes disagree).
+    // Returns the sha, "" on failure.
+    fn write_bundle_fingerprint(model: &BundleInterfaceModel) -> str:
+        let text = bundle_fingerprint_text(model)
+        let sha = bundle_fingerprint_sha(text)
+        if runtime_write_file(self.bundle_fingerprint_path, sha ++ "\n") != 0:
+            runtime_eprint("error: could not write bundle fingerprint: " ++ self.bundle_fingerprint_path)
+            return ""
+        if runtime_write_file(self.bundle_fingerprint_path ++ ".tsv", text) != 0:
+            runtime_eprint("error: could not write bundle fingerprint rows: " ++ self.bundle_fingerprint_path ++ ".tsv")
+            return ""
+        sha
+
+    // D39: a `.wi` root holding `module <path>` sections is a whole bundle
+    // interface: register every section so the resolver reads them, and
+    // compile a root that imports each one — the second fingerprint pass.
+    // A `.wi` without sections is one module in interface flavor, as before.
+    // The check command's fingerprint pass: the model of the checked root.
+    fn write_check_bundle_fingerprint() -> str:
+        let model = self.bundle_model("--bundle-fingerprint")
+        if not model.ok:
+            return ""
+        self.write_bundle_fingerprint(&model)
+
+    mut fn compile_bundle_interface_root(wi_path: &str) -> AstPool:
+        let wi_text = runtime_read_file(wi_path)
+        let sections = bundle_interface_section_paths(wi_text)
+        if sections.len() == 0:
+            return self.compile_file(wi_path)
+        if not self.load_link_bundles():
+            return AstPool.new()
+        let _ = bundle_interfaces_register_wi(wi_text)
+        var root_text = "// bundle interface root for " ++ wi_path ++ "\n"
+        for si in 0..sections.len() as i32:
+            let dotted = bundle_module_dotted_name(sections.get(si as i64))
+            if dotted.len() == 0:
+                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ sections.get(si as i64) ++ "' is not under <embedded-std>/")
+                return AstPool.new()
+            root_text = root_text ++ "use " ++ dotted ++ "\n"
+        let root_path = wi_path ++ ".root.w"
+        var zcu = move self.zcu
+        let source_dir = frontend_dirname(root_path)
+        zcu.reset_for_new_invocation(source_dir, root_path, "")
+        zcu.project_config = self.project_config_for_source(root_path)
+        zcu.set_current_source(source_dir, root_path, root_text)
+        zcu = self.apply_cli_diag_mappings(move zcu)
+        let pool = zcu.compile_source_frontend_mode(root_text, root_path, 0, 0)
+        self.zcu = zcu
+        pool
 
     // D39 `--link-bundle <prefix>` (docs/wo_bundles.md): `<prefix>.o` joins
     // the link, the manifest's module prefixes make codegen declare (never
@@ -425,6 +511,16 @@ impl Compilation:
             let wi_text = runtime_read_file(wi_path)
             if wi_text.len() == 0:
                 with_eprint("error: --link-bundle: missing or empty bundle interface " ++ wi_path)
+                return false
+            // D39 pairing check: the interface the object was built with is
+            // the one being loaded — interface N never pairs with object N+1.
+            let manifest_wi_sha = link_stage_bundle_manifest_field(manifest, "interface-sha")
+            if manifest_wi_sha.len() == 0:
+                with_eprint("error: --link-bundle: " ++ manifest_path ++ " records no interface-sha; rebuild the bundle with --emit-bundle-interface")
+                return false
+            let loaded_wi_sha = bundle_text_sha256(wi_text)
+            if loaded_wi_sha != manifest_wi_sha:
+                with_eprint("error: --link-bundle: " ++ wi_path ++ " (sha256 " ++ loaded_wi_sha ++ ") is not the interface " ++ manifest_path ++ " was built with (" ++ manifest_wi_sha ++ "); rebuild the bundle")
                 return false
             if bundle_interfaces_register_wi(wi_text) == 0:
                 with_eprint("error: --link-bundle: no `module <path>` sections in " ++ wi_path)
@@ -1088,35 +1184,78 @@ impl Compilation:
         if backend_rc != 0:
             compilation_remove_file_best_effort(obj_path)
             return ""
-        if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path):
+        // D39: the interface and its fingerprint come from one model of the
+        // Sema codegen handed back (layouts frozen); the manifest records both.
+        var interface_sha = ""
+        var fingerprint = ""
+        if self.bundle_interface_path.len() > 0 or self.bundle_fingerprint_path.len() > 0:
+            let model = self.bundle_model(if self.bundle_interface_path.len() > 0: "--emit-bundle-interface" else: "--bundle-fingerprint")
+            if not model.ok:
+                compilation_remove_file_best_effort(obj_path)
+                return ""
+            if self.bundle_interface_path.len() > 0:
+                interface_sha = self.write_bundle_interface(&model)
+                if interface_sha.len() == 0:
+                    compilation_remove_file_best_effort(obj_path)
+                    return ""
+            if self.bundle_fingerprint_path.len() > 0:
+                fingerprint = self.write_bundle_fingerprint(&model)
+                if fingerprint.len() == 0:
+                    compilation_remove_file_best_effort(obj_path)
+                    return ""
+        if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path, fingerprint, interface_sha):
             compilation_remove_file_best_effort(obj_path)
             return ""
         with_str_clone_ref(obj_path)
 
-    // D38 (docs/wo_bundles.md): the .wo manifest for the object just emitted —
-    // the compiler's ABI identity, the target, the object's file name, and one
-    // link-name prefix per module compiled in (the on-demand link predicate
-    // and the link-time interface check). build.w adds the bundle name, the
-    // key, and the corpus hash it computed.
-    mut fn write_bundle_manifest(obj_path: &str) -> bool:
+    // D39: write the bundle's `.wi` (docs/wo_bundles.md) to
+    // --emit-bundle-interface; returns the sha256 of its bytes (the
+    // manifest's `interface-sha`), "" on refusal.
+    fn write_bundle_interface(model: &BundleInterfaceModel) -> str:
+        let rendered = bundle_interface_render(&self.zcu.last_sema, model)
+        for ei in 0..rendered.errors.len() as i32:
+            runtime_eprint("error: " ++ rendered.errors.get(ei as i64))
+        if rendered.errors.len() > 0:
+            return ""
+        if runtime_write_file(self.bundle_interface_path, rendered.text) != 0:
+            runtime_eprint("error: could not write bundle interface: " ++ self.bundle_interface_path)
+            return ""
+        bundle_text_sha256(rendered.text)
+
+    // D38/D39 (docs/wo_bundles.md): the .wo manifest for the object just
+    // emitted — the compiler's ABI identity, the target, the object's file
+    // name, the fingerprint and interface-sha of the .wi written beside it
+    // (the pairing check --link-bundle makes), and one link-name prefix per
+    // corpus module (the on-demand link predicate and the link-time
+    // interface check; never a prelude or std module the object happens to
+    // contain). build.w adds the bundle name, the key, and the corpus hash
+    // it computed.
+    mut fn write_bundle_manifest(obj_path: &str, fingerprint: &str, interface_sha: &str) -> bool:
         if not compiler_abi_sha_is_stamped():
             with_eprint("error: --emit-bundle-manifest: this compiler carries no ABI stamp (unstamped binary); a bundle key needs one")
             return false
         var text = "abi-sha " ++ compiler_abi_sha() ++ "\n"
         text = text ++ "target " ++ target_spec_name() ++ "\n"
         text = text ++ "object " ++ link_stage_basename(obj_path) ++ "\n"
+        if fingerprint.len() > 0:
+            text = text ++ "fingerprint " ++ fingerprint ++ "\n"
+        if interface_sha.len() > 0:
+            text = text ++ "interface-sha " ++ interface_sha ++ "\n"
         let seen: Vec[str] = Vec.new()
         for pi in 0..self.zcu.decl_source_paths.len() as i32:
             let path = self.zcu.decl_source_paths.get(pi as i64)
             if path.len() == 0:
                 continue
+            let canonical = codegen_canonical_module_path(path)
+            if not bundle_corpus_contains(self.bundle_corpus, canonical):
+                continue
             let prefix = fn_abi_module_link_prefix(path)
             if prefix.len() == 0 or seen.contains(prefix):
                 continue
             seen.push(with_str_clone_ref(prefix))
-            text = text ++ "prefix " ++ prefix ++ " " ++ path ++ "\n"
+            text = text ++ "prefix " ++ prefix ++ " " ++ canonical ++ "\n"
         if seen.len() == 0:
-            with_eprint("error: --emit-bundle-manifest: no module-qualified symbols in " ++ obj_path)
+            with_eprint("error: --emit-bundle-manifest: no module under corpus '" ++ self.bundle_corpus ++ "' in " ++ obj_path)
             return false
         if runtime_write_file(self.bundle_manifest_path, text) != 0:
             with_eprint("error: could not write bundle manifest: " ++ self.bundle_manifest_path)

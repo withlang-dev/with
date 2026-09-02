@@ -54,6 +54,14 @@ pub type BuildCommandOptions {
     // (`--emit-bundle-manifest <path>`): the compiler's abi-sha, the target,
     // and one link-name prefix per module compiled into the object.
     bundle_manifest_path: str,
+    // D39: with --emit-obj, also write the bundle's `.wi` interface here
+    // (`--emit-bundle-interface <path>`), and its exported-declaration
+    // fingerprint (`--bundle-fingerprint <path>`, also accepted by `check`);
+    // `--bundle-corpus <rel>` names the modules both cover
+    // (`<embedded-std>/<rel>/…`, or the single module `<embedded-std>/<rel>.w`).
+    bundle_interface_path: str,
+    bundle_fingerprint_path: str,
+    bundle_corpus: str,
     compiler_hooks_enabled: bool,
 }
 
@@ -131,6 +139,9 @@ pub fn build_command_options_default -> BuildCommandOptions:
         link_objects: Vec.new(),
         link_bundles: Vec.new(),
         bundle_manifest_path: "",
+        bundle_interface_path: "",
+        bundle_fingerprint_path: "",
+        bundle_corpus: "",
         compiler_hooks_enabled: true,
     }
 
@@ -167,6 +178,9 @@ pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOp
         link_objects: driver_clone_str_vec(&base.link_objects),
         link_bundles: driver_clone_str_vec(&base.link_bundles),
         bundle_manifest_path: with_str_clone_ref(base.bundle_manifest_path),
+        bundle_interface_path: with_str_clone_ref(base.bundle_interface_path),
+        bundle_fingerprint_path: with_str_clone_ref(base.bundle_fingerprint_path),
+        bundle_corpus: with_str_clone_ref(base.bundle_corpus),
         compiler_hooks_enabled: base.compiler_hooks_enabled,
     }
 
@@ -235,6 +249,19 @@ fn driver_flag_values(argc: i32, flag: &str) -> Vec[str]:
 pub fn driver_link_bundle_args(argc: i32) -> Vec[str]:
     driver_flag_values(argc, "--link-bundle")
 
+fn driver_first_flag_value(argc: i32, flag: &str) -> str:
+    let values = driver_flag_values(argc, flag)
+    if values.len() == 0: "" else: with_str_clone_ref(values.get(0))
+
+// D39: `--bundle-corpus <rel>` and `--bundle-fingerprint <path>` — the
+// fingerprint pass runs on a source root and on an emitted .wi root through
+// `check`, so both are read outside the build option parse too.
+pub fn driver_bundle_corpus_arg(argc: i32) -> str:
+    driver_first_flag_value(argc, "--bundle-corpus")
+
+pub fn driver_bundle_fingerprint_arg(argc: i32) -> str:
+    driver_first_flag_value(argc, "--bundle-fingerprint")
+
 fn driver_build_source_arg(argc: i32) -> str:
     var i = 2
     while i < argc:
@@ -244,7 +271,7 @@ fn driver_build_source_arg(argc: i32) -> str:
         if arg == "-o":
             step = 2
             skip = true
-        if not skip and (arg == "--output" or arg == "--filter" or arg == "-f" or arg == "--explain" or arg == "--target" or arg == "--link-object" or arg == "--link-bundle" or arg == "--emit-bundle-manifest"):
+        if not skip and (arg == "--output" or arg == "--filter" or arg == "-f" or arg == "--explain" or arg == "--target" or arg == "--link-object" or arg == "--link-bundle" or arg == "--emit-bundle-manifest" or arg == "--emit-bundle-interface" or arg == "--bundle-fingerprint" or arg == "--bundle-corpus"):
             step = 2
             skip = true
         if not skip and driver_has_output_prefix(arg):
@@ -481,6 +508,23 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
                 graph,
             }
         build.bundle_manifest_path = with_str_clone_ref(manifest_paths.get(0))
+    build.bundle_interface_path = driver_first_flag_value(argc, "--emit-bundle-interface")
+    build.bundle_fingerprint_path = driver_bundle_fingerprint_arg(argc)
+    build.bundle_corpus = driver_bundle_corpus_arg(argc)
+    if build.bundle_interface_path.len() > 0 and not emit_obj:
+        return BuildCommandParseResult {
+            ok: false,
+            error_msg: "--emit-bundle-interface requires --emit-obj",
+            build,
+            graph,
+        }
+    if build.bundle_corpus.len() == 0 and (build.bundle_interface_path.len() > 0 or build.bundle_fingerprint_path.len() > 0 or build.bundle_manifest_path.len() > 0):
+        return BuildCommandParseResult {
+            ok: false,
+            error_msg: "--emit-bundle-interface, --emit-bundle-manifest and --bundle-fingerprint require --bundle-corpus <rel> (the bundle's modules under the embedded std tree, e.g. std/re)",
+            build,
+            graph,
+        }
 
     graph.selected_target = driver_build_target_arg(argc)
     graph.graph_only = driver_has_flag(argc, "--graph")
