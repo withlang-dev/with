@@ -7651,6 +7651,202 @@ fn bs_check_object_symbols(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str, 
         if rc != 0: return rc
     0
 
+// ── D39 bundle interfaces (docs/wo_bundles.md, decisions.md D39) ──────────
+// The `.wi` flavor, `--link-bundle`, declared (never body-inferred) callable
+// semantics, and declaration-only codegen for a bundle-provided module.
+// Fixtures: test/bundle_interface/. The bundle object is built from the demo
+// module's source; its manifest is written here from the object's actual
+// module prefix (an unstamped stage cannot --emit-bundle-manifest); the
+// consumer is built against the hand-written interface, run, and its object
+// inspected.
+
+fn bs_bundle_interface_fixture(ctx: &ActionCtx, name: &str) -> str:
+    ctx.fs().read_text(bs_join("test/bundle_interface", name))
+
+// The `__with_mod_<hash>__` prefix of `<prefix><base>` in nm output ("" if absent).
+fn bs_nm_module_prefix(nm_text: &str, base: &str) -> str:
+    let want_suffix = "__" ++ base
+    let lines = bs_split_nonempty_lines(nm_text)
+    for i in 0..lines.len() as i32:
+        let name = bs_nm_symbol_name(lines.get(i as i64))
+        if not name.ends_with(want_suffix):
+            continue
+        let at = bs_index_of(name, "__with_mod_")
+        if at >= 0:
+            return selfhost_owned_text(name.slice(at as i64, name.len() - base.len()))
+    ""
+
+fn bs_bundle_build_args(src: &str, bundle: &str, out: &str, emit_obj: bool) -> Vec[str]:
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(selfhost_owned_text(src))
+    if emit_obj:
+        args |> push("--emit-obj")
+    args |> push("--link-bundle")
+    args |> push(selfhost_owned_text(bundle))
+    args |> push("-O1")
+    args |> push("-o")
+    args |> push(selfhost_owned_text(out))
+    args
+
+fn bs_expect_wi_check_error(ctx: &ActionCtx, compiler_path: &str, label: &str, wi_path: &str, needle: &str) -> i32:
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(selfhost_owned_text(wi_path))
+    let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    if result.rc == 0:
+        return bs_fail(ctx, "expected `with check " ++ wi_path ++ "` to fail (" ++ label ++ ")")
+    bs_assert_contains(ctx, result.stderr, needle, label)
+
+fn bs_dump_abi(ctx: &ActionCtx, compiler_path: &str, label: &str, src: &str, bundle: &str) -> SelfhostRunResult:
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(selfhost_owned_text(src))
+    args |> push("--dump-abi")
+    if bundle.len() > 0:
+        args |> push("--link-bundle")
+        args |> push(selfhost_owned_text(bundle))
+    bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+
+// The `param[0] ...` line under `fn <name> [` in a --dump-abi dump.
+fn bs_dump_abi_param_line(dump: &str, name: &str) -> str:
+    let head = "fn " ++ name ++ " ["
+    let lines = bs_split_nonempty_lines(dump)
+    for i in 0..lines.len() as i32:
+        if lines.get(i as i64).starts_with(head) and i + 1 < lines.len() as i32:
+            return selfhost_owned_text(lines.get((i + 1) as i64))
+    ""
+
+// The physical verdict of a --dump-abi param line (`value_ref_abi=… -> MODE`),
+// the part that must agree between an interface fn and its source twin.
+fn bs_dump_abi_pass_mode(line: &str) -> str:
+    let at = bs_index_of(line, "value_ref_abi=")
+    if at < 0:
+        return ""
+    selfhost_owned_text(line.slice(at as i64, line.len()))
+
+fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str, case_dir: &str) -> i32:
+    let lib_src = bs_join(case_dir, "lib/std/wi_demo.w")
+    let main_src = bs_join(case_dir, "main.w")
+    let bundle = bs_join(case_dir, "store/wi_demo")
+    var rc = bs_write_fixture(ctx, lib_src, bs_bundle_interface_fixture(ctx, "lib/std/wi_demo.w"), "bundle interface demo module")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, main_src, bs_bundle_interface_fixture(ctx, "main.w"), "bundle interface consumer")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bundle ++ ".wi", bs_bundle_interface_fixture(ctx, "wi_demo.wi"), "bundle interface")
+    if rc != 0: return rc
+
+    // The bundle object, from the module's source: module-object mode names
+    // its symbols by the canonical <embedded-std>/std/wi_demo.w path.
+    let obj_path = bundle ++ ".o"
+    rc = bs_build_emit_obj(ctx, compiler_path, "bundle-interface-object", lib_src, obj_path)
+    if rc != 0: return rc
+    let obj_nm = bs_nm_output(ctx, nm_tool, obj_path, "bundle-interface-object")
+    if obj_nm.rc != 0: return bs_fail(ctx, "nm failed for the bundle object")
+    let prefix = bs_nm_module_prefix(obj_nm.stdout, "add")
+    if prefix.len() == 0: return bs_fail(ctx, "bundle object defines no __with_mod_*__add symbol")
+    rc = bs_expect_nm_symbol(ctx, obj_nm.stdout, "bundle object defines add", "", "__add", "__with_mod_", "T", "")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, obj_nm.stdout, "bundle object defines TABLE", "", "__TABLE", "__with_mod_", "", "U")
+    if rc != 0: return rc
+
+    // The manifest: this compiler's ABI identity and the object's prefix (a
+    // stamped compiler refuses any other abi-sha; a stage is unstamped).
+    var abi_args: Vec[str] = Vec.new()
+    abi_args |> push("version")
+    abi_args |> push("--abi-sha")
+    let abi = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-abi-sha", abi_args, 120000)
+    if abi.rc != 0: return bs_fail(ctx, "with version --abi-sha failed")
+    let manifest = "abi-sha " ++ bs_trim_trailing_line_endings(abi.stdout) ++ "\nobject wi_demo.o\nprefix " ++ prefix ++ " <embedded-std>/std/wi_demo.w\n"
+    rc = bs_write_fixture(ctx, bundle ++ ".manifest", manifest, "bundle interface manifest")
+    if rc != 0: return rc
+
+    // The consumer against the interface: builds, links the bundle, runs.
+    let consumer = bs_join(case_dir, "consumer")
+    let built = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-consumer-build", bs_bundle_build_args(main_src, bundle, consumer, false), 120000)
+    if built.rc != 0: return bs_fail(ctx, f"consumer build against the bundle interface failed with exit code {built.rc}")
+    let ran = bs_run_binary_capture(ctx, consumer, "bundle-interface-consumer-run", 120000)
+    if ran.rc != 0: return bs_fail(ctx, f"consumer linked against the bundle failed with exit code {ran.rc}")
+    rc = bs_assert_stdout_exact(ctx, ran, "7 12 3 7 2", "bundle interface consumer")
+    if rc != 0: return rc
+
+    // Declaration only: the consumer's object references the bundle's
+    // symbols and defines none of them.
+    let consumer_obj = bs_join(case_dir, "consumer.o")
+    let built_obj = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-consumer-object", bs_bundle_build_args(main_src, bundle, consumer_obj, true), 120000)
+    if built_obj.rc != 0: return bs_fail(ctx, f"consumer object build against the bundle interface failed with exit code {built_obj.rc}")
+    let consumer_nm = bs_nm_output(ctx, nm_tool, consumer_obj, "bundle-interface-consumer-object")
+    if consumer_nm.rc != 0: return bs_fail(ctx, "nm failed for the consumer object")
+    rc = bs_expect_nm_symbol(ctx, consumer_nm.stdout, "consumer declares add", prefix ++ "add", "", "", "U", "")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, consumer_nm.stdout, "consumer declares take", prefix ++ "take", "", "", "U", "")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, consumer_nm.stdout, "consumer declares TABLE", prefix ++ "TABLE", "", "", "U", "")
+    if rc != 0: return rc
+
+    // The interface, not the source, was read: `take(p: Pair)` is consumed
+    // by declaration (its source body only reads p), while the pass modes of
+    // interface and source twins agree.
+    let iface_dump = bs_dump_abi(ctx, compiler_path, "bundle-interface-dump-abi", main_src, bundle)
+    if iface_dump.rc != 0: return bs_fail(ctx, "--dump-abi with --link-bundle failed")
+    let source_dump = bs_dump_abi(ctx, compiler_path, "bundle-interface-dump-abi-source", main_src, "")
+    if source_dump.rc != 0: return bs_fail(ctx, "--dump-abi from source failed")
+    rc = bs_assert_contains(ctx, bs_dump_abi_param_line(iface_dump.stdout, "take"), "eff=[consume]", "interface take consumes by declaration")
+    if rc != 0: return rc
+    var names: Vec[str] = Vec.new()
+    names |> push("add")
+    names |> push("take")
+    names |> push("table_at")
+    for ni in 0..names.len() as i32:
+        let name = names.get(ni as i64)
+        let iface_mode = bs_dump_abi_pass_mode(bs_dump_abi_param_line(iface_dump.stdout, name))
+        let source_mode = bs_dump_abi_pass_mode(bs_dump_abi_param_line(source_dump.stdout, name))
+        if iface_mode.len() == 0 or iface_mode != source_mode:
+            return bs_fail(ctx, "pass mode of interface fn '" ++ name ++ "' differs from its source twin: '" ++ iface_mode ++ "' vs '" ++ source_mode ++ "'")
+
+    // The consumer's cross-layer audit against the interface.
+    var analyze_args: Vec[str] = Vec.new()
+    analyze_args |> push("analyze")
+    analyze_args |> push(selfhost_owned_text(main_src))
+    analyze_args |> push("audit:all")
+    analyze_args |> push("--link-bundle")
+    analyze_args |> push(selfhost_owned_text(bundle))
+    let audited = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-audit", analyze_args, 120000)
+    if audited.rc != 0: return bs_fail(ctx, f"analyze audit:all on the consumer failed with exit code {audited.rc}")
+
+    // .wi diagnostics: elision ambiguity, a body, an initializer.
+    rc = bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-bad-elision", "test/bundle_interface/bad_elision.wi", "returns a reference with no unambiguous origin")
+    if rc != 0: return rc
+    rc = bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-body-in-wi", "test/bundle_interface/body_in_wi.wi", "interface declarations carry no bodies")
+    if rc != 0: return rc
+    bs_expect_wi_check_error(ctx, compiler_path, "bundle-interface-init-in-wi", "test/bundle_interface/init_in_wi.wi", "interface storage declarations carry no initializer")
+
+pub fn run_bundle_interface_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+
+    // nm resolves as in run_cli_selfhost_object_symbol_action: $NM, else the
+    // target's arg.
+    let args = ctx.args()
+    let nm_arg = if args.len() > 0: selfhost_owned_text(args.get(0)) else: "nm"
+    let nm_tool = bs_build_w_tool_from_env("NM", nm_arg)
+    bs_check_bundle_interface(ctx, compiler_path, nm_tool, bs_join(output_dir, "cases"))
+
 pub fn run_cli_selfhost_object_symbol_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:

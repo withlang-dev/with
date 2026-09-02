@@ -1,0 +1,7 @@
+module <embedded-std>/std/wi_demo.w
+pub type Pair { a: i32, b: i32 }
+pub const K: i32 = 7
+pub let TABLE: [4]u8
+pub fn add(p: &Pair) -> i32
+pub fn take(p: Pair) -> i32
+pub fn table_at(i: i64) -> u8

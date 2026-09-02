@@ -1,0 +1,2 @@
+// D39: interface storage carries only its declaration; the object supplies it.
+pub let TABLE: [4]u8 = [1, 2, 3, 4]

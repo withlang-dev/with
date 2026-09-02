@@ -2346,6 +2346,22 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.dep("build")
     out = out.add_target(cli_selfhost_object_symbol_tests)
 
+    // D39 bundle interfaces: .wi flavor, --link-bundle, declaration-only
+    // codegen (build/selfhost.w bs_check_bundle_interface).
+    var bundle_interface_tests = target_new(.Action, "bundle-interface-tests", "").output("out/test-graph/bundle-interface-tests")
+    bundle_interface_tests = bundle_interface_tests.allow_parallel()
+    bundle_interface_tests.action = run_bundle_interface_action
+    bundle_interface_tests = bundle_interface_tests.arg("nm")
+    bundle_interface_tests = bundle_interface_tests.input(release_compiler_bin("with"))
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_demo.w")
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/wi_demo.wi")
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/main.w")
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/bad_elision.wi")
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/body_in_wi.wi")
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/init_in_wi.wi")
+    bundle_interface_tests = bundle_interface_tests.dep("build")
+    out = out.add_target(bundle_interface_tests)
+
     var cli_selfhost_build_w_tests = target_new(.Action, "cli-selfhost-build-w-tests", "").output("out/test-graph/cli-selfhost-build-w-tests")
     cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.allow_parallel()
     cli_selfhost_build_w_tests.action = run_cli_selfhost_build_w_action
@@ -2473,6 +2489,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-one-liner-tests")
     tests = tests.dep("cli-selfhost-fmt-tests")
     tests = tests.dep("cli-selfhost-object-symbol-tests")
+    tests = tests.dep("bundle-interface-tests")
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")

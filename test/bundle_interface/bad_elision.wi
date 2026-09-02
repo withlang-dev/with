@@ -1,0 +1,5 @@
+// D39 elision: a returned reference's origin is the receiver, else the single
+// borrowed parameter; two borrowed parameters leave it ambiguous — an error on
+// the declaration, never at a call site.
+pub type Foo { x: i32 }
+pub fn choose(a: &Foo, b: &Foo) -> &Foo
