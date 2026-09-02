@@ -2431,31 +2431,15 @@ impl Sema:
             return
         let param_count = self.sig_get_param_count(sig_idx)
         let receiver_mode = self.sig_receiver_mode(sig_idx)
-        let has_receiver = receiver_mode != ReceiverMode.None and receiver_mode != ReceiverMode.Missing
-        var ref_param_count = 0
-        var ref_param_index = -1
         for pi in 0..param_count:
             let p_tid = self.sig_param_type(sig_idx, pi)
-            let p_resolved = self.resolve_alias(p_tid as TypeId)
-            let p_kind = self.get_type_kind(p_resolved)
-            var eff = 0
-            if pi == 0 and has_receiver:
-                eff = if receiver_mode == ReceiverMode.Move: EFF_CONSUME
-                    else if receiver_mode == ReceiverMode.Mut: EFF_READ | EFF_WRITE
-                    else: EFF_READ
-            else if p_kind == TypeKind.TY_REF:
-                eff = if self.get_type_d1(p_resolved) != 0: EFF_READ | EFF_WRITE else: EFF_READ
-                ref_param_count = ref_param_count + 1
-                ref_param_index = pi
-            else if p_kind != TypeKind.TY_PTR:
-                eff = if self.is_copy(p_tid as TypeId) != 0: EFF_READ else: EFF_CONSUME
+            let eff = self.declared_param_effect(pi, p_tid, receiver_mode, self.is_copy(p_tid as TypeId))
             self.set_sig_param_effect(sig_idx, pi, eff)
             self.set_sig_param_direct_effect(sig_idx, pi, eff)
             self.set_sig_param_view_origin(sig_idx, pi, 0)
-        let ret_resolved = self.resolve_alias(self.sig_return_type(sig_idx) as TypeId)
-        if self.get_type_kind(ret_resolved) != TypeKind.TY_REF:
+        let origin = self.declared_view_origin(sig_idx)
+        if origin == DECLARED_ORIGIN_NONE:
             return
-        let origin = if has_receiver: 0 else if ref_param_count == 1: ref_param_index else: -1
         if origin < 0:
             self.emit_error("interface declaration returns a reference with no unambiguous origin: name the origin in the source signature (D39 elision: receiver, else the single borrowed parameter)", node)
             return
@@ -2463,6 +2447,44 @@ impl Sema:
         self.set_sig_param_effect(sig_idx, origin, origin_eff)
         self.set_sig_param_direct_effect(sig_idx, origin, origin_eff)
         self.set_sig_param_view_origin(sig_idx, origin, sema_param_origin_bit(origin))
+
+    // D39's rule for one parameter's declared effect — the receiver by its
+    // mode, `&T` reads, `&mut T` writes, a raw pointer carries nothing, and a
+    // plain `T` consumes unless Copy. Shared with the bundle fingerprint
+    // (compiler.BundleInterfaceEmit), which must compute the same declared
+    // effects from a source body and from its interface twin; the caller
+    // supplies Copy-ness so the frozen and the checking Sema both fit.
+    fn declared_param_effect(pi: i32, p_tid: i32, receiver_mode: ReceiverMode, p_is_copy: i32) -> i32:
+        if pi == 0 and receiver_mode != ReceiverMode.None and receiver_mode != ReceiverMode.Missing:
+            return if receiver_mode == ReceiverMode.Move: EFF_CONSUME
+                else if receiver_mode == ReceiverMode.Mut: EFF_READ | EFF_WRITE
+                else: EFF_READ
+        let p_resolved = self.resolve_alias(p_tid as TypeId)
+        let p_kind = self.get_type_kind(p_resolved)
+        if p_kind == TypeKind.TY_REF:
+            return if self.get_type_d1(p_resolved) != 0: EFF_READ | EFF_WRITE else: EFF_READ
+        if p_kind == TypeKind.TY_PTR:
+            return 0
+        if p_is_copy != 0: EFF_READ else: EFF_CONSUME
+
+    // D39 elision: the declared origin of a returned reference — the
+    // receiver, else the single `&`/`&mut` parameter; DECLARED_ORIGIN_AMBIGUOUS
+    // when the declaration cannot say, DECLARED_ORIGIN_NONE when nothing is
+    // returned by reference.
+    fn declared_view_origin(sig_idx: i32) -> i32:
+        let ret_resolved = self.resolve_alias(self.sig_return_type(sig_idx) as TypeId)
+        if self.get_type_kind(ret_resolved) != TypeKind.TY_REF:
+            return DECLARED_ORIGIN_NONE
+        let receiver_mode = self.sig_receiver_mode(sig_idx)
+        if receiver_mode != ReceiverMode.None and receiver_mode != ReceiverMode.Missing:
+            return 0
+        var ref_param_count = 0
+        var ref_param_index = DECLARED_ORIGIN_AMBIGUOUS
+        for pi in 0..self.sig_get_param_count(sig_idx):
+            if self.get_type_kind(self.resolve_alias(self.sig_param_type(sig_idx, pi) as TypeId)) == TypeKind.TY_REF:
+                ref_param_count = ref_param_count + 1
+                ref_param_index = pi
+        if ref_param_count == 1: ref_param_index else: DECLARED_ORIGIN_AMBIGUOUS
 
     mut fn check_trait_default_method_body_for_impl(impl_node: i32, method_idx: i32):
         let body: i32 = self.trait_method_default_bodies.get(method_idx as i64)

@@ -81,6 +81,11 @@ impl Copy for BindingProvenance
 fn binding_provenance_empty -> BindingProvenance:
     BindingProvenance { view_origin_mask: 0, view_dep_start: 0, view_dep_count: 0, effect_dep_sym: 0, is_ephemeral_value: 0, is_ephemeral_task: 0, is_non_send_task: 0, poisoned_origin_sym: 0, poisoned_origin_node: 0, poisoned_binding_node: 0 }
 
+// D39 declared view origin (SemaCheck.declared_view_origin): a parameter
+// index, or one of these.
+const DECLARED_ORIGIN_NONE: i32 = -2
+const DECLARED_ORIGIN_AMBIGUOUS: i32 = -1
+
 fn sema_param_origin_bit(pi: i32) -> i32:
     if pi < 0:
         return 0
