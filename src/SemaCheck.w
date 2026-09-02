@@ -6795,7 +6795,7 @@ impl Sema:
                 let filter = self.ast.get_extra(base + 2)
                 let iter_ty = self.check_expr(iterable)
                 self.demand_generic_iter_next(iter_ty, iterable, iterable)
-                let elem_ty = self.infer_for_element_type(iter_ty as i32)
+                let elem_ty = self.for_loop_element_type(iterable, iter_ty as i32)
                 self.push_scope()
                 pushed_scopes = pushed_scopes + 1
                 if self.ast.comprehension_binding_is_pattern(node, binding):
@@ -6852,7 +6852,7 @@ impl Sema:
                 let filter2 = self.ast.get_extra(base3 + 2)
                 let iter_ty2 = self.check_expr(iterable2)
                 self.demand_generic_iter_next(iter_ty2, iterable2, iterable2)
-                let elem_ty2 = self.infer_for_element_type(iter_ty2 as i32)
+                let elem_ty2 = self.for_loop_element_type(iterable2, iter_ty2 as i32)
                 self.push_scope()
                 pushed_scopes2 = pushed_scopes2 + 1
                 if self.ast.comprehension_binding_is_pattern(node, binding2):
@@ -10575,7 +10575,7 @@ impl Sema:
 
         self.union_clear_last_written()
         let iter_type = self.check_expr(iterable)
-        let elem_type = self.infer_for_element_type(iter_type as i32)
+        let elem_type = self.for_loop_element_type(iterable, iter_type as i32)
 
         // #912: the for-desugar over a generic iterator IS a next() call, but
         // no spelled call ever demands the specialization — register it here,
@@ -23746,6 +23746,30 @@ impl Sema:
     // docs/mut.md Rev 8 §11.4 / §15.17 — returns 1 when the for-loop iterable
     // is a .iter() call (or any iter_of_self method), meaning the iterator
     // yields &T views rather than owned T values.
+    // #925: `for x in vec.iter()` IS §13's implicit form. MirLower lowers it
+    // exactly like the bare Vec — Drop-class elements bind &T views through
+    // VEC_GET_REF, Copy-class elements bind by value — and never calls
+    // VecIter.next(). Typing the binding from next()'s Option[T] made Sema
+    // say `str` where MIR held `&str`; the call site then auto-referenced a
+    // reference and passed a pointer to the pointer as the {ptr,len} pair.
+    // Mirror MirLower's dispatch predicate here (an `iter` call on a
+    // receiver whose type is a Vec instantiation); every other iterable,
+    // including HashMap.iter() and user iterators, keeps next()'s element.
+    mut fn for_loop_element_type(iterable: i32, iter_type: i32) -> i32:
+        if self.ast.kind(iterable) == NodeKind.NK_CALL:
+            let callee = self.ast.get_data0(iterable)
+            if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and self.pool_resolve(self.ast.get_data1(callee)) == "iter":
+                let recv_node = self.ast.get_data0(callee)
+                if self.typed_expr_types.contains(recv_node):
+                    let recv_resolved = self.resolve_alias(self.typed_expr_types.get(recv_node).unwrap() as TypeId)
+                    if self.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_arg_count(recv_resolved as i32) > 0:
+                        if self.pool_resolve(self.get_type_d0(recv_resolved)) == "Vec":
+                            let vec_elem = self.get_generic_inst_arg(recv_resolved as i32, 0)
+                            if self.type_needs_drop(vec_elem) != 0 and self.is_copy(vec_elem as TypeId) == 0:
+                                return self.ensure_exact_type(TypeKind.TY_REF, vec_elem, 0, 0) as i32
+                            return vec_elem
+        self.infer_for_element_type(iter_type)
+
     mut fn for_iterable_yields_views(iterable: i32) -> i32:
         // §13: a bare Drop-element Vec iterable binds &T views (see
         // infer_for_element_type), so the binding is view-bound for §15.17.
