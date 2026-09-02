@@ -4171,6 +4171,15 @@ impl Codegen:
         let mode = if self.path_uses_module_link_names(source_path): 1 else: 0
         fn_abi_module_link_name(mode, source_path, base_name)
 
+    // D39: the prefixes of `--link-bundle` manifests join the embedded ones,
+    // so a compiler with an empty embedded index (stage1) compiles exactly
+    // what a compiler with the bundle embedded compiles.
+    mut fn add_bundle_prefixes(prefixes: &Vec[str]):
+        for i in 0..prefixes.len() as i32:
+            let prefix = prefixes.get(i as i64)
+            if not self.bundle_prefixes.contains(prefix):
+                self.bundle_prefixes.push(with_str_clone_ref(prefix))
+
     // D38: does an embedded .wo bundle provide this module? Then this unit
     // declares its functions and the bundle's object defines them.
     fn path_is_bundle_provided(source_path: &str) -> bool:
@@ -4178,6 +4187,12 @@ impl Codegen:
             return false
         let prefix = fn_abi_module_link_prefix(source_path)
         prefix.len() > 0 and self.bundle_prefixes.contains(prefix)
+
+    // A function this unit declares and never defines: an interface
+    // declaration (D39) or a function of a bundle-provided module (D38).
+    // Its definition is the bundle's object, so it keeps external linkage.
+    fn fn_node_is_declared_only(fn_node: i32) -> bool:
+        self.pool.fn_decl_body_is_interface(fn_node) or self.path_is_bundle_provided(self.current_decl_source_file)
 
     fn fn_is_bundle_provided(sema_sym: i32) -> bool:
         let path_opt = self.sema.fn_decl_source_paths.get(sema_sym)
@@ -4590,7 +4605,9 @@ impl Codegen:
         // Whole-program codegen internalizes non-prelude functions because imported
         // modules are duplicated into the current AST. In module-object mode we must
         // keep owner definitions externally linkable and let importers reference them.
-        if self.module_object_mode == 0:
+        // A function this unit only declares stays external: its definition is
+        // the bundle's object (an internal declaration without a body is invalid).
+        if self.module_object_mode == 0 and not self.fn_node_is_declared_only(fn_node):
             let is_prelude = self.current_decl_source_file.contains("lib/std/")
             if effective_name != "main" and not is_prelude and
                 not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
@@ -4761,7 +4778,7 @@ impl Codegen:
                 wl_set_value_name(function, promoted_fi)
             else:
                 wl_set_linkage(function, wl_internal_linkage())
-        else if self.module_object_mode == 0:
+        else if self.module_object_mode == 0 and not self.path_is_bundle_provided(self.current_decl_source_file):
             if effective_name != "main" and not self.current_decl_source_file.contains("lib/std/") and
                 not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
                 let promoted_mo = self.unit_promoted_name(fn_sym, effective_name)

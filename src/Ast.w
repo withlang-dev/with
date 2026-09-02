@@ -135,6 +135,16 @@ pub enum NodeKind: i32:
     // NK_MAP_COMPREHENSION: d0=extra_start, d1=clause_count, d2=0
     // Extra: [key_expr, value_expr, then per clause: binding, iterable, filter]
     NK_MAP_COMPREHENSION = 129
+    // D39 typed body state (docs/decisions.md): a `.wi` interface declaration
+    // carries these in place of a source body / initializer. They are real
+    // nodes, never a 0 slot — `d1 == 0` on NK_LET_DECL already means a
+    // zero-initialized `var x: T` and DEFINES storage; an interface global is
+    // storage the bundle object supplies.
+    // NK_INTERFACE_BODY: d0=0, d1=0, d2=0  (NK_FN_DECL.d1; wrapped in
+    //   NK_UNSAFE_BLOCK/UNSAFE_ORIGIN_FN_BODY for `unsafe fn`, like a source body)
+    // NK_INTERFACE_PROVIDED: d0=0, d1=0, d2=0  (NK_LET_DECL.d1)
+    NK_INTERFACE_BODY = 130
+    NK_INTERFACE_PROVIDED = 131
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -709,6 +719,23 @@ impl AstPool:
 
     fn get_data2(idx: NodeId) -> i32:
         self.state.data2.get((idx as i32) as i64)
+
+    // D39: the fn's body slot holds an interface body (looking through the
+    // `unsafe fn` wrapper the parser inserts around every fn body).
+    fn fn_decl_body_is_interface(node: NodeId) -> bool:
+        if self.kind(node) != NodeKind.NK_FN_DECL:
+            return false
+        var body = self.get_data1(node)
+        if body != 0 and self.kind(body) == NodeKind.NK_UNSAFE_BLOCK and self.get_data2(body) == UNSAFE_ORIGIN_FN_BODY:
+            body = self.get_data0(body)
+        body != 0 and self.kind(body) == NodeKind.NK_INTERFACE_BODY
+
+    // D39: the global's initializer slot says the bundle object supplies it.
+    fn let_decl_is_interface_provided(node: NodeId) -> bool:
+        if self.kind(node) != NodeKind.NK_LET_DECL:
+            return false
+        let value = self.get_data1(node)
+        value != 0 and self.kind(value) == NodeKind.NK_INTERFACE_PROVIDED
 
     fn literal_suffix(idx: NodeId) -> i32:
         self.state.literal_suffixes.get((idx as i32) as i64)
@@ -1760,6 +1787,10 @@ impl AstPool:
 //
 // NodeKind.NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
 //                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*, type_param_count, [type_param_name, bound_count, bounds...]*]
+//                   body is a source expression, or NK_INTERFACE_BODY for a `.wi` declaration (D39)
+//
+// NodeKind.NK_INTERFACE_BODY:     d0=0, d1=0, d2=0  (fn body of an interface declaration)
+// NodeKind.NK_INTERFACE_PROVIDED: d0=0, d1=0, d2=0  (initializer of an interface global)
 //
 // NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.* + TDK_FLAG_*)
 //                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
@@ -1771,6 +1802,8 @@ impl AstPool:
 //
 // NodeKind.NK_LET_DECL:      d0=name(sym), d1=value(node), d2=flags (bit0=mut, bit1=pub)
 //                   extra: [type_expr(node)] if type annotation present
+//                   value: initializer expression, 0 for zero-initialized `var x: T`,
+//                   or NK_INTERFACE_PROVIDED for a `.wi` storage declaration (D39)
 //
 // NodeKind.NK_EXTERN_FN:     d0=name(sym), d1=extra_start, d2=flags (bit0=variadic)
 //                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*]

@@ -11,6 +11,7 @@ use Diagnostic
 use Span
 use compiler.EmbeddedStdlib
 use compiler.EmbeddedRuntime
+use compiler.ModuleSource
 use compiler.Runtime
 use std.collections.HashMap
 use std.string.StringBuilder
@@ -211,12 +212,8 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
             state.process_module_with_pool(work, normalized_root_text, root_pool)
         else:
             let path = state.module_paths.get(work as i64)
-            let embedded_rel = embedded_std_rel_path(path)
-            let embedded_rt_rel = embedded_rt_rel_path(path)
-            let raw_text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel)
-                else if embedded_rt_rel.len() > 0: embedded_rt_source(embedded_rt_rel)
-                else: with_fs_read_file(path)
-            let text = resolve_normalize_source_text(raw_text)
+            let src = module_source_read(path)
+            let text = resolve_normalize_source_text(src.text)
             if text.len() == 0:
                 state.emit_import_error(work, "failed to read imported module")
                 state.module_processed.set_i32(work as i64, 1)
@@ -227,6 +224,8 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
             var lexer = Lexer.init(text, file_id)
             let tokens = lexer.tokenize()
             var parser = Parser.init(move tokens, text, file_id, state.pool, move state.diags)
+            if src.interface:
+                parser.enable_interface_mode()
             let parsed = parser.parse_module()
             state.pool = parser.intern
             state.diags = move parser.diags
@@ -505,8 +504,9 @@ impl ResolveState:
             if resolve_node_valid(pool, ret_ty):
                 self.walk_type_expr(pool, module_id, fn_scope, ret_ty)
 
+        // D39: an interface declaration has no body to walk.
         let body = pool.get_data1(fn_node)
-        if walk_body and resolve_node_valid(pool, body):
+        if walk_body and not pool.fn_decl_body_is_interface(fn_node) and resolve_node_valid(pool, body):
             self.walk_expr(pool, module_id, fn_def, fn_scope, body)
 
     fn walk_type_expr(pool: AstPool, module_id: i32, current_scope: i32, node: i32):

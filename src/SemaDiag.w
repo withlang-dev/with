@@ -252,6 +252,8 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_ARRAY_COMPREHENSION: return "array_comprehension"
     if kind == NodeKind.NK_MAP_LIT: return "map_lit"
     if kind == NodeKind.NK_MAP_COMPREHENSION: return "map_comprehension"
+    if kind == NodeKind.NK_INTERFACE_BODY: return "interface_body"
+    if kind == NodeKind.NK_INTERFACE_PROVIDED: return "interface_provided"
     if kind == NodeKind.NK_STRUCT_LIT: return "struct_literal"
     if kind == NodeKind.NK_MATCH: return "match_expr"
     if kind == NodeKind.NK_ENUM_VARIANT: return "enum_variant"

@@ -7513,6 +7513,9 @@ impl ComptimeEvaluator:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
             return comptime_control_value(self.empty_string_builder_value(result_type))
         let fn_node = self.find_fn_decl_node(fn_sym)
+        // D39: an interface declaration has no body to evaluate.
+        if fn_node != 0 and self.ast.fn_decl_body_is_interface(fn_node):
+            return self.fail(node, "cannot evaluate '" ++ fn_name ++ "' at comptime: an interface declaration has no body (D39)")
         if fn_node != 0:
             let fn_decl_path = self.decl_path(fn_node)
             if fn_decl_path.ends_with("string.w") and (fn_name == "new" or fn_name == "with_capacity"):
@@ -7938,7 +7941,9 @@ impl Sema:
             if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
                 continue
             let value = self.ast.get_data1(decl)
-            if value == 0:
+            // Zero-initialized `var x: T`, or D39 interface-provided storage:
+            // no initializer to check.
+            if value == 0 or self.ast.let_decl_is_interface_provided(decl):
                 continue
 
             let name = self.ast.get_data0(decl)

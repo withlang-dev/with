@@ -45,6 +45,11 @@ pub type BuildCommandOptions {
     // D38: extra objects handed straight to the link (`--link-object <path>`,
     // repeatable) — how build.w gives a stage link its .wo bundle objects.
     link_objects: Vec[str],
+    // D39: `--link-bundle <prefix>` (repeatable): `<prefix>.o` joins the link,
+    // `<prefix>.manifest` names the modules codegen declares only, and
+    // `<prefix>.wi` is the interface the resolver reads for them — how a
+    // compiler with an empty embedded index (stage1) links a bundle.
+    link_bundles: Vec[str],
     // D38: with --emit-obj, also write the .wo bundle manifest here
     // (`--emit-bundle-manifest <path>`): the compiler's abi-sha, the target,
     // and one link-name prefix per module compiled into the object.
@@ -124,6 +129,7 @@ pub fn build_command_options_default -> BuildCommandOptions:
         defines: Vec.new(),
         link_libs: Vec.new(),
         link_objects: Vec.new(),
+        link_bundles: Vec.new(),
         bundle_manifest_path: "",
         compiler_hooks_enabled: true,
     }
@@ -159,6 +165,7 @@ pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOp
         defines: driver_clone_str_vec(&base.defines),
         link_libs: driver_clone_str_vec(&base.link_libs),
         link_objects: driver_clone_str_vec(&base.link_objects),
+        link_bundles: driver_clone_str_vec(&base.link_bundles),
         bundle_manifest_path: with_str_clone_ref(base.bundle_manifest_path),
         compiler_hooks_enabled: base.compiler_hooks_enabled,
     }
@@ -223,6 +230,11 @@ fn driver_flag_values(argc: i32, flag: &str) -> Vec[str]:
         i = i + 1
     out
 
+// D39: `--link-bundle <prefix>` values, for every command that compiles
+// (build, check, analyze).
+pub fn driver_link_bundle_args(argc: i32) -> Vec[str]:
+    driver_flag_values(argc, "--link-bundle")
+
 fn driver_build_source_arg(argc: i32) -> str:
     var i = 2
     while i < argc:
@@ -232,7 +244,7 @@ fn driver_build_source_arg(argc: i32) -> str:
         if arg == "-o":
             step = 2
             skip = true
-        if not skip and (arg == "--output" or arg == "--filter" or arg == "-f" or arg == "--explain" or arg == "--target"):
+        if not skip and (arg == "--output" or arg == "--filter" or arg == "-f" or arg == "--explain" or arg == "--target" or arg == "--link-object" or arg == "--link-bundle" or arg == "--emit-bundle-manifest"):
             step = 2
             skip = true
         if not skip and driver_has_output_prefix(arg):
@@ -458,6 +470,7 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
     else if emit_obj:
         build.output_kind = BuildOutputKind.Object
     build.link_objects = driver_flag_values(argc, "--link-object")
+    build.link_bundles = driver_link_bundle_args(argc)
     let manifest_paths = driver_flag_values(argc, "--emit-bundle-manifest")
     if manifest_paths.len() > 0:
         if not emit_obj:

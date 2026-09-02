@@ -13830,6 +13830,8 @@ fn mir_symbol_for_pool(sema: &Sema, pool: InternPool, sym: i32) -> i32:
     sym
 
 fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody:
+    if builder.ast.fn_decl_body_is_interface(fn_node):
+        sema_phase_bug("BUG: interface body reached MIR lowering (D39: lower_module skips interface declarations)")
     builder.contextual_fact_sig_idx = sig_idx
     let fn_flags = builder.ast.get_data2(fn_node)
     if sig_idx >= 0:
@@ -14669,6 +14671,10 @@ fn lower_module(input_sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirLow
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
         if ast_pool.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        // D39: an interface declaration has no body to lower; the bundle's
+        // object defines it.
+        if ast_pool.fn_decl_body_is_interface(decl):
             continue
 
         let fn_sym = sema.fn_decl_semantic_symbol_at(decl as i32, ast_pool.get_data0(decl), di)

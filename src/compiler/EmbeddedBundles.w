@@ -10,6 +10,7 @@
 // manifest's abi-sha against this compiler's own (compiler.AbiStamp).
 // With no bundles the data module reports a count of zero.
 use compiler.EmbeddedBundlesData
+extern fn with_str_clone_ref(s: &str) -> str
 
 pub fn embedded_bundle_count() -> i32:
     embedded_bundles_count_data()
@@ -33,28 +34,35 @@ fn embedded_blob_view(start: i64, end: i64) -> str:
 pub fn embedded_bundle_manifest_text(index: i32) -> str:
     embedded_blob_view(embedded_bundles_manifest_start_data(index), embedded_bundles_manifest_end_data(index))
 
-// Every module link-name prefix (`__with_mod_<hash>__`) any embedded bundle
-// provides — the `prefix <p> <path>` manifest lines across all bundles.
-// Codegen emits declarations only for functions whose module carries one of
-// these; the link stage selects the bundle when an undefined symbol does.
+// The module link-name prefixes (`__with_mod_<hash>__`) a manifest lists —
+// its `prefix <p> <path>` lines. Codegen emits declarations only for
+// functions whose module carries one of these; the link stage selects the
+// bundle when an undefined symbol does.
+pub fn bundle_manifest_prefixes(manifest: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    var start: i64 = 0
+    while start < manifest.len():
+        var end = start
+        while end < manifest.len() and manifest.byte_at(end) != '\n':
+            end = end + 1
+        let line = manifest.slice(start, end)
+        if line.starts_with("prefix "):
+            let rest = line.slice(7, line.len())
+            var sp: i64 = 0
+            while sp < rest.len() and rest.byte_at(sp) != ' ':
+                sp = sp + 1
+            if sp > 0:
+                out.push(with_str_clone_ref(rest.slice(0, sp)))
+        start = end + 1
+    out
+
+// Every prefix any embedded bundle provides.
 pub fn embedded_bundle_prefixes() -> Vec[str]:
     let out: Vec[str] = Vec.new()
     for bi in 0..embedded_bundle_count():
-        let manifest = embedded_bundle_manifest_text(bi)
-        var start: i64 = 0
-        while start < manifest.len():
-            var end = start
-            while end < manifest.len() and manifest.byte_at(end) != '\n':
-                end = end + 1
-            let line = manifest.slice(start, end)
-            if line.starts_with("prefix "):
-                let rest = line.slice(7, line.len())
-                var sp: i64 = 0
-                while sp < rest.len() and rest.byte_at(sp) != ' ':
-                    sp = sp + 1
-                if sp > 0:
-                    out.push(rest.slice(0, sp))
-            start = end + 1
+        let prefixes = bundle_manifest_prefixes(embedded_bundle_manifest_text(bi))
+        for pi in 0..prefixes.len() as i32:
+            out.push(with_str_clone_ref(prefixes.get(pi as i64)))
     out
 
 // Blob address pairs; the link stage turns them into byte slices.

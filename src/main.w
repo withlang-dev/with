@@ -269,7 +269,8 @@ fn cli_option_takes_value(arg: &str) -> bool:
     arg == "--trace-place" or arg == "--explain-mir-origin" or
     arg == "--trace-ownership" or arg == "--trace-cleanup-edge" or
     arg == "--contains" or arg == "--exit-code" or
-    arg == "--debug-alloc-filter" or arg == "--out"
+    arg == "--debug-alloc-filter" or arg == "--out" or
+    arg == "--link-object" or arg == "--link-bundle" or arg == "--emit-bundle-manifest"
 
 fn cli_default_opt_level(argc: i32) -> i32:
     if argc >= 2:
@@ -854,6 +855,7 @@ fn run_cli(argc: i32) -> i32:
         comp.configure(opt_level, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         comp.set_overflow_mode(driver_internal_overflow_mode())
+        comp.set_link_bundles(&driver_link_bundle_args(argc))
         let result = comp.analyze_file(source, cli_analysis_request(argc, source))
         with_write(result.text)
         return result.status
@@ -909,6 +911,7 @@ fn run_cli(argc: i32) -> i32:
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
+        comp.set_link_bundles(&driver_link_bundle_args(argc))
         let pool = comp.compile_file(source)
         if pool.decl_count() == 0:
             with_eprint("error: check failed during compilation")
@@ -2896,9 +2899,7 @@ fn dump_tokens(source_file: &str, deterministic: bool) -> i32:
     0
 
 fn dump_resolved_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let result = comp.resolve_file(source_file, true)
     let has_errors = comp.has_errors()
     if has_errors:
@@ -2908,10 +2909,18 @@ fn dump_resolved_artifact(source_file: &str, no_std: bool, alloc_mode: bool, run
     with_write(resolved_text)
     0
 
-fn dump_typed_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+// A check-tier Compilation for the `check` dump/trace artifacts. D39
+// `--link-bundle` prefixes apply to every command that compiles, so a dump
+// of a consumer sees the bundle's interface exactly as a build does.
+fn cli_check_compilation(no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> Compilation:
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
+    comp.set_link_bundles(&driver_link_bundle_args(with_arg_count()))
+    comp
+
+fn dump_typed_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let typed_ok = comp.emit_typed_file(source_file)
     if not typed_ok:
         with_eprint("error: typed dump failed during compilation or semantic analysis")
@@ -2919,9 +2928,7 @@ fn dump_typed_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtim
     0
 
 fn dump_project_info_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_project_info_file(source_file)
     if text.len() == 0:
         with_eprint("error: project info dump failed")
@@ -2930,9 +2937,7 @@ fn dump_project_info_artifact(source_file: &str, no_std: bool, alloc_mode: bool,
     0
 
 fn dump_mir_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let mir_ok = comp.print_mir_file(source_file)
     if not mir_ok:
         with_eprint("error: mir dump failed during compilation or mir lowering")
@@ -2940,9 +2945,7 @@ fn dump_mir_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_
     0
 
 fn dump_drop_state_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_drop_state_file(source_file)
     if text.len() == 0:
         with_eprint("error: drop-state dump failed during compilation or mir lowering")
@@ -2951,9 +2954,7 @@ fn dump_drop_state_artifact(source_file: &str, no_std: bool, alloc_mode: bool, r
     0
 
 fn trace_place_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.trace_place_file(source_file, spec)
     if text.len() == 0:
         with_eprint("error: trace-place failed during compilation or mir lowering")
@@ -2962,9 +2963,7 @@ fn trace_place_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode:
     0
 
 fn explain_mir_origin_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.explain_mir_origin_file(source_file, spec)
     if text.len() == 0:
         with_eprint("error: explain-mir-origin failed during compilation or mir lowering")
@@ -2973,9 +2972,7 @@ fn explain_mir_origin_artifact(source_file: &str, spec: &str, no_std: bool, allo
     0
 
 fn trace_ownership_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.trace_ownership_file(source_file, spec)
     if text.len() == 0:
         with_eprint("error: trace-ownership failed during compilation or mir lowering")
@@ -2984,9 +2981,7 @@ fn trace_ownership_artifact(source_file: &str, spec: &str, no_std: bool, alloc_m
     0
 
 fn dump_drop_plan_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_drop_plan_file(source_file)
     if text.len() == 0:
         with_eprint("error: drop-plan dump failed during compilation or mir lowering")
@@ -2995,9 +2990,7 @@ fn dump_drop_plan_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
     0
 
 fn dump_abi_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_abi_file(source_file)
     if text.len() == 0:
         with_eprint("error: abi dump failed during compilation")
@@ -3006,9 +2999,7 @@ fn dump_abi_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_
     0
 
 fn validate_ownership_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let result = comp.validate_ownership_file(source_file)
     if result != "ok":
         with_eprint("error: validate-ownership failed: " ++ result)
@@ -3017,9 +3008,7 @@ fn validate_ownership_artifact(source_file: &str, no_std: bool, alloc_mode: bool
     0
 
 fn dump_place_map_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.dump_place_map_file(source_file)
     if text.len() == 0:
         with_eprint("error: place-map dump failed during compilation or mir lowering")
@@ -3032,9 +3021,7 @@ fn trace_cleanup_edge_artifact(source_file: &str, spec: &str, no_std: bool, allo
     if mir_cleanup_edge_spec_ok(spec) == 0:
         with_eprint("error: invalid --trace-cleanup-edge spec '" ++ spec ++ "'; expected fn:bbFROM->bbTO")
         return 1
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let text = comp.trace_cleanup_edge_file(source_file, spec)
     if text.len() == 0:
         with_eprint("error: trace-cleanup-edge failed during compilation or mir lowering")
@@ -3043,9 +3030,7 @@ fn trace_cleanup_edge_artifact(source_file: &str, spec: &str, no_std: bool, allo
     0
 
 fn validate_all_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let result = comp.validate_all_file(source_file)
     if result != "ok":
         with_eprint("error: validate-all failed: " ++ result)
@@ -3054,9 +3039,7 @@ fn validate_all_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runt
     0
 
 fn dump_async_mir_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let async_mir_text = comp.dump_async_mir_file(source_file)
     if async_mir_text.len() == 0:
         with_eprint("error: async-mir dump failed during compilation or lowering")
@@ -4273,9 +4256,7 @@ fn run_doc_command(argc: i32, source: &str, output: &str, no_std: bool, alloc_mo
     if source_text.len() == 0:
         with_eprint("error: with doc could not read source file: " ++ source_path)
         return 1
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     let pool = comp.compile_file(source_path)
     if pool.decl_count() == 0:
         with_eprint("error: with doc failed during compilation")
@@ -4346,9 +4327,7 @@ fn run_repl_line(line: &str, no_std: bool, alloc_mode: bool, runtime_available: 
         return 1
     let source = repl_source_for_line(line)
     let bin_path = repl_bin_path()
-    var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode, runtime_available)
-    comp.set_prelude_mode(prelude_mode)
+    var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     comp.set_debug_info(false)
     let built = comp.build_entry_binary_from_source_to_path("<repl>", source, bin_path)
     if built == "":

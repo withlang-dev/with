@@ -356,6 +356,8 @@ fn analysis_ast_node_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_TYPE_PTR: return "type-ptr"
     if kind == NodeKind.NK_TYPE_TYPEOF: return "type-typeof"
     if kind == NodeKind.NK_FN_DECL: return "fn-decl"
+    if kind == NodeKind.NK_INTERFACE_BODY: return "interface-body"
+    if kind == NodeKind.NK_INTERFACE_PROVIDED: return "interface-provided"
     if kind == NodeKind.NK_TYPE_DECL: return "type-decl"
     if kind == NodeKind.NK_LET_BINDING: return "let-binding"
     if kind == NodeKind.NK_BLOCK: return "block"

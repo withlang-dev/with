@@ -19,6 +19,8 @@ use compiler.Link
 use compiler.ProjectConfig
 use compiler.DriverOptions
 use compiler.AbiStamp
+use compiler.BundleInterfaces
+use compiler.EmbeddedBundles
 use FnAbi
 use compiler.Zcu
 use compiler.Runtime
@@ -330,6 +332,11 @@ type Compilation {
     last_link_rc: i32,
     // D38: `--link-object` paths for this build's link (see build_binary_to_path).
     link_objects: Vec[str],
+    // D39: `--link-bundle` prefixes, loaded once by load_link_bundles before
+    // the first frontend entry (the interface registry must be populated
+    // before any import resolves).
+    link_bundles: Vec[str],
+    link_bundles_loaded: bool,
     // D38: `--emit-bundle-manifest` path for emit_object_to_path ("" = none).
     bundle_manifest_path: str,
 }
@@ -357,6 +364,8 @@ pub fn Compilation.init -> Compilation:
         last_link_command: link_stage_empty_command(),
         last_link_rc: 0,
         link_objects: Vec.new(),
+        link_bundles: Vec.new(),
+        link_bundles_loaded: false,
         bundle_manifest_path: "",
     }
 
@@ -375,7 +384,57 @@ impl Compilation:
         self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
         self.set_target_kind(options.target_kind)
         self.link_objects = driver_clone_str_vec(&options.link_objects)
+        self.set_link_bundles(&options.link_bundles)
         self.bundle_manifest_path = with_str_clone_ref(options.bundle_manifest_path)
+
+    pub mut fn set_link_bundles(prefixes: &Vec[str]):
+        self.link_bundles = driver_clone_str_vec(prefixes)
+        self.link_bundles_loaded = false
+
+    // D39 `--link-bundle <prefix>` (docs/wo_bundles.md): `<prefix>.o` joins
+    // the link, the manifest's module prefixes make codegen declare (never
+    // define) those modules' functions, and `<prefix>.wi` registers with the
+    // interface registry so the resolver reads it in place of the source. A
+    // manifest whose abi-sha differs from this compiler's is a hard error
+    // (#761: never a mixed-ABI link); an unstamped compiler (stage1) carries
+    // no identity to compare, so it links on the bootstrap plan's trust.
+    mut fn load_link_bundles() -> bool:
+        if self.link_bundles_loaded:
+            return true
+        self.link_bundles_loaded = true
+        for bi in 0..self.link_bundles.len() as i32:
+            let prefix_path = self.link_bundles.get(bi as i64)
+            let obj_path = prefix_path ++ ".o"
+            let manifest_path = prefix_path ++ ".manifest"
+            let wi_path = prefix_path ++ ".wi"
+            if runtime_file_exists(obj_path) == 0:
+                with_eprint("error: --link-bundle: missing bundle object " ++ obj_path)
+                return false
+            let manifest = runtime_read_file(manifest_path)
+            if manifest.len() == 0:
+                with_eprint("error: --link-bundle: missing or empty bundle manifest " ++ manifest_path)
+                return false
+            let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
+            if compiler_abi_sha_is_stamped() and bundle_abi != compiler_abi_sha():
+                with_eprint("error: --link-bundle: " ++ manifest_path ++ " was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
+                return false
+            let prefixes = bundle_manifest_prefixes(manifest)
+            if prefixes.len() == 0:
+                with_eprint("error: --link-bundle: no `prefix` lines in " ++ manifest_path)
+                return false
+            let wi_text = runtime_read_file(wi_path)
+            if wi_text.len() == 0:
+                with_eprint("error: --link-bundle: missing or empty bundle interface " ++ wi_path)
+                return false
+            if bundle_interfaces_register_wi(wi_text) == 0:
+                with_eprint("error: --link-bundle: no `module <path>` sections in " ++ wi_path)
+                return false
+            if not self.link_objects.contains(obj_path):
+                self.link_objects.push(with_str_clone_ref(obj_path))
+            var zcu = move self.zcu
+            zcu.add_link_bundle_prefixes(&prefixes)
+            self.zcu = zcu
+        true
 
     // Install the --target selection (§18.5) before any parse or
     // codegen: @[target] guards, comptime sysinfo, C-ABI decisions,
@@ -452,6 +511,8 @@ impl Compilation:
 
     mut fn compile_file(path: &str) -> AstPool:
         compilation_debug_init("Compilation.compile_file:start " ++ path)
+        if not self.load_link_bundles():
+            return AstPool.new()
         var zcu = move self.zcu
         let pool = zcu.compile_file_frontend_with_config(path, self.project_config_for_source(path))
         self.zcu = zcu
@@ -460,6 +521,8 @@ impl Compilation:
 
     mut fn compile_file_with_config(path: &str, cfg: ProjectConfig) -> AstPool:
         compilation_debug_init("Compilation.compile_file_with_config:start " ++ path)
+        if not self.load_link_bundles():
+            return AstPool.new()
         var zcu = move self.zcu
         let pool = zcu.compile_file_frontend_with_config(path, self.apply_runtime_config(move cfg))
         self.zcu = zcu
@@ -468,6 +531,8 @@ impl Compilation:
 
     mut fn compile_entry_file(path: &str) -> AstPool:
         compilation_debug_init("Compilation.compile_entry_file:start " ++ path)
+        if not self.load_link_bundles():
+            return AstPool.new()
         var zcu = move self.zcu
         let pool = zcu.compile_file_frontend_entry_with_config(path, self.project_config_for_source(path))
         self.zcu = zcu
@@ -476,6 +541,8 @@ impl Compilation:
 
     mut fn compile_entry_file_with_config(path: &str, cfg: ProjectConfig) -> AstPool:
         compilation_debug_init("Compilation.compile_entry_file_with_config:start " ++ path)
+        if not self.load_link_bundles():
+            return AstPool.new()
         var zcu = move self.zcu
         let pool = zcu.compile_file_frontend_entry_with_config(path, self.apply_runtime_config(move cfg))
         self.zcu = zcu
@@ -1186,6 +1253,16 @@ impl Compilation:
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
     mut fn emit_c(source_path: &str, output_path: &str) -> str:
+        // The emit-C lane compiles a corpus in-unit as C; it has no bundle
+        // objects to link and no bodies for an interface declaration
+        // (docs/wo_bundles.md), so both are refused here rather than emitted
+        // as stubs.
+        if self.link_bundles.len() > 0:
+            runtime_eprint("error: --emit-c cannot link a .wo bundle (--link-bundle): the emit-C lane compiles every module in-unit (docs/wo_bundles.md)")
+            return ""
+        if source_path.ends_with(".wi"):
+            runtime_eprint("error: --emit-c needs source bodies; '" ++ source_path ++ "' is an interface (D39)")
+            return ""
         let pool = self.compile_file(source_path)
         if pool.decl_count() == 0:
             return ""

@@ -15,6 +15,7 @@ use render
 use compiler.EmbeddedStdlib
 use compiler.EmbeddedRuntime
 use compiler.EmbeddedClangResource
+use compiler.ModuleSource
 use TargetSpec
 
 extern fn with_str_clone_ref(s: &str) -> str
@@ -1529,6 +1530,8 @@ impl Zcu:
         var pool: AstPool = AstPool.new()
         self.prelude_prefix_decls = 0
         self.prelude_prefix_non_use = 0
+        // D39: a `.wi` root (`with check x.wi`) parses in interface flavor.
+        let interface_root = name.ends_with(".wi")
         if self.prelude_mode != PRELUDE_NONE():
             let prelude_module = if self.prelude_mode == PRELUDE_CORE(): "std.prelude_core" else if self.prelude_mode == PRELUDE_ALLOC(): "std.prelude_alloc" else: "std.prelude"
             let synthetic = "use " ++ prelude_module ++ "\n"
@@ -1550,6 +1553,8 @@ impl Zcu:
             var uparser = Parser.init_with_pool(move utokens, normalized_text, file_id, self.pool, move self.diagnostics, pool)
             if implicit_main_mode != 0:
                 uparser.enable_implicit_main_mode()
+            if interface_root:
+                uparser.enable_interface_mode()
             pool = uparser.parse_module()
             self.pool = uparser.intern
             self.diagnostics = move uparser.diags
@@ -1560,6 +1565,8 @@ impl Zcu:
             var parser = Parser.init(move tokens, normalized_text, file_id, self.pool, move self.diagnostics)
             if implicit_main_mode != 0:
                 parser.enable_implicit_main_mode()
+            if interface_root:
+                parser.enable_interface_mode()
             pool = parser.parse_module()
             self.pool = parser.intern
             self.diagnostics = move parser.diags
@@ -1783,12 +1790,7 @@ impl Zcu:
                     break
             if already:
                 continue
-            let embedded_rel = embedded_std_rel_path(mod.path)
-            let embedded_rt_rel = embedded_rt_rel_path(mod.path)
-            let raw_text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel)
-                else if embedded_rt_rel.len() > 0: embedded_rt_source(embedded_rt_rel)
-                else: runtime_read_file(mod.path)
-            let text = frontend_normalize_source_text(raw_text)
+            let text = frontend_normalize_source_text(module_source_read(mod.path).text)
             if text.len() > 0:
                 self.add_source_text_mapping(mod.file_id, mod.path, text)
 
@@ -1804,7 +1806,8 @@ impl Zcu:
             if path.len() == 0 or path == root_path:
                 continue
 
-            let text = frontend_normalize_source_text(runtime_read_file(path))
+            let src = module_source_read(path)
+            let text = frontend_normalize_source_text(src.text)
             if text.len() == 0:
                 let span = Span { file: 0, start: 0, end: 0 }
                 self.diagnostics.emit(Diagnostic.err("failed to read imported module", span))
@@ -1814,6 +1817,8 @@ impl Zcu:
             let tokens = lexer.tokenize()
             let before = merged_pool.decl_count()
             var parser = Parser.init_with_pool(move tokens, text, mod.file_id, self.pool, move self.diagnostics, merged_pool)
+            if src.interface:
+                parser.enable_interface_mode()
             merged_pool = parser.parse_module()
             self.pool = parser.intern
             self.diagnostics = move parser.diags
@@ -2467,12 +2472,8 @@ impl Zcu:
         ""
 
     mut fn parse_imported_file_frontend(path: &str, target_pool: AstPool) -> AstPool:
-        let embedded_rel = embedded_std_rel_path(path)
-        let embedded_rt_rel = embedded_rt_rel_path(path)
-        let raw_text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel)
-            else if embedded_rt_rel.len() > 0: embedded_rt_source(embedded_rt_rel)
-            else: runtime_read_file(path)
-        let text = frontend_normalize_source_text(raw_text)
+        let src = module_source_read(path)
+        let text = frontend_normalize_source_text(src.text)
         if text.len() == 0:
             return target_pool
 
@@ -2485,6 +2486,8 @@ impl Zcu:
         let tokens = lexer.tokenize()
 
         var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, target_pool)
+        if src.interface:
+            parser.enable_interface_mode()
         let merged_pool = parser.parse_module()
         self.pool = parser.intern
         self.diagnostics = move parser.diags

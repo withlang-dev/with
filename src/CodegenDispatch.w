@@ -53,6 +53,10 @@ impl Codegen:
         if self.sema.generic_fn_node_for_symbol(fn_sym) != 0:
             if not self.fn_values.get(fn_sym).is_some():
                 return
+        // D39: an interface declaration is declared only (pass 1); the
+        // bundle's object defines it.
+        if self.pool.fn_decl_body_is_interface(fn_node):
+            return
         // D38: a function an embedded .wo bundle provides is declared only —
         // its body is the bundle's object, selected at link time.
         if self.fn_is_bundle_provided(fn_sym):

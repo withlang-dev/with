@@ -86,6 +86,10 @@ pub type Parser {
     implicit_main_has_main_hint: i32,
     top_level_stmts: Vec[i32],
     explicit_main_decl: i32,
+    // D39: `.wi` interface flavor — functions omit bodies and storage globals
+    // omit initializers (typed NK_INTERFACE_* nodes fill the slots). Off for
+    // every `.w`, so ordinary source never admits a bodyless declaration.
+    interface_mode: i32,
 }
 
 type InterpolatedExprParseAttempt {
@@ -173,12 +177,29 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         implicit_main_has_main_hint: 0,
         top_level_stmts: Vec.new(),
         explicit_main_decl: 0,
+        interface_mode: 0,
     }
 
 impl Parser:
     mut fn enable_implicit_main_mode():
         self.implicit_main_mode = 1
         self.implicit_main_has_main_hint = self.has_top_level_main_decl()
+
+    mut fn enable_interface_mode(): self.interface_mode = 1
+
+    // D39 interface mode: the body slot of a declaration. A body in a `.wi`
+    // is an error (the object holds the code); the recovery still parses it
+    // so the rest of the file is diagnosed. Generic, async, gen and comptime
+    // functions cannot cross a bundle boundary (Level 0, docs/abi_roadmap.md).
+    mut fn parse_interface_body(tp_count: i32, is_async: i32, is_gen: i32, is_comptime: i32) -> NodeId:
+        if tp_count > 0:
+            self.emit_error("interface declarations cannot be generic (D39: a bundle boundary is Level 0, docs/abi_roadmap.md)")
+        if is_async != 0 or is_gen != 0 or is_comptime != 0:
+            self.emit_error("interface declarations cannot be async, gen, or comptime functions (D39)")
+        if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_L_BRACE:
+            self.emit_error("interface declarations carry no bodies (D39: a .wi holds signatures; the object holds the code)")
+            return self.parse_body()
+        self.pool.add_node(NodeKind.NK_INTERFACE_BODY, self.prev_end(), self.prev_end(), 0, 0, 0)
 
     fn token_text_at(pos: i32) -> str:
         if pos < 0 or pos >= self.tokens.len():
@@ -1245,8 +1266,8 @@ impl Parser:
         // Where clause
         self.parse_optional_where_clause()
 
-        // Body
-        let body = self.parse_body()
+        // Body (D39: an interface declaration's slot holds NK_INTERFACE_BODY)
+        let body = if self.interface_mode != 0: self.parse_interface_body(tp_count, is_async, is_gen, is_comptime) else: self.parse_body()
         if body == 0:
             return self.poisoned_expr()
 
@@ -2707,45 +2728,46 @@ impl Parser:
             if is_var: LET_FLAG_GLOBAL_VAR else: LET_FLAG_GLOBAL
         else: 0
 
-        // var x: T (no initializer) — zero-initialized
         if self.peek() != TokenKind.TK_EQ:
+            // D39 interface mode: storage the bundle object supplies. The slot
+            // holds a typed NK_INTERFACE_PROVIDED node — never the 0 of the
+            // zero-initialized `var x: T` below, which DEFINES storage.
+            if self.interface_mode != 0:
+                if type_ann == 0:
+                    self.emit_error("interface storage declarations require a type annotation (D39)")
+                    return self.poisoned_expr()
+                let provided = self.pool.add_node(NodeKind.NK_INTERFACE_PROVIDED, self.prev_end(), self.prev_end(), 0, 0, 0)
+                return self.add_top_level_let(start, name, provided, type_ann, is_mut, is_pub, global_bits)
+            // var x: T (no initializer) — zero-initialized
             if is_mut and type_ann != 0:
-                var flags = 1  // mut
-                if is_pub == Visibility.Public:
-                    flags = flags + 2
-                flags = flags + global_bits
-                let type_extra = self.pool.extra_len()
-                self.pool.add_extra(type_ann)
-                flags = flags + (type_extra + 1) * 16
-                let decl = self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, 0, flags)
-                if self.pending_global_allocator != 0:
-                    self.pool.mark_global_allocator_decl(decl)
-                    self.pending_global_allocator = 0
-                return decl
+                return self.add_top_level_let(start, name, 0 as NodeId, type_ann, is_mut, is_pub, global_bits)
             if not is_mut:
                 self.emit_error("let binding requires initializer")
                 return self.poisoned_expr()
             self.emit_error("var without initializer requires type annotation")
             return self.poisoned_expr()
 
+        if self.interface_mode != 0:
+            self.emit_error("interface storage declarations carry no initializer (D39: the object supplies the storage)")
         self.advance()  // consume '='
         self.skip_newlines()
         let value = self.parse_expr()
         if value == 0:
             return self.poisoned_expr()
+        self.add_top_level_let(start, name, value, type_ann, is_mut, is_pub, global_bits)
 
-        var flags = 0
+    // Lower 4 bits of NK_LET_DECL.d2: mut, pub, GLOBAL, GLOBAL_VAR. Type-extra
+    // index (+1) at bit 4+ (Ast.w "NK_LET_DECL flags layout").
+    mut fn add_top_level_let(start: i32, name: i32, value: NodeId, type_ann: NodeId, is_mut: bool, is_pub: i32, global_bits: i32) -> NodeId:
+        var flags = global_bits
         if is_mut:
             flags = flags + 1
         if is_pub == Visibility.Public:
             flags = flags + 2
-        flags = flags + global_bits
         if type_ann != 0:
             let type_extra = self.pool.extra_len()
             self.pool.add_extra(type_ann)
-            // Lower 4 bits: mut, pub, GLOBAL, GLOBAL_VAR. Type-extra at bit 4+.
             flags = flags + (type_extra + 1) * 16
-
         let decl = self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
         if self.pending_global_allocator != 0:
             self.pool.mark_global_allocator_decl(decl)
@@ -3244,7 +3266,12 @@ impl Parser:
             self.parse_optional_where_clause()
 
             var body: NodeId = 0 as NodeId
-            if self.peek() == TokenKind.TK_COLON:
+            if self.interface_mode != 0:
+                // D39: methods of an interface declaration carry no bodies either.
+                body = self.parse_interface_body(m_tp_count + impl_tp_count, m_async, 0, 0)
+                if body == 0:
+                    break
+            else if self.peek() == TokenKind.TK_COLON:
                 self.advance()
                 body = self.parse_block_or_expr()
             else if self.peek() == TokenKind.TK_L_BRACE:

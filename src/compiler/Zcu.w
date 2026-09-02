@@ -88,6 +88,10 @@ type Zcu {
     last_codegen_unit_count: i32,
     last_link_lib_names: Vec[str],
     tracked_input_paths: Vec[str],
+    // D39: module prefixes of the `--link-bundle` manifests — codegen
+    // declares (never defines) the functions of these modules, exactly as
+    // for the compiler's embedded bundles (Codegen.bundle_prefixes).
+    link_bundle_prefixes: Vec[str],
     project_config: ProjectConfig,
     trace_c_import_cache: i32,
     // Analysis commands preserve diagnostics but may continue past preliminary
@@ -151,6 +155,7 @@ fn Zcu.init -> Zcu:
         last_codegen_unit_count: 1,
         last_link_lib_names: zcu_new_vec_str(),
         tracked_input_paths: zcu_new_vec_str(),
+        link_bundle_prefixes: zcu_new_vec_str(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,
         analysis_partial_semantics: 0,
@@ -163,6 +168,12 @@ fn Zcu.init -> Zcu:
     }
 
 impl Zcu:
+    mut fn add_link_bundle_prefixes(prefixes: &Vec[str]):
+        for i in 0..prefixes.len() as i32:
+            let prefix = prefixes.get(i as i64)
+            if not self.link_bundle_prefixes.contains(prefix):
+                self.link_bundle_prefixes.push(with_str_clone_ref(prefix))
+
     mut fn reset_import_state():
         let empty = zcu_new_vec_str()
         self.imported_paths = empty

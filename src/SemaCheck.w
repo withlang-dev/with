@@ -1605,6 +1605,12 @@ impl Sema:
                         let active_node = self.fn_decl_nodes.get(fn_name).unwrap()
                         if active_node != decl:
                             continue
+                    // D39: an interface declaration means what it says — its
+                    // effects come from the signature and there is no body.
+                    if self.ast.fn_decl_body_is_interface(decl):
+                        self.update_module_context(di)
+                        self.apply_interface_declared_effects(decl, fn_name)
+                        continue
                     // Skip generic functions
                     let meta = self.ast.find_fn_meta(decl)
                     var tp_count = 0
@@ -2034,6 +2040,8 @@ impl Sema:
         let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
         let body = self.ast.get_data1(node)
         let flags = self.ast.get_data2(node)
+        if self.ast.fn_decl_body_is_interface(node):
+            sema_phase_bug("BUG: interface body reached body check (D39: check_bodies applies the declared effects and skips it)")
         if sig_idx < 0:
             return
         // §16.4 union last-written tracking is per-function-body.
@@ -2408,6 +2416,53 @@ impl Sema:
         let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
         let sig_idx = self.get_sig(fn_name)
         self.check_fn_body_with_sig_at(node, sig_idx, decl_index)
+
+    // D39 (decisions.md): an interface declaration's callable semantics are
+    // the declaration, never a body inference. `T` consumes, `&T` reads, `&mut
+    // T` writes, the receiver follows its mode, raw pointers carry no With
+    // ownership. A returned reference's origin follows deterministic elision:
+    // the receiver if there is one, else the single borrowed parameter, else
+    // the declaration is ambiguous — an error here, never at a call site.
+    // Writes the same tables the body flush at the end of
+    // check_fn_body_with_sig_at writes: both effect tables and the view origin.
+    mut fn apply_interface_declared_effects(node: i32, fn_name: i32):
+        let sig_idx = self.get_sig(fn_name)
+        if sig_idx < 0:
+            return
+        let param_count = self.sig_get_param_count(sig_idx)
+        let receiver_mode = self.sig_receiver_mode(sig_idx)
+        let has_receiver = receiver_mode != ReceiverMode.None and receiver_mode != ReceiverMode.Missing
+        var ref_param_count = 0
+        var ref_param_index = -1
+        for pi in 0..param_count:
+            let p_tid = self.sig_param_type(sig_idx, pi)
+            let p_resolved = self.resolve_alias(p_tid as TypeId)
+            let p_kind = self.get_type_kind(p_resolved)
+            var eff = 0
+            if pi == 0 and has_receiver:
+                eff = if receiver_mode == ReceiverMode.Move: EFF_CONSUME
+                    else if receiver_mode == ReceiverMode.Mut: EFF_READ | EFF_WRITE
+                    else: EFF_READ
+            else if p_kind == TypeKind.TY_REF:
+                eff = if self.get_type_d1(p_resolved) != 0: EFF_READ | EFF_WRITE else: EFF_READ
+                ref_param_count = ref_param_count + 1
+                ref_param_index = pi
+            else if p_kind != TypeKind.TY_PTR:
+                eff = if self.is_copy(p_tid as TypeId) != 0: EFF_READ else: EFF_CONSUME
+            self.set_sig_param_effect(sig_idx, pi, eff)
+            self.set_sig_param_direct_effect(sig_idx, pi, eff)
+            self.set_sig_param_view_origin(sig_idx, pi, 0)
+        let ret_resolved = self.resolve_alias(self.sig_return_type(sig_idx) as TypeId)
+        if self.get_type_kind(ret_resolved) != TypeKind.TY_REF:
+            return
+        let origin = if has_receiver: 0 else if ref_param_count == 1: ref_param_index else: -1
+        if origin < 0:
+            self.emit_error("interface declaration returns a reference with no unambiguous origin: name the origin in the source signature (D39 elision: receiver, else the single borrowed parameter)", node)
+            return
+        let origin_eff = self.sig_param_effect(sig_idx, origin) | EFF_ESCAPE_VIEW
+        self.set_sig_param_effect(sig_idx, origin, origin_eff)
+        self.set_sig_param_direct_effect(sig_idx, origin, origin_eff)
+        self.set_sig_param_view_origin(sig_idx, origin, sema_param_origin_bit(origin))
 
     mut fn check_trait_default_method_body_for_impl(impl_node: i32, method_idx: i32):
         let body: i32 = self.trait_method_default_bodies.get(method_idx as i64)
@@ -3212,6 +3267,9 @@ impl Sema:
             let decl2 = self.ast.get_decl(di2)
             if self.ast.kind(decl2) != NodeKind.NK_FN_DECL:
                 continue
+            // D39: an interface declaration has no body to walk.
+            if self.ast.fn_decl_body_is_interface(decl2):
+                continue
             if self.fn_decl_is_comptime_error_root(decl2) == 0:
                 continue
             self.check_fn_reachable_comptime_errors(decl2)
@@ -3242,8 +3300,9 @@ impl Sema:
             return
         self.reachable_visiting.insert(fn_node, 1)
         self.update_reachable_fn_source_context(fn_node)
-        let body = self.ast.get_data1(fn_node)
-        self.check_expr_reachable_comptime_errors(body)
+        // D39: an interface declaration has no body to walk.
+        if not self.ast.fn_decl_body_is_interface(fn_node):
+            self.check_expr_reachable_comptime_errors(self.ast.get_data1(fn_node))
         self.reachable_visiting.remove(fn_node)
         self.reachable_seen.insert(fn_node, 1)
 
@@ -3551,6 +3610,8 @@ impl Sema:
     mut fn check_fn_body_concrete(fn_node: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], mono_sym: i32, param_concrete_tys: &Vec[i32]) -> i32:
         let fn_name = self.ast.get_data0(fn_node)
         let body = self.ast.get_data1(fn_node)
+        if self.ast.fn_decl_body_is_interface(fn_node):
+            sema_phase_bug("BUG: interface body reached generic body check (D39: the parser rejects generic interface declarations)")
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
             return -1
@@ -4195,8 +4256,9 @@ impl Sema:
             return 0
         self.suspend_visiting.insert(fn_sym, 1)
         let fn_node: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
-        let body = self.ast.get_data1(fn_node)
-        let result = self.expr_may_suspend(body)
+        // D39: an interface declaration is never async (the parser rejects
+        // it), so by declaration it never suspends.
+        let result = if self.ast.fn_decl_body_is_interface(fn_node): 0 else: self.expr_may_suspend(self.ast.get_data1(fn_node))
         self.suspend_visiting.remove(fn_sym)
         result
 
@@ -4476,8 +4538,8 @@ impl Sema:
         if fn_node == 0:
             return 0
         self.eph_task_visiting.insert(fn_sym, 1)
-        let body = self.ast.get_data1(fn_node)
-        let result = self.expr_creates_ephemeral_task(body)
+        // D39: an interface declaration is never async, so it creates no task.
+        let result = if self.ast.fn_decl_body_is_interface(fn_node): 0 else: self.expr_creates_ephemeral_task(self.ast.get_data1(fn_node))
         self.eph_task_visiting.remove(fn_sym)
         result
 
@@ -5130,6 +5192,11 @@ impl Sema:
         if self.param_is_by_reference(param_ty) != 0 or self.type_is_task(param_ty) == 0:
             self.task_param_consumed_memo.insert(key, 0)
             return 0
+        // D39: a by-value Task parameter of an interface declaration is
+        // consumed by declaration — there is no body to inspect.
+        if self.ast.fn_decl_body_is_interface(fn_node):
+            self.task_param_consumed_memo.insert(key, 1)
+            return 1
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0 or param_i >= self.ast.fn_meta_param_count(meta):
             self.task_param_consumed_memo.insert(key, 0)

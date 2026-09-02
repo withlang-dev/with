@@ -311,6 +311,8 @@ type SemaMethodLookup {
 
 const GLOBAL_VALUE_DECL_DEF: i32 = 1
 const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
+// D39: storage a bundle interface declares; the bundle's object defines it.
+const GLOBAL_VALUE_DECL_INTERFACE: i32 = 3
 
 // docs/mutability.md §5 — per-parameter effect bits.
 const EFF_READ: i32         = 1   // parameter is read
@@ -4506,7 +4508,10 @@ impl Sema:
             self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
             return
 
-        if existing_kind == GLOBAL_VALUE_DECL_DEF and decl_kind == GLOBAL_VALUE_DECL_DEF:
+        // Only an extern declaration may coexist with another declaration of
+        // the same global; two definitions, or a definition beside interface
+        // storage (D39), is one symbol declared twice.
+        if existing_kind != GLOBAL_VALUE_DECL_EXTERN and decl_kind != GLOBAL_VALUE_DECL_EXTERN:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
             self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
             return
@@ -4526,8 +4531,8 @@ impl Sema:
         if existing_tid == 0 and tid != 0:
             self.bind_types.set_i32(existing_idx as i64, tid)
 
-        if existing_kind == GLOBAL_VALUE_DECL_EXTERN and decl_kind == GLOBAL_VALUE_DECL_DEF:
-            self.global_value_decl_kinds.insert(sym, GLOBAL_VALUE_DECL_DEF)
+        if existing_kind == GLOBAL_VALUE_DECL_EXTERN and decl_kind != GLOBAL_VALUE_DECL_EXTERN:
+            self.global_value_decl_kinds.insert(sym, decl_kind)
 
     fn scope_lookup(sym: i32) -> i32:
         let opt = self.scope_name_map.get(sym)

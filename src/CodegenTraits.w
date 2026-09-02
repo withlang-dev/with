@@ -2294,6 +2294,16 @@ impl Codegen:
                 if ann_ty != 0:
                     binding_ty = ann_ty as i32
         let resolved_binding_ty = if binding_ty != 0: self.sema.resolve_alias(binding_ty) else: 0
+        // D39: interface-provided storage — declare the external (module-
+        // prefixed) global; the bundle's object defines it and owns its drop.
+        if self.pool.let_decl_is_interface_provided(let_node):
+            if resolved_binding_ty == 0:
+                return
+            let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
+            if global_ty == 0:
+                return
+            let _ = self.declare_module_binding_global(name_sym, global_ty, is_mut)
+            return
         if value_node == 0:
             if resolved_binding_ty == 0:
                 return

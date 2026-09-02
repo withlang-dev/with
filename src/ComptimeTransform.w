@@ -2972,13 +2972,15 @@ impl Sema:
         let kind = pool.kind(node)
         if kind == NodeKind.NK_FN_DECL:
             let body = pool.get_data1(node)
-            if body != 0:
+            // D39: an interface body / interface-provided initializer holds
+            // no expression to transform.
+            if body != 0 and not pool.fn_decl_body_is_interface(node):
                 pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, body))
             self.ct_transform_fn_param_defaults(source_ast, pool, intern, node)
             return
         if kind == NodeKind.NK_LET_DECL:
             let value = pool.get_data1(node)
-            if value != 0:
+            if value != 0 and not pool.let_decl_is_interface_provided(node):
                 if pool.kind(value) == NodeKind.NK_COMPTIME:
                     let flags = pool.get_data2(node)
                     let ann_extra = self.top_level_let_type_ann_extra(flags)
