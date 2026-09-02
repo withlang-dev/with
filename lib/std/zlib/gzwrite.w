@@ -753,7 +753,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
                 }
 
 
-                gz_error(__param_state, (-1 as c_int), (strerror(((unsafe *(__error())) as c_int)) as *const i8))
+                gz_error(__param_state, (-1 as c_int), (strerror((unsafe *(__error()))) as *const i8))
 
                 return -1
 
@@ -847,7 +847,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
                     }
 
 
-                    gz_error(__param_state, (-1 as c_int), (strerror(((unsafe *(__error())) as c_int)) as *const i8))
+                    gz_error(__param_state, (-1 as c_int), (strerror((unsafe *(__error()))) as *const i8))
 
                     return -1
 

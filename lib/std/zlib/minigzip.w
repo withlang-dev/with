@@ -19,7 +19,7 @@ unsafe fn string_copy(__param_dst: *mut i8, __param_src: *const i8, __param_len:
     var __local_src = __param_src
     var __local_len = __param_len
     if ((if __local_len == 0: 1 else: 0) != 0) {
-        return null
+        return ((null as *mut i8))
     }
 
     while true {
@@ -109,7 +109,7 @@ unsafe fn gz_uncompress(__param_in_: *mut gzFile_s, __param_out: *mut c_void) ->
             break
         }
 
-        if ((if ((fwrite((&__local_buf[0] as *mut c_char), (1 as c_ulong), (__local_len as c_uint), __param_out) as c_int)) != __local_len: 1 else: 0) != 0) {
+        if ((if ((fwrite((&__local_buf[0] as *mut c_char), (1 as c_ulong), ((__local_len as c_uint) as c_ulong), __param_out) as c_int)) != __local_len: 1 else: 0) != 0) {
             error_(c"failed fwrite".ptr)
 
         }

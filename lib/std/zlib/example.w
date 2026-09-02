@@ -848,9 +848,9 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     printf(c"zlib version %s = 0x%04x, compile flags = 0x%lx\n".ptr, "1.3.2", (4896 as c_uint), zlibCompileFlags())
 
-    (__local_compr = (((with_alloc_zeroed(((__local_comprLen as c_uint) as i64), ((1 as c_ulong) as i64)) as *mut c_void) as *mut u8)))
+    (__local_compr = (((with_alloc_zeroed((((__local_comprLen as c_uint) as c_ulong) as i64), ((1 as c_ulong) as i64)) as *mut c_void) as *mut u8)))
 
-    (__local_uncompr = (((with_alloc_zeroed(((__local_uncomprLen as c_uint) as i64), ((1 as c_ulong) as i64)) as *mut c_void) as *mut u8)))
+    (__local_uncompr = (((with_alloc_zeroed((((__local_uncomprLen as c_uint) as c_ulong) as i64), ((1 as c_ulong) as i64)) as *mut c_void) as *mut u8)))
 
     var __ci_expr_logic_0: c_int
 

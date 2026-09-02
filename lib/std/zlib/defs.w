@@ -211,7 +211,7 @@ pub unsafe fn __with_builtin_sub_overflow_i128(a: i128, b: i128, out: *mut i128)
 // compiled into freestanding runtime objects whose COFF link has no builtins
 // library to resolve them from. Limb decomposition keeps the check to multiplies
 // and shifts, which lower inline on every target and at every -O level.
-fn u128_mul_would_overflow(a: u128, b: u128) -> bool {
+pub fn u128_mul_would_overflow(a: u128, b: u128) -> bool {
     let a_hi = (a >> 64) as u64
     let b_hi = (b >> 64) as u64
     if a_hi != 0 and b_hi != 0: return true
@@ -268,12 +268,6 @@ pub extern fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32
 pub extern fn with_va_start(ap: *mut i8) -> Unit
 pub extern fn with_va_end(ap: *mut i8) -> Unit
 
-// PCRE2 string constants (from pcre2_internal.h macros)
-pub let STRING_MARK: *const u8 = c"MARK".ptr
-pub let STRING_DEFINE: *const u8 = c"DEFINE".ptr
-pub let STRING_VERSION: *const u8 = c"VERSION".ptr
-pub let STRING_WEIRD_STARTWORD: *const u8 = c"[:<:]]".ptr
-pub let STRING_WEIRD_ENDWORD: *const u8 = c"[:>:]]".ptr
 
 pub type max_align_t = c_longdouble
 
@@ -396,7 +390,7 @@ pub let WORD_BIT: c_int = 32
 pub let SIZE_T_MAX: c_ulong = 0xffffffffffffffff
 pub let UQUAD_MAX: c_ulonglong = 0xffffffffffffffff
 pub let QUAD_MAX: c_longlong = 0x7fffffffffffffff
-pub let QUAD_MIN: c_longlong = LLONG_MIN
+pub let QUAD_MIN = LLONG_MIN
 pub let ARG_MAX: c_int = (1024 * 1024)
 pub let CHILD_MAX: c_int = 266
 pub let GID_MAX: c_uint = 2147483647
@@ -423,7 +417,7 @@ pub let NZERO: c_int = 20
 pub let PTHREAD_DESTRUCTOR_ITERATIONS: c_int = 4
 pub let PTHREAD_KEYS_MAX: c_int = 512
 pub let PTHREAD_STACK_MIN: c_int = 16384
-pub let OFF_MIN: c_longlong = LLONG_MIN
+pub let OFF_MIN = LLONG_MIN
 pub let OFF_MAX: c_longlong = 0x7fffffffffffffff
 pub let NL_ARGMAX: c_int = 9
 pub let NL_LANGMAX: c_int = 14
@@ -639,8 +633,8 @@ pub let UINT32_MAX: c_uint = 4294967295
 pub let UINT64_MAX: c_ulonglong = 18446744073709551615
 pub let INT_LEAST8_MIN: c_int = -128
 pub let INT_LEAST16_MIN: c_int = -32768
-pub let INT_LEAST32_MIN: c_int = INT32_MIN
-pub let INT_LEAST64_MIN: c_longlong = INT64_MIN
+pub let INT_LEAST32_MIN = INT32_MIN
+pub let INT_LEAST64_MIN = INT64_MIN
 pub let INT_LEAST8_MAX: c_int = 127
 pub let INT_LEAST16_MAX: c_int = 32767
 pub let INT_LEAST32_MAX: c_int = 2147483647
@@ -651,8 +645,8 @@ pub let UINT_LEAST32_MAX: c_uint = 4294967295
 pub let UINT_LEAST64_MAX: c_ulonglong = 18446744073709551615
 pub let INT_FAST8_MIN: c_int = -128
 pub let INT_FAST16_MIN: c_int = -32768
-pub let INT_FAST32_MIN: c_int = INT32_MIN
-pub let INT_FAST64_MIN: c_longlong = INT64_MIN
+pub let INT_FAST32_MIN = INT32_MIN
+pub let INT_FAST64_MIN = INT64_MIN
 pub let INT_FAST8_MAX: c_int = 127
 pub let INT_FAST16_MAX: c_int = 32767
 pub let INT_FAST32_MAX: c_int = 2147483647
@@ -667,13 +661,13 @@ pub let UINTPTR_MAX: c_ulong = 18446744073709551615
 pub let INTMAX_MAX: c_long = INTMAX_C(9223372036854775807)
 pub let UINTMAX_MAX: c_ulong = UINTMAX_C(18446744073709551615u64)
 pub let INTMAX_MIN: c_long = ((0 - INTMAX_MAX) - 1)
-pub let PTRDIFF_MIN: c_long = INTMAX_MIN
-pub let PTRDIFF_MAX: c_long = INTMAX_MAX
+pub let PTRDIFF_MIN = INTMAX_MIN
+pub let PTRDIFF_MAX = INTMAX_MAX
 pub let SIZE_MAX: c_ulong = 18446744073709551615
 pub let RSIZE_MAX: c_ulong = (SIZE_MAX >> 1)
-pub let WINT_MIN: c_int = INT32_MIN
+pub let WINT_MIN = INT32_MIN
 pub let WINT_MAX: c_int = 2147483647
-pub let SIG_ATOMIC_MIN: c_int = INT32_MIN
+pub let SIG_ATOMIC_MIN = INT32_MIN
 pub let SIG_ATOMIC_MAX: c_int = 2147483647
 pub let PRIO_PROCESS: c_int = 0
 pub let PRIO_PGRP: c_int = 1
@@ -913,7 +907,7 @@ pub let O_DP_AUTHENTICATE: c_int = 0x0004
 pub let AUTH_OPEN_NOAUTHFD: c_int = -1
 pub let FAPPEND: c_int = 0x00000008
 pub let FASYNC: c_int = 0x00000040
-pub let FFSYNC: c_int = O_FSYNC
+pub let FFSYNC = O_FSYNC
 pub let FFDSYNC: c_int = 0x400000
 pub let FNONBLOCK: c_int = 0x00000004
 pub let FNDELAY: c_int = 0x00000004

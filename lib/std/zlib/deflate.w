@@ -2669,7 +2669,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: c_int) -
         (__ci_expr_ternary_24 = need_more)
     }
 
-    return __ci_expr_ternary_24
+    return ((__ci_expr_ternary_24 as i32))
 
 
 }
@@ -3974,7 +3974,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
                 (__local_init = ((258 as c_ulong)))
             }
 
-            with_memset(((((unsafe *__param_s).window + (__local_curr as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((__local_init as c_uint) as i64))
+            with_memset(((((unsafe *__param_s).window + (__local_curr as usize)) as *mut c_void) as *mut u8), (0 as c_int), (((__local_init as c_uint) as c_ulong) as i64))
 
             ((unsafe *__param_s).high_water = ((((__local_curr as c_ulong) +% (__local_init as c_ulong)) as c_ulong)))
 
@@ -3986,7 +3986,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) -> Unit {
                     (__local_init = (((((unsafe *__param_s).window_size as c_ulong) -% ((unsafe *__param_s).high_water as c_ulong)) as c_ulong)))
                 }
 
-                with_memset(((((unsafe *__param_s).window + ((unsafe *__param_s).high_water as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((__local_init as c_uint) as i64))
+                with_memset(((((unsafe *__param_s).window + ((unsafe *__param_s).high_water as usize)) as *mut c_void) as *mut u8), (0 as c_int), (((__local_init as c_uint) as c_ulong) as i64))
 
                 ((unsafe *__param_s).high_water = ((unsafe *__param_s).high_water +% __local_init))
 

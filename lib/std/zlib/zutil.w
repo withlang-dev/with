@@ -124,7 +124,7 @@ pub fn zError(__param_err: c_int) -> *const i8 {
         (__ci_expr_ternary_1 = (((2 - __param_err) as c_int)))
     }
 
-    return z_errmsg[__ci_expr_ternary_1]
+    return ((z_errmsg[__ci_expr_ternary_1] as *const i8))
 
 
 }

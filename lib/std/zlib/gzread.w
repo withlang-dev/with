@@ -68,7 +68,7 @@ pub unsafe fn gzread(__param_file: *mut gzFile_s, __param_buf: *mut c_void, __pa
 
 
         if (__local_state.again != 0) {
-            gz_error(__local_state, (-1 as c_int), (strerror(((unsafe *(__error())) as c_int)) as *const i8))
+            gz_error(__local_state, (-1 as c_int), (strerror((unsafe *(__error()))) as *const i8))
 
             return -1
 
@@ -173,14 +173,14 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
     }
 
     if (__ci_expr_logic_1 != 0) {
-        return null
+        return ((null as *mut i8))
     }
 
 
     (__local_state = ((__param_file as *mut gz_state)))
 
     if ((if __local_state.mode != 7247: 1 else: 0) != 0) {
-        return null
+        return ((null as *mut i8))
     }
 
     var __ci_expr_logic_3: c_int = 0
@@ -196,7 +196,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
     }
 
     if (__ci_expr_logic_3 != 0) {
-        return null
+        return ((null as *mut i8))
     }
 
 
@@ -209,7 +209,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
     }
 
     if (__ci_expr_logic_4 != 0) {
-        return null
+        return ((null as *mut i8))
     }
 
 
@@ -279,12 +279,12 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
     }
 
     if ((if __local_buf == __local_str: 1 else: 0) != 0) {
-        return null
+        return ((null as *mut i8))
     }
 
     ((unsafe __local_buf[0]) = ((0 as c_char)))
 
-    return __local_str
+    return ((__local_str as *mut i8))
 
 }
 
@@ -331,7 +331,7 @@ pub unsafe fn gzgetc(__param_file: *mut gzFile_s) -> c_int {
 
         (__local_state.x.next = (unsafe *(&raw const __local_state.x as *const gzFile_s)).next + 1)
 
-        return (unsafe *__ci_expr_old_2)
+        return (((unsafe *__ci_expr_old_2) as c_int))
 
 
     }
@@ -608,7 +608,7 @@ unsafe fn gz_load(__param_state: *mut gz_state, __param_buf: *mut u8, __param_le
         }
 
 
-        gz_error(__param_state, (-1 as c_int), (strerror(((unsafe *(__error())) as c_int)) as *const i8))
+        gz_error(__param_state, (-1 as c_int), (strerror((unsafe *(__error()))) as *const i8))
 
         return -1
 
