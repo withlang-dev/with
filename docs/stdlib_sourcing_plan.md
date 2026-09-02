@@ -45,6 +45,17 @@ Outside the corpora, written natively: graph algorithms and union-find
 free list (#936 — no mature C library ships generational slot maps), and the
 intrinsic-integrated Vec and str, which stay as they are.
 
+**The sourcing rule** (Eric, 2026-09-02): migrate-and-facade for
+*libraries* whose value is breadth, upstream tests, and tracking upstream
+releases — pcre2, zlib, the container corpora. Hand-port and own for
+*runtime and low-level primitives* that are small, stable, and entangled
+with assembly or the allocator: the fiber switch (minicoro is the
+reference to port from, not a corpus; `runtime/fiber_asm_*.s` already
+exists), the crypto primitives (`lib/std/crypto`, 2.5k lines in BearSSL's
+image against 59k of upstream, of which we use only the primitives — held
+to upstream's known-answer vectors as fixtures rather than to a migrated
+corpus), and the allocator.
+
 To confirm at pin time, not from memory: TommyDS's exact license text (its
 `COPYING`), and that c-algorithms is `void*` + comparator callbacks
 throughout (expected; it determines facade shape).
