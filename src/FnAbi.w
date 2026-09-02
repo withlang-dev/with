@@ -91,6 +91,15 @@ pub fn codegen_is_runtime_abi_symbol(base_name: &str) -> bool:
 pub fn codegen_preserve_runtime_link_name(source_path: &str, base_name: &str) -> bool:
     codegen_is_runtime_source_file(source_path) and codegen_is_runtime_abi_symbol(base_name)
 
+// The prefix every module-qualified symbol of `source_path` carries:
+// `__with_mod_<hash(canonical module path)>__`. A .wo bundle's manifest lists
+// one per module; an undefined symbol starting with it is that bundle's.
+pub fn fn_abi_module_link_prefix(source_path: &str) -> str:
+    let canonical_path = codegen_canonical_module_path(source_path)
+    if canonical_path.len() == 0 or canonical_path == "<unknown>":
+        return ""
+    "__with_mod_" ++ codegen_hash_name_component(with_str_hash(canonical_path) as i64) ++ "__"
+
 // A function's link name when objects are built per module:
 // __with_mod_<hash(canonical module path)>__<base>. Runtime ABI symbols keep
 // their bare names; whole-program mode keeps every base name.

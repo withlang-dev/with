@@ -18,6 +18,8 @@ use compiler.Frontend
 use compiler.Link
 use compiler.ProjectConfig
 use compiler.DriverOptions
+use compiler.AbiStamp
+use FnAbi
 use compiler.Zcu
 use compiler.Runtime
 use Overflow
@@ -326,6 +328,10 @@ type Compilation {
     last_link_command_available: i32,
     last_link_command: LinkStageCommand,
     last_link_rc: i32,
+    // D38: `--link-object` paths for this build's link (see build_binary_to_path).
+    link_objects: Vec[str],
+    // D38: `--emit-bundle-manifest` path for emit_object_to_path ("" = none).
+    bundle_manifest_path: str,
 }
 
 type CompilationBinaryLinkPlan {
@@ -350,6 +356,8 @@ pub fn Compilation.init -> Compilation:
         last_link_command_available: 0,
         last_link_command: link_stage_empty_command(),
         last_link_rc: 0,
+        link_objects: Vec.new(),
+        bundle_manifest_path: "",
     }
 
 impl Compilation:
@@ -366,6 +374,8 @@ impl Compilation:
         self.set_debug_info(options.debug_info)
         self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
         self.set_target_kind(options.target_kind)
+        self.link_objects = driver_clone_str_vec(&options.link_objects)
+        self.bundle_manifest_path = with_str_clone_ref(options.bundle_manifest_path)
 
     // Install the --target selection (§18.5) before any parse or
     // codegen: @[target] guards, comptime sysinfo, C-ABI decisions,
@@ -933,7 +943,12 @@ impl Compilation:
         for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
             all_link_libs.push(with_str_clone_ref(self.zcu.project_config.dep_link_libs.get(dli as i64)))
         var _sp_dla = move self.zcu.project_config.dep_link_args
-        let unit_objects = codegen_unit_extra_objects(obj_path, self.zcu.last_codegen_unit_count)
+        var unit_objects = codegen_unit_extra_objects(obj_path, self.zcu.last_codegen_unit_count)
+        // D38: `--link-object` objects (a stage link's .wo bundles) join the
+        // link exactly as codegen units do — full linker inputs, probed for
+        // undefined symbols like any other unit.
+        for loi in 0..self.link_objects.len() as i32:
+            unit_objects.push(with_str_clone_ref(self.link_objects.get(loi as i64)))
         // D30 R2c: this compile emitted the runtime in-unit iff the lane is
         // on AND the frontend actually parsed the rt prefix (prelude on).
         let rt_in_unit = if runtime_getenv("WITH_RT_IN_UNIT").len() > 0 and self.config.prelude_mode != PRELUDE_NONE(): 1 else: 0
@@ -1006,7 +1021,40 @@ impl Compilation:
         if backend_rc != 0:
             compilation_remove_file_best_effort(obj_path)
             return ""
+        if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path):
+            compilation_remove_file_best_effort(obj_path)
+            return ""
         with_str_clone_ref(obj_path)
+
+    // D38 (docs/wo_bundles.md): the .wo manifest for the object just emitted —
+    // the compiler's ABI identity, the target, the object's file name, and one
+    // link-name prefix per module compiled in (the on-demand link predicate
+    // and the link-time interface check). build.w adds the bundle name, the
+    // key, and the corpus hash it computed.
+    mut fn write_bundle_manifest(obj_path: &str) -> bool:
+        if not compiler_abi_sha_is_stamped():
+            with_eprint("error: --emit-bundle-manifest: this compiler carries no ABI stamp (unstamped binary); a bundle key needs one")
+            return false
+        var text = "abi-sha " ++ compiler_abi_sha() ++ "\n"
+        text = text ++ "target " ++ target_spec_name() ++ "\n"
+        text = text ++ "object " ++ link_stage_basename(obj_path) ++ "\n"
+        let seen: Vec[str] = Vec.new()
+        for pi in 0..self.zcu.decl_source_paths.len() as i32:
+            let path = self.zcu.decl_source_paths.get(pi as i64)
+            if path.len() == 0:
+                continue
+            let prefix = fn_abi_module_link_prefix(path)
+            if prefix.len() == 0 or seen.contains(prefix):
+                continue
+            seen.push(with_str_clone_ref(prefix))
+            text = text ++ "prefix " ++ prefix ++ " " ++ path ++ "\n"
+        if seen.len() == 0:
+            with_eprint("error: --emit-bundle-manifest: no module-qualified symbols in " ++ obj_path)
+            return false
+        if runtime_write_file(self.bundle_manifest_path, text) != 0:
+            with_eprint("error: could not write bundle manifest: " ++ self.bundle_manifest_path)
+            return false
+        true
 
     mut fn emit_object_to_path_with_build_settings(source_path: &str, obj_path: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> str:
         let output_dir = link_stage_dirname(obj_path)

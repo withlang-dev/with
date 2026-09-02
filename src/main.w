@@ -31,6 +31,7 @@ use InitTemplates
 use BuildGraphRuntime
 use BuildGraphCache
 use compiler.DriverOptions
+use compiler.AbiStamp
 use Analysis
 use ReceiverMigration
 use TargetSpec
@@ -938,6 +939,11 @@ fn run_cli(argc: i32) -> i32:
         // across commits — every commit used to change out/gen/main.w and
         // force a full recompile (see docs/decisions.md D13).
         // Read null-terminated so trailing slot padding never reaches stdout.
+        if cli_has_flag(argc, "--abi-sha"):
+            // D38: the ABI identity this compiler was linked with (compiler.AbiStamp).
+            with_write(compiler_abi_sha())
+            with_write("\n")
+            return 0
         with_write("with ")
         with_write(with_str_from_cstr(c"WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX".ptr))
         with_write("\n")

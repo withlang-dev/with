@@ -42,6 +42,13 @@ pub type BuildCommandOptions {
     include_paths: Vec[str],
     defines: Vec[str],
     link_libs: Vec[str],
+    // D38: extra objects handed straight to the link (`--link-object <path>`,
+    // repeatable) — how build.w gives a stage link its .wo bundle objects.
+    link_objects: Vec[str],
+    // D38: with --emit-obj, also write the .wo bundle manifest here
+    // (`--emit-bundle-manifest <path>`): the compiler's abi-sha, the target,
+    // and one link-name prefix per module compiled into the object.
+    bundle_manifest_path: str,
     compiler_hooks_enabled: bool,
 }
 
@@ -116,6 +123,8 @@ pub fn build_command_options_default -> BuildCommandOptions:
         include_paths: Vec.new(),
         defines: Vec.new(),
         link_libs: Vec.new(),
+        link_objects: Vec.new(),
+        bundle_manifest_path: "",
         compiler_hooks_enabled: true,
     }
 
@@ -149,6 +158,8 @@ pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOp
         include_paths: driver_clone_str_vec(&base.include_paths),
         defines: driver_clone_str_vec(&base.defines),
         link_libs: driver_clone_str_vec(&base.link_libs),
+        link_objects: driver_clone_str_vec(&base.link_objects),
+        bundle_manifest_path: with_str_clone_ref(base.bundle_manifest_path),
         compiler_hooks_enabled: base.compiler_hooks_enabled,
     }
 
@@ -199,6 +210,18 @@ fn driver_has_flag(argc: i32, flag: &str) -> bool:
             return true
         i = i + 1
     false
+
+// Every value following an occurrence of `flag` (`--flag a --flag b` → [a, b]).
+fn driver_flag_values(argc: i32, flag: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    var i = 1
+    while i + 1 < argc:
+        if with_arg_at(i) == flag:
+            out.push(with_arg_at(i + 1))
+            i = i + 2
+            continue
+        i = i + 1
+    out
 
 fn driver_build_source_arg(argc: i32) -> str:
     var i = 2
@@ -434,6 +457,17 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
         build.output_kind = BuildOutputKind.C
     else if emit_obj:
         build.output_kind = BuildOutputKind.Object
+    build.link_objects = driver_flag_values(argc, "--link-object")
+    let manifest_paths = driver_flag_values(argc, "--emit-bundle-manifest")
+    if manifest_paths.len() > 0:
+        if not emit_obj:
+            return BuildCommandParseResult {
+                ok: false,
+                error_msg: "--emit-bundle-manifest requires --emit-obj",
+                build,
+                graph,
+            }
+        build.bundle_manifest_path = with_str_clone_ref(manifest_paths.get(0))
 
     graph.selected_target = driver_build_target_arg(argc)
     graph.graph_only = driver_has_flag(argc, "--graph")

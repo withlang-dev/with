@@ -1,5 +1,7 @@
 use Archive
 use compiler.Runtime
+use compiler.EmbeddedBundles
+use compiler.AbiStamp
 use std.collections.Atomic
 use TargetSpec
 
@@ -900,6 +902,100 @@ fn link_stage_undefined_symbols_need_regex_runtime(undef: &str) -> i32:
         return 1
     0
 
+// ── .wo bundles (docs/wo_bundles.md, D38) ─────────────────────────────
+
+// The value of the first manifest line `key <value>…` ("" if absent).
+fn link_stage_bundle_manifest_field(manifest: &str, key: &str) -> str:
+    let want = key ++ " "
+    var start: i64 = 0
+    while start < manifest.len():
+        var end = start
+        while end < manifest.len() and manifest.byte_at(end) != '\n':
+            end = end + 1
+        let line = manifest.slice(start, end)
+        if line.starts_with(want):
+            let rest = line.slice(want.len(), line.len())
+            var sp: i64 = 0
+            while sp < rest.len() and rest.byte_at(sp) != ' ':
+                sp = sp + 1
+            return rest.slice(0, sp)
+        start = end + 1
+    ""
+
+// True when an undefined symbol carries one of the manifest's module prefixes.
+fn link_stage_bundle_needed(manifest: &str, undef: &str) -> bool:
+    if undef == "<probe-failed>":
+        return true
+    if undef.len() == 0:
+        return false
+    var start: i64 = 0
+    while start < manifest.len():
+        var end = start
+        while end < manifest.len() and manifest.byte_at(end) != '\n':
+            end = end + 1
+        let line = manifest.slice(start, end)
+        if line.starts_with("prefix "):
+            let rest = line.slice(7, line.len())
+            var sp: i64 = 0
+            while sp < rest.len() and rest.byte_at(sp) != ' ':
+                sp = sp + 1
+            if sp > 0 and link_stage_str_contains(undef, rest.slice(0, sp)):
+                return true
+        start = end + 1
+    false
+
+// Atomic extraction of an embedded blob (the runtime-object discipline: a
+// complete matching file is reused, else unique temp + rename).
+fn link_stage_extract_blob(data: &str, path: &str) -> i32:
+    if data.len() == 0:
+        return 1
+    let existing = runtime_read_file(path)
+    if existing.len() == data.len() and existing == data:
+        return 0
+    let tmp_path = path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.tmp"
+    if runtime_write_file(tmp_path, data) != 0:
+        return 1
+    if runtime_rename(tmp_path, path) != 0:
+        let _ = runtime_remove_file(tmp_path)
+        let after = runtime_read_file(path)
+        if after.len() == data.len() and after == data:
+            return 0
+        return 1
+    0
+
+// The extracted objects of every embedded bundle the program needs, in index
+// order. A needed bundle whose abi-sha differs from this compiler's, or one
+// that cannot be extracted, yields the single marker LINK_BUNDLE_FAILED
+// (already reported) so the caller fails the plan.
+fn LINK_BUNDLE_FAILED -> str: "<bundle-failed>"
+
+fn link_stage_select_embedded_bundles(undef: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let count = embedded_bundle_count()
+    if count == 0:
+        return out
+    let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
+    for bi in 0..count:
+        let manifest = link_stage_embedded_obj_slice(embedded_bundle_manifest_start(bi) as *const u8, embedded_bundle_manifest_end(bi) as *const u8)
+        if not link_stage_bundle_needed(manifest, undef):
+            continue
+        let name = embedded_bundle_name(bi)
+        let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
+        if bundle_abi != compiler_abi_sha():
+            with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
+            let failed: Vec[str] = Vec.new()
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        let obj_path = tmp_dir ++ "/wo_" ++ name ++ ".o"
+        let data = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
+        if runtime_mkdir_p(tmp_dir) != 0 or link_stage_extract_blob(data, obj_path) != 0:
+            with_eprint("error: could not extract embedded bundle '" ++ name ++ "' to " ++ obj_path)
+            let failed: Vec[str] = Vec.new()
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        out.push(obj_path)
+    out
+
 fn link_stage_undefined_symbols_need_compat_runtime(undef: &str) -> i32:
     if undef == "<probe-failed>":
         return 1
@@ -1187,6 +1283,14 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     let needs_fiber_runtime = if needs_async_runtime: 1 else: link_stage_undefined_symbols_need_fiber_runtime(undef)
     let needs_regex_runtime = link_stage_undefined_symbols_need_regex_runtime(undef)
     let needs_compat_runtime = link_stage_undefined_symbols_need_compat_runtime(undef)
+    // D38: embedded .wo bundles join on demand — an undefined symbol carrying
+    // one of a bundle's module prefixes selects it; its abi-sha must equal this
+    // compiler's (never a silent mixed-ABI link, #761).
+    let bundle_objects = link_stage_select_embedded_bundles(undef)
+    if bundle_objects.len() == 1 and bundle_objects.get(0) == LINK_BUNDLE_FAILED():
+        return link_stage_plan_fail()
+    for boi in 0..bundle_objects.len() as i32:
+        extras.push(with_str_clone_ref(bundle_objects.get(boi as i64)))
     if needs_fiber_runtime != 0 and link_stage_rt_in_unit() != 0:
         // Runtime emitted in-unit: the asm-defined with_fiber_* symbols
         // still trip the predicate, but only fiber_asm.o may link — the

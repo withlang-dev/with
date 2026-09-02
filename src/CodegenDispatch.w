@@ -53,6 +53,10 @@ impl Codegen:
         if self.sema.generic_fn_node_for_symbol(fn_sym) != 0:
             if not self.fn_values.get(fn_sym).is_some():
                 return
+        // D38: a function an embedded .wo bundle provides is declared only —
+        // its body is the bundle's object, selected at link time.
+        if self.fn_is_bundle_provided(fn_sym):
+            return
         let body_idx = self.mir_find_body_idx(fn_sym)
         if body_idx >= 0:
             let body = self.mir_body_at(body_idx as i64)

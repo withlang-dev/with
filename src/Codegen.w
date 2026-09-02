@@ -19,6 +19,7 @@ use compiler.LlvmBridge.*
 use Overflow
 use TargetSpec
 use FnAbi
+use compiler.EmbeddedBundles
 use AnalysisTypes
 
 extern fn exit(code: i32) -> Unit
@@ -298,6 +299,11 @@ type Codegen {
     decl_source_paths: Vec[str],
     current_decl_source_file: str,
     module_object_mode: i32,
+    // D38: module link-name prefixes provided by embedded .wo bundles; loaded
+    // once on first use. A function from such a module is declared, never
+    // defined, in this unit (docs/wo_bundles.md "Declarations only").
+    bundle_prefixes: Vec[str],
+    bundle_prefixes_loaded: i32,
 
     // Loop stack (fixed-size arrays via Vec)
     loop_break_bbs: Vec[i64],
@@ -935,6 +941,8 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         decl_source_paths: Vec.new(),
         current_decl_source_file: "<unknown>",
         module_object_mode: 0,
+        bundle_prefixes: Vec.new(),
+        bundle_prefixes_loaded: 0,
         loop_break_bbs: Vec.new(),
         loop_continue_bbs: Vec.new(),
         loop_result_allocas: Vec.new(),
@@ -4156,6 +4164,20 @@ impl Codegen:
 impl Codegen:
     fn module_link_name_for_path(source_path: &str, base_name: &str) -> str:
         fn_abi_module_link_name(self.module_object_mode, source_path, base_name)
+
+    // D38: is this Sema function defined by a module an embedded .wo bundle
+    // provides? Then this unit declares it and the bundle's object defines it.
+    mut fn fn_is_bundle_provided(sema_sym: i32) -> bool:
+        if self.bundle_prefixes_loaded == 0:
+            self.bundle_prefixes = embedded_bundle_prefixes()
+            self.bundle_prefixes_loaded = 1
+        if self.bundle_prefixes.len() == 0:
+            return false
+        let path_opt = self.sema.fn_decl_source_paths.get(sema_sym)
+        if path_opt.is_none():
+            return false
+        let prefix = fn_abi_module_link_prefix(path_opt.unwrap())
+        prefix.len() > 0 and self.bundle_prefixes.contains(prefix)
 
     fn current_decl_module_link_name(base_name: &str) -> str:
         self.module_link_name_for_path(self.current_decl_source_file, base_name)

@@ -1533,6 +1533,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedRuntimeData.w")
+    // D38: the embedded .wo bundle index (empty until the first bundle; each
+    // embedded bundle is named as an arg here and carried as blobs by the
+    // embedded-objects target).
+    compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedBundlesData.w")
     compat_runtime = compat_runtime.input(build_owned_text(host_runtime.compat_source))
     compat_runtime = target_with_embedded_stdlib_inputs(move compat_runtime, ctx)
     compat_runtime = target_with_embedded_runtime_inputs(move compat_runtime, ctx)

@@ -15,6 +15,14 @@ const COMPILER_FALLBACK_LLVM_PREFIX: str = "/usr/local/llvm"
 const COMPILER_VERSION_SENTINEL: str = "WITHVERSIONSTAMPv1"
 const COMPILER_VERSION_SLOT_WIDTH: i32 = 48
 const COMPILER_VERSION_SOURCE_SLOT: str = "WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+// D38 / docs/wo_bundles.md: the compiler bakes in the sha256 of
+// docs/with-abi.sha256 (the recorded hashes of the ABI-defining sources) the
+// same way it bakes in its version — a post-link byte patch of a sentinel
+// slot. `with version --abi-sha` prints it; .wo bundle keys and link-time
+// bundle checks compare against it.
+const COMPILER_ABI_SHA_SENTINEL: str = "WITHABISHASTAMPv1"
+const COMPILER_ABI_SHA_SLOT_WIDTH: i32 = 82
+const COMPILER_ABI_SHA_RECORD: str = "docs/with-abi.sha256"
 
 type StackBudgetReport {
     path: str,
@@ -1496,6 +1504,22 @@ pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path:
         patched = patched + 1
     if patched == 0:
         return comp_fail(ctx, "version stamp sentinel not found in " ++ input_path)
+    // ABI identity: sha256 of the ABI hash record, into its own slot.
+    let abi_sha = fs.sha256_file(COMPILER_ABI_SHA_RECORD)
+    if abi_sha.len() != 64:
+        return comp_fail(ctx, "could not hash " ++ COMPILER_ABI_SHA_RECORD ++ " for the ABI stamp")
+    let abi_slot: i64 = COMPILER_ABI_SHA_SLOT_WIDTH as i64
+    var abi_patched = 0
+    loop:
+        let aoff = data.find(COMPILER_ABI_SHA_SENTINEL) as i64
+        if aoff < 0:
+            break
+        if aoff + abi_slot > data.len():
+            return comp_fail(ctx, "ABI stamp slot truncated at end of binary")
+        data = data.slice(0, aoff) ++ abi_sha ++ nul ++ data.slice(aoff + abi_sha.len() + 1, data.len())
+        abi_patched = abi_patched + 1
+    if abi_patched == 0:
+        return comp_fail(ctx, "ABI stamp sentinel not found in " ++ input_path)
     let output_dir = comp_dirname(output_path)
     if fs.mkdir_all(output_dir) != 0:
         return comp_fail(ctx, "could not create output directory: " ++ output_dir)

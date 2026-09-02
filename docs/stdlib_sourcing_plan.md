@@ -106,10 +106,12 @@ compiler build links the existing object instead of recompiling the
 corpus. The compiler embeds every bundle; user programs automatically
 link the ones they reference.
 
-Proposed layout (proposal, not ruling): the bundles' source checked in
-under `lib/vendor/<corpus>/` the way pcre2's lives in `lib/std/re/`,
-generated and never hand-edited; facades in `lib/std/collections.w` and a
-new `lib/std/algorithms.w`; a `corpora` battery lane that runs every
+Layout: each bundle's source is checked in under `lib/std/<corpus>/`
+exactly as pcre2's (`lib/std/re/`) and zlib's (`lib/std/zlib/`) are —
+generated, never hand-edited, and inside the embedded stdlib tree because a
+bundle's symbols hash the module's canonical `<embedded-std>/…` path
+(`docs/wo_bundles.md`, "Object build"); facades in `lib/std/collections.w`
+and a new `lib/std/algorithms.w`; a `corpora` battery lane that runs every
 bundle's upstream tests, plus the `wo-drift` lane from `docs/wo_bundles.md`.
 
 ## Facade rules
