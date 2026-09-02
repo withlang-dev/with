@@ -1,6 +1,7 @@
 use std.build
 use build.runtime
 use build.selfhost
+use build.abi
 use build.pcre2
 use build.zlib
 use build.seed
@@ -2245,6 +2246,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     deep_debug_tool_tests = deep_debug_tool_tests.write_scope("out/deep-debug-tool-tests")
     out = out.add_target(deep_debug_tool_tests)
 
+    // D38: the ABI-defining sources' recorded hash must match — an ABI change
+    // without a WITH_ABI_VERSION bump fails the battery (docs/with-abi.md §7).
+    var abi_hash_check = target_new(.Action, "abi-hash-check", "").output("out/abi-hash-check/stamp")
+    abi_hash_check = abi_hash_check.allow_parallel()
+    abi_hash_check.action = run_abi_hash_check_action
+    abi_hash_check = abi_hash_check.input("src/FnAbi.w")
+    abi_hash_check = abi_hash_check.input("src/TypeLayout.w")
+    abi_hash_check = abi_hash_check.input("docs/with-abi.sha256")
+    abi_hash_check = abi_hash_check.write_scope("out/abi-hash-check")
+    out = out.add_target(abi_hash_check)
+
     var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
     native_compile_error_tests = native_compile_error_tests.allow_parallel()
     native_compile_error_tests = native_compile_error_tests.arg("compiler=" ++ release_compiler_bin("with"))
@@ -2452,6 +2464,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("lexer-tests")
     tests = tests.dep("parser-tests")
     tests = tests.dep("deep-debug-tool-tests")
+    tests = tests.dep("abi-hash-check")
     tests = tests.dep("cli-selfhost-smoke-tests")
     tests = tests.dep("cli-selfhost-one-liner-tests")
     tests = tests.dep("cli-selfhost-fmt-tests")

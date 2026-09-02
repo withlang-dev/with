@@ -3,9 +3,10 @@
 Status: DRAFT v1 (2026-09-02), the convention as the compiler implements
 it today, written down so `.wo` bundles (decisions.md D38,
 `docs/wo_bundles.md`) can depend on it. Nothing here is a new rule. The
-sources named in §7 define the ABI; this document describes them. When one
-of them changes the convention, `WITH_ABI_VERSION` bumps and this document
-gets a new section.
+sources named in §7 define the ABI; this document describes them, and at
+Level 0 of `docs/abi_roadmap.md` their sha256 — not a version number — is
+what keys a bundle. `WITH_ABI_VERSION` labels the version history below;
+it becomes a frozen, normative major version at Level 1.
 
 This is With's own calling convention. It is not a C ABI and exposes none
 (`@[c_export]` is for foreign callers and does not appear in the compiler).
@@ -134,13 +135,23 @@ executable.
 - the LLVM version and target triple the object is built for (part of
   the `.wo` key, not of the version number).
 
-**Enforcement** (`docs/wo_bundles.md`): these rules move out of the large
-files into ABI-owned modules (`src/FnAbi.w` for §4–5 alongside
-`src/TypeLayout.w`; the runtime header sections already sit together), a
-recorded sha256 of those files is checked in next to this document, and a
-battery target fails when the hash changes without a `WITH_ABI_VERSION`
-bump. Non-ABI edits to `Codegen.w` then never trip it, and an ABI edit
-cannot land unnoticed.
+**Enforcement** (implemented): the §4–5 rules live in `src/FnAbi.w`
+(`WITH_ABI_VERSION`, the `PM_*` modes, `fn_abi_pass_mode`,
+`fn_abi_platform_aggregate_indirect`, the symbol-naming rules), with
+one-line adapters left on `Codegen`; §2 lives in `src/TypeLayout.w`.
+`docs/with-abi.sha256` records both files' sha256 (`shasum -a 256`
+format), and the `abi-hash-check` action in `build.w` (`build/abi.w`,
+part of `:test`) fails when a recorded hash no longer matches. To change
+the convention: edit the rule, bump `WITH_ABI_VERSION`, add a
+version-history entry, re-record the hashes. A comment-only or refactor
+edit re-records without a bump. Non-ABI edits to `Codegen.w` never trip
+it.
+
+Not yet under the hash: the runtime header layouts (§3) and drop glue
+(§6) still sit inside `rt/rt_core.w` and `CodegenDispatch.w`, which
+change for non-ABI reasons too often to hash whole. They move under an
+ABI-owned file when D30's in-unit runtime retirement lands; until then a
+layout change there is caught by the `wo-drift` lane, not by this check.
 
 ## Version history
 

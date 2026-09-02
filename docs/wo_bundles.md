@@ -62,16 +62,18 @@ the compiler. Today `FnAbi`, the `str`/`Vec` headers, view
 representations, the drop protocol, and mangling may change with any
 commit. For `.wo` they change only deliberately:
 
-- `docs/with-abi.md` names the boundary rules and a `WITH_ABI_VERSION`
-  constant in the compiler.
-- The `.wo` object key is `corpus content sha × target × WITH_ABI_VERSION`
-  and nothing else. The compiler generation is not in the key.
-- A commit that changes an ABI-defining rule bumps the version; every
-  `.wo` is then rebuilt once from its bundled source.
-- **The bump is enforced, not remembered.** The battery hashes the
-  ABI-defining sources (`compute_fn_abi`, layout, the header types, view
-  representations, mangling, drop glue) and fails when that hash changes
-  without a version bump — the fixpoint discipline applied to the ABI.
+- `docs/with-abi.md` names the boundary rules; the rules live in
+  ABI-owned files (`src/FnAbi.w`, `src/TypeLayout.w`).
+- The `.wo` object key is `corpus content sha × target × sha256(ABI-defining
+  sources)` and nothing else (`docs/abi_roadmap.md`, Level 0). The compiler
+  generation is not in the key. An edit to an ABI-defining file changes
+  the key, so every `.wo` is rebuilt once, automatically; nothing has to
+  be remembered. `WITH_ABI_VERSION` is a documentation label.
+- **Creep is enforced, not remembered.** The `abi-hash-check` battery
+  target compares the recorded hashes (`docs/with-abi.sha256`) with the
+  files, so an ABI-affecting rule cannot move into an unhashed file, and a
+  legitimate change re-records the hash consciously — the fixpoint
+  discipline applied to the ABI.
 
 Inside a `.wo` nothing is constrained: it was compiled as one unit by one
 compiler.

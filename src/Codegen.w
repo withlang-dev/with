@@ -18,6 +18,7 @@ use Resolve
 use compiler.LlvmBridge.*
 use Overflow
 use TargetSpec
+use FnAbi
 use AnalysisTypes
 
 extern fn exit(code: i32) -> Unit
@@ -4148,55 +4149,13 @@ impl Codegen:
         let name = self.intern.resolve(sym)
         if name.len() > 0:
             return with_str_clone_ref(name)
-        f"__fn_{sym}"
+        fn_abi_anonymous_symbol(sym)
 
-fn codegen_hash_name_component(value: i64) -> str:
-    if value < 0:
-        return "n" ++ f"{0 - value}"
-    f"{value}"
-
-fn codegen_canonical_module_path(path: &str) -> str:
-    if path.len() == 0 or path == "<unknown>":
-        return with_str_clone_ref(path)
-    if path.byte_at(0) == 60:
-        return with_str_clone_ref(path)
-    if path.byte_at(0) == 47:
-        return resolve_normalize_path(path)
-    let cwd = with_getenv_str("PWD")
-    if cwd.len() == 0:
-        return resolve_normalize_path(path)
-    resolve_join(cwd, path)
-
-fn codegen_is_runtime_source_file(source_path: &str) -> bool:
-    source_path.starts_with("rt/") or source_path.contains("/rt/") or
-        source_path.starts_with("rt\\") or source_path.contains("\\rt\\") or
-        source_path == "out/gen/compat_runtime.w" or
-        source_path == "out\\gen\\compat_runtime.w" or
-        source_path.ends_with("/out/gen/compat_runtime.w") or
-        source_path.ends_with("\\out\\gen\\compat_runtime.w")
-
-fn codegen_is_runtime_abi_symbol(base_name: &str) -> bool:
-    if base_name.starts_with("with_") or base_name.starts_with("rt_") or base_name.starts_with("wl_"):
-        return true
-    base_name == "__error" or base_name == "__open" or
-        base_name == "gethostname" or base_name == "pthread_self" or
-        base_name == "mkstemp" or base_name == "realpath" or
-        base_name == "i32_to_str" or base_name == "i64_to_string" or
-        base_name == "str_from_byte"
-
-fn codegen_preserve_runtime_link_name(source_path: &str, base_name: &str) -> bool:
-    codegen_is_runtime_source_file(source_path) and codegen_is_runtime_abi_symbol(base_name)
-
+// Symbol-naming rules live in src/FnAbi.w (docs/with-abi.md §5); this is
+// the adapter that feeds them the codegen mode.
 impl Codegen:
     fn module_link_name_for_path(source_path: &str, base_name: &str) -> str:
-        if self.module_object_mode == 0:
-            return with_str_clone_ref(base_name)
-        if codegen_preserve_runtime_link_name(source_path, base_name):
-            return with_str_clone_ref(base_name)
-        let canonical_path = codegen_canonical_module_path(source_path)
-        if canonical_path.len() == 0 or canonical_path == "<unknown>":
-            return with_str_clone_ref(base_name)
-        "__with_mod_" ++ codegen_hash_name_component(with_str_hash(canonical_path) as i64) ++ "__" ++ base_name
+        fn_abi_module_link_name(self.module_object_mode, source_path, base_name)
 
     fn current_decl_module_link_name(base_name: &str) -> str:
         self.module_link_name_for_path(self.current_decl_source_file, base_name)
@@ -4660,17 +4619,13 @@ impl Codegen:
         self.current_method_owner_sym = saved_owner
 
 // #D6: PassMode — the per-parameter ABI classification, the SINGLE source of
-// truth. `arg_pass_mode` computes it; both the callee prologue
-// (declare_function_from_sig) and every call site read it, so caller and callee
-// can never disagree on how an argument is passed (that disagreement is exactly
-// the transparent T*/T** bug). Extend the classification HERE, never per-path.
-// See decisions.md D6, docs/fn_abi_descriptor_design.md.
-//   PM_DIRECT         = by value (Copy / scalar / small aggregate)
-//   PM_INDIRECT       = pointer to a callee-owned copy (byval, Windows-x86_64)
-//   PM_INDIRECT_PLACE = pointer to the CALLER's place (share-place / value_ref_abi)
-const PM_DIRECT: i32 = 0
-const PM_INDIRECT: i32 = 1
-const PM_INDIRECT_PLACE: i32 = 2
+// truth; the rule and the PM_* constants live in src/FnAbi.w
+// (docs/with-abi.md §4). `arg_pass_mode` feeds it Sema's share-place
+// verdict and the platform's aggregate rule; both the callee prologue
+// (declare_function_from_sig) and every call site read it, so caller and
+// callee can never disagree on how an argument is passed (that disagreement
+// is exactly the transparent T*/T** bug). Extend the classification THERE,
+// never per-path. See decisions.md D6, docs/fn_abi_descriptor_design.md.
 
 impl Codegen:
     mut fn abi_param_source_type(sig_idx: i32, pi: i32) -> i64:
@@ -4694,12 +4649,11 @@ impl Codegen:
         self.sema.get_type_kind(resolved) == TypeKind.TY_REF
 
     mut fn arg_pass_mode(sig_idx: i32, pi: i32) -> i32:
-        if self.sema.sig_param_uses_value_ref_abi(sig_idx, pi) != 0:
-            return PM_INDIRECT_PLACE
+        let uses_value_ref_abi = self.sema.sig_param_uses_value_ref_abi(sig_idx, pi)
+        if uses_value_ref_abi != 0:
+            return fn_abi_pass_mode(uses_value_ref_abi, false)
         let p_ty = self.abi_param_source_type(sig_idx, pi)
-        if self.internal_abi_needs_indirect_param(p_ty):
-            return PM_INDIRECT
-        PM_DIRECT
+        fn_abi_pass_mode(0, self.internal_abi_needs_indirect_param(p_ty))
 
     mut fn declare_function_from_sig(fn_sym: i32, sig_idx: i32, force_internal: i32):
         if fn_sym == 0 or sig_idx < 0:
@@ -4972,25 +4926,22 @@ fn codegen_windows_x86_64() -> bool:
     os == "Windows" and arch == "x86_64"
 
 impl Codegen:
+    // Both feed fn_abi_platform_aggregate_indirect (src/FnAbi.w) the facts it
+    // needs: the target, whether the LLVM type is an aggregate, and its size.
     mut fn internal_abi_needs_sret(ret_ty: i64) -> bool:
-        if not codegen_windows_x86_64():
-            return false
-        if ret_ty == 0:
-            return false
-        let kind = wl_get_type_kind(ret_ty)
-        if kind != wl_struct_type_kind() and kind != wl_array_type_kind():
-            return false
-        self.abi_size_of(ret_ty) > 8
+        self.internal_abi_aggregate_indirect(ret_ty)
 
     mut fn internal_abi_needs_indirect_param(param_ty: i64) -> bool:
-        if not codegen_windows_x86_64():
+        self.internal_abi_aggregate_indirect(param_ty)
+
+    mut fn internal_abi_aggregate_indirect(ty: i64) -> bool:
+        if not codegen_windows_x86_64() or ty == 0:
             return false
-        if param_ty == 0:
+        let kind = wl_get_type_kind(ty)
+        let is_aggregate = kind == wl_struct_type_kind() or kind == wl_array_type_kind()
+        if not is_aggregate:
             return false
-        let kind = wl_get_type_kind(param_ty)
-        if kind != wl_struct_type_kind() and kind != wl_array_type_kind():
-            return false
-        self.abi_size_of(param_ty) > 8
+        fn_abi_platform_aggregate_indirect(true, true, self.abi_size_of(ty))
 
     // #806/D6: the LLVM param type a fat-closure signature must declare for a
     // value of `val_ty`. A win64 aggregate >8B is passed indirectly (pointer):

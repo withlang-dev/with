@@ -23,10 +23,17 @@ this." Design: `docs/wo_bundles.md`.
 
 **Decision.** Each migrated corpus is a `.wo` bundle: its With source
 (the interface — generics, ownership modes, effects all visible to Sema),
-its migrated tests, and one With-native object per target and With ABI
-version. The object key is corpus content × target × `WITH_ABI_VERSION`;
-the compiler generation is not in the key, so a `.wo` is rebuilt only
-when the corpus or the ABI version changes. The compiler embeds every
+its migrated tests, and one With-native object per target and ABI. The
+object key is corpus content × target × sha256 of the ABI-defining
+sources (`src/FnAbi.w`, `src/TypeLayout.w`; `docs/with-abi.sha256`) —
+Go's toolchain-keyed cache applied to the ABI subset, after the reference
+survey (2026-09-02: Go, Rust, Zig key artifacts on the whole toolchain
+and recompile; only Swift promises cross-version stability, at the cost
+of resilience). The compiler generation is not in the key, so a `.wo` is
+rebuilt only when the corpus or an ABI rule changes, and no version
+number has to be remembered. The longer road to Swift-level stability is
+`docs/abi_roadmap.md` (Level 0 now, Level 1 frozen ABI at a release,
+Level 2 library evolution as a campaign). The compiler embeds every
 `.wo` and stays one standalone file; a user binary automatically links
 the `.wo` objects it references and is standalone too. The boundary
 convention is With's own (`FnAbi` pass modes, header types, mangling,
