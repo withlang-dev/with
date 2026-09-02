@@ -5,6 +5,7 @@ use pcre2
 use std.build
 use std.process
 use std.sysinfo
+use std.crypto.sha256
 fn selfhost_owned_text(s: &str): s ++ ""
 
 type SelfhostRunResult {
@@ -7725,22 +7726,96 @@ fn bs_dump_abi_pass_mode(line: &str) -> str:
         return ""
     selfhost_owned_text(line.slice(at as i64, line.len()))
 
+// The bundle build of one corpus module with the D39 emitter: the object,
+// the .wi (--emit-bundle-interface) and the source-side fingerprint.
+fn bs_build_bundle(ctx: &ActionCtx, compiler_path: &str, label: &str, src_path: &str, corpus: &str, obj_path: &str, wi_path: &str, fingerprint_path: &str) -> SelfhostRunResult:
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(selfhost_owned_text(src_path))
+    args |> push("--emit-obj")
+    args |> push("--bundle-corpus")
+    args |> push(selfhost_owned_text(corpus))
+    args |> push("--emit-bundle-interface")
+    args |> push(selfhost_owned_text(wi_path))
+    args |> push("--bundle-fingerprint")
+    args |> push(selfhost_owned_text(fingerprint_path))
+    args |> push("-O1")
+    args |> push("-o")
+    args |> push(selfhost_owned_text(obj_path))
+    bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+
+// `with check <wi> --bundle-corpus … --bundle-fingerprint <out>`: the
+// interface-side fingerprint pass, out of process like the bundle build's.
+fn bs_check_wi_fingerprint(ctx: &ActionCtx, compiler_path: &str, label: &str, wi_path: &str, corpus: &str, fingerprint_path: &str) -> SelfhostRunResult:
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(selfhost_owned_text(wi_path))
+    args |> push("--bundle-corpus")
+    args |> push(selfhost_owned_text(corpus))
+    args |> push("--bundle-fingerprint")
+    args |> push(selfhost_owned_text(fingerprint_path))
+    bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+
+// The sha on the first line of a --bundle-fingerprint output file.
+fn bs_fingerprint_sha(ctx: &ActionCtx, path: &str) -> str:
+    let lines = bs_split_nonempty_lines(ctx.fs().read_text(path))
+    if lines.len() == 0: "" else: selfhost_owned_text(lines.get(0))
+
+fn bs_sha256_text(text: &str) -> str:
+    var digest: [32]u8 = [0 as u8; 32]
+    sha256_hash_str(text, &raw mut digest[0] as *mut u8)
+    sha256_hex(&digest[0] as *const u8)
+
+// The first line at which two texts differ, for a byte-identity failure.
+fn bs_first_differing_line(expected: &str, actual: &str) -> str:
+    let a = expected.split("\n")
+    let b = actual.split("\n")
+    let n = if a.len() < b.len(): a.len() else: b.len()
+    for i in 0..n as i32:
+        if a.get(i as i64) != b.get(i as i64):
+            return f"line {i + 1}: expected '" ++ a.get(i as i64) ++ "' got '" ++ b.get(i as i64) ++ "'"
+    f"line counts differ: expected {a.len() as i32}, got {b.len() as i32}"
+
+// A refusal fixture: the emitter must fail loudly, naming the declaration.
+fn bs_expect_bundle_refusal(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, name: &str, needle: &str) -> i32:
+    let src = bs_join(case_dir, "lib/std/" ++ name ++ ".w")
+    let rc = bs_write_fixture(ctx, src, bs_bundle_interface_fixture(ctx, "lib/std/" ++ name ++ ".w"), "bundle refusal fixture " ++ name)
+    if rc != 0: return rc
+    let out = bs_join(case_dir, "refuse/" ++ name)
+    let result = bs_build_bundle(ctx, compiler_path, "bundle-refuse-" ++ name, src, "std/" ++ name, out ++ ".o", out ++ ".wi", out ++ ".fp")
+    if result.rc == 0:
+        return bs_fail(ctx, "expected --emit-bundle-interface to refuse " ++ name)
+    if ctx.fs().exists(out ++ ".wi"):
+        return bs_fail(ctx, "a refused bundle build must write no interface: " ++ out ++ ".wi")
+    bs_assert_contains(ctx, result.stderr, needle, "bundle refusal " ++ name)
+
 fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str, case_dir: &str) -> i32:
     let lib_src = bs_join(case_dir, "lib/std/wi_demo.w")
     let main_src = bs_join(case_dir, "main.w")
     let bundle = bs_join(case_dir, "store/wi_demo")
+    let corpus = "std/wi_demo"
     var rc = bs_write_fixture(ctx, lib_src, bs_bundle_interface_fixture(ctx, "lib/std/wi_demo.w"), "bundle interface demo module")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, main_src, bs_bundle_interface_fixture(ctx, "main.w"), "bundle interface consumer")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bundle ++ ".wi", bs_bundle_interface_fixture(ctx, "wi_demo.wi"), "bundle interface")
-    if rc != 0: return rc
 
-    // The bundle object, from the module's source: module-object mode names
-    // its symbols by the canonical <embedded-std>/std/wi_demo.w path.
+    // The bundle object, its interface and its fingerprint, from the
+    // module's source: module-object mode names its symbols by the canonical
+    // <embedded-std>/std/wi_demo.w path; the emitter prints the interface
+    // from the finalized Sema.
     let obj_path = bundle ++ ".o"
-    rc = bs_build_emit_obj(ctx, compiler_path, "bundle-interface-object", lib_src, obj_path)
-    if rc != 0: return rc
+    let wi_path = bundle ++ ".wi"
+    let source_fp = bs_join(case_dir, "fingerprint.source")
+    let built_bundle = bs_build_bundle(ctx, compiler_path, "bundle-interface-object", lib_src, corpus, obj_path, wi_path, source_fp)
+    if built_bundle.rc != 0: return bs_fail(ctx, f"bundle build (object + interface + fingerprint) failed with exit code {built_bundle.rc}")
+    // (3a) The emitter regenerates the hand-written interface byte for byte —
+    // the fixture is the expectation, never the other way round.
+    let expected_wi = bs_bundle_interface_fixture(ctx, "wi_demo.wi")
+    let emitted_wi = ctx.fs().read_text(wi_path)
+    if emitted_wi != expected_wi:
+        return bs_fail(ctx, "emitted wi_demo.wi differs from test/bundle_interface/wi_demo.wi: " ++ bs_first_differing_line(expected_wi, emitted_wi))
+    let source_sha = bs_fingerprint_sha(ctx, source_fp)
+    if source_sha.len() == 0: return bs_fail(ctx, "no source fingerprint written to " ++ source_fp)
     let obj_nm = bs_nm_output(ctx, nm_tool, obj_path, "bundle-interface-object")
     if obj_nm.rc != 0: return bs_fail(ctx, "nm failed for the bundle object")
     let prefix = bs_nm_module_prefix(obj_nm.stdout, "add")
@@ -7750,24 +7825,87 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_expect_nm_symbol(ctx, obj_nm.stdout, "bundle object defines TABLE", "", "__TABLE", "__with_mod_", "", "U")
     if rc != 0: return rc
 
-    // The manifest: this compiler's ABI identity and the object's prefix (a
-    // stamped compiler refuses any other abi-sha; a stage is unstamped).
+    // (3b) The interface-side fingerprint, from the emitted .wi in a second
+    // process, equals the source-side one.
+    let wi_fp = bs_join(case_dir, "fingerprint.wi")
+    let checked_wi = bs_check_wi_fingerprint(ctx, compiler_path, "bundle-interface-fingerprint-wi", wi_path, corpus, wi_fp)
+    if checked_wi.rc != 0: return bs_fail(ctx, f"check of the emitted interface with --bundle-fingerprint failed with exit code {checked_wi.rc}")
+    let wi_sha = bs_fingerprint_sha(ctx, wi_fp)
+    if wi_sha != source_sha:
+        return bs_fail(ctx, "fingerprint of the emitted interface (" ++ wi_sha ++ ") differs from the source fingerprint (" ++ source_sha ++ "); diff " ++ source_fp ++ ".tsv against " ++ wi_fp ++ ".tsv")
+
+    // (3c) Each declaration-level change to the interface changes the
+    // fingerprint: a dropped field, a discriminant, a borrow flipped to a
+    // consume.
+    var mutation_names: Vec[str] = Vec.new()
+    mutation_names |> push("drop-field")
+    mutation_names |> push("discriminant")
+    mutation_names |> push("ref-to-owned")
+    var mutation_from: Vec[str] = Vec.new()
+    mutation_from |> push("pub type Pair { a: i32, b: i32 }")
+    mutation_from |> push("High = 200")
+    mutation_from |> push("pub fn add(p: &Pair) -> i32")
+    var mutation_to: Vec[str] = Vec.new()
+    mutation_to |> push("pub type Pair { a: i32 }")
+    mutation_to |> push("High = 201")
+    mutation_to |> push("pub fn add(p: Pair) -> i32")
+    for mi in 0..mutation_names.len() as i32:
+        let mname = mutation_names.get(mi as i64)
+        if not emitted_wi.contains(mutation_from.get(mi as i64)):
+            return bs_fail(ctx, "mutation " ++ mname ++ ": the emitted interface lacks '" ++ mutation_from.get(mi as i64) ++ "'")
+        let mutated_path = bs_join(case_dir, "mutated/" ++ mname ++ ".wi")
+        rc = bs_write_fixture(ctx, mutated_path, emitted_wi.replace(mutation_from.get(mi as i64), mutation_to.get(mi as i64)), "mutated interface " ++ mname)
+        if rc != 0: return rc
+        let mutated_fp = mutated_path ++ ".fp"
+        let checked = bs_check_wi_fingerprint(ctx, compiler_path, "bundle-interface-mutation-" ++ mname, mutated_path, corpus, mutated_fp)
+        if checked.rc != 0: return bs_fail(ctx, f"check of the mutated interface ({mname}) failed with exit code {checked.rc}")
+        let mutated_sha = bs_fingerprint_sha(ctx, mutated_fp)
+        if mutated_sha.len() == 0 or mutated_sha == source_sha:
+            return bs_fail(ctx, "mutation " ++ mname ++ " left the fingerprint unchanged (" ++ mutated_sha ++ ")")
+
+    // The manifest: this compiler's ABI identity, the object, the
+    // fingerprint, the interface-sha --link-bundle pairs against, and the
+    // object's prefix (a stamped compiler refuses any other abi-sha; a stage
+    // is unstamped, so the manifest is written here).
     var abi_args: Vec[str] = Vec.new()
     abi_args |> push("version")
     abi_args |> push("--abi-sha")
     let abi = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-abi-sha", abi_args, 120000)
     if abi.rc != 0: return bs_fail(ctx, "with version --abi-sha failed")
-    let manifest = "abi-sha " ++ bs_trim_trailing_line_endings(abi.stdout) ++ "\nobject wi_demo.o\nprefix " ++ prefix ++ " <embedded-std>/std/wi_demo.w\n"
+    let manifest = "abi-sha " ++ bs_trim_trailing_line_endings(abi.stdout) ++ "\nobject wi_demo.o\nfingerprint " ++ source_sha ++ "\ninterface-sha " ++ bs_sha256_text(emitted_wi) ++ "\nprefix " ++ prefix ++ " <embedded-std>/std/wi_demo.w\n"
     rc = bs_write_fixture(ctx, bundle ++ ".manifest", manifest, "bundle interface manifest")
     if rc != 0: return rc
 
-    // The consumer against the interface: builds, links the bundle, runs.
+    // (3d) The consumer against the EMITTED interface: builds, links the
+    // bundle, runs.
     let consumer = bs_join(case_dir, "consumer")
     let built = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-consumer-build", bs_bundle_build_args(main_src, bundle, consumer, false), 120000)
     if built.rc != 0: return bs_fail(ctx, f"consumer build against the bundle interface failed with exit code {built.rc}")
     let ran = bs_run_binary_capture(ctx, consumer, "bundle-interface-consumer-run", 120000)
     if ran.rc != 0: return bs_fail(ctx, f"consumer linked against the bundle failed with exit code {ran.rc}")
-    rc = bs_assert_stdout_exact(ctx, ran, "7 12 3 7 2", "bundle interface consumer")
+    rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 5", "bundle interface consumer")
+    if rc != 0: return rc
+
+    // A tampered interface never pairs with the object (interface-sha).
+    let tampered = bs_join(case_dir, "store-tampered/wi_demo")
+    rc = bs_write_fixture(ctx, tampered ++ ".wi", emitted_wi ++ "// tampered\n", "tampered interface")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, tampered ++ ".manifest", manifest, "tampered manifest")
+    if rc != 0: return rc
+    if ctx.fs().copy_file(obj_path, tampered ++ ".o") != 0: return bs_fail(ctx, "could not copy the bundle object for the tamper check")
+    let tampered_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-tampered-build", bs_bundle_build_args(main_src, tampered, bs_join(case_dir, "consumer-tampered"), false), 120000)
+    if tampered_build.rc == 0: return bs_fail(ctx, "a consumer built against an interface whose sha differs from the manifest's interface-sha")
+    rc = bs_assert_contains(ctx, tampered_build.stderr, "is not the interface", "interface-sha pairing check")
+    if rc != 0: return rc
+
+    // Refusals: each a loud error naming the declaration, no interface written.
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_generic", "fn id: is generic")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_drop", "type Res: has a drop method")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_const", "const ORIGIN: constant does not fold to a literal")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_elision", "fn choose: returns a reference with no unambiguous origin")
     if rc != 0: return rc
 
     // Declaration only: the consumer's object references the bundle's
