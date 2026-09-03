@@ -34,6 +34,9 @@ pub const BX_GLOBAL: i32 = 2
 pub const BX_EXTERN: i32 = 3
 pub const BX_FN: i32 = 4
 pub const BX_IMPL: i32 = 5
+// a note line in the .wi (no fingerprint row): a declaration the boundary
+// cannot carry at Level 0, named so a reader sees why it is absent
+pub const BX_NOTE: i32 = 6
 
 // One exported declaration: its `.wi` text (newline-terminated, attribute
 // lines included) and its fingerprint row(s).
@@ -58,6 +61,10 @@ pub type BundleInterfaceModel {
     // with what it declares (D39: the boundary exposes the mistaken
     // declaration)
     warnings: Vec[str],
+    // D39 Level 0: generic functions stay corpus-internal — omitted from the
+    // interface, named here ("<module>\t<name>\tgeneric-fn") for the
+    // manifest's `omitted` lines
+    omitted: Vec[str],
 }
 
 type BundleEmitter {
@@ -83,6 +90,7 @@ type BundleEmitter {
     failed: bool,
     // the fingerprint row of the method fn_text last printed for an impl
     last_fn_row: str,
+    omitted: Vec[str],
 }
 
 pub type BundleInterfaceText {
@@ -107,6 +115,7 @@ fn bx_new_emitter(corpus: &str) -> BundleEmitter:
         context: "",
         failed: false,
         last_fn_row: "",
+        omitted: Vec.new(),
     }
 
 fn bx_str_less(a: &str, b: &str) -> bool: with_str_cmp_ref(a, b) < 0
@@ -148,6 +157,15 @@ impl BundleEmitter:
     mut fn refuse_global(message: &str):
         self.errors.push(with_str_clone_ref(message))
         self.failed = true
+
+    // D39 Level 0: a generic function cannot cross the boundary (its body
+    // instantiates at each use site, and an interface carries no bodies).
+    // It stays corpus-internal: omitted from the interface, named in the
+    // section as a note and in the manifest's `omitted` lines. Not a
+    // refusal — migrated C corpora export their macro helpers this way.
+    mut fn omit_generic_fn(mod_path: &str, name: &str):
+        self.omitted.push(mod_path ++ "\t" ++ name ++ "\tgeneric-fn")
+        self.push_export(BX_NOTE, mod_path, name, "// not exported at Level 0 (generic): fn " ++ name ++ "\n", "")
 
     mut fn add_module(canonical: &str, source_path: &str):
         if not self.modules.contains(canonical):
@@ -442,7 +460,7 @@ impl BundleEmitter:
             self.refuse("has no function metadata")
             return ""
         if ast.fn_meta_tp_count(meta) > 0 or sema.fn_node_is_generic_template(node, fn_sym) != 0:
-            self.refuse("is generic; a bundle boundary is Level 0 (docs/abi_roadmap.md)")
+            self.omit_generic_fn(mod_path, full)
             return ""
         let cc_sym = ast.fn_meta_tp_start(meta)
         if cc_sym != 0:
@@ -975,12 +993,13 @@ pub fn bundle_interface_build(sema: &Sema, corpus: &str) -> BundleInterfaceModel
         exports: move em.exports,
         errors: move em.errors,
         warnings: move em.warnings,
+        omitted: move em.omitted,
     }
 
 // The export indices of one module in canonical order: kind, then name.
 fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> Vec[i32]:
     var order: Vec[i32] = Vec.new()
-    for kind in 0..6:
+    for kind in 0..7:
         var names: Vec[str] = Vec.new()
         for ei in 0..model.exports.len() as i32:
             let e = model.exports.get(ei as i64)

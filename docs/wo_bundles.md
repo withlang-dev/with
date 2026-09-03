@@ -397,7 +397,12 @@ inside every other spelling; `impl Copy for T` follows a Copy type;
 struct field defaults are printed when they are literals, casts of
 literals (`0 as c_ulong`) or repeat arrays (`[0 as u8; 32]`); a plain
 enum never gets `= N`, a discriminant enum always does, with its backing
-type. Refused: generics, async/gen/comptime/variadic/`@[c_export]`
+type. A generic function is corpus-internal at Level 0 (its body
+instantiates at each use site, and an interface carries no bodies): it is
+omitted from the interface, named there by a note line and in the
+manifest's `omitted` lines, and the build warns — a migrated C corpus
+exports its macro helpers this way. Refused: generic types and impls,
+async/gen/comptime/variadic/`@[c_export]`
 functions, extension methods, default parameter values, destructured
 parameters, a type with a `drop` method, a droppable mutable global, a
 const whose folded value is not a literal, an ambiguous returned
@@ -422,10 +427,10 @@ Measured on pcre2 (2026-09-02, stage1): a 4.3k-line `.wi`, source and
 interface fingerprints equal, and a tiny `std.re` consumer's `check`
 drops from 5.2 s through the source to 0.26 s through the interface.
 Corpus findings for batch C3: `defs.w` exports 46 generic functions
-(migrated C macros such as `INT8_C[T]`, `PCRE2_GLUE[T]`, `MAX_255[T]`)
-that the bundle build refuses — the migrator must emit them non-pub or
-non-generic; `pcre2_chartables.w`, `pcre2_tables.w` and `pcre2_ucd.w`
-carry only `use` lines.
+(migrated C macros such as `INT8_C[T]`, `PCRE2_GLUE[T]`, `MAX_255[T]`);
+they stay corpus-internal and are omitted from the interface (above);
+`pcre2_chartables.w`, `pcre2_tables.w` and `pcre2_ucd.w` carry only
+`use` lines.
 
 **Resolver.** `use std.re.X` on a compiler whose bundle index provides
 `<embedded-std>/std/re/X.w` reads that module's interface section;

@@ -2357,7 +2357,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/wi_demo.wi")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/main.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/bad_elision.wi")
-    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_generic.w")
+    bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_omit_generic.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_drop.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_const.w")
     bundle_interface_tests = bundle_interface_tests.input("test/bundle_interface/lib/std/wi_refuse_elision.w")

@@ -7777,6 +7777,26 @@ fn bs_first_differing_line(expected: &str, actual: &str) -> str:
     f"line counts differ: expected {a.len() as i32}, got {b.len() as i32}"
 
 // A refusal fixture: the emitter must fail loudly, naming the declaration.
+// A generic function in a bundle module: the build succeeds, warns, writes
+// the interface without it (a note line names it), and still exports the
+// module's other declarations.
+fn bs_expect_bundle_omission(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, name: &str, omitted_fn: &str, kept_line: &str) -> i32:
+    let src = bs_join(case_dir, "lib/std/" ++ name ++ ".w")
+    var rc = bs_write_fixture(ctx, src, bs_bundle_interface_fixture(ctx, "lib/std/" ++ name ++ ".w"), "bundle omission fixture " ++ name)
+    if rc != 0: return rc
+    let out = bs_join(case_dir, "omit/" ++ name)
+    let result = bs_build_bundle(ctx, compiler_path, "bundle-omit-" ++ name, src, "std/" ++ name, out ++ ".o", out ++ ".wi", out ++ ".fp")
+    if result.rc != 0:
+        return bs_fail(ctx, "a bundle with a generic function must build (the function is omitted, not refused): " ++ name ++ "\n" ++ result.stderr)
+    rc = bs_assert_contains(ctx, result.stderr, "1 generic function(s) not exported at Level 0", "bundle omission warning " ++ name)
+    if rc != 0: return rc
+    let wi_text = ctx.fs().read_text(out ++ ".wi")
+    rc = bs_assert_contains(ctx, wi_text, "// not exported at Level 0 (generic): fn " ++ omitted_fn ++ "\n", "bundle omission note " ++ name)
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, wi_text, "fn " ++ omitted_fn ++ "[", "bundle omission removed the generic " ++ name)
+    if rc != 0: return rc
+    bs_assert_contains(ctx, wi_text, kept_line, "bundle omission kept the rest " ++ name)
+
 fn bs_expect_bundle_refusal(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, name: &str, needle: &str) -> i32:
     let src = bs_join(case_dir, "lib/std/" ++ name ++ ".w")
     let rc = bs_write_fixture(ctx, src, bs_bundle_interface_fixture(ctx, "lib/std/" ++ name ++ ".w"), "bundle refusal fixture " ++ name)
@@ -7898,9 +7918,13 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_assert_contains(ctx, tampered_build.stderr, "is not the interface", "interface-sha pairing check")
     if rc != 0: return rc
 
-    // Refusals: each a loud error naming the declaration, no interface written.
-    rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_generic", "fn id: is generic")
+    // D39 Level 0: a generic function is corpus-internal — omitted from the
+    // interface with a note and a warning, never a refusal (migrated C
+    // corpora export their macro helpers as generic functions).
+    rc = bs_expect_bundle_omission(ctx, compiler_path, case_dir, "wi_omit_generic", "id", "pub fn plain(x: i32) -> i32")
     if rc != 0: return rc
+
+    // Refusals: each a loud error naming the declaration, no interface written.
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_drop", "type Res: has a drop method")
     if rc != 0: return rc
     rc = bs_expect_bundle_refusal(ctx, compiler_path, case_dir, "wi_refuse_const", "const ORIGIN: constant does not fold to a literal")

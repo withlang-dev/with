@@ -419,6 +419,8 @@ impl Compilation:
         let model = bundle_interface_build(sema, self.bundle_corpus)
         for wi in 0..model.warnings.len() as i32:
             runtime_eprint("warning: bundle interface: " ++ model.warnings.get(wi as i64))
+        if model.omitted.len() > 0:
+            runtime_eprint(f"warning: bundle interface: {model.omitted.len() as i32} generic function(s) not exported at Level 0 (corpus-internal; each is named in the .wi and in the manifest's `omitted` lines)")
         for ei in 0..model.errors.len() as i32:
             runtime_eprint("error: bundle interface: " ++ model.errors.get(ei as i64))
         if not model.ok:
@@ -1188,8 +1190,9 @@ impl Compilation:
         // Sema codegen handed back (layouts frozen); the manifest records both.
         var interface_sha = ""
         var fingerprint = ""
-        if self.bundle_interface_path.len() > 0 or self.bundle_fingerprint_path.len() > 0:
-            let model = self.bundle_model(if self.bundle_interface_path.len() > 0: "--emit-bundle-interface" else: "--bundle-fingerprint")
+        var omitted: Vec[str] = Vec.new()
+        if self.bundle_interface_path.len() > 0 or self.bundle_fingerprint_path.len() > 0 or self.bundle_manifest_path.len() > 0:
+            let model = self.bundle_model(if self.bundle_interface_path.len() > 0: "--emit-bundle-interface" else if self.bundle_fingerprint_path.len() > 0: "--bundle-fingerprint" else: "--emit-bundle-manifest")
             if not model.ok:
                 compilation_remove_file_best_effort(obj_path)
                 return ""
@@ -1203,7 +1206,8 @@ impl Compilation:
                 if fingerprint.len() == 0:
                     compilation_remove_file_best_effort(obj_path)
                     return ""
-        if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path, fingerprint, interface_sha):
+            omitted = driver_clone_str_vec(&model.omitted)
+        if self.bundle_manifest_path.len() > 0 and not self.write_bundle_manifest(obj_path, fingerprint, interface_sha, &omitted):
             compilation_remove_file_best_effort(obj_path)
             return ""
         with_str_clone_ref(obj_path)
@@ -1230,7 +1234,7 @@ impl Compilation:
     // interface check; never a prelude or std module the object happens to
     // contain). build.w adds the bundle name, the key, and the corpus hash
     // it computed.
-    mut fn write_bundle_manifest(obj_path: &str, fingerprint: &str, interface_sha: &str) -> bool:
+    mut fn write_bundle_manifest(obj_path: &str, fingerprint: &str, interface_sha: &str, omitted: &Vec[str]) -> bool:
         if not compiler_abi_sha_is_stamped():
             with_eprint("error: --emit-bundle-manifest: this compiler carries no ABI stamp (unstamped binary); a bundle key needs one")
             return false
@@ -1241,6 +1245,10 @@ impl Compilation:
             text = text ++ "fingerprint " ++ fingerprint ++ "\n"
         if interface_sha.len() > 0:
             text = text ++ "interface-sha " ++ interface_sha ++ "\n"
+        // D39 Level 0: declarations the boundary cannot carry, one
+        // `omitted <module> <name> <why>` line each (the .wi names them too)
+        for oi in 0..omitted.len() as i32:
+            text = text ++ "omitted " ++ omitted.get(oi as i64).replace("\t", " ") ++ "\n"
         let seen: Vec[str] = Vec.new()
         for pi in 0..self.zcu.decl_source_paths.len() as i32:
             let path = self.zcu.decl_source_paths.get(pi as i64)
