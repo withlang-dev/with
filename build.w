@@ -1557,14 +1557,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     print_version = target_with_version_inputs(move print_version, ctx)
     out = out.add_target(print_version)
 
+    // The release compiler emits the package's C as a subprocess (the
+    // binary under test, never the driver's seed) with the pcre2 corpus
+    // in-unit (build/emit_c.w emitc_build_compiler_c, #955).
     var bootstrap_c_emit_sources = target_new(.Action, "bootstrap-c-emit-sources", "").output("out/bootstrap-c/src/with_compiler.c")
     bootstrap_c_emit_sources.action = run_bootstrap_c_emit_sources_action
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.arg(release_compiler_bin("with"))
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/gen/wl_decls.h")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/gen/wl_stubs.c")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/bootstrap-c/src")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/gen")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/command/bootstrap-c-emit-sources")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.input(release_compiler_bin("with"))
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.input("out/gen/versioned_main.w")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.dep("build")
     bootstrap_c_emit_sources = bootstrap_c_emit_sources.dep("compiler-version-sources")
     // The compiler source imports the generated EmbeddedStdlibData and
     // EmbeddedClangResourceData modules (same as stage1/2/3); without these

@@ -587,6 +587,12 @@ fn emitc_compile_runtime_args(root: &str, argv: Vec[str], platform_obj: &str) ->
     argv |> push(emitc_abs(root, "out/lib/cimport_stubs.o"))
     argv
 
+// The compiler emitted to one C unit by `compiler_path` as a subprocess —
+// the binary under test emits, never the build driver's seed (the #761
+// mixed-world class). `--bundle-corpus std/re` compiles the pcre2 corpus
+// in-unit from its source: the emit-C lane links no .wo bundle, so the
+// prelude's std.regex reaches the engine as C in the same file
+// (docs/wo_bundles.md "Retiring the shim", #955).
 fn emitc_build_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: Vec[str] = Vec.new()
@@ -594,31 +600,22 @@ fn emitc_build_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str) ->
     argv |> push("build")
     argv |> push(emitc_abs(root, "out/gen/versioned_main.w"))
     argv |> push("--emit-c")
+    argv |> push("--bundle-corpus")
+    argv |> push("std/re")
     argv |> push("-o")
     argv |> push(emitc_abs(root, main_c))
-    emitc_run_capture(ctx, "emit-compiler-c", argv, 600000)
-
-fn emitc_build_compiler_c_workspace(ctx: &ActionCtx, source_w: &str, main_c: &str) -> i32:
-    let ws = ctx.create_workspace("emit-compiler-c")
-    ws.add_file(source_w)
-    var options = ws.options()
-    options.output_path = emit_c_owned_text(main_c)
-    options.output_kind = BuildOutputKind.C
-    ws.set_options(options)
-    let result = ws.compile()
-    if result.rc != 0:
-        return emitc_fail(ctx, f"workspace emit-C failed with exit code {result.rc}")
-    if not ctx.fs().exists(main_c):
-        return emitc_fail(ctx, "workspace emit-C did not produce output: " ++ main_c)
-    0
+    emitc_run_capture(ctx, "emit-compiler-c", argv, 900000)
 
 pub fn run_bootstrap_c_emit_sources_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    if args.len() == 0:
+        return emitc_fail(ctx, "requires the release compiler argument")
     let fs = ctx.fs()
     let main_c = ctx.output()
     let out_dir = emitc_dirname(main_c)
     if fs.mkdir_all(out_dir) != 0:
         return emitc_fail(ctx, "could not create output directory: " ++ out_dir)
-    var rc = emitc_build_compiler_c_workspace(ctx, "out/gen/versioned_main.w", main_c)
+    var rc = emitc_build_compiler_c(ctx, args.get(0), main_c)
     if rc != 0: return rc
     emitc_generate_stub_files(ctx)
 
@@ -898,7 +895,7 @@ pub fn run_emit_c_roundtrip_action(ctx: ActionCtx) -> i32:
     let migrated_w = emitc_join(out_dir, "main_roundtrip.w")
     let with_roundtrip = emitc_join(out_dir, emitc_exe_name("with-roundtrip"))
     let with_rebuilt_by_roundtrip = emitc_join(out_dir, emitc_exe_name("with-rebuilt-by-roundtrip"))
-    var rc = emitc_build_compiler_c_workspace(ctx, "out/gen/versioned_main.w", main_c)
+    var rc = emitc_build_compiler_c(ctx, compiler_path, main_c)
     if rc != 0: return rc
     rc = emitc_generate_stub_files(ctx)
     if rc != 0: return rc
