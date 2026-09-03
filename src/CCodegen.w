@@ -8792,6 +8792,11 @@ impl CCodegen:
                 let tid = self.global_decl_tid(decl)
                 if tid == 0:
                     continue
+                // stdio's globals are <stdio.h>'s (`FILE *__stdoutp`); a
+                // `void*` redeclaration is a conflicting type, and the
+                // emitted reads convert implicitly.
+                if ci_libc_symbol_allowed_as(cc_intern_resolve(self.intern, sym), CI_LIBC_KIND_VAR):
+                    continue
                 out = out ++ "extern " ++ self.c_decl(tid, self.global_c_name(sym)) ++ ";\n"
         if out.len() > 0:
             out = out ++ "\n"
@@ -8831,9 +8836,18 @@ impl CCodegen:
         if not referenced.contains(fn_sym):
             return 0
         let name = self.canonical_extern_name(cc_intern_resolve(self.intern, fn_sym))
-        if cc_str_starts_with(name, "with_") != 0:
+        // The runtime ABI is declared by with_runtime.h and the fixed block
+        // in emit_module_prelude; the libc bindings (with_libc_*, rt_core.w)
+        // are declared only by std.libc's extern fns, so their prototypes
+        // come from those declarations — with or without the prelude.
+        if cc_str_starts_with(name, "with_") != 0 and cc_str_starts_with(name, "with_libc_") == 0:
             return 0
         if cc_str_starts_with(name, "wl_") != 0:
+            return 0
+        // A name the included libc headers declare is theirs: a With
+        // spelling (`*const i8` for `char*`) never redeclares it. The
+        // migrator's libc knowledge is the list.
+        if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN) or ci_libc_simple_rename(name).len() > 0 or ci_migrate_preamble_name_is_modeled_libc(name):
             return 0
         if name == "malloc" or name == "free":
             return 0
