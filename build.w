@@ -60,6 +60,18 @@ fn with_ir_target_overflow(name: &str, compiler: &str, source: &str, output: &st
     target = target.arg("overflow=" ++ overflow)
     target
 
+// The regex runtime shim compiles pcre2 from its source whatever compiler
+// builds it. A compiler that embeds the pcre2 bundle would otherwise
+// resolve the shim's `use std.re.*` to the bundle's interface, and the
+// object would reference the corpus instead of defining it — which the
+// seed, linking stage1 with no bundle, cannot resolve (D38 batch C3).
+// `--bundle-corpus std/re` makes the corpus owned and read from source.
+// Retired with the shim in batch C4.
+fn regex_runtime_ir_target(name: &str, compiler: &str, output: &str, dep: &str) -> Target:
+    var target = with_ir_target_overflow(name, compiler, "rt/regex_runtime.w", output, dep, "wrap")
+    target = target.arg("--bundle-corpus")
+    target.arg("std/re")
+
 fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     let target = if args.len() > 0: build_owned_text(args.get(0)) else: ""
@@ -141,7 +153,7 @@ fn add_cross_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, wo_na
     // regex: whole-module IR (like the native regex-runtime-ir path) so
     // the migrated pcre2 modules land in one object; the IR carries the
     // target triple and CompileLlvmIrObject compiles it as written.
-    var cross_regex_ir = with_ir_target_overflow(p ++ "regex-runtime-ir", release_compiler_bin("with"), "rt/regex_runtime.w", "out/tmp/" ++ tag ++ "_regex_runtime.ll", "build", "wrap")
+    var cross_regex_ir = regex_runtime_ir_target(p ++ "regex-runtime-ir", release_compiler_bin("with"), "out/tmp/" ++ tag ++ "_regex_runtime.ll", "build")
     cross_regex_ir = cross_regex_ir.arg("--target=" ++ triple)
     out = out.add_target(cross_regex_ir)
     var cross_regex = target_new(.CompileLlvmIrObject, p ++ "regex-runtime-object", "out/tmp/" ++ tag ++ "_regex_runtime.ll").output(dir ++ "/regex_runtime.o")
@@ -1668,7 +1680,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O1", ""))
     out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O1", "compat-runtime-source"))
     out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O1", ""))
-    out = out.add_target(with_ir_target_overflow("bootstrap-regex-runtime-ir", "seed", "rt/regex_runtime.w", "out/bootstrap-tmp/regex_runtime.ll", "", "wrap"))
+    out = out.add_target(regex_runtime_ir_target("bootstrap-regex-runtime-ir", "seed", "out/bootstrap-tmp/regex_runtime.ll", ""))
     var bootstrap_regex_runtime = target_new(.CompileLlvmIrObject, "bootstrap-regex-runtime-object", "out/bootstrap-tmp/regex_runtime.ll").output("out/bootstrap-lib/regex_runtime.o")
     bootstrap_regex_runtime = bootstrap_regex_runtime.dep("bootstrap-regex-runtime-ir")
     out = out.add_target(bootstrap_regex_runtime)
@@ -1955,7 +1967,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
     out = out.add_target(compat_runtime_obj)
     out = out.add_target(with_object_target("panic-runtime-object", stage_compiler_bin("with-stage2"), "rt/panic_runtime.w", "out/lib/panic_runtime.o", "-O1", "stage2"))
-    out = out.add_target(with_ir_target_overflow("regex-runtime-ir", stage_compiler_bin("with-stage2"), "rt/regex_runtime.w", "out/tmp/regex_runtime.ll", "stage2", "wrap"))
+    out = out.add_target(regex_runtime_ir_target("regex-runtime-ir", stage_compiler_bin("with-stage2"), "out/tmp/regex_runtime.ll", "stage2"))
 
     var regex_runtime = target_new(.CompileLlvmIrObject, "regex-runtime-object", "out/tmp/regex_runtime.ll").output("out/lib/regex_runtime.o")
     regex_runtime = regex_runtime.dep("regex-runtime-ir")
@@ -2060,7 +2072,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(cross_windows_object_target_named("cross-win-llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
     out = out.add_target(cross_windows_object_target_named("cross-win-clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
 
-    var cross_win_regex_ir = with_ir_target_overflow("cross-win-regex-runtime-ir", release_compiler_bin("with"), "rt/regex_runtime.w", "out/tmp/cross_win_regex_runtime.ll", "build", "wrap")
+    var cross_win_regex_ir = regex_runtime_ir_target("cross-win-regex-runtime-ir", release_compiler_bin("with"), "out/tmp/cross_win_regex_runtime.ll", "build")
     cross_win_regex_ir = cross_win_regex_ir.arg("--target=" ++ cross_windows_triple())
     out = out.add_target(cross_win_regex_ir)
     var cross_win_regex = target_new(.CompileLlvmIrObject, "cross-win-regex-runtime-object", "out/tmp/cross_win_regex_runtime.ll").output(cross_windows_dir() ++ "/regex_runtime.o")
@@ -2148,7 +2160,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-llvm-bridge-object", "src/compiler/LlvmBridge.w", "llvm_bridge.o", "-O1"))
     out = out.add_target(cross_windows_aarch64_object_target_named("cross-winarm-clang-bridge-object", "src/compiler/ClangBridge.w", "clang_bridge.o", "-O1"))
 
-    var cross_winarm_regex_ir = with_ir_target_overflow("cross-winarm-regex-runtime-ir", release_compiler_bin("with"), "rt/regex_runtime.w", "out/tmp/cross_winarm_regex_runtime.ll", "build", "wrap")
+    var cross_winarm_regex_ir = regex_runtime_ir_target("cross-winarm-regex-runtime-ir", release_compiler_bin("with"), "out/tmp/cross_winarm_regex_runtime.ll", "build")
     cross_winarm_regex_ir = cross_winarm_regex_ir.arg("--target=" ++ cross_windows_aarch64_triple())
     out = out.add_target(cross_winarm_regex_ir)
     var cross_winarm_regex = target_new(.CompileLlvmIrObject, "cross-winarm-regex-runtime-object", "out/tmp/cross_winarm_regex_runtime.ll").output(cross_windows_aarch64_dir() ++ "/regex_runtime.o")

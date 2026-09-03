@@ -837,6 +837,12 @@ fn run_cli(argc: i32) -> i32:
             with_eprint("error: " ++ ir_target.error_msg)
             return 1
         comp.set_target_kind(ir_target.kind)
+        // D38: `ir` is how build.w compiles the regex runtime shim whole-
+        // module; `--bundle-corpus` keeps that corpus on its source (owned,
+        // defined in-unit) even in a compiler that embeds its bundle, and
+        // `--link-bundle` reads the same flags every compiling command does.
+        comp.set_link_bundles(&driver_link_bundle_args(argc))
+        comp.set_bundle_fingerprint(driver_bundle_corpus_arg(argc), "")
         let pool = comp.compile_file(source)
         if pool.decl_count() == 0:
             with_eprint("error: IR generation failed during compilation")
