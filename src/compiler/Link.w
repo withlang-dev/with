@@ -1,6 +1,7 @@
 use Archive
 use compiler.Runtime
 use compiler.EmbeddedBundles
+use compiler.BundleInterfaces
 use compiler.AbiStamp
 use std.collections.Atomic
 use TargetSpec
@@ -964,10 +965,31 @@ fn link_stage_extract_blob(data: &str, path: &str) -> i32:
     0
 
 // The extracted objects of every embedded bundle the program needs, in index
-// order. A needed bundle whose abi-sha differs from this compiler's, or one
-// that cannot be extracted, yields the single marker LINK_BUNDLE_FAILED
-// (already reported) so the caller fails the plan.
+// order. A needed bundle whose abi-sha or target differs from this link's,
+// whose interface is not its manifest's, or that cannot be extracted, yields
+// the single marker LINK_BUNDLE_FAILED (already reported) so the caller
+// fails the plan.
 fn LINK_BUNDLE_FAILED -> str: "<bundle-failed>"
+
+// Module prefixes of the bundles `--link-bundle` already put on the link
+// (Compilation.load_link_bundles): an embedded copy of the same modules
+// must not join too.
+var link_stage_explicit_bundle_prefixes: Vec[str] = Vec.new()
+
+pub fn link_stage_add_explicit_bundle_prefixes(prefixes: &Vec[str]) -> Unit:
+    for i in 0..prefixes.len() as i32:
+        let prefix = prefixes.get(i as i64)
+        if not link_stage_explicit_bundle_prefixes.contains(prefix):
+            link_stage_explicit_bundle_prefixes.push(with_str_clone_ref(prefix))
+
+fn link_stage_bundle_provided_explicitly(manifest: &str) -> bool:
+    let prefixes = bundle_manifest_prefixes(manifest)
+    if prefixes.len() == 0:
+        return false
+    for i in 0..prefixes.len() as i32:
+        if not link_stage_explicit_bundle_prefixes.contains(prefixes.get(i as i64)):
+            return false
+    true
 
 fn link_stage_select_embedded_bundles(undef: &str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
@@ -976,13 +998,33 @@ fn link_stage_select_embedded_bundles(undef: &str) -> Vec[str]:
         return out
     let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
     for bi in 0..count:
+        if not embedded_bundle_present(bi):
+            continue
         let manifest = link_stage_embedded_obj_slice(embedded_bundle_manifest_start(bi) as *const u8, embedded_bundle_manifest_end(bi) as *const u8)
-        if not link_stage_bundle_needed(manifest, undef):
+        if link_stage_bundle_provided_explicitly(manifest) or not link_stage_bundle_needed(manifest, undef):
             continue
         let name = embedded_bundle_name(bi)
         let bundle_abi = link_stage_bundle_manifest_field(manifest, "abi-sha")
         if bundle_abi != compiler_abi_sha():
             with_eprint("error: embedded bundle '" ++ name ++ "' was built for ABI " ++ bundle_abi ++ " but this compiler is " ++ compiler_abi_sha() ++ " (a .wo never links across ABI identities; rebuild the bundle)")
+            let failed: Vec[str] = Vec.new()
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        // A bundle is compiled for one platform; a cross link of a program
+        // that needs it has no bundle for its target (§18.5: never link
+        // native output into a cross binary).
+        let bundle_target = link_stage_bundle_manifest_field(manifest, "target")
+        if bundle_target != target_spec_resolved_name():
+            with_eprint("error: embedded bundle '" ++ name ++ "' was built for target " ++ bundle_target ++ " but this link targets " ++ target_spec_resolved_name() ++ " (this compiler embeds no " ++ name ++ " bundle for that target)")
+            let failed: Vec[str] = Vec.new()
+            failed.push(LINK_BUNDLE_FAILED())
+            return failed
+        // D39 pairing: the embedded interface is the one the object was
+        // built with, or the binary's embedded bundles are corrupt.
+        let manifest_wi_sha = link_stage_bundle_manifest_field(manifest, "interface-sha")
+        let embedded_wi_sha = bundle_text_sha256(embedded_bundle_interface_text(bi))
+        if manifest_wi_sha.len() == 0 or embedded_wi_sha != manifest_wi_sha:
+            with_eprint("error: embedded bundle '" ++ name ++ "': its interface (sha256 " ++ embedded_wi_sha ++ ") is not the one its manifest was built with (" ++ manifest_wi_sha ++ "); this compiler's embedded bundles are corrupt")
             let failed: Vec[str] = Vec.new()
             failed.push(LINK_BUNDLE_FAILED())
             return failed

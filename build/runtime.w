@@ -262,6 +262,8 @@ fn br_generate_embedded_bundles(names: &Vec[str]) -> str:
         out.push_str("extern let with_embedded_wo_" ++ name ++ "_o_end: u8\n")
         out.push_str("extern let with_embedded_wo_" ++ name ++ "_manifest_start: u8\n")
         out.push_str("extern let with_embedded_wo_" ++ name ++ "_manifest_end: u8\n")
+        out.push_str("extern let with_embedded_wo_" ++ name ++ "_wi_start: u8\n")
+        out.push_str("extern let with_embedded_wo_" ++ name ++ "_wi_end: u8\n")
     out.push_str(f"\npub fn embedded_bundles_count_data() -> i32: {names.len() as i32}\n\n")
     out.push_str("pub fn embedded_bundles_name_data(index: i32) -> str:\n")
     for i in 0..names.len() as i32:
@@ -272,9 +274,11 @@ fn br_generate_embedded_bundles(names: &Vec[str]) -> str:
     kinds.push("manifest_end")
     kinds.push("object_start")
     kinds.push("object_end")
+    kinds.push("interface_start")
+    kinds.push("interface_end")
     for ki in 0..kinds.len() as i32:
         let kind = kinds.get(ki as i64)
-        let blob = if kind.starts_with("manifest"): "manifest" else: "o"
+        let blob = if kind.starts_with("manifest"): "manifest" else if kind.starts_with("interface"): "wi" else: "o"
         let edge = if kind.ends_with("start"): "start" else: "end"
         out.push_str("pub fn embedded_bundles_" ++ kind ++ "_data(index: i32) -> i64:\n")
         for i in 0..names.len() as i32:

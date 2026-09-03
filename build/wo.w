@@ -206,9 +206,7 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
     build_target = build_target.arg("slot=" ++ plan.slot)
     build_target = build_target.input(wo_owned_text(compiler))
     build_target = build_target.input("docs/with-abi.sha256")
-    let corpus_files = wo_w_files(ctx.fs(), plan.corpus_dir)
-    for fi in 0..corpus_files.len() as i32:
-        build_target = build_target.input(wo_owned_text(corpus_files.get(fi as i64)))
+    build_target = target_with_wo_corpus_inputs(move build_target, ctx, plan)
     build_target = build_target.write_scope("out/wo")
     build_target = build_target.write_scope("out/command/" ++ build_name)
     build_target = build_target.timeout(900000)
@@ -234,6 +232,14 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
         group = group.dep(wo_owned_text(install_name))
         previous = install_name
     graph.add_target(group)
+
+// Every .w file of the corpus as inputs: a corpus edit re-runs the target.
+pub fn target_with_wo_corpus_inputs(target: Target, ctx: &BuildCtx, plan: &WoBundle) -> Target:
+    var out = target
+    let corpus_files = wo_w_files(ctx.fs(), plan.corpus_dir)
+    for fi in 0..corpus_files.len() as i32:
+        out = out.input(wo_owned_text(corpus_files.get(fi as i64)))
+    out
 
 // "" when the slot holds a coherent bundle of this corpus, else why not.
 fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &str, abi_sha: &str) -> str:

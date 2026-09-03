@@ -495,6 +495,8 @@ impl Compilation:
         if self.link_bundles_loaded:
             return true
         self.link_bundles_loaded = true
+        if not self.register_embedded_bundle_interfaces():
+            return false
         for bi in 0..self.link_bundles.len() as i32:
             let prefix_path = self.link_bundles.get(bi as i64)
             let obj_path = prefix_path ++ ".o"
@@ -534,10 +536,47 @@ impl Compilation:
                 return false
             if not self.link_objects.contains(obj_path):
                 self.link_objects.push(with_str_clone_ref(obj_path))
+            // The object joins the link explicitly, so on-demand selection
+            // must not extract an embedded copy of the same modules.
+            link_stage_add_explicit_bundle_prefixes(&prefixes)
             var zcu = move self.zcu
             zcu.add_link_bundle_prefixes(&prefixes)
             self.zcu = zcu
         true
+
+    // D39 (batch C3): every bundle this compiler embeds registers its
+    // interface before the first import resolves, after the pairing check —
+    // sha256(.wi) equals the manifest's interface-sha, or the binary's
+    // embedded bundles are corrupt and compilation stops (never a silent
+    // fall back to source). An unfilled slot (stage1) has nothing to
+    // register. The corpus a bundle build compiles (--bundle-corpus) stays on
+    // its source: that is how the wo-drift lane rebuilds an embedded bundle
+    // from the tree.
+    fn register_embedded_bundle_interfaces() -> bool:
+        for bi in 0..embedded_bundle_count():
+            if not embedded_bundle_present(bi):
+                continue
+            let name = embedded_bundle_name(bi)
+            let manifest = embedded_bundle_manifest_text(bi)
+            if self.bundle_corpus.len() > 0 and self.manifest_lies_under_bundle_corpus(manifest):
+                continue
+            let wi_text = embedded_bundle_interface_text(bi)
+            let manifest_wi_sha = link_stage_bundle_manifest_field(manifest, "interface-sha")
+            let embedded_wi_sha = bundle_text_sha256(wi_text)
+            if manifest_wi_sha.len() == 0 or embedded_wi_sha != manifest_wi_sha:
+                with_eprint("error: embedded bundle '" ++ name ++ "': its interface (sha256 " ++ embedded_wi_sha ++ ") is not the one its manifest was built with (" ++ manifest_wi_sha ++ "); this compiler's embedded bundles are corrupt")
+                return false
+            if bundle_interfaces_register_wi(wi_text) == 0:
+                with_eprint("error: embedded bundle '" ++ name ++ "': no `module <path>` sections in its interface")
+                return false
+        true
+
+    fn manifest_lies_under_bundle_corpus(manifest: &str) -> bool:
+        let paths = bundle_manifest_paths(manifest)
+        for pi in 0..paths.len() as i32:
+            if bundle_corpus_contains(self.bundle_corpus, paths.get(pi as i64)):
+                return true
+        false
 
     // Install the --target selection (§18.5) before any parse or
     // codegen: @[target] guards, comptime sysinfo, C-ABI decisions,

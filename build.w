@@ -120,7 +120,7 @@ fn cross_fiber_asm_source(tag: &str) -> str:
 
 // Register the full cross runtime/bridge/embed/rsp target set for one
 // cross tag under name prefix `p`, grouped as `group_name`.
-fn add_cross_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str) -> Build:
+fn add_cross_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, wo_name: &str) -> Build:
     var out = out0
     let dir = cross_dir(tag)
     let triple = cross_triple(tag)
@@ -186,6 +186,8 @@ fn add_cross_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str) -> Bu
     cross_embedded = cross_embedded.dep(p ++ "fiber-asm-object")
     cross_embedded = cross_embedded.dep(p ++ "rt-core-object")
     cross_embedded = cross_embedded.dep(p ++ "rt-platform-object")
+    out = add_empty_wo_blob_targets(move out, p, dir, wo_name)
+    cross_embedded = target_with_empty_wo_blobs(move cross_embedded, p, dir, wo_name)
     out = out.add_target(cross_embedded)
 
     var cross_embedded_obj = target_new(.CompileAsmObject, p ++ "embedded-objects-object", dir ++ "/embedded_objects.s").output(dir ++ "/embedded_objects.o")
@@ -398,6 +400,63 @@ fn empty_platform_blob_path(dir: &str, sym: &str) -> str:
 
 fn empty_platform_blob_target(prefix: &str, sym: &str) -> str:
     prefix ++ sym
+
+// D38 .wo bundles: a compiler binary embeds three blobs per bundle slot —
+// object, manifest, interface — under `with_embedded_wo_<name>_{o,manifest,
+// wi}_*`. A lib dir whose compilers do not fill the slot (bootstrap-lib:
+// stage1 is linked before the tree's bundle exists; the cross dirs: cross
+// compilers embed no bundle yet) carries zero-length blobs, which the
+// compiler reads as "not present" (src/compiler/EmbeddedBundles.w).
+fn wo_blob_kinds() -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    out.push("o")
+    out.push("manifest")
+    out.push("wi")
+    out
+
+fn empty_wo_blob_path(dir: &str, name: &str, kind: &str) -> str:
+    dir ++ "/empty_wo_" ++ name ++ "_" ++ kind ++ ".bin"
+
+fn empty_wo_blob_target(prefix: &str, name: &str, kind: &str) -> str:
+    prefix ++ "empty-wo-" ++ name ++ "-" ++ kind
+
+fn add_empty_wo_blob_targets(out0: Build, prefix: &str, dir: &str, name: &str) -> Build:
+    var out = out0
+    let kinds = wo_blob_kinds()
+    for ki in 0..kinds.len() as i32:
+        let kind = kinds.get(ki as i64)
+        out = out.add_target(empty_file_target(empty_wo_blob_target(prefix, name, kind), empty_wo_blob_path(dir, name, kind)))
+    out
+
+fn target_with_empty_wo_blobs(target: Target, prefix: &str, dir: &str, name: &str) -> Target:
+    var out = target
+    let kinds = wo_blob_kinds()
+    for ki in 0..kinds.len() as i32:
+        let kind = kinds.get(ki as i64)
+        out = out.input(empty_wo_blob_path(dir, name, kind))
+        out = out.arg("wo_" ++ name ++ "_" ++ kind)
+        out = out.dep(empty_wo_blob_target(prefix, name, kind))
+    out
+
+// The tree's bundle (out/wo/<name>.{o,manifest,wi}, build/wo.w) as the
+// blobs of an embed target.
+fn target_with_wo_blobs(target: Target, plan: &WoBundle) -> Target:
+    var out = target
+    let kinds = wo_blob_kinds()
+    for ki in 0..kinds.len() as i32:
+        let kind = kinds.get(ki as i64)
+        out = out.input(wo_prefix(plan) ++ "." ++ kind)
+        out = out.arg("wo_" ++ plan.name ++ "_" ++ kind)
+    out.dep(wo_group_target_name(plan))
+
+// `--link-bundle out/wo/<name>` for a stage compile: the interface,
+// declarations-only codegen and the object, exactly what a compiler that
+// embeds the bundle provides (docs/wo_bundles.md "Bootstrap chain").
+fn target_with_link_bundle(target: Target, ctx: &BuildCtx, plan: &WoBundle) -> Target:
+    var out = target
+    out = out.arg("--link-bundle")
+    out = out.arg(build_project_abs(ctx.project_info().project_root(), wo_prefix(plan)))
+    out.dep(wo_group_target_name(plan))
 
 
 fn target_with_embedded_stdlib_inputs(target: Target, ctx: &BuildCtx) -> Target:
@@ -1529,13 +1588,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(sdk_group_target())
     out = out.add_target(sdk_package_target(ctx))
 
+    // D38 .wo bundles (docs/wo_bundles.md, build/wo.w): pcre2. stage1 is the
+    // first compiler carrying the tree's ABI stamp, so it builds the bundle
+    // when the store lacks this corpus; every later stage compiles with
+    // --link-bundle out/wo/pcre2 and the release binary embeds the triple.
+    let pcre2_wo = wo_bundle_plan(ctx, "pcre2", "std/re", "lib/std/re/bundle.w")
+
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedRuntimeData.w")
-    // D38: the embedded .wo bundle index (empty until the first bundle; each
-    // embedded bundle is named as an arg here and carried as blobs by the
-    // embedded-objects target).
+    // D38: the embedded .wo bundle index — each embedded bundle is named as
+    // an arg here and carried as blobs by the embedded-objects targets (an
+    // unfilled slot carries zero-length blobs).
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedBundlesData.w")
+    compat_runtime = compat_runtime.arg(build_owned_text(pcre2_wo.name))
     compat_runtime = compat_runtime.input(build_owned_text(host_runtime.compat_source))
     compat_runtime = target_with_embedded_stdlib_inputs(move compat_runtime, ctx)
     compat_runtime = target_with_embedded_runtime_inputs(move compat_runtime, ctx)
@@ -1641,6 +1707,11 @@ pub fn build(ctx: BuildCtx) -> Build:
         if bsym2 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.input(empty_platform_blob_path("out/bootstrap-lib", bsym2))
             bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(bsym2))
+    // stage1, stage2 and stage3 link this object: the bundle slot stays
+    // unfilled here (stage1 builds the tree's bundle; the stages after it
+    // take it through --link-bundle).
+    out = add_empty_wo_blob_targets(move out, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
+    bootstrap_embedded_objects = target_with_empty_wo_blobs(move bootstrap_embedded_objects, "bootstrap-", "out/bootstrap-lib", pcre2_wo.name)
     // Every consumed object's producer, declared (#680 edge audit).
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-cimport-stubs-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-compat-runtime-object")
@@ -1733,10 +1804,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.dep("with-sha256")
     out = out.add_target(stage1)
 
-    // D38 .wo bundles (docs/wo_bundles.md, build/wo.w): pcre2. stage1 is the
-    // first compiler carrying the tree's ABI stamp, so it builds the bundle
-    // when the store lacks this key; every later stage links and embeds it.
-    let pcre2_wo = wo_bundle_plan(ctx, "pcre2", "std/re", "lib/std/re/bundle.w")
     out = wo_bundle_targets(move out, ctx, &pcre2_wo, bootstrap_compiler_bin("with-stage1"), "stage1")
 
     // Dev tier (D14): the sanctioned iterate loop. One self-compile —
@@ -1926,6 +1993,8 @@ pub fn build(ctx: BuildCtx) -> Build:
         if esym2 != host_runtime.platform_symbol:
             embedded_objects = embedded_objects.input(empty_platform_blob_path("out/lib", esym2))
             embedded_objects = embedded_objects.arg(build_owned_text(esym2))
+    // The release binary embeds the tree's bundle (D38).
+    embedded_objects = target_with_wo_blobs(move embedded_objects, &pcre2_wo)
     // Every consumed object's producer, declared (#680 edge audit).
     embedded_objects = embedded_objects.dep("cimport-stubs-object")
     embedded_objects = embedded_objects.dep("compat-runtime-object")
@@ -1964,8 +2033,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     // exclusively from that directory (§18.5). Note: these graph
     // actions must be driven by a --target-capable compiler
     // (WITH=out/release/bin/with) until the seed is updated.
-    out = add_cross_rt_targets(move out, "linux_x86_64", "cross-", "cross-rt")
-    out = add_cross_rt_targets(move out, "linux_aarch64", "cross-arm-", "cross-rt-arm")
+    out = add_cross_rt_targets(move out, "linux_x86_64", "cross-", "cross-rt", pcre2_wo.name)
+    out = add_cross_rt_targets(move out, "linux_aarch64", "cross-arm-", "cross-rt-arm", pcre2_wo.name)
 
     // ── Cross-target runtime (windows_x86_64) ───────────────────────
     // `with build :cross-rt-windows` builds the full windows_x86_64
@@ -2032,6 +2101,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_win_embedded = cross_win_embedded.dep("cross-win-fiber-asm-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-rt-core-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-rt-platform-object")
+    out = add_empty_wo_blob_targets(move out, "cross-win-", cross_windows_dir(), pcre2_wo.name)
+    cross_win_embedded = target_with_empty_wo_blobs(move cross_win_embedded, "cross-win-", cross_windows_dir(), pcre2_wo.name)
     out = out.add_target(cross_win_embedded)
 
     var cross_win_embedded_obj = target_new(.CompileAsmObject, "cross-win-embedded-objects-object", cross_windows_dir() ++ "/embedded_objects.s").output(cross_windows_dir() ++ "/embedded_objects.o")
@@ -2118,6 +2189,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-asm-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-core-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-platform-object")
+    out = add_empty_wo_blob_targets(move out, "cross-winarm-", cross_windows_aarch64_dir(), pcre2_wo.name)
+    cross_winarm_embedded = target_with_empty_wo_blobs(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir(), pcre2_wo.name)
     out = out.add_target(cross_winarm_embedded)
 
     var cross_winarm_embedded_obj = target_new(.CompileAsmObject, "cross-winarm-embedded-objects-object", cross_windows_aarch64_dir() ++ "/embedded_objects.s").output(cross_windows_aarch64_dir() ++ "/embedded_objects.o")
@@ -2829,20 +2902,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     // before anything migrates (the zlib chain already had them).
     pcre2_test = pcre2_test.dep("pcre2-build")
     out = out.add_target(pcre2_test)
-
-    var pcre2_check_generated = target_new(.Action, "pcre2-check-generated", "").output("out/gen/.pcre2-check-generated-stamp")
-    pcre2_check_generated.action = run_pcre2_check_generated_action
-    pcre2_check_generated = pcre2_check_generated.write_scope("out/tmp/action-scratch/pcre2-check-generated")
-    pcre2_check_generated = pcre2_check_generated.input("out/pcre2_build/lib/std/re")
-    pcre2_check_generated = pcre2_check_generated.dep("build")
-    out = out.add_target(pcre2_check_generated)
-
-    var pcre2_promote = target_new(.Action, "pcre2-promote", "").output("lib/std/re")
-    pcre2_promote.action = run_pcre2_promote_action
-    pcre2_promote = pcre2_promote.write_scope("out/tmp/action-scratch/pcre2-promote")
-    pcre2_promote = pcre2_promote.input("out/pcre2_build/lib/std/re")
-    pcre2_promote = pcre2_promote.dep("pcre2-test")
-    out = out.add_target(pcre2_promote)
 
     var zlib_reference = target_new(.Action, "zlib-reference", "").output("out/zlib_reference/zlib-1.3.2")
     zlib_reference.action = run_zlib_reference_action
