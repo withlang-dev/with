@@ -1468,6 +1468,20 @@ pub fn run_print_version_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, "could not write stamp: " ++ stamp_path)
     0
 
+// A linked compiler binary is stamped by the action that links it; an object
+// (`--emit-obj`) has no slot, and the release intermediate (`.unstamped`) is
+// stamped by the commit-tracking `build` target so the expensive link stays
+// cached across commits (#650).
+fn comp_output_is_stamped_compiler(ctx: &ActionCtx, output_path: &str) -> bool:
+    not output_path.ends_with(".unstamped") and not comp_vec_contains(ctx.args(), "--emit-obj")
+
+fn comp_stamp_compiler_binary(ctx: &ActionCtx, unstamped: &str, output_path: &str) -> i32:
+    let version = comp_resolve_compiler_version(ctx)
+    if version.len() == 0:
+        return comp_fail(ctx, "could not resolve compiler version from src/version")
+    let _remove_old = comp_remove_file_if_exists(ctx.fs(), output_path)
+    comp_patch_version_binary(ctx, unstamped, output_path, version)
+
 pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path: &str, version: &str) -> i32:
     let fs = ctx.fs()
     if input_path.len() == 0:
@@ -1775,13 +1789,24 @@ pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
         let _cleanup_tmp_obj_missing = comp_remove_file_if_exists(fs, tmp_output ++ ".o")
         let _cleanup_tmp_dsym_missing = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
         return comp_fail(ctx, "did not produce output: " ++ tmp_output)
-    let _remove_old = comp_remove_file_if_exists(fs, output_path)
     let _remove_old_dsym = comp_remove_tree_if_exists(fs, output_path ++ ".dSYM")
-    if fs.rename(tmp_output, output_path) != 0:
-        let _cleanup_tmp_bin_rename = comp_remove_file_if_exists(fs, tmp_output)
-        let _cleanup_tmp_obj_rename = comp_remove_file_if_exists(fs, tmp_output ++ ".o")
-        let _cleanup_tmp_dsym_rename = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
-        return comp_fail(ctx, "could not move output to: " ++ output_path)
+    if comp_output_is_stamped_compiler(ctx, output_path):
+        // D38 (docs/wo_bundles.md, batch C3): a stage binary carries the
+        // version and ABI stamps exactly as the release binary does, so the
+        // stage whose stamp equals a bundle key's abi-sha can build that
+        // bundle and its manifest.
+        let stamp_rc = comp_stamp_compiler_binary(ctx, tmp_output, output_path)
+        if stamp_rc != 0:
+            let _cleanup_tmp_bin_stamp = comp_remove_file_if_exists(fs, tmp_output)
+            let _cleanup_tmp_dsym_stamp = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
+            return stamp_rc
+    else:
+        let _remove_old = comp_remove_file_if_exists(fs, output_path)
+        if fs.rename(tmp_output, output_path) != 0:
+            let _cleanup_tmp_bin_rename = comp_remove_file_if_exists(fs, tmp_output)
+            let _cleanup_tmp_obj_rename = comp_remove_file_if_exists(fs, tmp_output ++ ".o")
+            let _cleanup_tmp_dsym_rename = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
+            return comp_fail(ctx, "could not move output to: " ++ output_path)
     if fs.exists(tmp_output ++ ".dSYM"):
         if fs.rename(tmp_output ++ ".dSYM", output_path ++ ".dSYM") != 0:
             let _cleanup_tmp_dsym_move = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")

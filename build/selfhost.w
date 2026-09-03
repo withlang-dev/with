@@ -7728,7 +7728,7 @@ fn bs_dump_abi_pass_mode(line: &str) -> str:
 
 // The bundle build of one corpus module with the D39 emitter: the object,
 // the .wi (--emit-bundle-interface) and the source-side fingerprint.
-fn bs_build_bundle(ctx: &ActionCtx, compiler_path: &str, label: &str, src_path: &str, corpus: &str, obj_path: &str, wi_path: &str, fingerprint_path: &str) -> SelfhostRunResult:
+fn bs_build_bundle(ctx: &ActionCtx, compiler_path: &str, label: &str, src_path: &str, corpus: &str, obj_path: &str, wi_path: &str, fingerprint_path: &str, manifest_path: &str) -> SelfhostRunResult:
     var args: Vec[str] = Vec.new()
     args |> push("build")
     args |> push(selfhost_owned_text(src_path))
@@ -7739,6 +7739,8 @@ fn bs_build_bundle(ctx: &ActionCtx, compiler_path: &str, label: &str, src_path: 
     args |> push(selfhost_owned_text(wi_path))
     args |> push("--bundle-fingerprint")
     args |> push(selfhost_owned_text(fingerprint_path))
+    args |> push("--emit-bundle-manifest")
+    args |> push(selfhost_owned_text(manifest_path))
     args |> push("-O1")
     args |> push("-o")
     args |> push(selfhost_owned_text(obj_path))
@@ -7755,6 +7757,23 @@ fn bs_check_wi_fingerprint(ctx: &ActionCtx, compiler_path: &str, label: &str, wi
     args |> push("--bundle-fingerprint")
     args |> push(selfhost_owned_text(fingerprint_path))
     bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+
+// The value of a manifest's `<key> <value>` line ("" if absent).
+fn bs_manifest_field(manifest: &str, key: &str) -> str:
+    let lines = bs_split_nonempty_lines(manifest)
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i as i64)
+        if line.starts_with(key ++ " "):
+            let rest = line.slice(key.len() + 1, line.len())
+            let sp = bs_index_of(rest, " ")
+            return selfhost_owned_text(rest.slice(0, if sp < 0: rest.len() else: sp as i64))
+    ""
+
+fn bs_assert_manifest_field(ctx: &ActionCtx, manifest: &str, key: &str, expected: &str) -> i32:
+    let actual = bs_manifest_field(manifest, key)
+    if actual != expected:
+        return bs_fail(ctx, "manifest `" ++ key ++ "` is '" ++ actual ++ "', expected '" ++ expected ++ "'")
+    0
 
 // The sha on the first line of a --bundle-fingerprint output file.
 fn bs_fingerprint_sha(ctx: &ActionCtx, path: &str) -> str:
@@ -7785,10 +7804,12 @@ fn bs_expect_bundle_omission(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     var rc = bs_write_fixture(ctx, src, bs_bundle_interface_fixture(ctx, "lib/std/" ++ name ++ ".w"), "bundle omission fixture " ++ name)
     if rc != 0: return rc
     let out = bs_join(case_dir, "omit/" ++ name)
-    let result = bs_build_bundle(ctx, compiler_path, "bundle-omit-" ++ name, src, "std/" ++ name, out ++ ".o", out ++ ".wi", out ++ ".fp")
+    let result = bs_build_bundle(ctx, compiler_path, "bundle-omit-" ++ name, src, "std/" ++ name, out ++ ".o", out ++ ".wi", out ++ ".fp", out ++ ".manifest")
     if result.rc != 0:
         return bs_fail(ctx, "a bundle with a generic function must build (the function is omitted, not refused): " ++ name ++ "\n" ++ result.stderr)
     rc = bs_assert_contains(ctx, result.stderr, "1 generic function(s) not exported at Level 0", "bundle omission warning " ++ name)
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, ctx.fs().read_text(out ++ ".manifest"), "\nomitted <embedded-std>/std/" ++ name ++ ".w " ++ omitted_fn ++ " ", "bundle omission manifest line " ++ name)
     if rc != 0: return rc
     let wi_text = ctx.fs().read_text(out ++ ".wi")
     rc = bs_assert_contains(ctx, wi_text, "// not exported at Level 0 (generic): fn " ++ omitted_fn ++ "\n", "bundle omission note " ++ name)
@@ -7802,7 +7823,7 @@ fn bs_expect_bundle_refusal(ctx: &ActionCtx, compiler_path: &str, case_dir: &str
     let rc = bs_write_fixture(ctx, src, bs_bundle_interface_fixture(ctx, "lib/std/" ++ name ++ ".w"), "bundle refusal fixture " ++ name)
     if rc != 0: return rc
     let out = bs_join(case_dir, "refuse/" ++ name)
-    let result = bs_build_bundle(ctx, compiler_path, "bundle-refuse-" ++ name, src, "std/" ++ name, out ++ ".o", out ++ ".wi", out ++ ".fp")
+    let result = bs_build_bundle(ctx, compiler_path, "bundle-refuse-" ++ name, src, "std/" ++ name, out ++ ".o", out ++ ".wi", out ++ ".fp", out ++ ".manifest")
     if result.rc == 0:
         return bs_fail(ctx, "expected --emit-bundle-interface to refuse " ++ name)
     if ctx.fs().exists(out ++ ".wi"):
@@ -7826,8 +7847,9 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let obj_path = bundle ++ ".o"
     let wi_path = bundle ++ ".wi"
     let source_fp = bs_join(case_dir, "fingerprint.source")
-    let built_bundle = bs_build_bundle(ctx, compiler_path, "bundle-interface-object", lib_src, corpus, obj_path, wi_path, source_fp)
-    if built_bundle.rc != 0: return bs_fail(ctx, f"bundle build (object + interface + fingerprint) failed with exit code {built_bundle.rc}")
+    let manifest_path = bundle ++ ".manifest"
+    let built_bundle = bs_build_bundle(ctx, compiler_path, "bundle-interface-object", lib_src, corpus, obj_path, wi_path, source_fp, manifest_path)
+    if built_bundle.rc != 0: return bs_fail(ctx, f"bundle build (object + interface + fingerprint + manifest) failed with exit code {built_bundle.rc}")
     // (3a) The emitter regenerates the hand-written interface byte for byte —
     // the fixture is the expectation, never the other way round.
     let expected_wi = bs_bundle_interface_fixture(ctx, "wi_demo.wi")
@@ -7883,17 +7905,29 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
         if mutated_sha.len() == 0 or mutated_sha == source_sha:
             return bs_fail(ctx, "mutation " ++ mname ++ " left the fingerprint unchanged (" ++ mutated_sha ++ ")")
 
-    // The manifest: this compiler's ABI identity, the object, the
-    // fingerprint, the interface-sha --link-bundle pairs against, and the
-    // object's prefix (a stamped compiler refuses any other abi-sha; a stage
-    // is unstamped, so the manifest is written here).
+    // The manifest the build wrote beside the object: this compiler's ABI
+    // identity (every compiler binary the chain links is stamped, C3.0), the
+    // object, the fingerprint, the interface-sha --link-bundle pairs against,
+    // and the object's prefix.
     var abi_args: Vec[str] = Vec.new()
     abi_args |> push("version")
     abi_args |> push("--abi-sha")
     let abi = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-abi-sha", abi_args, 120000)
     if abi.rc != 0: return bs_fail(ctx, "with version --abi-sha failed")
-    let manifest = "abi-sha " ++ bs_trim_trailing_line_endings(abi.stdout) ++ "\nobject wi_demo.o\nfingerprint " ++ source_sha ++ "\ninterface-sha " ++ bs_sha256_text(emitted_wi) ++ "\nprefix " ++ prefix ++ " <embedded-std>/std/wi_demo.w\n"
-    rc = bs_write_fixture(ctx, bundle ++ ".manifest", manifest, "bundle interface manifest")
+    let abi_sha = bs_trim_trailing_line_endings(abi.stdout)
+    if abi_sha.len() != 64 or abi_sha.starts_with("WITHABISHASTAMP"):
+        return bs_fail(ctx, "the compiler under test carries no ABI stamp: " ++ abi_sha)
+    let manifest = ctx.fs().read_text(manifest_path)
+    if manifest.len() == 0: return bs_fail(ctx, "no manifest written to " ++ manifest_path)
+    rc = bs_assert_manifest_field(ctx, manifest, "abi-sha", abi_sha)
+    if rc != 0: return rc
+    rc = bs_assert_manifest_field(ctx, manifest, "object", "wi_demo.o")
+    if rc != 0: return rc
+    rc = bs_assert_manifest_field(ctx, manifest, "fingerprint", source_sha)
+    if rc != 0: return rc
+    rc = bs_assert_manifest_field(ctx, manifest, "interface-sha", bs_sha256_text(emitted_wi))
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, manifest, "\nprefix " ++ prefix ++ " <embedded-std>/std/wi_demo.w\n", "manifest prefix line")
     if rc != 0: return rc
 
     // (3d) The consumer against the EMITTED interface: builds, links the

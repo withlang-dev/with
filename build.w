@@ -1719,6 +1719,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.extra_output("out/.build-state/seed-input.json")
     stage1 = stage1.timeout(1800000)
     stage1 = stage1.input(host_bin("out/bin/with-sha256"))
+    // The ABI stamp every stage binary carries is sha256 of this record; a
+    // re-record re-links (and re-stamps) the stage.
+    stage1 = stage1.input("docs/with-abi.sha256")
     stage1 = stage1.write_scope("out/bootstrap/bin")
     stage1 = stage1.write_scope("out/.build-state")
     stage1 = stage1.dep("compiler-main-source")
@@ -1745,6 +1748,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.arg("-O1")
     stage2 = stage2.extra_output("out/command/stage2")
     stage2 = stage2.timeout(1800000)
+    stage2 = stage2.input("docs/with-abi.sha256")
     stage2 = stage2.write_scope("out/stage/bin")
     stage2 = stage2.dep("stage1")
     stage2 = stage2.dep("compiler-main-source")
@@ -1760,6 +1764,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = stage3.arg("-O1")
     stage3 = stage3.extra_output("out/command/stage3")
     stage3 = stage3.timeout(1800000)
+    stage3 = stage3.input("docs/with-abi.sha256")
     stage3 = stage3.write_scope("out/stage/bin")
     stage3 = stage3.dep("stage2")
     stage3 = stage3.dep("compiler-main-source")
