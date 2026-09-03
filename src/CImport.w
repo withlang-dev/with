@@ -3451,6 +3451,13 @@ fn ci_parse_postfix_expr(s: &str, params: &str, known: &str) -> str:
                 let libc_result = ci_map_libc_call(fn_name, translated_libc_args)
                 if libc_result.len() > 0:
                     return libc_result
+            // #945: a paste-suffix macro applied to an integer literal IS that
+            // literal with the suffix (`INTMAX_C(9223372036854775807)` is
+            // `9223372036854775807L`) — typed data, not a call to the generic
+            // helper, so a global it initializes folds to data.
+            let pasted_literal = ci_paste_int_literal(fn_name, args_str)
+            if pasted_literal.len() > 0:
+                return pasted_literal
             if ci_str_contains(params, "|" ++ fn_name ++ "|") or with_cimport_is_name_emitted(fn_name) != 0:
                 let translated_args = ci_translate_call_args(args_str, params, known)
                 if translated_args.len() > 0:
@@ -4258,22 +4265,64 @@ fn ci_translate_discard_pattern(body: &str, params: &str, known: &str) -> str:
 
 // ── Token pasting (##) translation ───────────────────────────
 // Handles macros like: (v ## ULL), (v ## U), (v ## L)
-// Translates param##SUFFIX → (param as target_type)
+// Translates param##SUFFIX → (param as target_type); an integer-literal
+// argument at a use site becomes the suffixed literal (ci_paste_int_literal).
 
-fn ci_try_translate_token_paste(body: &str, params: &str) -> str:
+// The suffix of a `param ## SUFFIX` body whose suffix ci_token_paste_suffix
+// types (`(v ## ULL)` → "ULL"), else "". SUFFIX ## param is rare and not
+// translatable.
+fn ci_token_paste_param_suffix(body: &str, params: &str) -> str:
     let stripped = ci_strip_parens(ci_trim(body))
     let paste_pos = ci_find_str(stripped, "##")
     if paste_pos < 0:
         return ""
     let before = ci_trim(stripped.slice(0, paste_pos as i64))
     let after = ci_trim(stripped.slice(paste_pos as i64 + 2, stripped.len()))
-    // Case: param##SUFFIX (e.g., v##U, v##ULL)
-    if ci_str_contains(params, "|" ++ before ++ "|"):
-        let target_type = ci_token_paste_suffix(after)
-        if target_type.len() > 0:
-            return "(" ++ before ++ " as " ++ target_type ++ ")"
-    // Case: SUFFIX##param — rare, not translatable
+    if not ci_str_contains(params, "|" ++ before ++ "|") or ci_token_paste_suffix(after).len() == 0:
+        return ""
+    after
+
+fn ci_try_translate_token_paste(body: &str, params: &str) -> str:
+    let suffix = ci_token_paste_param_suffix(body, params)
+    if suffix.len() == 0:
+        return ""
+    let stripped = ci_strip_parens(ci_trim(body))
+    let param = ci_trim(stripped.slice(0, ci_find_str(stripped, "##") as i64))
+    "(" ++ param ++ " as " ++ ci_token_paste_suffix(suffix) ++ ")"
+
+// #945: the paste suffix of function-like macro `name` as the migrate macro
+// session defines it (`#define INTMAX_C(v) (v ## L)` → "L"), else "". The
+// definition decides, not whether a helper was emitted for it: glibc's
+// `__INT64_C` is never emitted (leading underscore) yet pastes all the same.
+fn ci_macro_paste_suffix(name: &str) -> str:
+    let msession = g_migrate_macro_session
+    if msession == 0 or name.len() == 0:
+        return ""
+    let count = with_cimport_macro_count(msession)
+    for i in 0..count:
+        if with_cimport_macro_is_fn_like(msession, i) != 0 and with_cimport_macro_name(msession, i) == name:
+            var params = ""
+            for pi in 0..with_cimport_macro_param_count(msession, i):
+                params = params ++ "|" ++ ci_escape_reserved(with_cimport_macro_param_name(msession, i, pi)) ++ "|"
+            return ci_token_paste_param_suffix(ci_trim(ci_strip_c_comments(with_cimport_macro_value(msession, i))), params)
     ""
+
+// #945: `macro(arg)` with an integer-literal argument and a paste-suffix
+// definition is the literal with the pasted suffix, spelled as With's typed
+// literal (`9223372036854775807i64`, `5u32`); "" when it is not that shape.
+// The literal's own suffix pastes first, as C does (`5U ## L` is `5UL`).
+fn ci_paste_int_literal(macro_name: &str, arg: &str) -> str:
+    let literal = ci_trim(arg)
+    if not ci_is_int_literal(literal):
+        return ""
+    let suffix = ci_macro_paste_suffix(macro_name)
+    if suffix.len() == 0:
+        return ""
+    let core = ci_strip_int_suffix(literal)
+    let target_type = ci_token_paste_suffix(literal.slice(core.len(), literal.len()) ++ suffix)
+    if target_type.len() == 0:
+        return ""
+    core ++ target_type
 
 fn ci_token_paste_suffix(suffix: &str) -> str:
     if suffix == "U" or suffix == "u": return "u32"
