@@ -6172,15 +6172,22 @@ impl MirBuilder:
         let result_local = self.new_temp(result_ty)
         let result_place = self.place_for_local(result_local)
 
+        // Each branch is its own temporary scope (lower_if, #729; lower_match):
+        // a temp created inside one branch must drop on that branch's path,
+        // never at the join where the other path would free garbage.
         self.switch_to(then_bb)
         let _ = self.lower_pattern(pat, scrutinee_place)
+        let then_temp_frame = self.push_stmt_temp_frame()
         let then_op = self.lower_expr(then_expr)
         self.assign_operand_to_place(result_place, then_op, self.ast.get_start(then_expr))
+        self.finish_stmt_temp_frame(then_temp_frame)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(else_bb)
+        let else_temp_frame = self.push_stmt_temp_frame()
         let else_op = if else_expr_opt != 0: self.lower_expr(else_expr_opt) else: self.unit_operand()
         self.assign_operand_to_place(result_place, else_op, self.ast.get_start(node))
+        self.finish_stmt_temp_frame(else_temp_frame)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         // #605/#606: like match, consume the if-let subject so the enum payload-drop
@@ -8735,7 +8742,12 @@ impl MirBuilder:
             self.field_move_in_branch = self.field_move_in_branch + 1
 
             if guard_node != 0:
+                // A temp created by the guard exists only on this arm's dispatch
+                // path; frame it like the arm body below so it never reaches the
+                // enclosing statement frame (which drops at the match's join).
+                let guard_temp_frame = self.push_stmt_temp_frame()
                 let guard_op = self.lower_expr(guard_node)
+                self.finish_stmt_temp_frame(guard_temp_frame)
                 let guard_pass_bb = self.new_block()
                 let guard_fail_bb = self.new_block()
                 let vals: Vec[i32] = Vec.new()
@@ -8754,6 +8766,15 @@ impl MirBuilder:
                 self.terminate(TermKind.TK_GOTO, fail_bb, 0, 0, 0)
                 self.switch_to(guard_pass_bb)
 
+            // The arm body is its own temporary scope (like lower_if's branches
+            // after #729): a temp created inside the arm — a call result, or a
+            // default-argument value such as assert's message — exists only on
+            // this arm's path. Left in the enclosing statement frame, its drop
+            // landed at the match's join (here: the function's exit block) and
+            // every other arm's path freed uninitialized stack garbage. A temp
+            // moved into the arm result is cancelled by assign_operand_to_place
+            // before the frame closes.
+            let arm_temp_frame = self.push_stmt_temp_frame()
             if result_is_void != 0:
                 let _ = self.lower_expr_discard(body_node)
             else:
@@ -8768,6 +8789,7 @@ impl MirBuilder:
                 // corrupts typed MIR when the result type is non-Unit.
                 if self.sema.body_can_fall_through(body_node) != 0:
                     self.assign_operand_to_place(result_place, arm_value, self.ast.get_start(body_node))
+            self.finish_stmt_temp_frame(arm_temp_frame)
             // Reset-on-move (spec §2.5.1): flush this arm's pending source-resets
             // inside the arm, before it merges to the join (same reason as lower_if).
             self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)

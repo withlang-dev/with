@@ -1855,6 +1855,12 @@ type MirDropStateBlocksState {
     counts: Vec[i32],
     keys: Vec[str],
     states: Vec[i32],
+    // 1 once a block's out-state has been stored at least once. A predecessor
+    // that has never been computed contributes nothing to a join (it is not
+    // "all Uninit" — that was the single-pass driver's blind spot: a join block
+    // numbered before its arm blocks, as lower_match allocates them, saw no
+    // computed predecessor and took the entry state instead).
+    computed: Vec[i32],
 }
 
 type MirDropStateBlocks {
@@ -1869,14 +1875,17 @@ fn mir_drop_state_blocks_new(bb_count: i32) -> MirDropStateBlocks:
         counts: Vec.new(),
         keys: Vec.new(),
         states: Vec.new(),
+        computed: Vec.new(),
     }
     for _ in 0..bb_count:
         unsafe { ptr.starts.push(0) }
         unsafe { ptr.counts.push(0) }
+        unsafe { ptr.computed.push(0) }
     MirDropStateBlocks { state: ptr }
 
 fn mir_drop_state_store_block(blocks: MirDropStateBlocks, bb: i32, map: MirDropStateMap):
     let st = blocks.state
+    unsafe { st.computed.set_i32(bb as i64, 1) }
     unsafe { st.starts.set_i32(bb as i64, st.keys.len() as i32) }
     unsafe { st.counts.set_i32(bb as i64, mir_drop_state_map_len(map)) }
     for i in 0..mir_drop_state_map_len(map):
@@ -1897,9 +1906,16 @@ fn mir_drop_state_load_block(blocks: MirDropStateBlocks, bb: i32) -> MirDropStat
 fn mir_drop_state_block_input(body: &MirBody, blocks: MirDropStateBlocks, bb: i32) -> MirDropStateMap:
     if bb == 0:
         return mir_drop_state_initial(body)
+    // Join over EVERY predecessor, not just the lower-numbered ones: a join
+    // block is often numbered before the arms that feed it (lower_match, the
+    // loop back-edge). A predecessor not computed yet contributes nothing; the
+    // fixpoint driver revisits this block once it is.
     var seen = 0
     var out = mir_drop_state_map_new()
-    for pred in 0..bb:
+    let st = blocks.state
+    for pred in 0..body.block_count():
+        if unsafe { st.computed.get(pred as i64) } == 0:
+            continue
         if not mir_drop_state_block_has_successor(body, pred, bb):
             continue
         let pred_map = mir_drop_state_load_block(blocks, pred)
@@ -1911,6 +1927,22 @@ fn mir_drop_state_block_input(body: &MirBody, blocks: MirDropStateBlocks, bb: i3
     if seen == 0:
         return mir_drop_state_initial(body)
     out
+
+// Whether `bb` has an input this sweep: the entry block always does; any other
+// block needs at least one computed predecessor. Feeding an uncomputed block
+// the entry state instead is not a bottom element of this lattice (Uninit and
+// Init are siblings under Maybe), and a loop seeded that way oscillates
+// forever instead of climbing to its fixpoint.
+fn mir_drop_state_block_has_input(body: &MirBody, blocks: MirDropStateBlocks, bb: i32) -> bool:
+    if bb == 0:
+        return true
+    let st = blocks.state
+    for pred in 0..body.block_count():
+        if unsafe { st.computed.get(pred as i64) } == 0:
+            continue
+        if mir_drop_state_block_has_successor(body, pred, bb):
+            return true
+    false
 
 fn mir_drop_state_format(map: MirDropStateMap) -> str:
     var out = ""
@@ -1939,7 +1971,7 @@ fn dump_drop_state_body(body: &MirBody, pool: &InternPool) -> str:
         "<anon>"
     out = out ++ "fn " ++ fn_name ++ " " ++ lbrace() ++ "\n"
     let bb_count = body.block_count()
-    let blocks = mir_drop_state_blocks_new(bb_count)
+    let blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..bb_count:
         let state = mir_drop_state_block_input(body, blocks, bb)
         out = out ++ f"  bb{bb} in: " ++ mir_drop_state_format(state) ++ "\n"
@@ -2083,24 +2115,58 @@ fn mir_ownership_term_event(body: &MirBody, bb: i32, target: &str) -> str:
         return "goto"
     "term"
 
+fn mir_drop_state_map_equal(a: MirDropStateMap, b: MirDropStateMap) -> bool:
+    let count = mir_drop_state_map_len(a)
+    if count != mir_drop_state_map_len(b):
+        return false
+    for i in 0..count:
+        let idx = mir_drop_state_map_find(b, mir_drop_state_map_key(a, i))
+        if idx < 0 or mir_drop_state_map_state(b, idx) != mir_drop_state_map_state(a, i):
+            return false
+    true
+
+// Every block's out-state at the dataflow fixpoint. One sweep in block order is
+// not enough: a block's input joins ALL its predecessors, some of which are
+// numbered after it (match arms feeding an earlier join block, loop back
+// edges), so sweeps repeat until no stored out-state changes. The lattice is
+// finite (each place climbs Uninit/Init/Moved → Maybe → MaybeGarbage at most
+// twice), so the bound below is never reached by a converging body; hitting it
+// is a driver bug and fails loudly rather than returning a partial answer.
 fn mir_drop_state_compute_blocks(body: &MirBody) -> MirDropStateBlocks:
     let bb_count = body.block_count()
     let blocks = mir_drop_state_blocks_new(bb_count)
-    for bb in 0..bb_count:
-        let state = mir_drop_state_block_input(body, blocks, bb)
-        let stmt_start = body.bb_stmt_starts.get(bb as i64)
-        let stmt_count = body.bb_stmt_counts.get(bb as i64)
-        for si in 0..stmt_count:
-            mir_drop_state_transfer_stmt(state, body, stmt_start + si)
-        mir_drop_state_transfer_term(state, body, bb)
-        mir_drop_state_store_block(blocks, bb, state)
+    let sweep_bound = 3 * (body.local_count() + 1) * (bb_count + 1) + 2
+    var sweeps = 0
+    var changed = true
+    while changed:
+        changed = false
+        sweeps = sweeps + 1
+        if sweeps > sweep_bound:
+            panic(f"mir drop-state dataflow did not converge for sym{body.fn_sym} after {sweeps} sweeps")
+        for bb in 0..bb_count:
+            // No computed predecessor yet (or unreachable): nothing to
+            // propagate this sweep; a later sweep picks the block up once a
+            // predecessor is stored.
+            if not mir_drop_state_block_has_input(body, blocks, bb):
+                continue
+            let state = mir_drop_state_block_input(body, blocks, bb)
+            let stmt_start = body.bb_stmt_starts.get(bb as i64)
+            let stmt_count = body.bb_stmt_counts.get(bb as i64)
+            for si in 0..stmt_count:
+                mir_drop_state_transfer_stmt(state, body, stmt_start + si)
+            mir_drop_state_transfer_term(state, body, bb)
+            let st = blocks.state
+            let was_computed = unsafe { st.computed.get(bb as i64) } != 0
+            if not was_computed or not mir_drop_state_map_equal(state, mir_drop_state_load_block(blocks, bb)):
+                changed = true
+            mir_drop_state_store_block(blocks, bb, state)
     blocks
 
 fn trace_ownership_body(body: &MirBody, pool: &InternPool, sema: &Sema, spec: &str, target: &str) -> str:
     var out = ""
     out = out ++ "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
     var hits = 0
-    let blocks = mir_drop_state_blocks_new(body.block_count())
+    let blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
         let state = mir_drop_state_block_input(body, blocks, bb)
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
@@ -2159,7 +2225,7 @@ fn mir_drop_plan_place_line(body: &MirBody, pool: &InternPool, sema: &Sema, plac
 fn dump_drop_plan_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
     var out = "fn " ++ mir_debug_body_label(body, pool) ++ "\n"
     var hits = 0
-    let blocks = mir_drop_state_blocks_new(body.block_count())
+    let blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
         let state = mir_drop_state_block_input(body, blocks, bb)
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
@@ -2222,7 +2288,7 @@ pub fn mir_elaborate_dead_drops(body: MirBody) -> MirBody:
     if not has_drop:
         return body
     var to_nop: Vec[i32] = Vec.new()
-    let blocks = mir_drop_state_blocks_new(body.block_count())
+    let blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
         let state = mir_drop_state_block_input(&body, blocks, bb)
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
@@ -2377,7 +2443,7 @@ fn trace_cleanup_edge_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema
     out
 
 fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
-    let blocks = mir_drop_state_blocks_new(body.block_count())
+    let blocks = mir_drop_state_compute_blocks(body)
     for bb in 0..body.block_count():
         let state = mir_drop_state_block_input(body, blocks, bb)
         let stmt_start = body.bb_stmt_starts.get(bb as i64)
