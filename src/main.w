@@ -918,6 +918,15 @@ fn run_cli(argc: i32) -> i32:
         var comp = Compilation.init()
         comp.configure(0, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
+        // §18.5: `--target` selects the platform the check is for — its
+        // layouts and @[target] guards, exactly as `build` and `ir` resolve
+        // them — so a cross bundle's interface fingerprint (below) is taken
+        // under the target the object was compiled for (#946).
+        let check_target = driver_parse_build_target(argc)
+        if not check_target.ok:
+            with_eprint("error: " ++ check_target.error_msg)
+            return 1
+        comp.set_target_kind(check_target.kind)
         comp.set_link_bundles(&driver_link_bundle_args(argc))
         // D39: `--bundle-fingerprint` on check is the interface-side pass of
         // the bundle build's fingerprint comparison; a `.wi` root holding
