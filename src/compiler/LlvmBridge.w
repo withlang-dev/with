@@ -1618,8 +1618,8 @@ pub fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
         LLVMDisposeTargetData(layout)
         LLVMDisposeMessage(default_triple)
         // `with ir` emits UNOPTIMIZED IR, so this path is the only place the
-        // -O1 pipeline runs for an IR->object target (regex_runtime.o in every
-        // build). Run the one pipeline the direct source->object path runs —
+        // -O1 pipeline runs for an IR->object target. Run the one pipeline
+        // the direct source->object path runs —
         // wl_optimize is the single pass-runner, so the two routes cannot
         // drift — and the invariant "-O1 everywhere" holds here too, not just
         // at codegen level.

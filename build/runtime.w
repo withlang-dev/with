@@ -40,7 +40,6 @@ pub fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
     stale_runtime_objects.push("out/lib/rt_windows_x86_64.o")
     stale_runtime_objects.push("out/lib/compat_runtime.o")
     stale_runtime_objects.push("out/lib/panic_runtime.o")
-    stale_runtime_objects.push("out/lib/regex_runtime.o")
     stale_runtime_objects.push("out/lib/channel_runtime.o")
     stale_runtime_objects.push("out/lib/fiber_runtime.o")
     stale_runtime_objects.push("out/lib/fiber.o")

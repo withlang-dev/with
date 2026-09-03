@@ -548,7 +548,6 @@ int __open(const uint8_t *path, int flags, int mode) {
 WITH_EMPTY_EMBEDDED_OBJECT(cimport_stubs_o);
 WITH_EMPTY_EMBEDDED_OBJECT(compat_runtime_o);
 WITH_EMPTY_EMBEDDED_OBJECT(panic_runtime_o);
-WITH_EMPTY_EMBEDDED_OBJECT(regex_runtime_o);
 WITH_EMPTY_EMBEDDED_OBJECT(fiber_stubs_o);
 WITH_EMPTY_EMBEDDED_OBJECT(channel_runtime_o);
 WITH_EMPTY_EMBEDDED_OBJECT(fiber_runtime_o);

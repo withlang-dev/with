@@ -428,23 +428,13 @@ fn emitc_public_function_name(line: &str) -> str:
 fn emitc_is_bridge_abi_symbol(name: &str) -> bool:
     name.starts_with("wl_") or name.starts_with("with_cimport_") or name.starts_with("with_ci_")
 
-fn emitc_is_runtime_abi_symbol(name: &str) -> bool:
-    name.starts_with("with_regex_")
-
-fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: &str, runtime: i32) -> Vec[EmitCFunction]:
+fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> Vec[EmitCFunction]:
     let exports: Vec[EmitCFunction] = Vec.new()
     let lines = emitc_split_lines(text)
     for li in 0..lines.len() as i32:
         let line = emitc_trim(lines[li])
         let name = emitc_public_function_name(line)
-        if name.len() == 0:
-            continue
-        let include =
-            if runtime != 0:
-                emitc_is_runtime_abi_symbol(name)
-            else:
-                emitc_is_bridge_abi_symbol(name)
-        if not include:
+        if name.len() == 0 or not emitc_is_bridge_abi_symbol(name):
             continue
         let fn_sig = emitc_parse_export_function(name, line)
         if fn_sig.ok == 0:
@@ -453,7 +443,7 @@ fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: 
         exports.push(fn_sig)
     exports
 
-fn emitc_collect_public_abi(ctx: &ActionCtx, sources: Vec[str], runtime: i32) -> Vec[EmitCFunction]:
+fn emitc_collect_public_abi(ctx: &ActionCtx, sources: Vec[str]) -> Vec[EmitCFunction]:
     let all: Vec[EmitCFunction] = Vec.new()
     let fs = ctx.fs()
     for si in 0..sources.len() as i32:
@@ -462,7 +452,7 @@ fn emitc_collect_public_abi(ctx: &ActionCtx, sources: Vec[str], runtime: i32) ->
         if text.len() == 0:
             let _ = emitc_fail(ctx, "could not read source for ABI scan: " ++ source_path)
             return Vec.new()
-        var exports = emitc_collect_public_abi_from_text(ctx, text, source_path, runtime)
+        var exports = emitc_collect_public_abi_from_text(ctx, text, source_path)
         if exports.len() == 0:
             return Vec.new()
         while exports.len() > 0:
@@ -501,7 +491,7 @@ fn emitc_generate_stub_files(ctx: &ActionCtx) -> i32:
     let bridge_sources: Vec[str] = Vec.new()
     bridge_sources |> push("src/compiler/LlvmBridge.w")
     bridge_sources |> push("src/compiler/ClangBridge.w")
-    let stub_exports = emitc_collect_public_abi(ctx, bridge_sources, 0)
+    let stub_exports = emitc_collect_public_abi(ctx, bridge_sources)
     if stub_exports.len() == 0:
         return emitc_fail(ctx, "found no bridge exports")
     let fs = ctx.fs()
@@ -523,13 +513,6 @@ fn emitc_generate_stub_files(ctx: &ActionCtx) -> i32:
             stubs = stubs ++ "    (void)" ++ param.name ++ ";\n"
         stubs = stubs ++ emitc_stub_return(fn_sig.return_type)
         stubs = stubs ++ "}\n\n"
-    let runtime_sources: Vec[str] = Vec.new()
-    runtime_sources |> push("rt/regex_runtime.w")
-    let runtime_exports = emitc_collect_public_abi(ctx, runtime_sources, 1)
-    if runtime_exports.len() == 0:
-        return emitc_fail(ctx, "found no runtime exports")
-    for ei in 0..runtime_exports.len() as i32:
-        decls = decls ++ emitc_function_proto(runtime_exports[ei]) ++ ";\n"
     decls = decls ++ "\n#endif\n"
     if fs.write_text("out/gen/wl_decls.h", decls) != 0:
         return emitc_fail(ctx, "could not write out/gen/wl_decls.h")
@@ -600,7 +583,6 @@ fn emitc_compile_runtime_args(root: &str, argv: Vec[str], platform_obj: &str) ->
     argv |> push(emitc_abs(root, "out/lib/" ++ platform_obj))
     argv |> push(emitc_abs(root, "out/lib/compat_runtime.o"))
     argv |> push(emitc_abs(root, "out/lib/panic_runtime.o"))
-    argv |> push(emitc_abs(root, "out/lib/regex_runtime.o"))
     argv |> push(emitc_abs(root, "out/lib/fiber_stubs.o"))
     argv |> push(emitc_abs(root, "out/lib/cimport_stubs.o"))
     argv

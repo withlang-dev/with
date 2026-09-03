@@ -3169,24 +3169,11 @@ fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path:
     let platform_obj = bs_host_platform_runtime_object()
     if platform_obj.len() == 0:
         return bs_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
-    // regex_runtime.o's thunks reference the migrated pcre2 symbols; the real
-    // link path adds it as an on-demand ARCHIVE (members pulled only when a
-    // program needs regex). Mirror that — linking the raw object would demand
-    // pcre2_* even for programs that never touch regex.
-    let regex_ar = bs_abs(root, bs_join(case_dir, "regex_runtime.a"))
-    var ar_args: Vec[str] = Vec.new()
-    ar_args |> push("ar")
-    ar_args |> push("rcs")
-    ar_args |> push(selfhost_owned_text(regex_ar))
-    ar_args |> push(bs_abs(root, "out/lib/regex_runtime.o"))
-    let ar_result = ctx.process_runner().run_capture(ar_args, stdout_path, stderr_path, 120000)
-    if ar_result.rc != 0:
-        return bs_fail(ctx, "could not archive regex_runtime.o for emit-c link")
     var cc_args: Vec[str] = Vec.new()
     cc_args = bs_push_c_compiler(move cc_args)
     cc_args |> push("-O1")
     // Mirror the real link path: dead-strip removes unreferenced runtime
-    // thunks (e.g. regex->pcre2) so their undefs never reach resolution.
+    // code so its undefs never reach resolution.
     if os() == "Linux":
         cc_args |> push("-no-pie")
         cc_args |> push("-Wl,--gc-sections")
@@ -3199,7 +3186,6 @@ fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path:
     cc_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
     cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
-    cc_args |> push(regex_ar)
     cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
     cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
     cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
@@ -3627,24 +3613,11 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let platform_obj = bs_host_platform_runtime_object()
     if platform_obj.len() == 0:
         return bs_fail(ctx, "unsupported host runtime object for emit-c smoke C compile: " ++ os() ++ "/" ++ arch())
-    // regex_runtime.o's thunks reference the migrated pcre2 symbols; the real
-    // link path adds it as an on-demand ARCHIVE (members pulled only when a
-    // program needs regex). Mirror that — linking the raw object would demand
-    // pcre2_* even for programs that never touch regex.
-    let regex_ar = bs_abs(root, bs_join(output_dir, "regex_runtime.a"))
-    var ar_args: Vec[str] = Vec.new()
-    ar_args |> push("ar")
-    ar_args |> push("rcs")
-    ar_args |> push(selfhost_owned_text(regex_ar))
-    ar_args |> push(bs_abs(root, "out/lib/regex_runtime.o"))
-    let ar_result = ctx.process_runner().run_capture(ar_args, compile_stdout, compile_stderr, 120000)
-    if ar_result.rc != 0:
-        return bs_fail(ctx, "could not archive regex_runtime.o for emit-c link")
     var cc_args: Vec[str] = Vec.new()
     cc_args = bs_push_c_compiler(move cc_args)
     cc_args |> push("-O1")
     // Mirror the real link path: dead-strip removes unreferenced runtime
-    // thunks (e.g. regex->pcre2) so their undefs never reach resolution.
+    // code so its undefs never reach resolution.
     if os() == "Linux":
         cc_args |> push("-no-pie")
         cc_args |> push("-Wl,--gc-sections")
@@ -3657,7 +3630,6 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     cc_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
     cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
-    cc_args |> push(regex_ar)
     cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
     cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
     cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
