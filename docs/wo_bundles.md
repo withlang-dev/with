@@ -385,9 +385,14 @@ manifest's. `--bundle-corpus std/re` selects `<embedded-std>/std/re/…`;
 The emitter (`src/compiler/BundleInterfaceEmit.w`) prints from Sema's
 finalized tables only, never source text, never a placeholder: a
 declaration it cannot state exactly is a loud error naming it and
-nothing is written. Per section: the module's `use` lines in import order
-(a module holding only `use` lines, as pcre2's migrated table modules do,
-still gets a section), then types, consts, storage globals, extern fns,
+nothing is written. Per section: the `use` lines its declarations need, in
+import order — every corpus sibling, and a module outside the corpus only
+when one of the section's declarations names a type it declares; a
+body's imports are implementation, never interface (pcre2_maketables'
+`use std.libc` stays out of every program's prelude closure, where its
+stdio globals would shadow any local named `stdout`) — (a module holding
+only `use` lines, as pcre2's migrated table modules do, still gets a
+section), then types, consts, storage globals, extern fns,
 free fns and impl blocks, each group bytewise by name. Exported: every
 `pub` declaration plus every corpus type a printed declaration names,
 with its own visibility (a layout needs its field types; a std-tier

@@ -65,6 +65,10 @@ pub type BundleInterfaceModel {
     // interface, named here ("<module>\t<name>\tgeneric-fn") for the
     // manifest's `omitted` lines
     omitted: Vec[str],
+    // "<module>\t<canonical path>" per module OUTSIDE the corpus whose type a
+    // declaration of <module> names: the only non-corpus `use` lines a
+    // section carries (a body's imports are implementation, never interface)
+    needed_imports: Vec[str],
 }
 
 type BundleEmitter {
@@ -86,6 +90,15 @@ type BundleEmitter {
     // the type closure worklist: name symbols a printed declaration named
     named_type_syms: Vec[i32],
     named_type_seen: HashMap[i32, i32],
+    // every type declaration in the compilation: name symbol → canonical
+    // module path, so a named non-corpus type finds the `use` it needs
+    type_decl_paths: HashMap[i32, str],
+    // the module whose declaration is being printed, and per module the
+    // type symbols its declarations named ("<module>\t<sym>" deduped)
+    current_module: str,
+    named_in_module_paths: Vec[str],
+    named_in_module_syms: Vec[i32],
+    named_in_module_seen: HashMap[str, i32],
     exports: Vec[BundleExport],
     // "<module>: <declaration>" for messages
     context: str,
@@ -115,6 +128,11 @@ fn bx_new_emitter(corpus: &str, unlowered_globals: &Vec[str]) -> BundleEmitter:
         impl_decl_indices: Vec.new(),
         named_type_syms: Vec.new(),
         named_type_seen: HashMap.new(),
+        type_decl_paths: HashMap.new(),
+        current_module: "",
+        named_in_module_paths: Vec.new(),
+        named_in_module_syms: Vec.new(),
+        named_in_module_seen: HashMap.new(),
         exports: Vec.new(),
         context: "",
         failed: false,
@@ -177,10 +195,35 @@ impl BundleEmitter:
             self.module_sources.push(with_str_clone_ref(source_path))
 
     mut fn note_named_type(sym: i32):
-        if sym == 0 or self.named_type_seen.contains(sym):
+        if sym == 0:
+            return
+        if self.current_module.len() > 0:
+            let key = self.current_module ++ "\t" ++ f"{sym}"
+            if not self.named_in_module_seen.contains(key):
+                self.named_in_module_seen.insert(with_str_clone_ref(key), 1)
+                self.named_in_module_paths.push(with_str_clone_ref(self.current_module))
+                self.named_in_module_syms.push(sym)
+        if self.named_type_seen.contains(sym):
             return
         self.named_type_seen.insert(sym, 1)
         self.named_type_syms.push(sym)
+
+    // The non-corpus `use` lines each section needs: a module outside the
+    // corpus is imported by a section only when one of that section's
+    // declarations names a type it declares.
+    fn needed_imports() -> Vec[str]:
+        var out: Vec[str] = Vec.new()
+        for ni in 0..self.named_in_module_syms.len() as i32:
+            let sym = self.named_in_module_syms.get(ni as i64)
+            if not self.type_decl_paths.contains(sym):
+                continue
+            let path = self.type_decl_paths.get(sym).unwrap()
+            if bundle_corpus_contains(self.corpus, path):
+                continue
+            let row = self.named_in_module_paths.get(ni as i64) ++ "\t" ++ path
+            if not out.contains(row):
+                out.push(row)
+        out
 
     mut fn push_export(kind: i32, mod_path: &str, name: &str, wi: &str, row: &str):
         self.exports.push(BundleExport {
@@ -906,11 +949,13 @@ impl BundleEmitter:
         for di in 0..dc:
             let path = sema.decl_source_paths[di]
             let canonical = codegen_canonical_module_path(path)
+            let decl = ast.get_decl(di) as i32
+            let kind = ast.kind(decl)
+            if kind == NodeKind.NK_TYPE_DECL and not self.type_decl_paths.contains(ast.get_data0(decl)):
+                self.type_decl_paths.insert(ast.get_data0(decl), with_str_clone_ref(canonical))
             if bundle_corpus_contains(self.corpus, canonical):
                 self.decl_modules.push(with_str_clone_ref(canonical))
                 self.add_module(canonical, path)
-                let decl = ast.get_decl(di) as i32
-                let kind = ast.kind(decl)
                 if kind == NodeKind.NK_TYPE_DECL:
                     self.type_decl_index.insert(ast.get_data0(decl), di)
                 else if kind == NodeKind.NK_IMPL_DECL:
@@ -934,6 +979,7 @@ impl BundleEmitter:
             let mod_path = with_str_clone_ref(self.decl_modules[di])
             if mod_path.len() == 0:
                 continue
+            self.current_module = with_str_clone_ref(mod_path)
             let decl = ast.get_decl(di) as i32
             let kind = ast.kind(decl)
             if kind == NodeKind.NK_USE_DECL:
@@ -985,7 +1031,9 @@ impl BundleEmitter:
             if not self.type_decl_index.contains(sym):
                 continue
             let di: i32 = self.type_decl_index.get(sym).unwrap()
+            self.current_module = with_str_clone_ref(self.decl_modules.get(di as i64))
             self.emit_type(sema, di, ast.get_decl(di) as i32)
+        self.current_module = ""
 
 // Build the exported-declaration model of the corpus modules in `sema`.
 pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &Vec[str]) -> BundleInterfaceModel:
@@ -997,6 +1045,7 @@ pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &Vec
         for mi in 0..em.modules.len() as i32:
             if em.modules[mi] == ordered[oi]:
                 sources.push(with_str_clone_ref(em.module_sources[mi]))
+    let needed_imports = em.needed_imports()
     BundleInterfaceModel {
         ok: em.errors.len() == 0,
         corpus: with_str_clone_ref(corpus),
@@ -1006,6 +1055,7 @@ pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &Vec
         errors: move em.errors,
         warnings: move em.warnings,
         omitted: move em.omitted,
+        needed_imports,
     }
 
 // The export indices of one module in canonical order: kind, then name.
@@ -1042,9 +1092,17 @@ pub fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> Bun
         let module_index: i32 = sema.module_index_by_path.get(with_str_clone_ref(source_path)).unwrap()
         let edge_start = sema.module_import_starts[module_index]
         let edge_count = sema.module_import_counts[module_index]
+        // The section imports its corpus siblings, and a module outside the
+        // corpus only when a declaration names one of its types (D39: a
+        // body's `use` is implementation — pcre2_maketables' std.libc would
+        // otherwise reach every program through the prelude's std.regex).
         for ei in 0..edge_count:
             let import_path = sema.module_import_paths[(edge_start + ei)]
             if import_path == "std.prelude" or import_path == "std.prelude_core" or import_path == "std.prelude_alloc":
+                continue
+            let target_index = sema.module_import_targets.get((edge_start + ei) as i64)
+            let target = codegen_canonical_module_path(sema.module_paths.get(target_index as i64))
+            if not bundle_corpus_contains(model.corpus, target) and not model.needed_imports.contains(mod_path ++ "\t" ++ target):
                 continue
             out.push_str("use " ++ import_path ++ "\n")
             line_count = line_count + 1
