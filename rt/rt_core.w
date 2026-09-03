@@ -2440,6 +2440,7 @@ pub fn with_arg_at(idx: i32) -> str:
 pub fn with_getenv_str(name: &str) -> str:
     let cname = str_to_cstr(name)
     let val = rt_getenv(cname)
+    cstr_free(cname)
     if val as i64 == 0:
         return make_str("" as *const u8, 0)
     make_str(val, cstr_len(val))
@@ -3274,8 +3275,11 @@ fn fs_mkdir_component(path: *const u8, mode: i32) -> i32:
         return 0
     rc
 
-pub fn with_fs_read_file(path: &str) -> str:
-    let cpath = str_to_cstr(path)
+// The C path copy str_to_cstr makes lives exactly as long as the call it
+// serves (#952: every wrapper leaked one per call).
+fn cstr_free(cpath: *const u8): rt_free(cpath as *mut u8)
+
+fn fs_read_file_c(cpath: *const u8) -> str:
     if fs_path_is_dir_c(cpath):
         return make_str("" as *const u8, 0)
     let fd = rt_open(cpath, 0, 0)  // O_RDONLY
@@ -3299,8 +3303,15 @@ pub fn with_fs_read_file(path: &str) -> str:
     unsafe *((buf as i64 + total) as *mut u8) = 0
     make_str(buf as *const u8, total)
 
-pub fn with_fs_write_file(path: &str, data: &str) -> i32:
+pub fn with_fs_read_file(path: &str) -> str:
     let cpath = str_to_cstr(path)
+    let text = fs_read_file_c(cpath)
+    cstr_free(cpath)
+    text
+
+// 0 when every byte reached the file; a failed open returns its error, a
+// short or failed write -1 (#951: a short write reported success).
+fn fs_write_file_c(cpath: *const u8, data: &str) -> i32:
     // O_WRONLY=1, O_CREAT=0x200, O_TRUNC=0x400
     let fd = rt_open(cpath, 1 | 0x200 | 0x400, 0o644)
     if fd < 0: return fd
@@ -3312,24 +3323,28 @@ pub fn with_fs_write_file(path: &str, data: &str) -> i32:
         if r <= 0: break
         written = written + r
     let _ = rt_close(fd)
-    0
+    if written < dl: -1 else: 0
+
+pub fn with_fs_write_file(path: &str, data: &str) -> i32:
+    let cpath = str_to_cstr(path)
+    let rc = fs_write_file_c(cpath, data)
+    cstr_free(cpath)
+    rc
 
 pub fn with_fs_file_exists(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    if rt_access(cpath, 0) != 0:
-        return 0
-    1
+    let rc = if rt_access(cpath, 0) != 0: 0 else: 1
+    cstr_free(cpath)
+    rc
 
 pub fn with_fs_is_dir(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    if fs_path_is_dir_c(cpath):
-        return 1
-    0
+    let rc = if fs_path_is_dir_c(cpath): 1 else: 0
+    cstr_free(cpath)
+    rc
 
-pub fn with_fs_mkdir_p(path: &str) -> i32:
-    let cpath = str_to_cstr(path)
+fn fs_mkdir_p_c(cpath: *const u8, slen: i64) -> i32:
     // Create each directory component
-    let slen = path.len()
     var i: i64 = 1
     while i < slen:
         if unsafe *((cpath as i64 + i) as *const u8) == 47:  // '/'
@@ -3341,9 +3356,17 @@ pub fn with_fs_mkdir_p(path: &str) -> i32:
         i = i + 1
     fs_mkdir_component(cpath, 493)
 
+pub fn with_fs_mkdir_p(path: &str) -> i32:
+    let cpath = str_to_cstr(path)
+    let rc = fs_mkdir_p_c(cpath, path.len())
+    cstr_free(cpath)
+    rc
+
 pub fn with_fs_remove_file(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    rt_unlink(cpath)
+    let rc = rt_unlink(cpath)
+    cstr_free(cpath)
+    rc
 
 pub fn with_libc_open(path: *const i8, flags: i32, mode: i32) -> i32:
     let r = rt_open(path, flags, mode)
@@ -3371,46 +3394,69 @@ pub fn with_libc_unlink(path: *const i8) -> i32:
 
 pub fn with_fs_chmod(path: &str, mode: i32) -> i32:
     let cpath = str_to_cstr(path)
-    rt_chmod(cpath, mode)
+    let rc = rt_chmod(cpath, mode)
+    cstr_free(cpath)
+    rc
 
 pub fn with_fs_file_mode(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    rt_file_mode(cpath)
+    let rc = rt_file_mode(cpath)
+    cstr_free(cpath)
+    rc
 
 pub fn with_fs_readlink(path: &str) -> str:
     let cpath = str_to_cstr(path)
-    rt_readlink(cpath)
+    let target = rt_readlink(cpath)
+    cstr_free(cpath)
+    target
 
 pub fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32:
     let cold = str_to_cstr(old_path)
     let cnew = str_to_cstr(new_path)
-    rt_rename(cold, cnew)
+    let rc = rt_rename(cold, cnew)
+    cstr_free(cold)
+    cstr_free(cnew)
+    rc
 
 pub fn with_fs_create_dir(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    rt_mkdir(cpath, 493)  // 0755
+    let rc = rt_mkdir(cpath, 493)  // 0755
+    cstr_free(cpath)
+    rc
 
 pub fn with_fs_remove_dir(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    rt_rmdir(cpath)
+    let rc = rt_rmdir(cpath)
+    cstr_free(cpath)
+    rc
 
 pub fn with_fs_remove_tree(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    rt_remove_tree(cpath)
+    let rc = rt_remove_tree(cpath)
+    cstr_free(cpath)
+    rc
 
 pub fn with_fs_copy_tree(src: &str, dst: &str) -> i32:
     let csrc = str_to_cstr(src)
     let cdst = str_to_cstr(dst)
-    rt_copy_tree(csrc, cdst)
+    let rc = rt_copy_tree(csrc, cdst)
+    cstr_free(csrc)
+    cstr_free(cdst)
+    rc
 
 pub fn with_fs_symlink(target: &str, link_path: &str) -> i32:
     let ctarget = str_to_cstr(target)
     let clink = str_to_cstr(link_path)
-    rt_symlink(ctarget, clink)
+    let rc = rt_symlink(ctarget, clink)
+    cstr_free(ctarget)
+    cstr_free(clink)
+    rc
 
 pub fn with_fs_list_files(path: &str) -> str:
     let cpath = str_to_cstr(path)
-    rt_list_files(cpath)
+    let listing = rt_list_files(cpath)
+    cstr_free(cpath)
+    listing
 
 // ── stdin I/O ──────────────────────────────────────────────────────
 
@@ -3561,7 +3607,9 @@ pub fn with_process_alive(pid: i32) -> i32:
 
 pub fn with_fs_mkdir(path: &str) -> i32:
     let cpath = str_to_cstr(path)
-    rt_mkdir(cpath, 493)
+    let rc = rt_mkdir(cpath, 493)
+    cstr_free(cpath)
+    rc
 
 pub fn with_str_from_byte(byte: i32) -> str:
     let buf = rt_alloc(2) as *mut u8
