@@ -5,7 +5,6 @@ use pcre2
 use std.build
 use std.process
 use std.sysinfo
-use std.crypto.sha256
 fn selfhost_owned_text(s: &str): s ++ ""
 
 type SelfhostRunResult {
@@ -8043,11 +8042,6 @@ fn bs_fingerprint_sha(ctx: &ActionCtx, path: &str) -> str:
     let lines = bs_split_nonempty_lines(ctx.fs().read_text(path))
     if lines.len() == 0: "" else: selfhost_owned_text(lines.get(0))
 
-fn bs_sha256_text(text: &str) -> str:
-    var digest: [32]u8 = [0 as u8; 32]
-    sha256_hash_str(text, &raw mut digest[0] as *mut u8)
-    sha256_hex(&digest[0] as *const u8)
-
 // The first line at which two texts differ, for a byte-identity failure.
 fn bs_first_differing_line(expected: &str, actual: &str) -> str:
     let a = expected.split("\n")
@@ -8188,7 +8182,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if rc != 0: return rc
     rc = bs_assert_manifest_field(ctx, manifest, "fingerprint", source_sha)
     if rc != 0: return rc
-    rc = bs_assert_manifest_field(ctx, manifest, "interface-sha", bs_sha256_text(emitted_wi))
+    rc = bs_assert_manifest_field(ctx, manifest, "interface-sha", ctx.fs().sha256_file(wi_path))
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, manifest, "\nprefix " ++ prefix ++ " <embedded-std>/std/wi_demo.w\n", "manifest prefix line")
     if rc != 0: return rc
