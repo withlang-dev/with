@@ -2188,6 +2188,11 @@ impl Sema:
     mut fn warn_large_copy_type(type_name: i32, type_tid: i32, node: i32):
         if self.emit_config_warnings == 0:
             return
+        // Perf advice for the user's own types; a std or bundle-interface
+        // declaration (pcre2's match blocks reach every program through the
+        // prelude's std.regex) is not theirs to change.
+        if sema_path_is_user_lint_source(self.decl_source_path_for_node(node)) == 0:
+            return
         let threshold = self.copy_warn_threshold
         if threshold <= 0 or type_tid <= 0:
             return
