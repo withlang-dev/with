@@ -609,7 +609,11 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
     let actual_sha = fs.sha256_file(archive_path)
     if actual_sha != PCRE2_SHA256:
         return pcre2_fail(ctx, "sha256 mismatch for " ++ archive_path ++ ": expected " ++ PCRE2_SHA256 ++ " got " ++ actual_sha)
-    if not fs.is_dir(ref_dir):
+    // The tree is present when its `src` is, never when the directory merely
+    // exists: the runner creates the ready stamp's parent — ref_dir itself —
+    // before the action starts, so on a fresh out/ the directory is there
+    // and empty (#948), and a torn extraction leaves it partial.
+    if not fs.is_dir(pcre2_join(ref_dir, "src")):
         let tmp_dir = pcre2_join(scratch_dir, release ++ ".extract")
         let extracted_dir = pcre2_join(tmp_dir, release)
         if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:
@@ -634,6 +638,8 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
             return pcre2_fail(ctx, "archive did not contain expected src directory: " ++ extracted_dir)
         if fs.mkdir_all(pcre2_dirname(ref_dir)) != 0:
             return pcre2_fail(ctx, "could not create reference parent: " ++ pcre2_dirname(ref_dir))
+        if fs.exists(ref_dir) and fs.remove_tree(ref_dir) != 0:
+            return pcre2_fail(ctx, "could not remove the empty or partial reference tree: " ++ ref_dir)
         if fs.rename(extracted_dir, ref_dir) != 0:
             return pcre2_fail(ctx, "could not move extracted tree to: " ++ ref_dir)
         let _remove_extract_root = fs.remove_tree(tmp_dir)
