@@ -1828,6 +1828,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.dep("compiler-main-source")
     stage2 = stage2.dep("compat-runtime-source")
     stage2 = stage2.dep("embedded-clang-resource-source")
+    stage2 = target_with_link_bundle(move stage2, ctx, &pcre2_wo)
     out = out.add_target(stage2)
 
     var stage3 = target_new(.Action, "stage3", "").output(stage_compiler_bin("with-stage3"))
@@ -1844,6 +1845,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = stage3.dep("compiler-main-source")
     stage3 = stage3.dep("compat-runtime-source")
     stage3 = stage3.dep("embedded-clang-resource-source")
+    stage3 = target_with_link_bundle(move stage3, ctx, &pcre2_wo)
     out = out.add_target(stage3)
 
     var stage2_fixpoint = target_new(.Action, "stage2-fixpoint-object", "").output(stage_compiler_obj("with-stage2-fixpoint.o"))
@@ -1860,6 +1862,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2_fixpoint = stage2_fixpoint.dep("compiler-main-source")
     stage2_fixpoint = stage2_fixpoint.dep("compat-runtime-source")
     stage2_fixpoint = stage2_fixpoint.dep("embedded-clang-resource-source")
+    stage2_fixpoint = target_with_link_bundle(move stage2_fixpoint, ctx, &pcre2_wo)
     out = out.add_target(stage2_fixpoint)
 
     var stage3_fixpoint = target_new(.Action, "stage3-fixpoint-object", "").output(stage_compiler_obj("with-stage3-fixpoint.o"))
@@ -1876,6 +1879,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3_fixpoint = stage3_fixpoint.dep("compiler-main-source")
     stage3_fixpoint = stage3_fixpoint.dep("compat-runtime-source")
     stage3_fixpoint = stage3_fixpoint.dep("embedded-clang-resource-source")
+    stage3_fixpoint = target_with_link_bundle(move stage3_fixpoint, ctx, &pcre2_wo)
     out = out.add_target(stage3_fixpoint)
 
     var selfcheck = target_new(.RunCorpusTest, "selfcheck", stage_compiler_bin("with-stage2"))
@@ -2227,6 +2231,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = compiler.dep("compiler-main-source")
     compiler = compiler.dep("llvm-link-metadata")
     compiler = compiler.dep("embedded-objects-object")
+    compiler = target_with_link_bundle(move compiler, ctx, &pcre2_wo)
     out = out.add_target(compiler)
 
     // Post-link version stamp: keeps the name `build` and the output path so every
