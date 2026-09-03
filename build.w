@@ -89,10 +89,23 @@ fn run_cross_unsupported_action(ctx: ActionCtx) -> i32:
 fn cross_dir(tag: &str) -> str:
     "out/lib/cross/" ++ tag
 
+// The LLVM triple of a cross tag (src/TargetSpec.w target_spec_llvm_triple);
+// the tag is the platform in the compiler's target_spec_resolved_name
+// spelling, which is also how a .wo store slot is keyed.
 fn cross_triple(tag: &str) -> str:
     if tag == "linux_aarch64":
         return "aarch64-unknown-linux-gnu"
+    if tag == "windows_x86_64":
+        return "x86_64-pc-windows-msvc"
+    if tag == "windows_aarch64":
+        return "aarch64-pc-windows-msvc"
     "x86_64-unknown-linux-gnu"
+
+// The pcre2-style bundle plan for a cross tag: the same corpus, compiled by
+// the release compiler with --target=<triple> into its own store slot and
+// out/wo/<tag>/ (build/wo.w; #946).
+fn cross_wo_plan(ctx: &BuildCtx, host_plan: &WoBundle, tag: &str) -> WoBundle:
+    wo_bundle_plan_for_target(ctx, host_plan.name, host_plan.corpus_rel, host_plan.root, tag, cross_triple(tag))
 
 fn cross_platform_source(tag: &str) -> str:
     if tag == "linux_aarch64":
@@ -131,8 +144,9 @@ fn cross_fiber_asm_source(tag: &str) -> str:
     "runtime/fiber_asm_linux_x86_64.s"
 
 // Register the full cross runtime/bridge/embed/rsp target set for one
-// cross tag under name prefix `p`, grouped as `group_name`.
-fn add_cross_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, wo_name: &str) -> Build:
+// cross tag under name prefix `p`, grouped as `group_name`; `wo` is the
+// tag's bundle plan, built here and embedded by the tag's compiler.
+fn add_cross_rt_targets(out0: Build, ctx: &BuildCtx, tag: &str, p: &str, group_name: &str, wo: &WoBundle) -> Build:
     var out = out0
     let dir = cross_dir(tag)
     let triple = cross_triple(tag)
@@ -198,8 +212,8 @@ fn add_cross_rt_targets(out0: Build, tag: &str, p: &str, group_name: &str, wo_na
     cross_embedded = cross_embedded.dep(p ++ "fiber-asm-object")
     cross_embedded = cross_embedded.dep(p ++ "rt-core-object")
     cross_embedded = cross_embedded.dep(p ++ "rt-platform-object")
-    out = add_empty_wo_blob_targets(move out, p, dir, wo_name)
-    cross_embedded = target_with_empty_wo_blobs(move cross_embedded, p, dir, wo_name)
+    out = wo_bundle_targets(move out, ctx, wo, release_compiler_bin("with"), "build")
+    cross_embedded = target_with_wo_blobs(move cross_embedded, wo)
     out = out.add_target(cross_embedded)
 
     var cross_embedded_obj = target_new(.CompileAsmObject, p ++ "embedded-objects-object", dir ++ "/embedded_objects.s").output(dir ++ "/embedded_objects.o")
@@ -269,7 +283,7 @@ fn cross_windows_dir() -> str:
     "out/lib/cross/windows_x86_64"
 
 fn cross_windows_triple() -> str:
-    "x86_64-pc-windows-msvc"
+    cross_triple("windows_x86_64")
 
 fn cross_windows_llvm_prefix() -> str:
     ".deps/llvm-" ++ compiler_llvm_version() ++ "-windows-x86_64-msvc"
@@ -331,7 +345,7 @@ fn cross_windows_aarch64_dir() -> str:
     "out/lib/cross/windows_aarch64"
 
 fn cross_windows_aarch64_triple() -> str:
-    "aarch64-pc-windows-msvc"
+    cross_triple("windows_aarch64")
 
 fn cross_windows_aarch64_llvm_prefix() -> str:
     ".deps/llvm-" ++ compiler_llvm_version() ++ "-windows-aarch64-msvc"
@@ -415,10 +429,11 @@ fn empty_platform_blob_target(prefix: &str, sym: &str) -> str:
 
 // D38 .wo bundles: a compiler binary embeds three blobs per bundle slot —
 // object, manifest, interface — under `with_embedded_wo_<name>_{o,manifest,
-// wi}_*`. A lib dir whose compilers do not fill the slot (bootstrap-lib:
-// stage1 is linked before the tree's bundle exists; the cross dirs: cross
-// compilers embed no bundle yet) carries zero-length blobs, which the
-// compiler reads as "not present" (src/compiler/EmbeddedBundles.w).
+// wi}_*`. The release binary embeds the tree's bundle and each cross
+// compiler the bundle built for its target (#946); only bootstrap-lib —
+// stage1 is linked before the tree's bundle exists — carries zero-length
+// blobs, which the compiler reads as "not present"
+// (src/compiler/EmbeddedBundles.w).
 fn wo_blob_kinds() -> Vec[str]:
     let out: Vec[str] = Vec.new()
     out.push("o")
@@ -2057,8 +2072,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     // exclusively from that directory (§18.5). Note: these graph
     // actions must be driven by a --target-capable compiler
     // (WITH=out/release/bin/with) until the seed is updated.
-    out = add_cross_rt_targets(move out, "linux_x86_64", "cross-", "cross-rt", pcre2_wo.name)
-    out = add_cross_rt_targets(move out, "linux_aarch64", "cross-arm-", "cross-rt-arm", pcre2_wo.name)
+    // Each cross compiler embeds the pcre2 bundle compiled for its own target
+    // by the release compiler (#946): `pcre2-wo-<os>-<arch>` builds it into
+    // out/wo/<tag>/ and its store slot.
+    let pcre2_wo_linux_x86_64 = cross_wo_plan(ctx, &pcre2_wo, "linux_x86_64")
+    let pcre2_wo_linux_aarch64 = cross_wo_plan(ctx, &pcre2_wo, "linux_aarch64")
+    out = add_cross_rt_targets(move out, ctx, "linux_x86_64", "cross-", "cross-rt", &pcre2_wo_linux_x86_64)
+    out = add_cross_rt_targets(move out, ctx, "linux_aarch64", "cross-arm-", "cross-rt-arm", &pcre2_wo_linux_aarch64)
 
     // ── Cross-target runtime (windows_x86_64) ───────────────────────
     // `with build :cross-rt-windows` builds the full windows_x86_64
@@ -2125,8 +2145,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_win_embedded = cross_win_embedded.dep("cross-win-fiber-asm-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-rt-core-object")
     cross_win_embedded = cross_win_embedded.dep("cross-win-rt-platform-object")
-    out = add_empty_wo_blob_targets(move out, "cross-win-", cross_windows_dir(), pcre2_wo.name)
-    cross_win_embedded = target_with_empty_wo_blobs(move cross_win_embedded, "cross-win-", cross_windows_dir(), pcre2_wo.name)
+    let pcre2_wo_windows_x86_64 = cross_wo_plan(ctx, &pcre2_wo, "windows_x86_64")
+    out = wo_bundle_targets(move out, ctx, &pcre2_wo_windows_x86_64, release_compiler_bin("with"), "build")
+    cross_win_embedded = target_with_wo_blobs(move cross_win_embedded, &pcre2_wo_windows_x86_64)
     out = out.add_target(cross_win_embedded)
 
     var cross_win_embedded_obj = target_new(.CompileAsmObject, "cross-win-embedded-objects-object", cross_windows_dir() ++ "/embedded_objects.s").output(cross_windows_dir() ++ "/embedded_objects.o")
@@ -2213,8 +2234,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-fiber-asm-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-core-object")
     cross_winarm_embedded = cross_winarm_embedded.dep("cross-winarm-rt-platform-object")
-    out = add_empty_wo_blob_targets(move out, "cross-winarm-", cross_windows_aarch64_dir(), pcre2_wo.name)
-    cross_winarm_embedded = target_with_empty_wo_blobs(move cross_winarm_embedded, "cross-winarm-", cross_windows_aarch64_dir(), pcre2_wo.name)
+    let pcre2_wo_windows_aarch64 = cross_wo_plan(ctx, &pcre2_wo, "windows_aarch64")
+    out = wo_bundle_targets(move out, ctx, &pcre2_wo_windows_aarch64, release_compiler_bin("with"), "build")
+    cross_winarm_embedded = target_with_wo_blobs(move cross_winarm_embedded, &pcre2_wo_windows_aarch64)
     out = out.add_target(cross_winarm_embedded)
 
     var cross_winarm_embedded_obj = target_new(.CompileAsmObject, "cross-winarm-embedded-objects-object", cross_windows_aarch64_dir() ++ "/embedded_objects.s").output(cross_windows_aarch64_dir() ++ "/embedded_objects.o")

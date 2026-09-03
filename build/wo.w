@@ -7,7 +7,8 @@ module build.wo
 //   key        = sha256(corpus_sha | target | abi_sha)
 //   corpus_sha = sha256 of "<path>:<sha256(file)>\n" over every .w under
 //                lib/<corpus>, bytewise by path
-//   target     = the host platform in the compiler's spelling
+//   target     = the platform the object is compiled for, in the compiler's
+//                spelling (src/TargetSpec.w target_spec_resolved_name)
 //   abi_sha    = sha256(docs/with-abi.sha256), the identity every compiler
 //                binary carries (`with version --abi-sha`)
 //
@@ -19,14 +20,19 @@ module build.wo
 // the comptime evaluator, which serves ToolFs.sha256_file natively and
 // nothing else, so the slot path uses just that and the plan never hashes.)
 //
-// Per bundle: `<name>-wo-build` writes out/wo/<name>.{o,wi,manifest} —
-// copied from the slot when it holds this corpus (nothing compiles), else
-// compiled by the stage whose ABI stamp equals abi_sha (stage1 for the
-// tree's ABI) and proven by the second fingerprint pass on the emitted .wi;
-// `<name>-wo-install-{o,wi,manifest}` publish out/wo/ into the slot (the
-// .Install kind: temp sibling + rename; the manifest last, so a torn slot
-// never reads as present); `<name>-wo` groups them. Consumers (the embedded
-// blobs, a stage link's --link-bundle out/wo/<name>) read out/wo/.
+// Per bundle and target: `<name>-wo-build` writes out/wo/<name>.{o,wi,
+// manifest} — copied from the slot when it holds this corpus (nothing
+// compiles), else compiled by the stage whose ABI stamp equals abi_sha
+// (stage1 for the tree's ABI) and proven by the second fingerprint pass on
+// the emitted .wi; `<name>-wo-install-{o,wi,manifest}` publish out/wo/ into
+// the slot (the .Install kind: temp sibling + rename; the manifest last, so
+// a torn slot never reads as present); `<name>-wo` groups them. Consumers
+// (the embedded blobs, a stage link's --link-bundle out/wo/<name>) read
+// out/wo/. A cross target's bundle (#946) is the same plan with a triple:
+// the release compiler compiles it with --target=<triple> — the object, the
+// interface, the manifest and BOTH fingerprint passes under that target —
+// its targets are `<name>-wo-<os>-<arch>…`, its tree copy is
+// out/wo/<target>/<name>.*, and the cross compiler for that target embeds it.
 //
 // A test points WITH_WO_DIR at a scratch directory; the real store is never
 // written by one.
@@ -46,7 +52,12 @@ pub type WoBundle {
     corpus_dir: str,
     root: str,
     target: str,
+    // `--target=<triple>` for a cross bundle; "" compiles for the host
+    triple: str,
     abi_sha: str,
+    // the tree copy every consumer reads: out/wo for the host bundle,
+    // out/wo/<target> for a cross one, so the two never collide
+    tree_dir: str,
     // <store>/<name>/<target>-<abi_sha>, as the action reads it
     slot: str,
     // the same slot as the .Install kind spells a destination: `$HOME/…`
@@ -74,6 +85,15 @@ fn wo_sha256_text(text: &str) -> str:
     var digest: [32]u8 = [0 as u8; 32]
     sha256_hash_str(text, &raw mut digest[0] as *mut u8)
     sha256_hex(&digest[0] as *const u8)
+
+fn wo_dirname(path: &str) -> str:
+    var last: i64 = -1
+    for i in 0..path.len():
+        if path.byte_at(i) == '/':
+            last = i
+    if last < 0:
+        return "."
+    wo_owned_text(path.slice(0, last))
 
 fn wo_first_line(text: &str) -> str:
     var end: i64 = 0
@@ -153,40 +173,65 @@ fn wo_corpus_sha(fs: &ToolFs, dir: &str) -> str:
         combined = combined ++ path ++ ":" ++ fs.sha256_file(path) ++ "\n"
     wo_sha256_text(combined)
 
-// The bundle's plan: everything the graph needs to name its targets and
-// paths, none of it hashed text.
+// The bundle's plan for the host: everything the graph needs to name its
+// targets and paths, none of it hashed text.
 pub fn wo_bundle_plan(ctx: &BuildCtx, name: &str, corpus_rel: &str, root: &str) -> WoBundle:
-    let target = wo_host_target()
+    wo_bundle_plan_for_target(ctx, name, corpus_rel, root, wo_host_target(), "")
+
+// The plan for one target: `target_name` in the compiler's spelling (the
+// slot's key and the manifest's `target` line, which the build action
+// checks), `triple` the `--target` the release compiler takes to compile
+// for it — "" is the host plan.
+pub fn wo_bundle_plan_for_target(ctx: &BuildCtx, name: &str, corpus_rel: &str, root: &str, target_name: &str, triple: &str) -> WoBundle:
     let abi_sha = ctx.fs().sha256_file("docs/with-abi.sha256")
-    let slot_rel = "/" ++ name ++ "/" ++ target ++ "-" ++ abi_sha
+    let slot_rel = "/" ++ name ++ "/" ++ target_name ++ "-" ++ abi_sha
     WoBundle {
         name: wo_owned_text(name),
         corpus_rel: wo_owned_text(corpus_rel),
         corpus_dir: "lib/" ++ corpus_rel,
         root: wo_owned_text(root),
-        target,
+        target: wo_owned_text(target_name),
+        triple: wo_owned_text(triple),
         abi_sha,
+        tree_dir: if triple.len() > 0: "out/wo/" ++ target_name else: "out/wo",
         slot: wo_store_dir(ctx) ++ slot_rel,
         install_slot: wo_store_install_dir(ctx) ++ slot_rel,
     }
 
-// out/wo/<name>: the tree's copy every consumer reads.
+// out/wo/<name> (out/wo/<target>/<name> for a cross bundle): the tree's copy
+// every consumer reads.
 pub fn wo_prefix(plan: &WoBundle) -> str:
-    "out/wo/" ++ plan.name
+    plan.tree_dir ++ "/" ++ plan.name
 
 // <store>/<name>/<target>-<abi_sha>/<name>: the published copy.
 pub fn wo_store_prefix(plan: &WoBundle) -> str:
     plan.slot ++ "/" ++ plan.name
 
+// The stem of the bundle's target names: `<name>-wo` for the host,
+// `<name>-wo-<os>-<arch>` for a cross target (build.w spells platforms
+// `linux-x86_64` in target names and `linux_x86_64` in paths).
+fn wo_target_stem(plan: &WoBundle) -> str:
+    if plan.triple.len() == 0:
+        return plan.name ++ "-wo"
+    plan.name ++ "-wo-" ++ wo_target_label(plan.target)
+
+// "linux_x86_64" -> "linux-x86_64"
+fn wo_target_label(target: &str) -> str:
+    for i in 0..target.len():
+        if target.byte_at(i) == '_':
+            return target.slice(0, i) ++ "-" ++ target.slice(i + 1, target.len())
+    wo_owned_text(target)
+
 pub fn wo_build_target_name(plan: &WoBundle) -> str:
-    plan.name ++ "-wo-build"
+    wo_target_stem(plan) ++ "-build"
 
 pub fn wo_group_target_name(plan: &WoBundle) -> str:
-    plan.name ++ "-wo"
+    wo_target_stem(plan)
 
-// Registers `<name>-wo-build`, the three installs and the `<name>-wo` group.
-// `compiler` builds the bundle when the slot lacks this corpus: the stage
-// whose ABI stamp is abi_sha (compiler_dep produces it).
+// Registers `<name>-wo-build`, the three installs and the `<name>-wo` group
+// (with the target label for a cross plan). `compiler` builds the bundle
+// when the slot lacks this corpus: the stage whose ABI stamp is abi_sha
+// (compiler_dep produces it) — the release compiler for a cross target.
 pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: &str, compiler_dep: &str) -> Build:
     var graph = out
     let fs_prefix = wo_prefix(plan)
@@ -202,12 +247,14 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
     build_target = build_target.arg("corpus-dir=" ++ plan.corpus_dir)
     build_target = build_target.arg("root=" ++ plan.root)
     build_target = build_target.arg("target=" ++ plan.target)
+    build_target = build_target.arg("triple=" ++ plan.triple)
     build_target = build_target.arg("abi-sha=" ++ plan.abi_sha)
     build_target = build_target.arg("slot=" ++ plan.slot)
+    build_target = build_target.arg("prefix=" ++ fs_prefix)
     build_target = build_target.input(wo_owned_text(compiler))
     build_target = build_target.input("docs/with-abi.sha256")
     build_target = target_with_wo_corpus_inputs(move build_target, ctx, plan)
-    build_target = build_target.write_scope("out/wo")
+    build_target = build_target.write_scope(wo_owned_text(plan.tree_dir))
     build_target = build_target.write_scope("out/command/" ++ build_name)
     build_target = build_target.timeout(900000)
     build_target = build_target.dep(wo_owned_text(compiler_dep))
@@ -223,7 +270,7 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
     var group = target_new(.Group, wo_group_target_name(plan), "")
     for ei in 0..exts.len() as i32:
         let ext = exts.get(ei as i64)
-        let install_name = plan.name ++ "-wo-install-" ++ ext
+        let install_name = wo_target_stem(plan) ++ "-install-" ++ ext
         var install = target_new(.Install, wo_owned_text(install_name), fs_prefix ++ "." ++ ext).output(store_prefix ++ "." ++ ext)
         install = install.input(fs_prefix ++ "." ++ ext)
         install = install.arg("0644")
@@ -256,7 +303,7 @@ pub fn target_with_wo_corpus_inputs(target: Target, ctx: &BuildCtx, plan: &WoBun
 // must pass. The upstream suite runs against the stored one in
 // `<name>-wo-test`.
 pub fn wo_drift_target_name(plan: &WoBundle) -> str:
-    plan.name ++ "-wo-drift"
+    wo_target_stem(plan) ++ "-drift"
 
 pub fn wo_drift_dir(plan: &WoBundle) -> str:
     "out/wo-drift/" ++ plan.name
@@ -444,18 +491,20 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     let corpus_dir = wo_arg_value(args, "corpus-dir=")
     let root_path = wo_arg_value(args, "root=")
     let target = wo_arg_value(args, "target=")
+    let triple = wo_arg_value(args, "triple=")
     let abi_sha = wo_arg_value(args, "abi-sha=")
     let slot = wo_arg_value(args, "slot=")
+    let prefix = wo_arg_value(args, "prefix=")
     let compiler = wo_arg_value(args, "compiler=")
-    if name.len() == 0 or corpus.len() == 0 or corpus_dir.len() == 0 or root_path.len() == 0 or target.len() == 0 or abi_sha.len() != 64 or slot.len() == 0 or compiler.len() == 0:
-        return wo_fail(ctx, "requires name=, corpus=, corpus-dir=, root=, target=, abi-sha=, slot= and compiler= arguments")
+    if name.len() == 0 or corpus.len() == 0 or corpus_dir.len() == 0 or root_path.len() == 0 or target.len() == 0 or abi_sha.len() != 64 or slot.len() == 0 or prefix.len() == 0 or compiler.len() == 0:
+        return wo_fail(ctx, "requires name=, corpus=, corpus-dir=, root=, target=, triple=, abi-sha=, slot=, prefix= and compiler= arguments")
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
-    let prefix = "out/wo/" ++ name
+    let tree_dir = wo_dirname(prefix)
     let store_prefix = slot ++ "/" ++ name
     let capture_dir = "out/command/" ++ ctx.target_name()
-    if fs.mkdir_all("out/wo") != 0 or fs.mkdir_all(capture_dir) != 0:
-        return wo_fail(ctx, "could not create out/wo")
+    if fs.mkdir_all(tree_dir) != 0 or fs.mkdir_all(capture_dir) != 0:
+        return wo_fail(ctx, "could not create " ++ tree_dir)
     let corpus_sha = wo_corpus_sha(fs, corpus_dir)
     let key = wo_sha256_text(corpus_sha ++ "|" ++ target ++ "|" ++ abi_sha)
 
@@ -469,10 +518,10 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
         for ei in 0..exts.len() as i32:
             let ext = exts.get(ei as i64)
             if fs.write_text(prefix ++ "." ++ ext, fs.host_read_text(store_prefix ++ "." ++ ext)) != 0:
-                return wo_fail(ctx, "could not copy " ++ store_prefix ++ "." ++ ext ++ " into out/wo")
+                return wo_fail(ctx, "could not copy " ++ store_prefix ++ "." ++ ext ++ " into " ++ tree_dir)
         print("[" ++ ctx.target_name() ++ "] " ++ store_prefix ++ ".{o,wi,manifest} holds key " ++ key ++ " (corpus, target and ABI unchanged): compiled nothing")
         return 0
-    print("[" ++ ctx.target_name() ++ "] " ++ missing ++ "; building " ++ name ++ " key " ++ key ++ " with " ++ compiler)
+    print("[" ++ ctx.target_name() ++ "] " ++ missing ++ "; building " ++ name ++ " for " ++ target ++ " key " ++ key ++ " with " ++ compiler)
 
     // Only the compiler carrying the slot's ABI identity builds a bundle; an
     // unstamped binary carries the sentinel and never matches.
@@ -485,7 +534,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     if abi.rc != 0 or stamp != abi_sha:
         return wo_fail(ctx, "refusing to build bundle " ++ name ++ ": " ++ compiler ++ " carries ABI '" ++ stamp ++ "' (an unstamped compiler carries the sentinel) and the slot needs " ++ abi_sha)
 
-    let tmp = "out/wo/tmp/" ++ name
+    let tmp = tree_dir ++ "/tmp/" ++ name
     if fs.exists(tmp) and fs.remove_tree(tmp) != 0:
         return wo_fail(ctx, "could not clear " ++ tmp)
     if fs.mkdir_all(tmp) != 0:
@@ -500,6 +549,8 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     build_args.push("build")
     build_args.push(wo_abs(root, root_path))
     build_args.push("--emit-obj")
+    if triple.len() > 0:
+        build_args.push("--target=" ++ triple)
     build_args.push("--bundle-corpus")
     build_args.push(wo_owned_text(corpus))
     build_args.push("--emit-bundle-interface")
@@ -518,11 +569,14 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
         return wo_fail(ctx, "bundle build wrote no object, interface, manifest or fingerprint under " ++ tmp)
 
     // D39: the interface must reproduce the source's exported-declaration
-    // graph exactly — the second fingerprint pass, out of process.
+    // graph exactly — the second fingerprint pass, out of process, under the
+    // same target (layouts are the target's).
     var check_args: Vec[str] = Vec.new()
     check_args.push(wo_abs(root, compiler))
     check_args.push("check")
     check_args.push(wo_abs(root, tmp_wi))
+    if triple.len() > 0:
+        check_args.push("--target=" ++ triple)
     check_args.push("--bundle-corpus")
     check_args.push(wo_owned_text(corpus))
     check_args.push("--bundle-fingerprint")
@@ -542,7 +596,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     if wo_manifest_field(manifest, "abi-sha") != abi_sha:
         return wo_fail(ctx, "the manifest records abi-sha '" ++ wo_manifest_field(manifest, "abi-sha") ++ "', the slot needs " ++ abi_sha)
     if wo_manifest_field(manifest, "target") != target:
-        return wo_fail(ctx, "the compiler names its target '" ++ wo_manifest_field(manifest, "target") ++ "' but build/wo.w planned '" ++ target ++ "' (wo_host_target and src/TargetSpec.w disagree)")
+        return wo_fail(ctx, "the compiler names its target '" ++ wo_manifest_field(manifest, "target") ++ "' but build/wo.w planned '" ++ target ++ "' (the plan's target spelling and src/TargetSpec.w target_spec_resolved_name disagree)")
     if wo_manifest_field(manifest, "interface-sha") != wo_sha256_text(fs.read_text(tmp_wi)):
         return wo_fail(ctx, "the manifest's interface-sha is not the sha256 of " ++ tmp_wi)
     if wo_manifest_field(manifest, "fingerprint") != source_fp:
@@ -552,7 +606,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     manifest = manifest ++ "corpus-sha " ++ corpus_sha ++ "\n"
     manifest = manifest ++ "object-sha " ++ wo_sha256_text(fs.read_text(tmp_o)) ++ "\n"
 
-    // Into out/wo: object, interface, then the manifest.
+    // Into the tree copy: object, interface, then the manifest.
     if fs.rename(tmp_o, prefix ++ ".o") != 0:
         return wo_fail(ctx, "could not move " ++ tmp_o ++ " to " ++ prefix ++ ".o")
     if fs.rename(tmp_wi, prefix ++ ".wi") != 0:

@@ -456,7 +456,16 @@ corpus in-unit once (only until the reseed after this batch). stage1 →
 stage2: `--link-bundle` with the tree-ABI bundle stage1 built; stage2
 embeds it. stage2 → stage3: stage2's index; same stored bytes, so
 fixpoint holds by construction. Cross compilers embed the `--target`
-bundles the release compiler builds. The five `regex-runtime-ir`/`-object`
+bundles the release compiler builds (#946): each cross lane has its own
+plan (`wo_bundle_plan_for_target`, `build/wo.w`) — the same corpus, root
+and ABI, a store slot keyed by the target's `target_spec_resolved_name`
+spelling, targets `pcre2-wo-<os>-<arch>{,-build,-install-*}`, the tree
+copy under `out/wo/<target>/` — built by the release compiler with
+`--target=<triple>` for the object, interface and manifest AND for the
+second fingerprint pass (`with check <x>.wi --target=<triple>`), so both
+fingerprints are the target's; the lane's embedded-objects set carries
+that slot's blobs. Only bootstrap-lib keeps zero-length blobs (stage1 is
+linked before the tree's bundle exists). The five `regex-runtime-ir`/`-object`
 target pairs and the `regex_runtime.o` entries in `Link.w`,
 `build/package.w`, `build/emit_c.w`, `build/runtime.w`, and
 `install-regex-runtime` go away.
