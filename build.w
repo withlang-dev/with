@@ -927,6 +927,14 @@ fn install_file_target(name: &str, source: &str, dest: &str, mode: &str, dep: &s
         target = target.dep(build_owned_text(dep))
     target
 
+// A compiler binary is installed executable and PROVEN to run: the install
+// kind executes `<dest> version` after the rename and fails loudly when the
+// installed file cannot start (2026-09-03: an install landed a binary macOS
+// killed with "Code Signature Invalid" while the identical release binary
+// ran; nothing noticed until the next `with` invocation).
+fn install_compiler_target(name: &str, source: &str, dest: &str, dep: &str) -> Target:
+    install_file_target(name, source, dest, "0755", dep).arg("verify=version")
+
 fn build_project_join(left: &str, right: &str) -> str:
     if left.len() == 0:
         return build_owned_text(right)
@@ -2764,9 +2772,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     check_committed = check_committed.write_scope("out/command/check-committed-state")
     out = out.add_target(check_committed)
 
-    out = out.add_target(install_file_target("install-user", release_compiler_bin("with"), "$HOME/.local/bin/with", "0755", "require-last-green"))
+    out = out.add_target(install_compiler_target("install-user", release_compiler_bin("with"), "$HOME/.local/bin/with", "require-last-green"))
 
-    out = out.add_target(install_file_target("install-compiler", release_compiler_bin("with"), "$INSTALL_BINDIR/with" ++ host_exe_suffix(), "0755", "build"))
+    out = out.add_target(install_compiler_target("install-compiler", release_compiler_bin("with"), "$INSTALL_BINDIR/with" ++ host_exe_suffix(), "build"))
     out = out.add_target(install_file_target("install-rt-core", "out/lib/rt_core.o", "$INSTALL_LIBDIR/rt_core.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-rt-platform", host_runtime.platform_object, "$INSTALL_LIBDIR/" ++ host_runtime.platform_install_object, "0644", "runtime"))
     out = out.add_target(install_file_target("install-cimport-stubs", "out/lib/cimport_stubs.o", "$INSTALL_LIBDIR/cimport_stubs.o", "0644", "runtime"))
@@ -2839,7 +2847,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross = cross.write_scope("out/command/cross")
     out = out.add_target(cross)
 
-    out = out.add_target(install_file_target("update-seed", release_compiler_bin("with"), "src/main", "0755", "require-last-green"))
+    out = out.add_target(install_compiler_target("update-seed", release_compiler_bin("with"), "src/main", "require-last-green"))
 
     var clean = target_new(.Clean, "clean", "")
     clean = clean.arg("out")

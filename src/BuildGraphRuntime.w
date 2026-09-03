@@ -145,3 +145,6 @@ pub fn build_graph_rt_write(s: &str) -> Unit:
 
 pub fn build_graph_rt_eprint(s: &str) -> Unit:
     with_eprint(s)
+
+// This process's id (unique temp names for the install kind).
+pub fn build_graph_rt_pid() -> i32: with_getpid()

@@ -587,9 +587,12 @@ pub fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' requires source and destination paths")
         return 1
-    if target.args.len() > 1:
-        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' accepts at most one mode argument")
+    // args: [mode] [verify=<subcommand>] — the second runs `<dest> <subcommand>`
+    // after the rename and proves the installed executable starts.
+    if target.args.len() > 2 or (target.args.len() == 2 and not target.args.get(1).starts_with("verify=")):
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' accepts a mode and an optional verify=<subcommand>")
         return 1
+    let verify_subcommand = if target.args.len() == 2: target.args.get(1).slice("verify=".len(), target.args.get(1).len()) else: ""
     let arg_rc = build_graph_validate_process_args(target)
     if arg_rc != 0:
         return arg_rc
@@ -609,17 +612,37 @@ pub fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
     // arm64 macOS, truncating a previously-executed signed binary's inode
     // leaves the kernel's per-vnode code-signature cache stale, and the next
     // exec dies with SIGKILL even though codesign reads the file as valid.
-    // Rename gives the destination path a fresh inode atomically.
-    let temp_path = dest_path ++ ".install-tmp"
-    let _remove_stale_temp = build_graph_rt_remove_file(temp_path)
-    let contents = build_graph_rt_read_file(source_path)
-    if build_graph_rt_write_file(temp_path, contents) != 0:
-        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not write destination: " ++ temp_path)
-        return 1
+    // Rename gives the destination path a fresh inode atomically. The temp
+    // name carries this process id so no earlier temp's inode is reused.
     let mode = if target.args.len() == 0: 0o644 else: build_graph_parse_octal_mode(target.args.get(0))
     if mode < 0:
-        let _remove_temp = build_graph_rt_remove_file(temp_path)
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args.get(0))
+        return 1
+    let contents = build_graph_rt_read_file(source_path)
+    var attempt = 0
+    while attempt < 2:
+        attempt = attempt + 1
+        let rc = build_graph_install_place(target, contents, dest_path ++ f".install-tmp.{build_graph_rt_pid()}.{attempt}", dest_path, mode)
+        if rc != 0:
+            return rc
+        if verify_subcommand.len() == 0:
+            return 0
+        // Prove the installed executable starts. 2026-09-03: an install
+        // produced a file macOS killed with "Code Signature Invalid" while
+        // the byte-identical source ran; a second copy through a fresh inode
+        // was valid. One retry, loudly; a second failure is the error.
+        if build_graph_install_verify(target, dest_path, verify_subcommand) == 0:
+            return 0
+        if attempt == 1:
+            build_graph_rt_eprint("warning: install target '" ++ target.name ++ "': the installed executable did not start (`" ++ dest_path ++ " " ++ verify_subcommand ++ "` failed); reinstalling through a fresh inode")
+    build_graph_rt_eprint("error: install target '" ++ target.name ++ "': the installed executable does not start: " ++ dest_path ++ " " ++ verify_subcommand)
+    1
+
+// Write `contents` to a temp sibling, chmod, rename into place.
+fn build_graph_install_place(target: &BuildGraphTarget, contents: &str, temp_path: &str, dest_path: &str, mode: i32) -> i32:
+    let _remove_stale_temp = build_graph_rt_remove_file(temp_path)
+    if build_graph_rt_write_file(temp_path, contents) != 0:
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not write destination: " ++ temp_path)
         return 1
     if build_graph_rt_chmod(temp_path, mode) != 0:
         let _remove_temp = build_graph_rt_remove_file(temp_path)
@@ -630,3 +653,14 @@ pub fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not move into place: " ++ dest_path)
         return 1
     0
+
+// `<dest> <subcommand>` must exit 0 (a code-signature kill is 137).
+fn build_graph_install_verify(target: &BuildGraphTarget, dest_path: &str, subcommand: &str) -> i32:
+    var argv = build_graph_argv_append("", dest_path)
+    argv = build_graph_argv_append(argv, subcommand)
+    let stdout_path = dest_path ++ ".verify.stdout"
+    let stderr_path = dest_path ++ ".verify.stderr"
+    let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, 60000)
+    let _out = build_graph_rt_remove_file(stdout_path)
+    let _err = build_graph_rt_remove_file(stderr_path)
+    rc
