@@ -1120,19 +1120,28 @@ impl Codegen:
         self.di_source = Source.from_string(self.source_file, self.source_text, 0)
         self.di_builder = wl_di_create_builder(self.llmod)
 
-        // Split source path into directory and filename
+        // The DWARF compile unit names the root by its canonical module path
+        // when it is a stdlib-tree module (`<embedded-std>/std/re/bundle.w`),
+        // so a .wo bundle object is byte-identical from every checkout — the
+        // identity its symbols already carry (D38 C0; #949: the checkout's
+        // absolute directory made one key hash to a different object per
+        // tree). Any other root keeps its real path for the debugger.
+        let canonical = codegen_canonical_module_path(self.source_file)
+        // #747: an owned copy — plain field assignment would move source_file
+        // out of self and poison the slice reads below.
+        let di_path = if canonical.starts_with("<embedded-std>/"): canonical else: with_str_clone_ref(self.source_file)
+
+        // Split the path into directory and filename
         var last_slash = -1
-        for i in 0..self.source_file.len() as i32:
-            if self.source_file.byte_at(i as i64) == 47:
+        for i in 0..di_path.len() as i32:
+            if di_path.byte_at(i as i64) == 47:
                 last_slash = i
 
         var dir = "."
-        // #747: an owned copy — plain field assignment would move source_file
-        // out of self and poison the slice reads below.
-        var file = with_str_clone_ref(self.source_file)
+        var file = with_str_clone_ref(di_path)
         if last_slash >= 0:
-            dir = self.source_file.slice(0, last_slash as i64)
-            file = self.source_file.slice((last_slash + 1) as i64, self.source_file.len())
+            dir = di_path.slice(0, last_slash as i64)
+            file = di_path.slice((last_slash + 1) as i64, di_path.len())
 
         self.di_file = wl_di_create_file(self.di_builder, file, dir)
 
