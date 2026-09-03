@@ -195,7 +195,7 @@ fn regex_group_index(code: *const i8, name: &str) -> i32:
     with_free(cname as *mut u8)
     if number < 0: -1 else: number
 
-fn regex_substitute_into(code: *const i8, text: &str, c_repl: *const u8, repl_len: i64, options: c_uint, match_data: *mut pcre2_real_match_data_8, buffer: *mut u8, buffer_len: *mut c_ulong) -> c_int:
+fn regex_substitute_into(code: *const i8, text: &str, c_repl: *const u8, repl_len: i64, options: c_uint, match_data: *mut pcre2_real_match_data_8, out_bytes: *mut u8, out_len: *mut c_ulong) -> c_int:
     unsafe { pcre2_substitute_8(
         code as *const pcre2_real_code_8,
         regex_str_data(text),
@@ -206,8 +206,8 @@ fn regex_substitute_into(code: *const i8, text: &str, c_repl: *const u8, repl_le
         null,
         c_repl,
         repl_len as c_ulong,
-        buffer,
-        buffer_len
+        out_bytes,
+        out_len
     ) }
 
 fn regex_substitute(code: *const i8, text: &str, repl: &str, replace_all: bool) -> str:
@@ -219,25 +219,25 @@ fn regex_substitute(code: *const i8, text: &str, repl: &str, replace_all: bool) 
     var options: c_uint = PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH
     if replace_all:
         options = options | PCRE2_SUBSTITUTE_GLOBAL
-    var buffer_len: c_ulong = (text.len() + repl.len() + 64) as c_ulong
-    var buffer = with_alloc(buffer_len as i64 + 1)
-    var rc = regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, buffer, &raw mut buffer_len)
+    var out_len: c_ulong = (text.len() + repl.len() + 64) as c_ulong
+    var out_bytes = with_alloc(out_len as i64 + 1)
+    var rc = regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, out_bytes, &raw mut out_len)
     if rc == PCRE2_ERROR_NOMEMORY:
         // The engine reported the length it needs (PCRE2_SUBSTITUTE_OVERFLOW_LENGTH).
-        with_free(buffer)
-        buffer = with_alloc(buffer_len as i64 + 1)
-        rc = regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, buffer, &raw mut buffer_len)
+        with_free(out_bytes)
+        out_bytes = with_alloc(out_len as i64 + 1)
+        rc = regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, out_bytes, &raw mut out_len)
     if rc < 0:
         let msg = "Regex.replace: " ++ regex_error_message(rc as i32)
         with_free(c_repl as *mut u8)
-        with_free(buffer)
+        with_free(out_bytes)
         unsafe { pcre2_match_data_free_8(match_data) }
         unsafe { pcre2_general_context_free_8(gcontext) }
         with_panic(msg, "", 0)
-    unsafe { *((buffer as i64 + buffer_len as i64) as *mut u8) = 0 }
-    let result = with_str_from_bytes(buffer as *const u8, buffer_len as i64)
+    unsafe { *((out_bytes as i64 + out_len as i64) as *mut u8) = 0 }
+    let result = with_str_from_bytes(out_bytes as *const u8, out_len as i64)
     with_free(c_repl as *mut u8)
-    with_free(buffer)
+    with_free(out_bytes)
     unsafe { pcre2_match_data_free_8(match_data) }
     unsafe { pcre2_general_context_free_8(gcontext) }
     result

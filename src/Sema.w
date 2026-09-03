@@ -736,6 +736,13 @@ type Sema {
     // consulted by scope_lookup only from a module that imports theirs.
     interface_global_index: HashMap[i32, i32],
     interface_global_paths: HashMap[i32, str],
+    // every flat-scope global's declaring module (symbol → path), and the
+    // globals a local binding is standing in for while its scope lasts —
+    // a function's local may take the name of a global its module cannot
+    // see (§18.1); the global's slot returns when the scope ends
+    global_value_decl_paths: HashMap[i32, str],
+    shadowed_global_syms: Vec[i32],
+    shadowed_global_indices: Vec[i32],
     global_race_access_syms: Vec[i32],
     global_race_access_nodes: Vec[i32],
     global_race_access_files: Vec[i32],
@@ -1827,6 +1834,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let global_value_decl_kinds = sema_new_map_i32_i32()
     let interface_global_index = sema_new_map_i32_i32()
     let interface_global_paths = sema_new_map_i32_str()
+    let global_value_decl_paths = sema_new_map_i32_str()
     let global_race_mutated_syms = sema_new_map_i32_i32()
     let global_race_mutation_nodes = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
@@ -2032,6 +2040,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_value_decl_kinds,
         interface_global_index,
         interface_global_paths,
+        global_value_decl_paths,
+        shadowed_global_syms: Vec.new(),
+        shadowed_global_indices: Vec.new(),
         global_race_access_syms: Vec.new(),
         global_race_access_nodes: Vec.new(),
         global_race_access_files: Vec.new(),
@@ -4447,6 +4458,11 @@ impl Sema:
                 self.pending_generic_binding_decl.remove(removed_sym)
             self.clear_moved_fields_for_binding(removed_sym)
             self.scope_name_map.remove(removed_sym)
+            let shadow_top = self.shadowed_global_syms.len() as i32 - 1
+            if shadow_top >= 0 and self.shadowed_global_syms.get(shadow_top as i64) == removed_sym:
+                self.scope_name_map.insert(removed_sym, self.shadowed_global_indices.get(shadow_top as i64))
+                self.shadowed_global_syms.pop()
+                self.shadowed_global_indices.pop()
             self.bind_names.pop()
             self.bind_types.pop()
             self.bind_muts.pop()
@@ -4487,6 +4503,23 @@ impl Sema:
 
     mut fn scope_put_at(sym: i32, tid: i32, is_mut: i32, node: i32):
         if self.is_discard_binding_symbol(sym) != 0:
+            return
+        let existing = self.scope_name_map.get(sym)
+        if existing.is_some():
+            // A top-level global of a module this one cannot see is not in
+            // scope here (§18.1): the local takes the name, and pop_scope
+            // gives the global its slot back. Every other collision — a
+            // local, or a global the module can see — is shadowing.
+            let idx: i32 = existing.unwrap()
+            let first_scope_start = if self.scope_starts.len() > 0: self.scope_starts.get(0) else: self.bind_names.len() as i32
+            let global_path = if self.global_value_decl_paths.contains(sym): with_str_clone_ref(self.global_value_decl_paths.get(sym).unwrap()) else: ""
+            if idx < first_scope_start and global_path.len() > 0 and self.decl_visible_from_current(global_path, 1) == 0:
+                self.shadowed_global_syms.push(sym)
+                self.shadowed_global_indices.push(idx)
+                self.scope_insert_at(sym, tid, is_mut)
+                return
+            let name: str = with_str_clone_ref(self.pool_resolve(sym))
+            self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
             return
         if self.scope_lookup(sym) >= 0:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
@@ -4564,6 +4597,7 @@ impl Sema:
         if not existing_opt.is_some():
             self.scope_insert_at(sym, tid, is_mut)
             self.global_value_decl_kinds.insert(sym, decl_kind)
+            self.global_value_decl_paths.insert(sym, sema_owned_text(decl_path))
             return
 
         let existing_idx: i32 = existing_opt.unwrap()
