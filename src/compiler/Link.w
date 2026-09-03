@@ -1327,8 +1327,19 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     let needs_compat_runtime = link_stage_undefined_symbols_need_compat_runtime(undef)
     // D38: embedded .wo bundles join on demand — an undefined symbol carrying
     // one of a bundle's module prefixes selects it; its abi-sha must equal this
-    // compiler's (never a silent mixed-ABI link, #761).
-    let bundle_objects = link_stage_select_embedded_bundles(undef)
+    // compiler's (never a silent mixed-ABI link, #761). Selection sees every
+    // object on the link, the ones joining on demand included: a compiler
+    // that embeds pcre2 compiled the regex runtime against the bundle's
+    // interface, so regex_runtime.o references the corpus instead of
+    // defining it, and the program's own objects never mention it. (The
+    // shim retires in batch C4; until then its references select the bundle.)
+    var bundle_undef = with_str_clone_ref(undef)
+    if needs_regex_runtime != 0 and bundle_undef != "<probe-failed>":
+        let regex_probe_path = link_stage_find_runtime_object_path("regex_runtime.o")
+        if regex_probe_path.len() > 0:
+            let regex_undef = link_stage_undefined_symbols_for_object(regex_probe_path)
+            bundle_undef = if regex_undef == "<probe-failed>": with_str_clone_ref(regex_undef) else: bundle_undef ++ regex_undef
+    let bundle_objects = link_stage_select_embedded_bundles(bundle_undef)
     if bundle_objects.len() == 1 and bundle_objects.get(0) == LINK_BUNDLE_FAILED():
         return link_stage_plan_fail()
     for boi in 0..bundle_objects.len() as i32:
