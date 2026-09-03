@@ -9,11 +9,12 @@
 
 use std.regex
 
-var slot: *const i8 = null
+var literal_slot: *const i8 = null
 
 fn main:
-    let first = unsafe { Regex.__literal_code(&raw mut slot, "(a)(b)?", 0) }
-    let again = unsafe { Regex.__literal_code(&raw mut slot, "(a)(b)?", 0) }
+    let slot = &raw mut literal_slot
+    let first = unsafe { Regex.__literal_code(slot, "(a)(b)?", 0) }
+    let again = unsafe { Regex.__literal_code(slot, "(a)(b)?", 0) }
     let literal = /(a)(b)?/
     if first as i64 != 0 and again as i64 == first as i64 and Regex.__capture_count(first) == 2 and literal.num_captures() == 2:
         print("ok")

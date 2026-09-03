@@ -848,9 +848,8 @@ fn run_cli(argc: i32) -> i32:
             with_eprint("error: " ++ ir_target.error_msg)
             return 1
         comp.set_target_kind(ir_target.kind)
-        // D38: `ir` is how build.w compiles the regex runtime shim whole-
-        // module; `--bundle-corpus` keeps that corpus on its source (owned,
-        // defined in-unit) even in a compiler that embeds its bundle, and
+        // D38: `--bundle-corpus` keeps a corpus on its source (owned, defined
+        // in-unit) even in a compiler that embeds its bundle, and
         // `--link-bundle` reads the same flags every compiling command does.
         comp.set_link_bundles(&driver_link_bundle_args(argc))
         comp.set_bundle_fingerprint(driver_bundle_corpus_arg(argc), "")
@@ -3972,7 +3971,7 @@ fn run_test_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, r
     run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
 
 fn test_command_option_takes_value(arg: &str) -> bool:
-    arg == "-o" or arg == "--output" or arg == "-f" or arg == "--filter"
+    arg == "-f" or arg == "--filter" or cli_option_takes_value(arg)
 
 fn test_command_collect_targets(argc: i32) -> Vec[str]:
     let targets: Vec[str] = Vec.new()
