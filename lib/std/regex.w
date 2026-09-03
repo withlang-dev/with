@@ -1,23 +1,28 @@
 // std.regex — high-level regex facade over the migrated PCRE2 engine.
+//
+// The engine is the pcre2 .wo bundle (docs/wo_bundles.md, decisions.md D38,
+// D39): `use std.re.*` resolves to the bundle's interface, the calls below
+// are ordinary With calls, and the link selects the bundle on demand.
 
 use std.builtins
 use std.collections
 use std.option
 use std.result
+use std.re.defs
+use std.re.pcre2_compile
+use std.re.pcre2_context
+use std.re.pcre2_error
+use std.re.pcre2_maketables
+use std.re.pcre2_match
+use std.re.pcre2_match_data
+use std.re.pcre2_pattern_info
+use std.re.pcre2_substitute
+use std.re.pcre2_substring
 
 extern fn with_str_slice_ref(s: &str, start: i64, end: i64) -> str
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_str_from_byte(b: i32) -> str
-extern fn with_regex_error_message(code: i32) -> str
-extern fn with_regex_compile(pattern: &str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
-extern fn with_regex_code_copy(code: *const i8) -> *const i8
-extern fn with_regex_code_free(code: *const i8) -> Unit
-extern fn with_regex_capture_count(code: *const i8) -> i32
-extern fn with_regex_match_spans_alloc_at(code: *const i8, text: &str, start_offset: i32, out_count: *mut i32) -> *const i32
-extern fn with_regex_capture_name_count(code: *const i8) -> i32
-extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
-extern fn with_regex_group_name_to_index(code: *const i8, name: &str) -> i32
-extern fn with_regex_substitute(code: *const i8, text: &str, repl: &str, replace_all: i32) -> str
+extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 extern fn with_free(ptr: *mut u8) -> Unit
 
 const REGEX_FLAG_GLOBAL: i32 = 1
@@ -41,6 +46,8 @@ pub type RegexFlags {
 }
 impl Copy for RegexFlags
 
+// Ten fields in this order: codegen builds a regex literal's value field by
+// field (CodegenDispatch.gen_regex_literal_value).
 pub type Regex {
     ptr: *const i8,
     pattern_text: str,
@@ -63,8 +70,179 @@ pub type Captures {
 fn regex_make_flags(options: i32, flags: i32) -> RegexFlags:
     RegexFlags { options: options, flags: flags, }
 
+// ── The engine (pcre2 through std.re) ────────────────────────────────
+
+fn regex_engine_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
+    with_alloc(size as i64) as *mut c_void
+
+fn regex_engine_free(ptr: *mut c_void, data: *mut c_void):
+    with_free(ptr as *mut u8)
+
+fn regex_general_context(what: &str) -> *mut pcre2_real_general_context_8:
+    let gcontext = unsafe { pcre2_general_context_create_8(regex_engine_malloc, regex_engine_free, null) }
+    if gcontext as i64 == 0:
+        with_panic(what ++ ": general context creation failed", "", 0)
+    gcontext
+
+fn regex_match_data(code: *const i8, gcontext: *mut pcre2_real_general_context_8, what: &str) -> *mut pcre2_real_match_data_8:
+    let match_data = unsafe { pcre2_match_data_create_from_pattern_8(code as *const pcre2_real_code_8, gcontext) }
+    if match_data as i64 == 0:
+        unsafe { pcre2_general_context_free_8(gcontext) }
+        with_panic(what ++ ": match data creation failed", "", 0)
+    match_data
+
+// A NUL-terminated copy of `s` for the engine; the caller frees it.
+fn regex_cstr(s: &str) -> *const u8:
+    let out = with_alloc(s.len() + 1)
+    var i: i64 = 0
+    while i < s.len():
+        unsafe { *((out as i64 + i) as *mut u8) = s.byte_at(i) }
+        i = i + 1
+    unsafe { *((out as i64 + s.len()) as *mut u8) = 0 }
+    out as *const u8
+
+fn regex_str_data(s: &str) -> *const u8:
+    unsafe { **(&s as *const *const *const u8) }
+
+unsafe fn regex_owned_cstr(s: *const u8) -> str:
+    if s as i64 == 0:
+        return ""
+    var len: i64 = 0
+    while s[len] != 0:
+        len = len + 1
+    with_str_from_bytes(s, len)
+
 fn regex_error_message(code: i32) -> str:
-    with_regex_error_message(code)
+    let buf = with_alloc(256)
+    let rc = unsafe { pcre2_get_error_message_8(code, buf, 256) }
+    let text = if rc < 0: "regex error" else: unsafe { regex_owned_cstr(buf as *const u8) }
+    with_free(buf)
+    text
+
+// The compiled pattern, or null with `*err_code`/`*err_offset` set.
+unsafe fn regex_compile_code(pattern: &str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8:
+    let gcontext = regex_general_context("Regex.compile")
+    var ccontext = _pcre2_default_compile_context_8
+    ccontext.memctl = (*gcontext).memctl
+    ccontext.max_pattern_length = ~(0 as c_ulong)
+    ccontext.max_pattern_compiled_length = ~(0 as c_ulong)
+    ccontext.parens_nest_limit = 250
+    ccontext.max_varlookbehind = 255
+    ccontext.newline_convention = 2
+    ccontext.bsr_convention = 0
+    ccontext.optimization_flags = 4294967295
+    ccontext.tables = pcre2_maketables_8(gcontext)
+    let c_pattern = regex_cstr(pattern)
+    var raw_err_code: c_int = 0
+    var raw_err_offset: c_ulong = 0
+    let compiled = pcre2_compile_8(
+        c_pattern,
+        pattern.len() as c_ulong,
+        options as c_uint,
+        &raw mut raw_err_code,
+        &raw mut raw_err_offset,
+        &raw mut ccontext
+    )
+    with_free(c_pattern as *mut u8)
+    pcre2_general_context_free_8(gcontext)
+    if err_code as i64 != 0:
+        *err_code = raw_err_code
+    if err_offset as i64 != 0:
+        *err_offset = raw_err_offset as i32
+    compiled as *const i8
+
+fn regex_pattern_info(code: *const i8, what: c_int, where_: *mut c_void, label: &str):
+    let rc = unsafe { pcre2_pattern_info_8(code as *const pcre2_real_code_8, what as c_uint, where_) }
+    if rc < 0:
+        with_panic("Regex." ++ label ++ ": pattern info failed", "", 0)
+
+fn regex_pattern_info_count(code: *const i8, what: c_int, label: &str) -> i32:
+    var count: c_uint = 0
+    regex_pattern_info(code, what, (&raw mut count) as *mut c_void, label)
+    count as i32
+
+// The match ovector as [start, end] pairs; empty when nothing matched.
+fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -> Vec[i32]:
+    let spans: Vec[i32] = Vec.new()
+    if code as i64 == 0 or start_offset < 0 or start_offset as i64 > text.len():
+        return spans
+    let gcontext = regex_general_context("Regex.captures_at")
+    let match_data = regex_match_data(code, gcontext, "Regex.captures_at")
+    let rc = unsafe { pcre2_match_8(
+        code as *const pcre2_real_code_8,
+        regex_str_data(text),
+        text.len() as c_ulong,
+        start_offset as c_ulong,
+        0,
+        match_data,
+        null
+    ) }
+    if rc >= 0:
+        let ovector = unsafe { pcre2_get_ovector_pointer_8(match_data) }
+        let count = unsafe { pcre2_get_ovector_count_8(match_data) } as i32
+        for i in 0..count:
+            spans.push(unsafe { *((ovector as i64 + i as i64 * 16) as *const c_ulong) } as i32)
+            spans.push(unsafe { *((ovector as i64 + i as i64 * 16 + 8) as *const c_ulong) } as i32)
+    unsafe { pcre2_match_data_free_8(match_data) }
+    unsafe { pcre2_general_context_free_8(gcontext) }
+    spans
+
+fn regex_group_index(code: *const i8, name: &str) -> i32:
+    if code as i64 == 0:
+        return -1
+    let cname = regex_cstr(name)
+    let number = unsafe { pcre2_substring_number_from_name_8(code as *const pcre2_real_code_8, cname) }
+    with_free(cname as *mut u8)
+    if number < 0: -1 else: number
+
+fn regex_substitute_into(code: *const i8, text: &str, c_repl: *const u8, repl_len: i64, options: c_uint, match_data: *mut pcre2_real_match_data_8, buffer: *mut u8, buffer_len: *mut c_ulong) -> c_int:
+    unsafe { pcre2_substitute_8(
+        code as *const pcre2_real_code_8,
+        regex_str_data(text),
+        text.len() as c_ulong,
+        0,
+        options,
+        match_data,
+        null,
+        c_repl,
+        repl_len as c_ulong,
+        buffer,
+        buffer_len
+    ) }
+
+fn regex_substitute(code: *const i8, text: &str, repl: &str, replace_all: bool) -> str:
+    if code as i64 == 0:
+        return with_str_clone_ref(text)
+    let gcontext = regex_general_context("Regex.replace")
+    let match_data = regex_match_data(code, gcontext, "Regex.replace")
+    let c_repl = regex_cstr(repl)
+    var options: c_uint = PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH
+    if replace_all:
+        options = options | PCRE2_SUBSTITUTE_GLOBAL
+    var buffer_len: c_ulong = (text.len() + repl.len() + 64) as c_ulong
+    var buffer = with_alloc(buffer_len as i64 + 1)
+    var rc = regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, buffer, &raw mut buffer_len)
+    if rc == PCRE2_ERROR_NOMEMORY:
+        // The engine reported the length it needs (PCRE2_SUBSTITUTE_OVERFLOW_LENGTH).
+        with_free(buffer)
+        buffer = with_alloc(buffer_len as i64 + 1)
+        rc = regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, buffer, &raw mut buffer_len)
+    if rc < 0:
+        let msg = "Regex.replace: " ++ regex_error_message(rc as i32)
+        with_free(c_repl as *mut u8)
+        with_free(buffer)
+        unsafe { pcre2_match_data_free_8(match_data) }
+        unsafe { pcre2_general_context_free_8(gcontext) }
+        with_panic(msg, "", 0)
+    unsafe { *((buffer as i64 + buffer_len as i64) as *mut u8) = 0 }
+    let result = with_str_from_bytes(buffer as *const u8, buffer_len as i64)
+    with_free(c_repl as *mut u8)
+    with_free(buffer)
+    unsafe { pcre2_match_data_free_8(match_data) }
+    unsafe { pcre2_general_context_free_8(gcontext) }
+    result
+
+// ── Flags ────────────────────────────────────────────────────────────
 
 fn regex_compile_flags(flags: &str) -> Result[RegexFlags, RegexError]:
     var options: i32 = 0
@@ -97,11 +275,11 @@ fn regex_compile_flags(flags: &str) -> Result[RegexFlags, RegexError]:
 
 impl Regex:
     pub fn clone() -> Self:
-        let copied = with_regex_code_copy(self.ptr)
+        let copied = unsafe { pcre2_code_copy_8(self.ptr as *const pcre2_real_code_8) }
         if copied as i64 == 0:
             with_panic("Regex.clone(): pcre2_code_copy_8 failed", "", 0)
         Regex {
-            ptr: copied,
+            ptr: copied as *const i8,
             pattern_text: with_str_clone_ref(self.pattern_text),
             flags_text: with_str_clone_ref(self.flags_text),
             options: self.options,
@@ -115,7 +293,7 @@ impl Regex:
 
     move fn drop():
         if self.owned != 0 and self.ptr as i64 != 0:
-            with_regex_code_free(self.ptr)
+            unsafe { pcre2_code_free_8(self.ptr as *mut pcre2_real_code_8) }
 
     pub fn is_global() -> bool:
         (self.flags & REGEX_FLAG_GLOBAL) != 0
@@ -128,7 +306,7 @@ pub fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError
         Ok(parsed_flags) => {
             var err_code: i32 = 0
             var err_offset: i32 = 0
-            let compiled = with_regex_compile(pattern, parsed_flags.options, &raw mut err_code, &raw mut err_offset)
+            let compiled = unsafe { regex_compile_code(pattern, parsed_flags.options, &raw mut err_code, &raw mut err_offset) }
             if compiled as i64 == 0:
                 return Err(RegexError {
                     code: err_code,
@@ -141,7 +319,7 @@ pub fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError
                 flags_text: flags,
                 options: parsed_flags.options,
                 flags: parsed_flags.flags,
-                capture_count: with_regex_capture_count(compiled),
+                capture_count: Regex.__capture_count(compiled),
                 owned: 1,
                 global_pos: null,
                 global_subject_ptr: null,
@@ -150,6 +328,9 @@ pub fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError
         }
         Err(err) => Err(err)
 
+// The regex-literal entry points (CodegenDispatch.gen_regex_literal_value):
+// a literal compiles once into its slot, and its value carries the capture
+// count. Compiled code has no With type here; its raw pointer is opaque.
 pub unsafe fn Regex.__literal_code(slot: *mut *const i8, pattern: &str, options: i32) -> *const i8:
     if slot as i64 == 0:
         return null
@@ -158,11 +339,16 @@ pub unsafe fn Regex.__literal_code(slot: *mut *const i8, pattern: &str, options:
         return existing
     var err_code: i32 = 0
     var err_offset: i32 = 0
-    let compiled = with_regex_compile(pattern, options, &raw mut err_code, &raw mut err_offset)
+    let compiled = regex_compile_code(pattern, options, &raw mut err_code, &raw mut err_offset)
     if compiled as i64 == 0:
         with_panic("invalid regex literal: " ++ regex_error_message(err_code), "", 0)
     *slot = compiled
     compiled
+
+pub fn Regex.__capture_count(code: *const i8) -> i32:
+    if code as i64 == 0:
+        return 0
+    regex_pattern_info_count(code, PCRE2_INFO_CAPTURECOUNT, "num_captures")
 
 impl Regex:
     pub fn pattern() -> str:
@@ -172,9 +358,7 @@ impl Regex:
         self.capture_count
 
     pub fn capture_index(name: &str) -> Option[i32]:
-        if self.ptr as i64 == 0:
-            return None
-        let number = with_regex_group_name_to_index(self.ptr, name)
+        let number = regex_group_index(self.ptr, name)
         if number < 0:
             return None
         Some(number)
@@ -183,29 +367,24 @@ impl Regex:
         let out: Vec[str] = Vec.new()
         if self.ptr as i64 == 0:
             return out
-        let count = with_regex_capture_name_count(self.ptr)
-        var i: i32 = 0
-        while i < count:
-            out.push(with_regex_capture_name_at(self.ptr, i))
-            i = i + 1
+        let count = regex_pattern_info_count(self.ptr, PCRE2_INFO_NAMECOUNT, "capture_names")
+        if count == 0:
+            return out
+        let entry_size = regex_pattern_info_count(self.ptr, PCRE2_INFO_NAMEENTRYSIZE, "capture_names")
+        var table: *const u8 = null
+        regex_pattern_info(self.ptr, PCRE2_INFO_NAMETABLE, (&raw mut table) as *mut c_void, "capture_names")
+        // Each entry: a two-byte group number, then the NUL-terminated name.
+        for i in 0..count:
+            out.push(unsafe { regex_owned_cstr((table as i64 + i as i64 * entry_size as i64 + 2) as *const u8) })
         out
 
     pub fn captures(text: &str) -> Option[Captures]:
         self.captures_at(text, 0)
 
     pub fn captures_at(text: &str, start_offset: i32) -> Option[Captures]:
-        if self.ptr as i64 == 0:
+        let spans = regex_match_spans_at(self.ptr, text, start_offset)
+        if spans.len() == 0:
             return None
-        var ints_count: i32 = 0
-        let raw = with_regex_match_spans_alloc_at(self.ptr, text, start_offset, &raw mut ints_count)
-        if raw as i64 == 0 or ints_count <= 0:
-            return None
-        let spans: Vec[i32] = Vec.new()
-        var i: i32 = 0
-        while i < ints_count:
-            spans.push(unsafe *((raw as i64 + i as i64 * 4) as *const i32))
-            i = i + 1
-        with_free(raw as *mut u8)
         Some(Captures { regex_ptr: self.ptr, subject: with_str_clone_ref(text), spans: spans, })
 
     pub fn is_match(text: &str) -> bool:
@@ -214,7 +393,7 @@ impl Regex:
     pub fn captures_match_op(text: &str) -> Option[Captures]:
         if not self.is_global() or self.global_pos as i64 == 0 or self.global_subject_ptr as i64 == 0 or self.global_subject_len as i64 == 0:
             return self.captures(text)
-        let subject_ptr = unsafe **(&text as *const *const *const u8) as i64
+        let subject_ptr = regex_str_data(text) as i64
         let subject_len = text.len()
         if unsafe *self.global_subject_ptr != subject_ptr or unsafe *self.global_subject_len != subject_len:
             unsafe *self.global_subject_ptr = subject_ptr
@@ -396,10 +575,10 @@ impl Regex:
         out
 
     pub fn replace(text: &str, repl: &str) -> str:
-        with_regex_substitute(self.ptr, text, repl, if self.is_global(): 1 else: 0)
+        regex_substitute(self.ptr, text, repl, self.is_global())
 
     pub fn replace_all(text: &str, repl: &str) -> str:
-        with_regex_substitute(self.ptr, text, repl, 1)
+        regex_substitute(self.ptr, text, repl, true)
 
     pub fn replace_fn(text: &str, replacement_callback: fn(&Captures) -> str) -> str:
         var out = ""
@@ -493,9 +672,7 @@ impl Captures:
         (self.spans.len() as i32) / 2
 
     pub fn by_name(name: &str) -> Option[Match]:
-        if self.regex_ptr as i64 == 0:
-            return None
-        let number = with_regex_group_name_to_index(self.regex_ptr, name)
+        let number = regex_group_index(self.regex_ptr, name)
         if number < 0:
             return None
         self.get(number)
