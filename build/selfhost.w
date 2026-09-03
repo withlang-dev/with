@@ -1160,6 +1160,42 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "implicit-main-regex-fstring", bs_one_liner_args("run", implicit_src), "error 42\nok\n", "ERROR code=42")
     if rc != 0: return rc
 
+    // sed/awk/coreutils/jq parity (docs/improve_oneliners.md, 2026-09-03):
+    // every idiom that works today stays working. The rows that do not
+    // are #957–#961; each joins here when its gap closes.
+    let parity_in = "alpha 10 x\nbeta  20 y\ngamma 30 x\nSTART\ndelta 40 y\nEND\nalpha 10 x\n"
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-sed-range", bs_one_liner_args("-n", "if nr >= 2 and nr <= 3: print(line)"), parity_in, "beta  20 y\ngamma 30 x")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-sed-delete", bs_one_liner_args("-n", "if not (line == \"START\" or line == \"END\"): print(line)"), parity_in, "alpha 10 x\nbeta  20 y\ngamma 30 x\ndelta 40 y\nalpha 10 x")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-sed-subst-global", bs_one_liner_args("-p", "line = line.replace(\"a \", \"A \")"), parity_in, "alphA 10 x\nbetA  20 y\ngammA 30 x\nSTART\ndeltA 40 y\nEND\nalphA 10 x")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-sed-backrefs", bs_one_liner_args("-p", "line = /^(\\w+)\\s+(\\d+)/.replace(line, \"$2 $1\")"), parity_in, "10 alpha x\n20 beta y\n30 gamma x\nSTART\n40 delta y\nEND\n10 alpha x")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-sed-insert", bs_one_liner_args("-n", "if nr == 3: print(\"INS\")\nprint(line)"), parity_in, "alpha 10 x\nbeta  20 y\nINS\ngamma 30 x\nSTART\ndelta 40 y\nEND\nalpha 10 x")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-awk-nr-mod", bs_one_liner_args("-n", "if nr % 2 == 0: print(line)"), parity_in, "beta  20 y\nSTART\nEND")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-grep-i", bs_one_liner_args("-n", "if line =~ /start/i: print(line)"), parity_in, "START")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-head", bs_one_liner_args("-n", "if nr <= 2: print(line)"), parity_in, "alpha 10 x\nbeta  20 y")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-tr-upper", bs_one_liner_args("-p", "line = line.upper()"), parity_in, "ALPHA 10 X\nBETA  20 Y\nGAMMA 30 X\nSTART\nDELTA 40 Y\nEND\nALPHA 10 X")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-printf-align", bs_one_liner_args("-n", "if nr == 1: print(f\"{line.split(\\\" \\\").get(0):<8}|{nr:>5}\")"), parity_in, "alpha   |    1")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-e-grep-count", bs_one_liner_args("-e", "var c = 0\nfor l in stdin.lines(): if l.contains(\"alpha\"): c = c + 1\nprint(f\"{c}\")"), parity_in, "2")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-e-paste-join", bs_one_liner_args("-e", "print(stdin.lines().join(\",\"))"), parity_in, "alpha 10 x,beta  20 y,gamma 30 x,START,delta 40 y,END,alpha 10 x")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-e-uniq-count", bs_one_liner_args("-e", "let lines = stdin.lines()\nvar counts: HashMap[str, i32] = HashMap.new()\nfor l in lines: counts.insert(l.clone(), counts.get(l).unwrap_or(0) + 1)\nfor l in lines: if l == \"alpha 10 x\": print(f\"{l} {counts.get(l).unwrap_or(0)}\")"), parity_in, "alpha 10 x 2\nalpha 10 x 2")
+    if rc != 0: return rc
+    let parity_json = "{\"a\": 1, \"b\": {\"c\": \"hi\"}, \"xs\": [1, 2, 3]}\n"
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-jq-scalar", bs_one_liner_args("-e", "use std.json\nprint(JsonDocument.parse(read_all()).root().field(\"a\").raw())"), parity_json, "1")
+    if rc != 0: return rc
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-parity-jq-nested", bs_one_liner_args("-e", "use std.json\nprint(JsonDocument.parse(read_all()).root().field(\"b\").field(\"c\").raw())"), parity_json, "hi")
+    if rc != 0: return rc
+
     args = Vec.new()
     args |> push("-e")
     args |> push("print(\"x\")")

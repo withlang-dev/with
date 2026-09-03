@@ -31,6 +31,93 @@ replacements.
 | Explicit numeric formatting policy | 2 |
 | **Total** | **96** |
 
+## sed, awk, coreutils, and jq parity audit (2026-09-03)
+
+The goal is that a With one-liner replaces perl, sed, awk, jq, cut, tr, sort
+and friends outright (CLAUDE.md: never reach for sed; a transform that cannot
+be a one-liner is a bug to file). The cookbook above measures length against
+Perl; this audit measures *possibility* against the tools' idioms. Method:
+every idiom below was run as a real `with -n`/`-p`/`-e` one-liner on the
+installed compiler (v0.15.1.7-g54651442e) over a seven-line fixture, and each
+failing row became an issue. Verdicts are from the run, not from reading the
+spec.
+
+### What already works (and the cheat-sheet did not say)
+
+| tool idiom | With one-liner |
+|---|---|
+| `sed -n 'A,Bp' file` | `with -n 'if nr >= A and nr <= B: print(line)' < file` |
+| `sed '/pat/d'` | `with -n 'if not line.contains("pat"): print(line)'` |
+| `sed 's/old/new/g'` | `with -p 'line = line.replace("old", "new")'` (all occurrences) |
+| `sed -E 's/^(\w+) +(\d+)/\2 \1/'` | `with -p 'line = /^(\w+)\s+(\d+)/.replace(line, "$2 $1")'` |
+| `sed '3i text'` | `with -n 'if nr == 3: print("text")` ⏎ `print(line)'` |
+| `awk 'NR % 2 == 0'` | `with -n 'if nr % 2 == 0: print(line)'` |
+| `grep -i pat` | `with -n 'if line =~ /pat/i: print(line)'` |
+| `perl -ne 'print $1 if /(\d+)/'` | `with -n 'if line =~ /(\d+)/: print($1)'` |
+| `head -n 2` | `with -n 'if nr <= 2: print(line)'` |
+| `tr a-z A-Z` | `with -p 'line = line.upper()'` |
+| `sed 'y/xy/XY/'` | `with -p 'line = line.replace("x", "X").replace("y", "Y")'` |
+| `cut -c1-5` | `with -p 'line = line.slice(0, if line.len() < 5: line.len() else: 5)'` |
+| `paste -sd,` | `with -e 'print(stdin.lines().join(","))'` |
+| `perl -0777` (slurp) | `with -e '… read_all() …'` |
+| `grep -c pat`, `sort \| uniq -c` | `-e` with a counter / a `HashMap[str, i32]` over `stdin.lines()` |
+| `printf "%-8s\|%5d"` | `f"{name:<8}\|{n:>5}"` |
+| `jq -r .a`, `jq -r .b.c` | `with -e 'use std.json` ⏎ `print(JsonDocument.parse(read_all()).root().field("b").field("c").raw())'` |
+
+`nr` has been in §18.5b all along; the sed habit came from a cheat-sheet that
+mapped `grep`, `s///` and `cut` and nothing else. The regex-literal
+`.replace` with `$N` backreferences works directly in `-p`, so "complex regex
+needs a `with run` script" was also wrong.
+
+### What does not work, by cause
+
+Each row was run and failed with the diagnostic shown; the issue carries the
+proposal and the acceptance rows.
+
+**1. No persistent state and no END in `-n`/`-p` (#957).** A snippet runs
+inside the per-line loop (§18.5b.3's desugaring), so a `var` it declares is
+re-created per line, an undeclared assignment is "undefined variable", and
+there is no `last`/END. Blocked: `sed '$p'`, `sed -n '/START/,/END/p'`,
+`awk '{s+=$2} END{print s}'`, `awk '!seen[$0]++'`, `wc -l`, `tail -n 1`. All
+are expressible in `-e` with a loop over `stdin.lines()`, which already
+materializes the input as `Vec[str]`, so `last`/END cost nothing. Proposal:
+hoist a snippet's top-level `var` declarations out of the loop and bind
+`last: bool`.
+
+**2. No file operands and no `-i` (#958).** `with -n CODE file` and
+`with -p -i CODE file` are refused with "cannot combine one-liner code with a
+source file" — §18.5b's own sentence, so the fix is a spec edit (trailing
+operands are inputs; `filename`/`fnr` bindings; `-i` through a temp sibling
+and rename).
+
+**3. No whitespace-run fields and no integer parse on `str` (#959).**
+`line.split(" ")` yields an empty field for a double space (awk's `$N`
+ignores runs; `wc -w` overcounts the fixture 18 for 17), `fields()` does not
+exist, and the only integer parser is the free function
+`std.string.parse(s) -> i32`. Blocked: `awk '{print $2}'`, `awk -F: NF`,
+`$2 + 0`.
+
+**4. No `Vec.sort` and no `str.reverse` (#960).** `sort` and `rev` have no
+spelling; aggregation (`uniq -c`) does.
+
+**5. `std.json` stops at `field`/`raw` (#961).** `.a` and `.b.c` work;
+`.xs[1]`, `.xs[]`, `keys`, and pretty-printing have no method, only the
+token-pointer functions, and `std.json` is not an implicit one-liner import.
+
+**Found along the way.** Writing the rewrite script for the cheat-sheet as a
+`with run` tool exposed two compiler defects, filed with repros: `let p =
+args().get(1)` is a view into a temporary that dies at the end of the
+statement and reads as `""` instead of being rejected (#962, the D27/§5.4
+origin rule), and `with check` refuses an implicit-main file that `with run`
+and `with build` accept (#963), so a tool script cannot be typechecked
+before it runs.
+
+### Cheat-sheet consequences
+
+CLAUDE.md's one-liner cheat-sheet now maps the range, delete, backreference,
+awk-field (with the exact-separator caveat until #959), END-style, and jq
+idioms, so the next reader reaches for `nr` instead of `sed -n`.
+
 ## Explicit line topic and output plumbing
 
 Perl's `-n` and `-p` modes combine several terse conventions: `$_` is the
@@ -658,6 +745,12 @@ small number of reusable surfaces:
    iterators.
 5. Make `-p` expression results useful as transforms without introducing a
    language-wide implicit topic.
+6. Close the parity gaps the 2026-09-03 audit filed: persistent state and
+   `last`/END in `-n`/`-p` (#957), file operands and `-i` (#958),
+   `str.fields()` and `parse_i64` (#959), `Vec.sort` and `str.reverse`
+   (#960), the jq surface on `JsonView` and `std.json` as an implicit import
+   (#961) — each with its matrix rows as a `cli-selfhost-one-liner-tests`
+   case, so parity is a battery invariant.
 
 The markers are most valuable as an abstraction audit. Repeated manual loops
 usually identify a missing library primitive; repeated `unsafe` identifies a

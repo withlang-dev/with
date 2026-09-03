@@ -363,12 +363,23 @@ same violation as C in the compiler. With IS a scripting language; there is no
 - **Never `sed`/`awk`/`cut`/`perl` for text transforms — use a `with` one-liner.**
   A transform genuinely impossible as a one-liner is a BUG to file, not a reason
   to reach for sed.
-  - `sed 's/old/new/'`  →  `... | with -p 'line = line.replace("old", "new")'`
+  - `sed 's/old/new/g'` →  `... | with -p 'line = line.replace("old", "new")'`
+  - `sed -E 's/(a)(b)/\2\1/'` → `... | with -p 'line = /(a)(b)/.replace(line, "$2$1")'`
+    (a regex literal's `.replace` takes `$N` backreferences; no script needed)
+  - `sed -n 'A,Bp' file` → `with -n 'if nr >= A and nr <= B: print(line)' < file`
+    (`nr` is the 1-based line number, §18.5b; never `sed -n` to read a range)
+  - `sed '/pat/d'`      →  `... | with -n 'if not line.contains("pat"): print(line)'`
   - `grep pat`          →  `... | with -n 'if line.contains("pat"): print(line)'`
-    (also `.starts_with`/`.ends_with`)
+    (also `.starts_with`/`.ends_with`; `grep -i` is `line =~ /pat/i`)
   - `cut -f2`           →  `... | with -n 'print(line.split("\t").get(1))'`
-  - complex regex       →  `use std.regex` in a `with run tool.w` script
-    (`Regex.replace(text, repl)`); prefer str `slice`/`split`/`replace` first.
+  - `awk '{print $2}'`  →  `... | with -n 'print(line.split(" ").get(1))'` — exact
+    separator only until `str.fields()` lands (#959)
+  - `wc -l`, `tail`, sums → `with -e` with a loop over `stdin.lines()` (the
+    whole input, so END-style work is a print after the loop); `-n` gains
+    persistent state and `last` with #957
+  - `jq -r .a.b`        →  `with -e 'use std.json` ⏎ `print(JsonDocument.parse(read_all()).root().field("a").field("b").raw())'`
+  - `sed -i`, `awk … file` → not yet (#958): `< file` and `with run` until then
+  - The full sed/awk/jq parity matrix and every open gap: `docs/improve_oneliners.md`.
 - **Implicit main** — a `.w` file needs no `fn main`; top-level statements ARE
   the program, and may sit alongside helper `fn` definitions:
   ```
