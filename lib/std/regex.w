@@ -75,8 +75,8 @@ fn regex_make_flags(options: i32, flags: i32) -> RegexFlags:
 fn regex_engine_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
     with_alloc(size as i64) as *mut c_void
 
-fn regex_engine_free(ptr: *mut c_void, data: *mut c_void):
-    with_free(ptr as *mut u8)
+fn regex_engine_free(block: *mut c_void, data: *mut c_void):
+    with_free(block as *mut u8)
 
 fn regex_general_context(what: &str) -> *mut pcre2_real_general_context_8:
     let gcontext = unsafe { pcre2_general_context_create_8(regex_engine_malloc, regex_engine_free, null) }

@@ -13,6 +13,7 @@ use InternPool
 use render
 use Overflow
 use compiler.TrackedInputs
+use compiler.BundleInterfaces
 use std.collections.HashMap
 use std.collections.HashSet
 
@@ -730,6 +731,11 @@ type Sema {
     // here — it's rebindable.
     stable_global_syms: HashMap[i32, i32],
     global_value_decl_kinds: HashMap[i32, i32],
+    // D39: a bundle interface's storage and constants live beside the flat
+    // global scope, not in it — symbol → binding index and declaring module,
+    // consulted by scope_lookup only from a module that imports theirs.
+    interface_global_index: HashMap[i32, i32],
+    interface_global_paths: HashMap[i32, str],
     global_race_access_syms: Vec[i32],
     global_race_access_nodes: Vec[i32],
     global_race_access_files: Vec[i32],
@@ -1819,6 +1825,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let mutable_global_syms = sema_new_map_i32_i32()
     let stable_global_syms = sema_new_map_i32_i32()
     let global_value_decl_kinds = sema_new_map_i32_i32()
+    let interface_global_index = sema_new_map_i32_i32()
+    let interface_global_paths = sema_new_map_i32_str()
     let global_race_mutated_syms = sema_new_map_i32_i32()
     let global_race_mutation_nodes = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
@@ -2022,6 +2030,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         mutable_global_syms,
         stable_global_syms,
         global_value_decl_kinds,
+        interface_global_index,
+        interface_global_paths,
         global_race_access_syms: Vec.new(),
         global_race_access_nodes: Vec.new(),
         global_race_access_files: Vec.new(),
@@ -4529,6 +4539,27 @@ impl Sema:
     mut fn register_top_level_global_decl(sym: i32, tid: i32, is_mut: i32, node: i32, decl_kind: i32):
         if self.is_discard_binding_symbol(sym) != 0:
             return
+        // A bundle interface's storage and constants (D39) are reachable
+        // only through an import, so they stay out of the flat global scope:
+        // pcre2's NULL, BUFSIZ or CHAR_MAX reach every program through the
+        // prelude's std.regex and would otherwise collide with any program's
+        // own — a c_import's NULL, a local named stdout.
+        let decl_path = self.decl_source_path_for_node(node)
+        if bundle_interface_text(decl_path).len() > 0:
+            if not self.interface_global_index.contains(sym):
+                self.interface_global_index.insert(sym, self.bind_names.len() as i32)
+                self.interface_global_paths.insert(sym, sema_owned_text(decl_path))
+                self.bind_names.push(sym)
+                self.bind_types.push(tid)
+                self.bind_muts.push(is_mut)
+                self.bind_states.push(VarState.LIVE)
+                self.bind_is_task.push(0)
+                self.bind_task_used.push(0)
+                self.bind_is_scoped_task.push(0)
+                self.bind_is_view_bound.push(0)
+                self.bind_provenance.push(binding_provenance_empty())
+                self.global_value_decl_kinds.insert(sym, decl_kind)
+            return
         let existing_opt = self.scope_name_map.get(sym)
         if not existing_opt.is_some():
             self.scope_insert_at(sym, tid, is_mut)
@@ -4572,6 +4603,9 @@ impl Sema:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             return self.bind_types[opt.unwrap()]
+        let iface = self.interface_global_index.get(sym)
+        if iface.is_some() and self.decl_visible_from_current(self.interface_global_paths.get(sym).unwrap(), 1) != 0:
+            return self.bind_types[iface.unwrap()]
         -1
 
     mut fn scope_update_type(sym: i32, tid: i32):
