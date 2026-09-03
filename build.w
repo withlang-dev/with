@@ -12,6 +12,7 @@ use build.retention
 use build.release_uat
 use build.package
 use build.sdk
+use build.wo
 use std.sysinfo
 fn build_owned_text(s: &str): s ++ ""
 
@@ -1731,6 +1732,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.dep("prepare-bootstrap-link-root")
     stage1 = stage1.dep("with-sha256")
     out = out.add_target(stage1)
+
+    // D38 .wo bundles (docs/wo_bundles.md, build/wo.w): pcre2. stage1 is the
+    // first compiler carrying the tree's ABI stamp, so it builds the bundle
+    // when the store lacks this key; every later stage links and embeds it.
+    let pcre2_wo = wo_bundle_plan(ctx, "pcre2", "std/re", "lib/std/re/bundle.w")
+    out = wo_bundle_targets(move out, ctx, &pcre2_wo, bootstrap_compiler_bin("with-stage1"), "stage1")
 
     // Dev tier (D14): the sanctioned iterate loop. One self-compile —
     // seed → stage1 — yields a testable compiler at out/bootstrap/bin/
