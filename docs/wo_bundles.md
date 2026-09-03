@@ -489,10 +489,9 @@ are unchanged (determinism of the bundle itself) — and run `:pcre2-test`
 helpers; the promoted `defs.w` files carry a hand edit a re-migrate would
 drop. The generator is fixed before the first `wo-drift` run.
 
-**Ruled** as decisions.md D39 (2026-09-02). The spec projection — the
-interface source flavor, the elision rule, and the explicit-origin
-spelling as a future language feature — is drafted separately for Eric's
-blessing of the words.
+**Ruled** as decisions.md D39 (2026-09-02); the spec projection landed
+the same day with Eric's blessing of the words: specification §3.4 (the
+separate-compilation origin rule) and §18.5c (bundles and interfaces).
 
 ## Non-goals
 

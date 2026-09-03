@@ -114,6 +114,16 @@ with generics crossing the boundary (`docs/abi_roadmap.md` Level 1).
 Supersedes D38's "the interface is the source" wording; D38's key,
 store, and embedding stand. Design: `docs/wo_bundles.md`.
 
+**Spec projection landed** (2026-09-02, the words blessed by Eric): §3.4
+gains the separate-compilation origin rule (declaration's receiver, else
+the single reference parameter, else rejected at bundle build; the
+explicit-origin spelling is a future language feature), §18.5c "Bundles
+and interfaces" states the bundle, the `.wi` flavor, declaration-only
+callable semantics, the Level 0 rule that a generic function stays
+corpus-internal and is omitted from (and named in) the interface, and
+the fingerprint proof; the §18.5 CLI line for `with version --abi-sha`
+stands.
+
 ## D38 — Migrated corpora compile once into `.wo` bundles; the boundary is a versioned With ABI, never a C ABI
 
 **Date:** 2026-09-02
