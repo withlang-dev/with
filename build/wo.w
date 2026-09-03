@@ -241,6 +241,172 @@ pub fn target_with_wo_corpus_inputs(target: Target, ctx: &BuildCtx, plan: &WoBun
         out = out.input(wo_owned_text(corpus_files.get(fi as i64)))
     out
 
+// The wo-drift lane (docs/wo_bundles.md "Lanes"): `<name>-wo-drift`
+// rebuilds the bundle to a scratch object with the release compiler. The
+// interface, the fingerprint and the manifest's ABI and target must be
+// identical — a difference there is declaration drift the ABI hash did not
+// catch, a hard error. The object bytes are compared too: identical proves
+// the bundle deterministic across compiler generations; different means
+// codegen changed since the stored object was built (D38 keeps it: a .wo
+// is rebuilt only when its corpus or the ABI changes, never because the
+// compiler did), so the corpus's harness (`harness`, e.g. pcre2test.w, its
+// `use std.<corpus>.*` resolving to the interface) runs against BOTH
+// objects — the stored one through the embedded bundle, the fresh one
+// through --link-bundle — with `harness-arg` for a smoke check, and both
+// must pass. The upstream suite runs against the stored one in
+// `<name>-wo-test`.
+pub fn wo_drift_target_name(plan: &WoBundle) -> str:
+    plan.name ++ "-wo-drift"
+
+pub fn wo_drift_dir(plan: &WoBundle) -> str:
+    "out/wo-drift/" ++ plan.name
+
+pub fn wo_drift_harness_bin(plan: &WoBundle, harness: &str) -> str:
+    wo_drift_dir(plan) ++ "/" ++ wo_basename_no_ext(harness)
+
+fn wo_basename_no_ext(path: &str) -> str:
+    var start: i64 = 0
+    for i in 0..path.len():
+        if path.byte_at(i) == '/':
+            start = i + 1
+    var end = path.len()
+    for j in start..path.len():
+        if path.byte_at(j) == '.':
+            end = j
+    wo_owned_text(path.slice(start, end))
+
+pub fn wo_drift_target(ctx: &BuildCtx, plan: &WoBundle, compiler: &str, compiler_dep: &str, harness: &str, harness_arg: &str) -> Target:
+    let name = wo_drift_target_name(plan)
+    let dir = wo_drift_dir(plan)
+    var target = target_new(.Action, wo_owned_text(name), "").output(dir ++ "/stamp")
+    target.action = run_wo_drift_action
+    target = target.extra_output(wo_drift_harness_bin(plan, harness))
+    target = target.compiler(compiler)
+    target = target.arg("name=" ++ plan.name)
+    target = target.arg("corpus=" ++ plan.corpus_rel)
+    target = target.arg("root=" ++ plan.root)
+    target = target.arg("harness=" ++ harness)
+    target = target.arg("harness-arg=" ++ harness_arg)
+    target = target.arg("dir=" ++ dir)
+    target = target.input(wo_owned_text(compiler))
+    target = target.input(wo_owned_text(harness))
+    let kinds: Vec[str] = Vec.new()
+    kinds.push("o")
+    kinds.push("wi")
+    kinds.push("manifest")
+    for ki in 0..kinds.len() as i32:
+        target = target.input(wo_prefix(plan) ++ "." ++ kinds.get(ki as i64))
+    target = target_with_wo_corpus_inputs(move target, ctx, plan)
+    target = target.write_scope(wo_owned_text(dir))
+    target = target.write_scope("out/command/" ++ name)
+    target = target.timeout(900000)
+    target = target.dep(wo_owned_text(compiler_dep))
+    target = target.dep(wo_group_target_name(plan))
+    target
+
+pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    let name = wo_arg_value(args, "name=")
+    let corpus = wo_arg_value(args, "corpus=")
+    let root_path = wo_arg_value(args, "root=")
+    let harness = wo_arg_value(args, "harness=")
+    let harness_arg = wo_arg_value(args, "harness-arg=")
+    let dir = wo_arg_value(args, "dir=")
+    let compiler = wo_arg_value(args, "compiler=")
+    if name.len() == 0 or corpus.len() == 0 or root_path.len() == 0 or harness.len() == 0 or dir.len() == 0 or compiler.len() == 0:
+        return wo_fail(ctx, "requires name=, corpus=, root=, harness=, harness-arg=, dir= and compiler= arguments")
+    let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
+    let capture_dir = "out/command/" ++ ctx.target_name()
+    if fs.exists(dir) and fs.remove_tree(dir) != 0:
+        return wo_fail(ctx, "could not clear " ++ dir)
+    if fs.mkdir_all(dir) != 0 or fs.mkdir_all(capture_dir) != 0:
+        return wo_fail(ctx, "could not create " ++ dir)
+    let stored = "out/wo/" ++ name
+    let scratch = dir ++ "/" ++ name
+
+    // The rebuild: same corpus, same ABI, this compiler generation.
+    var build_args: Vec[str] = Vec.new()
+    build_args.push(wo_abs(root, compiler))
+    build_args.push("build")
+    build_args.push(wo_abs(root, root_path))
+    build_args.push("--emit-obj")
+    build_args.push("--bundle-corpus")
+    build_args.push(wo_owned_text(corpus))
+    build_args.push("--emit-bundle-interface")
+    build_args.push(wo_abs(root, scratch ++ ".wi"))
+    build_args.push("--emit-bundle-manifest")
+    build_args.push(wo_abs(root, scratch ++ ".manifest"))
+    build_args.push("--bundle-fingerprint")
+    build_args.push(wo_abs(root, scratch ++ ".fp"))
+    build_args.push("-O1")
+    build_args.push("-o")
+    build_args.push(wo_abs(root, scratch ++ ".o"))
+    let built = wo_run(ctx, "rebuild", &build_args, ctx.timeout())
+    if built.rc != 0:
+        return wo_fail(ctx, f"scratch rebuild of the bundle failed with exit code {built.rc}; stderr: " ++ capture_dir ++ "/rebuild.stderr")
+    if fs.read_text(stored ++ ".wi") != fs.read_text(scratch ++ ".wi"):
+        return wo_fail(ctx, "declaration drift: " ++ scratch ++ ".wi rebuilt by " ++ compiler ++ " differs from " ++ stored ++ ".wi (corpus and ABI unchanged); diff them before anything else")
+    let stored_manifest = fs.read_text(stored ++ ".manifest")
+    let scratch_manifest = fs.read_text(scratch ++ ".manifest")
+    let fields: Vec[str] = Vec.new()
+    fields.push("abi-sha")
+    fields.push("target")
+    fields.push("fingerprint")
+    fields.push("interface-sha")
+    for fi in 0..fields.len() as i32:
+        let field = fields.get(fi as i64)
+        if wo_manifest_field(stored_manifest, field) != wo_manifest_field(scratch_manifest, field):
+            return wo_fail(ctx, "declaration drift: manifest `" ++ field ++ "` differs between " ++ stored ++ " and " ++ scratch)
+    let stored_o = fs.read_text(stored ++ ".o")
+    let scratch_o = fs.read_text(scratch ++ ".o")
+    if stored_o.len() == 0 or scratch_o.len() == 0:
+        return wo_fail(ctx, "no object to compare (" ++ stored ++ ".o, " ++ scratch ++ ".o)")
+    let identical = stored_o == scratch_o
+
+    // The harness against the stored bundle (embedded; the link selects it
+    // on demand) and, when the bytes moved, against the fresh one too.
+    let harness_bin = dir ++ "/" ++ wo_basename_no_ext(harness)
+    let rc_stored = wo_drift_run_harness(ctx, compiler, harness, harness_arg, harness_bin, "", "stored")
+    if rc_stored != 0: return rc_stored
+    if not identical:
+        let rc_fresh = wo_drift_run_harness(ctx, compiler, harness, harness_arg, harness_bin ++ "-fresh", scratch, "fresh")
+        if rc_fresh != 0: return rc_fresh
+    if fs.write_text(dir ++ "/stamp", "ok\n") != 0:
+        return wo_fail(ctx, "could not write " ++ dir ++ "/stamp")
+    if identical:
+        print("[" ++ ctx.target_name() ++ "] " ++ scratch ++ ".o is byte-identical to " ++ stored ++ ".o; " ++ harness_bin ++ " links the bundle and runs")
+    else:
+        print("[" ++ ctx.target_name() ++ "] " ++ stored ++ ".o was built by an earlier compiler generation: " ++ scratch ++ ".o differs (same interface, fingerprint, ABI and target) and both pass the harness; remove the store slot to converge on the current bytes")
+    0
+
+// Builds `harness` against the bundle — the embedded one, or `<bundle>` via
+// --link-bundle — and runs it with `harness_arg`.
+fn wo_drift_run_harness(ctx: &ActionCtx, compiler: &str, harness: &str, harness_arg: &str, harness_bin: &str, bundle: &str, label: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let capture_dir = "out/command/" ++ ctx.target_name()
+    var harness_args: Vec[str] = Vec.new()
+    harness_args.push(wo_abs(root, compiler))
+    harness_args.push("build")
+    harness_args.push(wo_abs(root, harness))
+    if bundle.len() > 0:
+        harness_args.push("--link-bundle")
+        harness_args.push(wo_abs(root, bundle))
+    harness_args.push("-O1")
+    harness_args.push("-o")
+    harness_args.push(wo_abs(root, harness_bin))
+    let built = wo_run(ctx, "harness-build-" ++ label, &harness_args, ctx.timeout())
+    if built.rc != 0:
+        return wo_fail(ctx, f"harness build against the {label} bundle failed with exit code {built.rc}; stderr: " ++ capture_dir ++ "/harness-build-" ++ label ++ ".stderr")
+    var run_args: Vec[str] = Vec.new()
+    run_args.push(wo_abs(root, harness_bin))
+    if harness_arg.len() > 0:
+        run_args.push(wo_owned_text(harness_arg))
+    let ran = wo_run(ctx, "harness-run-" ++ label, &run_args, 120000)
+    if ran.rc != 0:
+        return wo_fail(ctx, f"harness linked against the {label} bundle failed with exit code {ran.rc}; stderr: " ++ capture_dir ++ "/harness-run-" ++ label ++ ".stderr")
+    0
+
 // "" when the slot holds a coherent bundle of this corpus, else why not.
 fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &str, abi_sha: &str) -> str:
     let exts: Vec[str] = Vec.new()

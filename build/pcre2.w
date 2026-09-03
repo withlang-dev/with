@@ -435,6 +435,23 @@ fn pcre2_write_bundle_root(ctx: &ActionCtx, generated_dir: &str) -> i32:
         return pcre2_fail(ctx, "could not write the bundle root " ++ path)
     0
 
+// wo-drift: the promoted bundle root is exactly what the migrate action
+// writes for the corpus listing — a module added without regenerating it,
+// or a hand edit, fails here. Input: the root; arg: the corpus directory.
+pub fn run_pcre2_bundle_root_check_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    let args = ctx.args()
+    if inputs.len() == 0 or args.len() == 0 or ctx.output().len() == 0:
+        return pcre2_fail(ctx, "requires the bundle root input, the corpus directory arg and a stamp output")
+    let fs = ctx.fs()
+    let root = inputs.get(0)
+    let expected = pcre2_bundle_root_text(fs.list_files(args.get(0)))
+    if fs.read_text(root) != expected:
+        return pcre2_fail(ctx, root ++ " is not the bundle root the migrate action writes for " ++ args.get(0) ++ " (one `use` per corpus module, bytewise); regenerate it")
+    if fs.mkdir_all(pcre2_dirname(ctx.output())) != 0 or fs.write_text(ctx.output(), "ok\n") != 0:
+        return pcre2_fail(ctx, "could not write " ++ ctx.output())
+    0
+
 pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, print_summary: bool) -> i32:
     let fs = ctx.fs()
     if not fs.is_dir(generated_dir):

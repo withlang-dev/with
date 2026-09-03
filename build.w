@@ -2584,6 +2584,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-fmt-tests")
     tests = tests.dep("cli-selfhost-object-symbol-tests")
     tests = tests.dep("bundle-interface-tests")
+    tests = tests.dep("wo-drift")
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
@@ -2907,6 +2908,50 @@ pub fn build(ctx: BuildCtx) -> Build:
     // before anything migrates (the zlib chain already had them).
     pcre2_test = pcre2_test.dep("pcre2-build")
     out = out.add_target(pcre2_test)
+
+    // wo-drift (docs/wo_bundles.md "Lanes", build/wo.w): the stored bundle
+    // rebuilt by the release compiler is byte-identical, the promoted root is
+    // the migrate action's, and pcre2test built against the embedded bundle
+    // runs. pcre2-wo-test runs upstream RunTest on that pcre2test.
+    var pcre2_root_check = target_new(.Action, "pcre2-bundle-root-check", "").output("out/wo-drift/pcre2-bundle-root-check.stamp")
+    pcre2_root_check.action = run_pcre2_bundle_root_check_action
+    pcre2_root_check = pcre2_root_check.input(build_owned_text(pcre2_wo.root))
+    pcre2_root_check = target_with_wo_corpus_inputs(move pcre2_root_check, ctx, &pcre2_wo)
+    pcre2_root_check = pcre2_root_check.arg(build_owned_text(pcre2_wo.corpus_dir))
+    pcre2_root_check = pcre2_root_check.write_scope("out/wo-drift")
+    out = out.add_target(pcre2_root_check)
+    out = out.add_target(wo_drift_target(ctx, &pcre2_wo, release_compiler_bin("with"), "build", "lib/std/re/pcre2test.w", "-C"))
+    var wo_drift = target_new(.Group, "wo-drift", "")
+    wo_drift = wo_drift.dep("pcre2-bundle-root-check")
+    wo_drift = wo_drift.dep(wo_drift_target_name(&pcre2_wo))
+    out = out.add_target(wo_drift)
+
+    var pcre2_wo_test = target_new(.Action, "pcre2-wo-test", "").output("out/corpus/pcre2-wo-test")
+    pcre2_wo_test.action = run_pcre2_test_action
+    // The action's first input names the corpus; the root file, never the
+    // directory — lib/std/re is pcre2-promote's output, and naming it here
+    // would pull the whole migration pipeline in as a producer (D36).
+    pcre2_wo_test = pcre2_wo_test.input(build_owned_text(pcre2_wo.root))
+    pcre2_wo_test = pcre2_wo_test.input(wo_drift_harness_bin(&pcre2_wo, "lib/std/re/pcre2test.w"))
+    pcre2_wo_test = pcre2_wo_test.input("out/pcre2_reference/pcre2-10.47/RunTest")
+    pcre2_wo_test = pcre2_wo_test.arg("out/pcre2_reference/pcre2-10.47")
+    pcre2_wo_test = pcre2_wo_test.dep(wo_drift_target_name(&pcre2_wo))
+    pcre2_wo_test = pcre2_wo_test.dep("pcre2-reference")
+    out = out.add_target(pcre2_wo_test)
+
+    var pcre2_check_generated = target_new(.Action, "pcre2-check-generated", "").output("out/gen/.pcre2-check-generated-stamp")
+    pcre2_check_generated.action = run_pcre2_check_generated_action
+    pcre2_check_generated = pcre2_check_generated.write_scope("out/tmp/action-scratch/pcre2-check-generated")
+    pcre2_check_generated = pcre2_check_generated.input("out/pcre2_build/lib/std/re")
+    pcre2_check_generated = pcre2_check_generated.dep("build")
+    out = out.add_target(pcre2_check_generated)
+
+    var pcre2_promote = target_new(.Action, "pcre2-promote", "").output("lib/std/re")
+    pcre2_promote.action = run_pcre2_promote_action
+    pcre2_promote = pcre2_promote.write_scope("out/tmp/action-scratch/pcre2-promote")
+    pcre2_promote = pcre2_promote.input("out/pcre2_build/lib/std/re")
+    pcre2_promote = pcre2_promote.dep("pcre2-test")
+    out = out.add_target(pcre2_promote)
 
     var zlib_reference = target_new(.Action, "zlib-reference", "").output("out/zlib_reference/zlib-1.3.2")
     zlib_reference.action = run_zlib_reference_action
