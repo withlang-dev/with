@@ -2,6 +2,7 @@ module build.pcre2
 
 use std.build
 use std.string.StringBuilder
+use build.compiler
 fn pcre2_owned_text(s: &str): s ++ ""
 
 const PCRE2_SHA256: str = "c08ae2388ef333e8403e670ad70c0a11f1eed021fd88308d7e02f596fcd9dc16"
@@ -383,6 +384,9 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
     if pcre2_add_imports(ctx, auto_path, "use std.re.pcre2_xclass", "use std.re.pcre2_xclass\n") != 0:
         return pcre2_fail(ctx, "could not update imports in " ++ auto_path)
 
+    let bundle_rc = pcre2_write_bundle_root(ctx, generated_dir)
+    if bundle_rc != 0: return bundle_rc
+
     let pcre2test_path = pcre2_join(generated_dir, "pcre2test.w")
     let fs = ctx.fs()
     if not fs.exists(pcre2test_path):
@@ -394,12 +398,41 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
     var imports = ""
     for mi in 0..modules.len() as i32:
         let mod_name = pcre2_module_name(modules.get(mi as i64))
-        if mod_name != "defs" and mod_name != "pcre2test":
+        if mod_name != "defs" and mod_name != "pcre2test" and mod_name != "bundle":
             imports = imports ++ "use std.re." ++ mod_name ++ "\n"
     let updated = pcre2_insert_after_defs_import(pcre2test_text, imports)
     if updated != pcre2test_text:
         if fs.write_text(pcre2test_path, updated) != 0:
             return pcre2_fail(ctx, "could not update imports in " ++ pcre2test_path)
+    0
+
+// The .wo bundle root (docs/wo_bundles.md "Root"): one `use` per corpus
+// module, bytewise by name, so the bundle build reaches every module.
+// pcre2test and pcre2posix are the harness, never the bundle. The text is a
+// pure function of the module listing; wo-drift checks the promoted
+// lib/std/re/bundle.w against it.
+pub fn pcre2_bundle_root_text(module_paths: &Vec[str]) -> str:
+    var names: Vec[str] = Vec.new()
+    for mi in 0..module_paths.len() as i32:
+        let path = module_paths.get(mi as i64)
+        if not path.ends_with(".w"):
+            continue
+        let mod_name = pcre2_module_name(path)
+        if mod_name != "bundle" and mod_name != "pcre2test" and mod_name != "pcre2posix":
+            names.push(pcre2_owned_text(mod_name))
+    let sorted = comp_sort_strings(move names)
+    var text = "// lib/std/re/bundle.w — the pcre2 .wo bundle root (docs/wo_bundles.md).\n"
+    text = text ++ "// Written by build/pcre2.w (pcre2-migrate) from the migrated module list:\n"
+    text = text ++ "// one `use` per corpus module; pcre2test and pcre2posix are the harness.\n"
+    for ni in 0..sorted.len() as i32:
+        text = text ++ "use std.re." ++ sorted.get(ni as i64) ++ "\n"
+    text
+
+fn pcre2_write_bundle_root(ctx: &ActionCtx, generated_dir: &str) -> i32:
+    let fs = ctx.fs()
+    let path = pcre2_join(generated_dir, "bundle.w")
+    if fs.write_text(path, pcre2_bundle_root_text(fs.list_files(generated_dir))) != 0:
+        return pcre2_fail(ctx, "could not write the bundle root " ++ path)
     0
 
 pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, print_summary: bool) -> i32:
