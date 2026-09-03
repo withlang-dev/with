@@ -431,7 +431,14 @@ pub fn pcre2_bundle_root_text(module_paths: &Vec[str]) -> str:
 fn pcre2_write_bundle_root(ctx: &ActionCtx, generated_dir: &str) -> i32:
     let fs = ctx.fs()
     let path = pcre2_join(generated_dir, "bundle.w")
-    if fs.write_text(path, pcre2_bundle_root_text(fs.list_files(generated_dir))) != 0:
+    let text = pcre2_bundle_root_text(fs.list_files(generated_dir))
+    // Idempotent like pcre2_add_imports: pcre2-check-generated and
+    // pcre2-promote run this over their INPUT tree (out/pcre2_build/lib/std/re),
+    // which is outside their write scope; a root already holding this text
+    // is left alone.
+    if fs.exists(path) and fs.read_text(path) == text:
+        return 0
+    if fs.write_text(path, text) != 0:
         return pcre2_fail(ctx, "could not write the bundle root " ++ path)
     0
 
