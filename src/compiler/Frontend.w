@@ -261,6 +261,11 @@ impl Sema:
                     continue
                 if imp.path_text == "std.prelude" or imp.path_text == "std.prelude_core" or imp.path_text == "std.prelude_alloc":
                     global_frontier.push(imp.target_module)
+            // The ambient tier is the prelude's enumerated list (§18.2, D29):
+            // the prelude modules and the modules they name. What those
+            // modules import for themselves stays theirs — std.regex reaches
+            // the pcre2 interface through its own `use std.re.*`, and pcre2's
+            // three thousand names are not every program's namespace.
             let seen_global: HashMap[i32, i32] = HashMap.new()
             while global_frontier.len() as i32 > 0:
                 let last = global_frontier.len() as i32 - 1
@@ -273,8 +278,11 @@ impl Sema:
                 self.global_visible_module_paths.insert(frontend_owned_text(mod.path), 1)
                 for ii in 0..mod.import_count:
                     let imp = resolved.imports[(mod.import_start + ii)]
-                    if imp.target_module >= 0:
-                        global_frontier.push(imp.target_module)
+                    if imp.target_module < 0 or seen_global.contains(imp.target_module):
+                        continue
+                    seen_global.insert(imp.target_module, 1)
+                    let named = resolved.modules[imp.target_module]
+                    self.global_visible_module_paths.insert(frontend_owned_text(named.path), 1)
 
 impl Zcu:
     mut fn expand_c_imports_frontend(pool: AstPool) -> AstPool:
