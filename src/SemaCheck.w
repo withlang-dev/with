@@ -12,18 +12,13 @@ use InternPool
 use TypeLayout
 use render
 use std.builtins.int_to_string
+use std.regex.Regex
 
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_write(s: &str) -> Unit
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
 extern fn str_from_byte(b: i32) -> str
-extern fn with_regex_compile(pattern: &str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
-extern fn with_regex_error_message(code: i32) -> str
-extern fn with_regex_code_free(code: *const i8) -> Unit
-extern fn with_regex_capture_count(code: *const i8) -> i32
-extern fn with_regex_capture_name_count(code: *const i8) -> i32
-extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 
 // docs/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
 const STRICT_NO_MUT_REF: i32 = 1
@@ -7241,25 +7236,22 @@ impl Sema:
             self.emit_error("invalid regex flag", node)
             self.regex_capture_counts.insert(node, 0)
             return
-        var err_code: i32 = 0
-        var err_offset: i32 = 0
-        let code = with_regex_compile(pattern, options, &raw mut err_code, &raw mut err_offset)
-        if code as i64 == 0:
-            self.emit_error("invalid regex literal: " ++ with_regex_error_message(err_code), node)
-            self.regex_capture_counts.insert(node, 0)
-            return
-        let capture_count = with_regex_capture_count(code)
-        self.regex_capture_counts.insert(node, capture_count)
-        let name_start = self.regex_capture_name_syms.len() as i32
-        let name_count = with_regex_capture_name_count(code)
-        var ni = 0
-        while ni < name_count:
-            let name = with_regex_capture_name_at(code, ni)
-            self.regex_capture_name_syms.push(self.pool_lookup_symbol("$" ++ name))
-            ni = ni + 1
-        self.regex_capture_name_starts.insert(node, name_start)
-        self.regex_capture_name_counts.insert(node, name_count)
-        with_regex_code_free(code)
+        // The literal compiles through std.regex like any program's pattern;
+        // the compiler is one more user of the facade (D30).
+        match Regex.compile_flags(pattern, flags):
+            Err(err) => {
+                self.emit_error("invalid regex literal: " ++ err.message, node)
+                self.regex_capture_counts.insert(node, 0)
+            }
+            Ok(regex) => {
+                self.regex_capture_counts.insert(node, regex.num_captures())
+                let name_start = self.regex_capture_name_syms.len() as i32
+                let names = regex.capture_names()
+                for ni in 0..names.len() as i32:
+                    self.regex_capture_name_syms.push(self.pool_lookup_symbol("$" ++ names.get(ni as i64)))
+                self.regex_capture_name_starts.insert(node, name_start)
+                self.regex_capture_name_counts.insert(node, names.len() as i32)
+            }
 
     mut fn regex_bind_capture_scope(regex_node: i32):
         if regex_node == 0:
