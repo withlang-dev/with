@@ -69,6 +69,9 @@ pub type BundleInterfaceModel {
 
 type BundleEmitter {
     corpus: str,
+    // "<canonical module>\t<name>" per owned global codegen could not fold
+    // to data (Codegen.bundle_unlowered_globals); empty on the .wi pass
+    unlowered_globals: Vec[str],
     errors: Vec[str],
     warnings: Vec[str],
     // canonical module path per decl index ("" outside the corpus)
@@ -98,9 +101,10 @@ pub type BundleInterfaceText {
     errors: Vec[str],
 }
 
-fn bx_new_emitter(corpus: &str) -> BundleEmitter:
+fn bx_new_emitter(corpus: &str, unlowered_globals: &Vec[str]) -> BundleEmitter:
     BundleEmitter {
         corpus: with_str_clone_ref(corpus),
+        unlowered_globals: sema_clone_str_vec(unlowered_globals),
         errors: Vec.new(),
         warnings: Vec.new(),
         decl_modules: Vec.new(),
@@ -420,6 +424,14 @@ impl BundleEmitter:
         let is_mut = flags % 2 != 0
         if is_mut and sema.type_needs_drop_frozen(tid) != 0:
             self.refuse("is a mutable global of a droppable type (" ++ spelling ++ "); nobody drops bundle storage (Level 0)")
+            return
+        // D38 Level 0: codegen could not fold this global's initializer to
+        // data, so the object does not define it — corpus-internal, omitted
+        // like a generic function (a migrated C corpus's `INTMAX_C(…)` macro
+        // values), named here and in the manifest's `omitted` lines.
+        if self.unlowered_globals.contains(mod_path ++ "\t" ++ name):
+            self.omitted.push(mod_path ++ "\t" ++ name ++ "\truntime-init-global")
+            self.push_export(BX_NOTE, mod_path, name, "// not exported at Level 0 (no compile-time initializer): " ++ (if is_mut: "var " else: "let ") ++ name ++ "\n", "")
             return
         let keyword = if is_mut: "pub var " else: "pub let "
         let mut_text = if is_mut: "1" else: "0"
@@ -976,8 +988,8 @@ impl BundleEmitter:
             self.emit_type(sema, di, ast.get_decl(di) as i32)
 
 // Build the exported-declaration model of the corpus modules in `sema`.
-pub fn bundle_interface_build(sema: &Sema, corpus: &str) -> BundleInterfaceModel:
-    var em = bx_new_emitter(corpus)
+pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &Vec[str]) -> BundleInterfaceModel:
+    var em = bx_new_emitter(corpus, unlowered_globals)
     em.walk(sema)
     let ordered = bx_sorted_strings(&em.modules)
     var sources: Vec[str] = Vec.new()

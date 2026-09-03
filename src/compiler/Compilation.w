@@ -421,11 +421,18 @@ impl Compilation:
     // Sema out of the Zcu (the root-15 class).
     fn bundle_model(what: &str) -> BundleInterfaceModel:
         let sema = &self.zcu.last_sema
-        let model = bundle_interface_build(sema, self.bundle_corpus)
+        let model = bundle_interface_build(sema, self.bundle_corpus, &self.zcu.last_bundle_unlowered_globals)
         for wi in 0..model.warnings.len() as i32:
             runtime_eprint("warning: bundle interface: " ++ model.warnings.get(wi as i64))
-        if model.omitted.len() > 0:
-            runtime_eprint(f"warning: bundle interface: {model.omitted.len() as i32} generic function(s) not exported at Level 0 (corpus-internal; each is named in the .wi and in the manifest's `omitted` lines)")
+        var omitted_fns = 0
+        var omitted_globals = 0
+        for oi in 0..model.omitted.len() as i32:
+            if model.omitted.get(oi as i64).ends_with("\tgeneric-fn"): omitted_fns = omitted_fns + 1
+            else: omitted_globals = omitted_globals + 1
+        if omitted_fns > 0:
+            runtime_eprint(f"warning: bundle interface: {omitted_fns} generic function(s) not exported at Level 0 (corpus-internal; each is named in the .wi and in the manifest's `omitted` lines)")
+        if omitted_globals > 0:
+            runtime_eprint(f"warning: bundle interface: {omitted_globals} global(s) without a compile-time initializer not exported at Level 0 (corpus-internal, undefined in the object; each is named in the .wi and in the manifest's `omitted` lines)")
         for ei in 0..model.errors.len() as i32:
             runtime_eprint("error: bundle interface: " ++ model.errors.get(ei as i64))
         if not model.ok:

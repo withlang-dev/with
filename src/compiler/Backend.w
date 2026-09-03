@@ -71,6 +71,7 @@ impl Zcu:
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         var tracked_paths = move self.tracked_input_paths
         self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &cg.tracked_input_paths)
+        self.last_bundle_unlowered_globals = sema_clone_str_vec(&cg.bundle_unlowered_globals)
         if result != 0:
             self.last_sema = cg.take_sema()
             runtime_eprint("error: code generation failed")

@@ -309,6 +309,10 @@ type Codegen {
     // owned here (defined), whatever unit imported it; "" outside a bundle
     // build. One rule, decl_path_is_bundle_owned.
     bundle_corpus: str,
+    // A bundle build's owned globals whose initializer did not fold to data
+    // ("<canonical module>\t<name>"): omitted from the interface and the
+    // object (CodegenTraits.gen_module_constant).
+    bundle_unlowered_globals: Vec[str],
 
     // Loop stack (fixed-size arrays via Vec)
     loop_break_bbs: Vec[i64],
@@ -948,6 +952,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         module_object_mode: 0,
         bundle_prefixes: embedded_bundle_prefixes(),
         bundle_corpus: "",
+        bundle_unlowered_globals: Vec.new(),
         loop_break_bbs: Vec.new(),
         loop_continue_bbs: Vec.new(),
         loop_result_allocas: Vec.new(),

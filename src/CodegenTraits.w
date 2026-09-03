@@ -1201,7 +1201,14 @@ impl Codegen:
             if self.pool.kind(decl) == NodeKind.NK_IMPL_DECL:
                 self.generate_trait_vtable_for_impl(decl)
 
-fn CONST_EVAL_FAIL -> i64: -9223372036854775807
+// A constant-int evaluation. `ok` is the verdict — never a sentinel value:
+// the old sentinel, -9223372036854775807, is the intermediate of C's
+// `(-0x7fffffffffffffff - 1)` LONG_MIN idiom, so every such global folded to
+// "failure" and was silently dropped from the object.
+type ConstIntEval { ok: bool, value: i64 }
+
+fn const_int_ok(value: i64) -> ConstIntEval: ConstIntEval { ok: true, value }
+fn const_int_fail() -> ConstIntEval: ConstIntEval { ok: false, value: 0 }
 
 type ConstStringEval {
     ok: bool,
@@ -1946,6 +1953,14 @@ impl Codegen:
         let str_value = self.try_eval_const_string(cur, current_source_file, 0)
         if str_value.ok:
             return self.const_c_string_pointer(str_value.text, ptr_ty)
+        // `c"…".ptr` (a migrated C string constant, `as *const i8` stripped
+        // above) is the same address constant.
+        if kind == NodeKind.NK_FIELD_ACCESS and self.intern.resolve(self.pool.get_data1(cur)) == "ptr":
+            let base = self.unwrap_const_expr_node(self.pool.get_data0(cur))
+            if base != 0 and self.pool.kind(base) == NodeKind.NK_C_STRING_LIT:
+                let base_value = self.try_eval_const_string(base, current_source_file, 0)
+                if base_value.ok:
+                    return self.const_c_string_pointer(base_value.text, ptr_ty)
 
         if kind == NodeKind.NK_IDENT:
             let sym = self.pool.get_data0(cur)
@@ -1970,7 +1985,7 @@ impl Codegen:
                     let base = self.unwrap_const_expr_node(self.pool.get_data0(target))
                     let idx_node = self.pool.get_data1(target)
                     let idx_val = self.try_eval_const_int(idx_node)
-                    if idx_val != 0:
+                    if not idx_val.ok or idx_val.value != 0:
                         return 0
                     if base != 0 and self.pool.kind(base) == NodeKind.NK_IDENT:
                         let base_sym = self.pool.get_data0(base)
@@ -1980,7 +1995,7 @@ impl Codegen:
                     return 0
 
         let ptr_zero = self.try_eval_const_int(cur)
-        if ptr_zero == 0:
+        if ptr_zero.ok and ptr_zero.value == 0:
             return wl_const_null(ptr_ty)
         0
 
@@ -2075,16 +2090,16 @@ impl Codegen:
             return typed
         expected_tid
 
-    mut fn try_eval_const_int(node: i32) -> i64:
+    mut fn try_eval_const_int(node: i32) -> ConstIntEval:
         self.try_eval_const_int_expected(node, 0)
 
-    mut fn try_eval_const_int_expected(node: i32, expected_tid: i32) -> i64:
+    mut fn try_eval_const_int_expected(node: i32, expected_tid: i32) -> ConstIntEval:
         let kind = self.pool.kind(node)
         if kind == NodeKind.NK_INT_LIT:
             let fast = self.pool.int_literal_fast_i64(node as NodeId)
             if fast.ok == 0:
-                return CONST_EVAL_FAIL()
-            return fast.value
+                return const_int_fail()
+            return const_int_ok(fast.value)
         if kind == NodeKind.NK_COMPTIME:
             return self.try_eval_const_int_expected(self.pool.get_data0(node), expected_tid)
         if kind == NodeKind.NK_GROUPED:
@@ -2092,69 +2107,66 @@ impl Codegen:
         if kind == NodeKind.NK_CAST:
             return self.try_eval_const_int_expected(self.pool.get_data0(node), expected_tid)
         if kind == NodeKind.NK_BOOL_LIT:
-            return self.pool.get_data0(node) as i64
+            return const_int_ok(self.pool.get_data0(node) as i64)
         if kind == NodeKind.NK_UNARY:
             let op = self.pool.get_data0(node)
-            let inner_val = self.try_eval_const_int_expected(self.pool.get_data1(node), expected_tid)
-            if inner_val == CONST_EVAL_FAIL(): return CONST_EVAL_FAIL()
+            let inner = self.try_eval_const_int_expected(self.pool.get_data1(node), expected_tid)
+            if not inner.ok: return inner
+            let inner_val = inner.value
             if op == UnaryOp.UOP_NEGATE:
                 let result_ty = self.try_eval_const_result_type(node, expected_tid)
                 let arith = int_eval_unary_neg(inner_val, self.codegen_const_int_width(result_ty), self.overflow_mode)
-                if arith.ok == 0 or arith.overflow != 0: return CONST_EVAL_FAIL()
-                return arith.value
-            if op == UnaryOp.UOP_BIT_NOT: return 0 - inner_val - 1
+                if arith.ok == 0 or arith.overflow != 0: return const_int_fail()
+                return const_int_ok(arith.value)
+            if op == UnaryOp.UOP_BIT_NOT: return const_int_ok(0 - inner_val - 1)
             if op == UnaryOp.UOP_NOT:
-                if inner_val == 0: return 1
-                return 0
-            return CONST_EVAL_FAIL()
+                return const_int_ok(if inner_val == 0: 1 else: 0)
+            return const_int_fail()
         if kind == NodeKind.NK_BINARY:
             let op = self.pool.get_data0(node)
-            let lv = self.try_eval_const_int_expected(self.pool.get_data1(node), expected_tid)
-            if lv == CONST_EVAL_FAIL(): return CONST_EVAL_FAIL()
-            let rv = self.try_eval_const_int_expected(self.pool.get_data2(node), expected_tid)
-            if rv == CONST_EVAL_FAIL(): return CONST_EVAL_FAIL()
+            let left = self.try_eval_const_int_expected(self.pool.get_data1(node), expected_tid)
+            if not left.ok: return left
+            let right = self.try_eval_const_int_expected(self.pool.get_data2(node), expected_tid)
+            if not right.ok: return right
+            let lv = left.value
+            let rv = right.value
             if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP or op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_SUB_SAT or op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP or op == BinaryOp.OP_MUL_SAT:
                 let result_ty = self.try_eval_const_result_type(node, expected_tid)
                 let arith = int_eval_binary_arithmetic(op, lv, rv, self.codegen_const_int_width(result_ty), self.codegen_const_int_is_unsigned(result_ty), self.overflow_mode)
-                if arith.ok == 0 or arith.overflow != 0: return CONST_EVAL_FAIL()
-                return arith.value
+                if arith.ok == 0 or arith.overflow != 0: return const_int_fail()
+                return const_int_ok(arith.value)
             if op == BinaryOp.OP_DIV:
-                if rv == 0: return CONST_EVAL_FAIL()
+                if rv == 0: return const_int_fail()
                 let result_ty = self.try_eval_const_result_type(node, expected_tid)
                 if int_div_overflows(lv, rv, self.codegen_const_int_width(result_ty), self.codegen_const_int_is_unsigned(result_ty)):
                     if self.overflow_mode == OVERFLOW_MODE_WRAP():
-                        return int_signed_min(self.codegen_const_int_width(result_ty))
+                        return const_int_ok(int_signed_min(self.codegen_const_int_width(result_ty)))
                     if self.overflow_mode == OVERFLOW_MODE_SATURATE():
-                        return int_signed_max(self.codegen_const_int_width(result_ty))
-                    return CONST_EVAL_FAIL()
-                return lv / rv
+                        return const_int_ok(int_signed_max(self.codegen_const_int_width(result_ty)))
+                    return const_int_fail()
+                return const_int_ok(lv / rv)
             if op == BinaryOp.OP_MOD:
-                if rv == 0: return CONST_EVAL_FAIL()
+                if rv == 0: return const_int_fail()
                 let result_ty = self.try_eval_const_result_type(node, expected_tid)
                 if int_div_overflows(lv, rv, self.codegen_const_int_width(result_ty), self.codegen_const_int_is_unsigned(result_ty)):
                     if self.overflow_mode == OVERFLOW_MODE_WRAP() or self.overflow_mode == OVERFLOW_MODE_SATURATE():
-                        return 0
-                    return CONST_EVAL_FAIL()
-                return lv % rv
-            if op == BinaryOp.OP_SHL:
-                // Implement shift via multiplication to bootstrap (seed doesn't have << operator yet)
-                var shift_result: i64 = lv
-                var shift_i: i64 = 0
-                while shift_i < rv:
-                    shift_result = shift_result * 2
-                    shift_i = shift_i + 1
-                return shift_result
-            if op == BinaryOp.OP_SHR:
-                var shift_result: i64 = lv
-                var shift_i: i64 = 0
-                while shift_i < rv:
-                    shift_result = shift_result / 2
-                    shift_i = shift_i + 1
-                return shift_result
-            if op == BinaryOp.OP_BIT_AND: return lv & rv
-            if op == BinaryOp.OP_BIT_OR: return lv | rv
-            if op == BinaryOp.OP_BIT_XOR: return lv ^ rv
-            return CONST_EVAL_FAIL()
+                        return const_int_ok(0)
+                    return const_int_fail()
+                return const_int_ok(lv % rv)
+            if op == BinaryOp.OP_SHL or op == BinaryOp.OP_SHR:
+                if rv < 0 or rv > 63: return const_int_fail()
+                if op == BinaryOp.OP_SHL:
+                    return const_int_ok(lv << (rv as u32))
+                // An unsigned result shifts logically: SIZE_MAX >> 1 is
+                // 0x7fff…, not the arithmetic shift of the i64 bit pattern.
+                let result_ty = self.try_eval_const_result_type(node, expected_tid)
+                if self.codegen_const_int_is_unsigned(result_ty):
+                    return const_int_ok(((lv as u64) >> (rv as u32)) as i64)
+                return const_int_ok(lv >> (rv as u32))
+            if op == BinaryOp.OP_BIT_AND: return const_int_ok(lv & rv)
+            if op == BinaryOp.OP_BIT_OR: return const_int_ok(lv | rv)
+            if op == BinaryOp.OP_BIT_XOR: return const_int_ok(lv ^ rv)
+            return const_int_fail()
         // sizeof[T]() / alignof[T]() as module-level constants
         if kind == NodeKind.NK_CALL:
             let callee = self.pool.get_data0(node)
@@ -2167,7 +2179,7 @@ impl Codegen:
                         let tp_node = if callee_kind == NodeKind.NK_TYPE_GENERIC:
                             let tp_start = self.pool.get_data1(callee)
                             let tp_count = self.pool.get_data2(callee)
-                            if tp_count == 0: return CONST_EVAL_FAIL()
+                            if tp_count == 0: return const_int_fail()
                             self.pool.get_extra(tp_start)
                         else:
                             self.pool.get_data1(callee)
@@ -2175,17 +2187,17 @@ impl Codegen:
                         if type_val != 0:
                             let dl = wl_get_module_data_layout(self.llmod)
                             if name_sym == self.sym_sizeof or name_sym == self.sym_size_of:
-                                return wl_abi_size_of(dl, type_val)
-                            return wl_abi_align_of(dl, type_val) as i64
-            return CONST_EVAL_FAIL()
+                                return const_int_ok(wl_abi_size_of(dl, type_val))
+                            return const_int_ok(wl_abi_align_of(dl, type_val) as i64)
+            return const_int_fail()
         if kind == NodeKind.NK_IDENT:
             let sym = self.pool.get_data0(node)
             // Linear search for known constant
             for ci in 0..self.const_int_syms.len() as i32:
                 if self.const_int_syms.get(ci as i64) == sym:
-                    return self.const_int_vals.get(ci as i64)
-            return CONST_EVAL_FAIL()
-        CONST_EVAL_FAIL()
+                    return const_int_ok(self.const_int_vals.get(ci as i64))
+            return const_int_fail()
+        const_int_fail()
 
     mut fn try_eval_const_llvm(node: i32, expected_tid: i32) -> i64:
         if node == 0 or expected_tid <= 0:
@@ -2242,9 +2254,10 @@ impl Codegen:
             let exact = self.exact_int_const_llvm(cur, resolved as i32)
             if exact != 0:
                 return exact
-            let val = self.try_eval_const_int_expected(cur, resolved as i32)
-            if val == CONST_EVAL_FAIL():
+            let eval = self.try_eval_const_int_expected(cur, resolved as i32)
+            if not eval.ok:
                 return 0
+            let val = eval.value
             let llvm_ty = self.sema_type_to_llvm(resolved)
             if llvm_ty == 0:
                 return 0
@@ -2364,8 +2377,9 @@ impl Codegen:
                 if global_ty != 0:
                     let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
                     return
-        let val = self.try_eval_const_int_expected(value_node, const_binding_ty as i32)
-        if val != CONST_EVAL_FAIL():
+        let eval = self.try_eval_const_int_expected(value_node, const_binding_ty as i32)
+        if eval.ok:
+            let val = eval.value
             if resolved_binding_ty != 0:
                 let binding_kind = self.sema.get_type_kind(resolved_binding_ty)
                 if binding_kind == TypeKind.TY_PTR or binding_kind == TypeKind.TY_REF:
@@ -2396,6 +2410,13 @@ impl Codegen:
                 if init != 0:
                     let global_ty = self.sema_type_to_llvm(const_binding_ty)
                     if global_ty != 0:
+                        // An exactly-folded 64-bit integer (SIZE_MAX, say) is a
+                        // known constant for the initializers that read it.
+                        if binding_kind == TypeKind.TY_INT and is_mut == 0 and self.sema.get_type_d0(const_binding_ty) <= 64:
+                            let words = self.pool.int_literal_expr_bits(value_node, self.sema.get_type_d0(const_binding_ty), self.sema.get_type_d1(const_binding_ty))
+                            if words.ok != 0 and words.overflow == 0:
+                                self.const_int_syms.push(name_sym)
+                                self.const_int_vals.push(words.lo as i64)
                         let _ = self.record_module_binding_global(name_sym, global_ty, init, is_mut)
                         return
 
@@ -2475,7 +2496,34 @@ impl Codegen:
                 0
         if runtime_tid != 0:
             let resolved_runtime = self.sema.resolve_alias(runtime_tid as TypeId)
-            let runtime_kind = self.sema.get_type_kind(resolved_runtime)
-            if runtime_kind != TypeKind.TY_INT and runtime_kind != TypeKind.TY_FLOAT and runtime_kind != TypeKind.TY_STR:
-                if self.queue_module_runtime_init(name_sym, value_node, runtime_tid, is_mut):
+            // #880's rule for the whole global, not only a struct field: an
+            // address constant — a C string's `.ptr`, a global's address, a
+            // function, a struct or array of them — is initialized data, never
+            // a runtime init. A module object has no main wrapper to run one
+            // (pcre2's `unicode_version` pointer was zero in the bundle, and
+            // pcre2_config crashed in strlen).
+            let const_init = self.try_eval_const_llvm(value_node, resolved_runtime as i32)
+            if const_init != 0:
+                let const_ty = self.sema_type_to_llvm(resolved_runtime)
+                if const_ty != 0:
+                    let _ = self.record_module_binding_global(name_sym, const_ty, const_init, is_mut)
                     return
+            // D38 Level 0: a bundle object supplies a global's storage AND its
+            // value as data; nothing ever runs an initializer for it. A global
+            // whose initializer does not fold stays corpus-internal — omitted
+            // from the interface with a note, named in the manifest's
+            // `omitted` lines (the D39 treatment of a generic function), and
+            // undefined in the object, so a corpus reference to it fails the
+            // link loudly. (Sema folds every use of such a global; codegen
+            // meets one only through `pub let` storage of migrated macros.)
+            if self.module_object_mode != 0 and self.decl_path_is_bundle_owned(self.current_decl_source_file):
+                self.bundle_unlowered_globals.push(codegen_canonical_module_path(self.current_decl_source_file) ++ "\t" ++ self.intern.resolve(name_sym))
+                return
+            // Anything else — a call, an expression over runtime values — is
+            // storage the main wrapper initializes before main; an integer or
+            // float is no exception (a `let X: i64 = f()` used to be dropped
+            // silently and read as garbage).
+            if self.queue_module_runtime_init(name_sym, value_node, runtime_tid, is_mut):
+                return
+        with_eprint("error: global '" ++ self.intern.resolve(name_sym) ++ "' has no initializer codegen can lower (" ++ self.current_decl_source_file ++ ")")
+        self.had_error = 1

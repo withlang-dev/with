@@ -95,6 +95,9 @@ type Zcu {
     // D38 batch C3: `--bundle-corpus <rel>` of a bundle build — codegen
     // owns (defines) every module under it (Codegen.bundle_corpus); "".
     bundle_corpus: str,
+    // The owned globals the last bundle build could not fold to data
+    // (Codegen.bundle_unlowered_globals), for the interface emitter.
+    last_bundle_unlowered_globals: Vec[str],
     project_config: ProjectConfig,
     trace_c_import_cache: i32,
     // Analysis commands preserve diagnostics but may continue past preliminary
@@ -160,6 +163,7 @@ fn Zcu.init -> Zcu:
         tracked_input_paths: zcu_new_vec_str(),
         link_bundle_prefixes: zcu_new_vec_str(),
         bundle_corpus: "",
+        last_bundle_unlowered_globals: zcu_new_vec_str(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,
         analysis_partial_semantics: 0,
