@@ -90,8 +90,16 @@ pub fn target_spec_llvm_triple() -> str:
     ""
 
 // Display name in the build_graph_target_name spelling.
+// The active target's name; "native" for kind 0 (a native build names no
+// platform). A .wo bundle is keyed by the platform it was compiled for, so
+// its manifest and fingerprint spell the resolved name instead.
 pub fn target_spec_name() -> str:
-    let kind = target_spec_active
+    target_spec_kind_name(target_spec_active)
+
+pub fn target_spec_resolved_name() -> str:
+    target_spec_kind_name(if target_spec_active == 0: target_spec_host_kind() else: target_spec_active)
+
+fn target_spec_kind_name(kind: i32) -> str:
     if kind == 1:
         return "linux_x86_64"
     if kind == 2:

@@ -405,10 +405,15 @@ impl Compilation:
         self.link_bundles_loaded = false
 
     // D39: `--bundle-corpus <rel>` and `--bundle-fingerprint <path>` — on
-    // `check` too, the second fingerprint pass runs on the emitted .wi.
+    // `check` too, the second fingerprint pass runs on the emitted .wi. The
+    // corpus also reaches codegen (Zcu.bundle_corpus): a bundle build owns
+    // every module under it (C3).
     pub mut fn set_bundle_fingerprint(corpus: &str, fingerprint_path: &str):
         self.bundle_corpus = with_str_clone_ref(corpus)
         self.bundle_fingerprint_path = with_str_clone_ref(fingerprint_path)
+        var zcu = move self.zcu
+        zcu.bundle_corpus = with_str_clone_ref(corpus)
+        self.zcu = zcu
 
     // The exported-declaration model of the corpus in the finalized Sema
     // (the one codegen handed back, or the one `check` froze), with every
@@ -1239,7 +1244,7 @@ impl Compilation:
             with_eprint("error: --emit-bundle-manifest: this compiler carries no ABI stamp (unstamped binary); a bundle key needs one")
             return false
         var text = "abi-sha " ++ compiler_abi_sha() ++ "\n"
-        text = text ++ "target " ++ target_spec_name() ++ "\n"
+        text = text ++ "target " ++ target_spec_resolved_name() ++ "\n"
         text = text ++ "object " ++ link_stage_basename(obj_path) ++ "\n"
         if fingerprint.len() > 0:
             text = text ++ "fingerprint " ++ fingerprint ++ "\n"

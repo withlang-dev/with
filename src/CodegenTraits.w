@@ -649,6 +649,13 @@ impl Codegen:
         self.apply_noalias_param_attrs(function, param_start, param_count)
         if function == 0 or wl_get_value_kind(function) != wl_function_value_kind():
             return
+        // A module object keeps a default method instantiated for an impl
+        // private, as it keeps every specialization
+        // (Codegen.ensure_concrete_mir_function): the importer instantiates
+        // its own, and a prelude impl's `Error.source` defined bare and
+        // external by every object would never link twice (D38 batch C3).
+        if self.module_object_mode != 0:
+            wl_set_linkage(function, wl_internal_linkage())
         self.fn_values.insert(fn_sym, function)
         self.fn_fn_types.insert(fn_sym, fn_ty)
         if has_ref_param:
@@ -1281,14 +1288,22 @@ impl Codegen:
                     return export_name
         self.module_link_name_for_path(self.decl_source_path(decl_index), name)
 
+    // A module-object build defines the root's symbols and declares every
+    // imported module's — except, in a bundle build, the corpus modules this
+    // object owns (D38 batch C3, Codegen.decl_path_is_bundle_owned).
     fn current_decl_is_imported_module_symbol() -> bool:
+        self.path_is_imported_module_symbol(self.current_decl_source_file)
+
+    fn path_is_imported_module_symbol(path: &str) -> bool:
         if self.module_object_mode == 0:
             return false
-        if self.current_decl_source_file.len() == 0 or self.current_decl_source_file == "<unknown>":
+        if path.len() == 0 or path == "<unknown>":
             return false
         if self.source_file.len() == 0 or self.source_file == "<unknown>":
             return false
-        self.current_decl_source_file != self.source_file
+        if self.decl_path_is_bundle_owned(path):
+            return false
+        path != self.source_file
 
     fn find_module_let_decl_index(sym: i32) -> i32:
         for di in 0..self.pool.decl_count():

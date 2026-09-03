@@ -92,6 +92,9 @@ type Zcu {
     // declares (never defines) the functions of these modules, exactly as
     // for the compiler's embedded bundles (Codegen.bundle_prefixes).
     link_bundle_prefixes: Vec[str],
+    // D38 batch C3: `--bundle-corpus <rel>` of a bundle build — codegen
+    // owns (defines) every module under it (Codegen.bundle_corpus); "".
+    bundle_corpus: str,
     project_config: ProjectConfig,
     trace_c_import_cache: i32,
     // Analysis commands preserve diagnostics but may continue past preliminary
@@ -156,6 +159,7 @@ fn Zcu.init -> Zcu:
         last_link_lib_names: zcu_new_vec_str(),
         tracked_input_paths: zcu_new_vec_str(),
         link_bundle_prefixes: zcu_new_vec_str(),
+        bundle_corpus: "",
         project_config: project_config_default(),
         trace_c_import_cache: 0,
         analysis_partial_semantics: 0,

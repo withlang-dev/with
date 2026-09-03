@@ -20,6 +20,7 @@ use Overflow
 use TargetSpec
 use FnAbi
 use compiler.EmbeddedBundles
+use compiler.BundleInterfaces
 use AnalysisTypes
 
 extern fn exit(code: i32) -> Unit
@@ -303,6 +304,11 @@ type Codegen {
     // function from such a module is declared under its module link name,
     // never defined, in this unit (docs/wo_bundles.md "Declarations only").
     bundle_prefixes: Vec[str],
+    // D38 batch C3: `--bundle-corpus <rel>` — this object IS the bundle of
+    // the corpus, so every module whose canonical path lies under it is
+    // owned here (defined), whatever unit imported it; "" outside a bundle
+    // build. One rule, decl_path_is_bundle_owned.
+    bundle_corpus: str,
 
     // Loop stack (fixed-size arrays via Vec)
     loop_break_bbs: Vec[i64],
@@ -941,6 +947,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         current_decl_source_file: "<unknown>",
         module_object_mode: 0,
         bundle_prefixes: embedded_bundle_prefixes(),
+        bundle_corpus: "",
         loop_break_bbs: Vec.new(),
         loop_continue_bbs: Vec.new(),
         loop_result_allocas: Vec.new(),
@@ -4180,10 +4187,21 @@ impl Codegen:
             if not self.bundle_prefixes.contains(prefix):
                 self.bundle_prefixes.push(with_str_clone_ref(prefix))
 
+    // D38 batch C3: the one ownership rule of a bundle build. Under
+    // `--bundle-corpus <rel>` a module whose canonical path lies under the
+    // corpus is owned by this object — its functions are defined under their
+    // module link names and its globals defined — however it was reached;
+    // every other imported module stays declared-only, as in any
+    // module-object build. Consulted by current_decl_is_imported_module_symbol
+    // and by path_is_bundle_provided (a compiler that embeds the bundle can
+    // still rebuild it from source, the wo-drift lane).
+    fn decl_path_is_bundle_owned(source_path: &str) -> bool:
+        self.bundle_corpus.len() > 0 and bundle_corpus_contains(self.bundle_corpus, codegen_canonical_module_path(source_path))
+
     // D38: does an embedded .wo bundle provide this module? Then this unit
     // declares its functions and the bundle's object defines them.
     fn path_is_bundle_provided(source_path: &str) -> bool:
-        if self.bundle_prefixes.len() == 0:
+        if self.bundle_prefixes.len() == 0 or self.decl_path_is_bundle_owned(source_path):
             return false
         let prefix = fn_abi_module_link_prefix(source_path)
         prefix.len() > 0 and self.bundle_prefixes.contains(prefix)
@@ -4834,6 +4852,30 @@ impl Codegen:
             if sig_sym != 0 and sig_idx >= 0:
                 self.declare_function_from_sig(sig_sym, sig_idx, 1)
 
+    // The declaration index of the module owning a generated MIR body: a
+    // clause dispatcher's (or one of its clauses') first clause declaration,
+    // else — a synthesized method such as an `error` type's `source` has no
+    // clause declaration — the owner type's declaration; -1 when neither
+    // names a declaration.
+    fn generated_body_decl_index(body_sym: i32) -> i32:
+        let dispatch = if self.sema.fn_is_clause_body_symbol(body_sym) != 0: self.sema.fn_clause_body_dispatch.get(body_sym).unwrap() else: body_sym
+        let group = self.sema.fn_clause_group_index(dispatch)
+        if group >= 0 and self.sema.fn_clause_group_clause_count(group) > 0:
+            return self.find_decl_index(self.sema.fn_clause_group_clause(group, 0))
+        let name = self.function_symbol_name(body_sym)
+        var dot = -1
+        for i in 0..name.len() as i32:
+            if name.byte_at(i as i64) == '.':
+                dot = i
+        if dot <= 0:
+            return -1
+        let owner_sym = self.intern.intern(name.slice(0, dot as i64))
+        for di in 0..self.pool.decl_count():
+            let decl = self.pool.get_decl(di)
+            if self.pool.kind(decl) == NodeKind.NK_TYPE_DECL and self.pool.get_data0(decl) == owner_sym:
+                return di
+        -1
+
     mut fn gen_mir_only_functions():
         for bi in 0..self.mir_fn_syms_len() as i32:
             let body_sym = self.mir_fn_sym_at(bi as i64)
@@ -4844,6 +4886,13 @@ impl Codegen:
             if not self.mir_body_is_generated_function_clause(body_sym):
                 continue
             if self.generated_mir_body_syms.contains(body_sym):
+                continue
+            // A module-object build defines only what it owns: a clause body
+            // declared by an imported module (a prelude error type's `source`
+            // dispatcher, say) is that module's to define, never this
+            // object's bare external duplicate (D38 batch C3).
+            let decl_index = self.generated_body_decl_index(body_sym)
+            if decl_index >= 0 and self.path_is_imported_module_symbol(self.decl_source_path(decl_index)):
                 continue
             let body = self.mir_body_at(bi as i64)
             if body.lowering_failed != 0 or body.block_count() == 0:
@@ -5930,6 +5979,14 @@ impl Codegen:
         let fn_type = wl_function_type(actual_ret_ty, vec_data_i64(&actual_params), actual_params.len() as i32, 0)
         let name = self.intern.resolve(mono_sym)
         let function = wl_add_function(self.llmod, name, fn_type)
+        // A module object keeps every specialization it instantiates — a
+        // generic call's instance, a dyn vtable row of a prelude error type —
+        // private: the importer instantiates its own, and two objects
+        // defining one bare external name would never link (D38 batch C3;
+        // docs/abi_roadmap.md Level 0: no instantiation crosses a bundle
+        // boundary).
+        if self.module_object_mode != 0:
+            wl_set_linkage(function, wl_internal_linkage())
         if has_sret != 0:
             wl_add_sret_attr(self.context, function, 0, ret_ty)
         if has_sret != 0 or byval_mask != 0:
