@@ -1360,13 +1360,15 @@ fn comp_resolve_compiler_version(ctx: &ActionCtx) -> str:
     base
 
 fn comp_read_git_short_hash(fs: &ToolFs, root: &str) -> str:
-    let head_raw = fs.read_text(".git/HEAD")
+    let head_raw = if fs.exists(".git/HEAD"): fs.read_text(".git/HEAD") else: ""
     let head = comp_first_trimmed_line(head_raw)
     if head.len() == 0:
         return ""
     if head.len() > 5 and head.slice(0, 5) == "ref: ":
         let ref_path = head.slice(5, head.len())
-        let loose = comp_first_trimmed_line(fs.read_text(".git/" ++ ref_path))
+        let loose_path = ".git/" ++ ref_path
+        let loose_raw = if fs.exists(loose_path): fs.read_text(loose_path) else: ""
+        let loose = comp_first_trimmed_line(loose_raw)
         if loose.len() >= 9:
             return loose.slice(0, 9)
         return comp_find_packed_ref(fs, root, ref_path)
@@ -1375,7 +1377,7 @@ fn comp_read_git_short_hash(fs: &ToolFs, root: &str) -> str:
     ""
 
 fn comp_find_packed_ref(fs: &ToolFs, root: &str, ref_path: &str) -> str:
-    let packed = fs.read_text(".git/packed-refs")
+    let packed = if fs.exists(".git/packed-refs"): fs.read_text(".git/packed-refs") else: ""
     if packed.len() == 0:
         return ""
     var line_start: i64 = 0
@@ -1405,13 +1407,13 @@ fn comp_write_generated_source(ctx: &ActionCtx, output: &str, text: &str) -> i32
     0
 
 fn comp_write_normalized_source(ctx: &ActionCtx, source: &str, output: &str) -> i32:
-    let text = ctx.fs().read_text(source)
+    let text = if ctx.fs().exists(source): ctx.fs().read_text(source) else: ""
     if text.len() == 0:
         return comp_fail(ctx, "could not read source: " ++ source)
     comp_write_generated_source(ctx, output, text)
 
 fn comp_write_replaced_source(ctx: &ActionCtx, source: &str, output: &str, placeholder: &str, replacement: &str) -> i32:
-    let text = ctx.fs().read_text(source)
+    let text = if ctx.fs().exists(source): ctx.fs().read_text(source) else: ""
     if text.len() == 0:
         return comp_fail(ctx, "could not read source: " ++ source)
     if not text.contains(placeholder):
@@ -1496,7 +1498,7 @@ pub fn comp_patch_version_binary(ctx: &ActionCtx, input_path: &str, output_path:
         return comp_fail(ctx, "version too long for stamp slot: " ++ version)
     // read_text/write_text are byte-exact (read by file size, write by str
     // length — NUL-safe), so str slicing patches the binary losslessly.
-    var data = fs.read_text(input_path)
+    var data = if fs.exists(input_path): fs.read_text(input_path) else: ""
     if data.len() == 0:
         return comp_fail(ctx, "empty unstamped binary: " ++ input_path)
     let sentinel = COMPILER_VERSION_SENTINEL
@@ -1858,7 +1860,7 @@ pub fn run_check_committed_state_action(ctx: ActionCtx) -> i32:
         if args[i] == "--force":
             return 0
     let fs = ctx.fs()
-    let manifest = fs.read_text("out/.build-state/blessed-manifest")
+    let manifest = if fs.exists("out/.build-state/blessed-manifest"): fs.read_text("out/.build-state/blessed-manifest") else: ""
     if manifest.len() == 0:
         ctx.diagnostics().error("no blessed manifest found; run `with build :fixpoint` first or pass --force")
         return 1

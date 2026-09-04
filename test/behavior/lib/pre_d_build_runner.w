@@ -105,7 +105,7 @@ pub fn p7_run(case_dir: &str, label: &str, args_blob: &str) -> P7Run:
     argv = p7_argv_append(argv, p7_compiler_path())
     argv = argv ++ args_blob
     let rc = unsafe { with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, 300000, case_dir) }
-    P7Run { rc: rc, stdout: read_file(stdout_path), stderr: read_file(stderr_path) }
+    P7Run { rc: rc, stdout: read_file(stdout_path).unwrap(), stderr: read_file(stderr_path).unwrap() }
 
 pub fn p7_build_args -> str:
     p7_argv_append("", "build")
@@ -131,5 +131,5 @@ pub fn p7_assert_failure_contains(result: &P7Run, needle: &str, label: &str) -> 
     assert(result.stderr.contains(needle) or result.stdout.contains(needle))
 
 pub fn p7_assert_file_contains(case_dir: &str, rel_path: &str, needle: &str) -> Unit:
-    let text = read_file(p7_join(case_dir, rel_path))
+    let text = read_file(p7_join(case_dir, rel_path)).unwrap()
     assert(text.contains(needle))

@@ -25,7 +25,7 @@ fn renamed(name: &str) -> str:
     "rt_libc_" ++ name.slice(i as i64, name.len())
 
 fn process(path: &str) -> i32:
-    let text = read_file(path)
+    let text = read_file(path) ?? ""
     if text.len() == 0:
         eprint("error: could not read " ++ path)
         return 1

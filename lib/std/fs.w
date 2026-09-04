@@ -5,7 +5,9 @@
 // which are backed by rt_* platform calls.
 
 extern fn with_fs_write_file(path: &str, data: &str) -> i32
-extern fn with_fs_read_file(path: &str) -> str
+extern fn with_fs_read_file_status(path: &str, status: *mut i32) -> str
+extern fn with_str_from_cstr(s: *const u8) -> str
+extern fn strerror(errnum: i32) -> *mut i8
 extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_fs_remove_file(path: &str) -> i32
 extern fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32
@@ -57,9 +59,24 @@ pub fn list_files_text(path: &str) -> str:
 pub fn write_file(path: &str, data: &str) -> i32:
     with_fs_write_file(path, data)
 
-/// Read an entire file as a string. Returns "" on failure.
-pub fn read_file(path: &str) -> str:
-    with_fs_read_file(path)
+/// A filesystem failure: the OS error number and the path it concerned.
+pub error IoError =
+    | Os(code: i32, path: str)
+
+/// The C library's text for the error, in the spec's shape:
+/// `No such file or directory (os error 2)`.
+pub fn IoError.message(self: &Self) -> str:
+    match self:
+        .Os(code, _) => with_str_from_cstr(strerror(code) as *const u8) ++ f" (os error {code})"
+
+/// Read an entire file. `Err` carries the OS error (a missing path, a
+/// directory, a permission failure, a short read); an empty file is `Ok("")`.
+pub fn read_file(path: &str) -> Result[str, IoError]:
+    var status: i32 = 0
+    let text = with_fs_read_file_status(path, &raw mut status as *mut i32)
+    if status != 0:
+        return Err(.Os(0 - status, path.clone()))
+    text
 
 /// Create directories recursively (like mkdir -p). Returns 0 on success.
 pub fn mkdir_p(path: &str) -> i32:

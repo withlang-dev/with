@@ -1293,7 +1293,7 @@ fn bs_project_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     result
 
 fn bs_check_init_ai_docs(ctx: &ActionCtx, project_dir: &str, label: &str) -> i32:
-    let expected = ctx.fs().read_text("docs/with_for_ai.md")
+    let expected = if ctx.fs().exists("docs/with_for_ai.md"): ctx.fs().read_text("docs/with_for_ai.md") else: ""
     if expected.len() == 0:
         return bs_fail(ctx, "could not read docs/with_for_ai.md")
     let agents = ctx.fs().read_text(bs_join(project_dir, "AGENTS.md"))
@@ -3751,10 +3751,10 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
             let stdout_rel = bs_join(output_dir, f"job-{i}.stdout")
             let stderr_rel = bs_join(output_dir, f"job-{i}.stderr")
             ctx.diagnostics().error(ctx.target_name() ++ f": job {i} failed with exit code {job_rc}")
-            let stdout_text = fs.read_text(stdout_rel)
+            let stdout_text = if fs.exists(stdout_rel): fs.read_text(stdout_rel) else: ""
             if stdout_text.len() > 0:
                 ctx.diagnostics().error(stdout_text)
-            let stderr_text = fs.read_text(stderr_rel)
+            let stderr_text = if fs.exists(stderr_rel): fs.read_text(stderr_rel) else: ""
             if stderr_text.len() > 0:
                 ctx.diagnostics().error(stderr_text)
             failed = true
@@ -6463,7 +6463,26 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if toolfs_tree_escape.rc == 0:
         ctx.diagnostics().error("error: build_w_toolfs_tree_escape unexpectedly succeeded")
         return 1
-    bs_assert_contains(ctx, toolfs_tree_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_tree_escape")
+    rc = bs_assert_contains(ctx, toolfs_tree_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_tree_escape")
+    if rc != 0: return rc
+
+    // #953: read_text_opt is the probe for an optional file; read_text on a
+    // file that cannot be read is a build-tool defect and panics with the OS
+    // error (it used to return "", indistinguishable from an empty file).
+    let toolfs_read_missing_dir = bs_join(base_dir, "toolfs_read_missing")
+    rc = bs_write_project_manifest(ctx, toolfs_read_missing_dir, "buildwtoolfsreadmissing")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_read_missing_dir, "src/main.w"), "fn main:\n    print(\"should not build\")\n", ctx.target_name(), "toolfs read missing source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_read_missing_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.read_text_opt(\"missing.txt\").is_none())\n    assert(fs.read_text_opt(\"src/main.w\").unwrap() == fs.read_text(\"src/main.w\"))\n    fs.read_text(\"missing.txt\")\n    ctx.new_build().executable(\"toolfs-read-missing\", \"src/main.w\")\n", ctx.target_name(), "toolfs read missing build.w")
+    if rc != 0: return rc
+    let toolfs_read_missing = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-read-missing", bs_blob_to_args(bs_argv_append("", "build")), 120000, toolfs_read_missing_dir)
+    if toolfs_read_missing.rc == 0:
+        ctx.diagnostics().error("error: build_w_toolfs_read_missing unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, toolfs_read_missing.stderr, "read_text: ", "build_w_toolfs_read_missing")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, toolfs_read_missing.stderr, "missing.txt: No such file or directory (os error 2)", "build_w_toolfs_read_missing")
 
 fn bs_check_comptime_string_budget(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let source =
@@ -8007,7 +8026,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let abi_sha = bs_trim_trailing_line_endings(abi.stdout)
     if abi_sha.len() != 64 or abi_sha.starts_with("WITHABISHASTAMP"):
         return bs_fail(ctx, "the compiler under test carries no ABI stamp: " ++ abi_sha)
-    let manifest = ctx.fs().read_text(manifest_path)
+    let manifest = if ctx.fs().exists(manifest_path): ctx.fs().read_text(manifest_path) else: ""
     if manifest.len() == 0: return bs_fail(ctx, "no manifest written to " ++ manifest_path)
     rc = bs_assert_manifest_field(ctx, manifest, "abi-sha", abi_sha)
     if rc != 0: return rc

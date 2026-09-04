@@ -19,7 +19,10 @@ use TargetSpec
 
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_str_clone_ref(s: &str) -> str
+extern fn with_str_from_cstr(s: *const u8) -> str
+extern fn strerror(errnum: i32) -> *mut i8
 extern fn with_fs_read_file(path: &str) -> str
+extern fn with_fs_read_file_status(path: &str, status: *mut i32) -> str
 extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_fs_is_dir(path: &str) -> i32
 extern fn with_fs_mkdir_p(path: &str) -> i32
@@ -524,6 +527,12 @@ fn comptime_tool_path_is_parent_of(parent: &str, child: &str) -> bool:
     if parent.len() >= child.len():
         return false
     child.starts_with(parent) and child[parent.len()] == 47
+
+// The C library's text for an OS error number, in std.fs.IoError's shape:
+// `No such file or directory (os error 2)`.
+fn comptime_os_error_message(code: i32) -> str:
+    let text = unsafe { strerror(code) }
+    with_str_from_cstr(text as *const u8) ++ f" (os error {code})"
 
 fn comptime_tool_split_nonempty_lines(text: &str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
@@ -5542,7 +5551,7 @@ impl ComptimeEvaluator:
             for gi in 0..sorted.len() as i32:
                 self.extra_values.push(comptime_value_str(sorted[gi]))
             return comptime_control_value(comptime_value_vec(vec_type, gstart, sorted.len() as i32))
-        if method == "exists" or method == "is_dir" or method == "read_text" or method == "read_binary" or method == "list_files" or method == "sha256_file" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
+        if method == "exists" or method == "is_dir" or method == "read_text" or method == "read_text_opt" or method == "read_binary" or method == "list_files" or method == "sha256_file" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
             if not self.capability_expect_arg_count(arg_count, 1, method, node):
                 return comptime_control_error()
             let args_signal = self.capability_args(extra_start, arg_count)
@@ -5558,8 +5567,26 @@ impl ComptimeEvaluator:
                 return comptime_control_value(comptime_value_bool(if with_fs_file_exists(resolved) != 0: 1 else: 0))
             if method == "is_dir":
                 return comptime_control_value(comptime_value_bool(if with_fs_is_dir(resolved) != 0: 1 else: 0))
+            // #953: read_text mirrors ToolFs.read_text's native contract — a
+            // file that cannot be read is a build-tool defect reported with
+            // the OS error, never ""; read_text_opt is the optional-file probe.
             if method == "read_text":
-                return comptime_control_value(comptime_value_str(with_fs_read_file(resolved)))
+                var status: i32 = 0
+                let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
+                if status != 0:
+                    return self.fail(node, "read_text: " ++ resolved ++ ": " ++ comptime_os_error_message(0 - status))
+                return comptime_control_value(comptime_value_str(text))
+            if method == "read_text_opt":
+                var opt_tid = self.node_type_or(node, 0)
+                if opt_tid == 0:
+                    opt_tid = self.sema.ensure_option_type_for(self.sema.ty_str as i32)
+                var status: i32 = 0
+                let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
+                if status != 0:
+                    return comptime_control_value(comptime_value_enum(opt_tid, self.sema.syms.none, self.extra_values.len() as i32, 0))
+                let some_start = self.extra_values.len() as i32
+                self.extra_values.push(comptime_value_str(text))
+                return comptime_control_value(comptime_value_enum(opt_tid, self.sema.syms.some, some_start, 1))
             if method == "read_binary":
                 let vec_type = self.node_type_or(node, 0)
                 if vec_type == 0:

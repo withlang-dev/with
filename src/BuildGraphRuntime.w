@@ -19,6 +19,7 @@ extern fn with_fs_file_mode(path: &str) -> i32
 extern fn with_fs_is_dir(path: &str) -> i32
 extern fn with_fs_mkdir_p(path: &str) -> i32
 extern fn with_fs_read_file(path: &str) -> str
+extern fn with_fs_read_file_status(path: &str, status: *mut i32) -> str
 extern fn with_fs_readlink(path: &str) -> str
 extern fn with_fs_remove_dir(path: &str) -> i32
 extern fn with_fs_remove_file(path: &str) -> i32
@@ -87,6 +88,11 @@ pub fn build_graph_rt_mkdir_p(path: &str) -> i32:
 
 pub fn build_graph_rt_read_file(path: &str) -> str:
     with_fs_read_file(path)
+
+// The file's text with the OS status (0, or the negated errno) — the read a
+// graph operation must not confuse with an empty file (#953).
+pub fn build_graph_rt_read_file_status(path: &str, status: *mut i32) -> str:
+    with_fs_read_file_status(path, status)
 
 pub fn build_graph_rt_readlink(path: &str) -> str:
     with_fs_readlink(path)

@@ -14,7 +14,10 @@ fn main:
     assert(write_file(path, "payload\n") == 0)
     assert(file_exists(path))
     assert(file_exists(path))
-    assert(read_file(path) == "payload\n")
+    // bound before the compare: `read_file(p).unwrap() == x` leaks the
+    // unwrapped temporary (#1039), which is not this fixture's subject
+    let text = read_file(path).unwrap()
+    assert(text == "payload\n")
     assert(list_files_text(dir).len() > 0)
     let moved = dir ++ "/moved.txt"
     assert(rename_file(path, moved) == 0)

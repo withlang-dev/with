@@ -405,8 +405,8 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
         let field = fields[fi]
         if wo_manifest_field(stored_manifest, field) != wo_manifest_field(scratch_manifest, field):
             return wo_fail(ctx, "declaration drift: manifest `" ++ field ++ "` differs between " ++ stored ++ " and " ++ scratch)
-    let stored_o = fs.read_text(stored ++ ".o")
-    let scratch_o = fs.read_text(scratch ++ ".o")
+    let stored_o = if fs.exists(stored ++ ".o"): fs.read_text(stored ++ ".o") else: ""
+    let scratch_o = if fs.exists(scratch ++ ".o"): fs.read_text(scratch ++ ".o") else: ""
     if stored_o.len() == 0 or scratch_o.len() == 0:
         return wo_fail(ctx, "no object to compare (" ++ stored ++ ".o, " ++ scratch ++ ".o)")
     let identical = stored_o == scratch_o

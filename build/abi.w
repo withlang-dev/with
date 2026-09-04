@@ -26,7 +26,7 @@ fn abi_split_lines(text: &str) -> Vec[str]:
 pub fn run_abi_hash_check_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let record_path = "docs/with-abi.sha256"
-    let record = fs.read_text(record_path)
+    let record = if fs.exists(record_path): fs.read_text(record_path) else: ""
     if record.len() == 0:
         ctx.diagnostics().error("abi-hash-check: missing " ++ record_path ++ " (record it with the current hashes of src/FnAbi.w and src/TypeLayout.w)")
         return 1

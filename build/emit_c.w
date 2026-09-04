@@ -458,7 +458,7 @@ fn emitc_collect_public_abi(ctx: &ActionCtx, sources: Vec[str], runtime: i32) ->
     let fs = ctx.fs()
     for si in 0..sources.len() as i32:
         let source_path = sources[si]
-        let text = fs.read_text(source_path)
+        let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
             let _ = emitc_fail(ctx, "could not read source for ABI scan: " ++ source_path)
             return Vec.new()
@@ -474,7 +474,7 @@ fn emitc_collect_exports(ctx: &ActionCtx, sources: Vec[str]) -> Vec[EmitCFunctio
     let fs = ctx.fs()
     for si in 0..sources.len() as i32:
         let source_path = sources[si]
-        let text = fs.read_text(source_path)
+        let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
             let _ = emitc_fail(ctx, "could not read source for export scan: " ++ source_path)
             return Vec.new()
@@ -647,7 +647,7 @@ fn emitc_compile_c_compiler(ctx: &ActionCtx, main_c: &str, output_path: &str) ->
     if platform_obj.len() == 0:
         return emitc_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
     let llvm_rsp = "out/lib/llvm_link.rsp"
-    if fs.read_text(llvm_rsp).len() == 0:
+    if not fs.exists(llvm_rsp) or fs.read_text(llvm_rsp).len() == 0:
         return emitc_fail(ctx, "missing LLVM link metadata: " ++ llvm_rsp)
     var argv: Vec[str] = Vec.new()
     argv = emitc_push_c_compiler(ctx, move argv)
@@ -671,7 +671,8 @@ fn emitc_compile_c_compiler_with_bridges(ctx: &ActionCtx, main_c: &str, output_p
     let platform_obj = emitc_host_platform_runtime_object()
     if platform_obj.len() == 0:
         return emitc_fail(ctx, "unsupported host runtime object for full emit-c C compile: " ++ os() ++ "/" ++ arch())
-    let cc_path = emitc_trim(fs.read_text("out/lib/llvm_cc"))
+    let cc_raw = if fs.exists("out/lib/llvm_cc"): fs.read_text("out/lib/llvm_cc") else: ""
+    let cc_path = emitc_trim(cc_raw)
     if cc_path.len() == 0:
         return emitc_fail(ctx, "missing LLVM compiler metadata: out/lib/llvm_cc")
     var argv: Vec[str] = Vec.new()

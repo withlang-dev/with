@@ -3279,35 +3279,57 @@ fn fs_mkdir_component(path: *const u8, mode: i32) -> i32:
 // serves (#952: every wrapper leaked one per call).
 fn cstr_free(cpath: *const u8): rt_free(cpath as *mut u8)
 
-fn fs_read_file_c(cpath: *const u8) -> str:
+// The file's text with its status: 0, or the negated errno of the failed
+// step (#953: a failure and an empty file used to be the same ""). A
+// directory is EISDIR; a read that stops short of the measured size is EIO.
+fn fs_read_file_status_c(cpath: *const u8, status: *mut i32) -> str:
+    unsafe *status = 0
     if fs_path_is_dir_c(cpath):
+        unsafe *status = -21  // EISDIR
         return make_str("" as *const u8, 0)
     let fd = rt_open(cpath, 0, 0)  // O_RDONLY
     if fd < 0:
+        unsafe *status = fd
         return make_str("" as *const u8, 0)
-
-    // Get file size via seek
     let size = rt_seek(fd, 0, 2)  // SEEK_END
-    if size <= 0:
+    if size < 0:
+        let _ = rt_close(fd)
+        unsafe *status = size as i32
+        return make_str("" as *const u8, 0)
+    if size == 0:
         let _ = rt_close(fd)
         return make_str("" as *const u8, 0)
     let _ = rt_seek(fd, 0, 0)  // SEEK_SET
-
     let buf = rt_alloc(size + 1)
     var total: i64 = 0
     while total < size:
         let r = rt_read(fd, (buf as i64 + total) as *mut u8, (size - total) as u64)
-        if r <= 0: break
+        if r < 0:
+            let _ = rt_close(fd)
+            rt_free(buf)
+            unsafe *status = r as i32
+            return make_str("" as *const u8, 0)
+        if r == 0: break
         total = total + r
     let _ = rt_close(fd)
+    if total < size:
+        rt_free(buf)
+        unsafe *status = -5  // EIO
+        return make_str("" as *const u8, 0)
     unsafe *((buf as i64 + total) as *mut u8) = 0
     make_str(buf as *const u8, total)
 
-pub fn with_fs_read_file(path: &str) -> str:
+pub fn with_fs_read_file_status(path: &str, status: *mut i32) -> str:
     let cpath = str_to_cstr(path)
-    let text = fs_read_file_c(cpath)
+    let text = fs_read_file_status_c(cpath, status)
     cstr_free(cpath)
     text
+
+// "" on failure: the contract the runtime's own probes keep (an existence
+// check through the text); std.fs.read_file reports the status instead.
+pub fn with_fs_read_file(path: &str) -> str:
+    var status: i32 = 0
+    with_fs_read_file_status(path, &raw mut status as *mut i32)
 
 // 0 when every byte reached the file; a failed open returns its error, a
 // short or failed write -1 (#951: a short write reported success).

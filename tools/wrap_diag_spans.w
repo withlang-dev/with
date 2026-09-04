@@ -131,7 +131,7 @@ fn kind_name(kind: i32) -> str:
 fn load_skips(skip_path: &str) -> Vec[str]:
     var skips: Vec[str] = Vec.new()
     if skip_path.len() == 0: return skips
-    let skip_text = read_file(skip_path ++ "")
+    let skip_text = read_file(skip_path ++ "") ?? ""
     let skip_lines = skip_text.split("\n")
     for i in 0..skip_lines.len() as i32:
         let s = skip_lines[i]
@@ -372,7 +372,7 @@ fn ensure_decl(path: &str, text_in: str) -> str:
     sb.to_str()
 
 fn finalize_existing(path: &str) -> i32:
-    var text = read_file(path ++ "")
+    var text = read_file(path ++ "") ?? ""
     if text.len() == 0: return -1
     let clone_fn = owned_fn_name(path)
     let prefix = clone_fn.slice(0, clone_fn.len() - 11)
@@ -389,7 +389,7 @@ fn finalize_existing(path: &str) -> i32:
     0
 
 fn process_file(path: &str, sites: &Vec[Site], skips: &Vec[str], apply: i32) -> i32:
-    var text = read_file(path ++ "")
+    var text = read_file(path ++ "") ?? ""
     if text.len() == 0:
         print("wrap-diag-spans: could not read source " ++ path)
         return -1
@@ -430,7 +430,7 @@ fn main -> i32:
         print("usage: wrap_diag_spans [--apply] [--skip skips.txt] diags.txt")
         return 1
     let skips = load_skips(skip_path)
-    let diag_text = read_file(diag_path ++ "")
+    let diag_text = read_file(diag_path ++ "") ?? ""
     if diag_text.len() == 0:
         print("wrap-diag-spans: could not read " ++ diag_path)
         return 1

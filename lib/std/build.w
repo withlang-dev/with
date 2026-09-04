@@ -4,6 +4,7 @@
 // turning this graph into concrete compiler/linker actions.
 
 use std.crypto.sha256
+use std.fs.IoError
 
 extern fn with_eprint(s: &str) -> Unit
 extern fn exit(code: i32) -> Never
@@ -15,6 +16,7 @@ extern fn with_fs_file_exists(path: &str) -> i32
 extern fn with_fs_is_dir(path: &str) -> i32
 extern fn with_fs_mkdir_p(path: &str) -> i32
 extern fn with_fs_read_file(path: &str) -> str
+extern fn with_fs_read_file_status(path: &str, status: *mut i32) -> str
 extern fn with_fs_chmod(path: &str, mode: i32) -> i32
 extern fn with_fs_copy_tree(src: &str, dst: &str) -> i32
 extern fn with_fs_list_files(path: &str) -> str
@@ -926,8 +928,25 @@ pub fn ToolFs.mkdir_all(self: &Self, path: &str) -> i32:
     self.require_mkdir_allowed(path)
     with_fs_mkdir_p(self.resolve_path(path))
 
+/// Read a project file. A file that cannot be read — missing, a directory, a
+/// permission failure, a short read — is a build-tool defect and panics with
+/// the OS error; an empty file is "". Probe an optional file with
+/// `read_text_opt` (#953: "" used to mean all four at once).
 pub fn ToolFs.read_text(self: &Self, path: &str) -> str:
-    with_fs_read_file(self.resolve_path(path))
+    let resolved = self.resolve_path(path)
+    var status: i32 = 0
+    let text = with_fs_read_file_status(resolved, &raw mut status as *mut i32)
+    if status != 0:
+        let site = "read_text: " ++ resolved ++ ": "
+        let err: IoError = .Os(0 - status, resolved)
+        panic(site ++ err.message())
+    text
+
+/// The file's text, or None when it cannot be read (the optional-file probe).
+pub fn ToolFs.read_text_opt(self: &Self, path: &str) -> Option[str]:
+    var status: i32 = 0
+    let text = with_fs_read_file_status(self.resolve_path(path), &raw mut status as *mut i32)
+    if status != 0: None else: Some(text)
 
 pub fn ToolFs.read_binary(self: &Self, path: &str) -> Vec[u8]:
     let resolved = self.resolve_path(path)
@@ -2241,7 +2260,7 @@ fn build_zlib_gunzip_source() -> str:
     "    if argv.len() < 3:\n" ++
     "        print(\"usage: zlib_gunzip <input.tar.gz> <output.tar>\")\n" ++
     "        return 2\n" ++
-    "    let input = read_file(argv.get(1))\n" ++
+    "    let input = read_file(argv.get(1)) ?? \"\"\n" ++
     "    if input.len() == 0:\n" ++
     "        print(\"could not read input archive\")\n" ++
     "        return 1\n" ++

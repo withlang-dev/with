@@ -32,7 +32,7 @@ fn line_of(text: &str, off: i32) -> i32:
 // `fn f(dst: *mut u8, n: i64) -> Unit` -> "(*mut u8,i64)->Unit"
 fn scan(path: &str, want_extern: bool, aliases: &Vec[str]) -> Vec[str]:
     var found: Vec[str] = Vec.new()
-    let text = read_file(path)
+    let text = read_file(path) ?? ""
     if text.len() == 0: return found
     var lexer = Lexer.init(text.slice(0, text.len()), 0)
     let toks = lexer.tokenize()
@@ -100,7 +100,7 @@ fn load_aliases(root: &str) -> Vec[str]:
     var out: Vec[str] = Vec.new()
     for p in list_files_text(root).split("\n"):
         if not p.ends_with(".w"): continue
-        for line in read_file(p).split("\n"):
+        for line in (read_file(p) ?? "").split("\n"):
             if not line.starts_with("type "): continue
             let eq = line.find(" = ")
             if eq < 0: continue

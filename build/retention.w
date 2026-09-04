@@ -362,7 +362,7 @@ fn ret_stage_fixpoint_path(name: &str) -> str:
 fn ret_append_test_marker(ctx: &ActionCtx, combined: &str, target_name: &str, entry: &str) -> str:
     let marker_path = "out/.build-state/" ++ target_name ++ ".test-pass"
     let fs = ctx.fs()
-    let actual = fs.read_text(marker_path)
+    let actual = if fs.exists(marker_path): fs.read_text(marker_path) else: ""
     if actual.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": missing test pass marker " ++ marker_path ++ "; run `with build :test`")
         return ""
@@ -374,7 +374,7 @@ fn ret_append_test_marker(ctx: &ActionCtx, combined: &str, target_name: &str, en
 
 fn ret_append_state_file(ctx: &ActionCtx, combined: &str, target_name: &str) -> str:
     let state_path = "out/.build-state/" ++ target_name ++ ".state"
-    let state = ctx.fs().read_text(state_path)
+    let state = if ctx.fs().exists(state_path): ctx.fs().read_text(state_path) else: ""
     if state.len() == 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": missing build state " ++ state_path ++ "; run `with build :test`")
         return ""
@@ -608,7 +608,7 @@ pub fn run_test_green_action(ctx: ActionCtx) -> i32:
     0
 
 fn ret_require_test_green(ctx: &ActionCtx, compiler_sha: &str) -> i32:
-    let manifest = ctx.fs().read_text("out/.build-state/test-green.json")
+    let manifest = if ctx.fs().exists("out/.build-state/test-green.json"): ctx.fs().read_text("out/.build-state/test-green.json") else: ""
     if manifest.len() == 0:
         return ret_fail(ctx, "missing test-green manifest; run `with build :test`")
     let fingerprint = ret_test_green_fingerprint(ctx)
@@ -684,7 +684,7 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
         return 1
     // D19: read the fixpoint tier's recorded evidence; never re-hash (or
     // rebuild) the objects here. Stale evidence fails loudly instead.
-    let fixpoint_evidence = fs.read_text("out/.build-state/fixpoint-evidence.json")
+    let fixpoint_evidence = if fs.exists("out/.build-state/fixpoint-evidence.json"): fs.read_text("out/.build-state/fixpoint-evidence.json") else: ""
     if fixpoint_evidence.len() == 0:
         return ret_fail(ctx, "missing fixpoint evidence; run `with build :fixpoint`")
     if ret_json_field(fixpoint_evidence, "compiler_sha256") != compiler_sha:
@@ -697,7 +697,7 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     let commit_label = if commit.len() > 0: commit else: "unknown"
     if ret_archive_verified_seed(ctx, source_version, commit_label, compiler_sha) != 0:
         return 1
-    let seed_input = fs.read_text("out/.build-state/seed-input.json")
+    let seed_input = if fs.exists("out/.build-state/seed-input.json"): fs.read_text("out/.build-state/seed-input.json") else: ""
     let seed_json = if seed_input.len() > 0: ret_trim(seed_input) else: "null"
     let manifest =
         "{\n" ++
@@ -721,7 +721,7 @@ pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
     let compiler_path = ret_release_compiler_path()
     if not fs.exists(compiler_path):
         return ret_fail(ctx, "missing " ++ compiler_path ++ "; run `with build` first")
-    let manifest = fs.read_text("out/.build-state/last-green.json")
+    let manifest = if fs.exists("out/.build-state/last-green.json"): fs.read_text("out/.build-state/last-green.json") else: ""
     if manifest.len() == 0:
         return ret_fail(ctx, "missing last-green manifest; run `with build :last-green` after build/fixpoint/test")
     let compiler_sha = ret_sha256_file(ctx, "verified-compiler-check", compiler_path)

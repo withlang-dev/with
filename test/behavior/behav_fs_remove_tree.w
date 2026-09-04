@@ -23,14 +23,14 @@ fn main:
     assert(file_exists(file2))
 
     assert(copy_tree(root, copied) == 0)
-    assert(read_file(copied ++ "/root.txt") == "root")
-    assert(read_file(copied ++ "/a/b/leaf.txt") == "leaf")
+    assert(read_file(copied ++ "/root.txt").unwrap() == "root")
+    assert(read_file(copied ++ "/a/b/leaf.txt").unwrap() == "leaf")
     let listed = list_files_text(copied)
     assert(contains_line(listed, copied ++ "/root.txt"))
     assert(contains_line(listed, copied ++ "/a/b/leaf.txt"))
 
     assert(symlink("root.txt", link) == 0)
-    assert(read_file(link) == "root")
+    assert(read_file(link).unwrap() == "root")
 
     assert(remove_tree(root) == 0)
     assert(not file_exists(file1))

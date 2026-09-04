@@ -305,7 +305,7 @@ fn ruat_run_c_package_uat(ctx: &ActionCtx, package: &str, label: &str, fixture: 
     if compiler.len() == 0:
         return ruat_fail(ctx, "missing compiler input")
 
-    let source = ctx.fs().read_text(fixture)
+    let source = if ctx.fs().exists(fixture): ctx.fs().read_text(fixture) else: ""
     if source.len() == 0:
         return ruat_fail(ctx, "could not read " ++ label ++ " UAT fixture: " ++ fixture)
 
@@ -391,7 +391,7 @@ pub fn run_release_raylib_spiral_uat_action(ctx: ActionCtx) -> i32:
     if rc != 0:
         return rc
 
-    let spiral_source = ctx.fs().read_text("build/release_uat_fixtures/raylib_spiral_main.w")
+    let spiral_source = if ctx.fs().exists("build/release_uat_fixtures/raylib_spiral_main.w"): ctx.fs().read_text("build/release_uat_fixtures/raylib_spiral_main.w") else: ""
     if spiral_source.len() == 0:
         return ruat_fail(ctx, "could not read spiral UAT fixture")
     if ctx.fs().write_text(ruat_join(workdir, "src/main.w"), spiral_source) != 0:

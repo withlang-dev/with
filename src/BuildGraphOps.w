@@ -19,6 +19,17 @@ fn build_graph_target_input_path(root: &str, target: &BuildGraphTarget, index: i
         return ""
     build_graph_resolve_project_path(root, target.inputs[input_index])
 
+// One checked read for the file-content operations (compare, copy, promote,
+// install): a read failure is the operation's error, never mistaken for an
+// empty file (#953). `what` names the operation for the diagnostic.
+fn build_graph_read_input(what: &str, path: &str) -> Option[str]:
+    var status: i32 = 0
+    let text = build_graph_rt_read_file_status(path, &raw mut status as *mut i32)
+    if status != 0:
+        build_graph_rt_eprint("error: " ++ what ++ " could not read " ++ path ++ f" (os error {0 - status})")
+        return None
+    Some(text)
+
 pub fn build_graph_compare_files(root: &str, target: &BuildGraphTarget, operation_name: &str) -> i32:
     let left_path = build_graph_target_input_path(root, target, 0)
     let right_path = if target.args.len() > 0:
@@ -34,8 +45,8 @@ pub fn build_graph_compare_files(root: &str, target: &BuildGraphTarget, operatio
     if build_graph_rt_file_exists(right_path) == 0:
         build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing right input: " ++ right_path)
         return 1
-    let left = build_graph_rt_read_file(left_path)
-    let right = build_graph_rt_read_file(right_path)
+    let left = build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", left_path) ?? return 1
+    let right = build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", right_path) ?? return 1
     let min_len = if left.len() < right.len(): left.len() else: right.len()
     var diff_at = -1
     var i = 0
@@ -367,7 +378,7 @@ pub fn build_graph_copy_manifest_files(root: &str, target: &BuildGraphTarget, op
         if build_graph_rt_mkdir_p(dest_dir) != 0:
             build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' could not create destination directory: " ++ dest_dir)
             return 1
-        let contents = build_graph_rt_read_file(source_path)
+        let contents = build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", source_path) ?? return 1
         if build_graph_rt_write_file(dest_path, contents) != 0:
             build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' could not write destination: " ++ dest_path)
             return 1
@@ -394,9 +405,9 @@ pub fn build_graph_promote_tree_if_verified(root: &str, target: &BuildGraphTarge
         if build_graph_rt_file_exists(source_path) == 0:
             build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' missing input: " ++ source_path)
             return 1
-        let source_contents = build_graph_rt_read_file(source_path)
+        let source_contents = build_graph_read_input("promote_tree_if_verified target '" ++ target.name ++ "'", source_path) ?? return 1
         if build_graph_rt_file_exists(dest_path) != 0:
-            let dest_contents = build_graph_rt_read_file(dest_path)
+            let dest_contents = build_graph_read_input("promote_tree_if_verified target '" ++ target.name ++ "'", dest_path) ?? return 1
             if source_contents.len() == dest_contents.len():
                 var same = true
                 var ci = 0
@@ -516,7 +527,7 @@ pub fn build_graph_copy_file_to_path(source_path: &str, dest_path: &str, mode: i
     if build_graph_rt_mkdir_p(dest_dir) != 0:
         build_graph_rt_eprint("error: could not create copy destination directory: " ++ dest_dir)
         return 1
-    let contents = build_graph_rt_read_file(source_path)
+    let contents = build_graph_read_input("copy_file", source_path) ?? return 1
     if build_graph_rt_write_file(dest_path, contents) != 0:
         build_graph_rt_eprint("error: could not write copied file: " ++ dest_path)
         return 1
@@ -618,7 +629,7 @@ pub fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
     if mode < 0:
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args.get(0))
         return 1
-    let contents = build_graph_rt_read_file(source_path)
+    let contents = build_graph_read_input("install target '" ++ target.name ++ "'", source_path) ?? return 1
     var attempt = 0
     while attempt < 2:
         attempt = attempt + 1

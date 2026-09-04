@@ -1165,7 +1165,7 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
         return invariance_fail(ctx, copy_err)
 
     let edit_copy = build_project_join(repo_copy, file)
-    let pristine = fs.read_text(edit_copy)
+    let pristine = if fs.exists(edit_copy): fs.read_text(edit_copy) else: ""
     if pristine.len() == 0:
         return invariance_fail(ctx, "could not read pristine source: " ++ edit_copy)
     if fs.write_text(edit_copy, pristine ++ payload) != 0:
