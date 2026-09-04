@@ -123,10 +123,13 @@ The compiler is self-hosting. The build chain is `seed -> stage1 -> stage2`:
 ```sh
 git clone https://github.com/withlang-dev/with.git
 cd with
-with build :seed        # download seed compiler (if `with` is not on PATH)
+with build :seed        # download the seed pinned in seed.lock (if `with` is not on PATH)
 with build              # build the compiler
 with build :test        # run test suite
 ```
+
+`seed.lock` names the published release every build starts from; `with build
+:seed-compat` (part of `:test`) proves that seed still builds the tree.
 
 Install to your PATH:
 

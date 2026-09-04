@@ -418,7 +418,7 @@ same violation as C in the compiler. With IS a scripting language; there is no
   `use Token`) for token-accurate source tooling — regex/text hacks are not
   acceptable for self-host-critical rewrites. See `tools/migrate_receivers.w`.
 - File I/O via `use std.fs` (`read_file(path)`, `write_file(path, data)`,
-  `list_files(path)`). Never declare the `with_fs_*` externs in a tool or
+  `list_files_text(path)`, newline-separated). Never declare the `with_fs_*` externs in a tool or
   user program: that D30-deprecated internal seam SEGFAULTS in user
   programs (#901) and dies with the D30 retirement (#761). Caveat until
   #909 lands: `read_file` returns `""` for a missing/unreadable path —
@@ -459,6 +459,7 @@ with build :stage2      # stage1 → stage2
 with build :fixpoint    # verify stage2 == stage3 (byte-identical)
 with build :test        # run test suite
 with build :test-green  # verify/record current test evidence
+with build :seed-compat # the seed pinned in seed.lock builds stage1 of this tree (in :test)
 with build :clean       # remove build artifacts
 ```
 
@@ -920,6 +921,20 @@ discipline batches them.
 Each PR must be green and buildable from a tagged seed release that already
 exists in the repo before it merges — if a change needs a newer seed, tag a
 release to be that seed first.
+
+The pinned seed is `seed.lock` (version and per-platform digests); every CI
+lane and `with build :seed` read it, and `with build :seed-compat` (part of
+`:test`) fetches that seed and builds stage1 of a copy of the tree with it,
+refusing when any workflow pin disagrees with the lock. The local battery
+cannot check this on its own: it ends in `:update-seed`, so the local seed
+always chases the tree. build.w, `build/*.w` and `lib/std/build.w` are
+comptime-evaluated by the seed that runs `with build`, so a language or
+evaluator feature used there raises the minimum seed — never revert the
+surface to appease an old seed (Eric, 2026-09-04); cut a newer seed, bump
+`seed.lock`, and land the change after. Main was unbuildable by every
+published seed for two days (2026-09-02..04) because nothing ran the
+published seed against the tree and twelve red CI runs on direct pushes
+went unread; `:seed-compat` red is a stop-the-line failure.
 
 ### The seed compiler is frozen
 The installed compiler at ~/.local/bin/with has its own Link.w, embedded runtime

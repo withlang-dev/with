@@ -52,9 +52,9 @@ jobs:
             runner: macos-latest
             sdk_host_tag: darwin-arm64
             seed_repo: withlang-dev/with
-            seed_version: v0.15.1.3
+            seed_version: v0.15.1.9
             seed_asset: with-darwin-aarch64
-            seed_sha256: b1eefae290630cc33d4a8ece2681c4ca1aa7b98944345a3969bfcfd5ce9fdc2e
+            seed_sha256: 5d4ea4639ca27860ade6bbb78efe353803fe74c85e394311f0bdac87b2383577
             sdk_version: nightly-sdk-test-20260815-680aa139
             sdk_asset: with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
             sdk_sha256: 4f99fc99a933ee3cf0578336a4fbbbcaaedbbe89112cd49454ea64149c188e6d
@@ -65,9 +65,9 @@ jobs:
             runner: ubuntu-latest
             sdk_host_tag: linux-x86_64
             seed_repo: withlang-dev/with
-            seed_version: v0.15.1.3
+            seed_version: v0.15.1.9
             seed_asset: with-linux-x86_64
-            seed_sha256: 0556c80c0acc44545c77e1dac77ffb677fe53c4cdbefba4aa7d36eb63b27b595
+            seed_sha256: 7d08771fbf4a5e57d7a70442f50f35386bb352e1555040e2e259dfd8592a4411
             sdk_version: nightly-sdk-test-20260815-680aa139
             sdk_asset: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
             sdk_sha256: c7747403c3556ba9ca6e8f47c5db023798c7c5828c807c4a3b474f0c87db24db
@@ -219,9 +219,9 @@ jobs:
       # predated that fix; a compiler bootstrapped from it self-perpetuates the
       # miscompile and crashes (0xC0000005) compiling any regex literal at comptime.
       # build and :fixpoint never compile a regex, so that poison shipped green.
-      WITH_SEED_VERSION: v0.15.1.4
+      WITH_SEED_VERSION: v0.15.1.8
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: cfb19aabfa78521c92c6a8f666d1b7107f451b681b18adc86a12028bbf0e9230
+      WITH_SEED_SHA256: 6f00a9e3a26751404f671f10ef7b61b345886c6d73a96c95df9086e6df6607fd
       # The Windows LLVM SDK is versioned independently of the nightly-sdk-* used
       # by darwin/linux and ships without .sha256/.manifest sidecars, so we pin the
       # archive digest directly here rather than fetching sidecar files.
@@ -346,9 +346,9 @@ jobs:
       # three platforms pin (a versioned release, not a rolling tag). That asset
       # was produced by this very job on the v0.15.1.5 tag, so the platform now
       # bootstraps from its own fixpoint-verified output.
-      WITH_SEED_VERSION: v0.15.1.5
+      WITH_SEED_VERSION: v0.15.1.8
       WITH_SEED_ASSET: with-linux-aarch64
-      WITH_SEED_SHA256: 20995c2de78d94c8e9c022107b48901ce97144ac2fb2b016f9ab19a22ae50683
+      WITH_SEED_SHA256: e26930b0f9e8a93fef1091216c4d0b8d49e2c20d8b4d6e89bbfa06dbb3fa7d8f
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-linux-aarch64
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
@@ -486,9 +486,9 @@ jobs:
       WITH_SEED_REPO: withlang-dev/with
       # CI-produced by seed-windows-aarch64.yml (cross-built on Linux, published
       # to the seed-windows-aarch64 prerelease) -- never a hand-uploaded asset.
-      WITH_SEED_VERSION: seed-windows-aarch64
+      WITH_SEED_VERSION: v0.15.1.8
       WITH_SEED_ASSET: with-windows-aarch64.exe
-      WITH_SEED_SHA256: e5fb03b405e48a724330f4f9ac7fcbb7f5f993645739e42172c2151ff2d29625
+      WITH_SEED_SHA256: 5f58841923a812dbebae17b3b44e47f352c9db7a624a57fd106d590eb5b803dd
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-windows-aarch64
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz

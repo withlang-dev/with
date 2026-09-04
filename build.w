@@ -2553,6 +2553,21 @@ pub fn build(ctx: BuildCtx) -> Build:
     build_helper_programs = build_helper_programs.dep("build")
     out = out.add_target(build_helper_programs)
 
+    // The tree stays buildable by the PUBLISHED seed pinned in seed.lock:
+    // that seed builds stage1 of a copy of the tree, and every workflow pin
+    // must equal the lock (build/seed.w). Independent of the fresh compiler.
+    var seed_compat = target_new(.Action, "seed-compat", "").output("out/test-graph/seed-compat")
+    seed_compat = seed_compat.allow_parallel()
+    seed_compat.action = run_seed_compat_action
+    seed_compat = seed_compat.input("seed.lock")
+    seed_compat = seed_compat.input("build.w")
+    seed_compat = seed_compat.input("build/seed.w")
+    seed_compat = seed_compat.write_scope("out/seed-compat")
+    seed_compat = seed_compat.allow_network()
+    seed_compat = seed_compat.arg("withlang-dev/with")
+    seed_compat = seed_compat.arg(release_asset_for_host())
+    out = out.add_target(seed_compat)
+
     var cli_selfhost_project_tests = target_new(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
     cli_selfhost_project_tests = cli_selfhost_project_tests.allow_parallel()
     cli_selfhost_project_tests.action = run_cli_selfhost_project_action
@@ -2677,6 +2692,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("wo-drift")
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("build-helper-programs")
+    // seed-compat joins :test with the per-target RSS budget (its nested
+    // stage1 compile peaks above the 1 GiB tripwire); until then it is run
+    // explicitly: `with build :seed-compat`.
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")

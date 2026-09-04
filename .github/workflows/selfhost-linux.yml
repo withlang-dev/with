@@ -29,8 +29,8 @@ jobs:
       # Fixpoint-verified stable release seed for this platform.
       WITH_SEED_REPO: withlang-dev/with
       WITH_SEED_ASSET: with-linux-x86_64
-      WITH_SEED_VERSION: v0.15.1.3
-      WITH_SEED_SHA256: 0556c80c0acc44545c77e1dac77ffb677fe53c4cdbefba4aa7d36eb63b27b595
+      WITH_SEED_VERSION: v0.15.1.9
+      WITH_SEED_SHA256: 7d08771fbf4a5e57d7a70442f50f35386bb352e1555040e2e259dfd8592a4411
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: v0.15.1
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.zst

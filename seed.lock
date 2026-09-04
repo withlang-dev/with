@@ -1,0 +1,22 @@
+# The pinned bootstrap seed: the published release this tree is built from.
+# Every CI lane reads it (`with run tools/bump_seed_pins.w` rewrites the
+# workflow pins from it; `with build :seed-compat` refuses while any pin
+# disagrees), `with build :seed` downloads it, and `:seed-compat` proves it
+# still builds this tree. Bump it — version and every digest — in the same
+# commit as the first change that needs a newer seed: tag the seed first.
+#
+# `<asset>.version=` pins one platform to another release while it cannot
+# bootstrap the newest seed; say which issue, and remove it when fixed.
+version=v0.15.1.9
+with-darwin-aarch64=5d4ea4639ca27860ade6bbb78efe353803fe74c85e394311f0bdac87b2383577
+with-linux-x86_64=7d08771fbf4a5e57d7a70442f50f35386bb352e1555040e2e259dfd8592a4411
+# linux-aarch64 and both Windows platforms cannot bootstrap v0.15.1.9 yet:
+# #1074 (linux-aarch64 links runtime objects from a stale rolling tarball)
+# and #1075 (Windows cannot link the native build runner). Their v0.15.1.8
+# seeds cannot build this tree either, so those lanes stay red until fixed.
+with-linux-aarch64.version=v0.15.1.8
+with-linux-aarch64=e26930b0f9e8a93fef1091216c4d0b8d49e2c20d8b4d6e89bbfa06dbb3fa7d8f
+with-windows-x86_64.exe.version=v0.15.1.8
+with-windows-x86_64.exe=6f00a9e3a26751404f671f10ef7b61b345886c6d73a96c95df9086e6df6607fd
+with-windows-aarch64.exe.version=v0.15.1.8
+with-windows-aarch64.exe=5f58841923a812dbebae17b3b44e47f352c9db7a624a57fd106d590eb5b803dd
