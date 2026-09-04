@@ -2505,6 +2505,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.dep("build")
     out = out.add_target(cli_selfhost_build_w_tests)
 
+    var build_helper_programs = target_new(.Action, "build-helper-programs", "").output("out/test-graph/build-helper-programs")
+    build_helper_programs = build_helper_programs.allow_parallel()
+    build_helper_programs.action = run_build_helper_programs_action
+    build_helper_programs = build_helper_programs.input(release_compiler_bin("with"))
+    build_helper_programs = build_helper_programs.input("build/https_fetch.w")
+    build_helper_programs = build_helper_programs.input("build/zlib_gzip.w")
+    build_helper_programs = build_helper_programs.input("build/zlib_gunzip.w")
+    build_helper_programs = build_helper_programs.input("build/zlib_http_fetch.w")
+    build_helper_programs = build_helper_programs.dep("build")
+    out = out.add_target(build_helper_programs)
+
     var cli_selfhost_project_tests = target_new(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
     cli_selfhost_project_tests = cli_selfhost_project_tests.allow_parallel()
     cli_selfhost_project_tests.action = run_cli_selfhost_project_action
@@ -2628,6 +2639,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("bundle-interface-tests")
     tests = tests.dep("wo-drift")
     tests = tests.dep("cli-selfhost-build-w-tests")
+    tests = tests.dep("build-helper-programs")
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")

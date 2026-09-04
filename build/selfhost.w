@@ -41,25 +41,23 @@ fn bs_join(left: &str, right: &str) -> str:
     left ++ "/" ++ right
 
 fn bs_dirname(path: &str) -> str:
-    var last_slash = -1
-    for i in 0..path.len() as i32:
-        if path[i] == 47:
-            last_slash = i
+    var last_slash: i64 = -1
+    for i in 0..path.len():
+        if path[i] == '/': last_slash = i
     if last_slash < 0:
         return "."
     if last_slash == 0:
         return "/"
-    path.slice(0, last_slash as i64)
+    path.slice(0, last_slash)
 
 fn bs_basename(path: &str) -> str:
-    var last_slash = -1
-    for i in 0..path.len() as i32:
-        if path[i] == 47:
-            last_slash = i
-    path.slice((last_slash + 1) as i64, path.len())
+    var last_slash: i64 = -1
+    for i in 0..path.len():
+        if path[i] == '/': last_slash = i
+    path.slice(last_slash + 1, path.len())
 
 fn bs_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path[0] == 47:
+    if path.len() > 0 and path[0] == '/':
         return selfhost_owned_text(path)
     bs_join(root, path)
 
@@ -7204,6 +7202,60 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     if rc != 0: return rc
 
     0
+
+/// Build every helper program under build/ with the fresh compiler. The
+/// deps, packaging, sdk and pcre2 lanes compile these only when they run, so
+/// a std change that breaks one is silent through a whole battery (#953
+/// changed read_file's return type and both zlib helpers stopped compiling
+/// while the battery stayed green). A subprocess, not workspace.compile():
+/// that runs in-process in the SEED (#761).
+pub fn run_build_helper_programs_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() < 2:
+        return bs_fail(ctx, "missing compiler and helper inputs")
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+    let root = ctx.project_info().project_root()
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(root, compiler_input)
+    for i in 1..inputs.len():
+        let source = inputs.get(i)
+        if not fs.exists(source):
+            return bs_fail(ctx, "missing helper source: " ++ source)
+        let base = bs_basename(source)
+        let name = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
+        let stdout_path = bs_capture_path(root, output_dir, name, "stdout")
+        let stderr_path = bs_capture_path(root, output_dir, name, "stderr")
+        var args: Vec[str] = Vec.new()
+        args |> push(selfhost_owned_text(compiler_path))
+        args |> push("build")
+        args |> push(bs_abs(root, source))
+        args |> push("-o")
+        args |> push(bs_abs(root, bs_join(output_dir, name)))
+        let result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, 600000)
+        if result.rc != 0:
+            return bs_fail(ctx, f"{source} failed to build with exit code {result.rc}: " ++ bs_error_lines(fs.read_text(stderr_path)))
+        if not fs.exists(bs_join(output_dir, name)):
+            return bs_fail(ctx, source ++ " built but produced no " ++ name)
+    let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
+    0
+
+/// The diagnostic lines of a compiler's stderr (each `error:` and its `-->`
+/// location), without the warning flood (#1045).
+fn bs_error_lines(text: &str) -> str:
+    var out = ""
+    for line in text.split("\n"):
+        if line.starts_with("error") or line.starts_with(" -->"):
+            out = out ++ line ++ "\n"
+    out
 
 pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
     if os() == "Windows":

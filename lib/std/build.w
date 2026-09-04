@@ -2245,7 +2245,7 @@ fn build_zlib_gunzip_source() -> str:
     "    let out: Vec[u8] = Vec.new()\n" ++
     "    var i: i64 = 0\n" ++
     "    while i < data.len():\n" ++
-    "        out.push(data[i] as u8)\n" ++
+    "        out.push(data[i])\n" ++
     "        i = i + 1\n" ++
     "    out\n\n" ++
     "fn bytes_to_str(data: &Vec[u8]) -> str:\n" ++

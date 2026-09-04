@@ -12,7 +12,7 @@ fn bytes_from_str(data: &str) -> Vec[u8]:
     let out: Vec[u8] = Vec.new()
     var i: i64 = 0
     while i < data.len():
-        out.push(data[i] as u8)
+        out.push(data[i])
         i = i + 1
     out
 
@@ -110,9 +110,14 @@ fn main -> i32:
     if argv.len() < 3:
         print("usage: zlib_gunzip <input.tar.gz> <output.tar>")
         return 2
-    let input = read_file(argv.get(1))
+    let input = match read_file(argv.get(1)):
+        Ok(text) => text
+        Err(err) => {
+            print("could not read input archive: " ++ err.message())
+            return 1
+        }
     if input.len() == 0:
-        print("could not read input archive")
+        print("input archive is empty")
         return 1
     let input_bytes = bytes_from_str(input)
     let err = decompress_gzip_to_file(&input_bytes, argv.get(2), ZLIB_MAX_OUTPUT)
