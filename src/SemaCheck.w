@@ -14294,7 +14294,7 @@ impl Sema:
         // instance method lookup should use the same method table path as ordinary
         // methods and this stdlib-specific list should disappear.
         if owner_sym == self.syms.vec:
-            if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.clear:
+            if field == self.syms.push or field == self.syms.clear:
                 return 1
             if field == self.syms.get or field == self.syms.pop or field == self.syms.remove:
                 return 1
@@ -18954,7 +18954,7 @@ impl Sema:
         if owner_sym == self.syms.vec:
             if field == self.syms.new or method_name == "with_capacity":
                 return self.generic_constructor_return_type(owner_sym, recv_type)
-            if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.clear:
+            if field == self.syms.push or field == self.syms.clear:
                 return self.ty_void as i32
             if field == self.syms.pop and tk == TypeKind.TY_GENERIC_INST:
                 return self.ensure_option_type_for(self.get_generic_inst_arg(resolved as i32, 0))
@@ -19152,13 +19152,6 @@ impl Sema:
         if owner_sym == self.syms.vec:
             if (field == self.syms.push or field == self.syms.contains) and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 0)
-            // `set_i32` is compiler-modeled rather than declared in the stdlib,
-            // but its value operand still has one semantic contract. Publish the
-            // owned i32 demand here so D22 records &i32 -> i32 materialization
-            // before MIR/backend lowering; codegen must never infer it from the
-            // runtime ABI.
-            if field == self.syms.set_i32 and arg_index == 1:
-                return self.ty_i32 as i32
             // `map`/`traverse` closure parameters are the element type; push `fn(elem) -> _`
             // as the expected arg type so the closure param is typed from the Vec's
             // element instead of defaulting to i32 (#306). The closure return is
@@ -19842,7 +19835,7 @@ impl Sema:
         if type_name_sym == self.syms.vec:
             if field == self.syms.split_at_mut:
                 return ReceiverMode.Mut
-            if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.remove or field == self.syms.clear or field == self.syms.pop:
+            if field == self.syms.push or field == self.syms.remove or field == self.syms.clear or field == self.syms.pop:
                 return ReceiverMode.Mut
         if type_name_sym == self.syms.vecrange:
             if field == self.syms.split_at_mut:
@@ -20786,7 +20779,7 @@ impl Sema:
             if type_name_sym == self.syms.vec:
                 if field == self.syms.push:
                     return self.ty_void as i32
-                if field == self.syms.set_i32 or field == self.syms.clear:
+                if field == self.syms.clear:
                     return self.ty_void as i32
                 if field == self.syms.get:
                     // D27 (docs/d27-implementation-plan.md E1): element access

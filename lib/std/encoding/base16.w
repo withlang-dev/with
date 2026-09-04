@@ -22,8 +22,8 @@ pub fn base16_encode(data: []u8) -> str:
     var i: i64 = 0
     while i < data.len():
         let byte = data[i] as i32
-        out.push_byte(BASE16_ALPHABET.byte_at((byte >> 4) as i64) as u8)
-        out.push_byte(BASE16_ALPHABET.byte_at((byte & 15) as i64) as u8)
+        out.push_byte(BASE16_ALPHABET[(byte >> 4)] as u8)
+        out.push_byte(BASE16_ALPHABET[(byte & 15)] as u8)
         i = i + 1
     out.to_str()
 
@@ -33,15 +33,15 @@ pub fn base16_decode(text: &str) -> Result[Vec[u8], DecodeError]:
         return Err(.InvalidLength(text.len()))
     var validate_i: i64 = 0
     while validate_i < text.len():
-        let byte = text.byte_at(validate_i)
+        let byte = text[validate_i]
         if base16_value(byte) < 0:
             return Err(.InvalidByte(validate_i, byte as u8))
         validate_i = validate_i + 1
     let out = Vec[u8].with_capacity(text.len() / 2)
     var i: i64 = 0
     while i < text.len():
-        let high = base16_value(text.byte_at(i))
-        let low = base16_value(text.byte_at(i + 1))
+        let high = base16_value(text[i])
+        let low = base16_value(text[i + 1])
         out.push(((high << 4) | low) as u8)
         i = i + 2
     out

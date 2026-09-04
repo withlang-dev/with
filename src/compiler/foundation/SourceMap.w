@@ -55,7 +55,7 @@ impl SourceMap:
     pub fn get_source(file_id: FileId) -> &Source:
         if not self.contains(file_id):
             return &self.sources[0]
-        &self.sources[file_id_raw(file_id) as i64]
+        &self.sources[file_id_raw(file_id)]
 
     pub fn offset_to_location(file_id: FileId, offset: i32) -> SourceLocation:
         if not self.contains(file_id):

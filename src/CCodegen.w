@@ -69,7 +69,7 @@ enum CcBuiltin: i32:
     VEC_GET
     VEC_LEN
     VEC_IS_EMPTY
-    VEC_SET_I32
+
     VEC_REMOVE
     VEC_CLEAR
     MAP_NEW
@@ -183,7 +183,6 @@ fn cc_builtin_uses_vec_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.VEC_LEN32: return true
     if kind == CcBuiltin.VEC_LEN64: return true
     if kind == CcBuiltin.VEC_ULEN32: return true
-    if kind == CcBuiltin.VEC_SET_I32: return true
     if kind == CcBuiltin.VEC_REMOVE: return true
     if kind == CcBuiltin.VEC_CLEAR: return true
     if kind == CcBuiltin.VEC_POP: return true
@@ -859,7 +858,7 @@ fn cc_is_vec_method_name(name: &str) -> i32:
         return 1
     if name == "push" or name == "get" or name == "len":
         return 1
-    if name == "slot" or name == "set_i32" or name == "remove" or name == "clear" or name == "pop":
+    if name == "slot" or name == "remove" or name == "clear" or name == "pop":
         return 1
     0
 
@@ -3789,7 +3788,7 @@ impl CCodegen:
                 if base == "insert" or base == "get" or base == "contains" or cc_is_len_method(base) or base == "remove":
                     out = CcCalleeHint.MAP_RECV
             else if cc_str_contains(owner, "Vec") != 0:
-                if base == "push" or base == "get" or cc_is_len_method(base) or base == "set_i32" or base == "remove" or base == "clear" or base == "pop":
+                if base == "push" or base == "get" or cc_is_len_method(base) or base == "remove" or base == "clear" or base == "pop":
                     out = CcCalleeHint.VEC_RECV
             else if cc_str_contains(owner, "Option") != 0:
                 if base == "is_some" or base == "unwrap" or base == "expect":
@@ -3816,7 +3815,7 @@ impl CCodegen:
             let method = self.call_method_base_name(body, body.term_data0(bb))
             if method.len() == 0:
                 continue
-            if method == "push" or method == "set_i32" or method == "clear" or method == "pop":
+            if method == "push" or method == "clear" or method == "pop":
                 vec_score = vec_score + 3
                 continue
             if method == "insert":
@@ -3872,7 +3871,7 @@ impl CCodegen:
             let method = self.call_method_base_name(body, body.term_data0(bb))
             if method.len() == 0:
                 continue
-            if method == "push" or method == "set_i32" or method == "clear" or method == "pop":
+            if method == "push" or method == "clear" or method == "pop":
                 vec_score = vec_score + 4
                 continue
             if method == "insert" or method == "contains":
@@ -5025,10 +5024,6 @@ impl CCodegen:
             if recv_kind_is_vec != 0:
                 return CcBuiltin.VEC_PUSH
             return CcBuiltin.NONE
-        if method == "set_i32":
-            if recv_kind_is_vec != 0:
-                return CcBuiltin.VEC_SET_I32
-            return CcBuiltin.NONE
         if method == "clear":
             if recv_kind_is_vec != 0:
                 return CcBuiltin.VEC_CLEAR
@@ -5120,7 +5115,7 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
-        if kind == CcBuiltin.VEC_SET_I32 or kind == CcBuiltin.VEC_REMOVE or kind == CcBuiltin.VEC_CLEAR:
+        if kind == CcBuiltin.VEC_REMOVE or kind == CcBuiltin.VEC_CLEAR:
             return self.sema.ty_void as i32
         if kind == CcBuiltin.VECSLOT_SET:
             return self.sema.ty_void as i32
@@ -5582,7 +5577,7 @@ impl CCodegen:
                 // Don't infer container type if this local is the call destination (it's the result, not the receiver)
                 if allow_container_receiver_infer != 0 and self.place_is_direct_local(body, recv_place, local_id) != 0 and self.place_is_direct_local(body, dest_place, local_id) == 0:
                     let kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
-                    if kind == CcBuiltin.VEC_NEW or kind == CcBuiltin.VEC_PUSH or kind == CcBuiltin.VEC_GET or kind == CcBuiltin.VEC_LEN or kind == CcBuiltin.VEC_SET_I32 or kind == CcBuiltin.VEC_REMOVE or kind == CcBuiltin.VEC_CLEAR or kind == CcBuiltin.VEC_POP:
+                    if kind == CcBuiltin.VEC_NEW or kind == CcBuiltin.VEC_PUSH or kind == CcBuiltin.VEC_GET or kind == CcBuiltin.VEC_LEN or kind == CcBuiltin.VEC_REMOVE or kind == CcBuiltin.VEC_CLEAR or kind == CcBuiltin.VEC_POP:
                         if recv_hint == 0:
                             recv_hint = CC_PSEUDO_TID_VEC
                     if kind == CcBuiltin.MAP_NEW or kind == CcBuiltin.MAP_INSERT or kind == CcBuiltin.MAP_GET or kind == CcBuiltin.MAP_CONTAINS or kind == CcBuiltin.MAP_LEN or kind == CcBuiltin.MAP_REMOVE:
@@ -5968,7 +5963,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.VEC_LEN32: return CcBuiltin.VEC_LEN32
     if intrinsic == MirIntrinsic.VEC_LEN64: return CcBuiltin.VEC_LEN64
     if intrinsic == MirIntrinsic.VEC_ULEN32: return CcBuiltin.VEC_ULEN32
-    if intrinsic == MirIntrinsic.VEC_SET: return CcBuiltin.VEC_SET_I32
+
     if intrinsic == MirIntrinsic.VEC_REMOVE: return CcBuiltin.VEC_REMOVE
     if intrinsic == MirIntrinsic.VEC_CLEAR: return CcBuiltin.VEC_CLEAR
     if intrinsic == MirIntrinsic.VEC_POP: return CcBuiltin.VEC_POP
@@ -6236,17 +6231,6 @@ impl CCodegen:
             var out = ""
             if has_ret != 0:
                 out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_vec_len(" ++ recv_ptr ++ ") == 0;\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
-
-        if kind == CcBuiltin.VEC_SET_I32:
-            if argc < 3:
-                self.fail("vec.set_i32 expects three arguments")
-                return "    abort();"
-            let recv_ptr = self.vec_recv_ptr_text(body, args_id)
-            let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            let val = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
-            var out = "    with_vec_set_i32(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "), (int32_t)(" ++ val ++ "));\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 

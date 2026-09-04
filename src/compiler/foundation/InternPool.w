@@ -68,7 +68,7 @@ fn foundation_intern_text_eq(a: &str, b: &str) -> bool:
         return false
     var i = 0
     while i < a.len() as i32:
-        if a.byte_at(i as i64) != b.byte_at(i as i64):
+        if a[i] != b[i]:
             return false
         i = i + 1
     true
@@ -97,7 +97,7 @@ pub fn InternPool.intern_str(self: &Self, s: &str) -> Symbol:
 
     var raw = 1
     while raw < st.symbol_texts.len() as i32:
-        let existing_text = st.symbol_texts.get(raw as i64)
+        let existing_text = st.symbol_texts[raw]
         if foundation_intern_text_eq(existing_text, s):
             let owned_key = existing_text.clone()
             st.symbol_map.insert(owned_key, raw)
@@ -116,7 +116,7 @@ pub fn InternPool.resolve_symbol(self: &Self, sym: Symbol) -> &str:
     let raw = symbol_raw(sym)
     if raw <= 0 or raw >= self.state.symbol_texts.len() as i32:
         return ""
-    self.state.symbol_texts.get(raw as i64)
+    self.state.symbol_texts[raw]
 
 pub fn InternPool.intern_type(self: &Self, key: TypeKey) -> TypeId:
     let st = self.state
@@ -136,7 +136,7 @@ pub fn InternPool.resolve_type(self: &Self, id: TypeId) -> TypeKey:
     let raw = type_id_raw(id)
     if raw <= 0 or raw >= self.state.type_keys.len() as i32:
         return type_key_invalid()
-    type_key_clone(self.state.type_keys.get(raw as i64))
+    type_key_clone(self.state.type_keys[raw])
 
 pub fn InternPool.intern_value(self: &Self, key: ValueKey) -> ValueId:
     let st = self.state
@@ -156,7 +156,7 @@ pub fn InternPool.resolve_value(self: &Self, id: ValueId) -> ValueKey:
     let raw = value_id_raw(id)
     if raw <= 0 or raw >= self.state.value_keys.len() as i32:
         return value_key_invalid()
-    value_key_clone(self.state.value_keys.get(raw as i64))
+    value_key_clone(self.state.value_keys[raw])
 
 pub fn InternPool.symbol_count(self: &Self) -> i32:
     (self.state.symbol_texts.len() as i32) - 1

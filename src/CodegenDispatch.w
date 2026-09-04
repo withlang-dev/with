@@ -643,7 +643,7 @@ impl MirValueScan:
 
     fn block_local(local_id: i32):
         let st = self.state
-        unsafe { st.blockers.set_i32(local_id, 1) }
+        unsafe { st.blockers[local_id] = 1 }
 
     fn local_blocked(local_id: i32) -> i32:
         let st = self.state
@@ -655,7 +655,7 @@ impl MirValueScan:
 
     fn set_read_count(local_id: i32, value: i32):
         let st = self.state
-        unsafe { st.read_counts.set_i32(local_id, value) }
+        unsafe { st.read_counts[local_id] = value }
 
     fn set_first_read(local_id: i32, use_bb: i32, use_order: i32):
         let st = self.state
@@ -7358,7 +7358,6 @@ impl Codegen:
             if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
             let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
             if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
-            if method_name == "set_i32": return MirIntrinsic.VEC_SET
             if method_name == "remove": return MirIntrinsic.VEC_REMOVE
             if method_name == "clear": return MirIntrinsic.VEC_CLEAR
             if method_name == "pop": return MirIntrinsic.VEC_POP
@@ -7582,7 +7581,6 @@ impl Codegen:
             if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
             let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
             if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
-            if method_name == "set_i32": return MirIntrinsic.VEC_SET
             if method_name == "remove": return MirIntrinsic.VEC_REMOVE
             if method_name == "clear": return MirIntrinsic.VEC_CLEAR
             if method_name == "pop": return MirIntrinsic.VEC_POP

@@ -280,7 +280,6 @@ type SemaBuiltinSymbols {
     transpose: i32,
     clear: i32,
     pop: i32,
-    set_i32: i32,
     keys: i32,
     values: i32,
     items: i32,
@@ -1724,7 +1723,6 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         transpose: 0,
         clear: 0,
         pop: 0,
-        set_i32: 0,
         keys: 0,
         values: 0,
         items: 0,
@@ -3059,7 +3057,6 @@ impl Sema:
         self.syms.transpose = self.pool_intern("transpose")
         self.syms.clear = self.pool_intern("clear")
         self.syms.pop = self.pool_intern("pop")
-        self.syms.set_i32 = self.pool_intern("set_i32")
         self.syms.keys = self.pool_intern("keys")
         self.syms.values = self.pool_intern("values")
         self.syms.items = self.pool_intern("items")

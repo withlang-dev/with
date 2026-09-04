@@ -17,7 +17,7 @@ fn contains_delimiter(text: &str, hashes: &str) -> bool:
         var j = 0
         var matched = true
         while j < needle.len() as i32:
-            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+            if text[(i + j)] != needle[j]:
                 matched = false
                 break
             j += 1
@@ -36,9 +36,9 @@ fn normalize_embedded_source(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     var i = 0
     while i < text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch == 13:
-            if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
+            if i + 1 < text.len() as i32 and text[(i + 1)] == 10:
                 i = i + 1
             out.push_byte(10 as u8)
         else:
@@ -58,8 +58,8 @@ fn path_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < min_len as i32:
-        let ac = a.byte_at(i as i64)
-        let bc = b.byte_at(i as i64)
+        let ac = a[i]
+        let bc = b[i]
         if ac != bc:
             return ac - bc
         i = i + 1
@@ -70,11 +70,11 @@ fn path_compare(a: &str, b: &str) -> i32:
 fn sort_paths(paths: Vec[str]):
     var sorted: Vec[str] = Vec.new()
     for i in 0..paths.len() as i32:
-        let path = paths.get(i as i64)
+        let path = paths[i]
         var inserted = false
         var next: Vec[str] = Vec.new()
         for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
+            let existing = sorted[j]
             if not inserted and path_compare(path, existing) < 0:
                 next.push(path)
                 inserted = true
@@ -90,7 +90,7 @@ fn stdlib_tree_files(dir: &str):
     var paths: Vec[str] = Vec.new()
     var start = 0
     for i in 0..listing.len() as i32 + 1:
-        if i == listing.len() as i32 or listing.byte_at(i as i64) as i32 == 10:
+        if i == listing.len() as i32 or listing[i] as i32 == 10:
             if i > start:
                 let path = listing.slice(start as i64, i as i64)
                 if path.ends_with(".w") and not path.starts_with(excluded):
@@ -130,7 +130,7 @@ fn main:
     var i = 0
     var index = 0
     while i < paths.len() as i32:
-        let path = paths.get(i as i64)
+        let path = paths[i]
         let rel = embedded_rel_path(root, path)
         let source = normalize_embedded_source(with_fs_read_file(path))
         if source.len() == 0:
@@ -156,7 +156,7 @@ fn main:
     i = 0
     index = 0
     while i < paths.len() as i32:
-        let path = paths.get(i as i64)
+        let path = paths[i]
         let rel = embedded_rel_path(root, path)
         let sym = f"EMBEDDED_STD_{index}"
         out.push_str("    if path == ")

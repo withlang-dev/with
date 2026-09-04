@@ -1692,7 +1692,7 @@ impl MirBuilder:
             if type_name == "Vec":
                 if len_method_ret != 0: return len_method_ret
                 if method_name == "new": return recv_type
-                if method_name == "push" or method_name == "set_i32" or method_name == "clear":
+                if method_name == "push" or method_name == "clear":
                     return self.sema.ty_void as i32
                 if method_name == "get" or method_name == "remove":
                     if tk == TypeKind.TY_GENERIC_INST:
@@ -9740,7 +9740,6 @@ impl MirBuilder:
             if method_name == "is_empty": return MirIntrinsic.VEC_IS_EMPTY
             let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
             if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
-            if method_name == "set_i32": return MirIntrinsic.VEC_SET
             if method_name == "remove": return MirIntrinsic.VEC_REMOVE
             if method_name == "clear": return MirIntrinsic.VEC_CLEAR
             if method_name == "pop": return MirIntrinsic.VEC_POP

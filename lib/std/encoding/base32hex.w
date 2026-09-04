@@ -27,7 +27,7 @@ fn base32hex_validate(text: &str) -> Result[i64, DecodeError]:
     var first_pad: i64 = -1
     var i: i64 = 0
     while i < text.len():
-        let byte = text.byte_at(i)
+        let byte = text[i]
         if byte == 61:
             if first_pad < 0:
                 let remaining = text.len() - i
@@ -43,7 +43,7 @@ fn base32hex_validate(text: &str) -> Result[i64, DecodeError]:
     let padding = if first_pad < 0: 0 else: text.len() - first_pad
     if padding > 0:
         let offset = first_pad - 1
-        let value = base32hex_value(text.byte_at(offset))
+        let value = base32hex_value(text[offset])
         let mask = if padding == 6: 3 else if padding == 4: 15 else if padding == 3: 1 else: 7
         if value & mask != 0:
             return Err(.NonCanonicalBits(offset))
@@ -70,14 +70,14 @@ pub fn base32hex_encode(data: []u8) -> str:
         let v5 = (b3 >> 2) & 31
         let v6 = ((b3 & 3) << 3) | (b4 >> 5)
         let v7 = b4 & 31
-        out.push_byte(BASE32HEX_ALPHABET.byte_at(v0 as i64) as u8)
-        out.push_byte(BASE32HEX_ALPHABET.byte_at(v1 as i64) as u8)
-        if symbols > 2: out.push_byte(BASE32HEX_ALPHABET.byte_at(v2 as i64) as u8) else: out.push_byte(61 as u8)
-        if symbols > 3: out.push_byte(BASE32HEX_ALPHABET.byte_at(v3 as i64) as u8) else: out.push_byte(61 as u8)
-        if symbols > 4: out.push_byte(BASE32HEX_ALPHABET.byte_at(v4 as i64) as u8) else: out.push_byte(61 as u8)
-        if symbols > 5: out.push_byte(BASE32HEX_ALPHABET.byte_at(v5 as i64) as u8) else: out.push_byte(61 as u8)
-        if symbols > 6: out.push_byte(BASE32HEX_ALPHABET.byte_at(v6 as i64) as u8) else: out.push_byte(61 as u8)
-        if symbols > 7: out.push_byte(BASE32HEX_ALPHABET.byte_at(v7 as i64) as u8) else: out.push_byte(61 as u8)
+        out.push_byte(BASE32HEX_ALPHABET[v0] as u8)
+        out.push_byte(BASE32HEX_ALPHABET[v1] as u8)
+        if symbols > 2: out.push_byte(BASE32HEX_ALPHABET[v2] as u8) else: out.push_byte(61 as u8)
+        if symbols > 3: out.push_byte(BASE32HEX_ALPHABET[v3] as u8) else: out.push_byte(61 as u8)
+        if symbols > 4: out.push_byte(BASE32HEX_ALPHABET[v4] as u8) else: out.push_byte(61 as u8)
+        if symbols > 5: out.push_byte(BASE32HEX_ALPHABET[v5] as u8) else: out.push_byte(61 as u8)
+        if symbols > 6: out.push_byte(BASE32HEX_ALPHABET[v6] as u8) else: out.push_byte(61 as u8)
+        if symbols > 7: out.push_byte(BASE32HEX_ALPHABET[v7] as u8) else: out.push_byte(61 as u8)
         offset = offset + count
     out.to_str()
 
@@ -90,14 +90,14 @@ pub fn base32hex_decode(text: &str) -> Result[Vec[u8], DecodeError]:
     while offset < text.len():
         let final_quantum = offset + 8 == text.len()
         let symbols = if final_quantum: 8 - padding else: 8
-        let v0 = base32hex_value(text.byte_at(offset))
-        let v1 = base32hex_value(text.byte_at(offset + 1))
-        let v2 = if symbols > 2: base32hex_value(text.byte_at(offset + 2)) else: 0
-        let v3 = if symbols > 3: base32hex_value(text.byte_at(offset + 3)) else: 0
-        let v4 = if symbols > 4: base32hex_value(text.byte_at(offset + 4)) else: 0
-        let v5 = if symbols > 5: base32hex_value(text.byte_at(offset + 5)) else: 0
-        let v6 = if symbols > 6: base32hex_value(text.byte_at(offset + 6)) else: 0
-        let v7 = if symbols > 7: base32hex_value(text.byte_at(offset + 7)) else: 0
+        let v0 = base32hex_value(text[offset])
+        let v1 = base32hex_value(text[offset + 1])
+        let v2 = if symbols > 2: base32hex_value(text[offset + 2]) else: 0
+        let v3 = if symbols > 3: base32hex_value(text[offset + 3]) else: 0
+        let v4 = if symbols > 4: base32hex_value(text[offset + 4]) else: 0
+        let v5 = if symbols > 5: base32hex_value(text[offset + 5]) else: 0
+        let v6 = if symbols > 6: base32hex_value(text[offset + 6]) else: 0
+        let v7 = if symbols > 7: base32hex_value(text[offset + 7]) else: 0
         out.push(((v0 << 3) | (v1 >> 2)) as u8)
         if symbols >= 4: out.push((((v1 & 3) << 6) | (v2 << 1) | (v3 >> 4)) as u8)
         if symbols >= 5: out.push((((v3 & 15) << 4) | (v4 >> 1)) as u8)

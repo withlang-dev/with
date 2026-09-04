@@ -30,7 +30,7 @@ pub fn render_diagnostic(diag: &Diagnostic, sm: &SourceMap) -> str:
     out = out ++ "\n"
 
     for i in 0..diag.labels.len() as i32:
-        let lab = diag.labels.get(i as i64)
+        let lab = diag.labels[i]
         let lloc = sm.offset_to_location(lab.span.file, lab.span.start)
         out = out ++ f"  = label @{lloc.line + 1}:{lloc.col + 1} "
         out = out ++ lab.message
@@ -38,11 +38,11 @@ pub fn render_diagnostic(diag: &Diagnostic, sm: &SourceMap) -> str:
 
     for i in 0..diag.notes.len() as i32:
         out = out ++ "  = note: "
-        out = out ++ diag.notes.get(i as i64)
+        out = out ++ diag.notes[i]
         out = out ++ "\n"
     for i in 0..diag.helps.len() as i32:
         out = out ++ "  = help: "
-        out = out ++ diag.helps.get(i as i64)
+        out = out ++ diag.helps[i]
         out = out ++ "\n"
 
     out
@@ -50,7 +50,7 @@ pub fn render_diagnostic(diag: &Diagnostic, sm: &SourceMap) -> str:
 pub fn render_all_diagnostics(store: &DiagnosticStore, sm: &SourceMap) -> str:
     var out = ""
     for i in 0..store.items.len() as i32:
-        out = out ++ render_diagnostic(&store.items[i as i64], sm)
+        out = out ++ render_diagnostic(&store.items[i], sm)
         if i + 1 < store.items.len() as i32:
             out = out ++ "\n"
     out

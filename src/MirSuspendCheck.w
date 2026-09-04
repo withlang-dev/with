@@ -36,7 +36,7 @@ impl SuspendBits:
 
     fn vset(idx: i32, value: i32):
         let st = self.state
-        unsafe { st.w.set_i32(idx, value) }
+        unsafe { st.w[idx] = value }
 
     fn vlen() -> i64:
         let st = self.state
