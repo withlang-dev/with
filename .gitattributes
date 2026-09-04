@@ -18,3 +18,11 @@ test/behavior/**/*.txt text eol=lf
 # project-root check. Pin LF so the hash is stable and the record parses cleanly.
 *.w text eol=lf
 docs/with-abi.sha256 text eol=lf
+
+# .wi interface fixtures (test/bundle_interface/*.wi) are compared byte-for-byte
+# against the compiler's freshly-emitted interface. Under core.autocrlf=true a
+# native Windows checkout rewrites the checked-in fixture's LF to CRLF, so each
+# read line carries a trailing "\r" the emitted (LF) interface never has, and the
+# byte-exact comparison fails on every line — reddening bundle-interface-tests on
+# Windows only. Pin LF so the fixture matches emitted output on every platform.
+*.wi text eol=lf
