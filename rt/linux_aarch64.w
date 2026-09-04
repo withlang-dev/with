@@ -43,6 +43,16 @@ extern var stdin: *mut c_void
 extern var stdout: *mut c_void
 extern var stderr: *mut c_void
 
+// Darwin-migrated C reads the preprocessed stdio globals __std{in,out,err}p;
+// glibc exports the streams as stdin/stdout/stderr instead. Define the
+// Darwin-spelled symbols here and bind them to the glibc streams at startup
+// (rt_store_args, the pre-main entry hook) so a Darwin-migrated harness links
+// and runs unchanged on Linux. Darwin's libSystem provides these directly, so
+// its backend does not define them.
+pub var __stdinp: *mut c_void = 0 as *mut c_void
+pub var __stdoutp: *mut c_void = 0 as *mut c_void
+pub var __stderrp: *mut c_void = 0 as *mut c_void
+
 fn get_errno() -> i32:
     let p = rt_libc_errno_location()
     unsafe *p
@@ -62,6 +72,9 @@ var rt_argv_raw: i64 = 0
 pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
+    __stdinp = stdin
+    __stdoutp = stdout
+    __stderrp = stderr
 
 fn rt_random_fail():
     let msg = "fatal: could not read OS randomness\n" as *const u8
