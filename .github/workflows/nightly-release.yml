@@ -77,7 +77,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
     permissions:
-      contents: read
+      contents: write
+      id-token: write
+      attestations: write
     env:
       WITH_SEED_REPO: ${{ matrix.seed_repo }}
       WITH_SEED_VERSION: ${{ matrix.seed_version }}
@@ -182,19 +184,38 @@ jobs:
           shasum -a 256 -c "out/release/${{ matrix.release_asset }}.sha256"
           shasum -a 256 -c "out/release/$WITH_SDK_ASSET.sha256"
 
-      - name: Upload verified release inputs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
-          name: nightly-${{ matrix.platform }}-${{ github.sha }}
-          path: |
-            out/release/${{ matrix.release_asset }}
-            out/release/${{ matrix.release_asset }}.sha256
-            out/release/${{ matrix.sdk_asset }}
-            out/release/${{ matrix.sdk_asset }}.sha256
-            out/release/${{ matrix.sdk_asset }}.manifest
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
+          subject-path: out/release/${{ matrix.release_asset }}
+
+      # Publish-first: this platform's asset goes onto the release the moment
+      # it is verified (the release is created by whichever platform gets
+      # there first, add-only after that; build/release_publish.w). Nobody
+      # waits for the slowest runner.
+      - name: Resolve release metadata
+        id: release
+        env:
+          REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
+        run: |
+          set -euo pipefail
+          ./out/release/bin/with run tools/nightly_release_metadata.w \
+            "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
+            "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md "${{ matrix.platform }}"
+
+      - name: Publish this platform's assets (add-only)
+        env:
+          GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.release.outputs.title }}
+          RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
+          RELEASE_ASSETS: out/release/${{ matrix.release_asset }}
+          RELEASE_EXTRA_FILES: out/release/${{ matrix.sdk_asset }},out/release/${{ matrix.sdk_asset }}.sha256,out/release/${{ matrix.sdk_asset }}.manifest
+          RELEASE_SOURCE_SHA: ${{ github.sha }}
+          RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (${{ matrix.platform }})
+          RELEASE_REPO: ${{ github.repository }}
+        run: ./out/release/bin/with build :publish-release-asset
 
   build-windows:
     name: Verify and package windows-x86_64
@@ -204,7 +225,9 @@ jobs:
       run:
         shell: bash
     permissions:
-      contents: read
+      contents: write
+      id-token: write
+      attestations: write
     env:
       # Native Windows self-host mirrors .github/workflows/selfhost-windows.yml:
       # the published Windows seed builds stage1 -> stage2 -> stage3, we assert
@@ -317,23 +340,42 @@ jobs:
       - name: Verify packaged checksum
         run: sha256sum -c out/release/with-windows-x86_64.exe.sha256
 
-      - name: Upload verified release inputs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
-          name: nightly-windows-x86_64-${{ github.sha }}
-          path: |
-            out/release/with-windows-x86_64.exe
-            out/release/with-windows-x86_64.exe.sha256
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
+          subject-path: out/release/with-windows-x86_64.exe
+
+      - name: Resolve release metadata
+        id: release
+        env:
+          REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
+        run: |
+          set -euo pipefail
+          ./out/release/bin/with.exe run tools/nightly_release_metadata.w \
+            "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
+            "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md windows-x86_64
+
+      - name: Publish this platform's assets (add-only)
+        env:
+          GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.release.outputs.title }}
+          RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
+          RELEASE_ASSETS: out/release/with-windows-x86_64.exe
+          RELEASE_SOURCE_SHA: ${{ github.sha }}
+          RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (windows-x86_64)
+          RELEASE_REPO: ${{ github.repository }}
+        run: ./out/release/bin/with.exe build :publish-release-asset
 
   build-linux-aarch64:
     name: Verify and package linux-aarch64
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 360
     permissions:
-      contents: read
+      contents: write
+      id-token: write
+      attestations: write
     env:
       # Native linux-aarch64 self-host mirrors .github/workflows/selfhost-linux-aarch64.yml:
       # the published seed builds stage1 -> stage2 -> stage3, we assert stage2 ==
@@ -456,16 +498,33 @@ jobs:
       - name: Verify packaged checksum
         run: sha256sum -c out/release/with-linux-aarch64.sha256
 
-      - name: Upload verified release inputs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
-          name: nightly-linux-aarch64-${{ github.sha }}
-          path: |
-            out/release/with-linux-aarch64
-            out/release/with-linux-aarch64.sha256
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
+          subject-path: out/release/with-linux-aarch64
+
+      - name: Resolve release metadata
+        id: release
+        env:
+          REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
+        run: |
+          set -euo pipefail
+          ./out/release/bin/with run tools/nightly_release_metadata.w \
+            "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
+            "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md linux-aarch64
+
+      - name: Publish this platform's assets (add-only)
+        env:
+          GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.release.outputs.title }}
+          RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
+          RELEASE_ASSETS: out/release/with-linux-aarch64
+          RELEASE_SOURCE_SHA: ${{ github.sha }}
+          RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (linux-aarch64)
+          RELEASE_REPO: ${{ github.repository }}
+        run: ./out/release/bin/with build :publish-release-asset
 
   build-windows-aarch64:
     name: Verify and package windows-aarch64
@@ -475,7 +534,9 @@ jobs:
       run:
         shell: bash
     permissions:
-      contents: read
+      contents: write
+      id-token: write
+      attestations: write
     env:
       # Native Windows-on-ARM64 self-host mirrors
       # .github/workflows/selfhost-windows-aarch64.yml: the published arm64
@@ -574,256 +635,31 @@ jobs:
       - name: Verify packaged checksum
         run: sha256sum -c out/release/with-windows-aarch64.exe.sha256
 
-      - name: Upload verified release inputs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: nightly-windows-aarch64-${{ github.sha }}
-          path: |
-            out/release/with-windows-aarch64.exe
-            out/release/with-windows-aarch64.exe.sha256
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
-
-  publish:
-    name: Publish immutable release
-    needs: [build, build-windows, build-linux-aarch64, build-windows-aarch64]
-    if: ${{ always() && !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      actions: read
-      attestations: write
-      contents: write
-      id-token: write
-    env:
-      # The metadata generator is With-native. Reuse the verified Linux output
-      # when Linux succeeds; otherwise these pins provision a metadata-only
-      # compiler and SDK without adding Linux assets to the partial release.
-      METADATA_SEED_REPO: withlang-dev/with
-      METADATA_SEED_VERSION: v0.15.1.3
-      METADATA_SEED_ASSET: with-linux-x86_64
-      METADATA_SEED_SHA256: 0556c80c0acc44545c77e1dac77ffb677fe53c4cdbefba4aa7d36eb63b27b595
-      METADATA_SDK_REPO: withlang-dev/with
-      METADATA_SDK_VERSION: nightly-sdk-test-20260815-680aa139
-      METADATA_SDK_ASSET: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
-      METADATA_SDK_SHA256: c7747403c3556ba9ca6e8f47c5db023798c7c5828c807c4a3b474f0c87db24db
-    steps:
-      - name: Checkout release metadata generator
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      # GITHUB_ENV does not cross job boundaries, so the build jobs' resolved
-      # WITH_VERSION is not visible here. Resolve it the same way, from the same
-      # source, or the metadata generator below is handed an empty version on a
-      # nightly.
-      - name: Resolve version
-        run: |
-          set -euo pipefail
-          src="$(tr -d '\r\n' < src/version)"
-          test -n "$src"
-          if [ -n "$WITH_VERSION" ]; then
-            test "$src" = "$WITH_VERSION"
-          else
-            echo "WITH_VERSION=$src" >> "$GITHUB_ENV"
-          fi
-
-      - name: Download verified release inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          pattern: nightly-*-${{ github.sha }}
-          path: out/release
-          merge-multiple: true
-
-      - name: Select and verify successful platform artifacts
-        id: artifacts
-        run: |
-          set -euo pipefail
-          assets_file="$RUNNER_TEMP/nightly-release-assets.txt"
-          : > "$assets_file"
-          platforms=""
-
-          require_asset() {
-            local asset="$1"
-            test -f "out/release/$asset" || {
-              echo "incomplete platform artifact set: missing $asset" >&2
-              exit 1
-            }
-            printf '%s\n' "out/release/$asset" >> "$assets_file"
-          }
-
-          append_platform() {
-            if [ -n "$platforms" ]; then
-              platforms="$platforms, "
-            fi
-            platforms="$platforms$1"
-          }
-
-          if [ -e out/release/with-darwin-aarch64 ] ||
-             [ -e out/release/with-darwin-aarch64.sha256 ]; then
-            require_asset with-darwin-aarch64
-            require_asset with-darwin-aarch64.sha256
-            require_asset with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
-            require_asset with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256
-            require_asset with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.manifest
-            shasum -a 256 -c out/release/with-darwin-aarch64.sha256
-            shasum -a 256 -c out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz.sha256
-            append_platform darwin-aarch64
-          fi
-
-          if [ -e out/release/with-linux-x86_64 ] ||
-             [ -e out/release/with-linux-x86_64.sha256 ]; then
-            require_asset with-linux-x86_64
-            require_asset with-linux-x86_64.sha256
-            require_asset with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
-            require_asset with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256
-            require_asset with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.manifest
-            shasum -a 256 -c out/release/with-linux-x86_64.sha256
-            shasum -a 256 -c out/release/with-llvm-sdk-22.1.6-linux-x86_64.tar.gz.sha256
-            append_platform linux-x86_64
-          fi
-
-          if [ -e out/release/with-windows-x86_64.exe ] ||
-             [ -e out/release/with-windows-x86_64.exe.sha256 ]; then
-            require_asset with-windows-x86_64.exe
-            require_asset with-windows-x86_64.exe.sha256
-            shasum -a 256 -c out/release/with-windows-x86_64.exe.sha256
-            append_platform windows-x86_64
-          fi
-
-          # linux-aarch64 ships the compiler binary + .sha256 only: its SDK is a
-          # separately-versioned release without .sha256/.manifest sidecars, so it
-          # is not republished per release (same shape as windows-x86_64 above).
-          if [ -e out/release/with-linux-aarch64 ] ||
-             [ -e out/release/with-linux-aarch64.sha256 ]; then
-            require_asset with-linux-aarch64
-            require_asset with-linux-aarch64.sha256
-            shasum -a 256 -c out/release/with-linux-aarch64.sha256
-            append_platform linux-aarch64
-          fi
-
-          # windows-aarch64 ships the compiler binary + .sha256 only, same shape
-          # as windows-x86_64 and linux-aarch64 (SDK separately versioned).
-          if [ -e out/release/with-windows-aarch64.exe ] ||
-             [ -e out/release/with-windows-aarch64.exe.sha256 ]; then
-            require_asset with-windows-aarch64.exe
-            require_asset with-windows-aarch64.exe.sha256
-            shasum -a 256 -c out/release/with-windows-aarch64.exe.sha256
-            append_platform windows-aarch64
-          fi
-
-          test -s "$assets_file" || {
-            echo "no verified platform artifact set succeeded; refusing an empty release" >&2
-            exit 1
-          }
-          printf 'assets_file=%s\n' "$assets_file" >> "$GITHUB_OUTPUT"
-          printf 'platforms=%s\n' "$platforms" >> "$GITHUB_OUTPUT"
-
       - name: Attest build provenance
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
-          subject-path: out/release/with-*
+          subject-path: out/release/with-windows-aarch64.exe
 
-      - name: Generate immutable release metadata
+      - name: Resolve release metadata
         id: release
         env:
           REQUESTED_CHANNEL: ${{ github.event_name == 'push' && 'release' || inputs.channel }}
-          SUCCESSFUL_PLATFORMS: ${{ steps.artifacts.outputs.platforms }}
         run: |
           set -euo pipefail
-          # Native `with run` delegates to `cc -fuse-ld=lld`.
-          metadata_with="out/release/with-linux-x86_64"
-          if [ ! -f "$metadata_with" ]; then
-            metadata_with="$RUNNER_TEMP/nightly-metadata-with"
-            curl -fL -o "$metadata_with" \
-              "https://github.com/$METADATA_SEED_REPO/releases/download/$METADATA_SEED_VERSION/$METADATA_SEED_ASSET"
-            printf '%s  %s\n' "$METADATA_SEED_SHA256" "$metadata_with" | shasum -a 256 -c -
-          fi
-          chmod +x "$metadata_with"
+          ./out/release/bin/with.exe run tools/nightly_release_metadata.w \
+            "$GITHUB_EVENT_NAME" "$REQUESTED_CHANNEL" "$(date -u +%Y%m%d)" "$(date -u +%Y-%m-%d)" \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
+            "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md windows-aarch64
 
-          metadata_sdk_archive="out/release/$METADATA_SDK_ASSET"
-          if [ ! -f "$metadata_sdk_archive" ]; then
-            metadata_sdk_archive="$RUNNER_TEMP/$METADATA_SDK_ASSET"
-            curl -fL -o "$metadata_sdk_archive" \
-              "https://github.com/$METADATA_SDK_REPO/releases/download/$METADATA_SDK_VERSION/$METADATA_SDK_ASSET"
-            printf '%s  %s\n' "$METADATA_SDK_SHA256" "$metadata_sdk_archive" | shasum -a 256 -c -
-          fi
-          metadata_sdk="$RUNNER_TEMP/nightly-metadata-sdk"
-          mkdir -p "$metadata_sdk"
-          tar -xzf "$metadata_sdk_archive" -C "$metadata_sdk"
-          metadata_sdk_bin="$metadata_sdk/llvm-22.1.6-linux-x86_64/bin"
-          ln -s clang "$metadata_sdk_bin/cc"
-          export PATH="$metadata_sdk_bin:$PATH"
-          test -x "$metadata_sdk_bin/cc"
-          test -x "$metadata_sdk_bin/ld.lld"
-          "$metadata_with" run tools/nightly_release_metadata.w \
-            "$GITHUB_EVENT_NAME" \
-            "$REQUESTED_CHANNEL" \
-            "$(date -u +%Y%m%d)" \
-            "$(date -u +%Y-%m-%d)" \
-            "$GITHUB_RUN_ID" \
-            "$GITHUB_RUN_ATTEMPT" \
-            "$GITHUB_SHA" \
-            "$GITHUB_SERVER_URL" \
-            "$GITHUB_REPOSITORY" \
-            "$WITH_VERSION" \
-            "$GITHUB_OUTPUT" \
-            out/release/nightly-release-notes.md \
-            "$SUCCESSFUL_PLATFORMS"
-
-      - name: Create tag and release
+      - name: Publish this platform's assets (add-only)
         env:
-          # Scheduled nightlies publish as the github-actions bot (github.token);
-          # this needs the repo's default workflow permissions set to
-          # "Read and write" (and, if a tag ruleset guards v*/nightly-*, the
-          # Actions bot on its bypass list). Manual dispatches and version-tag
-          # pushes publish with a release-capable PAT (RELEASE_TOKEN, e.g.
-          # ropoctl) — the bot cannot create releases here (POST /releases
-          # 403s), and ropoctl provably can.
           GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
-          RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_TITLE: ${{ steps.release.outputs.title }}
-          RELEASE_ASSETS_FILE: ${{ steps.artifacts.outputs.assets_file }}
-        run: |
-          set -euo pipefail
-          mapfile -t release_assets < "$RELEASE_ASSETS_FILE"
-          test "${#release_assets[@]}" -gt 0
-          release_flags=()
-          if [ "$RELEASE_CHANNEL" != release ]; then
-            release_flags+=(--prerelease)
-          fi
-          gh release create "$RELEASE_TAG" "${release_assets[@]}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "$RELEASE_TITLE" \
-            --notes-file out/release/nightly-release-notes.md \
-            "${release_flags[@]}"
-
-      - name: Verify published tag, assets, and digest
-        env:
-          # Verify as the same actor that created the release (reads work with
-          # either token; keeping them identical avoids any create/read actor
-          # skew across the schedule vs manual-dispatch paths).
-          GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          RELEASE_ASSETS_FILE: ${{ steps.artifacts.outputs.assets_file }}
-        run: |
-          set -euo pipefail
-          tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
-          test "$tag_sha" = "$GITHUB_SHA"
-          published_prerelease="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq .isPrerelease)"
-          if [ "$RELEASE_CHANNEL" = release ]; then
-            test "$published_prerelease" = false
-          else
-            test "$published_prerelease" = true
-          fi
-          while IFS= read -r asset_path; do
-            asset="${asset_path##*/}"
-            checksum_line="$(shasum -a 256 "$asset_path")"
-            expected="${checksum_line%% *}"
-            published="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq ".assets[] | select(.name == \"$asset\") | .digest")"
-            test "$published" = "sha256:$expected"
-          done < "$RELEASE_ASSETS_FILE"
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-            --json url,tagName,isPrerelease,targetCommitish,assets
+          RELEASE_ASSETS: out/release/with-windows-aarch64.exe
+          RELEASE_SOURCE_SHA: ${{ github.sha }}
+          RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (windows-aarch64)
+          RELEASE_REPO: ${{ github.repository }}
+        run: ./out/release/bin/with.exe build :publish-release-asset
+

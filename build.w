@@ -5,6 +5,7 @@ use build.abi
 use build.pcre2
 use build.zlib
 use build.seed
+use build.release_publish
 use build.emit_c
 use build.compiler
 use build.clang_resource
@@ -2914,6 +2915,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     seed = seed.arg("withlang-dev/with")
     seed = seed.arg(release_asset_for_host())
     out = out.add_target(seed)
+
+    // `with build :publish-release-asset` — publish one platform's verified
+    // asset to a GitHub release, add-only (build/release_publish.w). The
+    // Release workflow's platform jobs and the runbook's darwin fast lane
+    // both use it: a release exists as soon as the first platform is done
+    // and every other platform adds its asset when it finishes.
+    var publish_asset = target_new(.Action, "publish-release-asset", "").output("out/release-publish")
+    publish_asset.action = run_publish_release_asset_action
+    publish_asset = publish_asset.write_scope("out/tmp")
+    publish_asset = publish_asset.write_scope("out/release")
+    publish_asset = publish_asset.allow_network()
+    out = out.add_target(publish_asset)
 
     // `with build :deps` — fetch the pinned, per-platform static LLVM SDK that
     // bootstrap built and a release published, into `.deps/llvm-<ver>-<host>`,

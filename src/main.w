@@ -2478,9 +2478,14 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // here — never a silent creep.
         var rss_trip_rc = 0
         for tri in 0..timed_rss.len() as i32:
-            if timed_rss[tri] > 1073741824:
-                let trip_name = if tri < timed_names.len() as i32: with_str_clone_ref(timed_names[tri]) else: "?" ++ ""
-                with_eprint("error: rss tripwire: target '" ++ trip_name ++ f"' peaked at {timed_rss[tri] / 1048576}M (limit 1024M, #679)")
+            let trip_name = if tri < timed_names.len() as i32: with_str_clone_ref(timed_names[tri]) else: "?" ++ ""
+            // seed-compat runs a nested stage1 compile (the compiler compiling
+            // src/main.w peaks near 1.3 GiB); its budget is 2 GiB. By name, like
+            // the always-run lanes: a Target flag would be std.build API the
+            // pinned seed evaluating build.w does not have.
+            let rss_limit: i64 = if trip_name == "seed-compat": 2147483648 else: 1073741824
+            if timed_rss[tri] > rss_limit:
+                with_eprint("error: rss tripwire: target '" ++ trip_name ++ f"' peaked at {timed_rss[tri] / 1048576}M (limit {rss_limit / 1048576}M, #679)")
                 rss_trip_rc = 1
         if rss_trip_rc != 0:
             return 1
