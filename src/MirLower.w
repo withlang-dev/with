@@ -3276,10 +3276,20 @@ impl MirBuilder:
         let existing = self.lookup_local(sym)
         if existing >= 0:
             return existing
-        // Scan module declarations for a mutable let (var) or extern var
-        for di in 0..self.ast.decl_count():
+        // Scan module declarations for a mutable let (var) or extern var.
+        // Two passes: a source declaration first, a bundle interface's
+        // storage (D39) only when no source declares the name — Sema's
+        // order too (the flat scope, then the interface table), so a
+        // program's `const PACKAGE` is never pcre2's `pub let PACKAGE: str`.
+        let decl_count = self.ast.decl_count()
+        for step in 0..(2 * decl_count):
+            let pass = step / decl_count
+            let di = step % decl_count
             let decl = self.ast.get_decl(di)
             let dk = self.ast.kind(decl)
+            let interface_provided = dk == NodeKind.NK_LET_DECL and self.ast.let_decl_is_interface_provided(decl)
+            if (pass == 1) != interface_provided:
+                continue
             if dk == NodeKind.NK_EXTERN_VAR:
                 if self.ast.get_data0(decl) != sym:
                     continue

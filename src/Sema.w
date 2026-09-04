@@ -736,11 +736,13 @@ type Sema {
     // consulted by scope_lookup only from a module that imports theirs.
     interface_global_index: HashMap[i32, i32],
     interface_global_paths: HashMap[i32, str],
-    // every flat-scope global's declaring module (symbol → path), and the
-    // globals a local binding is standing in for while its scope lasts —
-    // a function's local may take the name of a global its module cannot
-    // see (§18.1); the global's slot returns when the scope ends
+    // every flat-scope global's declaring module and binding index (symbol
+    // → path, symbol → index), and the globals a local binding is standing
+    // in for while its scope lasts — a function's local may take the name
+    // of a global its module cannot see (§18.1); the global's slot returns
+    // when the scope ends
     global_value_decl_paths: HashMap[i32, str],
+    global_value_decl_bindings: HashMap[i32, i32],
     shadowed_global_syms: Vec[i32],
     shadowed_global_indices: Vec[i32],
     global_race_access_syms: Vec[i32],
@@ -1835,6 +1837,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let interface_global_index = sema_new_map_i32_i32()
     let interface_global_paths = sema_new_map_i32_str()
     let global_value_decl_paths = sema_new_map_i32_str()
+    let global_value_decl_bindings = sema_new_map_i32_i32()
     let global_race_mutated_syms = sema_new_map_i32_i32()
     let global_race_mutation_nodes = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
@@ -2041,6 +2044,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         interface_global_index,
         interface_global_paths,
         global_value_decl_paths,
+        global_value_decl_bindings,
         shadowed_global_syms: Vec.new(),
         shadowed_global_indices: Vec.new(),
         global_race_access_syms: Vec.new(),
@@ -4506,17 +4510,9 @@ impl Sema:
             return
         let existing = self.scope_name_map.get(sym)
         if existing.is_some():
-            // A top-level global of a module this one cannot see is not in
-            // scope here (§18.1): the local takes the name, and pop_scope
-            // gives the global its slot back. Every other collision — a
-            // local, or a global the module can see — is shadowing.
             let idx: i32 = existing.unwrap()
-            let first_scope_start = if self.scope_starts.len() > 0: self.scope_starts.get(0) else: self.bind_names.len() as i32
-            let global_path = if self.global_value_decl_paths.contains(sym): with_str_clone_ref(self.global_value_decl_paths.get(sym).unwrap()) else: ""
-            if idx < first_scope_start and global_path.len() > 0 and self.decl_visible_from_current(global_path, 1) == 0:
-                self.shadowed_global_syms.push(sym)
-                self.shadowed_global_indices.push(idx)
-                self.scope_insert_at(sym, tid, is_mut)
+            if self.binding_is_unseen_global(idx, sym):
+                self.shadow_unseen_global(sym, idx, tid, is_mut)
                 return
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
             self.emit_error("shadowing is not allowed for '" ++ name ++ "'", node)
@@ -4527,6 +4523,25 @@ impl Sema:
             return
         self.scope_insert_at(sym, tid, is_mut)
 
+    // A flat-scope global of a module the current one never imports is not
+    // in scope here (§18.1: the walk over explicit import edges, never the
+    // prelude's closure — through it every program reaches std.regex's
+    // engine), so a local may take its name; with the current module
+    // unknown (the comptime pre-pass) the local wins as well — the main
+    // pass reports a true same-module shadowing. Every other collision — a
+    // local, or a global the module imports — is shadowing.
+    fn binding_is_unseen_global(idx: i32, sym: i32) -> bool:
+        if not self.global_value_decl_bindings.contains(sym) or self.global_value_decl_bindings.get(sym).unwrap() != idx:
+            return false
+        let path = self.global_value_decl_paths.get(sym).unwrap()
+        self.current_module_path.len() == 0 or (path != self.current_module_path and self.module_visible_no_prelude(path) == 0)
+
+    // The local takes the name; pop_scope gives the global its slot back.
+    mut fn shadow_unseen_global(sym: i32, global_idx: i32, tid: i32, is_mut: i32):
+        self.shadowed_global_syms.push(sym)
+        self.shadowed_global_indices.push(global_idx)
+        self.scope_insert_at(sym, tid, is_mut)
+
     mut fn scope_put_consuming_rebind_at(sym: i32, tid: i32, is_mut: i32, node: i32) -> i32:
         if self.is_discard_binding_symbol(sym) != 0:
             return 1
@@ -4535,6 +4550,9 @@ impl Sema:
             self.scope_insert_at(sym, tid, is_mut)
             return 1
         let idx: i32 = existing.unwrap()
+        if self.binding_is_unseen_global(idx, sym):
+            self.shadow_unseen_global(sym, idx, tid, is_mut)
+            return 1
         let current_start = if self.scope_starts.len() > 0: self.scope_starts[(self.scope_starts.len() - 1)] else: 0
         if idx < current_start or self.bind_states[idx] != VarState.MOVED:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
@@ -4595,6 +4613,7 @@ impl Sema:
             return
         let existing_opt = self.scope_name_map.get(sym)
         if not existing_opt.is_some():
+            self.global_value_decl_bindings.insert(sym, self.bind_names.len() as i32)
             self.scope_insert_at(sym, tid, is_mut)
             self.global_value_decl_kinds.insert(sym, decl_kind)
             self.global_value_decl_paths.insert(sym, sema_owned_text(decl_path))
@@ -4637,8 +4656,12 @@ impl Sema:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             return self.bind_types[opt.unwrap()]
+        // An interface global resolves only from a known module that
+        // imports its own by an explicit path (never through the prelude's
+        // closure, and never in the comptime pre-pass, where the module is
+        // unknown): a program's const of the same name must win.
         let iface = self.interface_global_index.get(sym)
-        if iface.is_some() and self.decl_visible_from_current(self.interface_global_paths.get(sym).unwrap(), 1) != 0:
+        if iface.is_some() and self.current_module_path.len() > 0 and self.module_visible_no_prelude(self.interface_global_paths.get(sym).unwrap()) != 0:
             return self.bind_types[iface.unwrap()]
         -1
 
