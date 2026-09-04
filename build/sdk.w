@@ -28,7 +28,7 @@ fn sdk_join(left: &str, right: &str) -> str:
 fn sdk_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 47 or ch == 92:
             last_slash = i
     if last_slash < 0:
@@ -40,12 +40,12 @@ fn sdk_dirname(path: &str) -> str:
 fn sdk_is_abs(path: &str) -> bool:
     if path.len() == 0:
         return false
-    if path[0] == 47 or path[0] == 92:
+    if path.byte_at(0) == 47 or path.byte_at(0) == 92:
         return true
     if os() == "Windows" and path.len() >= 3:
-        let drive = path[0]
-        let colon = path[1]
-        let slash = path[2]
+        let drive = path.byte_at(0)
+        let colon = path.byte_at(1)
+        let slash = path.byte_at(2)
         if colon == 58 and (slash == 47 or slash == 92):
             return (drive >= 65 and drive <= 90) or (drive >= 97 and drive <= 122)
     false
@@ -58,7 +58,7 @@ fn sdk_abs(root: &str, path: &str) -> str:
 fn sdk_normalize(path: &str) -> str:
     var out = StringBuilder.with_capacity(path.len())
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 92:
             out.push_byte(47 as u8)
         else:
@@ -68,7 +68,7 @@ fn sdk_normalize(path: &str) -> str:
 fn sdk_basename(path: &str) -> str:
     var last_slash: i64 = -1
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 47 or ch == 92:
             last_slash = i as i64
     if last_slash >= 0:
@@ -190,8 +190,8 @@ fn sdk_str_compare(a: &str, b: &str) -> i32:
     let n = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < n as i32:
-        let ac = a[i]
-        let bc = b[i]
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
         if ac != bc:
             return ac - bc
         i = i + 1
@@ -229,7 +229,7 @@ fn sdk_add_unique(items: Vec[str], item: &str) -> Vec[str]:
 fn sdk_add_parent_dirs(dirs: Vec[str], top_dir: &str, rel_path: &str) -> Vec[str]:
     var out = sdk_add_unique(move dirs, top_dir)
     for i in 0..rel_path.len() as i32:
-        if rel_path[i] == 47:
+        if rel_path.byte_at(i as i64) == 47:
             out = sdk_add_unique(move out, top_dir ++ "/" ++ rel_path.slice(0, i as i64))
     out
 
@@ -260,7 +260,7 @@ fn sdk_split_lines(text: &str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     var start = 0
     for i in 0..text.len() as i32:
-        if text[i] == 10:
+        if text.byte_at(i as i64) == 10:
             out.push(text.slice(start as i64, i as i64))
             start = i + 1
     if start <= text.len() as i32:

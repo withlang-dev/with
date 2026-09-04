@@ -15,7 +15,7 @@ fn abi_split_lines(text: &str) -> Vec[str]:
     var start: i64 = 0
     var i: i64 = 0
     while i < text.len():
-        if text[i] == '\n':
+        if text.byte_at(i) == '\n':
             out.push(text.slice(start, i))
             start = i + 1
         i = i + 1

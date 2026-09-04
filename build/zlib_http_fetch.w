@@ -14,7 +14,7 @@ fn zlib_index_of(text: &str, needle: &str) -> i32:
         var j: i32 = 0
         var matched = true
         while j < needle.len() as i32:
-            if text[(i + j)] != needle[j]:
+            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
                 matched = false
                 break
             j = j + 1

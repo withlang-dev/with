@@ -22,7 +22,7 @@ fn pkg_join(left: &str, right: &str) -> str:
 fn pkg_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 47 or ch == 92:
             last_slash = i
     if last_slash < 0:
@@ -39,12 +39,12 @@ fn pkg_abs(root: &str, path: &str) -> str:
 fn pkg_is_abs(path: &str) -> bool:
     if path.len() == 0:
         return false
-    if path[0] == 47 or path[0] == 92:
+    if path.byte_at(0) == 47 or path.byte_at(0) == 92:
         return true
     if os() == "Windows" and path.len() >= 3:
-        let drive = path[0]
-        let colon = path[1]
-        let slash = path[2]
+        let drive = path.byte_at(0)
+        let colon = path.byte_at(1)
+        let slash = path.byte_at(2)
         if colon == 58 and (slash == 47 or slash == 92):
             return (drive >= 65 and drive <= 90) or (drive >= 97 and drive <= 122)
     false
@@ -52,18 +52,18 @@ fn pkg_is_abs(path: &str) -> bool:
 fn pkg_trim_line(text: &str) -> str:
     var end = 0
     while end < text.len() as i32:
-        let ch = text[end]
+        let ch = text.byte_at(end as i64)
         if ch == 10 or ch == 13:
             break
         end = end + 1
     var start = 0
     while start < end:
-        let ch = text[start]
+        let ch = text.byte_at(start as i64)
         if ch != 9 and ch != 32:
             break
         start = start + 1
     while end > start:
-        let ch = text[(end - 1)]
+        let ch = text.byte_at((end - 1) as i64)
         if ch != 9 and ch != 32:
             break
         end = end - 1
@@ -72,7 +72,7 @@ fn pkg_trim_line(text: &str) -> str:
 fn pkg_normalize_path(path: &str) -> str:
     var out = ""
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 92:
             out = out ++ "/"
         else:
@@ -83,8 +83,8 @@ fn pkg_str_compare(a: &str, b: &str) -> i32:
     let n = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < n as i32:
-        let ac = a[i] as i32
-        let bc = b[i] as i32
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
         if ac != bc:
             return ac - bc
         i = i + 1
@@ -130,7 +130,7 @@ fn pkg_rel_path(root: &str, path: &str) -> str:
 fn pkg_add_parent_dirs(dirs: Vec[str], top_dir: &str, rel_path: &str) -> Vec[str]:
     var out = pkg_add_unique(move dirs, top_dir)
     for i in 0..rel_path.len() as i32:
-        if rel_path[i] == 47:
+        if rel_path.byte_at(i as i64) == 47:
             out = pkg_add_unique(move out, top_dir ++ "/" ++ rel_path.slice(0, i as i64))
     out
 
@@ -187,7 +187,7 @@ fn pkg_process_path(root: &str, path: &str) -> str:
 fn pkg_ascii_lower(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     for i in 0..text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch >= 65 and ch <= 90:
             out.push_byte((ch + 32) as u8)
         else:

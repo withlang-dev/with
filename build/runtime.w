@@ -60,7 +60,7 @@ pub fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
 fn br_join(base: &str, child: &str) -> str:
     if child.len() == 0:
         return runtime_owned_text(base)
-    if child[0] == 47:
+    if child.byte_at(0) == 47:
         return runtime_owned_text(child)
     if base.len() == 0 or base.ends_with("/"):
         return base ++ child
@@ -69,7 +69,7 @@ fn br_join(base: &str, child: &str) -> str:
 fn br_dirname(path: &str) -> str:
     var last = -1
     for i in 0..path.len() as i32:
-        if path[i] == 47:
+        if path.byte_at(i as i64) == 47:
             last = i
     if last <= 0:
         return "."
@@ -79,7 +79,7 @@ fn br_split_nonempty_lines(text: &str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
     var start = 0
     for i in 0..text.len() as i32:
-        if text[i] == 10:
+        if text.byte_at(i as i64) == 10:
             if i > start:
                 lines.push(text.slice(start as i64, i as i64))
             start = i + 1
@@ -90,7 +90,7 @@ fn br_split_nonempty_lines(text: &str) -> Vec[str]:
 fn br_normalize_path_separators(path: &str) -> str:
     var out = ""
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 92:
             out = out ++ "/"
         else:
@@ -101,8 +101,8 @@ fn br_str_compare(a: &str, b: &str) -> i32:
     let n = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < n as i32:
-        let ac = a[i] as i32
-        let bc = b[i] as i32
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
         if ac != bc:
             return ac - bc
         i = i + 1
@@ -159,7 +159,7 @@ fn br_contains_delimiter(text: &str, hashes: &str) -> bool:
         var j = 0
         var matched = true
         while j < needle.len() as i32:
-            if text[(i + j)] != needle[j]:
+            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
                 matched = false
                 break
             j = j + 1
@@ -177,7 +177,7 @@ fn br_raw_string_literal(text: &str) -> str:
 fn br_normalize_embedded_source(text: &str) -> str:
     var has_cr = false
     for ci in 0..text.len() as i32:
-        if text[ci] == 13:
+        if text.byte_at(ci as i64) == 13:
             has_cr = true
             break
     if not has_cr:
@@ -186,11 +186,11 @@ fn br_normalize_embedded_source(text: &str) -> str:
     var start = 0
     var i = 0
     while i < text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch == 13:
             if i > start:
                 out.push_str(text.slice(start as i64, i as i64))
-            if i + 1 < text.len() as i32 and text[(i + 1)] == 10:
+            if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
                 i = i + 1
             out.push_str("\n")
             start = i + 1

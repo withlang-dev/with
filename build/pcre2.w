@@ -19,7 +19,7 @@ fn pcre2_join(left: &str, right: &str) -> str:
 fn pcre2_safe_label(text: &str) -> str:
     var out = ""
     for i in 0..text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
             out = out ++ text.slice(i as i64, (i + 1) as i64)
@@ -35,7 +35,7 @@ fn pcre2_scratch_dir(ctx: &ActionCtx) -> str:
 fn pcre2_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path[i] == 47:
+        if path.byte_at(i as i64) == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -46,12 +46,12 @@ fn pcre2_dirname(path: &str) -> str:
 fn pcre2_basename(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path[i] == 47:
+        if path.byte_at(i as i64) == 47:
             last_slash = i
     path.slice((last_slash + 1) as i64, path.len())
 
 fn pcre2_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path[0] == 47:
+    if path.len() > 0 and path.byte_at(0) == 47:
         return pcre2_owned_text(path)
     pcre2_join(root, path)
 
@@ -61,9 +61,9 @@ fn pcre2_split_lines(text: &str) -> Vec[str]:
     var i = 0
     while i <= text.len() as i32:
         let at_end = i == text.len() as i32
-        if at_end or text[i] == 10:
+        if at_end or text.byte_at(i as i64) == 10:
             var line = text.slice(start as i64, i as i64)
-            if line.len() > 0 and line[line.len() - 1] == 13:
+            if line.len() > 0 and line.byte_at(line.len() - 1) == 13:
                 line = line.slice(0, line.len() - 1)
             lines.push(line)
             start = i + 1
@@ -229,7 +229,7 @@ fn pcre2_insert_after_defs_import(text: &str, insertion: &str) -> str:
     var inserted = false
     var line_start = 0
     for i in 0..text.len() as i32:
-        if text[i] == 10:
+        if text.byte_at(i as i64) == 10:
             let line = text.slice(line_start as i64, (i + 1) as i64)
             out = out ++ line
             if not inserted and line == marker:
@@ -261,7 +261,7 @@ fn pcre2_add_imports(ctx: &ActionCtx, path: &str, sentinel: &str, insertion: &st
 fn pcre2_line_starts_with_fn_main(line: &str) -> bool:
     var j = 0
     while j < line.len() as i32:
-        let ch = line[j]
+        let ch = line.byte_at(j as i64)
         if ch != 32 and ch != 9:
             break
         j = j + 1
@@ -270,7 +270,7 @@ fn pcre2_line_starts_with_fn_main(line: &str) -> bool:
 fn pcre2_module_defines_main(text: &str) -> bool:
     var line_start = 0
     for i in 0..text.len() as i32:
-        if text[i] == 10:
+        if text.byte_at(i as i64) == 10:
             if pcre2_line_starts_with_fn_main(text.slice(line_start as i64, i as i64)):
                 return true
             line_start = i + 1
@@ -287,7 +287,7 @@ fn pcre2_module_body_for_synthetic_check(text: &str) -> str:
     var line_start = 0
     var line_no = 1
     for i in 0..text.len() as i32:
-        if text[i] == 10:
+        if text.byte_at(i as i64) == 10:
             let line = text.slice(line_start as i64, (i + 1) as i64)
             if line_no > 2 and not line.starts_with("use std.re."):
                 out.push_str(line)
@@ -302,12 +302,12 @@ fn pcre2_module_body_for_synthetic_check(text: &str) -> str:
 fn pcre2_first_function_name(text: &str) -> str:
     var line_start = 0
     for i in 0..text.len() as i32:
-        if text[i] == 10:
+        if text.byte_at(i as i64) == 10:
             let line = text.slice(line_start as i64, i as i64)
             if line.starts_with("fn "):
                 var end = 3
                 while end < line.len() as i32:
-                    let ch = line[end]
+                    let ch = line.byte_at(end as i64)
                     if ch == 40 or ch == 58 or ch == 32 or ch == 9:
                         break
                     end = end + 1
@@ -318,7 +318,7 @@ fn pcre2_first_function_name(text: &str) -> str:
         if line.starts_with("fn "):
             var end = 3
             while end < line.len() as i32:
-                let ch = line[end]
+                let ch = line.byte_at(end as i64)
                 if ch == 40 or ch == 58 or ch == 32 or ch == 9:
                     break
                 end = end + 1
