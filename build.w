@@ -1410,6 +1410,43 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("deep-debug-tool-tests: reducer output lost predicate line")
         return 1
 
+    // #1015: --test reduces a `fn test_*` fixture through the runner. The
+    // red test needs both of its lines (dropping either turns the failure
+    // into a build error or a pass), so exactly those survive.
+    let reduce_test_input = build_project_join(out_dir, "reduce-test-input.w")
+    let reduce_test_output = build_project_join(out_dir, "reduce-test-output.w")
+    let reduce_test_source =
+        "// the red test needs both of its lines\n" ++
+        "fn test_green: assert(1 + 1 == 2)\n\n" ++
+        "fn test_red:\n" ++
+        "    let xs: Vec[i32] = Vec.new()\n" ++
+        "    assert(xs.len() == 1)\n"
+    if fs.write_text(reduce_test_input, reduce_test_source) != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: could not write reduce --test fixture")
+        return 1
+    var reduce_test_args: Vec[str] = Vec.new()
+    reduce_test_args.push(build_owned_text(compiler))
+    reduce_test_args.push("reduce")
+    reduce_test_args.push(build_project_abs(root, reduce_test_input))
+    reduce_test_args.push("--test")
+    reduce_test_args.push("test_red")
+    reduce_test_args.push("--out")
+    reduce_test_args.push(build_project_abs(root, reduce_test_output))
+    let reduce_test_stdout = build_project_abs(root, build_project_join(out_dir, "reduce-test.stdout"))
+    let reduce_test_stderr = build_project_abs(root, build_project_join(out_dir, "reduce-test.stderr"))
+    let reduce_test_result = ctx.process_runner().run_capture_cwd(reduce_test_args, reduce_test_stdout, reduce_test_stderr, 300000, root)
+    if reduce_test_result.rc != 0:
+        ctx.diagnostics().error("deep-debug-tool-tests: reduce --test failed; stderr=" ++ reduce_test_stderr)
+        return reduce_test_result.rc
+    let reduced_test = fs.read_text(reduce_test_output)
+    let want_reduced = "fn test_red:\n    let xs: Vec[i32] = Vec.new()\n    assert(xs.len() == 1)\n"
+    if reduced_test != want_reduced:
+        ctx.diagnostics().error("deep-debug-tool-tests: reduce --test kept the wrong lines:\n" ++ reduced_test)
+        return 1
+    if not reduce_test_result.stdout.contains("(3 lines)"):
+        ctx.diagnostics().error("deep-debug-tool-tests: reduce --test line count; stdout=" ++ reduce_test_result.stdout)
+        return 1
+
     let left = build_project_join(out_dir, "left.bin")
     let right = build_project_join(out_dir, "right.bin")
     let report = build_project_join(out_dir, "fixpoint-diff.txt")

@@ -270,15 +270,27 @@ Options:
 - `--out <path>` writes the reduced repro somewhere specific.
 - `--contains <text>` requires predicate stdout/stderr to contain the text.
 - `--exit-code <n|nonzero>` requires an exact exit code or any non-zero exit.
+- `--test <name>` replaces the `--` predicate with the test runner: each
+  candidate goes through `with test {file} --filter <name>` (the runner sets
+  `WITH_TEST_FILTER=<name>` for the child exactly as `with test` does), and
+  the reduction holds while `<name>` still fails in the stage the original
+  failed in (build vs run) and, with `--contains`, with the same text. The
+  binaries a red run keeps (#1013) are discarded per candidate; run
+  `with test` on the reduced file to get one.
+
+```sh
+./out/stage/bin/with-stage2 reduce fixture.w --test test_needs_two_lines
+```
 
 The source path must immediately follow `reduce`. Use `{file}` in the predicate
 argv for the candidate path; without it, the candidate path is appended.
 
-What it cannot reduce: a `//! test` fixture (the failure lives in the
-synthesized test main and the runner's environment, #1015), and any
-layout-dependent bug — a drop of uninitialized stack garbage changes with
-every deleted line, so the predicate flips on noise. Route those to the
-drop-state view and the allocator instead.
+What it cannot reduce: a layout-dependent bug. A drop of uninitialized stack
+garbage (the #729 class) changes with every deleted line, so the predicate
+flips on noise and the reducer converges on nothing (#1015). That class is
+not a line-deletion problem: go to the drop-state view (`--dump-drop-state`,
+`--validate-ownership`) and the allocator instead — there the validator is
+the reducer.
 
 ## The drop-state view (one dataflow, several views)
 

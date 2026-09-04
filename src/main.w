@@ -268,7 +268,7 @@ fn cli_option_takes_value(arg: &str) -> bool:
     arg == "-o" or arg == "--output" or arg == "--target" or
     arg == "--trace-place" or arg == "--explain-mir-origin" or
     arg == "--trace-ownership" or arg == "--trace-cleanup-edge" or
-    arg == "--contains" or arg == "--exit-code" or
+    arg == "--contains" or arg == "--exit-code" or arg == "--test" or
     arg == "--debug-alloc-filter" or arg == "--out" or
     arg == "--link-object" or arg == "--link-bundle" or arg == "--emit-bundle-manifest" or
     arg == "--emit-bundle-interface" or arg == "--bundle-fingerprint" or arg == "--bundle-corpus"
@@ -1189,6 +1189,9 @@ fn reduce_split_lines_keep_empty(text: &str) -> Vec[str]:
     var i = 0
     while i <= text.len() as i32:
         let at_end = i == text.len() as i32
+        // A trailing newline ends the last line; it does not open an empty one.
+        if at_end and i == start and i > 0:
+            break
         let ch = if at_end: 10 else: text[i]
         if ch == 10:
             var line = text.slice(start as i64, i as i64)
@@ -1208,9 +1211,32 @@ fn reduce_join_lines(lines: &Vec[str], skip_idx: i32) -> str:
         out = out ++ "\n"
     out
 
-fn reduce_make_argv(argc: i32, dashdash: i32, candidate: &str) -> str:
+// What a reduction must keep true. `--test <name>` runs each candidate
+// through the test runner (`with test {file} --filter <name>`; the runner
+// sets WITH_TEST_FILTER for the child exactly as `with test` does) and holds
+// while <name> still fails in the stage the original failed in (build vs
+// run) and, with --contains, with the same text.
+type ReducePredicate {
+    dashdash: i32,
+    contains: str,
+    exit_mode: i32,
+    exit_want: i32,
+    original_rc: i32,
+    test_name: str,
+    want_stage: str,
+}
+
+fn reduce_make_argv(argc: i32, pred: &ReducePredicate, candidate: &str) -> str:
     var argv = ""
     var used_placeholder = false
+    if pred.test_name.len() > 0:
+        argv = build_graph_argv_append(argv, with_arg_at(0))
+        argv = build_graph_argv_append(argv, "test")
+        argv = build_graph_argv_append(argv, candidate)
+        argv = build_graph_argv_append(argv, "--filter")
+        argv = build_graph_argv_append(argv, pred.test_name)
+        return argv
+    let dashdash = pred.dashdash
     if dashdash < 0 or dashdash + 1 >= argc:
         argv = build_graph_argv_append(argv, with_arg_at(0))
         argv = build_graph_argv_append(argv, "check")
@@ -1236,18 +1262,53 @@ fn reduce_exit_matches(mode: i32, want: i32, original_rc: i32, rc: i32) -> bool:
         return rc == want
     rc == original_rc
 
-fn reduce_candidate_matches(argc: i32, dashdash: i32, candidate_path: &str, contains: &str, exit_mode: i32, exit_want: i32, original_rc: i32, timeout_ms: i32) -> bool:
+fn reduce_stderr_has_line(text: &str, line: &str) -> bool:
+    let lines = reduce_split_lines_keep_empty(text)
+    for i in 0..lines.len() as i32:
+        if lines[i] == line:
+            return true
+    false
+
+// The runner's ` = stage: <stage>` line for the first failure, or "".
+fn reduce_failure_stage(text: &str) -> str:
+    let prefix = " = stage: "
+    let lines = reduce_split_lines_keep_empty(text)
+    for i in 0..lines.len() as i32:
+        let line = lines[i]
+        if line.starts_with(prefix):
+            return line.slice(prefix.len(), line.len())
+    ""
+
+// A red runner run keeps its binary (#1013). The reducer is that binary's
+// only consumer here, so each candidate's copy goes once it is judged; run
+// `with test` on the reduced file to get one to keep.
+fn reduce_discard_kept_test_binary(text: &str):
+    let prefix = "test binary kept: "
+    let lines = reduce_split_lines_keep_empty(text)
+    for i in 0..lines.len() as i32:
+        let line = lines[i]
+        if line.starts_with(prefix):
+            cleanup_binary_artifacts(line.slice(prefix.len(), line.len()))
+
+fn reduce_candidate_matches(argc: i32, pred: &ReducePredicate, candidate_path: &str, timeout_ms: i32) -> bool:
     let out_path = "out/reduce/stdout.txt"
     let err_path = "out/reduce/stderr.txt"
     let _rm_out = with_fs_remove_file(out_path)
     let _rm_err = with_fs_remove_file(err_path)
-    let argv = reduce_make_argv(argc, dashdash, candidate_path)
+    let argv = reduce_make_argv(argc, pred, candidate_path)
     let rc = with_exec_argv_capture(argv, out_path, err_path, timeout_ms)
-    if not reduce_exit_matches(exit_mode, exit_want, original_rc, rc):
+    let stderr = with_fs_read_file(err_path)
+    if pred.test_name.len() > 0:
+        reduce_discard_kept_test_binary(stderr)
+        if rc == 0 or reduce_failure_stage(stderr) != pred.want_stage:
+            return false
+        if pred.want_stage == "run" and not reduce_stderr_has_line(stderr, " = test: " ++ pred.test_name):
+            return false
+    else if not reduce_exit_matches(pred.exit_mode, pred.exit_want, pred.original_rc, rc):
         return false
-    if contains.len() > 0:
-        let combined = with_fs_read_file(out_path) ++ "\n" ++ with_fs_read_file(err_path)
-        if not combined.contains(contains):
+    if pred.contains.len() > 0:
+        let combined = with_fs_read_file(out_path) ++ "\n" ++ stderr
+        if not combined.contains(pred.contains):
             return false
     true
 
@@ -1261,22 +1322,46 @@ fn run_reduce_command(argc: i32) -> i32:
         with_eprint("error: reduce could not read source: " ++ source)
         return 1
     let dashdash = cli_double_dash_index(argc)
-    let contains = cli_value_or_prefix(argc, "--contains", "--contains=")
-    let exit_mode = reduce_exit_mode(argc)
-    let exit_want = reduce_exit_want(argc)
+    let test_name = cli_value_or_prefix(argc, "--test", "--test=")
+    if test_name.len() > 0:
+        if dashdash >= 0:
+            with_eprint("error: reduce --test runs the candidate through 'with test'; it cannot take a -- predicate")
+            return 1
+        if cli_value_or_prefix(argc, "--exit-code", "--exit-code=").len() > 0:
+            with_eprint("error: reduce --test judges the runner's failure stage, not an exit code; drop --exit-code")
+            return 1
     let _mkdir = with_fs_mkdir_p("out/reduce")
     let candidate_path = "out/reduce/candidate.w"
     if with_fs_write_file(candidate_path, original) != 0:
         with_eprint("error: reduce could not write candidate path")
         return 1
-    let original_argv = reduce_make_argv(argc, dashdash, candidate_path)
+    var pred = ReducePredicate {
+        dashdash: dashdash,
+        contains: cli_value_or_prefix(argc, "--contains", "--contains="),
+        exit_mode: reduce_exit_mode(argc),
+        exit_want: reduce_exit_want(argc),
+        original_rc: 0,
+        test_name: test_name,
+        want_stage: "",
+    }
+    let original_argv = reduce_make_argv(argc, pred, candidate_path)
     let out_path = "out/reduce/original.stdout.txt"
     let err_path = "out/reduce/original.stderr.txt"
-    let original_rc = with_exec_argv_capture(original_argv, out_path, err_path, 120000)
-    if exit_mode == 0 and original_rc == 0 and contains.len() == 0:
+    pred.original_rc = with_exec_argv_capture(original_argv, out_path, err_path, 120000)
+    if pred.test_name.len() > 0:
+        let original_stderr = with_fs_read_file(err_path)
+        reduce_discard_kept_test_binary(original_stderr)
+        if pred.original_rc == 0:
+            with_eprint("error: reduce --test: '" ++ pred.test_name ++ "' passes in the original input; nothing to reduce")
+            return 1
+        pred.want_stage = reduce_failure_stage(original_stderr)
+        if pred.want_stage.len() == 0:
+            with_eprint("error: reduce --test: the runner reported no ' = stage:' line for the original input")
+            return 1
+    else if pred.exit_mode == 0 and pred.original_rc == 0 and pred.contains.len() == 0:
         with_eprint("error: reduce default predicate needs a failing command or --contains/--exit-code")
         return 1
-    if not reduce_candidate_matches(argc, dashdash, candidate_path, contains, exit_mode, exit_want, original_rc, 120000):
+    if not reduce_candidate_matches(argc, pred, candidate_path, 120000):
         with_eprint("error: reduce predicate does not hold for original input")
         return 1
 
@@ -1290,7 +1375,7 @@ fn run_reduce_command(argc: i32) -> i32:
             if with_fs_write_file(candidate_path, candidate) != 0:
                 with_eprint("error: reduce could not write candidate")
                 return 1
-            if reduce_candidate_matches(argc, dashdash, candidate_path, contains, exit_mode, exit_want, original_rc, 120000):
+            if reduce_candidate_matches(argc, pred, candidate_path, 120000):
                 let next_lines = reduce_split_lines_keep_empty(candidate)
                 if next_lines.len() < lines.len():
                     lines = next_lines
@@ -4712,6 +4797,7 @@ fn print_reduce_usage:
     with_write("\n")
     with_write("  with reduce repro.w --contains \"undefined variable\" -- ./out/stage/bin/with-stage2 check {file}\n")
     with_write("  with reduce repro.w --exit-code nonzero --out out/reduced.w\n")
+    with_write("  with reduce fixture.w --test test_needs_two_lines\n")
     with_write("\n")
     with_write("Reduce Options:\n")
     with_write("\n")
@@ -4720,6 +4806,10 @@ fn print_reduce_usage:
     with_write("  --contains <txt> Require predicate stdout/stderr to contain text\n")
     with_write("  --exit-code <n|nonzero>\n")
     with_write("                   Require an exact exit code or any non-zero exit\n")
+    with_write("  --test <name>    Run each candidate through the test runner (with test {file}\n")
+    with_write("                   --filter <name>, which sets WITH_TEST_FILTER for the child) and\n")
+    with_write("                   hold while <name> still fails in the same stage (build vs run)\n")
+    with_write("                   and, with --contains, with the same text. Not with -- or --exit-code.\n")
 
 fn print_fixpoint_diff_usage:
     with_write("Usage: with fixpoint-diff [left-object] [right-object]\n")
