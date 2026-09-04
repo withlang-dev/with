@@ -2115,7 +2115,7 @@ impl Parser:
             self.pool.add_extra(variant_count)
             var pidx = 0
             for vi in 0..variant_count:
-                self.pool.add_extra(names.get(vi as i64))
+                self.pool.add_extra(names[vi])
                 self.pool.add_extra(discs[vi])
                 let pc = pcounts[vi]
                 self.pool.add_extra(pc)
@@ -2129,7 +2129,7 @@ impl Parser:
         self.pool.add_extra(variant_count)
         var pidx2 = 0
         for vi in 0..variant_count:
-            self.pool.add_extra(names.get(vi as i64))
+            self.pool.add_extra(names[vi])
             let pc = pcounts[vi]
             self.pool.add_extra(pc)
             for pj in 0..pc:
@@ -5494,7 +5494,7 @@ impl Parser:
     // if not found.
     fn asm_operand_index(names: &Vec[i32], name_sym: i32) -> i32:
         for i in 0..names.len() as i32:
-            if names.get(i as i64) == name_sym:
+            if names[i] == name_sym:
                 return i
         -1
 
@@ -6982,7 +6982,7 @@ impl Parser:
                 self.pool.add_extra(names.len() as i32)
                 self.pool.add_extra(is_mut)
                 for ni in 0..names.len() as i32:
-                    self.pool.add_extra(names.get(ni as i64))
+                    self.pool.add_extra(names[ni])
                 item_sources.push(source as i32)
                 item_payloads.push(extra_start)
                 item_is_tuple.push(1)

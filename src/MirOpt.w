@@ -135,7 +135,7 @@ fn promote_non_escaping_boxes(mod: MirOptModule) -> i32:
 fn eliminate_dead_fields(mod: MirOptModule) -> i32:
     var changed = 0
     for ti in 0..mod.types.len() as i32:
-        let ty = mod.types.get(ti as i64)
+        let ty = mod.types[ti]
         for fi in 0..ty.fields.len() as i32:
             let field = ty.fields[fi]
             if not field.removed and field.read_count == 0:

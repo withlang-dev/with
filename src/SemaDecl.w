@@ -1892,7 +1892,7 @@ impl Sema:
         if trait_sym == 0 or impl_node == 0 or not self.trait_lookup.contains(trait_sym):
             return
         let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
-        let tp_count = self.trait_tp_counts.get(trait_idx as i64)
+        let tp_count = self.trait_tp_counts[trait_idx]
         if tp_count <= 0:
             return
         let tta_idx = self.ast.find_impl_trait_type_args(impl_node as NodeId)
@@ -1900,7 +1900,7 @@ impl Sema:
             return
         let arg_start = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
         let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
-        let tp_start = self.trait_tp_starts.get(trait_idx as i64)
+        let tp_start = self.trait_tp_starts[trait_idx]
         var ti = 0
         while ti < tp_count and ti < arg_count:
             let tp_sym: i32 = self.trait_tp_syms[(tp_start + ti)]

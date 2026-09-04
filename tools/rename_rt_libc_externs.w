@@ -44,7 +44,7 @@ fn process(path: &str) -> i32:
         if is_bare(name):
             var seen = false
             for j in 0..names.len() as i32:
-                if names.get(j as i64) == name: seen = true
+                if names[j] == name: seen = true
             if not seen:
                 names.push(name)
     if names.len() == 0:
@@ -65,7 +65,7 @@ fn process(path: &str) -> i32:
         let tok = slice(text, ts, te)
         var hit = false
         for j in 0..names.len() as i32:
-            if names.get(j as i64) == tok: hit = true
+            if names[j] == tok: hit = true
         if not hit:
             continue
         let is_decl = i >= 2 and tokens.get_tag(i - 1) == TokenKind.TK_KW_FN and tokens.get_tag(i - 2) == TokenKind.TK_KW_EXTERN

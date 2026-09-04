@@ -1664,7 +1664,7 @@ impl PoolState:
 
     fn dep_inflight(dep_name: &str) -> bool:
         for pi in self.oldest..self.names.len() as i32:
-            if self.names.get(pi as i64) == dep_name:
+            if self.names[pi] == dep_name:
                 return true
         false
 

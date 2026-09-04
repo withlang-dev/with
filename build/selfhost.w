@@ -8084,7 +8084,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     names |> push("take")
     names |> push("table_at")
     for ni in 0..names.len() as i32:
-        let name = names.get(ni as i64)
+        let name = names[ni]
         let iface_mode = bs_dump_abi_pass_mode(bs_dump_abi_param_line(iface_dump.stdout, name))
         let source_mode = bs_dump_abi_pass_mode(bs_dump_abi_param_line(source_dump.stdout, name))
         if iface_mode.len() == 0 or iface_mode != source_mode:

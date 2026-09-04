@@ -11204,7 +11204,7 @@ impl Sema:
 
 fn sema_autoderef_seen_type(types: &Vec[i32], ty: i32) -> i32:
     for i in 0..types.len() as i32:
-        if types.get(i as i64) == ty:
+        if types[i] == ty:
             return 1
     0
 
@@ -16964,14 +16964,14 @@ impl Sema:
 
     fn subst_vec_lookup(names: &Vec[i32], types: &Vec[i32], name: i32) -> i32:
         for i in 0..names.len() as i32:
-            if names.get(i as i64) == name:
-                return types.get(i as i64)
+            if names[i] == name:
+                return types[i]
         let target_name = self.pool_resolve(name)
         var found = 0
         var found_count = 0
         for i2 in 0..names.len() as i32:
-            if self.pool_resolve(names.get(i2 as i64)) == target_name:
-                found = types.get(i2 as i64)
+            if self.pool_resolve(names[i2]) == target_name:
+                found = types[i2]
                 found_count = found_count + 1
         if found_count == 1:
             return found
@@ -17619,8 +17619,8 @@ impl ConcreteSubst:
         if sym == 0 or tid == 0:
             return
         for i in 0..self.names.len() as i32:
-            if self.names.get(i as i64) == sym:
-                if self.types.get(i as i64) != tid:
+            if self.names[i] == sym:
+                if self.types[i] != tid:
                     sema_phase_bug(f"BUG: conflicting concrete substitution for symbol {sym}")
                 return
         self.names.push(sym)

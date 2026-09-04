@@ -883,10 +883,10 @@ impl Zcu:
         var i = 0
         let total = names.len() as i32
         while i < total:
-            while i < total and names.byte_at(i as i64) == 124:
+            while i < total and names[i] == 124:
                 i = i + 1
             let start = i
-            while i < total and names.byte_at(i as i64) != 124:
+            while i < total and names[i] != 124:
                 i = i + 1
             if i > start:
                 let name = names.slice(start as i64, i as i64)

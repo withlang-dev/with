@@ -298,7 +298,7 @@ fn link_stage_apply_env(env: &Vec[LinkStageEnvVar]) -> LinkStageSavedEnv:
 
 fn link_stage_restore_env(saved: &LinkStageSavedEnv):
     for i in 0..saved.names.len() as i32:
-        let _ = runtime_setenv(saved.names.get(i as i64), saved.values.get(i as i64))
+        let _ = runtime_setenv(saved.names[i], saved.values[i])
 
 impl LinkStageCommand:
     fn run() -> i32:

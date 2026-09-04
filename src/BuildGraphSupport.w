@@ -317,7 +317,7 @@ pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64]
     var text = "target\tseconds\tpeak_rss\n"
     for i in 0..names.len() as i32:
         let rss = if i < rss_list.len() as i32: rss_list[i] else: 0
-        text = text ++ names.get(i as i64) ++ "\t" ++ build_graph_time_fmt(ns_list.get(i as i64)) ++ "\t" ++ build_graph_rss_fmt(rss) ++ "\n"
+        text = text ++ names[i] ++ "\t" ++ build_graph_time_fmt(ns_list[i]) ++ "\t" ++ build_graph_rss_fmt(rss) ++ "\n"
     text = text ++ "TOTAL\t" ++ build_graph_time_fmt(total_ns) ++ "\t" ++ build_graph_rss_fmt(build_graph_rt_self_maxrss()) ++ "\n"
     let state_dir = resolve_join(root, "out/.build-state")
     let _mkdir = build_graph_rt_mkdir_p(state_dir)

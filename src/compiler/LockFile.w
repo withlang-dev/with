@@ -359,7 +359,7 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
     let key = name ++ "/" ++ version
     var out = walk
     for i in 0..out.seen.len() as i32:
-        if out.seen.get(i as i64) == key:
+        if out.seen[i] == key:
             return out
     out.seen.push(key)
     let entry = lock_entry_from_installed_c_dep(project_root, name, version)

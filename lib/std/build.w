@@ -1576,7 +1576,7 @@ fn tool_process_restore_env(saved: SavedProcessEnv):
     // D32: field vacates need a mutable path — rebind the owned param.
     var owned = saved
     for i in 0..owned.names.len() as i32:
-        let _restore = with_setenv_str(owned.names.get(i as i64), owned.values.get(i as i64))
+        let _restore = with_setenv_str(owned.names[i], owned.values[i])
     tool_process_restore_driver_env(move owned.driver)
 
 // ── #921: effect records (native twin of the evaluator's) ──────────────

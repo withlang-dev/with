@@ -73,7 +73,7 @@ fn edit_key(path: str, line: i32, name: str): path ++ ":" ++ line.to_string() ++
 fn has_edit(edits: &Edits, path: str, line: i32, name: str) -> bool:
     let wanted = edit_key(path, line, name)
     for i in 0..edits.paths.len() as i32:
-        if edit_key(edits.paths.get(i as i64), edits.lines.get(i as i64), edits.names.get(i as i64)) == wanted: return true
+        if edit_key(edits.paths[i], edits.lines[i], edits.names[i]) == wanted: return true
     false
 
 fn parse_diagnostics(text: str) -> Edits:
@@ -199,7 +199,7 @@ fn main:
         exit_code(1)
     var failures = 0
     for i in 0..edits.paths.len() as i32:
-        if apply_one(edits.paths.get(i as i64), edits.lines.get(i as i64), edits.names.get(i as i64), edits.types.get(i as i64), apply) < 0:
+        if apply_one(edits.paths[i], edits.lines[i], edits.names[i], edits.types[i], apply) < 0:
             failures = failures + 1
     print(f"D22 migration: {edits.paths.len()} proven binding(s), failures={failures}")
     if failures != 0: exit_code(1)

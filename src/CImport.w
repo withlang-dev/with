@@ -1050,7 +1050,7 @@ fn ci_render_missing_pointer_opaques(session: i64, count: i32) -> str:
     var start = 0
     var i = 0
     while i <= names.len() as i32:
-        if i == names.len() as i32 or names.byte_at(i as i64) == 124:
+        if i == names.len() as i32 or names[i] == 124:
             if i > start:
                 let name = names.slice(start as i64, i as i64)
                 if name.len() > 0 and not ci_type_name_is_emitted(name):
