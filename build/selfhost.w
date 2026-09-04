@@ -219,6 +219,32 @@ fn bs_run_cli_capture_cwd(ctx: &ActionCtx, compiler_path: &str, label: &str, arg
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, move result.stdout, move result.stderr }
 
+fn bs_run_binary_capture_with_env(ctx: &ActionCtx, exe_path: &str, label: &str, timeout_ms: i32, process_env: &ProcessEnv) -> SelfhostRunResult:
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
+    let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
+    var argv: Vec[str] = Vec.new()
+    argv |> push(bs_abs(root, exe_path))
+    var result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_clone_process_env(process_env))
+    if result.rc == 0:
+        let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
+        let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
+    SelfhostRunResult { result.rc, move result.stdout, move result.stderr }
+
+// The rest of the first line of `text` that starts with `prefix`, or "".
+fn bs_line_after(text: &str, prefix: &str) -> str:
+    var start = 0
+    while start < text.len() as i32:
+        var end = start
+        while end < text.len() as i32 and text[end] != 10:
+            end = end + 1
+        let line = text.slice(start as i64, end as i64)
+        if line.starts_with(prefix):
+            return line.slice(prefix.len(), line.len())
+        start = end + 1
+    ""
+
 fn bs_run_binary_capture(ctx: &ActionCtx, exe_path: &str, label: &str, timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
@@ -961,6 +987,78 @@ fn bs_check_test_directives(ctx: &ActionCtx, compiler_path: &str, test_dir: &str
         return bs_fail(ctx, "expected exit directive failure")
     bs_assert_contains(ctx, bad_exit_result.stderr, "exit code 0, expected 7", "test_runtime_directives")
 
+// The runner's artifacts land under WITH_OUT_DIR, so kept test binaries stay
+// inside this action's output tree (removed at the next run).
+fn bs_test_artifact_env(root: &str, test_dir: &str) -> ProcessEnv:
+    process_env().set("WITH_OUT_DIR", bs_abs(root, bs_join(test_dir, "out")))
+
+// #1013: a red `with test` keeps the runner's binary and prints an honest
+// rerun line; a green run deletes it unless --keep-binary; --verbose names
+// it either way.
+fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &str) -> i32:
+    let fs = ctx.fs()
+    if fs.mkdir_all(test_dir) != 0:
+        return bs_fail(ctx, "could not create keep-binary test directory: " ++ test_dir)
+    let env = bs_test_artifact_env(ctx.project_info().project_root(), test_dir)
+
+    let red_src = bs_join(test_dir, "keep_binary_red.w")
+    if fs.write_text(red_src, "fn test_green: assert(true)\n\nfn test_red:\n    let n = 1\n    assert(n == 2)\n") != 0:
+        return bs_fail(ctx, "could not write " ++ red_src)
+    let red = bs_run_cli_capture_with_env(ctx, compiler_path, "test-keep-binary-red", bs_test_args(red_src), 120000, env)
+    if red.rc == 0:
+        return bs_fail(ctx, "keep-binary red fixture unexpectedly passed")
+    let kept = bs_line_after(red.stderr, "test binary kept: ")
+    if not kept.starts_with("/"):
+        return bs_fail(ctx, "red run did not print an absolute kept path; stderr=" ++ red.stderr)
+    if not fs.host_exists(kept):
+        return bs_fail(ctx, "red run's kept binary is missing: " ++ kept)
+    var rc = bs_assert_contains(ctx, red.stderr, "rerun: WITH_TEST_FILTER=test_red " ++ kept, "test_keep_binary")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, red.stderr, "rerun: WITH_TEST_FILTER=test_green", "test_keep_binary")
+    if rc != 0: return rc
+    // The rerun line is honest: under the printed environment the kept
+    // binary reproduces the failure, and the green test still passes in it.
+    let red_env = process_env().set("WITH_TEST_FILTER", "test_red")
+    let rerun_red = bs_run_binary_capture_with_env(ctx, kept, "test-keep-binary-rerun-red", 60000, red_env)
+    if rerun_red.rc == 0:
+        return bs_fail(ctx, "kept binary did not reproduce test_red under WITH_TEST_FILTER=test_red")
+    let green_env = process_env().set("WITH_TEST_FILTER", "test_green")
+    let rerun_green = bs_run_binary_capture_with_env(ctx, kept, "test-keep-binary-rerun-green", 60000, green_env)
+    if rerun_green.rc != 0:
+        return bs_fail(ctx, f"kept binary failed test_green under WITH_TEST_FILTER=test_green (exit code {rerun_green.rc})")
+
+    let green_src = bs_join(test_dir, "keep_binary_green.w")
+    if fs.write_text(green_src, "fn test_green: assert(true)\n") != 0:
+        return bs_fail(ctx, "could not write " ++ green_src)
+    var verbose_args: Vec[str] = Vec.new()
+    verbose_args |> push("test")
+    verbose_args |> push("--verbose")
+    verbose_args |> push(selfhost_owned_text(green_src))
+    let green = bs_run_cli_capture_with_env(ctx, compiler_path, "test-keep-binary-green-verbose", verbose_args, 120000, env)
+    if green.rc != 0:
+        return bs_fail(ctx, f"keep-binary green fixture failed with exit code {green.rc}")
+    let named = bs_line_after(green.stderr, "test binary: ")
+    if not named.starts_with("/"):
+        return bs_fail(ctx, "verbose green run did not name an absolute test binary; stderr=" ++ green.stderr)
+    if fs.host_exists(named):
+        return bs_fail(ctx, "green run without --keep-binary left its test binary behind: " ++ named)
+    rc = bs_assert_not_contains(ctx, green.stderr, "test binary kept: ", "test_keep_binary")
+    if rc != 0: return rc
+
+    var keep_args: Vec[str] = Vec.new()
+    keep_args |> push("test")
+    keep_args |> push("--keep-binary")
+    keep_args |> push(selfhost_owned_text(green_src))
+    let kept_green = bs_run_cli_capture_with_env(ctx, compiler_path, "test-keep-binary-green-keep", keep_args, 120000, env)
+    if kept_green.rc != 0:
+        return bs_fail(ctx, f"--keep-binary green fixture failed with exit code {kept_green.rc}")
+    let kept_path = bs_line_after(kept_green.stderr, "test binary kept: ")
+    if not kept_path.starts_with("/"):
+        return bs_fail(ctx, "--keep-binary green run did not print an absolute kept path; stderr=" ++ kept_green.stderr)
+    if not fs.host_exists(kept_path):
+        return bs_fail(ctx, "--keep-binary green run's kept binary is missing: " ++ kept_path)
+    bs_assert_not_contains(ctx, kept_green.stderr, "rerun: ", "test_keep_binary")
+
 pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
     if os() == "Windows":
         return bs_windows_skip(ctx, "#809")
@@ -994,6 +1092,10 @@ pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
     let directives_rc = bs_check_test_directives(ctx, compiler_path, test_dir)
     if directives_rc != 0:
         return directives_rc
+
+    let keep_rc = bs_check_test_keep_binary(ctx, compiler_path, bs_join(output_dir, "keep-binary"))
+    if keep_rc != 0:
+        return keep_rc
     0
 
 fn bs_one_liner_args(first: &str, second: &str) -> Vec[str]:

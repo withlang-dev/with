@@ -25,9 +25,13 @@ the routes.
 3. **Get the exact failing binary.** A fixture that fails only under
    `with test` fails in the runner's own artifact
    (`out/<dir>/<stem>.test.<pid>.<nanos>`, built from the synthesized test
-   main); a `with build` of the file has no test main. Keep that artifact
-   (#1013) and run it directly with `WITH_TEST_FILTER=<test>` — if it fails
-   standalone, every later step works on it without the runner.
+   main); a `with build` of the file has no test main. A red run keeps that
+   artifact and prints `test binary kept: <path>` plus one
+   `rerun: WITH_TEST_FILTER=<test> <path>` line per failure — the exact
+   environment the runner gave the child (#1013). `with test --keep-binary`
+   keeps it on a green run too, and `--verbose` names it for every run. Run
+   the rerun line as printed — if it fails standalone, every later step
+   works on it without the runner.
 4. **Resolve the second free's site**: `lldb --batch -o "settings set
    target.env-vars WITH_TEST_FILTER=<test> WITH_DEBUG_ALLOC=1" -o
    "breakpoint set --name dbg_report_double_free" -o run -o "bt 24" -o quit

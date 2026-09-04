@@ -307,6 +307,9 @@ fn cli_test_verbose(argc: i32) -> bool:
 fn cli_test_quiet(argc: i32) -> bool:
     cli_has_flag(argc, "-q") or cli_has_flag(argc, "--quiet")
 
+fn cli_test_keep_binary(argc: i32) -> bool:
+    cli_has_flag(argc, "--keep-binary")
+
 fn cli_is_build_target_selector(arg: &str) -> bool:
     arg.len() > 1 and arg[0] == 58
 
@@ -1102,6 +1105,45 @@ fn cleanup_binary_artifacts(bin_path: &str):
         return
     let _bin = build_graph_rt_remove_file(bin_path)
     let _dsym = build_graph_rt_remove_tree(bin_path ++ ".dSYM")
+
+// #1013: the runner's artifact (the synthesized test main, linked) is the
+// only reproducer of a failure that lives in that layout — a `with build`
+// of the fixture has no test main. A red run keeps it and says where it is
+// and how the runner invoked it; `--keep-binary` keeps it on green too.
+fn test_binary_absolute_path(bin_path: &str) -> str:
+    if bin_path.starts_with("/"):
+        return bin_path ++ ""
+    let cwd = with_getenv_str("PWD")
+    if cwd.len() == 0:
+        return bin_path ++ ""
+    cwd ++ "/" ++ bin_path
+
+// The exact environment run_test_process set for the child, as a shell
+// prefix, so the printed rerun line reproduces the run.
+fn test_child_env_prefix(test_name: &str, quiet: bool) -> str:
+    var prefix = ""
+    if test_name.len() > 0:
+        prefix = "WITH_TEST_FILTER=" ++ test_name ++ " "
+    if quiet:
+        prefix = prefix ++ "WITH_TEST_SHORT=1 "
+    prefix
+
+// `rerun_tests` names one child run per failure: the test name, or "" for
+// a whole-binary run (a fixture with a main or run expectations).
+fn finish_test_binary(bin_path: &str, keep: bool, rerun_tests: &Vec[str], quiet: bool):
+    if not keep:
+        cleanup_binary_artifacts(bin_path)
+        return
+    let kept = test_binary_absolute_path(bin_path)
+    with_eprint("test binary kept: " ++ kept)
+    for ti in 0..rerun_tests.len() as i32:
+        with_eprint("rerun: " ++ test_child_env_prefix(rerun_tests[ti], quiet) ++ kept)
+
+fn single_run_reruns(rc: i32) -> Vec[str]:
+    let reruns: Vec[str] = Vec.new()
+    if rc != 0:
+        reruns.push("")
+    reruns
 
 // ── Deep debug commands ─────────────────────────────────────────
 
@@ -2246,7 +2288,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     if survey_target_failed:
                         break
                     let test_path = test_files[fi]
-                    let test_rc = run_test_file_with_build_settings(test_path, target_options.opt_level, target_options.no_std, target_options.alloc_mode, target_options.runtime_available, target_options.prelude_mode, target_options.debug_info, false, false, "", target_options.include_paths, target_options.defines, target_options.link_libs)
+                    let test_rc = run_test_file_with_build_settings(test_path, target_options.opt_level, target_options.no_std, target_options.alloc_mode, target_options.runtime_available, target_options.prelude_mode, target_options.debug_info, false, false, false, "", target_options.include_paths, target_options.defines, target_options.link_libs)
                     if test_rc != 0:
                         with_eprint("error: build.w test target failed: " ++ target.name)
                         if not survey:
@@ -3662,24 +3704,24 @@ fn run_test_binary_checked(bin_path: &str, target: &str, test_name: &str, quiet:
 // known-bug model): the fixture documents an open bug and MUST stay red.
 // Both directions are enforced — a red is tolerated (loudly), and a green
 // fails the file until the directive is removed with the issue's fix.
-fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
+fn run_test_file_with_build_settings(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
     var directives = parse_test_directives_for_target(target)
     let known_issue = move directives.known_issue
     if known_issue.len() == 0:
-        return run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
-    let rc = run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
+        return run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
+    let rc = run_test_file_with_build_settings_inner(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
     if rc == 0:
         emit_test_stage_error("known-issue " ++ known_issue ++ " expected this test to stay red, but it passed; if the issue is fixed, remove the known-issue directive", target, "known-issue", "")
         return 1
     with_eprint("[known-issue " ++ known_issue ++ "] " ++ target ++ " red as expected")
     0
 
-fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
+fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
     // `//! env:` pairs apply to the compile (in-process) and the run
     // (inherited), and restore after so one test cannot poison the next.
     let env_directives = parse_test_directives_for_target(target)
     if env_directives.env_pairs.len() == 0:
-        return run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
+        return run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
     let saved: Vec[str] = Vec.new()
     for ei in 0..env_directives.env_pairs.len() as i32:
         let pair = env_directives.env_pairs[ei]
@@ -3690,7 +3732,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
             let _ = with_setenv_str(name, pair.slice(eq + 1, pair.len()))
         else:
             saved.push("")
-    let env_rc = run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
+    let env_rc = run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
     for ei in 0..env_directives.env_pairs.len() as i32:
         let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
@@ -3698,7 +3740,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
             let _ = with_setenv_str(pair.slice(0, eq), saved[ei])
     env_rc
 
-fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
+fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
     let directives = parse_test_directives_for_target(target)
     let directive_rc = run_test_directive_command(target, directives, quiet)
     if directive_rc >= 0:
@@ -3728,41 +3770,41 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     if bin_path == "":
         emit_test_stage_error("test build failed", target, "build", "")
         return 1
+    if verbose:
+        with_eprint("test binary: " ++ test_binary_absolute_path(bin_path))
     if discovery.parse_ok and not discovery.has_main and discovery.test_names.len() > 0:
         if test_directives_have_run_expectations(directives) and filter.len() == 0:
             var run_quiet = quiet
             if verbose:
                 run_quiet = false
             let rc = run_test_binary_checked(bin_path, target, "", run_quiet, directives)
-            cleanup_binary_artifacts(bin_path)
+            finish_test_binary(bin_path, keep_binary or rc != 0, single_run_reruns(rc), run_quiet)
             if rc == 0:
                 print_test_summary(target, discovery.test_names.len() as i32, 0, run_quiet)
                 return 0
             print_test_summary(target, 0, 1, run_quiet)
             return 1
         var passed = 0
-        var failed = 0
+        let failed_tests: Vec[str] = Vec.new()
+        var run_quiet = quiet
+        if verbose:
+            run_quiet = false
         for ti in 0..discovery.test_names.len() as i32:
             let test_name = discovery.test_names[ti]
             if filter.len() > 0 and not test_name.contains(filter):
                 continue
-            var run_quiet = quiet
-            if verbose:
-                run_quiet = false
             let rc = run_test_binary_checked(bin_path, target, test_name, run_quiet, empty_test_directives())
             if rc == 0:
                 passed = passed + 1
                 if verbose:
                     with_write("PASS " ++ test_name ++ "\n")
             else:
-                failed = failed + 1
+                failed_tests.push(test_name ++ "")
                 if verbose:
                     with_eprint("FAIL " ++ test_name)
-        cleanup_binary_artifacts(bin_path)
-        var summary_quiet = quiet
-        if verbose:
-            summary_quiet = false
-        print_test_summary(target, passed, failed, summary_quiet)
+        let failed = failed_tests.len() as i32
+        finish_test_binary(bin_path, keep_binary or failed > 0, failed_tests, run_quiet)
+        print_test_summary(target, passed, failed, run_quiet)
         if failed == 0:
             return 0
         return 1
@@ -3770,18 +3812,18 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     if verbose:
         run_quiet = false
     let run_rc = run_test_binary_checked(bin_path, target, "", run_quiet, directives)
-    cleanup_binary_artifacts(bin_path)
+    finish_test_binary(bin_path, keep_binary or run_rc != 0, single_run_reruns(run_rc), run_quiet)
     if run_rc == 0:
         print_test_summary(target, 1, 0, run_quiet)
         return 0
     print_test_summary(target, 0, 1, run_quiet)
     run_rc
 
-fn run_test_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: &str) -> i32:
+fn run_test_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str) -> i32:
     let include_paths: Vec[str] = Vec.new()
     let defines: Vec[str] = Vec.new()
     let link_libs: Vec[str] = Vec.new()
-    run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
+    run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs)
 
 fn test_command_option_takes_value(arg: &str) -> bool:
     arg == "-o" or arg == "--output" or arg == "-f" or arg == "--filter"
@@ -3802,7 +3844,7 @@ fn test_command_collect_targets(argc: i32) -> Vec[str]:
         i = i + 1
     targets
 
-fn run_test_target(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: &str) -> i32:
+fn run_test_target(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str) -> i32:
     if test_target_is_directory(target):
         let test_files = collect_test_files(target)
         if test_files.len() == 0:
@@ -3810,18 +3852,19 @@ fn run_test_target(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool,
             return 1
         for ti in 0..test_files.len() as i32:
             let test_file = test_files[ti]
-            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
+            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter)
             if run_rc != 0:
                 with_eprint(f"error: test failed in '{test_file}'")
                 return run_rc
         return 0
-    run_test_file(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
+    run_test_file(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter)
 
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let verbose = cli_test_verbose(argc)
     var quiet = cli_test_quiet(argc)
     if verbose:
         quiet = false
+    let keep_binary = cli_test_keep_binary(argc)
     let filter = cli_test_filter(argc)
     let targets = test_command_collect_targets(argc)
     if targets.len() == 0:
@@ -3837,7 +3880,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
         return run_build_command(move build_options, graph_options)
     for ti in 0..targets.len() as i32:
         let target = targets[ti]
-        let rc = run_test_target(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
+        let rc = run_test_target(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter)
         if rc != 0:
             return rc
     0
@@ -4638,10 +4681,13 @@ fn print_test_usage:
     with_write("Test Options:\n")
     with_write("\n")
     with_write("  -h, --help       Print this help and exit\n")
-    with_write("  -v, --verbose    Print each discovered test name\n")
+    with_write("  -v, --verbose    Print each discovered test name and the test binary's path\n")
     with_write("  -q, --quiet      Suppress per-file summaries\n")
     with_write("  -f, --filter     Run discovered tests whose name contains the filter\n")
     with_write("  --filter=<text>  Same as --filter <text>\n")
+    with_write("  --keep-binary    Keep the test binary (and its .dSYM) after a green run and\n")
+    with_write("                   print 'test binary kept: <path>'. A red run always keeps it and\n")
+    with_write("                   prints 'rerun: WITH_TEST_FILTER=<test> <path>' per failure.\n")
     with_write("  -O0|-O1|-O2|-O3  Set optimization level\n")
     with_write("  -o, --output     Write output to path\n")
     with_write("  --release        Enable release defaults\n")
