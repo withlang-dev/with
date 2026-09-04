@@ -596,6 +596,20 @@ Match the surrounding code, and follow the mission at the character level:
 - **Boy-scout the style: any time you touch a function, fix its style too** —
   drop inferable types, inline tiny bodies. Leave the whole function
   least-ceremony, not just the lines you came to change.
+- **Unnecessary casts and `unsafe` are defects: fix them on sight, anywhere —
+  even in code you are not otherwise editing.** The defaults already cover
+  them: `v[i]`, `v[i] = x`, and `v.get(i)` take an `i32` index; `i32` widens
+  into `i64` arithmetic and comparisons; `for k in 0..n` indexes directly. So
+  `.get(i as i64)`, `.set_i32(i as i64, x)`, `v[i as i64]`, and `x as i64`
+  where the target already widens are never written — only a narrowing needs
+  `as`. `unsafe` is for a raw pointer that must exist (FFI, the allocator, an
+  ABI seam), never a stand-in for mutation the language expresses safely: a
+  `*mut State` handle mutated through by-value calls is an owned struct with
+  `mut fn` methods in disguise; convert it. (Spec §15.1: `&mut T` is not safe
+  With; `mut self`, an owned-by-value parameter, or a returned value is.) A
+  file full of the legacy idiom is not a style to match; it is a backlog to
+  burn down as you pass through, and a mechanical class of it is a `with -p`
+  or Lexer-based rewrite, not N hand edits.
 
 ### One logical change at a time
 
