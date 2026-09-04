@@ -19,7 +19,7 @@ fn build_owned_text(s: &str): s ++ ""
 fn build_project_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path[i] == 47:
+        if path.byte_at(i as i64) == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -539,18 +539,18 @@ fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
 fn build_project_trim_line(text: &str) -> str:
     var end = 0
     while end < text.len() as i32:
-        let ch = text[end]
+        let ch = text.byte_at(end as i64)
         if ch == 10 or ch == 13:
             break
         end = end + 1
     var start = 0
     while start < end:
-        let ch = text[start]
+        let ch = text.byte_at(start as i64)
         if ch != 9 and ch != 32:
             break
         start = start + 1
     while end > start:
-        let ch = text[(end - 1)]
+        let ch = text.byte_at((end - 1) as i64)
         if ch != 9 and ch != 32:
             break
         end = end - 1
@@ -960,14 +960,14 @@ fn build_project_join(left: &str, right: &str) -> str:
     left ++ "/" ++ right
 
 fn build_project_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path[0] == 47:
+    if path.len() > 0 and path.byte_at(0) == 47:
         return build_owned_text(path)
     build_project_join(root, path)
 
 fn build_trim_trailing_line_endings(text: &str) -> str:
     var end = text.len()
     while end > 0:
-        let ch = text[end - 1]
+        let ch = text.byte_at(end - 1)
         if ch != 10 and ch != 13:
             break
         end = end - 1
@@ -1044,7 +1044,7 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     if marker_at < 0:
         return issue61_fail(ctx, "missing insertion point in " ++ sema_path)
     var indent_start = marker_at
-    while indent_start > 0 and sema_text[(indent_start - 1)] != 10:
+    while indent_start > 0 and sema_text.byte_at((indent_start - 1) as i64) != 10:
         indent_start = indent_start - 1
     let indent = sema_text.slice(indent_start as i64, marker_at as i64)
     let marker = indent ++ marker_comment

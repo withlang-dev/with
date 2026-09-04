@@ -489,7 +489,7 @@ fn tool_capability_require(token: &str, name: &str):
 fn tool_safe_label(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     for i in 0..text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
             out.push_byte(ch)
@@ -664,12 +664,12 @@ pub fn Diagnostics.error(self: &Self, message: str) -> Unit:
 fn tool_path_is_project_relative(path: &str) -> bool:
     if path.len() == 0:
         return false
-    if path[0] == 47:
+    if path.byte_at(0) == 47:
         return false
     if path.contains(".."):
         return false
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 0 or ch == 9 or ch == 10 or ch == 13:
             return false
     true
@@ -682,7 +682,7 @@ fn tool_path_require_project_relative(path: &str):
 fn tool_path_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path[i] == 47:
+        if path.byte_at(i as i64) == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -695,9 +695,9 @@ fn tool_path_normalize(path: &str) -> str:
         return "."
     let parts: Vec[str] = Vec.new()
     var start = 0
-    var is_absolute = path[0] == 47 or path[0] == 92
+    var is_absolute = path.byte_at(0) == 47 or path.byte_at(0) == 92
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 47 or ch == 92:
             if i > start:
                 let part = path.slice(start as i64, i as i64)
@@ -735,7 +735,7 @@ fn tool_split_by_slash(path: &str) -> Vec[str]:
     let parts: Vec[str] = Vec.new()
     var start = 0
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 47 or ch == 92:
             if i > start:
                 parts.push(path.slice(start as i64, i as i64))
@@ -747,7 +747,7 @@ fn tool_split_by_slash(path: &str) -> Vec[str]:
 fn tool_glob_segment_matches(pattern: &str, name: &str) -> bool:
     var star = -1
     for i in 0..pattern.len() as i32:
-        if pattern[i] == 42:
+        if pattern.byte_at(i as i64) == 42:
             if star >= 0:
                 return false
             star = i
@@ -786,8 +786,8 @@ fn tool_glob_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < min_len as i32:
-        let ac = a[i] as i32
-        let bc = b[i] as i32
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
         if ac != bc:
             return ac - bc
         i = i + 1
@@ -828,12 +828,12 @@ fn tool_path_is_same_or_child(path: &str, root: &str) -> bool:
         return true
     if path.len() <= root.len():
         return false
-    path.starts_with(root) and path[root.len()] == 47
+    path.starts_with(root) and path.byte_at(root.len() as i64) == 47
 
 fn tool_path_is_parent_of(parent: &str, child: &str) -> bool:
     if parent.len() >= child.len():
         return false
-    child.starts_with(parent) and child[parent.len()] == 47
+    child.starts_with(parent) and child.byte_at(parent.len() as i64) == 47
 
 fn ToolFs.write_file_allowed(self: &Self, path: &str) -> bool:
     if not self.write_scoped:
@@ -868,7 +868,7 @@ fn tool_split_nonempty_lines(text: &str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
     var start = 0
     for i in 0..text.len() as i32:
-        if text[i] == 10:
+        if text.byte_at(i as i64) == 10:
             if i > start:
                 lines.push(text.slice(start as i64, i as i64))
             start = i + 1
@@ -953,7 +953,7 @@ pub fn ToolFs.read_binary(self: &Self, path: &str) -> Vec[u8]:
     let data = with_fs_read_file(resolved)
     let result: Vec[u8] = Vec.new()
     for i in 0..data.len() as i32:
-        result.push(data[i] as u8)
+        result.push(data.byte_at(i as i64) as u8)
     result
 
 pub fn ToolFs.list_files(self: &Self, path: &str) -> Vec[str]:
@@ -968,7 +968,7 @@ pub fn ToolFs.glob(self: &Self, pattern: &str) -> Vec[str]:
     var last_clean_slash = -1
     var has_glob = false
     for i in 0..pattern.len() as i32:
-        let c = pattern[i]
+        let c = pattern.byte_at(i as i64)
         if c == 42:
             has_glob = true
             break
@@ -1023,7 +1023,7 @@ fn tool_tar_append_str_padded(out: Vec[u8], value: &str, width: i64) -> Vec[u8]:
     if value.len() > width:
         return Vec.new()
     for i in 0..value.len() as i32:
-        out.push(value[i] as u8)
+        out.push(value.byte_at(i as i64) as u8)
     var pad = value.len()
     while pad < width:
         out.push(0 as u8)
@@ -1043,7 +1043,7 @@ fn tool_tar_octal_digits(value: i64) -> str:
     var i = reversed.len()
     while i > 0:
         i = i - 1
-        out.push_byte(reversed[i] as u8)
+        out.push_byte(reversed.byte_at(i) as u8)
     out.to_str()
 
 fn tool_tar_append_octal_nul(out: Vec[u8], value: i64, width: i64) -> Vec[u8]:
@@ -1057,7 +1057,7 @@ fn tool_tar_append_octal_nul(out: Vec[u8], value: i64, width: i64) -> Vec[u8]:
         out.push(48 as u8)
         pad = pad + 1
     for i in 0..digits.len() as i32:
-        out.push(digits[i] as u8)
+        out.push(digits.byte_at(i as i64) as u8)
     out.push(0 as u8)
     out
 
@@ -1070,7 +1070,7 @@ fn tool_tar_append_checksum(out: Vec[u8], checksum: i64) -> Vec[u8]:
         out.push(48 as u8)
         pad = pad + 1
     for i in 0..digits.len() as i32:
-        out.push(digits[i] as u8)
+        out.push(digits.byte_at(i as i64) as u8)
     out.push(0 as u8)
     out.push(32 as u8)
     out
@@ -1103,12 +1103,12 @@ fn tool_tar_link_name(target: &str) -> str:
 fn tool_tar_link_target_safe(output_dir: &str, output_path: &str, target: &str) -> bool:
     if target.len() == 0:
         return false
-    if target[0] == 47 or target[0] == 92:
+    if target.byte_at(0) == 47 or target.byte_at(0) == 92:
         return false
-    if target.len() >= 3 and target[1] == 58 and (target[2] == 47 or target[2] == 92):
+    if target.len() >= 3 and target.byte_at(1) == 58 and (target.byte_at(2) == 47 or target.byte_at(2) == 92):
         return false
     for i in 0..target.len() as i32:
-        let ch = target[i]
+        let ch = target.byte_at(i as i64)
         if ch == 0 or ch == 9 or ch == 10 or ch == 13:
             return false
     let parent = tool_path_dirname(output_path)
@@ -1345,7 +1345,7 @@ fn tool_tar_payload_text(bytes: &Vec[u8], offset: i64, size: i64) -> str:
 fn tool_tar_trim_payload_name(text: &str) -> str:
     var end = text.len() as i32
     while end > 0:
-        let ch = text[(end - 1)]
+        let ch = text.byte_at((end - 1) as i64)
         if ch != 0 and ch != 10 and ch != 13:
             break
         end = end - 1
@@ -1357,7 +1357,7 @@ fn tool_pax_parse_decimal(text: &str, start: i32, end: i32) -> i32:
     var value = 0
     var i = start
     while i < end:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch < 48 or ch > 57:
             return -1
         value = value * 10 + (ch - 48)
@@ -1368,7 +1368,7 @@ fn tool_pax_value(text: &str, key: &str) -> str:
     var pos = 0
     while pos < text.len() as i32:
         var space = pos
-        while space < text.len() as i32 and text[space] != 32:
+        while space < text.len() as i32 and text.byte_at(space as i64) != 32:
             space = space + 1
         if space >= text.len() as i32:
             return ""
@@ -1378,14 +1378,14 @@ fn tool_pax_value(text: &str, key: &str) -> str:
         let record_start = space + 1
         let record_end = pos + record_len
         var eq = record_start
-        while eq < record_end and text[eq] != 61:
+        while eq < record_end and text.byte_at(eq as i64) != 61:
             eq = eq + 1
         if eq < record_end:
             let name = text.slice(record_start as i64, eq as i64)
             if name == key:
                 var value_end = record_end
                 while value_end > eq + 1:
-                    let ch = text[(value_end - 1)]
+                    let ch = text.byte_at((value_end - 1) as i64)
                     if ch != 10 and ch != 13:
                         break
                     value_end = value_end - 1
@@ -1609,7 +1609,7 @@ fn tool_process_restore_env(saved: SavedProcessEnv):
 fn tool_effect_escape(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     for i in 0..text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch == 92:
             out.push_str("\\\\")
         else if ch == 9:
@@ -1632,7 +1632,7 @@ fn tool_effect_join_argv(parts: &Vec[str]) -> str:
 
 fn tool_effect_contains_slash(text: &str) -> bool:
     for i in 0..text.len() as i32:
-        if text[i] == 47:
+        if text.byte_at(i as i64) == 47:
             return true
     false
 
@@ -1647,7 +1647,7 @@ fn tool_effect_resolve_executable(exe: &str) -> str:
     var start = 0
     var i = 0
     while i <= path.len() as i32:
-        if i == path.len() as i32 or path[i] == 58:
+        if i == path.len() as i32 or path.byte_at(i as i64) == 58:
             let dir = path.slice(start as i64, i as i64)
             let candidate = if dir.len() == 0: with_str_clone_ref(exe) else: dir ++ "/" ++ exe
             if with_fs_file_exists(candidate) != 0:
@@ -1818,7 +1818,7 @@ pub fn ProcessRunner.wait(self: &Self, pid: i32, timeout_ms: i32) -> i32:
 fn tool_process_basename(path: &str) -> str:
     var start = 0
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 47 or ch == 92:
             start = i + 1
     path.slice(start as i64, path.len())
@@ -1966,7 +1966,7 @@ pub fn ActionCtx.env_input(self: &Self, name: &str) -> str:
 fn build_graph_escape(value: &str) -> str:
     var out = StringBuilder.with_capacity(value.len())
     for i in 0..value.len() as i32:
-        let ch = value[i]
+        let ch = value.byte_at(i as i64)
         if ch == 92:
             out.push_str("\\\\")
         else if ch == 9:
@@ -2201,7 +2201,7 @@ pub fn Build.extract_tar_gz(move self: Self, name: str, archive: str, output_dir
 fn build_path_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path[i] == 47:
+        if path.byte_at(i as i64) == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -2245,7 +2245,7 @@ fn build_zlib_gunzip_source() -> str:
     "    let out: Vec[u8] = Vec.new()\n" ++
     "    var i: i64 = 0\n" ++
     "    while i < data.len():\n" ++
-    "        out.push(data[i] as u8)\n" ++
+    "        out.push(data.byte_at(i) as u8)\n" ++
     "        i = i + 1\n" ++
     "    out\n\n" ++
     "fn bytes_to_str(data: &Vec[u8]) -> str:\n" ++
@@ -2562,12 +2562,12 @@ fn wp_parse_i32(s: &str, default_value: i32) -> i32:
     var v = 0
     var sign = 1
     var i: i64 = 0
-    if s[0] == 45:
+    if s.byte_at(0) == 45:
         sign = -1
         i = 1
     if i >= s.len(): return default_value
     while i < s.len():
-        let ch = s[i]
+        let ch = s.byte_at(i)
         if ch < 48 or ch > 57: return default_value
         v = v * 10 + (ch - 48)
         i = i + 1
@@ -2579,7 +2579,7 @@ impl WpCursor:
             return ""
         var end = self.pos
         let n = self.text.len()
-        while end < n and self.text[end] != 10:
+        while end < n and self.text.byte_at(end) != 10:
             end = end + 1
         if end >= n:
             self.ok = 0
@@ -2760,7 +2760,7 @@ fn ws_alloc_id(name: &str) -> i32:
     if text.len() > 0:
         var i: i64 = 0
         while i < text.len():
-            let ch = text[i]
+            let ch = text.byte_at(i)
             if ch < 48 or ch > 57: break
             id = id * 10 + (ch - 48)
             i = i + 1
@@ -2778,7 +2778,7 @@ fn ws_needs_evaluator(what: &str) -> Never:
 fn ws_path(root: &str, path: &str) -> str:
     if path.len() == 0:
         return with_str_clone_ref(path)
-    if path[0] == 47:
+    if path.byte_at(0) == 47:
         return with_str_clone_ref(path)
     let clean_root = if root.ends_with("/"): root.slice(0, root.len() - 1) else: with_str_clone_ref(root)
     if clean_root.len() == 0 or clean_root == ".":

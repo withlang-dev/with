@@ -51,12 +51,12 @@ fn comp_join(left: &str, right: &str) -> str:
 fn comp_is_absolute_path(path: &str) -> bool:
     if path.len() == 0:
         return false
-    if path[0] == 47 or path[0] == 92:
+    if path.byte_at(0) == 47 or path.byte_at(0) == 92:
         return true
     if os() == "Windows" and path.len() >= 3:
-        let drive = path[0]
-        let colon = path[1]
-        let slash = path[2]
+        let drive = path.byte_at(0)
+        let colon = path.byte_at(1)
+        let slash = path.byte_at(2)
         if colon == 58 and (slash == 47 or slash == 92):
             if (drive >= 65 and drive <= 90) or (drive >= 97 and drive <= 122):
                 return true
@@ -70,7 +70,7 @@ fn comp_abs(root: &str, path: &str) -> str:
 fn comp_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 47 or ch == 92:
             last_slash = i
     if last_slash < 0:
@@ -82,7 +82,7 @@ fn comp_dirname(path: &str) -> str:
 pub fn comp_path_basename(path: &str) -> str:
     var last_slash: i64 = -1
     for i in 0..path.len() as i32:
-        let ch = path[i]
+        let ch = path.byte_at(i as i64)
         if ch == 47 or ch == 92:
             last_slash = i as i64
     if last_slash >= 0:
@@ -137,12 +137,12 @@ fn comp_trim(text: &str) -> str:
     var start = 0
     var end = text.len() as i32
     while start < end:
-        let ch = text[start]
+        let ch = text.byte_at(start as i64)
         if ch != 9 and ch != 10 and ch != 13 and ch != 32:
             break
         start = start + 1
     while end > start:
-        let ch = text[(end - 1)]
+        let ch = text.byte_at((end - 1) as i64)
         if ch != 9 and ch != 10 and ch != 13 and ch != 32:
             break
         end = end - 1
@@ -151,7 +151,7 @@ fn comp_trim(text: &str) -> str:
 fn comp_first_trimmed_line(text: &str) -> str:
     var end = text.len() as i32
     for i in 0..text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch == 10 or ch == 13:
             end = i
             break
@@ -166,7 +166,7 @@ fn comp_index_of(text: &str, needle: &str) -> i32:
     for i in 0..(last + 1):
         var matched = true
         for j in 0..needle.len() as i32:
-            if text[(i + j)] != needle[j]:
+            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
                 matched = false
                 break
         if matched:
@@ -195,7 +195,7 @@ fn comp_replace_all(text: &str, needle: &str, replacement: &str) -> str:
 fn comp_normalize_line_endings(text: &str) -> str:
     var has_cr = false
     for ci in 0..text.len() as i32:
-        if text[ci] == 13:
+        if text.byte_at(ci as i64) == 13:
             has_cr = true
             break
     if not has_cr:
@@ -209,11 +209,11 @@ fn comp_normalize_line_endings(text: &str) -> str:
     var start = 0
     var i = 0
     while i < text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch == 13:
             if i > start:
                 out.push_str(text.slice(start as i64, i as i64))
-            if i + 1 < text.len() as i32 and text[(i + 1)] == 10:
+            if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
                 i = i + 1
             out.push_str("\n")
             start = i + 1
@@ -353,7 +353,7 @@ fn comp_step_timeout_ms() -> i32:
     let raw = env("WITH_BUILD_STEP_TIMEOUT_MS")
     var parsed = 0
     for i in 0..raw.len() as i32:
-        let ch = raw[i]
+        let ch = raw.byte_at(i as i64)
         if ch < 48 or ch > 57:
             parsed = 0
             break
@@ -388,7 +388,7 @@ fn comp_resolve_seed_compiler(ctx: &ActionCtx) -> str:
         var start = 0
         for i in 0..path_env.len() as i32 + 1:
             let at_end = i == path_env.len() as i32
-            let is_sep = not at_end and path_env[i] == comp_path_separator()
+            let is_sep = not at_end and path_env.byte_at(i as i64) == comp_path_separator()
             if is_sep or at_end:
                 if i > start:
                     let dir = path_env.slice(start as i64, i as i64)
@@ -527,7 +527,7 @@ fn comp_parse_nonnegative_i32(text: &str) -> i32:
         return -1
     var value = 0
     for i in 0..text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch < 48 or ch > 57:
             return -1
         value = value * 10 + (ch - 48)
@@ -563,13 +563,13 @@ fn comp_stack_collect_after_marker(text: &str, marker: &str, sizes: Vec[i32]) ->
             break
         var pos = at + marker.len() as i32
         while pos < text.len() as i32:
-            let ch = text[pos]
+            let ch = text.byte_at(pos as i64)
             if ch != 9 and ch != 32:
                 break
             pos = pos + 1
         var sign = 1
         if pos < text.len() as i32:
-            let sign_ch = text[pos]
+            let sign_ch = text.byte_at(pos as i64)
             if sign_ch == 43:
                 pos = pos + 1
             else if sign_ch == 45:
@@ -578,7 +578,7 @@ fn comp_stack_collect_after_marker(text: &str, marker: &str, sizes: Vec[i32]) ->
         var value = 0
         var seen_digit = false
         while pos < text.len() as i32:
-            let ch = text[pos]
+            let ch = text.byte_at(pos as i64)
             if ch < 48 or ch > 57:
                 break
             value = value * 10 + (ch - 48)
@@ -642,18 +642,18 @@ fn comp_count_actual_c_export_attrs(text: &str) -> i32:
     var i: i64 = 0
     while i <= text.len():
         let at_end = i == text.len()
-        if at_end or text[i] == 10:
+        if at_end or text.byte_at(i) == 10:
             var p = line_start
             while p < i:
-                let ch = text[p]
+                let ch = text.byte_at(p)
                 if ch != 9 and ch != 32:
                     break
                 p = p + 1
-            if p + 11 <= i and text[p] == 64:
-                if text[p + 1] == 91 and text[p + 2] == 99 and text[p + 3] == 95 and
-                    text[p + 4] == 101 and text[p + 5] == 120 and text[p + 6] == 112 and
-                    text[p + 7] == 111 and text[p + 8] == 114 and text[p + 9] == 116 and
-                    text[p + 10] == 40:
+            if p + 11 <= i and text.byte_at(p) == 64:
+                if text.byte_at(p + 1) == 91 and text.byte_at(p + 2) == 99 and text.byte_at(p + 3) == 95 and
+                    text.byte_at(p + 4) == 101 and text.byte_at(p + 5) == 120 and text.byte_at(p + 6) == 112 and
+                    text.byte_at(p + 7) == 111 and text.byte_at(p + 8) == 114 and text.byte_at(p + 9) == 116 and
+                    text.byte_at(p + 10) == 40:
                     count = count + 1
             line_start = i + 1
         i = i + 1
@@ -712,9 +712,9 @@ fn comp_split_lines(text: &str) -> Vec[str]:
     var i: i64 = 0
     while i <= text.len():
         let at_end = i == text.len()
-        if at_end or text[i] == 10:
+        if at_end or text.byte_at(i) == 10:
             var end = i
-            if end > start and text[end - 1] == 13:
+            if end > start and text.byte_at(end - 1) == 13:
                 end = end - 1
             lines.push(text.slice(start, end))
             start = i + 1
@@ -755,7 +755,7 @@ fn comp_add_words(items: Vec[str], text: &str) -> Vec[str]:
     var out = items
     var start = -1
     for i in 0..text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         let ws = ch == 9 or ch == 10 or ch == 13 or ch == 32
         if ws:
             if start >= 0:
@@ -792,7 +792,7 @@ fn comp_spec_subsection(text: &str, heading: &str) -> str:
     var end = text.len() as i32
     var i = start + 1
     while i < text.len() as i32:
-        if text[i] == 10:
+        if text.byte_at(i as i64) == 10:
             if i + 4 < text.len() as i32 and text.slice((i + 1) as i64, (i + 4) as i64) == "## ":
                 end = i
                 break
@@ -837,9 +837,9 @@ fn comp_collect_attr_names(items: Vec[str], text: &str) -> Vec[str]:
         if at < 0:
             break
         let name_start = at + 2
-        if name_start < text.len() as i32 and comp_is_ident_start(text[name_start]):
+        if name_start < text.len() as i32 and comp_is_ident_start(text.byte_at(name_start as i64)):
             var name_end = name_start + 1
-            while name_end < text.len() as i32 and comp_is_ident_continue(text[name_end]):
+            while name_end < text.len() as i32 and comp_is_ident_continue(text.byte_at(name_end as i64)):
                 name_end = name_end + 1
             let item = text.slice(name_start as i64, name_end as i64)
             if item.len() > 0 and not comp_vec_contains(out, item):
@@ -863,7 +863,7 @@ fn comp_spec_public_attributes(spec: &str) -> Vec[str]:
         if line.starts_with("| `@["):
             var end = -1
             for ci in 1..line.len() as i32:
-                if line[ci] == 124:
+                if line.byte_at(ci as i64) == 124:
                     end = ci
                     break
             if end > 1:
@@ -914,7 +914,7 @@ fn comp_strip_comment(text: &str) -> str:
 fn comp_first_shell_word(text: &str) -> str:
     let trimmed = comp_trim(text)
     for i in 0..trimmed.len() as i32:
-        let ch = trimmed[i]
+        let ch = trimmed.byte_at(i as i64)
         if ch == 9 or ch == 32:
             return trimmed.slice(0, i as i64)
     trimmed
@@ -933,7 +933,7 @@ fn comp_spec_cli_commands(spec: &str) -> Vec[str]:
         var part_start = 0
         var pi = 0
         while pi <= body.len() as i32:
-            if pi == body.len() as i32 or body[pi] == 124:
+            if pi == body.len() as i32 or body.byte_at(pi as i64) == 124:
                 var part = comp_trim(body.slice(part_start as i64, pi as i64))
                 if part.starts_with("with "):
                     part = comp_trim(part.slice(5, part.len()))
@@ -983,12 +983,12 @@ fn comp_collect_string_literal_flags(items: Vec[str], text: &str) -> Vec[str]:
     var flags = items
     var i = 0
     while i < text.len() as i32:
-        if text[i] != 34:
+        if text.byte_at(i as i64) != 34:
             i = i + 1
             continue
         var j = i + 1
         while j < text.len() as i32:
-            let ch = text[j]
+            let ch = text.byte_at(j as i64)
             if ch == 92:
                 j = j + 2
                 continue
@@ -998,14 +998,14 @@ fn comp_collect_string_literal_flags(items: Vec[str], text: &str) -> Vec[str]:
         if j >= text.len() as i32:
             break
         let literal = text.slice((i + 1) as i64, j as i64)
-        if literal.len() >= 2 and literal[0] == 45:
+        if literal.len() >= 2 and literal.byte_at(0) == 45:
             var hyphens = 1
-            if literal.len() >= 3 and literal[1] == 45:
+            if literal.len() >= 3 and literal.byte_at(1) == 45:
                 hyphens = 2
-            if literal.len() > hyphens and comp_is_ident_continue(literal[hyphens]):
+            if literal.len() > hyphens and comp_is_ident_continue(literal.byte_at(hyphens as i64)):
                 var end = hyphens + 1
                 while end < literal.len() as i32:
-                    let ch = literal[end]
+                    let ch = literal.byte_at(end as i64)
                     if not ((ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or (ch >= 48 and ch <= 57) or ch == 45):
                         break
                     end = end + 1
@@ -1050,7 +1050,7 @@ fn comp_std_module_from_path(path: &str) -> str:
         return ""
     var first = compiler_owned_text(rest)
     for i in 0..rest.len() as i32:
-        if rest[i] == 47:
+        if rest.byte_at(i as i64) == 47:
             first = rest.slice(0, i as i64)
             break
     if first.len() == 0 or first.starts_with("."):
@@ -1283,7 +1283,7 @@ pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
 fn comp_json_escape(text: &str) -> str:
     var out = ""
     for i in 0..text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch == 34:
             out = out ++ "\\\""
         else if ch == 92:
@@ -1382,16 +1382,16 @@ fn comp_find_packed_ref(fs: &ToolFs, root: &str, ref_path: &str) -> str:
         return ""
     var line_start: i64 = 0
     for i in 0..packed.len() as i32:
-        if packed[i] == 10:
+        if packed.byte_at(i as i64) == 10:
             let line = packed.slice(line_start, i as i64)
-            if line.len() > 41 and line[0] != 35:
+            if line.len() > 41 and line.byte_at(0) != 35:
                 let ref_in_line = line.slice(41, line.len())
                 if ref_in_line == ref_path:
                     return line.slice(0, 9)
             line_start = i as i64 + 1
     if line_start < packed.len():
         let line = packed.slice(line_start, packed.len())
-        if line.len() > 41 and line[0] != 35:
+        if line.len() > 41 and line.byte_at(0) != 35:
             let ref_in_line = line.slice(41, line.len())
             if ref_in_line == ref_path:
                 return line.slice(0, 9)
@@ -1909,7 +1909,7 @@ fn comp_check_manifest(fs: &ToolFs, manifest: &str) -> str:
     var changed = ""
     var line_start: i64 = 0
     for i in 0..manifest.len() as i32:
-        if manifest[i] == 10:
+        if manifest.byte_at(i as i64) == 10:
             let line = manifest.slice(line_start, i as i64)
             if line.len() > 0:
                 let sep = comp_last_colon_pos(line)
@@ -1926,22 +1926,22 @@ fn comp_check_manifest(fs: &ToolFs, manifest: &str) -> str:
 fn comp_fnv1a(s: &str) -> i64:
     var h: i64 = -3750763034362895579
     for i in 0..s.len() as i32:
-        h = h ^ (s[i] as i64)
+        h = h ^ (s.byte_at(i as i64) as i64)
         h = h *% 1099511628211
     h
 
 fn comp_last_colon_pos(line: &str) -> i64:
     var pos: i64 = -1
     for i in 0..line.len() as i32:
-        if line[i] == 58:
+        if line.byte_at(i as i64) == 58:
             pos = i as i64
     pos
 
 fn comp_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     for i in 0..min_len as i32:
-        let ac = a[i] as i32
-        let bc = b[i] as i32
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
         if ac != bc:
             return ac - bc
     if a.len() == b.len():

@@ -32,14 +32,14 @@ fn emitc_join(left: &str, right: &str) -> str:
     left ++ "/" ++ right
 
 fn emitc_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path[0] == 47:
+    if path.len() > 0 and path.byte_at(0) == 47:
         return emit_c_owned_text(path)
     emitc_join(root, path)
 
 fn emitc_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path[i] == 47:
+        if path.byte_at(i as i64) == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -50,7 +50,7 @@ fn emitc_dirname(path: &str) -> str:
 fn emitc_basename(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path[i] == 47:
+        if path.byte_at(i as i64) == 47:
             last_slash = i
     path.slice((last_slash + 1) as i64, path.len())
 
@@ -63,12 +63,12 @@ fn emitc_trim(text: &str) -> str:
     var start = 0
     var end = text.len() as i32
     while start < end:
-        let ch = text[start]
+        let ch = text.byte_at(start as i64)
         if ch != 9 and ch != 10 and ch != 13 and ch != 32:
             break
         start = start + 1
     while end > start:
-        let ch = text[(end - 1)]
+        let ch = text.byte_at((end - 1) as i64)
         if ch != 9 and ch != 10 and ch != 13 and ch != 32:
             break
         end = end - 1
@@ -224,7 +224,7 @@ fn emitc_index_of(text: &str, needle: &str) -> i32:
         var j = 0
         var matched = true
         while j < needle.len() as i32:
-            if text[(i + j)] != needle[j]:
+            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
                 matched = false
                 break
             j = j + 1
@@ -239,9 +239,9 @@ fn emitc_split_lines(text: &str) -> Vec[str]:
     var i = 0
     while i <= text.len() as i32:
         let at_end = i == text.len() as i32
-        if at_end or text[i] == 10:
+        if at_end or text.byte_at(i as i64) == 10:
             var line = text.slice(start as i64, i as i64)
-            if line.len() > 0 and line[line.len() - 1] == 13:
+            if line.len() > 0 and line.byte_at(line.len() - 1) == 13:
                 line = line.slice(0, line.len() - 1)
             lines.push(line)
             start = i + 1
@@ -256,7 +256,7 @@ fn emitc_c_export_symbol(line: &str) -> str:
     let symbol_start = start + prefix.len() as i32
     var i = symbol_start
     while i < line.len() as i32:
-        if line[i] == 34:
+        if line.byte_at(i as i64) == 34:
             return line.slice(symbol_start as i64, i as i64)
         i = i + 1
     ""
@@ -265,7 +265,7 @@ fn emitc_find_matching_paren(text: &str, open_at: i32) -> i32:
     var depth = 0
     var i = open_at
     while i < text.len() as i32:
-        let ch = text[i]
+        let ch = text.byte_at(i as i64)
         if ch == 40:
             depth = depth + 1
         else if ch == 41:
@@ -312,7 +312,7 @@ fn emitc_parse_param(param_text: &str) -> EmitCParam:
     let trimmed = emitc_trim(param_text)
     var colon = -1
     for i in 0..trimmed.len() as i32:
-        if trimmed[i] == 58:
+        if trimmed.byte_at(i as i64) == 58:
             colon = i
             break
     if colon < 0:
@@ -327,7 +327,7 @@ fn emitc_parse_params(text: &str) -> Vec[EmitCParam]:
     var i = 0
     while i <= text.len() as i32:
         let at_end = i == text.len() as i32
-        if at_end or text[i] == 44:
+        if at_end or text.byte_at(i as i64) == 44:
             let piece = emitc_trim(text.slice(start as i64, i as i64))
             if piece.len() > 0:
                 params.push(emitc_parse_param(piece))
@@ -343,7 +343,7 @@ fn emitc_parse_export_function(symbol: &str, line: &str) -> EmitCFunction:
     var open_at = -1
     var i = fn_at
     while i < line.len() as i32:
-        if line[i] == 40:
+        if line.byte_at(i as i64) == 40:
             open_at = i
             break
         i = i + 1
@@ -370,7 +370,7 @@ fn emitc_parse_export_function(symbol: &str, line: &str) -> EmitCFunction:
         let after_arrow = rest.slice((arrow + 2) as i64, rest.len())
         var colon = -1
         for ci in 0..after_arrow.len() as i32:
-            if after_arrow[ci] == 58:
+            if after_arrow.byte_at(ci as i64) == 58:
                 colon = ci
                 break
         if colon < 0:
@@ -417,7 +417,7 @@ fn emitc_public_function_name(line: &str) -> str:
         return ""
     var i = start
     while i < line.len() as i32:
-        let ch = line[i]
+        let ch = line.byte_at(i as i64)
         if ch == 40 or ch == 32 or ch == 58:
             break
         i = i + 1
@@ -824,7 +824,7 @@ fn emitc_compare_files(ctx: &ActionCtx, left_path: &str, right_path: &str) -> i3
     var diff_at = -1
     var i = 0
     while i < min_len:
-        if left[i] != right[i]:
+        if left.byte_at(i as i64) != right.byte_at(i as i64):
             diff_at = i
             break
         i = i + 1
