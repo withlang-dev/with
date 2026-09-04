@@ -47,12 +47,37 @@ prints are hypotheses, not proof; don't propose a fix or deferral from a
 characterization alone. Deferring is valid only after locating the bug at the
 instruction level and showing the fix needs foundation work you can point to.
 
-**Self-check trip-wire.** If your last three actions were edit, compile, read
-trace output, and you still can't name the exact wrong line, stop and switch
-tools: a breakpoint, an allocator verdict, `with reduce`, `--trace-place`,
-`--explain-mir-origin`, `--trace-ownership`, `--dump-drop-plan`,
-`--trace-cleanup-edge`, `--validate-all`, `nm`/`otool`, or a smaller checked
-repro.
+**Every bug has a route, and you state it.** `docs/deep-debugging-tools.md`
+orders the tools by bug class. Before the first edit for a bug, name the
+route you are on and run its first steps: a drop, free, or leak bug starts
+with the debug allocator, `WITH_ALLOC_NO_REUSE`, the address trap
+(`WITH_DEBUG_ALLOC_TRAP_FREE`), and the runner's own binary — never with
+`grep` or a trace print. A fix commit cites the tool output that proves the
+exact line: the allocator report and backtrace, the `matrix` row, the
+validator error, the IR of the block. Output that only characterizes
+(counts, dump greps, trace prints) is a hypothesis and does not justify an
+edit.
+
+**A tool that stayed silent is a bug.** If a validator said ok, a dump said
+skip, an audit passed, or a reducer converged on noise while the bug
+existed, the tool is wrong and is fixed or filed in the same batch as the
+bug, before the fix is called done (`validate-all: ok` over a garbage drop
+is the model: the drop-state driver joined only lower-numbered
+predecessors).
+
+**Three-action trip-wire.** If your last three actions were edit, compile,
+read output and you cannot name the exact wrong line, stop and switch to the
+route's next tool: a breakpoint, an allocator verdict, `with reduce`,
+`--trace-place`, `--explain-mir-origin`, `--trace-ownership`,
+`--dump-drop-plan`, `--trace-cleanup-edge`, `--validate-all`, `nm`/`otool`,
+or a smaller checked repro. Do not start a fourth.
+
+**Tools are products.** When a hunt needs a capability that does not exist
+(`--keep-binary`, a first-free site in the ledger, a test-mode reducer),
+file it during the hunt, not after, and prefer building it over a
+workaround when the workaround is a race or a manual lldb session. Before
+building, grep the runtime and the doc for the flag that already exists —
+the address trap sat unmentioned in `rt_core.w` for a month.
 
 **Deep compiler bugs.** If the repro isn't minimal, run `with reduce` with the
 failing command as the predicate. For MIR lowering, ownership, and codegen bugs,
@@ -788,8 +813,10 @@ use-after-free, and leak bugs:
 with build :debug-alloc-tests
 ./out/release/bin/with build tools/debug_drop.w -o out/debug-alloc-tests/debug_drop
 out/debug-alloc-tests/debug_drop run ./out/release/bin/with repro.w
+WITH_DEBUG_ALLOC_TRAP_FREE=<decimal payload addr> ./bin        # every alloc/free of that block, with drop origins
 lldb --batch -s tools/debug_drop_sites.lldb \
-  -o "run run repro.w" -o "quit" -- ./out/release/bin/with
+  -o "settings set target.env-vars WITH_DEBUG_ALLOC=1 WITH_DEBUG_ALLOC_TRAP_FREE=<addr>" \
+  -o run -o "bt 24" -o quit -- ./bin                            # backtraces at each trap hit and at the double-free reporter
 ```
 
 ### Heap corruption

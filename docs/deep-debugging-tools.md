@@ -2,9 +2,91 @@
 
 Status: implemented. Audience: compiler/runtime contributors.
 
-These tools exist to stop edit/compile/trace loops. Use them to reduce the
-input, inspect the exact MIR place or origin, classify allocator behavior, or
-localize fixpoint nondeterminism before changing code.
+These tools exist to stop edit/compile/trace loops. This page is ordered by
+the kind of bug you are holding, not by tool: each route says which tool
+proves what, and what it cannot prove. The catalog of every command follows
+the routes.
+
+## Routes by bug class
+
+### A drop, double free, invalid free, use-after-free, or leak
+
+1. **Native debug allocator first.** `with run --debug-alloc repro.w` (or
+   `WITH_DEBUG_ALLOC=1` on any binary). It names the block, its size, and
+   the drop-origin tag of the first free (`first_drop=drop#struct
+   __drop_struct_16` is the str drop glue; `<untagged>` is a raw `rt_free`
+   caller such as a collection's own free). The tag is the first real clue:
+   a str drop freeing a block another owner also frees means a str aliases
+   that owner's buffer, or a str value is garbage.
+2. **`WITH_ALLOC_NO_REUSE=1`** on the same run. A plain double free still
+   reports; a report that disappears means the second free came through a
+   stale pointer whose address was reused, or the "str" was uninitialized
+   stack (the #729 class: a temp dropped on a path that never created it).
+3. **Get the exact failing binary.** A fixture that fails only under
+   `with test` fails in the runner's own artifact
+   (`out/<dir>/<stem>.test.<pid>.<nanos>`, built from the synthesized test
+   main); a `with build` of the file has no test main. Keep that artifact
+   (#1013) and run it directly with `WITH_TEST_FILTER=<test>` — if it fails
+   standalone, every later step works on it without the runner.
+4. **Resolve the second free's site**: `lldb --batch -o "settings set
+   target.env-vars WITH_TEST_FILTER=<test> WITH_DEBUG_ALLOC=1" -o
+   "breakpoint set --name dbg_report_double_free" -o run -o "bt 24" -o quit
+   -- ./bin`. One hit, seconds. Do **not** put unconditional breakpoints on
+   `rt_alloc`/`rt_free` with backtraces — that is thousands of stops and
+   times out on a four-test fixture.
+5. **Resolve the first free and every touch of the block** with the
+   allocator's own trap, no debugger needed:
+   `WITH_DEBUG_ALLOC_TRAP_FREE=<decimal addr> ./bin` prints every alloc and
+   free of that payload address with its drop origin (it works without
+   `WITH_DEBUG_ALLOC`, so the heap layout is unchanged), and
+   `WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>` panics on the n-th free so lldb
+   stops on that call chain. `tools/debug_drop_sites.lldb` puts backtrace
+   breakpoints on those trap checks and on the double-free reporter. A
+   hardware watchpoint on the payload (`watchpoint set expression -w write
+   -s 8 -- <addr>`) is the other fast tool; lldb runs with ASLR off, so an
+   address from one run is stable in the next. #1014 asks for the first
+   free's site to be recorded by default so the plain report names both.
+6. **Read the function's IR or disassembly at the join block.** `--emit-llvm`
+   on the fixture, or `otool -tV bin | awk '/^_fn:/,/^_next:/'`. Two
+   unconditional drop calls after a `switch` merge, with no drop-flag test,
+   is the whole diagnosis for the #729 class.
+7. **Confirm with the drop-state view** (`--dump-drop-plan`,
+   `--dump-drop-state`, `--validate-ownership`, below) and fix the lowering.
+   For this class the validator is the reducer: `with reduce` deletes lines,
+   and deleting lines changes the stack garbage (#1015).
+
+### A wrong receiver mode, effect, or ownership verdict
+
+`analyze file 'explain:effect:<fn>[:<param>]'` prints the provenance chain
+down to the seed that first set the bit. Then `matrix:name~<fn>` to see the
+first layer (AST, Sema, ABI, MIR, codegen) where the facts diverge. Never
+bisect by neutralizing code: the #691 escalation cascade was one misattributed
+seed, a one-query answer with provenance.
+
+### A `with build :fixpoint` failure
+
+`with build :fixpoint-diff`, then `cat out/fixpoint-diff/report.txt`. The
+report names the first differing byte; `llvm-nm`/`otool` attribute it to a
+symbol. Nondeterminism is a codegen bug (unordered-map iteration, address-
+dependent ordering); never an excuse for `-O0`.
+
+### A lowering, MIR, ABI, or codegen bug on a compilable input
+
+`with reduce` to a minimal input, `analyze repro.w audit:all` as the proof
+gate (it must pass on the reduced repro before any build), `matrix` for the
+diverging layer, `lldb:<query>` for breakpoints from real facts, then lldb
+on the compiler branch. `--dump-abi` answers "is this parameter lowered
+consistently at caller and callee" — never infer that from MIR.
+
+### The compiler crashes or aborts on an input
+
+An internal `BUG:` line, a SIGTRAP (exit 133), or exit 134 is a compiler
+defect regardless of what the input did. Reduce it (`with reduce --exit-code
+nonzero -- with check {file}`), then lldb on the compiler: LLVM frames in the
+backtrace mean invalid IR construction, pure With frames mean a With-side
+abort (#653's `switch undef` class). File it with the reduced input; `map[k]`
+on a HashMap aborting in `validate_generic_call_contracts` (#1012) is the
+current example.
 
 ## Integrated Compiler Analysis
 
@@ -31,6 +113,10 @@ calls. It also runs `audit:storage`, which checks AST-indexed table bounds,
 parallel start/count storage, canonical argument-node validity, and non-colliding
 64-bit keys across the former 16-bit AST-node boundary. The command exits nonzero
 on any violation.
+
+Cost: instant on a repro; on the compiler itself (`analyze src/main.w
+audit:all`, the batch-tier step) about 170 s and 20 GB resident at 12033103.
+It is a batch-tier gate, not a per-edit one.
 
 Use `matrix:<query>` for root cause. A call matrix places AST/Sema/ABI/MIR and
 Codegen facts in one stable table, making the first diverging layer visible. Use
@@ -184,28 +270,52 @@ Options:
 The source path must immediately follow `reduce`. Use `{file}` in the predicate
 argv for the candidate path; without it, the candidate path is appended.
 
-## MIR Place Inspection
+What it cannot reduce: a `//! test` fixture (the failure lives in the
+synthesized test main and the runner's environment, #1015), and any
+layout-dependent bug — a drop of uninitialized stack garbage changes with
+every deleted line, so the predicate flips on noise. Route those to the
+drop-state view and the allocator instead.
 
-These run from `with check` after MIR lowering:
+## The drop-state view (one dataflow, several views)
+
+One analysis backs all of these: a per-body dataflow over every place the
+MIR can name (locals and projected places, interned per body), joined at
+every predecessor to a fixpoint — including back edges and join blocks that
+are numbered before the arms that feed them, which the pre-12033103 single
+sweep silently skipped. States: `Uninit`, `Init`, `Moved`, `Maybe`, and
+`MaybeGarbage` (some path never touched the place: a drop there frees
+stack garbage, the #729 class).
 
 ```sh
-./out/stage/bin/with-stage2 check repro.w --trace-place main:_1
-./out/stage/bin/with-stage2 check repro.w --explain-mir-origin main:_1
-./out/stage/bin/with-stage2 check repro.w --validate-all
+./out/stage/bin/with-stage2 check repro.w --dump-drop-state
+./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
+./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
+./out/stage/bin/with-stage2 check repro.w --trace-cleanup-edge 'main:bb0->bb1'
 ./out/stage/bin/with-stage2 check repro.w --validate-ownership
+./out/stage/bin/with-stage2 check repro.w --validate-all
 ```
 
-- `--trace-place <fn:place>` prints MIR locals, statements, and terminators in
-  matching functions whose text mentions the target place.
-- `--explain-mir-origin <fn:item>` prints local/type/span and MIR statement or
-  terminator lines that mention the target item.
-- `--validate-all` runs all MIR validators and reports `validate-all: ok` or the
-  first validator error.
-- `--validate-ownership` runs the MIR shape checks plus ownership-specific
-  place/type checks and reports `validate-ownership: ok` or the first error.
+- `--dump-drop-state` prints every block's in/out state.
+- `--dump-drop-plan` prints each MIR drop site with the state before it and
+  an `action` (`drop`, `drop-conditional`, `skip`). **Read `action` as the
+  analysis's verdict, not as what codegen does**: drop flags are retired and
+  codegen emits every `drop` statement, so a `skip` on an `Uninit` place is
+  a drop of garbage at runtime. Making that a hard `check` error rather than
+  an opt-in validator is the intended end state.
+- `--trace-ownership <fn:place>` prints the before/after state at every
+  statement or terminator that touches the place (empty place: all places).
+- `--trace-cleanup-edge <fn:from->to>` prints the state across one CFG edge.
+  Quote the argument; `>` is a shell redirection.
+- `--validate-ownership` rejects a drop of a `MaybeGarbage` place and
+  reports the first error; `--validate-all` runs every MIR validator.
+- `--dump-place-map` lists each MIR place with base local, type id, and
+  projection list, for when `_N.fK` does not mean what the source seemed
+  to say. `--dump-drop-flags` reports runtime drop flags; today it prints
+  `<no drop flags>` for every module.
 
-Use these before adding temporary trace prints to MIR lowering, ownership, or
-codegen code.
+These show what MIR believes. They now believe the right thing about joins,
+but still use `lldb` on the lowering or codegen branch to prove *why* a
+statement is where it is.
 
 ## Source Rewrite Clients
 
@@ -225,41 +335,11 @@ All clients preflight the complete file/path and fail before writing on missing,
 duplicate, ambiguous, or mismatched facts. The removed receiver/frozen/closure,
 AST-metadata, diagnostic-map, and receiver-flip scripts must not be recreated.
 
-## Ownership And Cleanup Inspection
-
-These commands focus on deep move/drop bugs, especially partial moves, cleanup
-edges, and future runtime drop-flag work:
-
-```sh
-./out/stage/bin/with-stage2 check repro.w --trace-ownership main:_1
-./out/stage/bin/with-stage2 check repro.w --dump-drop-plan
-./out/stage/bin/with-stage2 check repro.w --dump-place-map
-./out/stage/bin/with-stage2 check repro.w --trace-cleanup-edge 'main:bb0->bb1'
-./out/stage/bin/with-stage2 check repro.w --dump-drop-flags
-```
-
-- `--trace-ownership <fn:place>` prints before/after ownership state for the
-  selected place whenever MIR statements or terminators move, drop, initialize,
-  or otherwise mention it. Use `fn:` with an empty place to trace all tracked
-  places in that function.
-- `--dump-drop-plan` prints each MIR drop site, the place being dropped, its
-  state before cleanup, and whether the static plan drops, conditionally drops,
-  or skips it.
-- `--dump-place-map` lists each MIR place with its base local, type id, and
-  normalized projection list. Use it when `_N.fK` does not mean what the source
-  expression seemed to mean.
-- `--trace-cleanup-edge <fn:from->to>` prints ownership state across one CFG
-  edge. Both `0->1` and `bb0->bb1` are accepted. Quote this argument in shell
-  commands because `>` is a redirection operator.
-- `--dump-drop-flags` reports MIR-generated runtime drop flags. It prints
-  `<no drop flags>` when a module does not need them; otherwise each line names
-  the value local guarded by its flag local. Use this to confirm conditional
-  whole-local moves are protected by a runtime flag before trusting cleanup
-  behavior.
-
-Do not infer the root cause from these reports alone. They show what MIR
-believes; use `lldb` on the lowering or codegen branch to prove why it believes
-that.
+A purely lexical class of rewrite (`.get(i as i64)` → `v[i]`, `byte_at(i)`
+→ `s[i]`) is a `with -p` regex or a balanced-paren With script, run tree-wide
+in one pass; the type checker is the safety net, and the two traps are map
+receivers (a HashMap `.get` is a lookup, not an index) and build-driver files,
+which must stay compilable by the installed seed.
 
 ## Instruction-Level Root Cause
 
@@ -289,7 +369,9 @@ Hard-won specifics for `lldb --batch` against `-O1 -g` With binaries:
   ABI-stable argument registers.
 - Our DWARF has no variable info (`frame variable` fails with "no variable
   information"); read entry-register args at non-inlined symbol entries, and
-  treat `[inlined]` frame line attributions as unreliable.
+  treat `[inlined]` frame line attributions as unreliable. Fixing variable
+  info would strengthen every recipe on this page more than a new query
+  verb would.
 - `register read` transcribes inside breakpoint command lists;
   `memory read` with a `$reg` address does not — do memory dumps at the
   final stop from the `-o` command stream instead.
@@ -301,6 +383,10 @@ Hard-won specifics for `lldb --batch` against `-O1 -g` With binaries:
   `brk` or a `switch undef` miscompile detonating; the backtrace
   discriminates in one run — LLVM frames mean invalid IR construction,
   pure With frames mean the silent-undef class (#653).
+- Conditional breakpoints (`--condition '$x0 == <addr>'`) on hot runtime
+  entry points evaluate an expression per hit and are effectively hangs on
+  real programs. Use a reporter breakpoint or a hardware watchpoint instead.
+- Set the environment with `settings set target.env-vars A=1 B=2`, not `env`.
 
 ## Fixpoint Diff
 
@@ -324,7 +410,7 @@ offset, and a small byte window around the mismatch. It does not yet attribute
 the difference to an object symbol; use `llvm-nm`, `otool`, or `lldb` after the
 byte offset narrows the search.
 
-## Debug Allocator Filters
+## Debug Allocator
 
 The native debug allocator remains the first tool for drop, lifetime,
 double-free, use-after-free, and leak bugs:
@@ -332,7 +418,25 @@ double-free, use-after-free, and leak bugs:
 ```sh
 ./out/stage/bin/with-stage2 run --debug-alloc repro.w
 ./out/stage/bin/with-stage2 run --debug-alloc --debug-alloc-filter=non-root repro.w
+WITH_DEBUG_ALLOC=1 ./bin                 # any binary
+WITH_ALLOC_NO_REUSE=1 ./bin              # never reuse a freed address
 ```
+
+The report names the block (address, size), the drop-origin tag of the
+first free, and whether the second was tagged. `WITH_ALLOC_NO_REUSE=1`
+distinguishes a genuine double free (still reported) from a stale pointer
+into reused memory or an uninitialized value that happened to hold a live
+address (report disappears). Then trap the address:
+
+```sh
+WITH_DEBUG_ALLOC_TRAP_FREE=<decimal payload addr> ./bin        # print every alloc/free of it, with drop origins
+WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n> WITH_DEBUG_ALLOC_TRAP_FREE=<addr> ./bin   # panic on the n-th free
+```
+
+The trap works without `WITH_DEBUG_ALLOC` (the allocation pattern under
+test is unchanged), and values may be zero-padded so the environment block
+keeps the same length across learn/trap runs. The plain report does not
+record the first free's site by itself yet (#1014).
 
 Leak filters:
 
@@ -344,6 +448,10 @@ Runtime code can mark an allocation as an intentional root with
 `with_debug_alloc_mark_root(ptr, reason_ptr, reason_len)`. Debug-allocator
 fixtures can set `//! debug-alloc-filter: non-root` to assert the non-root leak
 view instead of raw process-lifetime noise.
+
+`tools/debug_drop_sites.lldb` (breakpoints on every alloc/free with a
+backtrace) is retired in favor of the reporter breakpoint and the
+watchpoint: it did not finish within five minutes on a four-test fixture.
 
 ## Verification Targets
 

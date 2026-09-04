@@ -1,25 +1,47 @@
-# tools/debug_drop_sites.lldb — resolve alloc/free SOURCE SITES for an address.
+# tools/debug_drop_sites.lldb — resolve the SITES behind a debug-allocator verdict.
 #
-# The debug allocator (--debug-alloc) reports WHICH block double-freed or leaked
-# (its address). This lldb command file resolves WHERE that block was allocated
-# and freed, by breaking on the allocator entry points with backtraces. (The lldb
-# on the dev box has no script interpreter, so this is plain commands — no Python.)
+# The debug allocator (--debug-alloc / WITH_DEBUG_ALLOC=1) reports WHICH block
+# double-freed or leaked (address, size, the drop-origin tag of the first free).
+# This file resolves WHERE, with recipes that finish in seconds on real programs.
+# (The old version put unconditional breakpoints with backtraces on every
+# rt_alloc/rt_free; it did not finish within five minutes on a four-test fixture.)
 #
-# Usage — run the repro under lldb and grep the log for the flagged address:
+# 0. Classify first, no debugger:
+#      WITH_DEBUG_ALLOC=1 ./bin            -> the verdict: block, size, first-drop tag
+#      WITH_ALLOC_NO_REUSE=1 ./bin         -> report persists: genuine double free;
+#                                             report vanishes: stale pointer into
+#                                             reused memory, or an uninitialized
+#                                             value holding a live address (#729)
 #
-#   lldb --batch -s tools/debug_drop_sites.lldb \
-#       -o "run run <repro.w>" -o "quit" -- out/release/bin/with \
-#     2>&1 | grep -A6 "<addr-from-debug-alloc>"
+# 1. Every alloc and free of ONE address, with drop origins — the allocator's
+#    own trap (works without WITH_DEBUG_ALLOC, so the heap layout is unchanged):
+#      WITH_DEBUG_ALLOC_TRAP_FREE=<decimal payload addr> ./bin
+#    prints each hit; add WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n> to panic on the
+#    n-th free so a debugger stops on that call chain. Values may be zero-padded
+#    to keep the environment block the same length across runs (heap replay).
 #
-# For a standalone repro binary (built with `with build <repro> -o bin`), use
-# `-- ./bin` and `-o run`. Each alloc/free prints x0 (the payload/arg pointer)
-# and a short backtrace; match x0 against the address the ledger reported.
+# 2. Sites with backtraces, under lldb (ASLR is off under lldb, so an address
+#    from run 0 is stable):
+#      lldb --batch -s tools/debug_drop_sites.lldb \
+#          -o "settings set target.env-vars WITH_DEBUG_ALLOC=1 WITH_DEBUG_ALLOC_TRAP_FREE=<addr> WITH_TEST_FILTER=<test>" \
+#          -o run -o "bt 24" -o quit -- ./bin
+#    The trap-check breakpoints below fire once per alloc/free of <addr> (with
+#    a backtrace each, via their command lists); the reporter breakpoint fires
+#    at the second free; the final `bt 24` is the stop that ended the run.
+#
+#    For a fixture that fails only under `with test`, debug the runner's own
+#    artifact — out/<dir>/<stem>.test.<pid>.<nanos> — not a `with build` of the
+#    file (#1013 tracks keeping it).
+#
+# Do NOT set conditional breakpoints (`--condition '$x0 == <addr>'`) on rt_free
+# or rt_alloc: the expression is evaluated per hit and the run never finishes.
+# A hardware watchpoint on the payload (`watchpoint set expression -w write
+# -s 8 -- <addr>`) is the other fast tool when the trap env is not enough.
 
-breakpoint set --name rt_alloc
-breakpoint command add --one-liner "register read x0" --one-liner "bt 6" --one-liner "continue"
+breakpoint set --name dbg_trap_free_check
+breakpoint command add --one-liner "bt 12" --one-liner "continue"
 
-breakpoint set --name rt_free
-breakpoint command add --one-liner "register read x0" --one-liner "bt 6" --one-liner "continue"
+breakpoint set --name dbg_trap_alloc_check
+breakpoint command add --one-liner "bt 12" --one-liner "continue"
 
-breakpoint set --name with_vec_free
-breakpoint command add --one-liner "register read x0" --one-liner "bt 6" --one-liner "continue"
+breakpoint set --name dbg_report_double_free
