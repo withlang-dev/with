@@ -2481,7 +2481,7 @@ fn repo_lock_parse_pid(owner: &str) -> i32:
         return -1
     var pid = 0
     for i in start..end:
-        pid = pid * 10 + (owner[i] - 48)
+        pid = pid * 10 + (owner[i] as i32 - 48)
     pid
 
 fn repo_lock_acquire(target_name: &str) -> bool:

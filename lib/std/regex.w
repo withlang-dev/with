@@ -298,7 +298,7 @@ fn regex_expand_numbered_capture(captures: &Captures, repl: &str, start: i64, en
     var number: i32 = 0
     var i = start
     while i < end:
-        number = number * 10 + (repl[i] - 48)
+        number = number * 10 + (repl[i] as i32 - 48)
         i = i + 1
     match captures.get(number):
         Some(found) => { var taken = found; let out = move taken.text; out }

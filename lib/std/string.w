@@ -173,8 +173,8 @@ pub fn string_cmp(a: &str, b: &str) -> i32:
     let min_len = if al < bl: al else: bl
     var i: i64 = 0
     while i < min_len:
-        let ca = a[i]
-        let cb = b[i]
+        let ca = a[i] as i32
+        let cb = b[i] as i32
         if ca != cb:
             return ca - cb
         i = i + 1

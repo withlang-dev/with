@@ -256,8 +256,8 @@ fn build_cache_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < min_len as i32:
-        let ac = a[i]
-        let bc = b[i]
+        let ac = a[i] as i32
+        let bc = b[i] as i32
         if ac != bc:
             return ac - bc
         i = i + 1
