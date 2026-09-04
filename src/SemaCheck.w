@@ -2133,9 +2133,14 @@ impl Sema:
                 for pi in 0..apply_count:
                     let ppat = self.ast.fn_param_pattern_value(ppat_start + pi)
                     if ppat != 0:
-                        if self.pattern_is_refutable(ppat) != 0 and self.fn_is_clause_body_symbol(fn_name) == 0:
-                            self.emit_error("refutable parameter pattern requires another function clause or an else", ppat)
                         self.check_pattern(ppat, self.sig_param_type(sig_idx, pi))
+                        // A variant pattern that resolved to nothing already has
+                        // its own error (the wrong-case binding case); the
+                        // refutability note would only pile on.
+                        let unresolved_variant = self.ast.kind(ppat) == NodeKind.NK_PAT_VARIANT and
+                            not self.comp_resolved.contains(ppat) and not self.pattern_value_syms.contains(ppat)
+                        if not unresolved_variant and self.pattern_is_refutable(ppat) != 0 and self.fn_is_clause_body_symbol(fn_name) == 0:
+                            self.emit_error("refutable parameter pattern requires another function clause or an else", ppat)
 
         // Effect tracking: save outer state and populate for this function
         let saved_eff_sig_idx = self.current_fn_sig_idx
@@ -7160,6 +7165,11 @@ impl Sema:
         let ident_gate_note = self.std_gated_import_note(sym)
         if ident_gate_note.len() > 0:
             self.emit_error("'" ++ target_name ++ "' requires an explicit import (§18.1)" ++ ident_gate_note, node)
+            return 0
+        if self.ast.kind(node) == NodeKind.NK_PAT_VARIANT:
+            // A bare uppercase-initial identifier in a pattern is a unit
+            // variant or a constant (§9.7); `fn f(N: i32)` meant a binding.
+            self.emit_error("'" ++ target_name ++ "' is neither a variant of the subject type nor a known constant; a binding starts with a lowercase letter, a unit variant is spelled ." ++ target_name ++ " (§9.7)", node)
             return 0
         let suggestion = self.suggest_name(target_name, node)
         self.emit_error_with_suggestion("undefined variable", node, suggestion)
