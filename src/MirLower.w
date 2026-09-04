@@ -10832,6 +10832,16 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(none_bb)
+        // `??` decomposes its subject like `?` does (#605/#606): on the
+        // success path the payload moved out above, so the subject must not
+        // reach its scope-exit drop — the Result/Option's variant-aware drop
+        // glue freed the moved-out str again (a `read_file(p) ?? ""` result
+        // dangled over reused memory: double free in the gunzip helper). On
+        // this path nothing moved out, so the subject — an Err payload, or
+        // nothing — is dropped here, explicitly.
+        let dq_scrut_local = mir_place_plain_local(&self.body, value_place)
+        if dq_scrut_local >= 0:
+            self.emit_drop_stmt(value_place, "coalesce-default", self.ast.get_start(expr))
         // #772: a stmt-temp frame + divergence guard, exactly like lower_if's
         // branches. A diverging default (`?? return e`) leaves a Unit operand
         // in its unreachable continuation; assigning it into the typed join
@@ -10844,6 +10854,10 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
+        if dq_scrut_local >= 0:
+            self.cancel_stmt_temp_for_local(dq_scrut_local)
+            self.cancel_scheduled_value_drop_for_local(dq_scrut_local)
+            self.mark_local_value_moved(dq_scrut_local)
         self.forget_string_flow_facts()
         if self.sema.is_copy_frozen(result_ty) != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
