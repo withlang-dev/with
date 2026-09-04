@@ -2139,6 +2139,16 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     var runner_checked = false
     var runner_path = ""
     var runner_fallback: Vec[str] = Vec.new()
+    // #1075/#1074: the runner is compiled at the FIRST action target, before
+    // the bootstrap targets have produced the tree's runtime objects
+    // (out/bootstrap-lib/cimport_stubs.o and friends) and, on Windows, the
+    // LLVM linker metadata (out/bootstrap-lib/llvm_ld). A seed that does not
+    // embed its runtime (linux-aarch64) or cannot link without the metadata
+    // (Windows) fails that first attempt; it is retried once both exist.
+    // Until then actions evaluate at comptime, as before.
+    var runner_waits_for_bootstrap = false
+    let runtime_probe_path = resolve_join(root, "out/bootstrap-lib/cimport_stubs.o")
+    let link_metadata_path = resolve_join(root, "out/bootstrap-lib/llvm_ld")
     for ti in 0..graph.targets.len() as i32:
         let target = &graph.targets[ti]
         if timing_name.len() > 0:
@@ -2213,9 +2223,16 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     skipped_targets.push(with_str_clone_ref(target.name))
                     completed_targets.push(with_str_clone_ref(target.name))
                     continue
-        if target.kind == 23 and not runner_checked and not build_action_worker_env_enabled() and not options.strict_effects:
+        let bootstrap_ready = with_fs_file_exists(runtime_probe_path) != 0 and with_fs_file_exists(link_metadata_path) != 0
+        let runner_retry = runner_waits_for_bootstrap and bootstrap_ready
+        if target.kind == 23 and (not runner_checked or runner_retry) and not build_action_worker_env_enabled() and not options.strict_effects:
+            if runner_retry:
+                with_eprint("[build] runner: retrying the compile now that the bootstrap runtime objects and linker metadata exist")
             runner_checked = true
+            runner_waits_for_bootstrap = false
             runner_path = build_runner_ensure(root, options)
+            if runner_path.len() == 0 and not bootstrap_ready:
+                runner_waits_for_bootstrap = true
             if runner_path.len() > 0:
                 runner_fallback = build_runner_load_fallback(root)
                 let _e1 = with_setenv_str("WITH_BUILD_RUNNER_ROOT", root)
