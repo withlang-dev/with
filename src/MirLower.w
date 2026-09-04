@@ -2525,7 +2525,20 @@ impl MirBuilder:
             if inner == -9223372036854775807: return -9223372036854775807
             if op == UnaryOp.UOP_NEGATE:
                 let result_ty = self.expr_type(node)
-                let arith = int_eval_unary_neg(inner, self.mir_const_int_width(result_ty), self.sema.overflow_mode)
+                let neg_width = self.mir_const_int_width(result_ty)
+                // #943 / #914 D2: fold the whole negation against the target
+                // width. int_eval_unary_neg narrows the operand first, so
+                // `-2147483648i32` made the operand i32::MIN, tripped the
+                // negate-MIN guard, and failed to fold — leaving codegen to
+                // emit a runtime negation that traps on the same value. The
+                // magnitude and sign must stay apart until the width applies.
+                if neg_width <= 64 and not self.mir_const_int_is_unsigned(result_ty):
+                    let neg_expr = self.ast.int_literal_exact_expr(node)
+                    if neg_expr.ok != 0 and neg_expr.overflow == 0:
+                        let neg_words = self.ast.int_literal_expr_bits(node, neg_width, 1)
+                        if neg_words.ok != 0 and neg_words.overflow == 0:
+                            return int_truncate_to_width(neg_words.lo, neg_width, false)
+                let arith = int_eval_unary_neg(inner, neg_width, self.sema.overflow_mode)
                 if arith.ok == 0 or arith.overflow != 0: return -9223372036854775807
                 return arith.value
             if op == UnaryOp.UOP_BIT_NOT: return 0 - inner - 1
@@ -4763,6 +4776,24 @@ impl MirBuilder:
             let place = self.lower_expr_place(expr)
             let deref_place = self.new_deref_place(place)
             return self.body.new_operand(OperandKind.OK_COPY, deref_place)
+
+        // #943 / #914 D2: a negated integer literal is a constant, and its value
+        // has to come from the whole expression measured against the target
+        // width. `-2147483648i32` is i32::MIN, which no negation of an i32
+        // operand can produce — lowering it as a runtime RK_UN_OP emitted a
+        // negate that trapped on exactly the value the source asked for.
+        // CK_INT_EXACT carries the node through to codegen, which resolves it
+        // with int_literal_expr_bits (the same path that keeps magnitude and
+        // sign apart until the width applies).
+        if op == UnaryOp.UOP_NEGATE:
+            let neg_ty = self.expr_type(node)
+            let neg_resolved = self.sema.resolve_alias(neg_ty as TypeId)
+            if self.sema.get_type_kind(neg_resolved) == TypeKind.TY_INT:
+                let neg_bits = self.sema.get_type_d0(neg_resolved)
+                let neg_signed = self.sema.get_type_d1(neg_resolved)
+                let neg_words = self.ast.int_literal_expr_bits(node, neg_bits, neg_signed)
+                if neg_words.ok != 0 and neg_words.overflow == 0:
+                    return self.exact_int_const_operand(node, neg_ty)
 
         let arg = self.lower_expr(expr)
         let rv = self.body.new_rvalue(RvalueKind.RK_UN_OP, op, arg, 0)
