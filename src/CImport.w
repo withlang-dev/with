@@ -1988,6 +1988,17 @@ fn ci_strip_struct_prefix(fn_name: &str, struct_name: &str) -> str:
     ""
 
 // Emit a method wrapper: fn StructName.method(self: *mut Struct, ...) -> Ret: fn_name(self, ...)
+/// A wrapper parameter's With name. In a parameter list an uppercase-initial
+/// identifier is a unit-variant pattern (`fn value(None: Option[i32])`, §9.7),
+/// so a C parameter named `N`, `Z` or `C` (sqlite3.h) would parse as a
+/// refutable pattern and the wrapper body's `N` as an undefined variable.
+/// Such names get a `p_` prefix; reserved names escape as everywhere else.
+fn ci_escape_param_name(pname: &str) -> str:
+    let escaped = ci_escape_reserved(pname)
+    if escaped.len() > 0 and escaped[0] >= 'A' and escaped[0] <= 'Z':
+        return "p_" ++ escaped
+    escaped
+
 fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: &str, method_name: &str, first_param_type: &str) -> str:
     let fn_name = with_cimport_decl_name(session, idx)
     let safe_fn_name = ci_migrate_c_function_name(fn_name)
@@ -2028,7 +2039,7 @@ fn ci_emit_member_fn_wrapper(session: i64, idx: i32, struct_name: &str, method_n
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
         if ci_cimport_param_type_requires_raw_abi(ptype):
             raw_wrapper = true
-        let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
+        let actual_name = if pname.len() > 0: ci_escape_param_name(pname) else: f"p{pi}"
         if params.len() > 0:
             params = params ++ ", "
         params = params ++ actual_name ++ ": " ++ ptype
@@ -2070,7 +2081,7 @@ fn ci_emit_constructor_wrapper(session: i64, idx: i32, struct_name: &str, method
         let ptype = ci_pointer_type_explicit_mut(with_cimport_fn_param_type_translated(session, idx, pi))
         if ci_cimport_param_type_requires_raw_abi(ptype):
             raw_wrapper = true
-        let actual_name = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
+        let actual_name = if pname.len() > 0: ci_escape_param_name(pname) else: f"p{pi}"
         if pi > 0:
             params = params ++ ", "
             call_args = call_args ++ ", "
@@ -12183,35 +12194,33 @@ fn ci_eval_int_text(session: i64, cursor: i32) -> str:
         return "(0 -% " ++ i64_to_string(0 - val) ++ ")"
     i64_to_string(val)
 
+/// The C integer-literal suffix letters (long / unsigned, either case).
+const CI_INT_SUFFIX_CHARS: str = "LlUu"
+
+fn ci_is_int_suffix_char(c: u8) -> bool:
+    for i in 0..CI_INT_SUFFIX_CHARS.len():
+        if CI_INT_SUFFIX_CHARS[i] == c: return true
+    false
+
+/// An optionally negative decimal or 0x-hex integer literal with C suffixes.
+/// At least one digit is required: a bare suffix macro such as
+/// `#define CURL_SUFFIX_CURL_OFF_T L` is a token, not a value, and used to
+/// pass as the empty literal `` (emitted as `let X: c_long = `).
 fn ci_is_int_literal(s: &str) -> bool:
-    if s.len() == 0:
-        return false
-    var start = 0
-    // Allow leading minus
-    if s[0] == 45:
-        start = 1
-    if start as i64 >= s.len():
-        return false
-    // Check for hex prefix
-    if s.len() as i32 - start >= 2:
-        if s[start] == 48:
-            let next = s[start as i64 + 1]
-            if next == 120 or next == 88:
-                for i in start + 2..s.len() as i32:
-                    let c = s[i]
-                    if not ((c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)):
-                        if c == 76 or c == 85 or c == 108 or c == 117:
-                            continue
-                        return false
-                return true
-    // Decimal digits
-    for i in start..s.len() as i32:
+    var i: i64 = 0
+    if s.len() > 0 and s[0] == '-': i = 1
+    let hex = s.len() - i >= 2 and s[i] == '0' and (s[i + 1] == 'x' or s[i + 1] == 'X')
+    if hex: i = i + 2
+    var digits = 0
+    while i < s.len():
         let c = s[i]
-        if not (c >= 48 and c <= 57):
-            if c == 76 or c == 85 or c == 108 or c == 117:
-                continue
+        let is_digit = (c >= '0' and c <= '9') or (hex and ((c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F')))
+        if is_digit:
+            digits = digits + 1
+        else if not ci_is_int_suffix_char(c):
             return false
-    true
+        i = i + 1
+    digits > 0
 
 // #775: the C type of an evaluated integer constant, by value range —
 // mirrors C's usual arithmetic conversions closely enough for macro
