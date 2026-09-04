@@ -268,6 +268,11 @@ fn comp_llvm_prefix() -> str:
 fn comp_llvm_prefix_for_root(root: &str) -> str:
     comp_abs(root, comp_llvm_prefix())
 
+/// The static LLVM SDK this build uses, absolute: LLVM_PREFIX when set,
+/// otherwise the host's `.deps/llvm-<ver>-<host>` under `root`. Exposed for
+/// lanes that run a nested build elsewhere (`:seed-compat`).
+pub fn compiler_llvm_prefix_for_root(root: &str) -> str: comp_llvm_prefix_for_root(root)
+
 // Exposed so the `deps` target can name the per-platform SDK asset and the
 // `.deps/llvm-<ver>-<host>` directory it extracts into.
 pub fn compiler_llvm_version() -> str:

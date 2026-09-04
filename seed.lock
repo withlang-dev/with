@@ -1,0 +1,15 @@
+# The pinned bootstrap seed: the published release this tree is built from.
+# Every CI lane reads it (`with run tools/bump_seed_pins.w` rewrites the
+# workflow pins from it; `with build :seed-compat` refuses while any pin
+# disagrees), `with build :seed` downloads it, and `:seed-compat` proves it
+# still builds this tree. Bump it — version and every digest — in the same
+# commit as the first change that needs a newer seed: tag the seed first.
+#
+# `<asset>.version=` pins one platform to another release while it cannot
+# bootstrap the newest seed; say which issue, and remove it when fixed.
+version=v0.15.1.8
+with-darwin-aarch64=3ffdd488bfb2648fb391d4cfb8c761a2fecfae643d654665ff49ed6321293712
+with-linux-aarch64=e26930b0f9e8a93fef1091216c4d0b8d49e2c20d8b4d6e89bbfa06dbb3fa7d8f
+with-linux-x86_64=48c0a54d2062d4746648df2af0126d59ce0593d9fa845cf49be0446827139297
+with-windows-x86_64.exe=6f00a9e3a26751404f671f10ef7b61b345886c6d73a96c95df9086e6df6607fd
+with-windows-aarch64.exe=5f58841923a812dbebae17b3b44e47f352c9db7a624a57fd106d590eb5b803dd

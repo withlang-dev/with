@@ -407,6 +407,12 @@ event's `GITHUB_SHA`, creates the stable GitHub release for the existing tag, an
 then verifies that the published tag resolves back to that same SHA. Do not run a
 second manual `gh release create` for a tag handled by this workflow.
 
+When the release is meant to become the seed, bump `seed.lock` on main to the
+new version with every platform's published digest (the `.sha256` sidecars),
+move every workflow seed pin with it (`with build :seed-compat` refuses while
+any pin disagrees with the lock), and confirm `:seed-compat` is green before
+landing the first change that needs the new seed.
+
 Prepare the platform-named assets on their native platforms with the
 With-native release package targets:
 
