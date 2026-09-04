@@ -343,6 +343,16 @@ fn bs_assert_not_contains(ctx: &ActionCtx, text: &str, needle: &str, label: &str
         return 0
     bs_fail(ctx, "found forbidden output for " ++ label ++ ": " ++ needle)
 
+// Passes when EITHER spelling is present. For assertions on migrated output
+// whose exact form is fixed by the system header text (glibc vs darwin
+// stdint.h spell the same const differently) yet is equally correct — both
+// alternatives must be a valid, intended output, never a way to accept a
+// wrong one.
+fn bs_assert_contains_either(ctx: &ActionCtx, text: &str, needle_a: &str, needle_b: &str, label: &str) -> i32:
+    if text.contains(needle_a) or text.contains(needle_b):
+        return 0
+    bs_fail(ctx, "missing expected output for " ++ label ++ ": " ++ needle_a ++ " (or " ++ needle_b ++ ")")
+
 fn bs_assert_count_at_least(ctx: &ActionCtx, text: &str, needle: &str, min_count: i32, label: &str) -> i32:
     let count = bs_count_occurrences(text, needle)
     if count >= min_count:
@@ -4733,7 +4743,11 @@ fn bs_check_migrate_paste_suffix_macros(ctx: &ActionCtx, compiler_path: &str, ca
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let UINTMAX_MAX: c_ulong = 18446744073709551615u64", "paste_suffix_uintmax_max_literal")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let INTMAX_MIN: c_long = ((0 - INTMAX_MAX) - 1)", "paste_suffix_intmax_min_folds_through_max")
+    // INTMAX_MIN folds to compile-time data either by reading INTMAX_MAX
+    // (darwin's `-INTMAX_MAX - 1`) or by re-pasting the same literal glibc's
+    // `-__INT64_C(9223372036854775807) - 1` spells inline — the system header
+    // decides, and both are the intended fold to i64::MIN, never a helper call.
+    rc = bs_assert_contains_either(ctx, out_text, "let INTMAX_MIN: c_long = ((0 - INTMAX_MAX) - 1)", "let INTMAX_MIN: c_long = ((0 - 9223372036854775807i64) - 1)", "paste_suffix_intmax_min_folds_through_max")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "INTMAX_C(9223372036854775807", "paste_suffix_no_helper_call_for_literal")
     if rc != 0: return rc
@@ -4742,8 +4756,12 @@ fn bs_check_migrate_paste_suffix_macros(ctx: &ActionCtx, compiler_path: &str, ca
     // A use inside a function-like macro body takes the same route.
     rc = bs_assert_contains(ctx, out_text, "(1i64 << n)", "paste_suffix_literal_in_fn_macro_body")
     if rc != 0: return rc
-    // The generic helper remains the translation for a non-literal argument.
-    rc = bs_assert_contains(ctx, out_text, "fn INTMAX_C[T](v: T) -> i64", "paste_suffix_helper_kept")
+    // The generic helper remains the translation for a non-literal argument. Its
+    // parameter name is the system header's own macro parameter identifier —
+    // darwin spells `INTMAX_C(v)`, glibc spells `INTMAX_C(c)` — so both helper
+    // signatures are the identical intended `[T] -> i64` translation, differing
+    // only in that echoed name, never in whether the helper is kept.
+    rc = bs_assert_contains_either(ctx, out_text, "fn INTMAX_C[T](v: T) -> i64", "fn INTMAX_C[T](c: T) -> i64", "paste_suffix_helper_kept")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let X_MAX: c_longlong = 9223372036854775807", "paste_suffix_user_macro_probe_folds")
     if rc != 0: return rc
