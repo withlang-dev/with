@@ -426,9 +426,18 @@ impl Zcu:
             self.c_import_record_omissions_frontend(synthetic)
 
             let before = out.decl_count()
-            var lexer = Lexer.init(synthetic, 0)
+            // The translation is a source of its own: a diagnostic inside it
+            // renders the generated declaration, not the importer's text at
+            // the same byte offset (which was the importer's EOF for every
+            // c_import error and warning). Its decls keep the importer's
+            // module path — ownership is the importer's — but carry this file
+            // id, so span reasoning never crosses the two coordinate spaces.
+            let ci_file_id = self.next_file_id
+            self.next_file_id = self.next_file_id + 1
+            self.add_source_text_mapping(ci_file_id, "<c_import " ++ header_spec ++ ">", synthetic)
+            var lexer = Lexer.init(synthetic, ci_file_id)
             let tokens = lexer.tokenize()
-            var parser = Parser.init_with_pool(move tokens, synthetic, 0, self.pool, move self.diagnostics, out)
+            var parser = Parser.init_with_pool(move tokens, synthetic, ci_file_id, self.pool, move self.diagnostics, out)
             out = parser.parse_module()
             self.pool = parser.intern
             self.diagnostics = move parser.diags
@@ -436,7 +445,7 @@ impl Zcu:
             let after = out.decl_count()
             // Mark all c_import-synthesized declarations
             let ci_owner_path = self.decl_source_path_frontend(i)
-            let ci_owner_file_id = self.decl_source_file_id_frontend(i)
+            let ci_owner_file_id = ci_file_id
 
             // §16.2 selective import: keep only the requested symbols (and their
             // auto-methods); strict completeness is validated below.
@@ -478,9 +487,11 @@ impl Zcu:
         out
 
     fn c_import_cache_key_frontend(pool: AstPool, decl: i32, header_spec: &str) -> str:
-        // v16: evaluated macro constants annotate by value range (#775); v15
+        // v17: uppercase-initial wrapper parameters get a `p_` prefix and a
+        // bare integer-suffix macro (`L`) is no longer an empty literal; v16
+        // evaluated macro constants annotate by value range (#775); v15
         // suffixed >i64::MAX literals.
-        var key = header_spec ++ "\n#format:cimport-v16\n#links:"
+        var key = header_spec ++ "\n#format:cimport-v17\n#links:"
         let link_start = pool.get_data1(decl)
         let packed_counts = pool.get_data2(decl)
         let link_count = c_import_link_count(packed_counts)
