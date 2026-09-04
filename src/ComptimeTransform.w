@@ -33,6 +33,10 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
 
     for ni in 1..src.node_count():
         let src_node = ni as NodeId
+        // A node keeps its file: the lazy interface collection tells a .wi
+        // section's nodes from the source's by it, in every Sema after the
+        // transform too.
+        out.set_current_file_id(src.file(src_node))
         let node = out.add_node(
             src.kind(src_node),
             src.get_start(src_node),
@@ -3064,7 +3068,7 @@ impl Sema:
             ordered_file_ids.push(decl_file_id)
             ordered_ci.push(decl_ci)
 
-            if out.kind(decl) != NodeKind.NK_TYPE_DECL:
+            if out.kind(decl) != NodeKind.NK_TYPE_DECL or self.decl_is_lazy_skipped(di):
                 continue
             if self.type_decl_has_derive(decl as i32, copy_trait_sym) != 0:
                 let generated_copy = self.ct_generate_copy_derive(out, intern, decl as i32)
@@ -3232,6 +3236,8 @@ impl Sema:
             return out
 
         for di in 0..out.decl_count():
+            if transform_sema.decl_is_lazy_skipped(di):
+                continue
             transform_sema.update_decl_source_context(di)
             let decl = out.get_decl(di)
             let live_ast = out

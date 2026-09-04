@@ -969,6 +969,8 @@ impl Codegen:
 
     mut fn generate_default_trait_methods():
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) == NodeKind.NK_IMPL_DECL:
                 self.generate_default_trait_methods_for_impl(decl)
@@ -1197,6 +1199,8 @@ impl Codegen:
 
     mut fn generate_trait_vtables():
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) == NodeKind.NK_IMPL_DECL:
                 self.generate_trait_vtable_for_impl(decl)

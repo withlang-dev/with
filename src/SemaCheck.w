@@ -1547,7 +1547,7 @@ impl Sema:
         var has_global_allocator = 0
 
         for di in 0..self.ast.decl_count():
-            if self.no_std_decl_is_user_code(di) == 0:
+            if self.decl_is_lazy_skipped(di) or self.no_std_decl_is_user_code(di) == 0:
                 continue
             let decl = self.ast.get_decl(di)
             if fallback_node == 0:
@@ -1577,6 +1577,8 @@ impl Sema:
 
     mut fn check_bodies():
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL:
@@ -2551,6 +2553,8 @@ impl Sema:
 
     mut fn check_trait_default_method_bodies():
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             self.update_decl_source_context(di)
             let impl_node = self.ast.get_decl(di)
             if self.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL:
@@ -3165,6 +3169,8 @@ impl Sema:
     fn cheader_generate(guard: &str) -> str:
         let exported: Vec[i32] = Vec.new()
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             let d = self.ast.get_decl(di)
             if self.ast.kind(d) == NodeKind.NK_FN_DECL and self.fn_decl_has_c_export(d) != 0:
                 exported.push(d as i32)
@@ -3270,6 +3276,8 @@ impl Sema:
         self.reachable_decl_indices = sema_new_map_i32_i32()
 
         for di in 0..self.ast.decl_count():
+            if self.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL:
                 self.reachable_decl_indices.insert(decl, di)
@@ -12030,6 +12038,9 @@ impl Sema:
         if self.diags.has_errors():
             return
         for di in 0..self.ast.decl_count():
+            // A bundle's own build checked its interface's defaults (D39).
+            if self.decl_is_interface(di):
+                continue
             self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
@@ -17650,6 +17661,8 @@ impl Sema:
             var matched_subst_names: Vec[i32] = Vec.new()
             var matched_subst_types: Vec[i32] = Vec.new()
             for di in 0..self.ast.decl_count():
+                if self.decl_is_lazy_skipped(di):
+                    continue
                 let impl_node = self.ast.get_decl(di)
                 if self.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL or self.ast.get_data2(impl_node) != self.syms.drop:
                     continue

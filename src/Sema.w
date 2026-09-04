@@ -746,6 +746,12 @@ type Sema {
     // consulted by scope_lookup only from a module that imports theirs.
     interface_global_index: HashMap[i32, i32],
     interface_global_paths: HashMap[i32, str],
+    // D39 lazy interface collection (SemaDecl.prepare_interface_demand):
+    // per declaration, 1 when its module is a registered .wi section, and
+    // 1 when the source can name it; the symbols the source names.
+    decl_is_iface: Vec[i32],
+    decl_iface_demanded: Vec[i32],
+    iface_mentioned: HashMap[i32, i32],
     // every flat-scope global's declaring module and binding index (symbol
     // → path, symbol → index), and the globals a local binding is standing
     // in for while its scope lasts — a function's local may take the name
@@ -1846,6 +1852,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let global_value_decl_kinds = sema_new_map_i32_i32()
     let interface_global_index = sema_new_map_i32_i32()
     let interface_global_paths = sema_new_map_i32_str()
+    let decl_is_iface = sema_new_vec_i32()
+    let decl_iface_demanded = sema_new_vec_i32()
+    let iface_mentioned = sema_new_map_i32_i32()
     let global_value_decl_paths = sema_new_map_i32_str()
     let global_value_decl_bindings = sema_new_map_i32_i32()
     let global_race_mutated_syms = sema_new_map_i32_i32()
@@ -2053,6 +2062,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         global_value_decl_kinds,
         interface_global_index,
         interface_global_paths,
+        decl_is_iface,
+        decl_iface_demanded,
+        iface_mentioned,
         global_value_decl_paths,
         global_value_decl_bindings,
         shadowed_global_syms: Vec.new(),

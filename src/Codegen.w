@@ -5526,6 +5526,8 @@ impl Codegen:
 
     fn detect_drop_functions():
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) != NodeKind.NK_IMPL_DECL:
                 continue
@@ -6178,6 +6180,8 @@ impl Codegen:
 
         // Pass 0a: predeclare all struct/enum names so forward references resolve.
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)
@@ -6211,6 +6215,8 @@ impl Codegen:
 
         // Pass 0b: define struct/enum bodies and type aliases.
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)
@@ -6258,6 +6264,8 @@ impl Codegen:
 
         // Pass 0.5: collect trait declarations
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) == NodeKind.NK_TRAIT_DECL:
@@ -6265,6 +6273,8 @@ impl Codegen:
 
         // Pass 1: declare all functions and externs (forward declarations)
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)
@@ -6314,6 +6324,8 @@ impl Codegen:
         // Function declarations must exist first so global struct initializers can
         // contain function-pointer fields.
         for i in 0..self.pool.decl_count():
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) == NodeKind.NK_LET_DECL:
@@ -6326,6 +6338,8 @@ impl Codegen:
         for i in 0..self.pool.decl_count():
             if self.had_error != 0:
                 break
+            if self.sema.decl_is_lazy_skipped(i):
+                continue
             self.sync_decl_context(i)
             let decl = self.pool.get_decl(i)
             let kind = self.pool.kind(decl)

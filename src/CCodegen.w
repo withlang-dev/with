@@ -3017,6 +3017,8 @@ impl CCodegen:
         for di in 0..self.ast.decl_count():
             if self.check_interrupted() != 0:
                 return texts
+            if self.sema.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
                 continue
@@ -8783,6 +8785,8 @@ impl CCodegen:
         for di in 0..self.ast.decl_count():
             if self.check_interrupted() != 0:
                 return ""
+            if self.sema.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             let kind = self.ast.kind(decl)
             if kind == NodeKind.NK_LET_DECL:
@@ -8920,6 +8924,8 @@ impl CCodegen:
         for di in 0..self.ast.decl_count():
             if self.check_interrupted() != 0:
                 return ""
+            if self.sema.decl_is_lazy_skipped(di):
+                continue
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_EXTERN_FN:
                 continue
