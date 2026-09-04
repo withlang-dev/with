@@ -63,6 +63,11 @@ distinction is the whole bug.
 
 ## Current state
 
+> **Historical.** This section and "Root cause" below record the defect as
+> found at `22e534c6`, before any fix. They are kept because the diagnosis is
+> what the stages were built against; for what is now true, see **Status** at
+> the end.
+
 | Behavior | State | Evidence |
 |---|---|---|
 | Plain const folding, within 64 bits | correct | `const A: i64 = 3000000001 + 0` returns `3000000001` |
@@ -125,10 +130,11 @@ other side.
 
 That line is not sloppiness; it is forced. `data0: i64` has nowhere to put
 `exact.hi`. This is the concrete form of invariant 2 being unsatisfiable at
-128 bits, and the reason widening is structural rather than optional (S4,
-and "Relationship to #914").
+128 bits, and the reason widening is structural rather than optional (see
+"Relationship to #914"). Still open: the 64-bit ceiling is unchanged by this
+campaign — the payload is still one `i64`.
 
-### Workaround for user code until this lands
+### Workaround for user code (superseded)
 
 `eval_cast` resolves the cast's target type expression itself rather than
 trusting sema, so **explicit `as i64` / `as u64` casts set the width reliably
@@ -152,8 +158,11 @@ Without the casts the same loop raises `integer overflow in comptime` at the
 32-bit boundary. Note the asymmetry worth communicating to users: **`as u64`
 works, the `u64` literal suffix does not** — the evaluator never reads suffixes.
 
-This is a stopgap for callers, not a substitute for S2. Once S2a lands the
-suffix form works too, and the casts become redundant rather than wrong.
+**No longer needed.** S2 landed the suffix and annotation handling, so
+`5381u64` and `var acc: u64 = 5381` now carry their declared width without
+help. Kept as a record of the asymmetry that existed — casts worked because
+`eval_cast` resolved its own target type, which is what suggested reading the
+suffix in the same way.
 
 ---
 
@@ -528,23 +537,69 @@ against a compiler built from the commit it targets.
 
 ## Status
 
-- **S0 — done.** Five files, all verified through the harness:
-  - `test/behavior/behav_comptime_int_width.w` — the four-term oracle across
-    all eight widths (`known-issue: #943`, red as expected; first failure is an
-    assertion at the `i64` case, not a compile error, so nothing downstream is
-    masked).
-  - `test/behavior/behav_comptime_overflow_wrap.w` and `..._saturate.w` —
-    `//! args: --overflow=<mode>` (`known-issue: #943`, red as expected).
-  - `test/compile_errors/comptime_int_width_overflow.w` and
-    `..._unsigned_fit.w` — green, pinning the current diagnostics.
+Branch `issue943`. All commits gate-verified: `:fixpoint` FIXPOINT and the full
+`:test` suite green, every target re-run rather than cached.
 
-  `known-issue` is enforced in both directions: a red is tolerated and logged,
-  a **green fails the file** until the directive is removed. So the fix
-  announces itself — the three behavior files must be promoted and the two
-  compile-error files deleted when #943 closes.
+- **S0 — done** (`b236f1b6`). Three behavior files carrying the four-term
+  oracle, plus two compile_errors fixtures pinning the then-current
+  diagnostics. The fixtures were deleted and their cases promoted once the
+  errors stopped firing, exactly as their own comments instructed.
 
-  Measured boundary from the oracle: every width at or below 32 bits passes
-  today, including `u32` at `4294967295`; only `i64` and `u64` corrupt. `/ 1`
-  also passes, since `OP_DIV` computes on raw operands.
+- **S2 — done**, in four commits. It took more sites than the stage predicted,
+  because the same defect was independently re-implemented by every consumer of
+  a typed integer payload:
 
-- **S1 onward — not started.**
+  | commit | sites |
+  |---|---|
+  | `f668e4f1` | literal type from suffix + sema's value-based default; local `let`/`var` annotation applied at binding |
+  | `ff07cf5e` | value write-back to the AST (`ct_build_value_tree`); unsigned `OP_DIV`/`OP_MOD`; unsigned ordering `< > <= >=` |
+  | `4c6f87e5` | negated literals in comptime, via `int_literal_expr_bits` on the unary node |
+  | `ff201949` | #914 D2 — sema `check_unary` + the negation-aware fit check + both MIR lowering paths |
+
+  Nine sites in total. Every one had narrowed or re-interpreted a payload before
+  measuring it.
+
+- **S3 (miss → internal error) — not done, and now lower value.** S2 fixed the
+  width resolution rather than making the lookup reliable, so the fallback is
+  still reachable in principle. S4 below is the stronger guard and lands first.
+
+- **S4 — done in part.** `checked_int_value` in `ComptimeEval.w` asserts the
+  payload is canonical in its own `type_id` and aborts with a `BUG:` diagnostic
+  otherwise, matching the `ast_pool_phase_bug` idiom.
+
+  **Partial by choice:** 25 of 102 `comptime_value_int` call sites are routed
+  through it — the 21 that build computed arithmetic results plus the literal
+  and annotation constructions. Those are where every defect in this campaign
+  originated. The remaining 77 construct trivially canonical values
+  (`comptime_value_int(ty_i32, 0)` and similar), and mechanical edits at that
+  scale in a self-hosting compiler cost more risk than the coverage is worth.
+  Anyone extending this should convert the rest rather than assume it is total.
+
+- **S1 — deliberately not done.** See "S1 reassessed" below.
+
+- **S5 — standing.** Every commit above ran `:fixpoint` and the full suite.
+
+### S1 reassessed
+
+S1's value was converting silent corruption into loud errors *while the width
+bug was live*, which is why it was ordered first. That rationale is gone: S2
+fixed the widths, so S1 now changes no observable behavior — its own acceptance
+criterion says as much ("no behavior change for any call site that already
+passes canonical operands"). Against that it touches six helpers on a path
+reached by Sema, the comptime evaluator, and both codegens: the largest blast
+radius left, for no measurable gain.
+
+The decisive evidence is a bug made during this campaign. The `4c6f87e5` fix
+stored `0x80000001` into an `i64` payload typed `i32` without sign-extending,
+and `-2147483647i32 / 3` silently returned `+715827883`. It was caught by a
+differential test that happened to include negative-operand division.
+
+**S1 would not have caught it** — the corruption surfaced through `OP_DIV`,
+which computes `lv / rv` directly and never enters the helpers S1 modifies.
+**S4 catches it at construction**, before the value reaches any operator, along
+with the original `(i32, 3000000001)` defect.
+
+S4 is strictly upstream: every case S1 could see must pass through the
+constructor first, plus cases S1 structurally cannot see. Recommendation: leave
+S1 undone, and fold it into #914's word-pair work on `Overflow.w`, where the
+file is open anyway and the change is close to free.
