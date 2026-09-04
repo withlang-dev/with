@@ -481,7 +481,7 @@ pub fn run_seed_compat_action(ctx: ActionCtx) -> i32:
     // The static LLVM SDK: the embedded-clang-resource target resolves
     // `.deps/llvm-<ver>-<host>/lib/clang` relative to the tree root, not
     // through LLVM_PREFIX, so the copy links the checkout's .deps.
-    if fs.exists(".deps") and fs.symlink(seed_abs(root, ".deps"), seed_join(tree, ".deps")) != 0:
+    if fs.exists(".deps") and fs.symlink(".deps", seed_join(tree, ".deps")) != 0:
         return seed_fail(ctx, "could not link .deps into " ++ tree)
 
     // The pinned seed drives AND seeds the build: WITH names it explicitly
