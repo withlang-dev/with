@@ -35,4 +35,4 @@ fn main:
     if value != 42:
         print("sqlite3 value mismatch")
         return 1
-    write("sqlite3 UAT passed\n")
+    print("sqlite3 UAT passed")

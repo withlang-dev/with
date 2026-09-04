@@ -31,4 +31,4 @@ fn main:
     if not unsafe { same_prefix(&raw const output[0] as *const u8, input as *const u8, input.len() as i32) }:
         print("bzip2 content mismatch")
         return 1
-    write("bzip2 UAT passed\n")
+    print("bzip2 UAT passed")

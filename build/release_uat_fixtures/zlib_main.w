@@ -34,4 +34,4 @@ fn main:
     if unsafe { zlibVersion() } == null:
         print("zlib version missing")
         return 1
-    write("zlib UAT passed\n")
+    print("zlib UAT passed")

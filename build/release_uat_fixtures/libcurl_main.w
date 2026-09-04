@@ -33,4 +33,4 @@ fn main:
 
     unsafe { curl_easy_cleanup(easy) }
     curl_global_cleanup()
-    write("libcurl UAT passed\n")
+    print("libcurl UAT passed")
