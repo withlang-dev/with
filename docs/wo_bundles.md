@@ -507,6 +507,62 @@ drop. The generator is fixed before the first `wo-drift` run.
 the same day with Eric's blessing of the words: specification §3.4 (the
 separate-compilation origin rule) and §18.5c (bundles and interfaces).
 
+## Shim retired (batch C4, 2026-09-04)
+
+`rt/regex_runtime.w` and every `with_regex_*` hook are gone (D30's
+regex seam). `std.regex` imports ten `std.re` modules through the
+embedded interface and calls pcre2 directly; `Regex.__literal_code` and
+`Regex.__capture_count` are the regex-literal entry points codegen calls
+(`CodegenDispatch.regex_facade_fn`); `SemaCheck.validate_regex_literal`
+compiles the literal with `Regex.compile_flags`, so the compiler is one
+more user of the facade and its own link selects the embedded bundle.
+Retired with the shim: the five `regex-runtime-ir`/`-object` lane pairs
+and the `with_ir_target` helpers, the `regex_runtime_o` blob in every
+embedded-objects set, `install-regex-runtime`, Link.w's on-demand
+selection and its transitive probe (no on-demand runtime object references
+a bundle any more; selection reads the program's own undefined symbols),
+CCodegen's prototypes, CiMigrate's borrowed-str mask, emit_c.w's harvest
+and `package.w`'s `regex_runtime.c`. The emit-C lane compiles every
+embedded bundle's corpus in-unit: `--emit-c` registers no interface
+(`Compilation.emit_c_in_unit`), the compiler's own C is emitted by the
+release compiler with `--bundle-corpus std/re` (#955, option a), and the
+C backend no longer redeclares a name the included libc headers own
+(`strchr`, `__stdinp`…) while emitting `with_libc_*` prototypes from
+std.libc's declarations.
+
+**What the prelude reaching a corpus exposed.** Every program now carries
+pcre2's interface (3,057 `pub let` globals, 87 types, 206 functions)
+through `std.regex`, and Sema's global scope is flat (D29 campaign B):
+`PACKAGE`, `NULL`, `BUFSIZ` collided with programs' own declarations,
+std.libc's `stdout` (imported by `pcre2_maketables`'s body) with a local
+`let stdout`, and a prelude function's locals with any top-level global.
+Landed with C4: the ambient tier is the prelude's enumerated list and the
+modules it names, not their closure (`init_module_graph`); an interface
+section carries only the imports its declarations need (the emitter drops
+`use std.libc`; fingerprint unchanged); interface globals live in a side
+table reachable only by an explicit import (`Sema.interface_global_index`,
+`MirLower.ensure_global_local` prefers source declarations); a local may
+take the name of a global its module never imports (`scope_put_at`,
+`scope_put_consuming_rebind_at`, restored by `pop_scope`). An unimported
+interface global is an undefined variable — D29's fallback tier is not
+implemented, and nothing offered these names before C4.
+
+**Measured** (darwin-arm64, main `947b9e79` vs this batch; the release
+compiler unless noted):
+
+| | before | after |
+|---|---|---|
+| release compiler binary | 109,229,696 B | 108,695,600 B (−534,096) |
+| hello-world `with check` | 0.03 s | 0.23 s |
+| behavior-tests lane | 144 s | 414 s (≈1,000 checks × the interface's Sema) |
+| `with build` from a clean `out/` (bundle in the store; a battery was running on the same box) | 251.8 s (59 targets; regex-runtime-ir 5.7 s + bootstrap 5.5 s + objects) | 295.8 s (55 targets; stage1 +9 s, stage2 +25 s, link-compiler +29 s — every stage now Semas the interface; re-measure idle) |
+
+The per-program cost is Sema over the 4.4k-line interface (33 sections,
+`check_bodies` and field-default checks dominate; parsing is twice per
+module, not per import, so caching parsed sections would not recover it).
+Bringing hello world back under 0.1 s needs a mechanism — lazy Sema of
+interface sections, or D29 campaign B — and is Eric's call.
+
 ## Non-goals
 
 - Dynamic linking (`.so`): a runtime loader, C-ABI symbol tables, and
