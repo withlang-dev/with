@@ -28,7 +28,7 @@ extern fn with_eprint(s: &str) -> Unit
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
-extern fn abort() -> Unit
+extern fn abort() -> Never
 
 fn ci_ir_phase_bug(message: &str):
     with_eprint(message)

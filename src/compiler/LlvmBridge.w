@@ -13,7 +13,7 @@ extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_nanosleep(ns: i64) -> i32
 extern fn pthread_self() -> i64
-extern fn abort() -> Unit
+extern fn abort() -> Never
 extern fn rt_sysinfo_os() -> str
 extern fn rt_sysinfo_arch() -> str
 
@@ -439,7 +439,6 @@ fn to_cstr(s: &str) -> *const u8:
         let _ = rt_write(2, "error: LLVM bridge exhausted thread-local cstr slots\n" as *const u8, 53)
         unsafe:
             abort()
-        return empty_cstr()
     let idx = cstr_slot_indices[slot]
     let n = if s.len() < 4095: s.len() else: 4095
     let src = unsafe **(&s as *const *const *const u8)

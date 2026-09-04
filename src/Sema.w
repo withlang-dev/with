@@ -22,7 +22,7 @@ extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn i64_to_string(n: i64) -> str
-extern fn abort() -> Unit
+extern fn abort() -> Never
 
 fn sema_phase_bug(message: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
     with_eprint(f"{message} [{origin_file}:{origin_line} {origin_fn}]")
@@ -1238,7 +1238,6 @@ impl Sema:
             if existing != 0:
                 return existing
             sema_phase_bug("BUG: Sema.pool_intern called after symbol freeze: '" ++ name ++ "'")
-            return 0
         let existing = self.pool.state.symbol_map.get(name)
         if existing.is_some():
             return existing.unwrap()

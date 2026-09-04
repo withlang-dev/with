@@ -1251,11 +1251,9 @@ impl Sema:
         let length = self.int_literal_i64_value(length_node)
         if length.ok == 0 or length.value <= 0 or length.value > 2147483647:
             sema_phase_bug("BUG: frozen FixedString type has invalid length node")
-            return 0
         let storage_tid = self.find_exact_type(TypeKind.TY_ARRAY, self.ty_u8 as i32, length.value as i32, 0) as i32
         if storage_tid == 0:
             sema_phase_bug("BUG: frozen FixedString storage array type not preregistered")
-            return 0
         let args: Vec[i32] = Vec.new()
         args.push(storage_tid)
         self.find_generic_inst_type(self.syms.fixed_string, args, 1) as i32
@@ -1266,7 +1264,6 @@ impl Sema:
             let gi_arg_count = self.ast.get_data2(node)
             if gi_arg_count != 1:
                 sema_phase_bug("BUG: frozen FixedString type has wrong arg count")
-                return 0
             let gi_extra_start = self.ast.get_data1(node)
             return self.fixed_string_type_from_length_node_frozen(self.ast.get_extra(gi_extra_start))
         let range_inclusive = self.canonical_range_type_constructor_inclusive(gi_base_sym)
@@ -1274,7 +1271,6 @@ impl Sema:
             let gi_arg_count2 = self.ast.get_data2(node)
             if gi_arg_count2 != 1:
                 sema_phase_bug("BUG: frozen Range type has wrong arg count")
-                return 0
             let gi_extra_start2 = self.ast.get_data1(node)
             let elem_tid = self.resolve_type_expr_frozen(self.ast.get_extra(gi_extra_start2))
             if elem_tid == 0:
@@ -1297,7 +1293,6 @@ impl Sema:
                 gi_base_tid = self.named_types.get(gi_base_sym).unwrap()
         if gi_base_tid == 0:
             sema_phase_bug("BUG: frozen generic type base not visible")
-            return 0
         let gi_arg_count = self.ast.get_data2(node)
         let gi_extra_start = self.ast.get_data1(node)
         let gi_args: Vec[i32] = Vec.new()
@@ -1309,10 +1304,8 @@ impl Sema:
         if self.pool_resolve_symbol(gi_base_sym) == "Atomic":
             if gi_arg_count != 1:
                 sema_phase_bug("BUG: frozen Atomic type has wrong arg count")
-                return 0
             if self.atomic_payload_type_is_valid(gi_args.get(0)) == 0:
                 sema_phase_bug("BUG: frozen Atomic type has invalid payload")
-                return 0
         self.find_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
 
     fn resolve_type_expr_frozen(node: i32) -> TypeId:
@@ -1348,7 +1341,6 @@ impl Sema:
             if base_sym == self.syms.self_type and self.assoc_type_bindings.contains(assoc_sym):
                 return self.assoc_type_bindings.get(assoc_sym).unwrap() as TypeId
             sema_phase_bug("BUG: frozen associated type resolution needs preregistered type-node answer")
-            return 0 as TypeId
         if kind == NodeKind.NK_TYPE_GENERIC:
             return self.resolve_generic_type_frozen(node) as TypeId
         if kind == NodeKind.NK_TYPE_PTR:
@@ -1409,7 +1401,6 @@ impl Sema:
             if self.typed_expr_types.contains(expr_node):
                 return self.typed_expr_types.get(expr_node).unwrap()
             sema_phase_bug("BUG: frozen @TypeOf has no checked expression type")
-            return 0
         if kind == NodeKind.NK_UNARY:
             let op = self.ast.get_data0(node)
             let inner = self.resolve_type_level_arg_expr_frozen(self.ast.get_data1(node))
@@ -1452,7 +1443,6 @@ impl Sema:
             if self.is_fixed_string_symbol(base_sym) != 0:
                 if self.ast.get_data2(node) != 0:
                     sema_phase_bug("BUG: frozen FixedString index has wrong arg count")
-                    return 0
                 return self.fixed_string_type_from_length_node_frozen(self.ast.get_data1(node))
             var base_tid = self.lookup_named_type_visible(base_sym)
             if base_tid == 0:
@@ -7922,16 +7912,13 @@ impl Sema:
             let result_resolved = self.resolve_alias(result_ref_ty as TypeId)
             if self.get_type_kind(result_resolved) != TypeKind.TY_REF:
                 sema_phase_bug("BUG: frozen Deref.deref return type is not a reference")
-                return sema_deref_info_none()
             let pointee = self.get_type_d0(result_resolved)
             if target_ty != 0 and self.types_compatible_frozen(target_ty, pointee) == 0:
                 sema_phase_bug("BUG: frozen Deref.deref return type does not match target")
-                return sema_deref_info_none()
             let concrete_target = if target_ty != 0: target_ty else: pointee
             let concrete_result_ref = if target_ty != 0: self.find_exact_type(TypeKind.TY_REF, target_ty, 0, 0) as i32 else: result_resolved as i32
             if concrete_result_ref == 0:
                 sema_phase_bug("BUG: frozen Deref result reference type not preregistered")
-                return sema_deref_info_none()
             return SemaDerefInfo { ok: 1, target_ty: concrete_target, result_ref_ty: concrete_result_ref, deref_fn }
         sema_deref_info_none()
 
@@ -10932,7 +10919,6 @@ impl Sema:
                 let recv_resolved = self.resolve_alias(recv_type as TypeId)
                 if self.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
                     sema_phase_bug("BUG: optional_chain_method_raw_result_type_frozen generic return substitution needs preregistered result")
-                    return 0
                 return ret
         0
 
@@ -11126,7 +11112,6 @@ impl Sema:
                 if self.generic_struct_field_type_cache.contains(twin_ckey):
                     return self.generic_struct_field_type_cache.get(twin_ckey).unwrap()
             sema_phase_bug(f"BUG: struct_field_type_frozen generic-inst field type miss tid={resolved as i32} base={self.pool_resolve_symbol(self.get_type_d0(resolved))} field={self.pool_resolve_symbol(field)}")
-            return 0
 
         0
 
@@ -11355,7 +11340,6 @@ impl Sema:
                 return current
             if sema_autoderef_seen_type(&seen, current as i32) != 0:
                 sema_phase_bug("BUG: auto_deref_method_type_frozen cycle through Deref implementation")
-                return current
             seen.push(current as i32)
             let next = self.autoderef_next_type_frozen(current)
             if next == current:
@@ -11363,7 +11347,6 @@ impl Sema:
             current = next
             depth = depth + 1
         sema_phase_bug("BUG: auto_deref_method_type_frozen exceeded deref depth")
-        current
 
     mut fn field_access_type_no_diagnostic(node: i32) -> i32:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_FIELD_ACCESS:
@@ -13219,7 +13202,6 @@ impl Sema:
             if not variant_exists:
                 return result
             sema_phase_bug("BUG: enum_variant_payload_types_frozen generic-inst payload miss")
-            return result
         result
 
 fn sema_accessor_char_lower(ch: i32) -> str:
@@ -17171,7 +17153,6 @@ impl Sema:
             if self.impl_generic_inst.contains(gi_key2):
                 return 1
             sema_phase_bug("BUG: type_implements_trait_frozen generic blanket path needs preregistered answer")
-            return 0
         var type_sym = self.get_type_name(resolved)
         if type_sym == 0:
             type_sym = self.pool_lookup_symbol(self.type_name(resolved as i32))
@@ -21533,7 +21514,6 @@ impl Sema:
                 if self.generic_struct_field_index_type_cache.contains(twin_key):
                     return self.generic_struct_field_index_type_cache.get(twin_key).unwrap()
             sema_phase_bug("BUG: type_reflection_field_type_frozen generic-inst field type miss")
-            return 0
         0
 
     fn type_reflection_variant_base(tid: i32) -> i32:

@@ -2068,13 +2068,13 @@ fn build_graph_run_cli_capture(root: &str, target: &BuildGraphTarget, compiler_p
     argv = build_graph_argv_append(argv, compiler_path)
     argv = argv ++ argv_tail
     let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
-    let stdout = with_fs_read_file(stdout_path)
-    let stderr = with_fs_read_file(stderr_path)
+    let out_text = with_fs_read_file(stdout_path)
+    let err_text = with_fs_read_file(stderr_path)
     let _ = label
     if rc == 0:
         let _remove_stdout = with_fs_remove_file(stdout_path)
         let _remove_stderr = with_fs_remove_file(stderr_path)
-    TestRunResult { rc, stdout, stderr }
+    TestRunResult { rc, stdout: out_text, stderr: err_text }
 
 fn build_graph_trim_space_and_newlines(text: &str) -> str:
     var start = 0
@@ -3622,15 +3622,15 @@ fn run_test_compiler_command(target: &str, command_name: &str, directives: &Test
     // with four workers it crossed a 60s limit and reported as a plain check
     // failure (#1086, windows x86_64).
     let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, 300000)
-    let stdout = with_fs_read_file(stdout_path)
-    let stderr = with_fs_read_file(stderr_path)
+    let out_text = with_fs_read_file(stdout_path)
+    let err_text = with_fs_read_file(stderr_path)
     let _remove_stdout = with_fs_remove_file(stdout_path)
     let _remove_stderr = with_fs_remove_file(stderr_path)
     let _remove_bin = with_fs_remove_file(capture_dir ++ "/out")
     let _remove_obj = with_fs_remove_file(capture_dir ++ "/out.o")
     let _remove_dsym = with_fs_remove_dir(capture_dir ++ "/out.dSYM")
     let _remove_dir = with_fs_remove_dir(capture_dir)
-    TestRunResult { rc, stdout, stderr }
+    TestRunResult { rc, stdout: out_text, stderr: err_text }
 
 fn test_output_contains_expected(actual: &str, expected: &str) -> bool:
     expected.len() == 0 or actual.contains(expected)
@@ -3806,16 +3806,16 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
         let _restore_filter = build_graph_rt_setenv("WITH_TEST_FILTER", old_filter)
     if quiet:
         let _restore_short = build_graph_rt_setenv("WITH_TEST_SHORT", old_short)
-    let stdout = with_fs_read_file(out_path)
-    let stderr = with_fs_read_file(err_path)
+    let out_text = with_fs_read_file(out_path)
+    let err_text = with_fs_read_file(err_path)
     let _cleanup_stdout = build_graph_rt_remove_file(out_path)
     let _cleanup_stderr = build_graph_rt_remove_file(err_path)
     if not quiet:
-        if stdout.len() > 0:
-            with_write(stdout)
-        if stderr.len() > 0:
-            with_ewrite(stderr)
-    TestRunResult { rc, stdout, stderr }
+        if out_text.len() > 0:
+            with_write(out_text)
+        if err_text.len() > 0:
+            with_ewrite(err_text)
+    TestRunResult { rc, stdout: out_text, stderr: err_text }
 
 fn test_validate_output(stream_name: &str, actual: &str, expected_values: &Vec[str], target: &str, test_name: &str) -> bool:
     for ei in 0..expected_values.len() as i32:
