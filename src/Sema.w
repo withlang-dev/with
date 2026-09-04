@@ -4459,8 +4459,8 @@ impl Sema:
             self.clear_moved_fields_for_binding(removed_sym)
             self.scope_name_map.remove(removed_sym)
             let shadow_top = self.shadowed_global_syms.len() as i32 - 1
-            if shadow_top >= 0 and self.shadowed_global_syms.get(shadow_top as i64) == removed_sym:
-                self.scope_name_map.insert(removed_sym, self.shadowed_global_indices.get(shadow_top as i64))
+            if shadow_top >= 0 and self.shadowed_global_syms[shadow_top] == removed_sym:
+                self.scope_name_map.insert(removed_sym, self.shadowed_global_indices[shadow_top])
                 self.shadowed_global_syms.pop()
                 self.shadowed_global_indices.pop()
             self.bind_names.pop()

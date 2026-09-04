@@ -214,13 +214,13 @@ impl BundleEmitter:
     fn needed_imports() -> Vec[str]:
         var out: Vec[str] = Vec.new()
         for ni in 0..self.named_in_module_syms.len() as i32:
-            let sym = self.named_in_module_syms.get(ni as i64)
+            let sym = self.named_in_module_syms[ni]
             if not self.type_decl_paths.contains(sym):
                 continue
             let path = self.type_decl_paths.get(sym).unwrap()
             if bundle_corpus_contains(self.corpus, path):
                 continue
-            let row = self.named_in_module_paths.get(ni as i64) ++ "\t" ++ path
+            let row = self.named_in_module_paths[ni] ++ "\t" ++ path
             if not out.contains(row):
                 out.push(row)
         out
@@ -1031,7 +1031,7 @@ impl BundleEmitter:
             if not self.type_decl_index.contains(sym):
                 continue
             let di: i32 = self.type_decl_index.get(sym).unwrap()
-            self.current_module = with_str_clone_ref(self.decl_modules.get(di as i64))
+            self.current_module = with_str_clone_ref(self.decl_modules[di])
             self.emit_type(sema, di, ast.get_decl(di) as i32)
         self.current_module = ""
 
@@ -1101,7 +1101,7 @@ pub fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> Bun
             if import_path == "std.prelude" or import_path == "std.prelude_core" or import_path == "std.prelude_alloc":
                 continue
             let target_index = sema.module_import_targets.get((edge_start + ei) as i64)
-            let target = codegen_canonical_module_path(sema.module_paths.get(target_index as i64))
+            let target = codegen_canonical_module_path(sema.module_paths[target_index])
             if not bundle_corpus_contains(model.corpus, target) and not model.needed_imports.contains(mod_path ++ "\t" ++ target):
                 continue
             out.push_str("use " ++ import_path ++ "\n")

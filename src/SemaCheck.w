@@ -7248,7 +7248,7 @@ impl Sema:
                 let name_start = self.regex_capture_name_syms.len() as i32
                 let names = regex.capture_names()
                 for ni in 0..names.len() as i32:
-                    self.regex_capture_name_syms.push(self.pool_lookup_symbol("$" ++ names.get(ni as i64)))
+                    self.regex_capture_name_syms.push(self.pool_lookup_symbol("$" ++ names[ni]))
                 self.regex_capture_name_starts.insert(node, name_start)
                 self.regex_capture_name_counts.insert(node, names.len() as i32)
             }
