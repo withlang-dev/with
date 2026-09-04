@@ -1,4 +1,3 @@
-//! known-issue: #943 comptime integer arithmetic evaluates at 32 bits
 //! expect-stdout: ok
 
 // S0 differential oracle for #943.
@@ -18,8 +17,6 @@
 // so a correct evaluator cannot overflow at any width. That isolates the
 // operand-truncation defect: the corruption is applied to the inputs before
 // the overflow check runs, and an identity operation can never trip that check.
-//
-// Remove the known-issue directive when #943 is fixed.
 
 // ── comptime terms ───────────────────────────────────────────────────────
 // Widths at or below 32 bits pass today; i64/u64 are the defect.
@@ -46,6 +43,14 @@ comptime fn ct_u64_mul -> u64: 4294967296u64 * 1u64
 // Reaches the corruption through eval_shift_value rather than int_signed_add.
 comptime fn ct_i64_shl -> i64: 1i64 << 40
 
+// Promoted from test/compile_errors/ when #943 was fixed. Both used to be
+// compile errors: the first a spurious "integer overflow in comptime" on an
+// expression that never overflows i64, the second a misleading "integer
+// literal does not fit expected type" naming a literal that fits u64 exactly
+// (the truncated operand went negative and the unsigned fit check rejected it).
+comptime fn ct_i64_edge -> i64: 2147483647i64 + 1i64
+comptime fn ct_u64_fit  -> u64: 3000000001u64 + 0u64
+
 const CT_I8:  i8  = comptime ct_i8()
 const CT_I16: i16 = comptime ct_i16()
 const CT_I32: i32 = comptime ct_i32()
@@ -61,6 +66,8 @@ const CT_I64_DIV: i64 = comptime ct_i64_div()
 const CT_U64_SUB: u64 = comptime ct_u64_sub()
 const CT_U64_MUL: u64 = comptime ct_u64_mul()
 const CT_I64_SHL: i64 = comptime ct_i64_shl()
+const CT_I64_EDGE: i64 = comptime ct_i64_edge()
+const CT_U64_FIT: u64 = comptime ct_u64_fit()
 
 // ── plain-const-fold terms (no `comptime` keyword) ───────────────────────
 
@@ -98,6 +105,8 @@ fn main:
     assert(CT_U64_SUB == 4294967296)
     assert(CT_U64_MUL == 4294967296)
     assert(CT_I64_SHL == 1099511627776)
+    assert(CT_I64_EDGE == 2147483648)
+    assert(CT_U64_FIT == 3000000001)
 
     // ── plain-const-fold term == expected literal ────────────────────────
     assert(FOLD_I32 == 2000000000)

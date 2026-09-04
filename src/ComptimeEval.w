@@ -2614,6 +2614,35 @@ impl ComptimeEvaluator:
                 return typed
         fallback
 
+    // #943: comptime folding runs *before* sema. Frontend.compile_source calls
+    // comptime_transform_module against a Sema prepared only by
+    // prepare_for_comptime_transform, which never runs check_expr — so
+    // typed_expr_types is empty for the nodes being folded and node_type_or
+    // falls through to its default. Defaulting an integer literal to i32 there
+    // discards the width the programmer wrote, and every later operation
+    // inherits it: `3000000001i64 + 0i64` truncated its operand to 32 bits and
+    // returned -1294967295.
+    //
+    // A suffixed literal carries its own width, and that is readable pre-sema.
+    // Consult it before defaulting. Sema applies the same precedence for
+    // NK_INT_LIT (suffix first, then expected type), so a node folded here gets
+    // the type it will be assigned once checking does run.
+    //
+    // For an unsuffixed literal, mirror sema's own default rule rather than
+    // hardcoding i32: SemaCheck picks i64 when the value is outside i32 range
+    // and i32 otherwise. Hardcoding i32 here made `var x: i64 = 3000000001`
+    // narrow at the literal even though no i32 was ever written.
+    fn comptime_int_literal_type(node: i32, value: i64, fallback: i32) -> i32:
+        let typed = self.node_type_or(node, 0)
+        if typed != 0:
+            return typed
+        let suffix_ty = self.sema.literal_suffix_type(self.ast.literal_suffix(node as NodeId))
+        if suffix_ty != 0:
+            return suffix_ty
+        if fallback == self.sema.ty_i32 as i32 and (value < -2147483648 or value > 2147483647):
+            return self.sema.ty_i64 as i32
+        fallback
+
     fn comptime_value_semantic_type(value: &ComptimeValue) -> i32:
         if value.type_id != 0:
             return value.type_id
@@ -6806,8 +6835,46 @@ impl ComptimeEvaluator:
             return value_signal
         let flags = self.ast.get_data2(node)
         let is_mut = flags % 2
+        // #943: a local `let`/`var` annotation is the declared type of the
+        // binding, and pre-sema it is the only place that width is written.
+        // Without this, `var h: u64 = 5381` bound an i32-typed 5381 and every
+        // later `h * 33` was evaluated at 32 bits.
+        //
+        // Retype only when the value fits the annotation. A value that does not
+        // fit is left as-is so sema still reports the mismatch — narrowing it
+        // here would turn a diagnosable error into a silently masked one, which
+        // is the defect this fix exists to remove.
+        let retype_to = self.local_annotation_int_type(flags, &value_signal.value)
+        if retype_to != 0:
+            let raw = comptime_value_intlike(&value_signal.value)
+            self.bind_value(self.ast.get_data0(node), comptime_value_int(retype_to, raw), is_mut)
+            return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         self.bind_value(self.ast.get_data0(node), value_signal.value, is_mut)
         comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+
+    // Returns the integer type this binding's annotation declares, or 0 to
+    // leave the value's own type alone. 0 is returned when there is no
+    // annotation, when it is not an integer type, when it already matches, or
+    // when the value does not fit it — see the caller for why the last case is
+    // deliberately left to sema.
+    mut fn local_annotation_int_type(flags: i32, value: &ComptimeValue) -> i32:
+        if value.kind != ComptimeValueKind.CV_INT:
+            return 0
+        let ann_extra = self.sema.local_let_type_ann_extra(flags)
+        if ann_extra < 0:
+            return 0
+        let ann_type = self.sema.resolve_type_expr(self.ast.get_extra(ann_extra)) as i32
+        if ann_type == 0 or ann_type == value.type_id:
+            return 0
+        let resolved = self.sema.resolve_alias(self.sema.numeric_operand_type(ann_type) as TypeId)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_INT:
+            return 0
+        let width = self.comptime_int_width(ann_type)
+        let is_unsigned = self.comptime_int_is_unsigned(ann_type)
+        let raw = comptime_value_intlike(value)
+        if comptime_bit_result(raw, width, is_unsigned) != raw:
+            return 0
+        ann_type
 
     mut fn eval_assign(node: i32) -> ComptimeControl:
         let target = self.ast.get_data0(node)
@@ -7870,8 +7937,8 @@ impl ComptimeEvaluator:
                 let exact = self.ast.int_literal_exact_value(node as NodeId)
                 if exact.ok == 0 or exact.overflow != 0:
                     return self.fail(node, "comptime integer literal too large")
-                return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), exact.lo))
-            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), fast.value))
+                return comptime_control_value(comptime_value_int(self.comptime_int_literal_type(node, exact.lo, self.sema.ty_i64 as i32), exact.lo))
+            return comptime_control_value(comptime_value_int(self.comptime_int_literal_type(node, fast.value, self.sema.ty_i32 as i32), fast.value))
         if kind == NodeKind.NK_BOOL_LIT:
             return comptime_control_value(comptime_value_bool(self.ast.get_data0(node)))
         if kind == NodeKind.NK_STRING_LIT:

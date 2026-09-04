@@ -1,5 +1,4 @@
 //! args: --overflow=saturate
-//! known-issue: #943 comptime integer arithmetic evaluates at 32 bits
 //! expect-stdout: ok
 
 // S0 for #943, --overflow=saturate lane.
@@ -16,8 +15,6 @@
 // the same decision about whether an operation overflows. Under the default
 // panic mode the same expression is a compile error, pinned separately in
 // test/compile_errors/comptime_int_width_overflow.w.
-//
-// Remove the known-issue directive when #943 is fixed.
 
 comptime fn edge -> i64:
     2147483647i64 + 1i64
