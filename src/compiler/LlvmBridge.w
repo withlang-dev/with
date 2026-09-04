@@ -418,18 +418,18 @@ fn cstr_slot_for_current_thread() -> i32:
     var slot = -1
     cstr_lock()
     for i in 0..CSTR_THREAD_SLOTS:
-        if cstr_slot_owners[i as i64] == tid:
+        if cstr_slot_owners[i] == tid:
             slot = i
             break
     if slot < 0:
         for i in 0..CSTR_THREAD_SLOTS:
-            if cstr_slot_owners[i as i64] == 0:
-                cstr_slot_owners[i as i64] = tid
-                cstr_slot_indices[i as i64] = 0
+            if cstr_slot_owners[i] == 0:
+                cstr_slot_owners[i] = tid
+                cstr_slot_indices[i] = 0
                 slot = i
                 break
     if slot >= 0:
-        cstr_slot_indices[slot as i64] = (cstr_slot_indices[slot as i64] + 1) & 3
+        cstr_slot_indices[slot] = (cstr_slot_indices[slot] + 1) & 3
     cstr_unlock()
     slot
 
@@ -440,12 +440,12 @@ fn to_cstr(s: &str) -> *const u8:
         unsafe:
             abort()
         return empty_cstr()
-    let idx = cstr_slot_indices[slot as i64]
+    let idx = cstr_slot_indices[slot]
     let n = if s.len() < 4095: s.len() else: 4095
     let src = unsafe **(&s as *const *const *const u8)
-    let dst = &raw mut cstr_bufs[slot as i64][idx as i64] as *mut u8
+    let dst = &raw mut cstr_bufs[slot][idx] as *mut u8
     with_memcpy(dst, src, n)
-    cstr_bufs[slot as i64][idx as i64][n] = 0 as u8
+    cstr_bufs[slot][idx][n] = 0 as u8
     dst as *const u8
 
 fn c_strlen(s: *const u8) -> i64:
@@ -545,9 +545,9 @@ pub fn wl_set_active_target_triple(triple: str) -> Unit:
         n = 127
     var i = 0
     while i < n:
-        wl_active_triple_buf[i as i64] = triple.byte_at(i as i64)
+        wl_active_triple_buf[i] = triple[i]
         i = i + 1
-    wl_active_triple_buf[n as i64] = 0 as u8
+    wl_active_triple_buf[n] = 0 as u8
     wl_active_triple_len = n
 
 // The triple every emission path (target machine, .s assembly, IR
@@ -1178,7 +1178,7 @@ pub fn wl_get_fn_param_type(fn_ty: i64, index: i32) -> i64:
         var params: [128]i64 = [0 as i64; 128]
         let actual_count = if count > 128: 128 else: count
         LLVMGetParamTypes(fn_ty as *mut u8, &params as *mut *mut u8)
-        params[index as i64]
+        params[index]
 
 // ── Module verification / emission ──────────────────────────────
 

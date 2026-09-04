@@ -26,7 +26,7 @@ pub fn build_graph_test_target_files(root: &str, entry: &str) -> Vec[str]:
     let search_dir = if entry_dir == ".": with_str_clone_ref(root) else: build_graph_resolve_project_path(root, entry_dir)
     let candidates = collect_test_files(search_dir)
     for ci in 0..candidates.len() as i32:
-        let candidate = candidates.get(ci as i64)
+        let candidate = candidates[ci]
         let candidate_dir = build_graph_dirname(candidate)
         if candidate_dir != search_dir:
             continue
@@ -43,7 +43,7 @@ fn build_graph_test_compiler_arg(arg: &str) -> str:
 
 pub fn build_graph_test_compiler(root: &str, target: &BuildGraphTarget) -> str:
     for ai in 0..target.args.len() as i32:
-        let value = build_graph_test_compiler_arg(target.args.get(ai as i64))
+        let value = build_graph_test_compiler_arg(target.args[ai])
         if value.len() > 0:
             return build_graph_resolve_project_path(root, value)
     ""
@@ -51,7 +51,7 @@ pub fn build_graph_test_compiler(root: &str, target: &BuildGraphTarget) -> str:
 fn build_graph_append_test_args(argv: &str, target: &BuildGraphTarget) -> str:
     var out = with_str_clone_ref(argv)
     for ai in 0..target.args.len() as i32:
-        let arg = target.args.get(ai as i64)
+        let arg = target.args[ai]
         if build_graph_test_compiler_arg(arg).len() == 0:
             out = build_graph_argv_append(out, arg)
     out
@@ -59,7 +59,7 @@ fn build_graph_append_test_args(argv: &str, target: &BuildGraphTarget) -> str:
 fn build_graph_test_parse_jobs(value: &str) -> i32:
     var out = 0
     for i in 0..value.len() as i32:
-        let ch = value.byte_at(i as i64)
+        let ch = value[i]
         if ch < 48 or ch > 57:
             break
         out = out * 10 + (ch - 48)
@@ -145,7 +145,7 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
     var run_keys: Vec[str] = Vec.new()
     var cached_count = 0
     for i in 0..test_files.len() as i32:
-        let test_path = test_files.get(i as i64)
+        let test_path = test_files[i]
         let key = build_cache_test_verdict_key(root, target, compiler_fp, test_path)
         if prior.contains(key):
             cached_count = cached_count + 1
@@ -170,7 +170,7 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
     // rest of the window).
     while oldest < run_files.len() as i32:
         if next < run_files.len() as i32 and next - oldest < jobs_limit:
-            let test_path = run_files.get(next as i64)
+            let test_path = run_files[next]
             let base = build_graph_path_basename(test_path)
             let stdout_path = resolve_join(capture_dir, base ++ ".stdout")
             let stderr_path = resolve_join(capture_dir, base ++ ".stderr")
@@ -180,13 +180,13 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
                 build_graph_rt_eprint("error: build.w test target '" ++ target.name ++ "' could not spawn '" ++ test_path ++ "'")
                 return 1
             active.push(build_graph_external_test_job_new(test_path, stdout_path, stderr_path, pid))
-            active_keys.push(with_str_clone_ref(run_keys.get(next as i64)))
+            active_keys.push(with_str_clone_ref(run_keys[next]))
             next = next + 1
             continue
-        let job_path = active.get(oldest as i64).test_path
-        let rc = build_graph_wait_external_test_job(target, active.get(oldest as i64))
+        let job_path = active[oldest].test_path
+        let rc = build_graph_wait_external_test_job(target, active[oldest])
         if rc == 0:
-            pass_keys.push(with_str_clone_ref(active_keys.get(oldest as i64)))
+            pass_keys.push(with_str_clone_ref(active_keys[oldest]))
             pass_paths.push(build_cache_project_relative_path(root, job_path))
         else:
             failed_paths.push(with_str_clone_ref(job_path))
@@ -202,7 +202,7 @@ pub fn build_graph_run_external_test_files(root: &str, target: &BuildGraphTarget
     if failed_paths.len() as i32 > 0:
         build_graph_rt_eprint(f"error: build.w test target '{target.name}': {failed_paths.len() as i32} of {test_files.len() as i32} files failed ({cached_count} cached, {run_files.len() as i32} ran):")
         for fi in 0..failed_paths.len() as i32:
-            build_graph_rt_eprint("error:   failed: " ++ failed_paths.get(fi as i64))
+            build_graph_rt_eprint("error:   failed: " ++ failed_paths[fi])
         return first_failure
     build_graph_rt_eprint(f"test target '{target.name}': {test_files.len() as i32} files ok ({cached_count} cached, {run_files.len() as i32} ran)")
     0

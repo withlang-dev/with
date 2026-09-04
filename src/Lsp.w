@@ -52,7 +52,7 @@ fn lsp_parse_int(s: &str) -> i32:
     var result = 0
     var started = false
     for i in 0..s.len() as i32:
-        let ch = s.byte_at(i as i64)
+        let ch = s[i]
         if ch >= 48 and ch <= 57:
             result = result * 10 + (ch - 48)
             started = true
@@ -104,7 +104,7 @@ unsafe fn jsmn_fill_token(tokens: *mut JsonToken, idx: i32, tok_type: i32, start
 unsafe fn jsmn_parse_primitive(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     let start = parser.pos
     while parser.pos < len:
-        let c = js.byte_at(parser.pos as i64) as i32
+        let c = js[parser.pos] as i32
         if c == 0:
             break
         if c == 58 or c == 9 or c == 13 or c == 10 or c == 32 or c == 44 or c == 93 or c == 125:
@@ -126,7 +126,7 @@ unsafe fn jsmn_parse_string(parser: *mut JsonParser, js: &str, len: i32, tokens:
     let start = parser.pos
     parser.pos = parser.pos + 1
     while parser.pos < len:
-        let c = js.byte_at(parser.pos as i64) as i32
+        let c = js[parser.pos] as i32
         if c == 0:
             break
         if c == 34:
@@ -139,14 +139,14 @@ unsafe fn jsmn_parse_string(parser: *mut JsonParser, js: &str, len: i32, tokens:
             return 0
         if c == 92 and parser.pos + 1 < len:
             parser.pos = parser.pos + 1
-            let esc = js.byte_at(parser.pos as i64) as i32
+            let esc = js[parser.pos] as i32
             if esc == 34 or esc == 47 or esc == 92 or esc == 98 or esc == 102 or esc == 114 or esc == 110 or esc == 116:
                 0
             else if esc == 117:
                 parser.pos = parser.pos + 1
                 var hi = 0
                 while hi < 4 and parser.pos < len:
-                    let hc = js.byte_at(parser.pos as i64) as i32
+                    let hc = js[parser.pos] as i32
                     if hc == 0:
                         break
                     if not ((hc >= 48 and hc <= 57) or (hc >= 65 and hc <= 70) or (hc >= 97 and hc <= 102)):
@@ -165,7 +165,7 @@ unsafe fn jsmn_parse_string(parser: *mut JsonParser, js: &str, len: i32, tokens:
 unsafe fn jsmn_parse(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     var count = parser.toknext
     while parser.pos < len:
-        let c = js.byte_at(parser.pos as i64) as i32
+        let c = js[parser.pos] as i32
         if c == 0:
             break
         if c == 123 or c == 91:
@@ -317,9 +317,9 @@ fn json_unescape(s: &str) -> str:
     var out = ""
     var i = 0
     while i < s.len() as i32:
-        let ch = s.byte_at(i as i64)
+        let ch = s[i]
         if ch == 92 and i + 1 < s.len() as i32:
-            let next = s.byte_at((i + 1) as i64)
+            let next = s[(i + 1)]
             if next == 110:
                 out = out ++ str_from_byte(10)
             else if next == 116:
@@ -341,7 +341,7 @@ fn json_unescape(s: &str) -> str:
 fn json_escape(s: &str) -> str:
     var out = ""
     for i in 0..s.len() as i32:
-        let ch = s.byte_at(i as i64)
+        let ch = s[i]
         if ch == 34:
             out = out ++ "\\\""
         else if ch == 92:
@@ -364,7 +364,7 @@ fn lsp_find_substr(haystack: &str, needle: &str) -> i32:
     for i in 0..(h_len - n_len + 1):
         var ok = true
         for j in 0..n_len:
-            if haystack.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+            if haystack[(i + j)] != needle[j]:
                 ok = false
                 break
         if ok:
@@ -504,12 +504,12 @@ impl LspDocument:
         // Build trait-methods-per-type map from sema's impl tables.
         self.cached_trait_methods = HashMap.new()
         for ii in 0..sema.impl_type_syms.len() as i32:
-            let type_sym = sema.impl_type_syms.get(ii as i64)
+            let type_sym = sema.impl_type_syms[ii]
             let type_name = sema.pool_resolve(type_sym)
             if type_name.len() == 0:
                 continue
-            let start = sema.impl_starts.get(ii as i64)
-            let count = sema.impl_counts.get(ii as i64)
+            let start = sema.impl_starts[ii]
+            let count = sema.impl_counts[ii]
             var methods: Vec[str] = Vec.new()
             let existing = self.cached_trait_methods.get(type_name)
             if existing.is_some():
@@ -518,19 +518,19 @@ impl LspDocument:
                     // HashMap.get returns a view. The cache being rebuilt needs
                     // independent strings, and concatenation is the existing
                     // ownership-producing string operation available here.
-                    methods.push("" ++ prior.get(method_i as i64))
+                    methods.push("" ++ prior[method_i])
             var ti = 0
             while ti < count:
-                let trait_sym = sema.impl_extra.get((start + ti) as i64)
+                let trait_sym = sema.impl_extra[(start + ti)]
                 let trait_opt = sema.trait_lookup.get(trait_sym)
                 if trait_opt.is_some():
                     let tidx = trait_opt.unwrap()
                     if tidx >= 0 and tidx < sema.trait_method_starts.len() as i32:
-                        let mstart = sema.trait_method_starts.get(tidx as i64)
-                        let mcount = sema.trait_method_counts.get(tidx as i64)
+                        let mstart = sema.trait_method_starts[tidx]
+                        let mcount = sema.trait_method_counts[tidx]
                         var mi = 0
                         while mi < mcount:
-                            let msym = sema.trait_method_names.get((mstart + mi) as i64)
+                            let msym = sema.trait_method_names[(mstart + mi)]
                             let mname = sema.pool_resolve(msym)
                             if mname.len() > 0:
                                 methods.push(with_str_clone_ref(mname))
@@ -559,7 +559,7 @@ impl LspDocument:
             let prior = opt.unwrap()
             let methods: Vec[str] = Vec.new()
             for method_i in 0..prior.len() as i32:
-                methods.push("" ++ prior.get(method_i as i64))
+                methods.push("" ++ prior[method_i])
             return methods
         Vec.new()
 
@@ -578,7 +578,7 @@ fn LspState.new() -> LspState:
 impl LspState:
     fn find_doc(uri: &str) -> i32:
         for i in 0..self.documents.len() as i32:
-            if (&self.documents[i as i64]).uri == uri:
+            if (&self.documents[i]).uri == uri:
                 return i
         -1
 
@@ -590,7 +590,7 @@ impl LspState:
         // element — freeing buffers the copy just stored (post-#691 this is a
         // real double free; pre-flip it merely leaked). Decide from a VIEW,
         // then replace the slot with an independently built document.
-        let parsed_view = &self.documents[idx as i64]
+        let parsed_view = &self.documents[idx]
         if parsed_view.fast_valid and parsed_view.fast_text_len == parsed_view.text.len() as i32:
             return
         var reparsed = LspDocument.new(parsed_view.uri, parsed_view.path, parsed_view.text, parsed_view.version)
@@ -602,7 +602,7 @@ impl LspState:
     mut fn ensure_doc_analyzed(idx: i32):
         if idx < 0:
             return
-        let analyzed_view = &self.documents[idx as i64]
+        let analyzed_view = &self.documents[idx]
         if analyzed_view.cache_valid and analyzed_view.cached_text_len == analyzed_view.text.len() as i32:
             return
         var reanalyzed = LspDocument.new(analyzed_view.uri, analyzed_view.path, analyzed_view.text, analyzed_view.version)
@@ -642,7 +642,7 @@ fn lsp_offset_to_line(text: &str, offset: i32) -> i32:
     var line = 0
     var i = 0
     while i < offset and i < text.len() as i32:
-        if text.byte_at(i as i64) == 10:
+        if text[i] == 10:
             line = line + 1
         i = i + 1
     line
@@ -651,7 +651,7 @@ fn lsp_offset_to_col(text: &str, offset: i32) -> i32:
     var col = 0
     var i = 0
     while i < offset and i < text.len() as i32:
-        if text.byte_at(i as i64) == 10:
+        if text[i] == 10:
             col = 0
         else:
             col = col + 1
@@ -664,7 +664,7 @@ fn lsp_line_col_to_offset(text: &str, line: i32, col: i32) -> i32:
     for i in 0..text.len() as i32:
         if cur_line == line and cur_col == col:
             return i
-        if text.byte_at(i as i64) == 10:
+        if text[i] == 10:
             cur_line = cur_line + 1
             cur_col = 0
         else:
@@ -684,16 +684,16 @@ fn LspState.publish_diagnostics(mut self: LspState, uri: &str, text: &str):
     // (the lsp-use-std shutdown crash). comp stays at function scope so the
     // fresh branch's view outlives its use.
     var comp = Compilation.init()
-    let use_cache = idx >= 0 and (&self.documents[idx as i64]).cache_valid
+    let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
     if not use_cache:
         comp.set_prelude_mode(2)
         let pool = comp.compile_source_text(uri_to_path(uri), text)
-    let dl = if use_cache: &self.documents[idx as i64].cached_diags else: &comp.zcu.diagnostics
+    let dl = if use_cache: &self.documents[idx].cached_diags else: &comp.zcu.diagnostics
 
     var diags = jarr_start()
     var first = true
     for i in 0..dl.count():
-        let d = &dl.items[i as i64]
+        let d = &dl.items[i]
         let severity = d.severity
         let sl = lsp_offset_to_line(text, d.primary.start)
         let sc = lsp_offset_to_col(text, d.primary.start)
@@ -737,10 +737,10 @@ fn LspState.definition(mut self: LspState, id: i32, uri: &str, text: &str, line:
     let empty_pool = AstPool.new()
     let empty_intern = InternPool.init()
     let empty_paths: Vec[str] = Vec.new()
-    let slow_valid = idx >= 0 and (&self.documents[idx as i64]).cache_valid
-    let slow_pool = if slow_valid: &self.documents[idx as i64].cached_pool else: &empty_pool
-    let slow_intern = if slow_valid: &self.documents[idx as i64].cached_intern else: &empty_intern
-    let slow_paths = if slow_valid: &self.documents[idx as i64].cached_decl_paths else: &empty_paths
+    let slow_valid = idx >= 0 and (&self.documents[idx]).cache_valid
+    let slow_pool = if slow_valid: &self.documents[idx].cached_pool else: &empty_pool
+    let slow_intern = if slow_valid: &self.documents[idx].cached_intern else: &empty_intern
+    let slow_paths = if slow_valid: &self.documents[idx].cached_decl_paths else: &empty_paths
     if slow_valid:
         for di in 0..slow_pool.decl_count():
             let decl = slow_pool.get_decl(di)
@@ -752,7 +752,7 @@ fn LspState.definition(mut self: LspState, id: i32, uri: &str, text: &str, line:
                     var def_uri = with_str_clone_ref(uri)
                     var def_text = with_str_clone_ref(text)
                     if di < slow_paths.len() as i32:
-                        let decl_path = slow_paths.get(di as i64)
+                        let decl_path = slow_paths[di]
                         if decl_path.len() > 0 and decl_path != uri_to_path(uri):
                             def_uri = "file://" ++ decl_path
                             let file_text = with_fs_read_file(decl_path)
@@ -790,14 +790,14 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
     // Walk backward from decl_start to find preceding /// comment lines.
     var pos = decl_start - 1
     // Skip whitespace/newlines before the declaration
-    while pos >= 0 and (text.byte_at(pos as i64) == 32 or text.byte_at(pos as i64) == 9 or text.byte_at(pos as i64) == 13 or text.byte_at(pos as i64) == 10):
+    while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
         pos = pos - 1
     // Collect doc comment lines (walking backward)
     var doc_lines: Vec[str] = Vec.new()
     while pos >= 0:
         // Find start of this line
         var line_start = pos
-        while line_start > 0 and text.byte_at((line_start - 1) as i64) != 10:
+        while line_start > 0 and text[(line_start - 1)] != 10:
             line_start = line_start - 1
         let line = text.slice(line_start as i64, (pos + 1) as i64).trim()
         if line.starts_with("///"):
@@ -805,7 +805,7 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
             doc_lines.push(content)
             // Move to previous line
             pos = line_start - 1
-            while pos >= 0 and (text.byte_at(pos as i64) == 32 or text.byte_at(pos as i64) == 9 or text.byte_at(pos as i64) == 13 or text.byte_at(pos as i64) == 10):
+            while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
                 pos = pos - 1
         else:
             break
@@ -815,7 +815,7 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
     while i >= 0:
         if result.len() > 0:
             result = result ++ "\n"
-        result = result ++ doc_lines.get(i as i64)
+        result = result ++ doc_lines[i]
         i = i - 1
     result
 
@@ -840,12 +840,12 @@ fn LspState.hover(mut self: LspState, id: i32, uri: &str, text: &str, line: i32,
         self.ensure_doc_analyzed(idx)
     var comp = Compilation.init()
     var fresh_pool = AstPool.new()
-    let use_cache = idx >= 0 and (&self.documents[idx as i64]).cache_valid
+    let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
     if not use_cache:
         comp.set_prelude_mode(2)
         fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
-    let pool = if use_cache: &self.documents[idx as i64].cached_pool else: &fresh_pool
-    let intern = if use_cache: &self.documents[idx as i64].cached_intern else: &comp.zcu.pool
+    let pool = if use_cache: &self.documents[idx].cached_pool else: &fresh_pool
+    let intern = if use_cache: &self.documents[idx].cached_intern else: &comp.zcu.pool
 
     var hover = ""
     var decl_start = 0
@@ -892,7 +892,7 @@ fn LspState.dot_completion(mut self: LspState, id: i32, uri: &str, text: &str, o
     // Find the receiver identifier before the dot
     var recv_end = dot_pos
     var recv_start = recv_end - 1
-    while recv_start >= 0 and lsp_is_ident_char(text.byte_at(recv_start as i64)):
+    while recv_start >= 0 and lsp_is_ident_char(text[recv_start]):
         recv_start = recv_start - 1
     recv_start = recv_start + 1
     if recv_start >= recv_end:
@@ -907,8 +907,8 @@ fn LspState.dot_completion(mut self: LspState, id: i32, uri: &str, text: &str, o
     // Slow-tier fallback: use typed_expr_types for type inference
     if type_name.len() == 0:
         let cidx = self.find_doc(uri)
-        if cidx >= 0 and (&self.documents[cidx as i64]).cache_valid:
-            type_name = (&self.documents[cidx as i64]).type_at_offset(recv_start)
+        if cidx >= 0 and (&self.documents[cidx]).cache_valid:
+            type_name = (&self.documents[cidx]).type_at_offset(recv_start)
 
     // Build items JSON inline (Vec is pass-by-value, can't use helpers)
     var items = jarr_start()
@@ -919,8 +919,8 @@ fn LspState.dot_completion(mut self: LspState, id: i32, uri: &str, text: &str, o
         let str_methods = "len,slice,starts_with,ends_with,contains,find,replace,to_upper,to_lower,upper,lower,trim,split,byte_at,repeat"
         var sm_start = 0
         for smi in 0..str_methods.len() as i32:
-            if str_methods.byte_at(smi as i64) == 44 or smi == str_methods.len() as i32 - 1:
-                let sm_end = if str_methods.byte_at(smi as i64) == 44: smi else: smi + 1
+            if str_methods[smi] == 44 or smi == str_methods.len() as i32 - 1:
+                let sm_end = if str_methods[smi] == 44: smi else: smi + 1
                 let m = str_methods.slice(sm_start as i64, sm_end as i64)
                 if not first: items = items ++ ","
                 first = false
@@ -931,8 +931,8 @@ fn LspState.dot_completion(mut self: LspState, id: i32, uri: &str, text: &str, o
         let vec_methods = "push,pop,get,len,is_empty,contains,clear"
         var vm_start = 0
         for vmi in 0..vec_methods.len() as i32:
-            if vec_methods.byte_at(vmi as i64) == 44 or vmi == vec_methods.len() as i32 - 1:
-                let vm_end = if vec_methods.byte_at(vmi as i64) == 44: vmi else: vmi + 1
+            if vec_methods[vmi] == 44 or vmi == vec_methods.len() as i32 - 1:
+                let vm_end = if vec_methods[vmi] == 44: vmi else: vmi + 1
                 let m = vec_methods.slice(vm_start as i64, vm_end as i64)
                 if not first: items = items ++ ","
                 first = false
@@ -943,8 +943,8 @@ fn LspState.dot_completion(mut self: LspState, id: i32, uri: &str, text: &str, o
         let hm_methods = "get,insert,contains,remove,len,is_empty,clear"
         var hm_start = 0
         for hmi in 0..hm_methods.len() as i32:
-            if hm_methods.byte_at(hmi as i64) == 44 or hmi == hm_methods.len() as i32 - 1:
-                let hm_end = if hm_methods.byte_at(hmi as i64) == 44: hmi else: hmi + 1
+            if hm_methods[hmi] == 44 or hmi == hm_methods.len() as i32 - 1:
+                let hm_end = if hm_methods[hmi] == 44: hmi else: hmi + 1
                 let m = hm_methods.slice(hm_start as i64, hm_end as i64)
                 if not first: items = items ++ ","
                 first = false
@@ -1017,10 +1017,10 @@ fn LspState.dot_completion(mut self: LspState, id: i32, uri: &str, text: &str, o
                 break
         // Sema-based trait methods from slow tier (includes imported traits)
         let cidx = self.find_doc(uri)
-        if cidx >= 0 and (&self.documents[cidx as i64]).cache_valid:
-            let trait_methods = (&self.documents[cidx as i64]).trait_methods_for_type(type_name)
+        if cidx >= 0 and (&self.documents[cidx]).cache_valid:
+            let trait_methods = (&self.documents[cidx]).trait_methods_for_type(type_name)
             for tmi in 0..trait_methods.len() as i32:
-                let tmname = trait_methods.get(tmi as i64)
+                let tmname = trait_methods[tmi]
                 if not first: items = items ++ ","
                 first = false
                 items = items ++ jobj_start() ++ jkv_str("label", tmname) ++ "," ++ jkv_int("kind", 2) ++ jobj_end()
@@ -1133,7 +1133,7 @@ fn LspState.completion(mut self: LspState, id: i32, uri: &str, text: &str, line:
 
     // Find the line text up to cursor to detect context
     var line_start = offset
-    while line_start > 0 and text.byte_at((line_start - 1) as i64) != 10:
+    while line_start > 0 and text[(line_start - 1)] != 10:
         line_start = line_start - 1
     let line_text = text.slice(line_start as i64, offset as i64)
 
@@ -1144,7 +1144,7 @@ fn LspState.completion(mut self: LspState, id: i32, uri: &str, text: &str, line:
     if lsp_find_substr(line_text, "use std.") >= 0:
         let modules = lsp_list_embedded_modules("std/")
         for i in 0..modules.len() as i32:
-            let m = modules.get(i as i64)
+            let m = modules[i]
             if not first:
                 items = items ++ ","
             first = false
@@ -1157,7 +1157,7 @@ fn LspState.completion(mut self: LspState, id: i32, uri: &str, text: &str, line:
     if lsp_find_substr(line_text, "use test.") >= 0:
         let test_mods = lsp_list_embedded_modules("test/")
         for i in 0..test_mods.len() as i32:
-            let m = test_mods.get(i as i64)
+            let m = test_mods[i]
             if not first:
                 items = items ++ ","
             first = false
@@ -1168,9 +1168,9 @@ fn LspState.completion(mut self: LspState, id: i32, uri: &str, text: &str, line:
 
     // Detect dot context: character before cursor is '.'
     var dot_pos = offset - 1
-    while dot_pos >= 0 and text.byte_at(dot_pos as i64) == 32:
+    while dot_pos >= 0 and text[dot_pos] == 32:
         dot_pos = dot_pos - 1
-    if dot_pos >= 0 and text.byte_at(dot_pos as i64) == 46:
+    if dot_pos >= 0 and text[dot_pos] == 46:
         self.dot_completion(id, uri, text, offset, dot_pos)
         return
 
@@ -1180,12 +1180,12 @@ fn LspState.completion(mut self: LspState, id: i32, uri: &str, text: &str, line:
         self.ensure_doc_analyzed(cidx)
     var comp = Compilation.init()
     var fresh_pool = AstPool.new()
-    let use_cache = cidx >= 0 and (&self.documents[cidx as i64]).cache_valid
+    let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
     if not use_cache:
         comp.set_prelude_mode(2)
         fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
-    let pool = if use_cache: &self.documents[cidx as i64].cached_pool else: &fresh_pool
-    let intern = if use_cache: &self.documents[cidx as i64].cached_intern else: &comp.zcu.pool
+    let pool = if use_cache: &self.documents[cidx].cached_pool else: &fresh_pool
+    let intern = if use_cache: &self.documents[cidx].cached_intern else: &comp.zcu.pool
 
     // Phase 2: scope-aware completion via AST walking.
     // Find the enclosing function, collect its parameters and local bindings
@@ -1199,15 +1199,15 @@ fn LspState.completion(mut self: LspState, id: i32, uri: &str, text: &str, line:
     if enclosing_fn as i32 != 0:
         let params = lsp_collect_fn_params(parse_pool, parse_intern, enclosing_fn)
         for pi in 0..params.len() as i32:
-            scope_names.push(with_str_clone_ref(params.get(pi as i64)))
+            scope_names.push(with_str_clone_ref(params[pi]))
         // Walk body recursively to collect bindings visible at cursor.
         let body = parse_pool.get_data1(enclosing_fn)
         if body != 0:
             let bindings = lsp_collect_bindings_rec(parse_pool, parse_intern, body, offset)
             for bi in 0..bindings.len() as i32:
-                scope_names.push(with_str_clone_ref(bindings.get(bi as i64)))
+                scope_names.push(with_str_clone_ref(bindings[bi]))
     for si in 0..scope_names.len() as i32:
-        let sname = scope_names.get(si as i64)
+        let sname = scope_names[si]
         if not first:
             items = items ++ ","
         first = false
@@ -1216,7 +1216,7 @@ fn LspState.completion(mut self: LspState, id: i32, uri: &str, text: &str, line:
     // Keywords
     let keywords = lsp_keywords()
     for i in 0..keywords.len() as i32:
-        let kw = keywords.get(i as i64)
+        let kw = keywords[i]
         if not first:
             items = items ++ ","
         first = false
@@ -1262,8 +1262,8 @@ fn lsp_append_csv_items(items: &str, csv: &str, kind: i32, first: bool) -> str:
     var f = first
     var start = 0
     for i in 0..csv.len() as i32:
-        if csv.byte_at(i as i64) == 44 or i == csv.len() as i32 - 1:
-            let end = if csv.byte_at(i as i64) == 44: i else: i + 1
+        if csv[i] == 44 or i == csv.len() as i32 - 1:
+            let end = if csv[i] == 44: i else: i + 1
             let name = csv.slice(start as i64, end as i64)
             if not f:
                 result = result ++ ","
@@ -1368,7 +1368,7 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
         if for_body != 0:
             let inner = lsp_collect_bindings_rec(pool, intern, for_body, offset)
             for ii in 0..inner.len() as i32:
-                result.push(with_str_clone_ref(inner.get(ii as i64)))
+                result.push(with_str_clone_ref(inner[ii]))
         return result
 
     if kind == NodeKind.NK_BLOCK:
@@ -1380,11 +1380,11 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
             let stmt = pool.get_extra(extra_start + i)
             let inner = lsp_collect_bindings_rec(pool, intern, stmt, offset)
             for ii in 0..inner.len() as i32:
-                result.push(with_str_clone_ref(inner.get(ii as i64)))
+                result.push(with_str_clone_ref(inner[ii]))
         if tail != 0:
             let inner = lsp_collect_bindings_rec(pool, intern, tail, offset)
             for ii in 0..inner.len() as i32:
-                result.push(with_str_clone_ref(inner.get(ii as i64)))
+                result.push(with_str_clone_ref(inner[ii]))
         return result
 
     if kind == NodeKind.NK_IF_EXPR:
@@ -1394,11 +1394,11 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
         if then_body != 0 and offset >= pool.get_start(then_body as NodeId) and offset <= pool.get_end(then_body as NodeId):
             let inner = lsp_collect_bindings_rec(pool, intern, then_body, offset)
             for ii in 0..inner.len() as i32:
-                result.push(with_str_clone_ref(inner.get(ii as i64)))
+                result.push(with_str_clone_ref(inner[ii]))
         if else_body != 0 and offset >= pool.get_start(else_body as NodeId) and offset <= pool.get_end(else_body as NodeId):
             let inner = lsp_collect_bindings_rec(pool, intern, else_body, offset)
             for ii in 0..inner.len() as i32:
-                result.push(with_str_clone_ref(inner.get(ii as i64)))
+                result.push(with_str_clone_ref(inner[ii]))
         return result
 
     if kind == NodeKind.NK_WHILE:
@@ -1445,7 +1445,7 @@ fn lsp_list_embedded_modules(prefix: &str) -> Vec[str]:
     var i = 0
     while i <= listing.len() as i32:
         let at_end = i == listing.len() as i32
-        let ch = if at_end: 10 else: listing.byte_at(i as i64)
+        let ch = if at_end: 10 else: listing[i]
         if ch == 10:
             let entry = listing.slice(start as i64, i as i64)
             if entry.starts_with(prefix) and entry.ends_with(".w"):
@@ -1585,7 +1585,7 @@ fn LspState.signature_help(mut self: LspState, id: i32, uri: &str, text: &str, l
     for pi in 0..param_labels.len() as i32:
         if pi > 0:
             params_json = params_json ++ ","
-        params_json = params_json ++ jobj_start() ++ jkv_str("label", param_labels.get(pi as i64)) ++ jobj_end()
+        params_json = params_json ++ jobj_start() ++ jkv_str("label", param_labels[pi]) ++ jobj_end()
     params_json = params_json ++ jarr_end()
 
     let sig = jobj_start() ++ jkv_str("label", sig_label) ++ "," ++ jkv_raw("parameters", params_json) ++ jobj_end()
@@ -1670,12 +1670,12 @@ fn LspState.find_references(mut self: LspState, id: i32, uri: &str, text: &str, 
     if idx >= 0:
         self.ensure_doc_analyzed(idx)
     let empty_paths: Vec[str] = Vec.new()
-    let use_cache = idx >= 0 and (&self.documents[idx as i64]).cache_valid
-    let cached_paths = if use_cache: &self.documents[idx as i64].cached_decl_paths else: &empty_paths
+    let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
+    let cached_paths = if use_cache: &self.documents[idx].cached_decl_paths else: &empty_paths
     if cached_paths.len() > 0:
         var scanned_paths = uri_to_path(uri) ++ "\n"
         for di in 0..cached_paths.len() as i32:
-            let dpath = cached_paths.get(di as i64)
+            let dpath = cached_paths[di]
             if dpath.len() == 0:
                 continue
             if dpath.starts_with("<embedded"):
@@ -1714,12 +1714,12 @@ fn LspState.document_symbols(mut self: LspState, id: i32, uri: &str, text: &str)
         self.ensure_doc_analyzed(idx)
     var comp = Compilation.init()
     var fresh_pool = AstPool.new()
-    let use_cache = idx >= 0 and (&self.documents[idx as i64]).cache_valid
+    let use_cache = idx >= 0 and (&self.documents[idx]).cache_valid
     if not use_cache:
         comp.set_prelude_mode(2)
         fresh_pool = comp.compile_source_text(uri_to_path(uri), text)
-    let pool = if use_cache: &self.documents[idx as i64].cached_pool else: &fresh_pool
-    let intern = if use_cache: &self.documents[idx as i64].cached_intern else: &comp.zcu.pool
+    let pool = if use_cache: &self.documents[idx].cached_pool else: &fresh_pool
+    let intern = if use_cache: &self.documents[idx].cached_intern else: &comp.zcu.pool
 
     var items = jarr_start()
     var first = true
@@ -1763,11 +1763,11 @@ fn LspState.document_symbols(mut self: LspState, id: i32, uri: &str, text: &str)
 fn lsp_is_valid_ident(name: &str) -> bool:
     if name.len() == 0:
         return false
-    let first_ch = name.byte_at(0)
+    let first_ch = name[0]
     if not ((first_ch >= 97 and first_ch <= 122) or (first_ch >= 65 and first_ch <= 90) or first_ch == 95):
         return false
     for i in 1..name.len() as i32:
-        let ch = name.byte_at(i as i64)
+        let ch = name[i]
         if not ((ch >= 97 and ch <= 122) or (ch >= 65 and ch <= 90) or (ch >= 48 and ch <= 57) or ch == 95):
             return false
     true
@@ -1825,12 +1825,12 @@ fn LspState.rename(mut self: LspState, id: i32, uri: &str, text: &str, line: i32
     if cidx >= 0:
         self.ensure_doc_analyzed(cidx)
     let empty_paths: Vec[str] = Vec.new()
-    let use_cache = cidx >= 0 and (&self.documents[cidx as i64]).cache_valid
-    let cached_paths = if use_cache: &self.documents[cidx as i64].cached_decl_paths else: &empty_paths
+    let use_cache = cidx >= 0 and (&self.documents[cidx]).cache_valid
+    let cached_paths = if use_cache: &self.documents[cidx].cached_decl_paths else: &empty_paths
     if cached_paths.len() > 0:
         var scanned_paths = uri_to_path(uri) ++ "\n"
         for di in 0..cached_paths.len() as i32:
-            let dpath = cached_paths.get(di as i64)
+            let dpath = cached_paths[di]
             if dpath.len() == 0 or dpath.starts_with("<embedded"):
                 continue
             if lsp_find_substr(scanned_paths, dpath) >= 0:
@@ -1954,7 +1954,7 @@ fn run_lsp() -> i32:
                 state.ensure_doc_analyzed(idx)
                 // #747: owned snapshot — the handler mutates `state` while it runs,
                 // which would invalidate a live view of the stored document text.
-                let doc_text = with_str_clone_ref((&state.documents[idx as i64]).text)
+                let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 state.publish_diagnostics(uri, doc_text)
 
         else if method == "textDocument/hover":
@@ -1966,7 +1966,7 @@ fn run_lsp() -> i32:
             if idx >= 0:
                 // #747: owned snapshot — the handler mutates `state` while it runs,
                 // which would invalidate a live view of the stored document text.
-                let doc_text = with_str_clone_ref((&state.documents[idx as i64]).text)
+                let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 state.hover(id, uri, doc_text, line, character)
             else:
                 lsp_write_response(jrpc_result_null(id))
@@ -1980,7 +1980,7 @@ fn run_lsp() -> i32:
             if idx >= 0:
                 // #747: owned snapshot — the handler mutates `state` while it runs,
                 // which would invalidate a live view of the stored document text.
-                let doc_text = with_str_clone_ref((&state.documents[idx as i64]).text)
+                let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 state.definition(id, uri, doc_text, line, character)
             else:
                 lsp_write_response(jrpc_result_null(id))
@@ -1991,7 +1991,7 @@ fn run_lsp() -> i32:
             if idx >= 0:
                 // #747: owned snapshot — the handler mutates `state` while it runs,
                 // which would invalidate a live view of the stored document text.
-                let doc_text = with_str_clone_ref((&state.documents[idx as i64]).text)
+                let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 let formatted = format_source(doc_text)
                 if formatted != doc_text:
                     let el = lsp_offset_to_line(doc_text, doc_text.len() as i32)
@@ -2011,7 +2011,7 @@ fn run_lsp() -> i32:
             if idx >= 0:
                 // #747: owned snapshot — the handler mutates `state` while it runs,
                 // which would invalidate a live view of the stored document text.
-                let doc_text = with_str_clone_ref((&state.documents[idx as i64]).text)
+                let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 state.completion(id, uri, doc_text, line, character)
             else:
                 lsp_write_response(jrpc_result(id, jobj_start() ++ jkv_raw("items", "[]") ++ jobj_end()))
@@ -2025,7 +2025,7 @@ fn run_lsp() -> i32:
             if idx >= 0:
                 // #747: owned snapshot — the handler mutates `state` while it runs,
                 // which would invalidate a live view of the stored document text.
-                let doc_text = with_str_clone_ref((&state.documents[idx as i64]).text)
+                let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 state.signature_help(id, uri, doc_text, line, character)
             else:
                 lsp_write_response(jrpc_result_null(id))
@@ -2039,7 +2039,7 @@ fn run_lsp() -> i32:
             if idx >= 0:
                 // #747: owned snapshot — the handler mutates `state` while it runs,
                 // which would invalidate a live view of the stored document text.
-                let doc_text = with_str_clone_ref((&state.documents[idx as i64]).text)
+                let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 state.find_references(id, uri, doc_text, line, character)
             else:
                 lsp_write_response(jrpc_result(id, "[]"))
@@ -2050,7 +2050,7 @@ fn run_lsp() -> i32:
             if idx >= 0:
                 // #747: owned snapshot — the handler mutates `state` while it runs,
                 // which would invalidate a live view of the stored document text.
-                let doc_text = with_str_clone_ref((&state.documents[idx as i64]).text)
+                let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 state.document_symbols(id, uri, doc_text)
             else:
                 lsp_write_response(jrpc_result(id, "[]"))
@@ -2065,7 +2065,7 @@ fn run_lsp() -> i32:
             if idx >= 0:
                 // #747: owned snapshot — the handler mutates `state` while it runs,
                 // which would invalidate a live view of the stored document text.
-                let doc_text = with_str_clone_ref((&state.documents[idx as i64]).text)
+                let doc_text = with_str_clone_ref((&state.documents[idx]).text)
                 state.rename(id, uri, doc_text, line, character, new_name)
             else:
                 lsp_write_response(jrpc_result_null(id))

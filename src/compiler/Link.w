@@ -129,10 +129,10 @@ fn link_stage_is_digit(ch: i32) -> bool:
 fn link_stage_read_u32_le(data: &str, offset: i32) -> i64:
     if offset < 0 or offset + 3 >= data.len() as i32:
         return -1
-    (data.byte_at(offset as i64) as i64) |
-        ((data.byte_at((offset + 1) as i64) as i64) << 8) |
-        ((data.byte_at((offset + 2) as i64) as i64) << 16) |
-        ((data.byte_at((offset + 3) as i64) as i64) << 24)
+    (data[offset] as i64) |
+        ((data[(offset + 1)] as i64) << 8) |
+        ((data[(offset + 2)] as i64) << 16) |
+        ((data[(offset + 3)] as i64) << 24)
 
 fn link_stage_macho_macos_minos(path: &str) -> i64:
     let data = runtime_read_file(path)
@@ -177,7 +177,7 @@ fn link_stage_darwin_platform_version(obj_path: &str, extras: &Vec[str]) -> str:
     if obj_minos > best:
         best = obj_minos
     for i in 0..extras.len() as i32:
-        let extra_minos = link_stage_macho_macos_minos(extras.get(i as i64))
+        let extra_minos = link_stage_macho_macos_minos(extras[i])
         if extra_minos > best:
             best = extra_minos
     link_stage_darwin_version_string(best)
@@ -188,7 +188,7 @@ fn link_stage_is_temp_archive_path(path: &str) -> bool:
     var i = 0
     while i + 3 < path.len():
         if path.slice(i as i64, (i + 3) as i64) == ".o.":
-            return link_stage_is_digit(path.byte_at((i + 3) as i64))
+            return link_stage_is_digit(path[(i + 3)])
         i = i + 1
     false
 
@@ -222,14 +222,14 @@ pub fn link_stage_lib_args(lib: &str, is_darwin: i32) -> Vec[str]:
 fn link_stage_collect_cleanup_files(extras: &Vec[str]) -> Vec[str]:
     let cleanup: Vec[str] = Vec.new()
     for i in 0..extras.len() as i32:
-        let extra = extras.get(i as i64)
+        let extra = extras[i]
         if link_stage_is_temp_archive_path(extra):
             cleanup.push(with_str_clone_ref(extra))
     cleanup
 
 fn link_stage_cleanup_files(files: &Vec[str]):
     for i in 0..files.len() as i32:
-        let _remove = runtime_remove_file(files.get(i as i64))
+        let _remove = runtime_remove_file(files[i])
 
 fn link_stage_register_temp_archive(path: &str):
     // Comptime parallel() links on concurrent threads; an unguarded push to this
@@ -241,7 +241,7 @@ fn link_stage_register_temp_archive(path: &str):
 fn link_stage_basename(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_slash = i
     if last_slash < 0:
         return with_str_clone_ref(path)
@@ -257,7 +257,7 @@ fn link_stage_cleanup_owned_temp_archives_in(dir: &str, pid_text: &str):
     let listing = runtime_list_files(dir)
     var start = 0
     for i in 0..listing.len() as i32:
-        let ch = listing.byte_at(i as i64)
+        let ch = listing[i]
         if ch == 10 or ch == 13:
             if i > start:
                 let path = listing.slice(start as i64, i as i64)
@@ -290,7 +290,7 @@ fn link_stage_apply_env(env: &Vec[LinkStageEnvVar]) -> LinkStageSavedEnv:
     let names: Vec[str] = Vec.new()
     let values: Vec[str] = Vec.new()
     for i in 0..env.len() as i32:
-        let item = env.get(i as i64)
+        let item = env[i]
         names.push(with_str_clone_ref(item.name))
         values.push(runtime_getenv(item.name) ++ "")
         let _ = runtime_setenv(item.name, item.value)
@@ -305,7 +305,7 @@ impl LinkStageCommand:
         var argv = ""
         argv = link_stage_argv_append(argv, self.linker)
         for i in 0..self.args.len() as i32:
-            argv = link_stage_argv_append(argv, self.args.get(i as i64))
+            argv = link_stage_argv_append(argv, self.args[i])
         let saved = link_stage_apply_env(&self.env)
         let rc = if self.cwd.len() > 0:
             runtime_exec_argv_cwd(argv, self.cwd)
@@ -322,7 +322,7 @@ fn link_stage_make_link_command(linker: &str, obj_path: &str, bin_path: &str, ex
     args.push(with_str_clone_ref(obj_path))
     inputs.push(with_str_clone_ref(obj_path))
     for i in 0..extras.len() as i32:
-        let extra = extras.get(i as i64)
+        let extra = extras[i]
         args.push(with_str_clone_ref(extra))
         inputs.push(with_str_clone_ref(extra))
     if runtime_sysinfo_os() == "Macos":
@@ -337,11 +337,11 @@ fn link_stage_make_link_command(linker: &str, obj_path: &str, bin_path: &str, ex
     outputs.push(with_str_clone_ref(bin_path))
     let cc_is_darwin = if runtime_sysinfo_os() == "Macos": 1 else: 0
     for i in 0..link_libs.len() as i32:
-        let cc_la = link_stage_lib_args(link_libs.get(i as i64), cc_is_darwin)
+        let cc_la = link_stage_lib_args(link_libs[i], cc_is_darwin)
         for j in 0..cc_la.len() as i32:
-            args.push(with_str_clone_ref(cc_la.get(j as i64)))
+            args.push(with_str_clone_ref(cc_la[j]))
     for i in 0..link_args.len() as i32:
-        args.push(with_str_clone_ref(link_args.get(i as i64)))
+        args.push(with_str_clone_ref(link_args[i]))
     if runtime_sysinfo_os() == "Linux":
         args.push("-lm")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
@@ -411,7 +411,7 @@ fn link_stage_linux_gcc_dir(sysroot: &str) -> str:
     candidates.push(base ++ "10")
     candidates.push(base ++ "9")
     for i in 0..candidates.len() as i32:
-        let dir = candidates.get(i as i64)
+        let dir = candidates[i]
         if link_stage_file_exists(dir ++ "/crtbegin.o"):
             return with_str_clone_ref(dir)
     ""
@@ -454,15 +454,15 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_p
     args.push(with_str_clone_ref(obj_path))
     inputs.push(with_str_clone_ref(obj_path))
     for i in 0..extras.len() as i32:
-        let extra = extras.get(i as i64)
+        let extra = extras[i]
         args.push(with_str_clone_ref(extra))
         inputs.push(with_str_clone_ref(extra))
     for i in 0..link_libs.len() as i32:
-        let dw_la = link_stage_lib_args(link_libs.get(i as i64), 1)
+        let dw_la = link_stage_lib_args(link_libs[i], 1)
         for j in 0..dw_la.len() as i32:
-            args.push(with_str_clone_ref(dw_la.get(j as i64)))
+            args.push(with_str_clone_ref(dw_la[j]))
     for i in 0..link_args.len() as i32:
-        args.push(with_str_clone_ref(link_args.get(i as i64)))
+        args.push(with_str_clone_ref(link_args[i]))
     args.push("-lSystem")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
@@ -516,7 +516,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
     args.push(with_str_clone_ref(obj_path))
     inputs.push(with_str_clone_ref(obj_path))
     for i in 0..extras.len() as i32:
-        let extra = extras.get(i as i64)
+        let extra = extras[i]
         args.push(with_str_clone_ref(extra))
         inputs.push(with_str_clone_ref(extra))
 
@@ -526,7 +526,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
     args.push("-L" ++ sysroot ++ "/usr/lib")
     args.push("-L" ++ sysroot ++ "/lib")
     for i in 0..link_libs.len() as i32:
-        let lib = link_libs.get(i as i64)
+        let lib = link_libs[i]
         if link_stage_framework_name(lib).len() > 0:
             with_eprint("error: link: \"" ++ lib ++ "\" — Apple frameworks are only available on macOS targets\n")
         else:
@@ -537,7 +537,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
             else:
                 args.push("-l" ++ lib)
     for i in 0..link_args.len() as i32:
-        args.push(with_str_clone_ref(link_args.get(i as i64)))
+        args.push(with_str_clone_ref(link_args[i]))
     args.push("-lc")
     args.push("-lgcc")
 
@@ -586,7 +586,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
     args.push(with_str_clone_ref(obj_path))
     inputs.push(with_str_clone_ref(obj_path))
     for i in 0..extras.len() as i32:
-        let extra = extras.get(i as i64)
+        let extra = extras[i]
         if extra.starts_with("-L"):
             args.push("/libpath:" ++ extra.slice(2, extra.len()))
         else if extra.starts_with("@"):
@@ -595,7 +595,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
             args.push(with_str_clone_ref(extra))
             inputs.push(with_str_clone_ref(extra))
     for i in 0..link_libs.len() as i32:
-        let lib = link_libs.get(i as i64)
+        let lib = link_libs[i]
         if lib.ends_with(".lib"):
             args.push(with_str_clone_ref(lib))
         else if not link_stage_windows_lib_is_crt_implicit(lib):
@@ -607,7 +607,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
         // lib, so drop it. Any other name still becomes `<name>.lib` so a
         // genuinely missing library fails loudly rather than silently vanishing.
     for i in 0..link_args.len() as i32:
-        args.push(with_str_clone_ref(link_args.get(i as i64)))
+        args.push(with_str_clone_ref(link_args[i]))
     args.push("libcpmt.lib")
     args.push("libcmt.lib")
     args.push("oldnames.lib")
@@ -822,7 +822,7 @@ fn link_stage_str_contains(hay: &str, needle: &str) -> bool:
         var matched = true
         var j = 0
         while j < needle_len:
-            if hay.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+            if hay[(i + j)] != needle[j]:
                 matched = false
                 break
             j = j + 1
@@ -911,13 +911,13 @@ fn link_stage_bundle_manifest_field(manifest: &str, key: &str) -> str:
     var start: i64 = 0
     while start < manifest.len():
         var end = start
-        while end < manifest.len() and manifest.byte_at(end) != '\n':
+        while end < manifest.len() and manifest[end] != '\n':
             end = end + 1
         let line = manifest.slice(start, end)
         if line.starts_with(want):
             let rest = line.slice(want.len(), line.len())
             var sp: i64 = 0
-            while sp < rest.len() and rest.byte_at(sp) != ' ':
+            while sp < rest.len() and rest[sp] != ' ':
                 sp = sp + 1
             return rest.slice(0, sp)
         start = end + 1
@@ -932,13 +932,13 @@ fn link_stage_bundle_needed(manifest: &str, undef: &str) -> bool:
     var start: i64 = 0
     while start < manifest.len():
         var end = start
-        while end < manifest.len() and manifest.byte_at(end) != '\n':
+        while end < manifest.len() and manifest[end] != '\n':
             end = end + 1
         let line = manifest.slice(start, end)
         if line.starts_with("prefix "):
             let rest = line.slice(7, line.len())
             var sp: i64 = 0
-            while sp < rest.len() and rest.byte_at(sp) != ' ':
+            while sp < rest.len() and rest[sp] != ' ':
                 sp = sp + 1
             if sp > 0 and link_stage_str_contains(undef, rest.slice(0, sp)):
                 return true
@@ -978,7 +978,7 @@ var link_stage_explicit_bundle_prefixes: Vec[str] = Vec.new()
 
 pub fn link_stage_add_explicit_bundle_prefixes(prefixes: &Vec[str]) -> Unit:
     for i in 0..prefixes.len() as i32:
-        let prefix = prefixes.get(i as i64)
+        let prefix = prefixes[i]
         if not link_stage_explicit_bundle_prefixes.contains(prefix):
             link_stage_explicit_bundle_prefixes.push(with_str_clone_ref(prefix))
 
@@ -987,7 +987,7 @@ fn link_stage_bundle_provided_explicitly(manifest: &str) -> bool:
     if prefixes.len() == 0:
         return false
     for i in 0..prefixes.len() as i32:
-        if not link_stage_explicit_bundle_prefixes.contains(prefixes.get(i as i64)):
+        if not link_stage_explicit_bundle_prefixes.contains(prefixes[i]):
             return false
     true
 
@@ -1073,7 +1073,7 @@ fn link_stage_resolve_runtime_root() -> str:
     // <compiler_dir>/../lib/ (direct FHS-style path)
     candidates.push(compiler_dir ++ "/../lib")
     for i in 0..candidates.len() as i32:
-        let dir = candidates.get(i as i64)
+        let dir = candidates[i]
         let probe = dir ++ "/cimport_stubs.o"
         let platform_probe = if platform_object.len() > 0: dir ++ "/" ++ platform_object else: ""
         if runtime_read_file(probe).len() > 0 and (platform_probe.len() == 0 or runtime_read_file(platform_probe).len() > 0):
@@ -1109,7 +1109,7 @@ fn link_stage_read_file_trimmed(path: &str) -> str:
     // cannot launch "…lld-link.exe\r"), plus spaces/tabs.
     var end = content.len() as i32
     while end > 0:
-        let b = content.byte_at((end - 1) as i64)
+        let b = content[(end - 1)]
         if b == 10 or b == 13 or b == 32 or b == 9:
             end = end - 1
         else:
@@ -1256,7 +1256,7 @@ fn link_stage_sanitize_relative_dir(path: &str) -> str:
     var i = 0
     while i <= path.len():
         let at_end = i == path.len()
-        let ch = if at_end: 47 else: path.byte_at(i as i64)
+        let ch = if at_end: 47 else: path[i]
         if ch == 47 or ch == 92:
             if i > segment_start:
                 let segment = path.slice(segment_start as i64, i as i64)
@@ -1307,9 +1307,9 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     // #650 codegen units: sibling .o files are full linker inputs like the
     // primary object (objects always load wholly, so position is irrelevant).
     for ui in 0..extra_objects.len() as i32:
-        extras.push(with_str_clone_ref(extra_objects.get(ui as i64)))
+        extras.push(with_str_clone_ref(extra_objects[ui]))
     for i in 0..link_search_paths.len() as i32:
-        extras.push("-L" ++ link_search_paths.get(i as i64))
+        extras.push("-L" ++ link_search_paths[i])
     var undef = link_stage_undefined_symbols_for_object(obj_path)
     // Runtime-need detection must see undefined symbols from every unit, not
     // just the primary object. A failed probe stays the pure sentinel so the
@@ -1317,7 +1317,7 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     for uu in 0..extra_objects.len() as i32:
         if undef == "<probe-failed>":
             break
-        let unit_undef = link_stage_undefined_symbols_for_object(extra_objects.get(uu as i64))
+        let unit_undef = link_stage_undefined_symbols_for_object(extra_objects[uu])
         if unit_undef == "<probe-failed>":
             undef = "<probe-failed>"
         else:
@@ -1343,7 +1343,7 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     if bundle_objects.len() == 1 and bundle_objects.get(0) == LINK_BUNDLE_FAILED():
         return link_stage_plan_fail()
     for boi in 0..bundle_objects.len() as i32:
-        extras.push(with_str_clone_ref(bundle_objects.get(boi as i64)))
+        extras.push(with_str_clone_ref(bundle_objects[boi]))
     if needs_fiber_runtime != 0 and link_stage_rt_in_unit() != 0:
         // Runtime emitted in-unit: the asm-defined with_fiber_* symbols
         // still trip the predicate, but only fiber_asm.o may link — the

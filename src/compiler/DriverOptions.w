@@ -153,7 +153,7 @@ pub fn driver_clone_str(s: &str) -> str:
 pub fn driver_clone_str_vec(values: &Vec[str]) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     for i in 0..values.len() as i32:
-        out.push(driver_clone_str(values.get(i as i64)))
+        out.push(driver_clone_str(values[i]))
     out
 
 pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOptions:
@@ -222,7 +222,7 @@ fn driver_has_output_prefix(arg: &str) -> bool:
     arg.starts_with("--output=")
 
 fn driver_is_build_target_selector(arg: &str) -> bool:
-    arg.len() > 1 and arg.byte_at(0) == 58
+    arg.len() > 1 and arg[0] == 58
 
 fn driver_has_flag(argc: i32, flag: &str) -> bool:
     var i = 2

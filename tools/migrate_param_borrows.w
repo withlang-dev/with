@@ -129,7 +129,7 @@ fn main -> i32:
         var out = owned_text(text)
         var oi = offsets.len() as i32 - 1
         while oi >= 0:
-            let at = offsets.get(oi as i64) as i64
+            let at = offsets[oi] as i64
             out = out.slice(0, at) ++ "&" ++ out.slice(at, out.len())
             oi = oi - 1
         if write_file(path, out) != 0:

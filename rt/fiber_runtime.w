@@ -132,16 +132,16 @@ fn fiber_remove_detached_at(index: i32):
         return
     detached_fiber_count = detached_fiber_count - 1
     if index != detached_fiber_count:
-        detached_fiber_ids[index as i64] = detached_fiber_ids[detached_fiber_count as i64]
-        detached_result_bufs[index as i64] = detached_result_bufs[detached_fiber_count as i64]
-    detached_fiber_ids[detached_fiber_count as i64] = 0
-    detached_result_bufs[detached_fiber_count as i64] = 0
+        detached_fiber_ids[index] = detached_fiber_ids[detached_fiber_count]
+        detached_result_bufs[index] = detached_result_bufs[detached_fiber_count]
+    detached_fiber_ids[detached_fiber_count] = 0
+    detached_result_bufs[detached_fiber_count] = 0
 
 fn fiber_drain_detached_ready():
     var i = 0
     while i < detached_fiber_count:
-        let fid = detached_fiber_ids[i as i64]
-        let rbuf = detached_result_bufs[i as i64] as *mut u8
+        let fid = detached_fiber_ids[i]
+        let rbuf = detached_result_bufs[i] as *mut u8
         if fiber_take_detached_completed(fid, rbuf) != 0:
             fiber_remove_detached_at(i)
         else:
@@ -150,11 +150,11 @@ fn fiber_drain_detached_ready():
 fn fiber_clear_detached_buffers():
     var i = 0
     while i < detached_fiber_count:
-        let rbuf = detached_result_bufs[i as i64] as *mut u8
+        let rbuf = detached_result_bufs[i] as *mut u8
         if rbuf as i64 != 0:
             with_free(rbuf)
-        detached_fiber_ids[i as i64] = 0
-        detached_result_bufs[i as i64] = 0
+        detached_fiber_ids[i] = 0
+        detached_result_bufs[i] = 0
         i = i + 1
     detached_fiber_count = 0
 
@@ -277,8 +277,8 @@ pub fn with_fiber_detach(fiber_id: i32, result_buf: *mut u8) -> i32:
     if detached_fiber_count >= MAX_DETACHED_FIBERS:
         with_ewrite("fatal: too many detached fibers\n")
         rt_libc_abort()
-    detached_fiber_ids[detached_fiber_count as i64] = fiber_id
-    detached_result_bufs[detached_fiber_count as i64] = result_buf as i64
+    detached_fiber_ids[detached_fiber_count] = fiber_id
+    detached_result_bufs[detached_fiber_count] = result_buf as i64
     detached_fiber_count = detached_fiber_count + 1
     1
 
@@ -300,8 +300,8 @@ pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
     if detached_fiber_count >= MAX_DETACHED_FIBERS:
         with_ewrite("fatal: too many detached fibers\n")
         rt_libc_abort()
-    detached_fiber_ids[detached_fiber_count as i64] = fiber_id
-    detached_result_bufs[detached_fiber_count as i64] = result_buf as i64
+    detached_fiber_ids[detached_fiber_count] = fiber_id
+    detached_result_bufs[detached_fiber_count] = result_buf as i64
     detached_fiber_count = detached_fiber_count + 1
     1
 

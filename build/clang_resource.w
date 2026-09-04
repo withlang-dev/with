@@ -65,11 +65,11 @@ fn cr_str_compare(a: &str, b: &str) -> i32:
 fn cr_sorted(files: &Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         var inserted = false
         var out: Vec[str] = Vec.new()
         for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
+            let existing = sorted[j]
             if not inserted and cr_str_compare(path, existing) < 0:
                 out.push(clang_resource_owned_text(path))
                 inserted = true
@@ -143,7 +143,7 @@ fn cr_find_include_dir(ctx: &ActionCtx) -> str:
     let clang_root = prefix ++ "/lib/clang"
     let all = ctx.fs().list_files(clang_root)
     for i in 0..all.len() as i32:
-        let path = cr_normalize_path_separators(all.get(i as i64))
+        let path = cr_normalize_path_separators(all[i])
         let marker = "/include/"
         var pos = -1
         var k = 0
@@ -162,7 +162,7 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
     out = out ++ "// Do not edit by hand.\n\n"
     var listing = ""
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         let rel = cr_relpath(path, include_dir)
         let source = fs.read_text(path)
         if source.len() > 16000000:
@@ -179,7 +179,7 @@ fn cr_generate(ctx: &ActionCtx, include_dir: &str, files: &Vec[str], version: &s
     out = out ++ "pub fn embedded_clang_resource_version() -> str:\n    return CLANG_RES_VERSION\n\n"
     out = out ++ "pub fn embedded_clang_resource_data(name: &str) -> str:\n"
     for i in 0..files.len() as i32:
-        let rel = cr_relpath(files.get(i as i64), include_dir)
+        let rel = cr_relpath(files[i], include_dir)
         let sym = f"CLANG_RES_{i}"
         out = out ++ "    if name == " ++ cr_raw_string_literal(rel) ++ ":\n"
         out = out ++ "        return " ++ sym ++ "\n"
@@ -199,7 +199,7 @@ pub fn generate_embedded_clang_resource_action(ctx: ActionCtx) -> i32:
     let all = cr_sorted(fs.list_files(include_dir))
     let files: Vec[str] = Vec.new()
     for i in 0..all.len() as i32:
-        let path = cr_normalize_path_separators(all.get(i as i64))
+        let path = cr_normalize_path_separators(all[i])
         if cr_should_embed(cr_basename(path)):
             files.push(path)
     if files.len() == 0:

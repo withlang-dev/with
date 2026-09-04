@@ -942,7 +942,7 @@ unsafe fn cimport_path_to_cstr(path: &str) -> *mut u8:
         return 0 as *mut u8
     var i = 0
     while i as i64 < path.len():
-        *((buf as i64 + i as i64) as *mut u8) = path.byte_at(i as i64)
+        *((buf as i64 + i as i64) as *mut u8) = path[i]
         i = i + 1
     *((buf as i64 + path.len() as i64) as *mut u8) = 0
     buf
@@ -1132,7 +1132,7 @@ pub fn with_cimport_is_name_emitted(name: &str) -> i32:
         if len > 0:
             let sp = **(&name as *const *const *const u8)
             with_memcpy(&raw mut buf as *mut [512]u8 as *mut u8, sp, len)
-        buf[len as i64] = 0
+        buf[len] = 0
         is_name_emitted(&buf as *const [512]u8 as *const u8)
 
 pub fn with_cimport_mark_name_emitted(name: &str) -> i32:
@@ -1143,7 +1143,7 @@ pub fn with_cimport_mark_name_emitted(name: &str) -> i32:
         if len > 0:
             let sp = **(&name as *const *const *const u8)
             with_memcpy(&raw mut buf as *mut [512]u8 as *mut u8, sp, len)
-        buf[len as i64] = 0
+        buf[len] = 0
         mark_name_emitted(&buf as *const [512]u8 as *const u8)
 
 pub fn with_cimport_reset_names() -> i32:
@@ -1168,15 +1168,15 @@ pub fn with_cimport_add_include_path(path: &str) -> i32:
         let sp = **(&path as *const *const *const u8)
         with_memcpy(buf, sp, path.len())
         *((buf as i64 + path.len()) as *mut u8) = 0
-        g_cimport_include_paths[g_cimport_include_count as i64] = buf
+        g_cimport_include_paths[g_cimport_include_count] = buf
         g_cimport_include_count = g_cimport_include_count + 1
         0
 
 pub fn with_cimport_clear_include_paths() -> i32:
     var i: i32 = 0
     while i < g_cimport_include_count:
-        with_free(g_cimport_include_paths[i as i64])
-        g_cimport_include_paths[i as i64] = 0 as *mut u8
+        with_free(g_cimport_include_paths[i])
+        g_cimport_include_paths[i] = 0 as *mut u8
         i = i + 1
     g_cimport_include_count = 0
     0
@@ -1210,7 +1210,7 @@ pub fn with_cimport_set_resource_dir(path: &str) -> Unit:
         let len = if path.len() < 1023: path.len() else: 1023
         let sp = **(&path as *const *const *const u8)
         with_memcpy(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, sp, len)
-        resource_dir_buf[len as i64] = 0
+        resource_dir_buf[len] = 0
 
 // ── Parse ───────────────────────────────────────────────────
 
@@ -1251,30 +1251,30 @@ pub fn with_cimport_parse(header_code: &str) -> i64:
         var nargs: i32 = 0
         let sysroot = get_sdk_path()
         if sysroot as i64 != 0:
-            args[nargs as i64] = "-isysroot\0" as *const u8
+            args[nargs] = "-isysroot\0" as *const u8
             nargs = nargs + 1
-            args[nargs as i64] = sysroot
+            args[nargs] = sysroot
             nargs = nargs + 1
         let resdir = get_clang_resource_dir()
         if resdir as i64 != 0:
-            args[nargs as i64] = "-resource-dir\0" as *const u8
+            args[nargs] = "-resource-dir\0" as *const u8
             nargs = nargs + 1
-            args[nargs as i64] = resdir
+            args[nargs] = resdir
             nargs = nargs + 1
-        args[nargs as i64] = "-x\0" as *const u8
+        args[nargs] = "-x\0" as *const u8
         nargs = nargs + 1
-        args[nargs as i64] = "c\0" as *const u8
+        args[nargs] = "c\0" as *const u8
         nargs = nargs + 1
         // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
         // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
         // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
-        args[nargs as i64] = "-D_DEFAULT_SOURCE\0" as *const u8
+        args[nargs] = "-D_DEFAULT_SOURCE\0" as *const u8
         nargs = nargs + 1
         var ip: i32 = 0
         while ip < g_cimport_include_count and nargs < 62:
-            args[nargs as i64] = "-I\0" as *const u8
+            args[nargs] = "-I\0" as *const u8
             nargs = nargs + 1
-            args[nargs as i64] = g_cimport_include_paths[ip as i64] as *const u8
+            args[nargs] = g_cimport_include_paths[ip] as *const u8
             nargs = nargs + 1
             ip = ip + 1
 
@@ -1849,18 +1849,18 @@ unsafe fn cimport_var_decl_has_initializer_text(s: &str) -> i32:
     var brace_depth = 0
     var i = 0
     while i < slen:
-        let c = s.byte_at(i as i64)
+        let c = s[i]
         if c == 47 and i + 1 < slen:
-            let next = s.byte_at((i + 1) as i64)
+            let next = s[(i + 1)]
             if next == 47:
                 i = i + 2
-                while i < slen and s.byte_at(i as i64) != 10:
+                while i < slen and s[i] != 10:
                     i = i + 1
                 continue
             if next == 42:
                 i = i + 2
                 while i + 1 < slen:
-                    if s.byte_at(i as i64) == 42 and s.byte_at((i + 1) as i64) == 47:
+                    if s[i] == 42 and s[(i + 1)] == 47:
                         i = i + 2
                         break
                     i = i + 1
@@ -1869,7 +1869,7 @@ unsafe fn cimport_var_decl_has_initializer_text(s: &str) -> i32:
             let quote = c
             i = i + 1
             while i < slen:
-                let inner = s.byte_at(i as i64)
+                let inner = s[i]
                 if inner == 92:
                     i = i + 2
                     continue
@@ -1885,8 +1885,8 @@ unsafe fn cimport_var_decl_has_initializer_text(s: &str) -> i32:
         if c == 123: brace_depth = brace_depth + 1
         if c == 125 and brace_depth > 0: brace_depth = brace_depth - 1
         if c == 61 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
-            let prev = if i > 0: s.byte_at((i - 1) as i64) else: 0
-            let next = if i + 1 < slen: s.byte_at((i + 1) as i64) else: 0
+            let prev = if i > 0: s[(i - 1)] else: 0
+            let next = if i + 1 < slen: s[(i + 1)] else: 0
             if prev != 61 and prev != 33 and prev != 60 and prev != 62 and next != 61:
                 return 1
         i = i + 1
@@ -2123,24 +2123,24 @@ unsafe fn macro_source_line_from_cursor(s: *mut CImportSession, cursor: CXCursor
     var start: i32 = 0
     var i: i32 = 0
     while i <= text.len() as i32:
-        if i == text.len() as i32 or text.byte_at(i as i64) == 10:
+        if i == text.len() as i32 or text[i] == 10:
             if current == line_val:
                 var end = i
-                if end > start and text.byte_at((end - 1) as i64) == 13:
+                if end > start and text[(end - 1)] == 13:
                     end = end - 1
                 var result = text.slice(start as i64, end as i64)
                 // Preserve simple backslash continuations in multi-line macros.
                 var next_start = i + 1
-                var keep_going = result.len() > 0 and result.byte_at(result.len() - 1) == 92
+                var keep_going = result.len() > 0 and result[result.len() - 1] == 92
                 while keep_going and next_start < text.len() as i32:
                     var next_end = next_start
-                    while next_end < text.len() as i32 and text.byte_at(next_end as i64) != 10:
+                    while next_end < text.len() as i32 and text[next_end] != 10:
                         next_end = next_end + 1
                     var trimmed_next_end = next_end
-                    if trimmed_next_end > next_start and text.byte_at((trimmed_next_end - 1) as i64) == 13:
+                    if trimmed_next_end > next_start and text[(trimmed_next_end - 1)] == 13:
                         trimmed_next_end = trimmed_next_end - 1
                     result = result ++ "\n" ++ text.slice(next_start as i64, trimmed_next_end as i64)
-                    keep_going = trimmed_next_end > next_start and text.byte_at((trimmed_next_end - 1) as i64) == 92
+                    keep_going = trimmed_next_end > next_start and text[(trimmed_next_end - 1)] == 92
                     next_start = next_end + 1
                 return result
             current = current + 1
@@ -2200,7 +2200,7 @@ unsafe fn macro_session_grow(ms: *mut MacroSession):
 
 fn macro_source_is_define_line(source: &str) -> bool:
     var i = 0
-    while i < source.len() as i32 and (source.byte_at(i as i64) == 32 or source.byte_at(i as i64) == 9):
+    while i < source.len() as i32 and (source[i] == 32 or source[i] == 9):
         i = i + 1
     i + 7 <= source.len() as i32 and source.slice(i as i64, (i + 7) as i64) == "#define"
 
@@ -2338,30 +2338,30 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
     var nargs: i32 = 0
     let sysroot = get_sdk_path()
     if sysroot as i64 != 0:
-        args[nargs as i64] = "-isysroot\0" as *const u8
+        args[nargs] = "-isysroot\0" as *const u8
         nargs = nargs + 1
-        args[nargs as i64] = sysroot
+        args[nargs] = sysroot
         nargs = nargs + 1
     let resdir = get_clang_resource_dir()
     if resdir as i64 != 0:
-        args[nargs as i64] = "-resource-dir\0" as *const u8
+        args[nargs] = "-resource-dir\0" as *const u8
         nargs = nargs + 1
-        args[nargs as i64] = resdir
+        args[nargs] = resdir
         nargs = nargs + 1
-    args[nargs as i64] = "-x\0" as *const u8
+    args[nargs] = "-x\0" as *const u8
     nargs = nargs + 1
-    args[nargs as i64] = "c\0" as *const u8
+    args[nargs] = "c\0" as *const u8
     nargs = nargs + 1
     // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
     // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
     // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
-    args[nargs as i64] = "-D_DEFAULT_SOURCE\0" as *const u8
+    args[nargs] = "-D_DEFAULT_SOURCE\0" as *const u8
     nargs = nargs + 1
     var ip: i32 = 0
     while ip < g_cimport_include_count and nargs < 62:
-        args[nargs as i64] = "-I\0" as *const u8
+        args[nargs] = "-I\0" as *const u8
         nargs = nargs + 1
-        args[nargs as i64] = g_cimport_include_paths[ip as i64] as *const u8
+        args[nargs] = g_cimport_include_paths[ip] as *const u8
         nargs = nargs + 1
         ip = ip + 1
 
@@ -2417,10 +2417,10 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
 
         var pos: i32 = 0
         while pos < macro_names.len() as i32:
-            while pos < macro_names.len() as i32 and macro_names.byte_at(pos as i64) == 124:
+            while pos < macro_names.len() as i32 and macro_names[pos] == 124:
                 pos = pos + 1
             let start = pos
-            while pos < macro_names.len() as i32 and macro_names.byte_at(pos as i64) != 124:
+            while pos < macro_names.len() as i32 and macro_names[pos] != 124:
                 pos = pos + 1
             if pos > start:
                 let name = macro_names.slice(start as i64, pos as i64)
@@ -2434,30 +2434,30 @@ pub fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &
         var nargs: i32 = 0
         let sysroot = get_sdk_path()
         if sysroot as i64 != 0:
-            args[nargs as i64] = "-isysroot\0" as *const u8
+            args[nargs] = "-isysroot\0" as *const u8
             nargs = nargs + 1
-            args[nargs as i64] = sysroot
+            args[nargs] = sysroot
             nargs = nargs + 1
         let resdir = get_clang_resource_dir()
         if resdir as i64 != 0:
-            args[nargs as i64] = "-resource-dir\0" as *const u8
+            args[nargs] = "-resource-dir\0" as *const u8
             nargs = nargs + 1
-            args[nargs as i64] = resdir
+            args[nargs] = resdir
             nargs = nargs + 1
-        args[nargs as i64] = "-x\0" as *const u8
+        args[nargs] = "-x\0" as *const u8
         nargs = nargs + 1
-        args[nargs as i64] = "c\0" as *const u8
+        args[nargs] = "c\0" as *const u8
         nargs = nargs + 1
         // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
         // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
         // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
-        args[nargs as i64] = "-D_DEFAULT_SOURCE\0" as *const u8
+        args[nargs] = "-D_DEFAULT_SOURCE\0" as *const u8
         nargs = nargs + 1
         var ip: i32 = 0
         while ip < g_cimport_include_count and nargs < 62:
-            args[nargs as i64] = "-I\0" as *const u8
+            args[nargs] = "-I\0" as *const u8
             nargs = nargs + 1
-            args[nargs as i64] = g_cimport_include_paths[ip as i64] as *const u8
+            args[nargs] = g_cimport_include_paths[ip] as *const u8
             nargs = nargs + 1
             ip = ip + 1
 
@@ -2523,30 +2523,30 @@ pub fn with_cimport_parse_macro_probe(header_code: &str, macro_name: &str) -> i6
         var nargs: i32 = 0
         let sysroot = get_sdk_path()
         if sysroot as i64 != 0:
-            args[nargs as i64] = "-isysroot\0" as *const u8
+            args[nargs] = "-isysroot\0" as *const u8
             nargs = nargs + 1
-            args[nargs as i64] = sysroot
+            args[nargs] = sysroot
             nargs = nargs + 1
         let resdir = get_clang_resource_dir()
         if resdir as i64 != 0:
-            args[nargs as i64] = "-resource-dir\0" as *const u8
+            args[nargs] = "-resource-dir\0" as *const u8
             nargs = nargs + 1
-            args[nargs as i64] = resdir
+            args[nargs] = resdir
             nargs = nargs + 1
-        args[nargs as i64] = "-x\0" as *const u8
+        args[nargs] = "-x\0" as *const u8
         nargs = nargs + 1
-        args[nargs as i64] = "c\0" as *const u8
+        args[nargs] = "c\0" as *const u8
         nargs = nargs + 1
         // libclang defaults to strict-ANSI C (unlike the clang driver's gnu
         // dialect); _DEFAULT_SOURCE restores glibc's ordinary POSIX/BSD surface
         // (realpath, mkstemp, ...). Inert on Darwin/Windows headers.
-        args[nargs as i64] = "-D_DEFAULT_SOURCE\0" as *const u8
+        args[nargs] = "-D_DEFAULT_SOURCE\0" as *const u8
         nargs = nargs + 1
         var ip: i32 = 0
         while ip < g_cimport_include_count and nargs < 62:
-            args[nargs as i64] = "-I\0" as *const u8
+            args[nargs] = "-I\0" as *const u8
             nargs = nargs + 1
-            args[nargs as i64] = g_cimport_include_paths[ip as i64] as *const u8
+            args[nargs] = g_cimport_include_paths[ip] as *const u8
             nargs = nargs + 1
             ip = ip + 1
 

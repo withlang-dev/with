@@ -81,7 +81,7 @@ impl AsyncLower:
             self.lower_body(bi)
 
     mut fn lower_body(body_index: i32):
-        let body_fn_sym = (&self.mir_mod.bodies[body_index as i64]).fn_sym
+        let body_fn_sym = (&self.mir_mod.bodies[body_index]).fn_sym
         let fn_decl = async_find_fn_decl(self.ast, body_fn_sym)
         let flavor = async_fn_flavor(self.ast, fn_decl)
         self.cur_mir_body_index = body_index
@@ -93,8 +93,8 @@ impl AsyncLower:
 
         if flavor != AsyncBodyKind.Generator:
             for si in 0..async_body_suspend_count(self.cur_body):
-                if self.cur_body.suspend_kinds.get(si as i64) == AsyncSuspendKind.Yield:
-                    self.emit_error_at_span("yield used outside generator function", self.cur_body.suspend_span_starts.get(si as i64), self.cur_body.suspend_span_ends.get(si as i64))
+                if self.cur_body.suspend_kinds[si] == AsyncSuspendKind.Yield:
+                    self.emit_error_at_span("yield used outside generator function", self.cur_body.suspend_span_starts[si], self.cur_body.suspend_span_ends[si])
                     break
 
         self.cur_body.finalize_states()
@@ -111,7 +111,7 @@ impl AsyncLower:
     fn record_suspend(node: i32, suspend_kind: i32):
         let span_start = async_ast_get_start(self.ast, node)
         let span_end = async_ast_get_end(self.ast, node)
-        let snap = async_snapshot_for_span(&self.mir_mod.bodies[self.cur_mir_body_index as i64], span_start)
+        let snap = async_snapshot_for_span(&self.mir_mod.bodies[self.cur_mir_body_index], span_start)
         self.cur_body.add_suspend(suspend_kind, span_start, span_end, snap.resume_bb, snap.live_locals, snap.storage_dead, snap.drop_count)
 
     fn walk_expr(node: i32):
@@ -385,11 +385,11 @@ fn async_snapshot_for_span(body: &MirBody, span_start: i32) -> AsyncSnapshot:
     var drop_count = 0
 
     for bb in 0..body.bb_stmt_starts.len() as i32:
-        let stmt_start = body.bb_stmt_starts.get(bb as i64)
-        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        let stmt_start = body.bb_stmt_starts[bb]
+        let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
             let stmt_id = stmt_start + si
-            let stmt_span = body.stmt_spans.get(stmt_id as i64)
+            let stmt_span = body.stmt_spans[stmt_id]
             if stmt_span > span_start:
                 continue
             let kind = body.stmt_kind(stmt_id)
@@ -415,10 +415,10 @@ fn async_snapshot_for_span(body: &MirBody, span_start: i32) -> AsyncSnapshot:
 
 fn async_resume_bb_for_span(body: &MirBody, span_start: i32) -> i32:
     for bb in 0..body.bb_stmt_starts.len() as i32:
-        let stmt_start = body.bb_stmt_starts.get(bb as i64)
-        let stmt_count = body.bb_stmt_counts.get(bb as i64)
+        let stmt_start = body.bb_stmt_starts[bb]
+        let stmt_count = body.bb_stmt_counts[bb]
         for si in 0..stmt_count:
             let stmt_id = stmt_start + si
-            if body.stmt_spans.get(stmt_id as i64) == span_start:
+            if body.stmt_spans[stmt_id] == span_start:
                 return bb
     -1

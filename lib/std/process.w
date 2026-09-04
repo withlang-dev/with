@@ -52,7 +52,7 @@ pub fn set_env(name: &str, value: &str) -> i32:
 fn argv_blob(items: &Vec[str]) -> str:
     var out = ""
     for i in 0..items.len() as i32:
-        out = out ++ items.get(i as i64) ++ "\0"
+        out = out ++ items[i] ++ "\0"
     out
 
 /// Execute an argument vector. The first item is the program name.
@@ -75,7 +75,7 @@ impl Command:
     pub fn arg(arg: str) -> Command:
         var argv: Vec[str] = Vec.new()
         for i in 0..self.args.len() as i32:
-            argv.push(with_str_clone_ref(self.args.get(i as i64)))
+            argv.push(with_str_clone_ref(self.args[i]))
         argv.push(arg)
         Command { args: argv }
 

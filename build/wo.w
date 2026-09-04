@@ -76,7 +76,7 @@ fn wo_abs(root: &str, path: &str) -> str:
 
 fn wo_arg_value(args: &Vec[str], prefix: &str) -> str:
     for i in 0..args.len() as i32:
-        let arg = args.get(i as i64)
+        let arg = args[i]
         if arg.starts_with(prefix):
             return wo_owned_text(arg.slice(prefix.len(), arg.len()))
     ""
@@ -158,7 +158,7 @@ fn wo_w_files(fs: &ToolFs, dir: &str) -> Vec[str]:
     let listing = fs.list_files(dir)
     let out: Vec[str] = Vec.new()
     for i in 0..listing.len() as i32:
-        let path = listing.get(i as i64)
+        let path = listing[i]
         if path.ends_with(".w"):
             out.push(wo_owned_text(path))
     comp_sort_strings(move out)
@@ -169,7 +169,7 @@ fn wo_corpus_sha(fs: &ToolFs, dir: &str) -> str:
     let files = wo_w_files(fs, dir)
     var combined = ""
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         combined = combined ++ path ++ ":" ++ fs.sha256_file(path) ++ "\n"
     wo_sha256_text(combined)
 
@@ -269,7 +269,7 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
     var previous = wo_owned_text(build_name)
     var group = target_new(.Group, wo_group_target_name(plan), "")
     for ei in 0..exts.len() as i32:
-        let ext = exts.get(ei as i64)
+        let ext = exts[ei]
         let install_name = wo_target_stem(plan) ++ "-install-" ++ ext
         var install = target_new(.Install, wo_owned_text(install_name), fs_prefix ++ "." ++ ext).output(store_prefix ++ "." ++ ext)
         install = install.input(fs_prefix ++ "." ++ ext)
@@ -285,7 +285,7 @@ pub fn target_with_wo_corpus_inputs(target: Target, ctx: &BuildCtx, plan: &WoBun
     var out = target
     let corpus_files = wo_w_files(ctx.fs(), plan.corpus_dir)
     for fi in 0..corpus_files.len() as i32:
-        out = out.input(wo_owned_text(corpus_files.get(fi as i64)))
+        out = out.input(wo_owned_text(corpus_files[fi]))
     out
 
 // The wo-drift lane (docs/wo_bundles.md "Lanes"): `<name>-wo-drift`
@@ -342,7 +342,7 @@ pub fn wo_drift_target(ctx: &BuildCtx, plan: &WoBundle, compiler: &str, compiler
     kinds.push("wi")
     kinds.push("manifest")
     for ki in 0..kinds.len() as i32:
-        target = target.input(wo_prefix(plan) ++ "." ++ kinds.get(ki as i64))
+        target = target.input(wo_prefix(plan) ++ "." ++ kinds[ki])
     target = target_with_wo_corpus_inputs(move target, ctx, plan)
     target = target.write_scope(wo_owned_text(dir))
     target = target.write_scope("out/command/" ++ name)
@@ -402,7 +402,7 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
     fields.push("fingerprint")
     fields.push("interface-sha")
     for fi in 0..fields.len() as i32:
-        let field = fields.get(fi as i64)
+        let field = fields[fi]
         if wo_manifest_field(stored_manifest, field) != wo_manifest_field(scratch_manifest, field):
             return wo_fail(ctx, "declaration drift: manifest `" ++ field ++ "` differs between " ++ stored ++ " and " ++ scratch)
     let stored_o = fs.read_text(stored ++ ".o")
@@ -461,7 +461,7 @@ fn wo_slot_status(fs: &ToolFs, store_prefix: &str, corpus_sha: &str, target: &st
     exts.push("wi")
     exts.push("manifest")
     for ei in 0..exts.len() as i32:
-        let path = store_prefix ++ "." ++ exts.get(ei as i64)
+        let path = store_prefix ++ "." ++ exts[ei]
         if not fs.host_exists(path):
             return "store lacks " ++ path
     let manifest = fs.host_read_text(store_prefix ++ ".manifest")
@@ -516,7 +516,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
         exts.push("wi")
         exts.push("manifest")
         for ei in 0..exts.len() as i32:
-            let ext = exts.get(ei as i64)
+            let ext = exts[ei]
             if fs.write_text(prefix ++ "." ++ ext, fs.host_read_text(store_prefix ++ "." ++ ext)) != 0:
                 return wo_fail(ctx, "could not copy " ++ store_prefix ++ "." ++ ext ++ " into " ++ tree_dir)
         print("[" ++ ctx.target_name() ++ "] " ++ store_prefix ++ ".{o,wi,manifest} holds key " ++ key ++ " (corpus, target and ABI unchanged): compiled nothing")

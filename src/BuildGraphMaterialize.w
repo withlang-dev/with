@@ -40,7 +40,7 @@ impl BuildGraphMaterializer:
         let index = self.field_index(value.type_id, field_name)
         if index < 0 or index >= value.extra_count:
             return comptime_value_invalid()
-        comptime_value_clone(self.extras.get((value.extra_start + index) as i64))
+        comptime_value_clone(self.extras[(value.extra_start + index)])
 
     fn expect_str_field(value: &ComptimeValue, field_name: &str) -> ComptimeValue:
         let field = self.field_value(value, field_name)
@@ -60,7 +60,7 @@ impl BuildGraphMaterializer:
         if field.kind != ComptimeValueKind.CV_VEC and field.kind != ComptimeValueKind.CV_ARRAY:
             return out
         for i in 0..field.extra_count:
-            let item = self.extras.get((field.extra_start + i) as i64)
+            let item = self.extras[(field.extra_start + i)]
             if item.kind == ComptimeValueKind.CV_STR:
                 out.push(with_str_clone_ref(item.text))
         out
@@ -93,7 +93,7 @@ fn build_graph_materialized_target(kind: i32, name: &str, entry: &str, target_ki
 impl BuildGraphMaterializer:
     fn target_name_exists(graph: &BuildGraph, name: &str) -> bool:
         for i in 0..graph.targets.len() as i32:
-            if graph.targets.get(i as i64).name == name:
+            if graph.targets[i].name == name:
                 return true
         false
 
@@ -182,7 +182,7 @@ impl BuildGraphMaterializer:
         let defining = found.unwrap()
         var start_module = -1
         for mi in 0..self.sema.module_paths.len() as i32:
-            if self.sema.module_paths.get(mi as i64) == defining:
+            if self.sema.module_paths[mi] == defining:
                 start_module = mi
                 break
         if start_module < 0:
@@ -194,17 +194,17 @@ impl BuildGraphMaterializer:
         queue.push(start_module)
         var qi = 0
         while qi < queue.len() as i32:
-            let m = queue.get(qi as i64)
+            let m = queue[qi]
             qi = qi + 1
-            let istart = self.sema.module_import_starts.get(m as i64)
-            let icount = self.sema.module_import_counts.get(m as i64)
+            let istart = self.sema.module_import_starts[m]
+            let icount = self.sema.module_import_counts[m]
             for ii in 0..icount:
-                let t = self.sema.module_import_targets.get((istart + ii) as i64)
+                let t = self.sema.module_import_targets[(istart + ii)]
                 if t < 0:
                     continue
                 var seen = false
                 for vi in 0..visited.len() as i32:
-                    if visited.get(vi as i64) == t:
+                    if visited[vi] == t:
                         seen = true
                         break
                 if not seen:
@@ -212,7 +212,7 @@ impl BuildGraphMaterializer:
                     queue.push(t)
         let paths: Vec[str] = Vec.new()
         for i in 0..visited.len() as i32:
-            paths.push(with_str_clone_ref(self.sema.module_paths.get(visited.get(i as i64) as i64)))
+            paths.push(with_str_clone_ref(self.sema.module_paths[visited[i]]))
         paths
 
     fn materialize_generated_source(value: &ComptimeValue, graph: BuildGraph) -> BuildGraph:
@@ -248,7 +248,7 @@ impl BuildGraphMaterializer:
         if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
             with_eprint(f"[graph] build value start={value.extra_start} count={value.extra_count} extras_len={self.extras.len()}")
             for tf in 0..value.extra_count:
-                let tfv = self.extras.get((value.extra_start + tf) as i64)
+                let tfv = self.extras[(value.extra_start + tf)]
                 with_eprint(f"[graph] field[{tf}] kind={tfv.kind as i32} text=" ++ (if tfv.kind == ComptimeValueKind.CV_STR: tfv.text else: ""))
         let default_target = self.expect_str_field(value, "default_target")
         if package_name.kind == ComptimeValueKind.CV_INVALID or package_version.kind == ComptimeValueKind.CV_INVALID or default_target.kind == ComptimeValueKind.CV_INVALID:
@@ -263,7 +263,7 @@ impl BuildGraphMaterializer:
         if generated_sources.kind != ComptimeValueKind.CV_VEC and generated_sources.kind != ComptimeValueKind.CV_ARRAY:
             return self.error("Build.generated_sources is not a vector")
         for i in 0..generated_sources.extra_count:
-            graph = self.materialize_generated_source(self.extras.get((generated_sources.extra_start + i) as i64), move graph)
+            graph = self.materialize_generated_source(self.extras[(generated_sources.extra_start + i)], move graph)
             if graph.error_msg.len() > 0:
                 return graph
 
@@ -271,7 +271,7 @@ impl BuildGraphMaterializer:
         if targets.kind != ComptimeValueKind.CV_VEC and targets.kind != ComptimeValueKind.CV_ARRAY:
             return self.error("Build.targets is not a vector")
         for i in 0..targets.extra_count:
-            graph = self.materialize_target(self.extras.get((targets.extra_start + i) as i64), move graph)
+            graph = self.materialize_target(self.extras[(targets.extra_start + i)], move graph)
             if graph.error_msg.len() > 0:
                 return graph
             if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:

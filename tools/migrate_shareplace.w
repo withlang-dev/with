@@ -56,20 +56,20 @@ fn collect_targets(entry: &str) -> CollectResult:
     let result = compiler_analyze_file(entry, "facts")
     var receiver_sigs: Vec[i32] = Vec.new()
     for i in 0..result.report.facts.len() as i32:
-        let fact = &result.report.facts[i as i64]
+        let fact = &result.report.facts[i]
         if fact.kind == AnalysisFactKind.Receiver:
             receiver_sigs.push(fact.parent)
     var targets: Vec[ShareTarget] = Vec.new()
     var decls: Vec[DeclSpan] = Vec.new()
     for i in 0..result.report.facts.len() as i32:
-        let fact = &result.report.facts[i as i64]
+        let fact = &result.report.facts[i]
         if fact.kind == AnalysisFactKind.Declaration:
             var decl_path = owned_text(fact.path)
             if decl_path.starts_with("<embedded-std>/std/"):
                 decl_path = "lib/std/" ++ decl_path.slice(19, decl_path.len() as i64)
             decls.push(DeclSpan { path: move decl_path, name: owned_text(fact.name), start: fact.start, end: fact.end })
     for i in 0..result.report.facts.len() as i32:
-        let fact = &result.report.facts[i as i64]
+        let fact = &result.report.facts[i]
         if fact.kind != AnalysisFactKind.Parameter: continue
         if fact.stage != AnalysisStage.Sema: continue
         // Post-D5 the classifier is gone, so value_ref_abi no longer marks
@@ -100,7 +100,7 @@ fn collect_targets(entry: &str) -> CollectResult:
 
 fn find_dollar(name: &str) -> i32:
     for i in 0..name.len() as i32:
-        if name.byte_at(i as i64) as i32 == 36: return i
+        if name[i] as i32 == 36: return i
     -1
 
 fn base_name(name: &str) -> str:
@@ -111,7 +111,7 @@ fn base_name(name: &str) -> str:
 
 fn decl_for(decls: &Vec[DeclSpan], path: &str, name: &str) -> i32:
     for i in 0..decls.len() as i32:
-        let d = &decls[i as i64]
+        let d = &decls[i]
         if d.path == path and d.name == name: return i
     -1
 
@@ -133,7 +133,7 @@ fn main:
     var failures = 0
     var fi = 0
     while fi < targets.len() as i32:
-        let t = &targets[fi as i64]
+        let t = &targets[fi]
         fi = fi + 1
         let name = base_name(t.fn_name)
         let di = decl_for(&decls, t.path, name)
@@ -141,7 +141,7 @@ fn main:
             print(f"error: no declaration fact for {name} in {t.path}")
             failures = failures + 1
             continue
-        let d = &decls[di as i64]
+        let d = &decls[di]
         let decl_start = d.start
         let text = unsafe { with_fs_read_file(t.path) }
         if text.len() == 0:
@@ -238,7 +238,7 @@ fn main:
 
         var dup = false
         for e in 0..edit_paths.len() as i32:
-            if edit_paths.get(e as i64) == t.path and edit_offsets.get(e as i64) == off: dup = true
+            if edit_paths[e] == t.path and edit_offsets[e] == off: dup = true
         if dup: continue
         print(f"target: {t.path}:{name} parameter {t.sig_index}")
         edit_paths.push(owned_text(t.path))
@@ -251,7 +251,7 @@ fn main:
     // Apply per file, edits sorted ascending.
     var files: Vec[str] = Vec.new()
     for e in 0..edit_paths.len() as i32:
-        let p = edit_paths.get(e as i64)
+        let p = edit_paths[e]
         var seen = false
         for f in files:
             if f == p: seen = true
@@ -260,7 +260,7 @@ fn main:
     for f in files:
         var offs: Vec[i32] = Vec.new()
         for e in 0..edit_paths.len() as i32:
-            if edit_paths.get(e as i64) == f: offs.push(edit_offsets.get(e as i64))
+            if edit_paths[e] == f: offs.push(edit_offsets[e])
         var sorted: Vec[i32] = Vec.new()
         while sorted.len() < offs.len():
             var best = 2147483647

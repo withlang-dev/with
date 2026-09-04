@@ -11,7 +11,7 @@ fn owned(s: &str): s ++ ""     // #762: .clone() on a &str view
 
 fn arg_or(argv: &Vec[str], i: i32, fallback: &str) -> str:
     if argv.len() as i32 > i:
-        return owned(argv.get(i as i64))
+        return owned(argv[i])
     owned(fallback)
 
 let ROOT = "test/behavior/"
@@ -38,7 +38,7 @@ fn sweep(out_path: &str) -> i32:
             fails.push(owned(line))
     var out = ""
     for i in 0..fails.len() as i32:
-        out = out ++ fails.get(i as i64) ++ "\n"
+        out = out ++ fails[i] ++ "\n"
     let _ = write_file(out_path, out)
     eprint(f"lane_sweep: ran={ran} failed={fails.len()} -> {out_path}\n")
     if fails.len() > 0: 1 else: 0

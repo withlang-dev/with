@@ -31,7 +31,7 @@ fn http_parse_url(url: &str) -> HttpUrl:
     let url_len = url.len() as i32
     var host_end = start
     while host_end < url_len:
-        if url.byte_at(host_end as i64) == 47:
+        if url[host_end] == 47:
             break
         host_end = host_end + 1
 
@@ -51,7 +51,7 @@ fn http_find_header_end(data: &str) -> i32:
     let len = data.len() as i32
     var i = 0
     while i < len - 3:
-        if data.byte_at(i as i64) == 13 and data.byte_at((i + 1) as i64) == 10 and data.byte_at((i + 2) as i64) == 13 and data.byte_at((i + 3) as i64) == 10:
+        if data[i] == 13 and data[(i + 1)] == 10 and data[(i + 2)] == 13 and data[(i + 3)] == 10:
             return i + 4
         i = i + 1
     -1
@@ -60,16 +60,16 @@ fn http_status(headers: &str) -> i32:
     if headers.len() < 12:
         return -1
     var i = 0
-    while i < headers.len() as i32 and headers.byte_at(i as i64) != 32:
-        if headers.byte_at(i as i64) == 10:
+    while i < headers.len() as i32 and headers[i] != 32:
+        if headers[i] == 10:
             return -1
         i = i + 1
     if i + 3 >= headers.len() as i32:
         return -1
     i = i + 1
-    let c1 = headers.byte_at(i as i64)
-    let c2 = headers.byte_at((i + 1) as i64)
-    let c3 = headers.byte_at((i + 2) as i64)
+    let c1 = headers[i]
+    let c2 = headers[(i + 1)]
+    let c3 = headers[(i + 2)]
     if c1 < 48 or c1 > 57 or c2 < 48 or c2 > 57 or c3 < 48 or c3 > 57:
         return -1
     ((c1 - 48) as i32 * 100) + ((c2 - 48) as i32 * 10) + (c3 - 48) as i32
@@ -83,20 +83,20 @@ fn http_name_matches(line: &str, name: &str) -> bool:
     if line.len() < name.len() + 1:
         return false
     for i in 0..name.len() as i32:
-        if http_ascii_lower(line.byte_at(i as i64)) != http_ascii_lower(name.byte_at(i as i64)):
+        if http_ascii_lower(line[i]) != http_ascii_lower(name[i]):
             return false
-    line.byte_at(name.len()) == 58
+    line[name.len()] == 58
 
 fn http_trim_header_value(value: &str) -> str:
     var start = 0
     var end = value.len() as i32
     while start < end:
-        let ch = value.byte_at(start as i64)
+        let ch = value[start]
         if ch != 32 and ch != 9:
             break
         start = start + 1
     while end > start:
-        let ch = value.byte_at((end - 1) as i64)
+        let ch = value[(end - 1)]
         if ch != 32 and ch != 9 and ch != 13 and ch != 10:
             break
         end = end - 1
@@ -107,9 +107,9 @@ fn http_header_value(headers: &str, name: &str) -> str:
     var i = 0
     while i <= headers.len() as i32:
         let at_end = i == headers.len() as i32
-        if at_end or headers.byte_at(i as i64) == 10:
+        if at_end or headers[i] == 10:
             var line = headers.slice(line_start as i64, i as i64)
-            if line.len() > 0 and line.byte_at(line.len() - 1) == 13:
+            if line.len() > 0 and line[line.len() - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if http_name_matches(line, name):
                 return http_trim_header_value(line.slice((name.len() + 1) as i64, line.len()))
@@ -128,7 +128,7 @@ fn http_decode_chunked(data: &str) -> str:
     while pos < dlen:
         var chunk_size = 0
         while pos < dlen:
-            let c = data.byte_at(pos as i64) as i32
+            let c = data[pos] as i32
             if c >= 48 and c <= 57:
                 chunk_size = chunk_size * 16 + (c - 48)
             else if c >= 97 and c <= 102:
@@ -138,7 +138,7 @@ fn http_decode_chunked(data: &str) -> str:
             else:
                 break
             pos = pos + 1
-        while pos < dlen and data.byte_at(pos as i64) != 10:
+        while pos < dlen and data[pos] != 10:
             pos = pos + 1
         if pos < dlen:
             pos = pos + 1
@@ -147,9 +147,9 @@ fn http_decode_chunked(data: &str) -> str:
         let end = if pos + chunk_size > dlen: dlen else: pos + chunk_size
         result.push_str(data.slice(pos as i64, end as i64))
         pos = end
-        if pos < dlen and data.byte_at(pos as i64) == 13:
+        if pos < dlen and data[pos] == 13:
             pos = pos + 1
-        if pos < dlen and data.byte_at(pos as i64) == 10:
+        if pos < dlen and data[pos] == 10:
             pos = pos + 1
     result.to_str()
 

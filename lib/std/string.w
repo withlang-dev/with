@@ -116,7 +116,7 @@ impl str:
     pub fn to_owned() -> str:
         var sb = StringBuilder.new()
         for i in 0..self.len():
-            sb.push_byte(self.byte_at(i) as u8)
+            sb.push_byte(self[i] as u8)
         sb.to_str()
 
 /// Why a `str` could not be converted to a `CString`.
@@ -139,13 +139,13 @@ impl str:
         let n = self.len()
         var i: i64 = 0
         while i < n:
-            if self.byte_at(i) == 0:
+            if self[i] == 0:
                 return Err(.InteriorNul)
             i = i + 1
         let buf = with_alloc(n + 1)
         var j: i64 = 0
         while j < n:
-            unsafe { *((buf as i64 + j) as *mut u8) = self.byte_at(j) as u8 }
+            unsafe { *((buf as i64 + j) as *mut u8) = self[j] as u8 }
             j = j + 1
         unsafe { *((buf as i64 + n) as *mut u8) = 0 as u8 }
         Ok(CString { ptr: buf, len: n })
@@ -173,8 +173,8 @@ pub fn string_cmp(a: &str, b: &str) -> i32:
     let min_len = if al < bl: al else: bl
     var i: i64 = 0
     while i < min_len:
-        let ca = a.byte_at(i)
-        let cb = b.byte_at(i)
+        let ca = a[i]
+        let cb = b[i]
         if ca != cb:
             return ca - cb
         i = i + 1

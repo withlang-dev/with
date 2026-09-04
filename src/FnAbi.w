@@ -75,7 +75,7 @@ fn fn_abi_std_tree_relative(path: &str) -> str:
 pub fn codegen_canonical_module_path(path: &str) -> str:
     if path.len() == 0 or path == "<unknown>":
         return with_str_clone_ref(path)
-    if path.byte_at(0) == '<':
+    if path[0] == '<':
         return with_str_clone_ref(path)
     // A stdlib module resolved from a checkout's tree is the module its
     // embedded copy is (Sema names both `std.x`), so its canonical path is
@@ -84,7 +84,7 @@ pub fn codegen_canonical_module_path(path: &str) -> str:
     let std_rel = fn_abi_std_tree_relative(path)
     if std_rel.len() > 0:
         return "<embedded-std>/" ++ std_rel
-    if path.byte_at(0) == '/':
+    if path[0] == '/':
         return resolve_normalize_path(path)
     let cwd = with_getenv_str("PWD")
     if cwd.len() == 0:

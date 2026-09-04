@@ -28,7 +28,7 @@ fn d22_join_arm_role_name(role: i32) -> str:
 
 impl Sema:
     fn contextual_join_dump_text(index: i32) -> str:
-        let decision = self.contextual_join_decisions.get(index as i64)
+        let decision = self.contextual_join_decisions[index]
         var out = f"join[{index}] node={decision.join_node} final={self.type_name(decision.final_type)}"
         if decision.expected_type != 0:
             out = out ++ " expected=" ++ self.type_name(decision.expected_type)
@@ -37,11 +37,11 @@ impl Sema:
         out = out ++ f" expected-anchor={decision.expected_is_anchor} arms={decision.arm_count} owned-anchors={decision.owned_anchor_count} materialized={decision.materialized_count} views={decision.view_count} diverging={decision.diverging_count} origin-mask={decision.origin_mask} origin-deps={decision.origin_count}\n"
         for ai in 0..decision.arm_count:
             let arm_i = decision.arm_start + ai
-            let arm_node = self.contextual_join_arm_nodes.get(arm_i as i64)
-            let origin_node = self.contextual_join_arm_origin_nodes.get(arm_i as i64)
-            let arm_ty = self.contextual_join_arm_types.get(arm_i as i64)
-            let arm_kind = self.contextual_join_arm_kinds.get(arm_i as i64)
-            let arm_role = self.contextual_join_arm_roles.get(arm_i as i64)
+            let arm_node = self.contextual_join_arm_nodes[arm_i]
+            let origin_node = self.contextual_join_arm_origin_nodes[arm_i]
+            let arm_ty = self.contextual_join_arm_types[arm_i]
+            let arm_kind = self.contextual_join_arm_kinds[arm_i]
+            let arm_role = self.contextual_join_arm_roles[arm_i]
             out = out ++ f"  join[{index}].arm[{ai}] role={d22_join_arm_role_name(arm_role)} kind={d22_join_arm_kind_name(arm_kind)} node={arm_node} origin-node={origin_node} exact={self.type_name(arm_ty)}\n"
         out
 
@@ -376,7 +376,7 @@ impl Sema:
         out.push_str(f"typed module decls={dump_decl_count}\n")
         out.push_str(f"typed contextual-copy-adjustments={self.contextual_copy_adjustments.len()}\n")
         for ai in 0..self.contextual_copy_adjustments.len() as i32:
-            let adjustment = self.contextual_copy_adjustments.get(ai as i64)
+            let adjustment = self.contextual_copy_adjustments[ai]
             out.push_str(f"adjust[{ai}] node={adjustment.source_node} exact={self.type_name(adjustment.exact_source_type)} owned={self.type_name(adjustment.owned_value_type)} target={self.type_name(adjustment.target_type)}")
             if adjustment.post_copy_type != 0:
                 out.push_str(" post=" ++ self.type_name(adjustment.post_copy_type))
@@ -553,7 +553,7 @@ impl Sema:
         with_write(f"typed module decls={dump_decl_count}\n")
         with_write(f"typed contextual-copy-adjustments={self.contextual_copy_adjustments.len()}\n")
         for ai in 0..self.contextual_copy_adjustments.len() as i32:
-            let adjustment = self.contextual_copy_adjustments.get(ai as i64)
+            let adjustment = self.contextual_copy_adjustments[ai]
             with_write(f"adjust[{ai}] node={adjustment.source_node} exact={self.type_name(adjustment.exact_source_type)} owned={self.type_name(adjustment.owned_value_type)} target={self.type_name(adjustment.target_type)}")
             if adjustment.post_copy_type != 0:
                 with_write(" post=" ++ self.type_name(adjustment.post_copy_type))
@@ -734,7 +734,7 @@ impl Sema:
             out = out ++ f"{typed_indent(indent)}expr {typed_expr_kind_name(kind)} span={start}..{end} : {self.type_name(tid)}\n"
             let adjustment_index = self.latest_contextual_copy_adjustment_index(node)
             if adjustment_index >= 0:
-                let adjustment = self.contextual_copy_adjustments.get(adjustment_index as i64)
+                let adjustment = self.contextual_copy_adjustments[adjustment_index]
                 out = out ++ typed_indent(indent + 1) ++ "adjust contextual-copy exact=" ++ self.type_name(adjustment.exact_source_type) ++ " owned=" ++ self.type_name(adjustment.owned_value_type) ++ " target=" ++ self.type_name(adjustment.target_type)
                 if adjustment.post_copy_type != 0:
                     out = out ++ " post=" ++ self.type_name(adjustment.post_copy_type)
@@ -743,7 +743,7 @@ impl Sema:
                 out = out ++ "\n"
             let join_index = self.latest_contextual_join_decision_index(node)
             if join_index >= 0:
-                let join = self.contextual_join_decisions.get(join_index as i64)
+                let join = self.contextual_join_decisions[join_index]
                 out = out ++ typed_indent(indent + 1) ++ f"join contextual final={self.type_name(join.final_type)} owned-anchors={join.owned_anchor_count} materialized={join.materialized_count} views={join.view_count} diverging={join.diverging_count}\n"
 
         if kind == NodeKind.NK_LET_BINDING:
@@ -1043,7 +1043,7 @@ impl Sema:
             with_write("\n")
             let adjustment_index = self.latest_contextual_copy_adjustment_index(node)
             if adjustment_index >= 0:
-                let adjustment = self.contextual_copy_adjustments.get(adjustment_index as i64)
+                let adjustment = self.contextual_copy_adjustments[adjustment_index]
                 emit_typed_indent(indent + 1)
                 with_write("adjust contextual-copy exact=" ++ self.type_name(adjustment.exact_source_type) ++ " owned=" ++ self.type_name(adjustment.owned_value_type) ++ " target=" ++ self.type_name(adjustment.target_type))
                 if adjustment.post_copy_type != 0:
@@ -1053,7 +1053,7 @@ impl Sema:
                 with_write("\n")
             let join_index = self.latest_contextual_join_decision_index(node)
             if join_index >= 0:
-                let join = self.contextual_join_decisions.get(join_index as i64)
+                let join = self.contextual_join_decisions[join_index]
                 emit_typed_indent(indent + 1)
                 with_write(f"join contextual final={self.type_name(join.final_type)} owned-anchors={join.owned_anchor_count} materialized={join.materialized_count} views={join.view_count} diverging={join.diverging_count}\n")
 
@@ -1379,7 +1379,7 @@ impl Sema:
             for ei in 0..elem_count:
                 if ei > 0:
                     out = out ++ ", "
-                out = out ++ self.type_name(self.type_extra.get((te_start + ei) as i64))
+                out = out ++ self.type_name(self.type_extra[(te_start + ei)])
             if elem_count == 1:
                 out = out ++ ","
             return out ++ ")"
@@ -1395,7 +1395,7 @@ impl Sema:
             for pi in 0..param_count:
                 if pi > 0:
                     out = out ++ ", "
-                out = out ++ self.type_name(self.type_extra.get((te_start + pi) as i64))
+                out = out ++ self.type_name(self.type_extra[(te_start + pi)])
             return out ++ ") -> " ++ self.type_name(self.get_type_d2(resolved))
         if tk == TypeKind.TY_EXTERN_FN:
             let te_start = self.get_type_d0(resolved)
@@ -1404,7 +1404,7 @@ impl Sema:
             for pi in 0..param_count:
                 if pi > 0:
                     out = out ++ ", "
-                out = out ++ self.type_name(self.type_extra.get((te_start + pi) as i64))
+                out = out ++ self.type_name(self.type_extra[(te_start + pi)])
             return out ++ ") -> " ++ self.type_name(self.get_type_d2(resolved))
         if tk == TypeKind.TY_PTR:
             let pointee = self.type_name(self.get_type_d0(resolved))
@@ -1430,6 +1430,6 @@ impl Sema:
             for ai in 0..arg_count:
                 if ai > 0:
                     out = out ++ ", "
-                out = out ++ self.type_name(self.type_extra.get((extra_start + ai) as i64))
+                out = out ++ self.type_name(self.type_extra[(extra_start + ai)])
             return out ++ "]"
         "<unknown>"

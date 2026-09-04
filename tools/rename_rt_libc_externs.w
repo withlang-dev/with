@@ -20,7 +20,7 @@ fn renamed(name: &str) -> str:
     // Strip leading underscores for the With-side spelling (_exit →
     // rt_libc_exit, __error → rt_libc_error); the link_name keeps the truth.
     var i = 0
-    while i < name.len() as i32 and name.byte_at(i as i64) == 95:
+    while i < name.len() as i32 and name[i] == 95:
         i = i + 1
     "rt_libc_" ++ name.slice(i as i64, name.len())
 
@@ -73,7 +73,7 @@ fn process(path: &str) -> i32:
             // Insert the attribute before the `extern` keyword, after the
             // line's leading whitespace.
             var line_start = tokens.get_start(i - 2)
-            while line_start > 0 and text.byte_at(line_start as i64 - 1) != 10:
+            while line_start > 0 and text[line_start as i64 - 1] != 10:
                 line_start = line_start - 1
             out = out ++ slice(text, pos, line_start)
             let indent = slice(text, line_start, tokens.get_start(i - 2))
@@ -92,6 +92,6 @@ fn process(path: &str) -> i32:
 let argv = args()
 var rc = 0
 for ai in 1..argv.len() as i32:
-    if process(argv.get(ai as i64)) != 0:
+    if process(argv[ai]) != 0:
         rc = 1
 exit_code(rc)

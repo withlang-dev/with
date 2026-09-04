@@ -51,7 +51,7 @@ fn regex_to_cstr(s: &str) -> *const u8:
     let out = with_alloc(s.len() + 1)
     var i: i64 = 0
     while i < s.len():
-        unsafe { *((out as i64 + i) as *mut u8) = s.byte_at(i) }
+        unsafe { *((out as i64 + i) as *mut u8) = s[i] }
         i = i + 1
     unsafe { *((out as i64 + s.len()) as *mut u8) = 0 }
     out as *const u8

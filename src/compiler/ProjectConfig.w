@@ -79,7 +79,7 @@ fn project_config_clone_str(s: &str) -> str:
 fn project_config_clone_str_vec(values: &Vec[str]) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     for i in 0..values.len() as i32:
-        out.push(project_config_clone_str(values.get(i as i64)))
+        out.push(project_config_clone_str(values[i]))
     out
 
 pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
@@ -154,7 +154,7 @@ fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
     var i = 0
     let total = text.len() as i32
     while i <= total:
-        if i == total or text.byte_at(i as i64) == 10:
+        if i == total or text[i] == 10:
             var line = text.slice(line_start as i64, i as i64)
             line = project_config_trim(project_config_strip_comment(line))
             if line.len() > 0:
@@ -166,7 +166,7 @@ fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
                         cfg = project_config_apply_manifest_entry(move cfg, section, pending_key, pending_value)
                         pending_key = ""
                         pending_value = ""
-                else if line.byte_at(0) == 91 and line.byte_at(line.len() as i64 - 1) == 93:
+                else if line[0] == 91 and line[line.len() as i64 - 1] == 93:
                     section = project_config_trim(line.slice(1, line.len() - 1))
                 else:
                     let eq = project_config_find_char(line, 61)
@@ -340,7 +340,7 @@ fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: &str, k
         else:
             let libs = project_config_parse_string_array(value)
             for li in 0..libs.len() as i32:
-                out.dep_link_libs.push(with_str_clone_ref(libs.get(li as i64)))
+                out.dep_link_libs.push(with_str_clone_ref(libs[li]))
     else if key == "defines":
         if not project_config_is_string_array_value(value):
             if out.manifest_error.len() == 0:
@@ -348,14 +348,14 @@ fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: &str, k
         else:
             let defines = project_config_parse_string_array(value)
             for di in 0..defines.len() as i32:
-                out.c_import_defines.push(with_str_clone_ref(defines.get(di as i64)))
+                out.c_import_defines.push(with_str_clone_ref(defines[di]))
     else if out.manifest_error.len() == 0:
         out.manifest_error = "unknown key '" ++ key ++ "' in [deps.c." ++ dep_name ++ "]; expected include, lib, link, or defines"
     out
 
 fn project_config_strip_quotes(value: &str) -> str:
     let len = value.len() as i32
-    if len >= 2 and value.byte_at(0) == 34 and value.byte_at((len - 1) as i64) == 34:
+    if len >= 2 and value[0] == 34 and value[(len - 1)] == 34:
         return value.slice(1, (len - 1) as i64)
     with_str_clone_ref(value)
 
@@ -373,7 +373,7 @@ fn project_config_parse_positive_i64(value: &str) -> i64:
         return -1
     var out: i64 = 0
     for i in 0..text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch < 48 or ch > 57:
             return -1
         out = out * 10 + (ch - 48) as i64
@@ -387,7 +387,7 @@ fn project_config_parse_nonnegative_i64(value: &str) -> i64:
         return -1
     var out: i64 = 0
     for i in 0..text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch < 48 or ch > 57:
             return -1
         out = out * 10 + (ch - 48) as i64
@@ -395,7 +395,7 @@ fn project_config_parse_nonnegative_i64(value: &str) -> i64:
 
 fn project_config_vec_contains(values: &Vec[str], needle: &str) -> bool:
     for i in 0..values.len() as i32:
-        if values.get(i as i64) == needle:
+        if values[i] == needle:
             return true
     false
 
@@ -408,7 +408,7 @@ fn project_config_manual_c_dep_name(section: &str) -> str:
 
 fn project_config_is_quoted_string_value(value: &str) -> bool:
     let text = project_config_trim(value)
-    text.len() >= 2 and text.byte_at(0) == 34 and text.byte_at(text.len() as i64 - 1) == 34
+    text.len() >= 2 and text[0] == 34 and text[text.len() as i64 - 1] == 34
 
 fn project_config_load_dep_metadata(cfg: ProjectConfig, name: &str, version: &str) -> ProjectConfig:
     var out = cfg
@@ -423,24 +423,24 @@ fn project_config_load_dep_metadata(cfg: ProjectConfig, name: &str, version: &st
     // Extract include_paths, lib_paths, libs from JSON
     let includes = project_config_json_str_array(meta, "include_paths")
     for i in 0..includes.len() as i32:
-        let inc = includes.get(i as i64)
+        let inc = includes[i]
         out.c_import_include_paths.push(dep_dir ++ "/" ++ inc)
     let defines = project_config_json_str_array(meta, "defines")
     for i in 0..defines.len() as i32:
-        out.c_import_defines.push(with_str_clone_ref(defines.get(i as i64)))
+        out.c_import_defines.push(with_str_clone_ref(defines[i]))
     let lib_paths = project_config_json_str_array(meta, "lib_paths")
     for i in 0..lib_paths.len() as i32:
-        let lp = lib_paths.get(i as i64)
+        let lp = lib_paths[i]
         out.link_search_paths.push(dep_dir ++ "/" ++ lp)
     let libs = project_config_json_str_array(meta, "libs")
     for i in 0..libs.len() as i32:
-        out.dep_link_libs.push(with_str_clone_ref(libs.get(i as i64)))
+        out.dep_link_libs.push(with_str_clone_ref(libs[i]))
     let link_args = project_config_json_str_array(meta, "link_args")
     for i in 0..link_args.len() as i32:
-        out.dep_link_args.push(with_str_clone_ref(link_args.get(i as i64)))
+        out.dep_link_args.push(with_str_clone_ref(link_args[i]))
     let requires = project_config_json_str_array(meta, "requires")
     for i in 0..requires.len() as i32:
-        let req = requires.get(i as i64)
+        let req = requires[i]
         let slash = project_config_find_char(req, 47)
         if slash > 0:
             let req_name = req.slice(0, slash as i64)
@@ -457,24 +457,24 @@ fn project_config_json_str_array(json: &str, key: &str) -> Vec[str]:
     while pos < json_len - needle.len() as i32:
         var found = true
         for ni in 0..needle.len() as i32:
-            if json.byte_at((pos + ni) as i64) != needle.byte_at(ni as i64):
+            if json[(pos + ni)] != needle[ni]:
                 found = false
                 break
         if found:
             // Find the '[' after the key
             var ai = pos + needle.len() as i32
-            while ai < json_len and json.byte_at(ai as i64) != 91:
+            while ai < json_len and json[ai] != 91:
                 ai = ai + 1
             if ai >= json_len:
                 return result
             ai = ai + 1
             // Extract strings between '[' and ']'
-            while ai < json_len and json.byte_at(ai as i64) != 93:
-                if json.byte_at(ai as i64) == 34:
+            while ai < json_len and json[ai] != 93:
+                if json[ai] == 34:
                     // Start of quoted string
                     let start = ai + 1
                     var end = start
-                    while end < json_len and json.byte_at(end as i64) != 34:
+                    while end < json_len and json[end] != 34:
                         end = end + 1
                     if end > start:
                         result.push(json.slice(start as i64, end as i64))
@@ -549,7 +549,7 @@ fn project_config_value_complete(value: &str) -> bool:
     if project_config_find_char(value, 91) >= 0:
         return project_config_find_char(value, 93) >= 0
     // Quoted string values are complete as-is
-    if value.len() >= 2 and value.byte_at(0) == 34:
+    if value.len() >= 2 and value[0] == 34:
         return true
     // Bare values are complete
     true
@@ -558,7 +558,7 @@ fn project_config_parse_path_array(value: &str, root_dir: &str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     let entries = project_config_parse_string_array(value)
     for i in 0..entries.len() as i32:
-        out.push(project_config_resolve_path(root_dir, entries.get(i as i64)))
+        out.push(project_config_resolve_path(root_dir, entries[i]))
     out
 
 fn project_config_parse_string_array(value: &str) -> Vec[str]:
@@ -566,12 +566,12 @@ fn project_config_parse_string_array(value: &str) -> Vec[str]:
     var i = 0
     let total = value.len() as i32
     while i < total:
-        if value.byte_at(i as i64) == 34:
+        if value[i] == 34:
             i = i + 1
             var entry = ""
             var escaped = 0
             while i < total:
-                let ch = value.byte_at(i as i64)
+                let ch = value[i]
                 if escaped != 0:
                     if ch == 110:
                         entry = entry ++ "\n"
@@ -598,13 +598,13 @@ fn project_config_is_string_array_value(value: &str) -> bool:
     let text = project_config_trim(value)
     if text.len() < 2:
         return false
-    if text.byte_at(0) != 91 or text.byte_at(text.len() as i64 - 1) != 93:
+    if text[0] != 91 or text[text.len() as i64 - 1] != 93:
         return false
     var i = 1
     let total = text.len() as i32
     var expect_value = true
     while i < total - 1:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if project_config_is_space(ch):
             i = i + 1
         else if expect_value:
@@ -616,7 +616,7 @@ fn project_config_is_string_array_value(value: &str) -> bool:
             var escaped = 0
             var closed = false
             while i < total - 1:
-                let inner = text.byte_at(i as i64)
+                let inner = text[i]
                 if escaped != 0:
                     escaped = 0
                 else if inner == 92:
@@ -644,16 +644,16 @@ fn project_config_resolve_c_import_header(cfg: &ProjectConfig, decl_dir: &str, h
         return with_str_clone_ref(header_spec_raw)
     if project_config_str_contains(header_spec, ";"):
         return with_str_clone_ref(header_spec_raw)
-    if header_spec.byte_at(0) == 35:
+    if header_spec[0] == 35:
         return with_str_clone_ref(header_spec_raw)
 
     var header_name = with_str_clone_ref(header_spec)
     var preserve_angle = 0
     var preserve_quote = 0
-    if header_spec.len() >= 2 and header_spec.byte_at(0) == 60 and header_spec.byte_at(header_spec.len() as i64 - 1) == 62:
+    if header_spec.len() >= 2 and header_spec[0] == 60 and header_spec[header_spec.len() as i64 - 1] == 62:
         header_name = header_spec.slice(1, header_spec.len() - 1)
         preserve_angle = 1
-    else if header_spec.len() >= 2 and header_spec.byte_at(0) == 34 and header_spec.byte_at(header_spec.len() as i64 - 1) == 34:
+    else if header_spec.len() >= 2 and header_spec[0] == 34 and header_spec[header_spec.len() as i64 - 1] == 34:
         header_name = header_spec.slice(1, header_spec.len() - 1)
         preserve_quote = 1
 
@@ -685,7 +685,7 @@ fn project_config_resolve_header_path(cfg: &ProjectConfig, decl_dir: &str, heade
         return local_candidate
 
     for i in 0..cfg.c_import_include_paths.len() as i32:
-        let include_dir = cfg.c_import_include_paths.get(i as i64)
+        let include_dir = cfg.c_import_include_paths[i]
         let candidate = resolve_join(include_dir, header_name)
         if project_config_file_exists(candidate):
             return candidate
@@ -701,7 +701,7 @@ fn project_config_resolve_path(root_dir: &str, path: &str) -> str:
     resolve_join(root_dir, path)
 
 fn project_config_is_absolute_path(path: &str) -> bool:
-    path.len() > 0 and path.byte_at(0) == 47
+    path.len() > 0 and path[0] == 47
 
 fn project_config_normalize_absolute_path(path: &str) -> str:
     var out = with_str_clone_ref(path)
@@ -728,7 +728,7 @@ fn project_config_absolutize_path(path: &str) -> str:
 fn project_config_find_char(text: &str, ch: i32) -> i32:
     var i = 0
     while i < text.len() as i32:
-        if text.byte_at(i as i64) == ch:
+        if text[i] == ch:
             return i
         i = i + 1
     -1
@@ -738,7 +738,7 @@ fn project_config_strip_comment(line: &str) -> str:
     var escaped = 0
     var i = 0
     while i < line.len() as i32:
-        let ch = line.byte_at(i as i64)
+        let ch = line[i]
         if escaped != 0:
             escaped = 0
         else if in_string != 0 and ch == 92:
@@ -756,9 +756,9 @@ fn project_config_strip_comment(line: &str) -> str:
 fn project_config_trim(text: &str) -> str:
     var start = 0
     var end = text.len() as i32
-    while start < end and project_config_is_space(text.byte_at(start as i64)):
+    while start < end and project_config_is_space(text[start]):
         start = start + 1
-    while end > start and project_config_is_space(text.byte_at((end - 1) as i64)):
+    while end > start and project_config_is_space(text[(end - 1)]):
         end = end - 1
     text.slice(start as i64, end as i64)
 

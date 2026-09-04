@@ -51,7 +51,7 @@ pub fn read_all() -> str:
     out
 
 fn io_strip_trailing_cr(s: str) -> str:
-    if s.len() > 0 and s.byte_at(s.len() - 1) == 13:
+    if s.len() > 0 and s[s.len() - 1] == 13:
         return s.slice(0, s.len() - 1)
     s
 

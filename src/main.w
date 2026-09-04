@@ -308,7 +308,7 @@ fn cli_test_quiet(argc: i32) -> bool:
     cli_has_flag(argc, "-q") or cli_has_flag(argc, "--quiet")
 
 fn cli_is_build_target_selector(arg: &str) -> bool:
-    arg.len() > 1 and arg.byte_at(0) == 58
+    arg.len() > 1 and arg[0] == 58
 
 fn cli_build_target_arg(argc: i32) -> str:
     if cli_command(argc) != "build":
@@ -367,7 +367,7 @@ fn cli_analysis_request(argc: i32, source: &str) -> str:
     while i < argc:
         let arg = with_arg_at(i)
         if found_source:
-            if arg.len() > 0 and arg.byte_at(0) != 45:
+            if arg.len() > 0 and arg[0] != 45:
                 return arg
         else if arg == source:
             found_source = true
@@ -506,7 +506,7 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
 fn cli_escape_with_string(value: &str) -> str:
     var out = StringBuilder.with_capacity(value.len())
     for i in 0..value.len() as i32:
-        let ch = value.byte_at(i as i64)
+        let ch = value[i]
         if ch == 92:
             out.push_str("\\\\")
         else if ch == 34:
@@ -554,7 +554,7 @@ fn cli_indent_code(code: &str, indent: &str) -> str:
     var out = StringBuilder.with_capacity(code.len() + indent.len())
     out.push_str(indent)
     for i in 0..code.len() as i32:
-        let ch = code.byte_at(i as i64)
+        let ch = code[i]
         out.push_str(code.slice(i as i64, (i + 1) as i64))
         if ch == 10 and i + 1 < code.len() as i32:
             out.push_str(indent)
@@ -565,7 +565,7 @@ fn c_header_path_for(artifact_path: &str) -> str:
     var dot = -1
     var i = 0
     while i < artifact_path.len() as i32:
-        let c = artifact_path.byte_at(i as i64)
+        let c = artifact_path[i]
         if c == 46: dot = i
         if c == 47: dot = -1
         i = i + 1
@@ -577,13 +577,13 @@ fn c_header_guard_for(h_path: &str) -> str:
     var start = 0
     var i = 0
     while i < h_path.len() as i32:
-        if h_path.byte_at(i as i64) == 47: start = i + 1
+        if h_path[i] == 47: start = i + 1
         i = i + 1
     var g = StringBuilder.new()
     g.push_str("WITH_CHDR_")
     var j = start
     while j < h_path.len() as i32:
-        let c = h_path.byte_at(j as i64)
+        let c = h_path[j]
         if (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122):
             g.push_byte(c as u8)
         else:
@@ -613,7 +613,7 @@ fn cli_build_args_binding(args: &Vec[str]) -> str:
     var out = StringBuilder.new()
     out.push_str("let args: Vec[str] = Vec.new()\n")
     for i in 0..args.len() as i32:
-        let escaped = cli_escape_with_string(args.get(i as i64))
+        let escaped = cli_escape_with_string(args[i])
         out.push_str("args.push(\"")
         out.push_str(escaped)
         out.push_str("\")\n")
@@ -656,7 +656,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     source.push_str(cli_build_args_binding(one.args))
     if one.mode == CliOneLinerMode.Eval:
         for i in 0..one.code_parts.len() as i32:
-            let rewritten = cli_rewrite_semicolons(one.code_parts.get(i as i64))
+            let rewritten = cli_rewrite_semicolons(one.code_parts[i])
             let start = source.len() as i32
             source.push_str(rewritten)
             source.push_str("\n")
@@ -668,7 +668,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
         source.push_str("for line in stdin.lines():\n")
         source.push_str("    nr = nr + 1\n")
         for i in 0..one.code_parts.len() as i32:
-            let rewritten = cli_rewrite_semicolons(one.code_parts.get(i as i64))
+            let rewritten = cli_rewrite_semicolons(one.code_parts[i])
             let indented = cli_indent_code(rewritten, "    ")
             let start = source.len() as i32 + 4
             source.push_str(indented)
@@ -680,7 +680,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     source.push_str("    nr = nr + 1\n")
     source.push_str("    var line = __line.clone()\n")
     for i in 0..one.code_parts.len() as i32:
-        let rewritten = cli_rewrite_semicolons(one.code_parts.get(i as i64))
+        let rewritten = cli_rewrite_semicolons(one.code_parts[i])
         let indented = cli_indent_code(rewritten, "    ")
         let start = source.len() as i32 + 4
         source.push_str(indented)
@@ -715,10 +715,10 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
     comp.set_debug_info(false)
     for mi in 0..synthetic.gen_starts.len() as i32:
         comp.add_cli_diag_mapping(
-            synthetic.gen_starts.get(mi as i64),
-            synthetic.gen_ends.get(mi as i64),
-            synthetic.source_names.get(mi as i64),
-            synthetic.source_texts.get(mi as i64),
+            synthetic.gen_starts[mi],
+            synthetic.gen_ends[mi],
+            synthetic.source_names[mi],
+            synthetic.source_texts[mi],
         )
     let built = comp.build_entry_binary_from_source_to_path(source_name, source, bin_path)
     if built == "":
@@ -1147,10 +1147,10 @@ fn reduce_split_lines_keep_empty(text: &str) -> Vec[str]:
     var i = 0
     while i <= text.len() as i32:
         let at_end = i == text.len() as i32
-        let ch = if at_end: 10 else: text.byte_at(i as i64)
+        let ch = if at_end: 10 else: text[i]
         if ch == 10:
             var line = text.slice(start as i64, i as i64)
-            if line.len() > 0 and line.byte_at(line.len() - 1) == 13:
+            if line.len() > 0 and line[line.len() - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             lines.push(line)
             start = i + 1
@@ -1162,7 +1162,7 @@ fn reduce_join_lines(lines: &Vec[str], skip_idx: i32) -> str:
     for i in 0..lines.len() as i32:
         if i == skip_idx:
             continue
-        out = out ++ lines.get(i as i64)
+        out = out ++ lines[i]
         out = out ++ "\n"
     out
 
@@ -1281,7 +1281,7 @@ fn fixpoint_arg(argc: i32, index: i32, fallback: &str) -> str:
 fn fixpoint_byte_at(text: &str, idx: i32) -> i32:
     if idx < 0 or idx >= text.len() as i32:
         return -1
-    text.byte_at(idx as i64)
+    text[idx]
 
 fn fixpoint_diff_report(left_path: &str, right_path: &str) -> str:
     let left = with_fs_read_file(left_path)
@@ -1298,7 +1298,7 @@ fn fixpoint_diff_report(left_path: &str, right_path: &str) -> str:
     let min_len = if left.len() < right.len(): left.len() else: right.len()
     var first = -1
     for i in 0..min_len as i32:
-        if left.byte_at(i as i64) != right.byte_at(i as i64):
+        if left[i] != right[i]:
             first = i
             break
     if first < 0:
@@ -1356,7 +1356,7 @@ fn build_action_run_result_with_effects(rc: i32, effects: Vec[str]) -> BuildActi
 fn build_action_safe_label(text: &str) -> str:
     var out = ""
     for i in 0..text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
             out = out ++ text.slice(i as i64, (i + 1) as i64)
@@ -1425,8 +1425,8 @@ fn build_runner_load_fallback(root: &str) -> Vec[str]:
     let text = with_fs_read_file(build_runner_fallback_list_path(root))
     let lines = text.split("\n")
     for i in 0..lines.len() as i32:
-        if lines.get(i as i64).len() > 0:
-            out.push(with_str_clone_ref(lines.get(i as i64)))
+        if lines[i].len() > 0:
+            out.push(with_str_clone_ref(lines[i]))
     out
 
 fn build_runner_note_fallback(root: &str, name: &str):
@@ -1440,7 +1440,7 @@ fn build_runner_target_eligible(target: &BuildGraphTarget, options: &BuildComman
     if runner_path.len() == 0 or target.kind != 23 or options.strict_effects:
         return false
     for i in 0..fallback.len() as i32:
-        if fallback.get(i as i64) == target.name:
+        if fallback[i] == target.name:
             return false
     true
 
@@ -1454,8 +1454,8 @@ fn build_runner_read_effects(path: &str) -> Vec[str]:
     let text = with_fs_read_file(path)
     let lines = text.split("\n")
     for i in 0..lines.len() as i32:
-        if lines.get(i as i64).len() > 0:
-            out.push(with_str_clone_ref(lines.get(i as i64)))
+        if lines[i].len() > 0:
+            out.push(with_str_clone_ref(lines[i]))
     out
 
 fn build_runner_validate_outputs(root: &str, target: &BuildGraphTarget) -> i32:
@@ -1465,7 +1465,7 @@ fn build_runner_validate_outputs(root: &str, target: &BuildGraphTarget) -> i32:
             with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
             return 1
     for oi in 0..target.extra_outputs.len() as i32:
-        let extra_output = build_graph_resolve_project_path(root, target.extra_outputs.get(oi as i64))
+        let extra_output = build_graph_resolve_project_path(root, target.extra_outputs[oi])
         if with_fs_file_exists(extra_output) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ extra_output)
             return 1
@@ -1510,7 +1510,7 @@ fn build_pool_finalize_retire(root: &str, graph: &BuildGraph, options: &BuildCom
     let ti = build_graph_find_target_index_by_name(graph, retire.name)
     if ti < 0:
         return retire.rc
-    build_runner_postprocess(root, &graph.targets[ti as i64], retire.rc, retire.effects_path, options)
+    build_runner_postprocess(root, &graph.targets[ti], retire.rc, retire.effects_path, options)
 
 fn build_action_worker_env_enabled() -> bool:
     with_getenv_str("WITH_BUILD_ACTION_WORKER").len() > 0
@@ -1570,7 +1570,7 @@ fn run_build_action_worker_process(target: &BuildGraphTarget, options: &BuildCom
 fn build_pool_parse_jobs(value: &str) -> i32:
     var out = 0
     for i in 0..value.len() as i32:
-        let ch = value.byte_at(i as i64)
+        let ch = value[i]
         if ch < 48 or ch > 57:
             break
         out = out * 10 + (ch - 48)
@@ -1687,15 +1687,15 @@ impl PoolState:
     // child that has exited, in-order or not.
     mut fn sweep() -> Unit:
         for i in self.oldest..self.names.len() as i32:
-            if self.done.get(i as i64) != 0:
+            if self.done[i] != 0:
                 continue
-            let rc = build_graph_rt_exec_try_wait(self.pids.get(i as i64))
+            let rc = build_graph_rt_exec_try_wait(self.pids[i])
             if rc == -2:
                 continue
-            self.done[i as i64] = 1
-            self.done_rcs[i as i64] = rc
-            self.done_ats[i as i64] = with_clock_nanos()
-            self.done_rsss[i as i64] = build_graph_rt_child_maxrss()
+            self.done[i] = 1
+            self.done_rcs[i] = rc
+            self.done_ats[i] = with_clock_nanos()
+            self.done_rsss[i] = build_graph_rt_child_maxrss()
         return
 
     // Block until the oldest worker is done (sweeping siblings while we
@@ -1758,7 +1758,7 @@ unsafe fn run_build_action_from_build_w(root: &str, cfg: &ProjectConfig, target:
     if arg_rc != 0:
         return build_action_run_result(arg_rc)
     for ii in 0..target.inputs.len() as i32:
-        let input_path = build_graph_resolve_project_path(root, target.inputs.get(ii as i64))
+        let input_path = build_graph_resolve_project_path(root, target.inputs[ii])
         if with_fs_file_exists(input_path) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' missing declared input: " ++ input_path)
             return build_action_run_result(1)
@@ -1798,7 +1798,7 @@ unsafe fn run_build_action_from_build_w(root: &str, cfg: &ProjectConfig, target:
         with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
         return build_action_run_result_with_effects(1, move result.effect_records)
     for oi in 0..target.extra_outputs.len() as i32:
-        let extra_output = build_graph_resolve_project_path(root, target.extra_outputs.get(oi as i64))
+        let extra_output = build_graph_resolve_project_path(root, target.extra_outputs[oi])
         if with_fs_file_exists(extra_output) == 0:
             with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ extra_output)
             return build_action_run_result_with_effects(1, move result.effect_records)
@@ -1825,7 +1825,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
         var cache_admitted = worker_name.len() == 0
         if not cache_admitted:
             let wi = build_graph_find_target_index_by_name(&cached, worker_name)
-            cache_admitted = wi >= 0 and (&cached.targets[wi as i64]).kind == 2
+            cache_admitted = wi >= 0 and (&cached.targets[wi]).kind == 2
         if cache_admitted:
             return BuildGraphLoadResult { graph: cached, sema: Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new()) }
     var graph = empty_build_graph()
@@ -1877,7 +1877,7 @@ fn build_graph_restore_env(name: &str, old_value: &str) -> i32:
 fn build_graph_trim_trailing_line_endings(text: &str) -> str:
     var end = text.len() as i32
     while end > 0:
-        let ch = text.byte_at((end - 1) as i64)
+        let ch = text[(end - 1)]
         if ch != 10 and ch != 13:
             break
         end = end - 1
@@ -1892,7 +1892,7 @@ fn build_graph_find_substr(text: &str, needle: &str) -> i32:
     for i in 0..(last + 1):
         var matched = true
         for j in 0..needle.len() as i32:
-            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+            if text[(i + j)] != needle[j]:
                 matched = false
                 break
         if matched:
@@ -1946,12 +1946,12 @@ fn build_graph_trim_space_and_newlines(text: &str) -> str:
     var start = 0
     var end = text.len() as i32
     while start < end:
-        let ch = text.byte_at(start as i64)
+        let ch = text[start]
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             break
         start = start + 1
     while end > start:
-        let ch = text.byte_at((end - 1) as i64)
+        let ch = text[(end - 1)]
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             break
         end = end - 1
@@ -2013,7 +2013,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
     var runner_path = ""
     var runner_fallback: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
-        let target = &graph.targets[ti as i64]
+        let target = &graph.targets[ti]
         if timing_name.len() > 0:
             let spent = with_clock_nanos() - timing_t0
             timed_names.push(with_str_clone_ref(timing_name))
@@ -2037,19 +2037,19 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             with_eprint("error: build.w cross-target platform " ++ build_graph_target_name(target.target_kind) ++ " is not implemented yet for '" ++ target.name ++ "'; host is " ++ build_graph_target_name(build_graph_host_target_kind()))
             return 1
         for di in 0..target.defines.len() as i32:
-            let define = target.defines.get(di as i64)
+            let define = target.defines[di]
             if not build_graph_define_valid(define):
                 with_eprint("error: invalid build.w define for '" ++ target.name ++ "': " ++ define)
                 return 1
         var pool_dep_inflight = false
         if pool.has_live():
             for di in 0..target.deps.len() as i32:
-                if pool.dep_inflight(target.deps.get(di as i64)):
+                if pool.dep_inflight(target.deps[di]):
                     pool_dep_inflight = true
                     break
         var dep_rebuilt = false
         for di in 0..target.deps.len() as i32:
-            let dep_name = target.deps.get(di as i64)
+            let dep_name = target.deps[di]
             if not skipped_targets.contains(dep_name):
                 if completed_targets.contains(dep_name):
                     dep_rebuilt = true
@@ -2245,7 +2245,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 for fi in 0..test_files.len() as i32:
                     if survey_target_failed:
                         break
-                    let test_path = test_files.get(fi as i64)
+                    let test_path = test_files[fi]
                     let test_rc = run_test_file_with_build_settings(test_path, target_options.opt_level, target_options.no_std, target_options.alloc_mode, target_options.runtime_available, target_options.prelude_mode, target_options.debug_info, false, false, "", target_options.include_paths, target_options.defines, target_options.link_libs)
                     if test_rc != 0:
                         with_eprint("error: build.w test target failed: " ++ target.name)
@@ -2351,16 +2351,16 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // here — never a silent creep.
         var rss_trip_rc = 0
         for tri in 0..timed_rss.len() as i32:
-            if timed_rss.get(tri as i64) > 1073741824:
-                let trip_name = if tri < timed_names.len() as i32: with_str_clone_ref(timed_names.get(tri as i64)) else: "?" ++ ""
-                with_eprint("error: rss tripwire: target '" ++ trip_name ++ f"' peaked at {timed_rss.get(tri as i64) / 1048576}M (limit 1024M, #679)")
+            if timed_rss[tri] > 1073741824:
+                let trip_name = if tri < timed_names.len() as i32: with_str_clone_ref(timed_names[tri]) else: "?" ++ ""
+                with_eprint("error: rss tripwire: target '" ++ trip_name ++ f"' peaked at {timed_rss[tri] / 1048576}M (limit 1024M, #679)")
                 rss_trip_rc = 1
         if rss_trip_rc != 0:
             return 1
     if survey and survey_failed.len() as i32 > 0:
         with_eprint(f"survey: {survey_failed.len() as i32} target(s) failed:")
         for sfi in 0..survey_failed.len() as i32:
-            with_eprint("  failed: " ++ survey_failed.get(sfi as i64))
+            with_eprint("  failed: " ++ survey_failed[sfi])
         return 1
     if survey:
         with_write("survey: all targets green\n")
@@ -2394,7 +2394,7 @@ fn explain_kind_name(kind: i32) -> str:
 fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
     var found = false
     for i in 0..graph.targets.len() as i32:
-        let target = &graph.targets[i as i64]
+        let target = &graph.targets[i]
         if target.name == name:
             found = true
             with_write("target: " ++ target.name ++ "\n")
@@ -2406,19 +2406,19 @@ fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
             if target.deps.len() > 0:
                 with_write("  deps:\n")
                 for j in 0..target.deps.len() as i32:
-                    with_write("    - " ++ target.deps.get(j as i64) ++ "\n")
+                    with_write("    - " ++ target.deps[j] ++ "\n")
             if target.inputs.len() > 0:
                 with_write("  inputs:\n")
                 for j in 0..target.inputs.len() as i32:
-                    with_write("    - " ++ target.inputs.get(j as i64) ++ "\n")
+                    with_write("    - " ++ target.inputs[j] ++ "\n")
             if target.extra_outputs.len() > 0:
                 with_write("  extra_outputs:\n")
                 for j in 0..target.extra_outputs.len() as i32:
-                    with_write("    - " ++ target.extra_outputs.get(j as i64) ++ "\n")
+                    with_write("    - " ++ target.extra_outputs[j] ++ "\n")
             if target.args.len() > 0:
                 with_write("  args:\n")
                 for j in 0..target.args.len() as i32:
-                    with_write("    - " ++ target.args.get(j as i64) ++ "\n")
+                    with_write("    - " ++ target.args[j] ++ "\n")
             if target.timeout_ms != 0:
                 with_write(f"  timeout_ms: {target.timeout_ms}\n")
             if target.cwd.len() > 0:
@@ -2426,7 +2426,7 @@ fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
             if target.env.len() > 0:
                 with_write("  env:\n")
                 for j in 0..target.env.len() as i32:
-                    with_write("    - " ++ target.env.get(j as i64) ++ "\n")
+                    with_write("    - " ++ target.env[j] ++ "\n")
             if target.network != 0:
                 with_write("  network: true\n")
             with_write("  freshness: " ++ build_cache_freshness_reason(root, target, false) ++ "\n")
@@ -2435,7 +2435,7 @@ fn explain_build_target(root: &str, graph: &BuildGraph, name: &str) -> i32:
         with_eprint("error: target '" ++ name ++ "' not found in build graph\n")
         with_eprint("available targets:\n")
         for i in 0..graph.targets.len() as i32:
-            let target = &graph.targets[i as i64]
+            let target = &graph.targets[i]
             with_eprint("  " ++ target.name ++ " (" ++ explain_kind_name(target.kind) ++ ")\n")
         return 1
     0
@@ -2451,7 +2451,7 @@ fn run_graph_target_command(target_name: &str) -> i32:
 // freed buffers the graph still owned (#715 class). Callers borrow the element.
 fn build_graph_find_target_index_by_name(graph: &BuildGraph, target_name: &str) -> i32:
     for i in 0..graph.targets.len() as i32:
-        if (&graph.targets[i as i64]).name == target_name:
+        if (&graph.targets[i]).name == target_name:
             return i
     -1
 
@@ -2473,7 +2473,7 @@ fn repo_lock_parse_pid(owner: &str) -> i32:
         return -1
     var end = start
     while end < owner.len() as i32:
-        let ch = owner.byte_at(end as i64)
+        let ch = owner[end]
         if ch < 48 or ch > 57:
             break
         end = end + 1
@@ -2481,7 +2481,7 @@ fn repo_lock_parse_pid(owner: &str) -> i32:
         return -1
     var pid = 0
     for i in start..end:
-        pid = pid * 10 + (owner.byte_at(i as i64) - 48)
+        pid = pid * 10 + (owner[i] - 48)
     pid
 
 fn repo_lock_acquire(target_name: &str) -> bool:
@@ -2799,7 +2799,7 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     if selected_index < 0:
         with_eprint("error: target '" ++ selected_target_name ++ "' not found in build graph")
         return 1
-    if (&graph.targets[selected_index as i64]).kind != 0:
+    if (&graph.targets[selected_index]).kind != 0:
         with_eprint("error: run target '" ++ selected_target_name ++ "' is not executable")
         return 1
     let selected_graph = build_graph_filter_target(&graph, selected_target_name)
@@ -2816,7 +2816,7 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     if built_index < 0:
         with_eprint("error: target '" ++ selected_target_name ++ "' vanished from the filtered build graph")
         return 1
-    let bin_path = build_graph_output_path(root, &selected_graph.targets[built_index as i64], "", selected_graph.targets.len() as i32)
+    let bin_path = build_graph_output_path(root, &selected_graph.targets[built_index], "", selected_graph.targets.len() as i32)
     if bin_path.len() == 0 or with_fs_file_exists(bin_path) == 0:
         with_eprint("error: run target '" ++ selected_target_name ++ "' did not produce executable output")
         return 1
@@ -3078,7 +3078,7 @@ fn escape_dump_lexeme(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     var run_start = 0
     for i in 0..text.len():
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         var esc = ""
         if ch == 92:  // '\'
             esc = "\\\\"
@@ -3174,14 +3174,14 @@ fn discover_bench_functions(text: &str) -> BenchDiscovery:
 fn synthesize_bench_main_source(text: &str, bench_names: &Vec[str]) -> str:
     var out = StringBuilder.with_capacity(text.len())
     out.push_str(text)
-    if text.len() > 0 and text.byte_at(text.len() - 1) != 10:
+    if text.len() > 0 and text[text.len() - 1] != 10:
         out.push_str("\n")
     out.push_str("\nuse std.process\n")
     out.push_str("use test.bench\n")
     out.push_str("\nfn main:\n")
     out.push_str("    let __with_bench_filter = env(\"WITH_BENCH_FILTER\")\n")
     for bi in 0..bench_names.len() as i32:
-        let bench_name = bench_names.get(bi as i64)
+        let bench_name = bench_names[bi]
         out.push_str("    if __with_bench_filter.len() == 0 or \"")
         out.push_str(bench_name)
         out.push_str("\".contains(__with_bench_filter):\n")
@@ -3197,7 +3197,7 @@ fn synthesize_bench_main_source(text: &str, bench_names: &Vec[str]) -> str:
 fn synthesize_test_main_source(text: &str, test_names: &Vec[str]) -> str:
     var out = StringBuilder.with_capacity(text.len())
     out.push_str(text)
-    if text.len() > 0 and text.byte_at(text.len() - 1) != 10:
+    if text.len() > 0 and text[text.len() - 1] != 10:
         out.push_str("\n")
     out.push_str("\nuse std.process\n")
     out.push_str("\nfn __with_test_eq(a: &str, b: &str) -> bool:\n")
@@ -3206,7 +3206,7 @@ fn synthesize_test_main_source(text: &str, test_names: &Vec[str]) -> str:
     out.push_str("    let __with_test_filter = env(\"WITH_TEST_FILTER\")\n")
     out.push_str("    if __with_test_filter.len() > 0:\n")
     for ti in 0..test_names.len() as i32:
-        let test_name = test_names.get(ti as i64)
+        let test_name = test_names[ti]
         var prefix = "        else if "
         if ti == 0:
             prefix = "        if "
@@ -3222,7 +3222,7 @@ fn synthesize_test_main_source(text: &str, test_names: &Vec[str]) -> str:
     out.push_str("            exit_code(1)\n")
     for ti in 0..test_names.len() as i32:
         out.push_str("    ")
-        out.push_str(test_names.get(ti as i64))
+        out.push_str(test_names[ti])
         out.push_str("()\n")
     out.to_str()
 
@@ -3248,12 +3248,12 @@ fn maybe_synthesize_test_source(target: &str) -> str:
 fn test_parse_i32(text: &str) -> i32:
     var sign = 1
     var i = 0
-    if text.len() > 0 and text.byte_at(0) == 45:
+    if text.len() > 0 and text[0] == 45:
         sign = -1
         i = 1
     var value = 0
     while i < text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch < 48 or ch > 57:
             break
         value = value * 10 + (ch - 48)
@@ -3292,7 +3292,7 @@ fn test_gate_matches(value: &str) -> i32:
     var dash = -1
     var gi = 0
     while gi < value.len() as i32:
-        if value.byte_at(gi as i64) == 45:
+        if value[gi] == 45:
             dash = gi
             break
         gi = gi + 1
@@ -3337,10 +3337,10 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
     while i <= text_len:
         var ch = 10
         if i < text_len:
-            ch = text.byte_at(i as i64)
+            ch = text[i]
         if ch == 10:
             var line = text.slice(start as i64, i as i64)
-            if line.len() > 0 and line.byte_at(line.len() as i64 - 1) == 13:
+            if line.len() > 0 and line[line.len() as i64 - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if line.starts_with(expect_stdout_prefix):
                 result.expect_stdout.push(line.slice(expect_stdout_prefix.len(), line.len()))
@@ -3375,7 +3375,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 var gate_sp: i64 = -1
                 var gsi: i64 = 0
                 while gsi < rest.len():
-                    if rest.byte_at(gsi) == 32:
+                    if rest[gsi] == 32:
                         gate_sp = gsi
                         break
                     gsi = gsi + 1
@@ -3430,7 +3430,7 @@ fn test_append_extra_args(argv: &str, extra_args: &str) -> str:
     var i = 0
     while i <= extra_args.len() as i32:
         let at_end = i == extra_args.len() as i32
-        let ch = if at_end: 32 else: extra_args.byte_at(i as i64)
+        let ch = if at_end: 32 else: extra_args[i]
         if ch == 32 or ch == 9:
             if i > start:
                 out = build_graph_argv_append(out, extra_args.slice(start as i64, i as i64))
@@ -3505,12 +3505,12 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
             emit_test_stage_error(f"check failed with exit code {result.rc}", target, "check", "")
             return 1
         for i in 0..directives.expect_check_stdout.len() as i32:
-            let expected = directives.expect_check_stdout.get(i as i64)
+            let expected = directives.expect_check_stdout[i]
             if not test_output_contains_expected(result.stdout, expected):
                 emit_test_stage_error("missing expected check stdout: " ++ expected, target, "check", "")
                 return 1
         for i in 0..directives.expect_check_stdout_not.len() as i32:
-            let forbidden = directives.expect_check_stdout_not.get(i as i64)
+            let forbidden = directives.expect_check_stdout_not[i]
             if forbidden.len() > 0 and test_output_contains_expected(result.stdout, forbidden):
                 emit_test_stage_error("unexpected check stdout: " ++ forbidden, target, "check", "")
                 return 1
@@ -3529,7 +3529,7 @@ fn test_extra_arg_present(args: &str, wanted: &str) -> bool:
     var i = 0
     while i <= args.len() as i32:
         let at_end = i == args.len() as i32
-        let ch = if at_end: 32 else: args.byte_at(i as i64)
+        let ch = if at_end: 32 else: args[i]
         if ch == 32 or ch == 9:
             if i > start and args.slice(start as i64, i as i64) == wanted:
                 return true
@@ -3561,10 +3561,10 @@ fn split_nonempty_lines(text: &str) -> Vec[str]:
     while i <= text_len:
         var ch = 10
         if i < text_len:
-            ch = text.byte_at(i as i64)
+            ch = text[i]
         if ch == 10:
             var line = text.slice(start as i64, i as i64)
-            if line.len() > 0 and line.byte_at(line.len() as i64 - 1) == 13:
+            if line.len() > 0 and line[line.len() as i64 - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if line.len() > 0:
                 lines.push(line)
@@ -3632,7 +3632,7 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
 
 fn test_validate_output(stream_name: &str, actual: &str, expected_values: &Vec[str], target: &str, test_name: &str) -> bool:
     for ei in 0..expected_values.len() as i32:
-        let expected = expected_values.get(ei as i64)
+        let expected = expected_values[ei]
         if not actual.contains(expected):
             emit_test_stage_error(stream_name ++ " mismatch; missing expected output: " ++ expected, target, "run", test_name)
             return false
@@ -3682,7 +3682,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
         return run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
     let saved: Vec[str] = Vec.new()
     for ei in 0..env_directives.env_pairs.len() as i32:
-        let pair = env_directives.env_pairs.get(ei as i64)
+        let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
         if eq >= 0:
             let name = pair.slice(0, eq)
@@ -3692,10 +3692,10 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
             saved.push("")
     let env_rc = run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
     for ei in 0..env_directives.env_pairs.len() as i32:
-        let pair = env_directives.env_pairs.get(ei as i64)
+        let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
         if eq >= 0:
-            let _ = with_setenv_str(pair.slice(0, eq), saved.get(ei as i64))
+            let _ = with_setenv_str(pair.slice(0, eq), saved[ei])
     env_rc
 
 fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> i32:
@@ -3743,7 +3743,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
         var passed = 0
         var failed = 0
         for ti in 0..discovery.test_names.len() as i32:
-            let test_name = discovery.test_names.get(ti as i64)
+            let test_name = discovery.test_names[ti]
             if filter.len() > 0 and not test_name.contains(filter):
                 continue
             var run_quiet = quiet
@@ -3794,7 +3794,7 @@ fn test_command_collect_targets(argc: i32) -> Vec[str]:
         if test_command_option_takes_value(arg):
             i = i + 2
             continue
-        if arg.len() > 0 and arg.byte_at(0) == 45:
+        if arg.len() > 0 and arg[0] == 45:
             i = i + 1
             continue
         if not cli_is_build_target_selector(arg):
@@ -3809,7 +3809,7 @@ fn run_test_target(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool,
             with_eprint(f"error: no test sources found in '{target}'")
             return 1
         for ti in 0..test_files.len() as i32:
-            let test_file = test_files.get(ti as i64)
+            let test_file = test_files[ti]
             let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
             if run_rc != 0:
                 with_eprint(f"error: test failed in '{test_file}'")
@@ -3836,7 +3836,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
         graph_options.selected_target = "test"
         return run_build_command(move build_options, graph_options)
     for ti in 0..targets.len() as i32:
-        let target = targets.get(ti as i64)
+        let target = targets[ti]
         let rc = run_test_target(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
         if rc != 0:
             return rc
@@ -3885,7 +3885,7 @@ fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, 
             return 1
         var any_failed = false
         for fi in 0..files.len() as i32:
-            let file = files.get(fi as i64)
+            let file = files[fi]
             let text = with_fs_read_file(file)
             if text.len() == 0:
                 continue
@@ -3911,7 +3911,7 @@ fn migrate_header_insert_offset(text: &str) -> i64:
     let n = text.len()
     while line_start < n:
         var line_end = line_start
-        while line_end < n and text.byte_at(line_end) != 10:
+        while line_end < n and text[line_end] != 10:
             line_end = line_end + 1
         let line = text.slice(line_start, line_end)
         if line.starts_with("use ") or line.starts_with("module "):
@@ -3927,7 +3927,7 @@ fn migrate_apply_std_use_fixits(output_path: &str) -> i32:
         let result = compiler_analyze_file(output_path, "select:kind=diagnostic")
         var block = ""
         for i in 0..result.report.facts.len() as i32:
-            let fact = result.report.facts.get(i as i64)
+            let fact = result.report.facts[i]
             if fact.kind != AnalysisFactKind.Diagnostic or fact.flags != AnalysisDiagnosticSeverity.Error as i32:
                 continue
             let parts = fact.name.split("; add: use ")
@@ -4038,7 +4038,7 @@ fn run_migrate_command(argc: i32) -> i32:
             exclude_basenames = exclude_basenames ++ "|" ++ arg.slice(10, arg.len()) ++ "|"
             ai = ai + 1
             continue
-        if arg.len() > 0 and arg.byte_at(0) != 45:  // not a flag
+        if arg.len() > 0 and arg[0] != 45:  // not a flag
             source_path = arg
         ai = ai + 1
 
@@ -4047,7 +4047,7 @@ fn run_migrate_command(argc: i32) -> i32:
         return 1
 
     // Detect if source is a directory (ends with / or doesn't end with .c/.h)
-    let is_dir = (source_path.len() > 0 and source_path.byte_at(source_path.len() - 1) == 47) or (source_path.len() > 2 and source_path.slice(source_path.len() - 2, source_path.len()) != ".c" and source_path.slice(source_path.len() - 2, source_path.len()) != ".h")
+    let is_dir = (source_path.len() > 0 and source_path[source_path.len() - 1] == 47) or (source_path.len() > 2 and source_path.slice(source_path.len() - 2, source_path.len()) != ".c" and source_path.slice(source_path.len() - 2, source_path.len()) != ".h")
 
     if is_dir:
         // Directory mode
@@ -4082,11 +4082,11 @@ fn doc_field(line: &str, key: &str) -> str:
     let needle = key ++ "="
     var i = 0
     while i + needle.len() as i32 <= line.len() as i32:
-        let at_field = i == 0 or line.byte_at((i - 1) as i64) == 32
+        let at_field = i == 0 or line[(i - 1)] == 32
         if at_field and line.slice(i as i64, (i + needle.len() as i32) as i64) == needle:
             let start = i + needle.len() as i32
             var end = start
-            while end < line.len() as i32 and line.byte_at(end as i64) != 32:
+            while end < line.len() as i32 and line[end] != 32:
                 end = end + 1
             return line.slice(start as i64, end as i64)
         i = i + 1
@@ -4096,7 +4096,7 @@ fn doc_parse_span_start(span: &str) -> i32:
     var value = 0
     var i = 0
     while i < span.len() as i32:
-        let ch = span.byte_at(i as i64)
+        let ch = span[i]
         if ch < 48 or ch > 57:
             return value
         value = value * 10 + (ch - 48)
@@ -4133,37 +4133,37 @@ fn doc_source_line_at(text: &str, offset: i32) -> str:
         start = 0
     if start > text.len() as i32:
         start = text.len() as i32
-    while start > 0 and text.byte_at((start - 1) as i64) != 10:
+    while start > 0 and text[(start - 1)] != 10:
         start = start - 1
     var end = offset
     if end < start:
         end = start
-    while end < text.len() as i32 and text.byte_at(end as i64) != 10:
+    while end < text.len() as i32 and text[end] != 10:
         end = end + 1
     text.slice(start as i64, end as i64).trim()
 
 fn doc_extract_comment(text: &str, decl_start: i32) -> str:
     var pos = decl_start - 1
-    while pos >= 0 and (text.byte_at(pos as i64) == 32 or text.byte_at(pos as i64) == 9 or text.byte_at(pos as i64) == 13 or text.byte_at(pos as i64) == 10):
+    while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
         pos = pos - 1
     let lines: Vec[str] = Vec.new()
     while pos >= 0:
         var line_start = pos
-        while line_start > 0 and text.byte_at((line_start - 1) as i64) != 10:
+        while line_start > 0 and text[(line_start - 1)] != 10:
             line_start = line_start - 1
         let line = text.slice(line_start as i64, (pos + 1) as i64).trim()
         if not line.starts_with("///"):
             break
         lines.push(line.slice(3, line.len()).trim())
         pos = line_start - 1
-        while pos >= 0 and (text.byte_at(pos as i64) == 32 or text.byte_at(pos as i64) == 9 or text.byte_at(pos as i64) == 13 or text.byte_at(pos as i64) == 10):
+        while pos >= 0 and (text[pos] == 32 or text[pos] == 9 or text[pos] == 13 or text[pos] == 10):
             pos = pos - 1
     var out = ""
     var i = lines.len() as i32 - 1
     while i >= 0:
         if out.len() > 0:
             out = out ++ "\n"
-        out = out ++ lines.get(i as i64)
+        out = out ++ lines[i]
         i = i - 1
     out
 
@@ -4186,7 +4186,7 @@ fn doc_markdown_entry(kind: &str, path: &str, name: &str, detail: &str, source_t
 fn doc_project_root(info: &str) -> str:
     let lines = split_nonempty_lines(info)
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line.starts_with("config root="):
             return doc_field(line, "root")
     ""
@@ -4195,7 +4195,7 @@ fn doc_collect_modules(info: &str, root: &str, source_path: &str) -> str:
     let lines = split_nonempty_lines(info)
     var out = ""
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if not line.starts_with("module "):
             continue
         let path = doc_field(line, "path")
@@ -4206,7 +4206,7 @@ fn doc_collect_modules(info: &str, root: &str, source_path: &str) -> str:
 
 fn doc_path_seen(paths: &Vec[str], path: &str) -> bool:
     for i in 0..paths.len() as i32:
-        if paths.get(i as i64) == path:
+        if paths[i] == path:
             return true
     false
 
@@ -4214,7 +4214,7 @@ fn doc_module_paths(info: &str, root: &str, source_path: &str) -> Vec[str]:
     let paths: Vec[str] = Vec.new()
     let lines = split_nonempty_lines(info)
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if not line.starts_with("module "):
             continue
         let path = doc_field(line, "path")
@@ -4230,7 +4230,7 @@ fn doc_collect_entries(info: &str, root: &str, source_path: &str, fallback_sourc
     let lines = split_nonempty_lines(info)
     var out = ""
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if not line.starts_with(wanted_kind ++ " "):
             continue
         if doc_field(line, "pub") != "1":
@@ -4295,7 +4295,7 @@ fn run_doc_command(argc: i32, source: &str, output: &str, no_std: bool, alloc_mo
     let module_paths = doc_module_paths(info, root, source_path)
     var all_info = ""
     for mi in 0..module_paths.len() as i32:
-        let module_path = module_paths.get(mi as i64)
+        let module_path = module_paths[mi]
         var module_comp = Compilation.init()
         module_comp.configure(0, no_std, alloc_mode, runtime_available)
         module_comp.set_prelude_mode(prelude_mode)
@@ -4434,7 +4434,7 @@ fn run_fmt_command(argc: i32) -> i32:
     var any_changed = false
     var fi = 0
     while fi < files.len() as i32:
-        let path = files.get(fi as i64)
+        let path = files[fi]
         let source = with_fs_read_file(path)
         let formatted = format_source_styled(source, fmt_style)
         if formatted != source:
@@ -4839,7 +4839,7 @@ fn cli_parse_small_int(s: &str) -> i32:
     var i = 0
     let len = s.len() as i32
     while i < len:
-        let ch = s.byte_at(i as i64)
+        let ch = s[i]
         if ch >= 48 and ch <= 57:
             result = result * 10 + (ch - 48)
         i = i + 1
@@ -4852,7 +4852,7 @@ fn cli_parse_nonnegative_i64(s: &str) -> i64:
     var i = 0
     let len = s.len() as i32
     while i < len:
-        let ch = s.byte_at(i as i64)
+        let ch = s[i]
         if ch < 48 or ch > 57:
             return -1
         let digit = (ch - 48) as i64
@@ -4882,12 +4882,12 @@ fn cli_trim_line(text: &str) -> str:
     var start = 0
     var end = text.len() as i32
     while start < end:
-        let ch = text.byte_at(start as i64)
+        let ch = text[start]
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             break
         start = start + 1
     while end > start:
-        let ch = text.byte_at((end - 1) as i64)
+        let ch = text[(end - 1)]
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             break
         end = end - 1
@@ -4897,7 +4897,7 @@ fn cli_dep_line_matches(line: &str, pkg_name: &str) -> bool:
     let trimmed = cli_trim_line(line)
     var eq = -1
     for i in 0..trimmed.len() as i32:
-        if trimmed.byte_at(i as i64) == 61:
+        if trimmed[i] == 61:
             eq = i
             break
     if eq < 0:
@@ -4907,11 +4907,11 @@ fn cli_dep_line_matches(line: &str, pkg_name: &str) -> bool:
 
 fn cli_line_is_section(line: &str) -> bool:
     let trimmed = cli_trim_line(line)
-    trimmed.len() >= 2 and trimmed.byte_at(0) == 91 and trimmed.byte_at(trimmed.len() - 1) == 93
+    trimmed.len() >= 2 and trimmed[0] == 91 and trimmed[trimmed.len() - 1] == 93
 
 fn cli_strip_quotes(value: &str) -> str:
     let trimmed = cli_trim_line(value)
-    if trimmed.len() >= 2 and trimmed.byte_at(0) == 34 and trimmed.byte_at(trimmed.len() - 1) == 34:
+    if trimmed.len() >= 2 and trimmed[0] == 34 and trimmed[trimmed.len() - 1] == 34:
         return trimmed.slice(1, trimmed.len() - 1)
     trimmed
 
@@ -4936,7 +4936,7 @@ fn cli_update_manifest_dep(toml: &str, pkg_name: &str, pkg_version: &str) -> str
     let n = toml.len() as i32
     while i <= n:
         let at_end = i == n
-        let ch = if at_end: 10 else: toml.byte_at(i as i64)
+        let ch = if at_end: 10 else: toml[i]
         if ch == 10:
             let line = toml.slice(start as i64, i as i64)
             let trimmed = cli_trim_line(line)
@@ -4974,7 +4974,7 @@ fn cli_remove_manifest_dep(toml: &str, pkg_name: &str) -> CliManifestRemoveResul
     let n = toml.len() as i32
     while i <= n:
         let at_end = i == n
-        let ch = if at_end: 10 else: toml.byte_at(i as i64)
+        let ch = if at_end: 10 else: toml[i]
         if ch == 10:
             let line = toml.slice(start as i64, i as i64)
             let trimmed = cli_trim_line(line)
@@ -5000,7 +5000,7 @@ fn cli_manifest_c_deps(toml: &str) -> Vec[CliManifestDep]:
     let n = toml.len() as i32
     while i <= n:
         let at_end = i == n
-        let ch = if at_end: 10 else: toml.byte_at(i as i64)
+        let ch = if at_end: 10 else: toml[i]
         if ch == 10:
             let line = toml.slice(start as i64, i as i64)
             let trimmed = cli_trim_line(line)
@@ -5011,7 +5011,7 @@ fn cli_manifest_c_deps(toml: &str) -> Vec[CliManifestDep]:
             else if in_deps:
                 var eq = -1
                 for j in 0..trimmed.len() as i32:
-                    if trimmed.byte_at(j as i64) == 61:
+                    if trimmed[j] == 61:
                         eq = j
                         break
                 if eq > 0:
@@ -5044,13 +5044,13 @@ fn cli_path_basename(path_raw: &str) -> str:
         return path
 
     var end = path.len() as i32
-    while end > 1 and path.byte_at((end - 1) as i64) == 47:
+    while end > 1 and path[(end - 1)] == 47:
         end = end - 1
 
     var start = 0
     var i = 0
     while i < end:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             start = i + 1
         i = i + 1
 
@@ -5274,15 +5274,15 @@ fn get_command_with_pkg_name(spec: &str) -> str:
         return ""
     var name_end = spec.len() as i32
     for i in 0..spec.len() as i32:
-        if spec.byte_at(i as i64) == 64:
+        if spec[i] == 64:
             name_end = i
             break
     if name_end <= 0:
         return ""
-    if not get_command_valid_pkg_start(spec.byte_at(0)):
+    if not get_command_valid_pkg_start(spec[0]):
         return ""
     for i in 0..name_end:
-        if not get_command_valid_pkg_char(spec.byte_at(i as i64)):
+        if not get_command_valid_pkg_char(spec[i]):
             return ""
     if name_end < spec.len() as i32 and name_end + 1 >= spec.len() as i32:
         return ""
@@ -5329,7 +5329,7 @@ fn run_get_command(argc: i32) -> i32:
     var pkg_name = with_str_clone_ref(pkg_part)
     var pkg_version = ""
     for i in 0..pkg_part.len() as i32:
-        if pkg_part.byte_at(i as i64) == 64:
+        if pkg_part[i] == 64:
             pkg_name = pkg_part.slice(0, i as i64)
             pkg_version = pkg_part.slice((i + 1) as i64, pkg_part.len())
             break
@@ -5410,7 +5410,7 @@ fn run_update_command(argc: i32) -> i32:
         return 0
     var next_lock = lock_load(root)
     for i in 0..deps.len() as i32:
-        let dep = deps.get(i as i64)
+        let dep = deps[i]
         let resolved_version = conan_install(dep.name, dep.constraint, root, true)
         if resolved_version.len() == 0:
             return 1

@@ -71,7 +71,7 @@ fn regex_compile_flags(flags: &str) -> Result[RegexFlags, RegexError]:
     var state_flags: i32 = 0
     var i: i64 = 0
     while i < flags.len():
-        let flag_byte = flags.byte_at(i)
+        let flag_byte = flags[i]
         if flag_byte == 103:
             state_flags = state_flags | REGEX_FLAG_GLOBAL
         else if flag_byte == 105:
@@ -298,7 +298,7 @@ fn regex_expand_numbered_capture(captures: &Captures, repl: &str, start: i64, en
     var number: i32 = 0
     var i = start
     while i < end:
-        number = number * 10 + (repl.byte_at(i) - 48)
+        number = number * 10 + (repl[i] - 48)
         i = i + 1
     match captures.get(number):
         Some(found) => { var taken = found; let out = move taken.text; out }
@@ -314,7 +314,7 @@ fn regex_expand_replacement(captures: &Captures, repl: &str) -> str:
     var out = ""
     var i: i64 = 0
     while i < repl.len():
-        let ch = repl.byte_at(i)
+        let ch = repl[i]
         if ch != 36:
             out = out ++ with_str_from_byte(ch)
             i = i + 1
@@ -323,7 +323,7 @@ fn regex_expand_replacement(captures: &Captures, repl: &str) -> str:
             out = out ++ "$"
             i = i + 1
             continue
-        let next = repl.byte_at(i + 1)
+        let next = repl[i + 1]
         if next == 36:
             out = out ++ "$"
             i = i + 2
@@ -331,14 +331,14 @@ fn regex_expand_replacement(captures: &Captures, repl: &str) -> str:
         if next >= 48 and next <= 57:
             let digit_start = i + 1
             var digit_end = digit_start
-            while digit_end < repl.len() and repl.byte_at(digit_end) >= 48 and repl.byte_at(digit_end) <= 57:
+            while digit_end < repl.len() and repl[digit_end] >= 48 and repl[digit_end] <= 57:
                 digit_end = digit_end + 1
             out = out ++ regex_expand_numbered_capture(captures, repl, digit_start, digit_end)
             i = digit_end
             continue
         if next == 123:
             var name_end = i + 2
-            while name_end < repl.len() and repl.byte_at(name_end) != 125:
+            while name_end < repl.len() and repl[name_end] != 125:
                 name_end = name_end + 1
             if name_end < repl.len():
                 let name = with_str_slice_ref(repl, i + 2, name_end)
@@ -350,7 +350,7 @@ fn regex_expand_replacement(captures: &Captures, repl: &str) -> str:
         if regex_is_name_start(next):
             let name_start = i + 1
             var name_end = name_start
-            while name_end < repl.len() and regex_is_name_continue(repl.byte_at(name_end)):
+            while name_end < repl.len() and regex_is_name_continue(repl[name_end]):
                 name_end = name_end + 1
             let name = with_str_slice_ref(repl, name_start, name_end)
             match captures.name(name):
@@ -479,8 +479,8 @@ impl Captures:
         let base = index * 2
         if base < 0 or base + 1 >= self.spans.len() as i32:
             return None
-        let start = self.spans.get(base as i64)
-        let end = self.spans.get((base + 1) as i64)
+        let start = self.spans[base]
+        let end = self.spans[(base + 1)]
         if start < 0 or end < 0:
             return None
         Some(Match {
@@ -509,7 +509,7 @@ impl Captures:
             None => ""
 
     pub fn name_text(name: &str) -> str:
-        let lookup_name = if name.len() > 0 and name.byte_at(0) == 36:
+        let lookup_name = if name.len() > 0 and name[0] == 36:
             with_str_slice_ref(name, 1, name.len())
         else:
             with_str_clone_ref(name)
@@ -528,7 +528,7 @@ impl Regex:
             None => ""
 
     pub fn capture_name_text(text: &str, name: &str) -> str:
-        let lookup_name = if name.len() > 0 and name.byte_at(0) == 36:
+        let lookup_name = if name.len() > 0 and name[0] == 36:
             with_str_slice_ref(name, 1, name.len())
         else:
             with_str_clone_ref(name)

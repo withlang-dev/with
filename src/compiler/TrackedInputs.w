@@ -18,8 +18,8 @@ pub fn tracked_input_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < min_len as i32:
-        let ac = a.byte_at(i as i64)
-        let bc = b.byte_at(i as i64)
+        let ac = a[i]
+        let bc = b[i]
         if ac != bc:
             return ac - bc
         i = i + 1
@@ -35,7 +35,7 @@ pub fn tracked_input_insert_unique(paths: Vec[str], path: &str) -> Vec[str]:
     var out: Vec[str] = Vec.new()
     var inserted = false
     for i in 0..paths.len() as i32:
-        let existing = paths.get(i as i64)
+        let existing = paths[i]
         let cmp = tracked_input_str_compare(path, existing)
         if cmp == 0:
             return paths
@@ -50,7 +50,7 @@ pub fn tracked_input_insert_unique(paths: Vec[str], path: &str) -> Vec[str]:
 pub fn tracked_input_merge_unique(left: Vec[str], right: &Vec[str]) -> Vec[str]:
     var out = left
     for i in 0..right.len() as i32:
-        out = tracked_input_insert_unique(move out, right.get(i as i64))
+        out = tracked_input_insert_unique(move out, right[i])
     out
 
 fn tracked_dirname(path: &str) -> str:
@@ -60,7 +60,7 @@ fn tracked_dirname(path: &str) -> str:
     // helpers below.
     var last_slash = -1
     for i in 0..path.len() as i32:
-        let b = path.byte_at(i as i64)
+        let b = path[i]
         if b == 47 or b == 92:
             last_slash = i
     if last_slash < 0:
@@ -70,9 +70,9 @@ fn tracked_dirname(path: &str) -> str:
     path.slice(0, last_slash as i64)
 
 fn tracked_path_is_absolute(path: &str) -> bool:
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if path.len() > 0 and path[0] == 47:
         return true
-    path.len() >= 3 and path.byte_at(1) == 58 and (path.byte_at(2) == 47 or path.byte_at(2) == 92)
+    path.len() >= 3 and path[1] == 58 and (path[2] == 47 or path[2] == 92)
 
 fn tracked_path_has_parent_segment(path: &str) -> bool:
     path == ".." or path.starts_with("../") or path.starts_with("..\\") or
@@ -95,7 +95,7 @@ fn tracked_inside_root(path: &str, root: &str) -> bool:
         return true
     // Root "." contains every relative path (normalization strips the "./"
     // prefix from the path, so the prefix comparison below would miss).
-    if root == "." and path.len() > 0 and path.byte_at(0) != 47:
+    if root == "." and path.len() > 0 and path[0] != 47:
         return true
     let prefix = if root.ends_with("/"): with_str_clone_ref(root) else: root ++ "/"
     path.starts_with(prefix)
@@ -108,14 +108,14 @@ fn tracked_inside_root(path: &str, root: &str) -> bool:
 fn tracked_normalize_path(path: &str) -> str:
     if path.len() == 0:
         return with_str_clone_ref(path)
-    let is_abs = path.len() > 0 and path.byte_at(0) == 47
+    let is_abs = path.len() > 0 and path[0] == 47
     let parts: Vec[str] = Vec.new()
     var start = 0
     for i in 0..(path.len() as i32 + 1):
         let at_end = i == path.len() as i32
         // Split on both '/' and '\' so a '\'-separated Windows path normalizes
         // to the same '/'-form the containment checks expect (#801).
-        if at_end or path.byte_at(i as i64) == 47 or path.byte_at(i as i64) == 92:
+        if at_end or path[i] == 47 or path[i] == 92:
             if i > start:
                 // Flat decision (no inner chain ending in else-if): the seed
                 // compiler predates the #629 dangling-else fix and miscompiles
@@ -141,7 +141,7 @@ fn tracked_normalize_path(path: &str) -> str:
     for pi in 0..parts.len() as i32:
         if pi > 0:
             result = result ++ "/"
-        result = result ++ parts.get(pi as i64)
+        result = result ++ parts[pi]
     result
 
 fn tracked_authorized_root(source_path: &str, package_root: &str) -> str:

@@ -41,7 +41,7 @@ pub fn bundle_module_dotted_name(canonical_path: &str) -> str:
     let rel = canonical_path.slice(prefix.len(), canonical_path.len() - 2)
     var out = ""
     for i in 0..rel.len():
-        out = out ++ (if rel.byte_at(i) == '/': "." else: rel.slice(i, i + 1))
+        out = out ++ (if rel[i] == '/': "." else: rel.slice(i, i + 1))
     out
 
 // The `module <path>` section paths of an interface file, in file order.
@@ -50,7 +50,7 @@ pub fn bundle_interface_section_paths(wi_text: &str) -> Vec[str]:
     var start: i64 = 0
     while start < wi_text.len():
         var end = start
-        while end < wi_text.len() and wi_text.byte_at(end) != '\n':
+        while end < wi_text.len() and wi_text[end] != '\n':
             end = end + 1
         let line = wi_text.slice(start, end)
         if line.starts_with("module "):
@@ -69,9 +69,9 @@ pub fn bundle_interface_text(path: &str) -> str:
 fn bundle_interface_trim(s: &str) -> str:
     var a: i64 = 0
     var b = s.len()
-    while a < b and (s.byte_at(a) == ' ' or s.byte_at(a) == '\t'):
+    while a < b and (s[a] == ' ' or s[a] == '\t'):
         a = a + 1
-    while b > a and (s.byte_at(b - 1) == ' ' or s.byte_at(b - 1) == '\t' or s.byte_at(b - 1) == '\r'):
+    while b > a and (s[b - 1] == ' ' or s[b - 1] == '\t' or s[b - 1] == '\r'):
         b = b - 1
     with_str_clone_ref(s.slice(a, b))
 
@@ -87,7 +87,7 @@ pub fn bundle_interfaces_register_wi(wi_text: &str) -> i32:
     var start: i64 = 0
     while start < wi_text.len():
         var end = start
-        while end < wi_text.len() and wi_text.byte_at(end) != '\n':
+        while end < wi_text.len() and wi_text[end] != '\n':
             end = end + 1
         let line = wi_text.slice(start, end)
         if line.starts_with("module "):

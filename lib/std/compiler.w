@@ -62,7 +62,7 @@ pub type SourceEmitter {
 fn compiler_hook_escape(value: &str) -> str:
     var out = ""
     for i in 0..value.len() as i32:
-        let ch = value.byte_at(i as i64)
+        let ch = value[i]
         if ch == 92:
             out = out ++ "\\\\"
         else if ch == 9:

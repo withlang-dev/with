@@ -81,8 +81,8 @@ fn conan_extract_tgz_strip1(archive: &str, dest: &str) -> i32:
 fn conan_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     for i in 0..min_len as i32:
-        let ca = a.byte_at(i as i64) as i32
-        let cb = b.byte_at(i as i64) as i32
+        let ca = a[i] as i32
+        let cb = b[i] as i32
         if ca < cb:
             return -1
         if ca > cb:
@@ -95,7 +95,7 @@ fn conan_str_compare(a: &str, b: &str) -> i32:
 
 fn conan_vec_contains(values: &Vec[str], value: &str) -> bool:
     for i in 0..values.len() as i32:
-        if values.get(i as i64) == value:
+        if values[i] == value:
             return true
     false
 
@@ -105,7 +105,7 @@ fn conan_sorted_insert_unique(values: Vec[str], value: &str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     var inserted = false
     for i in 0..values.len() as i32:
-        let existing = values.get(i as i64)
+        let existing = values[i]
         if not inserted and conan_str_compare(value, existing) < 0:
             out.push(with_str_clone_ref(value))
             inserted = true
@@ -118,12 +118,12 @@ fn conan_trim(text: &str) -> str:
     var start = 0
     var end = text.len() as i32
     while start < end:
-        let ch = text.byte_at(start as i64)
+        let ch = text[start]
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             break
         start = start + 1
     while end > start:
-        let ch = text.byte_at((end - 1) as i64)
+        let ch = text[(end - 1)]
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             break
         end = end - 1
@@ -131,13 +131,13 @@ fn conan_trim(text: &str) -> str:
 
 fn conan_strip_quotes(value: &str) -> str:
     let t = conan_trim(value)
-    if t.len() >= 2 and t.byte_at(0) == 34 and t.byte_at(t.len() - 1) == 34:
+    if t.len() >= 2 and t[0] == 34 and t[t.len() - 1] == 34:
         return t.slice(1, t.len() - 1)
     t
 
 fn conan_find_char(text: &str, ch: i32) -> i32:
     for i in 0..text.len() as i32:
-        if text.byte_at(i as i64) == ch:
+        if text[i] == ch:
             return i
     -1
 
@@ -150,7 +150,7 @@ fn conan_find_text(text: &str, needle: &str) -> i32:
     while i <= n - m:
         var ok = true
         for j in 0..m:
-            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+            if text[(i + j)] != needle[j]:
                 ok = false
                 break
         if ok:
@@ -161,14 +161,14 @@ fn conan_find_text(text: &str, needle: &str) -> i32:
 fn conan_path_basename(path: &str) -> str:
     var start = 0
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             start = i + 1
     path.slice(start as i64, path.len())
 
 fn conan_path_dirname(path: &str) -> str:
     var slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             slash = i
     if slash < 0:
         return "."
@@ -189,10 +189,10 @@ fn conan_split_nonempty_lines(text: &str) -> Vec[str]:
     var i = 0
     while i <= n:
         let at_end = i == n
-        let ch = if at_end: 10 else: text.byte_at(i as i64)
+        let ch = if at_end: 10 else: text[i]
         if ch == 10:
             var line = text.slice(start as i64, i as i64)
-            if line.len() > 0 and line.byte_at(line.len() - 1) == 13:
+            if line.len() > 0 and line[line.len() - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             line = conan_trim(line)
             if line.len() > 0:
@@ -208,14 +208,14 @@ fn json_extract_string(json: &str, key: &str) -> str:
     while pos < json_len - needle.len() as i32:
         var found = true
         for ni in 0..needle.len() as i32:
-            if json.byte_at((pos + ni) as i64) != needle.byte_at(ni as i64):
+            if json[(pos + ni)] != needle[ni]:
                 found = false
                 break
         if found:
             var vi = pos + needle.len() as i32
-            while vi < json_len and json.byte_at(vi as i64) != 58:
+            while vi < json_len and json[vi] != 58:
                 vi = vi + 1
-            while vi < json_len and json.byte_at(vi as i64) != 34:
+            while vi < json_len and json[vi] != 34:
                 vi = vi + 1
             if vi >= json_len:
                 return ""
@@ -223,7 +223,7 @@ fn json_extract_string(json: &str, key: &str) -> str:
             let start = vi
             var escaped = false
             while vi < json_len:
-                let ch = json.byte_at(vi as i64)
+                let ch = json[vi]
                 if escaped:
                     escaped = false
                 else if ch == 92:
@@ -243,23 +243,23 @@ fn json_extract_string_array(json: &str, key: &str) -> Vec[str]:
     while pos < json_len - needle.len() as i32:
         var found = true
         for ni in 0..needle.len() as i32:
-            if json.byte_at((pos + ni) as i64) != needle.byte_at(ni as i64):
+            if json[(pos + ni)] != needle[ni]:
                 found = false
                 break
         if found:
             var ai = pos + needle.len() as i32
-            while ai < json_len and json.byte_at(ai as i64) != 91:
+            while ai < json_len and json[ai] != 91:
                 ai = ai + 1
             if ai >= json_len:
                 return result
             ai = ai + 1
-            while ai < json_len and json.byte_at(ai as i64) != 93:
-                if json.byte_at(ai as i64) == 34:
+            while ai < json_len and json[ai] != 93:
+                if json[ai] == 34:
                     let start = ai + 1
                     var end = start
                     var escaped = false
                     while end < json_len:
-                        let ch = json.byte_at(end as i64)
+                        let ch = json[end]
                         if escaped:
                             escaped = false
                         else if ch == 92:
@@ -282,21 +282,21 @@ fn conan_version_compare(a: &str, b: &str) -> i32:
     let an = a.len() as i32
     let bn = b.len() as i32
     while ai < an or bi < bn:
-        while ai < an and (a.byte_at(ai as i64) < 48 or a.byte_at(ai as i64) > 57):
+        while ai < an and (a[ai] < 48 or a[ai] > 57):
             ai = ai + 1
-        while bi < bn and (b.byte_at(bi as i64) < 48 or b.byte_at(bi as i64) > 57):
+        while bi < bn and (b[bi] < 48 or b[bi] > 57):
             bi = bi + 1
         var av = 0
         var bv = 0
         var ahas = false
         var bhas = false
-        while ai < an and a.byte_at(ai as i64) >= 48 and a.byte_at(ai as i64) <= 57:
+        while ai < an and a[ai] >= 48 and a[ai] <= 57:
             ahas = true
-            av = av * 10 + (a.byte_at(ai as i64) - 48)
+            av = av * 10 + (a[ai] - 48)
             ai = ai + 1
-        while bi < bn and b.byte_at(bi as i64) >= 48 and b.byte_at(bi as i64) <= 57:
+        while bi < bn and b[bi] >= 48 and b[bi] <= 57:
             bhas = true
-            bv = bv * 10 + (b.byte_at(bi as i64) - 48)
+            bv = bv * 10 + (b[bi] - 48)
             bi = bi + 1
         if not ahas and not bhas:
             break
@@ -336,7 +336,7 @@ fn conan_resolve_version(name: &str, version_hint: &str) -> str:
     let results = json_extract_string_array(response, "results")
     var best = ""
     for i in 0..results.len() as i32:
-        let version = conan_result_version_for_name(results.get(i as i64), name)
+        let version = conan_result_version_for_name(results[i], name)
         if version.len() == 0:
             continue
         if not conan_version_matches_hint(version, version_hint):
@@ -379,16 +379,16 @@ fn conan_find_matching_package(name: &str, version: &str, rev: &str) -> ConanPac
     let json_len = response.len() as i32
     var pos = 1
     while pos < json_len:
-        if response.byte_at(pos as i64) != 34:
+        if response[pos] != 34:
             pos = pos + 1
             continue
         let id_start = pos + 1
         var id_end = id_start
-        while id_end < json_len and response.byte_at(id_end as i64) != 34:
+        while id_end < json_len and response[id_end] != 34:
             id_end = id_end + 1
         let pkg_id = response.slice(id_start as i64, id_end as i64)
         pos = id_end + 1
-        while pos < json_len and response.byte_at(pos as i64) != 123:
+        while pos < json_len and response[pos] != 123:
             pos = pos + 1
         if pos >= json_len:
             break
@@ -396,7 +396,7 @@ fn conan_find_matching_package(name: &str, version: &str, rev: &str) -> ConanPac
         var depth = 1
         pos = pos + 1
         while pos < json_len and depth > 0:
-            let ch = response.byte_at(pos as i64)
+            let ch = response[pos]
             if ch == 123:
                 depth = depth + 1
             else if ch == 125:
@@ -429,7 +429,7 @@ fn conan_parse_requires_from_info(info: &str) -> Vec[str]:
     let lines = conan_split_nonempty_lines(info)
     var in_requires = false
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line.starts_with("["):
             in_requires = line == "[requires]"
             continue
@@ -456,7 +456,7 @@ fn conan_ref_version(req: &str) -> str:
 fn conan_json_escape(value: &str) -> str:
     var out = ""
     for i in 0..value.len() as i32:
-        let ch = value.byte_at(i as i64)
+        let ch = value[i]
         if ch == 34 or ch == 92:
             out = out ++ "\\"
         out = out ++ value.slice(i as i64, (i + 1) as i64)
@@ -468,7 +468,7 @@ fn conan_json_array(values: &Vec[str]) -> str:
     for i in 0..values.len() as i32:
         if i > 0:
             out = out ++ ", "
-        out = out ++ q ++ conan_json_escape(values.get(i as i64)) ++ q
+        out = out ++ q ++ conan_json_escape(values[i]) ++ q
     out ++ "]"
 
 fn conan_write_metadata(dest_dir: &str, name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, include_paths: &Vec[str], lib_paths: &Vec[str], libs: &Vec[str], defines: &Vec[str], link_args: &Vec[str], requires: &Vec[str]) -> i32:
@@ -524,7 +524,7 @@ fn conan_scan_libraries(dep_dir: &str) -> ConanLibraryScan:
     let listing = runtime_list_files(dep_dir)
     let files = conan_split_nonempty_lines(listing)
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         if conan_is_link_library_path(path):
             let lib = conan_library_name_from_path(path)
             if lib.len() > 0:
@@ -546,7 +546,7 @@ fn conan_scan_libraries(dep_dir: &str) -> ConanLibraryScan:
 
 fn conan_recipe_line_indent(line: &str) -> i32:
     var i = 0
-    while i < line.len() as i32 and line.byte_at(i as i64) == 32:
+    while i < line.len() as i32 and line[i] == 32:
         i = i + 1
     i
 
@@ -555,10 +555,10 @@ fn conan_recipe_extract_quoted(text: &str) -> Vec[str]:
     var i = 0
     let n = text.len() as i32
     while i < n:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch == 34 or ch == 39:
             var j = i + 1
-            while j < n and text.byte_at(j as i64) != ch:
+            while j < n and text[j] != ch:
                 j = j + 1
             if j < n:
                 out.push(text.slice((i + 1) as i64, j as i64))
@@ -570,7 +570,7 @@ fn conan_recipe_extract_quoted(text: &str) -> Vec[str]:
 // Returns 1 (true), 0 (false), or -1 (unresolvable).
 fn conan_recipe_eval_condition(cond_raw: &str, target_os: &str) -> i32:
     var cond = conan_trim(cond_raw)
-    while cond.len() >= 2 and cond.byte_at(0) == 40 and cond.byte_at(cond.len() - 1) == 41:
+    while cond.len() >= 2 and cond[0] == 40 and cond[cond.len() - 1] == 41:
         cond = conan_trim(cond.slice(1, cond.len() - 1))
     if conan_find_text(cond, " and ") >= 0 or conan_find_text(cond, " or ") >= 0:
         return -1
@@ -608,7 +608,7 @@ fn conan_recipe_attr_values(line: &str, attr_pos: i32) -> Vec[str]:
     var opens = 0
     var closes = 0
     for i in 0..rhs.len() as i32:
-        let ch = rhs.byte_at(i as i64)
+        let ch = rhs[i]
         if ch == 91: opens = opens + 1
         if ch == 93: closes = closes + 1
     if opens != closes:
@@ -639,13 +639,13 @@ pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> Cona
     let total = recipe.len() as i32
     while pos < total:
         var line_end = pos
-        while line_end < total and recipe.byte_at(line_end as i64) != 10:
+        while line_end < total and recipe[line_end] != 10:
             line_end = line_end + 1
         let raw_line = recipe.slice(pos as i64, line_end as i64)
         pos = line_end + 1
 
         let stripped = conan_trim(raw_line)
-        if stripped.len() == 0 or stripped.byte_at(0) == 35:
+        if stripped.len() == 0 or stripped[0] == 35:
             continue
         let indent = conan_recipe_line_indent(raw_line)
 
@@ -716,7 +716,7 @@ pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> Cona
         // known-taken.
         var collectible = true
         for i in 0..frame_indent.len() as i32:
-            if frame_active.get(i as i64) == 0 or frame_unknown.get(i as i64) != 0:
+            if frame_active[i] == 0 or frame_unknown[i] != 0:
                 collectible = false
         if not collectible:
             continue
@@ -727,11 +727,11 @@ pub fn conan_extract_recipe_link_metadata(recipe: &str, target_os: &str) -> Cona
         if sys_pos >= 0:
             let values = conan_recipe_attr_values(stripped, sys_pos + 12)
             for i in 0..values.len() as i32:
-                sys_libs = conan_sorted_insert_unique(move sys_libs, values.get(i as i64))
+                sys_libs = conan_sorted_insert_unique(move sys_libs, values[i])
         else if fw_pos >= 0:
             let values = conan_recipe_attr_values(stripped, fw_pos + 11)
             for i in 0..values.len() as i32:
-                let fw = values.get(i as i64)
+                let fw = values[i]
                 if not conan_vec_contains(fw_seen, fw):
                     fw_seen.push(with_str_clone_ref(fw))
                     fw_args.push("-framework")
@@ -769,9 +769,9 @@ fn conan_link_metadata_with_recipe(name: &str, version: &str, libs: Vec[str], li
     var out_libs = libs
     var out_args = link_args
     for i in 0..extracted.libs.len() as i32:
-        out_libs = conan_sorted_insert_unique(move out_libs, extracted.libs.get(i as i64))
+        out_libs = conan_sorted_insert_unique(move out_libs, extracted.libs[i])
     for i in 0..extracted.lib_paths.len() as i32:
-        out_args.push(with_str_clone_ref(extracted.lib_paths.get(i as i64)))
+        out_args.push(with_str_clone_ref(extracted.lib_paths[i]))
     ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
 fn conan_known_link_metadata(name: &str, version: &str, libs: Vec[str], link_args: Vec[str]) -> ConanLibraryScan:
@@ -800,7 +800,7 @@ fn conan_known_link_metadata(name: &str, version: &str, libs: Vec[str], link_arg
             frameworks.push("IOKit")
             for i in 0..frameworks.len() as i32:
                 out_args.push("-framework")
-                out_args.push(with_str_clone_ref(frameworks.get(i as i64)))
+                out_args.push(with_str_clone_ref(frameworks[i]))
         else if os == "Linux":
             out_libs = conan_sorted_insert_unique(move out_libs, "m")
             out_libs = conan_sorted_insert_unique(move out_libs, "pthread")
@@ -828,7 +828,7 @@ fn conan_known_link_metadata(name: &str, version: &str, libs: Vec[str], link_arg
         xlibs.push("Xext")
         xlibs.push("Xfixes")
         for i in 0..xlibs.len() as i32:
-            out_libs = conan_sorted_insert_unique(move out_libs, xlibs.get(i as i64))
+            out_libs = conan_sorted_insert_unique(move out_libs, xlibs[i])
         return ConanLibraryScan { lib_paths: out_args, libs: out_libs }
     ConanLibraryScan { lib_paths: out_args, libs: out_libs }
 
@@ -858,7 +858,7 @@ pub fn conan_write_known_system_package(name: &str, version: &str, project_root:
 fn conan_resolve_and_install_requirements(requirements: &Vec[str], project_root: &str, depth: i32, force_reinstall: bool) -> Vec[str]:
     let resolved: Vec[str] = Vec.new()
     for i in 0..requirements.len() as i32:
-        let req = requirements.get(i as i64)
+        let req = requirements[i]
         let req_name = conan_ref_name(req)
         let req_hint = conan_ref_version(req)
         if req_name.len() == 0 or req_hint.len() == 0:
@@ -981,7 +981,7 @@ fn conan_recipe_folder(name: &str, version: &str) -> str:
     let version_line_a = "\"" ++ version ++ "\":"
     let version_line_b = version ++ ":"
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line == version_line_a or line == version_line_b:
             in_version = true
         else if in_version and line.starts_with("folder:"):
@@ -996,7 +996,7 @@ fn conan_source_url_from_data(data: &str, version: &str) -> str:
     let version_line_a = "\"" ++ version ++ "\":"
     let version_line_b = version ++ ":"
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line == version_line_a or line == version_line_b:
             in_version = true
         else if in_version and line.starts_with("url:"):
@@ -1021,7 +1021,7 @@ fn conan_collect_c_sources_and_headers(source_dir: &str) -> ConanLibraryScan:
     var c_files: Vec[str] = Vec.new()
     var header_dirs: Vec[str] = Vec.new()
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         if path.ends_with(".c"):
             c_files = conan_sorted_insert_unique(move c_files, path)
         else if path.ends_with(".h"):
@@ -1039,7 +1039,7 @@ fn conan_compile_c_source(source: &str, obj: &str, include_dirs: &Vec[str]) -> i
     argv = conan_argv_append(argv, conan_c_compiler())
     argv = conan_argv_append(argv, "-O2")
     for i in 0..include_dirs.len() as i32:
-        argv = conan_argv_append(argv, "-I" ++ include_dirs.get(i as i64))
+        argv = conan_argv_append(argv, "-I" ++ include_dirs[i])
     argv = conan_argv_append(argv, "-c")
     argv = conan_argv_append(argv, source)
     argv = conan_argv_append(argv, "-o")
@@ -1097,13 +1097,13 @@ fn conan_install_source_fallback(name: &str, version: &str, project_root: &str) 
     let include_dirs_abs: Vec[str] = Vec.new()
     include_dirs_abs.push(source_dir)
     for i in 0..header_dirs_abs.len() as i32:
-        let abs = header_dirs_abs.get(i as i64)
+        let abs = header_dirs_abs[i]
         include_dirs_abs.push(with_str_clone_ref(abs))
         include_paths = conan_sorted_insert_unique(move include_paths, conan_relative_path(dep_dir, abs))
     let objects: Vec[str] = Vec.new()
     for i in 0..c_files.len() as i32:
         let obj = obj_dir ++ "/" ++ f"{i}.o"
-        if conan_compile_c_source(c_files.get(i as i64), obj, include_dirs_abs) != 0:
+        if conan_compile_c_source(c_files[i], obj, include_dirs_abs) != 0:
             runtime_eprint("error: source build failed for " ++ name ++ "/" ++ version ++ "; source build not supported for this package")
             let _remove = runtime_remove_tree(dep_dir)
             return ""

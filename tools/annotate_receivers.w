@@ -33,13 +33,13 @@ type ReceiverModeFacts {
 fn line_for_offset(text: str, offset: i32) -> i32:
     var line = 1
     for i in 0..offset:
-        if text.byte_at(i as i64) as i32 == 10:
+        if text[i] as i32 == 10:
             line = line + 1
     line
 
 fn column_for_offset(text: str, offset: i32) -> i32:
     var start = offset - 1
-    while start >= 0 and text.byte_at(start as i64) as i32 != 10:
+    while start >= 0 and text[start] as i32 != 10:
         start = start - 1
     offset - start
 
@@ -47,16 +47,16 @@ fn exact_mode(facts: &ReceiverModeFacts, line: i32, column: i32) -> str:
     var nearest = -1
     var nearest_column = -1
     for i in 0..facts.lines.len() as i32:
-        if facts.lines.get(i as i64) == line and facts.columns.get(i as i64) == column:
-            return facts.modes.get(i as i64)
+        if facts.lines[i] == line and facts.columns[i] == column:
+            return facts.modes[i]
         // AST declaration spans start at modifiers (`pub`, `unsafe`, `async`),
         // while the token rewrite anchors at `fn`. Use the nearest preceding
         // fact on the same line when no exact column exists.
-        let fact_column = facts.columns.get(i as i64)
-        if facts.lines.get(i as i64) == line and fact_column < column and fact_column > nearest_column:
+        let fact_column = facts.columns[i]
+        if facts.lines[i] == line and fact_column < column and fact_column > nearest_column:
             nearest = i
             nearest_column = fact_column
-    if nearest >= 0: facts.modes.get(nearest as i64) else: ""
+    if nearest >= 0: facts.modes[nearest] else: ""
 
 fn compiler_receiver_modes(path: str) -> ReceiverModeFacts:
     let result = compiler_analyze_file(path, "select:kind=declaration")
@@ -67,7 +67,7 @@ fn compiler_receiver_modes(path: str) -> ReceiverModeFacts:
         unproven: 0,
     }
     for i in 0..result.report.facts.len() as i32:
-        let fact = result.report.facts.get(i as i64)
+        let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Declaration or fact.path != path:
             continue
         let declared = fact.flags & 255
@@ -201,8 +201,8 @@ fn annotate_file(path: str, exact_facts: &ReceiverModeFacts) -> i32:
     var result = ""
     var prev = 0
     for e in 0..m:
-        result = result ++ slice(text, prev, starts.get(e as i64)) ++ repls.get(e as i64)
-        prev = ends.get(e as i64)
+        result = result ++ slice(text, prev, starts[e]) ++ repls[e]
+        prev = ends[e]
     result = result ++ slice(text, prev, tlen)
     let _ = unsafe { with_fs_write_file(path, result) }
     print(f"{path}: annotated {count}")
@@ -256,7 +256,7 @@ fn file_has_mode_less_receiver(path: str) -> bool:
 
 fn path_excluded(path: str, excludes: &Vec[str]) -> bool:
     for i in 0..excludes.len() as i32:
-        if path == excludes.get(i as i64):
+        if path == excludes[i]:
             return true
     false
 
@@ -280,7 +280,7 @@ fn annotate_integrated_path(path: str, excludes: &Vec[str]) -> i32:
     var failures = 0
     var start = 0
     for i in 0..listing.len() as i32 + 1:
-        if i != listing.len() as i32 and listing.byte_at(i as i64) as i32 != 10:
+        if i != listing.len() as i32 and listing[i] as i32 != 10:
             continue
         if i > start:
             let file = slice(listing, start, i)
@@ -305,14 +305,14 @@ fn main:
     let paths: Vec[str] = Vec.new()
     var arg = 1
     while arg < argv.len() as i32:
-        if argv.get(arg as i64) == "--exclude":
+        if argv[arg] == "--exclude":
             if arg + 1 >= argv.len() as i32:
                 print("error: --exclude requires a file path")
                 exit_code(1)
             arg = arg + 1
-            excludes.push(argv.get(arg as i64))
+            excludes.push(argv[arg])
         else:
-            paths.push(argv.get(arg as i64))
+            paths.push(argv[arg])
         arg = arg + 1
     if paths.len() == 0:
         print("error: no annotation paths supplied")
@@ -320,7 +320,7 @@ fn main:
     var total = 0
     var failures = 0
     for i in 0..paths.len() as i32:
-        let changed = annotate_integrated_path(paths.get(i as i64), &excludes)
+        let changed = annotate_integrated_path(paths[i], &excludes)
         if changed < 0: failures = failures + 1
         else: total = total + changed
     print(f"total: {total} receivers annotated from compiler facts")

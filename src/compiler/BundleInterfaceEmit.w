@@ -128,11 +128,11 @@ fn bx_str_less(a: &str, b: &str) -> bool: with_str_cmp_ref(a, b) < 0
 fn bx_sorted_strings(items: &Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for i in 0..items.len() as i32:
-        let item = items.get(i as i64)
+        let item = items[i]
         var out: Vec[str] = Vec.new()
         var inserted = false
         for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
+            let existing = sorted[j]
             if not inserted and bx_str_less(item, existing):
                 out.push(with_str_clone_ref(item))
                 inserted = true
@@ -239,7 +239,7 @@ impl BundleEmitter:
             for ei in 0..elem_count:
                 if ei > 0:
                     out = out ++ ", "
-                out = out ++ self.spell(sema, sema.type_extra.get((te_start + ei) as i64))
+                out = out ++ self.spell(sema, sema.type_extra[(te_start + ei)])
             if elem_count == 1:
                 out = out ++ ","
             return out ++ ")"
@@ -251,7 +251,7 @@ impl BundleEmitter:
             for pi in 0..param_count:
                 if pi > 0:
                     out = out ++ ", "
-                out = out ++ self.spell(sema, sema.type_extra.get((te_start + pi) as i64))
+                out = out ++ self.spell(sema, sema.type_extra[(te_start + pi)])
             return out ++ ") -> " ++ self.spell(sema, sema.get_type_d2(resolved))
         if tk == TypeKind.TY_PTR:
             let pointee = self.spell(sema, sema.get_type_d0(resolved))
@@ -269,7 +269,7 @@ impl BundleEmitter:
             for ai in 0..arg_count:
                 if ai > 0:
                     out = out ++ ", "
-                out = out ++ self.spell(sema, sema.type_extra.get((extra_start + ai) as i64))
+                out = out ++ self.spell(sema, sema.type_extra[(extra_start + ai)])
             return out ++ "]"
         if tk == TypeKind.TY_RANGE:
             self.refuse("a Range type is not a bundle interface surface")
@@ -299,7 +299,7 @@ impl BundleEmitter:
         var out = StringBuilder.new()
         out.push_str("\"")
         for i in 0..text.len():
-            let b = text.byte_at(i)
+            let b = text[i]
             let escaped = bx_string_escape_byte(b)
             if escaped.len() > 0:
                 out.push_str(escaped)
@@ -399,7 +399,7 @@ impl BundleEmitter:
         let flags = ast.get_data2(node)
         if (flags / 2) % 2 == 0:
             return
-        let mod_path = with_str_clone_ref(self.decl_modules.get(di as i64))
+        let mod_path = with_str_clone_ref(self.decl_modules[di])
         let name = with_str_clone_ref(sema.pool_resolve(ast.get_data0(node)))
         let is_const = ast.is_const_decl_node(node) != 0
         self.context = mod_path ++ ": " ++ (if is_const: "const " else: "global ") ++ name
@@ -445,7 +445,7 @@ impl BundleEmitter:
     mut fn fn_text(sema: &Sema, di: i32, node: i32, in_impl: bool, all_visibilities: bool) -> str:
         self.last_fn_row = ""
         let ast = sema.ast
-        let mod_path = with_str_clone_ref(self.decl_modules.get(di as i64))
+        let mod_path = with_str_clone_ref(self.decl_modules[di])
         let parsed = ast.get_data0(node)
         let fn_sym = sema.fn_decl_semantic_symbol_at(node, parsed, di)
         let full = with_str_clone_ref(sema.pool_resolve(fn_sym))
@@ -589,7 +589,7 @@ impl BundleEmitter:
 
     mut fn emit_extern(sema: &Sema, di: i32, node: i32):
         let ast = sema.ast
-        let mod_path = with_str_clone_ref(self.decl_modules.get(di as i64))
+        let mod_path = with_str_clone_ref(self.decl_modules[di])
         let name_sym = ast.get_data0(node)
         let name = with_str_clone_ref(sema.pool_resolve(name_sym))
         self.context = mod_path ++ ": extern fn " ++ name
@@ -651,11 +651,11 @@ impl BundleEmitter:
     mut fn emit_impls_of(sema: &Sema, type_sym: i32, type_name: &str):
         let ast = sema.ast
         for ii in 0..self.impl_type_syms.len() as i32:
-            if self.impl_type_syms.get(ii as i64) != type_sym:
+            if self.impl_type_syms[ii] != type_sym:
                 continue
-            let idi = self.impl_decl_indices.get(ii as i64)
+            let idi = self.impl_decl_indices[ii]
             let impl_node = ast.get_decl(idi) as i32
-            let mod_path = with_str_clone_ref(self.decl_modules.get(idi as i64))
+            let mod_path = with_str_clone_ref(self.decl_modules[idi])
             let trait_sym = ast.get_data2(impl_node)
             let trait_name = if trait_sym != 0: with_str_clone_ref(sema.pool_resolve(trait_sym)) else: ""
             self.context = mod_path ++ ": impl " ++ (if trait_sym != 0: trait_name ++ " for " else: "") ++ type_name
@@ -670,7 +670,7 @@ impl BundleEmitter:
                 self.refuse("binds associated types; no interface spelling (Level 0)")
                 continue
             let tp_meta = ast.find_impl_type_params(impl_node)
-            if tp_meta >= 0 and ast.state.impl_type_params.get((tp_meta + 2) as i64) > 0:
+            if tp_meta >= 0 and ast.state.impl_type_params[(tp_meta + 2)] > 0:
                 self.refuse("is generic; a bundle boundary is Level 0 (docs/abi_roadmap.md)")
                 continue
             if ast.find_impl_target_type_node(impl_node) != 0:
@@ -694,9 +694,9 @@ impl BundleEmitter:
             var method_count = 0
             for oi in 0..ordered.len() as i32:
                 for mi in 0..method_names.len() as i32:
-                    if method_names.get(mi as i64) != ordered.get(oi as i64):
+                    if method_names[mi] != ordered[oi]:
                         continue
-                    let mdi = method_decls.get(mi as i64)
+                    let mdi = method_decls[mi]
                     let text = self.fn_text(sema, mdi, ast.get_decl(mdi) as i32, true, trait_sym != 0)
                     if text.len() == 0:
                         continue
@@ -705,7 +705,7 @@ impl BundleEmitter:
                     var start: i64 = 0
                     while start < text.len():
                         var end = start
-                        while end < text.len() and text.byte_at(end) != '\n':
+                        while end < text.len() and text[end] != '\n':
                             end = end + 1
                         body = body ++ "    " ++ text.slice(start, end) ++ "\n"
                         start = end + 1
@@ -725,7 +725,7 @@ impl BundleEmitter:
 
     mut fn emit_type(sema: &Sema, di: i32, node: i32):
         let ast = sema.ast
-        let mod_path = with_str_clone_ref(self.decl_modules.get(di as i64))
+        let mod_path = with_str_clone_ref(self.decl_modules[di])
         let name_sym = ast.get_data0(node)
         let name = with_str_clone_ref(sema.pool_resolve(name_sym))
         let packed = ast.get_data2(node)
@@ -786,11 +786,11 @@ impl BundleEmitter:
             let field_count = sema.get_type_d2(resolved)
             var fields = ""
             for fi in 0..field_count:
-                let f_name = with_str_clone_ref(sema.pool_resolve(sema.type_extra.get((te_start + fi * 3) as i64)))
-                let f_tid = sema.type_extra.get((te_start + fi * 3 + 1) as i64)
-                let f_default = sema.type_extra.get((te_start + fi * 3 + 2) as i64)
+                let f_name = with_str_clone_ref(sema.pool_resolve(sema.type_extra[(te_start + fi * 3)]))
+                let f_tid = sema.type_extra[(te_start + fi * 3 + 1)]
+                let f_default = sema.type_extra[(te_start + fi * 3 + 2)]
                 let align_slot = te_start + field_count * 3 + fi
-                let f_align: i32 = if align_slot < sema.type_extra.len() as i32: sema.type_extra.get(align_slot as i64) else: 0
+                let f_align: i32 = if align_slot < sema.type_extra.len() as i32: sema.type_extra[align_slot] else: 0
                 let f_spelling = self.spell(sema, f_tid)
                 if self.failed:
                     return
@@ -817,7 +817,7 @@ impl BundleEmitter:
         else if sub_kind == TypeDeclKind.Distinct:
             kind_row = "distinct"
             let te_start = sema.get_type_d1(resolved)
-            let inner = self.spell(sema, sema.type_extra.get((te_start + 1) as i64))
+            let inner = self.spell(sema, sema.type_extra[(te_start + 1)])
             if self.failed:
                 return
             decl = pub_text ++ "type " ++ name ++ " = distinct " ++ inner
@@ -856,7 +856,7 @@ impl BundleEmitter:
                 var payloads = ""
                 var payloads_row = ""
                 for ppi in 0..payload_count:
-                    let p_spelling = self.spell(sema, sema.type_extra.get((pos + 2 + ppi) as i64))
+                    let p_spelling = self.spell(sema, sema.type_extra[(pos + 2 + ppi)])
                     if self.failed:
                         return
                     if ppi > 0:
@@ -904,7 +904,7 @@ impl BundleEmitter:
             self.refuse_global(f"bundle interface: decl_source_paths has {sema.decl_source_paths.len() as i32} entries for {dc} declarations (Analysis.w invariant)")
             return
         for di in 0..dc:
-            let path = sema.decl_source_paths.get(di as i64)
+            let path = sema.decl_source_paths[di]
             let canonical = codegen_canonical_module_path(path)
             if bundle_corpus_contains(self.corpus, canonical):
                 self.decl_modules.push(with_str_clone_ref(canonical))
@@ -923,7 +923,7 @@ impl BundleEmitter:
         // still needs a section, or a consumer's `use` of it resolves to
         // nothing once the source is not embedded.
         for mi in 0..sema.module_paths.len() as i32:
-            let path = sema.module_paths.get(mi as i64)
+            let path = sema.module_paths[mi]
             let canonical = codegen_canonical_module_path(path)
             if bundle_corpus_contains(self.corpus, canonical):
                 self.add_module(canonical, path)
@@ -931,7 +931,7 @@ impl BundleEmitter:
             self.refuse_global("bundle interface: no module under corpus '" ++ self.corpus ++ "' in this compilation (--bundle-corpus names a path under the embedded std tree, e.g. std/re)")
             return
         for di in 0..dc:
-            let mod_path = with_str_clone_ref(self.decl_modules.get(di as i64))
+            let mod_path = with_str_clone_ref(self.decl_modules[di])
             if mod_path.len() == 0:
                 continue
             let decl = ast.get_decl(di) as i32
@@ -980,7 +980,7 @@ impl BundleEmitter:
         // declaration named (field, payload, parameter and return types)
         var ti = 0
         while ti < self.named_type_syms.len() as i32:
-            let sym = self.named_type_syms.get(ti as i64)
+            let sym = self.named_type_syms[ti]
             ti = ti + 1
             if not self.type_decl_index.contains(sym):
                 continue
@@ -995,8 +995,8 @@ pub fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &Vec
     var sources: Vec[str] = Vec.new()
     for oi in 0..ordered.len() as i32:
         for mi in 0..em.modules.len() as i32:
-            if em.modules.get(mi as i64) == ordered.get(oi as i64):
-                sources.push(with_str_clone_ref(em.module_sources.get(mi as i64)))
+            if em.modules[mi] == ordered[oi]:
+                sources.push(with_str_clone_ref(em.module_sources[mi]))
     BundleInterfaceModel {
         ok: em.errors.len() == 0,
         corpus: with_str_clone_ref(corpus),
@@ -1014,14 +1014,14 @@ fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> Vec[i
     for kind in 0..7:
         var names: Vec[str] = Vec.new()
         for ei in 0..model.exports.len() as i32:
-            let e = model.exports.get(ei as i64)
+            let e = model.exports[ei]
             if e.kind == kind and e.mod_path == mod_path:
                 names.push(with_str_clone_ref(e.name))
         let sorted = bx_sorted_strings(&names)
         for si in 0..sorted.len() as i32:
             for ei in 0..model.exports.len() as i32:
-                let e = model.exports.get(ei as i64)
-                if e.kind == kind and e.mod_path == mod_path and e.name == sorted.get(si as i64) and not order.contains(ei):
+                let e = model.exports[ei]
+                if e.kind == kind and e.mod_path == mod_path and e.name == sorted[si] and not order.contains(ei):
                     order.push(ei)
                     break
     order
@@ -1032,25 +1032,25 @@ pub fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> Bun
     var out = StringBuilder.new()
     var errors: Vec[str] = Vec.new()
     for mi in 0..model.modules.len() as i32:
-        let mod_path = model.modules.get(mi as i64)
-        let source_path = model.module_sources.get(mi as i64)
+        let mod_path = model.modules[mi]
+        let source_path = model.module_sources[mi]
         out.push_str("module " ++ mod_path ++ "\n")
         var line_count = 0
         if not sema.module_index_by_path.contains(with_str_clone_ref(source_path)):
             errors.push("bundle interface: " ++ mod_path ++ ": not in Sema's module graph (" ++ source_path ++ ")")
             continue
         let module_index: i32 = sema.module_index_by_path.get(with_str_clone_ref(source_path)).unwrap()
-        let edge_start = sema.module_import_starts.get(module_index as i64)
-        let edge_count = sema.module_import_counts.get(module_index as i64)
+        let edge_start = sema.module_import_starts[module_index]
+        let edge_count = sema.module_import_counts[module_index]
         for ei in 0..edge_count:
-            let import_path = sema.module_import_paths.get((edge_start + ei) as i64)
+            let import_path = sema.module_import_paths[(edge_start + ei)]
             if import_path == "std.prelude" or import_path == "std.prelude_core" or import_path == "std.prelude_alloc":
                 continue
             out.push_str("use " ++ import_path ++ "\n")
             line_count = line_count + 1
         let order = bx_module_export_order(model, mod_path)
         for oi in 0..order.len() as i32:
-            out.push_str(model.exports.get(order.get(oi as i64) as i64).wi)
+            out.push_str(model.exports[order[oi]].wi)
             line_count = line_count + 1
         if line_count == 0:
             // a section must be non-empty to count as bundle-provided

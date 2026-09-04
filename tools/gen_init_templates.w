@@ -10,7 +10,7 @@ use std.process
 fn esc(chunk: str) -> str:
     var out = ""
     for i in 0..chunk.len() as i32:
-        let b = chunk.byte_at(i as i64)
+        let b = chunk[i]
         if b == 92:
             out = out ++ "\\\\"
         else if b == 34:

@@ -338,7 +338,7 @@ fn comp_host_sdk_path(ctx: &ActionCtx) -> str:
 
 fn comp_arg_value(args: &Vec[str], prefix: &str) -> str:
     for i in 0..args.len() as i32:
-        let arg = args.get(i as i64)
+        let arg = args[i]
         if arg.starts_with(prefix):
             return arg.slice(prefix.len(), arg.len())
     ""
@@ -498,7 +498,7 @@ fn comp_compile_args(ctx: &ActionCtx, command: &str, compiler_path: &str, source
     argv |> push(compiler_owned_text(command))
     argv |> push(comp_abs(root, source_path))
     for ai in 0..args.len() as i32:
-        let arg = args.get(ai as i64)
+        let arg = args[ai]
         if comp_arg_allowed_for_compiler(arg):
             argv |> push(compiler_owned_text(arg))
     argv
@@ -598,7 +598,7 @@ fn comp_stack_summarize(path: &str, format: &str, sizes: Vec[i32]) -> StackBudge
     var ge_128k = 0
     var ge_256k = 0
     for i in 0..sizes.len() as i32:
-        let size = sizes.get(i as i64)
+        let size = sizes[i]
         if size > max_frame:
             max_frame = size
         if size >= 16 * 1024:
@@ -688,9 +688,9 @@ fn comp_compiler_c_export_audit_files(fs: &ToolFs) -> Vec[str]:
     roots.push("lib/std")
     let files: Vec[str] = Vec.new()
     for ri in 0..roots.len() as i32:
-        let listing = fs.list_files(roots.get(ri as i64))
+        let listing = fs.list_files(roots[ri])
         for fi in 0..listing.len() as i32:
-            let path = listing.get(fi as i64)
+            let path = listing[fi]
             if path.ends_with(".w"):
                 files.push(compiler_owned_text(path))
     comp_sort_strings(files)
@@ -723,7 +723,7 @@ fn comp_split_lines(text: &str) -> Vec[str]:
 
 fn comp_requirements_section_30_start(lines: &Vec[str]) -> i32:
     for i in 0..lines.len() as i32:
-        if lines.get(i as i64).starts_with("## 30."):
+        if lines[i].starts_with("## 30."):
             return i
     -1
 
@@ -736,7 +736,7 @@ fn comp_check_requirements_informative_text(ctx: &ActionCtx, text: &str) -> i32:
         return comp_fail(ctx, "requirements missing Section 30")
     var has_trace = false
     for i in section_start..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line.contains("Informative trace:"):
             has_trace = true
         if line.contains("  - Requirement:"):
@@ -747,7 +747,7 @@ fn comp_check_requirements_informative_text(ctx: &ActionCtx, text: &str) -> i32:
 
 fn comp_vec_contains(items: &Vec[str], item: &str) -> bool:
     for i in 0..items.len() as i32:
-        if items.get(i as i64) == item:
+        if items[i] == item:
             return true
     false
 
@@ -859,7 +859,7 @@ fn comp_spec_public_attributes(spec: &str) -> Vec[str]:
     let lines = comp_split_lines(comp_spec_subsection(spec, "### 29.14 Attribute Index"))
     var attrs: Vec[str] = Vec.new()
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line.starts_with("| `@["):
             var end = -1
             for ci in 1..line.len() as i32:
@@ -874,11 +874,11 @@ fn comp_spec_internal_attributes(spec: &str) -> Vec[str]:
     let lines = comp_split_lines(comp_spec_subsection(spec, "### 29.14 Attribute Index"))
     var attrs: Vec[str] = Vec.new()
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line.starts_with("**Implementation-internal"):
             var j = i
-            while j < lines.len() as i32 and comp_trim(lines.get(j as i64)).len() > 0:
-                attrs = comp_collect_attr_names(move attrs, lines.get(j as i64))
+            while j < lines.len() as i32 and comp_trim(lines[j]).len() > 0:
+                attrs = comp_collect_attr_names(move attrs, lines[j])
                 j = j + 1
     attrs
 
@@ -900,7 +900,7 @@ fn comp_impl_attributes(fs: &ToolFs) -> Vec[str]:
     var attrs = comp_collect_quoted_after(text, "is_ident_named(\"")
     let more = comp_collect_quoted_after(text, "attr_text == \"")
     for i in 0..more.len() as i32:
-        let item = more.get(i as i64)
+        let item = more[i]
         if item.len() > 0 and not comp_vec_contains(attrs, item):
             attrs.push(compiler_owned_text(item))
     attrs
@@ -926,7 +926,7 @@ fn comp_spec_cli_commands(spec: &str) -> Vec[str]:
     let block = comp_first_fenced_block(comp_spec_subsection(spec, "### 18.5 Toolchain"))
     let lines = comp_split_lines(block)
     for i in 0..lines.len() as i32:
-        let stripped = comp_trim(lines.get(i as i64))
+        let stripped = comp_trim(lines[i])
         if not stripped.starts_with("with "):
             continue
         let body = comp_trim(comp_strip_comment(stripped.slice(5, stripped.len())))
@@ -970,7 +970,7 @@ fn comp_impl_commands(fs: &ToolFs) -> Vec[str]:
     let raw = comp_collect_quoted_after(fs.read_text("src/main.w"), "cli_command(argc) == \"")
     var commands: Vec[str] = Vec.new()
     for i in 0..raw.len() as i32:
-        let cmd = raw.get(i as i64)
+        let cmd = raw[i]
         // `__`-prefixed subcommands are the compiler invoking itself
         // (D24 `__workspace-compile` process isolation) — internal ABI
         // like `with_*` symbols, not user CLI surface the spec lists.
@@ -1063,7 +1063,7 @@ fn comp_impl_modules(fs: &ToolFs) -> Vec[str]:
     let files = fs.list_files("lib/std")
     var modules: Vec[str] = Vec.new()
     for i in 0..files.len() as i32:
-        let item = comp_std_module_from_path(files.get(i as i64))
+        let item = comp_std_module_from_path(files[i])
         if item.len() > 0 and not comp_vec_contains(modules, item):
             modules.push(item)
     if fs.exists("lib/std/internal/str_abi.w"):
@@ -1103,7 +1103,7 @@ fn comp_inventory_add_errors(errors: Vec[str], label: &str, spec_items: Vec[str]
     var out = errors
     let sorted_spec = comp_sort_strings(spec_items)
     for i in 0..sorted_spec.len() as i32:
-        let item = sorted_spec.get(i as i64)
+        let item = sorted_spec[i]
         if comp_vec_contains(impl_items, item):
             continue
         let known =
@@ -1119,7 +1119,7 @@ fn comp_inventory_add_errors(errors: Vec[str], label: &str, spec_items: Vec[str]
             out.push(label ++ ": missing " ++ item)
     let sorted_impl = comp_sort_strings(impl_items)
     for j in 0..sorted_impl.len() as i32:
-        let item = sorted_impl.get(j as i64)
+        let item = sorted_impl[j]
         if comp_vec_contains(sorted_spec, item):
             continue
         let internal =
@@ -1149,10 +1149,10 @@ fn comp_inventory_known_lines() -> Vec[str]:
 fn comp_inventory_error_text(errors: Vec[str]) -> str:
     var out = ""
     for i in 0..errors.len() as i32:
-        out = out ++ "spec inventory: " ++ errors.get(i as i64) ++ "\n"
+        out = out ++ "spec inventory: " ++ errors[i] ++ "\n"
     let known = comp_inventory_known_lines()
     for j in 0..known.len() as i32:
-        let line = known.get(j as i64)
+        let line = known[j]
         let tab = comp_index_of(line, "\t")
         if tab >= 0:
             out = out ++ "spec inventory: known spec-ahead " ++ line.slice(0, tab as i64) ++ " tracked by " ++ line.slice((tab + 1) as i64, line.len()) ++ "\n"
@@ -1162,7 +1162,7 @@ pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let files = comp_compiler_c_export_audit_files(fs)
     for i in 0..files.len() as i32:
-        let rc = comp_check_c_export_path(ctx, files.get(i as i64))
+        let rc = comp_check_c_export_path(ctx, files[i])
         if rc != 0:
             return rc
     comp_write_ok_output(ctx)
@@ -1193,7 +1193,7 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     var allowed_attrs = comp_spec_public_attributes(spec)
     let internal_attrs = comp_spec_internal_attributes(spec)
     for ai in 0..internal_attrs.len() as i32:
-        let item = internal_attrs.get(ai as i64)
+        let item = internal_attrs[ai]
         if item.len() > 0 and not comp_vec_contains(allowed_attrs, item):
             allowed_attrs.push(compiler_owned_text(item))
     errors = comp_inventory_add_errors(move errors, "attributes", allowed_attrs, comp_impl_attributes(fs), "attribute", "")
@@ -1585,7 +1585,7 @@ pub fn run_patch_version_action(ctx: ActionCtx) -> i32:
     var unstamped = ""
     let inputs = ctx.inputs()
     for ii in 0..inputs.len() as i32:
-        let p = inputs.get(ii as i64)
+        let p = inputs[ii]
         if p.ends_with(".unstamped"):
             unstamped = compiler_owned_text(p)
     if unstamped.len() == 0:
@@ -1612,7 +1612,7 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, "could not create output directory: " ++ output_dir)
     let inputs = ctx.inputs()
     for ii in 0..inputs.len() as i32:
-        let input_path = inputs.get(ii as i64)
+        let input_path = inputs[ii]
         if not fs.exists(input_path):
             return comp_fail(ctx, "missing input: " ++ input_path)
     let llvm_prefix = comp_llvm_prefix_for_root(root)
@@ -1638,7 +1638,7 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     var clang_archives: Vec[str] = Vec.new()
     var llvm_archives: Vec[str] = Vec.new()
     for i in 0..lib_files.len() as i32:
-        let path = lib_files.get(i as i64)
+        let path = lib_files[i]
         let name = comp_path_basename(path)
         if name.ends_with(".a") or name.ends_with(".lib"):
             if (name.starts_with("libclang") or (os() == "Windows" and name.starts_with("clang"))) and path != libclang:
@@ -1652,12 +1652,12 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     ld_rsp = ld_rsp ++ comp_rsp_path(libclang) ++ "\n"
     let sorted_clang_archives = comp_sort_strings(clang_archives)
     for i in 0..sorted_clang_archives.len() as i32:
-        let path = sorted_clang_archives.get(i as i64)
+        let path = sorted_clang_archives[i]
         rsp = rsp ++ comp_rsp_path(path) ++ "\n"
         ld_rsp = ld_rsp ++ comp_rsp_path(path) ++ "\n"
     let sorted_llvm_archives = comp_sort_strings(llvm_archives)
     for i in 0..sorted_llvm_archives.len() as i32:
-        let path = sorted_llvm_archives.get(i as i64)
+        let path = sorted_llvm_archives[i]
         rsp = rsp ++ comp_rsp_path(path) ++ "\n"
         ld_rsp = ld_rsp ++ comp_rsp_path(path) ++ "\n"
     if os() == "Macos":
@@ -1855,7 +1855,7 @@ pub fn run_with_compiler_ir_action(ctx: ActionCtx) -> i32:
 pub fn run_check_committed_state_action(ctx: ActionCtx) -> i32:
     let args = ctx.args()
     for i in 0..args.len() as i32:
-        if args.get(i as i64) == "--force":
+        if args[i] == "--force":
             return 0
     let fs = ctx.fs()
     let manifest = fs.read_text("out/.build-state/blessed-manifest")
@@ -1887,17 +1887,17 @@ fn comp_build_source_manifest(fs: &ToolFs) -> str:
     dirs.push("build")
     let all_files: Vec[str] = Vec.new()
     for di in 0..dirs.len() as i32:
-        let dir = dirs.get(di as i64)
+        let dir = dirs[di]
         let listing = fs.list_files(dir)
         for fi in 0..listing.len() as i32:
-            let path = listing.get(fi as i64)
+            let path = listing[fi]
             if path.ends_with(".w"):
                 all_files.push(compiler_owned_text(path))
     all_files.push("build.w")
     let sorted = comp_sort_strings(all_files)
     var manifest = ""
     for i in 0..sorted.len() as i32:
-        let path = sorted.get(i as i64)
+        let path = sorted[i]
         let contents = fs.read_text(path)
         let hash = comp_fnv1a(contents)
         manifest = manifest ++ path ++ ":" ++ f"{hash}" ++ "\n"
@@ -1951,11 +1951,11 @@ fn comp_str_compare(a: &str, b: &str) -> i32:
 pub fn comp_sort_strings(items: Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for i in 0..items.len() as i32:
-        let item = items.get(i as i64)
+        let item = items[i]
         var inserted = false
         var out: Vec[str] = Vec.new()
         for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
+            let existing = sorted[j]
             if not inserted and comp_str_compare(item, existing) < 0:
                 out.push(compiler_owned_text(item))
                 inserted = true

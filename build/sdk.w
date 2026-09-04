@@ -204,11 +204,11 @@ fn sdk_str_compare(a: &str, b: &str) -> i32:
 fn sdk_sort_strings(items: Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for i in 0..items.len() as i32:
-        let item = items.get(i as i64)
+        let item = items[i]
         var inserted = false
         var out: Vec[str] = Vec.new()
         for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
+            let existing = sorted[j]
             if not inserted and sdk_str_compare(item, existing) < 0:
                 out.push(sdk_owned_text(item))
                 inserted = true
@@ -221,7 +221,7 @@ fn sdk_sort_strings(items: Vec[str]) -> Vec[str]:
 fn sdk_add_unique(items: Vec[str], item: &str) -> Vec[str]:
     var out = items
     for i in 0..out.len() as i32:
-        if out.get(i as i64) == item:
+        if out[i] == item:
             return out
     out.push(sdk_owned_text(item))
     out
@@ -251,7 +251,7 @@ fn sdk_check_file(ctx: &ActionCtx, path: &str, label: &str) -> i32:
 fn sdk_cache_line(cache: &str, key: &str) -> str:
     let lines = sdk_split_lines(cache)
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line.starts_with(key):
             return sdk_owned_text(line)
     ""
@@ -316,7 +316,7 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         tools.push("llvm-readobj")
         tools.push("llvm-strip")
         for i in 0..tools.len() as i32:
-            rc = sdk_check_file(ctx, sdk_required_tool(prefix, tools.get(i as i64)), tools.get(i as i64))
+            rc = sdk_check_file(ctx, sdk_required_tool(prefix, tools[i]), tools[i])
             if rc != 0: return rc
     else:
         rc = sdk_check_file(ctx, sdk_join(prefix, "lib/libclang.a"), "static libclang archive")
@@ -331,7 +331,7 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
         tools.push("llvm-readobj")
         tools.push("llvm-strip")
         for i in 0..tools.len() as i32:
-            rc = sdk_check_file(ctx, sdk_required_tool(prefix, tools.get(i as i64)), tools.get(i as i64))
+            rc = sdk_check_file(ctx, sdk_required_tool(prefix, tools[i]), tools[i])
             if rc != 0: return rc
     let fs = ctx.fs()
     if not fs.is_dir(sdk_join(prefix, "lib/clang")):
@@ -343,7 +343,7 @@ fn sdk_validate_package_prefix(ctx: &ActionCtx, platform: &str, prefix: &str, bu
 fn sdk_package_has_builtin_stddef(fs: &ToolFs, prefix: &str) -> bool:
     let files = fs.list_files(sdk_join(prefix, "lib/clang"))
     for i in 0..files.len() as i32:
-        let path = sdk_normalize(files.get(i as i64))
+        let path = sdk_normalize(files[i])
         if path.ends_with("/include/stddef.h"):
             return true
     false
@@ -358,7 +358,7 @@ fn sdk_select_package_files(fs: &ToolFs, prefix: &str, platform: &str) -> Vec[st
     let selected: Vec[str] = Vec.new()
     let all = sdk_sort_strings(fs.list_files(prefix))
     for i in 0..all.len() as i32:
-        let path = all.get(i as i64)
+        let path = all[i]
         let rel = sdk_rel_path(prefix, path)
         if rel.len() == 0:
             continue
@@ -408,7 +408,7 @@ fn sdk_package_tool_selected(rel: &str, platform: &str) -> bool:
         tools.push("bin/llvm-readobj")
         tools.push("bin/llvm-strip")
     for i in 0..tools.len() as i32:
-        if rel == tools.get(i as i64):
+        if rel == tools[i]:
             return true
     false
 
@@ -422,7 +422,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
     let files = sdk_select_package_files(fs, prefix, platform)
     var dirs: Vec[str] = Vec.new()
     for i in 0..files.len() as i32:
-        let rel = sdk_rel_path(prefix, files.get(i as i64))
+        let rel = sdk_rel_path(prefix, files[i])
         dirs = sdk_add_parent_dirs(move dirs, sdk_base, rel)
     if platform != "windows-x86_64":
         let aliases: Vec[str] = Vec.new()
@@ -431,15 +431,15 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         aliases.push("lld-link")
         aliases.push("wasm-ld")
         for i in 0..aliases.len() as i32:
-            let alias = aliases.get(i as i64)
+            let alias = aliases[i]
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
                 dirs = sdk_add_parent_dirs(move dirs, sdk_base, "bin/" ++ alias)
     dirs = sdk_sort_strings(dirs)
     let entries: Vec[ArchiveEntry] = Vec.new()
     for i in 0..dirs.len() as i32:
-        entries.push(archive_dir_entry(sdk_owned_text(dirs.get(i as i64)), 0o755))
+        entries.push(archive_dir_entry(sdk_owned_text(dirs[i]), 0o755))
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         let rel = sdk_rel_path(prefix, path)
         entries.push(archive_file_entry(sdk_owned_text(path), sdk_base ++ "/" ++ rel, sdk_file_mode(rel)))
     if platform != "windows-x86_64":
@@ -449,7 +449,7 @@ fn sdk_package_entries(ctx: &ActionCtx, prefix: &str, sdk_base: &str, platform: 
         aliases.push("lld-link")
         aliases.push("wasm-ld")
         for i in 0..aliases.len() as i32:
-            let alias = aliases.get(i as i64)
+            let alias = aliases[i]
             if fs.exists(sdk_join(prefix, "bin/" ++ alias)):
                 entries.push(archive_symlink_entry("lld", sdk_base ++ "/bin/" ++ alias, 0o777))
     entries
@@ -466,7 +466,7 @@ fn sdk_write_text(ctx: &ActionCtx, path: &str, text: &str) -> i32:
 fn sdk_archive_manifest(entries: &Vec[ArchiveEntry]) -> str:
     var out = ""
     for i in 0..entries.len() as i32:
-        let entry = entries.get(i as i64)
+        let entry = entries[i]
         out = out ++ entry.archive_path ++ "\n"
     out
 

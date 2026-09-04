@@ -56,7 +56,7 @@ impl Sema:
             if self.named_types.contains(base_sym):
                 let base_tid = self.named_types.get(base_sym).unwrap()
                 let te_start = self.get_type_d1(base_tid)
-                field_tid = self.type_extra.get((te_start + field_index * 3 + 1) as i64)
+                field_tid = self.type_extra[(te_start + field_index * 3 + 1)]
         else:
             let tp_start = self.type_decl_tp_start(decl)
             let tp_count = self.type_decl_tp_count(decl)
@@ -81,11 +81,11 @@ impl Sema:
         let field_count = self.get_type_d2(resolved)
         if field_index < 0 or field_index >= field_count:
             return 1
-        let field_tid: i32 = self.type_extra.get((te_start + field_index * 3 + 1) as i64)
+        let field_tid: i32 = self.type_extra[(te_start + field_index * 3 + 1)]
         let natural = self.type_layout_align_of(field_tid)
         let align_slot = te_start + field_count * 3 + field_index
         if align_slot >= 0 and align_slot < self.type_extra.len() as i32:
-            let explicit = self.type_extra.get(align_slot as i64)
+            let explicit = self.type_extra[align_slot]
             if explicit > 0:
                 return explicit as i64
         natural
@@ -113,7 +113,7 @@ impl Sema:
             let field_align = self.type_layout_struct_field_align(resolved as i32, fi)
             offset = type_layout_align_up(offset, field_align)
             let te_start = self.get_type_d1(resolved)
-            let field_tid: i32 = self.type_extra.get((te_start + fi * 3 + 1) as i64)
+            let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
             offset = offset + self.type_layout_size_of(field_tid)
         type_layout_align_up(offset, self.type_layout_struct_field_align(resolved as i32, field_index))
 
@@ -140,7 +140,7 @@ impl Sema:
         let name_sym = self.get_type_d0(resolved)
         if self.distinct_type_names.contains(name_sym):
             let te_start = self.get_type_d1(resolved)
-            return self.type_layout_align_of(self.type_extra.get((te_start + 1) as i64))
+            return self.type_layout_align_of(self.type_extra[(te_start + 1)])
         let field_count = self.get_type_d2(resolved)
         if field_count <= 0:
             return 1
@@ -188,7 +188,7 @@ impl Sema:
         let name_sym = self.get_type_d0(resolved)
         if self.distinct_type_names.contains(name_sym):
             let te_start = self.get_type_d1(resolved)
-            return self.type_layout_size_of(self.type_extra.get((te_start + 1) as i64))
+            return self.type_layout_size_of(self.type_extra[(te_start + 1)])
         let sub_kind = self.type_layout_struct_sub_kind(name_sym)
         let field_count = self.get_type_d2(resolved)
         if sub_kind == TypeDeclKind.Union:
@@ -196,7 +196,7 @@ impl Sema:
             var max_align: i64 = 1
             for fi in 0..field_count:
                 let te_start = self.get_type_d1(resolved)
-                let field_tid: i32 = self.type_extra.get((te_start + fi * 3 + 1) as i64)
+                let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
                 let field_size = self.type_layout_size_of(field_tid)
                 let field_align = self.type_layout_struct_field_align(resolved as i32, fi)
                 if field_size > max_size:
@@ -213,7 +213,7 @@ impl Sema:
         for fi in 0..field_count:
             let field_align = self.type_layout_struct_field_align(resolved as i32, fi)
             offset = type_layout_align_up(offset, field_align)
-            let field_tid: i32 = self.type_extra.get((te_start + fi * 3 + 1) as i64)
+            let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
             offset = offset + self.type_layout_size_of(field_tid)
         type_layout_align_up(offset, self.type_layout_struct_align_of(resolved as i32))
 
@@ -245,14 +245,14 @@ impl Sema:
             var max_payload_size: i64 = 0
             var pos = te_start
             for _ in 0..variant_count:
-                let name_sym: i32 = self.type_extra.get(pos as i64)
-                let payload_count: i32 = self.type_extra.get((pos + 1) as i64)
+                let name_sym: i32 = self.type_extra[pos]
+                let payload_count: i32 = self.type_extra[(pos + 1)]
                 let payload_types = self.resolve_generic_enum_payload(resolved as i32, base_sym, name_sym, payload_count)
                 if payload_count > 0:
                     var payload_size: i64 = 0
                     var payload_align: i64 = 1
                     for pi in 0..payload_count:
-                        let payload_tid: i32 = if pi < payload_types.len() as i32: payload_types.get(pi as i64) else: self.type_extra.get((pos + 2 + pi) as i64)
+                        let payload_tid: i32 = if pi < payload_types.len() as i32: payload_types[pi] else: self.type_extra[(pos + 2 + pi)]
                         let align = self.type_layout_align_of(payload_tid)
                         payload_align = if align > payload_align: align else: payload_align
                         payload_size = type_layout_align_up(payload_size, align)
@@ -272,12 +272,12 @@ impl Sema:
         var max_payload_size: i64 = 0
         var pos = te_start
         for _ in 0..variant_count:
-            let payload_count = self.type_extra.get((pos + 1) as i64)
+            let payload_count = self.type_extra[(pos + 1)]
             if payload_count > 0:
                 var payload_size: i64 = 0
                 var payload_align: i64 = 1
                 for pi in 0..payload_count:
-                    let payload_tid: i32 = self.type_extra.get((pos + 2 + pi) as i64)
+                    let payload_tid: i32 = self.type_extra[(pos + 2 + pi)]
                     let align = self.type_layout_align_of(payload_tid)
                     payload_align = if align > payload_align: align else: payload_align
                     payload_size = type_layout_align_up(payload_size, align)
@@ -315,7 +315,7 @@ impl Sema:
             let elem_count = self.get_type_d1(resolved)
             var max_align: i64 = 1
             for ei in 0..elem_count:
-                let align = self.type_layout_align_of(self.type_extra.get((te_start + ei) as i64))
+                let align = self.type_layout_align_of(self.type_extra[(te_start + ei)])
                 if align > max_align:
                     max_align = align
             return max_align
@@ -367,7 +367,7 @@ impl Sema:
             var offset: i64 = 0
             var max_align: i64 = 1
             for ei in 0..elem_count:
-                let elem_tid: i32 = self.type_extra.get((te_start + ei) as i64)
+                let elem_tid: i32 = self.type_extra[(te_start + ei)]
                 let align = self.type_layout_align_of(elem_tid)
                 if align > max_align:
                     max_align = align

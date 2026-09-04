@@ -343,7 +343,7 @@ fn build_cells() -> Vec[Cell]:
     shapes.push("rcbare")
     shapes.push("boxfield")
     for si in 0..shapes.len() as i32:
-        let sh = shapes.get(si as i64)
+        let sh = shapes[si]
         cells.push(cell("scope_exit/" ++ sh, sc_scope_exit(sh), 1))
         cells.push(cell("branch_taken/" ++ sh, sc_branch(sh, true), 1))
         cells.push(cell("branch_untaken/" ++ sh, sc_branch(sh, false), 0))
@@ -399,7 +399,7 @@ fn last_int_line(s: str) -> str:
     let lines = s.split("\n")
     var i = lines.len() as i32 - 1
     while i >= 0:
-        let l = lines.get(i as i64)
+        let l = lines[i]
         if l.len() > 0:
             return l ++ ""
         i = i - 1
@@ -444,7 +444,7 @@ fn main:
     var regressions = 0
     print("cell\tcandidate" ++ (if baseline.len() > 0: "\tbaseline\tclass" else: ""))
     for i in 0..cells.len() as i32:
-        let c = cells.get(i as i64)
+        let c = cells[i]
         let cv = run_cell(candidate, dir, i, c.source, c.expect_sum, c.expect_clean)
         var row = c.name ++ "\t" ++ cv
         if baseline.len() > 0:

@@ -81,7 +81,7 @@ unsafe fn tls_recv_record(fd: i32, content_type: *mut u8, buf: *mut u8, buf_cap:
             return -1
         var ci = 0
         while ci < chunk.len() as i32:
-            let v = chunk.byte_at(ci as i64) as u8
+            let v = chunk[ci] as u8
             hdr[total_read + ci] = v
             ci = ci + 1
         total_read = total_read + chunk.len() as i32
@@ -101,7 +101,7 @@ unsafe fn tls_recv_record(fd: i32, content_type: *mut u8, buf: *mut u8, buf_cap:
             return -1
         var ci = 0
         while ci < chunk.len() as i32:
-            let v = chunk.byte_at(ci as i64) as u8
+            let v = chunk[ci] as u8
             *(buf + (total_read + ci) as u64) = v
             ci = ci + 1
         total_read = total_read + chunk.len() as i32

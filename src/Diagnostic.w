@@ -136,13 +136,13 @@ impl Diagnostic:
         with_eprint(render_diag_marker_line(loc.col, span_underline_len(pstart, pend)))
 
         for i in 0..self.labels.len() as i32:
-            let lab = &self.labels[i as i64]
+            let lab = &self.labels[i]
             let label_message: str = with_str_clone_ref(lab.message)
             var label_path = ""
             if i < label_paths.len() as i32:
-                label_path = with_str_clone_ref(label_paths.get(i as i64))
+                label_path = with_str_clone_ref(label_paths[i])
             if label_path.len() > 0 and label_path != source_path:
-                let label_source = Source.from_string(label_path, label_texts.get(i as i64), lab.span.file)
+                let label_source = Source.from_string(label_path, label_texts[i], lab.span.file)
                 let lloc2 = label_source.offset_to_location(lab.span.start)
                 with_eprint(render_diag_label_line_in_file(label_path, lloc2.line, lloc2.col, label_message))
             else:
@@ -150,10 +150,10 @@ impl Diagnostic:
                 with_eprint(render_diag_label_line(lloc.line, lloc.col, label_message))
 
         for i in 0..self.notes.len() as i32:
-            let note: str = with_str_clone_ref(self.notes.get(i as i64))
+            let note: str = with_str_clone_ref(self.notes[i])
             with_eprint(render_diag_note_line(note))
         for i in 0..self.helps.len() as i32:
-            let help: str = with_str_clone_ref(self.helps.get(i as i64))
+            let help: str = with_str_clone_ref(self.helps[i])
             with_eprint(render_diag_help_line(help))
 
 pub type DiagnosticList {
@@ -177,7 +177,7 @@ impl DiagnosticList:
         // run declaration collection, and every decl-phase error rendered
         // twice. Same node + same words twice is never signal.
         for i in 0..self.items.len() as i32:
-            let existing = self.items.get(i as i64)
+            let existing = self.items[i]
             if existing.severity == diag.severity and
                existing.primary.file == diag.primary.file and
                existing.primary.start == diag.primary.start and
@@ -193,7 +193,7 @@ impl DiagnosticList:
     fn count_by_severity(severity: i32) -> i32:
         var n = 0
         for i in 0..self.items.len() as i32:
-            if self.items.get(i as i64).severity == severity:
+            if self.items[i].severity == severity:
                 n = n + 1
         n
 
@@ -202,16 +202,16 @@ impl DiagnosticList:
 
     fn render_all(source: &Source):
         for i in 0..self.items.len() as i32:
-            self.items.get(i as i64).render(source)
+            self.items[i].render(source)
             if i + 1 < self.items.len() as i32:
                 with_eprint("")
 
     fn render_warnings(source: &Source):
         var printed = 0
         for i in 0..self.items.len() as i32:
-            if self.items.get(i as i64).severity != DiagSeverity.Warning:
+            if self.items[i].severity != DiagSeverity.Warning:
                 continue
             if printed != 0:
                 with_eprint("")
-            self.items.get(i as i64).render(source)
+            self.items[i].render(source)
             printed = printed + 1

@@ -54,7 +54,7 @@ fn ci_reindent_spaces(text: &str, spaces: i32) -> str:
     let tlen = text.len() as i32
     while start < tlen:
         var end = start
-        while end < tlen and text.byte_at(end as i64) != 10:
+        while end < tlen and text[end] != 10:
             end = end + 1
         if end > start:
             parts.push(with_str_clone_ref(prefix))
@@ -71,7 +71,7 @@ fn ci_is_decimal_literal_str(s: &str) -> bool:
     if s.len() == 0: return false
     var i = 0
     while i as i64 < s.len():
-        let c = s.byte_at(i as i64)
+        let c = s[i]
         if c < 48 or c > 57: return false
         i = i + 1
     true
@@ -97,12 +97,12 @@ fn ci_contains_str(s: &str, needle: &str) -> bool:
 fn ci_strip_one_outer_paren(s: &str) -> str:
     if s.len() < 2:
         return with_str_clone_ref(s)
-    if s.byte_at(0) != 40 or s.byte_at(s.len() - 1) != 41:
+    if s[0] != 40 or s[s.len() - 1] != 41:
         return with_str_clone_ref(s)
     var depth = 0
     var i = 0
     while i as i64 < s.len():
-        let c = s.byte_at(i as i64)
+        let c = s[i]
         if c == 40:
             depth = depth + 1
         else if c == 41:
@@ -531,9 +531,9 @@ fn ci_print_sizeof_type_text(text: &str) -> str:
         return "usize"
     if ci_starts_with_str(text, "*"):
         return "usize"
-    if text.len() > 0 and text.byte_at(0) == 91:
+    if text.len() > 0 and text[0] == 91:
         var i = 1
-        while i < text.len() as i32 and text.byte_at(i as i64) != 93:
+        while i < text.len() as i32 and text[i] != 93:
             i = i + 1
         if i < text.len() as i32:
             return text.slice(0, (i + 1) as i64) ++ ci_print_sizeof_type_text(text.slice((i + 1) as i64, text.len()))
@@ -956,7 +956,7 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
             cursor = cursor + 1
             var hi: i32 = 0
             while hi < arm_heads.len() as i32:
-                let arm_head = arm_heads.get(hi as i64)
+                let arm_head = arm_heads[hi]
                 if brace:
                     out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " => {\n"
                     if (body_id as i32) == 0:

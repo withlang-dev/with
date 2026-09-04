@@ -113,9 +113,9 @@ fn optimize(mod: MirOptModule) -> OptSummary:
 fn devirtualize(mod: MirOptModule) -> i32:
     var changed = 0
     for fi in 0..mod.functions.len() as i32:
-        let func = mod.functions.get(fi as i64)
+        let func = mod.functions[fi]
         for ci in 0..func.calls.len() as i32:
-            let call = func.calls.get(ci as i64)
+            let call = func.calls[ci]
             if call.kind == CallKind.DynDispatch and call.receiver_type_known:
                 // Devirtualize: rewrite to direct call
                 // Note: would need mutable access in real implementation
@@ -125,9 +125,9 @@ fn devirtualize(mod: MirOptModule) -> i32:
 fn promote_non_escaping_boxes(mod: MirOptModule) -> i32:
     var changed = 0
     for fi in 0..mod.functions.len() as i32:
-        let func = mod.functions.get(fi as i64)
+        let func = mod.functions[fi]
         for ai in 0..func.allocations.len() as i32:
-            let alloc = func.allocations.get(ai as i64)
+            let alloc = func.allocations[ai]
             if alloc.kind == AllocKind.Box and not alloc.escapes:
                 changed = changed + 1
     changed
@@ -137,7 +137,7 @@ fn eliminate_dead_fields(mod: MirOptModule) -> i32:
     for ti in 0..mod.types.len() as i32:
         let ty = mod.types.get(ti as i64)
         for fi in 0..ty.fields.len() as i32:
-            let field = ty.fields.get(fi as i64)
+            let field = ty.fields[fi]
             if not field.removed and field.read_count == 0:
                 changed = changed + 1
     changed
@@ -145,9 +145,9 @@ fn eliminate_dead_fields(mod: MirOptModule) -> i32:
 fn elide_redundant_moves(mod: MirOptModule) -> i32:
     var changed = 0
     for fi in 0..mod.functions.len() as i32:
-        let func = mod.functions.get(fi as i64)
+        let func = mod.functions[fi]
         for mi in 0..func.moves.len() as i32:
-            let mv = func.moves.get(mi as i64)
+            let mv = func.moves[mi]
             if not mv.elided and mv.source_consumed_immediately:
                 changed = changed + 1
     changed

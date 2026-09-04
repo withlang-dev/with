@@ -53,13 +53,13 @@ pub fn bundle_manifest_prefixes(manifest: &str) -> Vec[str]:
     var start: i64 = 0
     while start < manifest.len():
         var end = start
-        while end < manifest.len() and manifest.byte_at(end) != '\n':
+        while end < manifest.len() and manifest[end] != '\n':
             end = end + 1
         let line = manifest.slice(start, end)
         if line.starts_with("prefix "):
             let rest = line.slice(7, line.len())
             var sp: i64 = 0
-            while sp < rest.len() and rest.byte_at(sp) != ' ':
+            while sp < rest.len() and rest[sp] != ' ':
                 sp = sp + 1
             if sp > 0:
                 out.push(with_str_clone_ref(rest.slice(0, sp)))
@@ -73,13 +73,13 @@ pub fn bundle_manifest_paths(manifest: &str) -> Vec[str]:
     var start: i64 = 0
     while start < manifest.len():
         var end = start
-        while end < manifest.len() and manifest.byte_at(end) != '\n':
+        while end < manifest.len() and manifest[end] != '\n':
             end = end + 1
         let line = manifest.slice(start, end)
         if line.starts_with("prefix "):
             let rest = line.slice(7, line.len())
             var sp: i64 = 0
-            while sp < rest.len() and rest.byte_at(sp) != ' ':
+            while sp < rest.len() and rest[sp] != ' ':
                 sp = sp + 1
             if sp + 1 < rest.len():
                 out.push(with_str_clone_ref(rest.slice(sp + 1, rest.len())))
@@ -92,7 +92,7 @@ pub fn embedded_bundle_prefixes() -> Vec[str]:
     for bi in 0..embedded_bundle_count():
         let prefixes = bundle_manifest_prefixes(embedded_bundle_manifest_text(bi))
         for pi in 0..prefixes.len() as i32:
-            out.push(with_str_clone_ref(prefixes.get(pi as i64)))
+            out.push(with_str_clone_ref(prefixes[pi]))
     out
 
 // Blob address pairs; the link stage turns them into byte slices.

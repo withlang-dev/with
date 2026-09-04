@@ -21,7 +21,7 @@ extern fn with_str_hash(s: &str) -> u64
 fn ecr_dirname(path: &str) -> str:
     var last = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last = i
     if last <= 0:
         return ""
@@ -51,7 +51,7 @@ pub fn ensure_clang_resource_dir() -> str:
     var i = 0
     while i <= listing.len() as i32:
         let at_end = i == listing.len() as i32
-        if at_end or listing.byte_at(i as i64) == 10:
+        if at_end or listing[i] == 10:
             if i > start:
                 let rel = listing.slice(start as i64, i as i64)
                 let dest = include_dir ++ "/" ++ rel
@@ -77,7 +77,7 @@ pub fn ensure_clang_resource_identity_file() -> str:
     var i = 0
     while i <= listing.len() as i32:
         let at_end = i == listing.len() as i32
-        if at_end or listing.byte_at(i as i64) == 10:
+        if at_end or listing[i] == 10:
             if i > start:
                 let rel = listing.slice(start as i64, i as i64)
                 content = content ++ rel ++ ":" ++ f"{with_str_hash(embedded_clang_resource_data(rel)) as i64}" ++ "\n"

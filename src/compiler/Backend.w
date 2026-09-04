@@ -117,7 +117,7 @@ impl Zcu:
         if main_sym != 0:
             var mi = 0
             while mi < assign.fn_syms.len() as i32:
-                if assign.fn_syms.get(mi as i64) == main_sym:
+                if assign.fn_syms[mi] == main_sym:
                     let main_slot = mi as i64
                     with assign.units.slot(main_slot) as mut unit_slot:
                         unit_slot.set(0)
@@ -146,7 +146,7 @@ impl Zcu:
             cg.unit_index = k
             var ai = 0
             while ai < assign.fn_syms.len() as i32:
-                cg.unit_assign_insert(assign.fn_syms.get(ai as i64), assign.units.get(ai as i64), ai)
+                cg.unit_assign_insert(assign.fn_syms[ai], assign.units[ai], ai)
                 ai = ai + 1
             let rc = cg.gen_module_from_mir(mir_ptr, pool)
             var tracked = move self.tracked_input_paths

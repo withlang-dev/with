@@ -148,7 +148,7 @@ fn seed_release_from_api(ctx: &ActionCtx, repo: &str, asset_name: &str) -> str:
     let lines = seed_split_nonempty_lines(body)
     var current_tag = ""
     for li in 0..lines.len() as i32:
-        let line = lines.get(li as i64)
+        let line = lines[li]
         let tag = seed_json_line_value(line, "tag_name")
         if tag.len() > 0:
             current_tag = tag

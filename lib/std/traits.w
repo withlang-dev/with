@@ -208,8 +208,8 @@ impl Ord for str:
         let right_len = other.len()
         let limit = if left_len < right_len: left_len else: right_len
         while i < limit:
-            let left = value.byte_at(i)
-            let right = other.byte_at(i)
+            let left = value[i]
+            let right = other[i]
             if left < right:
                 return -1
             if left > right:

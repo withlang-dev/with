@@ -142,7 +142,7 @@ fn bs_run_cli_capture(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &
     var argv: Vec[str] = Vec.new()
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
-        argv |> push(selfhost_owned_text(args.get(i as i64)))
+        argv |> push(selfhost_owned_text(args[i]))
     var result = ctx.process_runner().run_capture(argv, stdout_path, stderr_path, timeout_ms)
     if result.rc == 0:
         let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
@@ -152,7 +152,7 @@ fn bs_run_cli_capture(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &
 fn bs_clone_process_env(process_env: &ProcessEnv) -> ProcessEnv:
     var vars: Vec[ProcessEnvVar] = Vec.new()
     for i in 0..process_env.vars.len() as i32:
-        let item = process_env.vars.get(i as i64)
+        let item = process_env.vars[i]
         vars.push(ProcessEnvVar { name: selfhost_owned_text(item.name), value: selfhost_owned_text(item.value) })
     ProcessEnv { vars }
 
@@ -164,7 +164,7 @@ fn bs_run_cli_capture_with_env(ctx: &ActionCtx, compiler_path: &str, label: &str
     var argv: Vec[str] = Vec.new()
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
-        argv |> push(selfhost_owned_text(args.get(i as i64)))
+        argv |> push(selfhost_owned_text(args[i]))
     var result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_clone_process_env(process_env))
     if result.rc == 0:
         let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
@@ -179,7 +179,7 @@ fn bs_run_cli_capture_cwd_with_env(ctx: &ActionCtx, compiler_path: &str, label: 
     var argv: Vec[str] = Vec.new()
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
-        argv |> push(selfhost_owned_text(args.get(i as i64)))
+        argv |> push(selfhost_owned_text(args[i]))
     var result = ctx.process_runner().run_capture_cwd_with_env(argv, stdout_path, stderr_path, timeout_ms, bs_abs(root, cwd), bs_clone_process_env(process_env))
     if result.rc == 0:
         let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
@@ -198,7 +198,7 @@ fn bs_run_cli_capture_input(ctx: &ActionCtx, compiler_path: &str, label: &str, a
     var argv: Vec[str] = Vec.new()
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
-        argv |> push(selfhost_owned_text(args.get(i as i64)))
+        argv |> push(selfhost_owned_text(args[i]))
     var result = ctx.process_runner().run_capture_input(argv, stdout_path, stderr_path, timeout_ms, stdin_path)
     if result.rc == 0:
         let _remove_stdin = ctx.fs().remove_file(stdin_rel)
@@ -214,7 +214,7 @@ fn bs_run_cli_capture_cwd(ctx: &ActionCtx, compiler_path: &str, label: &str, arg
     var argv: Vec[str] = Vec.new()
     argv |> push(selfhost_owned_text(compiler_path))
     for i in 0..args.len() as i32:
-        argv |> push(selfhost_owned_text(args.get(i as i64)))
+        argv |> push(selfhost_owned_text(args[i]))
     var result = ctx.process_runner().run_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, bs_abs(root, cwd))
     if result.rc == 0:
         let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
@@ -433,7 +433,7 @@ fn bs_check_lsp_parser_recovery(ctx: &ActionCtx, compiler_path: &str) -> i32:
     let files = ctx.fs().list_files("test/compile_errors")
     var checked = 0
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         let name = bs_basename(path)
         if name.starts_with("err_recovery_") and name.ends_with(".w"):
             checked = checked + 1
@@ -781,7 +781,7 @@ fn bs_check_help(ctx: &ActionCtx, compiler_path: &str) -> i32:
     checks |> push("  lsp              Start the language server")
     checks |> push("  -e <code>        Compile and run code as top-level statements")
     for i in 0..checks.len() as i32:
-        let rc = bs_assert_contains(ctx, result.stdout, checks.get(i as i64), "top_level_help")
+        let rc = bs_assert_contains(ctx, result.stdout, checks[i], "top_level_help")
         if rc != 0:
             return rc
 
@@ -807,7 +807,7 @@ fn bs_check_help(ctx: &ActionCtx, compiler_path: &str) -> i32:
     build_checks |> push("  --target <triple>")
     build_checks |> push("  --emit-c         Emit C instead of a binary")
     for bi in 0..build_checks.len() as i32:
-        let brc = bs_assert_contains(ctx, build_help.stdout, build_checks.get(bi as i64), "build_help")
+        let brc = bs_assert_contains(ctx, build_help.stdout, build_checks[bi], "build_help")
         if brc != 0:
             return brc
     let forbid_build_run = bs_assert_not_contains(ctx, build_help.stdout, "[build] wrote", "build_help")
@@ -3745,7 +3745,7 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
 
     var failed = false
     for i in 0..jobs:
-        let pid = pids.get(i as i64)
+        let pid = pids[i]
         let job_rc = ctx.process_runner().wait(pid, 120000)
         if job_rc != 0:
             let stdout_rel = bs_join(output_dir, f"job-{i}.stdout")
@@ -4507,14 +4507,14 @@ fn bs_check_migrate_libc_ctype(ctx: &ActionCtx, compiler_path: &str, case_dir: &
     required |> push("isgraph(__param_c)")
     required |> push("tolower(__param_c)")
     for i in 0..required.len() as i32:
-        rc = bs_assert_contains(ctx, out_text, required.get(i as i64), "libc_ctype_calls")
+        rc = bs_assert_contains(ctx, out_text, required[i], "libc_ctype_calls")
         if rc != 0: return rc
     let forbidden: Vec[str] = Vec.new()
     forbidden |> push("is_alpha(__param_c)")
     forbidden |> push("is_alnum(__param_c)")
     forbidden |> push("to_lower(__param_c)")
     for i in 0..forbidden.len() as i32:
-        rc = bs_assert_not_contains(ctx, out_text, forbidden.get(i as i64), "libc_ctype_calls")
+        rc = bs_assert_not_contains(ctx, out_text, forbidden[i], "libc_ctype_calls")
         if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")
@@ -5024,14 +5024,14 @@ fn bs_check_migrate_noop_pointer_casts(ctx: &ActionCtx, compiler_path: &str, cas
     required |> push("fn ret_callback() -> unsafe extern \"C\" fn(*mut c_void) -> Unit:")
     required |> push("return callback")
     for i in 0..required.len() as i32:
-        rc = bs_assert_contains(ctx, out_text, required.get(i as i64), "noop_pointer_cast_exprs")
+        rc = bs_assert_contains(ctx, out_text, required[i], "noop_pointer_cast_exprs")
         if rc != 0: return rc
     let forbidden: Vec[str] = Vec.new()
     forbidden |> push("extern fn ret_ctx()")
     forbidden |> push("as *mut ctx)) as *mut ctx")
     forbidden |> push("&raw const callback")
     for i in 0..forbidden.len() as i32:
-        rc = bs_assert_not_contains(ctx, out_text, forbidden.get(i as i64), "noop_pointer_cast_exprs")
+        rc = bs_assert_not_contains(ctx, out_text, forbidden[i], "noop_pointer_cast_exprs")
         if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")
@@ -7278,7 +7278,7 @@ fn bs_check_pcre2_prepare_shared_externs(ctx: &ActionCtx, base_dir: &str) -> i32
     files |> push("pcre2_compile.w")
     files |> push("pcre2_compile_class.w")
     for i in 0..files.len() as i32:
-        let file = files.get(i as i64)
+        let file = files[i]
         rc = bs_copy_fixture_file(ctx, bs_join(raw_dir, file), bs_join(generated_dir, file), "shared externs copy")
         if rc != 0: return rc
 
@@ -7341,7 +7341,7 @@ fn bs_check_pcre2_prepare_shared_lets(ctx: &ActionCtx, base_dir: &str) -> i32:
     files |> push("pcre2_compile.w")
     files |> push("pcre2_match.w")
     for i in 0..files.len() as i32:
-        let file = files.get(i as i64)
+        let file = files[i]
         rc = bs_copy_fixture_file(ctx, bs_join(raw_dir, file), bs_join(generated_dir, file), "shared lets copy")
         if rc != 0: return rc
 
@@ -7576,7 +7576,7 @@ fn bs_nm_output(ctx: &ActionCtx, nm_tool: &str, obj_path: &str, label: &str) -> 
 fn bs_nm_has_symbol(nm_text: &str, exact: &str, suffix: &str, prefix: &str, type_required: &str, type_forbidden: &str) -> bool:
     let lines = bs_split_nonempty_lines(nm_text)
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         let name = bs_nm_symbol_name(line)
         if name.len() == 0:
             continue
@@ -7759,7 +7759,7 @@ fn bs_nm_module_prefix(nm_text: &str, base: &str) -> str:
     let want_suffix = "__" ++ base
     let lines = bs_split_nonempty_lines(nm_text)
     for i in 0..lines.len() as i32:
-        let name = bs_nm_symbol_name(lines.get(i as i64))
+        let name = bs_nm_symbol_name(lines[i])
         if not name.ends_with(want_suffix):
             continue
         let at = bs_index_of(name, "__with_mod_")
@@ -7804,8 +7804,8 @@ fn bs_dump_abi_param_line(dump: &str, name: &str) -> str:
     let head = "fn " ++ name ++ " ["
     let lines = bs_split_nonempty_lines(dump)
     for i in 0..lines.len() as i32:
-        if lines.get(i as i64).starts_with(head) and i + 1 < lines.len() as i32:
-            return selfhost_owned_text(lines.get((i + 1) as i64))
+        if lines[i].starts_with(head) and i + 1 < lines.len() as i32:
+            return selfhost_owned_text(lines[(i + 1)])
     ""
 
 // The physical verdict of a --dump-abi param line (`value_ref_abi=… -> MODE`),
@@ -7852,7 +7852,7 @@ fn bs_check_wi_fingerprint(ctx: &ActionCtx, compiler_path: &str, label: &str, wi
 fn bs_manifest_field(manifest: &str, key: &str) -> str:
     let lines = bs_split_nonempty_lines(manifest)
     for i in 0..lines.len() as i32:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line.starts_with(key ++ " "):
             let rest = line.slice(key.len() + 1, line.len())
             let sp = bs_index_of(rest, " ")
@@ -7881,8 +7881,8 @@ fn bs_first_differing_line(expected: &str, actual: &str) -> str:
     let b = actual.split("\n")
     let n = if a.len() < b.len(): a.len() else: b.len()
     for i in 0..n as i32:
-        if a.get(i as i64) != b.get(i as i64):
-            return f"line {i + 1}: expected '" ++ a.get(i as i64) ++ "' got '" ++ b.get(i as i64) ++ "'"
+        if a[i] != b[i]:
+            return f"line {i + 1}: expected '" ++ a[i] ++ "' got '" ++ b[i] ++ "'"
     f"line counts differ: expected {a.len() as i32}, got {b.len() as i32}"
 
 // A refusal fixture: the emitter must fail loudly, naming the declaration.
@@ -7982,11 +7982,11 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     mutation_to |> push("High = 201")
     mutation_to |> push("pub fn add(p: Pair) -> i32")
     for mi in 0..mutation_names.len() as i32:
-        let mname = mutation_names.get(mi as i64)
-        if not emitted_wi.contains(mutation_from.get(mi as i64)):
-            return bs_fail(ctx, "mutation " ++ mname ++ ": the emitted interface lacks '" ++ mutation_from.get(mi as i64) ++ "'")
+        let mname = mutation_names[mi]
+        if not emitted_wi.contains(mutation_from[mi]):
+            return bs_fail(ctx, "mutation " ++ mname ++ ": the emitted interface lacks '" ++ mutation_from[mi] ++ "'")
         let mutated_path = bs_join(case_dir, "mutated/" ++ mname ++ ".wi")
-        rc = bs_write_fixture(ctx, mutated_path, emitted_wi.replace(mutation_from.get(mi as i64), mutation_to.get(mi as i64)), "mutated interface " ++ mname)
+        rc = bs_write_fixture(ctx, mutated_path, emitted_wi.replace(mutation_from[mi], mutation_to[mi]), "mutated interface " ++ mname)
         if rc != 0: return rc
         let mutated_fp = mutated_path ++ ".fp"
         let checked = bs_check_wi_fingerprint(ctx, compiler_path, "bundle-interface-mutation-" ++ mname, mutated_path, corpus, mutated_fp)

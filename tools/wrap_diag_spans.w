@@ -46,7 +46,7 @@ fn parse_int(text: &str) -> i32:
     if text.len() == 0: return -1
     var n = 0
     for i in 0..text.len() as i32:
-        let b = text.byte_at(i as i64)
+        let b = text[i]
         if b < 48 or b > 57: return -1
         n = n * 10 + (b - 48)
     n
@@ -59,8 +59,8 @@ fn owned_fn_name(path: &str) -> str:
     var start: i64 = 0
     var end = path.len()
     for i in 0..path.len():
-        if path.byte_at(i) == 47: start = i + 1
-        if path.byte_at(i) == 46: end = i
+        if path[i] == 47: start = i + 1
+        if path[i] == 46: end = i
     path.slice(start, end).replace("-", "_") ++ "_owned_text"
 
 fn classify(line: &str) -> i32:
@@ -84,13 +84,13 @@ fn classify(line: &str) -> i32:
 fn count_carets(line: &str) -> i32:
     var n = 0
     for i in 0..line.len() as i32:
-        if line.byte_at(i as i64) == 94: n = n + 1
+        if line[i] == 94: n = n + 1
     n
 
 fn is_ident_or_field(span: &str) -> bool:
     if span.len() == 0: return false
     for i in 0..span.len() as i32:
-        let b = span.byte_at(i as i64)
+        let b = span[i]
         let ok = (b >= 48 and b <= 57) or (b >= 65 and b <= 90) or (b >= 97 and b <= 122) or b == 95 or b == 46
         if not ok: return false
     true
@@ -99,10 +99,10 @@ fn is_ident_or_field(span: &str) -> bool:
 fn find_assign_eq(span: &str) -> i64:
     var j: i64 = 0
     while j + 3 <= span.len():
-        if span.byte_at(j) == 32 and span.byte_at(j + 1) == 61 and span.byte_at(j + 2) == 32:
+        if span[j] == 32 and span[j + 1] == 61 and span[j + 2] == 32:
             var prev_ok = true
             if j > 0:
-                let p = span.byte_at(j - 1)
+                let p = span[j - 1]
                 if p == 61 or p == 33 or p == 60 or p == 62 or p == 43 or p == 45 or p == 42 or p == 47 or p == 37: prev_ok = false
             if prev_ok: return j
         j = j + 1
@@ -112,7 +112,7 @@ fn find_assign_eq(span: &str) -> i64:
 fn prev_nonspace(text: &str, offset: i64) -> i32:
     var j = offset - 1
     while j >= 0:
-        let b = text.byte_at(j)
+        let b = text[j]
         if b != 32 and b != 9 and b != 10 and b != 13: return b
         j = j - 1
     0
@@ -134,7 +134,7 @@ fn load_skips(skip_path: &str) -> Vec[str]:
     let skip_text = read_file(skip_path ++ "")
     let skip_lines = skip_text.split("\n")
     for i in 0..skip_lines.len() as i32:
-        let s = skip_lines.get(i as i64)
+        let s = skip_lines[i]
         if s.len() > 0: skips.push(s ++ "")
     skips
 
@@ -145,7 +145,7 @@ fn push_label_ok(dlines: &Vec[str], caret_idx: i32) -> bool:
     var label_seen = 0
     var label_ok = 0
     while (li as i64) < dlines.len():
-        let extra = dlines.get(li as i64)
+        let extra = dlines[li]
         if not extra.starts_with("  = "): break
         if extra.contains("has type "):
             label_seen = 1
@@ -160,7 +160,7 @@ fn wrong_arg_label_ok(dlines: &Vec[str], caret_idx: i32) -> bool:
     var borrowed_arg = 0
     var owned_param = 0
     while (li as i64) < dlines.len():
-        let extra = dlines.get(li as i64)
+        let extra = dlines[li]
         if not extra.starts_with("  = "): break
         if extra.contains("has type &str"): borrowed_arg = 1
         if extra.ends_with("expects str"): owned_param = 1
@@ -172,7 +172,7 @@ fn collect_sites(dlines: &Vec[str]) -> Vec[Site]:
     var seen_keys: Vec[str] = Vec.new()
     var i = 0
     while (i as i64) < dlines.len():
-        let line = dlines.get(i as i64)
+        let line = dlines[i]
         let kind = classify(line)
         if kind == 0:
             i = i + 1
@@ -204,7 +204,7 @@ fn collect_sites(dlines: &Vec[str]) -> Vec[Site]:
         let key = path ++ f":{line_no}:{col}:{kind}"
         var dup = false
         for si in 0..seen_keys.len() as i32:
-            if seen_keys.get(si as i64) == key: dup = true
+            if seen_keys[si] == key: dup = true
         if dup: continue
         seen_keys.push(key)
         sites.push(Site { path, line_no, col, span_len, kind })
@@ -213,16 +213,16 @@ fn collect_sites(dlines: &Vec[str]) -> Vec[Site]:
 fn unique_files(sites: &Vec[Site]) -> Vec[str]:
     var files: Vec[str] = Vec.new()
     for si in 0..sites.len() as i32:
-        let p = sites.get(si as i64).path
+        let p = sites[si].path
         var have = false
         for fi in 0..files.len() as i32:
-            if files.get(fi as i64) == p: have = true
+            if files[fi] == p: have = true
         if not have: files.push(p ++ "")
     files
 
 fn in_list(items: &Vec[str], key: &str) -> bool:
     for i in 0..items.len() as i32:
-        if items.get(i as i64) == key: return true
+        if items[i] == key: return true
     false
 
 fn line_offsets(flines: &Vec[str]) -> Vec[i64]:
@@ -230,7 +230,7 @@ fn line_offsets(flines: &Vec[str]) -> Vec[i64]:
     var acc: i64 = 0
     for li in 0..flines.len() as i32:
         offsets.push(acc)
-        acc = acc + flines.get(li as i64).len() + 1
+        acc = acc + flines[li].len() + 1
     offsets
 
 fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> EditPlan:
@@ -241,7 +241,7 @@ fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> Ed
     var texts: Vec[str] = Vec.new()
     let clone_fn = owned_fn_name(path)
     for si in 0..sites.len() as i32:
-        let site = sites.get(si as i64)
+        let site = sites[si]
         if site.path != path: continue
         let tag = path ++ f":{site.line_no}:{site.col}"
         if in_list(skips, tag):
@@ -258,7 +258,7 @@ fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> Ed
         let start = line_start + site.col as i64 - 1
         let end = start + site.span_len as i64
         let span = text.slice(start, end)
-        if span.len() == 0 or span.byte_at(0) == 32 or span.byte_at(span.len() - 1) == 32:
+        if span.len() == 0 or span[0] == 32 or span[span.len() - 1] == 32:
             print("skip-span-shape " ++ tag)
             continue
         var ed_start = start
@@ -287,7 +287,7 @@ fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> Ed
             var expr_off: i64 = 0
             if span.starts_with("return "):
                 expr_off = 7
-                while expr_off < span.len() and span.byte_at(expr_off) == 32: expr_off = expr_off + 1
+                while expr_off < span.len() and span[expr_off] == 32: expr_off = expr_off + 1
             let expr = span.slice(expr_off, span.len())
             if expr.starts_with("if ") or expr.starts_with("match ") or expr.len() == 0:
                 print("skip-branch-span " ++ tag)
@@ -309,7 +309,7 @@ fn plan_edits(path: &str, text: &str, sites: &Vec[Site], skips: &Vec[str]) -> Ed
             new_text = clone_fn ++ "(" ++ span ++ ")"
         var overlap = false
         for ei in 0..starts.len() as i32:
-            if ed_start < ends.get(ei as i64) and starts.get(ei as i64) < ed_end: overlap = true
+            if ed_start < ends[ei] and starts[ei] < ed_end: overlap = true
         if overlap:
             print("skip-overlap " ++ tag)
             continue
@@ -333,16 +333,16 @@ fn apply_edits(text_in: str, plan: &EditPlan) -> str:
     for a in 0..edit_count:
         var best = a
         for b in (a + 1)..edit_count:
-            if plan.starts.get(order.get(b as i64) as i64) > plan.starts.get(order.get(best as i64) as i64):
+            if plan.starts[order[b]] > plan.starts[order[best]]:
                 best = b
         if best != a:
             // annotated: an unannotated binding is a live VIEW of the
             // element, and the first set below would change what it reads
-            let tmp: i32 = order.get(a as i64)
-            order.slot(a as i64).set(order.get(best as i64))
+            let tmp: i32 = order[a]
+            order.slot(a as i64).set(order[best])
             order.slot(best as i64).set(tmp)
     for oi in 0..edit_count:
-        let ei = order.get(oi as i64) as i64
+        let ei = order[oi] as i64
         let s = plan.starts.get(ei)
         let e = plan.ends.get(ei)
         text = splice(text, s, e, plan.texts.get(ei))
@@ -354,20 +354,20 @@ fn ensure_decl(path: &str, text_in: str) -> str:
     let out_lines = text_in.split("\n")
     var insert_at: i64 = -1
     for li in 0..out_lines.len() as i32:
-        if out_lines.get(li as i64).starts_with("extern fn "):
+        if out_lines[li].starts_with("extern fn "):
             insert_at = li as i64
             break
     if insert_at < 0:
         var last_use: i64 = -1
         for li in 0..out_lines.len() as i32:
             if li >= 60: break
-            if out_lines.get(li as i64).starts_with("use "): last_use = li as i64
+            if out_lines[li].starts_with("use "): last_use = li as i64
         insert_at = last_use + 1
     var sb = StringBuilder.new()
     for li in 0..out_lines.len() as i32:
         if li as i64 == insert_at:
             sb.push_str("fn " ++ clone_fn ++ "(s: &str): s ++ \"\"\n")
-        sb.push_str(out_lines.get(li as i64))
+        sb.push_str(out_lines[li])
         if (li as i64) < out_lines.len() - 1: sb.push_str("\n")
     sb.to_str()
 
@@ -441,11 +441,11 @@ fn main -> i32:
     let files = unique_files(&sites)
     if finalize == 1:
         for fi in 0..files.len() as i32:
-            if finalize_existing(files.get(fi as i64)) != 0: return 1
+            if finalize_existing(files[fi]) != 0: return 1
         return 0
     var total = 0
     for fi in 0..files.len() as i32:
-        let n = process_file(files.get(fi as i64), &sites, &skips, apply)
+        let n = process_file(files[fi], &sites, &skips, apply)
         if n < 0: return 1
         total = total + n
     print(f"planned/applied {total} edits")

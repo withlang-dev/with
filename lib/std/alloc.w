@@ -118,7 +118,7 @@ pub fn Arena.alloc(mut self: Arena, size: i32) -> *i8:
     let block_count = self.blocks.len() as i32
     if block_count > 1:
         for i in 0..block_count - 1:
-            used = used + self.block_sizes.get(i as i64) as i64
+            used = used + self.block_sizes[i] as i64
     if used > self.high_water_bytes:
         self.high_water_bytes = used
     out
@@ -133,7 +133,7 @@ pub fn FrameArena.alloc(mut self: FrameArena, size: i32) -> *i8:
     let block_count = self.blocks.len() as i32
     if block_count > 1:
         for i in 0..block_count - 1:
-            used = used + self.block_sizes.get(i as i64) as i64
+            used = used + self.block_sizes[i] as i64
     if used > self.high_water_bytes:
         self.high_water_bytes = used
     out
@@ -163,8 +163,8 @@ pub fn Arena.reset_to(mut self: Arena, mark: i64) -> Unit:
     var new_blocks: Vec[i64] = Vec.new()
     var new_sizes: Vec[i32] = Vec.new()
     for i in 0..n:
-        let raw = self.blocks.get(i as i64)
-        let size = self.block_sizes.get(i as i64)
+        let raw = self.blocks[i]
+        let size = self.block_sizes[i]
         if i as i64 <= block_index:
             new_blocks.push(raw)
             new_sizes.push(size)
@@ -174,8 +174,8 @@ pub fn Arena.reset_to(mut self: Arena, mark: i64) -> Unit:
     self.block_sizes = new_sizes
     if self.blocks.len() > 0:
         let last = self.blocks.len() as i32 - 1
-        self.current = self.blocks.get(last as i64) as *i8
-        self.capacity = self.block_sizes.get(last as i64)
+        self.current = self.blocks[last] as *i8
+        self.capacity = self.block_sizes[last]
         self.offset = if mark_offset >= 0 and mark_offset <= self.capacity: mark_offset else: 0
     else:
         self.current = 0 as *i8
@@ -194,7 +194,7 @@ pub fn FrameArena.reset(mut self: FrameArena) -> Unit:
     let first: i64 = self.blocks.get(0)
     let first_size: i32 = self.block_sizes.get(0)
     for i in 1..self.blocks.len() as i32:
-        let raw = self.blocks.get(i as i64)
+        let raw = self.blocks[i]
         if raw != 0:
             free_mem(raw as *i8)
     let new_blocks: Vec[i64] = Vec.new()
@@ -312,7 +312,7 @@ pub fn Pool.alloc(mut self: Pool) -> *i8:
     if self.free_list.len() == 0:
         self.add_slab()
     let last = self.free_list.len() as i32 - 1
-    let raw: i64 = self.free_list.get(last as i64)
+    let raw: i64 = self.free_list[last]
     self.free_list.remove(last as i64)
     raw as *i8
 

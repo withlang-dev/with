@@ -323,7 +323,7 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
         for i in 0..value.extra_count:
             if i > 0:
                 out = out ++ ", "
-            out = out ++ comptime_value_format(extras.get((value.extra_start + i) as i64), extras, sema)
+            out = out ++ comptime_value_format(extras[(value.extra_start + i)], extras, sema)
         return out ++ close
     if value.kind == ComptimeValueKind.CV_STRUCT:
         let resolved = sema.resolve_alias(value.type_id)
@@ -334,8 +334,8 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
             for fi in 0..field_count:
                 if fi > 0:
                     out = out ++ ", "
-                let field_sym = sema.type_extra.get((te_start + fi * 3) as i64)
-                let field_value = extras.get((value.extra_start + fi) as i64)
+                let field_sym = sema.type_extra[(te_start + fi * 3)]
+                let field_value = extras[(value.extra_start + fi)]
                 out = out ++ sema.pool_resolve(field_sym) ++ ": " ++ comptime_value_format(field_value, extras, sema)
             return out ++ " }"
     if value.kind == ComptimeValueKind.CV_VEC:
@@ -343,7 +343,7 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
         for i in 0..value.extra_count:
             if i > 0:
                 out = out ++ ", "
-            out = out ++ comptime_value_format(extras.get((value.extra_start + i) as i64), extras, sema)
+            out = out ++ comptime_value_format(extras[(value.extra_start + i)], extras, sema)
         return out ++ "])"
     if value.kind == ComptimeValueKind.CV_MAP:
         var out = sema.type_name(value.type_id) ++ " { "
@@ -351,8 +351,8 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
             if i > 0:
                 out = out ++ ", "
             let base = value.extra_start + i * 2
-            let key = extras.get(base as i64)
-            let item = extras.get((base + 1) as i64)
+            let key = extras[base]
+            let item = extras[(base + 1)]
             out = out ++ comptime_value_format(key, extras, sema) ++ ": " ++ comptime_value_format(item, extras, sema)
         return out ++ " }"
     if value.kind == ComptimeValueKind.CV_CAPABILITY:
@@ -366,7 +366,7 @@ fn comptime_value_format(value: &ComptimeValue, extras: &Vec[ComptimeValue], sem
             for i in 0..value.extra_count:
                 if i > 0:
                     out = out ++ ", "
-                out = out ++ comptime_value_format(extras.get((value.extra_start + i) as i64), extras, sema)
+                out = out ++ comptime_value_format(extras[(value.extra_start + i)], extras, sema)
             out = out ++ ")"
         return out
     if value.kind == ComptimeValueKind.CV_BYTES:
@@ -400,8 +400,8 @@ fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[
         if lhs.extra_count != rhs.extra_count:
             return 0
         for i in 0..lhs.extra_count:
-            let left = extras.get((lhs.extra_start + i) as i64)
-            let right = extras.get((rhs.extra_start + i) as i64)
+            let left = extras[(lhs.extra_start + i)]
+            let right = extras[(rhs.extra_start + i)]
             if comptime_values_equal(left, right, extras) == 0:
                 return 0
         return 1
@@ -409,8 +409,8 @@ fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[
         if lhs.type_id != rhs.type_id or lhs.extra_count != rhs.extra_count:
             return 0
         for i in 0..lhs.extra_count:
-            let left = extras.get((lhs.extra_start + i) as i64)
-            let right = extras.get((rhs.extra_start + i) as i64)
+            let left = extras[(lhs.extra_start + i)]
+            let right = extras[(rhs.extra_start + i)]
             if comptime_values_equal(left, right, extras) == 0:
                 return 0
         return 1
@@ -418,8 +418,8 @@ fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[
         if lhs.type_id != rhs.type_id or lhs.extra_count != rhs.extra_count:
             return 0
         for i in 0..lhs.extra_count:
-            let left = extras.get((lhs.extra_start + i) as i64)
-            let right = extras.get((rhs.extra_start + i) as i64)
+            let left = extras[(lhs.extra_start + i)]
+            let right = extras[(rhs.extra_start + i)]
             if comptime_values_equal(left, right, extras) == 0:
                 return 0
         return 1
@@ -428,12 +428,12 @@ fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[
             return 0
         for i in 0..lhs.extra_count:
             let base = i * 2
-            let left_key = extras.get((lhs.extra_start + base) as i64)
-            let right_key = extras.get((rhs.extra_start + base) as i64)
+            let left_key = extras[(lhs.extra_start + base)]
+            let right_key = extras[(rhs.extra_start + base)]
             if comptime_values_equal(left_key, right_key, extras) == 0:
                 return 0
-            let left_value = extras.get((lhs.extra_start + base + 1) as i64)
-            let right_value = extras.get((rhs.extra_start + base + 1) as i64)
+            let left_value = extras[(lhs.extra_start + base + 1)]
+            let right_value = extras[(rhs.extra_start + base + 1)]
             if comptime_values_equal(left_value, right_value, extras) == 0:
                 return 0
         return 1
@@ -449,8 +449,8 @@ fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &Vec[
         if lhs.type_id != rhs.type_id or lhs.data0 != rhs.data0 or lhs.extra_count != rhs.extra_count:
             return 0
         for i in 0..lhs.extra_count:
-            let left = extras.get((lhs.extra_start + i) as i64)
-            let right = extras.get((rhs.extra_start + i) as i64)
+            let left = extras[(lhs.extra_start + i)]
+            let right = extras[(rhs.extra_start + i)]
             if comptime_values_equal(left, right, extras) == 0:
                 return 0
         return 1

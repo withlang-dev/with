@@ -15,25 +15,25 @@ fn ar_u32_be(v: i32) -> str:
 fn ar_read_u16_le(data: &str, offset: i64) -> i32:
     if offset + 2 > data.len():
         return 0
-    (data.byte_at(offset) as i32) | ((data.byte_at(offset + 1) as i32) << 8)
+    (data[offset] as i32) | ((data[offset + 1] as i32) << 8)
 
 fn ar_read_u32_le(data: &str, offset: i64) -> i32:
     if offset + 4 > data.len():
         return 0
-    (data.byte_at(offset) as i32) | ((data.byte_at(offset + 1) as i32) << 8) | ((data.byte_at(offset + 2) as i32) << 16) | ((data.byte_at(offset + 3) as i32) << 24)
+    (data[offset] as i32) | ((data[offset + 1] as i32) << 8) | ((data[offset + 2] as i32) << 16) | ((data[offset + 3] as i32) << 24)
 
 fn ar_read_u64_le(data: &str, offset: i64) -> i64:
     if offset + 8 > data.len():
         return 0
     var out: i64 = 0
     for i in 0..8:
-        out = out | ((data.byte_at(offset + i) as i64) << ((i * 8) as u32))
+        out = out | ((data[offset + i] as i64) << ((i * 8) as u32))
     out
 
 fn ar_basename(path: &str) -> str:
     var last_sep: i64 = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_sep = i as i64
     if last_sep >= 0:
         return path.slice(last_sep + 1, path.len())
@@ -108,8 +108,8 @@ type ArSymbol:
 fn ar_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     for i in 0..min_len as i32:
-        let ca = a.byte_at(i as i64) as i32
-        let cb = b.byte_at(i as i64) as i32
+        let ca = a[i] as i32
+        let cb = b[i] as i32
         if ca < cb:
             return -1
         if ca > cb:
@@ -126,7 +126,7 @@ fn ar_sort_symbols(items: Vec[ArSymbol]) -> Vec[ArSymbol]:
         let item = items.remove(0)
         var pos = result.len() as i32
         for j in 0..result.len() as i32:
-            if ar_str_compare(item.name, result.get(j as i64).name) < 0:
+            if ar_str_compare(item.name, result[j].name) < 0:
                 pos = j
                 break
         let tail: Vec[ArSymbol] = Vec.new()
@@ -167,14 +167,14 @@ fn extract_macho_symbols(data: &str) -> Vec[str]:
         if entry_off + 16 > data.len():
             break
         let n_strx = ar_read_u32_le(data, entry_off)
-        let n_type = data.byte_at(entry_off + 4) as i32
+        let n_type = data[entry_off + 4] as i32
         let is_ext = (n_type & 1) != 0
         let type_bits = (n_type >> 1) & 7
         if is_ext and type_bits != 0:
             let name_off = stroff as i64 + n_strx as i64
             if name_off < data.len():
                 var name_end = name_off
-                while name_end < data.len() and data.byte_at(name_end) != 0:
+                while name_end < data.len() and data[name_end] != 0:
                     name_end = name_end + 1
                 if name_end > name_off:
                     result.push(data.slice(name_off, name_end))
@@ -184,7 +184,7 @@ fn ar_elf_str_at(data: &str, start: i64) -> str:
     if start <= 0 or start >= data.len():
         return ""
     var end = start
-    while end < data.len() and data.byte_at(end) != 0:
+    while end < data.len() and data[end] != 0:
         end = end + 1
     if end <= start:
         return ""
@@ -194,9 +194,9 @@ fn extract_elf_symbols(data: &str) -> Vec[str]:
     let result: Vec[str] = Vec.new()
     if data.len() < 64:
         return result
-    if data.byte_at(0) != 0x7f or data.byte_at(1) != 69 or data.byte_at(2) != 76 or data.byte_at(3) != 70:
+    if data[0] != 0x7f or data[1] != 69 or data[2] != 76 or data[3] != 70:
         return result
-    if data.byte_at(4) != 2 or data.byte_at(5) != 1:
+    if data[4] != 2 or data[5] != 1:
         return result
     let shoff = ar_read_u64_le(data, 40)
     let shentsize = ar_read_u16_le(data, 58)
@@ -228,7 +228,7 @@ fn extract_elf_symbols(data: &str) -> Vec[str]:
         let sym_end = sym_off + sym_size
         while sym_pos + sym_entsize <= sym_end and sym_pos + 24 <= data.len():
             let name_off = ar_read_u32_le(data, sym_pos)
-            let info = data.byte_at(sym_pos + 4) as i32
+            let info = data[sym_pos + 4] as i32
             let shndx = ar_read_u16_le(data, sym_pos + 6)
             let bind = info >> 4
             let typ = info & 0x0f
@@ -242,14 +242,14 @@ fn extract_elf_symbols(data: &str) -> Vec[str]:
 fn create_gnu_indexed_archive(output_path: &str, member_names: &Vec[str], member_data: &Vec[str], sorted: &Vec[ArSymbol]) -> i32:
     var string_table = ""
     for i in 0..sorted.len() as i32:
-        string_table = string_table ++ sorted.get(i as i64).name ++ str_from_byte(0)
+        string_table = string_table ++ sorted[i].name ++ str_from_byte(0)
     let ranlib_count = sorted.len() as i32
     let symtab_size = 4 + ranlib_count * 4 + string_table.len() as i32
 
     var long_name_table = ""
     let long_name_offsets: Vec[i32] = Vec.new()
     for i in 0..member_names.len() as i32:
-        let name = member_names.get(i as i64)
+        let name = member_names[i]
         if ar_gnu_needs_long_name(name):
             long_name_offsets.push(long_name_table.len() as i32)
             long_name_table = long_name_table ++ name ++ "/\n"
@@ -262,12 +262,12 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &Vec[str], member
         offset = offset + ar_gnu_member_size(long_name_table.len())
     for i in 0..member_names.len() as i32:
         member_offsets.push(offset)
-        offset = offset + ar_gnu_member_size(member_data.get(i as i64).len())
+        offset = offset + ar_gnu_member_size(member_data[i].len())
 
     var symtab = ar_u32_be(ranlib_count)
     for i in 0..ranlib_count:
-        let sym = sorted.get(i as i64)
-        symtab = symtab ++ ar_u32_be(member_offsets.get(sym.member_index as i64) as i32)
+        let sym = sorted[i]
+        symtab = symtab ++ ar_u32_be(member_offsets[sym.member_index] as i32)
     symtab = symtab ++ string_table
 
     var archive = "!<arch>\n"
@@ -283,9 +283,9 @@ fn create_gnu_indexed_archive(output_path: &str, member_names: &Vec[str], member
             archive = archive ++ "\n"
 
     for i in 0..member_names.len() as i32:
-        let name = member_names.get(i as i64)
-        let data = member_data.get(i as i64)
-        let name_field = ar_gnu_member_name_field(name, long_name_offsets.get(i as i64))
+        let name = member_names[i]
+        let data = member_data[i]
+        let name_field = ar_gnu_member_name_field(name, long_name_offsets[i])
         archive = archive ++ ar_gnu_member_header(name_field, data.len())
         archive = archive ++ data
         if archive.len() % 2 != 0:
@@ -302,7 +302,7 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
     let member_names: Vec[str] = Vec.new()
     let member_data: Vec[str] = Vec.new()
     for i in 0..member_count:
-        let path = member_paths.get(i as i64)
+        let path = member_paths[i]
         let data = with_fs_read_file(path)
         if data.len() == 0:
             with_eprint("error: archive: cannot read member: " ++ path)
@@ -313,7 +313,7 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
     var saw_elf = false
     let all_symbols: Vec[ArSymbol] = Vec.new()
     for i in 0..member_count:
-        let data = member_data.get(i as i64)
+        let data = member_data[i]
         let elf_syms = extract_elf_symbols(data)
         let syms = if elf_syms.len() > 0:
             saw_elf = true
@@ -321,7 +321,7 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
         else:
             extract_macho_symbols(data)
         for si in 0..syms.len() as i32:
-            let sym = ArSymbol { name: with_str_clone_ref(syms.get(si as i64)), member_index: i }
+            let sym = ArSymbol { name: with_str_clone_ref(syms[si]), member_index: i }
             all_symbols.push(move sym)
     let sorted = ar_sort_symbols(all_symbols)
     if saw_elf:
@@ -331,7 +331,7 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
     let string_offsets: Vec[i32] = Vec.new()
     for i in 0..sorted.len() as i32:
         string_offsets.push(string_table.len() as i32)
-        string_table = string_table ++ sorted.get(i as i64).name ++ str_from_byte(0)
+        string_table = string_table ++ sorted[i].name ++ str_from_byte(0)
     while string_table.len() % 8 != 0:
         string_table = string_table ++ str_from_byte(0)
 
@@ -344,13 +344,13 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
     var offset: i64 = 8 + ar_member_size(symdef_name, symdef_content_size)
     for i in 0..member_count:
         member_offsets.push(offset)
-        offset = offset + ar_member_size(member_names.get(i as i64), member_data.get(i as i64).len())
+        offset = offset + ar_member_size(member_names[i], member_data[i].len())
 
     var ranlib_data = ar_u32_le(ranlib_array_size)
     for i in 0..ranlib_count:
-        let sym = sorted.get(i as i64)
-        ranlib_data = ranlib_data ++ ar_u32_le(string_offsets.get(i as i64))
-        ranlib_data = ranlib_data ++ ar_u32_le(member_offsets.get(sym.member_index as i64) as i32)
+        let sym = sorted[i]
+        ranlib_data = ranlib_data ++ ar_u32_le(string_offsets[i])
+        ranlib_data = ranlib_data ++ ar_u32_le(member_offsets[sym.member_index] as i32)
     ranlib_data = ranlib_data ++ ar_u32_le(string_table.len() as i32)
     ranlib_data = ranlib_data ++ string_table
 
@@ -363,8 +363,8 @@ pub fn create_static_archive(output_path: &str, member_paths: &Vec[str]) -> i32:
         archive = archive ++ str_from_byte(0)
 
     for i in 0..member_count:
-        let name = member_names.get(i as i64)
-        let data = member_data.get(i as i64)
+        let name = member_names[i]
+        let data = member_data[i]
         archive = archive ++ ar_member_header(name, data.len())
         let padded_name = ar_pad_right(name, ar_bsd_name_pad_len(name.len()) as i32, 0)
         archive = archive ++ padded_name

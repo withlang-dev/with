@@ -43,9 +43,9 @@ fn ci_migrate_is_width_family_name(name: &str) -> bool:
     if name == "PCRE2_SPTR16" or name == "PCRE2_SPTR32":
         return true
     // Check identifiers ending in _16 or _32
-    if len >= 3 and name.byte_at((len - 3) as i64) == 95:
-        let d1 = name.byte_at((len - 2) as i64)
-        let d2 = name.byte_at((len - 1) as i64)
+    if len >= 3 and name[(len - 3)] == 95:
+        let d1 = name[(len - 2)]
+        let d2 = name[(len - 1)]
         // _16: d1='1'(49), d2='6'(54)
         if d1 == 49 and d2 == 54:
             return true
@@ -89,7 +89,7 @@ var g_migrate_unsafe_extern_fn_names: str = ""
 fn ci_migrate_text_is_blank(text: &str) -> bool:
     var i: i64 = 0
     while i < text.len():
-        let ch = text.byte_at(i)
+        let ch = text[i]
         if ch != 32 and ch != 9 and ch != 10 and ch != 13:
             return false
         i = i + 1
@@ -164,7 +164,7 @@ fn ci_migrate_shared_decl_upgrade_opaque_type(name: &str, rendered: &str):
     let opaque_marker = "type " ++ ci_escape_reserved(name) ++ " = opaque"
     var i = 0
     while i < g_migrate_shared_decl_buf.len() as i32:
-        if ci_str_contains(g_migrate_shared_decl_buf.get(i as i64), opaque_marker):
+        if ci_str_contains(g_migrate_shared_decl_buf[i], opaque_marker):
             let idx = i as i64
             with g_migrate_shared_decl_buf.slot(idx) as mut entry:
                 entry.set(rendered ++ "\n")
@@ -172,7 +172,7 @@ fn ci_migrate_shared_decl_upgrade_opaque_type(name: &str, rendered: &str):
         i = i + 1
     var j = 0
     while j < g_migrate_shared_decl_records.len() as i32:
-        let rec = g_migrate_shared_decl_records.get(j as i64)
+        let rec = g_migrate_shared_decl_records[j]
         if ci_str_contains(rec, "@@DECL|type|" ++ name ++ "\n") and ci_str_contains(rec, opaque_marker):
             let idx = j as i64
             with g_migrate_shared_decl_records.slot(idx) as mut entry:
@@ -214,9 +214,9 @@ fn ci_migrate_text_mentions_ident(text: &str, name: &str) -> bool:
         if rel < 0:
             return false
         let pos = start + rel as i64
-        let before_ok = pos == 0 or not ci_is_ident_char(text.byte_at(pos - 1))
+        let before_ok = pos == 0 or not ci_is_ident_char(text[pos - 1])
         let after_pos = pos + nlen
-        let after_ok = after_pos >= tlen or not ci_is_ident_char(text.byte_at(after_pos))
+        let after_ok = after_pos >= tlen or not ci_is_ident_char(text[after_pos])
         if before_ok and after_ok:
             return true
         start = pos + 1
@@ -235,11 +235,11 @@ fn ci_migrate_shared_note_output_uses(output: &str):
     var i = 0
     let n = output.len() as i32
     while i < n:
-        let ch = output.byte_at(i as i64)
+        let ch = output[i]
         if ci_is_ident_char(ch):
             let start = i
             i = i + 1
-            while i < n and ci_is_ident_char(output.byte_at(i as i64)):
+            while i < n and ci_is_ident_char(output[i]):
                 i = i + 1
             ci_migrate_shared_note_ident(output.slice(start as i64, i as i64))
             continue
@@ -308,13 +308,13 @@ fn ci_migrate_source_module_suffix(path: &str) -> str:
     var rel = with_str_clone_ref(path)
     if g_migrate_directory_input_dir.len() > 0 and ci_starts_with(path, g_migrate_directory_input_dir):
         rel = path.slice(g_migrate_directory_input_dir.len(), path.len())
-    while rel.len() > 0 and rel.byte_at(0) == 47:
+    while rel.len() > 0 and rel[0] == 47:
         rel = rel.slice(1, rel.len())
     if rel.ends_with(".c"):
         rel = rel.slice(0, rel.len() - 2)
     var out = ""
     for i in 0..rel.len() as i32:
-        let ch = rel.byte_at(i as i64)
+        let ch = rel[i]
         if ch == 47:
             out = out ++ "."
         else:
@@ -348,14 +348,14 @@ fn ci_migrate_project_imports_for_file(project_active: bool, project: &CiProject
     let current_module = project.ensure_module(input_path)
     var imports = ""
     for si in 0..project.symbols.len() as i32:
-        let symbol = project.symbols.get(si as i64)
+        let symbol = project.symbols[si]
         if symbol.owner_module < 0 or symbol.owner_module == current_module:
             continue
         if not ci_migrate_pipe_i32_contains(symbol.consumers, current_module):
             continue
         if symbol.owner_module >= project.module_paths.len() as i32:
             continue
-        imports = ci_migrate_add_import_once(imports, ci_migrate_source_module_path(project.module_paths.get(symbol.owner_module as i64)))
+        imports = ci_migrate_add_import_once(imports, ci_migrate_source_module_path(project.module_paths[symbol.owner_module]))
     imports
 
 // Replace all occurrences of needle with replacement, assuming few matches.
@@ -385,7 +385,7 @@ fn ci_comment_prefix_lines(text: &str) -> str:
     let tlen = text.len()
     while start < tlen:
         var end = start
-        while end < tlen and text.byte_at(end) != 10:
+        while end < tlen and text[end] != 10:
             end = end + 1
         let line = text.slice(start, end)
         if line.len() > 0:
@@ -401,7 +401,7 @@ fn ci_migrate_normalize_output(text: &str) -> str:
     if text.len() == 0:
         return ""
     var end = text.len()
-    while end > 0 and text.byte_at(end - 1) == 10:
+    while end > 0 and text[end - 1] == 10:
         end = end - 1
     ci_str_replace(text.slice(0, end), "-> void", "-> Unit") ++ "\n"
 
@@ -418,7 +418,7 @@ fn ci_migrate_publicize_shared_defs(text: &str) -> str:
     let n = text.len()
     while start < n:
         var end = start
-        while end < n and text.byte_at(end) != 10:
+        while end < n and text[end] != 10:
             end = end + 1
         out = out ++ ci_migrate_publicize_shared_line(text.slice(start, end))
         if end < n:
@@ -493,10 +493,10 @@ fn ci_migrate_write_shared_defs(output_dir: &str):
     if g_migrate_shared_decl_buf.len() > 0:
         defs.push_str("\n")
         for di in 0..g_migrate_shared_decl_buf.len() as i32:
-            defs.push_str(g_migrate_shared_decl_buf.get(di as i64))
+            defs.push_str(g_migrate_shared_decl_buf[di])
     var pending_i = 0
     while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
-        let pending = g_migrate_shared_pending_extern_vars.get(pending_i as i64)
+        let pending = g_migrate_shared_pending_extern_vars[pending_i]
         if ci_find_str(g_migrate_shared_usage_idents, "|" ++ pending.name ++ "|") >= 0:
             defs.push_str(pending.rendered)
             defs.push_str("\n")
@@ -516,10 +516,10 @@ fn ci_migrate_write_shared_fragment(path: &str):
 fn ci_migrate_shared_fragment_text() -> str:
     var fragment = StringBuilder.new()
     for di in 0..g_migrate_shared_decl_records.len() as i32:
-        fragment.push_str(g_migrate_shared_decl_records.get(di as i64))
+        fragment.push_str(g_migrate_shared_decl_records[di])
     var pending_i = 0
     while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
-        let pending = g_migrate_shared_pending_extern_vars.get(pending_i as i64)
+        let pending = g_migrate_shared_pending_extern_vars[pending_i]
         fragment.push_str(f"@@PENDING|{pending.kind}|{pending.name}\n{pending.rendered}\n@@END\n")
         pending_i = pending_i + 1
     fragment.push_str(f"@@USES\n{g_migrate_shared_usage_idents}\n@@END\n")
@@ -529,13 +529,13 @@ fn ci_migrate_merge_usage_keys(keys: &str):
     var i = 0
     let n = keys.len() as i32
     while i < n:
-        while i < n and keys.byte_at(i as i64) != 124:
+        while i < n and keys[i] != 124:
             i = i + 1
         if i >= n:
             return
         let start = i + 1
         i = start
-        while i < n and keys.byte_at(i as i64) != 124:
+        while i < n and keys[i] != 124:
             i = i + 1
         if i > start:
             ci_migrate_shared_note_ident(keys.slice(start as i64, i as i64))
@@ -546,7 +546,7 @@ fn ci_migrate_merge_shared_fragment_text(text: &str):
     let n = text.len() as i32
     while pos < n:
         var line_end = pos
-        while line_end < n and text.byte_at(line_end as i64) != 10:
+        while line_end < n and text[line_end] != 10:
             line_end = line_end + 1
         let line = text.slice(pos as i64, line_end as i64)
         let body_start = line_end + 1
@@ -578,7 +578,7 @@ fn ci_migrate_merge_shared_fragment_texts(output_dir: &str, fragments: &Vec[str]
     ci_migrate_shared_defs_reset()
     var i = 0
     while i < fragments.len() as i32:
-        ci_migrate_merge_shared_fragment_text(fragments.get(i as i64))
+        ci_migrate_merge_shared_fragment_text(fragments[i])
         i = i + 1
     ci_migrate_write_shared_defs(output_dir)
 
@@ -799,7 +799,7 @@ fn ci_collect_macro_type_names(session: i64) -> str:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_TYPEDEF or kind == CK_STRUCT or kind == CK_UNION or kind == CK_ENUM:
             let name = with_cimport_decl_name(session, i)
-            if name.len() > 0 and name.byte_at(0) != 95:
+            if name.len() > 0 and name[0] != 95:
                 names = names ++ "|" ++ name ++ "|"
         i = i + 1
     names
@@ -812,7 +812,7 @@ fn ci_collect_macro_type_aliases(session: i64) -> str:
         if with_cimport_decl_kind(session, i) == CK_TYPEDEF:
             let name = with_cimport_decl_name(session, i)
             let translated = with_cimport_typedef_underlying_translated(session, i)
-            if name.len() > 0 and name.byte_at(0) != 95 and translated.len() > 0:
+            if name.len() > 0 and name[0] != 95 and translated.len() > 0:
                 aliases = aliases ++ "|" ++ name ++ "=" ++ translated ++ "|"
         i = i + 1
     aliases
@@ -820,12 +820,12 @@ fn ci_collect_macro_type_aliases(session: i64) -> str:
 fn ci_migrate_prepare_include_path(input_path: &str):
     with_cimport_clear_include_paths()
     var dir_end = input_path.len() as i32 - 1
-    while dir_end > 0 and input_path.byte_at(dir_end as i64) != 47:  // '/'
+    while dir_end > 0 and input_path[dir_end] != 47:  // '/'
         dir_end = dir_end - 1
     if dir_end > 0:
         with_cimport_add_include_path(input_path.slice(0, dir_end as i64))
     for i in 0..g_migrate_include_paths.len() as i32:
-        with_cimport_add_include_path(g_migrate_include_paths.get(i as i64))
+        with_cimport_add_include_path(g_migrate_include_paths[i])
 
 // Portable-baseline migration preamble: undefine host CPU-feature macros so C
 // libraries select their generic, portable code path instead of host-specific
@@ -859,7 +859,7 @@ fn ci_migrate_source_prefix() -> str:
     let compat_preamble = migrate_host_compat_preamble()
     var prefix = ci_migrate_portable_baseline_preamble() ++ g_migrate_defines ++ compat_preamble
     for i in 0..g_migrate_forced_includes.len() as i32:
-        prefix = prefix ++ "#include \"" ++ g_migrate_forced_includes.get(i as i64) ++ "\"\n"
+        prefix = prefix ++ "#include \"" ++ g_migrate_forced_includes[i] ++ "\"\n"
     prefix
 
 fn ci_migrate_wrapped_source(input_path: &str) -> str:
@@ -923,7 +923,7 @@ impl CiProject:
                     i = i + 1
                     continue
                 let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_VAR, name)
-                self.symbols[symbol_id as i64].add_consumer(module_id)
+                self.symbols[symbol_id].add_consumer(module_id)
 
                 let owner_kind = ci_migrate_var_definition_kind(session, i)
                 if cursor < 0 or owner_kind == CI_VAR_DECL_ONLY:
@@ -937,33 +937,33 @@ impl CiProject:
                     return 1
 
                 let owner_rank = ci_migrate_project_var_owner_rank(owner_kind)
-                if self.symbols[symbol_id as i64].owner_module < 0:
-                    self.symbols[symbol_id as i64].owner_module = module_id
-                    self.symbols[symbol_id as i64].owner_rank = owner_rank
-                    self.symbols[symbol_id as i64].owner_definition_kind = owner_kind
+                if self.symbols[symbol_id].owner_module < 0:
+                    self.symbols[symbol_id].owner_module = module_id
+                    self.symbols[symbol_id].owner_rank = owner_rank
+                    self.symbols[symbol_id].owner_definition_kind = owner_kind
                     // owner_type's bytes live in THIS FILE's cimport session,
                     // which is disposed before emission — store an owned copy.
-                    self.symbols[symbol_id as i64].resolved_ty_text = ci_ir_owned_text(owner_type)
-                    self.symbols[symbol_id as i64].resolved_ty = self.migrate_var_type_id(session, i, owner_type)
+                    self.symbols[symbol_id].resolved_ty_text = ci_ir_owned_text(owner_type)
+                    self.symbols[symbol_id].resolved_ty = self.migrate_var_type_id(session, i, owner_type)
                     i = i + 1
                     continue
 
                 let existing_path = self.owner_module_path(symbol_id)
-                if self.symbols[symbol_id as i64].owner_rank == owner_rank:
-                    if self.symbols[symbol_id as i64].owner_definition_kind == CI_VAR_FULL_DEF and owner_kind == CI_VAR_FULL_DEF and existing_path != input_path:
+                if self.symbols[symbol_id].owner_rank == owner_rank:
+                    if self.symbols[symbol_id].owner_definition_kind == CI_VAR_FULL_DEF and owner_kind == CI_VAR_FULL_DEF and existing_path != input_path:
                         eprint("migrate: duplicate full global definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
                         with_cimport_dispose(session)
                         return 1
-                    if self.symbols[symbol_id as i64].resolved_ty_text.len() > 0 and self.symbols[symbol_id as i64].resolved_ty_text != owner_type:
+                    if self.symbols[symbol_id].resolved_ty_text.len() > 0 and self.symbols[symbol_id].resolved_ty_text != owner_type:
                         eprint("migrate: conflicting global owner type for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
                         with_cimport_dispose(session)
                         return 1
-                if owner_rank > self.symbols[symbol_id as i64].owner_rank or (owner_rank == self.symbols[symbol_id as i64].owner_rank and ci_str_compare(input_path, existing_path) < 0):
-                    self.symbols[symbol_id as i64].owner_module = module_id
-                    self.symbols[symbol_id as i64].owner_rank = owner_rank
-                    self.symbols[symbol_id as i64].owner_definition_kind = owner_kind
-                    self.symbols[symbol_id as i64].resolved_ty_text = ci_ir_owned_text(owner_type)
-                    self.symbols[symbol_id as i64].resolved_ty = self.migrate_var_type_id(session, i, owner_type)
+                if owner_rank > self.symbols[symbol_id].owner_rank or (owner_rank == self.symbols[symbol_id].owner_rank and ci_str_compare(input_path, existing_path) < 0):
+                    self.symbols[symbol_id].owner_module = module_id
+                    self.symbols[symbol_id].owner_rank = owner_rank
+                    self.symbols[symbol_id].owner_definition_kind = owner_kind
+                    self.symbols[symbol_id].resolved_ty_text = ci_ir_owned_text(owner_type)
+                    self.symbols[symbol_id].resolved_ty = self.migrate_var_type_id(session, i, owner_type)
             else if with_cimport_decl_kind(session, i) == CK_FUNCTION:
                 let name = with_cimport_decl_name(session, i)
                 let cursor = with_cimport_decl_cursor(session, i)
@@ -975,18 +975,18 @@ impl CiProject:
                     i = i + 1
                     continue
                 let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
-                self.symbols[symbol_id as i64].add_consumer(module_id)
+                self.symbols[symbol_id].add_consumer(module_id)
                 if cursor < 0 or with_ci_cursor_is_definition(session, cursor) == 0:
                     i = i + 1
                     continue
                 let existing_path = self.owner_module_path(symbol_id)
-                if self.symbols[symbol_id as i64].owner_module >= 0 and existing_path != input_path:
+                if self.symbols[symbol_id].owner_module >= 0 and existing_path != input_path:
                     eprint("migrate: duplicate function definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
                     with_cimport_dispose(session)
                     return 1
-                self.symbols[symbol_id as i64].owner_module = module_id
-                self.symbols[symbol_id as i64].owner_rank = 1
-                self.symbols[symbol_id as i64].owner_definition_kind = 1
+                self.symbols[symbol_id].owner_module = module_id
+                self.symbols[symbol_id].owner_rank = 1
+                self.symbols[symbol_id].owner_definition_kind = 1
             i = i + 1
 
         with_cimport_dispose(session)
@@ -1096,7 +1096,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
     while evi < count:
         if with_cimport_decl_kind(session, evi) == CK_VAR:
             let evname = with_cimport_decl_name(session, evi)
-            if evname.len() > 0 and evname.byte_at(0) != 95:
+            if evname.len() > 0 and evname[0] != 95:
                 extern_vars = extern_vars ++ "|" ++ evname ++ "|"
         evi = evi + 1
 
@@ -1121,7 +1121,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
             output_parts.push(struct_result)
             if struct_result_len > 0:
                 let sname = with_cimport_decl_name(session, i)
-                if sname.len() > 0 and sname.byte_at(0) != 95:
+                if sname.len() > 0 and sname[0] != 95:
                     translated_structs = translated_structs ++ "|" ++ sname ++ "|"
                     if ci_str_contains(typedef_shadowed, "|" ++ sname ++ "|"):
                         let alias_name = "struct_" ++ sname
@@ -1136,7 +1136,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
             output_parts.push(td_result)
             if td_result_len > 0:
                 let td_name = with_cimport_decl_name(session, i)
-                if td_name.len() > 0 and td_name.byte_at(0) != 95:
+                if td_name.len() > 0 and td_name[0] != 95:
                     translated_structs = translated_structs ++ "|" ++ td_name ++ "|"
         else if kind == CK_STATIC_ASSERT:
             let sa_name = with_cimport_decl_name(session, i)
@@ -1208,10 +1208,10 @@ pub fn migrate_c_file(input_path: &str, output_path: &str) -> i32:
 
 fn ci_migrate_path_basename(path: &str) -> str:
     var end = path.len() as i32
-    while end > 0 and path.byte_at((end - 1) as i64) == 47:
+    while end > 0 and path[(end - 1)] == 47:
         end = end - 1
     var start = end - 1
-    while start >= 0 and path.byte_at(start as i64) != 47:
+    while start >= 0 and path[start] != 47:
         start = start - 1
     path.slice((start + 1) as i64, end as i64)
 
@@ -1271,14 +1271,14 @@ fn ci_migrate_sorted_files(files: &Vec[str]) -> Vec[str]:
     while rank <= 320:
         var i = 0
         while i < files.len() as i32:
-            let path = files.get(i as i64)
+            let path = files[i]
             if ci_migrate_pcre2_order_rank(ci_migrate_path_basename(path)) == rank:
                 sorted.push(with_str_clone_ref(path))
             i = i + 1
         rank = rank + 10
     var i = 0
     while i < files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         if ci_migrate_pcre2_order_rank(ci_migrate_path_basename(path)) == 1000:
             sorted.push(with_str_clone_ref(path))
         i = i + 1
@@ -1306,7 +1306,7 @@ fn ci_migrate_print_progress(file_path: &str, current: i32, total: i32):
 
 fn ci_migrate_ensure_parent_dir(path: &str):
     var dir_end = path.len() as i32 - 1
-    while dir_end > 0 and path.byte_at(dir_end as i64) != 47:
+    while dir_end > 0 and path[dir_end] != 47:
         dir_end = dir_end - 1
     if dir_end > 0:
         with_fs_mkdir_p(path.slice(0, dir_end as i64))
@@ -1316,14 +1316,14 @@ fn ci_migrate_path_is_c_file(path: &str) -> bool:
 
 fn ci_migrate_basename_is_hidden(path: &str) -> bool:
     let base = ci_migrate_path_basename(path)
-    base.len() > 0 and base.byte_at(0) == 46
+    base.len() > 0 and base[0] == 46
 
 fn ci_migrate_sorted_insert(files: &Vec[str], path: &str) -> Vec[str]:
     let sorted: Vec[str] = Vec.new()
     var inserted = false
     var i = 0
     while i < files.len() as i32:
-        let existing = files.get(i as i64)
+        let existing = files[i]
         if not inserted and ci_str_compare(path, existing) < 0:
             sorted.push(with_str_clone_ref(path))
             inserted = true
@@ -1340,7 +1340,7 @@ fn ci_migrate_collect_c_files(input_dir: &str, exclude_basenames: &str) -> Vec[s
     let n = listing.len() as i32
     while pos < n:
         var line_end = pos
-        while line_end < n and listing.byte_at(line_end as i64) != 10:
+        while line_end < n and listing[line_end] != 10:
             line_end = line_end + 1
         if line_end > pos:
             let file_path = listing.slice(pos as i64, line_end as i64)
@@ -1357,7 +1357,7 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &Vec[
     var i = 0
     let total = files.len() as i32
     while i < files.len() as i32:
-        let file_path = files.get(i as i64)
+        let file_path = files[i]
         let base = ci_migrate_path_basename(file_path)
         let out_path = ci_migrate_directory_output_path(input_dir, output_dir, file_path)
         ci_migrate_ensure_parent_dir(out_path)
@@ -1367,7 +1367,7 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &Vec[
         var project = CiProject.new()
         var scan_i = 0
         while scan_i < files.len() as i32:
-            if project.migrate_scan_file(files.get(scan_i as i64)) != 0:
+            if project.migrate_scan_file(files[scan_i]) != 0:
                 eprint(f"migrate: failed while scanning project for {base}")
                 return 1
             scan_i = scan_i + 1
@@ -1407,14 +1407,14 @@ pub fn migrate_c_directory(input_dir: &str, output_dir: &str, exclude_basenames:
     var project = CiProject.new()
     var scan_i = 0
     while scan_i < sorted_files.len() as i32:
-        if project.migrate_scan_file(sorted_files.get(scan_i as i64)) != 0:
+        if project.migrate_scan_file(sorted_files[scan_i]) != 0:
             return 1
         scan_i = scan_i + 1
 
     var fi = 0
     let total_files = sorted_files.len() as i32
     while fi < sorted_files.len() as i32:
-        let file_path = sorted_files.get(fi as i64)
+        let file_path = sorted_files[fi]
         if g_migrate_directory_one_basename.len() > 0 and ci_migrate_path_basename(file_path) != g_migrate_directory_one_basename:
             fi = fi + 1
             continue
@@ -1695,7 +1695,7 @@ fn ci_migrate_project_var_resolved_type(project_active: bool, project: &CiProjec
     let symbol_id = ci_migrate_project_var_symbol(project_active, project, name)
     if symbol_id < 0:
         return ""
-    let symbol = project.symbols.get(symbol_id as i64)
+    let symbol = project.symbols[symbol_id]
     if symbol.resolved_ty_text.len() > 0:
         return symbol.resolved_ty_text.clone()
     if (symbol.resolved_ty as i32) != 0:
@@ -1793,7 +1793,7 @@ fn ci_migrate_var_owner_type(session: i64, idx: i32) -> str:
             let init_cursor = ci_find_var_init_cursor(session, cursor)
             if init_cursor >= 0:
                 let init_type = with_ci_type_translated(session, with_ci_cursor_type(session, init_cursor))
-                if init_type.len() > 0 and init_type.byte_at(0) == 91:
+                if init_type.len() > 0 and init_type[0] == 91:
                     let actual_elem = ci_array_elem_type(actual_type)
                     let init_elem = ci_array_elem_type(init_type)
                     if actual_elem.len() > 0 and actual_elem == init_elem:

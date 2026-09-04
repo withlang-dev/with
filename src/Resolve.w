@@ -175,9 +175,9 @@ fn resolve_normalize_source_text(text: &str) -> str:
     var out = StringBuilder.with_capacity(text.len())
     var i = 0
     while i < text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch == 13:
-            if i + 1 < text.len() as i32 and text.byte_at((i + 1) as i64) == 10:
+            if i + 1 < text.len() as i32 and text[(i + 1)] == 10:
                 i = i + 1
             out.push_byte(10 as u8)
         else:
@@ -204,23 +204,23 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
 
     var work = 0
     while work < state.module_paths.len() as i32:
-        if state.module_processed.get(work as i64) != 0:
+        if state.module_processed[work] != 0:
             work = work + 1
             continue
 
         if work == root_module:
             state.process_module_with_pool(work, normalized_root_text, root_pool)
         else:
-            let path = state.module_paths.get(work as i64)
+            let path = state.module_paths[work]
             let src = module_source_read(path)
             let text = resolve_normalize_source_text(src.text)
             if text.len() == 0:
                 state.emit_import_error(work, "failed to read imported module")
-                state.module_processed.set_i32(work as i64, 1)
+                state.module_processed[work] = 1
                 work = work + 1
                 continue
 
-            let file_id = state.module_file_ids.get(work as i64)
+            let file_id = state.module_file_ids[work]
             var lexer = Lexer.init(text, file_id)
             let tokens = lexer.tokenize()
             var parser = Parser.init(move tokens, text, file_id, state.pool, move state.diags)
@@ -317,24 +317,24 @@ impl ResolveState:
         for mid in 0..self.module_paths.len() as i32:
             out.push(ResolvedModule {
                 module_id: mid,
-                file_id: self.module_file_ids.get(mid as i64),
-                path: resolve_owned_text(self.module_paths.get(mid as i64)),
-                import_start: self.module_import_starts.get(mid as i64),
-                import_count: self.module_import_counts.get(mid as i64),
-                decl_count: self.module_decl_counts.get(mid as i64),
+                file_id: self.module_file_ids[mid],
+                path: resolve_owned_text(self.module_paths[mid]),
+                import_start: self.module_import_starts[mid],
+                import_count: self.module_import_counts[mid],
+                decl_count: self.module_decl_counts[mid],
             })
         out
 
     mut fn process_module_with_pool(module_id: i32, source_text: &str, pool: AstPool):
-        self.module_processed.set_i32(module_id as i64, 1)
+        self.module_processed[module_id] = 1
         // #682-inc1: root's own decl count excludes the prelude prefix
         // (decl 0's use plus everything from the skip boundary on).
         let owned_decls = if module_id == 0 and self.root_prefix_skip > 1: pool.decl_count() - (self.root_prefix_skip - 1) else: pool.decl_count()
-        self.module_decl_counts.set_i32(module_id as i64, owned_decls)
-        self.module_import_starts.set_i32(module_id as i64, self.result.imports.len() as i32)
+        self.module_decl_counts[module_id] = owned_decls
+        self.module_import_starts[module_id] = self.result.imports.len() as i32
 
         let module_scope = self.add_scope(module_id, -1, -1, ScopeKind.SK_MODULE)
-        self.module_scope_ids.set_i32(module_id as i64, module_scope)
+        self.module_scope_ids[module_id] = module_scope
 
         var pending_fn_nodes: Vec[i32] = Vec.new()
         var pending_fn_defs: Vec[i32] = Vec.new()
@@ -411,13 +411,13 @@ impl ResolveState:
                 pending_fn_nodes.push(decl as i32)
                 pending_fn_defs.push(did)
 
-        self.module_import_counts.set_i32(module_id as i64, import_index)
+        self.module_import_counts[module_id] = import_index
 
         // Pass 2: register function parameter defs/bindings.
         let walk_bodies = module_id == 0
         for fi in 0..pending_fn_nodes.len() as i32:
-            let fn_node = pending_fn_nodes.get(fi as i64)
-            let fn_def = pending_fn_defs.get(fi as i64)
+            let fn_node = pending_fn_nodes[fi]
+            let fn_def = pending_fn_defs[fi]
             self.resolve_fn_body(pool, module_id, module_scope, fn_node, fn_def, walk_bodies)
 
     fn record_link_lib(lib_sym: i32) -> Unit:
@@ -1018,7 +1018,7 @@ impl ResolveState:
 
             if sid >= self.result.scopes.len() as i32:
                 return -1
-            let scope = self.result.scopes.get(sid as i64)
+            let scope = self.result.scopes[sid]
             sid = scope.parent_scope
 
         -1
@@ -1036,7 +1036,7 @@ impl ResolveState:
         if path_count <= 0:
             return ""
 
-        let module_dir = self.module_dirs.get(module_id as i64)
+        let module_dir = self.module_dirs[module_id]
         let has_root_fallback = module_dir != self.root_source_dir
 
         var rel_primary = ""
@@ -1200,17 +1200,17 @@ fn resolve_normalize_path(path: &str) -> str:
     var out = ""
     var i = 0
     while i < path.len() as i32:
-        let ch = path[i as i64]
+        let ch = path[i]
         if ch == 92:
             out = out ++ "/"
             i = i + 1
             continue
 
-        if ch == 47 and i + 1 < path.len() as i32 and path[(i + 1) as i64] == 47:
+        if ch == 47 and i + 1 < path.len() as i32 and path[(i + 1)] == 47:
             i = i + 1
             continue
 
-        if ch == 47 and i + 2 < path.len() as i32 and path[(i + 1) as i64] == 46 and path[(i + 2) as i64] == 47:
+        if ch == 47 and i + 2 < path.len() as i32 and path[(i + 1)] == 46 and path[(i + 2)] == 47:
             i = i + 2
             continue
 
@@ -1241,7 +1241,7 @@ pub fn resolve_canonical_module_key(path: &str) -> str:
     var start = 0
     for i in 0..(p.len() as i32 + 1):
         let at_end = i == p.len() as i32
-        if at_end or p[i as i64] == 47 or p[i as i64] == 92:
+        if at_end or p[i] == 47 or p[i] == 92:
             if i > start:
                 // Flat decision (no inner chain ending in else-if): the seed
                 // compiler predates the #629 dangling-else fix and miscompiles
@@ -1263,7 +1263,7 @@ pub fn resolve_canonical_module_key(path: &str) -> str:
     for pi in 0..parts.len() as i32:
         if pi > 0:
             out = out ++ "/"
-        out = out ++ parts.get(pi as i64)
+        out = out ++ parts[pi]
     if out.len() == 0:
         return "."
     out
@@ -1288,7 +1288,7 @@ impl ResolveState:
         if not self.emit_resolve_diags:
             return
         let span = Span {
-            file: self.module_file_ids.get(module_id as i64),
+            file: self.module_file_ids[module_id],
             start: 0,
             end: 0,
         }
@@ -1298,7 +1298,7 @@ impl ResolveState:
         if not self.emit_resolve_diags:
             return
         let span = Span {
-            file: self.module_file_ids.get(module_id as i64),
+            file: self.module_file_ids[module_id],
             start,
             end,
         }
@@ -1337,28 +1337,28 @@ fn print_resolved(result: &ResolveResult, pool: InternPool, root_path: &str):
     with_write(f"resolved root={root_path} modules={result.modules.len() as i32} defs={result.defs.len() as i32}\n")
 
     for mi in 0..result.modules.len() as i32:
-        let m = result.modules.get(mi as i64)
+        let m = result.modules[mi]
         with_write(f"module[{m.module_id}] file={m.file_id} path={m.path} imports={m.import_count} decls={m.decl_count}\n")
 
         for ii in 0..m.import_count:
-            let imp = result.imports.get((m.import_start + ii) as i64)
+            let imp = result.imports[(m.import_start + ii)]
             if imp.kind == ImportKind.IK_USE:
                 with_write(f"import[{m.module_id}:{ii}] kind=use path={imp.path_text} target={imp.target_module}\n")
             else:
                 with_write(f"import[{m.module_id}:{ii}] kind=c_import header=\"{imp.path_text}\" target={imp.target_module}\n")
 
     for di in 0..result.defs.len() as i32:
-        let d = result.defs.get(di as i64)
+        let d = result.defs[di]
         let name = if d.name_sym > 0: with_str_clone_ref(pool.resolve(d.name_sym)) else: ""
         with_write(f"def[{d.def_id}] module={d.module_id} parent={d.parent_def} kind={resolved_def_kind_name(d.kind)} name={name} span={d.span_start}..{d.span_end}\n")
 
     for bi in 0..result.bindings.len() as i32:
-        let b = result.bindings.get(bi as i64)
+        let b = result.bindings[bi]
         let sym = pool.resolve(b.symbol)
         with_write(f"bind[{b.scope_id}:{sym}] def={b.def_id}\n")
 
     for ui in 0..result.uses.len() as i32:
-        let u = result.uses.get(ui as i64)
+        let u = result.uses[ui]
         let sym = pool.resolve(u.symbol)
         with_write(f"use[{ui}] module={u.module_id} node={u.node_id} sym={sym} def={u.def_id} span={u.span_start}..{u.span_end}\n")
 
@@ -1367,7 +1367,7 @@ fn print_resolved(result: &ResolveResult, pool: InternPool, root_path: &str):
         for li in 0..result.link_libs.len() as i32:
             if li > 0:
                 line = line ++ ","
-            line = line ++ pool.resolve(result.link_libs.get(li as i64))
+            line = line ++ pool.resolve(result.link_libs[li])
         with_write(line ++ "\n")
 
 fn dump_resolved(result: &ResolveResult, pool: InternPool, root_path: &str) -> str:
@@ -1375,28 +1375,28 @@ fn dump_resolved(result: &ResolveResult, pool: InternPool, root_path: &str) -> s
     out = out ++ f"resolved root={root_path} modules={result.modules.len() as i32} defs={result.defs.len() as i32}\n"
 
     for mi in 0..result.modules.len() as i32:
-        let m = result.modules.get(mi as i64)
+        let m = result.modules[mi]
         out = out ++ f"module[{m.module_id}] file={m.file_id} path={m.path} imports={m.import_count} decls={m.decl_count}\n"
 
         for ii in 0..m.import_count:
-            let imp = result.imports.get((m.import_start + ii) as i64)
+            let imp = result.imports[(m.import_start + ii)]
             if imp.kind == ImportKind.IK_USE:
                 out = out ++ f"import[{m.module_id}:{ii}] kind=use path={imp.path_text} target={imp.target_module}\n"
             else:
                 out = out ++ f"import[{m.module_id}:{ii}] kind=c_import header=\"{imp.path_text}\" target={imp.target_module}\n"
 
     for di in 0..result.defs.len() as i32:
-        let d = result.defs.get(di as i64)
+        let d = result.defs[di]
         let name = if d.name_sym > 0: with_str_clone_ref(pool.resolve(d.name_sym)) else: ""
         out = out ++ f"def[{d.def_id}] module={d.module_id} parent={d.parent_def} kind={resolved_def_kind_name(d.kind)} name={name} span={d.span_start}..{d.span_end}\n"
 
     for bi in 0..result.bindings.len() as i32:
-        let b = result.bindings.get(bi as i64)
+        let b = result.bindings[bi]
         let sym = pool.resolve(b.symbol)
         out = out ++ f"bind[{b.scope_id}:{sym}] def={b.def_id}\n"
 
     for ui in 0..result.uses.len() as i32:
-        let u = result.uses.get(ui as i64)
+        let u = result.uses[ui]
         let sym = pool.resolve(u.symbol)
         out = out ++ f"use[{ui}] module={u.module_id} node={u.node_id} sym={sym} def={u.def_id} span={u.span_start}..{u.span_end}\n"
 
@@ -1405,7 +1405,7 @@ fn dump_resolved(result: &ResolveResult, pool: InternPool, root_path: &str) -> s
         for li in 0..result.link_libs.len() as i32:
             if li > 0:
                 out = out ++ ","
-            out = out ++ pool.resolve(result.link_libs.get(li as i64))
+            out = out ++ pool.resolve(result.link_libs[li])
         out = out ++ "\n"
 
     out

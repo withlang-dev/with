@@ -702,7 +702,7 @@ fn rt_net_copy_str_to_c_buf(s: &str, out: *mut u8, cap: i64) -> i32:
         return -1
     var i: i64 = 0
     while i < s.len():
-        unsafe *((out as i64 + i) as *mut u8) = s.byte_at(i) as u8
+        unsafe *((out as i64 + i) as *mut u8) = s[i] as u8
         i = i + 1
     unsafe *((out as i64 + i) as *mut u8) = 0
     0

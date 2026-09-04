@@ -31,7 +31,7 @@ fn collect_sites(entry: str) -> Vec[OwnershipSite]:
     let message = "this parameter takes ownership of a non-Copy value"
     var unrelated = 0
     for i in 0..result.report.facts.len() as i32:
-        let fact = result.report.facts.get(i as i64)
+        let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Diagnostic or fact.flags != AnalysisDiagnosticSeverity.Error as i32:
             continue
         if fact.name != message:
@@ -43,7 +43,7 @@ fn collect_sites(entry: str) -> Vec[OwnershipSite]:
             exit_code(1)
         let path = source_path(fact.path)
         for si in 0..sites.len() as i32:
-            let old = sites.get(si as i64)
+            let old = sites[si]
             if old.path == path and old.offset == fact.start:
                 print(f"migrate-method-arg-moves: duplicate compiler fact {path}:{fact.start}")
                 exit_code(1)
@@ -61,7 +61,7 @@ fn liveness_lookup(tsv: str, key: str) -> str:
     var line_start: i64 = 0
     var i: i64 = 0
     while i <= tsv.len():
-        if i == tsv.len() or tsv.byte_at(i) == 10:
+        if i == tsv.len() or tsv[i] == 10:
             let line = tsv.slice(line_start, i)
             if line.starts_with(key ++ "\t"):
                 let cols = line.split("\t")
@@ -76,7 +76,7 @@ fn offset_line_col(text: str, offset: i32) -> str:
     var col = 1
     var i: i64 = 0
     while i < offset as i64 and i < text.len():
-        if text.byte_at(i) == 10:
+        if text[i] == 10:
             line = line + 1
             col = 1
         else:
@@ -91,7 +91,7 @@ fn line_col_offset(text: str, want_line: i64, want_col: i64) -> i32:
     while i < text.len():
         if line == want_line and col == want_col:
             return i as i32
-        if text.byte_at(i) == 10:
+        if text[i] == 10:
             line = line + 1
             col = 1
         else:
@@ -108,7 +108,7 @@ fn collect_sites_from_tsv(tsv: str) -> Vec[OwnershipSite]:
     var line_start: i64 = 0
     var i: i64 = 0
     while i <= tsv.len():
-        if i == tsv.len() or tsv.byte_at(i) == 10:
+        if i == tsv.len() or tsv[i] == 10:
             let line = tsv.slice(line_start, i)
             line_start = i + 1
             if line.contains("\t") and not line.starts_with("file:"):
@@ -133,7 +133,7 @@ fn bcm_parse_i64(s: str) -> i64:
     var out: i64 = 0
     var i: i64 = 0
     while i < s.len():
-        let ch = s.byte_at(i)
+        let ch = s[i]
         if ch < 48 or ch > 57:
             return out
         out = out * 10 + (ch - 48) as i64
@@ -150,7 +150,7 @@ fn migrate_file(path: str, sites: &Vec[OwnershipSite], apply: bool, liveness_tsv
     let offsets: Vec[i32] = Vec.new()
     let labels: Vec[str] = Vec.new()
     for i in 0..sites.len() as i32:
-        let site = sites.get(i as i64)
+        let site = sites[i]
         if site.path != path: continue
         if liveness_tsv.len() > 0:
             let key = path ++ ":" ++ offset_line_col(text, site.offset)
@@ -176,23 +176,23 @@ fn migrate_file(path: str, sites: &Vec[OwnershipSite], apply: bool, liveness_tsv
     var i = 1
     while i < offsets.len() as i32:
         var j = i
-        while j > 0 and offsets.get((j - 1) as i64) > offsets.get(j as i64):
-            let old_offset = offsets.get((j - 1) as i64)
-            let old_label = labels.get((j - 1) as i64)
-            offsets.set_i32((j - 1) as i64, offsets.get(j as i64))
-            labels.slot((j - 1) as i64).set(labels.get(j as i64))
-            offsets.set_i32(j as i64, old_offset)
+        while j > 0 and offsets[(j - 1)] > offsets[j]:
+            let old_offset = offsets[(j - 1)]
+            let old_label = labels[(j - 1)]
+            offsets[(j - 1)] = offsets[j]
+            labels.slot((j - 1) as i64).set(labels[j])
+            offsets[j] = old_offset
             labels.slot(j as i64).set(old_label)
             j = j - 1
         i = i + 1
 
     for oi in 0..offsets.len() as i32:
-        print(f"{path}\t{offsets.get(oi as i64)}\t{labels.get(oi as i64)}")
+        print(f"{path}\t{offsets[oi]}\t{labels[oi]}")
     if not apply or offsets.len() == 0: return offsets.len() as i32
     let chunks: Vec[str] = Vec.new()
     var cursor = 0
     for oi in 0..offsets.len() as i32:
-        let offset = offsets.get(oi as i64)
+        let offset = offsets[oi]
         chunks.push(slice(text, cursor, offset))
         chunks.push("move ")
         cursor = offset
@@ -213,7 +213,7 @@ fn main:
     var entry = ""
     var ai = 1
     while ai < argv.len() as i32:
-        let arg = argv.get(ai as i64)
+        let arg = argv[ai]
         if arg == "--apply":
             apply = true
         else: if arg == "--last-use":
@@ -223,7 +223,7 @@ fn main:
             if ai >= argv.len() as i32:
                 print("migrate-method-arg-moves: --liveness requires a path")
                 exit_code(1)
-            liveness_path = argv.get(ai as i64)
+            liveness_path = argv[ai]
         else:
             entry = arg
         ai = ai + 1
@@ -247,12 +247,12 @@ fn main:
     let sites = if entry == "--from-tsv": collect_sites_from_tsv(liveness_tsv) else: collect_sites(entry)
     let files: Vec[str] = Vec.new()
     for i in 0..sites.len() as i32:
-        let path = sites.get(i as i64).path
+        let path = sites[i].path
         var seen = false
         for fi in 0..files.len() as i32:
-            if files.get(fi as i64) == path: seen = true
+            if files[fi] == path: seen = true
         if not seen: files.push(path)
     var total = 0
     for i in 0..files.len() as i32:
-        total = total + migrate_file(files.get(i as i64), &sites, apply, liveness_tsv)
+        total = total + migrate_file(files[i], &sites, apply, liveness_tsv)
     print(f"migrate-method-arg-moves: files={files.len() as i32} sites={total} mode=" ++ if apply: "apply" else: "dry-run")

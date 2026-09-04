@@ -272,7 +272,7 @@ fn main:
     var regressions = 0
     print("cell\texpect\tcandidate\tverdict" ++ (if baseline.len() > 0: "\tbaseline" else: ""))
     for i in 0..cells.len() as i32:
-        let c = cells.get(i as i64)
+        let c = cells[i]
         let cv = classify(candidate, dir, i, c.source)
         let ok = cv == c.expect
         if not ok:

@@ -19,14 +19,14 @@ fn find_from(text: str, needle: str, start: i64) -> i64:
     var i = start
     while i + needle.len() <= text.len():
         var j: i64 = 0
-        while j < needle.len() and text.byte_at(i + j) == needle.byte_at(j): j = j + 1
+        while j < needle.len() and text[i + j] == needle[j]: j = j + 1
         if j == needle.len(): return i
         i = i + 1
     -1
 
 fn line_end(text: str, start: i64) -> i64:
     var end = start
-    while end < text.len() and text.byte_at(end) != 10: end = end + 1
+    while end < text.len() and text[end] != 10: end = end + 1
     end
 
 fn line_text(text: str, start: i64): text.slice(start, line_end(text, start))
@@ -40,7 +40,7 @@ fn diagnostic_source_path(path: str) -> str:
 fn parse_i32_text(text: str) -> i32:
     var out = 0
     for i in 0..text.len() as i32:
-        let b = text.byte_at(i as i64) as i32
+        let b = text[i] as i32
         if b < 48 or b > 57: return -1
         out = out * 10 + b - 48
     out
@@ -50,7 +50,7 @@ fn source_line_start(text: str, wanted: i32) -> i32:
     var line = 1
     var i = 0
     while i < text.len() as i32:
-        if text.byte_at(i as i64) as i32 == 10:
+        if text[i] as i32 == 10:
             line = line + 1
             if line == wanted: return i + 1
         i = i + 1
@@ -58,7 +58,7 @@ fn source_line_start(text: str, wanted: i32) -> i32:
 
 fn source_line_end(text: str, start: i32) -> i32:
     var i = start
-    while i < text.len() as i32 and text.byte_at(i as i64) as i32 != 10: i = i + 1
+    while i < text.len() as i32 and text[i] as i32 != 10: i = i + 1
     i
 
 type Edits {
@@ -177,7 +177,7 @@ fn main:
     var source_path = "src/main.w"
     var apply = false
     for ai in 2..argv.len() as i32:
-        let arg = argv.get(ai as i64)
+        let arg = argv[ai]
         if arg == "--apply":
             apply = true
         else if source_path == "src/main.w":

@@ -61,7 +61,7 @@ fn find_sub(s: &str, sub: &str) -> i64:
         var j: i64 = 0
         var ok = true
         while j < m:
-            if s.byte_at(i + j) != sub.byte_at(j):
+            if s[i + j] != sub[j]:
                 ok = false
                 break
             j = j + 1
@@ -77,10 +77,10 @@ fn line_after_prefix(src: &str, prefix: &str) -> str:
         return ""
     var start = idx + prefix.len()
     let n = src.len()
-    while start < n and src.byte_at(start) == 32:        // skip spaces
+    while start < n and src[start] == 32:        // skip spaces
         start = start + 1
     var end = start
-    while end < n and src.byte_at(end) != 10:            // to newline
+    while end < n and src[end] != 10:            // to newline
         end = end + 1
     src.slice(start, end)
 

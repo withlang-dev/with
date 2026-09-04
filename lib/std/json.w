@@ -51,7 +51,7 @@ fn json_escape_string(value: &str) -> str:
     var out = ""
     var i = 0
     while i < value.len() as i32:
-        let ch = value.byte_at(i as i64)
+        let ch = value[i]
         if ch == 34:
             out = out ++ "\\\""
         else if ch == 92:
@@ -191,7 +191,7 @@ unsafe fn fill_token(tokens: *mut JsonToken, idx: i32, tok_type: i32, start: i32
 unsafe fn parse_primitive(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     let start = parser.pos
     while parser.pos < len:
-        let c = js.byte_at(parser.pos as i64) as i32
+        let c = js[parser.pos] as i32
         if c == 0:
             break
         // Terminators: : \t \r \n space , ] }
@@ -217,7 +217,7 @@ unsafe fn parse_string(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut
     // Skip opening quote
     parser.pos = parser.pos + 1
     while parser.pos < len:
-        let c = js.byte_at(parser.pos as i64) as i32
+        let c = js[parser.pos] as i32
         if c == 0:
             break
         // Closing quote
@@ -232,7 +232,7 @@ unsafe fn parse_string(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut
         // Backslash escape
         if c == 92 and parser.pos + 1 < len:
             parser.pos = parser.pos + 1
-            let esc = js.byte_at(parser.pos as i64) as i32
+            let esc = js[parser.pos] as i32
             // " / \ b f r n t
             if esc == 34 or esc == 47 or esc == 92 or esc == 98 or esc == 102 or esc == 114 or esc == 110 or esc == 116:
                 0  // valid escape, continue
@@ -241,7 +241,7 @@ unsafe fn parse_string(parser: *mut JsonParser, js: &str, len: i32, tokens: *mut
                 parser.pos = parser.pos + 1
                 var hi = 0
                 while hi < 4 and parser.pos < len:
-                    let hc = js.byte_at(parser.pos as i64) as i32
+                    let hc = js[parser.pos] as i32
                     if hc == 0:
                         break
                     if not ((hc >= 48 and hc <= 57) or (hc >= 65 and hc <= 70) or (hc >= 97 and hc <= 102)):
@@ -263,7 +263,7 @@ unsafe fn json_parse_impl(parser: *mut JsonParser, js: &str, len: i32, tokens: *
     var count = parser.toknext
 
     while parser.pos < len:
-        let c = js.byte_at(parser.pos as i64) as i32
+        let c = js[parser.pos] as i32
         if c == 0:
             break
 
@@ -443,11 +443,11 @@ pub fn json_int(js: &str, tokens: *const JsonToken, idx: i32) -> i32:
     var val = 0
     var neg = false
     var pos = start
-    if pos < end and js.byte_at(pos as i64) == 45:
+    if pos < end and js[pos] == 45:
         neg = true
         pos = pos + 1
     while pos < end:
-        let d = js.byte_at(pos as i64) as i32
+        let d = js[pos] as i32
         if d >= 48 and d <= 57:
             val = val * 10 + (d - 48)
         else:
@@ -465,11 +465,11 @@ pub fn json_i64(js: &str, tokens: *const JsonToken, idx: i32) -> i64:
     var val: i64 = 0
     var neg = false
     var pos = start
-    if pos < end and js.byte_at(pos as i64) == 45:
+    if pos < end and js[pos] == 45:
         neg = true
         pos = pos + 1
     while pos < end:
-        let d = js.byte_at(pos as i64) as i32
+        let d = js[pos] as i32
         if d >= 48 and d <= 57:
             val = val * 10 + (d - 48) as i64
         else:
@@ -490,14 +490,14 @@ fn json_unescape_string(value: str) -> str:
     var out = ""
     var i = 0
     while i < value.len() as i32:
-        let ch = value.byte_at(i as i64) as i32
+        let ch = value[i] as i32
         if ch != 92:
             out = out ++ value.slice(i as i64, (i + 1) as i64)
         else:
             i = i + 1
             if i >= value.len() as i32:
                 json_panic("invalid JSON string escape")
-            let esc = value.byte_at(i as i64) as i32
+            let esc = value[i] as i32
             if esc == 34:
                 out = out ++ "\""
             else if esc == 92:
@@ -517,10 +517,10 @@ fn json_unescape_string(value: str) -> str:
             else if esc == 117:
                 if i + 4 >= value.len() as i32:
                     json_panic("invalid JSON unicode escape")
-                let h0 = json_hex_value(value.byte_at((i + 1) as i64) as i32)
-                let h1 = json_hex_value(value.byte_at((i + 2) as i64) as i32)
-                let h2 = json_hex_value(value.byte_at((i + 3) as i64) as i32)
-                let h3 = json_hex_value(value.byte_at((i + 4) as i64) as i32)
+                let h0 = json_hex_value(value[(i + 1)] as i32)
+                let h1 = json_hex_value(value[(i + 2)] as i32)
+                let h2 = json_hex_value(value[(i + 3)] as i32)
+                let h3 = json_hex_value(value[(i + 4)] as i32)
                 if h0 < 0 or h1 < 0 or h2 < 0 or h3 < 0:
                     json_panic("invalid JSON unicode escape")
                 let code = ((h0 * 4096) + (h1 * 256) + (h2 * 16) + h3)

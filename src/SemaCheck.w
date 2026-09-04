@@ -112,7 +112,7 @@ fn sema_regex_compile_options(flags: &str) -> i32:
     var options = 0
     var i: i64 = 0
     while i < flags.len():
-        let ch = flags.byte_at(i)
+        let ch = flags[i]
         if ch == 103:
             // g is a With-level iteration/replacement flag, not a PCRE2 compile option.
             options = options
@@ -206,9 +206,9 @@ impl Sema:
     fn named_type_path_for(sym: i32, tid: i32) -> str:
         var i = self.named_type_candidate_head(sym)
         while i >= 0:
-            if self.named_type_candidate_tids.get(i as i64) == tid:
-                return with_str_clone_ref(self.named_type_candidate_paths.get(i as i64))
-            i = self.named_type_candidate_next.get(i as i64)
+            if self.named_type_candidate_tids[i] == tid:
+                return with_str_clone_ref(self.named_type_candidate_paths[i])
+            i = self.named_type_candidate_next[i]
         ""
 
     fn tool_capability_kind_for_type(tid: i32) -> i32:
@@ -248,7 +248,7 @@ impl Sema:
         let te_start = self.get_type_d1(resolved)
         if te_start < 0:
             return tid
-        let inner_tid = self.type_extra.get((te_start + 1) as i64)
+        let inner_tid = self.type_extra[(te_start + 1)]
         if inner_tid != 0:
             return inner_tid
         tid
@@ -441,7 +441,7 @@ impl Sema:
             post_copy_type = expected
         if self.contextual_copy_adjustment_indices.contains(context_key):
             let existing_index: i32 = self.contextual_copy_adjustment_indices.get(context_key).unwrap()
-            let existing = self.contextual_copy_adjustments.get(existing_index as i64)
+            let existing = self.contextual_copy_adjustments[existing_index]
             if existing.exact_source_type == actual and existing.owned_value_type == pointee and existing.target_type == expected and existing.post_copy_type == post_copy_type:
                 return 1
             self.emit_error("internal error: conflicting contextual Copy demands for one expression", source_node)
@@ -491,7 +491,7 @@ impl Sema:
 
     fn contextual_copy_adjustment_for_sig(sig_idx: i32, source_node: i32) -> ContextualCopyAdjustment:
         let index = self.contextual_copy_adjustment_indices.get(sema_pair_key(sig_idx, source_node)).unwrap()
-        self.contextual_copy_adjustments.get(index as i64)
+        self.contextual_copy_adjustments[index]
 
     fn has_contextual_join_decision(join_node: i32) -> i32:
         self.has_contextual_join_decision_for_sig(self.current_fn_sig_idx, join_node)
@@ -504,7 +504,7 @@ impl Sema:
 
     fn contextual_join_decision_for_sig(sig_idx: i32, join_node: i32) -> ContextualJoinDecision:
         let index = self.contextual_join_decision_indices.get(sema_pair_key(sig_idx, join_node)).unwrap()
-        self.contextual_join_decisions.get(index as i64)
+        self.contextual_join_decisions[index]
 
     // Typed dumps are source-oriented rather than specialization-oriented. The
     // typed-expression sidecars already show the most recently checked concrete
@@ -512,7 +512,7 @@ impl Sema:
     fn latest_contextual_copy_adjustment_index(source_node: i32) -> i32:
         var i = self.contextual_copy_adjustments.len() as i32 - 1
         while i >= 0:
-            if self.contextual_copy_adjustments.get(i as i64).source_node == source_node:
+            if self.contextual_copy_adjustments[i].source_node == source_node:
                 return i
             i = i - 1
         -1
@@ -520,7 +520,7 @@ impl Sema:
     fn latest_contextual_join_decision_index(join_node: i32) -> i32:
         var i = self.contextual_join_decisions.len() as i32 - 1
         while i >= 0:
-            if self.contextual_join_decisions.get(i as i64).join_node == join_node:
+            if self.contextual_join_decisions[i].join_node == join_node:
                 return i
             i = i - 1
         -1
@@ -641,7 +641,7 @@ impl Sema:
 
         let resolved_arm_types: Vec[i32] = Vec.new()
         for ai in 0..arm_count:
-            resolved_arm_types.push(arm_types.get(ai as i64))
+            resolved_arm_types.push(arm_types[ai])
 
         var final_type = expected
         let expected_resolved = if expected != 0: self.resolve_alias(expected as TypeId) else: 0 as TypeId
@@ -651,7 +651,7 @@ impl Sema:
         var reference_candidate = 0
 
         for ai in 0..arm_count:
-            let arm_ty = resolved_arm_types.get(ai as i64)
+            let arm_ty = resolved_arm_types[ai]
             if arm_ty == 0:
                 continue
             let resolved = self.resolve_alias(arm_ty as TypeId)
@@ -660,7 +660,7 @@ impl Sema:
             // An arm that cannot fall through (a block ending in goto/return/
             // break) never reaches the join even when its recorded type is
             // Unit; it is diverging, not a Unit anchor.
-            let reach_node = arm_nodes.get(ai as i64)
+            let reach_node = arm_nodes[ai]
             if reach_node > 0 and self.body_can_fall_through(reach_node) == 0:
                 continue
             reaching_count = reaching_count + 1
@@ -705,10 +705,10 @@ impl Sema:
         // candidate is known. This preserves `Some(x) / None` ergonomics in
         // either arm order without restoring first-arm-driven join inference.
         for ai in 0..arm_count:
-            if resolved_arm_types.get(ai as i64) == 0:
-                let completed = self.complete_contextual_join_arm(arm_nodes.get(ai as i64), final_type)
+            if resolved_arm_types[ai] == 0:
+                let completed = self.complete_contextual_join_arm(arm_nodes[ai], final_type)
                 if completed != 0:
-                    resolved_arm_types.set_i32(ai as i64, completed)
+                    resolved_arm_types[ai] = completed
 
         let final_resolved = self.resolve_alias(final_type as TypeId)
         let final_is_ref = if self.get_type_kind(final_resolved) == TypeKind.TY_REF: 1 else: 0
@@ -721,10 +721,10 @@ impl Sema:
         var gathered_origins: Vec[i32] = Vec.new()
 
         for ai in 0..arm_count:
-            let arm_node = arm_nodes.get(ai as i64)
-            let origin_node = origin_nodes.get(ai as i64)
-            let arm_ty = resolved_arm_types.get(ai as i64)
-            let arm_role = arm_roles.get(ai as i64)
+            let arm_node = arm_nodes[ai]
+            let origin_node = origin_nodes[ai]
+            let arm_ty = resolved_arm_types[ai]
+            let arm_role = arm_roles[ai]
             var arm_kind = D22_JOIN_ARM_DIVERGING
             if arm_ty != 0:
                 let resolved = self.resolve_alias(arm_ty as TypeId)
@@ -765,7 +765,7 @@ impl Sema:
         let origin_start = self.contextual_join_origin_deps.len() as i32
         let seen_origins: HashMap[i32, i32] = HashMap.new()
         for oi in 0..gathered_origins.len() as i32:
-            let origin = gathered_origins.get(oi as i64)
+            let origin = gathered_origins[oi]
             if not seen_origins.contains(origin):
                 seen_origins.insert(origin, 1)
                 self.contextual_join_origin_deps.push(origin)
@@ -970,7 +970,7 @@ impl Sema:
     // binding, not the type machinery.
     mut fn check_mut_slice_call_exclusivity(mut_args: &Vec[i32], all_args: &Vec[i32]):
         for mi in 0..mut_args.len() as i32:
-            let m_node = mut_args.get(mi as i64)
+            let m_node = mut_args[mi]
             let m_root = self.place_root_sym(m_node)
             if m_root == 0:
                 continue
@@ -979,10 +979,10 @@ impl Sema:
             let m_count = self.borrow_collect_path(m_node)
             var m_pos = -1
             for pi in 0..all_args.len() as i32:
-                if all_args.get(pi as i64) == m_node:
+                if all_args[pi] == m_node:
                     m_pos = pi
             for oi in 0..all_args.len() as i32:
-                let o_node = all_args.get(oi as i64)
+                let o_node = all_args[oi]
                 if o_node == m_node or o_node == 0:
                     continue
                 var o_mut_coerced = 0
@@ -1077,11 +1077,11 @@ impl Sema:
                 if concrete_sym != 0:
                     // Find which trait provides assoc_sym for concrete_sym
                     for ti in 0..self.trait_name_syms.len() as i32:
-                        let at_start_t = self.trait_assoc_starts.get(ti as i64)
-                        let at_count_t = self.trait_assoc_counts.get(ti as i64)
+                        let at_start_t = self.trait_assoc_starts[ti]
+                        let at_count_t = self.trait_assoc_counts[ti]
                         for ai in 0..at_count_t:
-                            if self.trait_assoc_names.get((at_start_t + ai) as i64) == assoc_sym:
-                                let trait_sym_t: i32 = self.trait_name_syms.get(ti as i64)
+                            if self.trait_assoc_names[(at_start_t + ai)] == assoc_sym:
+                                let trait_sym_t: i32 = self.trait_name_syms[ti]
                                 if self.select_trait_impl(concrete_sym, trait_sym_t) != 0:
                                     let resolved_at = self.resolve_impl_assoc_type(concrete_sym, trait_sym_t, assoc_sym)
                                     if resolved_at != 0:
@@ -1487,7 +1487,7 @@ impl Sema:
 
     mut fn update_module_context(di: i32):
         if di < self.decl_source_paths.len() as i32:
-            let path: str = with_str_clone_ref(self.decl_source_paths.get(di as i64))
+            let path: str = with_str_clone_ref(self.decl_source_paths[di])
             if path != self.current_module_path:
                 self.current_module_path = with_str_clone_ref(path)
                 if self.scoping_active != 0:
@@ -1499,7 +1499,7 @@ impl Sema:
     mut fn update_decl_source_context(di: i32):
         self.local_file_id = 0
         if di >= 0 and di < self.decl_source_file_ids.len() as i32:
-            self.local_file_id = self.decl_source_file_ids.get(di as i64)
+            self.local_file_id = self.decl_source_file_ids[di]
         self.update_module_context(di)
 
     mut fn update_source_context_path(path: &str):
@@ -1507,9 +1507,9 @@ impl Sema:
             return
         self.local_file_id = 0
         for di in 0..self.decl_source_paths.len() as i32:
-            if self.decl_source_paths.get(di as i64) == path:
+            if self.decl_source_paths[di] == path:
                 if di < self.decl_source_file_ids.len() as i32:
-                    self.local_file_id = self.decl_source_file_ids.get(di as i64)
+                    self.local_file_id = self.decl_source_file_ids[di]
                 break
         if path != self.current_module_path:
             self.current_module_path = with_str_clone_ref(path)
@@ -1529,24 +1529,24 @@ impl Sema:
 
     fn no_std_decl_is_user_code(di: i32) -> i32:
         if di >= 0 and di < self.decl_source_paths.len() as i32:
-            if sema_tier_path_is_std_implementation(self.decl_source_paths.get(di as i64)) != 0:
+            if sema_tier_path_is_std_implementation(self.decl_source_paths[di]) != 0:
                 return 0
         1
 
     mut fn validate_no_std_import_tiers(fallback_node: NodeId):
         for mi in 0..self.module_paths.len() as i32:
-            let module_path = self.module_paths.get(mi as i64)
+            let module_path = self.module_paths[mi]
             if sema_tier_path_is_std_implementation(module_path) != 0:
                 continue
             if mi >= self.module_import_starts.len() as i32:
                 continue
-            let start = self.module_import_starts.get(mi as i64)
-            let count = self.module_import_counts.get(mi as i64)
+            let start = self.module_import_starts[mi]
+            let count = self.module_import_counts[mi]
             for ii in 0..count:
                 let idx = start + ii
                 if idx < 0 or idx >= self.module_import_paths.len() as i32:
                     continue
-                let import_path: str = with_str_clone_ref(self.module_import_paths.get(idx as i64))
+                let import_path: str = with_str_clone_ref(self.module_import_paths[idx])
                 if sema_tier_std_only_module(import_path) != 0:
                     self.emit_error(import_path ++ " requires std", fallback_node)
 
@@ -1624,7 +1624,7 @@ impl Sema:
                             fn_name_str = with_str_clone_ref(self.pool_resolve_symbol(fn_name_sym))
                         var is_generic_struct_method = false
                         for gsm_i in 0..fn_name_str.len() as i32:
-                            if fn_name_str.byte_at(gsm_i as i64) == 46:
+                            if fn_name_str[gsm_i] == 46:
                                 let owner_name = fn_name_str.slice(0, gsm_i as i64)
                                 let owner_sym = self.pool_intern(owner_name)
                                 if self.type_decl_nodes.contains(owner_sym):
@@ -1664,7 +1664,7 @@ impl Sema:
             return 1
         0
 
-    fn record_global_data_race_access(sym: i32, node: i32, kind: i32):
+    mut fn record_global_data_race_access(sym: i32, node: i32, kind: i32):
         if sym == 0 or node == 0:
             return
         if sema_path_is_std_implementation(self.current_module_path) != 0 or sema_path_is_runtime_implementation(self.current_module_path) != 0:
@@ -1687,15 +1687,15 @@ impl Sema:
             if kind == GLOBAL_RACE_ACCESS_WRITE or self.is_mutable_global(sym) != 0 or self.global_race_mutated_syms.contains(sym):
                 self.note_unsafe_operation()
 
-    fn record_global_place_write(place_node: i32, report_node: i32):
+    mut fn record_global_place_write(place_node: i32, report_node: i32):
         let root = self.place_root_sym(place_node)
         if root == 0:
             return
         self.record_global_data_race_access(root, report_node, GLOBAL_RACE_ACCESS_WRITE)
 
     fn global_data_race_access_needs_proof(idx: i32) -> i32:
-        let sym = self.global_race_access_syms.get(idx as i64)
-        let kind = self.global_race_access_kinds.get(idx as i64)
+        let sym = self.global_race_access_syms[idx]
+        let kind = self.global_race_access_kinds[idx]
         if kind == GLOBAL_RACE_ACCESS_WRITE:
             return 1
         if self.global_race_mutated_syms.contains(sym):
@@ -1703,10 +1703,10 @@ impl Sema:
         0
 
     mut fn emit_global_data_race_error(idx: i32):
-        let sym = self.global_race_access_syms.get(idx as i64)
-        let node = self.global_race_access_nodes.get(idx as i64)
-        let file_id = self.global_race_access_files.get(idx as i64)
-        let kind = self.global_race_access_kinds.get(idx as i64)
+        let sym = self.global_race_access_syms[idx]
+        let node = self.global_race_access_nodes[idx]
+        let file_id = self.global_race_access_files[idx]
+        let kind = self.global_race_access_kinds[idx]
         let name = self.pool_resolve(sym)
         let access = if kind == GLOBAL_RACE_ACCESS_WRITE: "mutation" else: "read"
         var diag = Diagnostic.err("E0921: " ++ access ++ " of global `" ++ name ++ "` may race", Span { file: file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
@@ -1723,15 +1723,15 @@ impl Sema:
         for i in 0..self.global_race_access_syms.len() as i32:
             if self.global_data_race_access_needs_proof(i) == 0:
                 continue
-            let in_unsafe: i32 = self.global_race_access_unsafe.get(i as i64)
+            let in_unsafe: i32 = self.global_race_access_unsafe[i]
             if proof_failed != 0:
                 if in_unsafe == 0:
                     self.emit_global_data_race_error(i)
             else if in_unsafe != 0:
-                let path = self.global_race_access_paths.get(i as i64)
+                let path = self.global_race_access_paths[i]
                 if sema_path_is_user_lint_source(path) == 0:
                     continue
-                let node: i32 = self.global_race_access_nodes.get(i as i64)
+                let node: i32 = self.global_race_access_nodes[i]
                 self.emit_warning("unsafe global access is currently covered by the single-thread proof; keep `unsafe` only if future concurrency is intended", node)
 
     mut fn generator_push_state_field(state_tid: i32, field_count: i32, sym: i32, tid: i32, report_node: i32) -> i32:
@@ -1870,8 +1870,8 @@ impl Sema:
             self.type_extra.push(0)
         for _ in 0..field_count:
             self.type_extra.push(0)
-        self.type_d1.set_i32(state_tid as i64, field_start)
-        self.type_d2.set_i32(state_tid as i64, field_count)
+        self.type_d1[state_tid] = field_start
+        self.type_d2[state_tid] = field_count
         if state_is_ephemeral != 0:
             self.mark_generator_state_ephemeral(state_tid)
 
@@ -1916,7 +1916,7 @@ impl Sema:
         var diag = Diagnostic.err(msg, primary)
         diag.add_label(primary, "'" ++ param_name ++ "' is by-value here, so the callee owns it")
         if pi >= 0 and pi < self.current_fn_param_view_nodes.len() as i32:
-            let view_node = self.current_fn_param_view_nodes.get(pi as i64)
+            let view_node = self.current_fn_param_view_nodes[pi]
             if view_node != 0:
                 let view_span = Span { file: self.local_file_id, start: self.ast.get_start(view_node), end: self.ast.get_end(view_node) }
                 diag.add_label(view_span, "returned view is derived from '" ++ param_name ++ "' here")
@@ -1984,11 +1984,11 @@ impl Sema:
         if method_name.len() == 0:
             return sema_trait_impl_method_contract_missing()
         let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
-        let mt_start = self.trait_method_starts.get(trait_idx as i64)
-        let mt_count = self.trait_method_counts.get(trait_idx as i64)
+        let mt_start = self.trait_method_starts[trait_idx]
+        let mt_count = self.trait_method_counts[trait_idx]
         for mi in 0..mt_count:
             let mt_idx = mt_start + mi
-            let method_sym = self.trait_method_names.get(mt_idx as i64)
+            let method_sym = self.trait_method_names[mt_idx]
             if self.pool_resolve(method_sym) != method_name:
                 continue
             let impl_type_sym = self.ast.get_data0(impl_node)
@@ -1998,17 +1998,17 @@ impl Sema:
                 let target_tid = self.resolve_type_expr(target_node)
                 if target_tid != 0:
                     impl_type_tid = target_tid
-            let ret_node: i32 = self.trait_method_ret_nodes.get(mt_idx as i64)
+            let ret_node: i32 = self.trait_method_ret_nodes[mt_idx]
             let ret_tid = self.resolve_trait_default_method_type(ret_node, impl_type_sym, impl_type_tid, trait_sym, impl_node)
             return SemaTraitImplMethodContract {
                 ok: 1,
                 trait_sym,
                 impl_node,
                 method_sym,
-                method_flags: self.trait_method_flags.get(mt_idx as i64),
+                method_flags: self.trait_method_flags[mt_idx],
                 ret_type: ret_tid,
-                param_start: self.trait_method_param_starts.get(mt_idx as i64),
-                param_count: self.trait_method_param_counts.get(mt_idx as i64),
+                param_start: self.trait_method_param_starts[mt_idx],
+                param_count: self.trait_method_param_counts[mt_idx],
             }
         sema_trait_impl_method_contract_missing()
 
@@ -2317,7 +2317,7 @@ impl Sema:
         // validity preconditions instead. Neither owns through the parameter.
         var raw_validity_param_sym = 0
         for pi in 0..self.current_fn_param_effs.len() as i32:
-            var eff: i32 = self.current_fn_param_effs.get(pi as i64)
+            var eff: i32 = self.current_fn_param_effs[pi]
             if eff != 0:
                 if sig_idx >= 0:
                     let p_tid = self.sig_param_type(sig_idx, pi)
@@ -2338,17 +2338,17 @@ impl Sema:
                         // move-by-default vestige (D5); they are removed, not gated.
                 if pi == 0 and self.sig_receiver_mode(sig_idx) == ReceiverMode.Move:
                     eff = eff | EFF_CONSUME
-                var direct_eff: i32 = self.current_fn_param_direct_effs.get(pi as i64)
+                var direct_eff: i32 = self.current_fn_param_direct_effs[pi]
                 if pi == 0 and self.sig_receiver_mode(sig_idx) == ReceiverMode.Move:
                     direct_eff = direct_eff | EFF_CONSUME
                 self.set_sig_param_effect(sig_idx, pi, eff)
                 self.set_sig_param_direct_effect(sig_idx, pi, direct_eff)
                 if (eff & EFF_ESCAPE_VIEW) != 0:
-                    self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins.get(pi as i64))
+                    self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins[pi])
                 else:
                     self.set_sig_param_view_origin(sig_idx, pi, 0)
                 if raw_validity_param_sym == 0 and (eff & EFF_RAW_PTR_VALIDITY) != 0 and pi < self.current_fn_param_syms.len() as i32:
-                    raw_validity_param_sym = self.current_fn_param_syms.get(pi as i64)
+                    raw_validity_param_sym = self.current_fn_param_syms[pi]
 
         if raw_validity_param_sym != 0 and self.fn_symbol_is_unsafe(fn_name) == 0:
             let param_name = self.pool_resolve(raw_validity_param_sym)
@@ -2386,11 +2386,11 @@ impl Sema:
             self.current_fn_param_origins.pop()
             self.current_fn_param_view_nodes.pop()
         for i in 0..saved_eff_param_syms.len() as i32:
-            self.current_fn_param_syms.push(saved_eff_param_syms.get(i as i64))
-            self.current_fn_param_effs.push(saved_eff_param_effs.get(i as i64))
-            self.current_fn_param_direct_effs.push(saved_eff_param_direct_effs.get(i as i64))
-            self.current_fn_param_origins.push(saved_eff_param_origins.get(i as i64))
-            self.current_fn_param_view_nodes.push(saved_eff_param_view_nodes.get(i as i64))
+            self.current_fn_param_syms.push(saved_eff_param_syms[i])
+            self.current_fn_param_effs.push(saved_eff_param_effs[i])
+            self.current_fn_param_direct_effs.push(saved_eff_param_direct_effs[i])
+            self.current_fn_param_origins.push(saved_eff_param_origins[i])
+            self.current_fn_param_view_nodes.push(saved_eff_param_view_nodes[i])
         self.current_return_type = saved_ret
         self.current_gen_yield_type = saved_gen_yield_type
         self.has_gen_yield_type = saved_has_gen_yield_type
@@ -2487,11 +2487,11 @@ impl Sema:
         if ref_param_count == 1: ref_param_index else: DECLARED_ORIGIN_AMBIGUOUS
 
     mut fn check_trait_default_method_body_for_impl(impl_node: i32, method_idx: i32):
-        let body: i32 = self.trait_method_default_bodies.get(method_idx as i64)
+        let body: i32 = self.trait_method_default_bodies[method_idx]
         if body == 0:
             return
         let impl_type_sym = self.ast.get_data0(impl_node)
-        let method_sym: i32 = self.trait_method_names.get(method_idx as i64)
+        let method_sym: i32 = self.trait_method_names[method_idx]
         if self.impl_decl_has_method(impl_node, method_sym) != 0:
             return
         let sig_idx = self.lookup_method_sig(impl_type_sym, method_sym)
@@ -2527,8 +2527,8 @@ impl Sema:
                 self.assoc_type_bindings.insert(at_name, at_tid as i32)
 
         self.push_scope()
-        let param_start = self.trait_method_param_starts.get(method_idx as i64)
-        let param_count = self.trait_method_param_counts.get(method_idx as i64)
+        let param_start = self.trait_method_param_starts[method_idx]
+        let param_count = self.trait_method_param_counts[method_idx]
         for pi in 0..param_count:
             let p_name = self.ast.fn_param_name(param_start, pi)
             // D12: `mut self` binds mutable — see check_fn_body_with_sig_at.
@@ -2569,8 +2569,8 @@ impl Sema:
             if trait_sym == 0 or not self.trait_lookup.contains(trait_sym):
                 continue
             let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
-            let mt_start: i32 = self.trait_method_starts.get(trait_idx as i64)
-            let mt_count = self.trait_method_counts.get(trait_idx as i64)
+            let mt_start: i32 = self.trait_method_starts[trait_idx]
+            let mt_count = self.trait_method_counts[trait_idx]
             for mi in 0..mt_count:
                 self.check_trait_default_method_body_for_impl(impl_node, mt_start + mi)
 
@@ -2645,7 +2645,7 @@ impl Sema:
     fn label_registry_path() -> str:
         var out = "|"
         for i in 0..self.fn_label_scope_stack.len() as i32:
-            out = out ++ i64_to_string(self.fn_label_scope_stack.get(i as i64) as i64) ++ "|"
+            out = out ++ i64_to_string(self.fn_label_scope_stack[i] as i64) ++ "|"
         out
 
 fn sema_label_path_is_prefix(prefix: &str, path: &str) -> bool:
@@ -2664,14 +2664,14 @@ impl Sema:
 
     fn find_function_label(sym: i32) -> i32:
         for i in 0..self.fn_label_syms.len() as i32:
-            if self.fn_label_syms.get(i as i64) == sym:
+            if self.fn_label_syms[i] == sym:
                 return i
         -1
 
-    fn mark_function_label_used(sym: i32):
+    mut fn mark_function_label_used(sym: i32):
         let idx = self.find_function_label(sym)
         if idx >= 0:
-            self.fn_label_used.set_i32(idx as i64, 1)
+            self.fn_label_used[idx] = 1
 
     mut fn register_function_label(sym: i32, node: i32, order: i32) -> Unit:
         if sym == 0:
@@ -2880,24 +2880,24 @@ impl Sema:
 
     mut fn validate_function_gotos():
         for gi in 0..self.fn_goto_syms.len() as i32:
-            let target_sym: i32 = self.fn_goto_syms.get(gi as i64)
+            let target_sym: i32 = self.fn_goto_syms[gi]
             let target_idx = self.find_function_label(target_sym)
-            let goto_node: i32 = self.fn_goto_nodes.get(gi as i64)
+            let goto_node: i32 = self.fn_goto_nodes[gi]
             if target_idx < 0:
                 self.emit_error("undefined goto target " ++ self.label_name(target_sym), goto_node)
                 continue
-            let target_path = self.fn_label_paths.get(target_idx as i64)
-            let goto_path = self.fn_goto_paths.get(gi as i64)
+            let target_path = self.fn_label_paths[target_idx]
+            let goto_path = self.fn_goto_paths[gi]
             if not sema_label_path_is_prefix(target_path, goto_path):
                 self.emit_error("goto would enter a block from outside", goto_node)
                 continue
-            let goto_order = self.fn_goto_orders.get(gi as i64)
-            let target_order = self.fn_label_orders.get(target_idx as i64)
+            let goto_order = self.fn_goto_orders[gi]
+            let target_order = self.fn_label_orders[target_idx]
             if target_order > goto_order:
                 for ii in 0..self.fn_init_orders.len() as i32:
-                    let init_order = self.fn_init_orders.get(ii as i64)
-                    if init_order > goto_order and init_order < target_order and self.fn_init_paths.get(ii as i64) == target_path:
-                        let init_node = self.fn_init_nodes.get(ii as i64)
+                    let init_order = self.fn_init_orders[ii]
+                    if init_order > goto_order and init_order < target_order and self.fn_init_paths[ii] == target_path:
+                        let init_node = self.fn_init_nodes[ii]
                         let ik = self.ast.kind(init_node)
                         if ik == NodeKind.NK_DEFER or ik == NodeKind.NK_ERRDEFER:
                             self.emit_error("goto would skip deferred cleanup registration", goto_node)
@@ -2907,12 +2907,12 @@ impl Sema:
 
     mut fn emit_unused_label_warnings():
         for li in 0..self.fn_label_syms.len() as i32:
-            if self.fn_label_used.get(li as i64) != 0:
+            if self.fn_label_used[li] != 0:
                 continue
-            let node = self.fn_label_nodes.get(li as i64)
+            let node = self.fn_label_nodes[li]
             let start = self.ast.get_start(node)
             let end = self.ast.get_end(node)
-            var diag = Diagnostic.warn("unused label " ++ self.label_name(self.fn_label_syms.get(li as i64)), Span { file: self.local_file_id, start, end })
+            var diag = Diagnostic.warn("unused label " ++ self.label_name(self.fn_label_syms[li]), Span { file: self.local_file_id, start, end })
             diag.set_code("unused-label")
             self.diags.emit(move diag)
 
@@ -2931,10 +2931,10 @@ impl Sema:
         if sym != 0:
             var i = self.label_syms.len() as i32 - 1
             while i >= 0:
-                let frame_kind = self.label_kinds.get(i as i64)
+                let frame_kind = self.label_kinds[i]
                 if frame_kind == LabelFrameKind.LFK_BOUNDARY:
                     break
-                if self.label_syms.get(i as i64) == sym:
+                if self.label_syms[i] == sym:
                     self.emit_error("nested duplicate active label " ++ self.label_name(sym), node)
                     break
                 i = i - 1
@@ -2961,12 +2961,12 @@ impl Sema:
         var crossed_boundary = 0
         var i = self.label_syms.len() as i32 - 1
         while i >= 0:
-            let frame_kind = self.label_kinds.get(i as i64)
+            let frame_kind = self.label_kinds[i]
             if frame_kind == LabelFrameKind.LFK_BOUNDARY:
                 crossed_boundary = 1
                 i = i - 1
                 continue
-            if self.label_syms.get(i as i64) == label:
+            if self.label_syms[i] == label:
                 if crossed_boundary != 0:
                     self.emit_error("label cannot cross function, closure, or async boundary", node)
                     return -1
@@ -2978,7 +2978,7 @@ impl Sema:
     mut fn resolve_innermost_loop_control(node: i32, word: &str) -> i32:
         var i = self.label_syms.len() as i32 - 1
         while i >= 0:
-            let frame_kind = self.label_kinds.get(i as i64)
+            let frame_kind = self.label_kinds[i]
             if frame_kind == LabelFrameKind.LFK_BOUNDARY:
                 break
             if frame_kind == LabelFrameKind.LFK_LOOP or frame_kind == LabelFrameKind.LFK_WHILE or frame_kind == LabelFrameKind.LFK_FOR:
@@ -2994,16 +2994,16 @@ impl Sema:
             return
         if actual == self.ty_never:
             return
-        let existing = self.label_break_value_types.get(frame_idx as i64)
+        let existing = self.label_break_value_types[frame_idx]
         if existing == 0 or existing == self.ty_never:
-            self.label_break_value_types.set_i32(frame_idx as i64, actual)
+            self.label_break_value_types[frame_idx] = actual
             return
         if self.types_compatible(existing, actual) != 0:
-            self.label_break_value_types.set_i32(frame_idx as i64, self.preferred_compatible_type(existing as TypeId, actual as TypeId) as i32)
+            self.label_break_value_types[frame_idx] = self.preferred_compatible_type(existing as TypeId, actual as TypeId) as i32
             return
         let arith = self.arithmetic_result_type(existing as TypeId, actual as TypeId)
         if arith != 0:
-            self.label_break_value_types.set_i32(frame_idx as i64, arith as i32)
+            self.label_break_value_types[frame_idx] = arith as i32
             return
         self.emit_error("break values of this loop do not unify: expected `" ++ self.type_name(existing) ++ "`, found `" ++ self.type_name(actual) ++ "` (§13.5d)", node)
 
@@ -3015,7 +3015,7 @@ impl Sema:
         // Annotated: copy the kind out — an unannotated binding views the
         // element, and the seed's pre-#753 checker phantom-flags the
         // emit_error below (offset-sensitive cross-file span matching).
-        let kind: i32 = self.label_kinds.get(target as i64)
+        let kind: i32 = self.label_kinds[target]
         if value != 0 and kind != LabelFrameKind.LFK_LOOP:
             self.emit_error("break with a value is only valid for `loop`; `while`, `for`, `do`-`while`, and labeled blocks cannot carry a break value (§13.5a)", node)
             self.check_expr(value)
@@ -3154,7 +3154,7 @@ impl Sema:
 
 fn cheader_vec_has(v: &Vec[i32], x: i32) -> bool:
     for i in 0..v.len() as i32:
-        if v.get(i as i64) == x:
+        if v[i] == x:
             return true
     false
 
@@ -3185,7 +3185,7 @@ impl Sema:
         // deepest first so by-value field structs are defined before their users.
         var ordered: Vec[i32] = Vec.new()
         for ei in 0..exported.len() as i32:
-            let fn_node = exported.get(ei as i64)
+            let fn_node = exported[ei]
             let sig = self.get_sig(self.ast.get_data0(fn_node))
             if sig < 0:
                 continue
@@ -3198,9 +3198,9 @@ impl Sema:
         out = out ++ "#include <stdint.h>\n#include <stdbool.h>\n#include <stddef.h>\n\n"
         out = out ++ "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
         for si in 0..ordered.len() as i32:
-            out = out ++ self.cheader_struct_def(ordered.get(si as i64))
+            out = out ++ self.cheader_struct_def(ordered[si])
         for ei in 0..exported.len() as i32:
-            out = out ++ self.cheader_prototype(exported.get(ei as i64))
+            out = out ++ self.cheader_prototype(exported[ei])
         out = out ++ "\n#ifdef __cplusplus\n}\n#endif\n\n#endif\n"
         out
 
@@ -3213,7 +3213,7 @@ impl Sema:
         let te = self.get_type_d1(tid)
         let fc = self.get_type_d2(tid)
         for fi in 0..fc:
-            let ftid = self.type_extra.get((te + fi * 3 + 1) as i64)
+            let ftid = self.type_extra[(te + fi * 3 + 1)]
             result = self.cheader_collect_struct(self.cheader_struct_ref(ftid), move result)
         if not cheader_vec_has(&result, tid):
             result.push(tid)
@@ -3224,8 +3224,8 @@ impl Sema:
         let te = self.get_type_d1(tid)
         let fc = self.get_type_d2(tid)
         for fi in 0..fc:
-            let fname = self.pool_resolve(self.type_extra.get((te + fi * 3) as i64))
-            let ftid = self.type_extra.get((te + fi * 3 + 1) as i64)
+            let fname = self.pool_resolve(self.type_extra[(te + fi * 3)])
+            let ftid = self.type_extra[(te + fi * 3 + 1)]
             out = out ++ "    " ++ self.cheader_decl_with_name(ftid, fname) ++ ";\n"
         out ++ "} " ++ self.type_name(tid) ++ ";\n\n"
 
@@ -3605,14 +3605,14 @@ impl Sema:
     // populating typed_expr_types so MirLower has type information.
     // Returns the sig index for the concrete signature.
 
-    fn register_concrete_specialization(fn_node: i32, mono_sym: i32, sig_idx: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], param_concrete_tys: &Vec[i32]):
+    mut fn register_concrete_specialization(fn_node: i32, mono_sym: i32, sig_idx: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], param_concrete_tys: &Vec[i32]):
         if mono_sym == 0 or sig_idx < 0:
             return
         self.record_fn_behavior_metadata(mono_sym, fn_node, self.ast.get_data2(fn_node))
         let found = self.concrete_specialization_by_sym.get(mono_sym)
         if found.is_some():
             let found_idx: i32 = found.unwrap()
-            self.concrete_specialization_sigs.set_i32(found_idx as i64, sig_idx)
+            self.concrete_specialization_sigs[found_idx] = sig_idx
             return
         let idx = self.concrete_specialization_nodes.len() as i32
         self.concrete_specialization_by_sym.insert(mono_sym, idx)
@@ -3622,12 +3622,12 @@ impl Sema:
         self.concrete_specialization_subst_starts.push(self.concrete_specialization_subst_syms.len() as i32)
         self.concrete_specialization_subst_counts.push(tp_syms.len() as i32)
         for ti in 0..tp_syms.len() as i32:
-            self.concrete_specialization_subst_syms.push(tp_syms.get(ti as i64))
-            self.concrete_specialization_subst_types.push(tp_sema_tys.get(ti as i64))
+            self.concrete_specialization_subst_syms.push(tp_syms[ti])
+            self.concrete_specialization_subst_types.push(tp_sema_tys[ti])
         self.concrete_specialization_param_starts.push(self.concrete_specialization_param_types.len() as i32)
         self.concrete_specialization_param_counts.push(param_concrete_tys.len() as i32)
         for pi in 0..param_concrete_tys.len() as i32:
-            self.concrete_specialization_param_types.push(param_concrete_tys.get(pi as i64))
+            self.concrete_specialization_param_types.push(param_concrete_tys[pi])
 
     mut fn check_fn_body_concrete(fn_node: i32, tp_syms: &Vec[i32], tp_sema_tys: &Vec[i32], mono_sym: i32, param_concrete_tys: &Vec[i32]) -> i32:
         let fn_name = self.ast.get_data0(fn_node)
@@ -3656,14 +3656,14 @@ impl Sema:
         let saved_named: Vec[i32] = Vec.new()
         let saved_had: Vec[i32] = Vec.new()
         for ti in 0..tp_count:
-            let tp_sym = tp_syms.get(ti as i64)
+            let tp_sym = tp_syms[ti]
             if self.named_types.contains(tp_sym):
                 saved_had.push(1)
                 saved_named.push(self.named_types.get(tp_sym).unwrap())
             else:
                 saved_had.push(0)
                 saved_named.push(0)
-            let tp_sema_ty = tp_sema_tys.get(ti as i64)
+            let tp_sema_ty = tp_sema_tys[ti]
             self.named_types.insert(tp_sym, tp_sema_ty)
             self.put_generic_subst(tp_sym, tp_sema_ty, fn_node)
             let tp_text = self.pool_resolve_symbol(tp_sym)
@@ -3682,7 +3682,7 @@ impl Sema:
             var p_tid = if p_type_node != 0: self.resolve_type_expr(p_type_node) else: 0
             if p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.ast.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL:
                 if pi < param_concrete_tys.len() as i32:
-                    let concrete_param_ty = param_concrete_tys.get(pi as i64)
+                    let concrete_param_ty = param_concrete_tys[pi]
                     if concrete_param_ty != 0:
                         p_tid = concrete_param_ty as TypeId
             self.sig_params.push(p_tid as i32)
@@ -3708,26 +3708,26 @@ impl Sema:
             let saved_vra_count = self.sig_get_param_count(sig_idx)
             for svi in 0..saved_vra_count:
                 saved_vra.push(self.sig_param_uses_value_ref_abi(sig_idx, svi))
-            self.sig_type_ids.set_i32(sig_idx as i64, 0)
-            self.sig_ret_types.set_i32(sig_idx as i64, ret_tid as i32)
-            self.sig_param_starts.set_i32(sig_idx as i64, ps)
-            self.sig_param_counts.set_i32(sig_idx as i64, param_count)
-            self.sig_variadic.set_i32(sig_idx as i64, 0)
-            self.sig_param_eff_starts.set_i32(sig_idx as i64, self.sig_param_effects.len() as i32)
+            self.sig_type_ids[sig_idx] = 0
+            self.sig_ret_types[sig_idx] = ret_tid as i32
+            self.sig_param_starts[sig_idx] = ps
+            self.sig_param_counts[sig_idx] = param_count
+            self.sig_variadic[sig_idx] = 0
+            self.sig_param_eff_starts[sig_idx] = self.sig_param_effects.len() as i32
             for cpi in 0..param_count:
                 self.sig_param_effects.push(0)
                 self.sig_param_direct_effects.push(0)
                 self.sig_param_view_origins.push(0)
                 self.sig_value_ref_abi_params.push(0)
             for svi in 0..saved_vra_count:
-                if svi < param_count and saved_vra.get(svi as i64) != 0:
+                if svi < param_count and saved_vra[svi] != 0:
                     self.set_sig_param_value_ref_abi(sig_idx, svi, 1)
         self.set_sig_receiver_mode(sig_idx, self.receiver_mode_from_param(param_start, param_count))
         var method_owner_sym = 0
         var self_type_id = 0
         let fn_name_str = self.pool_resolve(fn_name)
         for owner_ci in 0..fn_name_str.len() as i32:
-            if fn_name_str.byte_at(owner_ci as i64) == 46:
+            if fn_name_str[owner_ci] == 46:
                 let owner_name = fn_name_str.slice(0, owner_ci as i64)
                 method_owner_sym = self.pool_lookup_symbol(owner_name)
                 if method_owner_sym != 0:
@@ -3815,9 +3815,9 @@ impl Sema:
 
         // Restore named_types
         for ti in 0..tp_count:
-            let tp_sym = tp_syms.get(ti as i64)
-            if saved_had.get(ti as i64) == 1:
-                self.named_types.insert(tp_sym, saved_named.get(ti as i64))
+            let tp_sym = tp_syms[ti]
+            if saved_had[ti] == 1:
+                self.named_types.insert(tp_sym, saved_named[ti])
             else:
                 self.named_types.remove(tp_sym)
 
@@ -3988,8 +3988,8 @@ impl Sema:
     fn has_live_await_guard_binding() -> i32:
         var i = self.bind_names.len() as i32 - 1
         while i >= 0:
-            if self.bind_states.get(i as i64) == VarState.LIVE:
-                let tid = self.bind_types.get(i as i64)
+            if self.bind_states[i] == VarState.LIVE:
+                let tid = self.bind_types[i]
                 if self.type_is_no_await_guard(tid) != 0:
                     return 1
             i = i - 1
@@ -4093,8 +4093,8 @@ impl Sema:
             let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
             if tta_idx < 0:
                 continue
-            let arg_start: i32 = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
-            let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+            let arg_start: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
+            let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
             if arg_count <= 0:
                 continue
             return self.resolve_impl_trait_arg_for_source(decl, recv_type, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
@@ -4165,7 +4165,7 @@ impl Sema:
             return
         var trait_idx = -1
         for ti in 0..self.trait_name_syms.len() as i32:
-            if self.trait_name_syms.get(ti as i64) == trait_sym:
+            if self.trait_name_syms[ti] == trait_sym:
                 trait_idx = ti
                 break
         if trait_idx < 0:
@@ -4174,11 +4174,11 @@ impl Sema:
         let start = self.dyn_impl_flat_method_names.len() as i32
         self.dyn_impl_starts.insert(reg_key, start)
         self.dyn_impl_counts.insert(reg_key, 0)
-        let m_start = self.trait_method_starts.get(trait_idx as i64)
-        let m_count = self.trait_method_counts.get(trait_idx as i64)
+        let m_start = self.trait_method_starts[trait_idx]
+        let m_count = self.trait_method_counts[trait_idx]
         var rows = 0
         for mi in 0..m_count:
-            let method_sym: i32 = self.trait_method_names.get((m_start + mi) as i64)
+            let method_sym: i32 = self.trait_method_names[(m_start + mi)]
             let method_fn = self.lookup_generic_method_fn(owner_sym, method_sym)
             if method_fn == 0:
                 continue
@@ -4187,7 +4187,7 @@ impl Sema:
                 continue
             self.dyn_impl_flat_method_names.push(method_sym)
             self.dyn_impl_flat_sigs.push(sig)
-            self.dyn_impl_flat_mono_syms.push(self.sig_names.get(sig as i64))
+            self.dyn_impl_flat_mono_syms.push(self.sig_names[sig])
             rows = rows + 1
         self.dyn_impl_counts.insert(reg_key, rows)
 
@@ -4202,7 +4202,7 @@ impl Sema:
             self.emit_error("BTree collection insertion method could not be specialized for the concrete collection type", anchor_node)
             return 0
         self.btree_insert_sigs.insert(anchor_node, insert_sig)
-        self.btree_insert_mono_syms.insert(anchor_node, self.sig_names.get(insert_sig as i64))
+        self.btree_insert_mono_syms.insert(anchor_node, self.sig_names[insert_sig])
         1
 
     // A compiler-modeled operation that promises an owned clone must carry the
@@ -4228,7 +4228,7 @@ impl Sema:
             return 0
         self.clone_contract_fns.insert(anchor_node, clone_fn)
         self.clone_contract_sigs.insert(anchor_node, clone_sig)
-        self.clone_contract_mono_syms.insert(anchor_node, self.sig_names.get(clone_sig as i64))
+        self.clone_contract_mono_syms.insert(anchor_node, self.sig_names[clone_sig])
         1
 
     mut fn classify_guarded_with(node: i32, source_ty: i32, is_mut: i32) -> i32:
@@ -4264,9 +4264,9 @@ impl Sema:
         self.with_enter_methods.insert(node, enter_fn)
         self.with_exit_methods.insert(node, exit_fn)
         self.with_enter_sigs.insert(node, enter_sig)
-        self.with_enter_mono_syms.insert(node, self.sig_names.get(enter_sig as i64))
+        self.with_enter_mono_syms.insert(node, self.sig_names[enter_sig])
         self.with_exit_sigs.insert(node, exit_sig)
-        self.with_exit_mono_syms.insert(node, self.sig_names.get(exit_sig as i64))
+        self.with_exit_mono_syms.insert(node, self.sig_names[exit_sig])
         if is_mut != 0: WithFormKind.GuardedMut else: WithFormKind.Guarded
 
     mut fn fn_symbol_may_suspend(fn_sym: i32) -> i32:
@@ -4603,7 +4603,7 @@ impl Sema:
         let body = self.ast.get_data0(closure)
         let trait_name: str = with_str_clone_ref(self.pool_resolve_symbol(trait_sym))
         for bi in 0..self.bind_names.len() as i32:
-            let cap_sym: i32 = self.bind_names.get(bi as i64)
+            let cap_sym: i32 = self.bind_names[bi]
             if cap_sym == 0:
                 continue
             if self.expr_uses_symbol(body, cap_sym) == 0:
@@ -4628,7 +4628,7 @@ impl Sema:
             return 0
         let body = self.ast.get_data0(closure)
         for bi in 0..self.bind_names.len() as i32:
-            let cap_sym: i32 = self.bind_names.get(bi as i64)
+            let cap_sym: i32 = self.bind_names[bi]
             if cap_sym == 0:
                 continue
             if self.expr_uses_symbol(body, cap_sym) == 0:
@@ -5904,9 +5904,9 @@ impl Sema:
             return 1
         0
 
-    fn note_unsafe_operation():
+    mut fn note_unsafe_operation():
         for i in 0..self.unsafe_scope_used.len() as i32:
-            self.unsafe_scope_used.set_i32(i as i64, 1)
+            self.unsafe_scope_used[i] = 1
 
     mut fn require_unsafe_operation(msg: &str, node: i32) -> i32:
         if self.in_unsafe == 0:
@@ -5915,7 +5915,7 @@ impl Sema:
         self.note_unsafe_operation()
         1
 
-    fn note_raw_pointer_validity_param(sym: i32):
+    mut fn note_raw_pointer_validity_param(sym: i32):
         if self.current_fn_sig_idx < 0 or sym == 0:
             return
         let pi = self.param_index_for_sym(sym)
@@ -5925,7 +5925,7 @@ impl Sema:
         if self.type_is_raw_pointer_value(p_tid) != 0:
             self.note_param_effect(sym, EFF_RAW_PTR_VALIDITY)
 
-    fn note_raw_pointer_validity_precondition(expr_node: i32):
+    mut fn note_raw_pointer_validity_precondition(expr_node: i32):
         if self.current_fn_sig_idx < 0 or expr_node == 0:
             return
         if sema_path_is_runtime_implementation(self.current_module_path) != 0:
@@ -5944,7 +5944,7 @@ impl Sema:
             for pi in 0..self.current_fn_param_syms.len() as i32:
                 let bit = ((1 as i64) << (pi as u32)) as i32
                 if (origin_mask & bit) != 0:
-                    self.note_raw_pointer_validity_param(self.current_fn_param_syms.get(pi as i64))
+                    self.note_raw_pointer_validity_param(self.current_fn_param_syms[pi])
 
     fn fn_symbol_is_unsafe(fn_sym: i32) -> i32:
         let fn_node = self.fn_symbol_decl_node(fn_sym)
@@ -6298,7 +6298,7 @@ impl Sema:
             // the back-edge, not an exit.
             let loop_body_diverges = if self.get_type_kind(self.resolve_alias(loop_body_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
             self.finalize_loop_move_state(&loop_entry_states, loop_frame_idx, loop_body_diverges, 0, node)
-            let result_ty = if loop_frame_idx >= 0: self.label_break_value_types.get(loop_frame_idx as i64) else: 0
+            let result_ty = if loop_frame_idx >= 0: self.label_break_value_types[loop_frame_idx] else: 0
             self.pop_label_frame()
             self.pop_scope()
             self.loop_depth = self.loop_depth - 1
@@ -6331,7 +6331,7 @@ impl Sema:
             let label = self.ast.get_data0(node)
             if label != 0:
                 let target = self.resolve_labeled_control(label, node)
-                if target >= 0 and self.label_kinds.get(target as i64) == LabelFrameKind.LFK_BLOCK:
+                if target >= 0 and self.label_kinds[target] == LabelFrameKind.LFK_BLOCK:
                     self.emit_error("cannot continue a labeled block; only loops support continue", node)
                 self.mark_function_label_used(label)
                 self.check_loop_continue_carried_move(target, node)
@@ -6454,7 +6454,7 @@ impl Sema:
             self.in_unsafe = saved_unsafe
             if tracks_use != 0:
                 let used_idx = self.unsafe_scope_used.len() as i32 - 1
-                let used = if used_idx >= 0: self.unsafe_scope_used.get(used_idx as i64) else: 0
+                let used = if used_idx >= 0: self.unsafe_scope_used[used_idx] else: 0
                 let _ = self.unsafe_scope_used.pop()
                 if unsafe_result != 0 and used == 0:
                     self.emit_error("unsafe block contains no unsafe operations", node)
@@ -6613,7 +6613,7 @@ impl Sema:
                     unwrapped_elems.push(self.unwrap_task_type(elem_ty) as i32)
                 let te_start = self.type_extra.len() as i32
                 for ei in 0..elem_count:
-                    self.type_extra.push(unwrapped_elems.get(ei as i64))
+                    self.type_extra.push(unwrapped_elems[ei])
                 let unwrapped_tuple = self.add_type(TypeKind.TY_TUPLE, te_start, elem_count, 0)
                 self.typed_expr_types.insert(node, unwrapped_tuple as i32)
                 return unwrapped_tuple as TypeId
@@ -7014,7 +7014,7 @@ fn ci_omitted_field(record: &str, idx: i32) -> str:
     var i = 0
     let n = record.len() as i32
     while i < n:
-        if record.byte_at(i as i64) == 124:
+        if record[i] == 124:
             if first < 0:
                 first = i
             else if second < 0:
@@ -7091,7 +7091,7 @@ impl Sema:
 
         let sig_idx = self.get_visible_sig(sym)
         if sig_idx >= 0 and self.is_ci_visible(sym) != 0 and self.symbol_visible_from_current(sym) != 0:
-            let fn_tid: i32 = self.sig_type_ids.get(sig_idx as i64)
+            let fn_tid: i32 = self.sig_type_ids[sig_idx]
             // An async fn referenced as a value can be called through the value
             // later; the call site no longer knows it spawns — record here.
             if self.task_fns.contains(sym):
@@ -7265,7 +7265,7 @@ impl Sema:
         let name_start = if self.regex_capture_name_starts.contains(regex_node): self.regex_capture_name_starts.get(regex_node).unwrap() else: 0
         var ni = 0
         while ni < name_count:
-            let sym: i32 = self.regex_capture_name_syms.get((name_start + ni) as i64)
+            let sym: i32 = self.regex_capture_name_syms[(name_start + ni)]
             if sym != 0:
                 self.scope_put(sym, self.ty_str as i32, 0)
             ni = ni + 1
@@ -7688,8 +7688,8 @@ impl Sema:
             if pattern_arg_count != self.get_generic_inst_arg_count(carrier_resolved as i32):
                 return sema_impl_target_no_match()
             let tp_meta = self.ast.find_impl_type_params(impl_node as NodeId)
-            let tp_start = if tp_meta >= 0: self.ast.state.impl_type_params.get((tp_meta + 1) as i64) else: 0
-            let tp_count = if tp_meta >= 0: self.ast.state.impl_type_params.get((tp_meta + 2) as i64) else: 0
+            let tp_start = if tp_meta >= 0: self.ast.state.impl_type_params[(tp_meta + 1)] else: 0
+            let tp_count = if tp_meta >= 0: self.ast.state.impl_type_params[(tp_meta + 2)] else: 0
             let pattern_arg_start = self.ast.get_data1(target_node)
             for ai in 0..pattern_arg_count:
                 let pattern_arg = self.ast.get_extra(pattern_arg_start + ai)
@@ -7742,8 +7742,8 @@ impl Sema:
             if pattern_arg_count != self.get_generic_inst_arg_count(carrier_resolved as i32):
                 return sema_impl_target_no_match()
             let tp_meta = self.ast.find_impl_type_params(impl_node as NodeId)
-            let tp_start = if tp_meta >= 0: self.ast.state.impl_type_params.get((tp_meta + 1) as i64) else: 0
-            let tp_count = if tp_meta >= 0: self.ast.state.impl_type_params.get((tp_meta + 2) as i64) else: 0
+            let tp_start = if tp_meta >= 0: self.ast.state.impl_type_params[(tp_meta + 1)] else: 0
+            let tp_count = if tp_meta >= 0: self.ast.state.impl_type_params[(tp_meta + 2)] else: 0
             let pattern_arg_start = self.ast.get_data1(target_node)
             for ai in 0..pattern_arg_count:
                 let pattern_arg = self.ast.get_extra(pattern_arg_start + ai)
@@ -7856,8 +7856,8 @@ impl Sema:
             var target_ty = 0
             let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
             if tta_idx >= 0:
-                let arg_start: i32 = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
-                let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+                let arg_start: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
+                let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
                 if arg_count >= 1:
                     target_ty = self.resolve_impl_trait_arg_for_source(decl, source_ty, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
             let sig_idx = self.get_sig(deref_fn)
@@ -7901,8 +7901,8 @@ impl Sema:
             var target_ty = 0
             let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
             if tta_idx >= 0:
-                let arg_start = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
-                let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+                let arg_start = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
+                let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
                 if arg_count >= 1:
                     target_ty = self.resolve_impl_trait_arg_for_source_frozen(decl, source_ty, self.ast.get_extra(arg_start), target_match.subst_names, target_match.subst_types)
             let sig_idx = self.get_sig(deref_fn)
@@ -7955,8 +7955,8 @@ impl Sema:
             var continue_ty = 0
             var break_ty = 0
             if tta_idx >= 0:
-                let arg_start: i32 = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
-                let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+                let arg_start: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
+                let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
                 if arg_count >= 2:
                     continue_ty = self.resolve_type_node_with_subst(self.ast.get_extra(arg_start), carrier_ty, target_match.subst_names, target_match.subst_types)
                     break_ty = self.resolve_type_node_with_subst(self.ast.get_extra(arg_start + 1), carrier_ty, target_match.subst_names, target_match.subst_types)
@@ -8261,8 +8261,8 @@ impl Sema:
             let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
             if tta_idx < 0:
                 return 0
-            let arg_start: i32 = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
-            let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+            let arg_start: i32 = self.ast.state.impl_trait_type_args[(tta_idx + 1)]
+            let arg_count = self.ast.state.impl_trait_type_args[(tta_idx + 2)]
             if arg_count <= 0:
                 return 0
             return self.resolve_type_expr(self.ast.get_extra(arg_start)) as i32
@@ -8821,9 +8821,9 @@ impl Sema:
                 self.try_branch_fns.insert(node, try_info.branch_fn)
                 self.try_from_break_fns.insert(node, return_try.from_break_fn)
                 self.try_branch_sigs.insert(node, branch_sig)
-                self.try_branch_mono_syms.insert(node, self.sig_names.get(branch_sig as i64))
+                self.try_branch_mono_syms.insert(node, self.sig_names[branch_sig])
                 self.try_from_break_sigs.insert(node, from_break_sig)
-                self.try_from_break_mono_syms.insert(node, self.sig_names.get(from_break_sig as i64))
+                self.try_from_break_mono_syms.insert(node, self.sig_names[from_break_sig])
                 self.typed_expr_types.insert(node, try_info.continue_ty)
                 self.record_transparent_view_origins(node, operand_node)
                 return try_info.continue_ty
@@ -8931,9 +8931,9 @@ impl Sema:
     mut fn check_unused_task_bindings_since(start: i32):
         var i = start
         while i < self.bind_names.len() as i32:
-            let sym = self.bind_names.get(i as i64)
+            let sym = self.bind_names[i]
             let decl = self.binding_decl_node(sym)
-            if decl != 0 and self.ast.kind(decl) == NodeKind.NK_LET_BINDING and self.bind_is_task.get(i as i64) != 0 and self.bind_is_scoped_task.get(i as i64) == 0 and self.bind_task_used.get(i as i64) == 0:
+            if decl != 0 and self.ast.kind(decl) == NodeKind.NK_LET_BINDING and self.bind_is_task[i] != 0 and self.bind_is_scoped_task[i] == 0 and self.bind_task_used[i] == 0:
                 let name = self.pool_resolve(sym)
                 var diag = Diagnostic.err("unused Task handle `" ++ name ++ "`", Span { file: self.local_file_id, start: self.ast.get_start(decl), end: self.ast.get_end(decl) })
                 diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(decl), end: self.ast.get_end(decl) }, "binding a task declares intent to observe it")
@@ -9054,7 +9054,7 @@ impl Sema:
         // gives the block that value's type (§29.13).
         if result == self.ty_never and block_label != 0 and self.body_contains_break_to_label(node, block_label) != 0:
             let blk_frame_idx = self.label_syms.len() as i32 - 1
-            let blk_break_ty: i32 = if blk_frame_idx >= 0: self.label_break_value_types.get(blk_frame_idx as i64) else: 0
+            let blk_break_ty: i32 = if blk_frame_idx >= 0: self.label_break_value_types[blk_frame_idx] else: 0
             result = if blk_break_ty != 0: blk_break_ty as TypeId else: self.ty_void
         if block_label != 0:
             self.pop_label_frame()
@@ -9385,7 +9385,7 @@ impl Sema:
             if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
                 let blen = self.borrow_refs.len() as i32
                 if blen > 0:
-                    self.borrow_refs.set_i32((blen - 1) as i64, name)
+                    self.borrow_refs[(blen - 1)] = name
 
         // §16.4 union last-written: a union literal initializer establishes the
         // last-written field for this local.
@@ -9557,7 +9557,7 @@ impl Sema:
             return ""
         let di = self.find_decl_index(fn_node)
         if di >= 0 and di < self.decl_source_paths.len() as i32:
-            return with_str_clone_ref(self.decl_source_paths.get(di as i64))
+            return with_str_clone_ref(self.decl_source_paths[di])
         ""
 
     fn fn_symbol_is_tool_comptime_allowed(fn_sym: i32) -> i32:
@@ -9648,7 +9648,7 @@ impl Sema:
         if value == 0:
             return xs
         for i in 0..xs.len() as i32:
-            if xs.get(i as i64) == value:
+            if xs[i] == value:
                 return xs
         xs.push(value)
         xs
@@ -9851,7 +9851,7 @@ impl Sema:
         var param_mask = 0
         var deps: Vec[i32] = Vec.new()
         for si in 0..source_nodes.len() as i32:
-            let source_node = source_nodes.get(si as i64)
+            let source_node = source_nodes[si]
             if source_node > 0:
                 param_mask = param_mask | self.compute_expr_view_origin_mask(source_node)
                 deps = self.collect_expr_view_deps(source_node, move deps)
@@ -10029,7 +10029,7 @@ impl Sema:
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         for i in 0..deps.len() as i32:
-            let origin_sym = deps.get(i as i64)
+            let origin_sym = deps[i]
             if origin_sym == 0:
                 continue
             if self.view_origin_is_stack_local(origin_sym) != 0:
@@ -10096,7 +10096,7 @@ impl Sema:
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         for i in 0..deps.len() as i32:
-            let origin_sym = deps.get(i as i64)
+            let origin_sym = deps[i]
             if origin_sym == 0:
                 continue
             if self.view_origin_is_stack_local(origin_sym) != 0:
@@ -10125,7 +10125,7 @@ impl Sema:
         var deps: Vec[i32] = Vec.new()
         deps = self.collect_expr_view_deps(expr_node, move deps)
         for i in 0..deps.len() as i32:
-            let origin_sym = deps.get(i as i64)
+            let origin_sym = deps[i]
             if origin_sym == 0:
                 continue
             if self.view_origin_is_stack_local(origin_sym) != 0:
@@ -10151,10 +10151,10 @@ impl Sema:
         for pi in 0..self.current_fn_param_syms.len() as i32:
             if sema_param_origin_mask_contains(origin_mask, pi) != 0:
                 continue
-            let param_sym = self.current_fn_param_syms.get(pi as i64)
+            let param_sym = self.current_fn_param_syms[pi]
             let param_name = self.pool_resolve(param_sym)
             for di in 0..deps.len() as i32:
-                let dep_sym = deps.get(di as i64)
+                let dep_sym = deps[di]
                 if dep_sym == param_sym or self.pool_resolve(dep_sym) == param_name:
                     origin_mask = origin_mask | sema_param_origin_bit(pi)
                     break
@@ -10163,7 +10163,7 @@ impl Sema:
         for pi in 0..self.current_fn_param_syms.len() as i32:
             if sema_param_origin_mask_contains(origin_mask, pi) == 0:
                 continue
-            let param_sym: i32 = self.current_fn_param_syms.get(pi as i64)
+            let param_sym: i32 = self.current_fn_param_syms[pi]
             self.effect_note_origin_node = expr_node
             self.note_param_effect(param_sym, EFF_ESCAPE_VIEW)
             self.effect_note_origin_node = 0
@@ -10256,7 +10256,7 @@ impl Sema:
             return
         if call_node != 0:
             self.resolved_call_sigs.insert(call_node, sig_idx)
-            self.resolved_call_mono_syms.insert(call_node, self.sig_names.get(sig_idx as i64))
+            self.resolved_call_mono_syms.insert(call_node, self.sig_names[sig_idx])
         let param_count = self.sig_get_param_count(sig_idx)
         if recv_node != 0 and param_offset == 1 and param_count > 0:
             self.propagate_call_param_effect(self.sig_param_effect(sig_idx, 0), recv_node)
@@ -10731,8 +10731,8 @@ impl Sema:
             let te_start = self.get_type_d1(resolved)
             let field_count = self.get_type_d2(resolved)
             if index >= 0 and index < field_count:
-                let f_name = self.type_extra.get((te_start + index * 3) as i64)
-                let f_type = self.type_extra.get((te_start + index * 3 + 1) as i64)
+                let f_name = self.type_extra[(te_start + index * 3)]
+                let f_type = self.type_extra[(te_start + index * 3 + 1)]
                 return (f_name as i64) | ((f_type as i64) * 4294967296)
         0
 
@@ -11002,9 +11002,9 @@ impl Sema:
             let te_start = self.get_type_d1(resolved)
             let field_count = self.get_type_d2(resolved)
             for fi in 0..field_count:
-                let f_name = self.type_extra.get((te_start + fi * 3) as i64)
+                let f_name = self.type_extra[(te_start + fi * 3)]
                 if f_name == field:
-                    return self.type_extra.get((te_start + fi * 3 + 1) as i64)
+                    return self.type_extra[(te_start + fi * 3 + 1)]
             return 0
 
         if tk == TypeKind.TY_GENERIC_INST:
@@ -11043,9 +11043,9 @@ impl Sema:
                             let canonical_field2 = self.canonical_symbol_by_text(field)
                             let gi_te_start = self.get_type_d1(gi_struct_tid)
                             for gi_fi in 0..fc:
-                                let gi_f_name = self.type_extra.get((gi_te_start + gi_fi * 3) as i64)
+                                let gi_f_name = self.type_extra[(gi_te_start + gi_fi * 3)]
                                 if gi_f_name == field or self.canonical_symbol_by_text(gi_f_name) == canonical_field2:
-                                    return self.type_extra.get((gi_te_start + gi_fi * 3 + 1) as i64)
+                                    return self.type_extra[(gi_te_start + gi_fi * 3 + 1)]
             return 0
 
         0
@@ -11068,9 +11068,9 @@ impl Sema:
             let te_start = self.get_type_d1(resolved)
             let field_count = self.get_type_d2(resolved)
             for fi in 0..field_count:
-                let f_name = self.type_extra.get((te_start + fi * 3) as i64)
+                let f_name = self.type_extra[(te_start + fi * 3)]
                 if f_name == field:
-                    return self.type_extra.get((te_start + fi * 3 + 1) as i64)
+                    return self.type_extra[(te_start + fi * 3 + 1)]
             return 0
 
         if tk == TypeKind.TY_GENERIC_INST:
@@ -11162,7 +11162,7 @@ impl Sema:
                 if ch >= 48 and ch <= 57:
                     idx = idx * 10 + ch - 48
             if idx < elem_count:
-                return self.type_extra.get((te_start + idx) as i64)
+                return self.type_extra[(te_start + idx)]
         if ftk == TypeKind.TY_ARRAY or ftk == TypeKind.TY_SLICE or ftk == TypeKind.TY_STR:
             if self.pool_resolve(field) == "len":
                 return self.ty_i64 as i32
@@ -11182,7 +11182,7 @@ impl Sema:
                 if ch >= 48 and ch <= 57:
                     idx = idx * 10 + ch - 48
             if idx < elem_count:
-                return self.type_extra.get((te_start + idx) as i64)
+                return self.type_extra[(te_start + idx)]
         if ftk == TypeKind.TY_ARRAY or ftk == TypeKind.TY_SLICE or ftk == TypeKind.TY_STR:
             if self.pool_resolve(field) == "len":
                 return self.ty_i64 as i32
@@ -11197,8 +11197,8 @@ impl Sema:
             return
         let start = self.autoderef_step_fns.len() as i32
         for i in 0..step_fns.len() as i32:
-            self.autoderef_step_fns.push(step_fns.get(i as i64))
-            self.autoderef_step_tys.push(step_tys.get(i as i64))
+            self.autoderef_step_fns.push(step_fns[i])
+            self.autoderef_step_tys.push(step_tys[i])
         self.autoderef_step_starts.insert(expr, start)
         self.autoderef_step_counts.insert(expr, step_fns.len() as i32)
 
@@ -11397,7 +11397,7 @@ impl Sema:
     // over the insertion-ordered Vec to keep codegen deterministic.
     fn union_clear_last_written():
         for i in 0..self.union_tracked_syms.len() as i32:
-            self.union_last_written.insert(self.union_tracked_syms.get(i as i64), 0)
+            self.union_last_written.insert(self.union_tracked_syms[i], 0)
 
     mut fn check_field_access(node: i32) -> i32:
         let expr = self.ast.get_data0(node)
@@ -11503,7 +11503,7 @@ impl Sema:
                 else:
                     valid_index = 0
             if valid_index != 0 and idx < elem_count:
-                return self.type_extra.get((te_start + idx) as i64)
+                return self.type_extra[(te_start + idx)]
             self.emit_error("unknown field '" ++ field_name ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             return 0
 
@@ -12063,7 +12063,7 @@ impl Sema:
                 continue
             let type_node = self.ast.get_extra(td_extra + 1 + declared * 3 + 1)
             let value = self.ast.get_extra(extra_start + li * 2 + 1)
-            let value_ty = val_types.get(li as i64)
+            let value_ty = val_types[li]
             // A bare Vec.new()/HashMap.new()/HashSet.new() needs context; it
             // cannot constrain the struct type until concrete sibling fields
             // have supplied that context. Settle it after the instance exists.
@@ -12098,7 +12098,7 @@ impl Sema:
             if declared < 0 or declared >= declared_count:
                 continue
             let value = self.ast.get_extra(extra_start + li * 2 + 1)
-            let value_ty = val_types.get(li as i64)
+            let value_ty = val_types[li]
             if self.pending_generic_constructor_base(value, value_ty) == 0:
                 continue
             let expected = if positional:
@@ -12212,7 +12212,7 @@ impl Sema:
                     // accepting it silently stored the wrong value (#886).
                     if field_expected != 0 and val_ty != 0 and self.type_is_union(field_expected) and self.types_compatible(field_expected, val_ty as i32) == 0 and self.has_contextual_copy_adjustment(f_value) == 0:
                         let u_resolved = self.resolve_alias(field_expected as TypeId)
-                        let u_member = if self.get_type_d2(u_resolved) > 0: with_str_clone_ref(self.pool_resolve(self.type_extra.get(self.get_type_d1(u_resolved) as i64))) else: "member"
+                        let u_member = if self.get_type_d2(u_resolved) > 0: with_str_clone_ref(self.pool_resolve(self.type_extra[self.get_type_d1(u_resolved)])) else: "member"
                         self.emit_error("a union-typed field requires an explicit member initializer; use `" ++ self.type_name(field_expected) ++ " { " ++ u_member ++ ": ... }` (§16.4)", f_value)
                     if field_expected != 0 and val_ty != 0:
                         let field_expected_resolved = self.resolve_alias(field_expected as TypeId)
@@ -12300,7 +12300,7 @@ impl Sema:
                                 continue
                             var cf_dup = false
                             for sfi in 0..seen_lit_fields.len() as i32:
-                                if seen_lit_fields.get(sfi as i64) == cf_name:
+                                if seen_lit_fields[sfi] == cf_name:
                                     cf_dup = true
                                     break
                             if cf_dup:
@@ -12608,7 +12608,7 @@ impl Sema:
                 let si_start = self.sealed_impl_starts.get(trait_sym).unwrap()
                 // Check that each implementor is covered by an arm
                 for si in 0..si_count:
-                    let impl_sym = self.sealed_impl_types.get((si_start + si) as i64)
+                    let impl_sym = self.sealed_impl_types[(si_start + si)]
                     var covered = 0
                     for ai in 0..arm_count:
                         let arm_node = self.ast.get_extra(extra_start + ai)
@@ -12638,8 +12638,8 @@ impl Sema:
         // Collect all variant name syms
         var pos = te_start
         for vi in 0..variant_count:
-            let v_name_sym = self.type_extra.get(pos as i64)
-            let pc = self.type_extra.get((pos + 1) as i64)
+            let v_name_sym = self.type_extra[pos]
+            let pc = self.type_extra[(pos + 1)]
             // Check if this variant is covered by any arm
             var covered = 0
             for ai in 0..arm_count:
@@ -12751,16 +12751,16 @@ impl Sema:
                     let param_index = self.generic_type_param_index(tp_start, tp_count, payload_sym)
                     if param_index < 0:
                         continue
-                    let actual_ty = arg_types.get(ai as i64)
+                    let actual_ty = arg_types[ai]
                     if actual_ty == 0:
                         continue
-                    let existing = inferred_args.get(param_index as i64)
+                    let existing = inferred_args[param_index]
                     if existing != 0 and self.types_compatible(existing as TypeId, actual_ty as TypeId) == 0:
                         return 0
                     let preferred = self.preferred_compatible_type(existing as TypeId, actual_ty as TypeId)
-                    inferred_args.set_i32(param_index as i64, preferred as i32)
+                    inferred_args[param_index] = preferred as i32
                 for ai in 0..tp_count:
-                    if inferred_args.get(ai as i64) == 0:
+                    if inferred_args[ai] == 0:
                         return 0
                 return self.ensure_generic_inst_type(base_sym, inferred_args, tp_count) as i32
             pos = pos + payload_count
@@ -12855,7 +12855,7 @@ impl Sema:
             return 0
         let payloads: Vec[i32] = Vec.new()
         for ei in 0..elem_count:
-            let elem_ty: i32 = self.type_extra.get((elem_start + ei) as i64)
+            let elem_ty: i32 = self.type_extra[(elem_start + ei)]
             let payload_ty = self.try_unwrapped_type(elem_ty)
             let source_err_ty = self.result_error_type(elem_ty)
             if payload_ty == 0 or source_err_ty == 0:
@@ -12937,10 +12937,10 @@ impl Sema:
         var other_first_variant = 0
         var qi = 0
         while qi < queue_types.len() as i32:
-            let current_ty = queue_types.get(qi as i64)
-            let current_start = queue_starts.get(qi as i64)
-            let current_count = queue_counts.get(qi as i64)
-            let current_first = queue_first_variants.get(qi as i64)
+            let current_ty = queue_types[qi]
+            let current_start = queue_starts[qi]
+            let current_count = queue_counts[qi]
+            let current_first = queue_first_variants[qi]
             qi = qi + 1
             if best_count >= 0 and current_count >= best_count:
                 continue
@@ -12971,8 +12971,8 @@ impl Sema:
                             let new_count = current_count + 1
                             let new_start = path_types.len() as i32
                             for pi in 0..current_count:
-                                let existing_ty: i32 = path_types.get((current_start + pi) as i64)
-                                let existing_variant: i32 = path_variants.get((current_start + pi) as i64)
+                                let existing_ty: i32 = path_types[(current_start + pi)]
+                                let existing_variant: i32 = path_variants[(current_start + pi)]
                                 path_types.push(existing_ty)
                                 path_variants.push(existing_variant)
                             path_types.push(current_ty)
@@ -12998,8 +12998,8 @@ impl Sema:
         let out_types: Vec[i32] = Vec.new()
         let out_variants: Vec[i32] = Vec.new()
         for pi in 0..best_count:
-            out_types.push(path_types.get((best_start + pi) as i64))
-            out_variants.push(path_variants.get((best_start + pi) as i64))
+            out_types.push(path_types[(best_start + pi)])
+            out_variants.push(path_variants[(best_start + pi)])
         ErrorConversionChain { 1, ambiguous, best_first_variant, other_first_variant, out_types, out_variants }
 
     fn error_conversion_chain_frozen(target_err_ty: i32, source_err_ty: i32) -> ErrorConversionChain:
@@ -13026,10 +13026,10 @@ impl Sema:
         var other_first_variant = 0
         var qi = 0
         while qi < queue_types.len() as i32:
-            let current_ty = queue_types.get(qi as i64)
-            let current_start = queue_starts.get(qi as i64)
-            let current_count = queue_counts.get(qi as i64)
-            let current_first = queue_first_variants.get(qi as i64)
+            let current_ty = queue_types[qi]
+            let current_start = queue_starts[qi]
+            let current_count = queue_counts[qi]
+            let current_first = queue_first_variants[qi]
             qi = qi + 1
             if best_count >= 0 and current_count >= best_count:
                 continue
@@ -13060,8 +13060,8 @@ impl Sema:
                             let new_count = current_count + 1
                             let new_start = path_types.len() as i32
                             for pi in 0..current_count:
-                                let existing_ty: i32 = path_types.get((current_start + pi) as i64)
-                                let existing_variant: i32 = path_variants.get((current_start + pi) as i64)
+                                let existing_ty: i32 = path_types[(current_start + pi)]
+                                let existing_variant: i32 = path_variants[(current_start + pi)]
                                 path_types.push(existing_ty)
                                 path_variants.push(existing_variant)
                             path_types.push(current_ty)
@@ -13087,8 +13087,8 @@ impl Sema:
         let out_types: Vec[i32] = Vec.new()
         let out_variants: Vec[i32] = Vec.new()
         for pi in 0..best_count:
-            out_types.push(path_types.get((best_start + pi) as i64))
-            out_variants.push(path_variants.get((best_start + pi) as i64))
+            out_types.push(path_types[(best_start + pi)])
+            out_variants.push(path_variants[(best_start + pi)])
         ErrorConversionChain { 1, ambiguous, best_first_variant, other_first_variant, out_types, out_variants }
 
     // Returns 0 when no wrapper is needed, a variant symbol when target_err wraps
@@ -13113,11 +13113,11 @@ impl Sema:
             let variant_count = self.get_type_d2(resolved)
             var pos = te_start
             for vi in 0..variant_count:
-                let name_sym = self.type_extra.get(pos as i64)
-                let payload_count = self.type_extra.get((pos + 1) as i64)
+                let name_sym = self.type_extra[pos]
+                let payload_count = self.type_extra[(pos + 1)]
                 if name_sym == variant_name or name_sym == bare_variant_name:
                     for pi in 0..payload_count:
-                        result.push(self.type_extra.get((pos + 2 + pi) as i64))
+                        result.push(self.type_extra[(pos + 2 + pi)])
                     return result
                 pos = pos + 2 + payload_count
             return result
@@ -13132,14 +13132,14 @@ impl Sema:
             let variant_count = self.get_type_d2(base_tid)
             var pos = te_start
             for vi in 0..variant_count:
-                let name_sym = self.type_extra.get(pos as i64)
-                let payload_count: i32 = self.type_extra.get((pos + 1) as i64)
+                let name_sym = self.type_extra[pos]
+                let payload_count: i32 = self.type_extra[(pos + 1)]
                 if name_sym == variant_name or name_sym == bare_variant_name:
                     let generic_payloads = self.resolve_generic_enum_payload(resolved, base_sym, bare_variant_name, payload_count)
                     if generic_payloads.len() as i32 > 0:
                         return generic_payloads
                     for pi in 0..payload_count:
-                        result.push(self.type_extra.get((pos + 2 + pi) as i64))
+                        result.push(self.type_extra[(pos + 2 + pi)])
                     return result
                 pos = pos + 2 + payload_count
         result
@@ -13154,11 +13154,11 @@ impl Sema:
             let variant_count = self.get_type_d2(resolved)
             var pos = te_start
             for vi in 0..variant_count:
-                let name_sym = self.type_extra.get(pos as i64)
-                let payload_count = self.type_extra.get((pos + 1) as i64)
+                let name_sym = self.type_extra[pos]
+                let payload_count = self.type_extra[(pos + 1)]
                 if name_sym == variant_name or name_sym == bare_variant_name:
                     for pi in 0..payload_count:
-                        result.push(self.type_extra.get((pos + 2 + pi) as i64))
+                        result.push(self.type_extra[(pos + 2 + pi)])
                     return result
                 pos = pos + 2 + payload_count
             return result
@@ -13168,7 +13168,7 @@ impl Sema:
                 let start = self.generic_enum_payload_cache_starts.get(key).unwrap()
                 let count = self.generic_enum_payload_cache_counts.get(key).unwrap()
                 for pi in 0..count:
-                    result.push(self.generic_enum_payload_cache_values.get((start + pi) as i64))
+                    result.push(self.generic_enum_payload_cache_values[(start + pi)])
                 return result
             if variant_name != bare_variant_name:
                 let direct_key = sema_pair_key(resolved as i32, variant_name)
@@ -13176,7 +13176,7 @@ impl Sema:
                     let start = self.generic_enum_payload_cache_starts.get(direct_key).unwrap()
                     let count = self.generic_enum_payload_cache_counts.get(direct_key).unwrap()
                     for pi in 0..count:
-                        result.push(self.generic_enum_payload_cache_values.get((start + pi) as i64))
+                        result.push(self.generic_enum_payload_cache_values[(start + pi)])
                     return result
             var variant_exists = false
             let variant_count = self.type_reflection_variant_count(resolved as i32)
@@ -13201,7 +13201,7 @@ fn sema_accessor_snake_name(name: &str) -> str:
     var prev_upper = false
     var i = 0
     while i < name.len() as i32:
-        let ch = name.byte_at(i as i64)
+        let ch = name[i]
         let is_upper = ch >= 65 and ch <= 90
         let is_lower = ch >= 97 and ch <= 122
         let is_digit = ch >= 48 and ch <= 57
@@ -13209,7 +13209,7 @@ fn sema_accessor_snake_name(name: &str) -> str:
             if prev_lower:
                 result = result ++ "_"
             else if prev_upper and i > 1 and i + 1 < name.len() as i32:
-                let next = name.byte_at((i + 1) as i64)
+                let next = name[(i + 1)]
                 if next >= 97 and next <= 122 and result.len() > 0:
                     result = result ++ "_"
             result = result ++ sema_accessor_char_lower(ch)
@@ -13259,8 +13259,8 @@ impl Sema:
         let variant_count = self.get_type_d2(enum_decl)
         var pos = te_start
         for _ in 0..variant_count:
-            let variant_sym = self.type_extra.get(pos as i64)
-            let payload_count = self.type_extra.get((pos + 1) as i64)
+            let variant_sym = self.type_extra[pos]
+            let payload_count = self.type_extra[(pos + 1)]
             let snake = sema_accessor_snake_name(self.pool_resolve(variant_sym))
             if method_name == "is_" ++ snake:
                 return variant_sym
@@ -13300,8 +13300,8 @@ impl Sema:
         let variant_count = self.get_type_d2(enum_decl)
         var pos = te_start
         for vi in 0..variant_count:
-            let cur_sym = self.type_extra.get(pos as i64)
-            let payload_count = self.type_extra.get((pos + 1) as i64)
+            let cur_sym = self.type_extra[pos]
+            let payload_count = self.type_extra[(pos + 1)]
             if cur_sym == variant_sym or cur_sym == bare_variant_sym:
                 return vi
             pos = pos + 2 + payload_count
@@ -13336,7 +13336,7 @@ impl Sema:
             return 0
         let elem_tys: Vec[i32] = Vec.new()
         for pi in 0..payload_count:
-            var elem_ty: i32 = payloads.get(pi as i64)
+            var elem_ty: i32 = payloads[pi]
             if accessor_kind == 3:
                 elem_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
             else if accessor_kind == 4:
@@ -13365,8 +13365,8 @@ impl Sema:
             let arg_node = self.ast.get_extra(args_start + ai)
             if arg_node == 0:
                 continue
-            if ai < payloads.len() as i32 and payloads.get(ai as i64) != 0:
-                let _ = self.check_expr_with_expected(arg_node, payloads.get(ai as i64) as TypeId)
+            if ai < payloads.len() as i32 and payloads[ai] != 0:
+                let _ = self.check_expr_with_expected(arg_node, payloads[ai] as TypeId)
             else:
                 let _ = self.check_expr_value_context(arg_node)
 
@@ -13407,7 +13407,7 @@ impl Sema:
         let text = self.pool_resolve(variant_name)
         var dot = -1
         for i in 0..text.len() as i32:
-            if text.byte_at(i as i64) == 46:
+            if text[i] == 46:
                 dot = i
         if dot >= 0 and dot + 1 < text.len() as i32:
             return self.pool_lookup_symbol(text.slice((dot + 1) as i64, text.len() as i64))
@@ -13575,8 +13575,8 @@ impl Sema:
                 let variant_count = self.get_type_d2(resolved)
                 var pos = te_start
                 for vi in 0..variant_count:
-                    let name_sym = self.type_extra.get(pos as i64)
-                    let pc = self.type_extra.get((pos + 1) as i64)
+                    let name_sym = self.type_extra[pos]
+                    let pc = self.type_extra[(pos + 1)]
                     if name_sym == v_name:
                         found_variant = 1
                         payload_start = pos + 2
@@ -13592,8 +13592,8 @@ impl Sema:
                         let variant_count = self.get_type_d2(base_tid)
                         var pos = te_start
                         for vi in 0..variant_count:
-                            let name_sym = self.type_extra.get(pos as i64)
-                            let pc = self.type_extra.get((pos + 1) as i64)
+                            let name_sym = self.type_extra[pos]
+                            let pc = self.type_extra[(pos + 1)]
                             if name_sym == v_name:
                                 found_variant = 1
                                 payload_start = pos + 2
@@ -13626,16 +13626,16 @@ impl Sema:
                     return
                 for bi in 0..rest_pos:
                     let inner_pat = self.ast.get_extra(v_extra + bi)
-                    var inner_ty = if bi < payload_count: self.type_extra.get((payload_start + bi) as i64) else: 0
+                    var inner_ty = if bi < payload_count: self.type_extra[(payload_start + bi)] else: 0
                     if bi < gi_payload_types.len() as i32:
-                        let gi_ty = gi_payload_types.get(bi as i64)
+                        let gi_ty = gi_payload_types[bi]
                         if gi_ty != 0:
                             inner_ty = gi_ty
                     self.check_pattern(inner_pat, self.pattern_child_subject_type(subject_type, inner_ty))
                 return
             var unit_elided_payload_pattern = 0
             if bind_count == 0 and payload_count == 1:
-                var only_payload_ty = self.type_extra.get(payload_start as i64)
+                var only_payload_ty = self.type_extra[payload_start]
                 if gi_payload_types.len() as i32 > 0 and gi_payload_types.get(0) != 0:
                     only_payload_ty = gi_payload_types.get(0)
                 if self.type_is_unit(only_payload_ty) != 0:
@@ -13646,9 +13646,9 @@ impl Sema:
                 return
             for bi in 0..bind_count:
                 let inner_pat = self.ast.get_extra(v_extra + bi)
-                var inner_ty = if bi < payload_count: self.type_extra.get((payload_start + bi) as i64) else: 0
+                var inner_ty = if bi < payload_count: self.type_extra[(payload_start + bi)] else: 0
                 if bi < gi_payload_types.len() as i32:
-                    let gi_ty = gi_payload_types.get(bi as i64)
+                    let gi_ty = gi_payload_types[bi]
                     if gi_ty != 0:
                         inner_ty = gi_ty
                 self.check_pattern(inner_pat, self.pattern_child_subject_type(subject_type, inner_ty))
@@ -13692,7 +13692,7 @@ impl Sema:
                 self.emit_error("tuple pattern arity mismatch", node)
                 return
             for ti in 0..t_count:
-                let elem_ty: i32 = self.type_extra.get((elem_start + ti) as i64)
+                let elem_ty: i32 = self.type_extra[(elem_start + ti)]
                 self.check_pattern(self.ast.get_extra(t_extra + ti), self.pattern_child_subject_type(subject_type, elem_ty))
             return
 
@@ -13739,9 +13739,9 @@ impl Sema:
                 let f_pat = self.ast.get_extra(sp_extra + 1 + spi * 2 + 1)
                 var field_ty = 0
                 for fi in 0..field_count:
-                    let name_sym = self.type_extra.get((field_start + fi * 3) as i64)
+                    let name_sym = self.type_extra[(field_start + fi * 3)]
                     if name_sym == f_name:
-                        field_ty = self.type_extra.get((field_start + fi * 3 + 1) as i64)
+                        field_ty = self.type_extra[(field_start + fi * 3 + 1)]
                         break
                 let binding_ty = self.pattern_child_subject_type(subject_type, field_ty)
                 // #607: destructuring a needs-drop field (incl. Vec[Drop]) out of a
@@ -13794,11 +13794,11 @@ impl Sema:
         let saved_capture_origins: Vec[i32] = Vec.new()
         let saved_capture_view_nodes: Vec[i32] = Vec.new()
         for i in 0..self.current_fn_param_syms.len() as i32:
-            saved_capture_syms.push(self.current_fn_param_syms.get(i as i64))
-            saved_capture_effs.push(self.current_fn_param_effs.get(i as i64))
-            saved_capture_direct_effs.push(self.current_fn_param_direct_effs.get(i as i64))
-            saved_capture_origins.push(self.current_fn_param_origins.get(i as i64))
-            saved_capture_view_nodes.push(self.current_fn_param_view_nodes.get(i as i64))
+            saved_capture_syms.push(self.current_fn_param_syms[i])
+            saved_capture_effs.push(self.current_fn_param_effs[i])
+            saved_capture_direct_effs.push(self.current_fn_param_direct_effs[i])
+            saved_capture_origins.push(self.current_fn_param_origins[i])
+            saved_capture_view_nodes.push(self.current_fn_param_view_nodes[i])
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
             self.current_fn_param_effs.pop()
@@ -13807,7 +13807,7 @@ impl Sema:
             self.current_fn_param_view_nodes.pop()
         let closure_capture_syms: Vec[i32] = Vec.new()
         for ci in 0..outer_count:
-            let cap_sym: i32 = self.bind_names.get(ci as i64)
+            let cap_sym: i32 = self.bind_names[ci]
             if self.expr_uses_symbol(body, cap_sym) != 0:
                 closure_capture_syms.push(cap_sym)
                 self.current_fn_param_syms.push(cap_sym)
@@ -13895,12 +13895,12 @@ impl Sema:
         let closure_body_materializes_copy = expected_ret_ty != 0 and self.can_contextually_copy_ref(expected_ret_ty, body_ty as i32) != 0
 
         for ici in 0..outer_count:
-            let implicit_cap_sym: i32 = self.bind_names.get(ici as i64)
+            let implicit_cap_sym: i32 = self.bind_names[ici]
             if self.expr_uses_symbol(body, implicit_cap_sym) == 0:
                 continue
             var already_captured = 0
             for cci in 0..closure_capture_syms.len() as i32:
-                if closure_capture_syms.get(cci as i64) == implicit_cap_sym:
+                if closure_capture_syms[cci] == implicit_cap_sym:
                     already_captured = 1
                     break
             if already_captured == 0:
@@ -13929,7 +13929,7 @@ impl Sema:
                 var closure_default_from_side_effect = false
                 if self.type_has_default_value(expected_ret_ty) != 0:
                     for closure_bi in 0..self.bind_names.len() as i32:
-                        if self.expr_mutates_place(body, self.bind_names.get(closure_bi as i64)) != 0:
+                        if self.expr_mutates_place(body, self.bind_names[closure_bi]) != 0:
                             closure_default_from_side_effect = true
                             break
                 if not closure_ok_wrapped and not closure_default_from_side_effect:
@@ -13954,18 +13954,18 @@ impl Sema:
 
         var direct_arg_escapes = 0
         if self.closure_direct_arg_escape_flags.len() > 0:
-            direct_arg_escapes = self.closure_direct_arg_escape_flags.get((self.closure_direct_arg_escape_flags.len() - 1) as i64)
+            direct_arg_escapes = self.closure_direct_arg_escape_flags[(self.closure_direct_arg_escape_flags.len() - 1)]
 
         let is_non_escaping = self.closure_direct_arg_depth > 0 and direct_arg_escapes == 0 and self.ast.is_move_closure(node) == 0
 
         let closure_capture_effs: Vec[i32] = Vec.new()
         for ci in 0..closure_capture_syms.len() as i32:
-            let summary_cap_sym = closure_capture_syms.get(ci as i64)
+            let summary_cap_sym = closure_capture_syms[ci]
             let summary_cap_ty = self.scope_lookup(summary_cap_sym)
             if self.ast.is_by_place_closure(node) == 0 and self.ast.is_move_closure(node) == 0 and summary_cap_ty != 0 and self.is_copy(summary_cap_ty as TypeId) != 0:
                 closure_capture_effs.push(0)
             else:
-                closure_capture_effs.push(self.current_fn_param_effs.get(ci as i64))
+                closure_capture_effs.push(self.current_fn_param_effs[ci])
         self.set_closure_capture_summary(node, closure_capture_syms, closure_capture_effs)
         while self.current_fn_param_syms.len() > 0:
             self.current_fn_param_syms.pop()
@@ -13974,11 +13974,11 @@ impl Sema:
             self.current_fn_param_origins.pop()
             self.current_fn_param_view_nodes.pop()
         for i in 0..saved_capture_syms.len() as i32:
-            self.current_fn_param_syms.push(saved_capture_syms.get(i as i64))
-            self.current_fn_param_effs.push(saved_capture_effs.get(i as i64))
-            self.current_fn_param_direct_effs.push(saved_capture_direct_effs.get(i as i64))
-            self.current_fn_param_origins.push(saved_capture_origins.get(i as i64))
-            self.current_fn_param_view_nodes.push(saved_capture_view_nodes.get(i as i64))
+            self.current_fn_param_syms.push(saved_capture_syms[i])
+            self.current_fn_param_effs.push(saved_capture_effs[i])
+            self.current_fn_param_direct_effs.push(saved_capture_direct_effs[i])
+            self.current_fn_param_origins.push(saved_capture_origins[i])
+            self.current_fn_param_view_nodes.push(saved_capture_view_nodes[i])
         self.current_fn_sig_idx = saved_capture_sig_idx
 
         // Restore borrow state — discard borrows created inside closure body.
@@ -14003,9 +14003,9 @@ impl Sema:
             // field-level borrows for disjoint capture checking.
             var ci = 0
             while ci < outer_count:
-                let cap_sym: i32 = self.bind_names.get(ci as i64)
+                let cap_sym: i32 = self.bind_names[ci]
                 if self.expr_uses_symbol(body, cap_sym) != 0:
-                    let cap_ty: i32 = self.bind_types.get(ci as i64)
+                    let cap_ty: i32 = self.bind_types[ci]
                     if self.ast.is_by_place_closure(node) == 0 and self.is_copy(cap_ty as TypeId) != 0:
                         ci = ci + 1
                         continue
@@ -14018,8 +14018,8 @@ impl Sema:
                         self.collect_capture_fields(body, cap_sym)
                         var fi = 0
                         while fi < self.capture_field_syms.len() as i32:
-                            let field_sym: i32 = self.capture_field_syms.get(fi as i64)
-                            let bk: i32 = self.capture_field_kinds.get(fi as i64)
+                            let field_sym: i32 = self.capture_field_syms[fi]
+                            let bk: i32 = self.capture_field_kinds[fi]
                             let path_start = self.borrow_path_data.len() as i32
                             self.borrow_path_data.push(field_sym)
                             self.check_borrow_create_direct(cap_sym, bk, field_sym, path_start, 1, node)
@@ -14037,16 +14037,16 @@ impl Sema:
         if is_escaping:
             var ebi = 0
             while ebi < outer_count:
-                let cap_sym = self.bind_names.get(ebi as i64)
+                let cap_sym = self.bind_names[ebi]
                 if self.expr_uses_symbol(body, cap_sym) != 0:
-                    let cap_ty = self.bind_types.get(ebi as i64)
+                    let cap_ty = self.bind_types[ebi]
                     if self.type_is_ephemeral_value(cap_ty) != 0:
                         self.emit_error("escaping closure cannot capture ephemeral references", node)
                         break
                 ebi = ebi + 1
             var emitted_capability_escape = 0
             for cci in 0..closure_capture_syms.len() as i32:
-                let cap_sym2 = closure_capture_syms.get(cci as i64)
+                let cap_sym2 = closure_capture_syms[cci]
                 let cap_ty2 = self.scope_lookup(cap_sym2)
                 if emitted_capability_escape == 0 and self.is_tool_capability_type(cap_ty2):
                     self.emit_error("capability-bearing closure cannot escape into runtime code", node)
@@ -14058,9 +14058,9 @@ impl Sema:
             var emitted_escape_warn = 0
             var ci = 0
             while ci < outer_count:
-                let cap_sym: i32 = self.bind_names.get(ci as i64)
+                let cap_sym: i32 = self.bind_names[ci]
                 if self.expr_uses_symbol(body, cap_sym) != 0:
-                    let cap_ty: i32 = self.bind_types.get(ci as i64)
+                    let cap_ty: i32 = self.bind_types[ci]
                     if self.is_copy(cap_ty as TypeId) == 0:
                         self.scope_set_state(cap_sym, VarState.MOVED)
                         self.effect_note_origin_node = node
@@ -14396,7 +14396,7 @@ impl Sema:
         let tuple_elems: Vec[i32] = Vec.new()
         for ei in 0..elem_count:
             let elem = self.ast.get_extra(extra_start + ei)
-            let expected_elem = if expected_tuple != 0: self.type_extra.get((expected_elem_start + ei) as i64) else: 0
+            let expected_elem = if expected_tuple != 0: self.type_extra[(expected_elem_start + ei)] else: 0
             let et = if expected_elem != 0:
                 self.check_expr_with_owned_demand(elem, expected_elem as TypeId)
             else:
@@ -14507,7 +14507,7 @@ impl Sema:
         for i in 0..name_count:
             let sym = self.ast.get_extra(extra_start + 2 + i)
             if sym != 0:
-                let elem_ty: i32 = self.type_extra.get((te_start + i) as i64)
+                let elem_ty: i32 = self.type_extra[(te_start + i)]
                 self.scope_put(sym, elem_ty, is_mut)
                 self.binding_decl_nodes.insert(sym, node)
         let body_ty = self.check_expr(body)
@@ -14645,7 +14645,7 @@ impl Sema:
                 let n_sym = self.ast.get_extra(extra_start + ni)
                 var bind_ty = 0
                 if ni < elem_count:
-                    bind_ty = self.type_extra.get((elem_start + ni) as i64)
+                    bind_ty = self.type_extra[(elem_start + ni)]
                 if n_sym > 0:
                     self.scope_put(n_sym, bind_ty, 0)
                     if self.type_is_ephemeral_value(bind_ty) != 0:
@@ -14659,7 +14659,7 @@ impl Sema:
                 for ri in 0..rest_elem_count:
                     let idx = rest_pos + ri
                     if idx < elem_count:
-                        rest_elems.push(self.type_extra.get((elem_start + idx) as i64))
+                        rest_elems.push(self.type_extra[(elem_start + idx)])
                     else:
                         rest_elems.push(0)
                 let rest_ty = self.ensure_tuple_type(rest_elems, rest_elem_count)
@@ -14674,7 +14674,7 @@ impl Sema:
                 let elem_idx = elem_count - after_rest + ni
                 var bind_ty = 0
                 if elem_idx >= 0 and elem_idx < elem_count:
-                    bind_ty = self.type_extra.get((elem_start + elem_idx) as i64)
+                    bind_ty = self.type_extra[(elem_start + elem_idx)]
                 if n_sym > 0:
                     self.scope_put(n_sym, bind_ty, 0)
                     if self.type_is_ephemeral_value(bind_ty) != 0:
@@ -14685,7 +14685,7 @@ impl Sema:
                 let n_sym = self.ast.get_extra(extra_start + ni)
                 var bind_ty = 0
                 if ni < elem_count:
-                    bind_ty = self.type_extra.get((elem_start + ni) as i64)
+                    bind_ty = self.type_extra[(elem_start + ni)]
                 else:
                     if emitted_arity_error == 0 and is_tuple != 0:
                         self.emit_error("tuple destructuring arity mismatch", node)
@@ -14925,7 +14925,7 @@ impl Sema:
             if param_i >= expected:
                 break
             let expected_ty = self.fn_type_param_type(fn_tid, param_i)
-            let arg_ty = arg_types.get(ai as i64)
+            let arg_ty = arg_types[ai]
             if expected_ty != 0 and arg_ty != 0:
                 let exp_resolved = self.resolve_alias(expected_ty)
                 if self.type_is_dyn_object(exp_resolved) == 0:
@@ -15250,9 +15250,9 @@ impl Sema:
                     let expected_ty = self.sig_param_type(sig_idx, pi)
                     var si = self.implicit_binding_types.len() as i32 - 1
                     while si >= 0:
-                        let bind_ty: i32 = self.implicit_binding_types.get(si as i64)
+                        let bind_ty: i32 = self.implicit_binding_types[si]
                         if self.types_compatible(expected_ty, bind_ty) != 0:
-                            let bind_sym = self.implicit_binding_syms.get(si as i64)
+                            let bind_sym = self.implicit_binding_syms[si]
                             resolved_map.insert(pi, 0 - bind_sym)
                             break
                         si = si - 1
@@ -15308,9 +15308,9 @@ impl Sema:
                                 let expected_ty = self.sig_param_type(sig_idx, pi)
                                 var si = self.implicit_binding_types.len() as i32 - 1
                                 while si >= 0:
-                                    let bind_ty: i32 = self.implicit_binding_types.get(si as i64)
+                                    let bind_ty: i32 = self.implicit_binding_types[si]
                                     if self.types_compatible(expected_ty, bind_ty) != 0:
-                                        let bind_sym = self.implicit_binding_syms.get(si as i64)
+                                        let bind_sym = self.implicit_binding_syms[si]
                                         resolved_map.insert(pi, 0 - bind_sym)
                                         break
                                     si = si - 1
@@ -15379,7 +15379,7 @@ impl Sema:
                 if param_i < self.sig_get_param_count(sig_idx):
                     expected_ty = self.sig_param_type(sig_idx, param_i)
             else if ai < variant_payload_tys.len() as i32:
-                expected_ty = variant_payload_tys.get(ai as i64)
+                expected_ty = variant_payload_tys[ai]
             else if callable_value_tid != 0:
                 expected_ty = self.fn_type_param_type(callable_value_tid, ai + param_offset)
             if arg_node == 0:
@@ -15450,7 +15450,7 @@ impl Sema:
         // Drop iter-of-self borrows in reverse insertion order so indices stay valid.
         var ibi = iter_borrow_idxs.len() as i32 - 1
         while ibi >= 0:
-            self.remove_borrow_at(iter_borrow_idxs.get(ibi as i64))
+            self.remove_borrow_at(iter_borrow_idxs[ibi])
             ibi = ibi - 1
 
         // docs/mut.md Rev 8 §9.2 — closure capture conflict detection.
@@ -15561,7 +15561,7 @@ impl Sema:
                 if param_i >= expected:
                     break
                 let expected_ty = self.sig_param_type(sig_idx, param_i)
-                let arg_ty = arg_types.get(ai as i64)
+                let arg_ty = arg_types[ai]
                 if expected_ty != 0 and arg_ty != 0:
                     let exp_resolved = self.resolve_alias(expected_ty)
                     if self.type_is_dyn_object(exp_resolved) == 0:
@@ -15689,8 +15689,8 @@ impl Sema:
             for ai in 0..resolved_arg_count:
                 if ai >= expected_payload_count:
                     break
-                let expected_ty = final_payload_tys.get(ai as i64)
-                let arg_ty = arg_types.get(ai as i64)
+                let expected_ty = final_payload_tys[ai]
+                let arg_ty = arg_types[ai]
                 let payload_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                 self.check_ephemeral_task_storage(if payload_arg_node > 0: payload_arg_node else: node, "enum payload")
                 if expected_ty != 0 and arg_ty != 0:
@@ -15762,7 +15762,7 @@ impl Sema:
         let start = self.call_resolved_args_data.len() as i32
         let count = args.len() as i32
         for i in 0..count:
-            self.call_resolved_args_data.push(args.get(i as i64))
+            self.call_resolved_args_data.push(args[i])
         self.call_resolved_arg_starts.insert(call_node, start)
         self.call_resolved_arg_counts.insert(call_node, count)
 
@@ -15783,7 +15783,7 @@ impl Sema:
     fn get_resolved_call_arg(call_node: i32, idx: i32) -> i32:
         if self.call_resolved_arg_starts.contains(call_node):
             let start = self.call_resolved_arg_starts.get(call_node).unwrap()
-            return self.call_resolved_args_data.get((start + idx) as i64)
+            return self.call_resolved_args_data[(start + idx)]
         0
 
     fn has_resolved_call_args(call_node: i32) -> i32:
@@ -16055,8 +16055,8 @@ impl Sema:
         let variant_count = self.get_type_d2(resolved)
         var pos = te_start
         for vi in 0..variant_count:
-            let v_name = self.type_extra.get(pos as i64)
-            let payload_count = self.type_extra.get((pos + 1) as i64)
+            let v_name = self.type_extra[pos]
+            let payload_count = self.type_extra[(pos + 1)]
             if v_name == variant_sym or v_name == bare_variant_sym:
                 return 1
             pos = pos + 2 + payload_count
@@ -16182,7 +16182,7 @@ impl Sema:
             if trait_sym == 0:
                 continue
 
-            let arg_ty = arg_types.get(ai as i64)
+            let arg_ty = arg_types[ai]
             let concrete_sym = self.dyn_arg_concrete_type_symbol(arg_ty)
             if concrete_sym == 0:
                 self.emit_error("argument cannot be converted to dyn trait object", self.ast.get_extra(call_extra_start + ai))
@@ -16222,8 +16222,8 @@ impl Sema:
             var score3 = 1
             let args_idx = self.ast.find_impl_trait_type_args(type_node as NodeId)
             if args_idx >= 0:
-                let start3 = self.ast.state.impl_trait_type_args.get((args_idx + 1) as i64)
-                let count3 = self.ast.state.impl_trait_type_args.get((args_idx + 2) as i64)
+                let start3 = self.ast.state.impl_trait_type_args[(args_idx + 1)]
+                let count3 = self.ast.state.impl_trait_type_args[(args_idx + 2)]
                 for i3 in 0..count3:
                     score3 = score3 + self.generic_type_pattern_specificity(self.ast.get_extra(start3 + i3), tp_start, tp_count)
             return score3
@@ -16236,8 +16236,8 @@ impl Sema:
         let trait_args_idx = self.ast.find_impl_trait_type_args(type_node as NodeId)
         if trait_args_idx < 0:
             return 1
-        let trait_arg_start: i32 = self.ast.state.impl_trait_type_args.get((trait_args_idx + 1) as i64)
-        let trait_arg_count: i32 = self.ast.state.impl_trait_type_args.get((trait_args_idx + 2) as i64)
+        let trait_arg_start: i32 = self.ast.state.impl_trait_type_args[(trait_args_idx + 1)]
+        let trait_arg_count: i32 = self.ast.state.impl_trait_type_args[(trait_args_idx + 2)]
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL or self.ast.get_data2(decl) != trait_sym:
@@ -16248,8 +16248,8 @@ impl Sema:
             let impl_args_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
             if impl_args_idx < 0:
                 continue
-            let impl_arg_start: i32 = self.ast.state.impl_trait_type_args.get((impl_args_idx + 1) as i64)
-            let impl_arg_count = self.ast.state.impl_trait_type_args.get((impl_args_idx + 2) as i64)
+            let impl_arg_start: i32 = self.ast.state.impl_trait_type_args[(impl_args_idx + 1)]
+            let impl_arg_count = self.ast.state.impl_trait_type_args[(impl_args_idx + 2)]
             if impl_arg_count != trait_arg_count:
                 continue
             var matches = 1
@@ -16309,7 +16309,7 @@ impl Sema:
         let saved_diag_count = self.diags.items.len() as i32
         self.clear_generic_substitution()
         for pi in 0..arg_count:
-            self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi), arg_types.get(pi as i64), tp_start, tp_count, call_node)
+            self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi), arg_types[pi], tp_start, tp_count, call_node)
         self.ensure_generic_substitutions(tp_start, tp_count, param_start, param_count, call_node)
 
         var matches = if self.diags.items.len() as i32 == saved_diag_count: 1 else: 0
@@ -16317,7 +16317,7 @@ impl Sema:
         if matches != 0:
             for pi2 in 0..arg_count:
                 let param_type = self.ast.fn_param_type(param_start, pi2)
-                if self.generic_param_accepts(param_type, arg_types.get(pi2 as i64), tp_start, tp_count) == 0:
+                if self.generic_param_accepts(param_type, arg_types[pi2], tp_start, tp_count) == 0:
                     matches = 0
                     break
                 score = score + self.generic_type_pattern_specificity(param_type, tp_start, tp_count)
@@ -16326,8 +16326,8 @@ impl Sema:
         if matches != 0:
             let where_idx = self.ast.find_where_meta(fn_node)
             if where_idx >= 0:
-                let where_start: i32 = self.ast.state.where_meta.get((where_idx + 1) as i64)
-                let where_count: i32 = self.ast.state.where_meta.get((where_idx + 2) as i64)
+                let where_start: i32 = self.ast.state.where_meta[(where_idx + 1)]
+                let where_count: i32 = self.ast.state.where_meta[(where_idx + 2)]
                 if self.generic_bound_set_accepts(where_start, where_count) == 0:
                     matches = 0
 
@@ -16350,9 +16350,9 @@ impl Sema:
         var best_score = -1
         var best_count = 0
         for i in 0..self.generic_fn_candidate_syms.len() as i32:
-            if self.generic_fn_candidate_syms.get(i as i64) != key:
+            if self.generic_fn_candidate_syms[i] != key:
                 continue
-            let candidate: i32 = self.generic_fn_candidate_nodes.get(i as i64)
+            let candidate: i32 = self.generic_fn_candidate_nodes[i]
             let score = self.generic_overload_match_score(candidate, arg_types, arg_count, call_node)
             if score < 0:
                 continue
@@ -16384,12 +16384,12 @@ impl Sema:
             if ai >= param_count:
                 break
             let expected_ty = self.sig_param_type(sig_idx, ai)
-            let actual_ty = arg_types.get(ai as i64)
+            let actual_ty = arg_types[ai]
             if expected_ty == 0 or actual_ty == 0:
                 continue
             if self.type_is_dyn_object(self.resolve_alias(expected_ty)) != 0:
                 continue
-            let arg_node = if ai < arg_nodes.len() as i32: arg_nodes.get(ai as i64) else: call_node
+            let arg_node = if ai < arg_nodes.len() as i32: arg_nodes[ai] else: call_node
             if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
                 self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, ai, expected_ty, actual_ty, if arg_node > 0: arg_node else: call_node)
             else:
@@ -16430,14 +16430,14 @@ impl Sema:
             if pi >= arg_count:
                 break
             let p_type_node = self.ast.fn_param_type(param_start, pi)
-            let arg_ty = arg_types.get(pi as i64)
+            let arg_ty = arg_types[pi]
             self.bind_type_params_from_type_expr(p_type_node, arg_ty, tp_start, tp_count, call_node)
             // #600 (§5.1): generic calls (incl. static methods like Box.new) never
             // reached the ephemeral arg gates — heap-owning constructors accepted
             // ephemeral values by value. Route through the same gate; arg node
             // is supplied by the caller because pipelines prepend their lhs.
             if arg_ty != 0 and self.type_is_ephemeral_value(arg_ty as TypeId) != 0:
-                let eg_arg_node = if pi < arg_nodes.len() as i32: arg_nodes.get(pi as i64) else: 0
+                let eg_arg_node = if pi < arg_nodes.len() as i32: arg_nodes[pi] else: 0
                 self.check_ephemeral_task_arg_escape(if eg_arg_node > 0: eg_arg_node else: call_node, 0, 0, fn_sym, pi)
 
         // Obligation model: collect and solve trait bounds for each bound type parameter.
@@ -16445,8 +16445,8 @@ impl Sema:
         // Also check where clause bounds if present
         let where_idx = self.ast.find_where_meta(fn_node)
         if where_idx >= 0:
-            let where_start: i32 = self.ast.state.where_meta.get((where_idx + 1) as i64)
-            let where_count: i32 = self.ast.state.where_meta.get((where_idx + 2) as i64)
+            let where_start: i32 = self.ast.state.where_meta[(where_idx + 1)]
+            let where_count: i32 = self.ast.state.where_meta[(where_idx + 2)]
             self.check_generic_trait_bounds(where_start, where_count, call_node)
         let ege_before = self.diags.count_by_severity(DiagSeverity.Error)
         self.ensure_generic_substitutions(tp_start, tp_count, param_start, param_count, call_node)
@@ -16487,7 +16487,7 @@ impl Sema:
             var concrete_param_ty = 0
             let p_type_node = self.ast.fn_param_type(param_start, cpi)
             if cpi < arg_count and p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_TRAIT_OBJ and self.ast.get_data1(p_type_node) == TYPE_TRAIT_OBJECT_IMPL:
-                concrete_param_ty = arg_types.get(cpi as i64)
+                concrete_param_ty = arg_types[cpi]
             param_concrete_tys.push(concrete_param_ty)
         let concrete_sig = self.check_fn_body_concrete(fn_node, tp_syms, tp_sema_tys, mono_sym, param_concrete_tys)
         if concrete_sig >= 0:
@@ -16522,8 +16522,8 @@ impl Sema:
     fn lookup_generic_subst(param_sym: i32) -> i32:
         var i = self.generic_subst_param_syms.len() as i32 - 1
         while i >= 0:
-            if self.generic_subst_param_syms.get(i as i64) == param_sym:
-                return self.generic_subst_type_ids.get(i as i64)
+            if self.generic_subst_param_syms[i] == param_sym:
+                return self.generic_subst_type_ids[i]
             i = i - 1
         let param_text = self.pool_resolve_symbol(param_sym)
         if param_text.len() == 0:
@@ -16532,9 +16532,9 @@ impl Sema:
         var found_count = 0
         i = self.generic_subst_param_syms.len() as i32 - 1
         while i >= 0:
-            let stored = self.generic_subst_param_syms.get(i as i64)
+            let stored = self.generic_subst_param_syms[i]
             if self.pool_resolve_symbol(stored) == param_text:
-                found = self.generic_subst_type_ids.get(i as i64)
+                found = self.generic_subst_type_ids[i]
                 found_count = found_count + 1
             i = i - 1
         if found_count == 1:
@@ -16548,8 +16548,8 @@ impl Sema:
         var existing_i = -1
         var exact_i = self.generic_subst_param_syms.len() as i32 - 1
         while exact_i >= 0:
-            if self.generic_subst_param_syms.get(exact_i as i64) == param_sym:
-                existing = self.generic_subst_type_ids.get(exact_i as i64)
+            if self.generic_subst_param_syms[exact_i] == param_sym:
+                existing = self.generic_subst_type_ids[exact_i]
                 existing_i = exact_i
                 break
             exact_i = exact_i - 1
@@ -16564,7 +16564,7 @@ impl Sema:
                 let existing_r = self.resolve_alias(existing as TypeId)
                 if self.get_type_kind(existing_r) == TypeKind.TY_TRAIT_OBJ and self.type_implements_trait(tid, self.get_type_d0(existing_r)) != 0:
                     if existing_i >= 0:
-                        self.generic_subst_type_ids.set_i32(existing_i as i64, tid)
+                        self.generic_subst_type_ids[existing_i] = tid
                         return
             return
 
@@ -16682,7 +16682,7 @@ impl Sema:
             let pair_count = if inner_count < elem_count: inner_count else: elem_count
             for ei in 0..pair_count:
                 let inner_node = self.ast.get_extra(inner_start + ei)
-                let arg_elem: i32 = self.type_extra.get((te_start + ei) as i64)
+                let arg_elem: i32 = self.type_extra[(te_start + ei)]
                 self.bind_type_params_from_type_expr(inner_node, arg_elem, tp_start, tp_count, err_node)
             return
 
@@ -16708,8 +16708,8 @@ impl Sema:
             let trait_args_idx = self.ast.find_impl_trait_type_args(type_node as NodeId)
             if trait_args_idx < 0:
                 return
-            let trait_arg_start: i32 = self.ast.state.impl_trait_type_args.get((trait_args_idx + 1) as i64)
-            let trait_arg_count: i32 = self.ast.state.impl_trait_type_args.get((trait_args_idx + 2) as i64)
+            let trait_arg_start: i32 = self.ast.state.impl_trait_type_args[(trait_args_idx + 1)]
+            let trait_arg_count: i32 = self.ast.state.impl_trait_type_args[(trait_args_idx + 2)]
             for di in 0..self.ast.decl_count():
                 let decl = self.ast.get_decl(di)
                 if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
@@ -16722,8 +16722,8 @@ impl Sema:
                 let impl_args_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
                 if impl_args_idx < 0:
                     continue
-                let impl_arg_start = self.ast.state.impl_trait_type_args.get((impl_args_idx + 1) as i64)
-                let impl_arg_count = self.ast.state.impl_trait_type_args.get((impl_args_idx + 2) as i64)
+                let impl_arg_start = self.ast.state.impl_trait_type_args[(impl_args_idx + 1)]
+                let impl_arg_count = self.ast.state.impl_trait_type_args[(impl_args_idx + 2)]
                 let bind_count = if trait_arg_count < impl_arg_count: trait_arg_count else: impl_arg_count
                 for tai in 0..bind_count:
                     let param_trait_arg = self.ast.get_extra(trait_arg_start + tai)
@@ -16867,11 +16867,11 @@ impl Sema:
     fn select_trait_impl_tiered(type_sym: i32, trait_sym: i32, want_std: i32) -> i32:
         if self.impl_lookup.contains(type_sym):
             let idx = self.impl_lookup.get(type_sym).unwrap()
-            let start = self.impl_starts.get(idx as i64)
-            let count = self.impl_counts.get(idx as i64)
+            let start = self.impl_starts[idx]
+            let count = self.impl_counts[idx]
             for i in 0..count:
                 let record_idx = start + i
-                if self.impl_extra.get(record_idx as i64) == trait_sym and self.impl_record_matches_tier(record_idx, want_std) != 0:
+                if self.impl_extra[record_idx] == trait_sym and self.impl_record_matches_tier(record_idx, want_std) != 0:
                     return 1
         let key = self.selection_cache_key(type_sym, trait_sym)
         if self.blanket_guard_contains(key) != 0:
@@ -16880,18 +16880,18 @@ impl Sema:
         let guard = &raw const self.blanket_guard as *const HashSet[i64] as *mut HashSet[i64]
         unsafe { (*guard).insert(key) }
         for bi in 0..self.blanket_trait_syms.len() as i32:
-            if self.blanket_trait_syms.get(bi as i64) != trait_sym:
+            if self.blanket_trait_syms[bi] != trait_sym:
                 continue
-            let target_base = self.blanket_target_base_syms.get(bi as i64)
+            let target_base = self.blanket_target_base_syms[bi]
             if target_base != 0 and target_base != type_sym:
                 continue
             if target_base != 0 and self.type_decl_type_param_count(type_sym) == 0:
                 continue
-            let b_start = self.blanket_bound_starts.get(bi as i64)
-            let b_count = self.blanket_bound_counts.get(bi as i64)
+            let b_start = self.blanket_bound_starts[bi]
+            let b_count = self.blanket_bound_counts[bi]
             var all_satisfied = 1
             for bj in 0..b_count:
-                let bound_trait = self.blanket_bound_syms.get((b_start + bj) as i64)
+                let bound_trait = self.blanket_bound_syms[(b_start + bj)]
                 if self.select_trait_impl_tiered(type_sym, bound_trait, want_std) == 0:
                     all_satisfied = 0
             if all_satisfied != 0:
@@ -16913,10 +16913,10 @@ impl Sema:
         // Check direct impls
         if self.impl_lookup.contains(type_sym):
             let idx = self.impl_lookup.get(type_sym).unwrap()
-            let start = self.impl_starts.get(idx as i64)
-            let count = self.impl_counts.get(idx as i64)
+            let start = self.impl_starts[idx]
+            let count = self.impl_counts[idx]
             for i in 0..count:
-                if self.impl_extra.get((start + i) as i64) == trait_sym:
+                if self.impl_extra[(start + i)] == trait_sym:
                     found = 1
 
         // Check blanket impls: impl[T: Bound] Trait for T
@@ -16926,21 +16926,21 @@ impl Sema:
             let guard = &raw const self.blanket_guard as *const HashSet[i64] as *mut HashSet[i64]
             unsafe { (*guard).insert(key) }
             for bi in 0..self.blanket_trait_syms.len() as i32:
-                if self.blanket_trait_syms.get(bi as i64) != trait_sym:
+                if self.blanket_trait_syms[bi] != trait_sym:
                     continue
                 // For generic blanket impls (impl[T] Trait for Vec[T]),
                 // only match if query type's base sym matches the target.
-                let target_base = self.blanket_target_base_syms.get(bi as i64)
+                let target_base = self.blanket_target_base_syms[bi]
                 if target_base != 0 and target_base != type_sym:
                     continue
                 if target_base != 0 and self.type_decl_type_param_count(type_sym) == 0:
                     continue
                 // Check if type_sym satisfies all bounds
-                let b_start = self.blanket_bound_starts.get(bi as i64)
-                let b_count = self.blanket_bound_counts.get(bi as i64)
+                let b_start = self.blanket_bound_starts[bi]
+                let b_count = self.blanket_bound_counts[bi]
                 var all_satisfied = 1
                 for bj in 0..b_count:
-                    let bound_trait = self.blanket_bound_syms.get((b_start + bj) as i64)
+                    let bound_trait = self.blanket_bound_syms[(b_start + bj)]
                     let bound_ok = self.select_trait_impl(type_sym, bound_trait)
                     if bound_ok == 0:
                         all_satisfied = 0
@@ -16982,8 +16982,8 @@ impl Sema:
         let tp_meta = self.ast.find_impl_type_params(impl_node)
         if tp_meta < 0:
             return 1
-        let tp_start = self.ast.state.impl_type_params.get((tp_meta + 1) as i64)
-        let tp_count = self.ast.state.impl_type_params.get((tp_meta + 2) as i64)
+        let tp_start = self.ast.state.impl_type_params[(tp_meta + 1)]
+        let tp_count = self.ast.state.impl_type_params[(tp_meta + 2)]
         var pos: i32 = tp_start
         for ti in 0..tp_count:
             let tp_name = self.ast.get_extra(pos)
@@ -17002,8 +17002,8 @@ impl Sema:
         let tp_meta = self.ast.find_impl_type_params(impl_node)
         if tp_meta < 0:
             return 1
-        let tp_start = self.ast.state.impl_type_params.get((tp_meta + 1) as i64)
-        let tp_count = self.ast.state.impl_type_params.get((tp_meta + 2) as i64)
+        let tp_start = self.ast.state.impl_type_params[(tp_meta + 1)]
+        let tp_count = self.ast.state.impl_type_params[(tp_meta + 2)]
         var pos: i32 = tp_start
         for ti in 0..tp_count:
             let tp_name = self.ast.get_extra(pos)
@@ -17024,12 +17024,12 @@ impl Sema:
             return 0
         let base_sym = self.get_generic_inst_base(resolved as i32)
         for bi in 0..self.blanket_trait_syms.len() as i32:
-            if self.blanket_trait_syms.get(bi as i64) != trait_sym:
+            if self.blanket_trait_syms[bi] != trait_sym:
                 continue
-            let target_base = self.blanket_target_base_syms.get(bi as i64)
+            let target_base = self.blanket_target_base_syms[bi]
             if target_base != base_sym:
                 continue
-            let impl_node = self.blanket_impl_nodes.get(bi as i64)
+            let impl_node = self.blanket_impl_nodes[bi]
             let target_node = self.ast.find_impl_target_type_node(impl_node)
             if target_node == 0:
                 continue
@@ -17038,8 +17038,8 @@ impl Sema:
             let tp_meta = self.ast.find_impl_type_params(impl_node)
             if tp_meta < 0:
                 continue
-            let tp_start = self.ast.state.impl_type_params.get((tp_meta + 1) as i64)
-            let tp_count = self.ast.state.impl_type_params.get((tp_meta + 2) as i64)
+            let tp_start = self.ast.state.impl_type_params[(tp_meta + 1)]
+            let tp_count = self.ast.state.impl_type_params[(tp_meta + 2)]
             let pattern_arg_count = self.ast.get_data2(target_node)
             if pattern_arg_count != self.get_generic_inst_arg_count(resolved as i32):
                 continue
@@ -17160,7 +17160,7 @@ impl Sema:
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
         for fi in 0..field_count:
-            let field_ty: i32 = self.type_extra.get((te_start + fi * 3 + 1) as i64)
+            let field_ty: i32 = self.type_extra[(te_start + fi * 3 + 1)]
             if self.type_satisfies_thread_trait(field_ty, trait_sym) == 0:
                 return 0
         1
@@ -17170,9 +17170,9 @@ impl Sema:
         let variant_count = self.get_type_d2(resolved)
         var pos = self.get_type_d1(resolved)
         for vi in 0..variant_count:
-            let payload_count = self.type_extra.get((pos + 1) as i64)
+            let payload_count = self.type_extra[(pos + 1)]
             for pi in 0..payload_count:
-                let payload_ty: i32 = self.type_extra.get((pos + 2 + pi) as i64)
+                let payload_ty: i32 = self.type_extra[(pos + 2 + pi)]
                 if self.type_satisfies_thread_trait(payload_ty, trait_sym) == 0:
                     return 0
             pos = pos + 2 + payload_count
@@ -17205,7 +17205,7 @@ impl Sema:
             let te_start = self.get_type_d1(base_resolved)
             let field_count = self.get_type_d2(base_resolved)
             for fi in 0..field_count:
-                let field_ty = self.substitute_type(self.type_extra.get((te_start + fi * 3 + 1) as i64), subst_syms, subst_tids, tp_count)
+                let field_ty = self.substitute_type(self.type_extra[(te_start + fi * 3 + 1)], subst_syms, subst_tids, tp_count)
                 if self.type_satisfies_thread_trait(field_ty, trait_sym) == 0:
                     return 0
             return 1
@@ -17213,9 +17213,9 @@ impl Sema:
             let variant_count = self.get_type_d2(base_resolved)
             var epos = self.get_type_d1(base_resolved)
             for vi in 0..variant_count:
-                let payload_count = self.type_extra.get((epos + 1) as i64)
+                let payload_count = self.type_extra[(epos + 1)]
                 for pi in 0..payload_count:
-                    let payload_ty = self.substitute_type(self.type_extra.get((epos + 2 + pi) as i64), subst_syms, subst_tids, tp_count)
+                    let payload_ty = self.substitute_type(self.type_extra[(epos + 2 + pi)], subst_syms, subst_tids, tp_count)
                     if self.type_satisfies_thread_trait(payload_ty, trait_sym) == 0:
                         return 0
                 epos = epos + 2 + payload_count
@@ -17288,7 +17288,7 @@ impl Sema:
             let te_start = self.get_type_d0(resolved)
             let elem_count = self.get_type_d1(resolved)
             for ei in 0..elem_count:
-                if self.type_satisfies_thread_trait(self.type_extra.get((te_start + ei) as i64), trait_sym) == 0:
+                if self.type_satisfies_thread_trait(self.type_extra[(te_start + ei)], trait_sym) == 0:
                     return 0
             return 1
         if tk == TypeKind.TY_STRUCT:
@@ -17329,7 +17329,7 @@ impl Sema:
             let te_start = self.get_type_d0(resolved)
             let elem_count = self.get_type_d1(resolved)
             for ei in 0..elem_count:
-                if self.type_has_default_value(self.type_extra.get((te_start + ei) as i64)) == 0:
+                if self.type_has_default_value(self.type_extra[(te_start + ei)]) == 0:
                     return 0
             return 1
         if tk == TypeKind.TY_GENERIC_INST:
@@ -17661,7 +17661,7 @@ impl Sema:
 
             var subst = ConcreteSubst.init()
             for si in 0..matched_subst_names.len() as i32:
-                subst.push(matched_subst_names.get(si as i64), matched_subst_types.get(si as i64))
+                subst.push(matched_subst_names[si], matched_subst_types[si])
 
             let owner_sym = self.get_generic_inst_base(resolved)
             if self.type_decl_nodes.contains(owner_sym):
@@ -17719,7 +17719,7 @@ impl Sema:
             return
         var subst = ConcreteSubst.init()
         for si in 0..target.subst_names.len() as i32:
-            subst.push(target.subst_names.get(si as i64), target.subst_types.get(si as i64))
+            subst.push(target.subst_names[si], target.subst_types[si])
         let owner_sym = self.get_generic_inst_base(resolved)
         if self.type_decl_nodes.contains(owner_sym):
             let owner_decl = self.type_decl_nodes.get(owner_sym).unwrap()
@@ -17784,7 +17784,7 @@ impl Sema:
                 if pi >= param_count:
                     break
                 let p_type_node = self.ast.fn_param_type(param_start, pi)
-                let arg_ty = arg_types.get(ai as i64)
+                let arg_ty = arg_types[ai]
                 self.bind_type_params_from_type_expr(p_type_node, arg_ty, owner_tp_start, owner_tp_count, node)
         if fn_tp_count > 0:
             if is_static == 0 and param_count > 0:
@@ -17794,12 +17794,12 @@ impl Sema:
                 let pi2 = ai2 + bind_param_offset2
                 if pi2 >= param_count:
                     break
-                self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi2), arg_types.get(ai2 as i64), fn_tp_start, fn_tp_count, node)
+                self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi2), arg_types[ai2], fn_tp_start, fn_tp_count, node)
         // #600 (§5.1): generic-METHOD calls (Box.new / Rc.new / Arc.new on generic
         // owners) are a fourth checker lane that never reached the ephemeral arg
         // gates. Route each ephemeral arg through the same escape check.
         for egi in 0..arg_count:
-            if egi < arg_types.len() as i32 and arg_types.get(egi as i64) != 0 and self.type_is_ephemeral_value(arg_types.get(egi as i64) as TypeId) != 0:
+            if egi < arg_types.len() as i32 and arg_types[egi] != 0 and self.type_is_ephemeral_value(arg_types[egi] as TypeId) != 0:
                 let eg_extra = self.ast.get_data1(node)
                 let eg_arg = if self.has_resolved_call_args(node) != 0: self.get_resolved_call_arg(node, egi) else: self.ast.get_extra(eg_extra + egi)
                 if eg_arg > 0:
@@ -17843,7 +17843,7 @@ impl Sema:
             if pi3 >= param_count:
                 break
             let expected_ty = self.resolve_type_node_with_current_subst(self.ast.fn_param_type(param_start, pi3), concrete_owner)
-            let actual_ty = arg_types.get(ai3 as i64)
+            let actual_ty = arg_types[ai3]
             if expected_ty != 0 and actual_ty != 0:
                 let gen_method_arg = self.ast.get_extra(extra_start + ai3)
                 if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
@@ -17862,7 +17862,7 @@ impl Sema:
             // resolved receiver mode and return type from this signature, and
             // MIR/codegen must dispatch the exact same specialization.
             self.resolved_call_sigs.insert(node, concrete_sig)
-            self.resolved_call_mono_syms.insert(node, self.sig_names.get(concrete_sig as i64))
+            self.resolved_call_mono_syms.insert(node, self.sig_names[concrete_sig])
             let recv_param_offset = if is_static != 0: 0 else: 1
             let receiver = if is_static != 0: 0 else: recv_node
             if receiver != 0 and self.sig_get_param_count(concrete_sig) > 0:
@@ -17970,7 +17970,7 @@ impl Sema:
             return 0
         resolved as i32
 
-    fn settle_pending_generic_value_from_expected(value: i32, val_type: i32, expected: i32) -> i32:
+    mut fn settle_pending_generic_value_from_expected(value: i32, val_type: i32, expected: i32) -> i32:
         let base_sym = self.pending_generic_constructor_base(value, val_type)
         let concrete = self.pending_generic_expected_type_for_base(expected, base_sym)
         if concrete == 0:
@@ -17989,7 +17989,7 @@ impl Sema:
         self.typed_expr_types.insert(value, concrete)
         concrete
 
-    fn settle_pending_generic_binding(sym: i32, concrete_type: i32, expr_node: i32) -> i32:
+    mut fn settle_pending_generic_binding(sym: i32, concrete_type: i32, expr_node: i32) -> i32:
         if concrete_type == 0:
             return 0
         if not self.pending_generic_binding_base.contains(sym):
@@ -18002,7 +18002,7 @@ impl Sema:
             return 0
         let call_node = if self.pending_generic_binding_call.contains(sym): self.pending_generic_binding_call.get(sym).unwrap() else: 0
         for bi in 0..self.bind_names.len() as i32:
-            let other_sym: i32 = self.bind_names.get(bi as i64)
+            let other_sym: i32 = self.bind_names[bi]
             if not self.pending_generic_binding_base.contains(other_sym):
                 continue
             if self.pending_generic_binding_base.get(other_sym).unwrap() != base_sym:
@@ -18012,7 +18012,7 @@ impl Sema:
                 continue
             if call_node == 0 and other_sym != sym:
                 continue
-            self.bind_types.set_i32(bi as i64, concrete as i32)
+            self.bind_types[bi] = concrete as i32
             if self.pending_generic_binding_decl.contains(other_sym):
                 let decl_node: i32 = self.pending_generic_binding_decl.get(other_sym).unwrap()
                 self.typed_binding_types.insert(decl_node, concrete as i32)
@@ -18026,7 +18026,7 @@ impl Sema:
         self.scope_update_type(sym, concrete as i32)
         concrete as i32
 
-    fn settle_pending_generic_binding_from_expected(sym: i32, expected: i32, expr_node: i32) -> i32:
+    mut fn settle_pending_generic_binding_from_expected(sym: i32, expected: i32, expr_node: i32) -> i32:
         if not self.pending_generic_binding_base.contains(sym):
             return 0
         let base_sym = self.pending_generic_binding_base.get(sym).unwrap()
@@ -18035,7 +18035,7 @@ impl Sema:
             return 0
         self.settle_pending_generic_binding(sym, concrete, expr_node)
 
-    fn infer_pending_generic_method_receiver(expr: i32, field: i32, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
+    mut fn infer_pending_generic_method_receiver(expr: i32, field: i32, arg_types: &Vec[i32], arg_count: i32, node: i32) -> i32:
         let _ = node
         if expr == 0 or self.ast.kind(expr) != NodeKind.NK_IDENT:
             return 0
@@ -18135,8 +18135,8 @@ impl Sema:
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
         for fi in 0..field_count:
-            let field_sym: i32 = self.type_extra.get((te_start + fi * 3) as i64)
-            let default_node = self.type_extra.get((te_start + fi * 3 + 2) as i64)
+            let field_sym: i32 = self.type_extra[(te_start + fi * 3)]
+            let default_node = self.type_extra[(te_start + fi * 3 + 2)]
             if default_node != 0:
                 continue
             if self.visible_builder_chain_has_setter(expr, builder_sym, field_sym) == 0:
@@ -18547,8 +18547,8 @@ impl Sema:
                 return 0
             let elem_start = self.get_type_d0(elem_resolved)
             let out_elems: Vec[i32] = Vec.new()
-            out_elems.push(self.ensure_option_type_for(self.type_extra.get(elem_start as i64)))
-            out_elems.push(self.ensure_option_type_for(self.type_extra.get((elem_start + 1) as i64)))
+            out_elems.push(self.ensure_option_type_for(self.type_extra[elem_start]))
+            out_elems.push(self.ensure_option_type_for(self.type_extra[(elem_start + 1)]))
             return self.ensure_tuple_type(out_elems, 2) as i32
         if method_name == "flatten":
             if arg_count != 0:
@@ -18786,8 +18786,8 @@ impl Sema:
                     return 0
                 let pair_start0 = self.get_type_d0(pair_resolved0)
                 let hm_args0: Vec[i32] = Vec.new()
-                hm_args0.push(self.type_extra.get(pair_start0 as i64))
-                hm_args0.push(self.type_extra.get((pair_start0 + 1) as i64))
+                hm_args0.push(self.type_extra[pair_start0])
+                hm_args0.push(self.type_extra[(pair_start0 + 1)])
                 return self.ensure_generic_inst_type(self.syms.hashmap, hm_args0, 2) as i32
         if target_name == "BTreeMap":
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
@@ -18796,14 +18796,14 @@ impl Sema:
                     self.emit_error("collect[BTreeMap]() requires iterator elements of type (K, V)", node)
                     return 0
                 let pair_start_b0 = self.get_type_d0(pair_resolved_b0)
-                let key_b0: i32 = self.type_extra.get(pair_start_b0 as i64)
+                let key_b0: i32 = self.type_extra[pair_start_b0]
                 let ord_trait_b0 = self.pool_lookup_symbol("Ord")
                 if ord_trait_b0 != 0 and self.type_implements_trait(key_b0, ord_trait_b0) == 0:
                     self.emit_error("collect[BTreeMap]() key type must implement Ord", node)
                     return 0
                 let bm_args0: Vec[i32] = Vec.new()
                 bm_args0.push(key_b0)
-                bm_args0.push(self.type_extra.get((pair_start_b0 + 1) as i64))
+                bm_args0.push(self.type_extra[(pair_start_b0 + 1)])
                 return self.ensure_generic_inst_type(self.syms.btreemap, bm_args0, 2) as i32
 
         let target_ty = self.resolve_type_level_arg_expr(type_node)
@@ -18850,8 +18850,8 @@ impl Sema:
                 self.emit_error("collect[HashMap[K, V]] requires iterator elements of type (K, V)", node)
                 return 0
             let pair_start = self.get_type_d0(pair_resolved)
-            let key_ty: i32 = self.type_extra.get(pair_start as i64)
-            let val_ty: i32 = self.type_extra.get((pair_start + 1) as i64)
+            let key_ty: i32 = self.type_extra[pair_start]
+            let val_ty: i32 = self.type_extra[(pair_start + 1)]
             let want_key_ty = self.get_generic_inst_arg(target_resolved as i32, 0)
             let want_val_ty = self.get_generic_inst_arg(target_resolved as i32, 1)
             if self.types_compatible(want_key_ty as TypeId, key_ty as TypeId) == 0:
@@ -18867,8 +18867,8 @@ impl Sema:
                 self.emit_error("collect[BTreeMap[K, V]] requires iterator elements of type (K, V)", node)
                 return 0
             let pair_start_b = self.get_type_d0(pair_resolved_b)
-            let key_ty_b: i32 = self.type_extra.get(pair_start_b as i64)
-            let val_ty_b: i32 = self.type_extra.get((pair_start_b + 1) as i64)
+            let key_ty_b: i32 = self.type_extra[pair_start_b]
+            let val_ty_b: i32 = self.type_extra[(pair_start_b + 1)]
             let want_key_ty_b = self.get_generic_inst_arg(target_resolved as i32, 0)
             let want_val_ty_b = self.get_generic_inst_arg(target_resolved as i32, 1)
             if self.types_compatible(want_key_ty_b as TypeId, key_ty_b as TypeId) == 0:
@@ -18937,8 +18937,8 @@ impl Sema:
                 if self.get_type_kind(unzip_resolved) == TypeKind.TY_TUPLE and self.get_type_d1(unzip_resolved) == 2:
                     let uz_start = self.get_type_d0(unzip_resolved)
                     let uz_elems: Vec[i32] = Vec.new()
-                    uz_elems.push(self.ensure_vec_type_for(self.type_extra.get(uz_start as i64)))
-                    uz_elems.push(self.ensure_vec_type_for(self.type_extra.get((uz_start + 1) as i64)))
+                    uz_elems.push(self.ensure_vec_type_for(self.type_extra[uz_start]))
+                    uz_elems.push(self.ensure_vec_type_for(self.type_extra[(uz_start + 1)]))
                     return self.ensure_tuple_type(uz_elems, 2) as i32
                 return 0
 
@@ -19380,7 +19380,7 @@ impl Sema:
         if self.no_await_guard_origin_roots.len() == 0:
             return 0
         for i in 0..self.no_await_guard_origin_roots.len() as i32:
-            if self.no_await_guard_origin_roots.get(i as i64) != wait_root:
+            if self.no_await_guard_origin_roots[i] != wait_root:
                 return 0
         1
 
@@ -19435,19 +19435,19 @@ impl Sema:
     fn find_dyn_trait_method_info(trait_sym: i32, method_sym: i32) -> SemaDynTraitMethodInfo:
         if self.trait_lookup.contains(trait_sym):
             let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
-            let method_start = self.trait_method_starts.get(trait_idx as i64)
-            let method_count = self.trait_method_counts.get(trait_idx as i64)
+            let method_start = self.trait_method_starts[trait_idx]
+            let method_count = self.trait_method_counts[trait_idx]
             let want = self.pool_resolve(method_sym)
             for mi in 0..method_count:
                 let table_i = method_start + mi
-                let cur_method_sym = self.trait_method_names.get(table_i as i64)
+                let cur_method_sym = self.trait_method_names[table_i]
                 if cur_method_sym == method_sym or (want.len() > 0 and self.pool_resolve(cur_method_sym) == want):
                     return SemaDynTraitMethodInfo {
                         ok: 1,
-                        method_flags: self.trait_method_flags.get(table_i as i64),
-                        param_start: self.trait_method_param_starts.get(table_i as i64),
-                        param_count: self.trait_method_param_counts.get(table_i as i64),
-                        ret_node: self.trait_method_ret_nodes.get(table_i as i64),
+                        method_flags: self.trait_method_flags[table_i],
+                        param_start: self.trait_method_param_starts[table_i],
+                        param_count: self.trait_method_param_counts[table_i],
+                        ret_node: self.trait_method_ret_nodes[table_i],
                     }
 
         let trait_node = self.find_trait_decl_node(trait_sym)
@@ -19493,7 +19493,7 @@ impl Sema:
             return 0
         let want = self.pool_resolve(method_sym)
         for mi in 0..self.trait_method_names.len() as i32:
-            let candidate = self.trait_method_names.get(mi as i64)
+            let candidate = self.trait_method_names[mi]
             if candidate == method_sym or (want.len() > 0 and self.pool_resolve(candidate) == want):
                 return 1
         0
@@ -19533,7 +19533,7 @@ impl Sema:
                 self.emit_error("dyn trait method parameter cannot mention Self outside the receiver", self.ast.get_extra(extra_start + ai))
                 continue
             let expected_ty = self.resolve_type_expr(p_type_node) as i32
-            let actual_ty = arg_types.get(ai as i64)
+            let actual_ty = arg_types[ai]
             if expected_ty != 0 and actual_ty != 0:
                 if self.types_compatible(expected_ty as TypeId, actual_ty as TypeId) == 0:
                     if self.arithmetic_result_type(expected_ty as TypeId, actual_ty as TypeId) == 0:
@@ -19651,8 +19651,8 @@ impl Sema:
                 found_subst_names.pop()
                 found_subst_types.pop()
             for si in 0..target_match.subst_names.len() as i32:
-                found_subst_names.push(target_match.subst_names.get(si as i64))
-                found_subst_types.push(target_match.subst_types.get(si as i64))
+                found_subst_names.push(target_match.subst_names[si])
+                found_subst_types.push(target_match.subst_types[si])
 
         if found_trait == 0 or found_impl == 0 or found_fn == 0 or found_info.ok == 0:
             return 0
@@ -19671,7 +19671,7 @@ impl Sema:
                 break
             let p_type_node = self.ast.fn_param_type(found_info.param_start, param_i)
             let expected_ty = self.resolve_type_node_with_subst(p_type_node, recv_type, found_subst_names, found_subst_types)
-            let actual_ty = arg_types.get(ai as i64)
+            let actual_ty = arg_types[ai]
             if expected_ty != 0 and actual_ty != 0:
                 if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
                     let err_arg = if has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
@@ -19938,9 +19938,9 @@ impl Sema:
             var si = self.implicit_binding_types.len() as i32 - 1
             var found = 0
             while si >= 0:
-                let bind_ty: i32 = self.implicit_binding_types.get(si as i64)
+                let bind_ty: i32 = self.implicit_binding_types[si]
                 if self.types_compatible(expected_ty, bind_ty) != 0:
-                    let bind_sym = self.implicit_binding_syms.get(si as i64)
+                    let bind_sym = self.implicit_binding_syms[si]
                     resolved_map.insert(pi, 0 - bind_sym)
                     filled = 1
                     found = 1
@@ -20085,7 +20085,7 @@ impl Sema:
                     fold_params.push(fold_elem)
                     mc_expected = self.ensure_fn_type(fold_params, 2, fold_acc as TypeId) as i32
             if mc_expected == 0 and ai < mc_static_variant_payload_tys.len() as i32:
-                mc_expected = mc_static_variant_payload_tys.get(ai as i64)
+                mc_expected = mc_static_variant_payload_tys[ai]
             let mc_arg_ty = if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId) else: self.check_expr_value_context(mc_arg_node)
             arg_types.push(mc_arg_ty as i32)
             // Record the value read before viral view-origin propagation below:
@@ -20158,7 +20158,7 @@ impl Sema:
                 mc_iter_borrow_idxs.push(mc_iter_idx)
         var mc_ibi = mc_iter_borrow_idxs.len() as i32 - 1
         while mc_ibi >= 0:
-            self.remove_borrow_at(mc_iter_borrow_idxs.get(mc_ibi as i64))
+            self.remove_borrow_at(mc_iter_borrow_idxs[mc_ibi])
             mc_ibi = mc_ibi - 1
 
         // docs/mut.md Rev 8 §9.2 — closure capture conflict detection.
@@ -20422,8 +20422,8 @@ impl Sema:
             for ai in 0..mc_resolved_arg_count:
                 if ai >= expected:
                     break
-                let expected_ty = payload_tys.get(ai as i64)
-                let arg_ty = arg_types.get(ai as i64)
+                let expected_ty = payload_tys[ai]
+                let arg_ty = arg_types[ai]
                 let static_payload_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
                 static_payload_nodes.push(static_payload_arg_node)
                 self.check_ephemeral_task_storage(if static_payload_arg_node > 0: static_payload_arg_node else: node, "enum payload")
@@ -20535,7 +20535,7 @@ impl Sema:
                         if mc_plain_pi >= mc_plain_pc:
                             break
                         let mc_exp_ty = self.sig_param_type(sig_idx, mc_plain_pi)
-                        let mc_act_ty = arg_types.get(mc_pai as i64)
+                        let mc_act_ty = arg_types[mc_pai]
                         if mc_exp_ty != 0 and mc_act_ty != 0:
                             if self.type_is_dyn_object(self.resolve_alias(mc_exp_ty)) == 0:
                                 let mc_perr_arg = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, mc_pai) else: self.ast.get_extra(extra_start + mc_pai)
@@ -20563,7 +20563,7 @@ impl Sema:
                             if mc_stored_ty <= 0:
                                 continue
                             let exp_ty = self.substitute_type(mc_stored_ty, self.generic_subst_param_syms, self.generic_subst_type_ids, mc_subst_count)
-                            let arg_ty = arg_types.get(mc_ai as i64)
+                            let arg_ty = arg_types[mc_ai]
                             if exp_ty != 0 and arg_ty != 0:
                                 let exp_r = self.resolve_alias(exp_ty)
                                 if self.type_is_dyn_object(exp_r) == 0:
@@ -20730,7 +20730,7 @@ impl Sema:
                 else if field == self.syms.get_disjoint:
                     for sm_hi in 0..2:
                         if arg_count > sm_hi:
-                            let h_ty3 = arg_types.get(sm_hi as i64)
+                            let h_ty3 = arg_types[sm_hi]
                             if sm_handle_ty != 0 and h_ty3 != 0:
                                 let _ = self.check_builtin_method_call_arg(mc_call_name, sm_hi, sm_handle_ty, h_ty3, self.ast.get_extra(extra_start + sm_hi))
             else if type_name_sym == self.syms.slotmapslot:
@@ -21006,8 +21006,8 @@ impl Sema:
                         if self.get_type_kind(uz_iter_resolved) == TypeKind.TY_TUPLE and self.get_type_d1(uz_iter_resolved) == 2:
                             let uz_iter_start = self.get_type_d0(uz_iter_resolved)
                             let uz_vecs: Vec[i32] = Vec.new()
-                            uz_vecs.push(self.ensure_vec_type_for(self.type_extra.get(uz_iter_start as i64)))
-                            uz_vecs.push(self.ensure_vec_type_for(self.type_extra.get((uz_iter_start + 1) as i64)))
+                            uz_vecs.push(self.ensure_vec_type_for(self.type_extra[uz_iter_start]))
+                            uz_vecs.push(self.ensure_vec_type_for(self.type_extra[(uz_iter_start + 1)]))
                             return self.ensure_tuple_type(uz_vecs, 2) as i32
                         return 0
             if type_name_sym == self.syms.veciterref:
@@ -21416,11 +21416,11 @@ impl Sema:
         var only = 0
         var i = self.named_type_candidate_head(base_sym)
         while i >= 0:
-            let candidate_tid = self.named_type_candidate_tids.get(i as i64)
+            let candidate_tid = self.named_type_candidate_tids[i]
             if only != 0 and candidate_tid != only:
                 return 0
             only = candidate_tid
-            i = self.named_type_candidate_next.get(i as i64)
+            i = self.named_type_candidate_next[i]
         only
 
     fn type_reflection_field_name(tid: i32, field_index: i32) -> i32:
@@ -21431,7 +21431,7 @@ impl Sema:
             let field_count = self.get_type_d2(resolved)
             if field_index < 0 or field_index >= field_count:
                 return 0
-            return self.type_extra.get((te_start + field_index * 3) as i64)
+            return self.type_extra[(te_start + field_index * 3)]
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
             let base_tid = self.type_reflection_base_template(base_sym)
@@ -21442,7 +21442,7 @@ impl Sema:
                     let field_count = self.get_type_d2(base_resolved)
                     if field_index < 0 or field_index >= field_count:
                         return 0
-                    return self.type_extra.get((te_start + field_index * 3) as i64)
+                    return self.type_extra[(te_start + field_index * 3)]
         0
 
     mut fn type_reflection_field_type(tid: i32, field_index: i32) -> i32:
@@ -21453,7 +21453,7 @@ impl Sema:
             let field_count = self.get_type_d2(resolved)
             if field_index < 0 or field_index >= field_count:
                 return 0
-            return self.type_extra.get((te_start + field_index * 3 + 1) as i64)
+            return self.type_extra[(te_start + field_index * 3 + 1)]
         if tk == TypeKind.TY_GENERIC_INST:
             return self.type_layout_generic_struct_field_type(resolved as i32, field_index)
         0
@@ -21471,7 +21471,7 @@ impl Sema:
         for ti in 0..self.type_kinds.len() as i32:
             if ti == resolved as i32:
                 continue
-            if self.type_kinds.get(ti as i64) != TypeKind.TY_GENERIC_INST:
+            if self.type_kinds[ti] != TypeKind.TY_GENERIC_INST:
                 continue
             if self.get_type_d2(ti as TypeId) != argc:
                 continue
@@ -21480,7 +21480,7 @@ impl Sema:
             let ote = self.get_type_d1(ti as TypeId)
             var same = true
             for ai in 0..argc:
-                if self.type_extra.get((te + ai) as i64) != self.type_extra.get((ote + ai) as i64):
+                if self.type_extra[(te + ai)] != self.type_extra[(ote + ai)]:
                     same = false
             if same:
                 return ti
@@ -21494,7 +21494,7 @@ impl Sema:
             let field_count = self.get_type_d2(resolved)
             if field_index < 0 or field_index >= field_count:
                 return 0
-            return self.type_extra.get((te_start + field_index * 3 + 1) as i64)
+            return self.type_extra[(te_start + field_index * 3 + 1)]
         if tk == TypeKind.TY_GENERIC_INST:
             let field_count = self.type_reflection_field_count(resolved as i32)
             if field_index < 0 or field_index >= field_count:
@@ -21537,7 +21537,7 @@ impl Sema:
         for vi in 0..variant_count:
             if vi == variant_index:
                 return pos
-            let payload_count = self.type_extra.get((pos + 1) as i64)
+            let payload_count = self.type_extra[(pos + 1)]
             pos = pos + 2 + payload_count
         -1
 
@@ -21554,7 +21554,7 @@ impl Sema:
         let pos = self.type_reflection_variant_position(base_tid, variant_index)
         if pos < 0:
             return 0
-        self.type_extra.get(pos as i64)
+        self.type_extra[pos]
 
     fn type_reflection_variant_payload_count(tid: i32, variant_index: i32) -> i32:
         let base_tid = self.type_reflection_variant_base(tid)
@@ -21563,7 +21563,7 @@ impl Sema:
         let pos = self.type_reflection_variant_position(base_tid, variant_index)
         if pos < 0:
             return 0
-        self.type_extra.get((pos + 1) as i64)
+        self.type_extra[(pos + 1)]
 
     fn type_reflection_variant_discriminant(tid: i32, variant_index: i32) -> i64:
         let base_tid = self.type_reflection_variant_base(tid)
@@ -21593,19 +21593,19 @@ impl Sema:
         let pos = self.type_reflection_variant_position(base_tid, variant_index)
         if pos < 0:
             return 0
-        let payload_count: i32 = self.type_extra.get((pos + 1) as i64)
+        let payload_count: i32 = self.type_extra[(pos + 1)]
         if payload_index < 0 or payload_index >= payload_count:
             return 0
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
-            let name_sym: i32 = self.type_extra.get(pos as i64)
+            let name_sym: i32 = self.type_extra[pos]
             let payloads = self.resolve_generic_enum_payload(resolved as i32, base_sym, name_sym, payload_count)
             if payload_index < payloads.len() as i32:
-                let payload_tid = payloads.get(payload_index as i64)
+                let payload_tid = payloads[payload_index]
                 if payload_tid != 0:
                     return payload_tid
-        self.type_extra.get((pos + 2 + payload_index) as i64)
+        self.type_extra[(pos + 2 + payload_index)]
 
     fn type_reflection_variant_payload_type_frozen(tid: i32, variant_index: i32, payload_index: i32) -> i32:
         let base_tid = self.type_reflection_variant_base(tid)
@@ -21614,17 +21614,17 @@ impl Sema:
         let pos = self.type_reflection_variant_position(base_tid, variant_index)
         if pos < 0:
             return 0
-        let payload_count = self.type_extra.get((pos + 1) as i64)
+        let payload_count = self.type_extra[(pos + 1)]
         if payload_index < 0 or payload_index >= payload_count:
             return 0
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
-            let name_sym = self.type_extra.get(pos as i64)
+            let name_sym = self.type_extra[pos]
             let payloads = self.enum_variant_payload_types_frozen(resolved as i32, name_sym)
             if payloads.len() as i32 != payload_count:
                 sema_phase_bug("BUG: type_reflection_variant_payload_type_frozen payload count mismatch")
-            return payloads.get(payload_index as i64)
-        self.type_extra.get((pos + 2 + payload_index) as i64)
+            return payloads[payload_index]
+        self.type_extra[(pos + 2 + payload_index)]
 
     mut fn check_static_type_method_call(obj_type: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
         let is_type_method =
@@ -21880,8 +21880,8 @@ impl Sema:
         let min_count = if count_a < count_b: count_a else: count_b
         var i = 0
         while i < min_count:
-            let fa = self.borrow_path_data.get((start_a + i) as i64)
-            let fb = self.borrow_path_data.get((start_b + i) as i64)
+            let fa = self.borrow_path_data[(start_a + i)]
+            let fb = self.borrow_path_data[(start_b + i)]
             if fa != fb:
                 // Wildcard index overlaps with all indices at the same position
                 if fa == INDEX_PATH_WILDCARD or fb == INDEX_PATH_WILDCARD:
@@ -21913,19 +21913,19 @@ impl Sema:
 
         var i = 0
         while i < self.borrow_kinds.len() as i32:
-            let existing_place = self.borrow_places.get(i as i64)
+            let existing_place = self.borrow_places[i]
             if existing_place != place:
                 i = i + 1
                 continue
 
             // Check disjointness using full field paths
-            let ex_path_start = self.borrow_path_starts.get(i as i64)
-            let ex_path_count = self.borrow_path_counts.get(i as i64)
+            let ex_path_start = self.borrow_path_starts[i]
+            let ex_path_count = self.borrow_path_counts[i]
             if self.are_borrows_disjoint_paths(path_start, path_count, ex_path_start, ex_path_count) != 0:
                 i = i + 1
                 continue
 
-            let existing_kind = self.borrow_kinds.get(i as i64)
+            let existing_kind = self.borrow_kinds[i]
             if kind == BorrowKind.SHARED:
                 if existing_kind == BorrowKind.EXCLUSIVE:
                     self.emit_error("cannot borrow: already mutably borrowed", err_node)
@@ -21963,8 +21963,8 @@ impl Sema:
                 continue
             var attached = 0
             for bi in 0..self.borrow_refs.len() as i32:
-                if self.borrow_places.get(bi as i64) == origin_sym and self.borrow_kinds.get(bi as i64) == BorrowKind.SHARED and self.borrow_refs.get(bi as i64) == 0:
-                    self.borrow_refs.set_i32(bi as i64, view_sym)
+                if self.borrow_places[bi] == origin_sym and self.borrow_kinds[bi] == BorrowKind.SHARED and self.borrow_refs[bi] == 0:
+                    self.borrow_refs[bi] = view_sym
                     attached = 1
                     break
             if attached != 0:
@@ -21973,7 +21973,7 @@ impl Sema:
             let path_start = self.borrow_path_data.len() as i32
             self.check_borrow_create_direct(origin_sym, BorrowKind.SHARED, 0, path_start, 0, creation_node)
             if self.borrow_refs.len() as i32 > before:
-                self.borrow_refs.set_i32(before as i64, view_sym)
+                self.borrow_refs[before] = view_sym
 
     fn find_symbol_use_after_in_span(root: i32, sym: i32, after: i32) -> i32:
         if root == 0:
@@ -22024,26 +22024,26 @@ impl Sema:
         let path_count = self.borrow_collect_path(place_node)
         var i = 0
         while i < self.borrow_kinds.len() as i32:
-            let existing_place = self.borrow_places.get(i as i64)
+            let existing_place = self.borrow_places[i]
             if existing_place != place:
                 i = i + 1
                 continue
-            let existing_kind = self.borrow_kinds.get(i as i64)
+            let existing_kind = self.borrow_kinds[i]
             if existing_kind != BorrowKind.SHARED:
                 i = i + 1
                 continue
-            let ref_sym = self.borrow_refs.get(i as i64)
+            let ref_sym = self.borrow_refs[i]
             if ref_sym == 0:
                 i = i + 1
                 continue
-            let ex_path_start = self.borrow_path_starts.get(i as i64)
-            let ex_path_count = self.borrow_path_counts.get(i as i64)
+            let ex_path_start = self.borrow_path_starts[i]
+            let ex_path_count = self.borrow_path_counts[i]
             if self.are_borrows_disjoint_paths(path_start, path_count, ex_path_start, ex_path_count) != 0:
                 i = i + 1
                 continue
             let place_name = self.pool_resolve(place)
             let ref_name: str = with_str_clone_ref(self.pool_resolve(ref_sym))
-            let creation_node = self.borrow_creation_nodes.get(i as i64)
+            let creation_node = self.borrow_creation_nodes[i]
             let binding_node = self.binding_decl_node(ref_sym)
             let last_use = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, ref_sym, err_node)
             // A view whose final use is already behind this mutation is dead.
@@ -22083,16 +22083,16 @@ impl Sema:
     mut fn check_borrow_create_direct(place: i32, kind: i32, field: i32, path_start: i32, path_count: i32, err_node: i32) -> Unit:
         var i = 0
         while i < self.borrow_kinds.len() as i32:
-            let existing_place = self.borrow_places.get(i as i64)
+            let existing_place = self.borrow_places[i]
             if existing_place != place:
                 i = i + 1
                 continue
-            let ex_path_start = self.borrow_path_starts.get(i as i64)
-            let ex_path_count = self.borrow_path_counts.get(i as i64)
+            let ex_path_start = self.borrow_path_starts[i]
+            let ex_path_count = self.borrow_path_counts[i]
             if self.are_borrows_disjoint_paths(path_start, path_count, ex_path_start, ex_path_count) != 0:
                 i = i + 1
                 continue
-            let existing_kind = self.borrow_kinds.get(i as i64)
+            let existing_kind = self.borrow_kinds[i]
             if kind == BorrowKind.SHARED:
                 if existing_kind == BorrowKind.EXCLUSIVE:
                     self.emit_error("cannot borrow: already mutably borrowed", err_node)
@@ -22101,7 +22101,7 @@ impl Sema:
                 continue
             if existing_kind == BorrowKind.EXCLUSIVE:
                 self.emit_error("cannot borrow mutably: already mutably borrowed", err_node)
-            else if self.borrow_refs.get(i as i64) == -1:
+            else if self.borrow_refs[i] == -1:
                 let place_name: str = with_str_clone_ref(self.pool_resolve(place))
                 self.emit_error("iterator over `" ++ place_name ++ "` retains access; cannot also mutably capture `" ++ place_name ++ "` (§15.8)", err_node)
             else:
@@ -22116,19 +22116,19 @@ impl Sema:
         self.borrow_scope_depths.push(self.scope_starts.len() as i32)
         self.borrow_creation_nodes.push(err_node)
 
-    fn remove_borrow_at(idx: i32):
+    mut fn remove_borrow_at(idx: i32):
         let last = self.borrow_refs.len() as i32 - 1
         if idx < 0 or idx > last:
             return
         if idx < last:
-            self.borrow_kinds.set_i32(idx as i64, self.borrow_kinds.get(last as i64))
-            self.borrow_places.set_i32(idx as i64, self.borrow_places.get(last as i64))
-            self.borrow_fields.set_i32(idx as i64, self.borrow_fields.get(last as i64))
-            self.borrow_refs.set_i32(idx as i64, self.borrow_refs.get(last as i64))
-            self.borrow_path_starts.set_i32(idx as i64, self.borrow_path_starts.get(last as i64))
-            self.borrow_path_counts.set_i32(idx as i64, self.borrow_path_counts.get(last as i64))
-            self.borrow_scope_depths.set_i32(idx as i64, self.borrow_scope_depths.get(last as i64))
-            self.borrow_creation_nodes.set_i32(idx as i64, self.borrow_creation_nodes.get(last as i64))
+            self.borrow_kinds[idx] = self.borrow_kinds[last]
+            self.borrow_places[idx] = self.borrow_places[last]
+            self.borrow_fields[idx] = self.borrow_fields[last]
+            self.borrow_refs[idx] = self.borrow_refs[last]
+            self.borrow_path_starts[idx] = self.borrow_path_starts[last]
+            self.borrow_path_counts[idx] = self.borrow_path_counts[last]
+            self.borrow_scope_depths[idx] = self.borrow_scope_depths[last]
+            self.borrow_creation_nodes[idx] = self.borrow_creation_nodes[last]
         self.borrow_kinds.pop()
         self.borrow_places.pop()
         self.borrow_fields.pop()
@@ -22446,7 +22446,7 @@ impl Sema:
         if worker != 0:
             let worker_body = self.ast.get_data0(worker)
             for bi in 0..self.bind_names.len() as i32:
-                let cap_sym: i32 = self.bind_names.get(bi as i64)
+                let cap_sym: i32 = self.bind_names[bi]
                 if cap_sym == scope_sym or cap_sym == handle_sym:
                     continue
                 if self.expr_uses_symbol(worker_body, cap_sym) != 0:
@@ -22502,7 +22502,7 @@ impl Sema:
         if sym != 0:
             return if root == sym: 1 else: 0
         for bi in 0..self.bind_names.len() as i32:
-            if self.bind_names.get(bi as i64) == root:
+            if self.bind_names[bi] == root:
                 return 1
         0
 
@@ -23049,7 +23049,7 @@ impl Sema:
     // Collect top-level field syms accessed on a captured variable in a closure body.
     // Pushes (field_sym, borrow_kind) pairs into capture_field_syms/capture_field_kinds.
     // These are parallel Vecs used transiently during closure checking.
-    fn collect_capture_fields(node: i32, sym: i32):
+    mut fn collect_capture_fields(node: i32, sym: i32):
         if node == 0:
             return
         let kind = self.ast.kind(node)
@@ -23061,7 +23061,7 @@ impl Sema:
                 var found = 0
                 var fi = 0
                 while fi < self.capture_field_syms.len() as i32:
-                    if self.capture_field_syms.get(fi as i64) == field_sym:
+                    if self.capture_field_syms[fi] == field_sym:
                         found = 1
                         break
                     fi = fi + 1
@@ -23085,9 +23085,9 @@ impl Sema:
                     var found = 0
                     var fi = 0
                     while fi < self.capture_field_syms.len() as i32:
-                        if self.capture_field_syms.get(fi as i64) == field_sym:
+                        if self.capture_field_syms[fi] == field_sym:
                             found = 1
-                            self.capture_field_kinds.set_i32(fi as i64, BorrowKind.EXCLUSIVE)
+                            self.capture_field_kinds[fi] = BorrowKind.EXCLUSIVE
                             break
                         fi = fi + 1
                     if found == 0:
@@ -23108,9 +23108,9 @@ impl Sema:
                         var found = 0
                         var fi = 0
                         while fi < self.capture_field_syms.len() as i32:
-                            if self.capture_field_syms.get(fi as i64) == field_sym:
+                            if self.capture_field_syms[fi] == field_sym:
                                 found = 1
-                                self.capture_field_kinds.set_i32(fi as i64, BorrowKind.EXCLUSIVE)
+                                self.capture_field_kinds[fi] = BorrowKind.EXCLUSIVE
                                 break
                             fi = fi + 1
                         if found == 0:
@@ -23166,11 +23166,11 @@ impl Sema:
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
             self.collect_capture_fields(self.ast.get_data0(node), sym)
 
-    fn expire_dead_borrows_in_block(block_extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail_node: i32):
+    mut fn expire_dead_borrows_in_block(block_extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail_node: i32):
         let current_depth = self.scope_starts.len() as i32
         var bi = 0
         while bi < self.borrow_refs.len() as i32:
-            let ref_sym = self.borrow_refs.get(bi as i64)
+            let ref_sym = self.borrow_refs[bi]
             if ref_sym == 0:
                 self.remove_borrow_at(bi)
                 continue
@@ -23178,7 +23178,7 @@ impl Sema:
             // Only expire borrows owned by this scope or deeper — borrows from
             // outer scopes must be expired by the outer scope's own block walk,
             // which has the full forward context (§8.4 NLL scoped expiry).
-            if self.borrow_scope_depths.get(bi as i64) < current_depth:
+            if self.borrow_scope_depths[bi] < current_depth:
                 bi = bi + 1
                 continue
 
@@ -23212,7 +23212,7 @@ impl Sema:
             let te_start = self.get_type_d0(resolved)
             let elem_count = self.get_type_d1(resolved)
             for ei in 0..elem_count:
-                if self.type_is_ephemeral_value(self.type_extra.get((te_start + ei) as i64)) != 0:
+                if self.type_is_ephemeral_value(self.type_extra[(te_start + ei)]) != 0:
                     return 1
             return 0
         if tk == TypeKind.TY_GENERIC_INST:
@@ -23222,7 +23222,7 @@ impl Sema:
             let arg_count = self.get_type_d2(resolved)
             let arg_start = self.get_type_d1(resolved)
             for ai in 0..arg_count:
-                if self.type_is_ephemeral_value(self.type_extra.get((arg_start + ai) as i64)) != 0:
+                if self.type_is_ephemeral_value(self.type_extra[(arg_start + ai)]) != 0:
                     return 1
             return 0
         if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
@@ -23625,7 +23625,7 @@ impl Sema:
         var total = 0
         var visible = 0
         for i in 0..self.extension_method_owner_syms.len() as i32:
-            if self.extension_method_owner_syms.get(i as i64) != owner_sym or self.extension_method_syms.get(i as i64) != method_sym:
+            if self.extension_method_owner_syms[i] != owner_sym or self.extension_method_syms[i] != method_sym:
                 continue
             total = total + 1
             if self.extension_candidate_visible(i) != 0:
@@ -23660,7 +23660,7 @@ impl Sema:
 fn sema_module_display_name(path: &str) -> str:
     var start = 0
     for i in 0..path.len() as i32:
-        let ch = path.byte_at(i as i64)
+        let ch = path[i]
         if ch == 47 or ch == 92:
             start = i + 1
     var end = path.len()
@@ -23673,7 +23673,7 @@ fn sema_import_alias_matches(import_text: &str, alias: &str) -> i32:
         return 1
     var start = 0
     for i in 0..import_text.len() as i32:
-        let ch = import_text.byte_at(i as i64)
+        let ch = import_text[i]
         if ch == 46 or ch == 47 or ch == 92:
             start = i + 1
     if import_text.slice(start, import_text.len()) == alias:
@@ -23690,18 +23690,18 @@ impl Sema:
         let current = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path)).unwrap()
         if current < 0 or current >= self.module_import_starts.len() as i32:
             return ""
-        let start = self.module_import_starts.get(current as i64)
-        let count = self.module_import_counts.get(current as i64)
+        let start = self.module_import_starts[current]
+        let count = self.module_import_counts[current]
         for i in 0..count:
             let idx = start + i
             if idx < 0 or idx >= self.module_import_targets.len() as i32 or idx >= self.module_import_paths.len() as i32:
                 continue
-            let import_text = self.module_import_paths.get(idx as i64)
+            let import_text = self.module_import_paths[idx]
             if sema_import_alias_matches(import_text, alias) == 0:
                 continue
-            let target = self.module_import_targets.get(idx as i64)
+            let target = self.module_import_targets[idx]
             if target >= 0 and target < self.module_paths.len() as i32:
-                return with_str_clone_ref(self.module_paths.get(target as i64))
+                return with_str_clone_ref(self.module_paths[target])
         ""
 
     fn extension_path_visible_from_current(path: &str) -> i32:
@@ -23717,20 +23717,20 @@ impl Sema:
         let target = self.module_index_by_path.get(path).unwrap()
         if current == target:
             return 1
-        let start = self.module_import_starts.get(current as i64)
-        let count = self.module_import_counts.get(current as i64)
+        let start = self.module_import_starts[current]
+        let count = self.module_import_counts[current]
         for i in 0..count:
-            if self.module_import_targets.get((start + i) as i64) == target:
+            if self.module_import_targets[(start + i)] == target:
                 return 1
         0
 
     fn extension_candidate_visible(idx: i32) -> i32:
         if idx < 0 or idx >= self.extension_method_fn_syms.len() as i32 or idx >= self.extension_method_paths.len() as i32:
             return 0
-        let fn_sym = self.extension_method_fn_syms.get(idx as i64)
+        let fn_sym = self.extension_method_fn_syms[idx]
         if self.symbol_visible_from_current(fn_sym) == 0:
             return 0
-        self.extension_path_visible_from_current(self.extension_method_paths.get(idx as i64))
+        self.extension_path_visible_from_current(self.extension_method_paths[idx])
 
     // §11.4: an extension declared beside its type is inherent-equivalent
     // and wins over extensions imported from other modules.
@@ -23739,9 +23739,9 @@ impl Sema:
         if owner_path.len() == 0:
             return -1
         for i in 0..self.extension_method_owner_syms.len() as i32:
-            if self.extension_method_owner_syms.get(i as i64) != owner_sym or self.extension_method_syms.get(i as i64) != method_sym:
+            if self.extension_method_owner_syms[i] != owner_sym or self.extension_method_syms[i] != method_sym:
                 continue
-            if self.extension_candidate_visible(i) != 0 and self.extension_method_paths.get(i as i64) == owner_path:
+            if self.extension_candidate_visible(i) != 0 and self.extension_method_paths[i] == owner_path:
                 return i
         -1
 
@@ -23750,22 +23750,22 @@ impl Sema:
             return 1
         var count = 0
         for i in 0..self.extension_method_owner_syms.len() as i32:
-            if self.extension_method_owner_syms.get(i as i64) == owner_sym and self.extension_method_syms.get(i as i64) == method_sym and self.extension_candidate_visible(i) != 0:
+            if self.extension_method_owner_syms[i] == owner_sym and self.extension_method_syms[i] == method_sym and self.extension_candidate_visible(i) != 0:
                 count = count + 1
         count
 
     fn unique_visible_extension_sig(owner_sym: i32, method_sym: i32) -> i32:
         let inherent = self.inherent_equivalent_extension_candidate(owner_sym, method_sym)
         if inherent >= 0:
-            return self.extension_method_sig_idxs.get(inherent as i64)
+            return self.extension_method_sig_idxs[inherent]
         var found = -1
         var count = 0
         for i in 0..self.extension_method_owner_syms.len() as i32:
-            if self.extension_method_owner_syms.get(i as i64) != owner_sym or self.extension_method_syms.get(i as i64) != method_sym:
+            if self.extension_method_owner_syms[i] != owner_sym or self.extension_method_syms[i] != method_sym:
                 continue
             if self.extension_candidate_visible(i) == 0:
                 continue
-            found = self.extension_method_sig_idxs.get(i as i64)
+            found = self.extension_method_sig_idxs[i]
             count = count + 1
         if count == 1:
             return found
@@ -23774,15 +23774,15 @@ impl Sema:
     fn unique_visible_extension_fn(owner_sym: i32, method_sym: i32) -> i32:
         let inherent = self.inherent_equivalent_extension_candidate(owner_sym, method_sym)
         if inherent >= 0:
-            return self.extension_method_fn_syms.get(inherent as i64)
+            return self.extension_method_fn_syms[inherent]
         var found = 0
         var count = 0
         for i in 0..self.extension_method_owner_syms.len() as i32:
-            if self.extension_method_owner_syms.get(i as i64) != owner_sym or self.extension_method_syms.get(i as i64) != method_sym:
+            if self.extension_method_owner_syms[i] != owner_sym or self.extension_method_syms[i] != method_sym:
                 continue
             if self.extension_candidate_visible(i) == 0:
                 continue
-            found = self.extension_method_fn_syms.get(i as i64)
+            found = self.extension_method_fn_syms[i]
             count = count + 1
         if count == 1:
             return found
@@ -23799,14 +23799,14 @@ fn sema_extension_module_path_matches(candidate_path: &str, module_path: &str, a
 impl Sema:
     fn extension_fn_for_module(owner_sym: i32, method_sym: i32, module_path: &str, alias: &str) -> i32:
         for i in 0..self.extension_method_owner_syms.len() as i32:
-            if self.extension_method_owner_syms.get(i as i64) == owner_sym and self.extension_method_syms.get(i as i64) == method_sym and sema_extension_module_path_matches(self.extension_method_paths.get(i as i64), module_path, alias) != 0:
-                return self.extension_method_fn_syms.get(i as i64)
+            if self.extension_method_owner_syms[i] == owner_sym and self.extension_method_syms[i] == method_sym and sema_extension_module_path_matches(self.extension_method_paths[i], module_path, alias) != 0:
+                return self.extension_method_fn_syms[i]
         0
 
     fn extension_sig_for_module(owner_sym: i32, method_sym: i32, module_path: &str, alias: &str) -> i32:
         for i in 0..self.extension_method_owner_syms.len() as i32:
-            if self.extension_method_owner_syms.get(i as i64) == owner_sym and self.extension_method_syms.get(i as i64) == method_sym and sema_extension_module_path_matches(self.extension_method_paths.get(i as i64), module_path, alias) != 0:
-                return self.extension_method_sig_idxs.get(i as i64)
+            if self.extension_method_owner_syms[i] == owner_sym and self.extension_method_syms[i] == method_sym and sema_extension_module_path_matches(self.extension_method_paths[i], module_path, alias) != 0:
+                return self.extension_method_sig_idxs[i]
         -1
 
     mut fn emit_ambiguous_extension_method_error(owner_sym: i32, method_sym: i32, node: i32):
@@ -23814,13 +23814,13 @@ impl Sema:
         var candidates = ""
         var count = 0
         for i in 0..self.extension_method_owner_syms.len() as i32:
-            if self.extension_method_owner_syms.get(i as i64) != owner_sym or self.extension_method_syms.get(i as i64) != method_sym:
+            if self.extension_method_owner_syms[i] != owner_sym or self.extension_method_syms[i] != method_sym:
                 continue
             if self.extension_candidate_visible(i) == 0:
                 continue
             if count > 0:
                 candidates = candidates ++ ", "
-            candidates = candidates ++ sema_module_display_name(self.extension_method_paths.get(i as i64)) ++ "." ++ method_name
+            candidates = candidates ++ sema_module_display_name(self.extension_method_paths[i]) ++ "." ++ method_name
             count = count + 1
         self.emit_error("ambiguous extension method '" ++ method_name ++ "'; candidates: " ++ candidates ++ "; use pkg.method(value)", node)
 
@@ -23870,7 +23870,7 @@ impl Sema:
         let path_start = self.borrow_path_data.len() as i32
         self.check_borrow_create_direct(recv_root, BorrowKind.SHARED, 0, path_start, 0, arg_node)
         if (self.borrow_kinds.len() as i32) > pre_count:
-            self.borrow_refs.set_i32(pre_count as i64, -1)
+            self.borrow_refs[pre_count] = -1
             return pre_count
         -1
 
@@ -23973,7 +23973,7 @@ impl Sema:
             let bind_count = self.bind_names.len() as i32
             var bi = 0
             while bi < bind_count:
-                let cap_sym: i32 = self.bind_names.get(bi as i64)
+                let cap_sym: i32 = self.bind_names[bi]
                 if self.expr_mutates_place(closure_body, cap_sym) != 0:
                     // §9.2: if the closure only accesses specific fields, use
                     // field-level disjointness to avoid false conflicts.
@@ -24004,7 +24004,7 @@ impl Sema:
                                     conflict = 0
                                     var fi = 0
                                     while fi < closure_field_count:
-                                        if self.capture_field_syms.get(fi as i64) == sib_field:
+                                        if self.capture_field_syms[fi] == sib_field:
                                             conflict = 1
                                             break
                                         fi = fi + 1

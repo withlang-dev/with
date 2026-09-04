@@ -18,7 +18,7 @@ fn build_graph_dispatch_result(handled: bool, rc: i32) -> BuildGraphDispatchResu
 
 fn build_graph_output_seen(outputs: &Vec[str], path: &str) -> bool:
     for i in 0..outputs.len() as i32:
-        if outputs.get(i as i64) == path:
+        if outputs[i] == path:
             return true
     false
 
@@ -38,14 +38,14 @@ fn build_graph_record_output(outputs: Vec[str], path: &str) -> Vec[str]:
 pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &str) -> i32:
     var outputs: Vec[str] = Vec.new()
     for gi in 0..graph.generated_sources.len() as i32:
-        let generated = graph.generated_sources.get(gi as i64)
+        let generated = graph.generated_sources[gi]
         let generated_path = resolve_join(root, generated.path)
         if not build_graph_output_is_new(outputs, generated_path):
             build_graph_rt_eprint("error: duplicate build.w output path: " ++ generated.path)
             return 1
         outputs = build_graph_record_output(move outputs, generated_path)
     for ti in 0..graph.targets.len() as i32:
-        let target = &graph.targets[ti as i64]
+        let target = &graph.targets[ti]
         var path = ""
         if target.kind == 0:
             path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
@@ -64,7 +64,7 @@ pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path:
             return 1
         outputs = build_graph_record_output(move outputs, path)
         for oi in 0..target.extra_outputs.len() as i32:
-            let extra_path = build_graph_resolve_project_path(root, target.extra_outputs.get(oi as i64))
+            let extra_path = build_graph_resolve_project_path(root, target.extra_outputs[oi])
             if not build_graph_output_is_new(outputs, extra_path):
                 build_graph_rt_eprint("error: duplicate build.w output path for target '" ++ target.name ++ "': " ++ extra_path)
                 return 1
@@ -73,7 +73,7 @@ pub fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path:
 
 pub fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i32:
     for gi in 0..graph.generated_sources.len() as i32:
-        let generated = graph.generated_sources.get(gi as i64)
+        let generated = graph.generated_sources[gi]
         if not build_graph_generated_path_valid(generated.path):
             build_graph_rt_eprint("error: invalid build.w generated source path: " ++ generated.path)
             return 1
@@ -89,7 +89,7 @@ pub fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i3
 
 fn build_graph_target_completed(completed: &Vec[str], name: &str) -> bool:
     for i in 0..completed.len() as i32:
-        if completed.get(i as i64) == name:
+        if completed[i] == name:
             return true
     false
 
@@ -98,7 +98,7 @@ fn build_graph_verify_completed_deps(target: &BuildGraphTarget, completed: &Vec[
         build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires verification dependencies")
         return 1
     for di in 0..target.deps.len() as i32:
-        let dep = target.deps.get(di as i64)
+        let dep = target.deps[di]
         if not build_graph_target_completed(completed, dep):
             build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' dependency has not completed: " ++ dep)
             return 1

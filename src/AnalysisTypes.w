@@ -209,12 +209,12 @@ impl AnalysisReport:
 
     fn merge(other: &AnalysisReport):
         for i in 0..other.facts.len() as i32:
-            let fact = other.facts.get(i as i64)
+            let fact = other.facts[i]
             self.facts.push(fact.owned_copy())
         for i in 0..other.violations.len() as i32:
-            self.violations.push(with_str_clone_ref(copy other.violations.get(i as i64)))
+            self.violations.push(with_str_clone_ref(copy other.violations[i]))
         for i in 0..other.notes.len() as i32:
-            self.notes.push(with_str_clone_ref(copy other.notes.get(i as i64)))
+            self.notes.push(with_str_clone_ref(copy other.notes[i]))
 
 fn analysis_stage_name(stage: AnalysisStage) -> str:
     if stage == AnalysisStage.Ast: return "ast"
@@ -263,7 +263,7 @@ fn analysis_find_from(text: &str, needle: &str, start: i32) -> i32:
     var i = start
     while i + m <= n:
         var j = 0
-        while j < m and text.byte_at((i + j) as i64) == needle.byte_at(j as i64):
+        while j < m and text[(i + j)] == needle[j]:
             j = j + 1
         if j == m:
             return i
@@ -274,12 +274,12 @@ fn analysis_parse_i32(text: &str) -> i32:
     if text.len() == 0: return 0
     var sign = 1
     var i = 0
-    if text.byte_at(0) == 45:
+    if text[0] == 45:
         sign = -1
         i = 1
     var value = 0
     while i < text.len() as i32:
-        let ch = text.byte_at(i as i64) as i32
+        let ch = text[i] as i32
         if ch < 48 or ch > 57: return 0
         value = value * 10 + ch - 48
         i = i + 1
@@ -289,7 +289,7 @@ fn analysis_escape(text: &str) -> str:
     let parts: Vec[str] = Vec.new()
     var start = 0
     for i in 0..text.len() as i32:
-        let c = text.byte_at(i as i64) as i32
+        let c = text[i] as i32
         var replacement = ""
         if c == 92: replacement = "\\\\"
         else if c == 9: replacement = "\\t"
@@ -361,7 +361,7 @@ fn analysis_fact_matches(fact: &AnalysisFact, query: &str) -> bool:
     var i = 0
     let n = query.len() as i32
     while i <= n:
-        if i == n or query.byte_at(i as i64) as i32 == 44:
+        if i == n or query[i] as i32 == 44:
             if i > start:
                 let term = analysis_slice(query, start, i)
                 if not analysis_term_matches(fact, term):
@@ -383,7 +383,7 @@ impl AnalysisReport:
         let lines: Vec[str] = Vec.new()
         lines.push("analysis-facts\tv2\tstage\tkind\tid\tparent\tnode\tbody\tsymbol\towner\tindex\ttype\teffects\tflags\tsource-file\tstart\tend\tline\tcolumn\tpath\tname\tdetail\n")
         for i in 0..self.facts.len() as i32:
-            let fact = self.facts.get(i as i64)
+            let fact = self.facts[i]
             if analysis_fact_matches(fact, query):
                 lines.push(fact.render_tsv())
                 lines.push("\n")
@@ -392,7 +392,7 @@ impl AnalysisReport:
     fn count_matching(query: &str) -> i32:
         var count = 0
         for i in 0..self.facts.len() as i32:
-            let fact = self.facts.get(i as i64)
+            let fact = self.facts[i]
             if analysis_fact_matches(fact, query):
                 count = count + 1
         count
@@ -418,22 +418,22 @@ impl AnalysisReport:
         for i in 0..25: kind_counts.push(0)
         var total = 0
         for i in 0..self.facts.len() as i32:
-            let fact = self.facts.get(i as i64)
+            let fact = self.facts[i]
             if not analysis_fact_matches(fact, query): continue
             total = total + 1
-            stage_counts.set_i32(fact.stage as i64, stage_counts.get(fact.stage as i64) + 1)
-            kind_counts.set_i32(fact.kind as i64, kind_counts.get(fact.kind as i64) + 1)
+            stage_counts[fact.stage] = stage_counts[fact.stage] + 1
+            kind_counts[fact.kind] = kind_counts[fact.kind] + 1
         lines.push(f"facts\t{total}\n")
         for i in 0..stages.len() as i32:
             let stage = stages[i]
-            let count = stage_counts.get(stage as i64)
+            let count = stage_counts[stage]
             if count > 0:
                 lines.push("stage\t")
                 lines.push(analysis_stage_name(stage))
                 lines.push(f"\t{count}\n")
         for i in 0..kinds.len() as i32:
             let kind = kinds[i]
-            let count = kind_counts.get(kind as i64)
+            let count = kind_counts[kind]
             if count > 0:
                 lines.push("kind\t")
                 lines.push(analysis_kind_name(kind))
@@ -444,7 +444,7 @@ impl AnalysisReport:
         let lines: Vec[str] = Vec.new()
         lines.push("analysis-matrix\tv2\tstage\tkind\tname\towner\tindex\ttype\teffects\tflags\tsource-file\tstart\tend\tdetail\n")
         for i in 0..self.facts.len() as i32:
-            let fact = self.facts.get(i as i64)
+            let fact = self.facts[i]
             if not analysis_fact_matches(fact, query):
                 continue
             lines.push("row\t")
@@ -462,11 +462,11 @@ impl AnalysisReport:
         let lines: Vec[str] = Vec.new()
         for i in 0..self.notes.len() as i32:
             lines.push("note: ")
-            lines.push(with_str_clone_ref(self.notes.get(i as i64)))
+            lines.push(with_str_clone_ref(self.notes[i]))
             lines.push("\n")
         for i in 0..self.violations.len() as i32:
             lines.push("violation: ")
-            lines.push(with_str_clone_ref(self.violations.get(i as i64)))
+            lines.push(with_str_clone_ref(self.violations[i]))
             lines.push("\n")
         lines.push(with_str_clone_ref(label))
         lines.push(f": facts={self.facts.len() as i32} violations={self.violations.len() as i32}")

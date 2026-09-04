@@ -32,7 +32,7 @@ fn diag_path(loc_line: str) -> str:
     var colons = 0
     var i = with_pos.len() - 1
     while i >= 0 and colons < 2:
-        if with_pos.byte_at(i) == 58:
+        if with_pos[i] == 58:
             colons = colons + 1
             cut = i
         i = i - 1
@@ -45,7 +45,7 @@ fn header_insert_offset(text: str) -> i64:
     let n = text.len()
     while line_start < n:
         var line_end = line_start
-        while line_end < n and text.byte_at(line_end) != 10:
+        while line_end < n and text[line_end] != 10:
             line_end = line_end + 1
         let line = text.slice(line_start, line_end)
         if line.starts_with("use ") or line.starts_with("module "):
@@ -86,7 +86,7 @@ for line in diags.split("\n"):
             gate_count = gate_count + 1
             var seen = false
             for pi in 0..pair_paths.len() as i32:
-                if pair_paths.get(pi as i64) == path and pair_lines.get(pi as i64) == pending_use:
+                if pair_paths[pi] == path and pair_lines[pi] == pending_use:
                     seen = true
                     break
             if not seen:
@@ -97,14 +97,14 @@ for line in diags.split("\n"):
 print(f"insert-std-uses: {gate_count} gate diagnostics, {pair_paths.len() as i32} distinct (file, use) pairs")
 var done_paths: Vec[str] = Vec.new()
 for fi in 0..pair_paths.len() as i32:
-    let path = pair_paths.get(fi as i64)
+    let path = pair_paths[fi]
     if vec_contains(&done_paths, path):
         continue
     done_paths.push(path)
     var block = ""
     for li in 0..pair_paths.len() as i32:
-        if pair_paths.get(li as i64) == path:
-            block = block ++ pair_lines.get(li as i64) ++ "\n"
+        if pair_paths[li] == path:
+            block = block ++ pair_lines[li] ++ "\n"
     if not apply:
         for line in block.split("\n"):
             if line.len() > 0: print(path ++ ": " ++ line)

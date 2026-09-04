@@ -23,7 +23,7 @@ fn line_of(text: &str, off: i32) -> i32:
     var n = 1
     var i = 0
     while i < off:
-        if text.byte_at(i as i64) == 10: n = n + 1
+        if text[i] == 10: n = n + 1
         i = i + 1
     n
 
@@ -118,7 +118,7 @@ fn normalize_type_text(body: &str) -> str:
 fn expand_aliases(sig: &str, rt_aliases: &Vec[str]) -> str:
     var out = normalize_type_text(sig)
     for i in 0..rt_aliases.len() as i32:
-        let rec = rt_aliases.get(i as i64)
+        let rec = rt_aliases[i]
         let bar = rec.find("|")
         let alias = rec.slice(0, bar as i64)
         let body = rec.slice((bar + 1) as i64, rec.len())
@@ -150,20 +150,20 @@ roots.push("src")
 roots.push("tools")
 roots.push("test")
 for ri in 0..roots.len() as i32:
-    for r in collect(roots.get(ri as i64), true, &aliases):
+    for r in collect(roots[ri], true, &aliases):
         decls.push(owned(r))
 
 var bad = 0
 for di in 0..defs.len() as i32:
-    let dname = field(defs.get(di as i64), 0)
-    let dsig = field(defs.get(di as i64), 1)
-    let dat = field(defs.get(di as i64), 2)
+    let dname = field(defs[di], 0)
+    let dsig = field(defs[di], 1)
+    let dat = field(defs[di], 2)
     for ei in 0..decls.len() as i32:
-        let ename = field(decls.get(ei as i64), 0)
+        let ename = field(decls[ei], 0)
         if ename != dname: continue
-        let esig = field(decls.get(ei as i64), 1)
+        let esig = field(decls[ei], 1)
         if esig == dsig: continue
-        print(f"{dname}\n  def  {dsig}   [{dat}]\n  decl {esig}   [{field(decls.get(ei as i64), 2)}]")
+        print(f"{dname}\n  def  {dsig}   [{dat}]\n  decl {esig}   [{field(decls[ei], 2)}]")
         bad = bad + 1
 print(f"-- {bad} divergent decls / {defs.len()} rt defs / {decls.len()} extern with_* decls")
 exit_code(if bad > 0: 1 else: 0)

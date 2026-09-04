@@ -178,7 +178,7 @@ fn Zcu.init -> Zcu:
 impl Zcu:
     mut fn add_link_bundle_prefixes(prefixes: &Vec[str]):
         for i in 0..prefixes.len() as i32:
-            let prefix = prefixes.get(i as i64)
+            let prefix = prefixes[i]
             if not self.link_bundle_prefixes.contains(prefix):
                 self.link_bundle_prefixes.push(with_str_clone_ref(prefix))
 
@@ -197,7 +197,7 @@ impl Zcu:
     fn has_imported_path(path: &str) -> i32:
         let key = resolve_canonical_module_key(path)
         for i in 0..self.imported_paths.len() as i32:
-            if self.imported_paths.get(i as i64) == key:
+            if self.imported_paths[i] == key:
                 return 1
         0
 
@@ -227,12 +227,12 @@ impl Zcu:
 
     fn decl_source_path_frontend(decl_index: i32) -> str:
         if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
-            return with_str_clone_ref(self.decl_source_paths.get(decl_index as i64))
+            return with_str_clone_ref(self.decl_source_paths[decl_index])
         self.current_source_path.clone()
 
     fn decl_source_file_id_frontend(decl_index: i32) -> i32:
         if decl_index >= 0 and decl_index < self.decl_source_file_ids.len() as i32:
-            return self.decl_source_file_ids.get(decl_index as i64)
+            return self.decl_source_file_ids[decl_index]
         0
 
     fn decl_source_dir_frontend(decl_index: i32) -> str:
@@ -243,8 +243,8 @@ impl Zcu:
 
     fn c_import_cache_lookup(key: &str) -> str:
         for i in 0..self.c_import_cache_keys.len() as i32:
-            if self.c_import_cache_keys.get(i as i64) == key:
-                return with_str_clone_ref(self.c_import_cache_values.get(i as i64))
+            if self.c_import_cache_keys[i] == key:
+                return with_str_clone_ref(self.c_import_cache_values[i])
         ""
 
     fn c_import_cache_store(key: &str, value: &str) -> Unit:
@@ -268,8 +268,8 @@ impl Zcu:
 
     fn cli_diag_mapping_index(offset: i32) -> i32:
         for i in 0..self.cli_diag_gen_starts.len() as i32:
-            let start = self.cli_diag_gen_starts.get(i as i64)
-            let end = self.cli_diag_gen_ends.get(i as i64)
+            let start = self.cli_diag_gen_starts[i]
+            let end = self.cli_diag_gen_ends[i]
             if offset >= start and offset <= end:
                 return i
         -1
@@ -291,8 +291,8 @@ impl Zcu:
     fn render_diag_frontend_with(diag: &Diagnostic, source: &Source):
         let map_idx = self.cli_diag_mapping_index(diag.primary.start)
         if map_idx >= 0:
-            let gen_start = self.cli_diag_gen_starts.get(map_idx as i64)
-            let mapped = Source.from_string(self.cli_diag_source_names.get(map_idx as i64), self.cli_diag_source_texts.get(map_idx as i64), 0)
+            let gen_start = self.cli_diag_gen_starts[map_idx]
+            let mapped = Source.from_string(self.cli_diag_source_names[map_idx], self.cli_diag_source_texts[map_idx], 0)
             diag.render_at_offset(mapped, gen_start)
             return
         // #670: labels can point into other files (e.g. E0921's concurrency
@@ -300,7 +300,7 @@ impl Zcu:
         let label_paths: Vec[str] = Vec.new()
         let label_texts: Vec[str] = Vec.new()
         for li in 0..diag.labels.len() as i32:
-            let lab_file = diag.labels.get(li as i64).span.file
+            let lab_file = diag.labels[li].span.file
             if lab_file != 0 and lab_file != diag.primary.file:
                 var lab_source = self.source_for_file_id_frontend(lab_file)
                 label_paths.push(move lab_source.path)
@@ -318,10 +318,10 @@ impl Zcu:
         // zero decls was unfindable, and its errors rendered against the
         // ROOT module's text — phantom carets at root EOF.
         for si in 0..self.source_text_file_ids.len() as i32:
-            if self.source_text_file_ids.get(si as i64) == file_id:
-                return Source.from_string(self.source_text_names.get(si as i64), self.source_texts.get(si as i64), file_id)
+            if self.source_text_file_ids[si] == file_id:
+                return Source.from_string(self.source_text_names[si], self.source_texts[si], file_id)
         for i in 0..self.decl_source_file_ids.len() as i32:
-            if self.decl_source_file_ids.get(i as i64) != file_id:
+            if self.decl_source_file_ids[i] != file_id:
                 continue
             let path = self.decl_source_path_frontend(i)
             let embedded_rel = embedded_std_rel_path(path)
@@ -338,7 +338,7 @@ impl Zcu:
         var cached_file = -2147483648
         var cached_source = Source.from_string("", "", 0)
         for i in 0..self.diagnostics.items.len() as i32:
-            let diag = &self.diagnostics.items[i as i64]
+            let diag = &self.diagnostics.items[i]
             if self.cli_diag_mapping_index(diag.primary.start) < 0 and diag.primary.file != cached_file:
                 cached_source = self.source_for_file_id_frontend(diag.primary.file)
                 cached_file = diag.primary.file
@@ -351,7 +351,7 @@ impl Zcu:
         var cached_file = -2147483648
         var cached_source = Source.from_string("", "", 0)
         for i in 0..self.diagnostics.items.len() as i32:
-            let diag = &self.diagnostics.items[i as i64]
+            let diag = &self.diagnostics.items[i]
             if diag.severity != DiagSeverity.Warning:
                 continue
             if printed != 0:
@@ -453,7 +453,7 @@ impl Zcu:
     mut fn set_resolve_snapshot(result: &ResolveResult, root_path: &str):
         let modules: Vec[ResolvedModule] = Vec.new()
         for i in 0..result.modules.len() as i32:
-            let m = result.modules.get(i as i64)
+            let m = result.modules[i]
             modules.push(ResolvedModule {
                 module_id: m.module_id,
                 file_id: m.file_id,
@@ -465,7 +465,7 @@ impl Zcu:
 
         let imports: Vec[ResolvedImport] = Vec.new()
         for i in 0..result.imports.len() as i32:
-            let imp = result.imports.get(i as i64)
+            let imp = result.imports[i]
             imports.push(ResolvedImport {
                 module_id: imp.module_id,
                 index_in_module: imp.index_in_module,
@@ -478,23 +478,23 @@ impl Zcu:
 
         let defs: Vec[ResolvedDef] = Vec.new()
         for i in 0..result.defs.len() as i32:
-            defs.push(result.defs.get(i as i64))
+            defs.push(result.defs[i])
 
         let scopes: Vec[ResolvedScope] = Vec.new()
         for i in 0..result.scopes.len() as i32:
-            scopes.push(result.scopes.get(i as i64))
+            scopes.push(result.scopes[i])
 
         let bindings: Vec[ResolvedBinding] = Vec.new()
         for i in 0..result.bindings.len() as i32:
-            bindings.push(result.bindings.get(i as i64))
+            bindings.push(result.bindings[i])
 
         let uses: Vec[ResolvedUse] = Vec.new()
         for i in 0..result.uses.len() as i32:
-            uses.push(result.uses.get(i as i64))
+            uses.push(result.uses[i])
 
         let link_libs: Vec[i32] = Vec.new()
         for i in 0..result.link_libs.len() as i32:
-            link_libs.push(result.link_libs.get(i as i64))
+            link_libs.push(result.link_libs[i])
 
         self.last_resolved = ResolveResult {
             modules,
@@ -527,7 +527,7 @@ impl Zcu:
     mut fn capture_last_link_lib_names(pool: InternPool, result: &ResolveResult) -> Unit:
         self.reset_last_link_lib_names()
         for li in 0..result.link_libs.len() as i32:
-            let lib_sym = result.link_libs.get(li as i64)
+            let lib_sym = result.link_libs[li]
             if lib_sym <= 0:
                 continue
             let lib_name: str = with_str_clone_ref(pool.resolve(lib_sym))

@@ -78,7 +78,7 @@ impl AsyncMirBody:
 
     fn has_kind(kind: i32) -> bool:
         for i in 0..self.suspend_kinds.len() as i32:
-            if self.suspend_kinds.get(i as i64) == kind:
+            if self.suspend_kinds[i] == kind:
                 return true
         false
 
@@ -104,12 +104,12 @@ impl AsyncMirModule:
     fn total_suspend_points() -> i32:
         var total = 0
         for i in 0..self.bodies.len() as i32:
-            total = total + self.bodies.get(i as i64).suspend_count()
+            total = total + self.bodies[i].suspend_count()
         total
 
     fn requires_async_runtime() -> bool:
         for i in 0..self.bodies.len() as i32:
-            let body = &self.bodies[i as i64]
+            let body = &self.bodies[i]
             if body.flavor == AsyncBodyKind.Async:
                 return true
             if body.has_kind(AsyncSuspendKind.Await) or body.has_kind(AsyncSuspendKind.SelectAwait):
@@ -138,7 +138,7 @@ fn dump_async_mir_module(mod: &AsyncMirModule, pool: InternPool) -> str:
     out = out ++ f" suspend_points={mod.total_suspend_points()}\n"
 
     for bi in 0..mod.bodies.len() as i32:
-        let body = &mod.bodies[bi as i64]
+        let body = &mod.bodies[bi]
         if bi > 0:
             out = out ++ "\n"
 
@@ -150,15 +150,15 @@ fn dump_async_mir_module(mod: &AsyncMirModule, pool: InternPool) -> str:
 
         for si in 0..body.suspend_count():
             out = out ++ f"  suspend[{si}] "
-            out = out ++ async_suspend_kind_name(body.suspend_kinds.get(si as i64))
-            out = out ++ f" span={body.suspend_span_starts.get(si as i64)}"
-            out = out ++ f"..{body.suspend_span_ends.get(si as i64)}"
-            out = out ++ f" state={body.suspend_state_from.get(si as i64)}"
-            out = out ++ f"->{body.suspend_state_to.get(si as i64)}"
-            out = out ++ f" resume_bb={body.suspend_resume_bbs.get(si as i64)}"
-            out = out ++ f" live={body.suspend_live_locals.get(si as i64)}"
-            out = out ++ f" dead={body.suspend_storage_dead.get(si as i64)}"
-            out = out ++ f" drops={body.suspend_drop_counts.get(si as i64)}"
+            out = out ++ async_suspend_kind_name(body.suspend_kinds[si])
+            out = out ++ f" span={body.suspend_span_starts[si]}"
+            out = out ++ f"..{body.suspend_span_ends[si]}"
+            out = out ++ f" state={body.suspend_state_from[si]}"
+            out = out ++ f"->{body.suspend_state_to[si]}"
+            out = out ++ f" resume_bb={body.suspend_resume_bbs[si]}"
+            out = out ++ f" live={body.suspend_live_locals[si]}"
+            out = out ++ f" dead={body.suspend_storage_dead[si]}"
+            out = out ++ f" drops={body.suspend_drop_counts[si]}"
             out = out ++ "\n"
 
     out

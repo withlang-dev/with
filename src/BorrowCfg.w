@@ -118,14 +118,14 @@ impl CfgGraph:
         let st = self.state
         var n = 0
         for i in 0..unsafe { st.edges.len() as i32 }:
-            if unsafe { st.edges.get(i as i64) }.from == node_id:
+            if unsafe { st.edges[i] }.from == node_id:
                 n = n + 1
         n
 
     fn has_edge(from: i32, to: i32) -> bool:
         let st = self.state
         for i in 0..unsafe { st.edges.len() as i32 }:
-            let e = unsafe { st.edges.get(i as i64) }
+            let e = unsafe { st.edges[i] }
             if e.from == from and e.to == to:
                 return true
         false

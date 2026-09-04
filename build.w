@@ -256,7 +256,7 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     var clang_archives: Vec[str] = Vec.new()
     var llvm_archives: Vec[str] = Vec.new()
     for i in 0..lib_files.len() as i32:
-        let path = lib_files.get(i as i64)
+        let path = lib_files[i]
         let name = comp_path_basename(path)
         if name.ends_with(".a"):
             if name.starts_with("libclang") and path != libclang:
@@ -267,10 +267,10 @@ fn run_cross_linux_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
     for i in 0..sorted_clang.len() as i32:
-        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang.get(i as i64)) ++ "\n"
+        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang[i]) ++ "\n"
     let sorted_llvm = comp_sort_strings(llvm_archives)
     for i in 0..sorted_llvm.len() as i32:
-        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm.get(i as i64)) ++ "\n"
+        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     ld_rsp = ld_rsp ++ "-Bstatic\n-lstdc++\n-lgcc\n-lgcc_eh\n-Bdynamic\n-lpthread\n-ldl\n-lm\n-lz\n-lzstd\n-lxml2\n"
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-llvm-link-metadata: could not write: " ++ output_path)
@@ -319,7 +319,7 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     var clang_archives: Vec[str] = Vec.new()
     var llvm_archives: Vec[str] = Vec.new()
     for i in 0..lib_files.len() as i32:
-        let path = lib_files.get(i as i64)
+        let path = lib_files[i]
         let name = comp_path_basename(path)
         if name.ends_with(".lib"):
             if (name.starts_with("clang") or name.starts_with("libclang")) and path != libclang:
@@ -330,10 +330,10 @@ fn run_cross_windows_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
     for i in 0..sorted_clang.len() as i32:
-        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang.get(i as i64)) ++ "\n"
+        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang[i]) ++ "\n"
     let sorted_llvm = comp_sort_strings(llvm_archives)
     for i in 0..sorted_llvm.len() as i32:
-        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm.get(i as i64)) ++ "\n"
+        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-llvm-link-metadata: could not write: " ++ output_path)
         return 1
@@ -378,7 +378,7 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     var clang_archives: Vec[str] = Vec.new()
     var llvm_archives: Vec[str] = Vec.new()
     for i in 0..lib_files.len() as i32:
-        let path = lib_files.get(i as i64)
+        let path = lib_files[i]
         let name = comp_path_basename(path)
         if name.ends_with(".lib"):
             if (name.starts_with("clang") or name.starts_with("libclang")) and path != libclang:
@@ -389,10 +389,10 @@ fn run_cross_windows_aarch64_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     var ld_rsp = comp_rsp_path(libclang) ++ "\n"
     let sorted_clang = comp_sort_strings(clang_archives)
     for i in 0..sorted_clang.len() as i32:
-        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang.get(i as i64)) ++ "\n"
+        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_clang[i]) ++ "\n"
     let sorted_llvm = comp_sort_strings(llvm_archives)
     for i in 0..sorted_llvm.len() as i32:
-        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm.get(i as i64)) ++ "\n"
+        ld_rsp = ld_rsp ++ comp_rsp_path(sorted_llvm[i]) ++ "\n"
     if fs.write_text(output_path, ld_rsp) != 0:
         ctx.diagnostics().error("cross-windows-aarch64-llvm-link-metadata: could not write: " ++ output_path)
         return 1
@@ -451,7 +451,7 @@ fn add_empty_wo_blob_targets(out0: Build, prefix: &str, dir: &str, name: &str) -
     var out = out0
     let kinds = wo_blob_kinds()
     for ki in 0..kinds.len() as i32:
-        let kind = kinds.get(ki as i64)
+        let kind = kinds[ki]
         out = out.add_target(empty_file_target(empty_wo_blob_target(prefix, name, kind), empty_wo_blob_path(dir, name, kind)))
     out
 
@@ -459,7 +459,7 @@ fn target_with_empty_wo_blobs(target: Target, prefix: &str, dir: &str, name: &st
     var out = target
     let kinds = wo_blob_kinds()
     for ki in 0..kinds.len() as i32:
-        let kind = kinds.get(ki as i64)
+        let kind = kinds[ki]
         out = out.input(empty_wo_blob_path(dir, name, kind))
         out = out.arg("wo_" ++ name ++ "_" ++ kind)
         out = out.dep(empty_wo_blob_target(prefix, name, kind))
@@ -471,7 +471,7 @@ fn target_with_wo_blobs(target: Target, plan: &WoBundle) -> Target:
     var out = target
     let kinds = wo_blob_kinds()
     for ki in 0..kinds.len() as i32:
-        let kind = kinds.get(ki as i64)
+        let kind = kinds[ki]
         out = out.input(wo_prefix(plan) ++ "." ++ kind)
         out = out.arg("wo_" ++ plan.name ++ "_" ++ kind)
     out.dep(wo_group_target_name(plan))
@@ -490,7 +490,7 @@ fn target_with_embedded_stdlib_inputs(target: Target, ctx: &BuildCtx) -> Target:
     var out = target
     let files = ctx.fs().list_files("lib/std")
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         if path.ends_with(".w") and not path.starts_with("lib/std/re/"):
             out = out.input(build_owned_text(path))
     out
@@ -499,7 +499,7 @@ fn target_with_embedded_runtime_inputs(target: Target, ctx: &BuildCtx) -> Target
     var out = target
     let files = ctx.fs().list_files("rt")
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         if path.ends_with(".w"):
             out = out.input(build_owned_text(path))
     out
@@ -511,9 +511,9 @@ fn target_with_compiler_c_export_audit_inputs(target: Target, ctx: &BuildCtx) ->
     roots.push("rt")
     roots.push("lib/std")
     for ri in 0..roots.len() as i32:
-        let files = ctx.fs().list_files(roots.get(ri as i64))
+        let files = ctx.fs().list_files(roots[ri])
         for fi in 0..files.len() as i32:
-            let path = files.get(fi as i64)
+            let path = files[fi]
             if path.ends_with(".w"):
                 out = out.input(build_owned_text(path))
     out
@@ -529,9 +529,9 @@ fn target_with_compiler_source_inputs(target: Target, ctx: &BuildCtx) -> Target:
     // the action's own module closure. Declaring them re-created the
     // rebuild-the-world-on-any-build-edit tax.
     for ri in 0..roots.len() as i32:
-        let files = ctx.fs().list_files(roots.get(ri as i64))
+        let files = ctx.fs().list_files(roots[ri])
         for fi in 0..files.len() as i32:
-            let path = files.get(fi as i64)
+            let path = files[fi]
             if path.ends_with(".w"):
                 out = out.input(build_owned_text(path))
     out
@@ -575,7 +575,7 @@ fn target_with_version_inputs(target: Target, ctx: &BuildCtx) -> Target:
 fn target_with_live_targets(target: Target, graph: &Build) -> Target:
     var out = target
     for i in 0..graph.targets.len() as i32:
-        out = out.arg("live-target=" ++ graph.targets.get(i as i64).name)
+        out = out.arg("live-target=" ++ graph.targets[i].name)
     out
 
 type HostRuntimeSpec:
@@ -1215,7 +1215,7 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     check_args.push("check")
     check_args.push(compiler)
     for i in 0..fixtures.len() as i32:
-        let p = fixtures.get(i as i64)
+        let p = fixtures[i]
         if p.ends_with(".w"):
             check_args.push(build_project_abs(root, p))
     let cout = build_project_abs(root, build_project_join(out_dir, "check.stdout"))
@@ -1697,7 +1697,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("bootstrap-rt-platform-object", "seed", host_runtime.platform_source, host_runtime.bootstrap_platform_object, "-O1", ""))
     let bootstrap_empty_syms = embedded_platform_symbols()
     for bi in 0..bootstrap_empty_syms.len() as i32:
-        let bsym = bootstrap_empty_syms.get(bi as i64)
+        let bsym = bootstrap_empty_syms[bi]
         if bsym != host_runtime.platform_symbol:
             out = out.add_target(empty_file_target(empty_platform_blob_target("bootstrap-empty-", bsym), empty_platform_blob_path("out/bootstrap-lib", bsym)))
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O1", ""))
@@ -1738,7 +1738,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.bootstrap_platform_object)
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(host_runtime.platform_symbol))
     for bi2 in 0..bootstrap_empty_syms.len() as i32:
-        let bsym2 = bootstrap_empty_syms.get(bi2 as i64)
+        let bsym2 = bootstrap_empty_syms[bi2]
         if bsym2 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.input(empty_platform_blob_path("out/bootstrap-lib", bsym2))
             bootstrap_embedded_objects = bootstrap_embedded_objects.arg(build_owned_text(bsym2))
@@ -1760,7 +1760,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-core-object")
     bootstrap_embedded_objects = bootstrap_embedded_objects.dep("bootstrap-rt-platform-object")
     for bi3 in 0..bootstrap_empty_syms.len() as i32:
-        let bsym3 = bootstrap_empty_syms.get(bi3 as i64)
+        let bsym3 = bootstrap_empty_syms[bi3]
         if bsym3 != host_runtime.platform_symbol:
             bootstrap_embedded_objects = bootstrap_embedded_objects.dep(empty_platform_blob_target("bootstrap-empty-", bsym3))
     out = out.add_target(bootstrap_embedded_objects)
@@ -1773,7 +1773,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-core-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-platform-object")
     for bi4 in 0..bootstrap_empty_syms.len() as i32:
-        let bsym4 = bootstrap_empty_syms.get(bi4 as i64)
+        let bsym4 = bootstrap_empty_syms[bi4]
         if bsym4 != host_runtime.platform_symbol:
             bootstrap_runtime = bootstrap_runtime.dep(empty_platform_blob_target("bootstrap-empty-", bsym4))
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-cimport-stubs-object")
@@ -1982,7 +1982,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("rt-platform-object", stage_compiler_bin("with-stage2"), host_runtime.platform_source, host_runtime.platform_object, "-O1", "stage2"))
     let empty_syms = embedded_platform_symbols()
     for ei in 0..empty_syms.len() as i32:
-        let esym = empty_syms.get(ei as i64)
+        let esym = empty_syms[ei]
         if esym != host_runtime.platform_symbol:
             out = out.add_target(empty_file_target(empty_platform_blob_target("empty-", esym), empty_platform_blob_path("out/lib", esym)))
     out = out.add_target(with_object_target("cimport-stubs-object", stage_compiler_bin("with-stage2"), "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O1", "stage2"))
@@ -2028,7 +2028,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.input(build_owned_text(host_runtime.platform_object))
     embedded_objects = embedded_objects.arg(host_runtime.platform_symbol)
     for ei2 in 0..empty_syms.len() as i32:
-        let esym2 = empty_syms.get(ei2 as i64)
+        let esym2 = empty_syms[ei2]
         if esym2 != host_runtime.platform_symbol:
             embedded_objects = embedded_objects.input(empty_platform_blob_path("out/lib", esym2))
             embedded_objects = embedded_objects.arg(build_owned_text(esym2))
@@ -2047,7 +2047,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.dep("rt-core-object")
     embedded_objects = embedded_objects.dep("rt-platform-object")
     for ei3 in 0..empty_syms.len() as i32:
-        let esym3 = empty_syms.get(ei3 as i64)
+        let esym3 = empty_syms[ei3]
         if esym3 != host_runtime.platform_symbol:
             embedded_objects = embedded_objects.dep(empty_platform_blob_target("empty-", esym3))
     out = out.add_target(embedded_objects)
@@ -2059,7 +2059,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var runtime = target_new(.Group, "runtime", "")
     runtime = runtime.dep("embedded-objects-object")
     for ei4 in 0..empty_syms.len() as i32:
-        let esym4 = empty_syms.get(ei4 as i64)
+        let esym4 = empty_syms[ei4]
         if esym4 != host_runtime.platform_symbol:
             runtime = runtime.dep(empty_platform_blob_target("empty-", esym4))
     out = out.add_target(runtime)
@@ -2570,7 +2570,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     invariance_labels.push("let-main")
     var invariance_check = target_new(.Group, "invariance-check", "")
     for ii in 0..invariance_labels.len() as i32:
-        let inv_label = invariance_labels.get(ii as i64)
+        let inv_label = invariance_labels[ii]
         var inv = target_new(.Action, "invariance-" ++ inv_label, "").output("out/test-graph/invariance-" ++ inv_label)
         inv.action = invariance_variant_action
         inv = inv.input(release_compiler_bin("with"))

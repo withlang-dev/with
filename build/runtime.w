@@ -47,7 +47,7 @@ pub fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
     stale_runtime_objects.push("out/lib/fiber_asm.o")
     stale_runtime_objects.push("out/lib/fiber_stubs.o")
     for i in 0..stale_runtime_objects.len() as i32:
-        let _remove_stale = fs.remove_file(stale_runtime_objects.get(i as i64))
+        let _remove_stale = fs.remove_file(stale_runtime_objects[i])
     let output = ctx.output()
     if fs.mkdir_all(br_dirname(output)) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ br_dirname(output))
@@ -115,11 +115,11 @@ fn br_str_compare(a: &str, b: &str) -> i32:
 fn br_sorted_paths(files: &Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         var inserted = false
         var out: Vec[str] = Vec.new()
         for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
+            let existing = sorted[j]
             if not inserted and br_str_compare(path, existing) < 0:
                 out.push(runtime_owned_text(path))
                 inserted = true
@@ -136,7 +136,7 @@ fn br_collect_runtime_files(ctx: &ActionCtx) -> Vec[str]:
     let files: Vec[str] = Vec.new()
     let all_files = br_sorted_paths(ctx.fs().list_files("rt"))
     for i in 0..all_files.len() as i32:
-        let path = br_normalize_path_separators(all_files.get(i as i64))
+        let path = br_normalize_path_separators(all_files[i])
         if path.ends_with(".w"):
             files.push(path)
     files
@@ -145,7 +145,7 @@ fn br_collect_stdlib_files(ctx: &ActionCtx) -> Vec[str]:
     let files: Vec[str] = Vec.new()
     let all_files = br_sorted_paths(ctx.fs().list_files("lib/std"))
     for i in 0..all_files.len() as i32:
-        let path = br_normalize_path_separators(all_files.get(i as i64))
+        let path = br_normalize_path_separators(all_files[i])
         if path.ends_with(".w") and not path.starts_with("lib/std/re/"):
             files.push(path)
     files
@@ -211,7 +211,7 @@ fn br_generate_embedded_stdlib(ctx: &ActionCtx, files: &Vec[str]) -> str:
     out.push_str("// Do not edit by hand.\n\n")
     var listing = StringBuilder.new()
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         let rel = br_embedded_rel_path(path)
         let source = br_normalize_embedded_source(fs.read_text(path))
         if source.len() == 0:
@@ -234,7 +234,7 @@ fn br_generate_embedded_stdlib(ctx: &ActionCtx, files: &Vec[str]) -> str:
     out.push_str("\n\n")
     out.push_str("pub fn embedded_std_source_data(path: &str) -> str:\n")
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         let rel = br_embedded_rel_path(path)
         let sym = f"EMBEDDED_STD_{i}"
         out.push_str("    if path == ")
@@ -277,7 +277,7 @@ fn br_generate_embedded_bundles(names: &Vec[str]) -> str:
     kinds.push("interface_start")
     kinds.push("interface_end")
     for ki in 0..kinds.len() as i32:
-        let kind = kinds.get(ki as i64)
+        let kind = kinds[ki]
         let blob = if kind.starts_with("manifest"): "manifest" else if kind.starts_with("interface"): "wi" else: "o"
         let edge = if kind.ends_with("start"): "start" else: "end"
         out.push_str("pub fn embedded_bundles_" ++ kind ++ "_data(index: i32) -> i64:\n")
@@ -296,7 +296,7 @@ fn br_generate_embedded_runtime(ctx: &ActionCtx, files: &Vec[str]) -> str:
     out.push_str("// Do not edit by hand.\n\n")
     var listing = StringBuilder.new()
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         let source = br_normalize_embedded_source(fs.read_text(path))
         if source.len() == 0:
             ctx.diagnostics().error("compat-runtime-source: failed to read runtime source: " ++ path)
@@ -318,7 +318,7 @@ fn br_generate_embedded_runtime(ctx: &ActionCtx, files: &Vec[str]) -> str:
     out.push_str("\n\n")
     out.push_str("pub fn embedded_rt_source_data(path: &str) -> str:\n")
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         let sym = f"EMBEDDED_RT_{i}"
         out.push_str("    if path == ")
         out.push_str(br_raw_string_literal(path))

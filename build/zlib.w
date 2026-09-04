@@ -91,7 +91,7 @@ fn zlib_copy_w_files(ctx: &ActionCtx, source_dir: &str, dest_dir: &str) -> i32:
     if fs.mkdir_all(dest_dir) != 0:
         return zlib_fail(ctx, "could not create destination directory: " ++ dest_dir)
     for fi in 0..files.len() as i32:
-        let source_path = files.get(fi as i64)
+        let source_path = files[fi]
         if source_path.ends_with(".w"):
             let dest_path = zlib_join(dest_dir, zlib_basename(source_path))
             if fs.copy_file(source_path, dest_path) != 0:
@@ -139,7 +139,7 @@ fn zlib_prepare_migration_source(ctx: &ActionCtx, ref_dir: &str, out_dir: &str) 
         return zlib_fail(ctx, "could not create zlib migrate source directory: " ++ out_dir)
     let files = zlib_source_files()
     for i in 0..files.len() as i32:
-        let rel = files.get(i as i64)
+        let rel = files[i]
         rc = zlib_copy_file(ctx, zlib_join(ref_dir, rel), zlib_join(out_dir, rel))
         if rc != 0: return rc
     0
@@ -201,7 +201,7 @@ fn zlib_count_w_files(ctx: &ActionCtx, dir: &str) -> i32:
     let files = ctx.fs().list_files(dir)
     var count = 0
     for i in 0..files.len() as i32:
-        if files.get(i as i64).ends_with(".w"):
+        if files[i].ends_with(".w"):
             count = count + 1
     count
 
@@ -210,7 +210,7 @@ fn zlib_reject_c_exports(ctx: &ActionCtx, generated_dir: &str) -> i32:
     let files = fs.list_files(generated_dir)
     var errors = 0
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         if path.ends_with(".w"):
             let text = fs.read_text(path)
             if text.contains("@[c_export("):
@@ -461,13 +461,13 @@ pub fn run_zlib_promote_action(ctx: ActionCtx) -> i32:
         return zlib_fail(ctx, "could not create destination: " ++ dest_dir)
     let existing = fs.list_files(dest_dir)
     for ei in 0..existing.len() as i32:
-        let path = existing.get(ei as i64)
+        let path = existing[ei]
         if path.ends_with(".w") and fs.remove_file(path) != 0:
             return zlib_fail(ctx, "could not remove old generated file: " ++ path)
     let files = fs.list_files(generated_dir)
     var copied = 0
     for fi in 0..files.len() as i32:
-        let source_path = files.get(fi as i64)
+        let source_path = files[fi]
         if source_path.ends_with(".w"):
             let dest_path = zlib_join(dest_dir, zlib_basename(source_path))
             if fs.copy_file(source_path, dest_path) != 0:

@@ -387,20 +387,20 @@ impl TokenList:
         self.tags.len() as i32
 
     fn get_tag(index: i32) -> i32:
-        self.tags.get(index as i64)
+        self.tags[index]
 
     fn get_start(index: i32) -> i32:
-        self.starts.get(index as i64)
+        self.starts[index]
 
     fn get_end(index: i32) -> i32:
-        self.ends.get(index as i64)
+        self.ends[index]
 
     // Convenience: construct a Span for token at index with a given file_id.
     fn get_span(index: i32, file_id: i32) -> Span:
         Span {
             file: file_id,
-            start: self.starts.get(index as i64),
-            end: self.ends.get(index as i64),
+            start: self.starts[index],
+            end: self.ends[index],
         }
 
 // Also expose a keyword_lookup alias for the lexer.

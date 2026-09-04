@@ -726,7 +726,7 @@ fn tool_path_normalize(path: &str) -> str:
     for i in 0..parts.len() as i32:
         if i > 0:
             result = result ++ "/"
-        result = result ++ parts.get(i as i64)
+        result = result ++ parts[i]
     result
 
 fn tool_split_by_slash(path: &str) -> Vec[str]:
@@ -766,7 +766,7 @@ fn tool_glob_segment_matches(pattern: &str, name: &str) -> bool:
 fn tool_glob_segments_match(pat_segs: &Vec[str], pi: i32, file_segs: &Vec[str], fi: i32) -> bool:
     if pi >= pat_segs.len() as i32:
         return fi >= file_segs.len() as i32
-    let seg = pat_segs.get(pi as i64)
+    let seg = pat_segs[pi]
     if seg == "**":
         var k = fi
         while k <= file_segs.len() as i32:
@@ -776,7 +776,7 @@ fn tool_glob_segments_match(pat_segs: &Vec[str], pi: i32, file_segs: &Vec[str], 
         return false
     if fi >= file_segs.len() as i32:
         return false
-    if not tool_glob_segment_matches(seg, file_segs.get(fi as i64)):
+    if not tool_glob_segment_matches(seg, file_segs[fi]):
         return false
     tool_glob_segments_match(pat_segs, pi + 1, file_segs, fi + 1)
 
@@ -798,11 +798,11 @@ fn tool_glob_str_compare(a: &str, b: &str) -> i32:
 fn tool_glob_sort(items: Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for i in 0..items.len() as i32:
-        let item = items.get(i as i64)
+        let item = items[i]
         var inserted = false
         var out: Vec[str] = Vec.new()
         for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
+            let existing = sorted[j]
             if not inserted and tool_glob_str_compare(item, existing) < 0:
                 out.push(with_str_clone_ref(item))
                 inserted = true
@@ -837,7 +837,7 @@ fn ToolFs.write_file_allowed(self: &Self, path: &str) -> bool:
     if not self.write_scoped:
         return true
     for i in 0..self.write_scope.len() as i32:
-        if tool_path_is_same_or_child(path, self.write_scope.get(i as i64)):
+        if tool_path_is_same_or_child(path, self.write_scope[i]):
             return true
     false
 
@@ -845,7 +845,7 @@ fn ToolFs.mkdir_allowed(self: &Self, path: &str) -> bool:
     if not self.write_scoped:
         return true
     for i in 0..self.write_scope.len() as i32:
-        let allowed = self.write_scope.get(i as i64)
+        let allowed = self.write_scope[i]
         if tool_path_is_same_or_child(path, allowed) or tool_path_is_parent_of(path, allowed):
             return true
     false
@@ -942,7 +942,7 @@ pub fn ToolFs.list_files(self: &Self, path: &str) -> Vec[str]:
     let raw_files = tool_split_nonempty_lines(with_fs_list_files(resolved))
     let files: Vec[str] = Vec.new()
     for i in 0..raw_files.len() as i32:
-        files.push(self.project_relative_path(raw_files.get(i as i64)))
+        files.push(self.project_relative_path(raw_files[i]))
     files
 
 pub fn ToolFs.glob(self: &Self, pattern: &str) -> Vec[str]:
@@ -965,7 +965,7 @@ pub fn ToolFs.glob(self: &Self, pattern: &str) -> Vec[str]:
     let results: Vec[str] = Vec.new()
     let prefix = if base_dir == ".": "" else: base_dir ++ "/"
     for i in 0..all_files.len() as i32:
-        let file = all_files.get(i as i64)
+        let file = all_files[i]
         let rel = if prefix.len() > 0 and file.starts_with(prefix): file.slice(prefix.len(), file.len()) else: with_str_clone_ref(file)
         let file_segs = tool_split_by_slash(rel)
         if tool_glob_segments_match(pat_segs, 0, file_segs, 0):
@@ -985,7 +985,7 @@ pub fn ToolFs.write_binary(self: &Self, path: &str, bytes: Vec[u8]) -> i32:
     self.require_write_file_allowed(path)
     var out = StringBuilder.with_capacity(bytes.len())
     for i in 0..bytes.len() as i32:
-        out.push_byte(bytes.get(i as i64))
+        out.push_byte(bytes[i])
     with_fs_write_file(self.resolve_path(path), out.to_str())
 
 fn tool_tar_append_zeroes(out: Vec[u8], count: i64) -> Vec[u8]:
@@ -997,7 +997,7 @@ fn tool_tar_append_zeroes(out: Vec[u8], count: i64) -> Vec[u8]:
 
 fn tool_tar_append_bytes(out: Vec[u8], bytes: &Vec[u8]) -> Vec[u8]:
     for i in 0..bytes.len() as i32:
-        out.push(bytes.get(i as i64))
+        out.push(bytes[i])
     out
 
 fn tool_tar_append_str_padded(out: Vec[u8], value: &str, width: i64) -> Vec[u8]:
@@ -1059,7 +1059,7 @@ fn tool_tar_append_checksum(out: Vec[u8], checksum: i64) -> Vec[u8]:
 fn tool_tar_sum(bytes: &Vec[u8]) -> i64:
     var sum: i64 = 0
     for i in 0..bytes.len() as i32:
-        sum = sum + bytes.get(i as i64) as i64
+        sum = sum + bytes[i] as i64
     sum
 
 fn tool_tar_entry_name(path: &str, directory: bool) -> str:
@@ -1142,7 +1142,7 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
 fn ToolFs.tar_bytes(self: &Self, entries: &Vec[ArchiveEntry]) -> Vec[u8]:
     var out: Vec[u8] = Vec.new()
     for i in 0..entries.len() as i32:
-        let entry = entries.get(i as i64)
+        let entry = entries[i]
         if entry.kind == ArchiveEntryKind.Directory:
             let name = tool_tar_entry_name(entry.archive_path, true)
             let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Directory, "")
@@ -1187,7 +1187,7 @@ fn tool_gzip_append_u32_le(out: Vec[u8], value: u32) -> Vec[u8]:
 fn tool_gzip_crc32(bytes: &Vec[u8]) -> u32:
     var crc = 0xffffffff as u32
     for i in 0..bytes.len() as i32:
-        var c = (crc ^ (bytes.get(i as i64) as u32)) & (0xff as u32)
+        var c = (crc ^ (bytes[i] as u32)) & (0xff as u32)
         var bit = 0
         while bit < 8:
             if (c & (1 as u32)) != 0 as u32:
@@ -1531,7 +1531,7 @@ pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> 
 fn tool_process_argv(args: &Vec[str]) -> str:
     var out = StringBuilder.new()
     for i in 0..args.len() as i32:
-        out.push_str(args.get(i as i64))
+        out.push_str(args[i])
         out.push_byte(0)
     out.to_str()
 
@@ -1566,7 +1566,7 @@ fn tool_process_apply_env(env: ProcessEnv) -> SavedProcessEnv:
     let names: Vec[str] = Vec.new()
     let values: Vec[str] = Vec.new()
     for i in 0..env.vars.len() as i32:
-        let item = env.vars.get(i as i64)
+        let item = env.vars[i]
         names.push(with_str_clone_ref(item.name))
         values.push(with_getenv_str(item.name) ++ "")
         let _set = with_setenv_str(item.name, item.value)
@@ -1608,7 +1608,7 @@ fn tool_effect_join_argv(parts: &Vec[str]) -> str:
     for i in 0..parts.len() as i32:
         if i > 0:
             out.push_str(" ")
-        out.push_str(tool_effect_escape(parts.get(i as i64)))
+        out.push_str(tool_effect_escape(parts[i]))
     out.to_str()
 
 fn tool_effect_contains_slash(text: &str) -> bool:
@@ -1661,7 +1661,7 @@ fn tool_effect_record_env(target_name: &str, name: &str):
 fn tool_effect_env_text(process_env: &ProcessEnv) -> str:
     var out = StringBuilder.new()
     for i in 0..process_env.vars.len() as i32:
-        let item = process_env.vars.get(i as i64)
+        let item = process_env.vars[i]
         if i > 0:
             out.push_str(",")
         out.push_str(tool_effect_escape(item.name))
@@ -1824,7 +1824,7 @@ fn ProcessRunner.write_path_allowed(self: &Self, path: &str) -> bool:
     if not self.write_scoped:
         return true
     for i in 0..self.write_scope.len() as i32:
-        if tool_path_is_same_or_child(path, self.write_scope.get(i as i64)):
+        if tool_path_is_same_or_child(path, self.write_scope[i]):
             return true
     false
 
@@ -1873,7 +1873,7 @@ pub fn ProcessRunner.run_spec(self: &Self, spec: ProcessSpec, stdout_path: &str,
     let full_args: Vec[str] = Vec.new()
     full_args.push(with_str_clone_ref(spec.executable))
     for i in 0..spec.args.len() as i32:
-        full_args.push(with_str_clone_ref(spec.args.get(i as i64)))
+        full_args.push(with_str_clone_ref(spec.args[i]))
     let timeout = if spec.timeout_ms > 0: spec.timeout_ms else: 0
     if spec.env.vars.len() > 0:
         if spec.cwd.len() > 0:
@@ -2492,7 +2492,7 @@ fn wp_put_str(out: &str, s: &str) -> str: out ++ f"{s.len()}\n" ++ s ++ "\n"
 fn wp_put_vec(out: &str, v: &Vec[str]) -> str:
     var acc = out ++ f"{v.len() as i32}\n"
     for i in 0..v.len() as i32:
-        acc = wp_put_str(acc, v.get(i as i64))
+        acc = wp_put_str(acc, v[i])
     acc
 
 fn wp_put_bool(out: &str, b: bool) -> str: out ++ (if b: "1\n" else: "0\n")
@@ -2811,8 +2811,8 @@ fn ws_build_plan(state: &WsState, project_root: &str) -> WorkspaceCompilePlan:
             with_eprint("error: Workspace.compile source strings currently support binary or check output only\n")
             exit(1)
         for si in 0..state.string_names.len() as i32:
-            plan.source_paths.push(ws_path(project_root, state.string_names.get(si as i64)))
-            plan.source_texts.push(with_str_clone_ref(state.string_texts.get(si as i64)))
+            plan.source_paths.push(ws_path(project_root, state.string_names[si]))
+            plan.source_texts.push(with_str_clone_ref(state.string_texts[si]))
         plan.has_strings = 1
     else:
         if output_kind != 0 and output_kind != 1 and output_kind != 2 and output_kind != 4 and output_kind != 5:
@@ -2868,20 +2868,20 @@ fn build_action_outputs(target: &Target) -> Vec[str]:
     if target.output.len() > 0:
         outputs.push(with_str_clone_ref(target.output))
     for i in 0..target.extra_outputs.len() as i32:
-        outputs.push(with_str_clone_ref(target.extra_outputs.get(i as i64)))
+        outputs.push(with_str_clone_ref(target.extra_outputs[i]))
     outputs
 
 fn build_action_write_scope(target: &Target) -> Vec[str]:
     let scopes = build_action_outputs(target)
     for i in 0..target.write_scopes.len() as i32:
-        scopes.push(with_str_clone_ref(target.write_scopes.get(i as i64)))
+        scopes.push(with_str_clone_ref(target.write_scopes[i]))
     scopes.push(tool_action_scratch_dir(target.name))
     scopes
 
 fn tool_clone_str_vec(values: &Vec[str]) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     for i in 0..values.len() as i32:
-        out.push(with_str_clone_ref(values.get(i as i64)))
+        out.push(with_str_clone_ref(values[i]))
     out
 
 fn tool_clone_package(value: &Package) -> Package:
@@ -2917,7 +2917,7 @@ fn build_action_ctx(ctx: &BuildCtx, target: &Target) -> ActionCtx:
 pub fn Build.__driver_run_action(self: &Self, ctx: BuildCtx, action_name: &str) -> i32:
     tool_capability_require(ctx.token, "ActionCtx")
     for i in 0..self.targets.len() as i32:
-        let target = &self.targets[i as i64]
+        let target = &self.targets[i]
         if target.name == action_name:
             if target.kind != .Action:
                 with_eprint("error: build action target '" ++ action_name ++ "' is not an Action target\n")
@@ -2939,7 +2939,7 @@ pub fn Build.__driver_run_action(self: &Self, ctx: BuildCtx, action_name: &str) 
             // fails on a missing parent (behav_capability_token_mismatch).
             let outputs = build_action_outputs(target)
             for oi in 0..outputs.len() as i32:
-                let out_dir = tool_path_dirname(outputs.get(oi as i64))
+                let out_dir = tool_path_dirname(outputs[oi])
                 if out_dir.len() > 0:
                     let resolved_dir = if ctx.fs.root.len() == 0 or ctx.fs.root == ".":
                         with_str_clone_ref(out_dir)
@@ -2972,14 +2972,14 @@ pub fn Build.emit_graph(self: &Self) -> str:
         out.push_str(build_graph_escape(self.default_target))
         out.push_str("\n")
     for gi in 0..self.generated_sources.len() as i32:
-        let generated = self.generated_sources.get(gi as i64)
+        let generated = self.generated_sources[gi]
         out.push_str("generated_source\t")
         out.push_str(build_graph_escape(generated.path))
         out.push_str("\t")
         out.push_str(build_graph_escape(generated.contents))
         out.push_str("\n")
     for ti in 0..self.targets.len() as i32:
-        let target = &self.targets[ti as i64]
+        let target = &self.targets[ti]
         out.push_str("target\t")
         out.push_str(f"{target.kind as i32}\t")
         out.push_str(build_graph_escape(target.name))
@@ -2993,36 +2993,36 @@ pub fn Build.emit_graph(self: &Self) -> str:
         for li in 0..target.system_libs.len() as i32:
             out.push_str("system_lib\t")
             out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.system_libs.get(li as i64)))
+            out.push_str(build_graph_escape(target.system_libs[li]))
             out.push_str("\n")
         for ii in 0..target.include_paths.len() as i32:
             out.push_str("include_path\t")
             out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.include_paths.get(ii as i64)))
+            out.push_str(build_graph_escape(target.include_paths[ii]))
             out.push_str("\n")
         for di in 0..target.defines.len() as i32:
             out.push_str("define\t")
             out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.defines.get(di as i64)))
+            out.push_str(build_graph_escape(target.defines[di]))
             out.push_str("\n")
         for ini in 0..target.inputs.len() as i32:
             out.push_str("input\t")
             out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.inputs.get(ini as i64)))
+            out.push_str(build_graph_escape(target.inputs[ini]))
             out.push_str("\n")
         for outi in 0..target.extra_outputs.len() as i32:
             out.push_str("extra_output\t")
             out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.extra_outputs.get(outi as i64)))
+            out.push_str(build_graph_escape(target.extra_outputs[outi]))
             out.push_str("\n")
         for depi in 0..target.deps.len() as i32:
             out.push_str("dep\t")
             out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.deps.get(depi as i64)))
+            out.push_str(build_graph_escape(target.deps[depi]))
             out.push_str("\n")
         for ai in 0..target.args.len() as i32:
             out.push_str("arg\t")
             out.push_str(f"{ti}\t")
-            out.push_str(build_graph_escape(target.args.get(ai as i64)))
+            out.push_str(build_graph_escape(target.args[ai]))
             out.push_str("\n")
     out.to_str()

@@ -168,13 +168,13 @@ fn compilation_join_strings(values: &Vec[str], separator: &str) -> str:
     for i in 0..values.len() as i32:
         if i > 0:
             out = out ++ separator
-        out = out ++ values.get(i as i64)
+        out = out ++ values[i]
     out
 
 fn compilation_escape_with_string(value: &str) -> str:
     var out = ""
     for i in 0..value.len() as i32:
-        let ch = value.byte_at(i as i64)
+        let ch = value[i]
         if ch == 92:
             out = out ++ "\\\\"
         else if ch == 34:
@@ -194,7 +194,7 @@ fn compilation_split_escaped_fields(line: &str) -> Vec[str]:
     var cur = ""
     var escaped = false
     for i in 0..line.len() as i32:
-        let ch = line.byte_at(i as i64)
+        let ch = line[i]
         if escaped:
             if ch == 110:
                 cur = cur ++ "\n"
@@ -219,7 +219,7 @@ fn compilation_split_nonempty_lines(text: &str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
     var start = 0
     for i in 0..text.len() as i32:
-        if text.byte_at(i as i64) == 10:
+        if text[i] == 10:
             if i > start:
                 lines.push(text.slice(start as i64, i as i64))
             start = i + 1
@@ -230,12 +230,12 @@ fn compilation_split_nonempty_lines(text: &str) -> Vec[str]:
 fn compilation_parse_i32(text: &str) -> i32:
     var sign = 1
     var i = 0
-    if text.len() > 0 and text.byte_at(0) == 45:
+    if text.len() > 0 and text[0] == 45:
         sign = -1
         i = 1
     var value = 0
     while i < text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch < 48 or ch > 57:
             break
         value = value * 10 + (ch - 48)
@@ -262,7 +262,7 @@ fn compilation_module_import_name(root: &str, path: &str) -> str:
         rel = rel.slice(0, rel.len() - 2)
     var out = ""
     for i in 0..rel.len() as i32:
-        let ch = rel.byte_at(i as i64)
+        let ch = rel[i]
         if ch == 47:
             out = out ++ "."
         else:
@@ -423,18 +423,18 @@ impl Compilation:
         let sema = &self.zcu.last_sema
         let model = bundle_interface_build(sema, self.bundle_corpus, &self.zcu.last_bundle_unlowered_globals)
         for wi in 0..model.warnings.len() as i32:
-            runtime_eprint("warning: bundle interface: " ++ model.warnings.get(wi as i64))
+            runtime_eprint("warning: bundle interface: " ++ model.warnings[wi])
         var omitted_fns = 0
         var omitted_globals = 0
         for oi in 0..model.omitted.len() as i32:
-            if model.omitted.get(oi as i64).ends_with("\tgeneric-fn"): omitted_fns = omitted_fns + 1
+            if model.omitted[oi].ends_with("\tgeneric-fn"): omitted_fns = omitted_fns + 1
             else: omitted_globals = omitted_globals + 1
         if omitted_fns > 0:
             runtime_eprint(f"warning: bundle interface: {omitted_fns} generic function(s) not exported at Level 0 (corpus-internal; each is named in the .wi and in the manifest's `omitted` lines)")
         if omitted_globals > 0:
             runtime_eprint(f"warning: bundle interface: {omitted_globals} global(s) without a compile-time initializer not exported at Level 0 (corpus-internal, undefined in the object; each is named in the .wi and in the manifest's `omitted` lines)")
         for ei in 0..model.errors.len() as i32:
-            runtime_eprint("error: bundle interface: " ++ model.errors.get(ei as i64))
+            runtime_eprint("error: bundle interface: " ++ model.errors[ei])
         if not model.ok:
             runtime_eprint(f"error: {what}: {model.errors.len() as i32} declaration(s) have no exact interface spelling (listed above); nothing written")
         model
@@ -475,9 +475,9 @@ impl Compilation:
         let _ = bundle_interfaces_register_wi(wi_text)
         var root_text = "// bundle interface root for " ++ wi_path ++ "\n"
         for si in 0..sections.len() as i32:
-            let dotted = bundle_module_dotted_name(sections.get(si as i64))
+            let dotted = bundle_module_dotted_name(sections[si])
             if dotted.len() == 0:
-                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ sections.get(si as i64) ++ "' is not under <embedded-std>/")
+                runtime_eprint("error: " ++ wi_path ++ ": section path '" ++ sections[si] ++ "' is not under <embedded-std>/")
                 return AstPool.new()
             root_text = root_text ++ "use " ++ dotted ++ "\n"
         let root_path = wi_path ++ ".root.w"
@@ -505,7 +505,7 @@ impl Compilation:
         if not self.register_embedded_bundle_interfaces():
             return false
         for bi in 0..self.link_bundles.len() as i32:
-            let prefix_path = self.link_bundles.get(bi as i64)
+            let prefix_path = self.link_bundles[bi]
             let obj_path = prefix_path ++ ".o"
             let manifest_path = prefix_path ++ ".manifest"
             let wi_path = prefix_path ++ ".wi"
@@ -581,7 +581,7 @@ impl Compilation:
     fn manifest_lies_under_bundle_corpus(manifest: &str) -> bool:
         let paths = bundle_manifest_paths(manifest)
         for pi in 0..paths.len() as i32:
-            if bundle_corpus_contains(self.bundle_corpus, paths.get(pi as i64)):
+            if bundle_corpus_contains(self.bundle_corpus, paths[pi]):
                 return true
         false
 
@@ -651,10 +651,10 @@ impl Compilation:
         zcu.clear_cli_diag_mappings()
         for i in 0..self.cli_diag_gen_starts.len() as i32:
             zcu.add_cli_diag_mapping(
-                self.cli_diag_gen_starts.get(i as i64),
-                self.cli_diag_gen_ends.get(i as i64),
-                self.cli_diag_source_names.get(i as i64),
-                self.cli_diag_source_texts.get(i as i64),
+                self.cli_diag_gen_starts[i],
+                self.cli_diag_gen_ends[i],
+                self.cli_diag_source_names[i],
+                self.cli_diag_source_texts[i],
             )
         zcu
 
@@ -742,7 +742,7 @@ impl Compilation:
         out = out ++ f"config copy_warn_threshold={cfg.copy_warn_threshold}\n"
         out = out ++ "config lint_partial_statement_match=" ++ if cfg.lint_partial_statement_match: "true\n" else: "false\n"
         for mi in 0..zcu.last_resolved.modules.len() as i32:
-            let mod = zcu.last_resolved.modules.get(mi as i64)
+            let mod = zcu.last_resolved.modules[mi]
             out = out ++ f"module path={mod.path} file={mod.file_id} decls={mod.decl_count}\n"
 
         for di in 0..pool.decl_count():
@@ -776,7 +776,7 @@ impl Compilation:
         var out = "fn __with_compiler_hook_project_info() -> ProjectInfo:\n"
         out = out ++ "    var project = ProjectInfo.new()\n"
         for mi in 0..zcu.last_resolved.modules.len() as i32:
-            let mod = zcu.last_resolved.modules.get(mi as i64)
+            let mod = zcu.last_resolved.modules[mi]
             let module_name = compilation_module_import_name(zcu.project_config.root_dir, mod.path)
             out = out ++ "    project = project.add_module(ModuleInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(mod.path) ++ "\"))\n"
 
@@ -884,7 +884,7 @@ impl Compilation:
         var zcu = move self.zcu
         let lines = compilation_split_nonempty_lines(diag_text)
         for li in 0..lines.len() as i32:
-            let fields = compilation_split_escaped_fields(lines.get(li as i64))
+            let fields = compilation_split_escaped_fields(lines[li])
             if fields.len() != 5:
                 continue
             if fields.get(0) != "error":
@@ -1089,8 +1089,8 @@ impl Compilation:
         let extra_names: Vec[str] = Vec.new()
         let extra_texts: Vec[str] = Vec.new()
         for i in 1..source_paths.len() as i32:
-            extra_names.push(with_str_clone_ref(source_paths.get(i as i64)))
-            extra_texts.push(with_str_clone_ref(source_texts.get(i as i64)))
+            extra_names.push(with_str_clone_ref(source_paths[i]))
+            extra_texts.push(with_str_clone_ref(source_texts[i]))
         zcu.set_extra_sources(move extra_names, move extra_texts)
         zcu = self.apply_cli_diag_mappings(move zcu)
         let pool = zcu.compile_source_frontend_mode(source_text, source_path, 0, 1)
@@ -1112,11 +1112,11 @@ impl Compilation:
     mut fn check_file_with_build_settings(source_path: &str, include_paths: &Vec[str], defines: &Vec[str], link_libs: &Vec[str]) -> bool:
         var cfg = self.project_config_for_source(source_path)
         for ii in 0..include_paths.len() as i32:
-            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths.get(ii as i64)))
+            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
         for di in 0..defines.len() as i32:
-            cfg.c_import_defines.push(with_str_clone_ref(defines.get(di as i64)))
+            cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
         for li in 0..link_libs.len() as i32:
-            cfg.link_libs.push(with_str_clone_ref(link_libs.get(li as i64)))
+            cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
         let pool = self.compile_file_with_config(source_path, move cfg)
         self.check_pool(pool, source_path)
 
@@ -1155,16 +1155,16 @@ impl Compilation:
         // Merge direct and dependency link libraries from project config.
         var all_link_libs = move self.zcu.last_link_lib_names
         for lli in 0..self.zcu.project_config.link_libs.len() as i32:
-            all_link_libs.push(with_str_clone_ref(self.zcu.project_config.link_libs.get(lli as i64)))
+            all_link_libs.push(with_str_clone_ref(self.zcu.project_config.link_libs[lli]))
         for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
-            all_link_libs.push(with_str_clone_ref(self.zcu.project_config.dep_link_libs.get(dli as i64)))
+            all_link_libs.push(with_str_clone_ref(self.zcu.project_config.dep_link_libs[dli]))
         var _sp_dla = move self.zcu.project_config.dep_link_args
         var unit_objects = codegen_unit_extra_objects(obj_path, self.zcu.last_codegen_unit_count)
         // D38: `--link-object` objects (a stage link's .wo bundles) join the
         // link exactly as codegen units do — full linker inputs, probed for
         // undefined symbols like any other unit.
         for loi in 0..self.link_objects.len() as i32:
-            unit_objects.push(with_str_clone_ref(self.link_objects.get(loi as i64)))
+            unit_objects.push(with_str_clone_ref(self.link_objects[loi]))
         // D30 R2c: this compile emitted the runtime in-unit iff the lane is
         // on AND the frontend actually parsed the rt prefix (prelude on).
         let rt_in_unit = if runtime_getenv("WITH_RT_IN_UNIT").len() > 0 and self.config.prelude_mode != PRELUDE_NONE(): 1 else: 0
@@ -1269,7 +1269,7 @@ impl Compilation:
     fn write_bundle_interface(model: &BundleInterfaceModel) -> str:
         let rendered = bundle_interface_render(&self.zcu.last_sema, model)
         for ei in 0..rendered.errors.len() as i32:
-            runtime_eprint("error: " ++ rendered.errors.get(ei as i64))
+            runtime_eprint("error: " ++ rendered.errors[ei])
         if rendered.errors.len() > 0:
             return ""
         if runtime_write_file(self.bundle_interface_path, rendered.text) != 0:
@@ -1299,10 +1299,10 @@ impl Compilation:
         // D39 Level 0: declarations the boundary cannot carry, one
         // `omitted <module> <name> <why>` line each (the .wi names them too)
         for oi in 0..omitted.len() as i32:
-            text = text ++ "omitted " ++ omitted.get(oi as i64).replace("\t", " ") ++ "\n"
+            text = text ++ "omitted " ++ omitted[oi].replace("\t", " ") ++ "\n"
         let seen: Vec[str] = Vec.new()
         for pi in 0..self.zcu.decl_source_paths.len() as i32:
-            let path = self.zcu.decl_source_paths.get(pi as i64)
+            let path = self.zcu.decl_source_paths[pi]
             if path.len() == 0:
                 continue
             let canonical = codegen_canonical_module_path(path)
@@ -1328,11 +1328,11 @@ impl Compilation:
 
         var cfg = self.project_config_for_source(source_path)
         for ii in 0..include_paths.len() as i32:
-            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths.get(ii as i64)))
+            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
         for di in 0..defines.len() as i32:
-            cfg.c_import_defines.push(with_str_clone_ref(defines.get(di as i64)))
+            cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
         for li in 0..link_libs.len() as i32:
-            cfg.link_libs.push(with_str_clone_ref(link_libs.get(li as i64)))
+            cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
         let pool = self.compile_file_with_config(source_path, move cfg)
         if pool.decl_count() == 0:
             return ""
@@ -1383,11 +1383,11 @@ impl Compilation:
 
         var cfg = self.project_config_for_source(source_path)
         for ii in 0..include_paths.len() as i32:
-            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths.get(ii as i64)))
+            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
         for di in 0..defines.len() as i32:
-            cfg.c_import_defines.push(with_str_clone_ref(defines.get(di as i64)))
+            cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
         for li in 0..link_libs.len() as i32:
-            cfg.link_libs.push(with_str_clone_ref(link_libs.get(li as i64)))
+            cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
         let pool = self.compile_entry_file_with_config(source_path, move cfg)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
@@ -1419,11 +1419,11 @@ impl Compilation:
 
         var cfg = self.project_config_for_source(source_path)
         for ii in 0..include_paths.len() as i32:
-            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths.get(ii as i64)))
+            cfg.c_import_include_paths.push(with_str_clone_ref(include_paths[ii]))
         for di in 0..defines.len() as i32:
-            cfg.c_import_defines.push(with_str_clone_ref(defines.get(di as i64)))
+            cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
         for li in 0..link_libs.len() as i32:
-            cfg.link_libs.push(with_str_clone_ref(link_libs.get(li as i64)))
+            cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
         let pool = self.compile_source_text_with_config(source_path, source_text, move cfg)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
@@ -1770,7 +1770,7 @@ impl Compilation:
     fn tracked_input_paths() -> Vec[str]:
         var out: Vec[str] = Vec.new()
         for i in 0..self.zcu.tracked_input_paths.len() as i32:
-            out.push(with_str_clone_ref(self.zcu.tracked_input_paths.get(i as i64)))
+            out.push(with_str_clone_ref(self.zcu.tracked_input_paths[i]))
         out
 
     fn active_pool(pool: AstPool) -> AstPool:
@@ -1867,7 +1867,7 @@ impl Compilation:
             let tailrec_violations = mir_mod.verify_tailrec_contracts(&sema, active_pool, tailrec_syms)
             if tailrec_violations.len() > 0:
                 for vi in 0..tailrec_violations.len() as i32:
-                    let violation = tailrec_violations.get(vi as i64)
+                    let violation = tailrec_violations[vi]
                     let start = active_pool.get_start(violation.node)
                     let end_raw = active_pool.get_end(violation.node)
                     let end = if end_raw > start: end_raw else: start + 1

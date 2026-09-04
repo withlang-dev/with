@@ -97,11 +97,11 @@ fn pkg_str_compare(a: &str, b: &str) -> i32:
 fn pkg_sort_strings(items: Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for i in 0..items.len() as i32:
-        let item = items.get(i as i64)
+        let item = items[i]
         var inserted = false
         var out: Vec[str] = Vec.new()
         for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
+            let existing = sorted[j]
             if not inserted and pkg_str_compare(item, existing) < 0:
                 out.push(package_owned_text(item))
                 inserted = true
@@ -114,7 +114,7 @@ fn pkg_sort_strings(items: Vec[str]) -> Vec[str]:
 fn pkg_add_unique(items: Vec[str], item: &str) -> Vec[str]:
     var out = items
     for i in 0..out.len() as i32:
-        if out.get(i as i64) == item:
+        if out[i] == item:
             return out
     out.push(package_owned_text(item))
     out
@@ -212,7 +212,7 @@ fn pkg_forbidden_dependency(text: &str, platform: &str) -> str:
         needles.push("vcruntime")
         needles.push("zlib")
     for i in 0..needles.len() as i32:
-        let needle = needles.get(i as i64)
+        let needle = needles[i]
         if lower.contains(needle):
             return package_owned_text(needle)
     ""
@@ -398,7 +398,7 @@ fn pkg_write_sha256sums(ctx: &ActionCtx, stage_root: &str) -> i32:
     let files = pkg_sort_strings(fs.list_files(stage_root))
     var manifest = ""
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         let rel = pkg_rel_path(stage_root, path)
         if rel.len() == 0:
             return pkg_fail(ctx, "package file is outside stage root: " ++ path)
@@ -454,16 +454,16 @@ fn pkg_write_archive(ctx: &ActionCtx, compiler_path: &str, stage_root: &str, top
     let files = pkg_sort_strings(fs.list_files(stage_root))
     var dirs: Vec[str] = Vec.new()
     for i in 0..files.len() as i32:
-        let rel = pkg_rel_path(stage_root, files.get(i as i64))
+        let rel = pkg_rel_path(stage_root, files[i])
         if rel.len() == 0:
-            return pkg_fail(ctx, "package file is outside stage root: " ++ files.get(i as i64))
+            return pkg_fail(ctx, "package file is outside stage root: " ++ files[i])
         dirs = pkg_add_parent_dirs(move dirs, top_dir, rel)
     dirs = pkg_sort_strings(dirs)
     let entries: Vec[ArchiveEntry] = Vec.new()
     for i in 0..dirs.len() as i32:
-        entries.push(archive_dir_entry(package_owned_text(dirs.get(i as i64)), 0o755))
+        entries.push(archive_dir_entry(package_owned_text(dirs[i]), 0o755))
     for i in 0..files.len() as i32:
-        let source = files.get(i as i64)
+        let source = files[i]
         let rel = pkg_rel_path(stage_root, source)
         entries.push(archive_file_entry(package_owned_text(source), top_dir ++ "/" ++ rel, 0o644))
     let tmp_tar = pkg_join("out/bootstrap-c-package", top_dir ++ ".tar")

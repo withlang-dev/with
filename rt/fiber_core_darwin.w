@@ -168,13 +168,13 @@ fn current_worker_index() -> i32:
     let tid = rt_libc_pthread_self()
     var i = 0
     while i < active_worker_count:
-        if worker_thread_ids[i as i64] == tid:
+        if worker_thread_ids[i] == tid:
             return i
         i = i + 1
     0
 
 fn current_worker_fiber() -> i64:
-    worker_current_fibers[current_worker_index() as i64]
+    worker_current_fibers[current_worker_index()]
 
 fn alt_stack_ptr() -> *mut u8:
     (&raw mut fiber_alt_stack_buf) as *mut [131072]u8 as *mut u8
@@ -628,7 +628,7 @@ pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, 
 
 pub fn with_fiber_bootstrap_finish() -> Unit:
     let worker = current_worker_index()
-    let current = worker_current_fibers[worker as i64]
+    let current = worker_current_fibers[worker]
     if current == 0:
         rt_libc_abort()
     scheduler_lock()
@@ -644,7 +644,7 @@ fn finish_scheduler_turn(worker: i32, f: i64):
     scheduler_lock()
     if scheduler_running_fibers > 0:
         scheduler_running_fibers = scheduler_running_fibers - 1
-    worker_current_fibers[worker as i64] = 0
+    worker_current_fibers[worker] = 0
     if fiber_state(f) == FIBER_STATE_SUSPENDED:
         enqueue_worker_front(worker, f)
     scheduler_wake_all()
@@ -657,7 +657,7 @@ fn run_one_fiber_for_worker(worker: i32) -> i32:
         scheduler_unlock()
         return 0
     fiber_set_state(f, FIBER_STATE_RUNNING)
-    worker_current_fibers[worker as i64] = f
+    worker_current_fibers[worker] = f
     scheduler_running_fibers = scheduler_running_fibers + 1
     scheduler_unlock()
     with_fiber_switch(scheduler_ctx_ptr(worker), f as *mut u8)
@@ -679,7 +679,7 @@ fn scheduler_worker_loop(worker: i32):
 fn scheduler_worker_entry(arg: *mut u8) -> *mut u8:
     let worker = (arg as i64) as i32
     scheduler_lock()
-    worker_thread_ids[worker as i64] = rt_libc_pthread_self()
+    worker_thread_ids[worker] = rt_libc_pthread_self()
     scheduler_wake_all()
     scheduler_unlock()
     scheduler_worker_loop(worker)
@@ -704,7 +704,7 @@ fn scheduler_start_workers():
         if handle < 0:
             let _ = rt_libc_write(2, "fatal: could not start fiber scheduler worker\n" as *const u8, 46)
             rt_libc_abort()
-        worker_handles[i as i64] = handle
+        worker_handles[i] = handle
         i = i + 1
 
 pub fn with_runtime_core_init() -> Unit:
@@ -737,9 +737,9 @@ pub fn with_runtime_core_init() -> Unit:
         i = i + 1
     i = 0
     while i < MAX_FIBER_WORKERS:
-        worker_current_fibers[i as i64] = 0
-        worker_thread_ids[i as i64] = 0
-        worker_handles[i as i64] = 0
+        worker_current_fibers[i] = 0
+        worker_thread_ids[i] = 0
+        worker_handles[i] = 0
         worker_set_queue_head(i, 0)
         worker_set_queue_count(i, 0)
         i = i + 1
@@ -822,7 +822,7 @@ pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, 
 
 pub fn with_fiber_yield() -> Unit:
     let worker = current_worker_index()
-    let current = worker_current_fibers[worker as i64]
+    let current = worker_current_fibers[worker]
     if current == 0:
         return
     scheduler_lock()
@@ -886,7 +886,7 @@ pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg
 fn running_worker_for_fiber(f: i64) -> i32:
     var i = 0
     while i < active_worker_count:
-        if worker_current_fibers[i as i64] == f:
+        if worker_current_fibers[i] == f:
             return i
         i = i + 1
     -1
@@ -933,7 +933,7 @@ pub fn with_runtime_current_set_cancel_requested() -> Unit:
 
 pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32) -> Unit:
     let worker = current_worker_index()
-    let current = worker_current_fibers[worker as i64]
+    let current = worker_current_fibers[worker]
     if current == 0:
         return
     var buf: *mut u8 = 0 as *mut u8
@@ -963,7 +963,7 @@ pub fn with_runtime_core_shutdown() -> Unit:
     scheduler_unlock()
     var wi = 1
     while wi < active_worker_count:
-        let handle = worker_handles[wi as i64]
+        let handle = worker_handles[wi]
         if handle > 0:
             let _ = rt_thread_join(handle)
         wi = wi + 1
@@ -978,7 +978,7 @@ pub fn with_runtime_core_shutdown() -> Unit:
         i = i + 1
     i = 0
     while i < active_worker_count:
-        worker_current_fibers[i as i64] = 0
+        worker_current_fibers[i] = 0
         worker_set_queue_head(i, 0)
         worker_set_queue_count(i, 0)
         i = i + 1

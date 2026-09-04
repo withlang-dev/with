@@ -98,16 +98,16 @@ fn pcre2_append_normalized_heap_line(out: &str, line: &str, frame_count: i32) ->
 fn pcre2_normalize_heap_output(text: &str) -> str:
     let lines = pcre2_split_lines(text)
     var line_count = lines.len() as i32
-    while line_count > 0 and lines.get((line_count - 1) as i64).len() == 0:
+    while line_count > 0 and lines[(line_count - 1)].len() == 0:
         line_count = line_count - 1
     var out = ""
     var frame_count = 0
     var i = 0
     while i < line_count:
-        let line = lines.get(i as i64)
+        let line = lines[i]
         if line == "malloc  40960" and i + 2 < line_count:
-            let second = lines.get((i + 1) as i64)
-            let third = lines.get((i + 2) as i64)
+            let second = lines[(i + 1)]
+            let third = lines[(i + 2)]
             if second == "free unremembered block" and third == "No match":
                 out = out ++ line ++ "\nfree    20480\n" ++ third ++ "\n"
             else:
@@ -120,8 +120,8 @@ fn pcre2_normalize_heap_output(text: &str) -> str:
             i = i + 3
             continue
         if line == "free unremembered block" and i + 2 < line_count:
-            let second = lines.get((i + 1) as i64)
-            let third = lines.get((i + 2) as i64)
+            let second = lines[(i + 1)]
+            let third = lines[(i + 2)]
             if second == "malloc    128" and third == "malloc  20480":
                 out = out ++ line ++ "\nmalloc    152\n" ++ third ++ "\n"
             else:
@@ -202,7 +202,7 @@ fn pcre2_count_w_files(ctx: &ActionCtx, dir: &str) -> i32:
     let files = ctx.fs().list_files(dir)
     var count = 0
     for i in 0..files.len() as i32:
-        if files.get(i as i64).ends_with(".w"):
+        if files[i].ends_with(".w"):
             count = count + 1
     count
 
@@ -211,7 +211,7 @@ fn pcre2_reject_c_exports(ctx: &ActionCtx, generated_dir: &str) -> i32:
     let files = fs.list_files(generated_dir)
     var errors = 0
     for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
+        let path = files[i]
         if path.ends_with(".w") and fs.read_text(path).contains("@[c_export("):
             ctx.diagnostics().error("pcre2 generated source contains forbidden c_export attribute in " ++ path)
             errors = errors + 1
@@ -327,7 +327,7 @@ fn pcre2_first_function_name(text: &str) -> str:
 
 fn pcre2_decls_contain_function(decls: Vec[DeclSummary], name: &str, source_suffix: &str) -> bool:
     for di in 0..decls.len() as i32:
-        let decl = decls.get(di as i64)
+        let decl = decls[di]
         if decl.kind == DeclKind.function and decl.name == name and decl.source.file.ends_with(source_suffix):
             return true
     false
@@ -397,7 +397,7 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
     let modules = fs.list_files(generated_dir)
     var imports = ""
     for mi in 0..modules.len() as i32:
-        let mod_name = pcre2_module_name(modules.get(mi as i64))
+        let mod_name = pcre2_module_name(modules[mi])
         if mod_name != "defs" and mod_name != "pcre2test" and mod_name != "bundle":
             imports = imports ++ "use std.re." ++ mod_name ++ "\n"
     let updated = pcre2_insert_after_defs_import(pcre2test_text, imports)
@@ -414,7 +414,7 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
 pub fn pcre2_bundle_root_text(module_paths: &Vec[str]) -> str:
     var names: Vec[str] = Vec.new()
     for mi in 0..module_paths.len() as i32:
-        let path = module_paths.get(mi as i64)
+        let path = module_paths[mi]
         if not path.ends_with(".w"):
             continue
         let mod_name = pcre2_module_name(path)
@@ -425,7 +425,7 @@ pub fn pcre2_bundle_root_text(module_paths: &Vec[str]) -> str:
     text = text ++ "// Written by build/pcre2.w (pcre2-migrate) from the migrated module list:\n"
     text = text ++ "// one `use` per corpus module; pcre2test and pcre2posix are the harness.\n"
     for ni in 0..sorted.len() as i32:
-        text = text ++ "use std.re." ++ sorted.get(ni as i64) ++ "\n"
+        text = text ++ "use std.re." ++ sorted[ni] ++ "\n"
     text
 
 fn pcre2_write_bundle_root(ctx: &ActionCtx, generated_dir: &str) -> i32:
@@ -515,7 +515,7 @@ fn pcre2_copy_w_files(ctx: &ActionCtx, source_dir: &str, dest_dir: &str) -> i32:
     if fs.mkdir_all(dest_dir) != 0:
         return pcre2_fail(ctx, "could not create destination directory: " ++ dest_dir)
     for fi in 0..files.len() as i32:
-        let source_path = files.get(fi as i64)
+        let source_path = files[fi]
         if source_path.ends_with(".w"):
             let dest_path = pcre2_join(dest_dir, pcre2_basename(source_path))
             if fs.copy_file(source_path, dest_path) != 0:
@@ -690,7 +690,7 @@ pub fn run_pcre2_migrate_action(ctx: ActionCtx) -> i32:
     let excludes: Vec[str] = Vec.new()
     var exclude_i = 1
     while exclude_i < args.len() as i32:
-        excludes.push(pcre2_owned_text(args.get(exclude_i as i64)))
+        excludes.push(pcre2_owned_text(args[exclude_i]))
         exclude_i = exclude_i + 1
     let workspace = ctx.create_workspace("pcre2-migrate")
     workspace.set_migrate_options(pcre2_migrate_options(source_dir, tmp_dir, source_dir, move excludes))
@@ -937,13 +937,13 @@ pub fn run_pcre2_promote_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "could not create destination: " ++ dest_dir)
     let existing = fs.list_files(dest_dir)
     for ei in 0..existing.len() as i32:
-        let path = existing.get(ei as i64)
+        let path = existing[ei]
         if path.ends_with(".w") and fs.remove_file(path) != 0:
             return pcre2_fail(ctx, "could not remove old generated file: " ++ path)
     let files = fs.list_files(generated_dir)
     var copied = 0
     for fi in 0..files.len() as i32:
-        let source_path = files.get(fi as i64)
+        let source_path = files[fi]
         if source_path.ends_with(".w"):
             let dest_path = pcre2_join(dest_dir, pcre2_basename(source_path))
             if fs.copy_file(source_path, dest_path) != 0:

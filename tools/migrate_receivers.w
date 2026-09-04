@@ -43,7 +43,7 @@ fn compiler_receiver_decls(path: &str) -> ReceiverDeclFacts:
     let result = compiler_analyze_file(path, "select:kind=declaration")
     let facts = ReceiverDeclFacts { starts: Vec.new(), ends: Vec.new(), modes: Vec.new(), flags: Vec.new() }
     for i in 0..result.report.facts.len() as i32:
-        let fact = result.report.facts.get(i as i64)
+        let fact = result.report.facts[i]
         if fact.kind != AnalysisFactKind.Declaration or fact.path != path: continue
         let mode = fact.flags & 255
         if mode != AnalysisReceiverMode.Read as i32 and mode != AnalysisReceiverMode.Mut as i32 and mode != AnalysisReceiverMode.Move as i32: continue
@@ -57,7 +57,7 @@ fn compiler_receiver_decls(path: &str) -> ReceiverDeclFacts:
 
 fn receiver_fact_at(facts: &ReceiverDeclFacts, offset: i32) -> i32:
     for i in 0..facts.starts.len() as i32:
-        if offset >= facts.starts.get(i as i64) and offset < facts.ends.get(i as i64): return i
+        if offset >= facts.starts[i] and offset < facts.ends[i]: return i
     -1
 
 fn migrate_file(path: &str) -> i32:
@@ -127,14 +127,14 @@ fn migrate_file(path: &str) -> i32:
         if fact_index < 0:
             i = i + 1
             continue
-        let declared_mode = declarations.modes.get(fact_index as i64)
+        let declared_mode = declarations.modes[fact_index]
         // #727: trait-IMPL read borrows migrate too — synthesis is
         // trait-contract-driven (pinned by
         // behav_trait_impl_keyword_receivers, incl. the body-never-touches-
         // self case), so the D7-era conservative trait-impl skip is retired.
         // Trait DECLARATION read contracts stay explicit (the D7 carve-out:
         // associated contracts must remain spellable).
-        let trait_decl = declarations.flags.get(fact_index as i64) & (AnalysisDeclarationFlag.TraitDeclaration as i32) != 0
+        let trait_decl = declarations.flags[fact_index] & (AnalysisDeclarationFlag.TraitDeclaration as i32) != 0
         if declared_mode == AnalysisReceiverMode.Read as i32 and trait_decl:
             i = i + 1
             continue
@@ -167,7 +167,7 @@ fn migrate_file(path: &str) -> i32:
         if q < n and tokens.get_tag(q) == TokenKind.TK_COMMA:
             del_end = tokens.get_end(q)
         // Eat trailing spaces so `self: T, v` collapses to `v`, not ` v`.
-        while del_end < tlen and (text.byte_at(del_end as i64) as i32) == 32:
+        while del_end < tlen and (text[del_end] as i32) == 32:
             del_end = del_end + 1
 
         if mode == 2:
@@ -194,9 +194,9 @@ fn migrate_file(path: &str) -> i32:
     var prev = 0
     var methods = 0
     for e in 0..m:
-        let s = starts.get(e as i64)
-        let en = ends.get(e as i64)
-        let r = repls.get(e as i64)
+        let s = starts[e]
+        let en = ends[e]
+        let r = repls[e]
         if r.len() == 0:
             methods = methods + 1
         result = result ++ text.slice(prev as i64, s as i64) ++ r
@@ -207,7 +207,7 @@ fn migrate_file(path: &str) -> i32:
 
 fn path_excluded(path: &str, excludes: &Vec[str]) -> bool:
     for i in 0..excludes.len() as i32:
-        if path == excludes.get(i as i64): return true
+        if path == excludes[i]: return true
     false
 
 fn migrate_path(path: &str, excludes: &Vec[str]) -> i32:
@@ -220,7 +220,7 @@ fn migrate_path(path: &str, excludes: &Vec[str]) -> i32:
     var total = 0
     var start = 0
     for i in 0..listing.len() as i32 + 1:
-        if i != listing.len() as i32 and listing.byte_at(i as i64) as i32 != 10: continue
+        if i != listing.len() as i32 and listing[i] as i32 != 10: continue
         if i > start:
             let file = slice(listing, start, i)
             if file.ends_with(".w") and not path_excluded(file, excludes):
@@ -240,21 +240,21 @@ fn main:
     let paths: Vec[str] = Vec.new()
     var arg = 1
     while arg < argv.len() as i32:
-        if argv.get(arg as i64) == "--exclude":
+        if argv[arg] == "--exclude":
             if arg + 1 >= argv.len() as i32:
                 print("error: --exclude requires a file path")
                 exit_code(1)
             arg = arg + 1
-            excludes.push(argv.get(arg as i64).clone())
+            excludes.push(argv[arg].clone())
         else:
-            paths.push(argv.get(arg as i64).clone())
+            paths.push(argv[arg].clone())
         arg = arg + 1
     if paths.len() == 0:
         print("error: no migration paths supplied")
         exit_code(1)
     var total = 0
     for i in 0..paths.len() as i32:
-        let changed = migrate_path(paths.get(i as i64), &excludes)
+        let changed = migrate_path(paths[i], &excludes)
         if changed < 0: exit_code(1)
         total = total + changed
     print(f"total: {total} receiver methods migrated")

@@ -142,22 +142,22 @@ impl CiTypePool:
         self.state.frozen = 1
 
     fn kind(id: CiTypeId) -> i32:
-        self.state.kinds.get((id as i32) as i64)
+        self.state.kinds[(id as i32)]
 
     fn get_d0(id: CiTypeId) -> i32:
-        self.state.data0.get((id as i32) as i64)
+        self.state.data0[(id as i32)]
 
     fn get_d1(id: CiTypeId) -> i32:
-        self.state.data1.get((id as i32) as i64)
+        self.state.data1[(id as i32)]
 
     fn get_d2(id: CiTypeId) -> i32:
-        self.state.data2.get((id as i32) as i64)
+        self.state.data2[(id as i32)]
 
     fn get_extra(idx: i32) -> i32:
-        self.state.extra.get(idx as i64)
+        self.state.extra[idx]
 
     fn get_string(idx: i32) -> &str:
-        self.state.strings.get(idx as i64)
+        self.state.strings[idx]
 
     // Type constructor helpers.
     fn ty_void() -> CiTypeId:
@@ -367,16 +367,16 @@ impl CiExprPool:
         self.state.frozen = 1
 
     fn kind(id: CiExprId) -> i32:
-        self.state.kinds.get((id as i32) as i64)
+        self.state.kinds[(id as i32)]
 
     fn get_d0(id: CiExprId) -> i32:
-        self.state.data0.get((id as i32) as i64)
+        self.state.data0[(id as i32)]
 
     fn get_d1(id: CiExprId) -> i32:
-        self.state.data1.get((id as i32) as i64)
+        self.state.data1[(id as i32)]
 
     fn get_d2(id: CiExprId) -> i32:
-        self.state.data2.get((id as i32) as i64)
+        self.state.data2[(id as i32)]
 
     fn get_type(id: CiExprId) -> CiTypeId:
         (self.state.types.get((id as i32) as i64)) as CiTypeId
@@ -398,10 +398,10 @@ impl CiExprPool:
         st.types = out
 
     fn get_extra(idx: i32) -> i32:
-        self.state.extra.get(idx as i64)
+        self.state.extra[idx]
 
     fn get_string(idx: i32) -> &str:
-        self.state.strings.get(idx as i64)
+        self.state.strings[idx]
 
     fn extra_len() -> i32:
         self.state.extra.len() as i32
@@ -552,25 +552,25 @@ impl CiStmtPool:
         CiStmtPool { state: self.state }
 
     fn kind(id: CiStmtId) -> i32:
-        self.state.kinds.get((id as i32) as i64)
+        self.state.kinds[(id as i32)]
 
     fn get_d0(id: CiStmtId) -> i32:
-        self.state.data0.get((id as i32) as i64)
+        self.state.data0[(id as i32)]
 
     fn get_d1(id: CiStmtId) -> i32:
-        self.state.data1.get((id as i32) as i64)
+        self.state.data1[(id as i32)]
 
     fn get_d2(id: CiStmtId) -> i32:
-        self.state.data2.get((id as i32) as i64)
+        self.state.data2[(id as i32)]
 
     fn get_flags(id: CiStmtId) -> i32:
-        self.state.flags.get((id as i32) as i64)
+        self.state.flags[(id as i32)]
 
     fn get_extra(idx: i32) -> i32:
-        self.state.extra.get(idx as i64)
+        self.state.extra[idx]
 
     fn get_string(idx: i32) -> &str:
-        self.state.strings.get(idx as i64)
+        self.state.strings[idx]
 
     // Statement constructor helpers.
     fn expr_stmt(expr: CiExprId) -> CiStmtId:
@@ -743,25 +743,25 @@ impl CiDeclPool:
         self.state.frozen = 1
 
     fn kind(id: CiDeclId) -> i32:
-        self.state.kinds.get((id as i32) as i64)
+        self.state.kinds[(id as i32)]
 
     fn get_d0(id: CiDeclId) -> i32:
-        self.state.data0.get((id as i32) as i64)
+        self.state.data0[(id as i32)]
 
     fn get_d1(id: CiDeclId) -> i32:
-        self.state.data1.get((id as i32) as i64)
+        self.state.data1[(id as i32)]
 
     fn get_d2(id: CiDeclId) -> i32:
-        self.state.data2.get((id as i32) as i64)
+        self.state.data2[(id as i32)]
 
     fn get_flags(id: CiDeclId) -> i32:
-        self.state.flags.get((id as i32) as i64)
+        self.state.flags[(id as i32)]
 
     fn get_extra(idx: i32) -> i32:
-        self.state.extra.get(idx as i64)
+        self.state.extra[idx]
 
     fn get_string(idx: i32) -> &str:
-        self.state.strings.get(idx as i64)
+        self.state.strings[idx]
 
     // Decl constructor helpers.
     fn fn_decl(name_sym: i32, ret_ty: CiTypeId, body: CiStmtId, flags: i32) -> CiDeclId:
@@ -914,7 +914,7 @@ impl CiProject:
     fn ensure_module(path: &str) -> i32:
         var i = 0
         while i < self.module_paths.len() as i32:
-            if self.module_paths.get(i as i64) == path:
+            if self.module_paths[i] == path:
                 return i
             i = i + 1
         let id = self.module_paths.len() as i32
@@ -925,7 +925,7 @@ impl CiProject:
         let key = ci_project_symbol_key(kind, name)
         var i = self.symbols.len() as i32 - 1
         while i >= 0:
-            let symbol = self.symbols.get(i as i64)
+            let symbol = self.symbols[i]
             if ci_project_symbol_key(symbol.kind, symbol.name) == key:
                 return i
             i = i - 1
@@ -942,9 +942,9 @@ impl CiProject:
     fn owner_module_path(symbol_id: i32) -> str:
         if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:
             return ""
-        let owner_module = self.symbols.get(symbol_id as i64).owner_module
+        let owner_module = self.symbols[symbol_id].owner_module
         if owner_module < 0 or owner_module >= self.module_paths.len() as i32:
             return ""
-        with_str_clone_ref(self.module_paths.get(owner_module as i64))
+        with_str_clone_ref(self.module_paths[owner_module])
 
 let _ci_ir_eof_guard = 0

@@ -160,12 +160,12 @@ fn rt_f64_write_fixed_abs(val: f64, precision_arg: i32, trim: bool, buf: *mut u8
     var fv = frac_int
     var fdi = precision - 1
     while fdi >= 0:
-        fdigits[fdi as i64] = (48 + (fv % 10u64) as i32) as u8
+        fdigits[fdi] = (48 + (fv % 10u64) as i32) as u8
         fv = fv / 10u64
         fdi = fdi - 1
     var fwi: i32 = 0
     while fwi < precision:
-        pos = rt_buf_put(buf, bufsize, pos, fdigits[fwi as i64])
+        pos = rt_buf_put(buf, bufsize, pos, fdigits[fwi])
         fwi = fwi + 1
     if trim:
         while pos > frac_start and unsafe *((buf as i64 + pos - 1) as *const u8) == 48:
@@ -414,12 +414,12 @@ fn rt_record_slab_range(start: i64, size: i64):
     // rt_payload_start_is_owned, which binary-searches them — O(log n) per free
     // instead of an O(n) linear scan). Inserts are rare (one per mmap region).
     var i = rt_slab_range_count
-    while i > 0 and rt_slab_range_starts[(i - 1) as i64] > start:
-        rt_slab_range_starts[i as i64] = rt_slab_range_starts[(i - 1) as i64]
-        rt_slab_range_ends[i as i64] = rt_slab_range_ends[(i - 1) as i64]
+    while i > 0 and rt_slab_range_starts[(i - 1)] > start:
+        rt_slab_range_starts[i] = rt_slab_range_starts[(i - 1)]
+        rt_slab_range_ends[i] = rt_slab_range_ends[(i - 1)]
         i = i - 1
-    rt_slab_range_starts[i as i64] = start
-    rt_slab_range_ends[i as i64] = start + size
+    rt_slab_range_starts[i] = start
+    rt_slab_range_ends[i] = start + size
     rt_slab_range_count = rt_slab_range_count + 1
 
 fn rt_record_large_range(start: i64, size: i64):
@@ -432,12 +432,12 @@ fn rt_record_large_range(start: i64, size: i64):
     // large-allocation-heavy workloads (compiler C migration spent 90% of a
     // 43-minute run in that scan).
     var i = rt_large_range_count
-    while i > 0 and rt_large_range_starts[(i - 1) as i64] > start:
-        rt_large_range_starts[i as i64] = rt_large_range_starts[(i - 1) as i64]
-        rt_large_range_ends[i as i64] = rt_large_range_ends[(i - 1) as i64]
+    while i > 0 and rt_large_range_starts[(i - 1)] > start:
+        rt_large_range_starts[i] = rt_large_range_starts[(i - 1)]
+        rt_large_range_ends[i] = rt_large_range_ends[(i - 1)]
         i = i - 1
-    rt_large_range_starts[i as i64] = start
-    rt_large_range_ends[i as i64] = start + size
+    rt_large_range_starts[i] = start
+    rt_large_range_ends[i] = start + size
     rt_large_range_count = rt_large_range_count + 1
 
 fn rt_forget_large_range(start: i64):
@@ -447,16 +447,16 @@ fn rt_forget_large_range(start: i64):
     var hi = rt_large_range_count - 1
     while lo <= hi:
         let mid = (lo + hi) / 2
-        let mid_start = rt_large_range_starts[mid as i64]
+        let mid_start = rt_large_range_starts[mid]
         if mid_start == start:
             var i = mid
             while i + 1 < rt_large_range_count:
-                rt_large_range_starts[i as i64] = rt_large_range_starts[(i + 1) as i64]
-                rt_large_range_ends[i as i64] = rt_large_range_ends[(i + 1) as i64]
+                rt_large_range_starts[i] = rt_large_range_starts[(i + 1)]
+                rt_large_range_ends[i] = rt_large_range_ends[(i + 1)]
                 i = i + 1
             rt_large_range_count = rt_large_range_count - 1
-            rt_large_range_starts[rt_large_range_count as i64] = 0
-            rt_large_range_ends[rt_large_range_count as i64] = 0
+            rt_large_range_starts[rt_large_range_count] = 0
+            rt_large_range_ends[rt_large_range_count] = 0
             return
         if mid_start < start:
             lo = mid + 1
@@ -564,14 +564,14 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     var found = -1
     while lo <= hi:
         let mid = (lo + hi) / 2
-        if rt_slab_range_starts[mid as i64] <= header:
+        if rt_slab_range_starts[mid] <= header:
             found = mid
             lo = mid + 1
         else:
             hi = mid - 1
     if found >= 0:
-        let start = rt_slab_range_starts[found as i64]
-        let end = rt_slab_range_ends[found as i64]
+        let start = rt_slab_range_starts[found]
+        let end = rt_slab_range_ends[found]
         if header >= start and header + RT_ALLOC_HEADER_SIZE <= end:
             let size = unsafe *(header as *const i64)
             if size <= 0 or size > RT_LARGE_THRESHOLD:
@@ -590,9 +590,9 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     var lhi = rt_large_range_count - 1
     while llo <= lhi:
         let lmid = (llo + lhi) / 2
-        let lstart = rt_large_range_starts[lmid as i64]
+        let lstart = rt_large_range_starts[lmid]
         if lstart == header:
-            return if payload < rt_large_range_ends[lmid as i64]: 1 else: 0
+            return if payload < rt_large_range_ends[lmid]: 1 else: 0
         if lstart < header:
             llo = lmid + 1
         else:
@@ -1886,7 +1886,7 @@ pub fn with_fmt_f64_spec(val: f64, flags: i64, width: i32, precision: i32, mode:
         // Shift buffer right by 1 and prepend '+'
         var si = len
         while si > 0:
-            buf[si as i64] = buf[(si - 1) as i64]
+            buf[si] = buf[(si - 1)]
             si = si - 1
         buf[0] = 43  // '+'
         len = len + 1

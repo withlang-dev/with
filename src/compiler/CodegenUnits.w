@@ -122,19 +122,19 @@ pub fn codegen_units_assign_from_mir(mir_ptr: i64, unit_count: i32) -> CodegenUn
     unsafe:
         let m = mir_ptr as *const MirModule
         for i in 0..(*m).bodies.len() as i32:
-            let sym = (*m).body_fn_syms.get(i as i64)
-            let body = &(*m).bodies[i as i64]
+            let sym = (*m).body_fn_syms[i]
+            let body = &(*m).bodies[i]
             var cost: i64 = 1
             for b in 0..body.block_count():
-                cost = cost + body.bb_stmt_counts.get(b as i64) as i64
+                cost = cost + body.bb_stmt_counts[b] as i64
             total_cost = total_cost + cost
             var best = 0
             var best_load = bin_loads.get(0)
             var k = 1
             while k < unit_count:
-                if bin_loads.get(k as i64) < best_load:
+                if bin_loads[k] < best_load:
                     best = k
-                    best_load = bin_loads.get(k as i64)
+                    best_load = bin_loads[k]
                 k = k + 1
             fn_syms.push(sym)
             units.push(best)
@@ -204,7 +204,7 @@ pub fn codegen_units_emit_generated_all(unit_bc_paths: &Vec[str], obj_path: &str
     var ji = 0
     while ji < unit_count:
         jobs.push(CodegenUnitEmitJob {
-            bc_path: with_str_clone_ref(unit_bc_paths.get(ji as i64)),
+            bc_path: with_str_clone_ref(unit_bc_paths[ji]),
             obj_path: with_str_clone_ref(obj_path),
             opt_level,
             unit_index: ji,
@@ -225,22 +225,22 @@ pub fn codegen_units_emit_generated_all(unit_bc_paths: &Vec[str], obj_path: &str
             else:
                 handles.push(handle)
                 if handles.len() as i32 - next_join >= w:
-                    let rc = with_thread_join(handles.get(next_join as i64))
+                    let rc = with_thread_join(handles[next_join])
                     if rc != 0 and join_rc == 0:
                         join_rc = rc
                     next_join = next_join + 1
         k = k + 1
     while next_join < handles.len() as i32:
-        let rc = with_thread_join(handles.get(next_join as i64))
+        let rc = with_thread_join(handles[next_join])
         if rc != 0 and join_rc == 0:
             join_rc = rc
         next_join = next_join + 1
     var unit_rc = join_rc
     var ri = 0
     while ri < unit_count:
-        if jobs.get(ri as i64).rc != 0 and unit_rc == 0:
-            unit_rc = jobs.get(ri as i64).rc
-        let _ = with_fs_remove_file(unit_bc_paths.get(ri as i64))
+        if jobs[ri].rc != 0 and unit_rc == 0:
+            unit_rc = jobs[ri].rc
+        let _ = with_fs_remove_file(unit_bc_paths[ri])
         ri = ri + 1
     if unit_rc != 0:
         runtime_eprint(f"error: codegen-units generated emit failed with exit code {unit_rc}")

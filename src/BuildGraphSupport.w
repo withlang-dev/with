@@ -35,26 +35,26 @@ pub fn build_graph_object_output_path(root: &str, target: &BuildGraphTarget, out
     resolve_join(resolve_join(root, "out/obj"), target.name ++ ".o")
 
 pub fn build_graph_resolve_project_path(root: &str, path: &str) -> str:
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if path.len() > 0 and path[0] == 47:
         return with_str_clone_ref(path)
     resolve_join(root, path)
 
 pub fn build_graph_resolve_paths(root: &str, paths: &Vec[str]) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     for i in 0..paths.len() as i32:
-        out.push(build_graph_resolve_project_path(root, paths.get(i as i64)))
+        out.push(build_graph_resolve_project_path(root, paths[i]))
     out
 
 pub fn build_graph_clone_strings(values: &Vec[str]) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     for i in 0..values.len() as i32:
-        out.push(runtime_str_clone(values.get(i as i64)))
+        out.push(runtime_str_clone(values[i]))
     out
 
 pub fn build_graph_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -72,7 +72,7 @@ pub fn build_graph_path_has_glob(path: &str) -> bool:
 pub fn build_graph_single_star_pattern_matches(pattern: &str, name: &str) -> bool:
     var star = -1
     for i in 0..pattern.len() as i32:
-        if pattern.byte_at(i as i64) == 42:
+        if pattern[i] == 42:
             if star >= 0:
                 return false
             star = i
@@ -107,12 +107,12 @@ pub fn build_graph_path_for_child_process(root: &str, path: &str) -> str:
 pub fn build_graph_generated_path_valid(path: &str) -> bool:
     if path.len() == 0:
         return false
-    if path.byte_at(0) == 47:
+    if path[0] == 47:
         return false
     if path.contains(".."):
         return false
     for i in 0..path.len() as i32:
-        let ch = path.byte_at(i as i64)
+        let ch = path[i]
         if ch == 10 or ch == 13 or ch == 9:
             return false
     true
@@ -120,12 +120,12 @@ pub fn build_graph_generated_path_valid(path: &str) -> bool:
 pub fn build_graph_manifest_relative_path_valid(path: &str) -> bool:
     if path.len() == 0:
         return false
-    if path.byte_at(0) == 47:
+    if path[0] == 47:
         return false
     if path.contains(".."):
         return false
     for i in 0..path.len() as i32:
-        let ch = path.byte_at(i as i64)
+        let ch = path[i]
         if ch == 0 or ch == 10 or ch == 13 or ch == 9:
             return false
     true
@@ -134,28 +134,28 @@ pub fn build_graph_define_valid(define: &str) -> bool:
     if define.len() == 0:
         return false
     for i in 0..define.len() as i32:
-        let ch = define.byte_at(i as i64)
+        let ch = define[i]
         if ch == 10 or ch == 13:
             return false
     true
 
 pub fn build_graph_process_arg_valid(arg: &str) -> bool:
     for i in 0..arg.len() as i32:
-        if arg.byte_at(i as i64) == 0:
+        if arg[i] == 0:
             return false
     true
 
 pub fn build_graph_path_project_contained(path: &str) -> bool:
     if path.len() == 0:
         return true
-    if path.byte_at(0) == 47:
+    if path[0] == 47:
         return false
     if path.contains(".."):
         return false
     if path.starts_with("$"):
         return false
     for i in 0..path.len() as i32:
-        let ch = path.byte_at(i as i64)
+        let ch = path[i]
         if ch == 0 or ch == 10 or ch == 13 or ch == 9:
             return false
     true
@@ -192,7 +192,7 @@ pub fn build_graph_validate_target_containment(target: &BuildGraphTarget) -> i32
             build_graph_rt_eprint("error: target '" ++ target.name ++ "' entry escapes project root: " ++ target.entry)
             return 1
     for oi in 0..target.extra_outputs.len() as i32:
-        let extra = target.extra_outputs.get(oi as i64)
+        let extra = target.extra_outputs[oi]
         if not build_graph_path_project_contained(extra):
             build_graph_rt_eprint("error: target '" ++ target.name ++ "' extra_output escapes project root: " ++ extra)
             return 1
@@ -216,11 +216,11 @@ pub fn build_graph_validate_process_args(target: &BuildGraphTarget) -> i32:
         build_graph_rt_eprint("error: target '" ++ target.name ++ "' field 'output' contains a NUL byte: " ++ target.output)
         return 1
     for ii in 0..target.inputs.len() as i32:
-        if not build_graph_process_arg_valid(target.inputs.get(ii as i64)):
+        if not build_graph_process_arg_valid(target.inputs[ii]):
             build_graph_rt_eprint("error: target '" ++ target.name ++ f"' field 'input[{ii}]' contains a NUL byte")
             return 1
     for ai in 0..target.args.len() as i32:
-        if not build_graph_process_arg_valid(target.args.get(ai as i64)):
+        if not build_graph_process_arg_valid(target.args[ai]):
             build_graph_rt_eprint("error: target '" ++ target.name ++ f"' field 'arg[{ai}]' contains a NUL byte")
             return 1
     0
@@ -233,10 +233,10 @@ fn build_graph_split_nonempty_lines(text: &str) -> Vec[str]:
     while i <= text_len:
         var ch = 10
         if i < text_len:
-            ch = text.byte_at(i as i64)
+            ch = text[i]
         if ch == 10:
             var line = text.slice(start as i64, i as i64)
-            if line.len() > 0 and line.byte_at(line.len() as i64 - 1) == 13:
+            if line.len() > 0 and line[line.len() as i64 - 1] == 13:
                 line = line.slice(0, line.len() - 1)
             if line.len() > 0:
                 lines.push(line)
@@ -248,8 +248,8 @@ fn build_graph_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < min_len as i32:
-        let ac = a.byte_at(i as i64)
-        let bc = b.byte_at(i as i64)
+        let ac = a[i]
+        let bc = b[i]
         if ac != bc:
             return ac - bc
         i = i + 1
@@ -262,11 +262,11 @@ fn build_graph_str_compare(a: &str, b: &str) -> i32:
 pub fn build_graph_sorted_strings(items: &Vec[str]) -> Vec[str]:
     var sorted: Vec[str] = Vec.new()
     for i in 0..items.len() as i32:
-        let item = items.get(i as i64)
+        let item = items[i]
         var inserted = false
         var out: Vec[str] = Vec.new()
         for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
+            let existing = sorted[j]
             if not inserted and build_graph_str_compare(item, existing) < 0:
                 out.push(with_str_clone_ref(item))
                 inserted = true
@@ -283,7 +283,7 @@ pub fn collect_test_files(target_dir: &str) -> Vec[str]:
     let all_files = build_graph_split_nonempty_lines(listing)
     let w_files: Vec[str] = Vec.new()
     for i in 0..all_files.len() as i32:
-        let path = all_files.get(i as i64)
+        let path = all_files[i]
         if path.ends_with(".w"):
             w_files.push(with_str_clone_ref(path))
     build_graph_sorted_strings(w_files)
@@ -294,7 +294,7 @@ pub fn build_graph_time_fmt(ns: i64) -> str:
 
 fn build_graph_time_picked(picked: &Vec[i64], idx: i64) -> bool:
     for i in 0..picked.len() as i32:
-        if picked.get(i as i64) == idx:
+        if picked[i] == idx:
             return true
     false
 
@@ -316,7 +316,7 @@ pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64]
         return
     var text = "target\tseconds\tpeak_rss\n"
     for i in 0..names.len() as i32:
-        let rss = if i < rss_list.len() as i32: rss_list.get(i as i64) else: 0
+        let rss = if i < rss_list.len() as i32: rss_list[i] else: 0
         text = text ++ names.get(i as i64) ++ "\t" ++ build_graph_time_fmt(ns_list.get(i as i64)) ++ "\t" ++ build_graph_rss_fmt(rss) ++ "\n"
     text = text ++ "TOTAL\t" ++ build_graph_time_fmt(total_ns) ++ "\t" ++ build_graph_rss_fmt(build_graph_rt_self_maxrss()) ++ "\n"
     let state_dir = resolve_join(root, "out/.build-state")
@@ -328,13 +328,13 @@ pub fn build_graph_times_report(root: &str, names: &Vec[str], ns_list: &Vec[i64]
         var best: i64 = -1
         for i in 0..names.len() as i32:
             if not build_graph_time_picked(&picked, i as i64):
-                if best < 0 or ns_list.get(i as i64) > ns_list.get(best):
+                if best < 0 or ns_list[i] > ns_list.get(best):
                     best = i as i64
         picked.push(best)
         summary = summary ++ " " ++ names.get(best) ++ " " ++ build_graph_time_fmt(ns_list.get(best))
     var rss_best: i64 = -1
     for i in 0..rss_list.len() as i32:
-        if rss_best < 0 or rss_list.get(i as i64) > rss_list.get(rss_best):
+        if rss_best < 0 or rss_list[i] > rss_list.get(rss_best):
             rss_best = i as i64
     if rss_best >= 0 and rss_best < names.len() as i32 and rss_list.get(rss_best) > 0:
         summary = summary ++ "; peak rss " ++ build_graph_rss_fmt(rss_list.get(rss_best)) ++ " (" ++ names.get(rss_best) ++ ")"

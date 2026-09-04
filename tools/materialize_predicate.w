@@ -19,7 +19,7 @@ if argv.len() < 5:
 
 var separator = -1
 for i in 3..argv.len() as i32:
-    if argv.get(i as i64) == "--":
+    if argv[i] == "--":
         separator = i
         break
 if separator < 0 or separator + 1 >= argv.len() as i32:
@@ -34,7 +34,7 @@ if unsafe { with_fs_write_file(materialized, candidate) } != 0:
 
 let child: Vec[str] = Vec.new()
 for i in separator + 1..argv.len() as i32:
-    let arg = argv.get(i as i64)
+    let arg = argv[i]
     child.push(if arg == "{file}": materialized else: arg)
 let status = run(&child)
 let remove_status = unsafe { with_fs_remove_file(materialized) }

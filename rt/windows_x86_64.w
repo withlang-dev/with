@@ -1072,7 +1072,7 @@ fn rt_net_copy_str_to_c_buf(s: &str, out: *mut u8, cap: i64) -> i32:
         return -1
     var i: i64 = 0
     while i < s.len():
-        unsafe *((out as i64 + i) as *mut u8) = s.byte_at(i) as u8
+        unsafe *((out as i64 + i) as *mut u8) = s[i] as u8
         i = i + 1
     unsafe *((out as i64 + i) as *mut u8) = 0
     0
@@ -1110,7 +1110,7 @@ fn rt_net_fill_sockaddr_ipv4(host: &str, port: i32, sa: *mut u8) -> i32:
     var have_digit = false
     var i: i64 = 0
     while i < host.len():
-        let c = host.byte_at(i) as i32
+        let c = host[i] as i32
         if c >= 48 and c <= 57:
             cur = cur * 10 + (c - 48)
             if cur > 255:

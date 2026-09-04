@@ -58,7 +58,7 @@ fn validate_scaffold(spec_names: Vec[str], spec_paths: Vec[str]) -> i32:
         let req = required_module(ri)
         var count = 0
         for si in 0..spec_names.len() as i32:
-            if spec_names.get(si as i64) == req:
+            if spec_names[si] == req:
                 count = count + 1
         if count == 0:
             return ValidateError.MissingModule

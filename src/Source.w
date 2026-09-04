@@ -48,13 +48,13 @@ impl Source:
         var hi = self.line_offsets.len() as i32
         while lo < hi:
             let mid = lo + ((hi - lo) / 2)
-            if self.line_offsets.get(mid as i64) <= clamped:
+            if self.line_offsets[mid] <= clamped:
                 lo = mid + 1
             else:
                 hi = mid
 
         let line = lo - 1
-        let line_start = self.line_offsets.get(line as i64)
+        let line_start = self.line_offsets[line]
         SourceLocation {
             line,
             col: clamped - line_start,
@@ -64,10 +64,10 @@ impl Source:
         if line < 0 or line >= self.line_offsets.len() as i32:
             return ""
 
-        let start = self.line_offsets.get(line as i64)
+        let start = self.line_offsets[line]
         var end = self.text.len() as i32
         if line + 1 < self.line_offsets.len() as i32:
-            end = self.line_offsets.get((line + 1) as i64)
+            end = self.line_offsets[(line + 1)]
 
         let slice = self.text.slice(start as i64, end as i64)
         if slice.len() > 0 and slice[slice.len() - 1] == 10:

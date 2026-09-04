@@ -81,12 +81,12 @@ impl Codegen:
         let ast_param_count = self.pool.trait_method_field(trait_node, method_idx, TRAIT_METHOD_PARAM_COUNT)
         let ast_ret_node = self.pool.trait_method_field(trait_node, method_idx, TRAIT_METHOD_RETURN_TYPE)
         let ast_default_body = self.pool.trait_method_field(trait_node, method_idx, TRAIT_METHOD_DEFAULT_BODY)
-        let collected_name = self.trait_method_names.get(row as i64)
-        let collected_flags = self.trait_method_flags.get(row as i64)
-        let collected_param_start = self.trait_method_param_starts.get(row as i64)
-        let collected_param_count = self.trait_method_param_counts.get(row as i64)
-        let collected_ret_node = self.trait_method_ret_nodes.get(row as i64)
-        let collected_default_body = self.trait_method_default_bodies.get(row as i64)
+        let collected_name = self.trait_method_names[row]
+        let collected_flags = self.trait_method_flags[row]
+        let collected_param_start = self.trait_method_param_starts[row]
+        let collected_param_count = self.trait_method_param_counts[row]
+        let collected_ret_node = self.trait_method_ret_nodes[row]
+        let collected_default_body = self.trait_method_default_bodies[row]
         if collected_name != ast_name:
             self.analysis_fail(f"trait table {trait_name} index={trait_idx} method={method_idx}: name={collected_name} AST={ast_name}")
         if collected_flags != ast_flags:
@@ -129,16 +129,16 @@ impl Codegen:
 
         let mapped_syms = self.trait_map.keys()
         for ki in 0..mapped_syms.len() as i32:
-            let trait_sym = mapped_syms.get(ki as i64)
+            let trait_sym = mapped_syms[ki]
             let trait_idx = self.trait_map.get(trait_sym).unwrap()
             if trait_idx < 0 or trait_idx >= trait_count:
                 self.analysis_fail(f"trait map symbol={trait_sym}: index={trait_idx} is out of range 0..{trait_count}")
-            else if self.trait_idx_syms.get(trait_idx as i64) != trait_sym:
-                self.analysis_fail(f"trait map symbol={trait_sym}: index={trait_idx} points to symbol={self.trait_idx_syms.get(trait_idx as i64)}")
+            else if self.trait_idx_syms[trait_idx] != trait_sym:
+                self.analysis_fail(f"trait map symbol={trait_sym}: index={trait_idx} points to symbol={self.trait_idx_syms[trait_idx]}")
 
         var canonical_method_start = 0
         for trait_idx in 0..trait_count:
-            let trait_sym = self.trait_idx_syms.get(trait_idx as i64)
+            let trait_sym = self.trait_idx_syms[trait_idx]
             let trait_name = self.intern.resolve(trait_sym)
             let mapped_idx = self.trait_map.get(trait_sym)
             if not mapped_idx.is_some():
@@ -158,13 +158,13 @@ impl Codegen:
             if self.pool.get_data0(trait_node) != trait_sym:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: declaration symbol={self.pool.get_data0(trait_node)} expected={trait_sym}")
             let ast_method_count = self.pool.trait_method_count(trait_node)
-            let collected_start = self.trait_method_starts.get(trait_idx as i64)
-            let collected_count = self.trait_method_counts.get(trait_idx as i64)
+            let collected_start = self.trait_method_starts[trait_idx]
+            let collected_count = self.trait_method_counts[trait_idx]
             if collected_start != canonical_method_start:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: method-start={collected_start} expected={canonical_method_start}")
             if collected_count != ast_method_count:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: method-count={collected_count} AST={ast_method_count}")
-            let vtable_ty = self.trait_vtable_types.get(trait_idx as i64)
+            let vtable_ty = self.trait_vtable_types[trait_idx]
             var vtable_slots = -1
             if vtable_ty == 0 or wl_get_type_kind(vtable_ty) != wl_struct_type_kind():
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: vtable type is not an LLVM struct")
@@ -193,10 +193,10 @@ impl Codegen:
             self.analysis_fail(f"trait method rows={method_count} canonical AST rows={canonical_method_start}")
 
     fn find_trait_method_offset(trait_idx: i32, method_sym: i32) -> i32:
-        let start = self.trait_method_starts.get(trait_idx as i64)
-        let count = self.trait_method_counts.get(trait_idx as i64)
+        let start = self.trait_method_starts[trait_idx]
+        let count = self.trait_method_counts[trait_idx]
         for i in 0..count:
-            if self.trait_method_names.get((start + i) as i64) == method_sym:
+            if self.trait_method_names[(start + i)] == method_sym:
                 return i
         -1
 
@@ -259,11 +259,11 @@ impl Codegen:
                 with_eprint("error: missing trait method '" ++ self.intern.resolve(method_sym) ++ "' in dyn trait '" ++ self.intern.resolve(trait_sym) ++ "'")
                 self.had_error = 1
             return 0
-        let method_idx = self.trait_method_starts.get(trait_idx as i64) + method_offset
-        let method_flags = self.trait_method_flags.get(method_idx as i64)
-        let param_start = self.trait_method_param_starts.get(method_idx as i64)
-        let param_count = self.trait_method_param_counts.get(method_idx as i64)
-        let ret_node = self.trait_method_ret_nodes.get(method_idx as i64)
+        let method_idx = self.trait_method_starts[trait_idx] + method_offset
+        let method_flags = self.trait_method_flags[method_idx]
+        let param_start = self.trait_method_param_starts[method_idx]
+        let param_count = self.trait_method_param_counts[method_idx]
+        let ret_node = self.trait_method_ret_nodes[method_idx]
 
         let ptr_ty = wl_ptr_type(self.context)
         let param_types: Vec[i64] = Vec.new()
@@ -323,7 +323,7 @@ impl Codegen:
             abi_param_types.push(ptr_ty)
         var api = 0
         while api < param_types.len() as i32:
-            let src_ty = param_types.get(api as i64)
+            let src_ty = param_types[api]
             if self.internal_abi_needs_indirect_param(src_ty):
                 abi_param_types.push(ptr_ty)
             else:
@@ -363,7 +363,7 @@ impl Codegen:
         let rev_idx = method_count - 1 - slot
         if rev_idx < 0 or rev_idx >= rev_syms.len() as i32:
             return 0
-        rev_syms.get(rev_idx as i64)
+        rev_syms[rev_idx]
 
     fn find_impl_for_type_trait(impl_type_sym: i32, trait_sym: i32) -> i32:
         if impl_type_sym == 0 or trait_sym == 0:
@@ -496,11 +496,11 @@ impl Codegen:
         var concrete_ty = 0
         let st = self.struct_type_map.get(impl_type_sym)
         if st.is_some():
-            concrete_ty = self.struct_llvm_types.get(st.unwrap() as i64)
+            concrete_ty = self.struct_llvm_types[st.unwrap()]
         else:
             let et = self.enum_type_map.get(impl_type_sym)
             if et.is_some():
-                concrete_ty = self.enum_llvm_types.get(et.unwrap() as i64)
+                concrete_ty = self.enum_llvm_types[et.unwrap()]
         if concrete_ty == 0:
             return self.resolve_type(type_node)
 
@@ -514,8 +514,8 @@ impl Codegen:
         self.type_bindings_len = 0
         var found_self = false
         for i in 0..saved_len:
-            let sym = saved_syms.get(i as i64)
-            var ty: i64 = saved_tys.get(i as i64)
+            let sym = saved_syms[i]
+            var ty: i64 = saved_tys[i]
             if sym == self.sym_Self:
                 ty = concrete_ty
                 found_self = true
@@ -535,11 +535,11 @@ impl Codegen:
                 let tp_start = self.trait_tp_starts.get(trait_sym).unwrap()
                 let tta_idx = self.pool.find_impl_trait_type_args(impl_node)
                 if tta_idx >= 0:
-                    let arg_start = self.pool.state.impl_trait_type_args.get((tta_idx + 1) as i64)
-                    let arg_count = self.pool.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+                    let arg_start = self.pool.state.impl_trait_type_args[(tta_idx + 1)]
+                    let arg_count = self.pool.state.impl_trait_type_args[(tta_idx + 2)]
                     var ti = 0
                     while ti < tp_count and ti < arg_count:
-                        let tp_sym: i32 = self.trait_tp_flat_syms.get((tp_start + ti) as i64)
+                        let tp_sym: i32 = self.trait_tp_flat_syms[(tp_start + ti)]
                         let arg_node = self.pool.get_extra(arg_start + ti)
                         let arg_ty = self.resolve_type(arg_node)
                         if arg_ty != 0:
@@ -562,7 +562,7 @@ impl Codegen:
         // the live buffer across a possible realloc).
         let saved_vec_len = self.type_binding_syms.len()
         let saved_len = self.type_bindings_len
-        let body_node = self.trait_method_default_bodies.get(method_idx as i64)
+        let body_node = self.trait_method_default_bodies[method_idx]
         if body_node == 0:
             return
 
@@ -574,11 +574,11 @@ impl Codegen:
                 // Try to bind from explicit trait type args (impl Trait[i32] for Type)
                 let tta_idx = self.pool.find_impl_trait_type_args(impl_node)
                 if tta_idx >= 0:
-                    let arg_start = self.pool.state.impl_trait_type_args.get((tta_idx + 1) as i64)
-                    let arg_count = self.pool.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+                    let arg_start = self.pool.state.impl_trait_type_args[(tta_idx + 1)]
+                    let arg_count = self.pool.state.impl_trait_type_args[(tta_idx + 2)]
                     var ti = 0
                     while ti < tp_count and ti < arg_count:
-                        let tp_sym: i32 = self.trait_tp_flat_syms.get((tp_start + ti) as i64)
+                        let tp_sym: i32 = self.trait_tp_flat_syms[(tp_start + ti)]
                         let arg_node = self.pool.get_extra(arg_start + ti)
                         let arg_ty = self.resolve_type(arg_node)
                         if arg_ty != 0:
@@ -596,11 +596,11 @@ impl Codegen:
         self.type_bindings_len = saved_len
 
     mut fn generate_default_trait_method_for_impl(impl_type_sym: i32, method_idx: i32):
-        let body_node = self.trait_method_default_bodies.get(method_idx as i64)
+        let body_node = self.trait_method_default_bodies[method_idx]
         if body_node == 0:
             return
 
-        let method_sym = self.trait_method_names.get(method_idx as i64)
+        let method_sym = self.trait_method_names[method_idx]
         let method_name = self.intern.resolve(method_sym)
         let type_name = self.intern.resolve(impl_type_sym)
         let mangled = type_name ++ "." ++ method_name
@@ -608,9 +608,9 @@ impl Codegen:
         if self.fn_values.get(fn_sym).is_some():
             return
 
-        let param_start = self.trait_method_param_starts.get(method_idx as i64)
-        let param_count = self.trait_method_param_counts.get(method_idx as i64)
-        let ret_node = self.trait_method_ret_nodes.get(method_idx as i64)
+        let param_start = self.trait_method_param_starts[method_idx]
+        let param_count = self.trait_method_param_counts[method_idx]
+        let ret_node = self.trait_method_ret_nodes[method_idx]
         if with_getenv_str("WITH_DEBUG_DTM").len() > 0:
             with_eprint(f"[dtm] {mangled} method_idx={method_idx} param_start={param_start} param_count={param_count} ret_node={ret_node} body_node={body_node}")
         if param_start < 0:
@@ -790,9 +790,9 @@ impl Codegen:
         // Set return type
         let dtm_ret_sema = self.sema_type_of_node(body_node)
         if dtm_ret_sema != 0 and dtm_ret_sema != self.sema.ty_void:
-            dtm_builder.body.local_type_ids.set_i32(0, dtm_ret_sema)
+            dtm_builder.body.local_type_ids[0] = dtm_ret_sema
         else:
-            dtm_builder.body.local_type_ids.set_i32(0, self.sema.ty_i32)
+            dtm_builder.body.local_type_ids[0] = self.sema.ty_i32
 
         dtm_builder.push_scope()
 
@@ -869,7 +869,7 @@ impl Codegen:
 
         // Pre-populate globals
         for dtm_gli in 0..dtm_body.local_names.len() as i32:
-            let dtm_gl_name = dtm_body.local_names.get(dtm_gli as i64)
+            let dtm_gl_name = dtm_body.local_names[dtm_gli]
             if dtm_gl_name != 0:
                 let dtm_gl_mc = self.module_constants.get(dtm_gl_name)
                 if dtm_gl_mc.is_some():
@@ -892,10 +892,10 @@ impl Codegen:
         for dtm_bb in 0..dtm_body.block_count():
             if dtm_bb < 0 or dtm_bb >= self.mir_bb_values.len() as i32:
                 continue
-            let dtm_llbb: i64 = self.mir_bb_values.get(dtm_bb as i64)
+            let dtm_llbb: i64 = self.mir_bb_values[dtm_bb]
             wl_position_at_end(self.builder, dtm_llbb)
-            let dtm_stmt_start = dtm_body.bb_stmt_starts.get(dtm_bb as i64)
-            let dtm_stmt_count = dtm_body.bb_stmt_counts.get(dtm_bb as i64)
+            let dtm_stmt_start = dtm_body.bb_stmt_starts[dtm_bb]
+            let dtm_stmt_count = dtm_body.bb_stmt_counts[dtm_bb]
             for dtm_si in 0..dtm_stmt_count:
                 let dtm_stmt_id = dtm_stmt_start + dtm_si
                 if not self.mir_emit_stmt(dtm_body, dtm_stmt_id):
@@ -962,8 +962,8 @@ impl Codegen:
         if not trait_idx_opt.is_some():
             return
         let trait_idx = trait_idx_opt.unwrap()
-        let method_start: i32 = self.trait_method_starts.get(trait_idx as i64)
-        let method_count = self.trait_method_counts.get(trait_idx as i64)
+        let method_start: i32 = self.trait_method_starts[trait_idx]
+        let method_count = self.trait_method_counts[trait_idx]
         for mi in 0..method_count:
             self.generate_default_trait_method_for_impl_ext(impl_type_sym, method_start + mi, trait_sym, impl_node)
 
@@ -983,17 +983,17 @@ impl Codegen:
         if not trait_idx_opt.is_some():
             return
         let trait_idx = trait_idx_opt.unwrap()
-        let method_start = self.trait_method_starts.get(trait_idx as i64)
-        let method_count = self.trait_method_counts.get(trait_idx as i64)
-        let vtable_ty = self.trait_vtable_types.get(trait_idx as i64)
+        let method_start = self.trait_method_starts[trait_idx]
+        let method_count = self.trait_method_counts[trait_idx]
+        let vtable_ty = self.trait_vtable_types[trait_idx]
 
         let entries: Vec[i64] = Vec.new()
         for mi in 0..method_count:
-            let method_sym: i32 = self.trait_method_names.get((method_start + mi) as i64)
-            let method_flags = self.trait_method_flags.get((method_start + mi) as i64)
+            let method_sym: i32 = self.trait_method_names[(method_start + mi)]
+            let method_flags = self.trait_method_flags[(method_start + mi)]
             let trait_method_idx = method_start + mi
-            let param_start = self.trait_method_param_starts.get(trait_method_idx as i64)
-            let param_count = self.trait_method_param_counts.get(trait_method_idx as i64)
+            let param_start = self.trait_method_param_starts[trait_method_idx]
+            let param_count = self.trait_method_param_counts[trait_method_idx]
             let consumes_self =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
@@ -1087,19 +1087,19 @@ impl Codegen:
             return
 
         let trait_idx = trait_idx_opt.unwrap()
-        let method_start = self.trait_method_starts.get(trait_idx as i64)
-        let method_count = self.trait_method_counts.get(trait_idx as i64)
-        let vtable_ty = self.trait_vtable_types.get(trait_idx as i64)
+        let method_start = self.trait_method_starts[trait_idx]
+        let method_count = self.trait_method_counts[trait_idx]
+        let vtable_ty = self.trait_vtable_types[trait_idx]
         let type_name = self.intern.resolve(impl_type_sym)
         let trait_name = self.intern.resolve(trait_sym)
 
         let entries: Vec[i64] = Vec.new()
         for mi in 0..method_count:
-            let method_sym = self.trait_method_names.get((method_start + mi) as i64)
-            let method_flags = self.trait_method_flags.get((method_start + mi) as i64)
+            let method_sym = self.trait_method_names[(method_start + mi)]
+            let method_flags = self.trait_method_flags[(method_start + mi)]
             let trait_method_idx = method_start + mi
-            let param_start = self.trait_method_param_starts.get(trait_method_idx as i64)
-            let param_count = self.trait_method_param_counts.get(trait_method_idx as i64)
+            let param_start = self.trait_method_param_starts[trait_method_idx]
+            let param_count = self.trait_method_param_counts[trait_method_idx]
             let consumes_self =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
@@ -1141,18 +1141,18 @@ impl Codegen:
             return
         let trait_idx = trait_idx_opt.unwrap()
         let trait_text = self.intern.resolve(trait_sym)
-        let method_start = self.trait_method_starts.get(trait_idx as i64)
-        let method_count = self.trait_method_counts.get(trait_idx as i64)
-        let vtable_ty = self.trait_vtable_types.get(trait_idx as i64)
+        let method_start = self.trait_method_starts[trait_idx]
+        let method_count = self.trait_method_counts[trait_idx]
+        let vtable_ty = self.trait_vtable_types[trait_idx]
         let type_name: str = with_str_clone_ref(self.intern.resolve(impl_type_sym))
         let entries: Vec[i64] = Vec.new()
         var used_row = 0
         for mi in 0..method_count:
-            let method_sym = self.trait_method_names.get((method_start + mi) as i64)
-            let method_flags = self.trait_method_flags.get((method_start + mi) as i64)
+            let method_sym = self.trait_method_names[(method_start + mi)]
+            let method_flags = self.trait_method_flags[(method_start + mi)]
             let trait_method_idx = method_start + mi
-            let param_start = self.trait_method_param_starts.get(trait_method_idx as i64)
-            let param_count = self.trait_method_param_counts.get(trait_method_idx as i64)
+            let param_start = self.trait_method_param_starts[trait_method_idx]
+            let param_count = self.trait_method_param_counts[trait_method_idx]
             let consumes_self =
                 if param_count > 0 and fn_param_is_move_self(self.pool.fn_param_flags(param_start, 0)) != 0: 1
                 else: 0
@@ -1244,7 +1244,7 @@ impl Codegen:
 
     fn decl_source_path(decl_index: i32) -> str:
         if decl_index >= 0 and decl_index < self.decl_source_paths.len() as i32:
-            let path = self.decl_source_paths.get(decl_index as i64)
+            let path = self.decl_source_paths[decl_index]
             if path.len() > 0:
                 return with_str_clone_ref(path)
         if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
@@ -1339,7 +1339,7 @@ impl Codegen:
         if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
             let sym = self.pool.get_data0(node)
             let raw = self.intern.resolve(sym)
-            if raw.len() >= 5 and raw.byte_at(0) == 1 and raw.byte_at(1) == 114 and raw.byte_at(2) == 97 and raw.byte_at(3) == 119 and raw.byte_at(4) == 1:
+            if raw.len() >= 5 and raw[0] == 1 and raw[1] == 114 and raw[2] == 97 and raw[3] == 119 and raw[4] == 1:
                 return const_string_eval_ok(raw.slice(5, raw.len()))
             return const_string_eval_ok(self.decode_string_escapes(raw))
 
@@ -1507,7 +1507,7 @@ impl Codegen:
         // zeroing write. Callers enforce the writability condition.
         if tid == 0 or self.sema.type_needs_drop_frozen(tid) == 0: return
         for i in 0..self.module_drop_global_syms.len() as i32:
-            if self.module_drop_global_syms.get(i as i64) == name_sym: return
+            if self.module_drop_global_syms[i] == name_sym: return
         self.module_drop_global_syms.push(name_sym)
         self.module_drop_global_tids.push(tid)
 
@@ -1649,7 +1649,7 @@ impl Codegen:
         // stale predecessor's.
         self.current_function_name_sym = init_sym
         var init_builder = MirBuilder.init(self.sema, self.pool, self.intern, init_sym)
-        init_builder.body.local_type_ids.set_i32(0, result_tid)
+        init_builder.body.local_type_ids[0] = result_tid
         init_builder.push_scope()
         init_builder.expected_type = result_tid
         let init_result = init_builder.lower_expr(value_node)
@@ -1677,7 +1677,7 @@ impl Codegen:
         self.mir_local_types.insert(0, ret_ty)
 
         for gli in 0..init_body.local_names.len() as i32:
-            let gl_name = init_body.local_names.get(gli as i64)
+            let gl_name = init_body.local_names[gli]
             if gl_name == 0:
                 continue
             let gl_opt = self.module_constants.get(gl_name)
@@ -1697,10 +1697,10 @@ impl Codegen:
         for bb in 0..init_body.block_count():
             if bb < 0 or bb >= self.mir_bb_values.len() as i32:
                 continue
-            let llbb = self.mir_bb_values.get(bb as i64)
+            let llbb = self.mir_bb_values[bb]
             wl_position_at_end(self.builder, llbb)
-            let stmt_start = init_body.bb_stmt_starts.get(bb as i64)
-            let stmt_count = init_body.bb_stmt_counts.get(bb as i64)
+            let stmt_start = init_body.bb_stmt_starts[bb]
+            let stmt_count = init_body.bb_stmt_counts[bb]
             for si in 0..stmt_count:
                 let stmt_id = stmt_start + si
                 if not self.mir_emit_stmt(init_body, stmt_id):
@@ -1757,9 +1757,9 @@ impl Codegen:
 
     mut fn emit_module_runtime_init_helpers() -> Unit:
         for i in 0..self.module_runtime_init_syms.len() as i32:
-            let name_sym = self.module_runtime_init_syms.get(i as i64)
-            let value_node = self.module_runtime_init_nodes.get(i as i64)
-            let result_tid = self.module_runtime_init_type_ids.get(i as i64)
+            let name_sym = self.module_runtime_init_syms[i]
+            let value_node = self.module_runtime_init_nodes[i]
+            let result_tid = self.module_runtime_init_type_ids[i]
             let global_opt = self.module_constants.get(name_sym)
             if not global_opt.is_some():
                 with_eprint("error: missing global storage for runtime-initialized module constant '" ++ self.intern.resolve(name_sym) ++ "'")
@@ -2043,8 +2043,8 @@ impl Codegen:
         let source_field_count = self.sema.get_type_d2(resolved)
         if self.is_union_struct_index(struct_idx):
             for fi in 0..source_field_count:
-                let field_name = self.sema.type_extra.get((te_start + fi * 3) as i64)
-                let field_tid: i32 = self.sema.type_extra.get((te_start + fi * 3 + 1) as i64)
+                let field_name = self.sema.type_extra[(te_start + fi * 3)]
+                let field_tid: i32 = self.sema.type_extra[(te_start + fi * 3 + 1)]
                 let value_node = self.struct_literal_field_value_node(cur, field_name, fi)
                 if value_node == 0:
                     continue
@@ -2060,9 +2060,9 @@ impl Codegen:
                 return wl_const_named_struct(struct_ty, vec_data_i64(&fields), llvm_field_count)
             return wl_const_named_struct(struct_ty, vec_data_i64(&fields), llvm_field_count)
         for fi in 0..source_field_count:
-            let field_name = self.sema.type_extra.get((te_start + fi * 3) as i64)
-            let field_tid: i32 = self.sema.type_extra.get((te_start + fi * 3 + 1) as i64)
-            let default_node = self.sema.type_extra.get((te_start + fi * 3 + 2) as i64)
+            let field_name = self.sema.type_extra[(te_start + fi * 3)]
+            let field_tid: i32 = self.sema.type_extra[(te_start + fi * 3 + 1)]
+            let default_node = self.sema.type_extra[(te_start + fi * 3 + 2)]
             let llvm_idx = self.get_llvm_field_index(struct_ty, fi)
             if llvm_idx < 0 or llvm_idx >= llvm_field_count:
                 return 0
@@ -2194,8 +2194,8 @@ impl Codegen:
             let sym = self.pool.get_data0(node)
             // Linear search for known constant
             for ci in 0..self.const_int_syms.len() as i32:
-                if self.const_int_syms.get(ci as i64) == sym:
-                    return const_int_ok(self.const_int_vals.get(ci as i64))
+                if self.const_int_syms[ci] == sym:
+                    return const_int_ok(self.const_int_vals[ci])
             return const_int_fail()
         const_int_fail()
 
@@ -2427,7 +2427,7 @@ impl Codegen:
             if not st_opt.is_some():
                 with_eprint("warning: [string-global] str struct type not found")
                 return
-            let str_ty = self.struct_llvm_types.get(st_opt.unwrap() as i64)
+            let str_ty = self.struct_llvm_types[st_opt.unwrap()]
             if self.current_decl_is_imported_module_symbol():
                 let _ = self.declare_module_binding_global(name_sym, str_ty, is_mut)
                 return

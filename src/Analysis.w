@@ -23,13 +23,15 @@ fn analysis_line_for_offset(source: &str, offset: i32) -> i32:
     var line = 1
     let stop = if offset < source.len() as i32: offset else: source.len() as i32
     for i in 0..stop:
-        if source.byte_at(i as i64) as i32 == 10:
+        if source[i] as i32 == 10:
             line = line + 1
     line
 
 fn analysis_column_for_offset(source: &str, offset: i32) -> i32:
-    var start = offset - 1
-    while start >= 0 and source.byte_at(start as i64) as i32 != 10:
+    // An end offset can sit one past the last byte; the scan starts at the
+    // last real byte (byte_at used to read a silent 0 there — #1014 class).
+    var start: i32 = if offset - 1 < source.len(): offset - 1 else: source.len() as i32 - 1
+    while start >= 0 and source[start] != '\n':
         start = start - 1
     offset - start
 
@@ -140,11 +142,11 @@ fn analysis_extension_registration_index(sema: &Sema, owner: i32, method: i32, f
     for i in 0..count:
         if i >= sema.extension_method_syms.len() as i32 or i >= sema.extension_method_fn_syms.len() as i32 or i >= sema.extension_method_sig_idxs.len() as i32:
             return -1
-        if sema.extension_method_owner_syms.get(i as i64) != owner or sema.extension_method_syms.get(i as i64) != method:
+        if sema.extension_method_owner_syms[i] != owner or sema.extension_method_syms[i] != method:
             continue
-        if sema.extension_method_fn_syms.get(i as i64) != fn_sym:
+        if sema.extension_method_fn_syms[i] != fn_sym:
             continue
-        if sig >= 0 and sema.extension_method_sig_idxs.get(i as i64) != sig:
+        if sig >= 0 and sema.extension_method_sig_idxs[i] != sig:
             continue
         return i
     -1
@@ -300,9 +302,9 @@ fn analysis_collect_types(report: &AnalysisReport, sema: &Sema):
             continue
         for fi in 0..field_count:
             let base = field_start + fi * 3
-            let field_sym = sema.type_extra.get(base as i64)
-            let field_ty = sema.type_extra.get((base + 1) as i64)
-            let default_node = sema.type_extra.get((base + 2) as i64)
+            let field_sym = sema.type_extra[base]
+            let field_ty = sema.type_extra[(base + 1)]
+            let default_node = sema.type_extra[(base + 2)]
             var field = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Field)
             field.id = base
             field.parent = tid
@@ -332,7 +334,7 @@ fn analysis_parse_node_id(text: &str) -> i32:
         return -1
     var value = 0
     for i in 0..text.len() as i32:
-        let ch = text.byte_at(i as i64) as i32
+        let ch = text[i] as i32
         if ch < 48 or ch > 57:
             return -1
         value = value * 10 + ch - 48
@@ -420,15 +422,15 @@ fn analysis_node_subject(sema: &Sema, node: i32, fallback_path: &str, fallback_s
     var path = fallback_path
     var source = with_str_clone_ref(fallback_source)
     for i in 0..sema.diags.items.len() as i32:
-        let diag = &sema.diags.items[i as i64]
+        let diag = &sema.diags.items[i]
         if diag.origin_node != node:
             continue
         let exact_source = sema.source_text_for_file_id(diag.primary.file)
         if exact_source.len() > 0:
             source = exact_source
         for si in 0..sema.source_text_file_ids.len() as i32:
-            if sema.source_text_file_ids.get(si as i64) == diag.primary.file:
-                path = sema.source_text_names.get(si as i64)
+            if sema.source_text_file_ids[si] == diag.primary.file:
+                path = sema.source_text_names[si]
                 break
         break
     result.push(with_str_clone_ref(path))
@@ -495,14 +497,14 @@ fn analysis_collect_requested_node(report: &AnalysisReport, sema: &Sema, request
 
 fn analysis_collect_signatures(report: &AnalysisReport, sema: &Sema, source_path: &str):
     for si in 0..sema.sig_names.len() as i32:
-        let sym = sema.sig_names.get(si as i64)
+        let sym = sema.sig_names[si]
         let name = sema.pool_resolve(sym)
         var sig = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Signature)
         sig.id = si
         sig.symbol = sym
-        sig.type_id = sema.sig_ret_types.get(si as i64)
+        sig.type_id = sema.sig_ret_types[si]
         sig.index = sema.sig_get_param_count(si)
-        sig.flags = if sema.sig_variadic.get(si as i64) != 0: 1 else: 0
+        sig.flags = if sema.sig_variadic[si] != 0: 1 else: 0
         sig.path = analysis_sig_path(sema, sym, source_path)
         sig.name = with_str_clone_ref(name)
         sig.detail = f"params={sig.index} return={sig.type_id} variadic={sig.flags}"
@@ -510,7 +512,7 @@ fn analysis_collect_signatures(report: &AnalysisReport, sema: &Sema, source_path
 
         for pi in 0..sema.sig_get_param_count(si):
             var param = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Parameter)
-            param.id = sema.sig_param_eff_starts.get(si as i64) + pi
+            param.id = sema.sig_param_eff_starts[si] + pi
             param.parent = si
             param.symbol = sym
             param.index = pi
@@ -533,7 +535,7 @@ fn analysis_collect_signatures(report: &AnalysisReport, sema: &Sema, source_path
             fact.symbol = sym
             fact.index = 0
             fact.type_id = if sema.sig_get_param_count(si) > 0: sema.sig_param_type(si, 0) else: 0
-            fact.effects = if si < sema.sig_receiver_required_effects.len() as i32: sema.sig_receiver_required_effects.get(si as i64) else: 0
+            fact.effects = if si < sema.sig_receiver_required_effects.len() as i32: sema.sig_receiver_required_effects[si] else: 0
             fact.flags = receiver as i32
             fact.path = with_str_clone_ref(sig.path)
             fact.name = with_str_clone_ref(name)
@@ -544,21 +546,21 @@ fn analysis_collect_effect_edges(report: &AnalysisReport, sema: &Sema):
     var at = 0
     var edge = 0
     while at + 3 < sema.effect_flow_edges.len() as i32:
-        let caller_sig = sema.effect_flow_edges.get(at as i64)
-        let caller_pi = sema.effect_flow_edges.get((at + 1) as i64)
-        let callee_sig = sema.effect_flow_edges.get((at + 2) as i64)
-        let callee_pi = sema.effect_flow_edges.get((at + 3) as i64)
-        let projection = if edge < sema.effect_flow_projections.len() as i32: sema.effect_flow_projections.get(edge as i64) else: -1
+        let caller_sig = sema.effect_flow_edges[at]
+        let caller_pi = sema.effect_flow_edges[(at + 1)]
+        let callee_sig = sema.effect_flow_edges[(at + 2)]
+        let callee_pi = sema.effect_flow_edges[(at + 3)]
+        let projection = if edge < sema.effect_flow_projections.len() as i32: sema.effect_flow_projections[edge] else: -1
         var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.EffectEdge)
         fact.id = edge
         fact.parent = caller_sig
-        fact.symbol = if callee_sig >= 0 and callee_sig < sema.sig_names.len() as i32: sema.sig_names.get(callee_sig as i64) else: 0
+        fact.symbol = if callee_sig >= 0 and callee_sig < sema.sig_names.len() as i32: sema.sig_names[callee_sig] else: 0
         fact.index = caller_pi
         fact.type_id = callee_pi
         fact.effects = if callee_sig >= 0: sema.sig_param_effect(callee_sig, callee_pi) else: 0
         fact.flags = projection
-        let caller = if caller_sig >= 0 and caller_sig < sema.sig_names.len() as i32: with_str_clone_ref(sema.pool_resolve(sema.sig_names.get(caller_sig as i64))) else: "<invalid>"
-        let callee = if callee_sig >= 0 and callee_sig < sema.sig_names.len() as i32: with_str_clone_ref(sema.pool_resolve(sema.sig_names.get(callee_sig as i64))) else: "<invalid>"
+        let caller = if caller_sig >= 0 and caller_sig < sema.sig_names.len() as i32: with_str_clone_ref(sema.pool_resolve(sema.sig_names[caller_sig])) else: "<invalid>"
+        let callee = if callee_sig >= 0 and callee_sig < sema.sig_names.len() as i32: with_str_clone_ref(sema.pool_resolve(sema.sig_names[callee_sig])) else: "<invalid>"
         fact.name = caller
         fact.detail = f"param[{caller_pi}] -> {callee} param[{callee_pi}] projection={projection}"
         report.add(move fact)
@@ -567,16 +569,16 @@ fn analysis_collect_effect_edges(report: &AnalysisReport, sema: &Sema):
 
 fn analysis_collect_specializations(report: &AnalysisReport, sema: &Sema, source_path: &str):
     for si in 0..sema.concrete_specialization_nodes.len() as i32:
-        let node = sema.concrete_specialization_nodes.get(si as i64)
-        let mono = sema.concrete_specialization_syms.get(si as i64)
-        let sig = sema.concrete_specialization_sigs.get(si as i64)
-        let subst_start = sema.concrete_specialization_subst_starts.get(si as i64)
-        let subst_count = sema.concrete_specialization_subst_counts.get(si as i64)
+        let node = sema.concrete_specialization_nodes[si]
+        let mono = sema.concrete_specialization_syms[si]
+        let sig = sema.concrete_specialization_sigs[si]
+        let subst_start = sema.concrete_specialization_subst_starts[si]
+        let subst_count = sema.concrete_specialization_subst_counts[si]
         let parts: Vec[str] = Vec.new()
         for ti in 0..subst_count:
             if ti > 0: parts.push(", ")
-            let param = sema.concrete_specialization_subst_syms.get((subst_start + ti) as i64)
-            let ty = sema.concrete_specialization_subst_types.get((subst_start + ti) as i64)
+            let param = sema.concrete_specialization_subst_syms[(subst_start + ti)]
+            let ty = sema.concrete_specialization_subst_types[(subst_start + ti)]
             parts.push(with_str_clone_ref(sema.pool_resolve(param)))
             parts.push("=ty")
             parts.push(f"{ty}")
@@ -598,7 +600,7 @@ fn analysis_collect_resolved_calls(report: &AnalysisReport, sema: &Sema, source_
             continue
         let sig = sig_opt.unwrap()
         let mono_opt = sema.resolved_call_mono_syms.get(node)
-        let mono = if mono_opt.is_some(): mono_opt.unwrap() else if sig >= 0 and sig < sema.sig_names.len() as i32: sema.sig_names.get(sig as i64) else: 0
+        let mono = if mono_opt.is_some(): mono_opt.unwrap() else if sig >= 0 and sig < sema.sig_names.len() as i32: sema.sig_names[sig] else: 0
         var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Call)
         fact.id = node
         fact.parent = sig
@@ -616,13 +618,13 @@ fn analysis_collect_resolved_calls(report: &AnalysisReport, sema: &Sema, source_
 // diagnosable without re-deriving resolution from source.
 fn analysis_collect_method_resolutions(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for i in 0..sema.mres_nodes.len() as i32:
-        let owner = sema.mres_owner_syms.get(i as i64)
-        let method = sema.mres_method_syms.get(i as i64)
-        let sig = sema.mres_sigs.get(i as i64)
-        let fn_sym = sema.mres_fn_syms.get(i as i64)
-        let flags = sema.mres_flags.get(i as i64)
-        let total = sema.mres_cands_total.get(i as i64)
-        let visible = sema.mres_cands_visible.get(i as i64)
+        let owner = sema.mres_owner_syms[i]
+        let method = sema.mres_method_syms[i]
+        let sig = sema.mres_sigs[i]
+        let fn_sym = sema.mres_fn_syms[i]
+        let flags = sema.mres_flags[i]
+        let total = sema.mres_cands_total[i]
+        let visible = sema.mres_cands_visible[i]
         let inherent = (flags & 1) != 0
         let via_extension = (flags & 2) != 0
         // The recorder captured the direct owner-registry probe; builtin,
@@ -630,7 +632,7 @@ fn analysis_collect_method_resolutions(report: &AnalysisReport, sema: &Sema, sou
         // final resolved-call sidecar so the verdict reflects the selection
         // the program actually got, and keep the probe fields as the
         // inherent/extension diagnostics.
-        let mres_node = sema.mres_nodes.get(i as i64)
+        let mres_node = sema.mres_nodes[i]
         let final_sig_opt = sema.resolved_call_sigs.get(mres_node)
         let final_sig = if final_sig_opt.is_some(): final_sig_opt.unwrap() else: sig
         let final_mono_opt = sema.resolved_call_mono_syms.get(mres_node)
@@ -657,7 +659,7 @@ fn analysis_collect_method_resolutions(report: &AnalysisReport, sema: &Sema, sou
         fact.symbol = method
         fact.owner = owner
         fact.index = if final_mono != 0: final_mono else: fn_sym
-        fact.type_id = sema.mres_recv_types.get(i as i64)
+        fact.type_id = sema.mres_recv_types[i]
         fact.flags = flags
         fact.name = sema.pool_resolve(owner) ++ "." ++ sema.pool_resolve(method)
         fact.detail = f"sig={final_sig} fn={fact.index} verdict={verdict} probe-sig={sig} inherent={inherent} via-extension={via_extension} candidates={total} visible={visible} recv-type={fact.type_id}"
@@ -666,7 +668,7 @@ fn analysis_collect_method_resolutions(report: &AnalysisReport, sema: &Sema, sou
 
 fn analysis_collect_diagnostics(report: &AnalysisReport, sema: &Sema):
     for i in 0..sema.diags.items.len() as i32:
-        let diag = &sema.diags.items[i as i64]
+        let diag = &sema.diags.items[i]
         var fact = AnalysisFact.new(AnalysisStage.Diagnostic, AnalysisFactKind.Diagnostic)
         fact.id = i
         fact.node = diag.origin_node
@@ -677,12 +679,12 @@ fn analysis_collect_diagnostics(report: &AnalysisReport, sema: &Sema):
         fact.name = if diag.code.len() > 0: diag.code else: diag.message
         var subject = ""
         for si in 0..sema.source_text_file_ids.len() as i32:
-            if sema.source_text_file_ids.get(si as i64) == diag.primary.file:
-                subject = with_str_clone_ref(sema.source_text_names.get(si as i64))
+            if sema.source_text_file_ids[si] == diag.primary.file:
+                subject = with_str_clone_ref(sema.source_text_names[si])
                 break
         if subject.len() == 0:
             for di in 0..sema.decl_source_file_ids.len() as i32:
-                if sema.decl_source_file_ids.get(di as i64) == diag.primary.file:
+                if sema.decl_source_file_ids[di] == diag.primary.file:
                 subject = sema.decl_source_path_for_index(di)
                 break
         let subject_source = sema.source_text_for_file_id(diag.primary.file)
@@ -724,7 +726,7 @@ fn analysis_operand_kind_name(kind: i32) -> str:
 
 fn analysis_source_for_path(sema: &Sema, path: &str, fallback: &str) -> str:
     for i in 0..sema.source_text_names.len() as i32:
-        if sema.source_text_names.get(i as i64) == path: return with_str_clone_ref(sema.source_texts.get(i as i64))
+        if sema.source_text_names[i] == path: return with_str_clone_ref(sema.source_texts[i])
     with_str_clone_ref(fallback)
 
 fn analysis_call_receiver_node(sema: &Sema, call_node: i32) -> i32:
@@ -749,11 +751,11 @@ fn analysis_call_argument_node(sema: &Sema, call_node: i32, arg_index: i32, mir_
 fn analysis_collect_mir_call(report: &AnalysisReport, mir_mod: &MirModule, body: &MirBody, sema: &Sema, pool: &InternPool, call_id: i32, source_path: &str, source_text: &str):
     let sig = body.call_sig_index(call_id)
     let mono = body.call_mono_sym(call_id)
-    let start = body.call_arg_starts.get(call_id as i64)
-    let count = body.call_arg_counts.get(call_id as i64)
+    let start = body.call_arg_starts[call_id]
+    let count = body.call_arg_counts[call_id]
     let intrinsic = body.call_intrinsic(call_id)
     let required = body.call_requires_contract(call_id)
-    let name = if mono != 0: with_str_clone_ref(pool.resolve(mono)) else if sig >= 0 and sig < sema.sig_names.len() as i32: with_str_clone_ref(sema.pool_resolve(sema.sig_names.get(sig as i64))) else: "<unresolved>"
+    let name = if mono != 0: with_str_clone_ref(pool.resolve(mono)) else if sig >= 0 and sig < sema.sig_names.len() as i32: with_str_clone_ref(sema.pool_resolve(sema.sig_names[sig])) else: "<unresolved>"
     var call = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Call)
     call.id = call_id
     call.parent = sig
@@ -770,8 +772,8 @@ fn analysis_collect_mir_call(report: &AnalysisReport, mir_mod: &MirModule, body:
     call = analysis_with_node_location(move call, sema, call_node, caller_path, caller_source)
     report.add(call.owned_copy())
     for ai in 0..count:
-        let operand = body.call_arg_operands.get((start + ai) as i64)
-        let kind = if operand >= 0 and operand < body.operand_kinds.len() as i32: body.operand_kinds.get(operand as i64) else: -1
+        let operand = body.call_arg_operands[(start + ai)]
+        let kind = if operand >= 0 and operand < body.operand_kinds.len() as i32: body.operand_kinds[operand] else: -1
         let share = sig >= 0 and ai < sema.sig_get_param_count(sig) and sema.sig_param_uses_value_ref_abi(sig, ai) != 0
         var arg = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.CallArgument)
         arg.id = operand
@@ -791,7 +793,7 @@ fn analysis_collect_mir_call(report: &AnalysisReport, mir_mod: &MirModule, body:
 
 fn analysis_collect_mir(report: &AnalysisReport, mir_mod: &MirModule, sema: &Sema, pool: &InternPool, source_path: &str, source_text: &str):
     for bi in 0..mir_mod.bodies.len() as i32:
-        let body = &mir_mod.bodies[bi as i64]
+        let body = &mir_mod.bodies[bi]
         var body_fact = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Body)
         body_fact.id = bi
         body_fact.body_sym = body.fn_sym
@@ -805,20 +807,20 @@ fn analysis_collect_mir(report: &AnalysisReport, mir_mod: &MirModule, sema: &Sem
             local.id = li
             local.parent = bi
             local.body_sym = body.fn_sym
-            local.symbol = body.local_names.get(li as i64)
+            local.symbol = body.local_names[li]
             local.index = li
-            local.type_id = body.local_type_ids.get(li as i64)
-            local.flags = body.local_mutables.get(li as i64) | (body.local_is_user_var.get(li as i64) << 1)
+            local.type_id = body.local_type_ids[li]
+            local.flags = body.local_mutables[li] | (body.local_is_user_var[li] << 1)
             local.name = with_str_clone_ref(body_fact.name)
-            local.detail = f"_{li} ty={local.type_id} mut={body.local_mutables.get(li as i64)}"
+            local.detail = f"_{li} ty={local.type_id} mut={body.local_mutables[li]}"
             report.add(move local)
         for pi in 0..body.place_locals.len() as i32:
             var place = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Place)
             place.id = pi
-            place.parent = body.place_locals.get(pi as i64)
+            place.parent = body.place_locals[pi]
             place.body_sym = body.fn_sym
-            place.index = body.place_proj_counts.get(pi as i64)
-            place.type_id = body.place_sema_types.get(pi as i64)
+            place.index = body.place_proj_counts[pi]
+            place.type_id = body.place_sema_types[pi]
             place.name = with_str_clone_ref(body_fact.name)
             place.detail = mir_place_text(body, pi)
             report.add(move place)
@@ -827,7 +829,7 @@ fn analysis_collect_mir(report: &AnalysisReport, mir_mod: &MirModule, sema: &Sem
 
 fn analysis_audit_call_contracts(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule):
     for bi in 0..mir_mod.bodies.len() as i32:
-        let body = &mir_mod.bodies[bi as i64]
+        let body = &mir_mod.bodies[bi]
         let calls = body.call_arg_starts.len() as i32
         if body.call_arg_counts.len() as i32 != calls or body.call_intrinsic_kinds.len() as i32 != calls or body.call_ast_nodes.len() as i32 != calls or body.call_sig_indices.len() as i32 != calls or body.call_mono_syms.len() as i32 != calls or body.call_contract_required.len() as i32 != calls or body.call_pipeline_receiver_places.len() as i32 != calls:
             report.fail(f"body {body.fn_sym}: MIR call tables are not parallel")
@@ -836,7 +838,7 @@ fn analysis_audit_call_contracts(report: &AnalysisReport, sema: &Sema, mir_mod: 
             let sig = body.call_sig_index(ci)
             let mono = body.call_mono_sym(ci)
             let required = body.call_requires_contract(ci)
-            let argc = body.call_arg_counts.get(ci as i64)
+            let argc = body.call_arg_counts[ci]
             if required and (sig < 0 or sig >= sema.sig_names.len() as i32 or mono == 0):
                 report.fail(f"body {body.fn_sym} call {ci}: required concrete contract is incomplete sig={sig} mono={mono}")
                 continue
@@ -845,14 +847,14 @@ fn analysis_audit_call_contracts(report: &AnalysisReport, sema: &Sema, mir_mod: 
             if sig >= sema.sig_names.len() as i32:
                 report.fail(f"body {body.fn_sym} call {ci}: signature {sig} is out of range")
                 continue
-            if mono != 0 and sema.sig_names.get(sig as i64) != mono:
+            if mono != 0 and sema.sig_names[sig] != mono:
                 report.fail(f"body {body.fn_sym} call {ci}: signature/symbol mismatch sig={sig} mono={mono}")
             let params = sema.sig_get_param_count(sig)
-            if argc != params and sema.sig_variadic.get(sig as i64) == 0:
+            if argc != params and sema.sig_variadic[sig] == 0:
                 report.fail(f"body {body.fn_sym} call {ci}: argument/signature mismatch args={argc} params={params}")
-            let start = body.call_arg_starts.get(ci as i64)
+            let start = body.call_arg_starts[ci]
             for ai in 0..argc:
-                let operand = body.call_arg_operands.get((start + ai) as i64)
+                let operand = body.call_arg_operands[(start + ai)]
                 let ty = mir_validate_operand_type(mir_mod, body, operand)
                 if ty == 0:
                     report.fail(f"body {body.fn_sym} call {ci} arg {ai}: operand has no concrete MIR type")
@@ -866,7 +868,7 @@ fn analysis_audit_effects(report: &AnalysisReport, sema: &Sema):
         if mode == ReceiverMode.None or count == 0:
             continue
         let required = sema.sig_param_effect(si, 0) & EFF_DECLARED_MASK
-        if si >= sema.sig_receiver_required_effects.len() as i32 or sema.sig_receiver_required_effects.get(si as i64) != required:
+        if si >= sema.sig_receiver_required_effects.len() as i32 or sema.sig_receiver_required_effects[si] != required:
             report.fail(f"sig {si}: receiver requirement is not the finalized param[0] effect")
         if mode == ReceiverMode.Missing:
             report.fail(f"sig {si}: receiver mode is missing")
@@ -877,10 +879,10 @@ fn analysis_audit_effects(report: &AnalysisReport, sema: &Sema):
     var at = 0
     var edge_index = 0
     while at + 3 < sema.effect_flow_edges.len() as i32:
-        let caller_sig = sema.effect_flow_edges.get(at as i64)
-        let caller_pi = sema.effect_flow_edges.get((at + 1) as i64)
-        let callee_sig = sema.effect_flow_edges.get((at + 2) as i64)
-        let callee_pi = sema.effect_flow_edges.get((at + 3) as i64)
+        let caller_sig = sema.effect_flow_edges[at]
+        let caller_pi = sema.effect_flow_edges[(at + 1)]
+        let callee_sig = sema.effect_flow_edges[(at + 2)]
+        let callee_pi = sema.effect_flow_edges[(at + 3)]
         let projection = sema.effect_edge_projection(edge_index)
         at = at + 4
         edge_index = edge_index + 1
@@ -927,14 +929,14 @@ fn analysis_audit_pool(report: &AnalysisReport, sema: &Sema):
 
     var fmi = 0
     while fmi < ast.state.for_meta.len() as i32:
-        let for_node = ast.state.for_meta.get(fmi as i64)
+        let for_node = ast.state.for_meta[fmi]
         if for_node <= 0 or for_node >= ast.node_count() or ast.kind(for_node as NodeId) != NodeKind.NK_FOR:
             report.fail(f"pool: for_meta[{fmi}] does not reference an NK_FOR node (node={for_node})")
         fmi = fmi + 3
 
     var fni = 0
     while fni < ast.state.fn_meta.len() as i32:
-        let fn_node = ast.state.fn_meta.get(fni as i64)
+        let fn_node = ast.state.fn_meta[fni]
         if fn_node <= 0 or fn_node >= ast.node_count():
             report.fail(f"pool: fn_meta[{fni}] node out of range (node={fn_node})")
         else:
@@ -949,7 +951,7 @@ fn analysis_audit_pool(report: &AnalysisReport, sema: &Sema):
     if ast.state.pattern_binding_pairs.len() != ast.state.pattern_binding_keys.len():
         report.fail(f"pool: pattern_binding mirror diverged (vec={ast.state.pattern_binding_pairs.len() as i32} map={ast.state.pattern_binding_keys.len() as i32})")
     for pbi in 0..ast.state.pattern_binding_pairs.len() as i32:
-        if not ast.state.pattern_binding_keys.contains(ast.state.pattern_binding_pairs.get(pbi as i64)):
+        if not ast.state.pattern_binding_keys.contains(ast.state.pattern_binding_pairs[pbi]):
             report.fail(f"pool: pattern_binding pair[{pbi}] missing from key map")
 
     // Sema scope-stack family: 9 members, all pushed by scope_insert_at.
@@ -993,7 +995,7 @@ fn analysis_audit_storage(report: &AnalysisReport, sema: &Sema):
             continue
         for ai in 0..count:
             resolved_args = resolved_args + 1
-            let arg_node = sema.call_resolved_args_data.get((start + ai) as i64)
+            let arg_node = sema.call_resolved_args_data[(start + ai)]
             if arg_node < 0 or arg_node >= node_count:
                 report.fail(f"resolved call {node} arg {ai}: AST node {arg_node} is out of range")
             let key = sema.resolved_call_arg_key(node, ai)
@@ -1082,7 +1084,7 @@ fn analysis_audit_method_registrations(report: &AnalysisReport, sema: &Sema):
     var generic = 0
     var missing = 0
     for i in 0..report.facts.len() as i32:
-        let fact = report.facts.get(i as i64)
+        let fact = report.facts[i]
         if fact.kind != AnalysisFactKind.MethodRegistration:
             continue
         methods = methods + 1
@@ -1101,7 +1103,7 @@ fn analysis_is_frozen_consumer(path: &str) -> bool:
 
 fn analysis_audit_frozen_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule):
     for bi in 0..mir_mod.bodies.len() as i32:
-        let body = &mir_mod.bodies[bi as i64]
+        let body = &mir_mod.bodies[bi]
         let caller_path = analysis_sig_path(sema, body.fn_sym, "")
         if not analysis_is_frozen_consumer(caller_path):
             continue
@@ -1109,7 +1111,7 @@ fn analysis_audit_frozen_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &M
             let sig = body.call_sig_index(ci)
             if sig < 0 or sig >= sema.sig_names.len() as i32:
                 continue
-            let callee_sym = sema.sig_names.get(sig as i64)
+            let callee_sym = sema.sig_names[sig]
             let callee = sema.pool_resolve(callee_sym)
             if not callee.starts_with("Sema."):
                 continue
@@ -1137,7 +1139,7 @@ fn analysis_audit_mir(report: &AnalysisReport, mir_mod: &MirModule, pool: &Inter
     // blank. Guards ordinary bodies here; the synthesized const initializers are
     // checked where they are built (they never enter this module).
     for bi in 0..mir_mod.bodies.len() as i32:
-        let body = &mir_mod.bodies[bi as i64]
+        let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0:
             continue
         let uak = validate_use_after_kill(body, pool)
@@ -1157,7 +1159,7 @@ fn analysis_audit_return_consistency(report: &AnalysisReport, sema: &Sema, mir_m
     var checked = 0
     var unit_switches = 0
     for bi in 0..mir_mod.bodies.len() as i32:
-        let body = &mir_mod.bodies[bi as i64]
+        let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0:
             continue
         for bb in 0..body.block_count():
@@ -1190,7 +1192,7 @@ fn analysis_audit_return_consistency(report: &AnalysisReport, sema: &Sema, mir_m
             if dest_kind == TypeKind.TY_VOID or dest_kind == TypeKind.TY_NEVER:
                 continue
             mismatches = mismatches + 1
-            report.fail(f"return-consistency: fn sym{body.fn_sym} bb{bb} call {sema.pool_resolve(sema.sig_names.get(sig as i64))}: destination place type {dest_ty} but callee signature returns Unit")
+            report.fail(f"return-consistency: fn sym{body.fn_sym} bb{bb} call {sema.pool_resolve(sema.sig_names[sig])}: destination place type {dest_ty} but callee signature returns Unit")
     report.note(f"return-consistency: unit-return calls checked={checked} dest-mismatches={mismatches} unit-switches={unit_switches}")
 
 fn analysis_audit_receivers(report: &AnalysisReport, sema: &Sema):
@@ -1235,7 +1237,7 @@ fn analysis_audit_receiver_surface(report: &AnalysisReport, sema: &Sema):
     var conforming_trait_decl = 0
     var synthetic = 0
     for i in 0..report.facts.len() as i32:
-        let fact = report.facts.get(i as i64)
+        let fact = report.facts[i]
         if fact.kind != AnalysisFactKind.Declaration: continue
         let mode = fact.flags & 255
         if mode == AnalysisReceiverMode.None as i32: continue
@@ -1286,9 +1288,9 @@ fn analysis_audit_phase(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModul
                 if qualified_sym == 0 or not sema.disc_values.contains(qualified_sym):
                     report.fail(f"type {ti} variant {vi}: qualified discriminant lookup miss")
     for si in 0..sema.concrete_specialization_syms.len() as i32:
-        let mono = sema.concrete_specialization_syms.get(si as i64)
-        let sig = sema.concrete_specialization_sigs.get(si as i64)
-        if sig < 0 or sig >= sema.sig_names.len() as i32 or sema.sig_names.get(sig as i64) != mono:
+        let mono = sema.concrete_specialization_syms[si]
+        let sig = sema.concrete_specialization_sigs[si]
+        if sig < 0 or sig >= sema.sig_names.len() as i32 or sema.sig_names[sig] != mono:
             report.fail(f"specialization {si}: signature/symbol mismatch sig={sig} mono={mono}")
         if mir_mod.find_body(mono) < 0:
             report.fail(f"specialization {si}: no prelowered MIR body for mono={mono}")
@@ -1299,8 +1301,8 @@ fn analysis_audit_phase(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModul
 // request — its primary use is partitioning an ERROR worklist.
 fn analysis_move_site_file_name(sema: &Sema, file_id: i32, root_path: &str) -> str:
     for i in 0..sema.source_text_file_ids.len() as i32:
-        if sema.source_text_file_ids.get(i as i64) == file_id:
-            return with_str_clone_ref(sema.source_text_names.get(i as i64))
+        if sema.source_text_file_ids[i] == file_id:
+            return with_str_clone_ref(sema.source_text_names[i])
     with_str_clone_ref(root_path)
 
 fn analysis_move_site_shape(sema: &Sema, node: i32) -> str:
@@ -1322,13 +1324,13 @@ fn analysis_move_sites(sema: &Sema, source_path: &str) -> str:
     let n = sema.consume_call_sites.len() as i32
     var i = 0
     while i + 8 < n:
-        let arg_node = sema.consume_call_sites.get(i as i64)
-        let callee_sig = sema.consume_call_sites.get((i + 1) as i64)
-        let callee_pi = sema.consume_call_sites.get((i + 2) as i64)
-        let file_id = sema.consume_call_sites.get((i + 3) as i64)
-        let root_sym = sema.consume_call_sites.get((i + 4) as i64)
-        let loop_depth = sema.consume_call_sites.get((i + 7) as i64)
-        let liveness = sema.consume_call_sites.get((i + 8) as i64)
+        let arg_node = sema.consume_call_sites[i]
+        let callee_sig = sema.consume_call_sites[(i + 1)]
+        let callee_pi = sema.consume_call_sites[(i + 2)]
+        let file_id = sema.consume_call_sites[(i + 3)]
+        let root_sym = sema.consume_call_sites[(i + 4)]
+        let loop_depth = sema.consume_call_sites[(i + 7)]
+        let liveness = sema.consume_call_sites[(i + 8)]
         i = i + 9
         // Mirror finalize_call_site_ownership: only OWNED params are transfer
         // sites; share-place callees keep the caller's ownership.
@@ -1358,7 +1360,7 @@ fn analysis_move_sites(sema: &Sema, source_path: &str) -> str:
             unknown = unknown + 1
             "unknown"
         let loop_text = if loop_depth > 0: "in-loop" else: "-"
-        let callee = sema.pool_resolve(sema.sig_names.get(callee_sig as i64))
+        let callee = sema.pool_resolve(sema.sig_names[callee_sig])
         out = out ++ f"{file_name}:{line}:{col}\t{root}\t{shape}\t{spellable}\t{live_text}\t{loop_text}\t{callee}\t{callee_pi}\n"
     out ++ f"move-sites: {total} owned-param sites — {keyword} last-use (keyword), {design} design (live-after/in-loop), {unknown} unknown\n"
 
@@ -1383,17 +1385,17 @@ fn analysis_move_sites(sema: &Sema, source_path: &str) -> str:
 fn analysis_seam_place_class(sema: &Sema, body: &MirBody, place_id: i32, is_move: i32) -> str:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return ""
-    let local = body.place_locals.get(place_id as i64)
+    let local = body.place_locals[place_id]
     if local < 0 or local >= body.local_type_ids.len() as i32:
         return ""
-    let proj_start = body.place_proj_starts.get(place_id as i64)
-    let proj_count = body.place_proj_counts.get(place_id as i64)
-    let root_ty = body.local_type_ids.get(local as i64)
+    let proj_start = body.place_proj_starts[place_id]
+    let proj_count = body.place_proj_counts[place_id]
+    let root_ty = body.local_type_ids[local]
     let root_kind = if root_ty > 0: sema.get_type_kind(sema.resolve_alias(root_ty as TypeId)) else: TypeKind.TY_ERR
-    let deref_root = proj_count > 0 and body.proj_kinds.get(proj_start as i64) == ProjKind.PK_DEREF
+    let deref_root = proj_count > 0 and body.proj_kinds[proj_start] == ProjKind.PK_DEREF
     var has_index = 0
     for pi in 0..proj_count:
-        if body.proj_kinds.get((proj_start + pi) as i64) == ProjKind.PK_INDEX:
+        if body.proj_kinds[(proj_start + pi)] == ProjKind.PK_INDEX:
             has_index = 1
     if is_move != 0:
         // A whole `_k.*` move is the reborrow-materialize shape; only a
@@ -1403,7 +1405,7 @@ fn analysis_seam_place_class(sema: &Sema, body: &MirBody, place_id: i32, is_move
         if deref_root and root_kind == TypeKind.TY_PTR:
             return "move-raw-deref"
         return ""
-    let place_ty = body.place_sema_types.get(place_id as i64)
+    let place_ty = body.place_sema_types[place_id]
     if place_ty <= 0:
         return ""
     if sema.type_needs_drop_frozen(place_ty) == 0 or sema.is_copy_frozen(place_ty as TypeId) != 0:
@@ -1440,10 +1442,10 @@ fn analysis_seam_row(sema: &Sema, body: &MirBody, fn_name: &str, path: &str, spa
     let none = SeamRow { ok: 0, class_idx: 0, key: "", row: "", actionable: 0 }
     if operand < 0 or operand >= body.operand_kinds.len() as i32:
         return none
-    let okind = body.operand_kinds.get(operand as i64)
+    let okind = body.operand_kinds[operand]
     if okind != OperandKind.OK_COPY and okind != OperandKind.OK_MOVE:
         return none
-    let place_id = body.operand_d0.get(operand as i64)
+    let place_id = body.operand_d0[operand]
     let class = analysis_seam_place_class(sema, body, place_id, if okind == OperandKind.OK_MOVE: 1 else: 0)
     if class.len() == 0:
         return none
@@ -1453,7 +1455,7 @@ fn analysis_seam_row(sema: &Sema, body: &MirBody, fn_name: &str, path: &str, spa
         else if class == "copy-elem-drop": 2
         else if class == "copy-view-drop": 3
         else: 4
-    let place_ty = body.place_sema_types.get(place_id as i64)
+    let place_ty = body.place_sema_types[place_id]
     let actionable = analysis_seam_context_is_actionable(context, if okind == OperandKind.OK_MOVE: 1 else: 0)
     let tier = if actionable != 0: "actionable" else: "observed"
     SeamRow {
@@ -1477,11 +1479,11 @@ fn analysis_seam_row(sema: &Sema, body: &MirBody, fn_name: &str, path: &str, spa
 fn analysis_seam_place_is_unowned_root(sema: &Sema, body: &MirBody, place_id: i32) -> i32:
     if place_id < 0 or place_id >= body.place_locals.len() as i32:
         return 0
-    let local = body.place_locals.get(place_id as i64)
+    let local = body.place_locals[place_id]
     if local < 0 or local >= body.local_type_ids.len() as i32:
         return 0
-    let proj_count = body.place_proj_counts.get(place_id as i64)
-    let root_ty = body.local_type_ids.get(local as i64)
+    let proj_count = body.place_proj_counts[place_id]
+    let root_ty = body.local_type_ids[local]
     let root_kind = if root_ty > 0: sema.get_type_kind(sema.resolve_alias(root_ty as TypeId)) else: TypeKind.TY_ERR
     // A borrowed/raw root, or any projection off local 0 (`self`/first param).
     if root_kind == TypeKind.TY_REF or root_kind == TypeKind.TY_PTR:
@@ -1502,7 +1504,7 @@ fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path
         let dest = body.term_data2(bb)
         if dest < 0 or dest >= body.place_locals.len() as i32:
             continue
-        let dest_ty = body.place_sema_types.get(dest as i64)
+        let dest_ty = body.place_sema_types[dest]
         if dest_ty <= 0 or sema.type_needs_drop_frozen(dest_ty) == 0 or sema.is_copy_frozen(dest_ty as TypeId) != 0:
             continue
         let args_id = body.term_data1(bb)
@@ -1515,68 +1517,68 @@ fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path
         // view is caught by the escape-view class instead.)
         if body.call_sig_index(args_id) >= 0:
             continue
-        let start = body.call_arg_starts.get(args_id as i64)
-        let count = body.call_arg_counts.get(args_id as i64)
+        let start = body.call_arg_starts[args_id]
+        let count = body.call_arg_counts[args_id]
         if count <= 0 or start < 0 or start >= body.call_arg_operands.len() as i32:
             continue
-        let recv_op = body.call_arg_operands.get(start as i64)
+        let recv_op = body.call_arg_operands[start]
         if recv_op < 0 or recv_op >= body.operand_kinds.len() as i32:
             continue
-        if body.operand_kinds.get(recv_op as i64) == OperandKind.OK_MOVE:
+        if body.operand_kinds[recv_op] == OperandKind.OK_MOVE:
             continue
-        if analysis_seam_place_is_unowned_root(sema, body, body.operand_d0.get(recv_op as i64)) == 0:
+        if analysis_seam_place_is_unowned_root(sema, body, body.operand_d0[recv_op]) == 0:
             continue
-        candidate_locals.push(body.place_locals.get(dest as i64))
-        candidate_spans.push(body.bb_term_spans.get(bb as i64))
+        candidate_locals.push(body.place_locals[dest])
+        candidate_spans.push(body.bb_term_spans[bb])
         candidate_types.push(dest_ty)
     if candidate_locals.len() == 0:
         return rows
     // Pass 2: is a candidate retained (aggregate field, or an owned call arg)?
     for ci in 0..candidate_locals.len() as i32:
-        let want = candidate_locals.get(ci as i64)
+        let want = candidate_locals[ci]
         var retained_by = ""
         for si in 0..body.stmt_kinds.len() as i32:
             if retained_by.len() > 0: break
-            if body.stmt_kinds.get(si as i64) != StmtKind.Assign: continue
-            let rv = body.stmt_d1.get(si as i64)
+            if body.stmt_kinds[si] != StmtKind.Assign: continue
+            let rv = body.stmt_d1[si]
             if rv < 0 or rv >= body.rval_kinds.len() as i32: continue
-            if body.rval_kinds.get(rv as i64) != RvalueKind.RK_AGGREGATE: continue
-            let fid = body.rval_d1.get(rv as i64)
+            if body.rval_kinds[rv] != RvalueKind.RK_AGGREGATE: continue
+            let fid = body.rval_d1[rv]
             if fid < 0 or fid >= body.agg_field_starts.len() as i32: continue
-            let fstart = body.agg_field_starts.get(fid as i64)
-            let fcount = body.agg_field_counts.get(fid as i64)
+            let fstart = body.agg_field_starts[fid]
+            let fcount = body.agg_field_counts[fid]
             for fi in 0..fcount:
                 let opi = fstart + fi
                 if opi < 0 or opi >= body.agg_field_operands.len() as i32: continue
-                let op = body.agg_field_operands.get(opi as i64)
+                let op = body.agg_field_operands[opi]
                 if op < 0 or op >= body.operand_kinds.len() as i32: continue
-                let opl = body.operand_d0.get(op as i64)
-                if opl >= 0 and opl < body.place_locals.len() as i32 and body.place_locals.get(opl as i64) == want:
+                let opl = body.operand_d0[op]
+                if opl >= 0 and opl < body.place_locals.len() as i32 and body.place_locals[opl] == want:
                     retained_by = "store-aggregate"
         for bb2 in 0..body.block_count():
             if retained_by.len() > 0: break
             if body.term_kind(bb2) != TermKind.TK_CALL: continue
             let aid = body.term_data1(bb2)
             if aid < 0 or aid >= body.call_arg_starts.len() as i32: continue
-            let s2 = body.call_arg_starts.get(aid as i64)
-            let c2 = body.call_arg_counts.get(aid as i64)
+            let s2 = body.call_arg_starts[aid]
+            let c2 = body.call_arg_counts[aid]
             let sig2 = body.call_sig_index(aid)
             for ai in 1..c2:
                 let opi = s2 + ai
                 if opi < 0 or opi >= body.call_arg_operands.len() as i32: continue
-                let op = body.call_arg_operands.get(opi as i64)
+                let op = body.call_arg_operands[opi]
                 if op < 0 or op >= body.operand_kinds.len() as i32: continue
-                let opl = body.operand_d0.get(op as i64)
+                let opl = body.operand_d0[op]
                 if opl < 0 or opl >= body.place_locals.len() as i32: continue
-                if body.place_locals.get(opl as i64) != want: continue
+                if body.place_locals[opl] != want: continue
                 if sig2 >= 0 and ai < sema.sig_get_param_count(sig2):
                     let pty = sema.sig_param_type(sig2, ai)
                     let pk = if pty > 0: sema.get_type_kind(sema.resolve_alias(pty as TypeId)) else: TypeKind.TY_ERR
                     if pk == TypeKind.TY_REF or pk == TypeKind.TY_PTR: continue
                 retained_by = "retained-call-arg"
         if retained_by.len() > 0:
-            let span = candidate_spans.get(ci as i64)
-            rows.push(path ++ f"\t{span}\t{fn_name}\tretained-unowned-copy\t{retained_by}\t_{want}\t" ++ sema.type_name(candidate_types.get(ci as i64)) ++ "\n")
+            let span = candidate_spans[ci]
+            rows.push(path ++ f"\t{span}\t{fn_name}\tretained-unowned-copy\t{retained_by}\t_{want}\t" ++ sema.type_name(candidate_types[ci]) ++ "\n")
     rows
 
 fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
@@ -1589,50 +1591,50 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
     var escapes = 0
     let seen: HashMap[str, i32] = HashMap.new()
     for bi in 0..mir_mod.bodies.len() as i32:
-        let body = &mir_mod.bodies[bi as i64]
+        let body = &mir_mod.bodies[bi]
         if body.lowering_failed != 0:
             continue
         let fn_name = sema.pool_resolve(body.fn_sym)
         let fn_path = analysis_sig_path(sema, body.fn_sym, source_path)
         let ret_rows = analysis_seam_retention_rows(sema, body, fn_name, fn_path)
         for ri in 0..ret_rows.len() as i32:
-            report_lines.push(with_str_clone_ref(ret_rows.get(ri as i64)))
-            counts.set_i32(5, counts.get(5) + 1)
+            report_lines.push(with_str_clone_ref(ret_rows[ri]))
+            counts[5] = counts.get(5) + 1
         // Statements: an operand inside an aggregate or a plain assign is
         // RETAINED by the destination; anything else is a transient read.
         for si in 0..body.stmt_kinds.len() as i32:
-            if body.stmt_kinds.get(si as i64) != StmtKind.Assign:
+            if body.stmt_kinds[si] != StmtKind.Assign:
                 continue
-            let span = body.stmt_spans.get(si as i64)
-            let rv = body.stmt_d1.get(si as i64)
+            let span = body.stmt_spans[si]
+            let rv = body.stmt_d1[si]
             if rv < 0 or rv >= body.rval_kinds.len() as i32:
                 continue
-            let rk = body.rval_kinds.get(rv as i64)
+            let rk = body.rval_kinds[rv]
             let pending: Vec[i32] = Vec.new()
             let contexts: Vec[str] = Vec.new()
             if rk == RvalueKind.RK_AGGREGATE:
-                let fid = body.rval_d1.get(rv as i64)
+                let fid = body.rval_d1[rv]
                 if fid >= 0 and fid < body.agg_field_starts.len() as i32:
-                    let fstart = body.agg_field_starts.get(fid as i64)
-                    let fcount = body.agg_field_counts.get(fid as i64)
+                    let fstart = body.agg_field_starts[fid]
+                    let fcount = body.agg_field_counts[fid]
                     for fi in 0..fcount:
                         let opi = fstart + fi
                         if opi >= 0 and opi < body.agg_field_operands.len() as i32:
-                            pending.push(body.agg_field_operands.get(opi as i64))
+                            pending.push(body.agg_field_operands[opi])
                             contexts.push("store-aggregate")
             else if rk == RvalueKind.RK_USE:
-                pending.push(body.rval_d0.get(rv as i64))
+                pending.push(body.rval_d0[rv])
                 contexts.push("store-assign")
             else:
-                pending.push(body.rval_d0.get(rv as i64))
+                pending.push(body.rval_d0[rv])
                 contexts.push("read")
             for pi in 0..pending.len() as i32:
-                var r = analysis_seam_row(sema, body, fn_name, fn_path, span, pending.get(pi as i64), contexts.get(pi as i64))
+                var r = analysis_seam_row(sema, body, fn_name, fn_path, span, pending[pi], contexts[pi])
                 if r.ok != 0 and not seen.contains(r.key):
                     seen.insert(move r.key, 1)
-                    counts.set_i32(r.class_idx as i64, counts.get(r.class_idx as i64) + 1)
+                    counts[r.class_idx] = counts[r.class_idx] + 1
                     if r.actionable != 0:
-                        counts.set_i32(6, counts.get(6) + 1)
+                        counts[6] = counts.get(6) + 1
                     report_lines.push(move r.row)
         // Call arguments: retained when the callee consumes them.
         for bb in 0..body.block_count():
@@ -1641,10 +1643,10 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
             let args_id = body.term_data1(bb)
             if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
                 continue
-            let start = body.call_arg_starts.get(args_id as i64)
-            let count = body.call_arg_counts.get(args_id as i64)
+            let start = body.call_arg_starts[args_id]
+            let count = body.call_arg_counts[args_id]
             let sig = body.call_sig_index(args_id)
-            let term_span = body.bb_term_spans.get(bb as i64)
+            let term_span = body.bb_term_spans[bb]
             for ai in 0..count:
                 let opi = start + ai
                 if opi < 0 or opi >= body.call_arg_operands.len() as i32:
@@ -1666,15 +1668,15 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
                     if pkind == TypeKind.TY_REF or pkind == TypeKind.TY_PTR:
                         continue
                     context = "call-arg-owned"
-                var cr = analysis_seam_row(sema, body, fn_name, fn_path, term_span, body.call_arg_operands.get(opi as i64), context)
+                var cr = analysis_seam_row(sema, body, fn_name, fn_path, term_span, body.call_arg_operands[opi], context)
                 if cr.ok != 0 and not seen.contains(cr.key):
                     seen.insert(move cr.key, 1)
-                    counts.set_i32(cr.class_idx as i64, counts.get(cr.class_idx as i64) + 1)
+                    counts[cr.class_idx] = counts[cr.class_idx] + 1
                     if cr.actionable != 0:
-                        counts.set_i32(6, counts.get(6) + 1)
+                        counts[6] = counts.get(6) + 1
                     report_lines.push(move cr.row)
     for li in 0..report_lines.len() as i32:
-        out = out ++ report_lines.get(li as i64)
+        out = out ++ report_lines[li]
     let moves_ref = counts.get(0)
     let moves_raw = counts.get(1)
     let copies_elem = counts.get(2)
@@ -1693,7 +1695,7 @@ fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, sour
             if pi == 0 and sema.sig_receiver_mode(si) != ReceiverMode.None:
                 continue
             escapes = escapes + 1
-            out = out ++ sema.pool_resolve(sema.sig_names.get(si as i64)) ++ "\tescape-view-consume\tparam " ++ f"{pi}" ++ "\t" ++ sema.type_name(param_ty) ++ "\n"
+            out = out ++ sema.pool_resolve(sema.sig_names[si]) ++ "\tescape-view-consume\tparam " ++ f"{pi}" ++ "\t" ++ sema.type_name(param_ty) ++ "\n"
     // ACTIONABLE is the number that matters: a copy is only a latent
     // double-free when the copy is retained (stored/aggregated/consumed by a
     // callee). Read-position copies are operands that never drop — reported
@@ -1736,7 +1738,7 @@ fn analysis_explain_effect_chain(sema: &Sema, sig: i32, pi: i32, bit_idx: i32, s
             let line = analysis_line_for_offset(text, start)
             out = out ++ f"    direct seed at {file_name}:{line} (node {a})\n"
             return out
-        let callee = sema.pool_resolve(sema.sig_names.get(a as i64))
+        let callee = sema.pool_resolve(sema.sig_names[a])
         out = out ++ f"    via argument to {callee} param {b}\n"
         cur_sig = a
         cur_pi = b
@@ -1756,7 +1758,7 @@ fn analysis_explain_effect(sema: &Sema, target: &str, source_path: &str) -> str:
     var out = f"explain:effect {fn_name}\n"
     var found = 0
     for si in 0..sema.sig_names.len() as i32:
-        if sema.pool_resolve(sema.sig_names.get(si as i64)) != fn_name:
+        if sema.pool_resolve(sema.sig_names[si]) != fn_name:
             continue
         found = found + 1
         let pc = sema.sig_get_param_count(si)
@@ -1806,7 +1808,7 @@ fn analysis_lldb_recipe(report: &AnalysisReport, query: &str) -> str:
     lines.push("# Generated from live compiler-analysis facts.\n")
     var hits = 0
     for i in 0..report.facts.len() as i32:
-        let fact = report.facts.get(i as i64)
+        let fact = report.facts[i]
         if not analysis_fact_matches(fact, query):
             continue
         if fact.kind == AnalysisFactKind.Diagnostic and fact.path.len() > 0 and fact.line > 0:
@@ -1833,14 +1835,14 @@ fn analysis_lldb_recipe(report: &AnalysisReport, query: &str) -> str:
 
 fn analysis_symbol_name(report: &AnalysisReport, sym: i32) -> str:
     for i in 0..report.facts.len() as i32:
-        let fact = report.facts.get(i as i64)
+        let fact = report.facts[i]
         if fact.symbol == sym and (fact.kind == AnalysisFactKind.Signature or fact.kind == AnalysisFactKind.Body or fact.kind == AnalysisFactKind.Declaration):
             return fact.name.clone()
     f"sym{sym}"
 
 fn analysis_find_symbol(report: &AnalysisReport, name: &str) -> i32:
     for i in 0..report.facts.len() as i32:
-        let fact = report.facts.get(i as i64)
+        let fact = report.facts[i]
         if fact.symbol != 0 and fact.name == name and
            (fact.kind == AnalysisFactKind.Signature or fact.kind == AnalysisFactKind.Body or fact.kind == AnalysisFactKind.Declaration):
             return fact.symbol
@@ -1857,10 +1859,10 @@ fn analysis_call_path(report: &AnalysisReport, from: &str, to: &str) -> str:
     pred.insert(start, 0)
     var qi = 0
     while qi < queue.len() as i32 and not pred.contains(target):
-        let caller = queue.get(qi as i64)
+        let caller = queue[qi]
         qi = qi + 1
         for i in 0..report.facts.len() as i32:
-            let fact = report.facts.get(i as i64)
+            let fact = report.facts[i]
             if fact.kind != AnalysisFactKind.Call or fact.body_sym != caller or fact.symbol == 0 or pred.contains(fact.symbol):
                 continue
             pred.insert(fact.symbol, caller)
@@ -1877,7 +1879,7 @@ fn analysis_call_path(report: &AnalysisReport, from: &str, to: &str) -> str:
     var i = reverse.len() as i32 - 1
     while i >= 0:
         lines.push("  ")
-        lines.push(analysis_symbol_name(report, reverse.get(i as i64)))
+        lines.push(analysis_symbol_name(report, reverse[i]))
         lines.push("\n")
         i = i - 1
     lines.join("")
@@ -1892,10 +1894,10 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
     pred.insert(start, 0)
     var qi = 0
     while qi < queue.len() as i32:
-        let caller = queue.get(qi as i64)
+        let caller = queue[qi]
         qi = qi + 1
         for i in 0..report.facts.len() as i32:
-            let fact = report.facts.get(i as i64)
+            let fact = report.facts[i]
             if fact.kind != AnalysisFactKind.Call or fact.body_sym != caller or fact.symbol == 0 or pred.contains(fact.symbol):
                 continue
             pred.insert(fact.symbol, caller)
@@ -1903,7 +1905,7 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
     let lines: Vec[str] = Vec.new()
     lines.push(f"call-closure: root={root} reachable={queue.len() as i32}\n")
     for i in 0..queue.len() as i32:
-        let sym = queue.get(i as i64)
+        let sym = queue[i]
         let parent = pred.get(sym).unwrap()
         lines.push(analysis_symbol_name(report, sym))
         lines.push("\t")

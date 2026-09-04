@@ -29,7 +29,7 @@ fn split_lines(text: str) -> Vec[str]:
     var start: i64 = 0
     var i: i64 = 0
     while i < text.len():
-        if text.byte_at(i) == 10:
+        if text[i] == 10:
             out.push(text.slice(start, i))
             start = i + 1
         i = i + 1
@@ -42,7 +42,7 @@ fn split_tabs(line: str) -> Vec[str]:
     var start: i64 = 0
     var i: i64 = 0
     while i < line.len():
-        if line.byte_at(i) == 9:
+        if line[i] == 9:
             out.push(line.slice(start, i))
             start = i + 1
         i = i + 1
@@ -53,7 +53,7 @@ fn parse_int(text: str) -> i32:
     var out = 0
     var any = 0
     for i in 0..text.len() as i32:
-        let b = text.byte_at(i as i64) as i32
+        let b = text[i] as i32
         if b < 48 or b > 57:
             if any != 0: break
             return -1
@@ -71,7 +71,7 @@ fn main:
     let want_class = argv.get(3)
     var apply = false
     for i in 4..argv.len() as i32:
-        if argv.get(i as i64) == "--apply": apply = true
+        if argv[i] == "--apply": apply = true
 
     let out_path = "out/tmp/seam-sites.tsv"
     let err_path = "out/tmp/seam-sites.err"
