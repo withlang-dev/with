@@ -6626,6 +6626,37 @@ impl ComptimeEvaluator:
         if op == UnaryOp.UOP_NEGATE:
             if comptime_value_is_intlike(inner.value) == 0:
                 return self.fail(node, "unary '-' requires integer comptime values")
+            // #943: `-2147483648i32` is i32::MIN and must evaluate. Negating the
+            // *operand* cannot express it: int_eval_unary_neg narrows the
+            // operand to the target width first, and 2147483648 is 2^31, whose
+            // low 32 bits read as signed are -2147483648 — so the operand
+            // becomes MIN and the "negating MIN is unrepresentable" guard fires
+            // on a MIN the source never contained.
+            //
+            // The magnitude and the sign have to stay apart until the width is
+            // applied. int_literal_exact_expr already keeps them apart across
+            // UOP_NEGATE, and int_literal_expr_bits applies the width once via
+            // exact_int_fits_signed_negative_bits, which accepts magnitude
+            // 2^(bits-1) when it is negative and rejects it when it is not.
+            // Both codegens already lower negated literals through this path.
+            //
+            // Only for signed types at 64 bits or narrower: the 128-bit case
+            // needs the high word too (#914), and unsigned negation keeps its
+            // existing diagnostic.
+            let neg_width = self.comptime_int_width(result_ty)
+            if neg_width <= 64 and not self.comptime_int_is_unsigned(result_ty):
+                let neg_expr = self.ast.int_literal_exact_expr(node)
+                if neg_expr.ok != 0 and neg_expr.overflow == 0:
+                    let neg_words = self.ast.int_literal_expr_bits(node, neg_width, 1)
+                    if neg_words.ok == 0 or neg_words.overflow != 0:
+                        return self.fail(node, "integer overflow in comptime")
+                    // int_literal_expr_bits returns the two's-complement pattern
+                    // *within* neg_width, so at 32 bits -2147483647 comes back as
+                    // 0x80000001 = +2147483649. Sign-extend it into the i64
+                    // payload so the stored value is canonical for its type —
+                    // otherwise every later operation reads a large positive
+                    // number (-2147483647i32 / 3 returned +715827883).
+                    return comptime_control_value(comptime_value_int(result_ty, int_truncate_to_width(neg_words.lo, neg_width, false)))
             let arith = int_eval_unary_neg(comptime_value_intlike(inner.value), self.comptime_int_width(result_ty), self.sema.overflow_mode)
             if arith.ok == 0:
                 return self.fail(node, "integer arithmetic is not comptime-evaluable")
