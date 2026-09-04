@@ -7,15 +7,13 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=v0.15.1.9
-with-darwin-aarch64=5d4ea4639ca27860ade6bbb78efe353803fe74c85e394311f0bdac87b2383577
-with-linux-x86_64=7d08771fbf4a5e57d7a70442f50f35386bb352e1555040e2e259dfd8592a4411
-# linux-aarch64 and both Windows platforms cannot bootstrap v0.15.1.9 yet:
-# #1074 (linux-aarch64 links runtime objects from a stale rolling tarball)
-# and #1075 (Windows cannot link the native build runner). Their v0.15.1.8
-# seeds cannot build this tree either, so those lanes stay red until fixed.
-with-linux-aarch64.version=v0.15.1.8
-with-linux-aarch64=e26930b0f9e8a93fef1091216c4d0b8d49e2c20d8b4d6e89bbfa06dbb3fa7d8f
+version=v0.15.1.10
+with-darwin-aarch64=79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
+with-linux-x86_64=eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
+with-linux-aarch64=3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
+# Windows cannot bootstrap v0.15.1.10 yet: its pcre2 bundle build fails on
+# the Darwin stdio globals (#1029). The v0.15.1.8 seeds cannot build this
+# tree either, so the Windows lanes stay red until that lands.
 with-windows-x86_64.exe.version=v0.15.1.8
 with-windows-x86_64.exe=6f00a9e3a26751404f671f10ef7b61b345886c6d73a96c95df9086e6df6607fd
 with-windows-aarch64.exe.version=v0.15.1.8

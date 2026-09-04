@@ -52,9 +52,9 @@ jobs:
             runner: macos-latest
             sdk_host_tag: darwin-arm64
             seed_repo: withlang-dev/with
-            seed_version: v0.15.1.9
+            seed_version: v0.15.1.10
             seed_asset: with-darwin-aarch64
-            seed_sha256: 5d4ea4639ca27860ade6bbb78efe353803fe74c85e394311f0bdac87b2383577
+            seed_sha256: 79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
             sdk_version: nightly-sdk-test-20260815-680aa139
             sdk_asset: with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz
             sdk_sha256: 4f99fc99a933ee3cf0578336a4fbbbcaaedbbe89112cd49454ea64149c188e6d
@@ -65,9 +65,9 @@ jobs:
             runner: ubuntu-latest
             sdk_host_tag: linux-x86_64
             seed_repo: withlang-dev/with
-            seed_version: v0.15.1.9
+            seed_version: v0.15.1.10
             seed_asset: with-linux-x86_64
-            seed_sha256: 7d08771fbf4a5e57d7a70442f50f35386bb352e1555040e2e259dfd8592a4411
+            seed_sha256: eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
             sdk_version: nightly-sdk-test-20260815-680aa139
             sdk_asset: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
             sdk_sha256: c7747403c3556ba9ca6e8f47c5db023798c7c5828c807c4a3b474f0c87db24db
@@ -388,9 +388,9 @@ jobs:
       # three platforms pin (a versioned release, not a rolling tag). That asset
       # was produced by this very job on the v0.15.1.5 tag, so the platform now
       # bootstraps from its own fixpoint-verified output.
-      WITH_SEED_VERSION: v0.15.1.8
+      WITH_SEED_VERSION: v0.15.1.10
       WITH_SEED_ASSET: with-linux-aarch64
-      WITH_SEED_SHA256: e26930b0f9e8a93fef1091216c4d0b8d49e2c20d8b4d6e89bbfa06dbb3fa7d8f
+      WITH_SEED_SHA256: 3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-linux-aarch64
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-linux-aarch64.tar.gz
