@@ -260,6 +260,24 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     let uploaded = rp_gh(&ctx, scratch, "upload", &upload)
     if uploaded.rc != 0: return rp_fail(&ctx, "upload to " ++ tag ++ " failed: " ++ uploaded.stderr)
 
+    // Every name we sent is on the release, by the API's own listing: an
+    // upload that "succeeded" without producing the asset is a loud failure,
+    // never a release with a hole in it.
+    let after = rp_gh(&ctx, scratch, "names-after", &names_args)
+    if after.rc != 0: return rp_fail(&ctx, "could not list the assets of " ++ tag ++ " after the upload: " ++ after.stderr)
+    let present_after = rp_trim_lines(after.stdout)
+    var expected: Vec[str] = Vec.new()
+    for asset in assets:
+        expected.push(rp_basename(asset))
+        expected.push(rp_basename(asset) ++ ".sha256")
+        expected.push(rp_basename(asset) ++ ".provenance")
+    for extra in extras_to_upload: expected.push(rp_basename(extra))
+    for name in expected:
+        var found = false
+        for p in present_after:
+            if p == name: found = true
+        if not found: return rp_fail(&ctx, name ++ " was uploaded to " ++ tag ++ " but the release does not list it")
+
     // The published digest is the file's digest.
     for asset in assets:
         let name = rp_basename(asset)
@@ -297,7 +315,13 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
             let dl = rp_release_args("download", tag, repo, &dl_rest)
             let got = rp_gh(&ctx, scratch, "provenance-dl", &dl)
             let path = rp_join(prov_dir, pname)
-            if got.rc != 0 or not fs.exists(path): continue
+            if got.rc != 0 or not fs.exists(path):
+                // The notes stay honest about what they could not read; a
+                // sidecar the API listed but would not serve yet is reported,
+                // never dropped in silence.
+                print("publish: warning: could not fetch " ++ pname ++ " for the notes (" ++ got.stderr.trim() ++ ")")
+                rows.push("| " ++ pname.slice(0, pname.len() - 11) ++ " | (provenance not readable at publish time) | |")
+                continue
             let text = fs.read_text(path)
             rows.push("| " ++ rp_field(text, "asset") ++ " | " ++ rp_field(text, "builder") ++ " | " ++ rp_field(text, "built_at") ++ " |")
     let notes_path = rp_join(scratch, "notes.md")
