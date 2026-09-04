@@ -68,6 +68,20 @@ fn wo_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
+// A build action's captured output lives in files under out/command/ that
+// never reach the CI log, so a failure naming only a path hides the real
+// compiler diagnostic (No Silent Fallbacks). The action already holds both
+// streams in memory — echo whichever the tool actually wrote. A diagnostic
+// on stdout is surfaced too (a failing sub-compiler need not use stderr); a
+// tool silent on both folds to nothing, degrading to the path-only message.
+fn wo_captured_output(result: &ToolProcessResult) -> str:
+    var out = ""
+    if result.stdout.len() > 0:
+        out = out ++ "\n--- stdout ---\n" ++ result.stdout
+    if result.stderr.len() > 0:
+        out = out ++ "\n--- stderr ---\n" ++ result.stderr
+    out
+
 fn wo_abs(root: &str, path: &str) -> str:
     if path.len() > 0 and path.byte_at(0) == '/':
         return wo_owned_text(path)
@@ -401,7 +415,7 @@ pub fn run_wo_drift_action(ctx: ActionCtx) -> i32:
     build_args.push(wo_abs(root, scratch ++ ".o"))
     let built = wo_run(ctx, "rebuild", &build_args, ctx.timeout())
     if built.rc != 0:
-        return wo_fail(ctx, f"scratch rebuild of the bundle failed with exit code {built.rc}; stderr: " ++ capture_dir ++ "/rebuild.stderr")
+        return wo_fail(ctx, f"scratch rebuild of the bundle failed with exit code {built.rc}; captures under {capture_dir}" ++ wo_captured_output(&built))
     if fs.read_text(stored ++ ".wi") != fs.read_text(scratch ++ ".wi"):
         return wo_fail(ctx, "declaration drift: " ++ scratch ++ ".wi rebuilt by " ++ compiler ++ " differs from " ++ stored ++ ".wi (corpus and ABI unchanged); diff them before anything else")
     let stored_manifest = fs.read_text(stored ++ ".manifest")
@@ -454,14 +468,14 @@ fn wo_drift_run_harness(ctx: &ActionCtx, compiler: &str, harness: &str, harness_
     harness_args.push(wo_abs(root, harness_bin))
     let built = wo_run(ctx, "harness-build-" ++ label, &harness_args, ctx.timeout())
     if built.rc != 0:
-        return wo_fail(ctx, f"harness build against the {label} bundle failed with exit code {built.rc}; stderr: " ++ capture_dir ++ "/harness-build-" ++ label ++ ".stderr")
+        return wo_fail(ctx, f"harness build against the {label} bundle failed with exit code {built.rc}; captures under {capture_dir}" ++ wo_captured_output(&built))
     var run_args: Vec[str] = Vec.new()
     run_args.push(wo_abs(root, harness_bin))
     if harness_arg.len() > 0:
         run_args.push(wo_owned_text(harness_arg))
     let ran = wo_run(ctx, "harness-run-" ++ label, &run_args, 120000)
     if ran.rc != 0:
-        return wo_fail(ctx, f"harness linked against the {label} bundle failed with exit code {ran.rc}; stderr: " ++ capture_dir ++ "/harness-run-" ++ label ++ ".stderr")
+        return wo_fail(ctx, f"harness linked against the {label} bundle failed with exit code {ran.rc}; captures under {capture_dir}" ++ wo_captured_output(&ran))
     0
 
 // "" when the slot holds a coherent bundle of this corpus, else why not.
@@ -574,7 +588,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     build_args.push(wo_abs(root, tmp_o))
     let built = wo_run(ctx, "build", &build_args, ctx.timeout())
     if built.rc != 0:
-        return wo_fail(ctx, f"bundle build failed with exit code {built.rc}; stderr: " ++ capture_dir ++ "/build.stderr")
+        return wo_fail(ctx, f"bundle build failed with exit code {built.rc}; captures under {capture_dir}" ++ wo_captured_output(&built))
     if not fs.exists(tmp_o) or not fs.exists(tmp_wi) or not fs.exists(tmp_manifest) or not fs.exists(fp_source):
         return wo_fail(ctx, "bundle build wrote no object, interface, manifest or fingerprint under " ++ tmp)
 
@@ -593,7 +607,7 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     check_args.push(wo_abs(root, fp_wi))
     let checked = wo_run(ctx, "check-wi", &check_args, ctx.timeout())
     if checked.rc != 0:
-        return wo_fail(ctx, f"check of the emitted interface failed with exit code {checked.rc}; stderr: " ++ capture_dir ++ "/check-wi.stderr")
+        return wo_fail(ctx, f"check of the emitted interface failed with exit code {checked.rc}; captures under {capture_dir}" ++ wo_captured_output(&checked))
     let source_fp = wo_first_line(fs.read_text(fp_source))
     let wi_fp = wo_first_line(fs.read_text(fp_wi))
     if source_fp.len() != 64 or source_fp != wi_fp:
