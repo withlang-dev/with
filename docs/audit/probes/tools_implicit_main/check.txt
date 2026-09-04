@@ -1,0 +1,5 @@
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> .audit/probes/tools_implicit_main/mini.w:1:1
+1 | print("hi")
+  | ^^^^^
+error: check failed during compilation

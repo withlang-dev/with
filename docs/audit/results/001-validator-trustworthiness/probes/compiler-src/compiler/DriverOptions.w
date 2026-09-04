@@ -1,0 +1,448 @@
+// Structured CLI option values for compiler-driver commands.
+
+extern fn with_arg_at(idx: i32) -> str
+extern fn with_getenv_str(name: &str) -> str
+extern fn with_str_len(s: &str) -> i64
+extern fn with_str_byte_at_ref(s: &str, index: i64) -> i32
+extern fn with_str_slice_ref(s: &str, start: i64, end: i64) -> str
+extern fn with_str_clone_ref(s: &str) -> str
+
+use Overflow
+
+pub enum BuildOutputKind: i32:
+    Binary = 0
+    Object = 1
+    C = 2
+    LlvmIr = 3
+    Archive = 4
+
+impl Copy for BuildOutputKind
+
+pub enum DriverPreludeMode: i32:
+    Full = 0
+    Core = 1
+    None = 2
+    Alloc = 3
+
+pub type BuildCommandOptions {
+    source_path: str,
+    output_path: str,
+    output_kind: BuildOutputKind,
+    opt_level: i32,
+    debug_info: bool,
+    no_std: bool,
+    alloc_mode: bool,
+    runtime_available: bool,
+    prelude_mode: i32,
+    overflow_mode: i32,
+    deterministic: bool,
+    strict_effects: bool,
+    target_kind: i32,
+    target_explicit: bool,
+    include_paths: Vec[str],
+    defines: Vec[str],
+    link_libs: Vec[str],
+    compiler_hooks_enabled: bool,
+}
+
+pub type BuildGraphCommandOptions {
+    selected_target: str,
+    graph_only: bool,
+    dry_run: bool,
+    no_deps: bool,
+    // Keep-going for test/action targets: record failures, run every
+    // remaining target, report the full matrix at the end (exit nonzero if
+    // any failed). Kills the one-buried-failure-per-run "strata crawl".
+    survey: bool,
+    explain_target: str,
+}
+
+pub type TestCommandOptions {
+    filter: str,
+    verbose: bool,
+    quiet: bool,
+}
+
+pub type MigrateCommandOptions {
+    source_path: str,
+    output_path: str,
+    include_paths: Vec[str],
+    forced_includes: Vec[str],
+    defines: Vec[str],
+    exclude_basenames: Vec[str],
+    check_mode: bool,
+    diff_mode: bool,
+    stats_mode: bool,
+    no_c_export: bool,
+    c_export_functions: bool,
+    convert_goto_to_structured: bool,
+    block_style: i32,
+    width_slice: i32,
+    shared_defs: str,
+    migrate_one: str,
+    shared_fragment: str,
+    ir_roundtrip: bool,
+}
+
+pub type BuildCommandParseResult {
+    ok: bool,
+    error_msg: str,
+    build: BuildCommandOptions,
+    graph: BuildGraphCommandOptions,
+}
+
+pub fn driver_internal_overflow_mode -> i32:
+    let mode = overflow_mode_parse(with_getenv_str("WITH_INTERNAL_OVERFLOW_MODE"))
+    if overflow_mode_valid(mode):
+        return mode
+    -1
+
+pub fn build_command_options_default -> BuildCommandOptions:
+    BuildCommandOptions {
+        source_path: "",
+        output_path: "",
+        output_kind: BuildOutputKind.Binary,
+        opt_level: 1,
+        debug_info: true,
+        no_std: false,
+        alloc_mode: false,
+        runtime_available: true,
+        prelude_mode: DriverPreludeMode.Full,
+        overflow_mode: driver_internal_overflow_mode(),
+        deterministic: false,
+        strict_effects: false,
+        target_kind: 0,
+        target_explicit: false,
+        include_paths: Vec.new(),
+        defines: Vec.new(),
+        link_libs: Vec.new(),
+        compiler_hooks_enabled: true,
+    }
+
+pub fn driver_clone_str(s: &str) -> str:
+    if s.len() == 0:
+        return ""
+    with_str_clone_ref(s)
+
+pub fn driver_clone_str_vec(values: &Vec[str]) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    for i in 0..values.len() as i32:
+        out.push(driver_clone_str(values.get(i as i64)))
+    out
+
+pub fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOptions:
+    BuildCommandOptions {
+        source_path: driver_clone_str(base.source_path),
+        output_path: driver_clone_str(base.output_path),
+        output_kind: base.output_kind,
+        opt_level: base.opt_level,
+        debug_info: base.debug_info,
+        no_std: base.no_std,
+        alloc_mode: base.alloc_mode,
+        runtime_available: base.runtime_available,
+        prelude_mode: base.prelude_mode,
+        overflow_mode: base.overflow_mode,
+        deterministic: base.deterministic,
+        strict_effects: base.strict_effects,
+        target_kind: base.target_kind,
+        target_explicit: base.target_explicit,
+        include_paths: driver_clone_str_vec(&base.include_paths),
+        defines: driver_clone_str_vec(&base.defines),
+        link_libs: driver_clone_str_vec(&base.link_libs),
+        compiler_hooks_enabled: base.compiler_hooks_enabled,
+    }
+
+pub fn build_graph_command_options_default -> BuildGraphCommandOptions:
+    BuildGraphCommandOptions {
+        selected_target: "",
+        graph_only: false,
+        dry_run: false,
+        no_deps: false,
+        survey: false,
+        explain_target: "",
+    }
+
+pub fn migrate_command_options_default -> MigrateCommandOptions:
+    MigrateCommandOptions {
+        source_path: "",
+        output_path: "",
+        include_paths: Vec.new(),
+        forced_includes: Vec.new(),
+        defines: Vec.new(),
+        exclude_basenames: Vec.new(),
+        check_mode: false,
+        diff_mode: false,
+        stats_mode: false,
+        no_c_export: false,
+        c_export_functions: false,
+        convert_goto_to_structured: false,
+        block_style: 0,
+        width_slice: 0,
+        shared_defs: "",
+        migrate_one: "",
+        shared_fragment: "",
+        ir_roundtrip: false,
+    }
+
+fn driver_has_output_prefix(arg: &str) -> bool:
+    if with_str_len(arg) < 9:
+        return false
+    arg.starts_with("--output=")
+
+fn driver_is_build_target_selector(arg: &str) -> bool:
+    arg.len() > 1 and arg.byte_at(0) == 58
+
+fn driver_has_flag(argc: i32, flag: &str) -> bool:
+    var i = 2
+    while i < argc:
+        if with_arg_at(i) == flag:
+            return true
+        i = i + 1
+    false
+
+fn driver_build_source_arg(argc: i32) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        var step = 1
+        var skip = false
+        if arg == "-o":
+            step = 2
+            skip = true
+        if not skip and (arg == "--output" or arg == "--filter" or arg == "-f" or arg == "--explain" or arg == "--target"):
+            step = 2
+            skip = true
+        if not skip and driver_has_output_prefix(arg):
+            skip = true
+        if not skip:
+            if with_str_len(arg) > 0:
+                if with_str_byte_at_ref(arg, 0) != 45 and not driver_is_build_target_selector(arg):
+                    return arg
+        i = i + step
+    ""
+
+fn driver_output_arg(argc: i32) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "-o" or arg == "--output":
+            if i + 1 < argc:
+                return with_arg_at(i + 1)
+            return ""
+        if driver_has_output_prefix(arg):
+            return with_str_slice_ref(arg, 9, with_str_len(arg))
+        i = i + 1
+    ""
+
+fn driver_explain_arg(argc: i32) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "--explain":
+            if i + 1 < argc:
+                return with_arg_at(i + 1)
+            return ""
+        i = i + 1
+    ""
+
+// Target triples accepted by --target (§18.5). Returns the
+// std.build.BuildTarget kind, or -1 for a triple this compiler
+// cannot represent.
+pub fn driver_target_triple_kind(triple: &str) -> i32:
+    if triple == "native":
+        return 0
+    if triple == "x86_64-unknown-linux-gnu" or triple == "x86_64-linux-gnu" or triple == "linux_x86_64":
+        return 1
+    if triple == "aarch64-unknown-linux-gnu" or triple == "aarch64-linux-gnu" or triple == "linux_aarch64":
+        return 2
+    if triple == "x86_64-apple-darwin" or triple == "darwin_x86_64":
+        return 3
+    if triple == "aarch64-apple-darwin" or triple == "arm64-apple-darwin" or triple == "darwin_aarch64":
+        return 4
+    if triple == "x86_64-pc-windows-msvc" or triple == "windows_x86_64":
+        return 5
+    if triple == "aarch64-pc-windows-msvc" or triple == "arm64-pc-windows-msvc" or triple == "windows_aarch64":
+        return 6
+    -1
+
+pub type DriverTargetParseResult {
+    ok: bool,
+    kind: i32,
+    explicit: bool,
+    error_msg: str,
+}
+
+pub fn driver_parse_build_target(argc: i32) -> DriverTargetParseResult:
+    var kind = 0
+    var explicit = false
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        var value = ""
+        var seen = false
+        if arg == "--target":
+            if i + 1 >= argc:
+                return DriverTargetParseResult { false, 0, true, "--target requires a target triple argument" }
+            value = with_arg_at(i + 1)
+            seen = true
+            i = i + 2
+        else if arg.starts_with("--target="):
+            value = with_str_slice_ref(arg, 9, with_str_len(arg))
+            seen = true
+            i = i + 1
+        else:
+            i = i + 1
+        if seen:
+            let parsed = driver_target_triple_kind(value)
+            if parsed < 0:
+                return DriverTargetParseResult { false, 0, true, "unsupported target triple '" ++ value ++ "'; see §18.5 for the accepted triples" }
+            kind = parsed
+            explicit = true
+    DriverTargetParseResult { true, kind, explicit, "" }
+
+fn driver_build_target_arg(argc: i32) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if driver_is_build_target_selector(arg):
+            return with_str_slice_ref(arg, 1, with_str_len(arg))
+        i = i + 1
+    ""
+
+fn driver_build_opt_level(argc: i32) -> i32:
+    var level = 1
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "-O0":
+            level = 0
+        else if arg == "-O1":
+            level = 1
+        else if arg == "-O2":
+            level = 2
+        else if arg == "-O3":
+            level = 3
+        else if arg == "--release":
+            if level < 2:
+                level = 2
+        i = i + 1
+    level
+
+type DriverPreludeParseResult {
+    ok: bool,
+    mode: i32,
+    invalid_value: str,
+}
+
+type DriverOverflowParseResult {
+    ok: bool,
+    mode: i32,
+    invalid_value: str,
+}
+
+fn driver_parse_prelude_mode(argc: i32) -> DriverPreludeParseResult:
+    var mode = DriverPreludeMode.Full
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "--no-prelude":
+            mode = DriverPreludeMode.None
+        else if arg == "--freestanding":
+            mode = DriverPreludeMode.Core
+        else if arg.starts_with("--prelude="):
+            let value = with_str_slice_ref(arg, 10, with_str_len(arg))
+            if value == "core":
+                mode = DriverPreludeMode.Core
+            else if value == "alloc":
+                mode = DriverPreludeMode.Alloc
+            else if value == "full":
+                mode = DriverPreludeMode.Full
+            else if value == "none":
+                mode = DriverPreludeMode.None
+            else:
+                return DriverPreludeParseResult { false, DriverPreludeMode.Full, value }
+        i = i + 1
+    DriverPreludeParseResult { true, mode, "" }
+
+fn driver_parse_overflow_mode(argc: i32) -> DriverOverflowParseResult:
+    var mode = driver_internal_overflow_mode()
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg.starts_with("--overflow="):
+            let value = with_str_slice_ref(arg, 11, with_str_len(arg))
+            let parsed = overflow_mode_parse(value)
+            if not overflow_mode_valid(parsed):
+                return DriverOverflowParseResult { false, -1, value }
+            mode = parsed
+        i = i + 1
+    DriverOverflowParseResult { true, mode, "" }
+
+pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
+    var build = build_command_options_default()
+    var graph = build_graph_command_options_default()
+    build.source_path = driver_build_source_arg(argc)
+    build.output_path = driver_output_arg(argc)
+    build.opt_level = driver_build_opt_level(argc)
+    build.no_std = driver_has_flag(argc, "--no-std") or driver_has_flag(argc, "--freestanding")
+    build.alloc_mode = driver_has_flag(argc, "--alloc")
+    build.runtime_available = not driver_has_flag(argc, "--no-runtime") and not driver_has_flag(argc, "--freestanding")
+    build.debug_info = not driver_has_flag(argc, "-g0") and not driver_has_flag(argc, "--release")
+    build.deterministic = driver_has_flag(argc, "--deterministic")
+    build.strict_effects = driver_has_flag(argc, "--strict-effects")
+    let prelude = driver_parse_prelude_mode(argc)
+    if not prelude.ok:
+        return BuildCommandParseResult {
+            ok: false,
+            error_msg: "invalid --prelude value '" ++ prelude.invalid_value ++ "' (expected full|alloc|core|none)",
+            build,
+            graph,
+        }
+    build.prelude_mode = prelude.mode
+
+    let overflow = driver_parse_overflow_mode(argc)
+    if not overflow.ok:
+        return BuildCommandParseResult {
+            ok: false,
+            error_msg: "invalid --overflow value '" ++ overflow.invalid_value ++ "' (expected panic|wrap|saturate)",
+            build,
+            graph,
+        }
+    build.overflow_mode = overflow.mode
+
+    var target = driver_parse_build_target(argc)
+    if not target.ok:
+        return BuildCommandParseResult {
+            ok: false,
+            error_msg: move target.error_msg,
+            build,
+            graph,
+    }
+    build.target_kind = target.kind
+    build.target_explicit = target.explicit
+
+    let emit_c = driver_has_flag(argc, "--emit-c")
+    let emit_obj = driver_has_flag(argc, "--emit-obj")
+    if emit_c and emit_obj:
+        return BuildCommandParseResult {
+            ok: false,
+            error_msg: "--emit-c and --emit-obj are mutually exclusive",
+            build,
+            graph,
+        }
+    if emit_c:
+        build.output_kind = BuildOutputKind.C
+    else if emit_obj:
+        build.output_kind = BuildOutputKind.Object
+
+    graph.selected_target = driver_build_target_arg(argc)
+    graph.graph_only = driver_has_flag(argc, "--graph")
+    graph.dry_run = driver_has_flag(argc, "--dry-run")
+    graph.no_deps = driver_has_flag(argc, "--no-deps")
+    // Survey (keep going past test/action failures, report them all at the
+    // end) is the DEFAULT — Eric's ruling 2026-08-15 after fail-fast
+    // serialized a 25-run discovery campaign. --fail-fast opts into
+    // stop-at-first-failure; --survey stays accepted as a no-op.
+    graph.survey = not driver_has_flag(argc, "--fail-fast")
+    graph.explain_target = driver_explain_arg(argc)
+    BuildCommandParseResult { ok: true, error_msg: "", build, graph }

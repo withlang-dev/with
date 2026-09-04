@@ -1,0 +1,6 @@
+[package]
+name = "chantest"
+version = "0.0.0"
+
+[runtime]
+fiber_worker_count = 1

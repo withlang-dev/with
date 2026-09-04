@@ -1,0 +1,4 @@
+error: return type mismatch
+ --> .audit/probes/tools_wrap_diag_spans/fixture.w:2:5
+    name
+    ^^^^

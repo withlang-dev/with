@@ -1,0 +1,5 @@
+error: if would need to copy a `str`, which is not Copy
+ --> tools/materialize_predicate.w:38:36
+38 |     child.push(if arg == "{file}": materialized else: arg)
+  |                                    ^^^^^^^^^^^^
+error: run failed

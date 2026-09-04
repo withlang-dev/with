@@ -1,0 +1,1881 @@
+// Ast — AST node types for the With language.
+//
+// The AST is produced by the parser and consumed by later passes
+// (type checking, lowering, codegen). Nodes are stored in an AstPool
+// using index-based references (i32 handles) instead of pointers.
+// This follows a SoA (Struct of Arrays) approach for cache-friendly
+// access and avoids the need for heap-allocated pointer trees.
+
+use Span
+use Token
+use InternPool
+use std.collections.HashMap
+
+extern fn with_str_clone_ref(s: &str) -> str
+extern fn with_eprint(s: &str) -> Unit
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn abort() -> Unit
+
+fn ast_pool_phase_bug(message: &str):
+    with_eprint(message)
+    abort()
+
+// ── Node kinds ───────────────────────────────────────────────────
+
+type NodeId = i32
+
+// Enforced-distinct file id: the pilot for migrating the compiler's id
+// spaces (NodeId/Symbol/TypeId) off transparent i32 aliases. A distinct id
+// cannot be mixed with another id space without an explicit cast, making
+// the #660 collision class unrepresentable where adopted.
+pub type AstFileId = distinct i32
+impl Copy for AstFileId
+
+pub enum NodeKind: i32:
+    // Declarations
+    NK_FN_DECL = 1
+    NK_TYPE_DECL = 2
+    NK_USE_DECL = 3
+    NK_LET_DECL = 4
+    NK_EXTERN_FN = 5
+    NK_C_IMPORT = 6
+    NK_TRAIT_DECL = 7
+    NK_IMPL_DECL = 8
+    NK_POISONED_DECL = 9
+    NK_EXTERN_VAR = 10
+    // Expressions
+    NK_INT_LIT = 20
+    NK_FLOAT_LIT = 21
+    NK_STRING_LIT = 22
+    NK_BOOL_LIT = 23
+    NK_IDENT = 24
+    NK_BINARY = 25
+    NK_UNARY = 26
+    NK_CALL = 27
+    NK_FIELD_ACCESS = 28
+    NK_INDEX = 29
+    NK_BLOCK = 30
+    NK_IF_EXPR = 31
+    NK_RETURN = 32
+    NK_LET_BINDING = 33
+    NK_ASSIGN = 34
+    NK_WHILE = 35
+    NK_LOOP = 36
+    NK_FOR = 37
+    NK_BREAK = 38
+    NK_CONTINUE = 39
+    NK_MATCH = 40
+    NK_TUPLE = 41
+    NK_ARRAY_LIT = 42
+    NK_STRUCT_LIT = 43
+    NK_CLOSURE = 44
+    NK_CAST = 45
+    NK_DEFER = 46
+    NK_PIPELINE = 47
+    NK_RANGE = 48
+    NK_GROUPED = 49
+    NK_C_STRING_LIT = 50
+    NK_VARIANT_SHORTHAND = 51
+    NK_WITH_EXPR = 52
+    NK_RECORD_UPDATE = 53
+    NK_ENUM_VARIANT = 54
+    NK_SLICE = 55
+    NK_OPTIONAL_CHAIN = 56
+    NK_AWAIT = 57
+    NK_ASYNC_BLOCK = 58
+    NK_YIELD = 60
+    NK_COMPTIME = 61
+    NK_LET_ELSE = 62
+    NK_TUPLE_DESTRUCTURE = 63
+    NK_ARRAY_COMPREHENSION = 64
+    NK_ASYNC_SCOPE = 65
+    NK_SELECT_AWAIT = 66
+    NK_ERRDEFER = 67
+    NK_NULL_LIT = 68
+    NK_POISONED_EXPR = 69
+    NK_UNSAFE_BLOCK = 70
+    NK_COMPTIME_ERROR = 71
+    NK_FSTRING = 72       // d0=segment_count, d1=0, extra=[seg_kind, seg_data...]
+    NK_FSTRING_SPEC = 73  // d0=packed_flags, d1=width, d2=precision
+    // NK_WITH_IMPLICIT: d0=source_expr, d1=body, d2=binding_name_sym
+    NK_WITH_IMPLICIT = 76
+    NK_COMPUTED_FIELD_ACCESS = 74  // d0=expr(node), d1=field_expr(node), d2=0
+    NK_ASM_EXPR = 75  // d0=template(string_sym), d1=constraints(string_sym), d2=flags (bit0=volatile, bit1=has_output)
+    // NK_MULTI_INDEX: d0=base_expr, d1=specs_extra_start, d2=specs_count
+    NK_MULTI_INDEX = 77
+    // NK_INDEX_SPEC: d0=start_or_expr, d1=stop, d2=step_and_kind (kind * INDEX_KIND_SHIFT + step_node)
+    NK_INDEX_SPEC = 78
+    // NK_SCOPE: d0=name(sym), d1=body(node), d2=0
+    NK_SCOPE = 79
+    // Labels and unstructured jumps. Values are appended after existing
+    // expression/pattern nodes to avoid renumbering bootstrap-visible kinds.
+    // NK_LABEL: d0=label_sym, d1=statement, d2=0
+    // NK_GOTO:  d0=label_sym, d1=0, d2=0
+    NK_LABEL = 115
+    NK_GOTO = 116
+    // NK_WITH_TUPLE: d0=source_expr, d1=body_expr, d2=extra_start
+    // Extra: [name_count, is_mut, sym0, sym1, ...]
+    NK_WITH_TUPLE = 117
+    // docs/mutability.md — call-site passing mode wrappers.
+    // NK_COPY_ARG: d0=inner(node), d1=0, d2=0  (explicit copy at call site)
+    // NK_MOVE_ARG: d0=inner(node), d1=0, d2=0  (explicit move at call site)
+    NK_COPY_ARG = 118
+    NK_MOVE_ARG = 119
+    // NK_REGEX_LIT: d0=pattern_sym, d1=flags_sym, d2=0
+    NK_REGEX_LIT = 120
+    // NK_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
+    // NK_NEG_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
+    NK_MATCH_OP = 123
+    NK_NEG_MATCH_OP = 124
+    // NK_NO_SUSPEND: d0=body(node), d1=0, d2=0
+    NK_NO_SUSPEND = 126
+    // NK_MAP_LIT: d0=extra_start, d1=pair_count, d2=0
+    // Extra stores key/value node pairs in source order.
+    NK_MAP_LIT = 128
+    // NK_MAP_COMPREHENSION: d0=extra_start, d1=clause_count, d2=0
+    // Extra: [key_expr, value_expr, then per clause: binding, iterable, filter]
+    NK_MAP_COMPREHENSION = 129
+    // Type expressions
+    NK_TYPE_NAMED = 80
+    NK_TYPE_GENERIC = 81
+    NK_TYPE_REF = 82
+    NK_TYPE_PTR = 83
+    NK_TYPE_FN = 84
+    NK_TYPE_TUPLE = 85
+    NK_TYPE_OPTIONAL = 86
+    NK_TYPE_ARRAY = 87
+    NK_TYPE_SLICE = 88
+    NK_TYPE_TRAIT_OBJ = 89
+    NK_TYPE_INFERRED = 90
+    NK_TYPE_ASSOC = 91  // d0=base_sym (e.g. Self), d1=assoc_sym (e.g. Output), d2=0
+    NK_TYPE_TYPEOF = 92 // d0=expr(node), d1=0, d2=0
+    NK_TYPE_EXTERN_FN = 127
+    // Patterns (for match arms)
+    NK_PAT_WILDCARD = 100
+    NK_PAT_IDENT = 101
+    NK_PAT_INT = 102
+    NK_PAT_BOOL = 103
+    NK_PAT_STRING = 104
+    NK_PAT_VARIANT = 105
+    NK_PAT_TUPLE = 106
+    NK_PAT_STRUCT = 107
+    NK_PAT_RANGE = 108
+    NK_PAT_OR = 109
+    NK_MATCH_ARM = 110
+    NK_PAT_ENUM_SHORTHAND = 111
+    NK_PAT_AT_BINDING = 112
+    NK_PAT_SLICE = 113
+    NK_PAT_TYPED_BIND = 114
+    NK_PAT_REST = 125
+    NK_PAT_REGEX = 121
+    NK_DO_WHILE = 122
+
+// With-expression binding encoding in d2:
+// - positive value: immutable binding symbol id
+// - negative value: mutable binding symbol id
+fn encode_with_binding(sym: i32, is_mut: i32) -> i32:
+    if is_mut != 0 and sym > 0:
+        return 0 - sym
+    sym
+
+fn decode_with_binding_sym(encoded: i32) -> i32:
+    if encoded < 0:
+        return 0 - encoded
+    encoded
+
+fn decode_with_binding_is_mut(encoded: i32) -> i32:
+    if encoded < 0:
+        return 1
+    0
+
+// Type decl sub-kinds (stored in data2 field)
+enum TypeDeclKind: i32:
+    Alias = 0
+    Struct = 1
+    Enum = 2
+    Distinct = 3
+    DiscEnum = 4
+    Opaque = 5
+    Union = 6
+
+// Type decl flag bits (combined with TypeDeclKind via arithmetic)
+const TDK_FLAG_EPHEMERAL: i32 = 8
+const TDK_FLAG_PACKED: i32 = 16
+const TDK_FLAG_BITPACKED: i32 = 32
+const TDK_FLAG_SPECIFIED: i32 = 64
+const TDK_FLAG_ERROR: i32 = 128
+const TDK_FLAG_REPR_C: i32 = 256
+
+fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
+    if is_ephemeral != 0:
+        return sub_kind + TDK_FLAG_EPHEMERAL
+    sub_kind
+
+fn type_decl_sub_kind(packed: i32) -> i32:
+    packed % TDK_FLAG_EPHEMERAL
+
+fn type_decl_is_ephemeral(packed: i32) -> i32:
+    (packed / TDK_FLAG_EPHEMERAL) % 2
+
+fn type_decl_is_packed(packed: i32) -> i32:
+    (packed / TDK_FLAG_PACKED) % 2
+
+fn type_decl_is_bitpacked(packed: i32) -> i32:
+    (packed / TDK_FLAG_BITPACKED) % 2
+
+// @[repr(C)] layout. @[repr(packed)] implies repr(C) per §16.4.
+fn type_decl_is_repr_c(packed: i32) -> i32:
+    if (packed / TDK_FLAG_REPR_C) % 2 != 0:
+        return 1
+    type_decl_is_packed(packed)
+
+fn type_decl_is_specified(packed: i32) -> i32:
+    (packed / TDK_FLAG_SPECIFIED) % 2
+
+fn type_decl_is_error(packed: i32) -> i32:
+    (packed / TDK_FLAG_ERROR) % 2
+
+// Fn decl flag bits (stored in data2 field)
+@[flags]
+enum FnFlags: i32:
+    PUB = 1
+    ASYNC = 2
+    GEN = 4
+    COMPTIME = 8
+    TAILREC = 16
+    MUST_USE = 32
+    VARIADIC = 64
+    INLINE = 128
+    NOINLINE = 256
+    PANIC_HANDLER = 512
+    ENTRY = 1024
+    NO_MAIN = 2048
+    TEST = 4096
+    BEFORE = 8192
+    AFTER = 16384
+    BENCH = 32768
+
+// Metadata packing unit used to encode required-parameter count into
+// fn_meta flags without affecting existing FnFlags.* parity checks.
+const FN_META_REQUIRED_UNIT: i32 = 65536
+const FN_PARAM_STRIDE: i32 = 3
+const TRAIT_METHOD_STRIDE: i32 = 8
+const TRAIT_METHOD_NAME: i32 = 0
+const TRAIT_METHOD_FLAGS: i32 = 1
+const TRAIT_METHOD_PARAM_START: i32 = 2
+const TRAIT_METHOD_PARAM_COUNT: i32 = 3
+const TRAIT_METHOD_RETURN_TYPE: i32 = 4
+const TRAIT_METHOD_DEFAULT_BODY: i32 = 5
+const TRAIT_METHOD_SOURCE_START: i32 = 6
+const TRAIT_METHOD_SOURCE_END: i32 = 7
+const FN_PARAM_FLAG_NOALIAS: i32 = 1
+const FN_PARAM_FLAG_IMPLICIT: i32 = 2
+// docs/mut.md Rev 8 §5.1 — receiver-place mode `mut self: Self`.
+// Set by the parser when the param name is `self` and was preceded by `mut`.
+// Stored as a flag bit so callers can detect a mutating receiver without
+// reparsing. No semantic effect during the bridge phase (P1..P11);
+// at P11 sema reads this bit to require a mutable place at the call site.
+const FN_PARAM_FLAG_MUT_SELF: i32 = 4
+// docs/mutability.md — receiver-mode `self: &Self` (read-only view).
+// Set when param name is `self` and the declared type is a reference (&Self).
+const FN_PARAM_FLAG_REF_SELF: i32 = 8
+// docs/mutability.md — receiver-mode `move self: Self` (consuming).
+// Set when param name is `self` and was preceded by `move`.
+const FN_PARAM_FLAG_MOVE_SELF: i32 = 16
+// D7: the parser synthesized this receiver from `fn` / `mut fn` / `move fn`.
+// This is distinct from its access mode so analysis and migrations can prove
+// that no source-level `self` parameter remains.
+const FN_PARAM_FLAG_SYNTH_RECEIVER: i32 = 32
+
+// Multi-index spec kind constants (stored in NK_INDEX_SPEC.d2 high bits)
+const INDEX_SCALAR: i32 = 0
+const INDEX_SLICE: i32 = 1
+const INDEX_ELLIPSIS: i32 = 2
+const INDEX_NEWAXIS: i32 = 3
+const INDEX_KIND_SHIFT: i32 = 268435456  // 1 << 28
+
+pub const TYPE_TRAIT_OBJECT_DYN: i32 = 1
+pub const TYPE_TRAIT_OBJECT_IMPL: i32 = 2
+
+// NK_UNSAFE_BLOCK.d1 distinguishes a true unsafe block from the narrow
+// `unsafe *p` / `unsafe p[i]` raw-access prefix form. d2 marks parser-inserted
+// unsafe-function body wrappers, which are not subject to the unnecessary-block
+// diagnostic.
+const UNSAFE_KIND_BLOCK: i32 = 0
+const UNSAFE_KIND_PREFIX: i32 = 1
+const UNSAFE_ORIGIN_EXPR: i32 = 0
+const UNSAFE_ORIGIN_FN_BODY: i32 = 1
+
+fn fn_param_is_noalias(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_NOALIAS) % 2
+
+fn fn_param_is_implicit(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_IMPLICIT) % 2
+
+fn fn_param_is_mut_self(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_MUT_SELF) % 2
+
+fn fn_param_is_ref_self(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_REF_SELF) % 2
+
+fn fn_param_is_move_self(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_MOVE_SELF) % 2
+
+fn fn_param_is_synth_receiver(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_SYNTH_RECEIVER) % 2
+
+// docs/mut.md Rev 8 §12 — module-level place declarations.
+// NK_LET_DECL flags layout:
+//   bit 0 (mask 1):  is_mut (var vs let)
+//   bit 1 (mask 2):  is_pub
+//   bit 2 (mask 4):  LET_FLAG_GLOBAL     — declared via `global`
+//   bit 3 (mask 8):  LET_FLAG_GLOBAL_VAR — declared via `global var`
+//   bits 4+       :  (type_extra index + 1) * 16   (0 means no type)
+// Plain top-level `let`/`var` (without `global`) leave bits 2/3 clear.
+const LET_FLAG_GLOBAL: i32 = 4
+const LET_FLAG_GLOBAL_VAR: i32 = 8
+
+fn let_decl_is_global(flags: i32) -> i32:
+    (flags / LET_FLAG_GLOBAL) % 2
+
+fn let_decl_is_global_var(flags: i32) -> i32:
+    (flags / LET_FLAG_GLOBAL_VAR) % 2
+
+const C_IMPORT_ALLOW_COUNT_UNIT: i32 = 1024
+const C_IMPORT_NO_METHODS_COUNT_UNIT: i32 = 1048576       // 1024 * 1024
+const C_IMPORT_NO_METHODS_ALL_UNIT: i32 = 1073741824      // 1 << 30
+
+fn c_import_link_count(packed: i32) -> i32:
+    packed % C_IMPORT_ALLOW_COUNT_UNIT
+
+fn c_import_allow_count(packed: i32) -> i32:
+    (packed / C_IMPORT_ALLOW_COUNT_UNIT) % C_IMPORT_ALLOW_COUNT_UNIT
+
+// Count of per-type `no_methods: "Type"` names stored after the allow group.
+fn c_import_no_methods_count(packed: i32) -> i32:
+    (packed / C_IMPORT_NO_METHODS_COUNT_UNIT) % C_IMPORT_ALLOW_COUNT_UNIT
+
+// 1 when `no_methods: true` disabled auto-methods for the whole import.
+fn c_import_no_methods_all(packed: i32) -> i32:
+    (packed / C_IMPORT_NO_METHODS_ALL_UNIT) % 2
+
+fn pack_c_import_counts(link_count: i32, allow_count: i32) -> i32:
+    pack_c_import_counts_ex(link_count, allow_count, 0, 0)
+
+fn pack_c_import_counts_ex(link_count: i32, allow_count: i32, no_methods_count: i32, no_methods_all: i32) -> i32:
+    link_count + allow_count * C_IMPORT_ALLOW_COUNT_UNIT + no_methods_count * C_IMPORT_NO_METHODS_COUNT_UNIT + no_methods_all * C_IMPORT_NO_METHODS_ALL_UNIT
+
+// Visibility flags
+enum Visibility: i32:
+    Private = 0
+    Public = 1
+
+// Binary operators
+pub enum BinaryOp: i32:
+    OP_ADD = 0
+    OP_SUB = 1
+    OP_MUL = 2
+    OP_DIV = 3
+    OP_MOD = 4
+    OP_EQ = 5
+    OP_NEQ = 6
+    OP_LT = 7
+    OP_GT = 8
+    OP_LTE = 9
+    OP_GTE = 10
+    OP_AND = 11
+    OP_OR = 12
+    OP_BIT_AND = 13
+    OP_BIT_OR = 14
+    OP_BIT_XOR = 15
+    OP_SHL = 16
+    OP_SHR = 17
+    OP_DEFAULT = 18
+    OP_CONCAT = 19
+    OP_ADD_WRAP = 20
+    OP_SUB_WRAP = 21
+    OP_MUL_WRAP = 22
+    OP_IN = 23
+    OP_NOT_IN = 24
+    OP_ADD_SAT = 25
+    OP_SUB_SAT = 26
+    OP_MUL_SAT = 27
+    OP_MATMUL = 28
+
+// Unary operators
+enum UnaryOp: i32:
+    UOP_NEGATE = 0
+    UOP_NOT = 1
+    UOP_REF = 2
+    UOP_MUT_REF = 3  // dead after P12 lockdown — parser rejects &mut
+    UOP_DEREF = 4
+    UOP_TRY = 5
+    UOP_BIT_NOT = 6
+    // docs/mut.md Rev 8 §13.2 — explicit raw-address-of forms.
+    UOP_RAW_REF_CONST = 7
+    UOP_RAW_REF_MUT = 8
+
+// Literal suffix metadata (stored out-of-line in AstPool.literal_suffixes)
+enum LiteralSuffix: i32:
+    None = 0
+    I8 = 1
+    I16 = 2
+    I32 = 3
+    I64 = 4
+    I128 = 5
+    Isize = 6
+    U8 = 7
+    U16 = 8
+    U32 = 9
+    U64 = 10
+    U128 = 11
+    Usize = 12
+    F32 = 13
+    F64 = 14
+
+// F-string segment kinds (stored in extra_data)
+enum FStringSegmentKind: i32:
+    LITERAL = 0  // +1 word: string token index (interned symbol)
+    EXPR = 1     // +1 word: expression node, +1 word: spec node (0 if none)
+
+// ── AST Pool ──────────────────────────────────────────────────────
+
+// The AstPool stores all AST nodes in parallel arrays (SoA layout).
+// Each node has:
+// - A kind tag (NodeKind.NK_*)
+// - Start/end span positions (byte offsets into source)
+// - Up to 3 integer data fields (meaning depends on kind)
+// - An optional extra data range for variable-length data
+//
+// Node 0 is reserved as a null sentinel.
+
+type AstPoolState {
+    kinds: Vec[i32],
+    starts: Vec[i32],
+    ends: Vec[i32],
+    data0: Vec[i32],
+    data1: Vec[i32],
+    data2: Vec[i32],
+    literal_suffixes: Vec[i32],
+    int_literal_digit_idxs: Vec[i32],
+    int_literal_radices: Vec[i32],
+    // Tenth SoA column: the file each node was parsed from. Spans store
+    // (start,end) byte offsets only; without this, file identity is
+    // reconstructed positionally from decl tables (#661 class). Stamped
+    // from current_file_id, which each Parser sets for its file.
+    files: Vec[i32],
+    current_file_id: i32,
+    extra: Vec[i32],
+    decls: Vec[i32],
+    local_decl_count: i32,
+    prelude_decl_count: i32,
+    strings: Vec[str],
+    fn_meta: Vec[i32],
+    type_meta: Vec[i32],
+    pattern_qualifiers: Vec[i32],
+    fn_param_patterns: Vec[i32],
+    fn_param_pattern_meta: Vec[i32],
+    for_meta: Vec[i32],
+    block_meta: Vec[i32],
+    must_use_type_nodes: Vec[i32],
+    no_await_guard_type_nodes: Vec[i32],
+    no_alloc_fn_nodes: Vec[i32],
+    iter_of_self_fn_nodes: Vec[i32],
+    sealed_trait_nodes: Vec[i32],
+    extend_impl_nodes: Vec[i32],
+    comptime_decl_nodes: Vec[i32],
+    move_closure_nodes: Vec[i32],
+    non_escaping_closure_nodes: Vec[i32],
+    by_place_closure_nodes: Vec[i32],
+    compiler_hook_fn_nodes: Vec[i32],
+    compiler_hook_phase_syms: Vec[i32],
+    global_allocator_decl_nodes: Vec[i32],
+    where_meta: Vec[i32],
+    impl_type_params: Vec[i32],
+    impl_target_type_nodes: Vec[i32],
+    impl_trait_type_args: Vec[i32],
+    fn_meta_map: HashMap[i32, i32],
+    // For `x in collection` / `x not in collection` binary nodes: the extra-array
+    // index of the pre-reserved `collection.contains(x)` argument. Allocated at
+    // parse time because the pool freezes before MIR lowering (#234, §9.9).
+    membership_arg_map: HashMap[i32, i32],
+    // (parent for/comprehension node, binding value) pairs the parser built
+    // as PATTERN bindings; absent = plain symbol binding. See
+    // for_binding_is_pattern. The Vec mirrors the map in insertion order so
+    // pool clones (ComptimeTransform) can copy it deterministically.
+    pattern_binding_keys: HashMap[i64, i32],
+    pattern_binding_pairs: Vec[i64],
+    type_meta_map: HashMap[i32, i32],
+    pattern_qualifier_map: HashMap[i32, i32],
+    where_meta_map: HashMap[i32, i32],
+    impl_type_params_map: HashMap[i32, i32],
+    impl_target_type_nodes_map: HashMap[i32, i32],
+    impl_trait_type_args_map: HashMap[i32, i32],
+    fn_param_pattern_meta_map: HashMap[i32, i32],
+    for_meta_map: HashMap[i32, i32],
+    block_meta_map: HashMap[i32, i32],
+    fn_param_defaults: HashMap[i64, i32],
+    must_use_type_set: HashMap[i32, i32],
+    no_await_guard_type_set: HashMap[i32, i32],
+    no_alloc_fn_set: HashMap[i32, i32],
+    iter_of_self_fn_set: HashMap[i32, i32],
+    sealed_trait_set: HashMap[i32, i32],
+    extend_impl_set: HashMap[i32, i32],
+    comptime_decl_set: HashMap[i32, i32],
+    move_closure_set: HashMap[i32, i32],
+    non_escaping_closure_set: HashMap[i32, i32],
+    by_place_closure_set: HashMap[i32, i32],
+    compiler_hook_fn_set: HashMap[i32, i32],
+    compiler_hook_phase_map: HashMap[i32, i32],
+    global_allocator_decl_set: HashMap[i32, i32],
+    call_named_args: HashMap[i32, i32],
+    fn_stack_sizes: HashMap[i32, i32],
+    fn_weak_flags: HashMap[i32, i32],
+    fn_target_arch: HashMap[i32, i32],   // fn_node → @[target("arch")] arch name sym
+    unsafe_fn_type_nodes: HashMap[i32, i32],  // NK_TYPE_FN/EXTERN_FN node → 1 if `unsafe fn(...)`
+    fn_effect_pin_starts: HashMap[i32, i32],   // fn_node → first entry in fn_effect_pin_*
+    fn_effect_pin_counts: HashMap[i32, i32],   // fn_node → entry count
+    fn_effect_pin_params: Vec[i32],            // param_name_sym
+    fn_effect_pin_bits: Vec[i32],              // effect bitmask
+    // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
+    copy_arg_needs_clone: HashMap[i32, i32],   // node → 1
+    frozen: i32,
+}
+
+pub type AstPool {
+    state: *mut AstPoolState,
+}
+impl Copy for AstPool
+
+fn AstPool.new -> AstPool:
+    let ptr = with_alloc(2048) as *mut AstPoolState
+    unsafe:
+        *ptr = AstPoolState {
+            kinds: Vec.new(),
+            starts: Vec.new(),
+            ends: Vec.new(),
+            data0: Vec.new(),
+            data1: Vec.new(),
+            data2: Vec.new(),
+            literal_suffixes: Vec.new(),
+            int_literal_digit_idxs: Vec.new(),
+            int_literal_radices: Vec.new(),
+            files: Vec.new(),
+            current_file_id: 0,
+            extra: Vec.new(),
+            decls: Vec.new(),
+            local_decl_count: -1,
+            prelude_decl_count: -1,
+            strings: Vec.new(),
+            fn_meta: Vec.new(),
+            type_meta: Vec.new(),
+            pattern_qualifiers: Vec.new(),
+            fn_param_patterns: Vec.new(),
+            fn_param_pattern_meta: Vec.new(),
+            for_meta: Vec.new(),
+            block_meta: Vec.new(),
+            must_use_type_nodes: Vec.new(),
+            no_await_guard_type_nodes: Vec.new(),
+            no_alloc_fn_nodes: Vec.new(),
+            iter_of_self_fn_nodes: Vec.new(),
+            sealed_trait_nodes: Vec.new(),
+            extend_impl_nodes: Vec.new(),
+            comptime_decl_nodes: Vec.new(),
+            move_closure_nodes: Vec.new(),
+            non_escaping_closure_nodes: Vec.new(),
+            by_place_closure_nodes: Vec.new(),
+            compiler_hook_fn_nodes: Vec.new(),
+            compiler_hook_phase_syms: Vec.new(),
+            global_allocator_decl_nodes: Vec.new(),
+            where_meta: Vec.new(),
+            impl_type_params: Vec.new(),
+            impl_target_type_nodes: Vec.new(),
+            impl_trait_type_args: Vec.new(),
+            fn_meta_map: HashMap.new(),
+            membership_arg_map: HashMap.new(),
+            pattern_binding_keys: HashMap.new(),
+            pattern_binding_pairs: Vec.new(),
+            type_meta_map: HashMap.new(),
+            pattern_qualifier_map: HashMap.new(),
+            where_meta_map: HashMap.new(),
+            impl_type_params_map: HashMap.new(),
+            impl_target_type_nodes_map: HashMap.new(),
+            impl_trait_type_args_map: HashMap.new(),
+            fn_param_pattern_meta_map: HashMap.new(),
+            for_meta_map: HashMap.new(),
+            block_meta_map: HashMap.new(),
+            fn_param_defaults: HashMap.new(),
+            must_use_type_set: HashMap.new(),
+            no_await_guard_type_set: HashMap.new(),
+            no_alloc_fn_set: HashMap.new(),
+            iter_of_self_fn_set: HashMap.new(),
+            sealed_trait_set: HashMap.new(),
+            extend_impl_set: HashMap.new(),
+            comptime_decl_set: HashMap.new(),
+            move_closure_set: HashMap.new(),
+            non_escaping_closure_set: HashMap.new(),
+            by_place_closure_set: HashMap.new(),
+            compiler_hook_fn_set: HashMap.new(),
+            compiler_hook_phase_map: HashMap.new(),
+            global_allocator_decl_set: HashMap.new(),
+            call_named_args: HashMap.new(),
+            fn_stack_sizes: HashMap.new(),
+            fn_weak_flags: HashMap.new(),
+            fn_target_arch: HashMap.new(),
+            unsafe_fn_type_nodes: HashMap.new(),
+            fn_effect_pin_starts: HashMap.new(),
+            fn_effect_pin_counts: HashMap.new(),
+            fn_effect_pin_params: Vec.new(),
+            fn_effect_pin_bits: Vec.new(),
+            copy_arg_needs_clone: HashMap.new(),
+            frozen: 0,
+        }
+    let st = ptr
+    st.kinds.push(0)
+    st.starts.push(0)
+    st.ends.push(0)
+    st.data0.push(0)
+    st.data1.push(0)
+    st.data2.push(0)
+    st.literal_suffixes.push(LiteralSuffix.None)
+    st.int_literal_digit_idxs.push(-1)
+    st.int_literal_radices.push(0)
+    st.files.push(0)
+    AstPool { state: ptr }
+
+// Mark the pool as immutable. Any subsequent mutation will print an error.
+impl AstPool:
+    mut fn freeze():
+        self.state.frozen = 1
+
+    // Add a node to the pool, returns the node index.
+    fn add_node(kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: AstPool.add_node called after freeze")
+        let idx = self.state.kinds.len() as i32
+        self.state.kinds.push(kind)
+        self.state.starts.push(start)
+        self.state.ends.push(end)
+        self.state.data0.push(d0)
+        self.state.data1.push(d1)
+        self.state.data2.push(d2)
+        self.state.literal_suffixes.push(LiteralSuffix.None)
+        self.state.int_literal_digit_idxs.push(-1)
+        self.state.int_literal_radices.push(0)
+        self.state.files.push(self.state.current_file_id)
+        idx as NodeId
+
+    // Add extra data, returns the index in the extra array.
+    fn add_extra(value: i32) -> i32:
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: AstPool.add_extra called after freeze")
+        let idx = self.state.extra.len() as i32
+        self.state.extra.push(value)
+        idx
+
+    // Add a string to the string table, returns the string index.
+    fn add_string(s: &str) -> i32:
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: AstPool.add_string called after freeze")
+        let idx = self.state.strings.len() as i32
+        self.state.strings.push(with_str_clone_ref(s))
+        idx
+
+    // The file a node was parsed from (0 = root/unknown). See the `files`
+    // column note; synthesized nodes inherit the active parse's file.
+    // FileId is the compiler's first enforced-distinct id (D-candidate:
+    // "record at the producer; ids are distinct types") — mixing it with
+    // node/symbol/type ids is a compile error, which is the entire point
+    // (#660 was a symbol id read as a node id).
+    fn file(idx: NodeId) -> AstFileId:
+        let i = idx as i32
+        if i < 0 or i as i64 >= self.state.files.len():
+            return AstFileId(0)
+        AstFileId(self.state.files.get(i as i64))
+
+    mut fn set_current_file_id(file_id: AstFileId):
+        self.state.current_file_id = file_id as i32
+
+    // Get node kind at index
+    fn kind(idx: NodeId) -> i32:
+        self.state.kinds.get((idx as i32) as i64)
+
+    // Get node data fields
+    fn get_data0(idx: NodeId) -> i32:
+        self.state.data0.get((idx as i32) as i64)
+
+    fn get_data1(idx: NodeId) -> i32:
+        self.state.data1.get((idx as i32) as i64)
+
+    fn get_data2(idx: NodeId) -> i32:
+        self.state.data2.get((idx as i32) as i64)
+
+    fn literal_suffix(idx: NodeId) -> i32:
+        self.state.literal_suffixes.get((idx as i32) as i64)
+
+    fn set_literal_suffix(idx: NodeId, suffix: i32):
+        self.state.literal_suffixes.set_i32((idx as i32) as i64, suffix)
+
+    fn int_literal_digit_idx(idx: NodeId) -> i32:
+        self.state.int_literal_digit_idxs.get((idx as i32) as i64)
+
+    fn int_literal_radix(idx: NodeId) -> i32:
+        self.state.int_literal_radices.get((idx as i32) as i64)
+
+    fn set_int_literal_exact(idx: NodeId, digit_idx: i32, radix: i32):
+        self.state.int_literal_digit_idxs.set_i32((idx as i32) as i64, digit_idx)
+        self.state.int_literal_radices.set_i32((idx as i32) as i64, radix)
+
+    fn has_int_literal_exact(idx: NodeId) -> bool:
+        self.int_literal_digit_idx(idx) >= 0 and self.int_literal_radix(idx) >= 2
+
+    fn int_literal_digits(idx: NodeId) -> str:
+        let digit_idx = self.int_literal_digit_idx(idx)
+        if digit_idx < 0:
+            return ""
+        with_str_clone_ref(self.get_string(digit_idx))
+
+const AST_INT_PART_BASE: i64 = 2097152
+const AST_INT_PART_BASE2: i64 = 4398046511104
+
+fn ast_int_part0(value: i64) -> i32:
+    (value % AST_INT_PART_BASE) as i32
+
+fn ast_int_part1(value: i64) -> i32:
+    ((value / AST_INT_PART_BASE) % AST_INT_PART_BASE) as i32
+
+fn ast_int_part2(value: i64) -> i32:
+    (value / AST_INT_PART_BASE2) as i32
+
+fn ast_int_from_parts(d0: i32, d1: i32, d2: i32) -> i64:
+    (d0 as i64) + (d1 as i64) * AST_INT_PART_BASE + (d2 as i64) * AST_INT_PART_BASE2
+
+impl AstPool:
+    fn int_lit_value(idx: NodeId) -> i64:
+        ast_int_from_parts(self.get_data0(idx), self.get_data1(idx), self.get_data2(idx))
+
+type ExactIntValue {
+    ok: i32,
+    overflow: i32,
+    lo: i64,
+    hi: i64,
+}
+impl Copy for ExactIntValue
+
+type ExactIntExpr {
+    ok: i32,
+    overflow: i32,
+    negative: i32,
+    lo: i64,
+    hi: i64,
+}
+impl Copy for ExactIntExpr
+
+type ExactIntI64 {
+    ok: i32,
+    value: i64,
+}
+impl Copy for ExactIntI64
+
+fn exact_int_invalid() -> ExactIntValue:
+    ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+
+fn exact_int_overflow() -> ExactIntValue:
+    ExactIntValue { ok: 1, overflow: 1, lo: 0, hi: 0 }
+
+fn exact_int_value(lo: i64, hi: i64) -> ExactIntValue:
+    ExactIntValue { ok: 1, overflow: 0, lo, hi }
+
+fn exact_int_expr_invalid() -> ExactIntExpr:
+    ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
+
+fn exact_int_expr_value(lo: i64, hi: i64, negative: i32) -> ExactIntExpr:
+    ExactIntExpr { ok: 1, overflow: 0, negative, lo, hi }
+
+fn exact_int_expr_magnitude(expr: ExactIntExpr) -> ExactIntValue:
+    ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }
+
+fn exact_int_sign_bit() -> i64:
+    -9223372036854775807 - 1
+
+fn exact_int_uword_lt(lhs: i64, rhs: i64) -> bool:
+    let sign_bit = exact_int_sign_bit()
+    (lhs ^ sign_bit) < (rhs ^ sign_bit)
+
+fn exact_int_uword_lte(lhs: i64, rhs: i64) -> bool:
+    let sign_bit = exact_int_sign_bit()
+    (lhs ^ sign_bit) <= (rhs ^ sign_bit)
+
+fn exact_int_low_mask(bits: i32) -> i64:
+    if bits <= 0:
+        return 0
+    if bits >= 64:
+        return -1
+    if bits == 63:
+        return 9223372036854775807
+    ((1 as i64) << (bits as u32)) - 1
+
+fn exact_int_pow2_word(bit: i32) -> i64:
+    if bit < 0 or bit >= 64:
+        return 0
+    if bit == 63:
+        return exact_int_sign_bit()
+    (1 as i64) << (bit as u32)
+
+fn exact_int_logical_shr_word(value: i64, shift: i32) -> i64:
+    if shift <= 0:
+        return value
+    if shift >= 64:
+        return 0
+    (value >> (shift as u32)) & exact_int_low_mask(64 - shift)
+
+fn exact_int_shl_word(value: i64, shift: i32) -> i64:
+    if shift <= 0:
+        return value
+    if shift >= 64:
+        return 0
+    var out = value
+    for i in 0..shift:
+        out = out +% out
+    out
+
+fn exact_int_word_to_f64(value: i64) -> f64:
+    if value >= 0:
+        return value as f64
+    9223372036854775808.0 + ((value ^ exact_int_sign_bit()) as f64)
+
+fn exact_int_is_zero(value: ExactIntValue) -> bool:
+    value.ok != 0 and value.overflow == 0 and value.lo == 0 and value.hi == 0
+
+fn exact_int_cmp(lhs: ExactIntValue, rhs: ExactIntValue) -> i32:
+    if exact_int_uword_lt(lhs.hi, rhs.hi):
+        return -1
+    if exact_int_uword_lt(rhs.hi, lhs.hi):
+        return 1
+    if exact_int_uword_lt(lhs.lo, rhs.lo):
+        return -1
+    if exact_int_uword_lt(rhs.lo, lhs.lo):
+        return 1
+    0
+
+fn exact_int_add_values(lhs: ExactIntValue, rhs: ExactIntValue) -> ExactIntValue:
+    if lhs.ok == 0 or rhs.ok == 0:
+        return exact_int_invalid()
+    if lhs.overflow != 0 or rhs.overflow != 0:
+        return exact_int_overflow()
+    let lo = lhs.lo +% rhs.lo
+    let carry = if exact_int_uword_lt(lo, lhs.lo): 1 as i64 else: 0 as i64
+    let hi = lhs.hi +% rhs.hi
+    if exact_int_uword_lt(hi, lhs.hi):
+        return exact_int_overflow()
+    let hi2 = hi +% carry
+    if exact_int_uword_lt(hi2, hi):
+        return exact_int_overflow()
+    exact_int_value(lo, hi2)
+
+fn exact_int_add_small(value: ExactIntValue, digit: i64) -> ExactIntValue:
+    exact_int_add_values(value, exact_int_value(digit, 0))
+
+fn exact_int_shl_small(value: ExactIntValue, shift: i32) -> ExactIntValue:
+    if value.ok == 0:
+        return exact_int_invalid()
+    if value.overflow != 0:
+        return exact_int_overflow()
+    if shift < 0 or shift >= 64:
+        return exact_int_invalid()
+    if shift == 0:
+        return value
+    if exact_int_logical_shr_word(value.hi, 64 - shift) != 0:
+        return exact_int_overflow()
+    let hi = exact_int_shl_word(value.hi, shift) | exact_int_logical_shr_word(value.lo, 64 - shift)
+    let lo = exact_int_shl_word(value.lo, shift)
+    exact_int_value(lo, hi)
+
+fn exact_int_mul_small(value: ExactIntValue, factor: i32) -> ExactIntValue:
+    if value.ok == 0:
+        return exact_int_invalid()
+    if value.overflow != 0:
+        return exact_int_overflow()
+    if factor < 0:
+        return exact_int_invalid()
+    var result = exact_int_value(0, 0)
+    var addend = value
+    var mul = factor
+    while mul > 0:
+        if (mul & 1) != 0:
+            result = exact_int_add_values(result, addend)
+            if result.overflow != 0:
+                return result
+        mul = mul >> 1
+        if mul > 0:
+            addend = exact_int_shl_small(addend, 1)
+            if addend.overflow != 0:
+                return addend
+    result
+
+fn exact_int_mask_bits(value: ExactIntValue, bits: i32) -> ExactIntValue:
+    if value.ok == 0:
+        return exact_int_invalid()
+    if value.overflow != 0:
+        return exact_int_overflow()
+    if bits <= 0:
+        return exact_int_value(0, 0)
+    if bits >= 128:
+        return value
+    if bits < 64:
+        let mask = exact_int_low_mask(bits)
+        return exact_int_value(value.lo & mask, 0)
+    if bits == 64:
+        return exact_int_value(value.lo, 0)
+    let hi_bits = bits - 64
+    let hi_mask = exact_int_low_mask(hi_bits)
+    exact_int_value(value.lo, value.hi & hi_mask)
+
+fn exact_int_digit_value(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return ch - 48
+    if ch >= 97 and ch <= 102:
+        return ch - 87
+    if ch >= 65 and ch <= 70:
+        return ch - 55
+    -1
+
+fn exact_int_parse_digits(digits: &str, radix: i32) -> ExactIntValue:
+    if radix < 2 or radix > 16:
+        return exact_int_invalid()
+    var acc = exact_int_value(0, 0)
+    for i in 0..digits.len() as i32:
+        let digit = exact_int_digit_value(digits.byte_at(i as i64))
+        if digit < 0 or digit >= radix:
+            return exact_int_invalid()
+        acc = exact_int_mul_small(acc, radix)
+        if acc.overflow != 0:
+            return acc
+        acc = exact_int_add_small(acc, digit as i64)
+        if acc.overflow != 0:
+            return acc
+    acc
+
+fn exact_int_fits_unsigned_bits(value: ExactIntValue, bits: i32) -> bool:
+    if value.ok == 0 or value.overflow != 0:
+        return false
+    if bits <= 0:
+        return false
+    if bits >= 128:
+        return true
+    if bits < 64:
+        if value.hi != 0:
+            return false
+        let max_lo = exact_int_low_mask(bits)
+        return exact_int_uword_lte(value.lo, max_lo)
+    if bits == 64:
+        return value.hi == 0
+    let hi_bits = bits - 64
+    let max_hi = exact_int_low_mask(hi_bits)
+    exact_int_uword_lte(value.hi, max_hi)
+
+fn exact_int_fits_signed_magnitude_bits(value: ExactIntValue, bits: i32) -> bool:
+    if value.ok == 0 or value.overflow != 0:
+        return false
+    if bits <= 0:
+        return false
+    if bits == 1:
+        return exact_int_is_zero(value)
+    exact_int_fits_unsigned_bits(value, bits - 1)
+
+fn exact_int_fits_signed_negative_bits(value: ExactIntValue, bits: i32) -> bool:
+    if value.ok == 0 or value.overflow != 0:
+        return false
+    if bits <= 0:
+        return false
+    let mag_bits = bits - 1
+    if mag_bits < 64:
+        if value.hi != 0:
+            return false
+        return exact_int_uword_lte(value.lo, exact_int_pow2_word(mag_bits))
+    if mag_bits == 64:
+        if value.hi == 0:
+            return true
+        return value.hi == 1 and value.lo == 0
+    let limit_hi = exact_int_pow2_word(mag_bits - 64)
+    if exact_int_uword_lt(value.hi, limit_hi):
+        return true
+    value.hi == limit_hi and value.lo == 0
+
+fn exact_int_try_i64(value: ExactIntValue) -> ExactIntI64:
+    if value.ok == 0 or value.overflow != 0:
+        return ExactIntI64 { ok: 0, value: 0 }
+    if value.hi != 0 or value.lo < 0:
+        return ExactIntI64 { ok: 0, value: 0 }
+    ExactIntI64 { ok: 1, value: value.lo }
+
+fn exact_int_twos_complement_bits(value: ExactIntValue, bits: i32) -> ExactIntValue:
+    if value.ok == 0 or value.overflow != 0:
+        return exact_int_invalid()
+    let lo = (~value.lo) +% 1
+    let carry = if lo == 0: 1 as i64 else: 0 as i64
+    let hi = (~value.hi) +% carry
+    let neg = exact_int_value(lo, hi)
+    if bits >= 128:
+        return neg
+    exact_int_mask_bits(neg, bits)
+
+impl AstPool:
+    fn int_literal_exact_value(idx: NodeId) -> ExactIntValue:
+        if not self.has_int_literal_exact(idx):
+            return exact_int_invalid()
+        exact_int_parse_digits(self.int_literal_digits(idx), self.int_literal_radix(idx))
+
+    fn int_literal_fast_i64(idx: NodeId) -> ExactIntI64:
+        if self.has_int_literal_exact(idx):
+            return exact_int_try_i64(self.int_literal_exact_value(idx))
+        ExactIntI64 { ok: 1, value: self.int_lit_value(idx) }
+
+    fn int_literal_expr_i64(node: i32) -> ExactIntI64:
+        if node == 0:
+            return ExactIntI64 { ok: 0, value: 0 }
+        let kind = self.kind(node)
+        if kind == NodeKind.NK_INT_LIT and not self.has_int_literal_exact(node as NodeId):
+            return ExactIntI64 { ok: 1, value: self.int_lit_value(node as NodeId) }
+        let expr = self.int_literal_exact_expr(node)
+        if expr.ok == 0 or expr.overflow != 0:
+            return ExactIntI64 { ok: 0, value: 0 }
+        let mag = exact_int_expr_magnitude(expr)
+        if expr.negative == 0:
+            return exact_int_try_i64(mag)
+        if not exact_int_fits_signed_negative_bits(mag, 64):
+            return ExactIntI64 { ok: 0, value: 0 }
+        if mag.hi == 0 and mag.lo == exact_int_sign_bit():
+            return ExactIntI64 { ok: 1, value: -9223372036854775807 - 1 }
+        ExactIntI64 { ok: 1, value: 0 - mag.lo }
+
+    fn int_literal_exact_expr(node: i32) -> ExactIntExpr:
+        if node == 0:
+            return ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
+        let kind = self.kind(node)
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_CAST:
+            return self.int_literal_exact_expr(self.get_data0(node))
+        if kind == NodeKind.NK_UNARY and self.get_data0(node) == UnaryOp.UOP_NEGATE:
+            let inner = self.int_literal_exact_expr(self.get_data1(node))
+            if inner.ok == 0 or inner.overflow != 0:
+                return inner
+            return ExactIntExpr { ok: 1, overflow: 0, negative: if inner.negative != 0: 0 else: 1, lo: inner.lo, hi: inner.hi }
+        if kind != NodeKind.NK_INT_LIT:
+            return ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
+        if self.has_int_literal_exact(node):
+            let parsed = self.int_literal_exact_value(node)
+            return ExactIntExpr { ok: parsed.ok, overflow: parsed.overflow, negative: 0, lo: parsed.lo, hi: parsed.hi }
+        let raw = self.int_lit_value(node)
+        if raw < 0:
+            // Parser-folded negative literal: report magnitude + sign. For
+            // i64.min the magnitude 2^63 is raw's own bit pattern read as an
+            // unsigned word, which is what the exact-int helpers compare.
+            if raw == (-9223372036854775807 - 1):
+                return ExactIntExpr { ok: 1, overflow: 0, negative: 1, lo: raw, hi: 0 }
+            return ExactIntExpr { ok: 1, overflow: 0, negative: 1, lo: 0 - raw, hi: 0 }
+        ExactIntExpr { ok: 1, overflow: 0, negative: 0, lo: raw, hi: 0 }
+
+    fn int_literal_expr_bits(node: i32, bits: i32, signed: i32) -> ExactIntValue:
+        let expr = self.int_literal_exact_expr(node)
+        if expr.ok == 0 or expr.overflow != 0:
+            return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+        let mag = ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }
+        if expr.negative == 0:
+            if signed != 0:
+                if not exact_int_fits_signed_magnitude_bits(mag, bits):
+                    return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+            else:
+                if not exact_int_fits_unsigned_bits(mag, bits):
+                    return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+            return mag
+        if signed == 0 or not exact_int_fits_signed_negative_bits(mag, bits):
+            return ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }
+        exact_int_twos_complement_bits(mag, bits)
+
+    fn has_comptime_nodes() -> bool:
+        for ni in 1..self.node_count():
+            let nid = ni as NodeId
+            if self.kind(nid) == NodeKind.NK_COMPTIME:
+                return true
+        false
+
+    fn has_comptime_branch_nodes() -> bool:
+        for ni in 1..self.node_count():
+            let nid = ni as NodeId
+            if self.kind(nid) == NodeKind.NK_COMPTIME:
+                let inner_i32 = self.get_data0(nid)
+                if inner_i32 > 0 and inner_i32 < self.node_count():
+                    let inner = inner_i32 as NodeId
+                    let ik = self.kind(inner)
+                    if ik == NodeKind.NK_IF_EXPR or ik == NodeKind.NK_FOR:
+                        return true
+        false
+
+    fn has_type_derives() -> bool:
+        var meta = 0
+        while meta < self.state.type_meta.len() as i32:
+            if self.type_meta_derive_count(meta) > 0:
+                return true
+            meta = meta + 3
+        false
+
+    fn mark_compiler_hook_fn(node: NodeId, phase_sym: i32):
+        self.state.compiler_hook_fn_nodes.push(node as i32)
+        self.state.compiler_hook_phase_syms.push(phase_sym)
+        self.state.compiler_hook_fn_set.insert(node as i32, 1)
+        self.state.compiler_hook_phase_map.insert(node as i32, phase_sym)
+
+    fn is_compiler_hook_fn(node: NodeId) -> i32:
+        if self.state.compiler_hook_fn_set.contains(node as i32): 1 else: 0
+
+    fn compiler_hook_phase(node: NodeId) -> i32:
+        if self.state.compiler_hook_phase_map.contains(node as i32):
+            return self.state.compiler_hook_phase_map.get(node as i32).unwrap()
+        0
+
+    fn compiler_hook_count() -> i32:
+        self.state.compiler_hook_fn_nodes.len() as i32
+
+    fn compiler_hook_node(idx: i32) -> NodeId:
+        self.state.compiler_hook_fn_nodes.get(idx as i64) as NodeId
+
+    fn compiler_hook_phase_at(idx: i32) -> i32:
+        self.state.compiler_hook_phase_syms.get(idx as i64)
+
+    fn mark_global_allocator_decl(node: NodeId):
+        self.state.global_allocator_decl_nodes.push(node as i32)
+        self.state.global_allocator_decl_set.insert(node as i32, 1)
+
+    fn is_global_allocator_decl(node: NodeId) -> i32:
+        if self.state.global_allocator_decl_set.contains(node as i32): return 1
+        0
+
+    fn get_extra(idx: i32) -> i32:
+        self.state.extra.get(idx as i64)
+
+    fn optional_chain_is_call(extra_start: i32) -> i32:
+        if extra_start < 0 or extra_start >= self.extra_len():
+            return 0
+        self.get_extra(extra_start)
+
+    fn optional_chain_arg_count(extra_start: i32) -> i32:
+        if self.optional_chain_is_call(extra_start) == 0:
+            return 0
+        if extra_start + 1 >= self.extra_len():
+            return 0
+        self.get_extra(extra_start + 1)
+
+    fn optional_chain_arg_start(extra_start: i32) -> i32:
+        extra_start + 2
+
+    fn get_string(idx: i32) -> &str:
+        self.state.strings.get(idx as i64)
+
+    fn get_start(idx: NodeId) -> i32:
+        self.state.starts.get((idx as i32) as i64)
+
+    fn get_end(idx: NodeId) -> i32:
+        self.state.ends.get((idx as i32) as i64)
+
+    fn node_count() -> i32:
+        self.state.kinds.len() as i32
+
+    fn require_same_storage(other: &AstPool, context: &str):
+        if self.state != other.state:
+            ast_pool_phase_bug("BUG: mismatched AstPool storage at " ++ context)
+
+    fn add_decl(node_idx: NodeId) -> Unit:
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: AstPool.add_decl called after freeze")
+        self.state.decls.push(node_idx as i32)
+
+    fn decl_count() -> i32:
+        self.state.decls.len() as i32
+
+    fn get_decl(idx: i32) -> NodeId:
+        (self.state.decls.get(idx as i64)) as NodeId
+
+    mut fn set_local_decl_count(n: i32):
+        self.state.local_decl_count = n
+
+    fn local_decl_count() -> i32:
+        self.state.local_decl_count
+
+    mut fn set_prelude_decl_count(n: i32):
+        self.state.prelude_decl_count = n
+
+    fn prelude_decl_count() -> i32:
+        self.state.prelude_decl_count
+
+    fn extra_len() -> i32:
+        self.state.extra.len() as i32
+
+    fn trait_assoc_count(node: NodeId): self.get_extra(self.get_data1(node) + 2)
+
+    fn trait_assoc_start(node: NodeId): self.get_data1(node) + 3
+
+    fn trait_method_count_index(node: NodeId) -> i32:
+        var pos = self.trait_assoc_start(node)
+        for _ in 0..self.trait_assoc_count(node):
+            let bound_count = self.get_extra(pos + 1)
+            pos = pos + 3 + bound_count
+        pos
+
+    fn trait_method_count(node: NodeId): self.get_extra(self.trait_method_count_index(node))
+
+    fn trait_method_start(node: NodeId): self.trait_method_count_index(node) + 1
+
+    fn trait_method_field(node: NodeId, method: i32, field: i32):
+        self.get_extra(self.trait_method_start(node) + method * TRAIT_METHOD_STRIDE + field)
+
+    fn set_data0(idx: NodeId, val: i32):
+        self.state.data0.set_i32((idx as i32) as i64, val)
+
+    fn set_data1(idx: NodeId, val: i32):
+        self.state.data1.set_i32((idx as i32) as i64, val)
+
+    fn set_data2(idx: NodeId, val: i32):
+        self.state.data2.set_i32((idx as i32) as i64, val)
+
+    fn set_start(idx: NodeId, val: i32):
+        self.state.starts.set_i32((idx as i32) as i64, val)
+
+    fn set_end(idx: NodeId, val: i32):
+        self.state.ends.set_i32((idx as i32) as i64, val)
+
+    // Store fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]
+    fn add_fn_meta(node: NodeId, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
+        let idx = self.state.fn_meta.len() as i32
+        self.state.fn_meta.push(node as i32)
+        self.state.fn_meta.push(flags)
+        self.state.fn_meta.push(ret)
+        self.state.fn_meta.push(ps)
+        self.state.fn_meta.push(pc)
+        self.state.fn_meta.push(ts)
+        self.state.fn_meta.push(tc)
+        self.state.fn_meta_map.insert(node as i32, idx)
+
+    fn add_fn_effect_pin(node: NodeId, param_sym: i32, bits: i32):
+        let n = node as i32
+        if not self.state.fn_effect_pin_starts.contains(n):
+            self.state.fn_effect_pin_starts.insert(n, self.state.fn_effect_pin_params.len() as i32)
+            self.state.fn_effect_pin_counts.insert(n, 0)
+        self.state.fn_effect_pin_params.push(param_sym)
+        self.state.fn_effect_pin_bits.push(bits)
+        let count: i32 = self.state.fn_effect_pin_counts.get(n).unwrap()
+        self.state.fn_effect_pin_counts.insert(n, count + 1)
+
+    fn fn_effect_pin_count(node: NodeId) -> i32:
+        let n = node as i32
+        if self.state.fn_effect_pin_counts.contains(n):
+            return self.state.fn_effect_pin_counts.get(n).unwrap()
+        0
+
+    fn fn_effect_pin_param(node: NodeId, idx: i32) -> i32:
+        let n = node as i32
+        if not self.state.fn_effect_pin_starts.contains(n):
+            return 0
+        let start = self.state.fn_effect_pin_starts.get(n).unwrap()
+        self.state.fn_effect_pin_params.get((start + idx) as i64)
+
+    fn fn_effect_pin_bits(node: NodeId, idx: i32) -> i32:
+        let n = node as i32
+        if not self.state.fn_effect_pin_starts.contains(n):
+            return 0
+        let start = self.state.fn_effect_pin_starts.get(n).unwrap()
+        self.state.fn_effect_pin_bits.get((start + idx) as i64)
+
+    // Record the extra-array slot holding the `contains` argument for an `in` node.
+    fn set_membership_arg(node: NodeId, slot: i32):
+        self.state.membership_arg_map.insert(node as i32, slot)
+
+    // Get the pre-reserved `contains` argument slot for an `in` node, or -1.
+    fn find_membership_arg(node: NodeId) -> i32:
+        let opt = self.state.membership_arg_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    // Get fn metadata for a given fn decl node. Returns 7-int record start or -1.
+    fn find_fn_meta(node: NodeId) -> i32:
+        let opt = self.state.fn_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn fn_meta_flags(meta: i32) -> i32:
+        self.state.fn_meta.get((meta + 1) as i64)
+
+    fn fn_meta_ret(meta: i32) -> i32:
+        self.state.fn_meta.get((meta + 2) as i64)
+
+    fn fn_meta_param_start(meta: i32) -> i32:
+        self.state.fn_meta.get((meta + 3) as i64)
+
+    fn fn_meta_param_count(meta: i32) -> i32:
+        self.state.fn_meta.get((meta + 4) as i64)
+
+    fn fn_meta_tp_start(meta: i32) -> i32:
+        self.state.fn_meta.get((meta + 5) as i64)
+
+    fn fn_meta_tp_count(meta: i32) -> i32:
+        self.state.fn_meta.get((meta + 6) as i64)
+
+    // D7: trait declarations must retain an explicit receiver to distinguish
+    // instance methods from associated methods, but app-facing impl blocks keep
+    // the ordinary implicit-receiver spelling. That distinction is known only
+    // after the full imported AST is assembled, so inherit the trait receiver
+    // here, before freeze, rather than guessing while an individual file parses.
+    // Associated trait methods have no receiver and remain unchanged.
+    mut fn inherit_trait_impl_receivers(intern: InternPool):
+        if self.state.frozen != 0:
+            ast_pool_phase_bug("BUG: trait impl receiver inheritance ran after AstPool.freeze")
+        for impl_di in 0..self.decl_count():
+            let impl_node = self.get_decl(impl_di)
+            if self.kind(impl_node) != NodeKind.NK_IMPL_DECL:
+                continue
+            let trait_sym = self.get_data2(impl_node)
+            if trait_sym == 0:
+                continue
+
+            var trait_node: NodeId = 0 as NodeId
+            for trait_di in 0..self.decl_count():
+                let candidate = self.get_decl(trait_di)
+                if self.kind(candidate) == NodeKind.NK_TRAIT_DECL and self.get_data0(candidate) == trait_sym:
+                    trait_node = candidate
+                    break
+            if trait_node == 0:
+                continue
+
+            let impl_extra = self.get_data1(impl_node)
+            let assoc_count = self.get_extra(impl_extra)
+            let method_count = self.get_extra(impl_extra + 1 + assoc_count * 2)
+            let first_method_di = impl_di - method_count
+            if first_method_di < 0:
+                ast_pool_phase_bug("BUG: trait impl method range precedes the AST declaration table")
+
+            for method_offset in 0..method_count:
+                let method_node = self.get_decl(first_method_di + method_offset)
+                if self.kind(method_node) != NodeKind.NK_FN_DECL:
+                    ast_pool_phase_bug("BUG: trait impl method range contains a non-function declaration")
+                let method_name = intern.resolve(self.get_data0(method_node))
+
+                var trait_method = -1
+                for trait_mi in 0..self.trait_method_count(trait_node):
+                    let bare_sym = self.trait_method_field(trait_node, trait_mi, TRAIT_METHOD_NAME)
+                    let expected = intern.resolve(self.get_data0(impl_node)) ++ "." ++ intern.resolve(bare_sym)
+                    if method_name == expected:
+                        trait_method = trait_mi
+                        break
+                if trait_method < 0:
+                    continue
+
+                let trait_param_count = self.trait_method_field(trait_node, trait_method, TRAIT_METHOD_PARAM_COUNT)
+                if trait_param_count <= 0:
+                    continue
+                let trait_param_start = self.trait_method_field(trait_node, trait_method, TRAIT_METHOD_PARAM_START)
+                if intern.resolve(self.fn_param_name(trait_param_start, 0)) != "self":
+                    continue
+                let receiver_flags = self.fn_param_flags(trait_param_start, 0)
+                if fn_param_is_ref_self(receiver_flags) == 0 and fn_param_is_mut_self(receiver_flags) == 0 and fn_param_is_move_self(receiver_flags) == 0:
+                    continue
+
+                let meta = self.find_fn_meta(method_node)
+                if meta < 0:
+                    ast_pool_phase_bug("BUG: trait impl method has no function metadata")
+                let old_param_start = self.fn_meta_param_start(meta)
+                let old_param_count = self.fn_meta_param_count(meta)
+                if old_param_count > 0 and intern.resolve(self.fn_param_name(old_param_start, 0)) == "self":
+                    continue
+
+                let new_param_start = self.extra_len()
+                self.add_extra(self.fn_param_name(trait_param_start, 0))
+                self.add_extra(self.fn_param_type(trait_param_start, 0))
+                self.add_extra(receiver_flags | FN_PARAM_FLAG_SYNTH_RECEIVER)
+                for pi in 0..old_param_count:
+                    self.add_extra(self.fn_param_name(old_param_start, pi))
+                    self.add_extra(self.fn_param_type(old_param_start, pi))
+                    self.add_extra(self.fn_param_flags(old_param_start, pi))
+                    let default_node = self.get_fn_param_default(old_param_start, pi)
+                    if default_node != 0:
+                        self.set_fn_param_default(new_param_start, pi + 1, default_node)
+
+                self.state.fn_meta.set_i32((meta + 1) as i64, self.fn_meta_flags(meta) + FN_META_REQUIRED_UNIT)
+                self.state.fn_meta.set_i32((meta + 3) as i64, new_param_start)
+                self.state.fn_meta.set_i32((meta + 4) as i64, old_param_count + 1)
+
+                let pattern_meta = self.find_fn_param_pattern_meta(method_node)
+                if pattern_meta >= 0:
+                    let old_pattern_start = self.fn_param_pattern_meta_start(pattern_meta)
+                    let old_pattern_count = self.fn_param_pattern_meta_count(pattern_meta)
+                    let new_pattern_start = self.fn_param_patterns_len()
+                    self.add_fn_param_pattern_value(0 as NodeId)
+                    for pi in 0..old_pattern_count:
+                        self.add_fn_param_pattern_value(self.fn_param_pattern_value(old_pattern_start + pi))
+                    self.state.fn_param_pattern_meta.set_i32((pattern_meta + 1) as i64, new_pattern_start)
+                    self.state.fn_param_pattern_meta.set_i32((pattern_meta + 2) as i64, old_pattern_count + 1)
+
+    fn fn_param_name(param_start: i32, param_idx: i32) -> i32:
+        self.get_extra(param_start + param_idx * FN_PARAM_STRIDE)
+
+    fn fn_param_type(param_start: i32, param_idx: i32) -> i32:
+        self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 1)
+
+    fn fn_param_flags(param_start: i32, param_idx: i32) -> i32:
+        self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 2)
+
+    fn set_fn_param_default(param_start: i32, param_idx: i32, default_node: i32):
+        let key = (param_start as i64) * 1000 + (param_idx as i64)
+        self.state.fn_param_defaults.insert(key, default_node)
+
+    fn get_fn_param_default(param_start: i32, param_idx: i32) -> i32:
+        let key = (param_start as i64) * 1000 + (param_idx as i64)
+        if self.state.fn_param_defaults.contains(key):
+            return self.state.fn_param_defaults.get(key).unwrap()
+        0
+
+    fn set_call_named_args(call_node: NodeId, names_extra_start: i32):
+        self.state.call_named_args.insert(call_node as i32, names_extra_start)
+
+    fn get_call_named_arg(call_node: NodeId, arg_idx: i32) -> i32:
+        if self.state.call_named_args.contains(call_node as i32):
+            let start = self.state.call_named_args.get(call_node as i32).unwrap()
+            return self.get_extra(start + arg_idx)
+        0
+
+    fn has_call_named_args(call_node: NodeId) -> i32:
+        if self.state.call_named_args.contains(call_node as i32): 1 else: 0
+
+    fn add_type_meta(node: NodeId, derive_start: i32, derive_count: i32):
+        let idx = self.state.type_meta.len() as i32
+        self.state.type_meta.push(node as i32)
+        self.state.type_meta.push(derive_start)
+        self.state.type_meta.push(derive_count)
+        self.state.type_meta_map.insert(node as i32, idx)
+
+    fn find_type_meta(node: NodeId) -> i32:
+        let opt = self.state.type_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn type_meta_derive_start(meta: i32) -> i32:
+        self.state.type_meta.get((meta + 1) as i64)
+
+    fn type_meta_derive_count(meta: i32) -> i32:
+        self.state.type_meta.get((meta + 2) as i64)
+
+    fn add_pattern_qualifier(node: NodeId, type_sym: i32):
+        let idx = self.state.pattern_qualifiers.len() as i32
+        self.state.pattern_qualifiers.push(node as i32)
+        self.state.pattern_qualifiers.push(type_sym)
+        self.state.pattern_qualifier_map.insert(node as i32, idx)
+
+    fn pattern_qualifier(node: NodeId) -> i32:
+        let opt = self.state.pattern_qualifier_map.get(node as i32)
+        if opt.is_some():
+            return self.state.pattern_qualifiers.get((opt.unwrap() + 1) as i64)
+        0
+
+    fn mark_must_use_type(node: NodeId):
+        self.state.must_use_type_nodes.push(node as i32)
+        self.state.must_use_type_set.insert(node as i32, 1)
+
+    fn is_must_use_type_node(node: NodeId) -> i32:
+        if self.state.must_use_type_set.contains(node as i32): return 1
+        0
+
+    fn mark_no_await_guard_type(node: NodeId):
+        self.state.no_await_guard_type_nodes.push(node as i32)
+        self.state.no_await_guard_type_set.insert(node as i32, 1)
+
+    fn is_no_await_guard_type_node(node: NodeId) -> i32:
+        if self.state.no_await_guard_type_set.contains(node as i32): return 1
+        0
+
+    fn mark_no_alloc_fn(node: NodeId):
+        self.state.no_alloc_fn_nodes.push(node as i32)
+        self.state.no_alloc_fn_set.insert(node as i32, 1)
+
+    fn is_no_alloc_fn_node(node: NodeId) -> i32:
+        if self.state.no_alloc_fn_set.contains(node as i32): return 1
+        0
+
+    fn mark_fn_target_arch(node: NodeId, arch_sym: i32):
+        self.state.fn_target_arch.insert(node as i32, arch_sym)
+
+    // Returns the @[target("arch")] arch name sym for a fn node, or 0 if none.
+    fn fn_target_arch_of(node: NodeId) -> i32:
+        let v = self.state.fn_target_arch.get(node as i32)
+        if v.is_some(): v.unwrap() else: 0
+
+    // §16.11: mark an NK_TYPE_FN/NK_TYPE_EXTERN_FN node as `unsafe fn(...)`.
+    fn mark_unsafe_fn_type(node: NodeId):
+        self.state.unsafe_fn_type_nodes.insert(node as i32, 1)
+
+    fn is_unsafe_fn_type_node(node: NodeId) -> i32:
+        if self.state.unsafe_fn_type_nodes.contains(node as i32): return 1
+        0
+
+    fn mark_iter_of_self_fn(node: NodeId):
+        self.state.iter_of_self_fn_nodes.push(node as i32)
+        self.state.iter_of_self_fn_set.insert(node as i32, 1)
+
+    fn is_iter_of_self_fn_node(node: NodeId) -> i32:
+        if self.state.iter_of_self_fn_set.contains(node as i32): return 1
+        0
+
+    fn mark_sealed_trait(node: NodeId):
+        self.state.sealed_trait_nodes.push(node as i32)
+        self.state.sealed_trait_set.insert(node as i32, 1)
+
+    fn is_sealed_trait_node(node: NodeId) -> i32:
+        if self.state.sealed_trait_set.contains(node as i32): return 1
+        0
+
+    fn mark_extend_impl(node: NodeId):
+        self.state.extend_impl_nodes.push(node as i32)
+        self.state.extend_impl_set.insert(node as i32, 1)
+
+    fn is_extend_impl_node(node: NodeId) -> i32:
+        if self.state.extend_impl_set.contains(node as i32): return 1
+        0
+
+    fn mark_comptime_decl(node: NodeId):
+        self.state.comptime_decl_nodes.push(node as i32)
+        self.state.comptime_decl_set.insert(node as i32, 1)
+
+    fn is_comptime_decl_node(node: NodeId) -> i32:
+        if self.state.comptime_decl_set.contains(node as i32): return 1
+        0
+
+    fn mark_move_closure(node: NodeId):
+        self.state.move_closure_nodes.push(node as i32)
+        self.state.move_closure_set.insert(node as i32, 1)
+
+    fn is_move_closure(node: NodeId) -> i32:
+        if self.state.move_closure_set.contains(node as i32): return 1
+        0
+
+    fn mark_non_escaping_closure(node: NodeId):
+        self.state.non_escaping_closure_nodes.push(node as i32)
+        self.state.non_escaping_closure_set.insert(node as i32, 1)
+
+    fn is_non_escaping_closure(node: NodeId) -> i32:
+        if self.state.non_escaping_closure_set.contains(node as i32): return 1
+        0
+
+    fn mark_by_place_closure(node: NodeId):
+        self.state.by_place_closure_nodes.push(node as i32)
+        self.state.by_place_closure_set.insert(node as i32, 1)
+
+    fn is_by_place_closure(node: NodeId) -> i32:
+        if self.state.by_place_closure_set.contains(node as i32): return 1
+        0
+
+    fn add_where_meta(fn_node: NodeId, extra_start: i32, clause_count: i32):
+        let idx = self.state.where_meta.len() as i32
+        self.state.where_meta.push(fn_node as i32)
+        self.state.where_meta.push(extra_start)
+        self.state.where_meta.push(clause_count)
+        self.state.where_meta_map.insert(fn_node as i32, idx)
+
+    fn find_where_meta(fn_node: NodeId) -> i32:
+        let opt = self.state.where_meta_map.get(fn_node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn add_impl_type_params(impl_node: NodeId, tp_start: i32, tp_count: i32):
+        let idx = self.state.impl_type_params.len() as i32
+        self.state.impl_type_params.push(impl_node as i32)
+        self.state.impl_type_params.push(tp_start)
+        self.state.impl_type_params.push(tp_count)
+        self.state.impl_type_params_map.insert(impl_node as i32, idx)
+
+    fn find_impl_type_params(impl_node: NodeId) -> i32:
+        let opt = self.state.impl_type_params_map.get(impl_node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn impl_type_params_start(meta: i32): self.state.impl_type_params.get((meta + 1) as i64)
+    fn impl_type_params_count(meta: i32): self.state.impl_type_params.get((meta + 2) as i64)
+
+    fn add_impl_target_type_node(impl_node: NodeId, type_node: NodeId):
+        self.state.impl_target_type_nodes.push(impl_node as i32)
+        self.state.impl_target_type_nodes.push(type_node as i32)
+        self.state.impl_target_type_nodes_map.insert(impl_node as i32, type_node as i32)
+
+    fn find_impl_target_type_node(impl_node: NodeId) -> NodeId:
+        let opt = self.state.impl_target_type_nodes_map.get(impl_node as i32)
+        if opt.is_some():
+            return (opt.unwrap()) as NodeId
+        var i = 0
+        while i < self.state.impl_target_type_nodes.len() as i32:
+            if self.state.impl_target_type_nodes.get(i as i64) == (impl_node as i32):
+                return (self.state.impl_target_type_nodes.get((i + 1) as i64)) as NodeId
+            i = i + 2
+        0 as NodeId
+
+    fn add_impl_trait_type_args(impl_node: NodeId, args_start: i32, args_count: i32):
+        let idx = self.state.impl_trait_type_args.len() as i32
+        self.state.impl_trait_type_args.push(impl_node as i32)
+        self.state.impl_trait_type_args.push(args_start)
+        self.state.impl_trait_type_args.push(args_count)
+        self.state.impl_trait_type_args_map.insert(impl_node as i32, idx)
+
+    fn find_impl_trait_type_args(impl_node: NodeId) -> i32:
+        let opt = self.state.impl_trait_type_args_map.get(impl_node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn impl_trait_type_args_start(meta: i32): self.state.impl_trait_type_args.get((meta + 1) as i64)
+    fn impl_trait_type_args_count(meta: i32): self.state.impl_trait_type_args.get((meta + 2) as i64)
+
+    fn fn_param_patterns_len() -> i32:
+        self.state.fn_param_patterns.len() as i32
+
+    fn add_fn_param_pattern_value(node: NodeId) -> Unit:
+        self.state.fn_param_patterns.push(node as i32)
+
+    fn fn_param_pattern_value(idx: i32) -> NodeId:
+        (self.state.fn_param_patterns.get(idx as i64)) as NodeId
+
+    fn add_fn_param_pattern_meta(node: NodeId, start: i32, count: i32):
+        let idx = self.state.fn_param_pattern_meta.len() as i32
+        self.state.fn_param_pattern_meta.push(node as i32)
+        self.state.fn_param_pattern_meta.push(start)
+        self.state.fn_param_pattern_meta.push(count)
+        self.state.fn_param_pattern_meta_map.insert(node as i32, idx)
+
+    fn find_fn_param_pattern_meta(node: NodeId) -> i32:
+        let opt = self.state.fn_param_pattern_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn fn_param_pattern_meta_start(meta: i32) -> i32:
+        self.state.fn_param_pattern_meta.get((meta + 1) as i64)
+
+    fn fn_param_pattern_meta_count(meta: i32) -> i32:
+        self.state.fn_param_pattern_meta.get((meta + 2) as i64)
+
+    fn add_for_meta(node: NodeId, index_binding: i32, label: i32):
+        let idx = self.state.for_meta.len() as i32
+        self.state.for_meta.push(node as i32)
+        self.state.for_meta.push(index_binding)
+        self.state.for_meta.push(label)
+        self.state.for_meta_map.insert(node as i32, idx)
+
+    fn find_for_meta(node: NodeId) -> i32:
+        let opt = self.state.for_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn for_meta_index_binding(meta: i32) -> i32:
+        self.state.for_meta.get((meta + 1) as i64)
+
+    fn for_meta_label(meta: i32) -> i32:
+        self.state.for_meta.get((meta + 2) as i64)
+
+    fn add_block_meta(node: NodeId, label: i32):
+        let idx = self.state.block_meta.len() as i32
+        self.state.block_meta.push(node as i32)
+        self.state.block_meta.push(label)
+        self.state.block_meta_map.insert(node as i32, idx)
+
+    fn find_block_meta(node: NodeId) -> i32:
+        let opt = self.state.block_meta_map.get(node as i32)
+        if opt.is_some():
+            return opt.unwrap()
+        -1
+
+    fn block_meta_label(meta: i32) -> i32:
+        self.state.block_meta.get((meta + 1) as i64)
+
+fn ast_pattern_binding_key(parent: i32, binding: i32): (parent as i64) * 4294967296 + (binding as i64)
+
+fn ast_is_pattern_kind(kind: i32) -> bool:
+    kind == NodeKind.NK_PAT_WILDCARD or
+    kind == NodeKind.NK_PAT_IDENT or
+    kind == NodeKind.NK_PAT_INT or
+    kind == NodeKind.NK_PAT_BOOL or
+    kind == NodeKind.NK_PAT_STRING or
+    kind == NodeKind.NK_PAT_VARIANT or
+    kind == NodeKind.NK_PAT_TUPLE or
+    kind == NodeKind.NK_PAT_STRUCT or
+    kind == NodeKind.NK_PAT_RANGE or
+    kind == NodeKind.NK_PAT_OR or
+    kind == NodeKind.NK_PAT_ENUM_SHORTHAND or
+    kind == NodeKind.NK_PAT_AT_BINDING or
+    kind == NodeKind.NK_PAT_SLICE or
+    kind == NodeKind.NK_PAT_TYPED_BIND or
+    kind == NodeKind.NK_PAT_REST or
+    kind == NodeKind.NK_PAT_REGEX
+
+impl AstPool:
+    fn is_pattern_node(node: i32) -> bool:
+        if node <= 0 or node >= self.node_count():
+            return false
+        ast_is_pattern_kind(self.kind(node as NodeId))
+
+    // NK_FOR / comprehension binding slots hold an untagged union: a plain
+    // binding stores the SYMBOL id, a pattern binding stores the pattern
+    // NODE id. The parser records which case it built (key = parent,binding).
+    // Probing the pool to guess — the old heuristic — broke whenever a
+    // symbol id collided with a pattern-kinded node id whose span happened
+    // to overlap numerically (#660: interning one new symbol in Sema.w
+    // flipped a plain for-binding in CodegenTraits.w into a pattern match,
+    // unbinding the loop variable).
+    fn mark_pattern_binding(parent: NodeId, binding: i32):
+        self.mark_pattern_binding_pair(ast_pattern_binding_key(parent as i32, binding))
+
+    fn mark_pattern_binding_pair(pair: i64):
+        if self.state.pattern_binding_keys.contains(pair):
+            return
+        self.state.pattern_binding_keys.insert(pair, 1)
+        self.state.pattern_binding_pairs.push(pair)
+
+    fn has_pattern_binding(parent: NodeId, binding: i32) -> bool:
+        self.state.pattern_binding_keys.contains(ast_pattern_binding_key(parent as i32, binding))
+
+    fn for_binding_is_pattern(node: NodeId) -> bool:
+        if node <= 0 or node >= self.node_count():
+            return false
+        if self.kind(node) != NodeKind.NK_FOR:
+            return false
+        self.has_pattern_binding(node, self.get_data0(node))
+
+    fn comprehension_binding_is_pattern(node: NodeId, binding: i32) -> bool:
+        if node <= 0 or node >= self.node_count():
+            return false
+        if self.kind(node) != NodeKind.NK_ARRAY_COMPREHENSION and self.kind(node) != NodeKind.NK_MAP_COMPREHENSION:
+            return false
+        self.has_pattern_binding(node, binding)
+
+// ── Node Data Layout Reference ───────────────────────────────────
+//
+// NodeKind.NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
+//                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*, type_param_count, [type_param_name, bound_count, bounds...]*]
+//
+// NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.* + TDK_FLAG_*)
+//                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
+//                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
+//                   For alias/distinct: extra=[aliased_or_inner_type, vis, tp_start, tp_count]
+//
+// NodeKind.NK_USE_DECL:      d0=extra_start, d1=path_count, d2=selector_count
+//                   extra: [path_sym..., selector_sym...]
+//
+// NodeKind.NK_LET_DECL:      d0=name(sym), d1=value(node), d2=flags (bit0=mut, bit1=pub)
+//                   extra: [type_expr(node)] if type annotation present
+//
+// NodeKind.NK_EXTERN_FN:     d0=name(sym), d1=extra_start, d2=flags (bit0=variadic)
+//                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*]
+//
+// NodeKind.NK_C_IMPORT:      d0=header_str_idx, d1=extra_start, d2=pack_c_import_counts(link_count, allow_untranslated_count)
+//                   extra: [link_lib_sym..., allow_untranslated_sym...]
+//
+// NodeKind.NK_TRAIT_DECL:    d0=name(sym), d1=extra_start, d2=vis
+//
+// NodeKind.NK_IMPL_DECL:     d0=type_name(sym), d1=extra_start, d2=trait_name(sym, 0=none)
+//
+// NodeKind.NK_INT_LIT:       d0=value_low, d1=value_high, d2=0
+// NodeKind.NK_FLOAT_LIT:     d0=string_idx, d1=0, d2=0
+// NodeKind.NK_STRING_LIT:    d0=sym, d1=0, d2=0
+// NodeKind.NK_C_STRING_LIT:  d0=sym, d1=0, d2=0
+// NodeKind.NK_BOOL_LIT:      d0=value(0/1), d1=0, d2=0
+// NodeKind.NK_IDENT:         d0=sym, d1=0, d2=0
+// NodeKind.NK_BINARY:        d0=op(OP_*), d1=lhs(node), d2=rhs(node)
+// NodeKind.NK_UNARY:         d0=op(UOP_*), d1=operand(node), d2=0
+// NodeKind.NK_CALL:          d0=callee(node), d1=extra_start, d2=arg_count
+// NodeKind.NK_FIELD_ACCESS:  d0=expr(node), d1=field(sym), d2=0
+// NodeKind.NK_COMPUTED_FIELD_ACCESS: d0=expr(node), d1=field_expr(node), d2=0
+// NodeKind.NK_INDEX:         d0=expr(node), d1=index(node), d2=0
+// NodeKind.NK_SLICE:         d0=expr(node), d1=start(node,0=none), d2=end(node,0=none)
+// NodeKind.NK_BLOCK:         d0=extra_start, d1=stmt_count, d2=tail(node,0=none)
+// NodeKind.NK_IF_EXPR:       d0=cond(node), d1=then(node), d2=else(node,0=none)
+// NodeKind.NK_RETURN:        d0=value(node,0=none), d1=0, d2=0
+// NodeKind.NK_LET_BINDING:   d0=name(sym), d1=value(node), d2=flags (bit0=mut)
+//                   If has type: extra=[type_node]
+// NodeKind.NK_LET_ELSE:      d0=pattern(node), d1=value(node), d2=else_body(node)
+// NodeKind.NK_TUPLE_DESTRUCTURE: d0=extra_start, d1=name_count, d2=value(node)
+// NodeKind.NK_ASSIGN:        d0=target(node), d1=value(node), d2=0
+// NodeKind.NK_WHILE:         d0=cond(node), d1=body(node), d2=label(sym,0=none)
+// NodeKind.NK_DO_WHILE:      d0=body(node), d1=cond(node), d2=label(sym,0=none)
+// NodeKind.NK_LOOP:          d0=body(node), d1=label(sym,0=none), d2=0
+// NodeKind.NK_FOR:           d0=binding(sym) or pattern(node), d1=iterable(node), d2=body(node)
+//                   extra: [index_binding(sym,0=none), label(sym,0=none)]
+// NodeKind.NK_BREAK:         d0=value(node,0=none), d1=label(sym,0=none), d2=0
+// NodeKind.NK_CONTINUE:      d0=label(sym,0=none), d1=0, d2=0
+// NodeKind.NK_LABEL:         d0=label_sym, d1=statement(node), d2=0
+// NodeKind.NK_GOTO:          d0=label_sym, d1=0, d2=0
+// NodeKind.NK_MATCH:         d0=subject(node), d1=extra_start, d2=arm_count
+// NodeKind.NK_MATCH_ARM:     d0=pattern(node), d1=body(node), d2=guard(node,0=none)
+// NodeKind.NK_TUPLE:         d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_ARRAY_LIT:     d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_ARRAY_COMPREHENSION: d0=expr(node), d1=extra_start, d2=clause_count
+//                   extra per clause: [binding(pattern or sym), iterable(node), filter(node,0=none)]
+// NodeKind.NK_MAP_COMPREHENSION: d0=extra_start, d1=clause_count, d2=0
+//                   extra: [key_expr, value_expr, then per clause: binding(pattern or sym), iterable(node), filter(node,0=none)]
+// NodeKind.NK_STRUCT_LIT:    d0=name(sym), d1=extra_start, d2=field_count
+// NodeKind.NK_CLOSURE:       d0=body(node), d1=extra_start, d2=param_count
+// NodeKind.NK_CAST:          d0=expr(node), d1=target_type(node), d2=0
+// NodeKind.NK_DEFER:         d0=body(node), d1=0, d2=0
+// NodeKind.NK_ERRDEFER:      d0=body(node), d1=0, d2=0
+// NodeKind.NK_PIPELINE:      d0=lhs(node), d1=rhs(node), d2=0
+// NodeKind.NK_RANGE:         d0=start(node,0=none), d1=end(node,0=none), d2=inclusive(0/1)
+// NodeKind.NK_GROUPED:       d0=inner(node), d1=0, d2=0
+// NodeKind.NK_VARIANT_SHORTHAND: d0=name(sym), d1=extra_start, d2=arg_count
+// NodeKind.NK_WITH_EXPR:     d0=source(node), d1=body(node), d2=encoded_binding(sym+mut)
+// NodeKind.NK_RECORD_UPDATE: d0=source(node), d1=extra_start, d2=field_count
+// NodeKind.NK_ENUM_VARIANT:  d0=type_name(sym), d1=variant_name(sym), d2=extra_start
+//                   extra: [arg_count, args...]
+// NodeKind.NK_OPTIONAL_CHAIN: d0=expr(node), d1=member(sym), d2=extra_start
+//                    extra: [has_call(0/1), arg_count, args...]
+// NodeKind.NK_AWAIT:         d0=expr(node), d1=0, d2=0
+// NodeKind.NK_ASYNC_BLOCK:   d0=body(node), d1=0, d2=0
+// NodeKind.NK_YIELD:         d0=expr(node), d1=0, d2=0
+// NodeKind.NK_COMPTIME:      d0=expr(node), d1=0, d2=0
+// NodeKind.NK_NO_SUSPEND:    d0=body(node), d1=0, d2=0
+// NodeKind.NK_ASYNC_SCOPE:   d0=name(sym), d1=body(node), d2=0
+// NodeKind.NK_SCOPE:         d0=name(sym), d1=body(node), d2=0
+// NodeKind.NK_SELECT_AWAIT:  d0=extra_start, d1=arm_count, d2=biased(0/1)
+//
+// Type expression nodes:
+// NodeKind.NK_TYPE_NAMED:    d0=sym, d1=0, d2=0
+// NodeKind.NK_TYPE_GENERIC:  d0=name(sym), d1=extra_start, d2=arg_count
+// NodeKind.NK_TYPE_REF:      d0=pointee(node), d1=is_mut(0/1), d2=0
+// NodeKind.NK_TYPE_PTR:      d0=pointee(node), d1=is_mut(0/1), d2=0
+// NodeKind.NK_TYPE_FN:       d0=extra_start, d1=param_count, d2=return_type(node)
+// NodeKind.NK_TYPE_EXTERN_FN: d0=extra_start, d1=param_count, d2=return_type(node)
+// NodeKind.NK_TYPE_TUPLE:    d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_TYPE_OPTIONAL: d0=inner(node), d1=0, d2=0
+// NodeKind.NK_TYPE_ARRAY:    d0=element(node), d1=size_low, d2=size_high
+// NodeKind.NK_TYPE_SLICE:    d0=element(node), d1=is_mut(0/1), d2=0
+// NodeKind.NK_TYPE_TRAIT_OBJ: d0=sym, d1=TYPE_TRAIT_OBJECT_*, d2=0
+// NodeKind.NK_TYPE_INFERRED: d0=0, d1=0, d2=0
+//
+// Pattern nodes:
+// NodeKind.NK_PAT_WILDCARD:  d0=0, d1=0, d2=0
+// NodeKind.NK_PAT_IDENT:     d0=sym, d1=0, d2=0
+// NodeKind.NK_PAT_INT:       d0/d1/d2 = i64 value, encoded with ast_int_part0/1/2 (same as NK_INT_LIT)
+// NodeKind.NK_PAT_BOOL:      d0=value(0/1), d1=0, d2=0
+// NodeKind.NK_PAT_STRING:    d0=sym, d1=0, d2=0
+// NodeKind.NK_PAT_VARIANT:   d0=name(sym), d1=extra_start, d2=binding_count
+// NodeKind.NK_PAT_TUPLE:     d0=extra_start, d1=elem_count, d2=0
+// NodeKind.NK_PAT_STRUCT:    d0=type_name(sym,0=none), d1=extra_start, d2=field_count
+//                   extra: [has_rest(0/1), [field_name, field_pattern(node,0=shorthand)]...]
+// NodeKind.NK_PAT_RANGE:     d0=start_low, d1=end_low, d2=inclusive(0/1)
+// NodeKind.NK_PAT_OR:        d0=extra_start, d1=pattern_count, d2=0
+// NodeKind.NK_PAT_AT_BINDING: d0=name(sym), d1=pattern(node), d2=0
+// NodeKind.NK_PAT_SLICE:     d0=extra_start, d1=head_count, d2=rest(sym,0=none)
+//                   extra: [has_rest(0/1), head_syms..., tail_count, tail_syms...]
+// NodeKind.NK_PAT_TYPED_BIND:  d0=binding(sym), d1=type(sym), d2=0
+// NodeKind.NK_PAT_REST:      d0=0, d1=0, d2=0
+// NodeKind.NK_MATCH_OP:     d0=lhs(str expr), d1=regex expr, d2=0
+// NodeKind.NK_NEG_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
+// NodeKind.NK_PAT_REGEX:    d0=pattern_sym, d1=flags_sym, d2=0
+// NodeKind.NK_PAT_ENUM_SHORTHAND: d0=name(sym), d1=extra_start, d2=binding_count

@@ -1,0 +1,5 @@
+[package]
+name = "audit-003-threaded"
+
+[runtime]
+fiber_worker_count = 4

@@ -1,0 +1,1 @@
+usage: with run tools/migrate_shareplace.w <entry.w> [--apply]

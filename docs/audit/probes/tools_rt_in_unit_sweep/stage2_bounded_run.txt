@@ -1,0 +1,20 @@
+error: undefined variable
+ --> tools/rt_in_unit_sweep.w:22:57
+22 |     if not path.ends_with(".w") or not path.starts_with(ROOT): return false
+  |                                                         ^^^^
+
+error: undefined variable
+ --> tools/rt_in_unit_sweep.w:23:20
+23 |     not path.slice(ROOT.len(), path.len()).contains("/")
+  |                    ^^^^
+
+error: undefined variable
+ --> tools/rt_in_unit_sweep.w:23:20
+23 |     not path.slice(ROOT.len(), path.len()).contains("/")
+  |                    ^^^^
+
+error: undefined variable
+ --> tools/rt_in_unit_sweep.w:23:20
+23 |     not path.slice(ROOT.len(), path.len()).contains("/")
+  |                    ^^^^
+error: run failed

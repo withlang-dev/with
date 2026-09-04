@@ -1,0 +1,1 @@
+no bare externs: .audit/probes/tools_rename_rt_libc_externs/work.w

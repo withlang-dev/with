@@ -1,0 +1,2 @@
+test/behavior/behav_crypto_kats.w
+test/behavior/behav_wrapping_assign.w

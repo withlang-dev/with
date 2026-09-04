@@ -1,0 +1,105 @@
+// Compiler runtime boundary. Raw runtime exports are declared here; compiler
+// modules should depend on these typed wrappers instead of redeclaring externs.
+
+extern fn with_eprint(s: &str) -> Unit
+extern fn with_exec_binary(path: &str) -> i32
+extern fn with_exec_argv(args: &str) -> i32
+extern fn with_exec_argv_cwd(args: &str, cwd: &str) -> i32
+extern fn with_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32
+extern fn with_arg_at(idx: i32) -> str
+extern fn with_fs_write_file(path: &str, data: &str) -> i32
+extern fn with_fs_read_file(path: &str) -> str
+extern fn with_fs_file_exists(path: &str) -> i32
+extern fn with_fs_is_dir(path: &str) -> i32
+extern fn with_fs_list_files(path: &str) -> str
+extern fn with_fs_remove_file(path: &str) -> i32
+extern fn with_fs_remove_dir(path: &str) -> i32
+extern fn with_fs_remove_tree(path: &str) -> i32
+extern fn with_fs_mkdir_p(path: &str) -> i32
+extern fn with_fs_rename_file(old_path: &str, new_path: &str) -> i32
+extern fn with_getenv_str(name: &str) -> str
+extern fn with_setenv_str(name: &str, value: &str) -> i32
+extern fn with_clock_nanos() -> i64
+extern fn with_getpid() -> i32
+extern fn with_str_clone_ref(s: &str) -> str
+extern fn with_str_hash(s: &str) -> u64
+extern fn with_nanosleep(ns: i64) -> i32
+extern fn with_sysinfo_os() -> str
+extern fn with_sysinfo_arch() -> str
+
+pub fn runtime_eprint(s: &str) -> Unit:
+    with_eprint(s)
+
+pub fn runtime_exec_binary(path: &str) -> i32:
+    with_exec_binary(path)
+
+pub fn runtime_exec_argv(args: &str) -> i32:
+    with_exec_argv(args)
+
+pub fn runtime_exec_argv_cwd(args: &str, cwd: &str) -> i32:
+    with_exec_argv_cwd(args, cwd)
+
+pub fn runtime_exec_argv_capture(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32) -> i32:
+    with_exec_argv_capture(args, stdout_path, stderr_path, timeout_ms)
+
+pub fn runtime_arg_at(idx: i32) -> str:
+    with_arg_at(idx)
+
+pub fn runtime_write_file(path: &str, data: &str) -> i32:
+    with_fs_write_file(path, data)
+
+pub fn runtime_read_file(path: &str) -> str:
+    with_fs_read_file(path)
+
+pub fn runtime_file_exists(path: &str) -> i32:
+    with_fs_file_exists(path)
+
+pub fn runtime_is_dir(path: &str) -> i32:
+    with_fs_is_dir(path)
+
+pub fn runtime_list_files(path: &str) -> str:
+    with_fs_list_files(path)
+
+pub fn runtime_remove_file(path: &str) -> i32:
+    with_fs_remove_file(path)
+
+pub fn runtime_remove_dir(path: &str) -> i32:
+    with_fs_remove_dir(path)
+
+pub fn runtime_remove_tree(path: &str) -> i32:
+    with_fs_remove_tree(path)
+
+pub fn runtime_mkdir_p(path: &str) -> i32:
+    with_fs_mkdir_p(path)
+
+// Atomic on all platforms: POSIX rename replaces the target; the Windows
+// backend uses MoveFileExW with MOVEFILE_REPLACE_EXISTING.
+pub fn runtime_rename(old_path: &str, new_path: &str) -> i32:
+    with_fs_rename_file(old_path, new_path)
+
+pub fn runtime_getenv(name: &str) -> str:
+    with_getenv_str(name)
+
+pub fn runtime_setenv(name: &str, value: &str) -> i32:
+    with_setenv_str(name, value)
+
+pub fn runtime_clock_nanos() -> i64:
+    with_clock_nanos()
+
+pub fn runtime_getpid() -> i32:
+    with_getpid()
+
+pub fn runtime_str_clone(s: &str) -> str:
+    with_str_clone_ref(s)
+
+pub fn runtime_str_hash(s: &str) -> i64:
+    with_str_hash(s) as i64
+
+pub fn runtime_nanosleep(ns: i64) -> i32:
+    with_nanosleep(ns)
+
+pub fn runtime_sysinfo_os() -> str:
+    with_sysinfo_os()
+
+pub fn runtime_sysinfo_arch() -> str:
+    with_sysinfo_arch()

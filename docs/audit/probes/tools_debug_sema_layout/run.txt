@@ -1,0 +1,1 @@
+mres_recv_types: offset=784 size=32 type=Vec[i32]
