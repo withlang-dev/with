@@ -1705,13 +1705,22 @@ impl Zcu:
             pre_sema.emit_config_warnings = 0
             pre_sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
             pre_sema.overflow_mode = self.project_config.overflow_mode
+            let profile_comptime = runtime_getenv("WITH_PROFILE").len() > 0
+            let t_prepare = runtime_clock_nanos()
             pre_sema.init_module_graph(&self.last_resolved)
             pre_sema.prepare_for_comptime_transform()
+            if profile_comptime:
+                let prepare_ns = runtime_clock_nanos() - t_prepare
+                runtime_eprint(f"[profile] frontend.comptime.prepare  {prepare_ns / 1000000}.{(prepare_ns % 1000000) / 1000} ms")
             // The comptime transform must run against the same intern pool that
             // pre-sema prepared, otherwise cloned AST symbol ids may be resolved
             // against a stale symbol table in the transform pass.
             self.pool = pre_sema.pool
+            let t_transform = runtime_clock_nanos()
             pool = pre_sema.comptime_transform_module(pool, self.pool)
+            if profile_comptime:
+                let transform_ns = runtime_clock_nanos() - t_transform
+                runtime_eprint(f"[profile] frontend.comptime.transform  {transform_ns / 1000000}.{(transform_ns % 1000000) / 1000} ms")
             self.diagnostics = move pre_sema.diags
             self.decl_source_paths = sema_clone_str_vec(&pre_sema.decl_source_paths)
             self.decl_source_file_ids = sema_clone_i32_vec(&pre_sema.decl_source_file_ids)

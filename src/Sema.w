@@ -21,8 +21,17 @@ use std.collections.HashSet
 extern fn with_write(s: &str) -> Unit
 extern fn with_eprint(s: &str) -> Unit
 extern fn with_getenv_str(name: &str) -> str
+extern fn with_clock_nanos() -> i64
 extern fn with_str_clone_ref(s: &str) -> str
 extern fn i64_to_string(n: i64) -> str
+
+// WITH_PROFILE=1: one `[profile] sema.<phase>` line per check_module step,
+// the same switch and format as the frontend's phase lines.
+fn sema_profile_enabled() -> bool: with_getenv_str("WITH_PROFILE").len() > 0
+
+fn sema_profile_report(name: &str, t0: i64):
+    let ns = with_clock_nanos() - t0
+    with_eprint(f"[profile] sema.{name}  {ns / 1000000}.{(ns % 1000000) / 1000} ms")
 extern fn abort() -> Never
 
 fn sema_phase_bug(message: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
@@ -6640,11 +6649,24 @@ impl Sema:
     // ── Main entry point ─────────────────────────────────────────────
 
     mut fn check_module():
+        let profile = sema_profile_enabled()
+        var t = with_clock_nanos()
         self.prepare_for_comptime_transform()
         self.validate_no_std_requirements()
+        if profile:
+            t = with_clock_nanos()
         self.check_top_level_let_values()
+        if profile:
+            sema_profile_report("top_level_let_values", t)
+            t = with_clock_nanos()
         self.check_type_decl_field_defaults()
+        if profile:
+            sema_profile_report("type_decl_field_defaults", t)
+            t = with_clock_nanos()
         self.check_bodies()
+        if profile:
+            sema_profile_report("bodies", t)
+            t = with_clock_nanos()
         // #D5/P0: with every top-level body checked, complete transitive
         // write/consume/escape_value effects across the call graph so sig_param_effects is
         // final before any share-place decision (lowering/ABI) reads it.
@@ -6655,14 +6677,26 @@ impl Sema:
         // effects — the declared signature is authoritative (&T borrows, T owns).
         self.finalize_call_site_ownership()
         self.check_reachable_comptime_errors()
+        if profile:
+            sema_profile_report("effects_receivers_ownership", t)
 
     mut fn prepare_for_comptime_transform():
+        let profile = sema_profile_enabled()
+        var t = with_clock_nanos()
         self.compute_method_origins()
+        if profile:
+            sema_profile_report("method_origins", t)
+            t = with_clock_nanos()
         self.collect_declarations()
+        if profile:
+            sema_profile_report("collect_declarations", t)
+            t = with_clock_nanos()
         self.build_ci_scoping()
         self.validate_copy_derives()
         self.validate_compiler_hooks()
         self.validate_generic_type_decls()
+        if profile:
+            sema_profile_report("ci_scoping_copy_hooks_generics", t)
 
 // ── Utility functions ────────────────────────────────────────────
 
