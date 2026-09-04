@@ -52,6 +52,9 @@ extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
+// UCRT has no stdin/stdout/stderr global variables; the FILE* streams come from
+// __acrt_iob_func(0/1/2) (the UCRT `#define stdin (__acrt_iob_func(0))` macros).
+extern fn __acrt_iob_func(index: u32) -> *mut c_void
 
 let INVALID_HANDLE_VALUE: i64 = -1
 let STD_INPUT_HANDLE: i32 = -10
@@ -90,6 +93,16 @@ type RtSysInfo:
     cpu_cores: i32
     memory_total: i64
     page_size: i64
+
+// Darwin-migrated C reads the preprocessed stdio globals __std{in,out,err}p;
+// Windows/UCRT has neither those symbols nor stdin/stdout/stderr globals -- the
+// FILE* streams come from __acrt_iob_func(0/1/2). Define the Darwin-spelled
+// symbols here and bind them to the UCRT stream table at startup (rt_store_args,
+// the pre-main entry hook) so a Darwin-migrated harness (pcre2test.w) links and
+// runs unchanged on Windows. See rt/linux_x86_64.w for the glibc analogue.
+pub var __stdinp: *mut c_void = 0 as *mut c_void
+pub var __stdoutp: *mut c_void = 0 as *mut c_void
+pub var __stderrp: *mut c_void = 0 as *mut c_void
 
 var rt_argc: i32 = 0
 var rt_argv_raw: i64 = 0
@@ -182,6 +195,9 @@ fn win_alloc_fd(handle: i64) -> i32:
 pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
+    __stdinp = __acrt_iob_func(0 as u32)
+    __stdoutp = __acrt_iob_func(1 as u32)
+    __stderrp = __acrt_iob_func(2 as u32)
 
 pub fn rt_args() -> (*const *const u8, i32):
     (rt_argv_raw as *const *const u8, rt_argc)
