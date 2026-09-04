@@ -34,8 +34,8 @@ jobs:
       # three platforms pin (a versioned release, not a rolling tag). That
       # asset is itself CI-produced and fixpoint-verified by the Release
       # workflow's build-linux-aarch64 job.
-      WITH_SEED_VERSION: v0.15.1.5
-      WITH_SEED_SHA256: 20995c2de78d94c8e9c022107b48901ce97144ac2fb2b016f9ab19a22ae50683
+      WITH_SEED_VERSION: v0.15.1.8
+      WITH_SEED_SHA256: e26930b0f9e8a93fef1091216c4d0b8d49e2c20d8b4d6e89bbfa06dbb3fa7d8f
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-linux-aarch64
       # NOTE: this platform's SDK ships as .tar.gz (the linux-x86_64 asset is
