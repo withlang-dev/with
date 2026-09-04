@@ -70,7 +70,7 @@ fn wo_fail(ctx: &ActionCtx, message: &str) -> i32:
     1
 
 fn wo_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path.byte_at(0) == '/':
+    if path.len() > 0 and path[0] == '/':
         return wo_owned_text(path)
     root ++ "/" ++ path
 
@@ -89,7 +89,7 @@ fn wo_sha256_text(text: &str) -> str:
 fn wo_dirname(path: &str) -> str:
     var last: i64 = -1
     for i in 0..path.len():
-        if path.byte_at(i) == '/':
+        if path[i] == '/':
             last = i
     if last < 0:
         return "."
@@ -97,7 +97,7 @@ fn wo_dirname(path: &str) -> str:
 
 fn wo_first_line(text: &str) -> str:
     var end: i64 = 0
-    while end < text.len() and text.byte_at(end) != '\n' and text.byte_at(end) != '\r':
+    while end < text.len() and text[end] != '\n' and text[end] != '\r':
         end = end + 1
     wo_owned_text(text.slice(0, end))
 
@@ -107,13 +107,13 @@ pub fn wo_manifest_field(manifest: &str, key: &str) -> str:
     var start: i64 = 0
     while start < manifest.len():
         var end = start
-        while end < manifest.len() and manifest.byte_at(end) != '\n':
+        while end < manifest.len() and manifest[end] != '\n':
             end = end + 1
         let line = manifest.slice(start, end)
         if line.starts_with(want):
             let rest = line.slice(want.len(), line.len())
             var sp: i64 = 0
-            while sp < rest.len() and rest.byte_at(sp) != ' ':
+            while sp < rest.len() and rest[sp] != ' ':
                 sp = sp + 1
             return wo_owned_text(rest.slice(0, sp))
         start = end + 1
@@ -218,7 +218,7 @@ fn wo_target_stem(plan: &WoBundle) -> str:
 // "linux_x86_64" -> "linux-x86_64"
 fn wo_target_label(target: &str) -> str:
     for i in 0..target.len():
-        if target.byte_at(i) == '_':
+        if target[i] == '_':
             return target.slice(0, i) ++ "-" ++ target.slice(i + 1, target.len())
     wo_owned_text(target)
 
@@ -314,11 +314,11 @@ pub fn wo_drift_harness_bin(plan: &WoBundle, harness: &str) -> str:
 fn wo_basename_no_ext(path: &str) -> str:
     var start: i64 = 0
     for i in 0..path.len():
-        if path.byte_at(i) == '/':
+        if path[i] == '/':
             start = i + 1
     var end = path.len()
     for j in start..path.len():
-        if path.byte_at(j) == '.':
+        if path[j] == '.':
             end = j
     wo_owned_text(path.slice(start, end))
 

@@ -26,13 +26,13 @@ fn ruat_join(left: &str, right: &str) -> str:
 fn ruat_is_abs(path: &str) -> bool:
     if path.len() == 0:
         return false
-    let first = path.byte_at(0)
+    let first = path[0]
     if first == 47 or first == 92:
         return true
     if os() == "Windows" and path.len() >= 3:
-        let drive = path.byte_at(0)
-        let colon = path.byte_at(1)
-        let slash = path.byte_at(2)
+        let drive = path[0]
+        let colon = path[1]
+        let slash = path[2]
         if colon == 58 and (slash == 47 or slash == 92):
             return (drive >= 65 and drive <= 90) or (drive >= 97 and drive <= 122)
     false
@@ -45,7 +45,7 @@ fn ruat_abs(root: &str, path: &str) -> str:
 fn ruat_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        let ch = path.byte_at(i as i64)
+        let ch = path[i]
         if ch == 47 or ch == 92:
             last_slash = i
     if last_slash < 0:
@@ -57,7 +57,7 @@ fn ruat_dirname(path: &str) -> str:
 fn ruat_trim_trailing_line_endings(text: &str) -> str:
     var end = text.len()
     while end > 0:
-        let ch = text.byte_at(end - 1)
+        let ch = text[end - 1]
         if ch != 10 and ch != 13:
             break
         end = end - 1

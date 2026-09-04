@@ -43,7 +43,7 @@ fn bs_join(left: &str, right: &str) -> str:
 fn bs_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -54,19 +54,19 @@ fn bs_dirname(path: &str) -> str:
 fn bs_basename(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_slash = i
     path.slice((last_slash + 1) as i64, path.len())
 
 fn bs_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if path.len() > 0 and path[0] == 47:
         return selfhost_owned_text(path)
     bs_join(root, path)
 
 fn bs_with_string_literal(value: &str) -> str:
     var out = "\""
     for i in 0..value.len() as i32:
-        let ch = value.byte_at(i as i64)
+        let ch = value[i]
         if ch == 34:
             out = out ++ "\\\""
         else if ch == 92:
@@ -310,7 +310,7 @@ fn bs_run_cli_expect_success(ctx: &ActionCtx, compiler_path: &str, label: &str, 
 fn bs_trim_trailing_line_endings(text: &str) -> str:
     var end = text.len()
     while end > 0:
-        let ch = text.byte_at(end - 1)
+        let ch = text[end - 1]
         if ch != 10 and ch != 13:
             break
         end = end - 1
@@ -359,7 +359,7 @@ fn bs_assert_count_between(ctx: &ActionCtx, text: &str, needle: &str, min_count:
 fn bs_json_string(value: &str) -> str:
     var out = "\""
     for i in 0..value.len() as i32:
-        let ch = value.byte_at(i as i64)
+        let ch = value[i]
         if ch == 34:
             out = out ++ "\\\""
         else if ch == 92:
@@ -3781,7 +3781,7 @@ fn bs_index_of(text: &str, needle: &str) -> i32:
     for i in 0..(max_start + 1):
         var matched = true
         for j in 0..needle.len() as i32:
-            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+            if text[(i + j)] != needle[j]:
                 matched = false
                 break
         if matched:
@@ -5114,15 +5114,15 @@ fn bs_check_migrate_prefer_brace_ws(ctx: &ActionCtx, compiler_path: &str, case_d
     var line_start = 0
     while line_start < out_text.len() as i32:
         var line_end = line_start
-        while line_end < out_text.len() as i32 and out_text.byte_at(line_end as i64) != 10:
+        while line_end < out_text.len() as i32 and out_text[line_end] != 10:
             line_end = line_end + 1
         if line_end > line_start:
-            let last = out_text.byte_at((line_end - 1) as i64)
+            let last = out_text[(line_end - 1)]
             if last == 32 or last == 9:
                 return bs_fail(ctx, "prefer_brace_ws emitted trailing whitespace")
         var trimmed_start = line_start
         while trimmed_start < line_end:
-            let ch = out_text.byte_at(trimmed_start as i64)
+            let ch = out_text[trimmed_start]
             if ch != 32 and ch != 9:
                 break
             trimmed_start = trimmed_start + 1
@@ -5303,7 +5303,7 @@ fn bs_blob_to_args(blob: &str) -> Vec[str]:
     let args: Vec[str] = Vec.new()
     var start = 0
     for i in 0..blob.len() as i32:
-        if blob.byte_at(i as i64) == 0:
+        if blob[i] == 0:
             if i > start:
                 args.push(blob.slice(start as i64, i as i64))
             start = i + 1
@@ -7239,7 +7239,7 @@ fn bs_drop_first_lines(text: &str, count: i32) -> str:
     var line_start = 0
     var line_no = 1
     for i in 0..text.len() as i32:
-        if text.byte_at(i as i64) == 10:
+        if text[i] == 10:
             if line_no == count:
                 return text.slice((i + 1) as i64, text.len())
             line_no = line_no + 1
@@ -7509,7 +7509,7 @@ fn bs_split_words(line: &str) -> Vec[str]:
     var i = 0
     while i <= line.len() as i32:
         let at_end = i == line.len() as i32
-        let ch = if at_end: 32 else: line.byte_at(i as i64)
+        let ch = if at_end: 32 else: line[i]
         let is_space = ch == 32 or ch == 9
         if at_end or is_space:
             if in_word:
@@ -7528,9 +7528,9 @@ fn bs_split_nonempty_lines(text: &str) -> Vec[str]:
     var i = 0
     while i <= text.len() as i32:
         let at_end = i == text.len() as i32
-        if at_end or text.byte_at(i as i64) == 10:
+        if at_end or text[i] == 10:
             var end = i
-            if end > start and text.byte_at((end - 1) as i64) == 13:
+            if end > start and text[(end - 1)] == 13:
                 end = end - 1
             if end > start:
                 lines.push(text.slice(start as i64, end as i64))
@@ -7539,11 +7539,11 @@ fn bs_split_nonempty_lines(text: &str) -> Vec[str]:
     lines
 
 fn bs_strip_mach_o_underscore(name: &str) -> str:
-    if name.len() >= 3 and name.byte_at(0) == 95 and name.byte_at(1) == 95 and name.byte_at(2) == 95:
+    if name.len() >= 3 and name[0] == 95 and name[1] == 95 and name[2] == 95:
         return name.slice(1, name.len())
-    if name.len() >= 2 and name.byte_at(0) == 95 and name.byte_at(1) == 95:
+    if name.len() >= 2 and name[0] == 95 and name[1] == 95:
         return selfhost_owned_text(name)
-    if name.len() > 0 and name.byte_at(0) == 95:
+    if name.len() > 0 and name[0] == 95:
         return name.slice(1, name.len())
     selfhost_owned_text(name)
 

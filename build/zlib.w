@@ -18,7 +18,7 @@ fn zlib_join(left: &str, right: &str) -> str:
 fn zlib_safe_label(text: &str) -> str:
     var out = ""
     for i in 0..text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
             out = out ++ text.slice(i as i64, (i + 1) as i64)
@@ -34,7 +34,7 @@ fn zlib_scratch_dir(ctx: &ActionCtx) -> str:
 fn zlib_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -45,12 +45,12 @@ fn zlib_dirname(path: &str) -> str:
 fn zlib_basename(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_slash = i
     path.slice((last_slash + 1) as i64, path.len())
 
 fn zlib_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if path.len() > 0 and path[0] == 47:
         return zlib_owned_text(path)
     zlib_join(root, path)
 

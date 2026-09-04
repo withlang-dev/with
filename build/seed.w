@@ -16,7 +16,7 @@ fn seed_join(left: &str, right: &str) -> str:
 fn seed_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -25,7 +25,7 @@ fn seed_dirname(path: &str) -> str:
     path.slice(0, last_slash as i64)
 
 fn seed_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if path.len() > 0 and path[0] == 47:
         return seed_owned_text(path)
     seed_join(root, path)
 
@@ -37,7 +37,7 @@ fn seed_split_nonempty_lines(text: &str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
     var start = 0
     for i in 0..text.len() as i32:
-        if text.byte_at(i as i64) == 10:
+        if text[i] == 10:
             if i > start:
                 lines.push(text.slice(start as i64, i as i64))
             start = i + 1
@@ -57,25 +57,25 @@ fn seed_json_line_value(line: &str, key: &str) -> str:
     if pos < 0:
         return ""
     while pos < line.len() as i32:
-        let ch = line.byte_at(pos as i64)
+        let ch = line[pos]
         if ch != 32 and ch != 9:
             break
         pos = pos + 1
-    if pos >= line.len() as i32 or line.byte_at(pos as i64) != 58:
+    if pos >= line.len() as i32 or line[pos] != 58:
         return ""
     pos = pos + 1
     while pos < line.len() as i32:
-        let ch = line.byte_at(pos as i64)
+        let ch = line[pos]
         if ch != 32 and ch != 9:
             break
         pos = pos + 1
-    if pos >= line.len() as i32 or line.byte_at(pos as i64) != 34:
+    if pos >= line.len() as i32 or line[pos] != 34:
         return ""
     let start = pos + 1
     var end = start
     var escaped = false
     while end < line.len() as i32:
-        let ch = line.byte_at(end as i64)
+        let ch = line[end]
         if escaped:
             escaped = false
         else if ch == 92:
@@ -165,11 +165,11 @@ fn seed_is_hex(ch: i32) -> bool:
 
 fn seed_parse_sha256_sidecar(text: &str) -> str:
     var start = 0
-    while start < text.len() as i32 and seed_is_space(text.byte_at(start as i64)):
+    while start < text.len() as i32 and seed_is_space(text[start]):
         start = start + 1
     var end = start
-    while end < text.len() as i32 and not seed_is_space(text.byte_at(end as i64)):
-        if not seed_is_hex(text.byte_at(end as i64)):
+    while end < text.len() as i32 and not seed_is_space(text[end]):
+        if not seed_is_hex(text[end]):
             return ""
         end = end + 1
     if end - start != 64:

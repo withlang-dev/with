@@ -34,14 +34,14 @@ fn ret_join(left: &str, right: &str) -> str:
     left ++ "/" ++ right
 
 fn ret_abs(root: &str, path: &str) -> str:
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if path.len() > 0 and path[0] == 47:
         return retention_owned_text(path)
     ret_join(root, path)
 
 fn ret_dirname(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -52,7 +52,7 @@ fn ret_dirname(path: &str) -> str:
 fn ret_basename(path: &str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        if path[i] == 47:
             last_slash = i
     if last_slash < 0:
         return retention_owned_text(path)
@@ -62,12 +62,12 @@ fn ret_trim(text: &str) -> str:
     var start = 0
     var end = text.len() as i32
     while start < end:
-        let ch = text.byte_at(start as i64)
+        let ch = text[start]
         if ch != 9 and ch != 10 and ch != 13 and ch != 32:
             break
         start = start + 1
     while end > start:
-        let ch = text.byte_at((end - 1) as i64)
+        let ch = text[(end - 1)]
         if ch != 9 and ch != 10 and ch != 13 and ch != 32:
             break
         end = end - 1
@@ -76,7 +76,7 @@ fn ret_trim(text: &str) -> str:
 fn ret_first_line(text: &str) -> str:
     var end = text.len() as i32
     for i in 0..text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch == 10 or ch == 13:
             end = i
             break
@@ -86,7 +86,7 @@ fn ret_split_lines(text: &str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     var start = 0
     for i in 0..text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch == 10 or ch == 13:
             let line = ret_trim(text.slice(start as i64, i as i64))
             if line.len() > 0:
@@ -101,7 +101,7 @@ fn ret_split_lines(text: &str) -> Vec[str]:
 fn ret_json_escape(text: &str) -> str:
     var out = ""
     for i in 0..text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         if ch == 34:
             out = out ++ "\\\""
         else if ch == 92:
@@ -119,7 +119,7 @@ fn ret_json_escape(text: &str) -> str:
 fn ret_safe_label(text: &str) -> str:
     var out = ""
     for i in 0..text.len() as i32:
-        let ch = text.byte_at(i as i64)
+        let ch = text[i]
         let keep = (ch >= 48 and ch <= 57) or (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or ch == 45 or ch == 46 or ch == 95
         if keep:
             out = out ++ text.slice(i as i64, (i + 1) as i64)
@@ -204,8 +204,8 @@ fn ret_sha256_text(ctx: &ActionCtx, label: &str, text: &str) -> str:
 fn ret_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
     for i in 0..min_len as i32:
-        let ac = a.byte_at(i as i64)
-        let bc = b.byte_at(i as i64)
+        let ac = a[i] as i32
+        let bc = b[i] as i32
         if ac != bc:
             return ac - bc
     if a.len() == b.len():
@@ -239,7 +239,7 @@ fn ret_release_version_component(version: &str, part: i32) -> i32:
     while current < part:
         var dot = -1
         for i in start..version.len() as i32:
-            if version.byte_at(i as i64) == 46:
+            if version[i] == 46:
                 dot = i
                 break
         if dot < 0:
@@ -248,14 +248,14 @@ fn ret_release_version_component(version: &str, part: i32) -> i32:
         current = current + 1
     var end = version.len() as i32
     for i in start..version.len() as i32:
-        if version.byte_at(i as i64) == 46:
+        if version[i] == 46:
             end = i
             break
     if end <= start:
         return -1
     var value = 0
     for i in start..end:
-        let ch = version.byte_at(i as i64)
+        let ch = version[i]
         if ch < 48 or ch > 57:
             return -1
         value = value * 10 + (ch - 48)
@@ -660,7 +660,7 @@ fn ret_json_field(manifest: &str, key: &str) -> str:
         return ""
     let start = at + marker.len()
     var end = start
-    while end < manifest.len() and manifest.byte_at(end) != 34:
+    while end < manifest.len() and manifest[end] != 34:
         end = end + 1
     if end >= manifest.len():
         return ""

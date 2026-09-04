@@ -20,7 +20,7 @@ fn cr_fail(ctx: &ActionCtx, message: &str) -> i32:
 fn cr_dirname(path: &str) -> str:
     var last = -1
     for i in 0..path.len() as i32:
-        let ch = path.byte_at(i as i64)
+        let ch = path[i]
         if ch == 47 or ch == 92:
             last = i
     if last <= 0:
@@ -30,7 +30,7 @@ fn cr_dirname(path: &str) -> str:
 fn cr_basename(path: &str) -> str:
     var last = -1
     for i in 0..path.len() as i32:
-        let ch = path.byte_at(i as i64)
+        let ch = path[i]
         if ch == 47 or ch == 92:
             last = i
     if last < 0:
@@ -40,7 +40,7 @@ fn cr_basename(path: &str) -> str:
 fn cr_normalize_path_separators(path: &str) -> str:
     var out = ""
     for i in 0..path.len() as i32:
-        let ch = path.byte_at(i as i64)
+        let ch = path[i]
         if ch == 92:
             out = out ++ "/"
         else:
@@ -51,8 +51,8 @@ fn cr_str_compare(a: &str, b: &str) -> i32:
     let n = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
     while i < n as i32:
-        let ac = a.byte_at(i as i64)
-        let bc = b.byte_at(i as i64)
+        let ac = a[i] as i32
+        let bc = b[i] as i32
         if ac != bc:
             return ac - bc
         i = i + 1
@@ -88,7 +88,7 @@ fn cr_contains_delimiter(text: &str, hashes: &str) -> bool:
         var j = 0
         var matched = true
         while j < needle.len() as i32:
-            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+            if text[(i + j)] != needle[j]:
                 matched = false
                 break
             j = j + 1

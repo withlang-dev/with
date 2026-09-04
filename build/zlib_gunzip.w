@@ -12,7 +12,7 @@ fn bytes_from_str(data: &str) -> Vec[u8]:
     let out: Vec[u8] = Vec.new()
     var i: i64 = 0
     while i < data.len():
-        out.push(data.byte_at(i) as u8)
+        out.push(data[i] as u8)
         i = i + 1
     out
 
