@@ -14,6 +14,7 @@ use render
 use Overflow
 use compiler.TrackedInputs
 use compiler.BundleInterfaces
+use FnAbi
 use std.collections.HashMap
 use std.collections.HashSet
 
@@ -1168,6 +1169,7 @@ type Sema {
     module_import_targets: Vec[i32], // flattened target module indices
     module_import_paths: Vec[str],   // flattened import path text aligned with module_import_targets
     module_index_by_path: HashMap[str, i32],   // path -> module index
+    bundle_corpus: str,              // D39: the --bundle-corpus root, "" outside a bundle lane
     global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
     module_visibility_cache: HashMap[str, i32], // "from->to" -> visibility
     named_type_candidate_syms: Vec[i32],       // every registered named type symbol
@@ -2332,6 +2334,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         module_import_targets: Vec.new(),
         module_import_paths: sema_new_vec_str(),
         module_index_by_path: sema_new_map_str_i32(),
+        bundle_corpus: "",
         global_visible_module_paths: sema_new_map_str_i32(),
         module_visibility_cache: sema_new_map_str_i32(),
         named_type_candidate_syms: Vec.new(),
@@ -2660,6 +2663,10 @@ impl Sema:
             if current == target_idx:
                 self.module_visibility_cache.insert(sema_owned_text(cache_key), 1)
                 return 1
+            // D39 §3.4: a bundle corpus module compiled in-unit (--emit-c,
+            // #955) presents the surface its .wi would — its corpus siblings
+            // reach the importer, its body-only imports (std.libc) do not.
+            let corpus_boundary = current != start_idx and self.module_in_bundle_corpus(current)
             if current >= 0 and current < self.module_import_starts.len() as i32:
                 let edge_start = self.module_import_starts[current]
                 let edge_count = self.module_import_counts[current]
@@ -2669,9 +2676,15 @@ impl Sema:
                         let ip: str = with_str_clone_ref(self.module_import_paths[idx])
                         if ip == "std.prelude" or ip == "std.prelude_core" or ip == "std.prelude_alloc":
                             continue
-                        stack.push(self.module_import_targets[idx])
+                        let target = self.module_import_targets[idx]
+                        if corpus_boundary and not self.module_in_bundle_corpus(target):
+                            continue
+                        stack.push(target)
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
+
+    fn module_in_bundle_corpus(module_idx: i32) -> bool:
+        self.bundle_corpus.len() > 0 and module_idx >= 0 and module_idx < self.module_paths.len() as i32 and bundle_corpus_contains(self.bundle_corpus, codegen_canonical_module_path(self.module_paths[module_idx]))
 
     fn symbol_visible_from_current(sym: i32) -> i32:
         let symbol_name = self.pool_resolve(sym)
