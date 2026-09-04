@@ -2567,6 +2567,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     seed_compat = seed_compat.allow_network()
     seed_compat = seed_compat.arg("withlang-dev/with")
     seed_compat = seed_compat.arg(release_asset_for_host())
+    // Its nested stage1 compile peaks near 1.3 GiB (the compiler compiling
+    // src/main.w); the driver's RSS tripwire gives this target 2 GiB by name
+    // (src/main.w, #679).
     out = out.add_target(seed_compat)
 
     var cli_selfhost_project_tests = target_new(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
@@ -2693,9 +2696,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("wo-drift")
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("build-helper-programs")
-    // seed-compat joins :test with the per-target RSS budget (its nested
-    // stage1 compile peaks above the 1 GiB tripwire); until then it is run
-    // explicitly: `with build :seed-compat`.
+    tests = tests.dep("seed-compat")
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
@@ -2926,6 +2927,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     publish_asset = publish_asset.write_scope("out/tmp")
     publish_asset = publish_asset.write_scope("out/release")
     publish_asset = publish_asset.allow_network()
+    // Publishing is not a function of declared inputs: the driver never
+    // serves it from the effects cache (BuildGraphCache.w names it), and the
+    // release's add-only rule is what refuses a duplicate.
     out = out.add_target(publish_asset)
 
     // `with build :deps` — fetch the pinned, per-platform static LLVM SDK that

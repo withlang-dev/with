@@ -559,6 +559,12 @@ pub fn build_cache_freshness_reason(root: &str, target: &BuildGraphTarget, dep_r
         return "stale: target is always run"
     if target.name == "last-green" or target.name == "test-green" or target.name == "require-last-green" or target.name == "check-committed-state" or target.name == "print-version":
         return "stale: target is always run"
+    // Publishing is not a function of declared inputs (env-driven, and the
+    // release's add-only rule is what refuses a duplicate): never a cache hit.
+    // A name, like the lanes above: a Target flag would be a std.build API
+    // the pinned seed evaluating build.w does not have (the bootstrap rule).
+    if target.name == "publish-release-asset":
+        return "stale: target is always run"
     if dep_rebuilt:
         return "stale: dependency rebuilt"
     let state_path = build_cache_state_path(root, target.name)

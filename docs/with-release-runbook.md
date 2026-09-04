@@ -413,6 +413,36 @@ move every workflow seed pin with it (`with build :seed-compat` refuses while
 any pin disagrees with the lock), and confirm `:seed-compat` is green before
 landing the first change that needs the new seed.
 
+### Publish-first: the release exists as soon as one platform is done
+
+Nobody waits for the slowest runner. The release is created by whichever
+platform finishes first and every other platform adds its own asset when it
+is done, through one action, `with build :publish-release-asset`
+(build/release_publish.w): it creates the release for the tag if absent
+(stable for the `release` channel, prerelease otherwise), refuses any asset
+name already on the release (assets are add-only; a different build needs a
+different tag), uploads the asset with its `.sha256` and a `.provenance`
+sidecar (commit, builder, fixpoint verdict, time), verifies the published
+digest, and regenerates the notes from every provenance sidecar present.
+The Release workflow's platform jobs run it after their fixpoint; the fast
+lane is this machine, minutes after the tag:
+
+```sh
+WITH_VERSION=$WITH_VERSION with build && with build :fixpoint
+cp out/release/bin/with out/release/with-darwin-aarch64
+shasum -a 256 out/release/with-darwin-aarch64 > out/release/with-darwin-aarch64.sha256
+GH_TOKEN=$(gh auth token) RELEASE_TAG=$WITH_VERSION RELEASE_TITLE="With $WITH_VERSION" \
+  RELEASE_CHANNEL=release RELEASE_ASSETS=out/release/with-darwin-aarch64 \
+  RELEASE_BUILDER="$(hostname)" ./out/release/bin/with build :publish-release-asset
+```
+
+The tag must already be pushed (the action refuses a commit the repository
+does not have). A CI platform that finishes later adds its asset to the same
+release; a platform whose job failed simply has no asset there until its
+re-run succeeds. `with build :seed` and the seed pins select by asset name
+and digest, so a release that is darwin-only for an hour is invisible to a
+Linux user.
+
 Prepare the platform-named assets on their native platforms with the
 With-native release package targets:
 

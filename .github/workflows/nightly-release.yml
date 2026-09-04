@@ -18,9 +18,9 @@ on:
           - nightly
           - release
       version:
-        description: Compiler version; must exactly match src/version
+        description: Compiler version; must exactly match src/version (empty derives it from src/version)
         required: false
-        default: v0.15.1.3
+        default: ""
         type: string
 
 concurrency:
