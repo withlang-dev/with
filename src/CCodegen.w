@@ -5753,6 +5753,11 @@ impl CCodegen:
         // (the LLVM backend's entry-alloca-and-store for the same shape).
         if body.operand_kinds[op_id] != OperandKind.OK_CONSTANT:
             return "&(" ++ arg_text ++ ")"
+        // A str constant is already the WITH_STR_LIT compound literal, an
+        // lvalue of its own; wrapping it again initializes `ptr` with a
+        // with_str ("initializing 'const char *' with … 'with_str'").
+        if cc_str_starts_with(arg_text, "WITH_STR_LIT(") != 0:
+            return "&(" ++ arg_text ++ ")"
         var lit_tid = self.operand_tid(body, op_id)
         if lit_tid == 0 or self.is_void_tid(lit_tid) != 0:
             lit_tid = self.sema.ty_i64 as i32
@@ -8832,15 +8837,29 @@ impl CCodegen:
             return "extern " ++ self.c_decl(ret_tid, name) ++ ";\n"
         "extern " ++ self.c_type(ret_tid, 1) ++ " " ++ name ++ ";\n"
 
+    // The with_* names the fixed block (emit_module_prelude's `extern …`
+    // lines below) declares with their C spellings.
+    fn prelude_block_declares(name: &str) -> bool:
+        cc_str_starts_with(name, "with_str_") != 0 or cc_str_starts_with(name, "with_fmt_") != 0 or
+        cc_str_starts_with(name, "with_fiber_") != 0 or cc_str_starts_with(name, "with_println_") != 0 or
+        name == "with_alloc" or name == "with_free" or name == "with_memcpy" or name == "with_memmove" or
+        name == "with_memset" or name == "with_memcmp" or name == "with_hashmap_get_ptr" or
+        name == "with_clock_nanos" or name == "with_nanosleep" or name == "with_sysinfo_os" or
+        name == "with_sysinfo_arch" or name == "with_sysinfo_hostname" or name == "with_eprint" or
+        name == "with_write" or name == "with_ewrite" or name == "with_panic" or name == "with_bool_to_str" or
+        name == "with_i64_to_str" or name == "with_runtime_configure_fibers" or name == "with_str"
+
     fn should_emit_extern_fn_decl(fn_sym: i32, referenced: &HashMap[i32, i32]) -> i32:
         if not referenced.contains(fn_sym):
             return 0
         let name = self.canonical_extern_name(cc_intern_resolve(self.intern, fn_sym))
-        // The runtime ABI is declared by with_runtime.h and the fixed block
-        // in emit_module_prelude; the libc bindings (with_libc_*, rt_core.w)
-        // are declared only by std.libc's extern fns, so their prototypes
-        // come from those declarations — with or without the prelude.
-        if cc_str_starts_with(name, "with_") != 0 and cc_str_starts_with(name, "with_libc_") == 0:
+        // A with_* runtime function the fixed block below declares (the str,
+        // fmt, memory and fiber entry points) is not redeclared; every other
+        // with_* prototype comes from the With extern declaration itself, so
+        // the emitted C never trusts runtime/with_runtime.h for a signature
+        // the runtime has since changed (#1038: the fs/exec wrappers took
+        // `&str` in 7d8d085e while the header still said `with_str`).
+        if self.prelude_block_declares(name):
             return 0
         if cc_str_starts_with(name, "wl_") != 0:
             return 0
