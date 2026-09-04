@@ -11650,6 +11650,15 @@ impl Sema:
                 self.typed_expr_types.insert(node, elem_view)
                 self.record_view_producer_origins(node, expr)
                 return elem_view
+            // A keyed map is not a positional collection: `xs[i]` denotes an
+            // element place (D27), while a lookup may be absent and returns
+            // Option[&V] (D22). Without this the index reached MIR lowering
+            // as a generic call with no contract and aborted the compiler
+            // (#1012).
+            if not is_type_level_index and (base_name == "HashMap" or base_name == "BTreeMap" or base_name == "HashSet"):
+                self.check_expr(index)
+                self.emit_error(base_name ++ " is not indexable: a lookup may be absent, so it returns Option — use .get(key) (D22 §3.4)", node)
+                return 0
 
         // Type-level NodeKind.NK_INDEX: Vec[i32], HashMap[str, i32], etc.
         // Create TypeKind.TY_GENERIC_INST so MirLower can find it in the sema snapshot.
