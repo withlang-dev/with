@@ -11613,8 +11613,12 @@ impl Sema:
                 return elem_ty
         if container_tk == TypeKind.TY_STR:
             self.check_runtime_index_operand(index)
-            self.typed_expr_types.insert(node, self.ty_i32 as i32)
-            return self.ty_i32 as i32
+            // The element of a str is its byte, u8 (§9120 byte buffer, D27
+            // element place). i32 was byte_at's return type; it sign-extended
+            // 0xFF to -1 on widening and made `let b = s[i]` a `&i32` view
+            // over one byte (#1017).
+            self.typed_expr_types.insert(node, self.ty_u8 as i32)
+            return self.ty_u8 as i32
         if container_tk == TypeKind.TY_ARRAY:
             self.check_runtime_index_operand(index)
             let elem_ty = self.get_type_d0(container_tid)

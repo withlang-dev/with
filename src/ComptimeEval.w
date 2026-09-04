@@ -2931,7 +2931,7 @@ impl ComptimeEvaluator:
             let index = comptime_value_intlike(index_signal.value)
             if index < 0 or index >= recv_value.text.len():
                 return self.fail(node, "Vec[u8].get() index out of bounds in comptime")
-            return comptime_control_value(comptime_value_int(self.sema.ty_u8 as i32, recv_value.text.byte_at(index) as i64))
+            return comptime_control_value(comptime_value_int(self.sema.ty_u8 as i32, (recv_value.text[index] as i64) & 255))
         if method == "push":
             if arg_count != 1:
                 return self.fail(node, "Vec[u8].push() expects exactly one argument")
@@ -6537,7 +6537,16 @@ impl ComptimeEvaluator:
             if index < 0 or index >= base.extra_count as i64:
                 return self.fail(node, "comptime index out of bounds")
             return comptime_control_value(self.extra_value_at((base.extra_start + index as i32) as i64))
-        self.fail(node, "comptime index requires an array, tuple, or vec")
+        // `s[i]` on a str is the byte at i (D27: the element place), u8 —
+        // bounds-checked, never byte_at's silent 0.
+        if base.kind == ComptimeValueKind.CV_STR:
+            if index < 0 or index >= base.text.len():
+                return self.fail(node, "comptime str index out of bounds")
+            // `& 255`: a byte is 0..255 whatever the host compiler that built
+            // this evaluator did to the widening (the pre-#1017 seed
+            // sign-extended it).
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_u8 as i32), (base.text[index] as i64) & 255))
+        self.fail(node, "comptime index requires an array, tuple, vec, or str")
 
     mut fn fstring_segment_text(value: ComptimeValue, node: i32) -> str:
         if value.kind == ComptimeValueKind.CV_STR:

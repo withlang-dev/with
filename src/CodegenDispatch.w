@@ -1792,7 +1792,11 @@ impl Codegen:
                 if value_opt.is_some():
                     let value = value_opt.unwrap() as i64
                     if expected_ty != 0:
-                        return self.coerce_value_to_type(value, expected_ty)
+                        // Widen by the local's Sema signedness, not the LLVM
+                        // width alone (#1017: a u8 local sign-extended).
+                        let local_sema_ty: i32 = if local_id >= 0 and local_id < body.local_type_ids.len(): body.local_type_ids[local_id] else: 0
+                        let src_unsigned = self.mir_sema_type_is_unsigned(local_sema_ty)
+                        return self.mir_coerce_value_to_sema_type(value, expected_ty, 0, src_unsigned)
                     return value
             var ptr = self.mir_place_ptr(body, od, false, 0)
             // Lazy-create alloca using sema type when local not yet allocated
@@ -1865,6 +1869,13 @@ impl Codegen:
                 let ek = wl_get_type_kind(expected_ty)
                 if lk == wl_struct_type_kind() and ek == wl_struct_type_kind() and ptr_ty != expected_ty:
                     return loaded
+                if lk == wl_integer_type_kind() and ek == wl_integer_type_kind():
+                    // Widen by the place's Sema signedness (#1017); a str
+                    // byte is unsigned whatever Sema calls the expression.
+                    var src_unsigned = self.mir_operand_is_unsigned(body, operand_id)
+                    if not src_unsigned:
+                        src_unsigned = self.mir_place_is_str_byte(body, od)
+                    return self.mir_coerce_value_to_sema_type(loaded, expected_ty, 0, src_unsigned)
                 return self.coerce_value_to_type(loaded, expected_ty)
             return loaded
 
@@ -1882,8 +1893,16 @@ impl Codegen:
     fn mir_sema_type_is_unsigned(sema_ty: i32) -> bool:
         if sema_ty <= 0: return false
         let resolved = self.mir_resolve_alias_at(sema_ty)
-        if self.mir_type_kind_at(resolved) == TypeKind.TY_INT:
+        let kind = self.mir_type_kind_at(resolved)
+        if kind == TypeKind.TY_INT:
             return self.mir_type_d1_at(resolved) == 0
+        // A view binding (`let b = v[i]`, `let c = s[i]`) is typed &u8 but the
+        // value being widened is the loaded byte: its signedness is the
+        // pointee's (#1017).
+        if kind == TypeKind.TY_REF:
+            let pointee = self.mir_resolve_alias_at(self.mir_type_d0_at(resolved))
+            if self.mir_type_kind_at(pointee) == TypeKind.TY_INT:
+                return self.mir_type_d1_at(pointee) == 0
         false
 
     fn mir_sema_type_is_raw_pointer_or_ref(sema_ty: i32) -> bool:
@@ -3738,6 +3757,8 @@ impl Codegen:
                         return cast_ptr
             let val = self.mir_eval_operand(body, d0, 0)
             var src_unsigned = self.mir_operand_is_unsigned(body, d0)
+            if not src_unsigned:
+                src_unsigned = self.mir_operand_is_str_byte(body, d0)
             // Fallback: if operand lookup failed, check the sema type stored in d2
             // (MirLower stores the source sema type in rval_d2 for casts)
             if not src_unsigned and d2 > 0:
@@ -5778,6 +5799,14 @@ impl Codegen:
                 let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
                 if place_ptr != 0:
                     out = place_ptr
+        // Integer widening takes its signedness from the OPERAND's Sema type
+        // (#1017): the LLVM-level coercer below has no type to ask and
+        // sign-extends by default, so a u8 argument read 0xFF as -1.
+        if out != 0 and expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_integer_type_kind() and wl_get_type_kind(wl_type_of(out)) == wl_integer_type_kind():
+            var src_unsigned = self.mir_operand_is_unsigned(body, operand_id)
+            if not src_unsigned:
+                src_unsigned = self.mir_operand_is_str_byte(body, operand_id)
+            out = self.mir_coerce_value_to_sema_type(out, expected_ty, expected_sema_ty, src_unsigned)
         let had_error_before = self.had_error
         let coerced = self.enforce_coerced_type(out, expected_ty, "wrong argument type")
         if self.had_error != had_error_before:
@@ -6163,6 +6192,55 @@ impl Codegen:
         self.emit_runtime_panic("slice index out of bounds")
         wl_position_at_end(self.builder, ok_bb)
 
+    // A place whose last projection indexes a str: the memory byte is an i8
+    // but its value is the unsigned byte 0..255 (byte_at's contract, and the
+    // spec's — bytes are u8). Sema types the expression i32 today, so the
+    // place's cached Sema type cannot tell codegen to zero-extend; this can.
+    mut fn mir_place_is_str_byte(body: &MirBody, place_id: i32) -> bool:
+        if place_id < 0 or place_id >= body.place_locals.len():
+            return false
+        let p_count: i32 = body.place_proj_counts[place_id]
+        if p_count <= 0:
+            return false
+        let p_start: i32 = body.place_proj_starts[place_id]
+        if body.proj_kinds[p_start + p_count - 1] != ProjKind.PK_INDEX:
+            return false
+        // Type of the place with its last projection removed.
+        let local_id: i32 = body.place_locals[place_id]
+        if local_id < 0 or local_id >= body.local_type_ids.len():
+            return false
+        var ty: i32 = body.local_type_ids[local_id]
+        for pi in 0..p_count - 1:
+            let pk: i32 = body.proj_kinds[p_start + pi]
+            let pd: i32 = body.proj_d0[p_start + pi]
+            if pk == ProjKind.PK_FIELD or pk == ProjKind.PK_TUPLE_INDEX:
+                let field_ty = self.mir_project_field_sema_type(ty, pd)
+                if field_ty > 0: ty = field_ty
+            else if pk == ProjKind.PK_DEREF:
+                let d_resolved = self.mir_resolve_alias_at(ty)
+                let d_tk = self.mir_type_kind_at(d_resolved)
+                if d_tk == TypeKind.TY_PTR or d_tk == TypeKind.TY_REF:
+                    ty = self.mir_type_d0_at(d_resolved)
+            else if pk == ProjKind.PK_INDEX:
+                let elem_ty = self.mir_index_elem_sema_type(ty)
+                if elem_ty > 0: ty = elem_ty
+        if ty <= 0:
+            return false
+        var resolved = self.mir_resolve_alias_at(ty)
+        var kind = self.mir_type_kind_at(resolved)
+        if kind == TypeKind.TY_REF:
+            resolved = self.mir_resolve_alias_at(self.mir_type_d0_at(resolved))
+            kind = self.mir_type_kind_at(resolved)
+        kind == TypeKind.TY_STR
+
+    mut fn mir_operand_is_str_byte(body: &MirBody, operand_id: i32) -> bool:
+        if operand_id < 0 or operand_id >= body.operand_kinds.len():
+            return false
+        let ok: i32 = body.operand_kinds[operand_id]
+        if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
+            return false
+        self.mir_place_is_str_byte(body, body.operand_d0[operand_id])
+
     fn mir_index_elem_sema_type(sema_ty: i32) -> i32:
         if sema_ty <= 0:
             return 0
@@ -6171,7 +6249,10 @@ impl Codegen:
         if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
             return self.mir_type_d0_at(resolved)
         if tk == TypeKind.TY_STR:
-            return self.sema.ty_i32 as i32
+            // `s[i]` is the byte, u8 — Sema types it so and the value is an
+            // i8. Calling it i32 here (byte_at's old return type) made every
+            // widening of a str byte sign-extend (#1017: 0xFF read as -1).
+            return self.sema.ty_u8 as i32
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             // d0 = pointee type id
             return self.mir_type_d0_at(resolved)

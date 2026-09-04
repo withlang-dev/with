@@ -2008,7 +2008,11 @@ impl MirBuilder:
         if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
             return self.sema.get_type_d0(resolved)
         if tk == TypeKind.TY_STR:
-            return self.sema.ty_i32 as i32
+            // A str is a byte buffer (§9120) and `s[i]` its element place
+            // (D27): the byte, u8. Typing it i32 (byte_at's old return type)
+            // made a view of it a `&i32` over one byte — a 4-byte load past
+            // the element (#1017).
+            return self.sema.ty_u8 as i32
         if tk == TypeKind.TY_PTR:
             return self.sema.get_type_d0(resolved)
         if tk == TypeKind.TY_REF:

@@ -264,7 +264,8 @@ impl Hash for str:
         var h: i64 = 1469598103934665603
         var i: i64 = 0
         while i < value.len():
-            h = (h *% 1099511628211) ^ value[i]
+            // FNV-1a folds the byte value 0..255 into the signed accumulator.
+            h = (h *% 1099511628211) ^ (value[i] as i64)
             i = i + 1
         h
 
