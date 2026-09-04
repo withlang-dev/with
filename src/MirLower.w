@@ -3300,6 +3300,7 @@ impl MirBuilder:
                 if ev_ty <= 0:
                     ev_ty = self.sema.ty_i32
                 let local_id = self.body.new_local(ev_ty, ev_is_mut, sym, 1)
+                self.body.mark_global_local(local_id)
                 self.bind_local(sym, local_id)
                 return local_id
             if dk != NodeKind.NK_LET_DECL:
@@ -3331,6 +3332,7 @@ impl MirBuilder:
             if gty == 0:
                 gty = self.sema.ty_i32 as i32
             let local_id = self.body.new_local(gty, is_mut, sym, 1)
+            self.body.mark_global_local(local_id)
             self.bind_local(sym, local_id)
             return local_id
         -1
@@ -14472,6 +14474,8 @@ fn lower_generator_next_body(sema: &Sema, source: &MirBody, fn_node: i32) -> Mir
             source.local_names[li],
             source.local_is_user_var[li],
         )
+        if source.local_is_global[li] != 0:
+            out.mark_global_local(mapped)
         local_map.push(mapped)
 
     for ci in 0..source.const_kinds.len():

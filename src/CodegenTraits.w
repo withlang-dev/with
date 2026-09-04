@@ -870,7 +870,7 @@ impl Codegen:
         // Pre-populate globals
         for dtm_gli in 0..dtm_body.local_names.len() as i32:
             let dtm_gl_name = dtm_body.local_names[dtm_gli]
-            if dtm_gl_name != 0:
+            if dtm_gl_name != 0 and dtm_body.local_is_global[dtm_gli] != 0:
                 let dtm_gl_mc = self.module_constants.get(dtm_gl_name)
                 if dtm_gl_mc.is_some():
                     let dtm_global_value: i64 = dtm_gl_mc.unwrap()
@@ -1678,7 +1678,7 @@ impl Codegen:
 
         for gli in 0..init_body.local_names.len() as i32:
             let gl_name = init_body.local_names[gli]
-            if gl_name == 0:
+            if gl_name == 0 or init_body.local_is_global[gli] == 0:
                 continue
             let gl_opt = self.module_constants.get(gl_name)
             if gl_opt.is_some():

@@ -1055,7 +1055,7 @@ impl Codegen:
         if local_id < 0 or local_id >= body.local_names.len() as i32:
             return false
         let sym = body.local_names[local_id]
-        if sym == 0:
+        if sym == 0 or body.local_is_global[local_id] == 0:
             return false
         let decl_index = self.find_module_let_decl_index(sym)
         if decl_index < 0:
@@ -15807,7 +15807,7 @@ impl Codegen:
         // Pre-populate mir_local_ptrs for global variable proxy locals
         for gli in 0..body.local_names.len() as i32:
             let gl_name = body.local_names[gli]
-            if gl_name != 0:
+            if gl_name != 0 and body.local_is_global[gli] != 0:
                 let gl_mc = self.module_constants.get(gl_name)
                 if gl_mc.is_some():
                     let global_value: i64 = gl_mc.unwrap()
@@ -17506,7 +17506,7 @@ impl Codegen:
         // Pre-populate globals
         for cl_gli in 0..closure_body.local_names.len() as i32:
             let cl_gl_name = closure_body.local_names[cl_gli]
-            if cl_gl_name != 0:
+            if cl_gl_name != 0 and closure_body.local_is_global[cl_gli] != 0:
                 let cl_gl_mc = self.module_constants.get(cl_gl_name)
                 if cl_gl_mc.is_some():
                     let cl_global_value: i64 = cl_gl_mc.unwrap()

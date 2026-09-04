@@ -1097,7 +1097,7 @@ impl CCodegen:
         if local_id <= 0 or local_id >= body.local_names.len() as i32:
             return 0
         let sym = body.local_names[local_id]
-        if sym == 0:
+        if sym == 0 or body.local_is_global[local_id] == 0:
             return 0
         let decl = self.global_decl_node(sym)
         if decl == 0 as NodeId:
