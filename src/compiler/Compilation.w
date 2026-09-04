@@ -478,6 +478,9 @@ impl Compilation:
         if not self.load_link_bundles():
             return AstPool.new()
         let _ = bundle_interfaces_register_wi(wi_text)
+        var zcu = move self.zcu
+        zcu.interface_eager = true
+        self.zcu = zcu
         var root_text = "// bundle interface root for " ++ wi_path ++ "\n"
         for si in 0..sections.len() as i32:
             let dotted = bundle_module_dotted_name(sections[si])

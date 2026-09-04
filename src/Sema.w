@@ -752,6 +752,7 @@ type Sema {
     decl_is_iface: Vec[i32],
     decl_iface_demanded: Vec[i32],
     iface_mentioned: HashMap[i32, i32],
+    interface_eager: i32,            // 1: a bundle build or a .wi root — collect every interface declaration
     // every flat-scope global's declaring module and binding index (symbol
     // → path, symbol → index), and the globals a local binding is standing
     // in for while its scope lasts — a function's local may take the name
@@ -2065,6 +2066,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_is_iface,
         decl_iface_demanded,
         iface_mentioned,
+        interface_eager: 0,
         global_value_decl_paths,
         global_value_decl_bindings,
         shadowed_global_syms: Vec.new(),

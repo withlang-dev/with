@@ -95,6 +95,9 @@ type Zcu {
     // D38 batch C3: `--bundle-corpus <rel>` of a bundle build — codegen
     // owns (defines) every module under it (Codegen.bundle_corpus); "".
     bundle_corpus: str,
+    // D39: a .wi root compile — the interface emitter and the fingerprint
+    // read Sema's full tables, so every interface declaration is collected.
+    interface_eager: bool,
     // The owned globals the last bundle build could not fold to data
     // (Codegen.bundle_unlowered_globals), for the interface emitter.
     last_bundle_unlowered_globals: Vec[str],
@@ -163,6 +166,7 @@ fn Zcu.init -> Zcu:
         tracked_input_paths: zcu_new_vec_str(),
         link_bundle_prefixes: zcu_new_vec_str(),
         bundle_corpus: "",
+        interface_eager: false,
         last_bundle_unlowered_globals: zcu_new_vec_str(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,
@@ -385,6 +389,7 @@ impl Zcu:
     fn configure_tracked_input_sema(sema: Sema) -> Sema:
         sema.set_tracked_input_context(self.tracked_input_root(), &self.tracked_input_paths)
         sema.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
+        sema.interface_eager = if self.interface_eager or self.bundle_corpus.len() > 0: 1 else: 0
         sema
 
     mut fn set_extra_sources(names: Vec[str], texts: Vec[str]):

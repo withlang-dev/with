@@ -108,6 +108,9 @@ impl Sema:
         self.decl_iface_demanded = sema_new_vec_i32()
         self.iface_mentioned = sema_new_map_i32_i32()
         let iface_files = sema_new_map_i32_i32()
+        // A bundle build and a .wi root (the emitter, the fingerprint and
+        // the check-wi pass read the full tables) collect everything.
+        let eager = self.interface_eager != 0
         var iface_count = 0
         var last_path = ""
         var last_flag = 0
@@ -122,12 +125,12 @@ impl Sema:
                     last_path = with_str_clone_ref(path)
                     last_flag = flag
             self.decl_is_iface.push(flag)
-            self.decl_iface_demanded.push(if flag != 0: 0 else: 1)
+            self.decl_iface_demanded.push(if flag != 0 and not eager: 0 else: 1)
             if flag != 0:
                 iface_count = iface_count + 1
                 if di < self.decl_source_file_ids.len() as i32:
                     iface_files.insert(self.decl_source_file_ids[di], 1)
-        if iface_count == 0:
+        if iface_count == 0 or eager:
             return
         // S, and each interface file's contiguous node run (a file's nodes
         // are appended in one parse; anything after that run is generated).
