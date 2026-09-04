@@ -48,6 +48,29 @@ comptime fn ct_i64_shl -> i64: 1i64 << 40
 // expression that never overflows i64, the second a misleading "integer
 // literal does not fit expected type" naming a literal that fits u64 exactly
 // (the truncated operand went negative and the unsigned fit check rejected it).
+// The upper half of u64. These literals miss int_literal_fast_i64 and take the
+// exact path, landing in ComptimeValue.data0 (an i64) as a two's-complement bit
+// pattern — 2^63 as -9223372036854775808, u64::MAX as -1. Everything that reads
+// that payload has to know it is a bit pattern and not a number; three places
+// did not (value write-back, div/mod, and ordering).
+comptime fn ct_u64_p63 -> u64: 9223372036854775808u64 + 0u64
+comptime fn ct_u64_max -> u64: 18446744073709551615u64 + 0u64
+
+// Operators that read the payload directly. div/mod computed signed, so
+// u64::MAX / 3 was -1 / 3 = 0 and u64::MAX % 7 was -1 % 7 = -1. Ordering
+// compared signed, so u64::MAX < 1 was -1 < 1, i.e. true.
+comptime fn ct_u64_div -> u64: 18446744073709551615u64 / 3u64
+comptime fn ct_u64_mod -> u64: 18446744073709551615u64 % 7u64
+comptime fn ct_u64_lt  -> bool: 18446744073709551615u64 < 1u64
+comptime fn ct_u64_gte -> bool: 9223372036854775808u64 >= 1u64
+
+// Signed controls: the fixes above branch on signedness, so signed behavior
+// must be provably unchanged. Without these, making unsigned right by making
+// signed wrong would pass.
+comptime fn ct_i64_sdiv -> i64: -9i64 / 3i64
+comptime fn ct_i64_smod -> i64: -9i64 % 7i64
+comptime fn ct_i64_slt  -> bool: -1i64 < 1i64
+
 comptime fn ct_i64_edge -> i64: 2147483647i64 + 1i64
 comptime fn ct_u64_fit  -> u64: 3000000001u64 + 0u64
 
@@ -66,6 +89,15 @@ const CT_I64_DIV: i64 = comptime ct_i64_div()
 const CT_U64_SUB: u64 = comptime ct_u64_sub()
 const CT_U64_MUL: u64 = comptime ct_u64_mul()
 const CT_I64_SHL: i64 = comptime ct_i64_shl()
+const CT_U64_P63: u64 = comptime ct_u64_p63()
+const CT_U64_MAX: u64 = comptime ct_u64_max()
+const CT_U64_DIV: u64 = comptime ct_u64_div()
+const CT_U64_MOD: u64 = comptime ct_u64_mod()
+const CT_U64_LT: bool = comptime ct_u64_lt()
+const CT_U64_GTE: bool = comptime ct_u64_gte()
+const CT_I64_SDIV: i64 = comptime ct_i64_sdiv()
+const CT_I64_SMOD: i64 = comptime ct_i64_smod()
+const CT_I64_SLT: bool = comptime ct_i64_slt()
 const CT_I64_EDGE: i64 = comptime ct_i64_edge()
 const CT_U64_FIT: u64 = comptime ct_u64_fit()
 
@@ -107,6 +139,15 @@ fn main:
     assert(CT_I64_SHL == 1099511627776)
     assert(CT_I64_EDGE == 2147483648)
     assert(CT_U64_FIT == 3000000001)
+    assert(CT_U64_P63 == 9223372036854775808)
+    assert(CT_U64_MAX == 18446744073709551615)
+    assert(CT_U64_DIV == 6148914691236517205)
+    assert(CT_U64_MOD == 1)
+    assert(CT_U64_LT == false)
+    assert(CT_U64_GTE == true)
+    assert(CT_I64_SDIV == -3)
+    assert(CT_I64_SMOD == -2)
+    assert(CT_I64_SLT == true)
 
     // ── plain-const-fold term == expected literal ────────────────────────
     assert(FOLD_I32 == 2000000000)

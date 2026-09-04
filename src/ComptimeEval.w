@@ -6658,12 +6658,17 @@ impl ComptimeEvaluator:
         if comptime_value_is_intlike(lhs) != 0 and comptime_value_is_intlike(rhs) != 0:
             let lv = comptime_value_intlike(lhs)
             let rv = comptime_value_intlike(rhs)
+            // #943: ordering must follow the operand's signedness. These are
+            // i64 payloads, so an unsigned value in the upper half of its range
+            // has the sign bit set — `u64::MAX < 1` compared signed is `-1 < 1`,
+            // i.e. true. Equality is unaffected: it compares bit patterns.
+            let cmp_unsigned = self.comptime_int_is_unsigned(if lhs.type_id != 0: lhs.type_id else: rhs.type_id)
             if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(if lv == rv: 1 else: 0))
             if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(if lv != rv: 1 else: 0))
-            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(if lv < rv: 1 else: 0))
-            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(if lv > rv: 1 else: 0))
-            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(if lv <= rv: 1 else: 0))
-            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(if lv >= rv: 1 else: 0))
+            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lt(lv, rv) else: lv < rv): 1 else: 0))
+            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lt(rv, lv) else: lv > rv): 1 else: 0))
+            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lte(lv, rv) else: lv <= rv): 1 else: 0))
+            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lte(rv, lv) else: lv >= rv): 1 else: 0))
         if lhs.kind == ComptimeValueKind.CV_STR and rhs.kind == ComptimeValueKind.CV_STR:
             if op == BinaryOp.OP_EQ:
                 return comptime_control_value(comptime_value_bool(comptime_values_equal(lhs, rhs, self.extra_values)))
@@ -6808,6 +6813,10 @@ impl ComptimeEvaluator:
                 if self.sema.overflow_mode == OVERFLOW_MODE_SATURATE():
                     return comptime_control_value(comptime_value_int(result_ty, int_signed_max(self.comptime_int_width(result_ty))))
                 return self.fail(node, "integer overflow in comptime")
+            // #943: an i64 payload for an unsigned type is a bit pattern, so
+            // signed division reads it wrong — u64::MAX / 3 became -1 / 3 = 0.
+            if self.comptime_int_is_unsigned(result_ty):
+                return comptime_control_value(comptime_value_int(result_ty, ((lv as u64) / (rv as u64)) as i64))
             return comptime_control_value(comptime_value_int(result_ty, lv / rv))
         if op == BinaryOp.OP_MOD:
             if rv == 0:
@@ -6816,6 +6825,9 @@ impl ComptimeEvaluator:
                 if self.sema.overflow_mode == OVERFLOW_MODE_WRAP() or self.sema.overflow_mode == OVERFLOW_MODE_SATURATE():
                     return comptime_control_value(comptime_value_int(result_ty, 0))
                 return self.fail(node, "integer overflow in comptime")
+            // #943: same as OP_DIV — u64::MAX % 7 became -1 % 7 = -1.
+            if self.comptime_int_is_unsigned(result_ty):
+                return comptime_control_value(comptime_value_int(result_ty, ((lv as u64) % (rv as u64)) as i64))
             return comptime_control_value(comptime_value_int(result_ty, lv % rv))
         if op == BinaryOp.OP_SHL:
             return comptime_control_value(comptime_value_int(result_ty, self.eval_shift_value(op, result_ty, lv, rv)))
