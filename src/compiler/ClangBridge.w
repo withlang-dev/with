@@ -2199,10 +2199,18 @@ unsafe fn macro_session_grow(ms: *mut MacroSession):
     (*ms).param_counts = npc as *mut i32
 
 fn macro_source_is_define_line(source: &str) -> bool:
+    // C permits whitespace between `#` and `define` (glibc writes `#  define`).
+    // Recognize it so the raw source line — which preserves token adjacency,
+    // unlike libclang's space-inserting spelling reconstruction — is used.
     var i = 0
     while i < source.len() as i32 and (source[i] == 32 or source[i] == 9):
         i = i + 1
-    i + 7 <= source.len() as i32 and source.slice(i as i64, (i + 7) as i64) == "#define"
+    if i >= source.len() as i32 or source.byte_at(i as i64) != 35:
+        return false
+    i = i + 1
+    while i < source.len() as i32 and (source.byte_at(i as i64) == 32 or source.byte_at(i as i64) == 9):
+        i = i + 1
+    i + 6 <= source.len() as i32 and source.slice(i as i64, (i + 6) as i64) == "define"
 
 unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *const u8, loc_ptr: *const u8, is_system: i32):
     if line_ptr as i64 == 0:
@@ -2210,13 +2218,16 @@ unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *c
     var define_start = line_ptr
     while *(define_start) == 32 or *(define_start) == 9:
         define_start = (define_start as i64 + 1) as *const u8
-    if c_strncmp(define_start, "#define\0" as *const u8, 7) == 0:
-        define_start = (define_start as i64 + 7) as *const u8
+    // `#` then optional whitespace then `define` (glibc's `#  define`).
+    if *define_start == 35:
+        define_start = (define_start as i64 + 1) as *const u8
+        while *(define_start) == 32 or *(define_start) == 9:
+            define_start = (define_start as i64 + 1) as *const u8
+        if c_strncmp(define_start, "define\0" as *const u8, 6) == 0:
+            define_start = (define_start as i64 + 6) as *const u8
     while *(define_start) == 32 or *(define_start) == 9:
         define_start = (define_start as i64 + 1) as *const u8
     if *define_start == 0:
-        return
-    if *define_start == 95 and *((define_start as i64 + 1) as *const u8) == 95:
         return
 
     var name_end = define_start
