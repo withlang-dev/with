@@ -148,6 +148,14 @@ Set the release version explicitly for the rest of the flow:
 export WITH_VERSION=v0.14.3
 ```
 
+Choose the number by the bootstrap-compatibility rule (see `decisions.md` D40):
+`vW.X.Y.Z`, where **`Y` is a compatibility group** — every `vW.X.Y.*` seed can
+build every commit released in that group. A normal cut increments `Z`. A
+**bootstrap breakage** — a tree that the current group's seeds cannot
+materialize because build-driver code uses a compiler feature newer than those
+seeds — **must bump `Y` and reset `Z=0`**; that new `.0` seed need only be
+bootstrappable from the immediately-previous seed, not the whole old group.
+
 Bump `src/version` to the release tag and commit it:
 
 ```sh
