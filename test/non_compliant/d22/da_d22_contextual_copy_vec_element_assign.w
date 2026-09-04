@@ -1,7 +1,7 @@
 //! D22-NON-COMPLIANT
 //! owner-stage: 6
 //! required-verdict: compile-and-run under `--debug-alloc`
-//! exact-type: inferred `view` remains `&i32`; `Vec.set_i32` establishes an owned `i32` demand for its value argument
+//! exact-type: inferred `view` remains `&i32`; the element assignment `slots[0] = view` establishes an owned `i32` demand for its value (the retired `Vec.set_i32` intrinsic did the same, #1007)
 //! expected-diagnostic: none
 //! origin-set: `view` has `{map}`; the value stored in `slots` has `{}`
 //! drop-behavior: the pointee is copied once into `slots`; both containers drop once; leak count=0
@@ -16,7 +16,7 @@ fn main:
     slots.push(0)
 
     let view = map.get(1).unwrap()
-    slots.set_i32(0, view)
+    slots[0] = view
     map.clear()
 
     assert(slots.get(0) == 41)

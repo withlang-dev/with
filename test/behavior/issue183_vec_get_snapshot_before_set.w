@@ -7,7 +7,7 @@ fn main:
     values.push(30)
 
     let before: i32 = values.get(1)
-    values.set_i32(1, before + 1)
+    values[1] = before + 1
 
     assert(before == 20)
     assert(values.get(1) == 21)
