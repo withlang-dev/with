@@ -1089,6 +1089,11 @@ type Sema {
     in_defer: i32,
     in_unsafe: i32,
     in_bitwise_literal_context: i32,
+    // #943 / #914 D2: set while checking the operand of a unary `-`, so an
+    // integer literal is range-checked as the magnitude of a negation rather
+    // than as a standalone value. `2147483648` is not a valid i32, but
+    // `-2147483648` is exactly i32::MIN.
+    in_negated_literal_context: i32,
     unsafe_scope_used: Vec[i32],
     break_value_type: TypeId,
     has_break_value_type: i32,
@@ -2265,6 +2270,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         in_defer: 0,
         in_unsafe: 0,
         in_bitwise_literal_context: 0,
+        in_negated_literal_context: 0,
         unsafe_scope_used: Vec.new(),
         break_value_type: 0,
         has_break_value_type: 0,
@@ -4078,6 +4084,32 @@ impl Sema:
             return value <= 4294967295
         true
 
+    // #943 / #914 D2: does this literal fit `tid` when it is the magnitude of
+    // a negation? The positive and negative ranges are not symmetric — at
+    // `bits` the largest magnitude is 2^(bits-1) negative but 2^(bits-1)-1
+    // positive — so MIN is expressible only through this path.
+    fn int_literal_fits_type_negated(node: i32, tid: i32) -> bool:
+        let resolved = self.resolve_alias(tid as TypeId)
+        let kind = self.get_type_kind(resolved)
+        if kind == TypeKind.TY_FLOAT:
+            return true
+        if kind != TypeKind.TY_INT:
+            return false
+        if self.get_type_d1(resolved) == 0:
+            // Unsigned: negation is rejected by check_unary with its own
+            // message. Defer to the ordinary check so the diagnostic stays
+            // "cannot negate an unsigned value" rather than a fit error.
+            return self.int_literal_fits_type(node, tid)
+        let bits = self.get_type_d0(resolved)
+        if self.ast.has_int_literal_exact(node as NodeId):
+            return exact_int_fits_signed_negative_bits(self.ast.int_literal_exact_value(node as NodeId), bits)
+        let value = self.ast.int_lit_value(node as NodeId)
+        if value < 0:
+            return self.int_literal_fits_type(node, tid)
+        if bits >= 64:
+            return true
+        exact_int_uword_lte(value, exact_int_pow2_word(bits - 1))
+
     fn int_literal_bit_pattern_fits_type(node: i32, tid: i32) -> bool:
         let resolved = self.numeric_operand_type(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_INT:
@@ -4100,7 +4132,7 @@ impl Sema:
         if self.in_bitwise_literal_context != 0:
             if not self.int_literal_bit_pattern_fits_type(node, expected):
                 self.emit_error("integer literal bit pattern does not fit expected type", node)
-        else if not self.int_literal_fits_type(node, expected):
+        else if not (if self.in_negated_literal_context != 0: self.int_literal_fits_type_negated(node, expected) else: self.int_literal_fits_type(node, expected)):
             // Enriched like the default-type arm (#767 payoff pattern): name
             // the literal and the resolved expectation — id-confusion and
             // stale-sidecar failures self-identify.

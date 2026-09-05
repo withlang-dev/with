@@ -399,14 +399,30 @@ impl Sema:
 
     fn ct_build_value_tree(pool: AstPool, intern: InternPool, value: &ComptimeValue, node: i32, extras: &Vec[ComptimeValue]) -> i32:
         if value.kind == ComptimeValueKind.CV_INT:
-            return pool.add_node(
+            let int_lit = pool.add_node(
                 NodeKind.NK_INT_LIT,
                 pool.get_start(node),
                 pool.get_end(node),
                 ast_int_part0(value.data0),
                 ast_int_part1(value.data0),
                 ast_int_part2(value.data0)
-            ) as i32
+            )
+            // #943: data0 is an i64, so for an unsigned type in the upper half
+            // of its range the packed value is a two's-complement *bit pattern*
+            // rather than the number — u64::MAX arrives here as -1, 2^63 as
+            // -9223372036854775808. Emitting that as a bare literal loses the
+            // distinction: int_literal_fits_type then takes its non-exact path,
+            // reaches `if bits >= 64 ... return value >= 0`, and rejects the
+            // value for the very type it came from.
+            //
+            // Record the true magnitude as exact digits instead. That routes
+            // the check through exact_int_fits_unsigned_bits, which reads the
+            // magnitude rather than the sign bit. A genuine negative literal in
+            // source is unaffected: it is never carried by an unsigned type.
+            if value.data0 < 0 and self.is_unsigned_int_type(value.type_id):
+                let digits = f"{value.data0 as u64}"
+                pool.set_int_literal_exact(int_lit, pool.add_string(digits), 10)
+            return int_lit as i32
         if value.kind == ComptimeValueKind.CV_BOOL:
             return pool.add_node(
                 NodeKind.NK_BOOL_LIT,

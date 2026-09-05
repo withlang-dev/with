@@ -6067,7 +6067,11 @@ impl Sema:
         if kind == NodeKind.NK_INT_LIT:
             let suffix_ty = self.literal_suffix_type(self.ast.literal_suffix(node))
             if suffix_ty != 0:
-                if not self.int_literal_fits_type(node, suffix_ty):
+                // #943 / #914 D2: under a unary `-` the literal is a magnitude,
+                // so `-2147483648i32` is i32::MIN and must pass even though
+                // 2147483648 is not a valid i32 on its own.
+                let suffix_fits = if self.in_negated_literal_context != 0: self.int_literal_fits_type_negated(node, suffix_ty) else: self.int_literal_fits_type(node, suffix_ty)
+                if not suffix_fits:
                     self.emit_error("integer literal does not fit suffix type", node)
                 self.typed_expr_types.insert(node, suffix_ty)
                 return suffix_ty as TypeId
@@ -8652,7 +8656,24 @@ impl Sema:
             let expected_bitnot = self.numeric_operand_type(self.expected_expr_type as i32)
             if self.get_type_kind(self.resolve_alias(expected_bitnot as TypeId)) == TypeKind.TY_INT:
                 expected_operand = self.expected_expr_type as i32
+        // #943 / #914 D2: `-` is width-transparent for signed integers the way
+        // `~` is above, and its operand is a magnitude rather than a value.
+        // Only signed expectations are threaded: an unsigned one must still
+        // reach "cannot negate an unsigned value" below rather than turning
+        // into a fit error on the operand.
+        var negated_literal = 0
+        if op == UnaryOp.UOP_NEGATE:
+            negated_literal = 1
+            if self.has_expected_type != 0 and self.expected_expr_type != 0:
+                let expected_neg = self.numeric_operand_type(self.expected_expr_type as i32)
+                let resolved_neg = self.resolve_alias(expected_neg as TypeId)
+                if self.get_type_kind(resolved_neg) == TypeKind.TY_INT and self.get_type_d1(resolved_neg) != 0:
+                    expected_operand = self.expected_expr_type as i32
+        let saved_negated = self.in_negated_literal_context
+        if negated_literal != 0:
+            self.in_negated_literal_context = self.in_negated_literal_context + 1
         let operand = if expected_operand != 0: self.check_expr_with_expected(operand_node, expected_operand as TypeId) else: self.check_expr_value_context(operand_node)
+        self.in_negated_literal_context = saved_negated
         if operand == 0:
             return 0
 

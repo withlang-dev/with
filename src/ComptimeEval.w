@@ -311,6 +311,10 @@ fn comptime_decl_index_map(ast: &AstPool) -> HashMap[i32, i32]:
         map.insert(ast.get_decl(di), di)
     map
 
+fn comptime_int_canonical_bug(type_id: i32, value: i64, width: i32, is_unsigned: bool):
+    with_eprint(f"BUG: non-canonical comptime integer: type_id={type_id} width={width} unsigned={is_unsigned} payload={value} (#943 invariant 2)\n")
+    abort()
+
 fn comptime_control_error() -> ComptimeControl:
     ComptimeControl { kind: ComptimeControlKind.CTL_ERROR, value: comptime_value_invalid(), label: 0 }
 
@@ -2623,6 +2627,55 @@ impl ComptimeEvaluator:
                 return typed
         fallback
 
+    // #943: comptime folding runs *before* sema. Frontend.compile_source calls
+    // comptime_transform_module against a Sema prepared only by
+    // prepare_for_comptime_transform, which never runs check_expr — so
+    // typed_expr_types is empty for the nodes being folded and node_type_or
+    // falls through to its default. Defaulting an integer literal to i32 there
+    // discards the width the programmer wrote, and every later operation
+    // inherits it: `3000000001i64 + 0i64` truncated its operand to 32 bits and
+    // returned -1294967295.
+    //
+    // A suffixed literal carries its own width, and that is readable pre-sema.
+    // Consult it before defaulting. Sema applies the same precedence for
+    // NK_INT_LIT (suffix first, then expected type), so a node folded here gets
+    // the type it will be assigned once checking does run.
+    //
+    // For an unsuffixed literal, mirror sema's own default rule rather than
+    // hardcoding i32: SemaCheck picks i64 when the value is outside i32 range
+    // and i32 otherwise. Hardcoding i32 here made `var x: i64 = 3000000001`
+    // narrow at the literal even though no i32 was ever written.
+    // #943 invariant: a CV_INT payload must be the canonical representation of
+    // its value *in its own type_id*. `(i32, 3000000001)` is not a value of any
+    // i32 — it is the state every defect in this campaign passed through, and
+    // truncating it to fit is what made the corruption silent.
+    //
+    // Constructing through here makes that state unrepresentable rather than
+    // merely discouraged. Truncation is an identity on a canonical payload, so
+    // this fires only on a genuine compiler bug, never on user input. It is an
+    // internal-error abort for the same reason ast_pool_phase_bug is: the
+    // alternative is emitting a wrong constant into someone's binary.
+    //
+    // Width >= 64 always passes — any i64 payload is canonical for a 64-bit
+    // type, signed or not.
+    fn checked_int_value(type_id: i32, value: i64) -> ComptimeValue:
+        let width = self.comptime_int_width(type_id)
+        let is_unsigned = self.comptime_int_is_unsigned(type_id)
+        if comptime_bit_result(value, width, is_unsigned) != value:
+            comptime_int_canonical_bug(type_id, value, width, is_unsigned)
+        comptime_value_int(type_id, value)
+
+    fn comptime_int_literal_type(node: i32, value: i64, fallback: i32) -> i32:
+        let typed = self.node_type_or(node, 0)
+        if typed != 0:
+            return typed
+        let suffix_ty = self.sema.literal_suffix_type(self.ast.literal_suffix(node as NodeId))
+        if suffix_ty != 0:
+            return suffix_ty
+        if fallback == self.sema.ty_i32 as i32 and (value < -2147483648 or value > 2147483647):
+            return self.sema.ty_i64 as i32
+        fallback
+
     fn comptime_value_semantic_type(value: &ComptimeValue) -> i32:
         if value.type_id != 0:
             return value.type_id
@@ -2759,14 +2812,14 @@ impl ComptimeEvaluator:
                 return self.fail(node, method ++ "() argument must be an integer")
             let rotated = comptime_rotate_bits(recv_value.data0, width, comptime_value_intlike(count_signal.value), method == "rotate_left")
             let result_type = self.node_type_or(node, recv_type)
-            return comptime_control_value(comptime_value_int(result_type, comptime_bit_result(rotated, width, is_unsigned)))
+            return comptime_control_value(self.checked_int_value(result_type, comptime_bit_result(rotated, width, is_unsigned)))
 
         if method == "swap_bytes":
             if arg_count != 0:
                 return self.fail(node, "swap_bytes() takes no arguments")
             let swapped = comptime_swap_bytes_bits(recv_value.data0, width)
             let result_type2 = self.node_type_or(node, recv_type)
-            return comptime_control_value(comptime_value_int(result_type2, comptime_bit_result(swapped, width, is_unsigned)))
+            return comptime_control_value(self.checked_int_value(result_type2, comptime_bit_result(swapped, width, is_unsigned)))
 
         if method == "popcount":
             if arg_count != 0:
@@ -2788,7 +2841,7 @@ impl ComptimeEvaluator:
                 return self.fail(node, "bitreverse() takes no arguments")
             let reversed = comptime_reverse_bits(recv_value.data0, width)
             let result_type3 = self.node_type_or(node, recv_type)
-            return comptime_control_value(comptime_value_int(result_type3, comptime_bit_result(reversed, width, is_unsigned)))
+            return comptime_control_value(self.checked_int_value(result_type3, comptime_bit_result(reversed, width, is_unsigned)))
 
         self.fail(node, "integer method '" ++ method ++ "' is not comptime-evaluable yet")
 
@@ -6624,12 +6677,43 @@ impl ComptimeEvaluator:
         if op == UnaryOp.UOP_NEGATE:
             if comptime_value_is_intlike(inner.value) == 0:
                 return self.fail(node, "unary '-' requires integer comptime values")
+            // #943: `-2147483648i32` is i32::MIN and must evaluate. Negating the
+            // *operand* cannot express it: int_eval_unary_neg narrows the
+            // operand to the target width first, and 2147483648 is 2^31, whose
+            // low 32 bits read as signed are -2147483648 — so the operand
+            // becomes MIN and the "negating MIN is unrepresentable" guard fires
+            // on a MIN the source never contained.
+            //
+            // The magnitude and the sign have to stay apart until the width is
+            // applied. int_literal_exact_expr already keeps them apart across
+            // UOP_NEGATE, and int_literal_expr_bits applies the width once via
+            // exact_int_fits_signed_negative_bits, which accepts magnitude
+            // 2^(bits-1) when it is negative and rejects it when it is not.
+            // Both codegens already lower negated literals through this path.
+            //
+            // Only for signed types at 64 bits or narrower: the 128-bit case
+            // needs the high word too (#914), and unsigned negation keeps its
+            // existing diagnostic.
+            let neg_width = self.comptime_int_width(result_ty)
+            if neg_width <= 64 and not self.comptime_int_is_unsigned(result_ty):
+                let neg_expr = self.ast.int_literal_exact_expr(node)
+                if neg_expr.ok != 0 and neg_expr.overflow == 0:
+                    let neg_words = self.ast.int_literal_expr_bits(node, neg_width, 1)
+                    if neg_words.ok == 0 or neg_words.overflow != 0:
+                        return self.fail(node, "integer overflow in comptime")
+                    // int_literal_expr_bits returns the two's-complement pattern
+                    // *within* neg_width, so at 32 bits -2147483647 comes back as
+                    // 0x80000001 = +2147483649. Sign-extend it into the i64
+                    // payload so the stored value is canonical for its type —
+                    // otherwise every later operation reads a large positive
+                    // number (-2147483647i32 / 3 returned +715827883).
+                    return comptime_control_value(self.checked_int_value(result_ty, int_truncate_to_width(neg_words.lo, neg_width, false)))
             let arith = int_eval_unary_neg(comptime_value_intlike(inner.value), self.comptime_int_width(result_ty), self.sema.overflow_mode)
             if arith.ok == 0:
                 return self.fail(node, "integer arithmetic is not comptime-evaluable")
             if arith.overflow != 0:
                 return self.fail(node, "integer overflow in comptime")
-            return comptime_control_value(comptime_value_int(result_ty, arith.value))
+            return comptime_control_value(self.checked_int_value(result_ty, arith.value))
         if op == UnaryOp.UOP_BIT_NOT:
             if comptime_value_is_intlike(inner.value) == 0:
                 return self.fail(node, "bitwise not requires integer comptime values")
@@ -6638,7 +6722,7 @@ impl ComptimeEvaluator:
             // rejected it against u32.
             let bn_flipped = 0 - comptime_value_intlike(inner.value) - 1
             let bn_masked = comptime_bit_result(bn_flipped, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty))
-            return comptime_control_value(comptime_value_int(result_ty, bn_masked))
+            return comptime_control_value(self.checked_int_value(result_ty, bn_masked))
         if op == UnaryOp.UOP_NOT:
             let truthy = comptime_value_truthy(inner.value)
             if truthy < 0:
@@ -6656,12 +6740,17 @@ impl ComptimeEvaluator:
         if comptime_value_is_intlike(lhs) != 0 and comptime_value_is_intlike(rhs) != 0:
             let lv = comptime_value_intlike(lhs)
             let rv = comptime_value_intlike(rhs)
+            // #943: ordering must follow the operand's signedness. These are
+            // i64 payloads, so an unsigned value in the upper half of its range
+            // has the sign bit set — `u64::MAX < 1` compared signed is `-1 < 1`,
+            // i.e. true. Equality is unaffected: it compares bit patterns.
+            let cmp_unsigned = self.comptime_int_is_unsigned(if lhs.type_id != 0: lhs.type_id else: rhs.type_id)
             if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(if lv == rv: 1 else: 0))
             if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(if lv != rv: 1 else: 0))
-            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(if lv < rv: 1 else: 0))
-            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(if lv > rv: 1 else: 0))
-            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(if lv <= rv: 1 else: 0))
-            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(if lv >= rv: 1 else: 0))
+            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lt(lv, rv) else: lv < rv): 1 else: 0))
+            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lt(rv, lv) else: lv > rv): 1 else: 0))
+            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lte(lv, rv) else: lv <= rv): 1 else: 0))
+            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lte(rv, lv) else: lv >= rv): 1 else: 0))
         if lhs.kind == ComptimeValueKind.CV_STR and rhs.kind == ComptimeValueKind.CV_STR:
             if op == BinaryOp.OP_EQ:
                 return comptime_control_value(comptime_value_bool(comptime_values_equal(lhs, rhs, self.extra_values)))
@@ -6782,49 +6871,56 @@ impl ComptimeEvaluator:
                 return self.fail(node, "integer arithmetic is not comptime-evaluable")
             if arith.overflow != 0:
                 return self.fail(node, "integer overflow in comptime")
-            return comptime_control_value(comptime_value_int(result_ty, arith.value))
+            return comptime_control_value(self.checked_int_value(result_ty, arith.value))
         if op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP or op == BinaryOp.OP_SUB_SAT:
             let arith = int_eval_binary_arithmetic(op, lv, rv, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty), self.sema.overflow_mode)
             if arith.ok == 0:
                 return self.fail(node, "integer arithmetic is not comptime-evaluable")
             if arith.overflow != 0:
                 return self.fail(node, "integer overflow in comptime")
-            return comptime_control_value(comptime_value_int(result_ty, arith.value))
+            return comptime_control_value(self.checked_int_value(result_ty, arith.value))
         if op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP or op == BinaryOp.OP_MUL_SAT:
             let arith = int_eval_binary_arithmetic(op, lv, rv, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty), self.sema.overflow_mode)
             if arith.ok == 0:
                 return self.fail(node, "integer arithmetic is not comptime-evaluable")
             if arith.overflow != 0:
                 return self.fail(node, "integer overflow in comptime")
-            return comptime_control_value(comptime_value_int(result_ty, arith.value))
+            return comptime_control_value(self.checked_int_value(result_ty, arith.value))
         if op == BinaryOp.OP_DIV:
             if rv == 0:
                 return self.fail(node, "division by zero in comptime")
             if int_div_overflows(lv, rv, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty)):
                 if self.sema.overflow_mode == OVERFLOW_MODE_WRAP():
-                    return comptime_control_value(comptime_value_int(result_ty, int_signed_min(self.comptime_int_width(result_ty))))
+                    return comptime_control_value(self.checked_int_value(result_ty, int_signed_min(self.comptime_int_width(result_ty))))
                 if self.sema.overflow_mode == OVERFLOW_MODE_SATURATE():
-                    return comptime_control_value(comptime_value_int(result_ty, int_signed_max(self.comptime_int_width(result_ty))))
+                    return comptime_control_value(self.checked_int_value(result_ty, int_signed_max(self.comptime_int_width(result_ty))))
                 return self.fail(node, "integer overflow in comptime")
-            return comptime_control_value(comptime_value_int(result_ty, lv / rv))
+            // #943: an i64 payload for an unsigned type is a bit pattern, so
+            // signed division reads it wrong — u64::MAX / 3 became -1 / 3 = 0.
+            if self.comptime_int_is_unsigned(result_ty):
+                return comptime_control_value(self.checked_int_value(result_ty, ((lv as u64) / (rv as u64)) as i64))
+            return comptime_control_value(self.checked_int_value(result_ty, lv / rv))
         if op == BinaryOp.OP_MOD:
             if rv == 0:
                 return self.fail(node, "modulo by zero in comptime")
             if int_div_overflows(lv, rv, self.comptime_int_width(result_ty), self.comptime_int_is_unsigned(result_ty)):
                 if self.sema.overflow_mode == OVERFLOW_MODE_WRAP() or self.sema.overflow_mode == OVERFLOW_MODE_SATURATE():
-                    return comptime_control_value(comptime_value_int(result_ty, 0))
+                    return comptime_control_value(self.checked_int_value(result_ty, 0))
                 return self.fail(node, "integer overflow in comptime")
-            return comptime_control_value(comptime_value_int(result_ty, lv % rv))
+            // #943: same as OP_DIV — u64::MAX % 7 became -1 % 7 = -1.
+            if self.comptime_int_is_unsigned(result_ty):
+                return comptime_control_value(self.checked_int_value(result_ty, ((lv as u64) % (rv as u64)) as i64))
+            return comptime_control_value(self.checked_int_value(result_ty, lv % rv))
         if op == BinaryOp.OP_SHL:
-            return comptime_control_value(comptime_value_int(result_ty, self.eval_shift_value(op, result_ty, lv, rv)))
+            return comptime_control_value(self.checked_int_value(result_ty, self.eval_shift_value(op, result_ty, lv, rv)))
         if op == BinaryOp.OP_SHR:
-            return comptime_control_value(comptime_value_int(result_ty, self.eval_shift_value(op, result_ty, lv, rv)))
+            return comptime_control_value(self.checked_int_value(result_ty, self.eval_shift_value(op, result_ty, lv, rv)))
         if op == BinaryOp.OP_BIT_AND:
-            return comptime_control_value(comptime_value_int(result_ty, lv & rv))
+            return comptime_control_value(self.checked_int_value(result_ty, lv & rv))
         if op == BinaryOp.OP_BIT_OR:
-            return comptime_control_value(comptime_value_int(result_ty, lv | rv))
+            return comptime_control_value(self.checked_int_value(result_ty, lv | rv))
         if op == BinaryOp.OP_BIT_XOR:
-            return comptime_control_value(comptime_value_int(result_ty, lv ^ rv))
+            return comptime_control_value(self.checked_int_value(result_ty, lv ^ rv))
         self.unsupported(node)
 
     mut fn eval_let_binding(node: i32) -> ComptimeControl:
@@ -6833,8 +6929,46 @@ impl ComptimeEvaluator:
             return value_signal
         let flags = self.ast.get_data2(node)
         let is_mut = flags % 2
+        // #943: a local `let`/`var` annotation is the declared type of the
+        // binding, and pre-sema it is the only place that width is written.
+        // Without this, `var h: u64 = 5381` bound an i32-typed 5381 and every
+        // later `h * 33` was evaluated at 32 bits.
+        //
+        // Retype only when the value fits the annotation. A value that does not
+        // fit is left as-is so sema still reports the mismatch — narrowing it
+        // here would turn a diagnosable error into a silently masked one, which
+        // is the defect this fix exists to remove.
+        let retype_to = self.local_annotation_int_type(flags, &value_signal.value)
+        if retype_to != 0:
+            let raw = comptime_value_intlike(&value_signal.value)
+            self.bind_value(self.ast.get_data0(node), self.checked_int_value(retype_to, raw), is_mut)
+            return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         self.bind_value(self.ast.get_data0(node), value_signal.value, is_mut)
         comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+
+    // Returns the integer type this binding's annotation declares, or 0 to
+    // leave the value's own type alone. 0 is returned when there is no
+    // annotation, when it is not an integer type, when it already matches, or
+    // when the value does not fit it — see the caller for why the last case is
+    // deliberately left to sema.
+    mut fn local_annotation_int_type(flags: i32, value: &ComptimeValue) -> i32:
+        if value.kind != ComptimeValueKind.CV_INT:
+            return 0
+        let ann_extra = self.sema.local_let_type_ann_extra(flags)
+        if ann_extra < 0:
+            return 0
+        let ann_type = self.sema.resolve_type_expr(self.ast.get_extra(ann_extra)) as i32
+        if ann_type == 0 or ann_type == value.type_id:
+            return 0
+        let resolved = self.sema.resolve_alias(self.sema.numeric_operand_type(ann_type) as TypeId)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_INT:
+            return 0
+        let width = self.comptime_int_width(ann_type)
+        let is_unsigned = self.comptime_int_is_unsigned(ann_type)
+        let raw = comptime_value_intlike(value)
+        if comptime_bit_result(raw, width, is_unsigned) != raw:
+            return 0
+        ann_type
 
     mut fn eval_assign(node: i32) -> ComptimeControl:
         let target = self.ast.get_data0(node)
@@ -7897,8 +8031,8 @@ impl ComptimeEvaluator:
                 let exact = self.ast.int_literal_exact_value(node as NodeId)
                 if exact.ok == 0 or exact.overflow != 0:
                     return self.fail(node, "comptime integer literal too large")
-                return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), exact.lo))
-            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), fast.value))
+                return comptime_control_value(self.checked_int_value(self.comptime_int_literal_type(node, exact.lo, self.sema.ty_i64 as i32), exact.lo))
+            return comptime_control_value(self.checked_int_value(self.comptime_int_literal_type(node, fast.value, self.sema.ty_i32 as i32), fast.value))
         if kind == NodeKind.NK_BOOL_LIT:
             return comptime_control_value(comptime_value_bool(self.ast.get_data0(node)))
         if kind == NodeKind.NK_STRING_LIT:
