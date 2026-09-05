@@ -113,10 +113,10 @@ It does not rebuild the compiler from source.
 
 ## Building from Source
 
-Requirements:
-
- * LLVM toolchain (default `/usr/local/llvm`, override with `LLVM_PREFIX`)
- * clang on PATH
+Requirements: just `git`. With is self-contained — the release binary embeds
+its LLVM/Clang/lld toolchain and links it statically, and `with build` fetches
+the pinned static SDK into `.deps` for the bootstrap. There is no external
+LLVM, no `clang` on `PATH`, nothing to install.
 
 The compiler is self-hosting. The build chain is `seed -> stage1 -> stage2`:
 
