@@ -782,16 +782,43 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
     // LLVM linker plan, which dispatches on the active target.
     if runtime_sysinfo_os() == "Windows" or not target_spec_is_native():
         let root = link_stage_resolve_runtime_root()
-        let ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
+        var ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
+        // The `llvm_ld` metadata file only records the lld-link path; the lib
+        // dirs and system libs come from the environment already
+        // (link_stage_make_windows_llvm_link_command). So a NATIVE Windows
+        // link that runs before the metadata target has written the file — a
+        // .wo bundle build's --emit-obj link is the case (#1075) — resolves
+        // the linker the same way the metadata target does
+        // (build/compiler.w comp_llvm_lld_tool): WITH_LLVM_LD, then LLVM_LD,
+        // then LLVM_PREFIX/bin/lld-link.exe. A cross link still requires the
+        // generated metadata (it also carries the cross SDK's lib response).
+        if ld_path.len() == 0 and runtime_sysinfo_os() == "Windows" and target_spec_is_native():
+            ld_path = link_stage_windows_lld_from_env()
         if ld_path.len() == 0:
             if runtime_sysinfo_os() == "Windows":
-                with_eprint("error: missing Windows LLVM linker metadata")
+                with_eprint("error: missing Windows LLVM linker metadata (" ++ root ++ "/llvm_ld) and no WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment")
             else:
                 with_eprint("error: cross-target link requires LLVM linker metadata (" ++ root ++ "/llvm_ld)")
             return link_stage_plan_fail()
         return link_stage_link_with_llvm_args_plan(obj_path, bin_path, extras, link_libs, link_args, ld_path)
     let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs, link_args)
     link_stage_plan_for_command(move command)
+
+// The native-Windows lld-link path, resolved from the environment when the
+// generated `llvm_ld` metadata file is not present yet (#1075). Mirrors
+// build/compiler.w's comp_llvm_lld_tool exactly so a pre-metadata link picks
+// the same linker the metadata target would have recorded.
+fn link_stage_windows_lld_from_env() -> str:
+    let explicit = runtime_getenv("WITH_LLVM_LD")
+    if explicit.len() > 0:
+        return explicit ++ ""
+    let alt = runtime_getenv("LLVM_LD")
+    if alt.len() > 0:
+        return alt ++ ""
+    let prefix = runtime_getenv("LLVM_PREFIX")
+    if prefix.len() > 0:
+        return prefix ++ "/bin/lld-link.exe"
+    ""
 
 fn link_stage_link_with_llvm(obj_path: &str, bin_path: &str, extras: Vec[str], link_libs: Vec[str], llvm_ld: &str) -> bool:
     link_stage_link_with_llvm_result(obj_path, bin_path, extras, link_libs, llvm_ld).ok
