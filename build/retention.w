@@ -489,8 +489,6 @@ fn ret_test_green_fingerprint(ctx: &ActionCtx) -> str:
     if combined.len() == 0: return ""
     combined = ret_append_state_file(ctx, combined, "build-helper-programs")
     if combined.len() == 0: return ""
-    combined = ret_append_state_file(ctx, combined, "seed-compat")
-    if combined.len() == 0: return ""
     combined = ret_append_state_file(ctx, combined, "cli-selfhost-project-tests")
     if combined.len() == 0: return ""
     combined = ret_append_state_file(ctx, combined, "cli-selfhost-edge-tests")

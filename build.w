@@ -2696,7 +2696,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("wo-drift")
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("build-helper-programs")
-    tests = tests.dep("seed-compat")
+    // seed-compat is NOT a :test dependency: :test is driven by the pinned
+    // SEED on CI (WITH=with-seed), and seed-compat's nested `<seed> build
+    // :stage1` legitimately peaks right at the seed's 1 GiB RSS tripwire
+    // (#679) — flaky at the boundary (1066M/1114M), and the seed predates the
+    // tripwire's seed-compat exemption, so it trips under the seed. It is run
+    // with the FRESH compiler instead (which carries the exemption): the
+    // local battery runs `./out/release/bin/with build :seed-compat`.
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
