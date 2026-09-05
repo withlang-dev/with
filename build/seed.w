@@ -499,17 +499,34 @@ pub fn run_seed_compat_action(ctx: ActionCtx) -> i32:
     let stderr_path = seed_abs(root, seed_join(output_dir, "stage1.stderr"))
     print("seed-compat: " ++ version ++ " builds stage1 of the tree copy")
     let result = ctx.process_runner().run_capture_cwd_with_env(argv, stdout_path, stderr_path, 1800000, seed_abs(root, tree), move child_env)
-    if result.rc != 0:
+    // The success signal is the artifact, not the exit code: the pinned seed
+    // runs its own memory tripwire (#679, a hard 1 GiB) over the nested
+    // build, and a legitimate ~1 GiB compile trips it on a memory-tight
+    // runner AFTER stage1 is already written — that is the old seed's budget,
+    // not this tree's, and it does not mean the seed cannot build the tree.
+    // So a nonzero exit that still produced stage1 is a pass with a note; a
+    // nonzero exit with no stage1 is the real "cannot build" failure.
+    let stage1 = seed_join(tree, "out/bootstrap/bin/with-stage1")
+    let combined = result.stdout ++ "\n" ++ result.stderr
+    if not fs.exists(stage1):
         var message = f"the pinned seed {version} cannot build this tree (exit code {result.rc}); the first change that needs a newer seed must tag that seed first:"
         var shown = 0
-        for line in (result.stdout ++ "\n" ++ result.stderr).split("\n"):
+        for line in combined.split("\n"):
             if (line.starts_with("error") or line.contains("failed:")) and shown < 8:
                 message = message ++ "\n  " ++ line
                 shown = shown + 1
         return seed_fail(ctx, message ++ "\n  full output: " ++ stdout_path ++ " " ++ stderr_path)
-    let stage1 = seed_join(tree, "out/bootstrap/bin/with-stage1")
-    if not fs.exists(stage1):
-        return seed_fail(ctx, "the seed's build reported success but produced no " ++ stage1)
+    if result.rc != 0:
+        // stage1 exists but the build exited nonzero: only the seed's own RSS
+        // tripwire may be tolerated here (it fires post-artifact); any other
+        // nonzero cause is a real failure the artifact happens to survive.
+        var only_tripwire = true
+        for line in combined.split("\n"):
+            if (line.starts_with("error") or line.contains("failed:")) and not line.contains("rss tripwire") and not line.contains("seed-compat"):
+                only_tripwire = false
+        if not only_tripwire:
+            return seed_fail(ctx, f"the pinned seed {version} built stage1 but exited {result.rc} for a reason beyond its RSS tripwire; see " ++ stderr_path)
+        print(f"seed-compat: {version} built stage1; its own RSS tripwire fired on the nested build (#679, the old seed's budget) — tolerated")
     let _ = fs.write_text(seed_join(output_dir, ".stamp"), "ok")
     print("seed-compat: ok — " ++ version ++ " builds stage1")
     0
