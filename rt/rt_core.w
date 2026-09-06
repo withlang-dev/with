@@ -38,6 +38,10 @@ extern fn rt_set_process_memory_limit_bytes(limit: i64) -> i32
 extern fn rt_libc_gethostname(name: *mut u8, len: u64) -> i32
 extern fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64
 extern fn rt_thread_join(handle: i64) -> i32
+// Prints the current call chain to stderr where the platform can walk the
+// stack without a frame-pointer chain (Windows x64 unwind tables); a no-op
+// elsewhere. Called by with_panic_core so a panic names its site unaided.
+extern fn rt_backtrace_print()
 extern fn rt_fill_random(buf: *mut u8, len: u64) -> Unit
 
 // Filesystem extras (provided by platform backend)
@@ -408,6 +412,15 @@ var rt_alloc_limit_bytes: i64 = 0
 
 fn rt_record_slab_range(start: i64, size: i64):
     if rt_slab_range_count >= RT_ALLOC_RANGE_CAP:
+        // Past the cap the ownership tables are incomplete and
+        // rt_payload_start_can_be_owned must pass every pointer, so from
+        // here on an invalid or double free is silently accepted. Say so
+        // once: a compiler-sized run under WITH_ALLOC_NO_REUSE=1 fills the
+        // table and a double free that reproduces every time "vanished"
+        // (#1081) because this check stood down without a word.
+        if rt_slab_ranges_complete != 0:
+            let m = c"allocator: slab range table full; payload-ownership check disabled from here on (invalid and double frees now pass)\n".ptr
+            dbg_puts(m, cstr_len(m))
         rt_slab_ranges_complete = 0
         return
     // Insert sorted by start (slab ranges are append-only and read only by
@@ -424,6 +437,9 @@ fn rt_record_slab_range(start: i64, size: i64):
 
 fn rt_record_large_range(start: i64, size: i64):
     if rt_large_range_count >= RT_ALLOC_RANGE_CAP:
+        if rt_large_ranges_complete != 0:
+            let m = c"allocator: large range table full; payload-ownership check disabled from here on (invalid and double frees now pass)\n".ptr
+            dbg_puts(m, cstr_len(m))
         rt_large_ranges_complete = 0
         return
     // Insert sorted by start (same discipline as rt_record_slab_range): the
@@ -648,6 +664,61 @@ fn alloc_no_reuse_on() -> i32:
         return 1
     0
 
+var alloc_zero_class_state: i32 = 0   // DIAGNOSTIC: 0=unread,1=off,2=on
+
+// DIAGNOSTIC: WITH_ALLOC_ZERO_CLASS=1 zeroes a recycled small block to its full
+// class size, not just the requested size. Fresh slab memory is all-zero, so a
+// bug that reads a recycled block's tail (bytes between the request and the
+// class size — a same-class in-place rt_realloc grows into them) shows up as a
+// reuse-dependent difference: if the failure vanishes here but not under
+// WITH_ALLOC_NO_REUSE, the stale content is a block's tail, not stack garbage.
+fn alloc_zero_class_on() -> i32:
+    if alloc_zero_class_state == 0:
+        let v = rt_getenv(c"WITH_ALLOC_ZERO_CLASS".ptr)
+        if v as i64 != 0 and (unsafe *v) != 0:
+            alloc_zero_class_state = 2
+        else:
+            alloc_zero_class_state = 1
+    if alloc_zero_class_state == 2:
+        return 1
+    0
+
+// Invalid-free forensics: what the debugger would be asked first. Names the
+// slab or large range holding the header, the offset into it, and the header
+// word itself (a size class = live block, a slab address or 0 = freelist link
+// of an already-freed block, -1 = freed under WITH_ALLOC_NO_REUSE).
+fn dbg_invalid_free_forensics(payload: i64):
+    let header = payload - RT_ALLOC_HEADER_SIZE
+    var i: i32 = 0
+    while i < rt_slab_range_count:
+        let start = rt_slab_range_starts[i]
+        if header >= start and header < rt_slab_range_ends[i]:
+            dbg_puts("debug-alloc: invalid-free forensics: slab range " as *const u8, 48)
+            dbg_put_i64(i as i64)
+            dbg_puts(" start=" as *const u8, 7)
+            dbg_put_i64(start)
+            dbg_puts(" header-offset=" as *const u8, 15)
+            dbg_put_i64(header - start)
+            dbg_puts(" header-word=" as *const u8, 13)
+            dbg_put_i64(unsafe *(header as *const i64))
+            dbg_puts("\n" as *const u8, 1)
+            return
+        i = i + 1
+    var j: i32 = 0
+    while j < rt_large_range_count:
+        let lstart = rt_large_range_starts[j]
+        if payload >= lstart and payload < rt_large_range_ends[j]:
+            dbg_puts("debug-alloc: invalid-free forensics: large range " as *const u8, 49)
+            dbg_put_i64(j as i64)
+            dbg_puts(" start=" as *const u8, 7)
+            dbg_put_i64(lstart)
+            dbg_puts(" payload-offset=" as *const u8, 16)
+            dbg_put_i64(payload - lstart)
+            dbg_puts("\n" as *const u8, 1)
+            return
+        j = j + 1
+    dbg_puts("debug-alloc: invalid-free forensics: address is in no slab or large range\n" as *const u8, 74)
+
 fn free_small_block(block: i64, idx: i32):
     if alloc_no_reuse_on() != 0:
         unsafe *(block as *mut i64) = -1
@@ -662,9 +733,15 @@ fn free_small_block(block: i64, idx: i32):
 // aborts loudly on a double-free and lists un-freed blocks at exit. Source SITES
 // (which alloc/free call) are resolved out-of-process by the harness via lldb
 // conditioned on the address reported here — With codegen does not maintain a
-// walkable frame-pointer chain, so in-process backtraces are not used.
+// walkable frame-pointer chain. The exception is a panic on Windows x64, where
+// the unwind tables let rt_backtrace_print name the chain in-process, so a
+// WITH_DEBUG_ALLOC_TRAP_FREE_HIT stop needs no debugger there (#1081).
 // All ledger ops run under the allocator lock (called from rt_alloc/rt_free).
-let DBG_CAP: i64 = 65536            // hash slots (power of two)
+// Hash slots (power of two). 65536 truncated on every compiler-sized run
+// ("ledger full, tracking truncated"), which voids the double-free verdict
+// exactly where it is needed (#1081: a stage compiler's own double free).
+// 4M slots x 72 bytes is a 302 MB reservation, touched only as it fills.
+let DBG_CAP: i64 = 4194304
 let DBG_ENTRY_WORDS: i64 = 9        // addr, size, freed, alloc_origin, first_drop_ptr, first_drop_len, root_flag, root_reason_ptr, root_reason_len
 
 let DBG_ORIGIN_UNKNOWN: i64 = 0
@@ -1195,7 +1272,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         set_freelist(idx, next)
         alloc_store_small_header(head, cls_size)
         let ptr = small_block_ptr(head)
-        rt_memset(ptr, 0, size)
+        rt_memset(ptr, 0, if alloc_zero_class_on() != 0: cls_size else: size)
         return ptr
 
     // Carve from slab
@@ -1255,6 +1332,7 @@ fn rt_free_unlocked_with_drop_origin(ptr: *mut u8, drop_origin_ptr: i64, drop_or
             dbg_puts(" origin=" as *const u8, 8)
             dbg_puts(drop_origin_ptr as *const u8, drop_origin_len)
         dbg_puts("\n" as *const u8, 1)
+        dbg_invalid_free_forensics(ptr as i64)
         with_panic_core(make_str("invalid free: pointer is not an allocated payload start" as *const u8, 55), make_str("" as *const u8, 0), 0)
     let block = alloc_header_ptr(ptr as *const u8) as i64
     let size = unsafe *(block as *const i64)
@@ -1533,6 +1611,7 @@ fn with_panic_core(msg: str, file: str, line: i32) -> Unit:
             let len = i64_to_buf(line as i64, &buf as *mut u8)
             write_all(2, &buf as *const u8, len)
     let _ = rt_write(2, "\n" as *const u8, 1)
+    rt_backtrace_print()
     rt_exit(1)
 
 // ── Integer formatting ─────────────────────────────────────────────

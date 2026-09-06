@@ -38,6 +38,102 @@ extern fn FindFirstFileW(pattern: *const u16, data: *mut u8) -> i64
 extern fn FindNextFileW(handle: i64, data: *mut u8) -> i32
 extern fn FindClose(handle: i64) -> i32
 extern fn CreateSymbolicLinkW(link_path: *const u16, target: *const u16, flags: u32) -> i8
+extern fn RtlCaptureStackBackTrace(frames_to_skip: u32, frames_to_capture: u32, back_trace: *mut i64, back_trace_hash: *mut u32) -> u16
+extern fn GetCurrentProcess() -> i64
+extern fn SymSetOptions(options: u32) -> u32
+extern fn SymInitialize(process: i64, search_path: *const u8, invade_process: i32) -> i32
+extern fn SymFromAddr(process: i64, address: u64, displacement: *mut u64, symbol: *mut u8) -> i32
+extern fn SymGetLineFromAddr64(process: i64, address: u64, displacement: *mut u32, line: *mut u8) -> i32
+
+// ── Panic backtrace ────────────────────────────────────────────────
+// With codegen keeps no frame-pointer chain, but Win64 needs none: every
+// function carries unwind tables (.pdata/.xdata), so RtlCaptureStackBackTrace
+// walks the stack from anywhere, and dbghelp resolves each return address
+// against the PDB the link wrote. with_panic_core prints this so a Windows
+// panic names its call chain with no debugger attached.
+fn bt_put(s: *const u8, n: i64):
+    let _ = rt_write(2, s, n)
+
+fn bt_cstr_len(p: *const u8) -> i64:
+    var n: i64 = 0
+    while (unsafe *((p as i64 + n) as *const u8)) != 0:
+        n = n + 1
+    n
+
+fn bt_put_hex(v: i64):
+    let digits = "0123456789abcdef" as *const u8
+    var buf: [16]u8 = [0 as u8; 16]
+    var x = v as u64
+    var i: i32 = 16
+    if x == 0:
+        i = 15
+        buf[15] = 48 as u8
+    while x != 0:
+        i = i - 1
+        buf[i] = unsafe *((digits as i64 + ((x & 15) as i64)) as *const u8)
+        x = x >> 4
+    bt_put("0x" as *const u8, 2)
+    bt_put((&buf as *const u8 as i64 + i as i64) as *const u8, (16 - i) as i64)
+
+fn bt_put_dec(v: i64):
+    var buf: [20]u8 = [0 as u8; 20]
+    var x = v
+    var i: i32 = 20
+    if x == 0:
+        i = 19
+        buf[19] = 48 as u8
+    while x > 0:
+        i = i - 1
+        buf[i] = ((x % 10) + 48) as u8
+        x = x / 10
+    bt_put((&buf as *const u8 as i64 + i as i64) as *const u8, (20 - i) as i64)
+
+pub fn rt_backtrace_print() -> Unit:
+    var frames: [64]i64 = [0 as i64; 64]
+    let n = RtlCaptureStackBackTrace(0 as u32, 64 as u32, &frames as *mut i64, 0 as *mut u32) as i32
+    if n == 0:
+        return
+    let process = GetCurrentProcess()
+    // SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES
+    let _opts = SymSetOptions(22 as u32)
+    let symbols = SymInitialize(process, 0 as *const u8, 1)
+    bt_put("backtrace:\n" as *const u8, 11)
+    // SYMBOL_INFO: SizeOfStruct at 0 (88), NameLen at 76, MaxNameLen at 80, Name at 84.
+    var sym: [600]u8 = [0 as u8; 600]
+    // IMAGEHLP_LINE64: SizeOfStruct at 0 (40), LineNumber at 16, FileName at 24.
+    var line: [40]u8 = [0 as u8; 40]
+    var i: i32 = 0
+    while i < n:
+        let addr = frames[i]
+        bt_put("  #" as *const u8, 3)
+        bt_put_dec(i as i64)
+        bt_put(" " as *const u8, 1)
+        bt_put_hex(addr)
+        if symbols != 0:
+            let sym_base = &sym as *const u8 as i64
+            unsafe *(sym_base as *mut u32) = 88 as u32
+            unsafe *((sym_base + 76) as *mut u32) = 0 as u32
+            unsafe *((sym_base + 80) as *mut u32) = 512 as u32
+            var disp: u64 = 0
+            if SymFromAddr(process, addr as u64, &raw mut disp, &sym as *mut u8) != 0:
+                let name = (sym_base + 84) as *const u8
+                bt_put(" " as *const u8, 1)
+                bt_put(name, bt_cstr_len(name))
+                bt_put("+" as *const u8, 1)
+                bt_put_hex(disp as i64)
+            let line_base = &line as *const u8 as i64
+            unsafe *(line_base as *mut u32) = 40 as u32
+            var line_disp: u32 = 0
+            if SymGetLineFromAddr64(process, addr as u64, &raw mut line_disp, &line as *mut u8) != 0:
+                let file = unsafe *((line_base + 24) as *const *const u8)
+                let number = unsafe *((line_base + 16) as *const u32)
+                bt_put(" (" as *const u8, 2)
+                bt_put(file, bt_cstr_len(file))
+                bt_put(":" as *const u8, 1)
+                bt_put_dec(number as i64)
+                bt_put(")" as *const u8, 1)
+        bt_put("\n" as *const u8, 1)
+        i = i + 1
 extern fn GetSystemInfo(info: *mut u8) -> Unit
 extern fn GlobalMemoryStatusEx(info: *mut u8) -> i32
 extern fn GetComputerNameW(buf: *mut u16, size: *mut u32) -> i32

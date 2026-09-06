@@ -351,6 +351,10 @@ pub fn rt_nanosleep(ns: i64) -> i32:
     Sleep(ms)
     0
 
+// No in-process backtrace on this backend yet (see windows_x86_64.w).
+pub fn rt_backtrace_print() -> Unit:
+    return
+
 pub fn rt_getpid() -> i32:
     GetCurrentProcessId()
 
