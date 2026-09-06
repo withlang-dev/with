@@ -396,64 +396,75 @@ var freelists_8: i64 = 0
 var slab_ptr: i64 = 0
 var slab_remaining: i64 = 0
 
-var rt_slab_range_starts: [8192]i64 = [0 as i64; 8192]
-var rt_slab_range_ends: [8192]i64 = [0 as i64; 8192]
+// Ownership range tables: the slab regions and the live large allocations,
+// each a pair of sorted arrays (starts, then ends) in rt_mmap'd memory that
+// doubles when full. Every record, forget and lookup runs under the
+// allocator lock, so growth (map, copy, unmap) needs no further
+// synchronization. A fixed cap once made a table "incomplete" past 8192
+// regions and turned the payload-ownership check permissive without a word
+// (#1081: a compiler-sized run under WITH_ALLOC_NO_REUSE=1 got there).
+var rt_slab_range_base: i64 = 0
+var rt_slab_range_cap: i64 = 0
 var rt_slab_range_count: i32 = 0
-var rt_slab_ranges_complete: i32 = 1
 
-var rt_large_range_starts: [8192]i64 = [0 as i64; 8192]
-var rt_large_range_ends: [8192]i64 = [0 as i64; 8192]
+var rt_large_range_base: i64 = 0
+var rt_large_range_cap: i64 = 0
 var rt_large_range_count: i32 = 0
-var rt_large_ranges_complete: i32 = 1
+
+fn rt_range_start(base: i64, i: i32) -> i64:
+    unsafe *((base + (i as i64) * 8) as *const i64)
+
+fn rt_range_end(base: i64, cap: i64, i: i32) -> i64:
+    unsafe *((base + (cap + i as i64) * 8) as *const i64)
+
+fn rt_range_store(base: i64, cap: i64, i: i32, start: i64, end: i64):
+    unsafe *((base + (i as i64) * 8) as *mut i64) = start
+    unsafe *((base + (cap + i as i64) * 8) as *mut i64) = end
+
+// Doubles a table (first call: RT_ALLOC_RANGE_CAP entries). Returns the new
+// base and writes the new capacity through `cap_out`.
+fn rt_range_table_grow(base: i64, cap: i64, count: i32, cap_out: *mut i64) -> i64:
+    let new_cap = if cap == 0: RT_ALLOC_RANGE_CAP as i64 else: cap * 2
+    let p = rt_mmap((new_cap * 16) as u64)
+    if p as i64 == 0:
+        rt_exit(99)
+    if base != 0:
+        rt_memcpy(p, base as *const u8, (count as i64) * 8)
+        rt_memcpy((p as i64 + new_cap * 8) as *mut u8, (base + cap * 8) as *const u8, (count as i64) * 8)
+        rt_munmap(base as *mut u8, (cap * 16) as u64)
+    unsafe *cap_out = new_cap
+    p as i64
 
 var rt_alloc_committed_bytes: i64 = 0
 var rt_alloc_limit_state: i32 = 0       // 0=unread, 1=disabled, 2=enabled
 var rt_alloc_limit_bytes: i64 = 0
 
 fn rt_record_slab_range(start: i64, size: i64):
-    if rt_slab_range_count >= RT_ALLOC_RANGE_CAP:
-        // Past the cap the ownership tables are incomplete and
-        // rt_payload_start_can_be_owned must pass every pointer, so from
-        // here on an invalid or double free is silently accepted. Say so
-        // once: a compiler-sized run under WITH_ALLOC_NO_REUSE=1 fills the
-        // table and a double free that reproduces every time "vanished"
-        // (#1081) because this check stood down without a word.
-        if rt_slab_ranges_complete != 0:
-            let m = c"allocator: slab range table full; payload-ownership check disabled from here on (invalid and double frees now pass)\n".ptr
-            dbg_puts(m, cstr_len(m))
-        rt_slab_ranges_complete = 0
-        return
+    if rt_slab_range_count as i64 >= rt_slab_range_cap:
+        rt_slab_range_base = rt_range_table_grow(rt_slab_range_base, rt_slab_range_cap, rt_slab_range_count, &raw mut rt_slab_range_cap)
     // Insert sorted by start (slab ranges are append-only and read only by
     // rt_payload_start_is_owned, which binary-searches them — O(log n) per free
     // instead of an O(n) linear scan). Inserts are rare (one per mmap region).
     var i = rt_slab_range_count
-    while i > 0 and rt_slab_range_starts[(i - 1)] > start:
-        rt_slab_range_starts[i] = rt_slab_range_starts[(i - 1)]
-        rt_slab_range_ends[i] = rt_slab_range_ends[(i - 1)]
+    while i > 0 and rt_range_start(rt_slab_range_base, i - 1) > start:
+        rt_range_store(rt_slab_range_base, rt_slab_range_cap, i, rt_range_start(rt_slab_range_base, i - 1), rt_range_end(rt_slab_range_base, rt_slab_range_cap, i - 1))
         i = i - 1
-    rt_slab_range_starts[i] = start
-    rt_slab_range_ends[i] = start + size
+    rt_range_store(rt_slab_range_base, rt_slab_range_cap, i, start, start + size)
     rt_slab_range_count = rt_slab_range_count + 1
 
 fn rt_record_large_range(start: i64, size: i64):
-    if rt_large_range_count >= RT_ALLOC_RANGE_CAP:
-        if rt_large_ranges_complete != 0:
-            let m = c"allocator: large range table full; payload-ownership check disabled from here on (invalid and double frees now pass)\n".ptr
-            dbg_puts(m, cstr_len(m))
-        rt_large_ranges_complete = 0
-        return
+    if rt_large_range_count as i64 >= rt_large_range_cap:
+        rt_large_range_base = rt_range_table_grow(rt_large_range_base, rt_large_range_cap, rt_large_range_count, &raw mut rt_large_range_cap)
     // Insert sorted by start (same discipline as rt_record_slab_range): the
     // ownership check binary-searches large ranges too. The previous unsorted
     // append forced a linear scan per check, which went quadratic on
     // large-allocation-heavy workloads (compiler C migration spent 90% of a
     // 43-minute run in that scan).
     var i = rt_large_range_count
-    while i > 0 and rt_large_range_starts[(i - 1)] > start:
-        rt_large_range_starts[i] = rt_large_range_starts[(i - 1)]
-        rt_large_range_ends[i] = rt_large_range_ends[(i - 1)]
+    while i > 0 and rt_range_start(rt_large_range_base, i - 1) > start:
+        rt_range_store(rt_large_range_base, rt_large_range_cap, i, rt_range_start(rt_large_range_base, i - 1), rt_range_end(rt_large_range_base, rt_large_range_cap, i - 1))
         i = i - 1
-    rt_large_range_starts[i] = start
-    rt_large_range_ends[i] = start + size
+    rt_range_store(rt_large_range_base, rt_large_range_cap, i, start, start + size)
     rt_large_range_count = rt_large_range_count + 1
 
 fn rt_forget_large_range(start: i64):
@@ -463,16 +474,14 @@ fn rt_forget_large_range(start: i64):
     var hi = rt_large_range_count - 1
     while lo <= hi:
         let mid = (lo + hi) / 2
-        let mid_start = rt_large_range_starts[mid]
+        let mid_start = rt_range_start(rt_large_range_base, mid)
         if mid_start == start:
             var i = mid
             while i + 1 < rt_large_range_count:
-                rt_large_range_starts[i] = rt_large_range_starts[(i + 1)]
-                rt_large_range_ends[i] = rt_large_range_ends[(i + 1)]
+                rt_range_store(rt_large_range_base, rt_large_range_cap, i, rt_range_start(rt_large_range_base, i + 1), rt_range_end(rt_large_range_base, rt_large_range_cap, i + 1))
                 i = i + 1
             rt_large_range_count = rt_large_range_count - 1
-            rt_large_range_starts[rt_large_range_count] = 0
-            rt_large_range_ends[rt_large_range_count] = 0
+            rt_range_store(rt_large_range_base, rt_large_range_cap, rt_large_range_count, 0, 0)
             return
         if mid_start < start:
             lo = mid + 1
@@ -580,14 +589,14 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     var found = -1
     while lo <= hi:
         let mid = (lo + hi) / 2
-        if rt_slab_range_starts[mid] <= header:
+        if rt_range_start(rt_slab_range_base, mid) <= header:
             found = mid
             lo = mid + 1
         else:
             hi = mid - 1
     if found >= 0:
-        let start = rt_slab_range_starts[found]
-        let end = rt_slab_range_ends[found]
+        let start = rt_range_start(rt_slab_range_base, found)
+        let end = rt_range_end(rt_slab_range_base, rt_slab_range_cap, found)
         if header >= start and header + RT_ALLOC_HEADER_SIZE <= end:
             let size = unsafe *(header as *const i64)
             if size <= 0 or size > RT_LARGE_THRESHOLD:
@@ -606,9 +615,9 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     var lhi = rt_large_range_count - 1
     while llo <= lhi:
         let lmid = (llo + lhi) / 2
-        let lstart = rt_large_range_starts[lmid]
+        let lstart = rt_range_start(rt_large_range_base, lmid)
         if lstart == header:
-            return if payload < rt_large_range_ends[lmid]: 1 else: 0
+            return if payload < rt_range_end(rt_large_range_base, rt_large_range_cap, lmid): 1 else: 0
         if lstart < header:
             llo = lmid + 1
         else:
@@ -619,8 +628,6 @@ fn rt_payload_start_can_be_owned(ptr: *const u8) -> i32:
     if alloc_system_on() != 0:
         return 1
     if rt_payload_start_is_owned(ptr) != 0:
-        return 1
-    if rt_slab_ranges_complete == 0 or rt_large_ranges_complete == 0:
         return 1
     0
 
@@ -691,8 +698,8 @@ fn dbg_invalid_free_forensics(payload: i64):
     let header = payload - RT_ALLOC_HEADER_SIZE
     var i: i32 = 0
     while i < rt_slab_range_count:
-        let start = rt_slab_range_starts[i]
-        if header >= start and header < rt_slab_range_ends[i]:
+        let start = rt_range_start(rt_slab_range_base, i)
+        if header >= start and header < rt_range_end(rt_slab_range_base, rt_slab_range_cap, i):
             dbg_puts("debug-alloc: invalid-free forensics: slab range " as *const u8, 48)
             dbg_put_i64(i as i64)
             dbg_puts(" start=" as *const u8, 7)
@@ -706,8 +713,8 @@ fn dbg_invalid_free_forensics(payload: i64):
         i = i + 1
     var j: i32 = 0
     while j < rt_large_range_count:
-        let lstart = rt_large_range_starts[j]
-        if payload >= lstart and payload < rt_large_range_ends[j]:
+        let lstart = rt_range_start(rt_large_range_base, j)
+        if payload >= lstart and payload < rt_range_end(rt_large_range_base, rt_large_range_cap, j):
             dbg_puts("debug-alloc: invalid-free forensics: large range " as *const u8, 49)
             dbg_put_i64(j as i64)
             dbg_puts(" start=" as *const u8, 7)

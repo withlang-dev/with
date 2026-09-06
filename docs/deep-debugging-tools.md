@@ -22,12 +22,13 @@ the routes.
    reports; a report that disappears means the second free came through a
    stale pointer whose address was reused, or the "str" was uninitialized
    stack (the #729 class: a temp dropped on a path that never created it).
-   Read that verdict only if the run did NOT print `allocator: slab range
-   table full; payload-ownership check disabled`: with no recycling a
-   compiler-sized run fills the 8192-region ownership table, and past it
-   the invalid-free check passes every pointer. The #1081 double free
-   "vanished" under no-reuse for exactly that reason; the same free on a
-   three-line repro still reported.
+   The ownership range tables grow without bound (mmap-backed, doubling),
+   so this verdict is trustworthy on a compiler-sized run. It was not
+   before #1081: a fixed 8192-region cap made a no-reuse run's table
+   "incomplete" and the invalid-free check then passed every pointer
+   silently, so the double free "vanished" under no-reuse while a
+   three-line repro still reported it. A runtime older than that prints
+   nothing at all when it stands down.
 3. **Get the exact failing binary.** A fixture that fails only under
    `with test` fails in the runner's own artifact
    (`out/<dir>/<stem>.test.<pid>.<nanos>`, built from the synthesized test
@@ -511,7 +512,9 @@ dummy values on the learn run, and keep every argument the same length —
 see the native Windows recipe). The plain report does not record the first
 free's site by itself yet (#1014). The ledger holds 4M slots; if it still
 prints `ledger full, tracking truncated`, the double-free verdict for that
-run is void — do not read a silent run as clean.
+run is void — do not read a silent run as clean. (The ownership range
+tables the invalid-free check reads are growable, so that check never
+stands down.)
 
 Leak filters:
 
