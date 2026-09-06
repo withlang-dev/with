@@ -109,6 +109,24 @@ pub var __stdinp: *mut c_void = 0 as *mut c_void
 pub var __stdoutp: *mut c_void = 0 as *mut c_void
 pub var __stderrp: *mut c_void = 0 as *mut c_void
 
+// errno and rlimit for Darwin-migrated C; see windows_x86_64.w.
+@[link_name("_errno")]
+extern fn rt_ucrt_errno() -> *mut i32
+
+pub fn __error() -> *mut i32:
+    rt_ucrt_errno()
+
+pub fn getrlimit(resource: i32, lim: *mut u8) -> i32:
+    if resource != 3:
+        return -1
+    unsafe *(lim as *mut i64) = 9223372036854775807
+    unsafe *((lim as i64 + 8) as *mut i64) = 9223372036854775807
+    0
+
+pub fn setrlimit(resource: i32, lim: *const u8) -> i32:
+    let _ = lim
+    if resource != 3: -1 else: 0
+
 var rt_argc: i32 = 0
 var rt_argv_raw: i64 = 0
 var rt_handles: [256]i64 = [0 as i64; 256]
@@ -350,6 +368,10 @@ pub fn rt_nanosleep(ns: i64) -> i32:
     let ms = if ns <= 0: 0 else: ((ns + 999999) / 1000000) as u32
     Sleep(ms)
     0
+
+// No in-process backtrace on this backend yet (see windows_x86_64.w).
+pub fn rt_backtrace_print() -> Unit:
+    return
 
 pub fn rt_getpid() -> i32:
     GetCurrentProcessId()
@@ -624,7 +646,16 @@ fn win_list_append(out: str, path: *const u8) -> str:
     out ++ path_text ++ "\n"
 
 fn win_list_files_walk(path: *const u8, out: str) -> str:
-    if not win_is_dir(path):
+    // Parity with the unix walk (a failed lstat returns `out`): a path that
+    // does not exist lists nothing, a file lists itself, a directory lists
+    // its tree (#1081; see windows_x86_64.w).
+    var wpath: [4096]u16 = [0 as u16; 4096]
+    if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
+        return out
+    let attrs = GetFileAttributesW(&wpath as *const [4096]u16 as *const u16)
+    if attrs == 0xffffffff as u32:
+        return out
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0:
         return win_list_append(out, path)
     var result = out
     var pattern8: [4096]u8 = [0 as u8; 4096]
@@ -827,6 +858,10 @@ fn win_append_utf16(dst: *mut u16, pos: i64, cap: i64, src: *const u16) -> i64:
 fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) -> i32:
     var pos: i64 = 0
     var offset: i64 = 0
+    // argv[0] is spelled with backslashes: CreateProcessW does not resolve a
+    // relative forward-slash program path from the command line (#1081; see
+    // windows_x86_64.w).
+    var program = true
     while offset < len and pos < cap - 4:
         if pos > 0:
             unsafe *((out as i64 + pos * 2) as *mut u16) = 32 as u16
@@ -835,9 +870,11 @@ fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) ->
         pos = pos + 1
         var slash_count: i64 = 0
         while offset < len:
-            let ch = unsafe *((blob as i64 + offset) as *const u8)
+            var ch = unsafe *((blob as i64 + offset) as *const u8)
             if ch == 0:
                 break
+            if program and ch == 47:
+                ch = 92 as u8
             if ch == 92:
                 slash_count = slash_count + 1
                 offset = offset + 1
@@ -881,6 +918,7 @@ fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) ->
         unsafe *((out as i64 + pos * 2) as *mut u16) = 34 as u16
         pos = pos + 1
         offset = offset + 1
+        program = false
     unsafe *((out as i64 + pos * 2) as *mut u16) = 0 as u16
     0
 

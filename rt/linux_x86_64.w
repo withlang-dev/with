@@ -326,6 +326,10 @@ extern fn rt_libc_pthread_create(thread: *mut i64, attr: *const u8, start_routin
 @[link_name("pthread_join")]
 extern fn rt_libc_pthread_join(thread: i64, retval: *mut *mut u8) -> i32
 
+// No in-process backtrace on this backend (lldb is the site tool here).
+pub fn rt_backtrace_print() -> Unit:
+    return
+
 pub fn rt_getpid() -> i32:
     rt_libc_getpid()
 

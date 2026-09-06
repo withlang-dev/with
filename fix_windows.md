@@ -13,6 +13,83 @@ The route for THIS bug class is fixed by `docs/deep-debugging-tools.md`: a
 free/drop/UAF bug **starts with the native debug allocator**, not with a grep or
 a trace print.
 
+## Resolved (2026-09-06) — read this before the rest
+
+The crash was found and fixed on a native Windows box. The rest of this note
+is kept as the orientation it was; where it guesses, this section rules.
+
+**Root cause.** A double free in the runtime, not a drop-state or
+move-checker edge, and nothing to do with the pcre2 corpus or its Copy
+types. `with_fs_list_files` converts its path with `str_to_cstr` (an
+`rt_alloc`'d copy), walks, then `cstr_free`s it. The Windows walk's only
+test was `win_is_dir`, so a path that does not EXIST took the "not a
+directory → append the path" branch, and `win_list_append` built
+`path_text = with_str_from_cstr(path)` — which was `make_str`, a view of
+the C buffer typed as an owned `str`. Its scope-exit drop passed the
+ownership guard (the buffer is a live payload) and freed it; `cstr_free`
+freed it again. The compiler reached that branch because its temp-archive
+cleanup lists `out/lib` before the directory exists during the `.wo`
+bundle build. The unix walks return early when `stat` fails, which is the
+whole reason only Windows crashed — `list_files_text("<a file>")` took
+the same line on every platform (latent double free; the fixture covers
+it). Full evidence chain in `c44634d3`.
+
+**Landed** (branch `fix-1081-str-from-cstr`): `with_str_from_cstr` copies
+(an owned str owns its bytes, #747-H); the Windows walk treats a missing
+path like unix; the instruments that closed the hunt on a box with no
+debugger (a panic backtrace on Windows x64, invalid-free forensics, the
+range-table stand-down announced, a ledger that fits a compiler run); the
+route additions in `docs/deep-debugging-tools.md`. Separately,
+`windows-sdk-publish`: every release now republishes its LLVM SDK, which
+is what `with build :deps` needs to provision a Windows box at all.
+
+**A second Windows-only defect, found while verifying:** `with run`,
+`with test` and `with -e` could not launch the binary they had just built
+(`exit code -2` at the run stage; `run`/`-e` silent). `CreateProcessW`
+does not resolve a RELATIVE forward-slash program path from the command
+line (`out/tmp/x.exe` → `ERROR_FILE_NOT_FOUND`; `out\tmp\x.exe` and any
+absolute spelling work — a three-spelling `std.process.run` probe proved
+it), and every compiler-built binary is launched by such a path.
+`win_build_command_line` now spells argv[0] with backslashes on both
+Windows backends. It looked like a seed-only quirk until the tree's own
+compiler showed it too.
+
+**The `:test` battery on this box, under main's own release compiler:**
+984 behavior files ran, 983 passed; `pcre2-wo-drift` links and runs the
+pcre2test harness (after the errno/rlimit shims and
+`legacy_stdio_definitions.lib`); the two `nm` targets pass with `NM` set to
+the SDK's `llvm-nm.exe`, as the Windows lanes already do. One fixture is
+still red: `behav_project_overflow_modes` — its nested `with build` in a
+case directory under `out/tmp` reaches the repo's `build.w` graph, whose
+`with-sha256` link runs in a build-runner worker that does not carry the
+Windows linker variables (`missing Windows LLVM linker metadata … and no
+WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment`). Unix never
+notices because `cc` needs none of them. Two defects to file: the nested
+project resolving to the enclosing repo's graph, and action workers not
+forwarding the toolchain environment (build/compiler.w forwards it for
+stage compiles by hand). Also fixed while here: the ownership range
+tables grow instead of turning the invalid-free check off.
+
+**The seed ladder, and why the lanes stay red until a seed is published:**
+the v0.15.1.8 seed cannot evaluate main's `build.w` — `0173d08e` switched
+the build-driver files to comptime `str` indexing (`path[i]`), which that
+seed's evaluator lacks (`comptime index requires an array, tuple, or
+vec`). But `af7db8ce` is the commit that taught the evaluator `str`
+indexing, and v0.15.1.8 builds `af7db8ce`. So, natively on Windows, with
+no `--emit-c`: v0.15.1.8 → a worktree at `af7db8ce` carrying the runtime
+fix (full build green, `:fixpoint` green) → its release `with.exe` as
+`WITH=` for main → main's full build green and `:fixpoint` green. Main's
+release `out/release/bin/with.exe` from that chain is the Windows seed to
+publish; then move the `seed.lock` Windows overrides off v0.15.1.8 and
+`with run tools/bump_seed_pins.w` (numbering per D40: main is the
+v0.15.2.x group). Two things to know on a fresh box: the SDK must come
+from the release (`windows-sdk-publish` makes `:deps` able to find one),
+and the toolchain env (`LLVM_PREFIX`, `WITH_LLVM_LD`, `WITH_LIBCLANG`,
+`WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR`) must be set before the FIRST
+`with build`, because `out/bootstrap-lib/llvm_ld.rsp` caches whatever it
+saw and a later run reuses it (two stage1 links here failed on the 2019
+defaults for that reason; `with build :clean` resets it).
+
 ## The bug (#1081)
 
 Building the pcre2 `.wo` bundle, the compiler **crashes** on native Windows:

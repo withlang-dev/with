@@ -38,6 +38,10 @@ extern fn rt_set_process_memory_limit_bytes(limit: i64) -> i32
 extern fn rt_libc_gethostname(name: *mut u8, len: u64) -> i32
 extern fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64
 extern fn rt_thread_join(handle: i64) -> i32
+// Prints the current call chain to stderr where the platform can walk the
+// stack without a frame-pointer chain (Windows x64 unwind tables); a no-op
+// elsewhere. Called by with_panic_core so a panic names its site unaided.
+extern fn rt_backtrace_print()
 extern fn rt_fill_random(buf: *mut u8, len: u64) -> Unit
 
 // Filesystem extras (provided by platform backend)
@@ -392,52 +396,75 @@ var freelists_8: i64 = 0
 var slab_ptr: i64 = 0
 var slab_remaining: i64 = 0
 
-var rt_slab_range_starts: [8192]i64 = [0 as i64; 8192]
-var rt_slab_range_ends: [8192]i64 = [0 as i64; 8192]
+// Ownership range tables: the slab regions and the live large allocations,
+// each a pair of sorted arrays (starts, then ends) in rt_mmap'd memory that
+// doubles when full. Every record, forget and lookup runs under the
+// allocator lock, so growth (map, copy, unmap) needs no further
+// synchronization. A fixed cap once made a table "incomplete" past 8192
+// regions and turned the payload-ownership check permissive without a word
+// (#1081: a compiler-sized run under WITH_ALLOC_NO_REUSE=1 got there).
+var rt_slab_range_base: i64 = 0
+var rt_slab_range_cap: i64 = 0
 var rt_slab_range_count: i32 = 0
-var rt_slab_ranges_complete: i32 = 1
 
-var rt_large_range_starts: [8192]i64 = [0 as i64; 8192]
-var rt_large_range_ends: [8192]i64 = [0 as i64; 8192]
+var rt_large_range_base: i64 = 0
+var rt_large_range_cap: i64 = 0
 var rt_large_range_count: i32 = 0
-var rt_large_ranges_complete: i32 = 1
+
+fn rt_range_start(base: i64, i: i32) -> i64:
+    unsafe *((base + (i as i64) * 8) as *const i64)
+
+fn rt_range_end(base: i64, cap: i64, i: i32) -> i64:
+    unsafe *((base + (cap + i as i64) * 8) as *const i64)
+
+fn rt_range_store(base: i64, cap: i64, i: i32, start: i64, end: i64):
+    unsafe *((base + (i as i64) * 8) as *mut i64) = start
+    unsafe *((base + (cap + i as i64) * 8) as *mut i64) = end
+
+// Doubles a table (first call: RT_ALLOC_RANGE_CAP entries). Returns the new
+// base and writes the new capacity through `cap_out`.
+fn rt_range_table_grow(base: i64, cap: i64, count: i32, cap_out: *mut i64) -> i64:
+    let new_cap = if cap == 0: RT_ALLOC_RANGE_CAP as i64 else: cap * 2
+    let p = rt_mmap((new_cap * 16) as u64)
+    if p as i64 == 0:
+        rt_exit(99)
+    if base != 0:
+        rt_memcpy(p, base as *const u8, (count as i64) * 8)
+        rt_memcpy((p as i64 + new_cap * 8) as *mut u8, (base + cap * 8) as *const u8, (count as i64) * 8)
+        rt_munmap(base as *mut u8, (cap * 16) as u64)
+    unsafe *cap_out = new_cap
+    p as i64
 
 var rt_alloc_committed_bytes: i64 = 0
 var rt_alloc_limit_state: i32 = 0       // 0=unread, 1=disabled, 2=enabled
 var rt_alloc_limit_bytes: i64 = 0
 
 fn rt_record_slab_range(start: i64, size: i64):
-    if rt_slab_range_count >= RT_ALLOC_RANGE_CAP:
-        rt_slab_ranges_complete = 0
-        return
+    if rt_slab_range_count as i64 >= rt_slab_range_cap:
+        rt_slab_range_base = rt_range_table_grow(rt_slab_range_base, rt_slab_range_cap, rt_slab_range_count, &raw mut rt_slab_range_cap)
     // Insert sorted by start (slab ranges are append-only and read only by
     // rt_payload_start_is_owned, which binary-searches them — O(log n) per free
     // instead of an O(n) linear scan). Inserts are rare (one per mmap region).
     var i = rt_slab_range_count
-    while i > 0 and rt_slab_range_starts[(i - 1)] > start:
-        rt_slab_range_starts[i] = rt_slab_range_starts[(i - 1)]
-        rt_slab_range_ends[i] = rt_slab_range_ends[(i - 1)]
+    while i > 0 and rt_range_start(rt_slab_range_base, i - 1) > start:
+        rt_range_store(rt_slab_range_base, rt_slab_range_cap, i, rt_range_start(rt_slab_range_base, i - 1), rt_range_end(rt_slab_range_base, rt_slab_range_cap, i - 1))
         i = i - 1
-    rt_slab_range_starts[i] = start
-    rt_slab_range_ends[i] = start + size
+    rt_range_store(rt_slab_range_base, rt_slab_range_cap, i, start, start + size)
     rt_slab_range_count = rt_slab_range_count + 1
 
 fn rt_record_large_range(start: i64, size: i64):
-    if rt_large_range_count >= RT_ALLOC_RANGE_CAP:
-        rt_large_ranges_complete = 0
-        return
+    if rt_large_range_count as i64 >= rt_large_range_cap:
+        rt_large_range_base = rt_range_table_grow(rt_large_range_base, rt_large_range_cap, rt_large_range_count, &raw mut rt_large_range_cap)
     // Insert sorted by start (same discipline as rt_record_slab_range): the
     // ownership check binary-searches large ranges too. The previous unsorted
     // append forced a linear scan per check, which went quadratic on
     // large-allocation-heavy workloads (compiler C migration spent 90% of a
     // 43-minute run in that scan).
     var i = rt_large_range_count
-    while i > 0 and rt_large_range_starts[(i - 1)] > start:
-        rt_large_range_starts[i] = rt_large_range_starts[(i - 1)]
-        rt_large_range_ends[i] = rt_large_range_ends[(i - 1)]
+    while i > 0 and rt_range_start(rt_large_range_base, i - 1) > start:
+        rt_range_store(rt_large_range_base, rt_large_range_cap, i, rt_range_start(rt_large_range_base, i - 1), rt_range_end(rt_large_range_base, rt_large_range_cap, i - 1))
         i = i - 1
-    rt_large_range_starts[i] = start
-    rt_large_range_ends[i] = start + size
+    rt_range_store(rt_large_range_base, rt_large_range_cap, i, start, start + size)
     rt_large_range_count = rt_large_range_count + 1
 
 fn rt_forget_large_range(start: i64):
@@ -447,16 +474,14 @@ fn rt_forget_large_range(start: i64):
     var hi = rt_large_range_count - 1
     while lo <= hi:
         let mid = (lo + hi) / 2
-        let mid_start = rt_large_range_starts[mid]
+        let mid_start = rt_range_start(rt_large_range_base, mid)
         if mid_start == start:
             var i = mid
             while i + 1 < rt_large_range_count:
-                rt_large_range_starts[i] = rt_large_range_starts[(i + 1)]
-                rt_large_range_ends[i] = rt_large_range_ends[(i + 1)]
+                rt_range_store(rt_large_range_base, rt_large_range_cap, i, rt_range_start(rt_large_range_base, i + 1), rt_range_end(rt_large_range_base, rt_large_range_cap, i + 1))
                 i = i + 1
             rt_large_range_count = rt_large_range_count - 1
-            rt_large_range_starts[rt_large_range_count] = 0
-            rt_large_range_ends[rt_large_range_count] = 0
+            rt_range_store(rt_large_range_base, rt_large_range_cap, rt_large_range_count, 0, 0)
             return
         if mid_start < start:
             lo = mid + 1
@@ -564,14 +589,14 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     var found = -1
     while lo <= hi:
         let mid = (lo + hi) / 2
-        if rt_slab_range_starts[mid] <= header:
+        if rt_range_start(rt_slab_range_base, mid) <= header:
             found = mid
             lo = mid + 1
         else:
             hi = mid - 1
     if found >= 0:
-        let start = rt_slab_range_starts[found]
-        let end = rt_slab_range_ends[found]
+        let start = rt_range_start(rt_slab_range_base, found)
+        let end = rt_range_end(rt_slab_range_base, rt_slab_range_cap, found)
         if header >= start and header + RT_ALLOC_HEADER_SIZE <= end:
             let size = unsafe *(header as *const i64)
             if size <= 0 or size > RT_LARGE_THRESHOLD:
@@ -590,9 +615,9 @@ fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
     var lhi = rt_large_range_count - 1
     while llo <= lhi:
         let lmid = (llo + lhi) / 2
-        let lstart = rt_large_range_starts[lmid]
+        let lstart = rt_range_start(rt_large_range_base, lmid)
         if lstart == header:
-            return if payload < rt_large_range_ends[lmid]: 1 else: 0
+            return if payload < rt_range_end(rt_large_range_base, rt_large_range_cap, lmid): 1 else: 0
         if lstart < header:
             llo = lmid + 1
         else:
@@ -603,8 +628,6 @@ fn rt_payload_start_can_be_owned(ptr: *const u8) -> i32:
     if alloc_system_on() != 0:
         return 1
     if rt_payload_start_is_owned(ptr) != 0:
-        return 1
-    if rt_slab_ranges_complete == 0 or rt_large_ranges_complete == 0:
         return 1
     0
 
@@ -648,6 +671,61 @@ fn alloc_no_reuse_on() -> i32:
         return 1
     0
 
+var alloc_zero_class_state: i32 = 0   // DIAGNOSTIC: 0=unread,1=off,2=on
+
+// DIAGNOSTIC: WITH_ALLOC_ZERO_CLASS=1 zeroes a recycled small block to its full
+// class size, not just the requested size. Fresh slab memory is all-zero, so a
+// bug that reads a recycled block's tail (bytes between the request and the
+// class size — a same-class in-place rt_realloc grows into them) shows up as a
+// reuse-dependent difference: if the failure vanishes here but not under
+// WITH_ALLOC_NO_REUSE, the stale content is a block's tail, not stack garbage.
+fn alloc_zero_class_on() -> i32:
+    if alloc_zero_class_state == 0:
+        let v = rt_getenv(c"WITH_ALLOC_ZERO_CLASS".ptr)
+        if v as i64 != 0 and (unsafe *v) != 0:
+            alloc_zero_class_state = 2
+        else:
+            alloc_zero_class_state = 1
+    if alloc_zero_class_state == 2:
+        return 1
+    0
+
+// Invalid-free forensics: what the debugger would be asked first. Names the
+// slab or large range holding the header, the offset into it, and the header
+// word itself (a size class = live block, a slab address or 0 = freelist link
+// of an already-freed block, -1 = freed under WITH_ALLOC_NO_REUSE).
+fn dbg_invalid_free_forensics(payload: i64):
+    let header = payload - RT_ALLOC_HEADER_SIZE
+    var i: i32 = 0
+    while i < rt_slab_range_count:
+        let start = rt_range_start(rt_slab_range_base, i)
+        if header >= start and header < rt_range_end(rt_slab_range_base, rt_slab_range_cap, i):
+            dbg_puts("debug-alloc: invalid-free forensics: slab range " as *const u8, 48)
+            dbg_put_i64(i as i64)
+            dbg_puts(" start=" as *const u8, 7)
+            dbg_put_i64(start)
+            dbg_puts(" header-offset=" as *const u8, 15)
+            dbg_put_i64(header - start)
+            dbg_puts(" header-word=" as *const u8, 13)
+            dbg_put_i64(unsafe *(header as *const i64))
+            dbg_puts("\n" as *const u8, 1)
+            return
+        i = i + 1
+    var j: i32 = 0
+    while j < rt_large_range_count:
+        let lstart = rt_range_start(rt_large_range_base, j)
+        if payload >= lstart and payload < rt_range_end(rt_large_range_base, rt_large_range_cap, j):
+            dbg_puts("debug-alloc: invalid-free forensics: large range " as *const u8, 49)
+            dbg_put_i64(j as i64)
+            dbg_puts(" start=" as *const u8, 7)
+            dbg_put_i64(lstart)
+            dbg_puts(" payload-offset=" as *const u8, 16)
+            dbg_put_i64(payload - lstart)
+            dbg_puts("\n" as *const u8, 1)
+            return
+        j = j + 1
+    dbg_puts("debug-alloc: invalid-free forensics: address is in no slab or large range\n" as *const u8, 74)
+
 fn free_small_block(block: i64, idx: i32):
     if alloc_no_reuse_on() != 0:
         unsafe *(block as *mut i64) = -1
@@ -662,9 +740,15 @@ fn free_small_block(block: i64, idx: i32):
 // aborts loudly on a double-free and lists un-freed blocks at exit. Source SITES
 // (which alloc/free call) are resolved out-of-process by the harness via lldb
 // conditioned on the address reported here — With codegen does not maintain a
-// walkable frame-pointer chain, so in-process backtraces are not used.
+// walkable frame-pointer chain. The exception is a panic on Windows x64, where
+// the unwind tables let rt_backtrace_print name the chain in-process, so a
+// WITH_DEBUG_ALLOC_TRAP_FREE_HIT stop needs no debugger there (#1081).
 // All ledger ops run under the allocator lock (called from rt_alloc/rt_free).
-let DBG_CAP: i64 = 65536            // hash slots (power of two)
+// Hash slots (power of two). 65536 truncated on every compiler-sized run
+// ("ledger full, tracking truncated"), which voids the double-free verdict
+// exactly where it is needed (#1081: a stage compiler's own double free).
+// 4M slots x 72 bytes is a 302 MB reservation, touched only as it fills.
+let DBG_CAP: i64 = 4194304
 let DBG_ENTRY_WORDS: i64 = 9        // addr, size, freed, alloc_origin, first_drop_ptr, first_drop_len, root_flag, root_reason_ptr, root_reason_len
 
 let DBG_ORIGIN_UNKNOWN: i64 = 0
@@ -1195,7 +1279,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
         set_freelist(idx, next)
         alloc_store_small_header(head, cls_size)
         let ptr = small_block_ptr(head)
-        rt_memset(ptr, 0, size)
+        rt_memset(ptr, 0, if alloc_zero_class_on() != 0: cls_size else: size)
         return ptr
 
     // Carve from slab
@@ -1255,6 +1339,7 @@ fn rt_free_unlocked_with_drop_origin(ptr: *mut u8, drop_origin_ptr: i64, drop_or
             dbg_puts(" origin=" as *const u8, 8)
             dbg_puts(drop_origin_ptr as *const u8, drop_origin_len)
         dbg_puts("\n" as *const u8, 1)
+        dbg_invalid_free_forensics(ptr as i64)
         with_panic_core(make_str("invalid free: pointer is not an allocated payload start" as *const u8, 55), make_str("" as *const u8, 0), 0)
     let block = alloc_header_ptr(ptr as *const u8) as i64
     let size = unsafe *(block as *const i64)
@@ -1533,6 +1618,7 @@ fn with_panic_core(msg: str, file: str, line: i32) -> Unit:
             let len = i64_to_buf(line as i64, &buf as *mut u8)
             write_all(2, &buf as *const u8, len)
     let _ = rt_write(2, "\n" as *const u8, 1)
+    rt_backtrace_print()
     rt_exit(1)
 
 // ── Integer formatting ─────────────────────────────────────────────
@@ -2303,9 +2389,18 @@ fn str_replace_ref(s: &str, old: &str, new_s: &str) -> str:
 pub fn with_str_replace_ref(s: &str, old: &str, new_s: &str) -> str:
     str_replace_ref(s, old, new_s)
 
+// An owned `str` owns its bytes: a `-> str` return transfers ownership of
+// exactly one allocation (#747 instance H). The caller keeps owning `s` — a
+// C string it may free — so the result must be a copy. A make_str view here
+// is an owned-typed alias: when `s` is a live allocator payload (str_to_cstr's
+// buffer), the view's drop passes the ownership guard and frees the caller's
+// buffer, which the caller then frees again (#1081: win_list_append's
+// path_text over cpath, then cstr_free(cpath)). Null stays {null, 0} — the
+// c_import `*u8 -> str` coercion relies on it.
 pub fn with_str_from_cstr(s: *const u8) -> str:
-    let len = cstr_len(s)
-    make_str(s, len)
+    if s as i64 == 0:
+        return make_str(0 as *const u8, 0)
+    alloc_str(s, cstr_len(s))
 
 pub fn with_str_from_bytes(s: *const u8, len: i64) -> str:
     alloc_str(s, len)

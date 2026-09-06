@@ -610,6 +610,10 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_
         args.push(with_str_clone_ref(link_args[i]))
     args.push("libcpmt.lib")
     args.push("libcmt.lib")
+    // UCRT exports printf/scanf-family functions such as sprintf and
+    // vfprintf only through this archive (they are inline in the headers
+    // since VS 2015); Darwin-migrated C (pcre2test.w) calls them by name.
+    args.push("legacy_stdio_definitions.lib")
     args.push("oldnames.lib")
     args.push("kernel32.lib")
     args.push("advapi32.lib")

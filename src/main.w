@@ -694,7 +694,14 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     syn
 
 fn cli_one_liner_bin_path -> str:
-    f"out/tmp/with-cli-one-liner-{with_getpid()}-{with_clock_nanos()}"
+    // The host exe suffix on Windows: CreateProcessW appends ".exe" to a
+    // RELATIVE program name that has no extension and then finds nothing
+    // (std.process.run probe: "out/tmp/x" rc=-2, "out/tmp/x.exe" rc=0,
+    // while an absolute extensionless path runs). This was the only
+    // extensionless relative binary the compiler launches, so `with -e`
+    // and `-p` exited silently on native Windows (#1081).
+    let suffix = if with_sysinfo_os() == "Windows": ".exe" else: ""
+    f"out/tmp/with-cli-one-liner-{with_getpid()}-{with_clock_nanos()}" ++ suffix
 
 fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let _ = argc

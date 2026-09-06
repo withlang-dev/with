@@ -38,6 +38,102 @@ extern fn FindFirstFileW(pattern: *const u16, data: *mut u8) -> i64
 extern fn FindNextFileW(handle: i64, data: *mut u8) -> i32
 extern fn FindClose(handle: i64) -> i32
 extern fn CreateSymbolicLinkW(link_path: *const u16, target: *const u16, flags: u32) -> i8
+extern fn RtlCaptureStackBackTrace(frames_to_skip: u32, frames_to_capture: u32, back_trace: *mut i64, back_trace_hash: *mut u32) -> u16
+extern fn GetCurrentProcess() -> i64
+extern fn SymSetOptions(options: u32) -> u32
+extern fn SymInitialize(process: i64, search_path: *const u8, invade_process: i32) -> i32
+extern fn SymFromAddr(process: i64, address: u64, displacement: *mut u64, symbol: *mut u8) -> i32
+extern fn SymGetLineFromAddr64(process: i64, address: u64, displacement: *mut u32, line: *mut u8) -> i32
+
+// ── Panic backtrace ────────────────────────────────────────────────
+// With codegen keeps no frame-pointer chain, but Win64 needs none: every
+// function carries unwind tables (.pdata/.xdata), so RtlCaptureStackBackTrace
+// walks the stack from anywhere, and dbghelp resolves each return address
+// against the PDB the link wrote. with_panic_core prints this so a Windows
+// panic names its call chain with no debugger attached.
+fn bt_put(s: *const u8, n: i64):
+    let _ = rt_write(2, s, n)
+
+fn bt_cstr_len(p: *const u8) -> i64:
+    var n: i64 = 0
+    while (unsafe *((p as i64 + n) as *const u8)) != 0:
+        n = n + 1
+    n
+
+fn bt_put_hex(v: i64):
+    let digits = "0123456789abcdef" as *const u8
+    var buf: [16]u8 = [0 as u8; 16]
+    var x = v as u64
+    var i: i32 = 16
+    if x == 0:
+        i = 15
+        buf[15] = 48 as u8
+    while x != 0:
+        i = i - 1
+        buf[i] = unsafe *((digits as i64 + ((x & 15) as i64)) as *const u8)
+        x = x >> 4
+    bt_put("0x" as *const u8, 2)
+    bt_put((&buf as *const u8 as i64 + i as i64) as *const u8, (16 - i) as i64)
+
+fn bt_put_dec(v: i64):
+    var buf: [20]u8 = [0 as u8; 20]
+    var x = v
+    var i: i32 = 20
+    if x == 0:
+        i = 19
+        buf[19] = 48 as u8
+    while x > 0:
+        i = i - 1
+        buf[i] = ((x % 10) + 48) as u8
+        x = x / 10
+    bt_put((&buf as *const u8 as i64 + i as i64) as *const u8, (20 - i) as i64)
+
+pub fn rt_backtrace_print() -> Unit:
+    var frames: [64]i64 = [0 as i64; 64]
+    let n = RtlCaptureStackBackTrace(0 as u32, 64 as u32, &frames as *mut i64, 0 as *mut u32) as i32
+    if n == 0:
+        return
+    let process = GetCurrentProcess()
+    // SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES
+    let _opts = SymSetOptions(22 as u32)
+    let symbols = SymInitialize(process, 0 as *const u8, 1)
+    bt_put("backtrace:\n" as *const u8, 11)
+    // SYMBOL_INFO: SizeOfStruct at 0 (88), NameLen at 76, MaxNameLen at 80, Name at 84.
+    var sym: [600]u8 = [0 as u8; 600]
+    // IMAGEHLP_LINE64: SizeOfStruct at 0 (40), LineNumber at 16, FileName at 24.
+    var line: [40]u8 = [0 as u8; 40]
+    var i: i32 = 0
+    while i < n:
+        let addr = frames[i]
+        bt_put("  #" as *const u8, 3)
+        bt_put_dec(i as i64)
+        bt_put(" " as *const u8, 1)
+        bt_put_hex(addr)
+        if symbols != 0:
+            let sym_base = &sym as *const u8 as i64
+            unsafe *(sym_base as *mut u32) = 88 as u32
+            unsafe *((sym_base + 76) as *mut u32) = 0 as u32
+            unsafe *((sym_base + 80) as *mut u32) = 512 as u32
+            var disp: u64 = 0
+            if SymFromAddr(process, addr as u64, &raw mut disp, &sym as *mut u8) != 0:
+                let name = (sym_base + 84) as *const u8
+                bt_put(" " as *const u8, 1)
+                bt_put(name, bt_cstr_len(name))
+                bt_put("+" as *const u8, 1)
+                bt_put_hex(disp as i64)
+            let line_base = &line as *const u8 as i64
+            unsafe *(line_base as *mut u32) = 40 as u32
+            var line_disp: u32 = 0
+            if SymGetLineFromAddr64(process, addr as u64, &raw mut line_disp, &line as *mut u8) != 0:
+                let file = unsafe *((line_base + 24) as *const *const u8)
+                let number = unsafe *((line_base + 16) as *const u32)
+                bt_put(" (" as *const u8, 2)
+                bt_put(file, bt_cstr_len(file))
+                bt_put(":" as *const u8, 1)
+                bt_put_dec(number as i64)
+                bt_put(")" as *const u8, 1)
+        bt_put("\n" as *const u8, 1)
+        i = i + 1
 extern fn GetSystemInfo(info: *mut u8) -> Unit
 extern fn GlobalMemoryStatusEx(info: *mut u8) -> i32
 extern fn GetComputerNameW(buf: *mut u16, size: *mut u32) -> i32
@@ -103,6 +199,29 @@ type RtSysInfo:
 pub var __stdinp: *mut c_void = 0 as *mut c_void
 pub var __stdoutp: *mut c_void = 0 as *mut c_void
 pub var __stderrp: *mut c_void = 0 as *mut c_void
+
+// Darwin-migrated C (pcre2test.w through std.libc) reads errno through
+// __error() and sizes its stack with get/setrlimit. UCRT spells errno as
+// _errno(); there is no rlimit -- the main thread's stack is fixed at link
+// time -- so RLIMIT_STACK (3) reads as unlimited and a set is accepted as a
+// no-op; any other resource is refused. The rlimit layout is std.libc's:
+// rlim_cur then rlim_max, both u64; RLIM_INFINITY is Darwin's (1<<63)-1.
+@[link_name("_errno")]
+extern fn rt_ucrt_errno() -> *mut i32
+
+pub fn __error() -> *mut i32:
+    rt_ucrt_errno()
+
+pub fn getrlimit(resource: i32, lim: *mut u8) -> i32:
+    if resource != 3:
+        return -1
+    unsafe *(lim as *mut i64) = 9223372036854775807
+    unsafe *((lim as i64 + 8) as *mut i64) = 9223372036854775807
+    0
+
+pub fn setrlimit(resource: i32, lim: *const u8) -> i32:
+    let _ = lim
+    if resource != 3: -1 else: 0
 
 var rt_argc: i32 = 0
 var rt_argv_raw: i64 = 0
@@ -619,7 +738,18 @@ fn win_list_append(out: str, path: *const u8) -> str:
     out ++ path_text ++ "\n"
 
 fn win_list_files_walk(path: *const u8, out: str) -> str:
-    if not win_is_dir(path):
+    // Parity with the unix walk (a failed lstat returns `out`): a path that
+    // does not exist lists nothing, a file lists itself, a directory lists
+    // its tree. Before this, "not a directory" covered both cases, so a
+    // missing directory listed its own name (#1081: the compiler's cleanup
+    // listing an absent out/lib went down the append branch).
+    var wpath: [4096]u16 = [0 as u16; 4096]
+    if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
+        return out
+    let attrs = GetFileAttributesW(&wpath as *const [4096]u16 as *const u16)
+    if attrs == 0xffffffff as u32:
+        return out
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0:
         return win_list_append(out, path)
     var result = out
     var pattern8: [4096]u8 = [0 as u8; 4096]
@@ -822,6 +952,15 @@ fn win_append_utf16(dst: *mut u16, pos: i64, cap: i64, src: *const u16) -> i64:
 fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) -> i32:
     var pos: i64 = 0
     var offset: i64 = 0
+    // argv[0] is spelled with backslashes. CreateProcessW resolves the
+    // program from the command line, and a RELATIVE path with forward
+    // slashes ("out/tmp/x.exe") fails there with ERROR_FILE_NOT_FOUND while
+    // "out\tmp\x.exe" and any absolute spelling succeed (probe: rc=-2 / 0 /
+    // 0). Every compiler-built binary is launched by such a relative path
+    // (`with run`, `with test`, `with -e`), which is why all three died on
+    // native Windows (#1081). Programs that parse their own argv[0] --
+    // cmd.exe reads a forward-slash one as switches -- get the same relief.
+    var program = true
     while offset < len and pos < cap - 4:
         if pos > 0:
             unsafe *((out as i64 + pos * 2) as *mut u16) = 32 as u16
@@ -830,9 +969,11 @@ fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) ->
         pos = pos + 1
         var slash_count: i64 = 0
         while offset < len:
-            let ch = unsafe *((blob as i64 + offset) as *const u8)
+            var ch = unsafe *((blob as i64 + offset) as *const u8)
             if ch == 0:
                 break
+            if program and ch == 47:
+                ch = 92 as u8
             if ch == 92:
                 slash_count = slash_count + 1
                 offset = offset + 1
@@ -876,6 +1017,7 @@ fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) ->
         unsafe *((out as i64 + pos * 2) as *mut u16) = 34 as u16
         pos = pos + 1
         offset = offset + 1
+        program = false
     unsafe *((out as i64 + pos * 2) as *mut u16) = 0 as u16
     0
 

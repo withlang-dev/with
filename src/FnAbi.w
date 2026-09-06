@@ -107,6 +107,7 @@ pub fn codegen_is_runtime_abi_symbol(base_name: &str) -> bool:
         base_name == "__stderrp" or
         base_name == "gethostname" or base_name == "pthread_self" or
         base_name == "mkstemp" or base_name == "realpath" or
+        base_name == "getrlimit" or base_name == "setrlimit" or
         base_name == "i32_to_str" or base_name == "i64_to_string" or
         base_name == "str_from_byte"
 
