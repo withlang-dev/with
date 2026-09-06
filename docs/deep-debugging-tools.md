@@ -22,6 +22,12 @@ the routes.
    reports; a report that disappears means the second free came through a
    stale pointer whose address was reused, or the "str" was uninitialized
    stack (the #729 class: a temp dropped on a path that never created it).
+   Read that verdict only if the run did NOT print `allocator: slab range
+   table full; payload-ownership check disabled`: with no recycling a
+   compiler-sized run fills the 8192-region ownership table, and past it
+   the invalid-free check passes every pointer. The #1081 double free
+   "vanished" under no-reuse for exactly that reason; the same free on a
+   three-line repro still reported.
 3. **Get the exact failing binary.** A fixture that fails only under
    `with test` fails in the runner's own artifact
    (`out/<dir>/<stem>.test.<pid>.<nanos>`, built from the synthesized test
@@ -404,6 +410,49 @@ Hard-won specifics for `lldb --batch` against `-O1 -g` With binaries:
   real programs. Use a reporter breakpoint or a hardware watchpoint instead.
 - Set the environment with `settings set target.env-vars A=1 B=2`, not `env`.
 
+### Native Windows, no debugger (proven on #1081)
+
+A native Windows box may have no lldb, cdb or windbg (the LLVM SDK ships
+none; VS Build Tools ships none). The route still closes, because the
+runtime carries the two things the debugger was for:
+
+- **Every panic prints a backtrace** (`rt_backtrace_print`,
+  rt/windows_x86_64.w): Win64 unwind tables let
+  `RtlCaptureStackBackTrace` walk the stack with no frame-pointer chain,
+  and dbghelp symbolizes against the PDB the link wrote. So
+  `WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>` stops ARE the call chain of the
+  n-th free, and the invalid-free panic names the second free's frames by
+  itself. Frames are `_wcu$NNN$fn+0xNN`; inlined callees are attributed
+  to the caller (#1081's str drop sat in `win_list_append`, reported as
+  `win_list_files_walk+0x143`) — pair the frame with `--dump-drop-plan`
+  of the callee to name the statement.
+- **The invalid-free panic prints forensics**: the slab or large range
+  holding the header, the offset, and the header word. A slab address or
+  0 there is a freelist link — the block was already free, so this is a
+  double free before any trace runs.
+
+Making the address stable across runs, since lldb's ASLR-off is not
+available:
+
+```
+copy out\bootstrap\bin\with-stage1.exe with-stage1-noaslr.exe
+editbin /DYNAMICBASE:NO with-stage1-noaslr.exe      # MSVC Build Tools; bottom-up VirtualAlloc is deterministic without ASLR
+```
+
+Then the address depends only on the allocation sequence, and two things
+change that sequence between a learn run and a trap run: the environment
+block (add the trap variables to the LEARN run too, zero-padded —
+`WITH_DEBUG_ALLOC_TRAP_FREE=000000000 WITH_DEBUG_ALLOC_TRAP_FREE_HIT=00000`
+— then substitute digits) and any path the program builds from its
+arguments (an output label of a different LENGTH moved #1081's address by
+one 64 KB granule; a listing of a directory whose contents changed moves
+it too). Keep both byte-identical between runs; the trap run's own panic
+line shows whether the address held.
+
+The seed's runner (`with test` driven by v0.15.1.8) cannot spawn a test
+binary on native Windows (`exit code -2`, no child output); the tree's
+runner can — use the fresh stage compiler for `with test` there.
+
 ## Fixpoint Diff
 
 When `with build :fixpoint` fails, generate a focused byte-level report:
@@ -451,8 +500,12 @@ WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n> WITH_DEBUG_ALLOC_TRAP_FREE=<addr> ./bin   # p
 
 The trap works without `WITH_DEBUG_ALLOC` (the allocation pattern under
 test is unchanged), and values may be zero-padded so the environment block
-keeps the same length across learn/trap runs. The plain report does not
-record the first free's site by itself yet (#1014).
+keeps the same length across learn/trap runs (set the trap variables with
+dummy values on the learn run, and keep every argument the same length —
+see the native Windows recipe). The plain report does not record the first
+free's site by itself yet (#1014). The ledger holds 4M slots; if it still
+prints `ledger full, tracking truncated`, the double-free verdict for that
+run is void — do not read a silent run as clean.
 
 Leak filters:
 

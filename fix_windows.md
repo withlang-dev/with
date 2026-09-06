@@ -13,6 +13,50 @@ The route for THIS bug class is fixed by `docs/deep-debugging-tools.md`: a
 free/drop/UAF bug **starts with the native debug allocator**, not with a grep or
 a trace print.
 
+## Resolved (2026-09-06) — read this before the rest
+
+The crash was found and fixed on a native Windows box. The rest of this note
+is kept as the orientation it was; where it guesses, this section rules.
+
+**Root cause.** A double free in the runtime, not a drop-state or
+move-checker edge, and nothing to do with the pcre2 corpus or its Copy
+types. `with_fs_list_files` converts its path with `str_to_cstr` (an
+`rt_alloc`'d copy), walks, then `cstr_free`s it. The Windows walk's only
+test was `win_is_dir`, so a path that does not EXIST took the "not a
+directory → append the path" branch, and `win_list_append` built
+`path_text = with_str_from_cstr(path)` — which was `make_str`, a view of
+the C buffer typed as an owned `str`. Its scope-exit drop passed the
+ownership guard (the buffer is a live payload) and freed it; `cstr_free`
+freed it again. The compiler reached that branch because its temp-archive
+cleanup lists `out/lib` before the directory exists during the `.wo`
+bundle build. The unix walks return early when `stat` fails, which is the
+whole reason only Windows crashed — `list_files_text("<a file>")` took
+the same line on every platform (latent double free; the fixture covers
+it). Full evidence chain in `c44634d3`.
+
+**Landed** (branch `fix-1081-str-from-cstr`): `with_str_from_cstr` copies
+(an owned str owns its bytes, #747-H); the Windows walk treats a missing
+path like unix; the instruments that closed the hunt on a box with no
+debugger (a panic backtrace on Windows x64, invalid-free forensics, the
+range-table stand-down announced, a ledger that fits a compiler run); the
+route additions in `docs/deep-debugging-tools.md`. Separately,
+`windows-sdk-publish`: every release now republishes its LLVM SDK, which
+is what `with build :deps` needs to provision a Windows box at all.
+
+**Still open, and why the Windows lanes stay red after this merge:** the
+v0.15.1.8 seed cannot evaluate main's `build.w` — `0173d08e` switched the
+build-driver files to comptime `str` indexing (`path[i]`), which that
+seed's evaluator lacks (`comptime index requires an array, tuple, or vec`).
+So no `with build` at all on Windows from the published seed; the fix was
+verified from a worktree at `af7db8ce` (the last seed-buildable base),
+where the identical runtime rebuilt stage1 and the bundle then built. The
+way out is the one D40 prescribes: cut a Windows seed from a tree carrying
+this fix — cross-compiled from macOS, which works — publish it, and move
+the `seed.lock` Windows overrides off v0.15.1.8. Also noted while here:
+the seed's `with -e`/`-p` one-liners exit 127 with no diagnostic on native
+Windows, and its `with test` cannot spawn a test binary (`exit code -2`);
+the tree's runner does both.
+
 ## The bug (#1081)
 
 Building the pcre2 `.wo` bundle, the compiler **crashes** on native Windows:
