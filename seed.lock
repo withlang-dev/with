@@ -11,10 +11,10 @@ version=v0.15.2.0
 with-darwin-aarch64=79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
 with-linux-x86_64=eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
 with-linux-aarch64=3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
-# Windows cannot bootstrap v0.15.2.0 yet: its pcre2 bundle build fails on
-# the Darwin stdio globals (#1029). The v0.15.1.8 seeds cannot build this
-# tree either, so the Windows lanes stay red until that lands.
-with-windows-x86_64.exe.version=v0.15.1.8
-with-windows-x86_64.exe=6f00a9e3a26751404f671f10ef7b61b345886c6d73a96c95df9086e6df6607fd
+# windows-x86_64 bootstraps from v0.15.2.1 (the #1081 fixes; published from a
+# native ladder v0.15.1.8 -> af7db8ce -> main). windows-aarch64 stays on
+# v0.15.1.8 until its cross-built v0.15.2.1 seed is published (#1081).
+with-windows-x86_64.exe.version=v0.15.2.1
+with-windows-x86_64.exe=8f4817f2c4a3a916515ec93fd8a8f228bc9cfcd423689c5977dc564efc02a115
 with-windows-aarch64.exe.version=v0.15.1.8
 with-windows-aarch64.exe=5f58841923a812dbebae17b3b44e47f352c9db7a624a57fd106d590eb5b803dd
