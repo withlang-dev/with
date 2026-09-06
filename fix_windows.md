@@ -54,6 +54,22 @@ it), and every compiler-built binary is launched by such a path.
 Windows backends. It looked like a seed-only quirk until the tree's own
 compiler showed it too.
 
+**The `:test` battery on this box, under main's own release compiler:**
+984 behavior files ran, 983 passed; `pcre2-wo-drift` links and runs the
+pcre2test harness (after the errno/rlimit shims and
+`legacy_stdio_definitions.lib`); the two `nm` targets pass with `NM` set to
+the SDK's `llvm-nm.exe`, as the Windows lanes already do. One fixture is
+still red: `behav_project_overflow_modes` — its nested `with build` in a
+case directory under `out/tmp` reaches the repo's `build.w` graph, whose
+`with-sha256` link runs in a build-runner worker that does not carry the
+Windows linker variables (`missing Windows LLVM linker metadata … and no
+WITH_LLVM_LD / LLVM_LD / LLVM_PREFIX in the environment`). Unix never
+notices because `cc` needs none of them. Two defects to file: the nested
+project resolving to the enclosing repo's graph, and action workers not
+forwarding the toolchain environment (build/compiler.w forwards it for
+stage compiles by hand). Also fixed while here: the ownership range
+tables grow instead of turning the invalid-free check off.
+
 **The seed ladder, and why the lanes stay red until a seed is published:**
 the v0.15.1.8 seed cannot evaluate main's `build.w` — `0173d08e` switched
 the build-driver files to comptime `str` indexing (`path[i]`), which that
