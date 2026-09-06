@@ -1,0 +1,10 @@
+match rc=3
+copy[0] rc=0 len=9 s=hello!123
+copy[1] rc=0 len=5 s=hello
+copy[2] rc=0 len=3 s=123
+get word rc=0 len=5 s=hello
+len opt rc=0 len=3
+copy unset rc=-55
+get unset rc=-55
+copy badname rc=-49 copy badnum rc=-49 len badnum rc=-49
+list rc=0 l0=hello!123 l1=hello l2=123

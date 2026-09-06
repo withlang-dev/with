@@ -1,0 +1,2 @@
+1
+debug-alloc: leak count=0

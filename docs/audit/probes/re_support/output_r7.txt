@@ -1,0 +1,15 @@
+g-null=1
+set-bsrok=0 set-badbsr=-29 set-nlok=0 set-badnl=-29
+set-maxpat=0 set-maxcompl=0 set-parens=0 set-xopt=0 set-varlook=0
+set-opt-null=0 set-opt-full=0 set-opt-bad=-34
+set-opt-nullctx=-51
+set-depth=0 set-heap=0 set-match=0 set-off=0 set-rec=0
+glob-esc=0 glob-esc-bad=-29 glob-sep=0 glob-sep-bad=-29
+copies=4
+md0count=1 md1count=5 md1size=200 mdnull=1
+mdheap=0 startchar=0 marknull=1
+ovecptr=1
+is-crlf-t2=1 len=2 is-lf-t2=1 len=1
+is-nel-any=1 len=2 is-nel-t2=0
+is-lf-fixed=1 len=1
+was-crlf=1 len=2 was-lf=1 len=1

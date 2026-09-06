@@ -1,0 +1,30 @@
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/nightly_release_metadata.w:14:1
+14 | if argv.len() != 14:
+  | ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/nightly_release_metadata.w:32:1
+32 | if source_sha.len() < 12:
+  | ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/nightly_release_metadata.w:40:1
+40 | if event == "schedule":
+  | ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/nightly_release_metadata.w:46:1
+46 | if channel == "test":
+  | ^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/nightly_release_metadata.w:66:1
+66 | write_file(github_output, step_output)
+  | ^^^^^^^^^^
+
+error: expected declaration (fn, type, enum, let, use, extern)
+ --> tools/nightly_release_metadata.w:84:1
+84 | write_file(notes_output, notes)
+  | ^^^^^^^^^^
+error: check failed during compilation

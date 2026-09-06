@@ -1,0 +1,3 @@
+with-zlib-len 26 -> b'hello hello hello hello hello with zlib'
+with-gzip-len 38 -> b'hello hello hello hello hello with zlib'
+with-zlib == python-zlib: True

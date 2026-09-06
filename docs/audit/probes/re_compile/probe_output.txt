@@ -1,0 +1,94 @@
+CASE plain opts=0 COMPILE_OK MATCH rc=1 g0=[0,5) g1=[4294967295,4294967295)
+
+CASE ci opts=8 COMPILE_OK MATCH rc=1 g0=[0,3) g1=[4294967295,4294967295)
+
+CASE ci-off opts=0 COMPILE_OK MATCH rc=-1
+
+CASE ci-class opts=8 COMPILE_OK MATCH rc=1 g0=[0,5) g1=[4294967295,4294967295)
+
+CASE ml opts=1024 COMPILE_OK MATCH rc=1 g0=[2,3) g1=[4294967295,4294967295)
+
+CASE noml opts=0 COMPILE_OK MATCH rc=-1
+
+CASE ds opts=32 COMPILE_OK MATCH rc=1 g0=[0,3) g1=[4294967295,4294967295)
+
+CASE nods opts=0 COMPILE_OK MATCH rc=-1
+
+CASE ext opts=128 COMPILE_OK MATCH rc=1 g0=[0,3) g1=[4294967295,4294967295)
+
+CASE noext opts=0 COMPILE_OK MATCH rc=-1
+
+CASE ungreedy opts=262144 COMPILE_OK MATCH rc=3 g0=[0,4) g1=[0,3)
+
+CASE greedy opts=0 COMPILE_OK MATCH rc=3 g0=[0,4) g1=[0,3)
+
+CASE utf opts=524288 COMPILE_OK MATCH rc=1 g0=[0,2) g1=[4294967295,4294967295)
+
+CASE utf-ascii opts=524288 COMPILE_OK MATCH rc=1 g0=[0,1) g1=[4294967295,4294967295)
+
+CASE dupnames-ok opts=64 COMPILE_OK MATCH rc=3 g0=[0,2) g1=[0,1)
+
+CASE anchored opts=2147483648 COMPILE_OK MATCH rc=-1
+
+CASE noanch opts=0 COMPILE_OK MATCH rc=1 g0=[1,2) g1=[4294967295,4294967295)
+
+CASE endonly opts=16 COMPILE_OK MATCH rc=-1
+
+CASE noendonly opts=0 COMPILE_OK MATCH rc=1 g0=[0,1) g1=[4294967295,4294967295)
+
+CASE literal opts=33554432 COMPILE_OK MATCH rc=1 g0=[0,3) g1=[4294967295,4294967295)
+
+CASE noliteral opts=0 COMPILE_OK MATCH rc=-1
+
+CASE ucp opts=131072 COMPILE_OK MATCH rc=1 g0=[0,1) g1=[4294967295,4294967295)
+
+CASE noucp opts=0 COMPILE_OK MATCH rc=-1
+
+CASE no-auto-possess opts=16384 COMPILE_OK MATCH rc=1 g0=[0,4) g1=[4294967295,4294967295)
+
+CASE possessive opts=0 COMPILE_OK MATCH rc=1 g0=[0,4) g1=[4294967295,4294967295)
+
+CASE allow-empty-class opts=1 COMPILE_OK MATCH rc=-1
+
+CASE noallow-empty-class opts=0 COMPILE_FAIL code=106 off=3
+
+CASE jit COMPILE_OK JITRC=-45
+
+CASE bad-unclosed opts=0 COMPILE_FAIL code=114 off=4
+
+CASE bad-class opts=0 COMPILE_FAIL code=106 off=4
+
+CASE bad-quant opts=0 COMPILE_FAIL code=109 off=1
+
+CASE bad-backref opts=0 COMPILE_FAIL code=115 off=5
+
+CASE bad-range opts=0 COMPILE_FAIL code=104 off=5
+
+CASE bad-trailbs opts=0 COMPILE_FAIL code=101 off=4
+
+CASE bad-lonebs opts=0 COMPILE_FAIL code=101 off=1
+
+CASE bad-lookbehind opts=0 COMPILE_FAIL code=125 off=0
+
+CASE bad-dupname opts=0 COMPILE_FAIL code=143 off=14
+
+CASE bad-conflict opts=528384 COMPILE_FAIL code=174 off=0
+
+CASE bad-optbit opts=268435456 COMPILE_FAIL code=117 off=0
+
+CASE bad-bigrange opts=0 COMPILE_FAIL code=108 off=4
+
+CASE bad-varlook opts=0 COMPILE_OK MATCH rc=-1
+
+CASE bad-bigcount opts=0 COMPILE_FAIL code=105 off=10
+
+CASE bad-toolarge-utf opts=524288 COMPILE_FAIL code=134 off=9
+
+CASE toolarge-noutf opts=0 COMPILE_FAIL code=134 off=9
+
+CASE bad-optset opts=0 COMPILE_FAIL code=114 off=3
+
+CASE bad-rparen opts=0 COMPILE_FAIL code=122 off=4
+
+DONE
+

@@ -1,0 +1,100 @@
+CASE nested COMPILE_OK MATCH rc=5 g0=[0,3) s=abc
+
+CASE nested COMPILE_OK MATCH rc=5 g1=[0,3) s=abc
+
+CASE nested COMPILE_OK MATCH rc=5 g2=[0,1) s=a
+
+CASE nested COMPILE_OK MATCH rc=5 g3=[1,3) s=bc
+
+CASE nested COMPILE_OK MATCH rc=5 g4=[2,3) s=c
+
+CASE backref-hit COMPILE_OK MATCH rc=2 g0=[0,2) s=aa
+
+CASE backref-hit COMPILE_OK MATCH rc=2 g1=[0,1) s=a
+
+CASE backref-miss COMPILE_OK MATCH rc=-1 subjlen=2
+
+CASE lookahead COMPILE_OK MATCH rc=1 g0=[0,3) s=abc
+
+CASE neglookahead COMPILE_OK MATCH rc=1 g0=[0,3) s=bar
+
+CASE lookbehind COMPILE_OK MATCH rc=1 g0=[2,3) s=c
+
+CASE count COMPILE_OK MATCH rc=1 g0=[0,64) s=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+CASE countrange COMPILE_OK MATCH rc=1 g0=[0,4) s=xxxx
+
+CASE class COMPILE_OK MATCH rc=1 g0=[0,5) s=hello
+
+CASE negclass COMPILE_OK MATCH rc=1 g0=[0,3) s=xyz
+
+CASE posixclass COMPILE_OK MATCH rc=1 g0=[0,5) s=hello
+
+CASE alt COMPILE_OK MATCH rc=2 g0=[0,6) s=aababb
+
+CASE alt COMPILE_OK MATCH rc=2 g1=[2,3) s=b
+
+CASE nongreedy COMPILE_OK MATCH rc=1 g0=[0,4) s=aaab
+
+CASE named COMPILE_OK MATCH rc=2 g0=[0,3) s=abc
+
+CASE named COMPILE_OK MATCH rc=2 g1=[0,2) s=ab
+
+CASE namedref COMPILE_OK MATCH rc=2 g0=[0,3) s=aka
+
+CASE namedref COMPILE_OK MATCH rc=2 g1=[0,1) s=a
+
+CASE possessive COMPILE_OK MATCH rc=1 g0=[0,4) s=aaab
+
+CASE atomic COMPILE_OK MATCH rc=1 g0=[0,4) s=aaab
+
+CASE cond-hit COMPILE_OK MATCH rc=2 g0=[0,2) s=ab
+
+CASE cond-hit COMPILE_OK MATCH rc=2 g1=[0,1) s=a
+
+CASE cond-else COMPILE_OK MATCH rc=1 g0=[0,1) s=c
+
+CASE anchors COMPILE_OK MATCH rc=1 g0=[0,8) s=123-4567
+
+CASE deep10 COMPILE_OK MATCH rc=11 g0=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g1=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g2=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g3=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g4=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g5=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g6=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g7=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g8=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g9=[0,1) s=a
+
+CASE deep10 COMPILE_OK MATCH rc=11 g10=[0,1) s=a
+
+CASE empty COMPILE_OK MATCH rc=1 g0=[0,0) s=
+
+CASE bad-unclosed COMPILE_FAIL code=114 off=4 subjlen=3
+
+CASE bad-class COMPILE_FAIL code=106 off=4 subjlen=3
+
+CASE bad-quant COMPILE_FAIL code=109 off=1 subjlen=3
+
+CASE bad-backref COMPILE_FAIL code=115 off=5 subjlen=2
+
+CASE bad-range COMPILE_FAIL code=104 off=5 subjlen=3
+
+CASE bad-trailbs COMPILE_FAIL code=101 off=4 subjlen=3
+
+CASE bad-lookbehind COMPILE_FAIL code=125 off=0 subjlen=2
+
+CASE bad-dupname COMPILE_FAIL code=143 off=14 subjlen=2
+
+DONE
+

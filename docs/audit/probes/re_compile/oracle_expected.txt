@@ -1,0 +1,44 @@
+plain COMPILE_OK 0: hello
+ci COMPILE_OK 0: ABC
+ci-off COMPILE_OK No match
+ci-class COMPILE_OK 0: HELLO
+ml COMPILE_OK 0: b
+noml COMPILE_OK No match
+ds COMPILE_OK 0: a\x0ab
+nods COMPILE_OK No match
+ext COMPILE_OK 0: abc
+noext COMPILE_OK No match
+ungreedy COMPILE_OK 0: aaab
+greedy COMPILE_OK 0: aaab
+utf COMPILE_OK 0: \x{e9}
+utf-ascii COMPILE_OK 0: a
+dupnames-ok COMPILE_OK 0: ab
+anchored COMPILE_OK No match
+noanch COMPILE_OK 0: b
+endonly COMPILE_OK No match
+noendonly COMPILE_OK 0: a
+literal COMPILE_OK 0: a+b
+noliteral COMPILE_OK No match
+ucp COMPILE_OK 0: \xc3
+noucp COMPILE_OK No match
+no-auto-possess COMPILE_OK 0: aaab
+possessive COMPILE_OK 0: aaab
+allow-empty-class COMPILE_OK No match
+noallow-empty-class Failed: error 106 at offset 3: missing terminating ] for character class
+bad-unclosed Failed: error 114 at offset 4: missing closing parenthesis
+bad-class Failed: error 106 at offset 4: missing terminating ] for character class
+bad-quant Failed: error 109 at offset 1: quantifier does not follow a repeatable item
+bad-backref Failed: error 115 at offset 5: reference to non-existent subpattern
+bad-range Failed: error 104 at offset 5: numbers out of order in {} quantifier
+bad-trailbs ORACLE_ERROR rc=1 stderr=
+bad-lonebs ORACLE_ERROR rc=1 stderr=
+bad-lookbehind Failed: error 125 at offset 0: length of lookbehind assertion is not limited
+bad-dupname Failed: error 143 at offset 14: two named subpatterns have the same name (PCRE2_DUPNAMES not set)
+bad-conflict Failed: error 174 at offset 0: using UTF is disabled by the application
+bad-bigrange Failed: error 108 at offset 4: range out of order in character class
+bad-varlook COMPILE_OK No match
+bad-bigcount Failed: error 105 at offset 10: number too big in {} quantifier
+bad-toolarge-utf Failed: error 134 at offset 9: character code point value in \x{} or \o{} is too large
+toolarge-noutf Failed: error 134 at offset 9: character code point value in \x{} or \o{} is too large
+bad-optset Failed: error 114 at offset 3: missing closing parenthesis
+bad-rparen Failed: error 122 at offset 4: unmatched closing parenthesis

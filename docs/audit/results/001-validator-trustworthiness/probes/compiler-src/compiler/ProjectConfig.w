@@ -1,0 +1,779 @@
+use Resolve
+use compiler.Runtime
+use Overflow
+
+extern fn with_str_clone_ref(s: &str) -> str
+
+type ProjectConfig {
+    root_dir: str,
+    manifest_path: str,
+    manifest_error: str,
+    package_name: str,
+    package_version: str,
+    c_import_include_paths: Vec[str],
+    c_import_defines: Vec[str],
+    c_import_sdk_path: str,
+    link_libs: Vec[str],
+    link_search_paths: Vec[str],
+    dep_link_libs: Vec[str],
+    dep_link_args: Vec[str],
+    dep_names: Vec[str],
+    dep_constraints: Vec[str],
+    c_dep_metadata_names: Vec[str],
+    manual_c_dep_names: Vec[str],
+    feature_default: Vec[str],
+    feature_names: Vec[str],
+    feature_values: Vec[str],
+    target_default: str,
+    runtime_fiber_stack_size: i64,
+    runtime_fiber_pool_size: i32,
+    runtime_fiber_worker_count: i32,
+    copy_warn_threshold: i64,
+    no_std: bool,
+    alloc_mode: bool,
+    runtime_available: bool,
+    overflow_mode: i32,
+    strict_effects: bool,
+    lint_partial_statement_match: bool,
+}
+
+fn project_config_default -> ProjectConfig:
+    ProjectConfig {
+        root_dir: "",
+        manifest_path: "",
+        manifest_error: "",
+        package_name: "",
+        package_version: "",
+        c_import_include_paths: Vec.new(),
+        c_import_defines: Vec.new(),
+        c_import_sdk_path: "",
+        link_libs: Vec.new(),
+        link_search_paths: Vec.new(),
+        dep_link_libs: Vec.new(),
+        dep_link_args: Vec.new(),
+        dep_names: Vec.new(),
+        dep_constraints: Vec.new(),
+        c_dep_metadata_names: Vec.new(),
+        manual_c_dep_names: Vec.new(),
+        feature_default: Vec.new(),
+        feature_names: Vec.new(),
+        feature_values: Vec.new(),
+        target_default: "",
+        runtime_fiber_stack_size: 0,
+        runtime_fiber_pool_size: 0,
+        runtime_fiber_worker_count: 0,
+        copy_warn_threshold: 128,
+        no_std: false,
+        alloc_mode: false,
+        runtime_available: true,
+        overflow_mode: overflow_mode_default(),
+        strict_effects: false,
+        lint_partial_statement_match: false,
+    }
+
+fn project_config_clone_str(s: &str) -> str:
+    if s.len() == 0:
+        return ""
+    runtime_str_clone(s)
+
+fn project_config_clone_str_vec(values: &Vec[str]) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    for i in 0..values.len() as i32:
+        out.push(project_config_clone_str(values.get(i as i64)))
+    out
+
+pub fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
+    ProjectConfig {
+        root_dir: project_config_clone_str(cfg.root_dir),
+        manifest_path: project_config_clone_str(cfg.manifest_path),
+        manifest_error: project_config_clone_str(cfg.manifest_error),
+        package_name: project_config_clone_str(cfg.package_name),
+        package_version: project_config_clone_str(cfg.package_version),
+        c_import_include_paths: project_config_clone_str_vec(&cfg.c_import_include_paths),
+        c_import_defines: project_config_clone_str_vec(&cfg.c_import_defines),
+        c_import_sdk_path: project_config_clone_str(cfg.c_import_sdk_path),
+        link_libs: project_config_clone_str_vec(&cfg.link_libs),
+        link_search_paths: project_config_clone_str_vec(&cfg.link_search_paths),
+        dep_link_libs: project_config_clone_str_vec(&cfg.dep_link_libs),
+        dep_link_args: project_config_clone_str_vec(&cfg.dep_link_args),
+        dep_names: project_config_clone_str_vec(&cfg.dep_names),
+        dep_constraints: project_config_clone_str_vec(&cfg.dep_constraints),
+        c_dep_metadata_names: project_config_clone_str_vec(&cfg.c_dep_metadata_names),
+        manual_c_dep_names: project_config_clone_str_vec(&cfg.manual_c_dep_names),
+        feature_default: project_config_clone_str_vec(&cfg.feature_default),
+        feature_names: project_config_clone_str_vec(&cfg.feature_names),
+        feature_values: project_config_clone_str_vec(&cfg.feature_values),
+        target_default: project_config_clone_str(cfg.target_default),
+        runtime_fiber_stack_size: cfg.runtime_fiber_stack_size,
+        runtime_fiber_pool_size: cfg.runtime_fiber_pool_size,
+        runtime_fiber_worker_count: cfg.runtime_fiber_worker_count,
+        copy_warn_threshold: cfg.copy_warn_threshold,
+        no_std: cfg.no_std,
+        alloc_mode: cfg.alloc_mode,
+        runtime_available: cfg.runtime_available,
+        overflow_mode: cfg.overflow_mode,
+        strict_effects: cfg.strict_effects,
+        lint_partial_statement_match: cfg.lint_partial_statement_match,
+    }
+
+fn project_config_file_exists(path: &str) -> bool:
+    runtime_read_file(path).len() > 0
+
+fn project_config_find_root(start_dir: &str) -> str:
+    var cur = if start_dir.len() > 0: with_str_clone_ref(start_dir) else: "."
+    while true:
+        let manifest = resolve_join(cur, "with.toml")
+        if project_config_file_exists(manifest):
+            return project_config_absolutize_path(cur)
+        let parent = resolve_dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    ""
+
+fn project_config_load_for_source(source_path_raw: &str) -> ProjectConfig:
+    let source_path = project_config_absolutize_path(source_path_raw)
+    let root = project_config_find_root(resolve_dirname(source_path))
+    if root.len() == 0:
+        return project_config_default()
+
+    let manifest_path = resolve_join(root, "with.toml")
+    let text = runtime_read_file(manifest_path)
+
+    var cfg = project_config_default()
+    cfg.root_dir = root
+    cfg.manifest_path = manifest_path
+    if text.len() == 0:
+        return cfg
+
+    var section = ""
+    var pending_key = ""
+    var pending_value = ""
+
+    var line_start = 0
+    var i = 0
+    let total = text.len() as i32
+    while i <= total:
+        if i == total or text.byte_at(i as i64) == 10:
+            var line = text.slice(line_start as i64, i as i64)
+            line = project_config_trim(project_config_strip_comment(line))
+            if line.len() > 0:
+                if pending_key.len() > 0:
+                    if pending_value.len() > 0:
+                        pending_value = pending_value ++ " "
+                    pending_value = pending_value ++ line
+                    if project_config_value_complete(pending_value):
+                        cfg = project_config_apply_manifest_entry(move cfg, section, pending_key, pending_value)
+                        pending_key = ""
+                        pending_value = ""
+                else if line.byte_at(0) == 91 and line.byte_at(line.len() as i64 - 1) == 93:
+                    section = project_config_trim(line.slice(1, line.len() - 1))
+                else:
+                    let eq = project_config_find_char(line, 61)
+                    if eq > 0:
+                        let key = project_config_trim(line.slice(0, eq as i64))
+                        let value = project_config_trim(line.slice((eq + 1) as i64, line.len()))
+                        let forbidden = project_config_forbidden_entry(section, key)
+                        if forbidden.len() > 0 and cfg.manifest_error.len() == 0:
+                            cfg.manifest_error = forbidden
+                        if project_config_wants_key(section, key):
+                            if project_config_value_complete(value):
+                                cfg = project_config_apply_manifest_entry(move cfg, section, key, value)
+                            else:
+                                pending_key = key
+                                pending_value = value
+            line_start = i + 1
+        i = i + 1
+
+    if pending_key.len() > 0 and project_config_value_complete(pending_value):
+        cfg = project_config_apply_manifest_entry(move cfg, section, pending_key, pending_value)
+
+    cfg
+
+fn project_config_apply_manifest_entry(cfg: ProjectConfig, section: &str, key: &str, value: &str) -> ProjectConfig:
+    let manual_c_dep = project_config_manual_c_dep_name(section)
+    if manual_c_dep.len() > 0:
+        return project_config_apply_manual_c_dep_entry(move cfg, manual_c_dep, key, value)
+    project_config_apply_entry(move cfg, section, key, value)
+
+fn project_config_apply_entry(cfg: ProjectConfig, section: &str, key: &str, value: &str) -> ProjectConfig:
+    var out = cfg
+    if (section == "project" or section == "package") and key == "name":
+        out.package_name = project_config_strip_quotes(value)
+    else if (section == "project" or section == "package") and key == "version":
+        out.package_version = project_config_strip_quotes(value)
+    else if (section == "" or section == "project" or section == "package") and key == "std":
+        let parsed_std = project_config_parse_bool(value)
+        if parsed_std < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "std must be true or false"
+        else:
+            out.no_std = parsed_std == 0
+    else if (section == "" or section == "project" or section == "package") and key == "alloc":
+        let parsed_alloc = project_config_parse_bool(value)
+        if parsed_alloc < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "alloc must be true or false"
+        else:
+            out.alloc_mode = parsed_alloc != 0
+    else if (section == "" or section == "project" or section == "package") and key == "runtime":
+        let parsed_runtime = project_config_parse_bool(value)
+        if parsed_runtime < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "runtime must be true or false"
+        else:
+            out.runtime_available = parsed_runtime != 0
+    else if (section == "" or section == "project" or section == "package") and key == "copy_warn_threshold":
+        let parsed_copy_threshold = project_config_parse_nonnegative_i64(value)
+        if parsed_copy_threshold < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "copy_warn_threshold must be a non-negative integer"
+        else:
+            out.copy_warn_threshold = parsed_copy_threshold
+    else if section == "build" and key == "overflow":
+        let parsed_overflow = overflow_mode_parse(project_config_strip_quotes(project_config_trim(value)))
+        if parsed_overflow < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "build.overflow must be panic, wrap, or saturate"
+        else:
+            out.overflow_mode = parsed_overflow
+    else if section == "build" and key == "strict_effects":
+        let parsed_strict = project_config_parse_bool(value)
+        if parsed_strict < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "build.strict_effects must be true or false"
+        else:
+            out.strict_effects = parsed_strict != 0
+    else if section == "lint" and key == "partial_statement_match":
+        let parsed_lint = project_config_parse_bool(value)
+        if parsed_lint < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "lint.partial_statement_match must be true or false"
+        else:
+            out.lint_partial_statement_match = parsed_lint != 0
+    else if section == "runtime" and key == "fiber_stack_size":
+        let parsed_stack = project_config_parse_positive_i64(value)
+        if parsed_stack <= 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "runtime.fiber_stack_size must be a positive integer"
+        else:
+            out.runtime_fiber_stack_size = parsed_stack
+    else if section == "runtime" and key == "fiber_pool_size":
+        let parsed_pool = project_config_parse_positive_i64(value)
+        if parsed_pool <= 0 or parsed_pool > 2147483647:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "runtime.fiber_pool_size must be a positive integer"
+        else:
+            out.runtime_fiber_pool_size = parsed_pool as i32
+    else if section == "runtime" and key == "fiber_worker_count":
+        let parsed_workers = project_config_parse_positive_i64(value)
+        if parsed_workers <= 0 or parsed_workers > 8:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "runtime.fiber_worker_count must be a positive integer between 1 and 8"
+        else:
+            out.runtime_fiber_worker_count = parsed_workers as i32
+    else if section == "c_import" and key == "include_paths":
+        out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
+    else if section == "c_import" and key == "defines":
+        out.c_import_defines = project_config_parse_string_array(value)
+    else if section == "c_import" and key == "sdk_path":
+        out.c_import_sdk_path = project_config_resolve_path(out.root_dir, project_config_strip_quotes(value))
+    else if section == "link" and key == "libs":
+        if not project_config_is_string_array_value(value):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "link.libs must be an array of strings"
+        else:
+            out.link_libs = project_config_parse_string_array(value)
+    else if section == "link" and key == "search_paths":
+        out.link_search_paths = project_config_parse_path_array(value, out.root_dir)
+    else if section == "features" and key == "default":
+        out.feature_default = project_config_parse_string_array(value)
+    else if section == "features":
+        out.feature_names.push(with_str_clone_ref(key))
+        out.feature_values.push(project_config_trim(value))
+    else if section == "target" and key == "default":
+        out.target_default = project_config_strip_quotes(project_config_trim(value))
+    else if section == "deps":
+        let constraint = project_config_strip_quotes(project_config_trim(value))
+        if key.len() > 0 and constraint.len() > 0:
+            out.dep_names.push(with_str_clone_ref(key))
+            out.dep_constraints.push(with_str_clone_ref(constraint))
+            if key.starts_with("c."):
+                // C package dependency: c.sqlite3 = "3.45"
+                let pkg_name = key.slice(2, key.len())
+                if pkg_name.len() > 0:
+                    if project_config_vec_contains(out.manual_c_dep_names, pkg_name):
+                        if out.manifest_error.len() == 0:
+                            out.manifest_error = "dependency c." ++ pkg_name ++ " is declared both as a Conan dependency and a manual [deps.c." ++ pkg_name ++ "] table"
+                    else:
+                        if not project_config_vec_contains(out.c_dep_metadata_names, pkg_name):
+                            out.c_dep_metadata_names.push(with_str_clone_ref(pkg_name))
+                        out = project_config_load_dep_metadata(move out, pkg_name, constraint)
+            else if out.manifest_error.len() == 0:
+                out.manifest_error = "With package dependency '" ++ key ++ "' is declared in with.toml but the With package registry is not available yet; remove it or use a C package (c.<name>)"
+    out
+
+fn project_config_apply_manual_c_dep_entry(cfg: ProjectConfig, dep_name: &str, key: &str, value: &str) -> ProjectConfig:
+    var out = cfg
+    if project_config_vec_contains(out.c_dep_metadata_names, dep_name):
+        if out.manifest_error.len() == 0:
+            out.manifest_error = "dependency c." ++ dep_name ++ " is declared both as a Conan dependency and a manual [deps.c." ++ dep_name ++ "] table"
+    if not project_config_vec_contains(out.manual_c_dep_names, dep_name):
+        // Manual C deps are local manifest inputs, not fetched artifacts.
+        out.manual_c_dep_names.push(with_str_clone_ref(dep_name))
+    if key == "include":
+        if not project_config_is_quoted_string_value(value):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "include in [deps.c." ++ dep_name ++ "] must be a string path"
+        else:
+            out.c_import_include_paths.push(project_config_resolve_path(out.root_dir, project_config_strip_quotes(project_config_trim(value))))
+    else if key == "lib":
+        if not project_config_is_quoted_string_value(value):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "lib in [deps.c." ++ dep_name ++ "] must be a string path"
+        else:
+            out.link_search_paths.push(project_config_resolve_path(out.root_dir, project_config_strip_quotes(project_config_trim(value))))
+    else if key == "link":
+        if not project_config_is_string_array_value(value):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "link in [deps.c." ++ dep_name ++ "] must be an array of library names"
+        else:
+            let libs = project_config_parse_string_array(value)
+            for li in 0..libs.len() as i32:
+                out.dep_link_libs.push(with_str_clone_ref(libs.get(li as i64)))
+    else if key == "defines":
+        if not project_config_is_string_array_value(value):
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "defines in [deps.c." ++ dep_name ++ "] must be an array of strings"
+        else:
+            let defines = project_config_parse_string_array(value)
+            for di in 0..defines.len() as i32:
+                out.c_import_defines.push(with_str_clone_ref(defines.get(di as i64)))
+    else if out.manifest_error.len() == 0:
+        out.manifest_error = "unknown key '" ++ key ++ "' in [deps.c." ++ dep_name ++ "]; expected include, lib, link, or defines"
+    out
+
+fn project_config_strip_quotes(value: &str) -> str:
+    let len = value.len() as i32
+    if len >= 2 and value.byte_at(0) == 34 and value.byte_at((len - 1) as i64) == 34:
+        return value.slice(1, (len - 1) as i64)
+    with_str_clone_ref(value)
+
+fn project_config_parse_bool(value: &str) -> i32:
+    let text = project_config_strip_quotes(project_config_trim(value))
+    if text == "true":
+        return 1
+    if text == "false":
+        return 0
+    -1
+
+fn project_config_parse_positive_i64(value: &str) -> i64:
+    let text = project_config_strip_quotes(project_config_trim(value))
+    if text.len() == 0:
+        return -1
+    var out: i64 = 0
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        out = out * 10 + (ch - 48) as i64
+        if out <= 0:
+            return -1
+    out
+
+fn project_config_parse_nonnegative_i64(value: &str) -> i64:
+    let text = project_config_strip_quotes(project_config_trim(value))
+    if text.len() == 0:
+        return -1
+    var out: i64 = 0
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        out = out * 10 + (ch - 48) as i64
+    out
+
+fn project_config_vec_contains(values: &Vec[str], needle: &str) -> bool:
+    for i in 0..values.len() as i32:
+        if values.get(i as i64) == needle:
+            return true
+    false
+
+fn project_config_manual_c_dep_name(section: &str) -> str:
+    if not section.starts_with("deps.c."):
+        return ""
+    if section.len() <= 7:
+        return ""
+    section.slice(7, section.len())
+
+fn project_config_is_quoted_string_value(value: &str) -> bool:
+    let text = project_config_trim(value)
+    text.len() >= 2 and text.byte_at(0) == 34 and text.byte_at(text.len() as i64 - 1) == 34
+
+fn project_config_load_dep_metadata(cfg: ProjectConfig, name: &str, version: &str) -> ProjectConfig:
+    var out = cfg
+    // Read metadata.json from .with/deps/c/<name>/<version>/
+    let dep_dir = out.root_dir ++ "/.with/deps/c/" ++ name ++ "/" ++ version
+    let meta_path = dep_dir ++ "/metadata.json"
+    let meta = runtime_read_file(meta_path)
+    if meta.len() == 0:
+        if out.manifest_error.len() == 0:
+            out.manifest_error = "missing metadata for dependency c." ++ name ++ "@" ++ version ++ " at " ++ meta_path ++ "; run 'with get c." ++ name ++ "@" ++ version ++ "'"
+        return out
+    // Extract include_paths, lib_paths, libs from JSON
+    let includes = project_config_json_str_array(meta, "include_paths")
+    for i in 0..includes.len() as i32:
+        let inc = includes.get(i as i64)
+        out.c_import_include_paths.push(dep_dir ++ "/" ++ inc)
+    let defines = project_config_json_str_array(meta, "defines")
+    for i in 0..defines.len() as i32:
+        out.c_import_defines.push(with_str_clone_ref(defines.get(i as i64)))
+    let lib_paths = project_config_json_str_array(meta, "lib_paths")
+    for i in 0..lib_paths.len() as i32:
+        let lp = lib_paths.get(i as i64)
+        out.link_search_paths.push(dep_dir ++ "/" ++ lp)
+    let libs = project_config_json_str_array(meta, "libs")
+    for i in 0..libs.len() as i32:
+        out.dep_link_libs.push(with_str_clone_ref(libs.get(i as i64)))
+    let link_args = project_config_json_str_array(meta, "link_args")
+    for i in 0..link_args.len() as i32:
+        out.dep_link_args.push(with_str_clone_ref(link_args.get(i as i64)))
+    let requires = project_config_json_str_array(meta, "requires")
+    for i in 0..requires.len() as i32:
+        let req = requires.get(i as i64)
+        let slash = project_config_find_char(req, 47)
+        if slash > 0:
+            let req_name = req.slice(0, slash as i64)
+            let req_version = req.slice((slash + 1) as i64, req.len())
+            out = project_config_load_dep_metadata(move out, req_name, req_version)
+    out
+
+fn project_config_json_str_array(json: &str, key: &str) -> Vec[str]:
+    // Simple JSON array extractor: find "key": [...] and extract string values.
+    var result: Vec[str] = Vec.new()
+    let needle = "\"" ++ key ++ "\""
+    let json_len = json.len() as i32
+    var pos = 0
+    while pos < json_len - needle.len() as i32:
+        var found = true
+        for ni in 0..needle.len() as i32:
+            if json.byte_at((pos + ni) as i64) != needle.byte_at(ni as i64):
+                found = false
+                break
+        if found:
+            // Find the '[' after the key
+            var ai = pos + needle.len() as i32
+            while ai < json_len and json.byte_at(ai as i64) != 91:
+                ai = ai + 1
+            if ai >= json_len:
+                return result
+            ai = ai + 1
+            // Extract strings between '[' and ']'
+            while ai < json_len and json.byte_at(ai as i64) != 93:
+                if json.byte_at(ai as i64) == 34:
+                    // Start of quoted string
+                    let start = ai + 1
+                    var end = start
+                    while end < json_len and json.byte_at(end as i64) != 34:
+                        end = end + 1
+                    if end > start:
+                        result.push(json.slice(start as i64, end as i64))
+                    ai = end + 1
+                else:
+                    ai = ai + 1
+            return result
+        pos = pos + 1
+    result
+
+fn project_config_wants_key(section: &str, key: &str) -> bool:
+    let manual_c_dep = project_config_manual_c_dep_name(section)
+    if (section == "project" or section == "package") and (key == "name" or key == "version"):
+        return true
+    if (section == "" or section == "project" or section == "package") and (key == "std" or key == "alloc" or key == "runtime" or key == "copy_warn_threshold"):
+        return true
+    if section == "c_import" and key == "include_paths":
+        return true
+    if section == "c_import" and key == "defines":
+        return true
+    if section == "c_import" and key == "sdk_path":
+        return true
+    if section == "link" and key == "libs":
+        return true
+    if section == "link" and key == "search_paths":
+        return true
+    if section == "build" and (key == "overflow" or key == "strict_effects"):
+        return true
+    if section == "lint" and key == "partial_statement_match":
+        return true
+    if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size" or key == "fiber_worker_count"):
+        return true
+    if section == "features":
+        return true
+    if section == "target" and key == "default":
+        return true
+    if manual_c_dep.len() > 0:
+        return true
+    if section == "deps":
+        return true
+    false
+
+fn project_config_forbidden_entry(section: &str, key: &str) -> str:
+    if section == "build" and (key == "overflow" or key == "strict_effects"):
+        return ""
+    if section == "lint" and key == "partial_statement_match":
+        return ""
+    if section == "lint":
+        return "unknown key '" ++ key ++ "' in [lint]; expected partial_statement_match"
+    if section == "runtime" and (key == "fiber_stack_size" or key == "fiber_pool_size" or key == "fiber_worker_count"):
+        return ""
+    if section == "runtime":
+        return "unknown key '" ++ key ++ "' in [runtime]; expected fiber_stack_size, fiber_pool_size, or fiber_worker_count"
+    if section == "target" and key == "default":
+        return ""
+    if section == "build" or section == "commands" or section == "scripts" or section == "targets" or section == "target":
+        return "imperative build configuration belongs in build.w, not with.toml: [" ++ section ++ "]"
+    if section == "assets" or section == "asset" or section == "shaders" or section == "shader":
+        return "asset and shader pipelines belong in build.w, not with.toml: [" ++ section ++ "]"
+    if key == "command" or key == "commands" or key == "script" or key == "scripts":
+        return "imperative build configuration belongs in build.w, not with.toml: " ++ key
+    if key == "prebuild" or key == "postbuild" or key == "build_command":
+        return "imperative build configuration belongs in build.w, not with.toml: " ++ key
+    if key == "target" or key == "targets" or key == "binary" or key == "binaries":
+        return "build targets belong in build.w, not with.toml: " ++ key
+    if key == "library" or key == "libraries" or key == "asset_pipeline" or key == "shader_compile":
+        return "build targets and pipelines belong in build.w, not with.toml: " ++ key
+    ""
+
+fn project_config_value_complete(value: &str) -> bool:
+    // Array values need closing bracket
+    if project_config_find_char(value, 91) >= 0:
+        return project_config_find_char(value, 93) >= 0
+    // Quoted string values are complete as-is
+    if value.len() >= 2 and value.byte_at(0) == 34:
+        return true
+    // Bare values are complete
+    true
+
+fn project_config_parse_path_array(value: &str, root_dir: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let entries = project_config_parse_string_array(value)
+    for i in 0..entries.len() as i32:
+        out.push(project_config_resolve_path(root_dir, entries.get(i as i64)))
+    out
+
+fn project_config_parse_string_array(value: &str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    var i = 0
+    let total = value.len() as i32
+    while i < total:
+        if value.byte_at(i as i64) == 34:
+            i = i + 1
+            var entry = ""
+            var escaped = 0
+            while i < total:
+                let ch = value.byte_at(i as i64)
+                if escaped != 0:
+                    if ch == 110:
+                        entry = entry ++ "\n"
+                    else if ch == 116:
+                        entry = entry ++ "\t"
+                    else if ch == 114:
+                        entry = entry ++ "\r"
+                    else:
+                        entry = entry ++ value.slice(i as i64, (i + 1) as i64)
+                    escaped = 0
+                else if ch == 92:
+                    escaped = 1
+                else if ch == 34:
+                    break
+                else:
+                    entry = entry ++ value.slice(i as i64, (i + 1) as i64)
+                i = i + 1
+            if entry.len() > 0:
+                out.push(entry)
+        i = i + 1
+    out
+
+fn project_config_is_string_array_value(value: &str) -> bool:
+    let text = project_config_trim(value)
+    if text.len() < 2:
+        return false
+    if text.byte_at(0) != 91 or text.byte_at(text.len() as i64 - 1) != 93:
+        return false
+    var i = 1
+    let total = text.len() as i32
+    var expect_value = true
+    while i < total - 1:
+        let ch = text.byte_at(i as i64)
+        if project_config_is_space(ch):
+            i = i + 1
+        else if expect_value:
+            if ch == 44:
+                return false
+            if ch != 34:
+                return false
+            i = i + 1
+            var escaped = 0
+            var closed = false
+            while i < total - 1:
+                let inner = text.byte_at(i as i64)
+                if escaped != 0:
+                    escaped = 0
+                else if inner == 92:
+                    escaped = 1
+                else if inner == 34:
+                    closed = true
+                    break
+                i = i + 1
+            if not closed:
+                return false
+            i = i + 1
+            expect_value = false
+        else if ch == 44:
+            expect_value = true
+            i = i + 1
+        else:
+            return false
+    not expect_value or project_config_trim(text.slice(1, text.len() - 1)).len() == 0
+
+fn project_config_resolve_c_import_header(cfg: &ProjectConfig, decl_dir: &str, header_spec_raw: &str) -> str:
+    let header_spec = project_config_trim(header_spec_raw)
+    if header_spec.len() == 0:
+        return with_str_clone_ref(header_spec_raw)
+    if project_config_str_contains(header_spec, "\n"):
+        return with_str_clone_ref(header_spec_raw)
+    if project_config_str_contains(header_spec, ";"):
+        return with_str_clone_ref(header_spec_raw)
+    if header_spec.byte_at(0) == 35:
+        return with_str_clone_ref(header_spec_raw)
+
+    var header_name = with_str_clone_ref(header_spec)
+    var preserve_angle = 0
+    var preserve_quote = 0
+    if header_spec.len() >= 2 and header_spec.byte_at(0) == 60 and header_spec.byte_at(header_spec.len() as i64 - 1) == 62:
+        header_name = header_spec.slice(1, header_spec.len() - 1)
+        preserve_angle = 1
+    else if header_spec.len() >= 2 and header_spec.byte_at(0) == 34 and header_spec.byte_at(header_spec.len() as i64 - 1) == 34:
+        header_name = header_spec.slice(1, header_spec.len() - 1)
+        preserve_quote = 1
+
+    let resolved = project_config_resolve_header_path(cfg, decl_dir, header_name)
+    if resolved.len() > 0:
+        return "\"" ++ resolved ++ "\""
+    if project_config_is_absolute_path(header_name):
+        return "\"" ++ header_name ++ "\""
+    if preserve_quote != 0:
+        return "\"" ++ header_name ++ "\""
+    if preserve_angle != 0:
+        return "<" ++ header_name ++ ">"
+    with_str_clone_ref(header_spec_raw)
+
+fn project_config_resolve_header_path(cfg: &ProjectConfig, decl_dir: &str, header_name: &str) -> str:
+    if header_name.len() == 0:
+        return ""
+    if project_config_is_absolute_path(header_name):
+        if project_config_file_exists(header_name):
+            return with_str_clone_ref(header_name)
+        return ""
+
+    let base_dir = if decl_dir.len() > 0:
+        project_config_absolutize_path(decl_dir)
+    else:
+        if cfg.root_dir.len() > 0: cfg.root_dir else: project_config_absolutize_path(".")
+    let local_candidate = resolve_join(base_dir, header_name)
+    if project_config_file_exists(local_candidate):
+        return local_candidate
+
+    for i in 0..cfg.c_import_include_paths.len() as i32:
+        let include_dir = cfg.c_import_include_paths.get(i as i64)
+        let candidate = resolve_join(include_dir, header_name)
+        if project_config_file_exists(candidate):
+            return candidate
+    ""
+
+fn project_config_resolve_path(root_dir: &str, path: &str) -> str:
+    if path.len() == 0:
+        return with_str_clone_ref(path)
+    if project_config_is_absolute_path(path):
+        return with_str_clone_ref(path)
+    if root_dir.len() == 0:
+        return project_config_absolutize_path(path)
+    resolve_join(root_dir, path)
+
+fn project_config_is_absolute_path(path: &str) -> bool:
+    path.len() > 0 and path.byte_at(0) == 47
+
+fn project_config_normalize_absolute_path(path: &str) -> str:
+    var out = with_str_clone_ref(path)
+    while out.len() > 1 and out.ends_with("/"):
+        out = out.slice(0, out.len() - 1)
+    while out == "/." or out.ends_with("/."):
+        if out == "/.":
+            return "/"
+        out = out.slice(0, out.len() - 2)
+        while out.len() > 1 and out.ends_with("/"):
+            out = out.slice(0, out.len() - 1)
+    out
+
+fn project_config_absolutize_path(path: &str) -> str:
+    if path.len() == 0:
+        return with_str_clone_ref(path)
+    if project_config_is_absolute_path(path):
+        return project_config_normalize_absolute_path(path)
+    let cwd = runtime_getenv("PWD")
+    if cwd.len() == 0:
+        return with_str_clone_ref(path)
+    project_config_normalize_absolute_path(resolve_join(cwd, path))
+
+fn project_config_find_char(text: &str, ch: i32) -> i32:
+    var i = 0
+    while i < text.len() as i32:
+        if text.byte_at(i as i64) == ch:
+            return i
+        i = i + 1
+    -1
+
+fn project_config_strip_comment(line: &str) -> str:
+    var in_string = 0
+    var escaped = 0
+    var i = 0
+    while i < line.len() as i32:
+        let ch = line.byte_at(i as i64)
+        if escaped != 0:
+            escaped = 0
+        else if in_string != 0 and ch == 92:
+            escaped = 1
+        else if ch == 34:
+            if in_string != 0:
+                in_string = 0
+            else:
+                in_string = 1
+        else if ch == 35 and in_string == 0:
+            return line.slice(0, i as i64)
+        i = i + 1
+    with_str_clone_ref(line)
+
+fn project_config_trim(text: &str) -> str:
+    var start = 0
+    var end = text.len() as i32
+    while start < end and project_config_is_space(text.byte_at(start as i64)):
+        start = start + 1
+    while end > start and project_config_is_space(text.byte_at((end - 1) as i64)):
+        end = end - 1
+    text.slice(start as i64, end as i64)
+
+fn project_config_is_space(ch: i32) -> bool:
+    ch == 32 or ch == 9 or ch == 10 or ch == 13
+
+fn project_config_str_contains(text: &str, needle: &str) -> bool:
+    if needle.len() == 0:
+        return true
+    if needle.len() > text.len():
+        return false
+    var i = 0
+    let limit = text.len() as i32 - needle.len() as i32
+    while i <= limit:
+        if text.slice(i as i64, (i + needle.len() as i32) as i64) == needle:
+            return true
+        i = i + 1
+    false

@@ -1,0 +1,11 @@
+fn classify(x: i32) -> str:
+    if x > 0:
+        "pos"
+    else:
+        "neg"
+
+fn loopit -> i32:
+    var t = 0
+    while t < 3:
+        t = t + 1
+    t

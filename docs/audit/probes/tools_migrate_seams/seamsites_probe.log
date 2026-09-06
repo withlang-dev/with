@@ -1,0 +1,23 @@
+path	offset	fn	class	tier	context	place	type
+<embedded-std>/std/string.w	6019	string_cmp	copy-view-drop	observed	read	_1.*	str
+<embedded-std>/std/result.w	747	BuilderError.display	retained-unowned-copy	retained-call-arg	_4	str
+<embedded-std>/std/regex.w	2203	regex_compile_flags	copy-view-drop	observed	read	_1.*	str
+<embedded-std>/std/regex.w	2295	regex_compile_flags	copy-view-drop	observed	read	_1.*	str
+<embedded-std>/std/regex.w	2363	regex_compile_flags	copy-view-drop	observed	read	_1.*	str
+<embedded-std>/std/regex.w	2434	regex_compile_flags	copy-view-drop	observed	read	_1.*	str
+<embedded-std>/std/regex.w	2503	regex_compile_flags	copy-view-drop	observed	read	_1.*	str
+<embedded-std>/std/regex.w	2573	regex_compile_flags	copy-view-drop	observed	read	_1.*	str
+<embedded-std>/std/regex.w	2645	regex_compile_flags	copy-view-drop	observed	read	_1.*	str
+<embedded-std>/std/regex.w	7067	Regex.captures_match_op	copy-view-drop	observed	read	_1.*	Regex
+<embedded-std>/std/regex.w	13069	Regex.replace_impl	copy-view-drop	observed	read	_1.*	Regex
+<embedded-std>/std/regex.w	14888	Regex.replace_fn	copy-view-drop	observed	read	_1.*	Regex
+<embedded-std>/std/regex.w	15657	Regex.replace_all_fn	copy-view-drop	observed	read	_1.*	Regex
+<embedded-std>/std/regex.w	16257	Regex.replace_all_fn	copy-view-drop	observed	read	_1.*	Regex
+<embedded-std>/std/traits.w	7122	str.cmp	copy-view-drop	actionable	store-assign	_4.*	str
+<embedded-std>/std/traits.w	7252	str.cmp	copy-view-drop	observed	read	_2.*	str
+<embedded-std>/std/traits.w	7313	str.cmp	copy-view-drop	observed	read	_2.*	str
+<embedded-std>/std/traits.w	7420	str.cmp	copy-view-drop	observed	read	_2.*	str
+<embedded-std>/std/traits.w	7547	str.cmp	copy-view-drop	observed	read	_2.*	str
+<embedded-std>/std/traits.w	8105	str.debug_str	copy-view-drop	actionable	store-assign	_3.*	str
+<embedded-std>/std/traits.w	8675	str.hash_value	copy-view-drop	actionable	store-assign	_3.*	str
+seam-sites: 20 findings (3 actionable, 17 observed) — move-through-ref=0 move-raw-deref=0 copy-elem-drop=0 copy-view-drop=20 copy-raw-deref-drop=0 retained-unowned-copy=1 escape-view-consume=0

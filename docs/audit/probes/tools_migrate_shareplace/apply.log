@@ -1,0 +1,4 @@
+targets: 1 share-place free parameters
+target: .audit/probes/tools_migrate_shareplace/fixture_apply.w:sum parameter 0
+.audit/probes/tools_migrate_shareplace/fixture_apply.w: 1 parameters
+total: 1 parameters annotated

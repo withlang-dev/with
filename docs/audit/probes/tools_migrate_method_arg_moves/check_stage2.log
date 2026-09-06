@@ -1,0 +1,129 @@
+error: cannot take ownership of a non-Copy field through a borrow (str is not Copy); borrow the field, clone it, or restructure so the owner transfers it (D22 §13.6) — call argument
+ --> tools/migrate_method_arg_moves.w:44:32
+44 |         let path = source_path(fact.path)
+  |                                ^^^^^^^^^
+
+error: comparison operands must have compatible types
+ --> tools/migrate_method_arg_moves.w:47:16
+47 |             if old.path == path and old.offset == fact.start:
+  |                ^^^^^^^^^^^^^^^^
+
+error: return type mismatch
+ --> tools/migrate_method_arg_moves.w:69:21
+69 |                     return cols.get(4)
+  |                     ^^^^^^^^^^^^^^^^^^
+
+error: wrong argument type in call to 'bcm_parse_i64'
+ --> tools/migrate_method_arg_moves.w:124:74
+124 |                         let offset = line_col_offset(text, bcm_parse_i64(loc.get(1)), bcm_parse_i64(loc.get(2)))
+  |                                                                          ^^^^^^^^^^
+  = label @124:74 argument expression 'loc.get(1)' has type &str
+  = note: parameter 's' expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'bcm_parse_i64'
+ --> tools/migrate_method_arg_moves.w:124:101
+124 |                         let offset = line_col_offset(text, bcm_parse_i64(loc.get(1)), bcm_parse_i64(loc.get(2)))
+  |                                                                                                     ^^^^^^^^^^
+  = label @124:101 argument expression 'loc.get(2)' has type &str
+  = note: parameter 's' expects str
+  = note: actual type: &str
+
+error: use of moved value
+ --> tools/migrate_method_arg_moves.w:159:84
+159 |                 print(f"migrate-method-arg-moves: design site skipped ({verdict}) {key}")
+  |                                                                                    ^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `liveness_tsv` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_method_arg_moves.w:160:17
+160 |                 continue
+  |                 ^^^^^^^^
+  = help: reinitialize `liveness_tsv` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_method_arg_moves.w:160:17
+160 |                 continue
+  |                 ^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value
+ --> tools/migrate_method_arg_moves.w:174:27
+174 |         labels.push(slice(text, tokens.get_start(token), tokens.get_end(token)))
+  |                           ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value: `liveness_tsv` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_method_arg_moves.w:152:5
+152 |     for i in 0..sites.len() as i32:
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: reinitialize `liveness_tsv` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: use of moved value: `text` is moved inside a loop and not reinitialized before the loop repeats
+ --> tools/migrate_method_arg_moves.w:152:5
+152 |     for i in 0..sites.len() as i32:
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: reinitialize `text` on every path before the loop repeats, or move it only on a path that exits the loop
+
+error: cannot mutate `offsets` while `old_offset` is a live view into it
+ --> tools/migrate_method_arg_moves.w:182:13
+182 |             offsets.set_i32((j - 1) as i64, offsets.get(j as i64))
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = label @180:13 `old_offset` views a value stored in `offsets`
+  = label @182:13 mutation would invalidate that view
+  = label @184:13 view is used here after the mutation
+  = note: take an independent Copy value with `let old_offset: i32 = ...`
+  = help: change the binding to `let old_offset: i32 = ...`
+
+error: cannot mutate `offsets` while `old_offset` is a live view into it
+ --> tools/migrate_method_arg_moves.w:184:13
+184 |             offsets.set_i32(j as i64, old_offset)
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = label @180:13 `old_offset` views a value stored in `offsets`
+  = label @184:13 mutation would invalidate that view
+  = note: take an independent Copy value with `let old_offset: i32 = ...`
+  = help: change the binding to `let old_offset: i32 = ...`
+
+error: use of moved value
+ --> tools/migrate_method_arg_moves.w:196:27
+196 |         chunks.push(slice(text, cursor, offset))
+  |                           ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_method_arg_moves.w:199:23
+199 |     chunks.push(slice(text, cursor, text.len() as i32))
+  |                       ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: use of moved value
+ --> tools/migrate_method_arg_moves.w:199:37
+199 |     chunks.push(slice(text, cursor, text.len() as i32))
+  |                                     ^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: a field never moves out implicitly (§2.2, D32)
+ --> tools/migrate_method_arg_moves.w:238:24
+238 |         liveness_tsv = compiler_analyze_file(entry, "move-sites").text
+  |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = help: clone it (`compiler_analyze_file(entry, "move-sites").text.clone()`), or restructure so the owner transfers it — a vacate needs a `var` base or a `mut fn` receiver
+
+error: cannot consume read-only view binding `path`; clone it or transfer from the owner
+ --> tools/migrate_method_arg_moves.w:254:33
+254 |         if not seen: files.push(path)
+  |                                 ^^^^
+
+error: use of moved value
+ --> tools/migrate_method_arg_moves.w:257:74
+257 |         total = total + migrate_file(files.get(i as i64), &sites, apply, liveness_tsv)
+  |                                                                          ^^^^^^^^^^^^
+  = help: a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move
+
+error: wrong argument type in call to 'migrate_file'
+ --> tools/migrate_method_arg_moves.w:257:38
+257 |         total = total + migrate_file(files.get(i as i64), &sites, apply, liveness_tsv)
+  |                                      ^^^^^^^^^^^^^^^^^^^
+  = label @257:38 argument expression 'files.get(i as i64)' has type &str
+  = note: parameter 'path' expects str
+  = note: actual type: &str
+error: check failed during compilation

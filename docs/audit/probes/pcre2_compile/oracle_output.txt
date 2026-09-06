@@ -1,0 +1,172 @@
+PCRE2 version 10.47 2025-10-21 (8-bit)
+/((a)(b(c)))/
+    abc
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+/(a|b)\1/
+No match
+    aa
+No match
+/(a|b)\1/
+No match
+    ab
+No match
+/(?=abc)abc/
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+    abc
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+/(?!foo)bar/
+No match
+    bar
+No match
+/(?<=ab)c/
+No match
+    abc
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+/a{64}/
+No match
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+No match
+/x{1,200}/
+No match
+    xxxx
+No match
+/[a-z]+/
+No match
+    hello
+No match
+/[^abc]+/
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+    xyz
+No match
+/[[:alpha:]]+/
+No match
+    hello
+No match
+/(a|b)*abb/
+No match
+    aababb
+No match
+/a+?b/
+No match
+    aaab
+No match
+/(?<word>ab)c/
+No match
+    abc
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+/(?<w>a|b)k(?P=w)/
+No match
+    aka
+No match
+/a++b/
+No match
+    aaab
+No match
+/(?>a+)b/
+No match
+    aaab
+No match
+/(a)?(?(1)b|c)/
+No match
+    ab
+No match
+/(a)?(?(1)b|c)/
+No match
+    c
+No match
+/^\d{3}-\d{4}$/
+** Unrecognized escape sequence "\d"
+    123-4567
+No match
+/((((((((((a))))))))))/
+No match
+    a
+No match
+/(abc/
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+    abc
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+/[abc/
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+    abc
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+/*abc/
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+    abc
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+/(a)\2/
+No match
+    aa
+No match
+/a{3,2}/
+No match
+    aaa
+No match
+/abc\/
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+    abc
+ 0: abc
+ 1: abc
+ 2: a
+ 3: bc
+ 4: c
+/(?<=a*)b/
+No match
+    ab
+No match
+/(?P<n>a)(?P<n>b)/
+No match
+    ab
+No match

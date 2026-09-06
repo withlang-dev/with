@@ -1,0 +1,31 @@
+error: manual extern function call requires unsafe context
+ --> tools/insert_std_uses.w:74:13
+74 | let diags = with_fs_read_file(diags_file)
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: wrong argument type in call to 'vec_contains'
+ --> tools/insert_std_uses.w:101:34
+101 |     if vec_contains(&done_paths, path):
+  |                                  ^^^^
+  = label @101:34 argument expression 'path' has type &str
+  = note: parameter 's' expects str
+  = note: actual type: &str
+
+error: wrong argument type in call to 'Vec.push'
+ --> tools/insert_std_uses.w:103:21
+103 |     done_paths.push(path)
+  |                     ^^^^
+  = label @103:21 argument expression 'path' has type &str
+  = note: argument 1 expects str
+  = note: actual type: &str
+
+error: manual extern function call requires unsafe context
+ --> tools/insert_std_uses.w:112:16
+112 |     let text = with_fs_read_file(path)
+  |                ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: manual extern function call requires unsafe context
+ --> tools/insert_std_uses.w:125:8
+125 |     if with_fs_write_file(path, updated) != 0:
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+error: run failed

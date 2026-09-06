@@ -1,0 +1,4 @@
+fn greet(name: & str) -> str:
+    "hi " ++ name
+fn main:
+    print(greet("bob"))
