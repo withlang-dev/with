@@ -2303,9 +2303,18 @@ fn str_replace_ref(s: &str, old: &str, new_s: &str) -> str:
 pub fn with_str_replace_ref(s: &str, old: &str, new_s: &str) -> str:
     str_replace_ref(s, old, new_s)
 
+// An owned `str` owns its bytes: a `-> str` return transfers ownership of
+// exactly one allocation (#747 instance H). The caller keeps owning `s` — a
+// C string it may free — so the result must be a copy. A make_str view here
+// is an owned-typed alias: when `s` is a live allocator payload (str_to_cstr's
+// buffer), the view's drop passes the ownership guard and frees the caller's
+// buffer, which the caller then frees again (#1081: win_list_append's
+// path_text over cpath, then cstr_free(cpath)). Null stays {null, 0} — the
+// c_import `*u8 -> str` coercion relies on it.
 pub fn with_str_from_cstr(s: *const u8) -> str:
-    let len = cstr_len(s)
-    make_str(s, len)
+    if s as i64 == 0:
+        return make_str(0 as *const u8, 0)
+    alloc_str(s, cstr_len(s))
 
 pub fn with_str_from_bytes(s: *const u8, len: i64) -> str:
     alloc_str(s, len)
