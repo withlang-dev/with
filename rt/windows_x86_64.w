@@ -929,6 +929,15 @@ fn win_append_utf16(dst: *mut u16, pos: i64, cap: i64, src: *const u16) -> i64:
 fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) -> i32:
     var pos: i64 = 0
     var offset: i64 = 0
+    // argv[0] is spelled with backslashes. CreateProcessW resolves the
+    // program from the command line, and a RELATIVE path with forward
+    // slashes ("out/tmp/x.exe") fails there with ERROR_FILE_NOT_FOUND while
+    // "out\tmp\x.exe" and any absolute spelling succeed (probe: rc=-2 / 0 /
+    // 0). Every compiler-built binary is launched by such a relative path
+    // (`with run`, `with test`, `with -e`), which is why all three died on
+    // native Windows (#1081). Programs that parse their own argv[0] --
+    // cmd.exe reads a forward-slash one as switches -- get the same relief.
+    var program = true
     while offset < len and pos < cap - 4:
         if pos > 0:
             unsafe *((out as i64 + pos * 2) as *mut u16) = 32 as u16
@@ -937,9 +946,11 @@ fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) ->
         pos = pos + 1
         var slash_count: i64 = 0
         while offset < len:
-            let ch = unsafe *((blob as i64 + offset) as *const u8)
+            var ch = unsafe *((blob as i64 + offset) as *const u8)
             if ch == 0:
                 break
+            if program and ch == 47:
+                ch = 92 as u8
             if ch == 92:
                 slash_count = slash_count + 1
                 offset = offset + 1
@@ -983,6 +994,7 @@ fn win_build_command_line(blob: *const u8, len: i64, out: *mut u16, cap: i64) ->
         unsafe *((out as i64 + pos * 2) as *mut u16) = 34 as u16
         pos = pos + 1
         offset = offset + 1
+        program = false
     unsafe *((out as i64 + pos * 2) as *mut u16) = 0 as u16
     0
 

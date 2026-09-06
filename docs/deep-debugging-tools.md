@@ -449,9 +449,15 @@ one 64 KB granule; a listing of a directory whose contents changed moves
 it too). Keep both byte-identical between runs; the trap run's own panic
 line shows whether the address held.
 
-The seed's runner (`with test` driven by v0.15.1.8) cannot spawn a test
-binary on native Windows (`exit code -2`, no child output); the tree's
-runner can — use the fresh stage compiler for `with test` there.
+A `with test` that reports `exit code -2` at the run stage with no child
+output, or a `with run` / `with -e` that exits with no output, is the
+spawner, not the program: `-2` is `-ERROR_FILE_NOT_FOUND` from
+`CreateProcessW`, which does not resolve a RELATIVE forward-slash program
+path (`out/tmp/x.exe`) from the command line. Compilers older than the
+argv[0] backslash fix in `win_build_command_line` (#1081) hit it on every
+compiler-built binary; a probe through `std.process.run` with the three
+spellings (relative `/`, relative `\`, absolute) tells them apart in one
+run. Running the kept binary by hand always worked, which is the tell.
 
 ## Fixpoint Diff
 

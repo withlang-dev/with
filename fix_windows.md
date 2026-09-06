@@ -43,19 +43,36 @@ route additions in `docs/deep-debugging-tools.md`. Separately,
 `windows-sdk-publish`: every release now republishes its LLVM SDK, which
 is what `with build :deps` needs to provision a Windows box at all.
 
-**Still open, and why the Windows lanes stay red after this merge:** the
-v0.15.1.8 seed cannot evaluate main's `build.w` — `0173d08e` switched the
-build-driver files to comptime `str` indexing (`path[i]`), which that
-seed's evaluator lacks (`comptime index requires an array, tuple, or vec`).
-So no `with build` at all on Windows from the published seed; the fix was
-verified from a worktree at `af7db8ce` (the last seed-buildable base),
-where the identical runtime rebuilt stage1 and the bundle then built. The
-way out is the one D40 prescribes: cut a Windows seed from a tree carrying
-this fix — cross-compiled from macOS, which works — publish it, and move
-the `seed.lock` Windows overrides off v0.15.1.8. Also noted while here:
-the seed's `with -e`/`-p` one-liners exit 127 with no diagnostic on native
-Windows, and its `with test` cannot spawn a test binary (`exit code -2`);
-the tree's runner does both.
+**A second Windows-only defect, found while verifying:** `with run`,
+`with test` and `with -e` could not launch the binary they had just built
+(`exit code -2` at the run stage; `run`/`-e` silent). `CreateProcessW`
+does not resolve a RELATIVE forward-slash program path from the command
+line (`out/tmp/x.exe` → `ERROR_FILE_NOT_FOUND`; `out\tmp\x.exe` and any
+absolute spelling work — a three-spelling `std.process.run` probe proved
+it), and every compiler-built binary is launched by such a path.
+`win_build_command_line` now spells argv[0] with backslashes on both
+Windows backends. It looked like a seed-only quirk until the tree's own
+compiler showed it too.
+
+**The seed ladder, and why the lanes stay red until a seed is published:**
+the v0.15.1.8 seed cannot evaluate main's `build.w` — `0173d08e` switched
+the build-driver files to comptime `str` indexing (`path[i]`), which that
+seed's evaluator lacks (`comptime index requires an array, tuple, or
+vec`). But `af7db8ce` is the commit that taught the evaluator `str`
+indexing, and v0.15.1.8 builds `af7db8ce`. So, natively on Windows, with
+no `--emit-c`: v0.15.1.8 → a worktree at `af7db8ce` carrying the runtime
+fix (full build green, `:fixpoint` green) → its release `with.exe` as
+`WITH=` for main → main's full build green and `:fixpoint` green. Main's
+release `out/release/bin/with.exe` from that chain is the Windows seed to
+publish; then move the `seed.lock` Windows overrides off v0.15.1.8 and
+`with run tools/bump_seed_pins.w` (numbering per D40: main is the
+v0.15.2.x group). Two things to know on a fresh box: the SDK must come
+from the release (`windows-sdk-publish` makes `:deps` able to find one),
+and the toolchain env (`LLVM_PREFIX`, `WITH_LLVM_LD`, `WITH_LIBCLANG`,
+`WITH_WINDOWS_{MSVC,UCRT,UM}_LIBDIR`) must be set before the FIRST
+`with build`, because `out/bootstrap-lib/llvm_ld.rsp` caches whatever it
+saw and a later run reuses it (two stage1 links here failed on the 2019
+defaults for that reason; `with build :clean` resets it).
 
 ## The bug (#1081)
 
