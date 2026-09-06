@@ -12,13 +12,18 @@ decision supersedes an earlier one, say so in both.
 
 ## D40 — Seed/release version numbering: `y` is a bootstrap-compatibility group; a bootstrap breakage bumps `y` and resets `z`
 
-**Date:** 2026-09-04
-**Status:** Proposed — pending Eric's ruling. This convention is not yet
-written down anywhere, so the digits of a release tag currently carry no agreed
-meaning. The live case that forces the question: the str-index bootstrap
-breakage (below) is being tagged `v0.15.1.9` on `release/v0.15.1.9`; this
-convention says it must be `v0.15.2.0`. The release runbook's version-bump step
-points here.
+**Date:** 2026-09-04 (granted 2026-09-05)
+**Status:** Accepted (Eric, 2026-09-05). The convention below is now the rule:
+`Y` is a bootstrap-compatibility group; a bootstrap breakage bumps `Y` and
+resets `Z = 0`. The digits of a release tag now carry this agreed meaning, and
+the release runbook's version-bump step points here.
+
+Applying it retroactively to the tags cut on 2026-09-04..05 — the str-index
+bootstrap breakage went out as `v0.15.1.9` and its follow-ons `v0.15.1.10`..
+`v0.15.1.13`, which this convention says should have opened the `v0.15.2.x`
+group — is a separate call: it means retagging published releases and moving
+every `seed.lock`/CI pin, an outward-facing operation deferred to Eric. Until
+then those tags stand as published; the convention governs the next breakage.
 
 **The convention.** A published `with` seed/release is tagged `vW.X.Y.Z`:
 
