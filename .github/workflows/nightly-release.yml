@@ -52,7 +52,7 @@ jobs:
             runner: macos-latest
             sdk_host_tag: darwin-arm64
             seed_repo: withlang-dev/with
-            seed_version: v0.15.1.10
+            seed_version: v0.15.2.0
             seed_asset: with-darwin-aarch64
             seed_sha256: 79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
             sdk_version: nightly-sdk-test-20260815-680aa139
@@ -65,7 +65,7 @@ jobs:
             runner: ubuntu-latest
             sdk_host_tag: linux-x86_64
             seed_repo: withlang-dev/with
-            seed_version: v0.15.1.10
+            seed_version: v0.15.2.0
             seed_asset: with-linux-x86_64
             seed_sha256: eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
             sdk_version: nightly-sdk-test-20260815-680aa139
@@ -388,7 +388,7 @@ jobs:
       # three platforms pin (a versioned release, not a rolling tag). That asset
       # was produced by this very job on the v0.15.1.5 tag, so the platform now
       # bootstraps from its own fixpoint-verified output.
-      WITH_SEED_VERSION: v0.15.1.10
+      WITH_SEED_VERSION: v0.15.2.0
       WITH_SEED_ASSET: with-linux-aarch64
       WITH_SEED_SHA256: 3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
       WITH_SDK_REPO: withlang-dev/with

@@ -34,7 +34,7 @@ jobs:
       # three platforms pin (a versioned release, not a rolling tag). That
       # asset is itself CI-produced and fixpoint-verified by the Release
       # workflow's build-linux-aarch64 job.
-      WITH_SEED_VERSION: v0.15.1.10
+      WITH_SEED_VERSION: v0.15.2.0
       WITH_SEED_SHA256: 3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-linux-aarch64

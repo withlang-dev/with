@@ -18,12 +18,17 @@ decision supersedes an earlier one, say so in both.
 resets `Z = 0`. The digits of a release tag now carry this agreed meaning, and
 the release runbook's version-bump step points here.
 
-Applying it retroactively to the tags cut on 2026-09-04..05 — the str-index
-bootstrap breakage went out as `v0.15.1.9` and its follow-ons `v0.15.1.10`..
-`v0.15.1.13`, which this convention says should have opened the `v0.15.2.x`
-group — is a separate call: it means retagging published releases and moving
-every `seed.lock`/CI pin, an outward-facing operation deferred to Eric. Until
-then those tags stand as published; the convention governs the next breakage.
+Applied retroactively (Eric, 2026-09-05). The str-index bootstrap breakage
+went out as `v0.15.1.9`..`v0.15.1.13`, which this convention says should have
+opened the `v0.15.2.x` group. Only one of those was actually pinned — the
+Mac/Linux seed `v0.15.1.10` (7 CI pins + `seed.lock`) — so it was republished
+as **`v0.15.2.0`**, the first seed of the new group (same commit `4fd309e3`,
+byte-identical assets, so the pinned SHA-256 digests are unchanged; it
+bootstraps from `v0.15.1.8`, the last seed of the old group). `seed.lock` and
+every CI pin moved `v0.15.1.10` → `v0.15.2.0`. The unpinned transient chain
+tags (`v0.15.1.9`, `.11`, `.12`, `.13`) and the superseded `v0.15.1.10` were
+removed. `v0.15.1.8` stays as the old group's last seed (still the Windows
+pin, pending #1081).
 
 **The convention.** A published `with` seed/release is tagged `vW.X.Y.Z`:
 

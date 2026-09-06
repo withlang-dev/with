@@ -7,11 +7,11 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=v0.15.1.10
+version=v0.15.2.0
 with-darwin-aarch64=79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
 with-linux-x86_64=eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
 with-linux-aarch64=3e54f7839dbf9549233a19753c897fb08f493fa8cfafeeec25b62fa87a43aac3
-# Windows cannot bootstrap v0.15.1.10 yet: its pcre2 bundle build fails on
+# Windows cannot bootstrap v0.15.2.0 yet: its pcre2 bundle build fails on
 # the Darwin stdio globals (#1029). The v0.15.1.8 seeds cannot build this
 # tree either, so the Windows lanes stay red until that lands.
 with-windows-x86_64.exe.version=v0.15.1.8

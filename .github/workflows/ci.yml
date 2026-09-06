@@ -32,7 +32,7 @@ jobs:
       - name: Bootstrap seed
         env:
           WITH_SEED_REPO: withlang-dev/with
-          WITH_SEED_VERSION: v0.15.1.10
+          WITH_SEED_VERSION: v0.15.2.0
           WITH_SEED_ASSET: with-darwin-aarch64
           WITH_SEED_SHA256: 79a63ff91d5d9260463adf3e08ff43bdd5446d070eac2ca56ef543ae05484075
         run: |

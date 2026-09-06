@@ -29,7 +29,7 @@ jobs:
       # Fixpoint-verified stable release seed for this platform.
       WITH_SEED_REPO: withlang-dev/with
       WITH_SEED_ASSET: with-linux-x86_64
-      WITH_SEED_VERSION: v0.15.1.10
+      WITH_SEED_VERSION: v0.15.2.0
       WITH_SEED_SHA256: eaa955602fd96e960ea3cfcb2f41be4013380dce646e45a93422d67ce9003869
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: v0.15.1
