@@ -619,7 +619,18 @@ fn win_list_append(out: str, path: *const u8) -> str:
     out ++ path_text ++ "\n"
 
 fn win_list_files_walk(path: *const u8, out: str) -> str:
-    if not win_is_dir(path):
+    // Parity with the unix walk (a failed lstat returns `out`): a path that
+    // does not exist lists nothing, a file lists itself, a directory lists
+    // its tree. Before this, "not a directory" covered both cases, so a
+    // missing directory listed its own name (#1081: the compiler's cleanup
+    // listing an absent out/lib went down the append branch).
+    var wpath: [4096]u16 = [0 as u16; 4096]
+    if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
+        return out
+    let attrs = GetFileAttributesW(&wpath as *const [4096]u16 as *const u16)
+    if attrs == 0xffffffff as u32:
+        return out
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0:
         return win_list_append(out, path)
     var result = out
     var pattern8: [4096]u8 = [0 as u8; 4096]

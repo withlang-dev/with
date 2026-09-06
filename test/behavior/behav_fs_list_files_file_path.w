@@ -17,4 +17,7 @@ fn main:
     assert(write_file(file, "leaf") == 0)
     let listed = list_files_text(file)
     assert(listed == file ++ "\n")
+    // A path that does not exist lists nothing on every platform (the
+    // Windows walk used to list the missing path itself).
+    assert(list_files_text(dir ++ "/does-not-exist") == "")
     print("ok")
