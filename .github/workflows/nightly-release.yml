@@ -242,9 +242,9 @@ jobs:
       # predated that fix; a compiler bootstrapped from it self-perpetuates the
       # miscompile and crashes (0xC0000005) compiling any regex literal at comptime.
       # build and :fixpoint never compile a regex, so that poison shipped green.
-      WITH_SEED_VERSION: v0.15.1.8
+      WITH_SEED_VERSION: v0.15.2.1
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: 6f00a9e3a26751404f671f10ef7b61b345886c6d73a96c95df9086e6df6607fd
+      WITH_SEED_SHA256: 8f4817f2c4a3a916515ec93fd8a8f228bc9cfcd423689c5977dc564efc02a115
       # The Windows LLVM SDK is versioned independently of the nightly-sdk-* used
       # by darwin/linux and ships without .sha256/.manifest sidecars, so we pin the
       # archive digest directly here rather than fetching sidecar files.
