@@ -251,6 +251,10 @@ jobs:
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: v0.15.1
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.zst
+      # What this job publishes: the same SDK under the .tar.gz name
+      # build.w's llvm_sdk_asset_for_host() looks for (see the repack in
+      # "Package fixpoint-verified release asset").
+      WITH_SDK_PUBLISH_ASSET: with-llvm-sdk-22.1.6-windows-x86_64.tar.gz
       WITH_SDK_SHA256: 0c4f9860cf528b3821781d89e5b42947ef8ee2249327cffa64fb9fb5eac09a4a
       # windows-latest is a 4-vCPU runner; pin the worker pool to the real core
       # count (the seed's rt_sysinfo reads the wrong SYSTEM_INFO offset, which would
@@ -336,9 +340,28 @@ jobs:
           test "$(./out/release/bin/with.exe version)" = "with $WITH_VERSION"
           cp out/release/bin/with.exe out/release/with-windows-x86_64.exe
           sha256sum out/release/with-windows-x86_64.exe > out/release/with-windows-x86_64.exe.sha256
+          # Every release carries this platform's LLVM SDK too. `with build
+          # :deps` resolves the SDK from a release asset, so a release without
+          # one leaves a Windows box with no way to provision a toolchain --
+          # and no way to build the compiler at all. The unix matrix job
+          # republishes its SDK (RELEASE_EXTRA_FILES); this job fetched one and
+          # never republished it, so the newest Windows SDK on any release was
+          # v0.15.1's.
+          #
+          # Repacked as .tar.gz rather than passed through: the pinned source
+          # archive is .tar.zst, but build.w's llvm_sdk_asset_for_host() names
+          # a .tar.gz on every platform and the deps action decompresses with
+          # build/zlib_gunzip.w, which has no zstd. Publishing the .zst would
+          # put an asset on the release that `:deps` cannot name or unpack.
+          # The tree repacked is the one whose .zst digest was verified above.
+          tar -czf "out/release/$WITH_SDK_PUBLISH_ASSET" -C .deps llvm-22.1.6-windows-x86_64-msvc
+          sha256sum "out/release/$WITH_SDK_PUBLISH_ASSET" > "out/release/$WITH_SDK_PUBLISH_ASSET.sha256"
 
       - name: Verify packaged checksum
-        run: sha256sum -c out/release/with-windows-x86_64.exe.sha256
+        run: |
+          set -euo pipefail
+          sha256sum -c out/release/with-windows-x86_64.exe.sha256
+          sha256sum -c "out/release/$WITH_SDK_PUBLISH_ASSET.sha256"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
@@ -363,6 +386,7 @@ jobs:
           RELEASE_TITLE: ${{ steps.release.outputs.title }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
           RELEASE_ASSETS: out/release/with-windows-x86_64.exe
+          RELEASE_EXTRA_FILES: out/release/${{ env.WITH_SDK_PUBLISH_ASSET }},out/release/${{ env.WITH_SDK_PUBLISH_ASSET }}.sha256
           RELEASE_SOURCE_SHA: ${{ github.sha }}
           RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (windows-x86_64)
           RELEASE_REPO: ${{ github.repository }}
@@ -494,9 +518,16 @@ jobs:
           cp out/release/bin/with out/release/with-linux-aarch64
           chmod +x out/release/with-linux-aarch64
           sha256sum out/release/with-linux-aarch64 > out/release/with-linux-aarch64.sha256
+          # As on the Windows jobs: republish this platform's SDK so
+          # `with build :deps` can resolve one from the release.
+          cp "$RUNNER_TEMP/sdk.tar.gz" "out/release/$WITH_SDK_ASSET"
+          sha256sum "out/release/$WITH_SDK_ASSET" > "out/release/$WITH_SDK_ASSET.sha256"
 
       - name: Verify packaged checksum
-        run: sha256sum -c out/release/with-linux-aarch64.sha256
+        run: |
+          set -euo pipefail
+          sha256sum -c out/release/with-linux-aarch64.sha256
+          sha256sum -c "out/release/$WITH_SDK_ASSET.sha256"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
@@ -521,6 +552,7 @@ jobs:
           RELEASE_TITLE: ${{ steps.release.outputs.title }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
           RELEASE_ASSETS: out/release/with-linux-aarch64
+          RELEASE_EXTRA_FILES: out/release/${{ env.WITH_SDK_ASSET }},out/release/${{ env.WITH_SDK_ASSET }}.sha256
           RELEASE_SOURCE_SHA: ${{ github.sha }}
           RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (linux-aarch64)
           RELEASE_REPO: ${{ github.repository }}
@@ -631,9 +663,16 @@ jobs:
           test "$(./out/release/bin/with.exe version)" = "with $WITH_VERSION"
           cp out/release/bin/with.exe out/release/with-windows-aarch64.exe
           sha256sum out/release/with-windows-aarch64.exe > out/release/with-windows-aarch64.exe.sha256
+          # As on windows-x86_64: republish this platform's SDK so `with build
+          # :deps` can resolve one from the release being bootstrapped.
+          cp "$(cygpath -u "$RUNNER_TEMP")/sdk.tar.gz" "out/release/$WITH_SDK_ASSET"
+          sha256sum "out/release/$WITH_SDK_ASSET" > "out/release/$WITH_SDK_ASSET.sha256"
 
       - name: Verify packaged checksum
-        run: sha256sum -c out/release/with-windows-aarch64.exe.sha256
+        run: |
+          set -euo pipefail
+          sha256sum -c out/release/with-windows-aarch64.exe.sha256
+          sha256sum -c "out/release/$WITH_SDK_ASSET.sha256"
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
@@ -658,6 +697,7 @@ jobs:
           RELEASE_TITLE: ${{ steps.release.outputs.title }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
           RELEASE_ASSETS: out/release/with-windows-aarch64.exe
+          RELEASE_EXTRA_FILES: out/release/${{ env.WITH_SDK_ASSET }},out/release/${{ env.WITH_SDK_ASSET }}.sha256
           RELEASE_SOURCE_SHA: ${{ github.sha }}
           RELEASE_BUILDER: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (windows-aarch64)
           RELEASE_REPO: ${{ github.repository }}
