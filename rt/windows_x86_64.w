@@ -200,6 +200,29 @@ pub var __stdinp: *mut c_void = 0 as *mut c_void
 pub var __stdoutp: *mut c_void = 0 as *mut c_void
 pub var __stderrp: *mut c_void = 0 as *mut c_void
 
+// Darwin-migrated C (pcre2test.w through std.libc) reads errno through
+// __error() and sizes its stack with get/setrlimit. UCRT spells errno as
+// _errno(); there is no rlimit -- the main thread's stack is fixed at link
+// time -- so RLIMIT_STACK (3) reads as unlimited and a set is accepted as a
+// no-op; any other resource is refused. The rlimit layout is std.libc's:
+// rlim_cur then rlim_max, both u64; RLIM_INFINITY is Darwin's (1<<63)-1.
+@[link_name("_errno")]
+extern fn rt_ucrt_errno() -> *mut i32
+
+pub fn __error() -> *mut i32:
+    rt_ucrt_errno()
+
+pub fn getrlimit(resource: i32, lim: *mut u8) -> i32:
+    if resource != 3:
+        return -1
+    unsafe *(lim as *mut i64) = 9223372036854775807
+    unsafe *((lim as i64 + 8) as *mut i64) = 9223372036854775807
+    0
+
+pub fn setrlimit(resource: i32, lim: *const u8) -> i32:
+    let _ = lim
+    if resource != 3: -1 else: 0
+
 var rt_argc: i32 = 0
 var rt_argv_raw: i64 = 0
 var rt_handles: [256]i64 = [0 as i64; 256]
