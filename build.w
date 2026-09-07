@@ -753,7 +753,15 @@ fn package_platform_target(name: &str, platform: &str, ctx: &BuildCtx) -> Target
     target = target.input("src/version")
     target = target.input(release_compiler_bin("with"))
     target = target.input("build/package.w")
-    target = target.extra_output("out/release/" ++ asset)
+    // The platform asset out/release/<asset> is release-platform-asset's
+    // output: a plain copy every release-*-uat consumes. Packaging runs after
+    // those UATs (the dep below) and finalizes that same file in place --
+    // version check, dependency audit, strip, digest -- inside its out/release
+    // write scope. It must not declare the asset as its own output: with two
+    // declared producers the graph bound the UATs' input to this target, and
+    // this target depends on release-uat, so `with build :package-<platform>`
+    // failed with "target dependency cycle" on every host (#1087). Only the
+    // digest and the stamp are this target's declared products.
     target = target.extra_output("out/release/" ++ asset ++ ".sha256")
     target = target.write_scope("out/release")
     target = target.write_scope("out/command/" ++ name)
