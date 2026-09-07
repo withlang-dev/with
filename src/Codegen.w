@@ -4364,6 +4364,13 @@ impl Codegen:
         let flags = self.pool.get_data2(fn_node)
         let meta = self.pool.find_fn_meta(fn_node)
         if meta < 0: return
+        // D39: a source definition owns the symbol's function whatever the
+        // declaration order; a declared-only interface declaration of the
+        // same name (pcre2's is_alpha beside std.string's) never displaces
+        // it — the source body would be emitted into the bundle's symbol and
+        // the source's own function left declared without one.
+        if self.fn_node_is_declared_only(fn_node) and (self.fn_values.contains(name_sym) or (alias_sym != 0 and self.fn_values.contains(alias_sym))):
+            return
 
         // Check if method (has dot in name); for missing symbol text, infer owner
         // from `self: Type` in param 0.

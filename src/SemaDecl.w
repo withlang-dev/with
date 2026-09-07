@@ -1494,7 +1494,14 @@ impl Sema:
         let fn_flags = self.ast.get_data2(node)
         let decl_is_pub = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
         self.record_decl_visibility(fn_name, node, decl_is_pub)
-        if self.fn_decl_nodes.contains(fn_name):
+        // D39: a source definition owns the flat name whatever the
+        // declaration order; an interface declaration of the same name
+        // (pcre2's is_alpha beside std.string's) keeps its signature for
+        // the visibility-gated lookups and never displaces it — a
+        // displaced source body would be skipped as shadowed and its
+        // function left declared without a body.
+        let interface_yields = self.ast.fn_decl_body_is_interface(node) and self.fn_decl_nodes.contains(fn_name) and not self.ast.fn_decl_body_is_interface(self.fn_decl_nodes.get(fn_name).unwrap())
+        if self.fn_decl_nodes.contains(fn_name) and not interface_yields:
             let existing_node: i32 = self.fn_decl_nodes.get(fn_name).unwrap()
             if existing_node != node:
                 let existing_di = self.find_decl_index(existing_node)
@@ -1517,8 +1524,9 @@ impl Sema:
         let meta = self.ast.find_fn_meta(node)
         if meta < 0:
             // No meta available — register with no params
-            self.fn_decl_nodes.insert(fn_name, node)
-            self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
+            if not interface_yields:
+                self.fn_decl_nodes.insert(fn_name, node)
+                self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
             let fn_tid = self.add_type(TypeKind.TY_FN, 0, 0, self.ty_void)
             self.add_sig(fn_name, fn_tid, self.ty_void, 0, 0, 0)
             return
@@ -1654,8 +1662,9 @@ impl Sema:
                 self.named_types.remove(self_sym)
             return
 
-        self.fn_decl_nodes.insert(fn_name, node)
-        self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
+        if not interface_yields:
+            self.fn_decl_nodes.insert(fn_name, node)
+            self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
 
         // Resolve param types
         let sig_param_start = self.sig_params.len() as i32
@@ -1738,6 +1747,13 @@ impl Sema:
         if is_local != 0:
             self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
         self.record_decl_visibility(name, node, 1)
+        // D39: an extern names one C symbol in every tier (D29); a source
+        // declaration of it owns the flat name and its source path whatever
+        // the declaration order — an interface's (pcre2's `abort` beside
+        // LlvmBridge's) would move the symbol into the migrated-C zone and
+        // make the source's `unsafe: abort()` a block with no unsafe operation.
+        if bundle_interface_text(self.current_module_path).len() > 0 and self.fn_decl_source_paths.contains(name) and bundle_interface_text(self.fn_symbol_source_path(name)).len() == 0:
+            return
         self.fn_decl_source_paths.insert(name, with_str_clone_ref(self.current_module_path))
 
         // Error if this extern fn shadows a regular function from the same file or
