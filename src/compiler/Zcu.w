@@ -98,6 +98,11 @@ type Zcu {
     // D39: a .wi root compile — the interface emitter and the fingerprint
     // read Sema's full tables, so every interface declaration is collected.
     interface_eager: bool,
+    // The symbols the source names — the on-demand interface merge's S —
+    // and the interface sections whose declarations wait for it.
+    iface_mentioned: HashMap[i32, i32],
+    pending_iface_paths: Vec[str],
+    pending_iface_texts: Vec[str],
     // The owned globals the last bundle build could not fold to data
     // (Codegen.bundle_unlowered_globals), for the interface emitter.
     last_bundle_unlowered_globals: Vec[str],
@@ -167,6 +172,9 @@ fn Zcu.init -> Zcu:
         link_bundle_prefixes: zcu_new_vec_str(),
         bundle_corpus: "",
         interface_eager: false,
+        iface_mentioned: HashMap.new(),
+        pending_iface_paths: zcu_new_vec_str(),
+        pending_iface_texts: zcu_new_vec_str(),
         last_bundle_unlowered_globals: zcu_new_vec_str(),
         project_config: project_config_default(),
         trace_c_import_cache: 0,

@@ -213,7 +213,10 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
         else:
             let path = state.module_paths[work]
             let src = module_source_read(path)
-            let text = resolve_normalize_source_text(src.text)
+            // D39: an interface section's imports are its `use` lines; its
+            // declarations are parsed on demand by the merge, never here.
+            let source_text = if src.interface: resolve_interface_use_lines(src.text) else: src.text
+            let text = resolve_normalize_source_text(source_text)
             if text.len() == 0:
                 state.emit_import_error(work, "failed to read imported module")
                 state.module_processed[work] = 1
@@ -247,6 +250,14 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
             link_libs: move state.result.link_libs,
         },
     }
+
+pub fn resolve_interface_use_lines(text: &str) -> str:
+    var out = ""
+    let lines = text.split("\n")
+    for i in 0..lines.len() as i32:
+        if lines[i].starts_with("use "):
+            out = out ++ lines[i] ++ "\n"
+    out
 
 fn ResolveState.init(pool: InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveState:
     ResolveState {
