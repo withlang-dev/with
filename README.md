@@ -1,5 +1,12 @@
 # The With Programming Language
 
+[![linux x86_64](https://github.com/withlang-dev/with/actions/workflows/selfhost-linux.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/selfhost-linux.yml)
+[![linux aarch64](https://github.com/withlang-dev/with/actions/workflows/selfhost-linux-aarch64.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/selfhost-linux-aarch64.yml)
+[![macOS arm64](https://github.com/withlang-dev/with/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/ci.yml)
+[![windows x86_64](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows.yml)
+[![windows aarch64](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows-aarch64.yml/badge.svg?branch=main)](https://github.com/withlang-dev/with/actions/workflows/selfhost-windows-aarch64.yml)
+[![release](https://github.com/withlang-dev/with/actions/workflows/nightly-release.yml/badge.svg)](https://github.com/withlang-dev/with/actions/workflows/nightly-release.yml)
+
 A systems programming language that compiles to native code via LLVM.
 Fast, safe, and designed to feel less hostile than existing native languages.
 
