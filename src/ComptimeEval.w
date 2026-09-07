@@ -10,6 +10,7 @@ use compiler.Compilation
 use compiler.Link
 use compiler.ProjectConfig
 use compiler.TrackedInputs
+use compiler.Runtime
 use std.crypto.sha256
 use render
 use CiMigrate
@@ -449,7 +450,7 @@ fn comptime_decode_string_escapes(text: &str) -> str:
 fn comptime_tool_path_is_project_relative(path: &str) -> bool:
     if path.len() == 0:
         return false
-    if path[0] == 47:
+    if runtime_path_is_absolute(path):
         return false
     if path.contains(".."):
         return false
@@ -477,14 +478,14 @@ fn comptime_tool_join(root: &str, path: &str) -> str:
         return root ++ path
     root ++ "/" ++ path
 
-fn comptime_tool_path_push_part(parts: Vec[str], part: &str, is_absolute: bool) -> Vec[str]:
+fn comptime_tool_path_push_part(parts: Vec[str], part: &str, is_absolute: bool, root_parts: i32) -> Vec[str]:
     var out = parts
     if part == ".":
         return out
     if part != "..":
         out.push(with_str_clone_ref(part))
         return out
-    if out.len() > 0 and out.get(out.len() - 1) != "..":
+    if out.len() > root_parts and out.get(out.len() - 1) != "..":
         out.pop()
         return out
     if not is_absolute:
@@ -496,24 +497,23 @@ fn comptime_tool_path_normalize(path: &str) -> str:
         return "."
     var parts: Vec[str] = Vec.new()
     var start = 0
-    var is_absolute = path[0] == 47 or path[0] == 92
+    let is_absolute = runtime_path_is_absolute(path)
+    let root_parts = runtime_path_root_part_count(path)
     for i in 0..path.len() as i32:
         let ch = path[i]
         if ch == 47 or ch == 92:
             if i > start:
                 let part = path.slice(start as i64, i as i64)
-                parts = comptime_tool_path_push_part(move parts, part, is_absolute)
+                parts = comptime_tool_path_push_part(move parts, part, is_absolute, root_parts)
             start = i + 1
     if start < path.len() as i32:
         let part = path.slice(start as i64, path.len() as i64)
-        parts = comptime_tool_path_push_part(move parts, part, is_absolute)
+        parts = comptime_tool_path_push_part(move parts, part, is_absolute, root_parts)
     if parts.len() == 0:
         if is_absolute:
-            return "/"
+            return runtime_path_root_prefix(path)
         return "."
-    var result = ""
-    if is_absolute:
-        result = "/"
+    var result = runtime_path_root_prefix(path)
     for i in 0..parts.len() as i32:
         if i > 0:
             result = result ++ "/"
@@ -4022,7 +4022,7 @@ impl ComptimeEvaluator:
     fn workspace_path(root: &str, path: &str) -> str:
         if path.len() == 0:
             return with_str_clone_ref(path)
-        if path[0] == 47:
+        if runtime_path_is_absolute(path):
             return with_str_clone_ref(path)
         let clean_root = if root.ends_with("/"): root.slice(0, root.len() - 1) else: with_str_clone_ref(root)
         clean_root ++ "/" ++ path

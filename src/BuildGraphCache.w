@@ -4,6 +4,7 @@ use BuildGraphModel
 use BuildGraphRuntime
 use BuildGraphSupport
 use compiler.TrackedInputs
+use compiler.Runtime
 use std.crypto.sha256
 use std.collections.HashMap
 
@@ -298,7 +299,7 @@ fn build_cache_last_colon(text: &str) -> i32:
     last
 
 fn build_cache_dep_path(root: &str, stored_path: &str) -> str:
-    if stored_path.len() > 0 and stored_path[0] == 47:
+    if runtime_path_is_absolute(stored_path):
         return with_str_clone_ref(stored_path)
     root ++ "/" ++ stored_path
 
@@ -344,7 +345,7 @@ pub fn build_cache_hash_directory_w_files(root: &str, dir: &str) -> str:
 fn build_cache_action_source_disk_path(root: &str, path: &str) -> str:
     if path.starts_with("<embedded-std>/"):
         return root ++ "/lib/" ++ path.slice("<embedded-std>/".len(), path.len())
-    if path.starts_with("/"):
+    if runtime_path_is_absolute(path):
         return with_str_clone_ref(path)
     root ++ "/" ++ path
 

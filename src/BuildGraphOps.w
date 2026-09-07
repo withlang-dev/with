@@ -2,6 +2,7 @@
 
 use Archive
 use Resolve
+use compiler.Runtime
 use BuildGraphKinds
 use BuildGraphModel
 use BuildGraphSupport
@@ -66,7 +67,7 @@ pub fn build_graph_run_clean(root: &str, target: &BuildGraphTarget) -> i32:
     var removed = 0
     for ai in 0..target.args.len() as i32:
         let rel = target.args[ai]
-        if rel.len() == 0 or rel[0] == 47 or rel.contains(".."):
+        if rel.len() == 0 or runtime_path_is_absolute(rel) or rel.contains(".."):
             build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' has unsafe path: " ++ rel)
             return 1
         let path = build_graph_resolve_project_path(root, rel)
@@ -468,7 +469,7 @@ pub fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32
     let stdout_path = resolve_join(output_dir, "stdout.txt")
     let stderr_path = resolve_join(output_dir, "stderr.txt")
     var argv = ""
-    let runner_path = if target.entry[0] == 47 or target.entry.contains("/"):
+    let runner_path = if runtime_path_is_absolute(target.entry) or target.entry.contains("/"):
         build_graph_resolve_project_path(root, target.entry)
     else:
         target.entry
@@ -510,7 +511,7 @@ pub fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
     let stdout_path = resolve_join(capture_dir, "stdout.txt")
     let stderr_path = resolve_join(capture_dir, "stderr.txt")
     var argv = ""
-    let runner_path = if target.entry[0] == 47 or target.entry.contains("/"):
+    let runner_path = if runtime_path_is_absolute(target.entry) or target.entry.contains("/"):
         build_graph_resolve_project_path(root, target.entry)
     else:
         target.entry

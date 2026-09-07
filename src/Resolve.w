@@ -1232,12 +1232,13 @@ pub fn resolve_canonical_module_key(path: &str) -> str:
     if path.len() == 0 or path.starts_with("<"):
         return with_str_clone_ref(path)
     var p = with_str_clone_ref(path)
-    if p[0] != 47:
+    if not runtime_path_is_absolute(p):
         let cwd = with_getenv_str("PWD")
         if cwd.len() > 0:
             p = cwd ++ "/" ++ p
     let parts: Vec[str] = Vec.new()
-    let is_abs = p.len() > 0 and p[0] == 47
+    let is_abs = runtime_path_is_absolute(p)
+    let root_parts = runtime_path_root_part_count(p)
     var start = 0
     for i in 0..(p.len() as i32 + 1):
         let at_end = i == p.len() as i32
@@ -1252,14 +1253,14 @@ pub fn resolve_canonical_module_key(path: &str) -> str:
                     keep = false
                 if part == "..":
                     keep = false
-                    if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
+                    if parts.len() > root_parts and parts.get(parts.len() - 1) != "..":
                         parts.pop()
                     else if not is_abs:
                         parts.push(with_str_clone_ref(part))
                 if keep:
                     parts.push(part)
             start = i + 1
-    var out = if is_abs: "/" else: ""
+    var out = runtime_path_root_prefix(p)
     for pi in 0..parts.len() as i32:
         if pi > 0:
             out = out ++ "/"
