@@ -221,6 +221,10 @@ pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     __stdinp = __acrt_iob_func(0 as u32)
     __stdoutp = __acrt_iob_func(1 as u32)
     __stderrp = __acrt_iob_func(2 as u32)
+    // PWD is the runtime's on Windows (#1082; see windows_x86_64.w).
+    var cwd: [4096]u8 = [0 as u8; 4096]
+    if rt_getcwd(&raw mut cwd as *mut [4096]u8 as *mut u8, 4096) == 0:
+        let _pwd = win_setenv("PWD", with_str_from_cstr(&cwd as *const [4096]u8 as *const u8))
 
 pub fn rt_args() -> (*const *const u8, i32):
     (rt_argv_raw as *const *const u8, rt_argc)
@@ -974,7 +978,18 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
     if cwd.len() > 0:
         let _ = win_str_to_utf16_buf(cwd, &raw mut cwdw as *mut [4096]u16 as *mut u16, 4096)
         cwdp = &cwdw as *const [4096]u16 as *const u16
+    // PWD follows the child's directory (#1082; see windows_x86_64.w).
+    var old_pwd = ""
+    var pwd_set = false
+    if cwd.len() > 0:
+        let prev = rt_getenv(c"PWD".ptr)
+        if prev as i64 != 0:
+            old_pwd = with_str_from_cstr(prev)
+        let _pwd = win_setenv("PWD", cwd)
+        pwd_set = true
     let ok = CreateProcessW(0 as *const u16, cmd as *mut u16, 0 as *mut u8, 0 as *mut u8, inherit, 0 as u32, 0 as *mut u8, cwdp, &raw mut startup as *mut [104]u8 as *mut u8, &raw mut proc_info as *mut [24]u8 as *mut u8)
+    if pwd_set:
+        let _restore = win_setenv("PWD", old_pwd)
     with_free(cmd)
     if has_stdin and stdin_h != 0 and stdin_h != INVALID_HANDLE_VALUE:
         let _ = CloseHandle(stdin_h)
