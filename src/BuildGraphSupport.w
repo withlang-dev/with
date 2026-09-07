@@ -14,7 +14,7 @@ pub fn build_graph_output_path(root: &str, target: &BuildGraphTarget, output_pat
         return runtime_str_clone(output_path)
     if target.output.len() > 0:
         return build_graph_resolve_project_path(root, target.output)
-    resolve_join(resolve_join(root, "out/bin"), target.name)
+    runtime_program_path(resolve_join(resolve_join(root, "out/bin"), target.name))
 
 pub fn build_graph_library_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: i32) -> str:
     if output_path.len() > 0:

@@ -2803,7 +2803,11 @@ fn ws_build_plan(state: &WsState, project_root: &str) -> WorkspaceCompilePlan:
     let output_kind = state.options.output_kind as i32
     var final_output = with_str_clone_ref(state.options.output_path)
     if final_output.len() == 0:
+        // Windows shells run a file only by its extension: the default
+        // program path carries `.exe` there (compiler.Runtime's rule).
         final_output = "out/bin/" ++ state.name
+        if with_sysinfo_os() == "Windows":
+            final_output = final_output ++ ".exe"
         if output_kind == 1:
             final_output = "out/obj/" ++ state.name ++ ".o"
         else if output_kind == 2:
